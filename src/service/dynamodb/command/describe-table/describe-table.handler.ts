@@ -7,11 +7,13 @@ import type { CommandHandler } from "../../../../command/command-handler.js";
 import type {
   DynamoDbTableName,
   SimDynamoDbTable,
-} from "../../dynamodb-table.js";
+} from "../../table/dynamodb-table.js";
 import { jitter } from "../../../../util/sleep.js";
 
 /**
  * DynamoDB DescribeTableCommand handler.
+ *
+ * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/dynamodb/command/DescribeTableCommand/
  */
 export class DescribeTableCommandHandler implements CommandHandler<
   DescribeTableCommand,

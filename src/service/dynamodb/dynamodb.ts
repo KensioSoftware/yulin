@@ -5,12 +5,18 @@ import type {
   DescribeTableOutput,
   ListTablesCommand,
   ListTablesOutput,
+  PutItemCommand,
+  PutItemCommandOutput,
 } from "@aws-sdk/client-dynamodb";
-import type { DynamoDbTableName, SimDynamoDbTable } from "./dynamodb-table.js";
+import type {
+  DynamoDbTableName,
+  SimDynamoDbTable,
+} from "./table/dynamodb-table.js";
 import { CreateTableCommandHandler } from "./command/create-table/create-table.handler.js";
 import type { BackgroundScheduler } from "../../util/background/background.js";
 import { ListTablesCommandHandler } from "./command/list-tables/list-tables.handler.js";
 import { DescribeTableCommandHandler } from "./command/describe-table/describe-table.handler.js";
+import { PutItemCommandHandler } from "./command/put-item/put-item.handler.js";
 
 /**
  * Simulated DynamoDB. Handles SDK commands. Emulates AWS behaviour and state.
@@ -41,6 +47,14 @@ export class SimDynamoDb {
    */
   async describeTable(cmd: DescribeTableCommand): Promise<DescribeTableOutput> {
     const handler = new DescribeTableCommandHandler(this.tables);
+    return await handler.handle(cmd);
+  }
+
+  /**
+   * Handle a Put Item Command from the SDK.
+   */
+  async putItem(cmd: PutItemCommand): Promise<PutItemCommandOutput> {
+    const handler = new PutItemCommandHandler(this.tables);
     return await handler.handle(cmd);
   }
 }

@@ -22,7 +22,7 @@ export class BackgroundTasks
    */
   schedule(task: BackgroundTask): void {
     const promise = new Promise<void>((resolve) => {
-      setTimeout(resolve, Math.random() * 3);
+      setTimeout(resolve, Math.random());
     })
       .then(task)
       .then(

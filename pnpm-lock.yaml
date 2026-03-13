@@ -22,8 +22,8 @@ importers:
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.0.1(jiti@2.6.1))
       '@kensio/smartass':
-        specifier: ^0.1.4
-        version: 0.1.4
+        specifier: ^0.1.6
+        version: 0.1.6
       '@smithy/smithy-client':
         specifier: ^4.12.1
         version: 4.12.1
@@ -509,8 +509,8 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@kensio/smartass@0.1.4':
-    resolution: {integrity: sha512-PSNA19ncqt0u6hHwZI1+2yLYp4mu/3jwvyTIp5K1tDUPcZ7DIo5mYfZ8KxXTOydN9yFP6LG2u1xqSqOs6+NqJQ==}
+  '@kensio/smartass@0.1.6':
+    resolution: {integrity: sha512-fxU3sM0L50XuZJFXuiFMOXfg0OFsYGJ+gI5PIqC0ZK3Nl/NUdExkiNmFspe183sJHUvCJrI/zURlkq7dI2pQTw==}
     engines: {node: '>=24.14.0'}
 
   '@rollup/rollup-android-arm-eabi@4.59.0':
@@ -2388,7 +2388,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@kensio/smartass@0.1.4': {}
+  '@kensio/smartass@0.1.6': {}
 
   '@rollup/rollup-android-arm-eabi@4.59.0':
     optional: true

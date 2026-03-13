@@ -6,20 +6,24 @@ import {
   assertInstanceOf,
   assertThrowsError,
 } from "@kensio/smartass";
+import { BackgroundTasks } from "../../../util/background/background.js";
 
 describe("SimDynamoDbTable", () => {
   it("throws when TableName is undefined", () => {
     const command = new CreateTableCommand({ TableName: undefined });
 
-    assertThrowsError(() => new SimDynamoDbTable(command));
+    assertThrowsError(
+      () => new SimDynamoDbTable(command, new BackgroundTasks()),
+    );
   });
 
   it("creates table with CREATING status", () => {
     const command = new CreateTableCommand({
       TableName: "test-table",
+      KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
     });
 
-    const table = new SimDynamoDbTable(command);
+    const table = new SimDynamoDbTable(command, new BackgroundTasks());
 
     assertIdentical(table.tableName, "test-table");
     assertIdentical(table.status, "CREATING");
@@ -29,9 +33,10 @@ describe("SimDynamoDbTable", () => {
   it("activates table", async () => {
     const command = new CreateTableCommand({
       TableName: "test-table",
+      KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
     });
 
-    const table = new SimDynamoDbTable(command);
+    const table = new SimDynamoDbTable(command, new BackgroundTasks());
     assertIdentical(table.status, "CREATING");
 
     await table.activate();

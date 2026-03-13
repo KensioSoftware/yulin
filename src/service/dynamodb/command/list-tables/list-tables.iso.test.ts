@@ -12,9 +12,24 @@ describe("DynamoDB ListTablesCommand", () => {
     const simDynamoDb = simAccount.getDynamoDb();
 
     await Promise.all([
-      simDynamoDb.createTable(new CreateTableCommand({ TableName: "TableA" })),
-      simDynamoDb.createTable(new CreateTableCommand({ TableName: "TableB" })),
-      simDynamoDb.createTable(new CreateTableCommand({ TableName: "TableC" })),
+      simDynamoDb.createTable(
+        new CreateTableCommand({
+          TableName: "TableA",
+          KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+        }),
+      ),
+      simDynamoDb.createTable(
+        new CreateTableCommand({
+          TableName: "TableB",
+          KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+        }),
+      ),
+      simDynamoDb.createTable(
+        new CreateTableCommand({
+          TableName: "TableC",
+          KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+        }),
+      ),
     ]);
 
     const listTablesOutput = await simDynamoDb.listTables(
@@ -35,9 +50,24 @@ describe("DynamoDB ListTablesCommand", () => {
     const simDynamoDb = simAccount.getDynamoDb();
 
     await Promise.all([
-      simDynamoDb.createTable(new CreateTableCommand({ TableName: "TableA" })),
-      simDynamoDb.createTable(new CreateTableCommand({ TableName: "TableB" })),
-      simDynamoDb.createTable(new CreateTableCommand({ TableName: "TableC" })),
+      simDynamoDb.createTable(
+        new CreateTableCommand({
+          TableName: "TableA",
+          KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+        }),
+      ),
+      simDynamoDb.createTable(
+        new CreateTableCommand({
+          TableName: "TableB",
+          KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+        }),
+      ),
+      simDynamoDb.createTable(
+        new CreateTableCommand({
+          TableName: "TableC",
+          KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+        }),
+      ),
     ]);
 
     const listTablesOutput = await simDynamoDb.listTables(
@@ -57,9 +87,24 @@ describe("DynamoDB ListTablesCommand", () => {
     const simDynamoDb = simAccount.getDynamoDb();
 
     await Promise.all([
-      simDynamoDb.createTable(new CreateTableCommand({ TableName: "TableA" })),
-      simDynamoDb.createTable(new CreateTableCommand({ TableName: "TableB" })),
-      simDynamoDb.createTable(new CreateTableCommand({ TableName: "TableC" })),
+      simDynamoDb.createTable(
+        new CreateTableCommand({
+          TableName: "TableA",
+          KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+        }),
+      ),
+      simDynamoDb.createTable(
+        new CreateTableCommand({
+          TableName: "TableB",
+          KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+        }),
+      ),
+      simDynamoDb.createTable(
+        new CreateTableCommand({
+          TableName: "TableC",
+          KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+        }),
+      ),
     ]);
 
     const listTablesOutput = await simDynamoDb.listTables(
