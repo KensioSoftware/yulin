@@ -2,9 +2,11 @@
   "name": "@kensio/yulin",
   "version": "0.0.1",
   "description": "AWS system behaviour simulation for isolated unit testing",
+  "repository": "https://github.com/KensioSoftware/yulin",
   "type": "module",
   "main": "index.js",
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
     "fmt": "eslint --fix '{src,test}/**/*.{ts,js}' && prettier --write '{src,test}/**/*.{ts,js,json,md,css,html,yml,yaml}'",
     "lint": "eslint '{src,test}/**/*.{ts,js}' && prettier --check '{src,test}/**/*.{ts,js,json,md,css,html,yml,yaml}'",
     "test": "vitest run",
@@ -13,7 +15,10 @@
   "keywords": [
     "aws",
     "test",
-    "mock"
+    "mock",
+    "emulator",
+    "simulator",
+    "isolated"
   ],
   "author": "Kensio Software",
   "license": "AGPL-3.0",
