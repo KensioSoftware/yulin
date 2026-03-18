@@ -1,0 +1,65 @@
+{
+  "name": "@kensio/yulin",
+  "version": "0.0.1",
+  "description": "AWS system behaviour simulation for isolated unit testing",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "fmt": "eslint --fix '{src,test}/**/*.{ts,js}' && prettier --write '{src,test}/**/*.{ts,js,json,md,css,html,yml,yaml}'",
+    "lint": "eslint '{src,test}/**/*.{ts,js}' && prettier --check '{src,test}/**/*.{ts,js,json,md,css,html,yml,yaml}'",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "keywords": [
+    "aws",
+    "test",
+    "mock"
+  ],
+  "author": "Kensio Software",
+  "license": "AGPL-3.0",
+  "packageManager": "pnpm@10.32.1",
+  "devDependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1001.0",
+    "@aws-sdk/client-s3": "^3.1001.0",
+    "@eslint/js": "^10.0.1",
+    "@kensio/smartass": "^0.1.4",
+    "@smithy/smithy-client": "^4.12.1",
+    "@smithy/types": "^4.13.0",
+    "@types/eslint-plugin-security": "^3.0.1",
+    "@types/lodash-es": "^4.17.12",
+    "@types/node": "^25.3.0",
+    "@vitest/coverage-v8": "4.0.18",
+    "@vitest/eslint-plugin": "^1.6.9",
+    "aws-sdk-client-mock": "^4.1.0",
+    "eslint": "^10.0.1",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-jsdoc": "^62.7.1",
+    "eslint-plugin-no-secrets": "^2.2.2",
+    "eslint-plugin-security": "^4.0.0",
+    "eslint-plugin-unicorn": "^63.0.0",
+    "globals": "^17.3.0",
+    "jiti": "^2.6.1",
+    "prettier": "^3.8.1",
+    "typescript-eslint": "^8.56.0",
+    "vitest": "^4.0.18"
+  },
+  "peerDependencies": {
+    "@aws-sdk/client-dynamodb": "^3.1001.0",
+    "@aws-sdk/client-s3": "^3.1001.0",
+    "@smithy/smithy-client": "^4.12.1"
+  },
+  "peerDependenciesMeta": {
+    "@smithy/smithy-client": {
+      "optional": true
+    },
+    "@aws-sdk/client-s3": {
+      "optional": true
+    },
+    "@aws-sdk/client-dynamodb": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "lodash-es": "^4.17.23"
+  }
+}
