@@ -6,11 +6,13 @@ import type {
 import type {
   DynamoDbTableName,
   SimDynamoDbTable,
-} from "../../dynamodb-table.js";
+} from "../../table/dynamodb-table.js";
 import { jitter } from "../../../../util/sleep.js";
 
 /**
  * Simulated DynamoDB ListTablesCommand handler.
+ *
+ * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/dynamodb/command/ListTablesCommand/
  */
 export class ListTablesCommandHandler implements CommandHandler<
   ListTablesCommand,

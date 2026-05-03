@@ -1,5 +1,5 @@
-import type { DynamoDbTableName } from "../../dynamodb-table.js";
-import { SimDynamoDbTable } from "../../dynamodb-table.js";
+import type { DynamoDbTableName } from "../../table/dynamodb-table.js";
+import { SimDynamoDbTable } from "../../table/dynamodb-table.js";
 import {
   type CreateTableCommand,
   type CreateTableCommandOutput,
@@ -11,6 +11,8 @@ import { jitter } from "../../../../util/sleep.js";
 
 /**
  * DynamoDB CreateTableCommand handler.
+ *
+ * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/dynamodb/command/CreateTableCommand/
  */
 export class CreateTableCommandHandler implements CommandHandler<
   CreateTableCommand,
@@ -39,7 +41,7 @@ export class CreateTableCommandHandler implements CommandHandler<
 
     await jitter();
 
-    const table = new SimDynamoDbTable(cmd);
+    const table = new SimDynamoDbTable(cmd, this.background);
     this.tables.set(tableName, table);
 
     this.background.schedule(() => table.activate());

@@ -12,5 +12,5 @@ export async function sleep(ms = 0): Promise<void> {
  * operations completing in a non-deterministic order.
  */
 export async function jitter(): Promise<void> {
-  await sleep(Math.random() * 2);
+  await sleep(Math.random());
 }
