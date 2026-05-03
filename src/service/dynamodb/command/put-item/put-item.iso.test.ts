@@ -221,4 +221,134 @@ describe("DynamoDB PutItemCommand", () => {
       "DynamoDB Item sort key orderId is undefined",
     );
   });
+
+  it("rejects on invalid partition key type", async () => {
+    const simAccount = new SimAwsAccount();
+    const simDynamoDb = simAccount.getDynamoDb();
+
+    await simDynamoDb.createTable(
+      new CreateTableCommand({
+        TableName: "FooTable",
+        KeySchema: [{ AttributeName: "userId", KeyType: "HASH" }],
+      }),
+    );
+
+    const error = await assertThrowsErrorAsync(async () => {
+      await simDynamoDb.putItem(
+        new PutItemCommand({
+          TableName: "FooTable",
+          Item: {
+            userId: { BOOL: true },
+          },
+        }),
+      );
+    });
+
+    assertInstanceOf(error, Error);
+    assertStringIncludes(
+      error.message,
+      "DynamoDB Item partition key userId must be string or number",
+    );
+  });
+
+  it("rejects on invalid sort key type", async () => {
+    const simAccount = new SimAwsAccount();
+    const simDynamoDb = simAccount.getDynamoDb();
+
+    await simDynamoDb.createTable(
+      new CreateTableCommand({
+        TableName: "FooTable",
+        KeySchema: [
+          { AttributeName: "userId", KeyType: "HASH" },
+          { AttributeName: "orderId", KeyType: "RANGE" },
+        ],
+      }),
+    );
+
+    const error = await assertThrowsErrorAsync(async () => {
+      await simDynamoDb.putItem(
+        new PutItemCommand({
+          TableName: "FooTable",
+          Item: {
+            userId: { S: "ff8cc151-1b17-4d8e-8f98-ad631b6aefa7" },
+            orderId: { BOOL: true },
+          },
+        }),
+      );
+    });
+
+    assertInstanceOf(error, Error);
+    assertStringIncludes(
+      error.message,
+      "DynamoDB Item sort key orderId must be string or number",
+    );
+  });
+
+  it("rejects undefined table name", async () => {
+    const simAccount = new SimAwsAccount();
+    const simDynamoDb = simAccount.getDynamoDb();
+
+    const error = await assertThrowsErrorAsync(async () => {
+      await simDynamoDb.putItem(
+        new PutItemCommand({
+          TableName: undefined,
+          Item: {
+            userId: { S: "57bec277-9f94-4671-a592-d1c81df9860e" },
+          },
+        }),
+      );
+    });
+
+    assertInstanceOf(error, Error);
+    assertStringIncludes(
+      error.message,
+      "PutItemCommand.input.TableName is required",
+    );
+  });
+
+  it("rejects non-existent table", async () => {
+    const simAccount = new SimAwsAccount();
+    const simDynamoDb = simAccount.getDynamoDb();
+
+    const error = await assertThrowsErrorAsync(async () => {
+      await simDynamoDb.putItem(
+        new PutItemCommand({
+          TableName: "FooTable",
+          Item: {
+            userId: { S: "6aaaba1a-cfe8-449c-8a7b-760e4f8025cb" },
+          },
+        }),
+      );
+    });
+
+    assertInstanceOf(error, Error);
+    assertStringIncludes(error.message, "No DynamoDB Table named FooTable");
+  });
+
+  it("rejects missing item", async () => {
+    const simAccount = new SimAwsAccount();
+    const simDynamoDb = simAccount.getDynamoDb();
+
+    await simDynamoDb.createTable(
+      new CreateTableCommand({
+        TableName: "FooTable",
+        KeySchema: [{ AttributeName: "userId", KeyType: "HASH" }],
+      }),
+    );
+
+    const error = await assertThrowsErrorAsync(async () => {
+      await simDynamoDb.putItem(
+        new PutItemCommand({
+          TableName: "FooTable",
+          Item: undefined,
+        }),
+      );
+    });
+
+    assertInstanceOf(error, Error);
+    assertStringIncludes(
+      error.message,
+      "PutItemCommand.input.Item is required",
+    );
+  });
 });
