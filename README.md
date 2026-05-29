@@ -1,6 +1,6 @@
 # yulin
 
-AWS system behaviour simulation for isolated unit testing
+AWS system behaviour simulation for isolated unit testing, local development and CI.
 
 ## Installation
 

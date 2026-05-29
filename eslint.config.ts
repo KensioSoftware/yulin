@@ -14,6 +14,10 @@ import tseslint from "typescript-eslint";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+const securityRecommended = security.configs.recommended as Parameters<
+  typeof defineConfig
+>[0];
+
 export default defineConfig(
   // ── Global ignores ──────────────────────────────────────
   {
@@ -76,6 +80,11 @@ export default defineConfig(
           leadingUnderscore: "allow",
         },
         {
+          selector: ["property", "objectLiteralProperty", "typeProperty"],
+          modifiers: ["requiresQuotes"],
+          format: null,
+        },
+        {
           selector: "default",
           format: ["camelCase"],
           leadingUnderscore: "allow",
@@ -103,10 +112,8 @@ export default defineConfig(
     },
   },
 
-  // ── Security (low cost security checks) ────────────────
-  // TODO: Remove cast when eslint-plugin-security fixes defineConfig() types
-  // https://github.com/eslint-community/eslint-plugin-security/issues/175
-  security.configs.recommended as any,
+  // ── Security (low-cost security checks) ────────────────
+  securityRecommended,
 
   // ── Unicorn (modern JS best practices) ──────────────────
   // https://github.com/sindresorhus/eslint-plugin-unicorn?tab=readme-ov-file#recommended-config
@@ -116,6 +123,12 @@ export default defineConfig(
       "unicorn/better-regex": "warn",
       "unicorn/prevent-abbreviations": "off",
       "unicorn/no-null": "off",
+    },
+  },
+  {
+    files: ["**/index.ts"],
+    rules: {
+      "unicorn/no-empty-file": "off",
     },
   },
 
