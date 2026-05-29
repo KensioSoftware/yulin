@@ -1,4 +1,4 @@
-export { cloudFrontRequestFactory } from "./factory/cloudfront-functions.factory.js";
+export { cloudFrontViewerRequestEventFactory } from "./factory/cloudfront-functions.factory.js";
 export type {
   CloudFrontCookies,
   CloudFrontEvent,

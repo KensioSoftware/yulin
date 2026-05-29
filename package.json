@@ -32,6 +32,11 @@
     },
     "./package.json": "./package.json"
   },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "author": "Kensio Software",
   "license": "AGPL-3.0",
   "packageManager": "pnpm@11.4.0",
@@ -39,6 +44,7 @@
     "@aws-sdk/client-dynamodb": "^3.1056.0",
     "@aws-sdk/client-s3": "^3.1056.0",
     "@eslint/js": "^10.0.1",
+    "@faker-js/faker": "^10.4.0",
     "@kensio/smartass": "^1.0.0",
     "@smithy/smithy-client": "^4.13.5",
     "@smithy/types": "^4.14.2",
