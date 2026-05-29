@@ -30,6 +30,10 @@
       "types": "./dist/service/cloudfront/index.d.ts",
       "import": "./dist/service/cloudfront/index.js"
     },
+    "./cloudfront/globals": {
+      "types": "./dist/service/cloudfront/globals.d.ts",
+      "import": "./dist/service/cloudfront/globals.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [

@@ -131,6 +131,13 @@ export default defineConfig(
       "unicorn/no-empty-file": "off",
     },
   },
+  {
+    files: ["src/**/globals.{ts,d.ts}", "src/**/*.namespace.ts"],
+    rules: {
+      "unicorn/require-module-specifiers": "off",
+      "@typescript-eslint/no-namespace": "off",
+    },
+  },
 
   // ── Vitest (test files only) ────────────────────────────
   {
