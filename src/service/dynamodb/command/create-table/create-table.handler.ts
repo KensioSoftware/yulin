@@ -8,6 +8,7 @@ import {
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import type { CommandHandler } from "../../../../command/command-handler.js";
 import { jitter } from "../../../../util/sleep.js";
+import { assertDefined } from "../../../../util/defined.js";
 
 /**
  * DynamoDB CreateTableCommand handler.
@@ -27,9 +28,7 @@ export class CreateTableCommandHandler implements CommandHandler<
    * Handle creation of a new DynamoDB Table.
    */
   async handle(cmd: CreateTableCommand): Promise<CreateTableCommandOutput> {
-    if (cmd.input.TableName === undefined) {
-      throw new Error("CreateTableCommand.input.TableName is required");
-    }
+    assertDefined(cmd.input.TableName, "CreateTableCommand.input.TableName");
 
     const tableName = cmd.input.TableName as DynamoDbTableName;
     if (this.tables.has(tableName)) {
