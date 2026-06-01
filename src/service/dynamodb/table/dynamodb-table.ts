@@ -13,7 +13,8 @@ export type DynamoDbTableName = Brand<string, "DynamoDbTableName">;
 export class SimDynamoDbTable {
   public readonly creationDateTime: Date;
 
-  private readonly _tableName: DynamoDbTableName;
+  public readonly tableName: DynamoDbTableName;
+
   private readonly _keySchema: DynamoDbKeySchema;
   private _status: TableStatus = "CREATING";
 
@@ -27,7 +28,7 @@ export class SimDynamoDbTable {
       createCommand.input.TableName,
       "createCommand.input.TableName",
     );
-    this._tableName = createCommand.input.TableName as DynamoDbTableName;
+    this.tableName = createCommand.input.TableName as DynamoDbTableName;
     this.creationDateTime = new Date();
 
     if (
@@ -45,13 +46,6 @@ export class SimDynamoDbTable {
   activate(): Promise<void> {
     this._status = "ACTIVE";
     return Promise.resolve();
-  }
-
-  /**
-   * Get the DynamoDB table name.
-   */
-  public get tableName(): DynamoDbTableName {
-    return this._tableName;
   }
 
   /**

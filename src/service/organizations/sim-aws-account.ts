@@ -5,6 +5,7 @@ import {
 } from "../../util/background/background.js";
 import { SimDynamoDb } from "../dynamodb/dynamodb.js";
 import { Memo } from "../../util/memo/memo.js";
+import { SimS3 } from "../s3/s3.js";
 
 /**
  * Container for simulated AWS services.
@@ -32,5 +33,12 @@ export class SimAwsAccount {
       "DynamoDB",
       () => new SimDynamoDb(this.background),
     );
+  }
+
+  /**
+   * Get the simulated S3 service in this simulated Account.
+   */
+  getS3(): SimS3 {
+    return this.memo.getOrCreate("S3", () => new SimS3());
   }
 }
