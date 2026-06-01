@@ -19,6 +19,5 @@ minimumReleaseAgeExclude:
   - '@aws-sdk/nested-clients@3.997.13'
   - '@aws-sdk/signature-v4-multi-region@3.996.30'
   - '@aws-sdk/token-providers@3.1056.0'
-  - '@kensio/smartass@1.0.0'
   - '@kensio/smartass@1.0.2'
 useNodeVersion: 24.16.0
