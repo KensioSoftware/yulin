@@ -1,6 +1,6 @@
 import { describe, it } from "vitest";
 import { Memo } from "./memo.js";
-import { assertIdentical } from "@kensio/smartass";
+import { assertFalse, assertIdentical } from "@kensio/smartass";
 
 describe("Memo", () => {
   it("creates and caches values", () => {
@@ -36,7 +36,7 @@ describe("Memo", () => {
   it("checks key existence", () => {
     const memo = new Memo<string>();
 
-    assertIdentical(memo.has("key"), false);
+    assertFalse(memo.has("key"));
     memo.getOrCreate("key", () => "value");
     assertIdentical(memo.has("key"), true);
   });
