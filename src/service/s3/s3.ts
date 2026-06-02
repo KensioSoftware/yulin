@@ -2,11 +2,21 @@ import type { S3BucketName, SimS3Bucket } from "./bucket/s3-bucket.js";
 import type {
   CreateBucketCommand,
   CreateBucketCommandOutput,
+  GetObjectCommand,
+  GetObjectCommandOutput,
   ListBucketsCommand,
   ListBucketsCommandOutput,
+  ListObjectsCommand,
+  ListObjectsCommandOutput,
+  PutObjectCommand,
+  PutObjectCommandOutput,
 } from "@aws-sdk/client-s3";
 import { CreateBucketCommandHandler } from "./command/create-bucket/create-bucket.handler.js";
 import { ListBucketsCommandHandler } from "./command/list-buckets/list-buckets.handler.js";
+import { assertDefined } from "../../util/defined.js";
+import { PutObjectCommandHandler } from "./command/put-object/put-object.handler.js";
+import { GetObjectCommandHandler } from "./command/get-object/get-object.handler.js";
+import { ListObjectsCommandHandler } from "./command/list-objects/list-objects.handler.js";
 
 /**
  * Simulated S3. Handles SDK commands. Emulates AWS behaviour and state.
@@ -32,5 +42,40 @@ export class SimS3 {
   ): Promise<ListBucketsCommandOutput> {
     const handler = new ListBucketsCommandHandler(this.buckets);
     return await handler.handle(cmd);
+  }
+
+  /**
+   * Handle a Put Object Command from the SDK.
+   */
+  async putObject(cmd: PutObjectCommand): Promise<PutObjectCommandOutput> {
+    const handler = new PutObjectCommandHandler(this.buckets);
+    return await handler.handle(cmd);
+  }
+
+  /**
+   * Handle a Get Object Command from the SDK.
+   */
+  async getObject(cmd: GetObjectCommand): Promise<GetObjectCommandOutput> {
+    const handler = new GetObjectCommandHandler(this.buckets);
+    return await handler.handle(cmd);
+  }
+
+  /**
+   * Handle a List Objects Command from the SDK.
+   */
+  async listObjects(
+    cmd: ListObjectsCommand,
+  ): Promise<ListObjectsCommandOutput> {
+    const handler = new ListObjectsCommandHandler(this.buckets);
+    return await handler.handle(cmd);
+  }
+
+  /**
+   * Get a simulated S3 Bucket instance by name.
+   */
+  getSimBucketByName(bucketName: S3BucketName): SimS3Bucket {
+    const simBucket = this.buckets.get(bucketName);
+    assertDefined(simBucket, `Simulated S3 Bucket named '${bucketName}'`);
+    return simBucket;
   }
 }
