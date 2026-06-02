@@ -109,4 +109,28 @@ describe("S3 PutObjectCommand", () => {
 
     assertStringIncludes(error.message, "No S3 Bucket named bucket-a");
   });
+
+  it("rejects unsupported body type", async () => {
+    const simAccount = new SimAwsAccount();
+    const simS3 = simAccount.getS3();
+
+    const bucketName = "bucket-a" as S3BucketName;
+
+    await simS3.createBucket(new CreateBucketCommand({ Bucket: bucketName }));
+
+    const error = await assertThrowsErrorAsync(async () => {
+      await simS3.putObject(
+        new PutObjectCommand({
+          Bucket: bucketName,
+          Key: "foo.txt",
+          Body: 123 as unknown as Uint8Array,
+        }),
+      );
+    });
+
+    assertStringIncludes(
+      error.message,
+      "PutObjectCommand.input.Body must be a string or Uint8Array",
+    );
+  });
 });
