@@ -1,11 +1,9 @@
 import type { CreateBucketCommand } from "@aws-sdk/client-s3";
 import { assertDefined } from "../../../util/defined.js";
 import type { Brand } from "../../../util/brand.type.js";
-import {
-  MemoryS3BucketStorage,
-  type SimS3BucketStorage,
-} from "../storage/s3-bucket-storage.js";
+import type { SimS3BucketStorage } from "../storage/s3-bucket-storage.js";
 import type { SimS3Object } from "../object/s3-object.js";
+import { MemoryS3BucketStorage } from "../storage/s3-memory-storage.js";
 
 export type S3BucketName = Brand<string, "S3BucketName">;
 
@@ -17,21 +15,21 @@ export class SimS3Bucket {
 
   constructor(
     createCommand: CreateBucketCommand,
-    private readonly storage: SimS3BucketStorage = new MemoryS3BucketStorage(),
+    private storage: SimS3BucketStorage = new MemoryS3BucketStorage(),
   ) {
     assertDefined(createCommand.input.Bucket, "createCommand.input.Bucket");
     this.bucketName = createCommand.input.Bucket;
   }
 
-  // /**
-  //  * Change the storage implementation for this simulated S3 Bucket.
-  //  */
-  // configureSimStorage(storage: SimS3BucketStorage): void {
-  //   if (!this.storage.allowChangeStorage()) {
-  //     throw new Error("Cannot change simulated S3 storage implementation");
-  //   }
-  //   this.storage = storage;
-  // }
+  /**
+   * Change the storage implementation for this simulated S3 Bucket.
+   */
+  configureSimStorage(storage: SimS3BucketStorage): void {
+    if (!this.storage.allowChangeStorage()) {
+      throw new Error("Cannot change simulated S3 storage implementation");
+    }
+    this.storage = storage;
+  }
 
   /**
    * Put a simulated S3 Object into storage.
