@@ -1,5 +1,4 @@
 import { describe, it } from "vitest";
-import { SimAwsAccount } from "../../../organizations/sim-aws-account.js";
 import {
   CreateTableCommand,
   DescribeTableCommand,
@@ -12,11 +11,12 @@ import {
   assertOneOf,
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
+import { SimAws } from "../../../aws/sim-aws.js";
 
 describe("DynamoDB DescribeTableCommand", () => {
   it("describes DynamoDB Table", async () => {
-    const simAccount = new SimAwsAccount();
-    const simDynamoDb = simAccount.getDynamoDb();
+    const simAws = new SimAws();
+    const simDynamoDb = simAws.dynamoDb();
 
     await Promise.all([
       simDynamoDb.createTable(
@@ -48,7 +48,7 @@ describe("DynamoDB DescribeTableCommand", () => {
     assertNonNullable(describeTableOutput.Table.TableStatus);
     assertOneOf(describeTableOutput.Table.TableStatus, ["CREATING", "ACTIVE"]);
 
-    await simAccount.backgroundTasksComplete();
+    await simAws.backgroundTasksComplete();
 
     const describeAgain = await simDynamoDb.describeTable(
       new DescribeTableCommand({ TableName: "TableB" }),
@@ -58,8 +58,8 @@ describe("DynamoDB DescribeTableCommand", () => {
   });
 
   it("throws on undefined Table name", async () => {
-    const simAccount = new SimAwsAccount();
-    const simDynamoDb = simAccount.getDynamoDb();
+    const simAws = new SimAws();
+    const simDynamoDb = simAws.dynamoDb();
 
     await assertThrowsErrorAsync(async () =>
       simDynamoDb.describeTable(
@@ -69,8 +69,8 @@ describe("DynamoDB DescribeTableCommand", () => {
   });
 
   it("throws on describing non-existent DynamoDB Table", async () => {
-    const simAccount = new SimAwsAccount();
-    const simDynamoDb = simAccount.getDynamoDb();
+    const simAws = new SimAws();
+    const simDynamoDb = simAws.dynamoDb();
 
     const error = await assertThrowsErrorAsync(async () =>
       simDynamoDb.describeTable(

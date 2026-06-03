@@ -1,6 +1,6 @@
 import { describe, it } from "vitest";
 import { CreateTableCommand } from "@aws-sdk/client-dynamodb";
-import { SimDynamoDbTable } from "./dynamodb-table.js";
+import { makeSimDynamoDbTableArn, SimDynamoDbTable } from "./dynamodb-table.js";
 import {
   assertIdentical,
   assertInstanceOf,
@@ -13,7 +13,12 @@ describe("SimDynamoDbTable", () => {
     const command = new CreateTableCommand({ TableName: undefined });
 
     assertThrowsError(
-      () => new SimDynamoDbTable(command, new BackgroundTasks()),
+      () =>
+        new SimDynamoDbTable(
+          command,
+          makeSimDynamoDbTableArn(),
+          new BackgroundTasks(),
+        ),
     );
   });
 
@@ -23,7 +28,11 @@ describe("SimDynamoDbTable", () => {
       KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
     });
 
-    const table = new SimDynamoDbTable(command, new BackgroundTasks());
+    const table = new SimDynamoDbTable(
+      command,
+      makeSimDynamoDbTableArn(),
+      new BackgroundTasks(),
+    );
 
     assertIdentical(table.tableName, "test-table");
     assertIdentical(table.status, "CREATING");
@@ -36,7 +45,11 @@ describe("SimDynamoDbTable", () => {
       KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
     });
 
-    const table = new SimDynamoDbTable(command, new BackgroundTasks());
+    const table = new SimDynamoDbTable(
+      command,
+      makeSimDynamoDbTableArn(),
+      new BackgroundTasks(),
+    );
     assertIdentical(table.status, "CREATING");
 
     await table.activate();

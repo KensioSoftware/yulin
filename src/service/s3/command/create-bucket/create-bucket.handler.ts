@@ -4,7 +4,7 @@ import {
   type CreateBucketCommandOutput,
   BucketAlreadyExists,
 } from "@aws-sdk/client-s3";
-import { type S3BucketName, SimS3Bucket } from "../../bucket/s3-bucket.js";
+import { type SimS3BucketName, SimS3Bucket } from "../../bucket/s3-bucket.js";
 import { assertDefined } from "../../../../util/defined.js";
 import { jitter } from "../../../../util/sleep.js";
 
@@ -25,7 +25,7 @@ export class CreateBucketCommandHandler implements CommandHandler<
   async handle(cmd: CreateBucketCommand): Promise<CreateBucketCommandOutput> {
     assertDefined(cmd.input.Bucket, "CreateBucketCommand.input.Bucket");
 
-    const bucketName = cmd.input.Bucket as S3BucketName;
+    const bucketName = cmd.input.Bucket as SimS3BucketName;
     if (this.buckets.has(bucketName)) {
       throw new BucketAlreadyExists({
         message: `S3 Bucket ${bucketName} already exists`,

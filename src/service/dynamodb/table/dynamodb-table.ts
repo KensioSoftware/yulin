@@ -4,6 +4,11 @@ import { DynamoDbKeySchema } from "./dynamodb-key-schema.js";
 import { assertDefined } from "../../../util/defined.js";
 import type { DynamoDbItem } from "../item/dynamodb-item.js";
 import type { BackgroundScheduler } from "../../../util/background/background.js";
+import {
+  makeSimArn,
+  type SimArn,
+  type SimArnComponents,
+} from "../../aws/arn.js";
 
 export type DynamoDbTableName = Brand<string, "DynamoDbTableName">;
 
@@ -22,6 +27,7 @@ export class SimDynamoDbTable {
 
   constructor(
     createCommand: CreateTableCommand,
+    public readonly simArn: SimArn,
     private readonly background: BackgroundScheduler,
   ) {
     assertDefined(
@@ -66,4 +72,17 @@ export class SimDynamoDbTable {
     });
     return Promise.resolve();
   }
+}
+
+/**
+ * Generate a fake ARN for a DynamoDB Table.
+ */
+export function makeSimDynamoDbTableArn(
+  overrides?: Exclude<Partial<SimArnComponents>, "service" | "resourceType">,
+): SimArn {
+  return makeSimArn({
+    service: "dynamodb",
+    resourceType: "table",
+    ...overrides,
+  });
 }

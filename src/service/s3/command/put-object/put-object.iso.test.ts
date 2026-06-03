@@ -1,5 +1,4 @@
 import { describe, it } from "vitest";
-import { SimAwsAccount } from "../../../organizations/sim-aws-account.js";
 import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import {
   assertBufferEqual,
@@ -8,14 +7,15 @@ import {
   assertStringIncludes,
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
-import type { S3BucketName } from "../../bucket/s3-bucket.js";
+import type { SimS3BucketName } from "../../bucket/s3-bucket.js";
+import { SimAws } from "../../../aws/sim-aws.js";
 
 describe("S3 PutObjectCommand", () => {
   it("puts an Object into an S3 Bucket", async () => {
-    const simAccount = new SimAwsAccount();
-    const simS3 = simAccount.getS3();
+    const simAws = new SimAws();
+    const simS3 = simAws.s3();
 
-    const bucketName = "bucket-a" as S3BucketName;
+    const bucketName = "bucket-a" as SimS3BucketName;
 
     await simS3.createBucket(new CreateBucketCommand({ Bucket: bucketName }));
 
@@ -40,10 +40,10 @@ describe("S3 PutObjectCommand", () => {
   });
 
   it("puts an Object with Uint8Array body", async () => {
-    const simAccount = new SimAwsAccount();
-    const simS3 = simAccount.getS3();
+    const simAws = new SimAws();
+    const simS3 = simAws.s3();
 
-    const bucketName = "bucket-a" as S3BucketName;
+    const bucketName = "bucket-a" as SimS3BucketName;
 
     await simS3.createBucket(new CreateBucketCommand({ Bucket: bucketName }));
 
@@ -63,8 +63,8 @@ describe("S3 PutObjectCommand", () => {
   });
 
   it("rejects undefined bucket name", async () => {
-    const simAccount = new SimAwsAccount();
-    const simS3 = simAccount.getS3();
+    const simAws = new SimAws();
+    const simS3 = simAws.s3();
 
     const error = await assertThrowsErrorAsync(async () => {
       await simS3.putObject(
@@ -79,8 +79,8 @@ describe("S3 PutObjectCommand", () => {
   });
 
   it("rejects undefined object key", async () => {
-    const simAccount = new SimAwsAccount();
-    const simS3 = simAccount.getS3();
+    const simAws = new SimAws();
+    const simS3 = simAws.s3();
 
     const error = await assertThrowsErrorAsync(async () => {
       await simS3.putObject(
@@ -95,8 +95,8 @@ describe("S3 PutObjectCommand", () => {
   });
 
   it("rejects non-existent bucket", async () => {
-    const simAccount = new SimAwsAccount();
-    const simS3 = simAccount.getS3();
+    const simAws = new SimAws();
+    const simS3 = simAws.s3();
 
     const error = await assertThrowsErrorAsync(async () => {
       await simS3.putObject(
@@ -111,10 +111,10 @@ describe("S3 PutObjectCommand", () => {
   });
 
   it("rejects unsupported body type", async () => {
-    const simAccount = new SimAwsAccount();
-    const simS3 = simAccount.getS3();
+    const simAws = new SimAws();
+    const simS3 = simAws.s3();
 
-    const bucketName = "bucket-a" as S3BucketName;
+    const bucketName = "bucket-a" as SimS3BucketName;
 
     await simS3.createBucket(new CreateBucketCommand({ Bucket: bucketName }));
 

@@ -1,5 +1,4 @@
 import { describe, it } from "vitest";
-import { SimAwsAccount } from "../../../organizations/sim-aws-account.js";
 import {
   CreateBucketCommand,
   ListObjectsCommand,
@@ -13,11 +12,11 @@ import {
   assertThrowsErrorAsync,
   assertUndefined,
 } from "@kensio/smartass";
+import { SimS3 } from "../../s3.js";
 
 describe("S3 ListObjectsCommand", () => {
   it("lists all Objects in an S3 Bucket", async () => {
-    const simAccount = new SimAwsAccount();
-    const simS3 = simAccount.getS3();
+    const simS3 = new SimS3();
 
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "bucket-a" }));
 
@@ -64,8 +63,7 @@ describe("S3 ListObjectsCommand", () => {
   });
 
   it("lists Objects with prefix", async () => {
-    const simAccount = new SimAwsAccount();
-    const simS3 = simAccount.getS3();
+    const simS3 = new SimS3();
 
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "bucket-a" }));
 
@@ -105,8 +103,7 @@ describe("S3 ListObjectsCommand", () => {
   });
 
   it("lists Objects with max keys", async () => {
-    const simAccount = new SimAwsAccount();
-    const simS3 = simAccount.getS3();
+    const simS3 = new SimS3();
 
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "bucket-a" }));
 
@@ -148,8 +145,7 @@ describe("S3 ListObjectsCommand", () => {
   });
 
   it("lists Objects with marker", async () => {
-    const simAccount = new SimAwsAccount();
-    const simS3 = simAccount.getS3();
+    const simS3 = new SimS3();
 
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "bucket-a" }));
 
@@ -190,8 +186,7 @@ describe("S3 ListObjectsCommand", () => {
   });
 
   it("rejects undefined bucket name", async () => {
-    const simAccount = new SimAwsAccount();
-    const simS3 = simAccount.getS3();
+    const simS3 = new SimS3();
 
     const error = await assertThrowsErrorAsync(async () => {
       await simS3.listObjects(
@@ -205,8 +200,7 @@ describe("S3 ListObjectsCommand", () => {
   });
 
   it("rejects non-existent bucket", async () => {
-    const simAccount = new SimAwsAccount();
-    const simS3 = simAccount.getS3();
+    const simS3 = new SimS3();
 
     const error = await assertThrowsErrorAsync(async () => {
       await simS3.listObjects(

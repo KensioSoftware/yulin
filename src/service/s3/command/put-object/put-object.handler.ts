@@ -4,7 +4,7 @@ import {
   type PutObjectCommand,
   type PutObjectCommandOutput,
 } from "@aws-sdk/client-s3";
-import type { S3BucketName, SimS3Bucket } from "../../bucket/s3-bucket.js";
+import type { SimS3BucketName, SimS3Bucket } from "../../bucket/s3-bucket.js";
 import { SimS3Object, SimS3ObjectMetadata } from "../../object/s3-object.js";
 import { assertDefined } from "../../../../util/defined.js";
 import { jitter } from "../../../../util/sleep.js";
@@ -18,7 +18,7 @@ export class PutObjectCommandHandler implements CommandHandler<
   PutObjectCommand,
   PutObjectCommandOutput
 > {
-  constructor(private readonly buckets: Map<S3BucketName, SimS3Bucket>) {}
+  constructor(private readonly buckets: Map<SimS3BucketName, SimS3Bucket>) {}
 
   /**
    * Simulate putting an Object into an S3 Bucket.
@@ -27,7 +27,7 @@ export class PutObjectCommandHandler implements CommandHandler<
     assertDefined(cmd.input.Bucket, "PutObjectCommand.input.Bucket");
     assertDefined(cmd.input.Key, "PutObjectCommand.input.Key");
 
-    const bucketName = cmd.input.Bucket as S3BucketName;
+    const bucketName = cmd.input.Bucket as SimS3BucketName;
     const bucket = this.buckets.get(bucketName);
     if (bucket === undefined) {
       throw new NoSuchBucket({

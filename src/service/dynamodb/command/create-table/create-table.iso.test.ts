@@ -4,7 +4,6 @@ import {
   ListTablesCommand,
   ResourceInUseException,
 } from "@aws-sdk/client-dynamodb";
-import { SimAwsAccount } from "../../../organizations/sim-aws-account.js";
 import {
   assertArrayLength,
   assertIdentical,
@@ -13,11 +12,12 @@ import {
   assertStringIncludes,
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
+import { SimAws } from "../../../aws/sim-aws.js";
 
 describe("DynamoDB CreateTableCommand", () => {
   it("creates new DynamoDB Table", async () => {
-    const simAccount = new SimAwsAccount();
-    const simDynamoDb = simAccount.getDynamoDb();
+    const simAws = new SimAws();
+    const simDynamoDb = simAws.account().dynamoDb();
 
     const createTableOutput = await simDynamoDb.createTable(
       new CreateTableCommand({
@@ -40,12 +40,12 @@ describe("DynamoDB CreateTableCommand", () => {
     assertArrayLength(listTablesOutput.TableNames, 1);
     assertIdentical(listTablesOutput.TableNames[0], "FoobarTable");
 
-    await simAccount.backgroundTasksComplete();
+    await simAws.backgroundTasksComplete();
   });
 
   it("throws on undefined Table name", async () => {
-    const simAccount = new SimAwsAccount();
-    const simDynamoDb = simAccount.getDynamoDb();
+    const simAws = new SimAws();
+    const simDynamoDb = simAws.region().dynamoDb();
 
     const error = await assertThrowsErrorAsync(async () =>
       simDynamoDb.createTable(
@@ -64,8 +64,11 @@ describe("DynamoDB CreateTableCommand", () => {
   });
 
   it("throws on missing key schema", async () => {
-    const simAccount = new SimAwsAccount();
-    const simDynamoDb = simAccount.getDynamoDb();
+    const simAws = new SimAws();
+    const simDynamoDb = simAws
+      .account("666666666666")
+      .region("eu-west-2")
+      .dynamoDb();
 
     const error = await assertThrowsErrorAsync(async () =>
       simDynamoDb.createTable(
@@ -78,8 +81,8 @@ describe("DynamoDB CreateTableCommand", () => {
   });
 
   it("throws on duplicate Table name", async () => {
-    const simAccount = new SimAwsAccount();
-    const simDynamoDb = simAccount.getDynamoDb();
+    const simAws = new SimAws();
+    const simDynamoDb = simAws.dynamoDb();
 
     await simDynamoDb.createTable(
       new CreateTableCommand({

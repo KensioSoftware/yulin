@@ -3,7 +3,7 @@ import type {
   ListBucketsCommand,
   ListBucketsCommandOutput,
 } from "@aws-sdk/client-s3";
-import type { S3BucketName, SimS3Bucket } from "../../bucket/s3-bucket.js";
+import type { SimS3BucketName, SimS3Bucket } from "../../bucket/s3-bucket.js";
 import { jitter } from "../../../../util/sleep.js";
 
 /**
@@ -15,7 +15,7 @@ export class ListBucketsCommandHandler implements CommandHandler<
   ListBucketsCommand,
   ListBucketsCommandOutput
 > {
-  constructor(private readonly buckets: Map<S3BucketName, SimS3Bucket>) {}
+  constructor(private readonly buckets: Map<SimS3BucketName, SimS3Bucket>) {}
 
   /**
    * Simulate listing S3 Buckets.

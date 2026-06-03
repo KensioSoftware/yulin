@@ -1,15 +1,15 @@
 import { describe, it } from "vitest";
-import { SimAwsAccount } from "../../../organizations/sim-aws-account.js";
 import {
   CreateTableCommand,
   ListTablesCommand,
 } from "@aws-sdk/client-dynamodb";
 import { assertArrayLength, assertIdentical } from "@kensio/smartass";
+import { SimAws } from "../../../aws/sim-aws.js";
 
 describe("DynamoDB ListTablesCommand", () => {
   it("List all DynamoDB Tables", async () => {
-    const simAccount = new SimAwsAccount();
-    const simDynamoDb = simAccount.getDynamoDb();
+    const simAws = new SimAws();
+    const simDynamoDb = simAws.dynamoDb();
 
     await Promise.all([
       simDynamoDb.createTable(
@@ -46,8 +46,8 @@ describe("DynamoDB ListTablesCommand", () => {
   });
 
   it("List DynamoDB Tables with limit", async () => {
-    const simAccount = new SimAwsAccount();
-    const simDynamoDb = simAccount.getDynamoDb();
+    const simAws = new SimAws();
+    const simDynamoDb = simAws.dynamoDb();
 
     await Promise.all([
       simDynamoDb.createTable(
@@ -83,8 +83,8 @@ describe("DynamoDB ListTablesCommand", () => {
   });
 
   it("List DynamoDB Tables with exclusive start and limit", async () => {
-    const simAccount = new SimAwsAccount();
-    const simDynamoDb = simAccount.getDynamoDb();
+    const simAws = new SimAws();
+    const simDynamoDb = simAws.dynamoDb();
 
     await Promise.all([
       simDynamoDb.createTable(

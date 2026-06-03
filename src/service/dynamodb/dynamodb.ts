@@ -17,6 +17,8 @@ import type { BackgroundScheduler } from "../../util/background/background.js";
 import { ListTablesCommandHandler } from "./command/list-tables/list-tables.handler.js";
 import { DescribeTableCommandHandler } from "./command/describe-table/describe-table.handler.js";
 import { PutItemCommandHandler } from "./command/put-item/put-item.handler.js";
+import type { SimAwsAccountId } from "../aws/sim-aws-account.js";
+import type { AwsRegionName } from "../aws/sim-aws-region.js";
 
 /**
  * Simulated DynamoDB. Handles SDK commands. Emulates AWS behaviour and state.
@@ -24,13 +26,22 @@ import { PutItemCommandHandler } from "./command/put-item/put-item.handler.js";
 export class SimDynamoDb {
   private readonly tables = new Map<DynamoDbTableName, SimDynamoDbTable>();
 
-  constructor(private readonly background: BackgroundScheduler) {}
+  constructor(
+    private readonly accountId: SimAwsAccountId,
+    private readonly regionName: AwsRegionName,
+    private readonly background: BackgroundScheduler,
+  ) {}
 
   /**
    * Handle a Create Table Command from the SDK.
    */
   async createTable(cmd: CreateTableCommand): Promise<CreateTableOutput> {
-    const handler = new CreateTableCommandHandler(this.tables, this.background);
+    const handler = new CreateTableCommandHandler(
+      this.accountId,
+      this.regionName,
+      this.tables,
+      this.background,
+    );
     return await handler.handle(cmd);
   }
 

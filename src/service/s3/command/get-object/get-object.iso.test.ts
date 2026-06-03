@@ -1,5 +1,4 @@
 import { describe, it } from "vitest";
-import { SimAwsAccount } from "../../../organizations/sim-aws-account.js";
 import {
   CreateBucketCommand,
   GetObjectCommand,
@@ -14,11 +13,12 @@ import {
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import { simS3BodyToBuffer } from "../../storage/s3-body-buffer.js";
+import { SimAws } from "../../../aws/sim-aws.js";
 
 describe("S3 GetObjectCommand", () => {
   it("gets an Object from an S3 Bucket", async () => {
-    const simAccount = new SimAwsAccount();
-    const simS3 = simAccount.getS3();
+    const simAws = new SimAws();
+    const simS3 = simAws.s3();
 
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "bucket-a" }));
 
@@ -49,8 +49,8 @@ describe("S3 GetObjectCommand", () => {
   });
 
   it("rejects undefined bucket name", async () => {
-    const simAccount = new SimAwsAccount();
-    const simS3 = simAccount.getS3();
+    const simAws = new SimAws();
+    const simS3 = simAws.s3();
 
     const error = await assertThrowsErrorAsync(async () => {
       await simS3.getObject(
@@ -65,8 +65,8 @@ describe("S3 GetObjectCommand", () => {
   });
 
   it("rejects undefined object key", async () => {
-    const simAccount = new SimAwsAccount();
-    const simS3 = simAccount.getS3();
+    const simAws = new SimAws();
+    const simS3 = simAws.s3();
 
     const error = await assertThrowsErrorAsync(async () => {
       await simS3.getObject(
@@ -81,8 +81,8 @@ describe("S3 GetObjectCommand", () => {
   });
 
   it("rejects non-existent bucket", async () => {
-    const simAccount = new SimAwsAccount();
-    const simS3 = simAccount.getS3();
+    const simAws = new SimAws();
+    const simS3 = simAws.s3();
 
     const error = await assertThrowsErrorAsync(async () => {
       await simS3.getObject(
@@ -97,8 +97,8 @@ describe("S3 GetObjectCommand", () => {
   });
 
   it("rejects non-existent object", async () => {
-    const simAccount = new SimAwsAccount();
-    const simS3 = simAccount.getS3();
+    const simAws = new SimAws();
+    const simS3 = simAws.s3();
 
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "bucket-a" }));
 

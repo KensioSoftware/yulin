@@ -1,4 +1,4 @@
-import type { S3BucketName, SimS3Bucket } from "./bucket/s3-bucket.js";
+import type { SimS3BucketName, SimS3Bucket } from "./bucket/s3-bucket.js";
 import type {
   CreateBucketCommand,
   CreateBucketCommandOutput,
@@ -22,7 +22,7 @@ import { ListObjectsCommandHandler } from "./command/list-objects/list-objects.h
  * Simulated S3. Handles SDK commands. Emulates AWS behaviour and state.
  */
 export class SimS3 {
-  private readonly buckets = new Map<S3BucketName, SimS3Bucket>();
+  private readonly buckets = new Map<SimS3BucketName, SimS3Bucket>();
 
   /**
    * Handle a Create Bucket Command from the SDK.
@@ -73,7 +73,7 @@ export class SimS3 {
   /**
    * Get a simulated S3 Bucket instance by name.
    */
-  getSimBucketByName(bucketName: S3BucketName): SimS3Bucket {
+  getSimBucketByName(bucketName: SimS3BucketName): SimS3Bucket {
     const simBucket = this.buckets.get(bucketName);
     assertDefined(simBucket, `Simulated S3 Bucket named '${bucketName}'`);
     return simBucket;
