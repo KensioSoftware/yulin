@@ -1,5 +1,5 @@
-import type { SimDynamoDb } from "../dynamodb/dynamodb.js";
-import type { SimS3 } from "../s3/s3.js";
+import type { SimDynamoDb } from "../dynamodb/sim-dynamodb.js";
+import type { SimS3 } from "../s3/sim-s3.js";
 import type { SimAwsAccountId } from "./sim-aws-account.js";
 import type { AwsRegionName } from "./sim-aws-region.js";
 import type { SimAwsAccountRegionScope } from "./sim-aws-account-region-scope.js";

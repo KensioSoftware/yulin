@@ -17,8 +17,8 @@ import type {
   SimAwsAccountRegionScopes,
   SimAwsServices,
 } from "./sim-aws-services.js";
-import type { SimS3 } from "../s3/s3.js";
-import type { SimDynamoDb } from "../dynamodb/dynamodb.js";
+import type { SimS3 } from "../s3/sim-s3.js";
+import type { SimDynamoDb } from "../dynamodb/sim-dynamodb.js";
 import {
   type SimAccountRegionScopeKey,
   SimAwsAccountRegionScope,

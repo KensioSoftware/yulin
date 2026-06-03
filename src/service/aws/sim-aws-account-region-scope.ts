@@ -1,8 +1,8 @@
 import type { SimAwsAccount, SimAwsAccountId } from "./sim-aws-account.js";
 import type { SimAwsRegion, AwsRegionName } from "./sim-aws-region.js";
 import type { SimAwsServices } from "./sim-aws-services.js";
-import { SimDynamoDb } from "../dynamodb/dynamodb.js";
-import { SimS3 } from "../s3/s3.js";
+import { SimDynamoDb } from "../dynamodb/sim-dynamodb.js";
+import { SimS3 } from "../s3/sim-s3.js";
 import { Memo } from "../../util/memo/memo.js";
 import type { SimAws } from "./sim-aws.js";
 
