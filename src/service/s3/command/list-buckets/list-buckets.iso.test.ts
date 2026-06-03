@@ -1,16 +1,16 @@
 import { describe, it } from "vitest";
-import { SimAwsAccount } from "../../../organizations/sim-aws-account.js";
 import { CreateBucketCommand, ListBucketsCommand } from "@aws-sdk/client-s3";
 import {
   assertArrayLength,
   assertIdentical,
   assertUndefined,
 } from "@kensio/smartass";
+import { SimAws } from "../../../aws/sim-aws.js";
 
 describe("S3 ListBucketsCommand", () => {
   it("List all S3 Buckets", async () => {
-    const simAccount = new SimAwsAccount();
-    const simS3 = simAccount.getS3();
+    const simAws = new SimAws();
+    const simS3 = simAws.s3();
 
     await Promise.all([
       simS3.createBucket(new CreateBucketCommand({ Bucket: "bucket-a" })),
@@ -30,8 +30,8 @@ describe("S3 ListBucketsCommand", () => {
   });
 
   it("List S3 Buckets with max buckets", async () => {
-    const simAccount = new SimAwsAccount();
-    const simS3 = simAccount.getS3();
+    const simAws = new SimAws();
+    const simS3 = simAws.s3();
 
     await Promise.all([
       simS3.createBucket(new CreateBucketCommand({ Bucket: "bucket-a" })),
@@ -50,8 +50,8 @@ describe("S3 ListBucketsCommand", () => {
   });
 
   it("List S3 Buckets with continuation token", async () => {
-    const simAccount = new SimAwsAccount();
-    const simS3 = simAccount.getS3();
+    const simAws = new SimAws();
+    const simS3 = simAws.s3();
 
     await Promise.all([
       simS3.createBucket(new CreateBucketCommand({ Bucket: "bucket-a" })),
@@ -77,8 +77,8 @@ describe("S3 ListBucketsCommand", () => {
   });
 
   it("List S3 Buckets with prefix", async () => {
-    const simAccount = new SimAwsAccount();
-    const simS3 = simAccount.getS3();
+    const simAws = new SimAws();
+    const simS3 = simAws.s3();
 
     await Promise.all([
       simS3.createBucket(new CreateBucketCommand({ Bucket: "foo-a" })),

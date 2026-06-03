@@ -4,7 +4,6 @@ import {
   CreateBucketCommand,
   ListBucketsCommand,
 } from "@aws-sdk/client-s3";
-import { SimAwsAccount } from "../../../organizations/sim-aws-account.js";
 import {
   assertArrayLength,
   assertIdentical,
@@ -12,11 +11,12 @@ import {
   assertStringIncludes,
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
+import { SimAws } from "../../../aws/sim-aws.js";
 
 describe("S3 CreateBucketCommand", () => {
   it("creates new S3 Bucket", async () => {
-    const simAccount = new SimAwsAccount();
-    const simS3 = simAccount.getS3();
+    const simAws = new SimAws();
+    const simS3 = simAws.account("555555555555").s3();
 
     const createBucketOutput = await simS3.createBucket(
       new CreateBucketCommand({ Bucket: "foobar-bucket" }),
@@ -32,8 +32,8 @@ describe("S3 CreateBucketCommand", () => {
   });
 
   it("throws on undefined Bucket name", async () => {
-    const simAccount = new SimAwsAccount();
-    const simS3 = simAccount.getS3();
+    const simAws = new SimAws();
+    const simS3 = simAws.region("ap-east-1").s3();
 
     const error = await assertThrowsErrorAsync(async () =>
       simS3.createBucket(new CreateBucketCommand({ Bucket: undefined })),
@@ -47,8 +47,8 @@ describe("S3 CreateBucketCommand", () => {
   });
 
   it("throws on duplicate Bucket name", async () => {
-    const simAccount = new SimAwsAccount();
-    const simS3 = simAccount.getS3();
+    const simAws = new SimAws();
+    const simS3 = simAws.s3();
 
     await simS3.createBucket(
       new CreateBucketCommand({ Bucket: "foobar-bucket" }),

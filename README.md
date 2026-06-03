@@ -12,6 +12,24 @@ npm i -D @kensio/yulin
 
 Still in alpha!
 
+```typescript
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+simAws.getDynamoDb();
+simAws.getS3();
+
+simAws.account("111111111111" as AwsAccountId).getDynamoDb();
+
+simAws.region("eu-west-1" as AwsRegionName).getDynamoDb();
+
+simAws
+  .account("111111111111" as AwsAccountId)
+  .region("eu-west-1" as AwsRegionName)
+  .getDynamoDb();
+```
+
 ## What is yulin?
 
 TLDR: yulin is an AWS simulator for testing Node.js applications.

@@ -1,20 +1,20 @@
 import { describe, it } from "vitest";
-import { SimAwsAccount } from "../../../organizations/sim-aws-account.js";
 import { CreateTableCommand, PutItemCommand } from "@aws-sdk/client-dynamodb";
 import {
   assertBufferEqual,
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
+  assertStringIncludes,
   assertThrowsErrorAsync,
   assertTrue,
-  assertStringIncludes,
 } from "@kensio/smartass";
+import { SimAws } from "../../../aws/sim-aws.js";
 
 describe("DynamoDB PutItemCommand", () => {
   it("puts new Item into DynamoDB Table, returns attributes", async () => {
-    const simAccount = new SimAwsAccount();
-    const simDynamoDb = simAccount.getDynamoDb();
+    const simAws = new SimAws();
+    const simDynamoDb = simAws.dynamoDb();
 
     await simDynamoDb.createTable(
       new CreateTableCommand({
@@ -119,12 +119,12 @@ describe("DynamoDB PutItemCommand", () => {
       "-0.1",
     );
 
-    await simAccount.backgroundTasksComplete();
+    await simAws.backgroundTasksComplete();
   });
 
   it("puts new Item into DynamoDB Table with partition key + sort key", async () => {
-    const simAccount = new SimAwsAccount();
-    const simDynamoDb = simAccount.getDynamoDb();
+    const simAws = new SimAws();
+    const simDynamoDb = simAws.dynamoDb();
 
     await simDynamoDb.createTable(
       new CreateTableCommand({
@@ -160,8 +160,8 @@ describe("DynamoDB PutItemCommand", () => {
   });
 
   it("rejects when missing partition key", async () => {
-    const simAccount = new SimAwsAccount();
-    const simDynamoDb = simAccount.getDynamoDb();
+    const simAws = new SimAws();
+    const simDynamoDb = simAws.dynamoDb();
 
     await simDynamoDb.createTable(
       new CreateTableCommand({
@@ -190,8 +190,8 @@ describe("DynamoDB PutItemCommand", () => {
   });
 
   it("rejects when missing sort key", async () => {
-    const simAccount = new SimAwsAccount();
-    const simDynamoDb = simAccount.getDynamoDb();
+    const simAws = new SimAws();
+    const simDynamoDb = simAws.dynamoDb();
 
     await simDynamoDb.createTable(
       new CreateTableCommand({
@@ -223,8 +223,8 @@ describe("DynamoDB PutItemCommand", () => {
   });
 
   it("rejects on invalid partition key type", async () => {
-    const simAccount = new SimAwsAccount();
-    const simDynamoDb = simAccount.getDynamoDb();
+    const simAws = new SimAws();
+    const simDynamoDb = simAws.dynamoDb();
 
     await simDynamoDb.createTable(
       new CreateTableCommand({
@@ -252,8 +252,8 @@ describe("DynamoDB PutItemCommand", () => {
   });
 
   it("rejects on invalid sort key type", async () => {
-    const simAccount = new SimAwsAccount();
-    const simDynamoDb = simAccount.getDynamoDb();
+    const simAws = new SimAws();
+    const simDynamoDb = simAws.dynamoDb();
 
     await simDynamoDb.createTable(
       new CreateTableCommand({
@@ -285,8 +285,8 @@ describe("DynamoDB PutItemCommand", () => {
   });
 
   it("rejects undefined table name", async () => {
-    const simAccount = new SimAwsAccount();
-    const simDynamoDb = simAccount.getDynamoDb();
+    const simAws = new SimAws();
+    const simDynamoDb = simAws.dynamoDb();
 
     const error = await assertThrowsErrorAsync(async () => {
       await simDynamoDb.putItem(
@@ -307,8 +307,8 @@ describe("DynamoDB PutItemCommand", () => {
   });
 
   it("rejects non-existent table", async () => {
-    const simAccount = new SimAwsAccount();
-    const simDynamoDb = simAccount.getDynamoDb();
+    const simAws = new SimAws();
+    const simDynamoDb = simAws.dynamoDb();
 
     const error = await assertThrowsErrorAsync(async () => {
       await simDynamoDb.putItem(
@@ -326,8 +326,8 @@ describe("DynamoDB PutItemCommand", () => {
   });
 
   it("rejects missing item", async () => {
-    const simAccount = new SimAwsAccount();
-    const simDynamoDb = simAccount.getDynamoDb();
+    const simAws = new SimAws();
+    const simDynamoDb = simAws.dynamoDb();
 
     await simDynamoDb.createTable(
       new CreateTableCommand({

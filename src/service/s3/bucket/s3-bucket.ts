@@ -5,7 +5,7 @@ import type { SimS3BucketStorage } from "../storage/s3-bucket-storage.js";
 import type { SimS3Object } from "../object/s3-object.js";
 import { MemoryS3BucketStorage } from "../storage/s3-memory-storage.js";
 
-export type S3BucketName = Brand<string, "S3BucketName">;
+export type SimS3BucketName = Brand<string, "SimS3BucketName">;
 
 /**
  * Simulated S3 Bucket.

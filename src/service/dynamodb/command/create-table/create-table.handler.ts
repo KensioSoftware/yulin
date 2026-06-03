@@ -9,6 +9,9 @@ import type { BackgroundScheduler } from "../../../../util/background/background
 import type { CommandHandler } from "../../../../command/command-handler.js";
 import { jitter } from "../../../../util/sleep.js";
 import { assertDefined } from "../../../../util/defined.js";
+import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
+import type { AwsRegionName } from "../../../aws/sim-aws-region.js";
+import type { SimArn } from "../../../aws/arn.js";
 
 /**
  * DynamoDB CreateTableCommand handler.
@@ -20,6 +23,8 @@ export class CreateTableCommandHandler implements CommandHandler<
   CreateTableCommandOutput
 > {
   constructor(
+    private readonly accountId: SimAwsAccountId,
+    private readonly regionName: AwsRegionName,
     private readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>,
     private readonly background: BackgroundScheduler,
   ) {}
@@ -40,7 +45,8 @@ export class CreateTableCommandHandler implements CommandHandler<
 
     await jitter();
 
-    const table = new SimDynamoDbTable(cmd, this.background);
+    const tableArn: SimArn = `arn:aws:dynamodb:${this.regionName}:${this.accountId}:table/${tableName}`;
+    const table = new SimDynamoDbTable(cmd, tableArn, this.background);
     this.tables.set(tableName, table);
 
     this.background.schedule(() => table.activate());
@@ -48,7 +54,8 @@ export class CreateTableCommandHandler implements CommandHandler<
     return {
       TableDescription: {
         AttributeDefinitions: [],
-        TableName: tableName,
+        TableName: table.tableName,
+        TableArn: table.simArn,
         KeySchema: [],
         TableStatus: table.status,
         CreationDateTime: table.creationDateTime,
