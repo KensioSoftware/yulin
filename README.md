@@ -10,25 +10,50 @@ npm i -D @kensio/yulin
 
 ## Usage
 
-Still in alpha!
+Create and interact directly with a simulated AWS:
 
 ```typescript
 import { SimAws } from "@kensio/yulin";
+import { CreateTableCommand } from "@aws-sdk/client-dynamodb";
 
 const simAws = new SimAws();
 
-simAws.getDynamoDb();
-simAws.getS3();
+// Default Account and Region.
+await simAws.dynamoDb().createTable(
+ new CreateTableCommand({
+   TableName: "FoobarTable",
+   KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+ }),
+);
 
-simAws.account("111111111111" as AwsAccountId).getDynamoDb();
+// Specify Account.
+await simAws.account("111111111111").dynamoDb().createTable({ ... });
 
-simAws.region("eu-west-1" as AwsRegionName).getDynamoDb();
+// Specify Region.
+await simAws.region("eu-west-2").dynamoDb().createTable({ ... });
 
-simAws
-  .account("111111111111" as AwsAccountId)
-  .region("eu-west-1" as AwsRegionName)
-  .getDynamoDb();
+// Specify Account and Region.
+await simAws.account("111111111111").region("eu-west-2").dynamoDb().createTable({ ... });
 ```
+
+AWS state is simulated internally, so you can test realistic interactions with multiple AWS
+services.
+
+Each instance of `SimAws` is cheap and encapsulated so you can create them wherever you need them.
+It's fine to create a new instance of `SimAws` in every test case or in shared test setup.
+
+If you prefer, you can also instantiate simulated services individually:
+
+```typescript
+import { SimS3 } from "@kensio/yulin/s3";
+import { CreateBucketCommand } from "@aws-sdk/client-s3";
+
+const simS3 = new SimS3();
+
+await simS3.createBucket(new CreateBucketCommand({ Bucket: "foo-bucket" }));
+```
+
+That simulated service then has its own isolated state.
 
 ## What is yulin?
 

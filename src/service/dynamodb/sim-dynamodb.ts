@@ -13,12 +13,21 @@ import type {
   SimDynamoDbTable,
 } from "./table/dynamodb-table.js";
 import { CreateTableCommandHandler } from "./command/create-table/create-table.handler.js";
-import type { BackgroundScheduler } from "../../util/background/background.js";
+import {
+  type BackgroundScheduler,
+  BackgroundTasks,
+} from "../../util/background/background.js";
 import { ListTablesCommandHandler } from "./command/list-tables/list-tables.handler.js";
 import { DescribeTableCommandHandler } from "./command/describe-table/describe-table.handler.js";
 import { PutItemCommandHandler } from "./command/put-item/put-item.handler.js";
-import type { SimAwsAccountId } from "../aws/sim-aws-account.js";
-import type { AwsRegionName } from "../aws/sim-aws-region.js";
+import {
+  makeSimAwsAccountId,
+  type SimAwsAccountId,
+} from "../aws/sim-aws-account.js";
+import {
+  type AwsRegionName,
+  makeAwsRegionName,
+} from "../aws/sim-aws-region.js";
 
 /**
  * Simulated DynamoDB. Handles SDK commands. Emulates AWS behaviour and state.
@@ -27,9 +36,9 @@ export class SimDynamoDb {
   private readonly tables = new Map<DynamoDbTableName, SimDynamoDbTable>();
 
   constructor(
-    private readonly accountId: SimAwsAccountId,
-    private readonly regionName: AwsRegionName,
-    private readonly background: BackgroundScheduler,
+    private readonly accountId: SimAwsAccountId = makeSimAwsAccountId(),
+    private readonly regionName: AwsRegionName = makeAwsRegionName(),
+    private readonly background: BackgroundScheduler = new BackgroundTasks(),
   ) {}
 
   /**

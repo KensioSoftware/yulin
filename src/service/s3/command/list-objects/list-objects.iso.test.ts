@@ -12,7 +12,7 @@ import {
   assertThrowsErrorAsync,
   assertUndefined,
 } from "@kensio/smartass";
-import { SimS3 } from "../../s3.js";
+import { SimS3 } from "../../sim-s3.js";
 
 describe("S3 ListObjectsCommand", () => {
   it("lists all Objects in an S3 Bucket", async () => {
