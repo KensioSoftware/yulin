@@ -17,6 +17,11 @@ import { assertDefined } from "../../util/defined.js";
 import { PutObjectCommandHandler } from "./command/put-object/put-object.handler.js";
 import { GetObjectCommandHandler } from "./command/get-object/get-object.handler.js";
 import { ListObjectsCommandHandler } from "./command/list-objects/list-objects.handler.js";
+import { SimS3GlobalRegistry } from "./sim-s3-global-registry.js";
+import {
+  type SimAwsAccountRegionScope,
+  simAwsAccountRegionScopeFactory,
+} from "../aws/sim-aws-account-region-scope.js";
 
 /**
  * Simulated S3. Handles SDK commands. Emulates AWS behaviour and state.
@@ -24,13 +29,22 @@ import { ListObjectsCommandHandler } from "./command/list-objects/list-objects.h
 export class SimS3 {
   private readonly buckets = new Map<SimS3BucketName, SimS3Bucket>();
 
+  constructor(
+    private readonly accountRegionScope: SimAwsAccountRegionScope = simAwsAccountRegionScopeFactory.make(),
+    private readonly s3GlobalRegistry: SimS3GlobalRegistry = new SimS3GlobalRegistry(),
+  ) {}
+
   /**
    * Handle a Create Bucket Command from the SDK.
    */
   async createBucket(
     cmd: CreateBucketCommand,
   ): Promise<CreateBucketCommandOutput> {
-    const handler = new CreateBucketCommandHandler(this.buckets);
+    const handler = new CreateBucketCommandHandler(
+      this.accountRegionScope,
+      this.buckets,
+      this.s3GlobalRegistry,
+    );
     return await handler.handle(cmd);
   }
 

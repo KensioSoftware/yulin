@@ -21,8 +21,10 @@ import type { SimS3 } from "../s3/sim-s3.js";
 import type { SimDynamoDb } from "../dynamodb/sim-dynamodb.js";
 import {
   type SimAccountRegionScopeKey,
-  SimAwsAccountRegionScope,
+  SimAwsAccountRegionContainer,
 } from "./sim-aws-account-region-scope.js";
+import { Memo } from "../../util/memo/memo.js";
+import { SimS3GlobalRegistry } from "../s3/sim-s3-global-registry.js";
 
 /**
  * Top-level container for simulated AWS.
@@ -32,8 +34,10 @@ export class SimAws implements SimAwsServices, SimAwsAccountRegionScopes {
   private readonly regions = new Map<AwsRegionName, SimAwsRegion>();
   private readonly accountRegionScopes = new Map<
     SimAccountRegionScopeKey,
-    SimAwsAccountRegionScope
+    SimAwsAccountRegionContainer
   >();
+
+  private readonly memo = new Memo<object>();
 
   constructor(
     public readonly defaultAccountId = DEFAULT_SIM_AWS_ACCOUNT_ID,
@@ -76,20 +80,31 @@ export class SimAws implements SimAwsServices, SimAwsAccountRegionScopes {
   accountRegionScope(
     accountId: SimAwsAccountId = this.defaultAccountId,
     regionName: AwsRegionName = this.defaultRegionName,
-  ): SimAwsAccountRegionScope {
+  ): SimAwsAccountRegionContainer {
     const scopeKey = `${accountId}:${regionName}` as const;
     let accountRegionScope = this.accountRegionScopes.get(scopeKey);
 
     if (accountRegionScope === undefined) {
-      accountRegionScope = new SimAwsAccountRegionScope(
+      accountRegionScope = new SimAwsAccountRegionContainer(
         this,
         this.account(accountId),
         this.region(regionName),
+        this.s3GlobalRegistry(),
       );
       this.accountRegionScopes.set(scopeKey, accountRegionScope);
     }
 
     return accountRegionScope;
+  }
+
+  /**
+   * Get the simulated global S3 registry for this AWS environment.
+   */
+  s3GlobalRegistry(): SimS3GlobalRegistry {
+    return this.memo.getOrCreate(
+      "s3GlobalRegistry",
+      () => new SimS3GlobalRegistry(),
+    );
   }
 
   /**

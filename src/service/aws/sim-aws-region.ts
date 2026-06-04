@@ -1,5 +1,5 @@
 import type { SimAwsAccountId } from "./sim-aws-account.js";
-import type { SimAwsAccountRegionScope } from "./sim-aws-account-region-scope.js";
+import type { SimAwsAccountRegionContainer } from "./sim-aws-account-region-scope.js";
 import type {
   SimAwsAccountRegionScopes,
   SimAwsServices,
@@ -61,7 +61,7 @@ export class SimAwsRegion implements SimAwsServices {
   /**
    * Get a simulated AWS Account scoped for this Region.
    */
-  account(accountId?: SimAwsAccountId | string): SimAwsAccountRegionScope {
+  account(accountId?: SimAwsAccountId | string): SimAwsAccountRegionContainer {
     return this.accountRegionScopes.accountRegionScope(
       accountId as SimAwsAccountId,
       this.regionName,
