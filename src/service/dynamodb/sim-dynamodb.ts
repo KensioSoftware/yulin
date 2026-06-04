@@ -21,13 +21,9 @@ import { ListTablesCommandHandler } from "./command/list-tables/list-tables.hand
 import { DescribeTableCommandHandler } from "./command/describe-table/describe-table.handler.js";
 import { PutItemCommandHandler } from "./command/put-item/put-item.handler.js";
 import {
-  makeSimAwsAccountId,
-  type SimAwsAccountId,
-} from "../aws/sim-aws-account.js";
-import {
-  type AwsRegionName,
-  makeAwsRegionName,
-} from "../aws/sim-aws-region.js";
+  type SimAwsAccountRegionScope,
+  simAwsAccountRegionScopeFactory,
+} from "../aws/sim-aws-account-region-scope.js";
 
 /**
  * Simulated DynamoDB. Handles SDK commands. Emulates AWS behaviour and state.
@@ -36,8 +32,7 @@ export class SimDynamoDb {
   private readonly tables = new Map<DynamoDbTableName, SimDynamoDbTable>();
 
   constructor(
-    private readonly accountId: SimAwsAccountId = makeSimAwsAccountId(),
-    private readonly regionName: AwsRegionName = makeAwsRegionName(),
+    private readonly accountRegionScope: SimAwsAccountRegionScope = simAwsAccountRegionScopeFactory.make(),
     private readonly background: BackgroundScheduler = new BackgroundTasks(),
   ) {}
 
@@ -46,8 +41,7 @@ export class SimDynamoDb {
    */
   async createTable(cmd: CreateTableCommand): Promise<CreateTableOutput> {
     const handler = new CreateTableCommandHandler(
-      this.accountId,
-      this.regionName,
+      this.accountRegionScope,
       this.tables,
       this.background,
     );
