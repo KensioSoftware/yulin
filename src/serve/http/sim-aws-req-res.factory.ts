@@ -2,6 +2,7 @@ import { DynamicFactory } from "@kensio/part-factory";
 import { faker } from "@faker-js/faker";
 import { SimAwsHttpRequest } from "./sim-aws-req-res.js";
 import type { IncomingMessage } from "node:http";
+import { localhostSuffix } from "../resolve/sim-aws-local-service-resolver.js";
 
 interface SimAwsReqProps {
   method: string;
@@ -11,7 +12,8 @@ interface SimAwsReqProps {
 
 const simAwsReqPropsFactory = new DynamicFactory<SimAwsReqProps>(
   (overrides) => {
-    const host = overrides?.host ?? `${faker.internet.domainName()}.localhost`;
+    const host =
+      overrides?.host ?? `${faker.internet.domainName()}.${localhostSuffix}`;
     return {
       method: faker.internet.httpMethod(),
       host,

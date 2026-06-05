@@ -11,7 +11,7 @@ describe("SimAwsLocalServiceResolver", () => {
     const resolver = new SimAwsLocalServiceResolver();
 
     const target = resolver.resolveHost(
-      "bucket-a.s3-website.eu-west-1.localhost",
+      "bucket-a.s3-website.eu-west-1.sim-aws.localhost",
     );
 
     assertNonNullable(target);
@@ -24,7 +24,7 @@ describe("SimAwsLocalServiceResolver", () => {
     const resolver = new SimAwsLocalServiceResolver();
 
     const target = resolver.resolveHost(
-      "foo.bar.s3-website.eu-west-1.localhost",
+      "foo.bar.s3-website.eu-west-1.sim-aws.localhost",
     );
 
     assertNonNullable(target);
@@ -37,37 +37,47 @@ describe("SimAwsLocalServiceResolver", () => {
     const resolver = new SimAwsLocalServiceResolver();
 
     assertUndefined(
-      resolver.resolveHost("bucket-a.s3-website.eu-west-1.example.com"),
+      resolver.resolveHost("bucket-a.s3-website.eu-west-1.sim-aws.example.com"),
     );
   });
 
   it("returns undefined for host without resource name", () => {
     const resolver = new SimAwsLocalServiceResolver();
 
-    assertUndefined(resolver.resolveHost("s3-website.eu-west-1.localhost"));
+    assertUndefined(
+      resolver.resolveHost("s3-website.eu-west-1.sim-aws.localhost"),
+    );
   });
 
   it("returns undefined for host without region name", () => {
     const resolver = new SimAwsLocalServiceResolver();
 
-    assertUndefined(resolver.resolveHost("bucket-a.s3-website.localhost"));
+    assertUndefined(
+      resolver.resolveHost("bucket-a.s3-website.sim-aws.localhost"),
+    );
   });
 
   it("returns undefined for unknown service label", () => {
     const resolver = new SimAwsLocalServiceResolver();
 
-    assertUndefined(resolver.resolveHost("bucket-a.s3.eu-west-1.localhost"));
+    assertUndefined(
+      resolver.resolveHost("bucket-a.s3.eu-west-1.sim-aws.localhost"),
+    );
   });
 
   it("returns undefined for empty resource name", () => {
     const resolver = new SimAwsLocalServiceResolver();
 
-    assertUndefined(resolver.resolveHost(".s3-website.eu-west-1.localhost"));
+    assertUndefined(
+      resolver.resolveHost(".s3-website.eu-west-1.sim-aws.localhost"),
+    );
   });
 
   it("returns undefined for empty region name", () => {
     const resolver = new SimAwsLocalServiceResolver();
 
-    assertUndefined(resolver.resolveHost("bucket-a.s3-website..localhost"));
+    assertUndefined(
+      resolver.resolveHost("bucket-a.s3-website..sim-aws.localhost"),
+    );
   });
 });

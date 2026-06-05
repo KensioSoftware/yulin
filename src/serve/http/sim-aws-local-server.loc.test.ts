@@ -44,19 +44,19 @@ describe("Simulated AWS local HTTP server", () => {
   });
 
   it("responds HTTP 501 for unknown host", async () => {
-    const res = await fetch(`http://foobar.localhost:${port}/`);
+    const res = await fetch(`http://foobar.sim-aws.localhost:${port}/`);
 
     assertIdentical(res.status, 501);
     const resBody = await res.text();
     assertStringIncludes(
       resBody,
-      "Unknown simulated AWS host foobar.localhost",
+      "Unknown simulated AWS host foobar.sim-aws.localhost",
     );
   });
 
   it("routes S3 website request to simulated S3 controller", async () => {
     const res = await fetch(
-      `http://my-site.s3-website.eu-west-2.localhost:${port}/foobar-object.html`,
+      `http://my-site.s3-website.eu-west-2.sim-aws.localhost:${port}/foobar-object.html`,
     );
 
     assertIdentical(res.status, 404);

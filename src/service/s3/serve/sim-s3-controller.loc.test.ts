@@ -48,7 +48,7 @@ describe("Simulated S3 local HTTP controller", () => {
     );
 
     const res = await fetch(
-      `http://foo-site.s3-website.eu-west-2.localhost:${port}/index.html`,
+      `http://foo-site.s3-website.eu-west-2.sim-aws.localhost:${port}/index.html`,
     );
 
     assertIdentical(res.status, 200);
@@ -78,7 +78,7 @@ describe("Simulated S3 local HTTP controller", () => {
     );
 
     const res = await fetch(
-      `http://head-site.s3-website.eu-west-2.localhost:${port}/index.html`,
+      `http://head-site.s3-website.eu-west-2.sim-aws.localhost:${port}/index.html`,
       { method: "HEAD" },
     );
 
@@ -109,7 +109,7 @@ describe("Simulated S3 local HTTP controller", () => {
     );
 
     const res = await fetch(
-      `http://encoded-path-site.s3-website.eu-west-2.localhost:${port}/folder/hello%20world.txt`,
+      `http://encoded-path-site.s3-website.eu-west-2.sim-aws.localhost:${port}/folder/hello%20world.txt`,
     );
 
     assertIdentical(res.status, 200);
@@ -122,7 +122,7 @@ describe("Simulated S3 local HTTP controller", () => {
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "index-site" }));
 
     const res = await fetch(
-      `http://index-site.s3-website.eu-west-2.localhost:${port}/`,
+      `http://index-site.s3-website.eu-west-2.sim-aws.localhost:${port}/`,
     );
 
     assertIdentical(res.status, 501);
@@ -138,7 +138,7 @@ describe("Simulated S3 local HTTP controller", () => {
     );
 
     const res = await fetch(
-      `http://missing-object-site.s3-website.eu-west-2.localhost:${port}/missing.txt`,
+      `http://missing-object-site.s3-website.eu-west-2.sim-aws.localhost:${port}/missing.txt`,
     );
 
     assertIdentical(res.status, 404);
@@ -161,7 +161,7 @@ describe("Simulated S3 local HTTP controller", () => {
     );
 
     const res = await fetch(
-      `http://wrong-region-site.s3-website.us-east-1.localhost:${port}/index.html`,
+      `http://wrong-region-site.s3-website.us-east-1.sim-aws.localhost:${port}/index.html`,
     );
 
     assertIdentical(res.status, 404);
@@ -174,7 +174,7 @@ describe("Simulated S3 local HTTP controller", () => {
 
   it("responds HTTP 405 for unsupported methods", async () => {
     const res = await fetch(
-      `http://method-not-allowed-site.s3-website.eu-west-2.localhost:${port}/index.html`,
+      `http://method-not-allowed-site.s3-website.eu-west-2.sim-aws.localhost:${port}/index.html`,
       { method: "POST" },
     );
 
