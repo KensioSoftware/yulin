@@ -3,9 +3,10 @@ import http, {
   type Server,
   type ServerResponse,
 } from "node:http";
-import type { SimAws } from "../service/aws/sim-aws.js";
-import { SimAwsLocalServiceResolver } from "./sim-aws-local-service-resolver.js";
-import { SimAwsServiceControllerContainer } from "./sim-aws-service-controller-container.js";
+import { SimAwsLocalServiceResolver } from "../resolve/sim-aws-local-service-resolver.js";
+import { SimAwsServiceControllerContainer } from "../controller/sim-aws-service-controller-container.js";
+import type { SimAws } from "../../service/aws/sim-aws.js";
+import { SimAwsHttpRequest, SimAwsHttpResponse } from "./sim-aws-req-res.js";
 
 const defaultServePort = 0; // Find an available port.
 
@@ -34,24 +35,23 @@ export class SimAwsLocalServer {
   }
 
   private async handleRequest(
-    request: IncomingMessage,
-    response: ServerResponse,
+    nodeRequest: IncomingMessage,
+    nodeResponse: ServerResponse,
   ): Promise<void> {
+    const request = new SimAwsHttpRequest(nodeRequest);
+    const response = new SimAwsHttpResponse(nodeResponse);
+
     try {
-      const hostname = this.hostnameFromHostHeader(request.headers.host);
+      const hostname = this.hostnameFromHostHeader(request.host);
       /* v8 ignore if -- Node HTTP server rejects this situation earlier */
       if (hostname === undefined) {
-        this.sendText(response, 400, "Missing Host header\n");
+        response.sendText(400, "Missing Host header\n");
         return;
       }
 
       const target = this.serviceResolver.resolveHost(hostname);
       if (target === undefined) {
-        this.sendText(
-          response,
-          501,
-          `Unknown simulated AWS host ${hostname} \n`,
-        );
+        response.sendText(501, `Unknown simulated AWS host ${hostname} \n`);
         return;
       }
 
@@ -59,8 +59,7 @@ export class SimAwsLocalServer {
       await controller.handleRequest(target, request, response);
     } catch (error) {
       /* v8 ignore next */
-      this.sendText(
-        response,
+      response.sendText(
         500,
         error instanceof Error
           ? `${error.message}\n`
@@ -85,18 +84,6 @@ export class SimAwsLocalServer {
     }
 
     return hostname;
-  }
-
-  private sendText(
-    response: ServerResponse,
-    statusCode: number,
-    body: string,
-  ): void {
-    response.writeHead(statusCode, {
-      "content-type": "text/plain; charset=utf-8",
-      "content-length": Buffer.byteLength(body),
-    });
-    response.end(body);
   }
 }
 
