@@ -1,0 +1,73 @@
+import { describe, it } from "vitest";
+import {
+  assertIdentical,
+  assertNonNullable,
+  assertUndefined,
+} from "@kensio/smartass";
+import { SimAwsLocalServiceResolver } from "./sim-aws-local-service-resolver.js";
+
+describe("SimAwsLocalServiceResolver", () => {
+  it("resolves S3 website localhost host", () => {
+    const resolver = new SimAwsLocalServiceResolver();
+
+    const target = resolver.resolveHost(
+      "bucket-a.s3-website.eu-west-1.localhost",
+    );
+
+    assertNonNullable(target);
+    assertIdentical(target.service, "s3");
+    assertIdentical(target.resourceName, "bucket-a");
+    assertIdentical(target.regionName, "eu-west-1");
+  });
+
+  it("resolves dotted S3 website resource name", () => {
+    const resolver = new SimAwsLocalServiceResolver();
+
+    const target = resolver.resolveHost(
+      "foo.bar.s3-website.eu-west-1.localhost",
+    );
+
+    assertNonNullable(target);
+    assertIdentical(target.service, "s3");
+    assertIdentical(target.resourceName, "foo.bar");
+    assertIdentical(target.regionName, "eu-west-1");
+  });
+
+  it("returns undefined for non-localhost host", () => {
+    const resolver = new SimAwsLocalServiceResolver();
+
+    assertUndefined(
+      resolver.resolveHost("bucket-a.s3-website.eu-west-1.example.com"),
+    );
+  });
+
+  it("returns undefined for host without resource name", () => {
+    const resolver = new SimAwsLocalServiceResolver();
+
+    assertUndefined(resolver.resolveHost("s3-website.eu-west-1.localhost"));
+  });
+
+  it("returns undefined for host without region name", () => {
+    const resolver = new SimAwsLocalServiceResolver();
+
+    assertUndefined(resolver.resolveHost("bucket-a.s3-website.localhost"));
+  });
+
+  it("returns undefined for unknown service label", () => {
+    const resolver = new SimAwsLocalServiceResolver();
+
+    assertUndefined(resolver.resolveHost("bucket-a.s3.eu-west-1.localhost"));
+  });
+
+  it("returns undefined for empty resource name", () => {
+    const resolver = new SimAwsLocalServiceResolver();
+
+    assertUndefined(resolver.resolveHost(".s3-website.eu-west-1.localhost"));
+  });
+
+  it("returns undefined for empty region name", () => {
+    const resolver = new SimAwsLocalServiceResolver();
+
+    assertUndefined(resolver.resolveHost("bucket-a.s3-website..localhost"));
+  });
+});

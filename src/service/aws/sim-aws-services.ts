@@ -1,4 +1,4 @@
-import type { SimDynamoDb } from "../dynamodb/sim-dynamodb.js";
+import type { SimDynamoDb } from "../dynamodb/index.js";
 import type { SimS3 } from "../s3/sim-s3.js";
 import type { SimAwsAccountId } from "./sim-aws-account.js";
 import type { AwsRegionName } from "./sim-aws-region.js";
@@ -21,3 +21,7 @@ export interface SimAwsAccountRegionScopes {
     regionName?: AwsRegionName,
   ): SimAwsAccountRegionContainer;
 }
+
+export const SIM_AWS_SERVICE_NAMES = ["dynamodb", "s3"] as const;
+
+export type SimAwsServiceName = (typeof SIM_AWS_SERVICE_NAMES)[number];

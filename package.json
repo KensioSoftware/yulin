@@ -22,19 +22,31 @@
     "isolated"
   ],
   "exports": {
+    "./package.json": "./package.json",
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
     },
     "./cloudfront": {
-      "types": "./dist/service/cloudfront/index.d.ts",
-      "import": "./dist/service/cloudfront/index.js"
+      "import": "./dist/service/cloudfront/index.js",
+      "types": "./dist/service/cloudfront/index.d.ts"
     },
     "./cloudfront/globals": {
-      "types": "./dist/service/cloudfront/globals.d.ts",
-      "import": "./dist/service/cloudfront/globals.js"
+      "import": "./dist/service/cloudfront/globals.js",
+      "types": "./dist/service/cloudfront/globals.d.ts"
     },
-    "./package.json": "./package.json"
+    "./dynamodb": {
+      "import": "./dist/service/dynamodb/index.js",
+      "types": "./dist/service/dynamodb/index.d.ts"
+    },
+    "./s3": {
+      "import": "./dist/service/s3/index.js",
+      "types": "./dist/service/s3/index.d.ts"
+    },
+    "./serve": {
+      "import": "./dist/serve/index.js",
+      "types": "./dist/serve/index.d.ts"
+    }
   },
   "files": [
     "dist",
