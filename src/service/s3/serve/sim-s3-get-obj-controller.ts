@@ -1,11 +1,7 @@
 import type { SimS3Bucket } from "../bucket/s3-bucket.js";
-import type {
-  SimAwsHttpRequest,
-  SimAwsHttpResponse,
-} from "../../../serve/http/sim-aws-req-res.js";
 
 /**
- * Serves a simulated S3 Object over localhost HTTP.
+ * Serves a simulated S3 Object over HTTP.
  */
 export class SimS3GetObjectController {
   /**
@@ -14,28 +10,36 @@ export class SimS3GetObjectController {
   async handleRequest(
     bucket: SimS3Bucket,
     objectKey: string,
-    request: SimAwsHttpRequest,
-    response: SimAwsHttpResponse,
-  ): Promise<void> {
+    request: Request,
+  ): Promise<Response> {
     const object = await bucket.getObject(objectKey);
 
     if (object === undefined) {
-      response.sendText(404, "Object not found\n");
-      return;
+      return new Response("Object not found\n", {
+        status: 404,
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+        },
+      });
     }
 
     const contentType = object.metadata.values["content-type"];
 
     const headers = {
-      "content-length": object.body.length,
+      "content-length": String(object.body.length),
       ...(contentType === undefined ? {} : { "content-type": contentType }),
     };
 
     if (request.method === "HEAD") {
-      response.sendHead(200, headers);
-      return;
+      return new Response(undefined, {
+        status: 200,
+        headers,
+      });
     }
 
-    response.send(200, object.body, headers);
+    return new Response(object.body, {
+      status: 200,
+      headers,
+    });
   }
 }

@@ -10,6 +10,8 @@ npm i -D @kensio/yulin
 
 ## Usage
 
+### Direct interaction with simulated AWS
+
 Create and interact directly with a simulated AWS:
 
 ```typescript
@@ -54,6 +56,36 @@ await simS3.createBucket(new CreateBucketCommand({ Bucket: "foo-bucket" }));
 ```
 
 That simulated service then has its own isolated state.
+
+### Serve simulated AWS on localhost
+
+You can listen on a port to serve your simulated AWS on localhost:
+
+```typescript
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const srv = await serveSimAws(simAws); // Chooses available port on localhost.
+
+const simS3 = srv.simAws.region("eu-west-2").s3();
+await simS3.createBucket(new CreateBucketCommand({ Bucket: "foo-site" }));
+await simS3.putObject(
+    new PutObjectCommand({
+       Bucket: "foo-site",
+       Key: "index.html",
+       Body: "<h1>Hello, world!</h1>",
+       Metadata: {
+          "content-type": "text/html; charset=utf-8",
+       },
+    }),
+);
+
+// Fetch from the simulated S3 bucket via port on localhost.
+const res = await fetch(
+    `http://foo-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/index.html`,
+);
+```
 
 ## What is yulin?
 

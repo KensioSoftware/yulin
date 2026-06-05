@@ -5,35 +5,21 @@ import {
   assertStringIncludes,
 } from "@kensio/smartass";
 import { afterAll, beforeAll, describe, it } from "vitest";
-import type { Server } from "node:http";
-import { SimAws } from "../../aws/sim-aws.js";
-import { serveSimAws } from "../../../serve/index.js";
+import { SimAwsLocalServer } from "../../../serve/index.js";
 
 describe("Simulated S3 local HTTP controller", () => {
-  let server: Server | undefined;
-  let port = "";
-  let simAws: SimAws;
+  const srv: SimAwsLocalServer = new SimAwsLocalServer();
 
   beforeAll(async () => {
-    simAws = new SimAws();
-
-    server = serveSimAws(simAws);
-    await new Promise<void>((resolve) => {
-      server?.once("listening", resolve);
-    });
-    const address = server.address();
-    if (address === null || typeof address === "string") {
-      throw new Error("Expected local HTTP server to listen on a TCP port");
-    }
-    port = String(address.port);
+    await srv.listen();
   });
 
   afterAll(() => {
-    server?.close();
+    srv.close();
   });
 
   it("serves an S3 Object body and content type over HTTP GET", async () => {
-    const simS3 = simAws.region("eu-west-2").s3();
+    const simS3 = srv.simAws.region("eu-west-2").s3();
 
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "foo-site" }));
     await simS3.putObject(
@@ -48,7 +34,7 @@ describe("Simulated S3 local HTTP controller", () => {
     );
 
     const res = await fetch(
-      `http://foo-site.s3-website.eu-west-2.sim-aws.localhost:${port}/index.html`,
+      `http://foo-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/index.html`,
     );
 
     assertIdentical(res.status, 200);
@@ -63,7 +49,7 @@ describe("Simulated S3 local HTTP controller", () => {
   });
 
   it("serves S3 Object headers without a body over HTTP HEAD", async () => {
-    const simS3 = simAws.region("eu-west-2").s3();
+    const simS3 = srv.simAws.region("eu-west-2").s3();
 
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "head-site" }));
     await simS3.putObject(
@@ -78,7 +64,7 @@ describe("Simulated S3 local HTTP controller", () => {
     );
 
     const res = await fetch(
-      `http://head-site.s3-website.eu-west-2.sim-aws.localhost:${port}/index.html`,
+      `http://head-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/index.html`,
       { method: "HEAD" },
     );
 
@@ -92,7 +78,7 @@ describe("Simulated S3 local HTTP controller", () => {
   });
 
   it("decodes URL-encoded Object keys from the request path", async () => {
-    const simS3 = simAws.region("eu-west-2").s3();
+    const simS3 = srv.simAws.region("eu-west-2").s3();
 
     await simS3.createBucket(
       new CreateBucketCommand({ Bucket: "encoded-path-site" }),
@@ -109,7 +95,7 @@ describe("Simulated S3 local HTTP controller", () => {
     );
 
     const res = await fetch(
-      `http://encoded-path-site.s3-website.eu-west-2.sim-aws.localhost:${port}/folder/hello%20world.txt`,
+      `http://encoded-path-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/folder/hello%20world.txt`,
     );
 
     assertIdentical(res.status, 200);
@@ -117,12 +103,12 @@ describe("Simulated S3 local HTTP controller", () => {
   });
 
   it("responds HTTP 501 for S3 Bucket index requests", async () => {
-    const simS3 = simAws.region("eu-west-2").s3();
+    const simS3 = srv.simAws.region("eu-west-2").s3();
 
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "index-site" }));
 
     const res = await fetch(
-      `http://index-site.s3-website.eu-west-2.sim-aws.localhost:${port}/`,
+      `http://index-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/`,
     );
 
     assertIdentical(res.status, 501);
@@ -131,14 +117,14 @@ describe("Simulated S3 local HTTP controller", () => {
   });
 
   it("responds HTTP 404 for missing S3 Objects", async () => {
-    const simS3 = simAws.region("eu-west-2").s3();
+    const simS3 = srv.simAws.region("eu-west-2").s3();
 
     await simS3.createBucket(
       new CreateBucketCommand({ Bucket: "missing-object-site" }),
     );
 
     const res = await fetch(
-      `http://missing-object-site.s3-website.eu-west-2.sim-aws.localhost:${port}/missing.txt`,
+      `http://missing-object-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/missing.txt`,
     );
 
     assertIdentical(res.status, 404);
@@ -147,7 +133,7 @@ describe("Simulated S3 local HTTP controller", () => {
   });
 
   it("responds HTTP 404 when the hostname region differs from the Bucket region", async () => {
-    const simS3 = simAws.region("eu-west-2").s3();
+    const simS3 = srv.simAws.region("eu-west-2").s3();
 
     await simS3.createBucket(
       new CreateBucketCommand({ Bucket: "wrong-region-site" }),
@@ -161,7 +147,7 @@ describe("Simulated S3 local HTTP controller", () => {
     );
 
     const res = await fetch(
-      `http://wrong-region-site.s3-website.us-east-1.sim-aws.localhost:${port}/index.html`,
+      `http://wrong-region-site.s3-website.us-east-1.sim-aws.localhost:${srv.port}/index.html`,
     );
 
     assertIdentical(res.status, 404);
@@ -174,7 +160,7 @@ describe("Simulated S3 local HTTP controller", () => {
 
   it("responds HTTP 405 for unsupported methods", async () => {
     const res = await fetch(
-      `http://method-not-allowed-site.s3-website.eu-west-2.sim-aws.localhost:${port}/index.html`,
+      `http://method-not-allowed-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/index.html`,
       { method: "POST" },
     );
 

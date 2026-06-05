@@ -41,12 +41,21 @@ export class PutObjectCommandHandler implements CommandHandler<
     const object = new SimS3Object(
       cmd.input.Key,
       PutObjectCommandHandler.toBuffer(cmd.input.Body),
-      new SimS3ObjectMetadata(cmd.input.Metadata),
+      new SimS3ObjectMetadata(PutObjectCommandHandler.toMetadata(cmd)),
     );
     await bucket.putObject(object);
 
     return {
       $metadata: {},
+    };
+  }
+
+  private static toMetadata(cmd: PutObjectCommand): Record<string, string> {
+    return {
+      ...cmd.input.Metadata,
+      ...(cmd.input.ContentType === undefined
+        ? {}
+        : { "content-type": cmd.input.ContentType }),
     };
   }
 

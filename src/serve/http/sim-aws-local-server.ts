@@ -3,24 +3,21 @@ import http, {
   type Server,
   type ServerResponse,
 } from "node:http";
-import { SimAwsLocalServiceResolver } from "../resolve/sim-aws-local-service-resolver.js";
-import { SimAwsServiceControllerContainer } from "../controller/sim-aws-service-controller-container.js";
-import type { SimAws } from "../../service/aws/sim-aws.js";
-import { SimAwsHttpRequest, SimAwsHttpResponse } from "./sim-aws-req-res.js";
-
-const defaultServePort = 0; // Find an available port.
+import { SimAws } from "../../service/aws/sim-aws.js";
+import { simAwsLocalConf } from "./sim-aws-local.conf.js";
+import { SimAwsHttp } from "./sim-aws-http.js";
+import { assertDefined } from "../../util/defined.js";
 
 /**
  * Local HTTP server for a simulated AWS environment.
+ * Useful for local integration testing and local development.
  */
 export class SimAwsLocalServer {
-  private readonly serviceResolver: SimAwsLocalServiceResolver;
-  private readonly controllers: SimAwsServiceControllerContainer;
+  private readonly simAwsHttp: SimAwsHttp;
   private readonly server: Server;
 
-  constructor(simAws: SimAws) {
-    this.serviceResolver = new SimAwsLocalServiceResolver();
-    this.controllers = new SimAwsServiceControllerContainer(simAws);
+  constructor(public readonly simAws: SimAws = new SimAws()) {
+    this.simAwsHttp = new SimAwsHttp(simAws);
     this.server = http.createServer((request, response) => {
       void this.handleRequest(request, response);
     });
@@ -29,71 +26,148 @@ export class SimAwsLocalServer {
   /**
    * Start serving simulated AWS services on localhost.
    */
-  listen(port: number = defaultServePort): Server {
-    this.server.listen(port, "127.0.0.1");
-    return this.server;
+  async listen(port: number = simAwsLocalConf.defaultPort): Promise<this> {
+    this.server.listen(port, this.hostname);
+    await this.waitForListening();
+    return this;
+  }
+
+  /**
+   * Get the hostname on which this local server is listening.
+   */
+  get hostname(): string {
+    return simAwsLocalConf.hostname;
+  }
+
+  /**
+   * Get the TCP port on which this local server is listening.
+   */
+  get port(): string {
+    if (!this.server.listening) {
+      throw new Error("Server is not yet listening, cannot get port number");
+    }
+
+    const address = this.server.address();
+    /* v8 ignore if -- does not happen in practice */
+    if (address === null || typeof address === "string") {
+      throw new Error("Expected local HTTP server to listen on a TCP port");
+    }
+
+    return String(address.port);
+  }
+
+  /**
+   * Stop serving simulated AWS services.
+   */
+  close(): void {
+    this.server.close();
+  }
+
+  private async waitForListening(): Promise<void> {
+    /* v8 ignore if -- cannot happen in practice */
+    if (this.server.listening) {
+      return;
+    }
+
+    await new Promise<void>((resolve, reject) => {
+      const listening = (): void => {
+        cleanup();
+        resolve();
+      };
+
+      /* v8 ignore next */
+      const error = (cause: Error): void => {
+        cleanup();
+        reject(cause);
+      };
+
+      const cleanup = (): void => {
+        this.server.off("listening", listening);
+        this.server.off("error", error);
+      };
+
+      this.server.once("listening", listening);
+      this.server.once("error", error);
+    });
   }
 
   private async handleRequest(
     nodeRequest: IncomingMessage,
     nodeResponse: ServerResponse,
   ): Promise<void> {
-    const request = new SimAwsHttpRequest(nodeRequest);
-    const response = new SimAwsHttpResponse(nodeResponse);
+    const request = this.nodeRequestToFetchRequest(nodeRequest);
+    const response = await this.simAwsHttp.handleRequest(request);
 
-    try {
-      const hostname = this.hostnameFromHostHeader(request.host);
-      /* v8 ignore if -- Node HTTP server rejects this situation earlier */
-      if (hostname === undefined) {
-        response.sendText(400, "Missing Host header\n");
-        return;
-      }
-
-      const target = this.serviceResolver.resolveHost(hostname);
-      if (target === undefined) {
-        response.sendText(501, `Unknown simulated AWS host ${hostname} \n`);
-        return;
-      }
-
-      const controller = this.controllers.controllerForService(target.service);
-      await controller.handleRequest(target, request, response);
-    } catch (error) {
-      /* v8 ignore next */
-      response.sendText(
-        500,
-        error instanceof Error
-          ? `${error.message}\n`
-          : "Internal server error\n",
-      );
-    }
+    await this.sendFetchResponse(nodeResponse, response);
   }
 
-  private hostnameFromHostHeader(
-    hostHeader: string | undefined,
-  ): string | undefined {
-    /* v8 ignore if -- Node HTTP server rejects this situation earlier */
-    if (hostHeader === undefined) {
-      return undefined;
+  private nodeRequestToFetchRequest(nodeRequest: IncomingMessage): Request {
+    const host = nodeRequest.headers.host;
+    assertDefined(host, "local sim server nodeRequest.headers.host");
+    const url = new URL(nodeRequest.url ?? "/", `http://${host}`);
+
+    return new Request(url, {
+      method: nodeRequest.method,
+      headers: this.nodeRequestHeaders(nodeRequest),
+      body:
+        nodeRequest.method === "GET" || nodeRequest.method === "HEAD"
+          ? undefined
+          : nodeRequest,
+      duplex:
+        nodeRequest.method === "GET" || nodeRequest.method === "HEAD"
+          ? undefined
+          : "half",
+    } as RequestInit);
+  }
+
+  private nodeRequestHeaders(nodeRequest: IncomingMessage): Headers {
+    const headers = new Headers();
+
+    for (const [name, value] of Object.entries(nodeRequest.headers)) {
+      /* v8 ignore if -- does not happen in practice */
+      if (value === undefined) {
+        continue;
+      }
+
+      if (Array.isArray(value)) {
+        for (const item of value) {
+          headers.append(name, item);
+        }
+        continue;
+      }
+
+      headers.set(name, value);
     }
 
-    const hostname = hostHeader.split(":")[0]?.toLowerCase();
+    return headers;
+  }
 
-    /* v8 ignore if -- Node HTTP server rejects this situation earlier */
-    if (hostname === undefined || hostname.length === 0) {
-      return undefined;
+  private async sendFetchResponse(
+    nodeResponse: ServerResponse,
+    response: Response,
+  ): Promise<void> {
+    nodeResponse.writeHead(
+      response.status,
+      Object.fromEntries(response.headers.entries()),
+    );
+
+    if (response.body === null) {
+      nodeResponse.end();
+      return;
     }
 
-    return hostname;
+    const body = Buffer.from(await response.arrayBuffer());
+    nodeResponse.end(body);
   }
 }
 
 /**
  * Serve a simulated AWS environment on localhost.
  */
-export function serveSimAws(
-  simAws: SimAws,
-  port: number = defaultServePort,
-): Server {
+export async function serveSimAws(
+  simAws: SimAws = new SimAws(),
+  port: number = simAwsLocalConf.defaultPort,
+): Promise<SimAwsLocalServer> {
   const server = new SimAwsLocalServer(simAws);
   return server.listen(port);
 }
