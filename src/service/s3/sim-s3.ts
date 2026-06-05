@@ -1,4 +1,4 @@
-import type { SimS3BucketName, SimS3Bucket } from "./bucket/s3-bucket.js";
+import type { SimS3Bucket, SimS3BucketName } from "./bucket/s3-bucket.js";
 import type {
   CreateBucketCommand,
   CreateBucketCommandOutput,
@@ -13,7 +13,6 @@ import type {
 } from "@aws-sdk/client-s3";
 import { CreateBucketCommandHandler } from "./command/create-bucket/create-bucket.handler.js";
 import { ListBucketsCommandHandler } from "./command/list-buckets/list-buckets.handler.js";
-import { assertDefined } from "../../util/defined.js";
 import { PutObjectCommandHandler } from "./command/put-object/put-object.handler.js";
 import { GetObjectCommandHandler } from "./command/get-object/get-object.handler.js";
 import { ListObjectsCommandHandler } from "./command/list-objects/list-objects.handler.js";
@@ -87,9 +86,7 @@ export class SimS3 {
   /**
    * Get a simulated S3 Bucket instance by name.
    */
-  getSimBucketByName(bucketName: SimS3BucketName): SimS3Bucket {
-    const simBucket = this.buckets.get(bucketName);
-    assertDefined(simBucket, `Simulated S3 Bucket named '${bucketName}'`);
-    return simBucket;
+  getSimBucketByName(bucketName: SimS3BucketName): SimS3Bucket | undefined {
+    return this.buckets.get(bucketName);
   }
 }

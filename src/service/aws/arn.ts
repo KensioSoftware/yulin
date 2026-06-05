@@ -5,15 +5,17 @@ import {
 } from "./sim-aws-account.js";
 import { DynamicFactory } from "@kensio/part-factory";
 import { faker } from "@faker-js/faker";
+import {
+  SIM_AWS_SERVICE_NAMES,
+  type SimAwsServiceName,
+} from "./sim-aws-services.js";
 
 export type SimArn =
-  `arn:aws:${string}:${AwsRegionName}:${SimAwsAccountId}:${string}/${string}`;
-
-type SimArnServiceName = "dynamodb" | "s3";
+  `arn:aws:${SimAwsServiceName}:${AwsRegionName}:${SimAwsAccountId}:${string}/${string}`;
 
 export interface SimArnComponents {
   partition: "aws";
-  service: SimArnServiceName;
+  service: SimAwsServiceName;
   region: AwsRegionName;
   accountId: SimAwsAccountId;
   resourceType: string;
@@ -22,7 +24,7 @@ export interface SimArnComponents {
 
 const simArnComponentsFactory = new DynamicFactory<SimArnComponents>(() => ({
   partition: "aws",
-  service: faker.helpers.arrayElement(["dynamodb", "s3"]),
+  service: faker.helpers.arrayElement(SIM_AWS_SERVICE_NAMES),
   region: makeAwsRegionName(),
   accountId: makeSimAwsAccountId(),
   resourceType: "resource",

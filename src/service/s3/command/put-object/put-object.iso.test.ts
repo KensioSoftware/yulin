@@ -1,21 +1,27 @@
 import { describe, it } from "vitest";
-import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import {
+  CreateBucketCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
 import {
   assertBufferEqual,
   assertIdentical,
-  assertNonNullable,
+  assertInstanceOf,
   assertStringIncludes,
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
-import type { SimS3BucketName } from "../../bucket/s3-bucket.js";
+import { simS3BodyToBuffer } from "../../storage/s3-body-buffer.js";
 import { SimAws } from "../../../aws/sim-aws.js";
+import { Readable } from "node:stream";
+import type { SimS3BucketName } from "../../bucket/s3-bucket.js";
 
 describe("S3 PutObjectCommand", () => {
   it("puts an Object into an S3 Bucket", async () => {
     const simAws = new SimAws();
     const simS3 = simAws.s3();
 
-    const bucketName = "bucket-a" as SimS3BucketName;
+    const bucketName = "bucket-a";
 
     await simS3.createBucket(new CreateBucketCommand({ Bucket: bucketName }));
 
@@ -30,20 +36,26 @@ describe("S3 PutObjectCommand", () => {
       }),
     );
 
-    const simBucket = simS3.getSimBucketByName(bucketName);
-    const simObject = await simBucket.getObject("foo.txt");
+    const getObjectOutput = await simS3.getObject(
+      new GetObjectCommand({
+        Bucket: bucketName,
+        Key: "foo.txt",
+      }),
+    );
 
-    assertNonNullable(simObject);
-    assertIdentical(simObject.key, "foo.txt");
-    assertBufferEqual(simObject.body, Buffer.from("Hello, world!"));
-    assertIdentical(simObject.metadata.values["foo"], "bar");
+    assertInstanceOf(getObjectOutput.Body, Readable);
+    assertBufferEqual(
+      await simS3BodyToBuffer(getObjectOutput.Body),
+      Buffer.from("Hello, world!"),
+    );
+    assertIdentical(getObjectOutput.Metadata?.["foo"], "bar");
   });
 
   it("puts an Object with Uint8Array body", async () => {
     const simAws = new SimAws();
     const simS3 = simAws.s3();
 
-    const bucketName = "bucket-a" as SimS3BucketName;
+    const bucketName = "bucket-a";
 
     await simS3.createBucket(new CreateBucketCommand({ Bucket: bucketName }));
 
@@ -55,11 +67,18 @@ describe("S3 PutObjectCommand", () => {
       }),
     );
 
-    const simBucket = simS3.getSimBucketByName(bucketName);
-    const simObject = await simBucket.getObject("foo.bin");
+    const getObjectOutput = await simS3.getObject(
+      new GetObjectCommand({
+        Bucket: bucketName,
+        Key: "foo.bin",
+      }),
+    );
 
-    assertNonNullable(simObject);
-    assertBufferEqual(simObject.body, Buffer.from([1, 2, 3]));
+    assertInstanceOf(getObjectOutput.Body, Readable);
+    assertBufferEqual(
+      await simS3BodyToBuffer(getObjectOutput.Body),
+      Buffer.from([1, 2, 3]),
+    );
   });
 
   it("rejects undefined bucket name", async () => {
