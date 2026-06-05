@@ -8,6 +8,8 @@ import type {
   ListBucketsCommandOutput,
   ListObjectsCommand,
   ListObjectsCommandOutput,
+  PutBucketWebsiteCommand,
+  PutBucketWebsiteCommandOutput,
   PutObjectCommand,
   PutObjectCommandOutput,
 } from "@aws-sdk/client-s3";
@@ -21,6 +23,7 @@ import {
   type SimAwsAccountRegionScope,
   simAwsAccountRegionScopeFactory,
 } from "../aws/sim-aws-account-region-scope.js";
+import { PutBucketWebsiteCommandHandler } from "./command/put-bucket-website/put-bucket-website.handler.js";
 
 /**
  * Simulated S3. Handles SDK commands. Emulates AWS behaviour and state.
@@ -44,6 +47,16 @@ export class SimS3 {
       this.buckets,
       this.s3GlobalRegistry,
     );
+    return await handler.handle(cmd);
+  }
+
+  /**
+   * Handle a Put Bucket Website Command from the SDK.
+   */
+  async putBucketWebsite(
+    cmd: PutBucketWebsiteCommand,
+  ): Promise<PutBucketWebsiteCommandOutput> {
+    const handler = new PutBucketWebsiteCommandHandler(this.buckets);
     return await handler.handle(cmd);
   }
 
