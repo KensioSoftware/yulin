@@ -1,7 +1,10 @@
-import type { IncomingMessage, ServerResponse } from "node:http";
-import type { SimAws } from "../service/aws/sim-aws.js";
-import type { AwsRegionName } from "../service/aws/sim-aws-region.js";
-import type { SimAwsServiceName } from "../service/aws/sim-aws-services.js";
+import type { SimAwsServiceName } from "../../service/aws/sim-aws-services.js";
+import type { AwsRegionName } from "../../service/aws/sim-aws-region.js";
+import type { SimAws } from "../../service/aws/sim-aws.js";
+import type {
+  SimAwsHttpRequest,
+  SimAwsHttpResponse,
+} from "../http/sim-aws-req-res.js";
 
 export interface SimAwsServiceTarget {
   readonly service: SimAwsServiceName;
@@ -25,7 +28,7 @@ export interface SimAwsServiceController {
    */
   handleRequest(
     target: SimAwsServiceTarget,
-    request: IncomingMessage,
-    response: ServerResponse,
+    request: SimAwsHttpRequest,
+    response: SimAwsHttpResponse,
   ): Promise<void>;
 }

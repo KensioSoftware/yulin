@@ -5,8 +5,8 @@ import {
   assertStringIncludes,
   assertThrowsError,
 } from "@kensio/smartass";
-import { SimAws } from "../service/aws/sim-aws.js";
-import { SimS3ServiceController } from "../service/s3/serve/sim-s3-controller.js";
+import { SimAws } from "../../service/aws/sim-aws.js";
+import { SimS3ServiceController } from "../../service/s3/serve/sim-s3-controller.js";
 import { SimAwsServiceControllerContainer } from "./sim-aws-service-controller-container.js";
 
 describe("SimAwsServiceControllerContainer", () => {

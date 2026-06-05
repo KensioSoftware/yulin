@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, it } from "vitest";
 import http, { type Server } from "node:http";
 import { assertIdentical, assertStringIncludes } from "@kensio/smartass";
-import { SimAws } from "../service/aws/sim-aws.js";
+import { SimAws } from "../../service/aws/sim-aws.js";
 import { serveSimAws } from "./sim-aws-local-server.js";
 
 describe("Simulated AWS local HTTP server", () => {

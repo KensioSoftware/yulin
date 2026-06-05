@@ -1,9 +1,11 @@
 import { assertIdentical, assertStringIncludes } from "@kensio/smartass";
 import { describe, it } from "vitest";
-import type { IncomingMessage, ServerResponse } from "node:http";
+import type { ServerResponse } from "node:http";
 import { SimAws } from "../../aws/sim-aws.js";
 import { SimS3ServiceController } from "./sim-s3-controller.js";
 import type { SimS3BucketName } from "../bucket/s3-bucket.js";
+import { SimAwsHttpResponse } from "../../../serve/http/sim-aws-req-res.js";
+import { makeSimAwsHttpRequest } from "../../../serve/http/sim-aws-req-res.factory.js";
 
 describe("Simulated S3 local HTTP controller", () => {
   it("responds HTTP 400 for missing S3 Bucket name", async () => {
@@ -15,12 +17,12 @@ describe("Simulated S3 local HTTP controller", () => {
         resourceName: "",
         regionName: "eu-west-2",
       },
-      mockRequest({
+      makeSimAwsHttpRequest({
         method: "GET",
         host: "s3-website.eu-west-2.localhost",
         url: "/index.html",
       }),
-      res.asServerResponse(),
+      mockResponse(res),
     );
 
     assertIdentical(res.statusCode, 400);
@@ -35,37 +37,16 @@ describe("Simulated S3 local HTTP controller", () => {
         service: "s3",
         resourceName: "foo-site",
       },
-      mockRequest({
+      makeSimAwsHttpRequest({
         method: "GET",
         host: "foo-site.s3-website.localhost",
         url: "/index.html",
       }),
-      res.asServerResponse(),
+      mockResponse(res),
     );
 
     assertIdentical(res.statusCode, 400);
     assertStringIncludes(res.body, "Missing S3 Bucket region");
-  });
-
-  it("responds HTTP 400 for missing host header", async () => {
-    const res = new MockServerResponse();
-
-    await new SimS3ServiceController(new SimAws()).handleRequest(
-      {
-        service: "s3",
-        resourceName: "foo-site",
-        regionName: "eu-west-2",
-      },
-      mockRequest({
-        method: "GET",
-        host: undefined,
-        url: "/index.html",
-      }),
-      res.asServerResponse(),
-    );
-
-    assertIdentical(res.statusCode, 400);
-    assertStringIncludes(res.body, "Missing host header");
   });
 
   it("responds HTTP 404 when the Bucket is registered but missing from its scope", async () => {
@@ -83,12 +64,12 @@ describe("Simulated S3 local HTTP controller", () => {
         resourceName: "ghost-site",
         regionName: "eu-west-2",
       },
-      mockRequest({
+      makeSimAwsHttpRequest({
         method: "GET",
         host: "ghost-site.s3-website.eu-west-2.localhost",
         url: "/index.html",
       }),
-      res.asServerResponse(),
+      mockResponse(res),
     );
 
     assertIdentical(res.statusCode, 404);
@@ -96,22 +77,8 @@ describe("Simulated S3 local HTTP controller", () => {
   });
 });
 
-function mockRequest({
-  method,
-  host,
-  url,
-}: {
-  readonly method: string;
-  readonly host: string | undefined;
-  readonly url: string;
-}): IncomingMessage {
-  return {
-    method,
-    url,
-    headers: {
-      ...(host === undefined ? {} : { host }),
-    },
-  } as IncomingMessage;
+function mockResponse(response: MockServerResponse): SimAwsHttpResponse {
+  return new SimAwsHttpResponse(response.asServerResponse());
 }
 
 class MockServerResponse {

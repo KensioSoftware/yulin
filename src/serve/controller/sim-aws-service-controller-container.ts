@@ -1,7 +1,7 @@
-import type { SimAws } from "../service/aws/sim-aws.js";
-import type { SimAwsServiceName } from "../service/aws/sim-aws-services.js";
-import { SimS3ServiceController } from "../service/s3/serve/sim-s3-controller.js";
-import { Memo } from "../util/memo/memo.js";
+import type { SimAws } from "../../service/aws/sim-aws.js";
+import type { SimAwsServiceName } from "../../service/aws/sim-aws-services.js";
+import { SimS3ServiceController } from "../../service/s3/serve/sim-s3-controller.js";
+import { Memo } from "../../util/memo/memo.js";
 import type {
   SimAwsServiceController,
   SimAwsServiceControllerFactory,

@@ -1,5 +1,5 @@
-import type { SimAwsServiceTarget } from "./sim-service-controller.js";
-import type { AwsRegionName } from "../service/aws/sim-aws-region.js";
+import type { SimAwsServiceTarget } from "../controller/sim-service-controller.js";
+import type { AwsRegionName } from "../../service/aws/sim-aws-region.js";
 
 const localhostSuffix = ".localhost";
 const s3WebsiteServiceLabel = "s3-website";
