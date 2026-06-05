@@ -1,4 +1,8 @@
-import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import {
+  CreateBucketCommand,
+  PutBucketWebsiteCommand,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
 import { describe, it } from "vitest";
 import { assertIdentical, assertStringIncludes } from "@kensio/smartass";
 import { SimAwsHttp } from "./sim-aws-http.js";
@@ -45,26 +49,30 @@ describe("Simulated AWS HTTP", () => {
     assertStringIncludes(resBody, "S3 bucket named my-site not found");
   });
 
-  it("serves an S3 Object over simulated HTTP", async () => {
+  it("serves an S3 Object over simulated HTTP when static website hosting is configured", async () => {
     const simAws = new SimAws();
     const simAwsHttp = new SimAwsHttp(simAws);
+    const simS3 = simAws.region("eu-west-2").s3();
 
-    await simAws
-      .region("eu-west-2")
-      .s3()
-      .createBucket(new CreateBucketCommand({ Bucket: "foo-site" }));
-
-    await simAws
-      .region("eu-west-2")
-      .s3()
-      .putObject(
-        new PutObjectCommand({
-          Bucket: "foo-site",
-          Key: "index.html",
-          Body: "<h1>Hello, world!</h1>",
-          ContentType: "text/html; charset=utf-8",
-        }),
-      );
+    await simS3.createBucket(new CreateBucketCommand({ Bucket: "foo-site" }));
+    await simS3.putBucketWebsite(
+      new PutBucketWebsiteCommand({
+        Bucket: "foo-site",
+        WebsiteConfiguration: {
+          IndexDocument: {
+            Suffix: "index.html",
+          },
+        },
+      }),
+    );
+    await simS3.putObject(
+      new PutObjectCommand({
+        Bucket: "foo-site",
+        Key: "index.html",
+        Body: "<h1>Hello, world!</h1>",
+        ContentType: "text/html; charset=utf-8",
+      }),
+    );
 
     const res = await simAwsHttp.fetch(
       "http://foo-site.s3-website.eu-west-2.sim-aws.localhost/index.html",
@@ -78,29 +86,33 @@ describe("Simulated AWS HTTP", () => {
     assertIdentical(await res.text(), "<h1>Hello, world!</h1>");
   });
 
-  it("serves HEAD requests without a response body", async () => {
+  it("serves HEAD requests without a response body when static website hosting is configured", async () => {
     const simAws = new SimAws();
     const simAwsHttp = new SimAwsHttp(simAws);
+    const simS3 = simAws.region("eu-west-2").s3();
 
-    await simAws
-      .region("eu-west-2")
-      .s3()
-      .createBucket(new CreateBucketCommand({ Bucket: "foo-site" }));
-
-    await simAws
-      .region("eu-west-2")
-      .s3()
-      .putObject(
-        new PutObjectCommand({
-          Bucket: "foo-site",
-          Key: "index.html",
-          Body: "<h1>Hello, world!</h1>",
-          ContentType: "text/html; charset=utf-8",
-        }),
-      );
+    await simS3.createBucket(new CreateBucketCommand({ Bucket: "head-site" }));
+    await simS3.putBucketWebsite(
+      new PutBucketWebsiteCommand({
+        Bucket: "head-site",
+        WebsiteConfiguration: {
+          IndexDocument: {
+            Suffix: "index.html",
+          },
+        },
+      }),
+    );
+    await simS3.putObject(
+      new PutObjectCommand({
+        Bucket: "head-site",
+        Key: "index.html",
+        Body: "<h1>Hello, world!</h1>",
+        ContentType: "text/html; charset=utf-8",
+      }),
+    );
 
     const res = await simAwsHttp.fetch(
-      "http://foo-site.s3-website.eu-west-2.sim-aws.localhost/index.html",
+      "http://head-site.s3-website.eu-west-2.sim-aws.localhost/index.html",
       { method: "HEAD" },
     );
 

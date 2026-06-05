@@ -1,4 +1,8 @@
-import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import {
+  CreateBucketCommand,
+  PutBucketWebsiteCommand,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
 import {
   assertBufferEqual,
   assertIdentical,
@@ -22,6 +26,16 @@ describe("Simulated S3 local HTTP controller", () => {
     const simS3 = srv.simAws.region("eu-west-2").s3();
 
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "foo-site" }));
+    await simS3.putBucketWebsite(
+      new PutBucketWebsiteCommand({
+        Bucket: "foo-site",
+        WebsiteConfiguration: {
+          IndexDocument: {
+            Suffix: "index.html",
+          },
+        },
+      }),
+    );
     await simS3.putObject(
       new PutObjectCommand({
         Bucket: "foo-site",
@@ -52,6 +66,16 @@ describe("Simulated S3 local HTTP controller", () => {
     const simS3 = srv.simAws.region("eu-west-2").s3();
 
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "head-site" }));
+    await simS3.putBucketWebsite(
+      new PutBucketWebsiteCommand({
+        Bucket: "head-site",
+        WebsiteConfiguration: {
+          IndexDocument: {
+            Suffix: "index.html",
+          },
+        },
+      }),
+    );
     await simS3.putObject(
       new PutObjectCommand({
         Bucket: "head-site",
@@ -83,6 +107,16 @@ describe("Simulated S3 local HTTP controller", () => {
     await simS3.createBucket(
       new CreateBucketCommand({ Bucket: "encoded-path-site" }),
     );
+    await simS3.putBucketWebsite(
+      new PutBucketWebsiteCommand({
+        Bucket: "encoded-path-site",
+        WebsiteConfiguration: {
+          IndexDocument: {
+            Suffix: "index.html",
+          },
+        },
+      }),
+    );
     await simS3.putObject(
       new PutObjectCommand({
         Bucket: "encoded-path-site",
@@ -102,7 +136,7 @@ describe("Simulated S3 local HTTP controller", () => {
     assertIdentical(await res.text(), "Hello from an encoded path");
   });
 
-  it("responds HTTP 501 for S3 Bucket index requests", async () => {
+  it("does not serve S3 Bucket root requests when static website hosting is not enabled", async () => {
     const simS3 = srv.simAws.region("eu-west-2").s3();
 
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "index-site" }));
@@ -111,16 +145,26 @@ describe("Simulated S3 local HTTP controller", () => {
       `http://index-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/`,
     );
 
-    assertIdentical(res.status, 501);
+    assertIdentical(res.status, 403);
     const resBody = await res.text();
-    assertStringIncludes(resBody, "S3 Bucket indexes are not implemented");
+    assertStringIncludes(resBody, "Static website hosting is not enabled");
   });
 
-  it("responds HTTP 404 for missing S3 Objects", async () => {
+  it("responds HTTP 404 for missing S3 Objects when static website hosting is enabled", async () => {
     const simS3 = srv.simAws.region("eu-west-2").s3();
 
     await simS3.createBucket(
       new CreateBucketCommand({ Bucket: "missing-object-site" }),
+    );
+    await simS3.putBucketWebsite(
+      new PutBucketWebsiteCommand({
+        Bucket: "missing-object-site",
+        WebsiteConfiguration: {
+          IndexDocument: {
+            Suffix: "index.html",
+          },
+        },
+      }),
     );
 
     const res = await fetch(
@@ -129,7 +173,7 @@ describe("Simulated S3 local HTTP controller", () => {
 
     assertIdentical(res.status, 404);
     const resBody = await res.text();
-    assertStringIncludes(resBody, "Object not found");
+    assertStringIncludes(resBody, "Object missing.txt not found");
   });
 
   it("responds HTTP 404 when the hostname region differs from the Bucket region", async () => {

@@ -64,26 +64,39 @@ You can listen on a port to serve your simulated AWS on localhost:
 ```typescript
 import { SimAws } from "@kensio/yulin";
 import { serveSimAws } from "@kensio/yulin/serve";
+import {
+  CreateBucketCommand,
+  PutBucketWebsiteCommand,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
 
 const simAws = new SimAws();
 const srv = await serveSimAws(simAws); // Chooses available port on localhost.
 
 const simS3 = srv.simAws.region("eu-west-2").s3();
 await simS3.createBucket(new CreateBucketCommand({ Bucket: "foo-site" }));
+await simS3.putBucketWebsite(new PutBucketWebsiteCommand({
+  Bucket: "foo-site",
+  WebsiteConfiguration: {
+    IndexDocument: {
+      Suffix: "index.html",
+    },
+  },
+}));
 await simS3.putObject(
-    new PutObjectCommand({
-       Bucket: "foo-site",
-       Key: "index.html",
-       Body: "<h1>Hello, world!</h1>",
-       Metadata: {
-          "content-type": "text/html; charset=utf-8",
-       },
-    }),
+  new PutObjectCommand({
+    Bucket: "foo-site",
+    Key: "foo/index.html",
+    Body: "<h1>Hello, world!</h1>",
+    Metadata: {
+      "content-type": "text/html; charset=utf-8",
+    },
+  }),
 );
 
-// Fetch from the simulated S3 bucket via port on localhost.
+// Fetch from the simulated S3 bucket website via port on localhost.
 const res = await fetch(
-    `http://foo-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/index.html`,
+    `http://foo-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/foo/`,
 );
 ```
 

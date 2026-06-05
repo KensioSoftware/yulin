@@ -54,14 +54,6 @@ export class SimS3RequestRouter {
     const url = new URL(request.url);
     const objectKey = decodeURIComponent(url.pathname.replace(/^\/+/u, ""));
 
-    if (objectKey.length === 0) {
-      return {
-        action: "failure",
-        statusCode: 501,
-        message: "S3 Bucket indexes are not implemented\n",
-      };
-    }
-
     const bucketName = target.resourceName as SimS3BucketName;
     const bucketScope = this.simAws
       .s3GlobalRegistry()
