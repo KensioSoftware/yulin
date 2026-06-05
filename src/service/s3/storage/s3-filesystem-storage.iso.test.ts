@@ -15,10 +15,11 @@ import {
 } from "@kensio/smartass";
 import { FilesystemS3BucketStorage } from "./s3-filesystem-storage.js";
 import { SimS3Object } from "../object/s3-object.js";
+import { makeTempDir } from "../../../util/filesystem/temp-dir.js";
 
 describe("Filesystem simulated S3 storage", () => {
   it("puts and gets an Object from the filesystem", async () => {
-    const directoryPath = await makeTempStorageDirectory();
+    const directoryPath = await makeTempDir();
     const storage = new FilesystemS3BucketStorage(directoryPath);
 
     const body = Buffer.from("Hello, world!");
@@ -33,7 +34,7 @@ describe("Filesystem simulated S3 storage", () => {
   });
 
   it("gets undefined for missing Object", async () => {
-    const directoryPath = await makeTempStorageDirectory();
+    const directoryPath = await makeTempDir();
     const storage = new FilesystemS3BucketStorage(directoryPath);
 
     const object = await storage.getObject("missing.txt");
@@ -52,14 +53,14 @@ describe("Filesystem simulated S3 storage", () => {
   });
 
   it("does not allow changing storage implementation", async () => {
-    const directoryPath = await makeTempStorageDirectory();
+    const directoryPath = await makeTempDir();
     const storage = new FilesystemS3BucketStorage(directoryPath);
 
     assertFalse(storage.allowChangeStorage());
   });
 
   it("lists Objects from the filesystem", async () => {
-    const directoryPath = await makeTempStorageDirectory();
+    const directoryPath = await makeTempDir();
     const storage = new FilesystemS3BucketStorage(directoryPath);
 
     await Promise.all([
@@ -80,7 +81,7 @@ describe("Filesystem simulated S3 storage", () => {
   });
 
   it("lists Objects with prefix", async () => {
-    const directoryPath = await makeTempStorageDirectory();
+    const directoryPath = await makeTempDir();
     const storage = new FilesystemS3BucketStorage(directoryPath);
 
     await Promise.all([
@@ -100,7 +101,7 @@ describe("Filesystem simulated S3 storage", () => {
   });
 
   it("makes up reasonable Object metadata from file extension", async () => {
-    const directoryPath = await makeTempStorageDirectory();
+    const directoryPath = await makeTempDir();
     const storage = new FilesystemS3BucketStorage(directoryPath);
 
     await storage.putObject(
@@ -130,7 +131,7 @@ describe("Filesystem simulated S3 storage", () => {
     ["image.webp", "image/webp"],
     ["feed.xml", "application/xml"],
   ])("makes up %s Object content type metadata", async (key, contentType) => {
-    const directoryPath = await makeTempStorageDirectory();
+    const directoryPath = await makeTempDir();
     const storage = new FilesystemS3BucketStorage(directoryPath);
 
     await storage.putObject(new SimS3Object(key, Buffer.from(key)));
@@ -142,7 +143,7 @@ describe("Filesystem simulated S3 storage", () => {
   });
 
   it("ignores unsupported file extensions when listing Objects", async () => {
-    const directoryPath = await makeTempStorageDirectory();
+    const directoryPath = await makeTempDir();
 
     // eslint-disable-next-line security/detect-non-literal-fs-filename
     await writeFile(path.join(directoryPath, "safe.txt"), "safe");
@@ -223,7 +224,7 @@ describe("Filesystem simulated S3 storage", () => {
   });
 
   it("rejects Object key with parent directory segment", async () => {
-    const directoryPath = await makeTempStorageDirectory();
+    const directoryPath = await makeTempDir();
     const storage = new FilesystemS3BucketStorage(directoryPath);
 
     const error = await assertThrowsErrorAsync(async () => {
@@ -247,7 +248,7 @@ describe("Filesystem simulated S3 storage", () => {
   });
 
   it("rejects absolute Object key", async () => {
-    const directoryPath = await makeTempStorageDirectory();
+    const directoryPath = await makeTempDir();
     const storage = new FilesystemS3BucketStorage(directoryPath);
 
     const error = await assertThrowsErrorAsync(async () => {
@@ -263,7 +264,7 @@ describe("Filesystem simulated S3 storage", () => {
   });
 
   it("rejects Object key with unsupported file extension", async () => {
-    const directoryPath = await makeTempStorageDirectory();
+    const directoryPath = await makeTempDir();
     const storage = new FilesystemS3BucketStorage(directoryPath);
 
     const error = await assertThrowsErrorAsync(async () => {
@@ -275,13 +276,3 @@ describe("Filesystem simulated S3 storage", () => {
     assertStringIncludes(error.message, "unsupported file extension");
   });
 });
-
-async function makeTempStorageDirectory(): Promise<string> {
-  const tempRootPath = await mkdtemp(path.join(tmpdir(), "yulin-s3-test-"));
-  const directoryPath = path.join(tempRootPath, "public");
-
-  // eslint-disable-next-line security/detect-non-literal-fs-filename
-  await mkdir(directoryPath);
-
-  return directoryPath;
-}
