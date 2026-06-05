@@ -22,7 +22,7 @@ export class SimAwsHttpRequest {
   }
 
   /**
-   * Hostname for this local request (ending in .simaws.localhost).
+   * Hostname for this local request (ending in .sim-aws.localhost).
    */
   get host(): string {
     assertDefined(
