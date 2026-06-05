@@ -2,7 +2,6 @@ import type { SimAws } from "../../aws/sim-aws.js";
 import type { SimS3Bucket } from "../bucket/s3-bucket.js";
 import type { SimS3BucketName } from "../bucket/s3-bucket.js";
 import type { SimAwsServiceTarget } from "../../../serve/controller/sim-service-controller.js";
-import type { SimAwsHttpRequest } from "../../../serve/http/sim-aws-req-res.js";
 
 export interface SimS3GetObjectRoute {
   readonly action: "getObject";
@@ -19,7 +18,7 @@ export interface SimS3RouteFailure {
 export type SimS3Route = SimS3GetObjectRoute | SimS3RouteFailure;
 
 /**
- * Resolves localhost HTTP requests into simulated S3 actions.
+ * Resolves HTTP requests into simulated S3 actions.
  */
 export class SimS3RequestRouter {
   constructor(private readonly simAws: SimAws) {}
@@ -27,7 +26,7 @@ export class SimS3RequestRouter {
   /**
    * Route an incoming service target and HTTP request to a simulated S3 action.
    */
-  route(target: SimAwsServiceTarget, request: SimAwsHttpRequest): SimS3Route {
+  route(target: SimAwsServiceTarget, request: Request): SimS3Route {
     if (request.method !== "GET" && request.method !== "HEAD") {
       return {
         action: "failure",
@@ -52,7 +51,7 @@ export class SimS3RequestRouter {
       };
     }
 
-    const url = request.urlWithHost();
+    const url = new URL(request.url);
     const objectKey = decodeURIComponent(url.pathname.replace(/^\/+/u, ""));
 
     if (objectKey.length === 0) {

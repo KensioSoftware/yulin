@@ -1,7 +1,8 @@
 import type { SimAwsServiceTarget } from "../controller/sim-service-controller.js";
 import type { AwsRegionName } from "../../service/aws/sim-aws-region.js";
+import { simAwsLocalConf } from "../http/sim-aws-local.conf.js";
 
-export const localhostSuffix = ".sim-aws.localhost";
+export const localhostSuffix = `.${simAwsLocalConf.hostname}`;
 const s3WebsiteServiceLabel = "s3-website";
 
 /**

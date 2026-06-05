@@ -1,10 +1,6 @@
 import type { SimAwsServiceName } from "../../service/aws/sim-aws-services.js";
 import type { AwsRegionName } from "../../service/aws/sim-aws-region.js";
 import type { SimAws } from "../../service/aws/sim-aws.js";
-import type {
-  SimAwsHttpRequest,
-  SimAwsHttpResponse,
-} from "../http/sim-aws-req-res.js";
 
 export interface SimAwsServiceTarget {
   readonly service: SimAwsServiceName;
@@ -20,7 +16,7 @@ export type SimAwsServiceControllerFactory = (
 ) => SimAwsServiceController;
 
 /**
- * Controller for a simulated AWS service exposed through the localhost server.
+ * Controller for a simulated AWS service exposed through HTTP.
  */
 export interface SimAwsServiceController {
   /**
@@ -28,7 +24,6 @@ export interface SimAwsServiceController {
    */
   handleRequest(
     target: SimAwsServiceTarget,
-    request: SimAwsHttpRequest,
-    response: SimAwsHttpResponse,
-  ): Promise<void>;
+    request: Request,
+  ): Promise<Response>;
 }

@@ -5,10 +5,6 @@ import type {
 } from "../../../serve/controller/sim-service-controller.js";
 import { SimS3RequestRouter } from "./sim-s3-req-router.js";
 import { SimS3GetObjectController } from "./sim-s3-get-obj-controller.js";
-import type {
-  SimAwsHttpRequest,
-  SimAwsHttpResponse,
-} from "../../../serve/http/sim-aws-req-res.js";
 
 /**
  * Localhost HTTP controller for simulated S3.
@@ -27,21 +23,23 @@ export class SimS3ServiceController implements SimAwsServiceController {
    */
   async handleRequest(
     target: SimAwsServiceTarget,
-    request: SimAwsHttpRequest,
-    response: SimAwsHttpResponse,
-  ): Promise<void> {
+    request: Request,
+  ): Promise<Response> {
     const route = this.router.route(target, request);
 
     if (route.action === "failure") {
-      response.sendText(route.statusCode, route.message);
-      return;
+      return new Response(route.message, {
+        status: route.statusCode,
+        headers: {
+          "content-type": "text/plain; charset=utf-8",
+        },
+      });
     }
 
-    await this.getObjectController.handleRequest(
+    return this.getObjectController.handleRequest(
       route.bucket,
       route.objectKey,
       request,
-      response,
     );
   }
 }
