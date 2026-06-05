@@ -5,7 +5,7 @@ import {
   assertStringIncludes,
 } from "@kensio/smartass";
 import { afterAll, beforeAll, describe, it } from "vitest";
-import { SimAwsLocalServer } from "../../../serve/http/sim-aws-local-server.js";
+import { SimAwsLocalServer } from "../../../serve/index.js";
 
 describe("Simulated S3 local HTTP controller", () => {
   const srv: SimAwsLocalServer = new SimAwsLocalServer();
