@@ -12,7 +12,7 @@ import {
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import { SimAws } from "../../../aws/sim-aws.js";
-import { installSimDynamoDb } from "../../install-sim-dynamodb.js";
+import { installSimDynamoDb } from "../../install/install-sim-dynamodb.js";
 
 describe("DynamoDB DescribeTableCommand", () => {
   it("describes DynamoDB Table", async () => {

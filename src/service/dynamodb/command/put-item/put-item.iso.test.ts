@@ -10,7 +10,7 @@ import {
   assertTrue,
 } from "@kensio/smartass";
 import { SimAws } from "../../../aws/sim-aws.js";
-import { installSimDynamoDb } from "../../install-sim-dynamodb.js";
+import { installSimDynamoDb } from "../../install/install-sim-dynamodb.js";
 
 describe("DynamoDB PutItemCommand", () => {
   it("puts new Item into DynamoDB Table, returns attributes", async () => {

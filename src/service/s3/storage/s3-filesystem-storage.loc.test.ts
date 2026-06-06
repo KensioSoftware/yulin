@@ -12,7 +12,7 @@ import { assertIdentical, assertNonNullable } from "@kensio/smartass";
 import { FilesystemS3BucketStorage } from "./s3-filesystem-storage.js";
 import { makeAwsRegionName } from "../../aws/sim-aws-region.js";
 import { SimAws } from "../../aws/sim-aws.js";
-import { installSimS3 } from "../install-sim-s3.js";
+import { installSimS3 } from "../install/install-sim-s3.js";
 
 describe("Serve sim S3 Bucket on localhost with filesystem storage", () => {
   const simAws = new SimAws();

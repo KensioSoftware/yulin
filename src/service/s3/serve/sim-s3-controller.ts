@@ -1,5 +1,5 @@
 import type { SimAws } from "../../aws/sim-aws.js";
-import type { SimS3Services } from "../install-sim-s3.js";
+import type { SimS3Services } from "../install/install-sim-s3.js";
 import type {
   SimAwsServiceController,
   SimAwsServiceTarget,

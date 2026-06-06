@@ -1,10 +1,10 @@
-import type { SimAws } from "../aws/sim-aws.js";
-import type { SimAwsServiceMap } from "../aws/sim-aws-services.js";
-import { SimS3 } from "./sim-s3.js";
-import { SimS3GlobalRegistry } from "./sim-s3-global-registry.js";
-import { SimS3ServiceController } from "./serve/sim-s3-controller.js";
+import type { SimAws } from "../../aws/sim-aws.js";
+import type { SimAwsServiceMap } from "../../aws/sim-aws-services.js";
+import { SimS3 } from "../sim-s3.js";
+import { SimS3GlobalRegistry } from "../sim-s3-global-registry.js";
+import { SimS3ServiceController } from "../serve/sim-s3-controller.js";
 
-export { SimS3 } from "./sim-s3.js";
+export { SimS3 } from "../sim-s3.js";
 
 export interface SimS3Services {
   s3: SimS3;

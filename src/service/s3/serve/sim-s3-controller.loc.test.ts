@@ -11,7 +11,7 @@ import {
 import { afterAll, beforeAll, describe, it } from "vitest";
 import { SimAwsLocalServer } from "../../../serve/index.js";
 import { SimAws } from "../../aws/sim-aws.js";
-import { installSimS3 } from "../install-sim-s3.js";
+import { installSimS3 } from "../install/install-sim-s3.js";
 
 describe("Simulated S3 local HTTP controller", () => {
   const simAws = new SimAws();
