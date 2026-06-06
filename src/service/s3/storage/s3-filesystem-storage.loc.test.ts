@@ -87,4 +87,55 @@ describe("Serve sim S3 Bucket on localhost with filesystem storage", () => {
       "<h1>Not found on filesystem</h1>",
     );
   });
+
+  it("redirects extensionless filesystem folder paths to a trailing slash when an index document exists", async () => {
+    const directoryPath = await makeTempDir();
+    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    await fs.mkdir(path.join(directoryPath, "dengji", "a1"), {
+      recursive: true,
+    });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    await fs.writeFile(
+      path.join(directoryPath, "dengji", "a1", "index.html"),
+      "<h1>A1 index</h1>",
+    );
+
+    const region = makeAwsRegionName();
+    const bucketName = "folder-index-filesystem-site" as SimS3BucketName;
+    const simS3 = simAws.region(region).service("s3");
+
+    await simS3.createBucket(new CreateBucketCommand({ Bucket: bucketName }));
+    await simS3.putBucketWebsite(
+      new PutBucketWebsiteCommand({
+        Bucket: bucketName,
+        WebsiteConfiguration: {
+          IndexDocument: { Suffix: "index.html" },
+        },
+      }),
+    );
+
+    const simBucket = simS3.getSimBucketByName(bucketName);
+    assertNonNullable(simBucket);
+    simBucket.configureSimStorage(new FilesystemS3BucketStorage(directoryPath));
+
+    const redirectRes = await fetch(
+      `http://folder-index-filesystem-site.s3-website.${region}.sim-aws.localhost:${srv.port}/dengji/a1`,
+      { redirect: "manual" },
+    );
+
+    assertIdentical(redirectRes.status, 301);
+    assertIdentical(
+      redirectRes.headers.get("location"),
+      `http://folder-index-filesystem-site.s3-website.${region}.sim-aws.localhost:${srv.port}/dengji/a1/`,
+    );
+
+    const indexRes = await fetch(
+      `http://folder-index-filesystem-site.s3-website.${region}.sim-aws.localhost:${srv.port}/dengji/a1`,
+    );
+
+    assertIdentical(indexRes.status, 200);
+    assertIdentical(indexRes.url.endsWith("/dengji/a1/"), true);
+    assertIdentical(indexRes.headers.get("content-type"), "text/html");
+    assertIdentical(await indexRes.text(), "<h1>A1 index</h1>");
+  });
 });

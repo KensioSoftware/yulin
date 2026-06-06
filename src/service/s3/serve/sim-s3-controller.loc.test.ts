@@ -140,6 +140,85 @@ describe("Simulated S3 local HTTP controller", () => {
     assertIdentical(await res.text(), "Hello from an encoded path");
   });
 
+  it("redirects folder requests without a trailing slash when an index document exists", async () => {
+    const simS3 = simAws.region("eu-west-2").service("s3");
+
+    await simS3.createBucket(
+      new CreateBucketCommand({ Bucket: "folder-index-redirect-site" }),
+    );
+    await simS3.putBucketWebsite(
+      new PutBucketWebsiteCommand({
+        Bucket: "folder-index-redirect-site",
+        WebsiteConfiguration: {
+          IndexDocument: {
+            Suffix: "index.html",
+          },
+        },
+      }),
+    );
+    await simS3.putObject(
+      new PutObjectCommand({
+        Bucket: "folder-index-redirect-site",
+        Key: "docs/index.html",
+        Body: "<h1>Docs index</h1>",
+        Metadata: {
+          "content-type": "text/html; charset=utf-8",
+        },
+      }),
+    );
+
+    const res = await fetch(
+      `http://folder-index-redirect-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/docs`,
+      { redirect: "manual" },
+    );
+
+    assertIdentical(res.status, 301);
+    assertIdentical(
+      res.headers.get("location"),
+      `http://folder-index-redirect-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/docs/`,
+    );
+  });
+
+  it("serves the folder index document after following the trailing slash redirect", async () => {
+    const simS3 = simAws.region("eu-west-2").service("s3");
+
+    await simS3.createBucket(
+      new CreateBucketCommand({ Bucket: "folder-index-follow-site" }),
+    );
+    await simS3.putBucketWebsite(
+      new PutBucketWebsiteCommand({
+        Bucket: "folder-index-follow-site",
+        WebsiteConfiguration: {
+          IndexDocument: {
+            Suffix: "index.html",
+          },
+        },
+      }),
+    );
+    await simS3.putObject(
+      new PutObjectCommand({
+        Bucket: "folder-index-follow-site",
+        Key: "docs/index.html",
+        Body: "<h1>Docs index after redirect</h1>",
+        Metadata: {
+          "content-type": "text/html; charset=utf-8",
+        },
+      }),
+    );
+
+    const res = await fetch(
+      `http://folder-index-follow-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/docs`,
+    );
+
+    assertIdentical(res.status, 200);
+    assertIdentical(res.url.endsWith("/docs/"), true);
+    assertIdentical(
+      res.headers.get("content-type"),
+      "text/html; charset=utf-8",
+    );
+    assertIdentical(await res.text(), "<h1>Docs index after redirect</h1>");
+  });
+
   it("does not serve S3 Bucket root requests when static website hosting is not enabled", async () => {
     const simS3 = simAws.region("eu-west-2").service("s3");
 

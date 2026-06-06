@@ -30,6 +30,11 @@ export class FilesystemS3BucketStorage implements SimS3BucketStorage {
    * Get a simulated Object from a file in the directory.
    */
   async getObject(key: string): Promise<SimS3Object | undefined> {
+    if (!this.isAllowedObjectKeyExtension(key)) {
+      this.assertSafeObjectKeyPath(key);
+      return undefined;
+    }
+
     const filePath = this.filePathForObjectKey(key);
 
     try {
@@ -295,16 +300,20 @@ export class FilesystemS3BucketStorage implements SimS3BucketStorage {
   }
 
   private assertSafeObjectKey(key: string): void {
+    this.assertSafeObjectKeyPath(key);
+
+    if (!this.isAllowedObjectKeyExtension(key)) {
+      throw new Error(`S3 Object key has unsupported file extension: ${key}`);
+    }
+  }
+
+  private assertSafeObjectKeyPath(key: string): void {
     if (path.isAbsolute(key)) {
       throw new Error(`S3 Object key must not be an absolute path: ${key}`);
     }
 
     if (this.pathContainsParentDirectorySegment(key)) {
       throw new Error(`S3 Object key must not contain '..': ${key}`);
-    }
-
-    if (!this.isAllowedObjectKeyExtension(key)) {
-      throw new Error(`S3 Object key has unsupported file extension: ${key}`);
     }
   }
 
