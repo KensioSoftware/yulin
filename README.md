@@ -100,7 +100,7 @@ await simS3.putObject(
 
 // Fetch from the simulated S3 bucket website via port on localhost.
 const res = await fetch(
-    `http://foo-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/foo/`,
+  `http://foo-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/foo/`,
 );
 ```
 

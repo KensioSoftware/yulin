@@ -116,6 +116,7 @@ describe("Filesystem simulated S3 storage", () => {
 
   it.each([
     ["style.css", "text/css"],
+    ["font.eot", "application/vnd.ms-fontobject"],
     ["image.gif", "image/gif"],
     ["page.htm", "text/html"],
     ["favicon.ico", "image/x-icon"],
@@ -126,9 +127,14 @@ describe("Filesystem simulated S3 storage", () => {
     ["data.json", "application/json"],
     ["bundle.map", "application/json"],
     ["image.png", "image/png"],
+    ["font.otf", "font/otf"],
     ["image.svg", "image/svg+xml"],
+    ["font.ttc", "font/collection"],
+    ["font.ttf", "font/ttf"],
     ["note.txt", "text/plain"],
     ["image.webp", "image/webp"],
+    ["font.woff", "font/woff"],
+    ["font.woff2", "font/woff2"],
     ["feed.xml", "application/xml"],
   ])("makes up %s Object content type metadata", async (key, contentType) => {
     const directoryPath = await makeTempDir();
