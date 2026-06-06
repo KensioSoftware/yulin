@@ -77,7 +77,7 @@ const simAws = new SimAws();
 installSimS3(simAws);
 const srv = await serveSimAws(simAws); // Chooses available port on localhost.
 
-const simS3 = srv.simAws.region("eu-west-2").service("s3");
+const simS3 = simAws.region("eu-west-2").service("s3");
 await simS3.createBucket(new CreateBucketCommand({ Bucket: "foo-site" }));
 await simS3.putBucketWebsite(new PutBucketWebsiteCommand({
   Bucket: "foo-site",

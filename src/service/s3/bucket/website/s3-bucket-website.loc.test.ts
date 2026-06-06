@@ -6,7 +6,7 @@ import {
 import { assertIdentical, assertStringIncludes } from "@kensio/smartass";
 import { afterAll, beforeAll, describe, it } from "vitest";
 import { SimAwsLocalServer } from "../../../../serve/index.js";
-import { installSimS3 } from "../../install-sim-s3.js";
+import { installSimS3 } from "../../install/install-sim-s3.js";
 import { SimAws } from "../../../aws/sim-aws.js";
 
 describe("Serve simulated S3 Bucket static website on localhost", () => {

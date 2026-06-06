@@ -5,7 +5,7 @@ import {
 } from "@aws-sdk/client-dynamodb";
 import { assertArrayLength, assertIdentical } from "@kensio/smartass";
 import { SimAws } from "../../../aws/sim-aws.js";
-import { installSimDynamoDb } from "../../install-sim-dynamodb.js";
+import { installSimDynamoDb } from "../../install/install-sim-dynamodb.js";
 
 describe("DynamoDB ListTablesCommand", () => {
   it("List all DynamoDB Tables", async () => {

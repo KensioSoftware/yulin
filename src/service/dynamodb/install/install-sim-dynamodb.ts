@@ -1,8 +1,8 @@
-import type { SimAws } from "../aws/sim-aws.js";
-import type { SimAwsServiceMap } from "../aws/sim-aws-services.js";
-import { SimDynamoDb } from "./sim-dynamodb.js";
+import type { SimAws } from "../../aws/sim-aws.js";
+import type { SimAwsServiceMap } from "../../aws/sim-aws-services.js";
+import { SimDynamoDb } from "../sim-dynamodb.js";
 
-export { SimDynamoDb } from "./sim-dynamodb.js";
+export { SimDynamoDb } from "../sim-dynamodb.js";
 
 export interface SimDynamoDbServices {
   dynamoDb: SimDynamoDb;

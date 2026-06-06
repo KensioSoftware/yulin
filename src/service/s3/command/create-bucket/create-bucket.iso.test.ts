@@ -13,7 +13,7 @@ import {
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import { SimAws } from "../../../aws/sim-aws.js";
-import { installSimS3 } from "../../install-sim-s3.js";
+import { installSimS3 } from "../../install/install-sim-s3.js";
 
 describe("S3 CreateBucketCommand", () => {
   it("creates new S3 Bucket", async () => {

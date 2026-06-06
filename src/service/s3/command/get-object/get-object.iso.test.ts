@@ -14,7 +14,7 @@ import {
 } from "@kensio/smartass";
 import { simS3BodyToBuffer } from "../../storage/s3-body-buffer.js";
 import { SimAws } from "../../../aws/sim-aws.js";
-import { installSimS3 } from "../../install-sim-s3.js";
+import { installSimS3 } from "../../install/install-sim-s3.js";
 
 describe("S3 GetObjectCommand", () => {
   it("gets an Object from an S3 Bucket", async () => {

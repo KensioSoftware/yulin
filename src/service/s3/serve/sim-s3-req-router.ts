@@ -2,7 +2,7 @@ import type { SimAws } from "../../aws/sim-aws.js";
 import type { SimS3Bucket } from "../bucket/s3-bucket.js";
 import type { SimS3BucketName } from "../bucket/s3-bucket.js";
 import type { SimAwsServiceTarget } from "../../../serve/controller/sim-service-controller.js";
-import type { SimS3Services } from "../install-sim-s3.js";
+import type { SimS3Services } from "../install/install-sim-s3.js";
 
 export interface SimS3GetObjectRoute {
   readonly action: "getObject";
