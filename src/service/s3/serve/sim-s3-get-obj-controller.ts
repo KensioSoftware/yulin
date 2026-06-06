@@ -52,6 +52,19 @@ export class SimS3GetObjectController {
       return this.foundObjectResponse(object, request);
     }
 
+    const folderIndexDocumentKey =
+      website.folderIndexDocumentKeyForRequest(objectKey);
+
+    if (folderIndexDocumentKey !== undefined) {
+      const folderIndexDocumentObject = await bucket.getObject(
+        folderIndexDocumentKey,
+      );
+
+      if (folderIndexDocumentObject !== undefined) {
+        return website.trailingSlashRedirect(request);
+      }
+    }
+
     const errorDocumentKey = website.errorDocumentKey();
 
     if (errorDocumentKey !== undefined) {

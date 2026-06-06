@@ -118,6 +118,43 @@ describe("Serve simulated S3 Bucket static website on localhost", () => {
     assertIdentical(await res.text(), "<h1>Docs index</h1>");
   });
 
+  it("redirects to a slash-terminated folder URL when a folder index document exists", async () => {
+    const simS3 = simAws.region("eu-west-2").service("s3");
+
+    await simS3.createBucket(
+      new CreateBucketCommand({ Bucket: "folder-index-redirect-site" }),
+    );
+    await simS3.putObject(
+      new PutObjectCommand({
+        Bucket: "folder-index-redirect-site",
+        Key: "docs/index.html",
+        Body: "<h1>Docs index</h1>",
+        ContentType: "text/html; charset=utf-8",
+      }),
+    );
+    await simS3.putBucketWebsite(
+      new PutBucketWebsiteCommand({
+        Bucket: "folder-index-redirect-site",
+        WebsiteConfiguration: {
+          IndexDocument: {
+            Suffix: "index.html",
+          },
+        },
+      }),
+    );
+
+    const res = await fetch(
+      `http://folder-index-redirect-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/docs`,
+      { redirect: "manual" },
+    );
+
+    assertIdentical(res.status, 301);
+    assertIdentical(
+      res.headers.get("location"),
+      `http://folder-index-redirect-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/docs/`,
+    );
+  });
+
   it("serves the configured error document body with HTTP 404", async () => {
     const simS3 = simAws.region("eu-west-2").service("s3");
 
