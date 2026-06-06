@@ -24,6 +24,8 @@ import {
   simAwsAccountRegionScopeFactory,
 } from "../aws/sim-aws-account-region-scope.js";
 import { PutBucketWebsiteCommandHandler } from "./command/put-bucket-website/put-bucket-website.handler.js";
+import { assertDefined } from "../../util/defined.js";
+import { FilesystemS3BucketStorage } from "./storage/s3-filesystem-storage.js";
 
 /**
  * Simulated S3. Handles SDK commands. Emulates AWS behaviour and state.
@@ -99,7 +101,21 @@ export class SimS3 {
   /**
    * Get a simulated S3 Bucket instance by name.
    */
-  getSimBucketByName(bucketName: SimS3BucketName): SimS3Bucket | undefined {
-    return this.buckets.get(bucketName);
+  getSimBucketByName(
+    bucketName: SimS3BucketName | string,
+  ): SimS3Bucket | undefined {
+    return this.buckets.get(bucketName as SimS3BucketName);
+  }
+
+  /**
+   * Have a simulated S3 Bucket use a local filesystem directory for storage.
+   */
+  mountBucketFilesystem(
+    bucketName: SimS3BucketName | string,
+    directoryPath: string,
+  ): void {
+    const bucket = this.getSimBucketByName(bucketName);
+    assertDefined(bucket, `Sim S3 Bucket named ${bucketName}`);
+    bucket.configureSimStorage(new FilesystemS3BucketStorage(directoryPath));
   }
 }

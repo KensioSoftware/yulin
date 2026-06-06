@@ -1,21 +1,26 @@
-import { CreateBucketCommand } from "@aws-sdk/client-s3";
+import { CreateBucketCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import {
   assertArrayLength,
   assertBufferEqual,
   assertIdentical,
+  assertInstanceOf,
   assertNonNullable,
   assertStringIncludes,
   assertThrowsError,
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
-import { mkdir, mkdtemp } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
 import { SimS3Object } from "../object/s3-object.js";
 import { FilesystemS3BucketStorage } from "../storage/s3-filesystem-storage.js";
 import { SimS3Bucket } from "./s3-bucket.js";
 import { MemoryS3BucketStorage } from "../storage/s3-memory-storage.js";
+import { makeTempDir } from "../../../util/filesystem/temp-dir.js";
+import { SimS3 } from "../sim-s3.js";
+import { Readable } from "node:stream";
+import { simS3BodyToBuffer } from "../storage/s3-body-buffer.js";
 
 describe("Simulated S3 Bucket", () => {
   describe.each<StorageFactory>([
@@ -132,6 +137,27 @@ describe("Simulated S3 Bucket", () => {
     assertStringIncludes(
       error.message,
       "Cannot change simulated S3 storage implementation",
+    );
+  });
+
+  it("sets up filesystem storage using mountBucketFilesystem util method", async () => {
+    const simS3 = new SimS3();
+    await simS3.createBucket(new CreateBucketCommand({ Bucket: "foobar" }));
+
+    const directoryPath = await makeTempDir();
+    simS3.mountBucketFilesystem("foobar", directoryPath);
+
+    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    await writeFile(path.join(directoryPath, "hello.txt"), "hello!");
+
+    const getObject = await simS3.getObject(
+      new GetObjectCommand({ Bucket: "foobar", Key: "hello.txt" }),
+    );
+
+    assertInstanceOf(getObject.Body, Readable);
+    assertBufferEqual(
+      await simS3BodyToBuffer(getObject.Body),
+      Buffer.from("hello!"),
     );
   });
 });

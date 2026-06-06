@@ -70,6 +70,7 @@ describe("S3 Bucket static website configuration", () => {
           Condition: {
             HttpErrorCodeReturnedEquals: "404",
           },
+          Redirect: undefined,
         },
       ],
     });
@@ -224,6 +225,29 @@ describe("S3 Bucket static website configuration", () => {
     assertIdentical(
       res.headers.get("location"),
       "http://foo-site.s3-website.localhost/new/page.html",
+    );
+  });
+
+  it("redirects when a routing rule has no condition", () => {
+    const website = new S3BucketWebsite({
+      RoutingRules: [
+        {
+          Redirect: {
+            ReplaceKeyWith: "redirected.html",
+          },
+        },
+      ],
+    });
+
+    const res = website.redirectForRequestResponse(
+      new Request("http://foo-site.s3-website.localhost/anything.html"),
+      new Response("OK", { status: 200 }),
+    );
+
+    assertIdentical(res.status, 301);
+    assertIdentical(
+      res.headers.get("location"),
+      "http://foo-site.s3-website.localhost/redirected.html",
     );
   });
 
