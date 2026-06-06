@@ -1,6 +1,6 @@
 import type { SimAws } from "../../aws/sim-aws.js";
-import type { SimS3Bucket } from "../bucket/s3-bucket.js";
-import type { SimS3BucketName } from "../bucket/s3-bucket.js";
+import type { SimS3Bucket } from "../bucket/sim-s3-bucket.js";
+import type { SimS3BucketName } from "../bucket/sim-s3-bucket.js";
 import type { SimAwsServiceTarget } from "../../../serve/controller/sim-service-controller.js";
 import type { SimS3Services } from "../install/install-sim-s3.js";
 
@@ -79,6 +79,7 @@ export class SimS3RequestRouter {
       .service("s3")
       .getSimBucketByName(bucketName);
 
+    /* v8 ignore if -- does not happen in practice */
     if (bucket === undefined) {
       return {
         action: "failure",

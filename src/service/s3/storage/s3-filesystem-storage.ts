@@ -191,6 +191,9 @@ export class FilesystemS3BucketStorage implements SimS3BucketStorage {
       case ".css": {
         return "text/css";
       }
+      case ".eot": {
+        return "application/vnd.ms-fontobject";
+      }
       case ".gif": {
         return "image/gif";
       }
@@ -218,14 +221,29 @@ export class FilesystemS3BucketStorage implements SimS3BucketStorage {
       case ".png": {
         return "image/png";
       }
+      case ".otf": {
+        return "font/otf";
+      }
       case ".svg": {
         return "image/svg+xml";
+      }
+      case ".ttc": {
+        return "font/collection";
+      }
+      case ".ttf": {
+        return "font/ttf";
       }
       case ".txt": {
         return "text/plain";
       }
       case ".webp": {
         return "image/webp";
+      }
+      case ".woff": {
+        return "font/woff";
+      }
+      case ".woff2": {
+        return "font/woff2";
       }
       case ".xml": {
         return "application/xml";
@@ -328,6 +346,7 @@ const defaultAllowedDirectoryNames = [
  */
 const allowedObjectFileExtensions = new Set([
   ".css",
+  ".eot",
   ".gif",
   ".htm",
   ".html",
@@ -338,9 +357,14 @@ const allowedObjectFileExtensions = new Set([
   ".json",
   ".map",
   ".mjs",
+  ".otf",
   ".png",
   ".svg",
+  ".ttc",
+  ".ttf",
   ".txt",
   ".webp",
+  ".woff",
+  ".woff2",
   ".xml",
 ]);

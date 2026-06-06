@@ -1,4 +1,4 @@
-import type { SimS3BucketName } from "./bucket/s3-bucket.js";
+import type { SimS3BucketName } from "./bucket/sim-s3-bucket.js";
 
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 

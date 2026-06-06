@@ -1,8 +1,7 @@
 import type { SimAwsServiceTarget } from "../controller/sim-service-controller.js";
 import type { AwsRegionName } from "../../service/aws/sim-aws-region.js";
-import { simAwsLocalConf } from "../http/sim-aws-local.conf.js";
+import { SimAwsLocalUrl } from "../http/sim-aws-local-url.js";
 
-export const localhostSuffix = `.${simAwsLocalConf.hostname}`;
 const s3WebsiteServiceLabel = "s3-website";
 
 /**
@@ -19,11 +18,13 @@ export class SimAwsLocalServiceResolver {
   private builtinLocalhostServiceTarget(
     hostname: string,
   ): SimAwsServiceTarget | undefined {
-    if (!hostname.endsWith(localhostSuffix)) {
+    if (!hostname.endsWith(SimAwsLocalUrl.localhostSuffix)) {
       return undefined;
     }
 
-    const labels = hostname.slice(0, -localhostSuffix.length).split(".");
+    const labels = hostname
+      .slice(0, -SimAwsLocalUrl.localhostSuffix.length)
+      .split(".");
 
     if (labels.length < 3) {
       return undefined;

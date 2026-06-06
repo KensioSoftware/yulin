@@ -5,6 +5,11 @@ import type { SimS3BucketStorage } from "../storage/s3-bucket-storage.js";
 import type { SimS3Object } from "../object/s3-object.js";
 import { MemoryS3BucketStorage } from "../storage/s3-memory-storage.js";
 import { S3BucketWebsite } from "./website/s3-bucket-website.js";
+import { simAwsLocalConf } from "../../../serve/http/sim-aws-local.conf.js";
+import {
+  type SimAwsAccountRegionScope,
+  simAwsAccountRegionScopeFactory,
+} from "../../aws/sim-aws-account-region-scope.js";
 
 export type SimS3BucketName = Brand<string, "SimS3BucketName">;
 
@@ -16,6 +21,7 @@ export class SimS3Bucket {
 
   constructor(
     createCommand: CreateBucketCommand,
+    private readonly accountRegionScope: SimAwsAccountRegionScope = simAwsAccountRegionScopeFactory.make(),
     private storage: SimS3BucketStorage = new MemoryS3BucketStorage(),
     private website: S3BucketWebsite = new S3BucketWebsite(),
   ) {
@@ -66,5 +72,19 @@ export class SimS3Bucket {
    */
   getWebsite(): S3BucketWebsite {
     return this.website;
+  }
+
+  /**
+   * Get the simulated S3 static website URL for this Bucket.
+   */
+  getWebsiteUrl(): URL {
+    if (!this.getWebsite().websiteEnabled()) {
+      throw new Error(
+        `Static website hosting is not enabled for sim S3 Bucket ${this.bucketName}`,
+      );
+    }
+    return new URL(
+      `http://${this.bucketName}.s3-website.${this.accountRegionScope.regionName}.${simAwsLocalConf.hostname}/`,
+    );
   }
 }

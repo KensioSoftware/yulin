@@ -9,6 +9,7 @@ import {
   assertNonNullable,
   assertObjectEquals,
   assertStringIncludes,
+  assertThrowsError,
   assertThrowsErrorAsync,
   assertTrue,
 } from "@kensio/smartass";
@@ -142,6 +143,53 @@ describe("S3 PutBucketWebsiteCommand", () => {
     assertIdentical(
       res.headers.get("location"),
       "http://rules-site.s3-website.localhost/not-found.html",
+    );
+  });
+
+  it("gets the configured S3 Bucket website URL", async () => {
+    const simAws = new SimAws();
+    installSimS3(simAws);
+
+    const simS3 = simAws.region("eu-west-2").service("s3");
+
+    await simS3.createBucket(new CreateBucketCommand({ Bucket: "url-site" }));
+
+    await simS3.putBucketWebsite(
+      new PutBucketWebsiteCommand({
+        Bucket: "url-site",
+        WebsiteConfiguration: {
+          IndexDocument: {
+            Suffix: "index.html",
+          },
+        },
+      }),
+    );
+
+    const url = simS3.getBucketWebsiteUrl("url-site");
+
+    assertIdentical(
+      url.toString(),
+      "http://url-site.s3-website.eu-west-2.sim-aws.localhost/",
+    );
+  });
+
+  it("throws when getting an S3 Bucket website URL before website hosting is configured", async () => {
+    const simAws = new SimAws();
+    installSimS3(simAws);
+
+    const simS3 = simAws.service("s3");
+
+    await simS3.createBucket(
+      new CreateBucketCommand({ Bucket: "disabled-url-site" }),
+    );
+
+    const error = assertThrowsError(() => {
+      simS3.getBucketWebsiteUrl("disabled-url-site");
+    });
+
+    assertStringIncludes(
+      error.message,
+      "Static website hosting is not enabled for sim S3 Bucket disabled-url-site",
     );
   });
 

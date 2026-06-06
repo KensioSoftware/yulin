@@ -7,7 +7,7 @@ import {
   CreateBucketCommand,
   PutBucketWebsiteCommand,
 } from "@aws-sdk/client-s3";
-import type { SimS3BucketName } from "../bucket/s3-bucket.js";
+import type { SimS3BucketName } from "../bucket/sim-s3-bucket.js";
 import { assertIdentical, assertNonNullable } from "@kensio/smartass";
 import { FilesystemS3BucketStorage } from "./s3-filesystem-storage.js";
 import { makeAwsRegionName } from "../../aws/sim-aws-region.js";

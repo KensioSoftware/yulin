@@ -111,4 +111,15 @@ describe("Simulated AWS local HTTP server", () => {
       "Server is not yet listening, cannot get port number",
     );
   });
+
+  it("adapts a simulated AWS URL for this local server", () => {
+    const url = srv.localUrl(
+      "https://my-site.s3-website.eu-west-2.sim-aws.localhost/foo/",
+    );
+
+    assertIdentical(
+      url.toString(),
+      `http://my-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/foo/`,
+    );
+  });
 });

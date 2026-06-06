@@ -8,6 +8,8 @@ import { simAwsLocalConf } from "./sim-aws-local.conf.js";
 import { SimAwsHttp } from "./sim-aws-http.js";
 import { assertDefined } from "../../util/defined.js";
 
+import { SimAwsLocalUrl } from "./sim-aws-local-url.js";
+
 /**
  * Local HTTP server for a simulated AWS environment.
  * Useful for local integration testing and local development.
@@ -61,6 +63,13 @@ export class SimAwsLocalServer {
    */
   close(): void {
     this.server.close();
+  }
+
+  /**
+   * Adapt a simulated AWS URL for this local server instance.
+   */
+  localUrl(input: string | URL): URL {
+    return new SimAwsLocalUrl(input, this.port).toURL();
   }
 
   private async waitForListening(): Promise<void> {

@@ -6,7 +6,10 @@ import {
   type GetObjectCommandOutput,
 } from "@aws-sdk/client-s3";
 import { Readable } from "node:stream";
-import type { SimS3BucketName, SimS3Bucket } from "../../bucket/s3-bucket.js";
+import type {
+  SimS3BucketName,
+  SimS3Bucket,
+} from "../../bucket/sim-s3-bucket.js";
 import { assertDefined } from "../../../../util/defined.js";
 import { jitter } from "../../../../util/sleep.js";
 
