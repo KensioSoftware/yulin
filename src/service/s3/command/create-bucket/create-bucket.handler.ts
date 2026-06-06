@@ -5,7 +5,10 @@ import {
   BucketAlreadyExists,
   BucketAlreadyOwnedByYou,
 } from "@aws-sdk/client-s3";
-import { type SimS3BucketName, SimS3Bucket } from "../../bucket/s3-bucket.js";
+import {
+  type SimS3BucketName,
+  SimS3Bucket,
+} from "../../bucket/sim-s3-bucket.js";
 import { assertDefined } from "../../../../util/defined.js";
 import { jitter } from "../../../../util/sleep.js";
 import type { SimS3GlobalRegistry } from "../../sim-s3-global-registry.js";
@@ -61,7 +64,7 @@ export class CreateBucketCommandHandler implements CommandHandler<
       });
     }
 
-    const bucket = new SimS3Bucket(cmd);
+    const bucket = new SimS3Bucket(cmd, this.accountRegionScope);
     this.buckets.set(bucketName, bucket);
     this.s3GlobalRegistry.registerBucket(bucketName, this.accountRegionScope);
 

@@ -98,10 +98,11 @@ await simS3.putObject(
   }),
 );
 
-// Fetch from the simulated S3 bucket website via port on localhost.
-const res = await fetch(
-  `http://foo-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/foo/`,
-);
+const bucketWebsiteUrl = srv.localUrl(simS3.getBucketWebsiteUrl("foo-site"));
+console.log(bucketWebsiteUrl.toString());
+
+// Fetch /foo/index.html from the simulated S3 bucket website via port on localhost.
+const res = await fetch(new URL("/foo/", bucketWebsiteUrl));
 ```
 
 ## What is yulin?

@@ -15,12 +15,14 @@ import path from "node:path";
 import { tmpdir } from "node:os";
 import { SimS3Object } from "../object/s3-object.js";
 import { FilesystemS3BucketStorage } from "../storage/s3-filesystem-storage.js";
-import { SimS3Bucket } from "./s3-bucket.js";
+import { SimS3Bucket } from "./sim-s3-bucket.js";
 import { MemoryS3BucketStorage } from "../storage/s3-memory-storage.js";
 import { makeTempDir } from "../../../util/filesystem/temp-dir.js";
 import { SimS3 } from "../sim-s3.js";
 import { Readable } from "node:stream";
 import { simS3BodyToBuffer } from "../storage/s3-body-buffer.js";
+import { simAwsAccountRegionScopeFactory } from "../../aws/sim-aws-account-region-scope.js";
+import { S3BucketWebsite } from "./website/s3-bucket-website.js";
 
 describe("Simulated S3 Bucket", () => {
   describe.each<StorageFactory>([
@@ -36,6 +38,7 @@ describe("Simulated S3 Bucket", () => {
       makeBucket: async () =>
         new SimS3Bucket(
           new CreateBucketCommand({ Bucket: "bucket-a" }),
+          simAwsAccountRegionScopeFactory.make(),
           await makeFilesystemStorage(),
         ),
     },
@@ -137,6 +140,69 @@ describe("Simulated S3 Bucket", () => {
     assertStringIncludes(
       error.message,
       "Cannot change simulated S3 storage implementation",
+    );
+  });
+
+  it("gets a static website URL", () => {
+    const bucket = new SimS3Bucket(
+      new CreateBucketCommand({ Bucket: "bucket-a" }),
+      {
+        ...simAwsAccountRegionScopeFactory.make(),
+        regionName: "eu-west-2",
+      },
+      new MemoryS3BucketStorage(),
+      new S3BucketWebsite({
+        IndexDocument: {
+          Suffix: "index.html",
+        },
+      }),
+    );
+
+    const url = bucket.getWebsiteUrl();
+
+    assertIdentical(
+      url.toString(),
+      "http://bucket-a.s3-website.eu-west-2.sim-aws.localhost/",
+    );
+  });
+
+  it("throws when getting a static website URL before website hosting is enabled", () => {
+    const bucket = new SimS3Bucket(
+      new CreateBucketCommand({ Bucket: "bucket-a" }),
+    );
+
+    const error = assertThrowsError(() => {
+      bucket.getWebsiteUrl();
+    });
+
+    assertStringIncludes(
+      error.message,
+      "Static website hosting is not enabled for sim S3 Bucket bucket-a",
+    );
+  });
+
+  it("gets a static website URL after configuring website hosting", () => {
+    const bucket = new SimS3Bucket(
+      new CreateBucketCommand({ Bucket: "bucket-a" }),
+      {
+        ...simAwsAccountRegionScopeFactory.make(),
+        regionName: "ap-southeast-2",
+      },
+    );
+
+    bucket.configureWebsite(
+      new S3BucketWebsite({
+        ErrorDocument: {
+          Key: "error.html",
+        },
+      }),
+    );
+
+    const url = bucket.getWebsiteUrl();
+
+    assertIdentical(
+      url.toString(),
+      "http://bucket-a.s3-website.ap-southeast-2.sim-aws.localhost/",
     );
   });
 

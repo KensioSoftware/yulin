@@ -4,7 +4,10 @@ import {
   type PutBucketWebsiteCommand,
   type PutBucketWebsiteCommandOutput,
 } from "@aws-sdk/client-s3";
-import type { SimS3Bucket, SimS3BucketName } from "../../bucket/s3-bucket.js";
+import type {
+  SimS3Bucket,
+  SimS3BucketName,
+} from "../../bucket/sim-s3-bucket.js";
 import { S3BucketWebsite } from "../../bucket/website/s3-bucket-website.js";
 import { assertDefined } from "../../../../util/defined.js";
 import { jitter } from "../../../../util/sleep.js";

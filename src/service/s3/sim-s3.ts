@@ -1,4 +1,4 @@
-import type { SimS3Bucket, SimS3BucketName } from "./bucket/s3-bucket.js";
+import type { SimS3Bucket, SimS3BucketName } from "./bucket/sim-s3-bucket.js";
 import type {
   CreateBucketCommand,
   CreateBucketCommandOutput,
@@ -107,6 +107,16 @@ export class SimS3 {
     bucketName: SimS3BucketName | string,
   ): SimS3Bucket | undefined {
     return this.buckets.get(bucketName as SimS3BucketName);
+  }
+
+  /**
+   * Get the simulated S3 static website URL for a Bucket.
+   */
+  getBucketWebsiteUrl(bucketName: SimS3BucketName | string): URL {
+    const bucket = this.getSimBucketByName(bucketName);
+    assertDefined(bucket, `Sim S3 Bucket named ${bucketName}`);
+
+    return bucket.getWebsiteUrl();
   }
 
   /**

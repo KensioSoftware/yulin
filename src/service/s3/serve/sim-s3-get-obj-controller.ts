@@ -1,4 +1,4 @@
-import type { SimS3Bucket } from "../bucket/s3-bucket.js";
+import type { SimS3Bucket } from "../bucket/sim-s3-bucket.js";
 import type { SimS3Object } from "../object/s3-object.js";
 
 /**

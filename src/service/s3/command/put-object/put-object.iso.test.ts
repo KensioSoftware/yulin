@@ -14,7 +14,7 @@ import {
 import { simS3BodyToBuffer } from "../../storage/s3-body-buffer.js";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { Readable } from "node:stream";
-import type { SimS3BucketName } from "../../bucket/s3-bucket.js";
+import type { SimS3BucketName } from "../../bucket/sim-s3-bucket.js";
 import { installSimS3 } from "../../install/install-sim-s3.js";
 
 describe("S3 PutObjectCommand", () => {
