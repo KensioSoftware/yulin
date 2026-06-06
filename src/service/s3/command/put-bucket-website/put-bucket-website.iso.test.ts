@@ -6,15 +6,14 @@ import {
 import {
   assertIdentical,
   assertInstanceOf,
+  assertNonNullable,
+  assertObjectEquals,
   assertStringIncludes,
   assertThrowsErrorAsync,
   assertTrue,
-  assertObjectEquals,
-  assertNonNullable,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
-import type { SimS3BucketName } from "../../bucket/s3-bucket.js";
 
 describe("S3 PutBucketWebsiteCommand", () => {
   it("configures an index document for an S3 Bucket website", async () => {
@@ -35,7 +34,7 @@ describe("S3 PutBucketWebsiteCommand", () => {
 
     assertObjectEquals(output.$metadata, {});
 
-    const bucket = simS3.getSimBucketByName("foo-site" as SimS3BucketName);
+    const bucket = simS3.getSimBucketByName("foo-site");
 
     assertTrue(bucket?.getWebsite().websiteEnabled());
     assertIdentical(
@@ -60,7 +59,7 @@ describe("S3 PutBucketWebsiteCommand", () => {
       }),
     );
 
-    const bucket = simS3.getSimBucketByName("error-site" as SimS3BucketName);
+    const bucket = simS3.getSimBucketByName("error-site");
 
     assertNonNullable(bucket);
     assertTrue(bucket.getWebsite().websiteEnabled());
@@ -86,7 +85,7 @@ describe("S3 PutBucketWebsiteCommand", () => {
       }),
     );
 
-    const bucket = simS3.getSimBucketByName("redirect-site" as SimS3BucketName);
+    const bucket = simS3.getSimBucketByName("redirect-site");
 
     assertNonNullable(bucket);
     assertTrue(bucket.getWebsite().websiteEnabled());
@@ -116,7 +115,7 @@ describe("S3 PutBucketWebsiteCommand", () => {
       }),
     );
 
-    const bucket = simS3.getSimBucketByName("rules-site" as SimS3BucketName);
+    const bucket = simS3.getSimBucketByName("rules-site");
     assertNonNullable(bucket);
     const res = bucket
       .getWebsite()
@@ -162,7 +161,7 @@ describe("S3 PutBucketWebsiteCommand", () => {
       }),
     );
 
-    const bucket = simS3.getSimBucketByName("replace-site" as SimS3BucketName);
+    const bucket = simS3.getSimBucketByName("replace-site");
 
     assertNonNullable(bucket);
     assertIdentical(bucket.getWebsite().objectKeyForRequest("docs/"), "docs/");
