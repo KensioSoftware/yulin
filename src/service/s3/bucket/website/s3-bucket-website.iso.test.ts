@@ -98,6 +98,35 @@ describe("S3 Bucket static website configuration", () => {
     assertIdentical(website.objectKeyForRequest("foo/"), "foo/index.html");
   });
 
+  it("resolves a non-slash folder request to its redirect target index document", () => {
+    const website = new S3BucketWebsite({
+      IndexDocument: {
+        Suffix: "index.html",
+      },
+    });
+
+    assertIdentical(
+      website.folderIndexDocumentKeyForRequest("foo"),
+      "foo/index.html",
+    );
+  });
+
+  it("does not resolve a redirect target index document when no index document is configured", () => {
+    const website = new S3BucketWebsite();
+
+    assertUndefined(website.folderIndexDocumentKeyForRequest("foo"));
+  });
+
+  it("does not resolve a redirect target index document for slash-terminated folder requests", () => {
+    const website = new S3BucketWebsite({
+      IndexDocument: {
+        Suffix: "index.html",
+      },
+    });
+
+    assertUndefined(website.folderIndexDocumentKeyForRequest("foo/"));
+  });
+
   it("leaves a non-folder object key unchanged when an index document is configured", () => {
     const website = new S3BucketWebsite({
       IndexDocument: {
@@ -138,6 +167,24 @@ describe("S3 Bucket static website configuration", () => {
     assertIdentical(
       res.headers.get("location"),
       "https://example.com/docs/index.html",
+    );
+  });
+
+  it("redirects to the same path with a trailing slash", () => {
+    const website = new S3BucketWebsite({
+      IndexDocument: {
+        Suffix: "index.html",
+      },
+    });
+
+    const res = website.trailingSlashRedirect(
+      new Request("http://foo-site.s3-website.localhost/docs?x=1"),
+    );
+
+    assertIdentical(res.status, 301);
+    assertIdentical(
+      res.headers.get("location"),
+      "http://foo-site.s3-website.localhost/docs/?x=1",
     );
   });
 

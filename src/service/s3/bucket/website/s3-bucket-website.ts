@@ -59,6 +59,40 @@ export class S3BucketWebsite {
   }
 
   /**
+   * Get the index document key that would be served after redirecting this
+   * request to a slash-terminated folder URL, if an index document is configured.
+   */
+  folderIndexDocumentKeyForRequest(objectKey: string): string | undefined {
+    const indexSuffix = this.websiteConfiguration.IndexDocument?.Suffix;
+
+    if (
+      indexSuffix === undefined ||
+      objectKey === "" ||
+      objectKey.endsWith("/")
+    ) {
+      return undefined;
+    }
+
+    return `${objectKey}/${indexSuffix}`;
+  }
+
+  /**
+   * Redirect this request to the same URL with a trailing slash on the path.
+   */
+  trailingSlashRedirect(req: Request): Response {
+    const url = new URL(req.url);
+
+    url.pathname = `${url.pathname}/`;
+
+    return new Response(undefined, {
+      status: 301,
+      headers: {
+        location: url.toString(),
+      },
+    });
+  }
+
+  /**
    * Get the S3 object key for this website's error document, if configured.
    */
   errorDocumentKey(): string | undefined {
