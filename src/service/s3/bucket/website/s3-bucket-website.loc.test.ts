@@ -6,9 +6,13 @@ import {
 import { assertIdentical, assertStringIncludes } from "@kensio/smartass";
 import { afterAll, beforeAll, describe, it } from "vitest";
 import { SimAwsLocalServer } from "../../../../serve/index.js";
+import { installSimS3 } from "../../install-sim-s3.js";
+import { SimAws } from "../../../aws/sim-aws.js";
 
 describe("Serve simulated S3 Bucket static website on localhost", () => {
-  const srv: SimAwsLocalServer = new SimAwsLocalServer();
+  const simAws = new SimAws();
+  installSimS3(simAws);
+  const srv = new SimAwsLocalServer(simAws);
 
   beforeAll(async () => {
     await srv.listen();
@@ -19,7 +23,7 @@ describe("Serve simulated S3 Bucket static website on localhost", () => {
   });
 
   it("does not serve objects before static website hosting is configured", async () => {
-    const simS3 = srv.simAws.region("eu-west-2").s3();
+    const simS3 = simAws.region("eu-west-2").service("s3");
 
     await simS3.createBucket(
       new CreateBucketCommand({ Bucket: "website-disabled-site" }),
@@ -45,7 +49,7 @@ describe("Serve simulated S3 Bucket static website on localhost", () => {
   });
 
   it("serves a configured root index document", async () => {
-    const simS3 = srv.simAws.region("eu-west-2").s3();
+    const simS3 = simAws.region("eu-west-2").service("s3");
 
     await simS3.createBucket(
       new CreateBucketCommand({ Bucket: "root-index-site" }),
@@ -82,7 +86,7 @@ describe("Serve simulated S3 Bucket static website on localhost", () => {
   });
 
   it("serves a configured folder index document", async () => {
-    const simS3 = srv.simAws.region("eu-west-2").s3();
+    const simS3 = simAws.region("eu-west-2").service("s3");
 
     await simS3.createBucket(
       new CreateBucketCommand({ Bucket: "folder-index-site" }),
@@ -115,7 +119,7 @@ describe("Serve simulated S3 Bucket static website on localhost", () => {
   });
 
   it("serves the configured error document body with HTTP 404", async () => {
-    const simS3 = srv.simAws.region("eu-west-2").s3();
+    const simS3 = simAws.region("eu-west-2").service("s3");
 
     await simS3.createBucket(
       new CreateBucketCommand({ Bucket: "error-document-site" }),
@@ -155,7 +159,7 @@ describe("Serve simulated S3 Bucket static website on localhost", () => {
   });
 
   it("redirects missing objects with a matching HTTP error routing rule", async () => {
-    const simS3 = srv.simAws.region("eu-west-2").s3();
+    const simS3 = simAws.region("eu-west-2").service("s3");
 
     await simS3.createBucket(
       new CreateBucketCommand({ Bucket: "missing-redirect-site" }),
@@ -195,7 +199,7 @@ describe("Serve simulated S3 Bucket static website on localhost", () => {
   });
 
   it("resolves an index document before checking HTTP error routing rules", async () => {
-    const simS3 = srv.simAws.region("eu-west-2").s3();
+    const simS3 = simAws.region("eu-west-2").service("s3");
 
     await simS3.createBucket(
       new CreateBucketCommand({ Bucket: "index-before-rule-site" }),
@@ -240,7 +244,7 @@ describe("Serve simulated S3 Bucket static website on localhost", () => {
   });
 
   it("redirects all requests when RedirectAllRequestsTo is configured", async () => {
-    const simS3 = srv.simAws.region("eu-west-2").s3();
+    const simS3 = simAws.region("eu-west-2").service("s3");
 
     await simS3.createBucket(
       new CreateBucketCommand({ Bucket: "redirect-all-site" }),

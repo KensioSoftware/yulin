@@ -13,11 +13,14 @@ import {
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import { SimAws } from "../../../aws/sim-aws.js";
+import { installSimDynamoDb } from "../../install-sim-dynamodb.js";
 
 describe("DynamoDB CreateTableCommand", () => {
   it("creates new DynamoDB Table", async () => {
     const simAws = new SimAws();
-    const simDynamoDb = simAws.account().dynamoDb();
+    installSimDynamoDb(simAws);
+
+    const simDynamoDb = simAws.account().service("dynamoDb");
 
     const createTableOutput = await simDynamoDb.createTable(
       new CreateTableCommand({
@@ -45,7 +48,9 @@ describe("DynamoDB CreateTableCommand", () => {
 
   it("throws on undefined Table name", async () => {
     const simAws = new SimAws();
-    const simDynamoDb = simAws.region().dynamoDb();
+    installSimDynamoDb(simAws);
+
+    const simDynamoDb = simAws.region().service("dynamoDb");
 
     const error = await assertThrowsErrorAsync(async () =>
       simDynamoDb.createTable(
@@ -65,10 +70,12 @@ describe("DynamoDB CreateTableCommand", () => {
 
   it("throws on missing key schema", async () => {
     const simAws = new SimAws();
+    installSimDynamoDb(simAws);
+
     const simDynamoDb = simAws
       .account("666666666666")
       .region("eu-west-2")
-      .dynamoDb();
+      .service("dynamoDb");
 
     const error = await assertThrowsErrorAsync(async () =>
       simDynamoDb.createTable(
@@ -82,7 +89,9 @@ describe("DynamoDB CreateTableCommand", () => {
 
   it("throws on duplicate Table name", async () => {
     const simAws = new SimAws();
-    const simDynamoDb = simAws.dynamoDb();
+    installSimDynamoDb(simAws);
+
+    const simDynamoDb = simAws.service("dynamoDb");
 
     await simDynamoDb.createTable(
       new CreateTableCommand({

@@ -29,6 +29,8 @@ import { FilesystemS3BucketStorage } from "./storage/s3-filesystem-storage.js";
 
 /**
  * Simulated S3. Handles SDK commands. Emulates AWS behaviour and state.
+ * Scoped to an Account and Region, but has access to a global (as in
+ * cross-region) registry of simulated S3 Buckets.
  */
 export class SimS3 {
   private readonly buckets = new Map<SimS3BucketName, SimS3Bucket>();
@@ -105,6 +107,15 @@ export class SimS3 {
     bucketName: SimS3BucketName | string,
   ): SimS3Bucket | undefined {
     return this.buckets.get(bucketName as SimS3BucketName);
+  }
+
+  /**
+   * Find the Account Region scope for a globally registered simulated S3 Bucket.
+   */
+  findBucketScope(
+    bucketName: SimS3BucketName | string,
+  ): SimAwsAccountRegionScope | undefined {
+    return this.s3GlobalRegistry.findBucketScope(bucketName as SimS3BucketName);
   }
 
   /**

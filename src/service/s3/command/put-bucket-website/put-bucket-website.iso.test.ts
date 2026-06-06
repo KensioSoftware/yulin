@@ -14,10 +14,14 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
+import { installSimS3 } from "../../install-sim-s3.js";
 
 describe("S3 PutBucketWebsiteCommand", () => {
   it("configures an index document for an S3 Bucket website", async () => {
-    const simS3 = new SimAws().s3();
+    const simAws = new SimAws();
+    installSimS3(simAws);
+
+    const simS3 = simAws.service("s3");
 
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "foo-site" }));
 
@@ -44,7 +48,10 @@ describe("S3 PutBucketWebsiteCommand", () => {
   });
 
   it("configures an error document for an S3 Bucket website", async () => {
-    const simS3 = new SimAws().s3();
+    const simAws = new SimAws();
+    installSimS3(simAws);
+
+    const simS3 = simAws.service("s3");
 
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "error-site" }));
 
@@ -67,7 +74,10 @@ describe("S3 PutBucketWebsiteCommand", () => {
   });
 
   it("configures redirect all requests for an S3 Bucket website", async () => {
-    const simS3 = new SimAws().s3();
+    const simAws = new SimAws();
+    installSimS3(simAws);
+
+    const simS3 = simAws.service("s3");
 
     await simS3.createBucket(
       new CreateBucketCommand({ Bucket: "redirect-site" }),
@@ -93,7 +103,10 @@ describe("S3 PutBucketWebsiteCommand", () => {
   });
 
   it("configures routing rules for an S3 Bucket website", async () => {
-    const simS3 = new SimAws().s3();
+    const simAws = new SimAws();
+    installSimS3(simAws);
+
+    const simS3 = simAws.service("s3");
 
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "rules-site" }));
 
@@ -133,7 +146,10 @@ describe("S3 PutBucketWebsiteCommand", () => {
   });
 
   it("replaces existing website configuration", async () => {
-    const simS3 = new SimAws().s3();
+    const simAws = new SimAws();
+    installSimS3(simAws);
+
+    const simS3 = simAws.service("s3");
 
     await simS3.createBucket(
       new CreateBucketCommand({ Bucket: "replace-site" }),
@@ -169,7 +185,10 @@ describe("S3 PutBucketWebsiteCommand", () => {
   });
 
   it("throws on undefined Bucket name", async () => {
-    const simS3 = new SimAws().s3();
+    const simAws = new SimAws();
+    installSimS3(simAws);
+
+    const simS3 = simAws.service("s3");
 
     const error = await assertThrowsErrorAsync(async () =>
       simS3.putBucketWebsite(
@@ -192,7 +211,10 @@ describe("S3 PutBucketWebsiteCommand", () => {
   });
 
   it("throws on undefined website configuration", async () => {
-    const simS3 = new SimAws().s3();
+    const simAws = new SimAws();
+    installSimS3(simAws);
+
+    const simS3 = simAws.service("s3");
 
     const error = await assertThrowsErrorAsync(async () =>
       simS3.putBucketWebsite(
@@ -211,7 +233,10 @@ describe("S3 PutBucketWebsiteCommand", () => {
   });
 
   it("throws when the Bucket does not exist", async () => {
-    const simS3 = new SimAws().s3();
+    const simAws = new SimAws();
+    installSimS3(simAws);
+
+    const simS3 = simAws.service("s3");
 
     const error = await assertThrowsErrorAsync(async () =>
       simS3.putBucketWebsite(

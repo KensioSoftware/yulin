@@ -11,9 +11,13 @@ import type { SimS3BucketName } from "../bucket/s3-bucket.js";
 import { assertIdentical, assertNonNullable } from "@kensio/smartass";
 import { FilesystemS3BucketStorage } from "./s3-filesystem-storage.js";
 import { makeAwsRegionName } from "../../aws/sim-aws-region.js";
+import { SimAws } from "../../aws/sim-aws.js";
+import { installSimS3 } from "../install-sim-s3.js";
 
 describe("Serve sim S3 Bucket on localhost with filesystem storage", () => {
-  const srv: SimAwsLocalServer = new SimAwsLocalServer();
+  const simAws = new SimAws();
+  installSimS3(simAws);
+  const srv: SimAwsLocalServer = new SimAwsLocalServer(simAws);
 
   beforeAll(async () => {
     await srv.listen();
@@ -43,7 +47,7 @@ describe("Serve sim S3 Bucket on localhost with filesystem storage", () => {
 
     const region = makeAwsRegionName();
     const bucketName = "foo-site" as SimS3BucketName;
-    const simS3 = srv.simAws.region(region).s3();
+    const simS3 = simAws.region(region).service("s3");
     await simS3.createBucket(new CreateBucketCommand({ Bucket: bucketName }));
     await simS3.putBucketWebsite(
       new PutBucketWebsiteCommand({

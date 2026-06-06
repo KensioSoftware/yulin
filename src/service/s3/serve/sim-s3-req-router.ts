@@ -2,6 +2,7 @@ import type { SimAws } from "../../aws/sim-aws.js";
 import type { SimS3Bucket } from "../bucket/s3-bucket.js";
 import type { SimS3BucketName } from "../bucket/s3-bucket.js";
 import type { SimAwsServiceTarget } from "../../../serve/controller/sim-service-controller.js";
+import type { SimS3Services } from "../install-sim-s3.js";
 
 export interface SimS3GetObjectRoute {
   readonly action: "getObject";
@@ -21,7 +22,7 @@ export type SimS3Route = SimS3GetObjectRoute | SimS3RouteFailure;
  * Resolves HTTP requests into simulated S3 actions.
  */
 export class SimS3RequestRouter {
-  constructor(private readonly simAws: SimAws) {}
+  constructor(private readonly simAws: SimAws<SimS3Services>) {}
 
   /**
    * Route an incoming service target and HTTP request to a simulated S3 action.
@@ -55,9 +56,7 @@ export class SimS3RequestRouter {
     const objectKey = decodeURIComponent(url.pathname.replace(/^\/+/u, ""));
 
     const bucketName = target.resourceName as SimS3BucketName;
-    const bucketScope = this.simAws
-      .s3GlobalRegistry()
-      .findBucketScope(bucketName);
+    const bucketScope = this.simAws.service("s3").findBucketScope(bucketName);
 
     if (bucketScope === undefined) {
       return {
@@ -77,7 +76,7 @@ export class SimS3RequestRouter {
 
     const bucket = this.simAws
       .accountRegionScope(bucketScope.accountId, bucketScope.regionName)
-      .s3()
+      .service("s3")
       .getSimBucketByName(bucketName);
 
     if (bucket === undefined) {

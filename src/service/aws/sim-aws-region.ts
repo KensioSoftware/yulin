@@ -1,11 +1,10 @@
 import type { SimAwsAccountId } from "./sim-aws-account.js";
 import type { SimAwsAccountRegionContainer } from "./sim-aws-account-region-scope.js";
 import type {
+  NoSimAwsServices,
   SimAwsAccountRegionScopes,
-  SimAwsServices,
+  SimAwsServiceMap,
 } from "./sim-aws-services.js";
-import type { SimS3 } from "../s3/sim-s3.js";
-import type { SimDynamoDb } from "../dynamodb/sim-dynamodb.js";
 import { faker } from "@faker-js/faker";
 
 export const AWS_REGION_NAMES = [
@@ -52,16 +51,20 @@ export const DEFAULT_SIM_AWS_REGION_NAME = "us-east-1" as const;
 /**
  * Simulated AWS Region.
  */
-export class SimAwsRegion implements SimAwsServices {
+export class SimAwsRegion<
+  TServices extends SimAwsServiceMap = NoSimAwsServices,
+> {
   constructor(
-    private readonly accountRegionScopes: SimAwsAccountRegionScopes,
+    private readonly accountRegionScopes: SimAwsAccountRegionScopes<TServices>,
     public readonly regionName: AwsRegionName = DEFAULT_SIM_AWS_REGION_NAME,
   ) {}
 
   /**
    * Get a simulated AWS Account scoped for this Region.
    */
-  account(accountId?: SimAwsAccountId | string): SimAwsAccountRegionContainer {
+  account(
+    accountId?: SimAwsAccountId | string,
+  ): SimAwsAccountRegionContainer<TServices> {
     return this.accountRegionScopes.accountRegionScope(
       accountId as SimAwsAccountId,
       this.regionName,
@@ -69,17 +72,12 @@ export class SimAwsRegion implements SimAwsServices {
   }
 
   /**
-   * Get the simulated DynamoDB service scoped for this Region.
+   * Get an installed simulated AWS service for this Region's default Account.
+   * The service must be installed with the appropriate installer function
+   * first.
    */
-  dynamoDb(): SimDynamoDb {
-    return this.account().dynamoDb();
-  }
-
-  /**
-   * Get the simulated S3 service scoped for this Region.
-   */
-  s3(): SimS3 {
-    return this.account().s3();
+  service<TKey extends keyof TServices>(serviceName: TKey): TServices[TKey] {
+    return this.account().service(serviceName);
   }
 }
 

@@ -16,12 +16,14 @@ Create and interact directly with a simulated AWS:
 
 ```typescript
 import { SimAws } from "@kensio/yulin";
+import { installSimDynamoDb } from "@kensio/yulin/dynamodb"
 import { CreateTableCommand } from "@aws-sdk/client-dynamodb";
 
 const simAws = new SimAws();
+installSimDynamoDb(simAws);
 
 // Default Account and Region.
-await simAws.dynamoDb().createTable(
+await simAws.service("dynamoDb").createTable(
  new CreateTableCommand({
    TableName: "FoobarTable",
    KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
@@ -29,13 +31,13 @@ await simAws.dynamoDb().createTable(
 );
 
 // Specify Account.
-await simAws.account("111111111111").dynamoDb().createTable({ ... });
+await simAws.account("111111111111").service("dynamoDb").createTable({ ... });
 
 // Specify Region.
-await simAws.region("eu-west-2").dynamoDb().createTable({ ... });
+await simAws.region("eu-west-2").service("dynamoDb").createTable({ ... });
 
 // Specify Account and Region.
-await simAws.account("111111111111").region("eu-west-2").dynamoDb().createTable({ ... });
+await simAws.account("111111111111").region("eu-west-2").service("dynamoDb").createTable({ ... });
 ```
 
 AWS state is simulated internally, so you can test realistic interactions with multiple AWS
@@ -63,6 +65,7 @@ You can listen on a port to serve your simulated AWS on localhost:
 
 ```typescript
 import { SimAws } from "@kensio/yulin";
+import { installSimS3 } from "@kensio/yulin/s3";
 import { serveSimAws } from "@kensio/yulin/serve";
 import {
   CreateBucketCommand,
@@ -71,9 +74,10 @@ import {
 } from "@aws-sdk/client-s3";
 
 const simAws = new SimAws();
+installSimS3(simAws);
 const srv = await serveSimAws(simAws); // Chooses available port on localhost.
 
-const simS3 = srv.simAws.region("eu-west-2").s3();
+const simS3 = srv.simAws.region("eu-west-2").service("s3");
 await simS3.createBucket(new CreateBucketCommand({ Bucket: "foo-site" }));
 await simS3.putBucketWebsite(new PutBucketWebsiteCommand({
   Bucket: "foo-site",

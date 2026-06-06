@@ -1,9 +1,8 @@
-import type { SimAwsServiceName } from "../../service/aws/sim-aws-services.js";
 import type { AwsRegionName } from "../../service/aws/sim-aws-region.js";
 import type { SimAws } from "../../service/aws/sim-aws.js";
 
 export interface SimAwsServiceTarget {
-  readonly service: SimAwsServiceName;
+  readonly service: string;
   readonly resourceName: string;
   readonly regionName?: AwsRegionName;
 }
