@@ -8,10 +8,13 @@ import {
 import { SimAws } from "../../service/aws/sim-aws.js";
 import { SimS3ServiceController } from "../../service/s3/serve/sim-s3-controller.js";
 import { SimAwsServiceControllerContainer } from "./sim-aws-service-controller-container.js";
+import { installSimS3 } from "../../service/s3/index.js";
 
 describe("SimAwsServiceControllerContainer", () => {
   it("returns S3 service controller", () => {
-    const container = new SimAwsServiceControllerContainer(new SimAws());
+    const simAws = new SimAws();
+    installSimS3(simAws);
+    const container = new SimAwsServiceControllerContainer(simAws);
 
     const controller = container.controllerForService("s3");
 
@@ -19,7 +22,9 @@ describe("SimAwsServiceControllerContainer", () => {
   });
 
   it("returns same controller for same service", () => {
-    const container = new SimAwsServiceControllerContainer(new SimAws());
+    const simAws = new SimAws();
+    installSimS3(simAws);
+    const container = new SimAwsServiceControllerContainer(simAws);
 
     assertIdentical(
       container.controllerForService("s3"),
@@ -28,7 +33,9 @@ describe("SimAwsServiceControllerContainer", () => {
   });
 
   it("throws for unimplemented service controller", () => {
-    const container = new SimAwsServiceControllerContainer(new SimAws());
+    const simAws = new SimAws();
+    installSimS3(simAws);
+    const container = new SimAwsServiceControllerContainer(simAws);
 
     const error = assertThrowsError(() => {
       container.controllerForService("dynamodb");
@@ -37,7 +44,7 @@ describe("SimAwsServiceControllerContainer", () => {
     assertInstanceOf(error, Error);
     assertStringIncludes(
       error.message,
-      "No controller implemented for simulated AWS service dynamodb",
+      "No controller installed for simulated AWS service dynamodb",
     );
   });
 });

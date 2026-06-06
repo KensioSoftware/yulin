@@ -1,27 +1,32 @@
-import type { SimDynamoDb } from "../dynamodb/index.js";
-import type { SimS3 } from "../s3/sim-s3.js";
 import type { SimAwsAccountId } from "./sim-aws-account.js";
 import type { AwsRegionName } from "./sim-aws-region.js";
 import type { SimAwsAccountRegionContainer } from "./sim-aws-account-region-scope.js";
 
 /**
- * Interface for accessing AWS services within a simulated AWS.
+ * Empty installed service map for a simulated AWS environment.
  */
-export interface SimAwsServices {
-  dynamoDb(): SimDynamoDb;
-  s3(): SimS3;
-}
+export type NoSimAwsServices = Record<never, never>;
+
+/**
+ * Installed service map for a simulated AWS environment.
+ */
+export type SimAwsServiceMap = object;
+
+/**
+ * Runtime factory for creating a simulated AWS service in an Account Region scope.
+ */
+export type SimAwsServiceFactory = (
+  scope: SimAwsAccountRegionContainer<SimAwsServiceMap>,
+) => unknown;
 
 /**
  * Interface for accessing combined simulated AWS Account Region scopes.
  */
-export interface SimAwsAccountRegionScopes {
+export interface SimAwsAccountRegionScopes<
+  TServices extends SimAwsServiceMap = NoSimAwsServices,
+> {
   accountRegionScope(
     accountId?: SimAwsAccountId,
     regionName?: AwsRegionName,
-  ): SimAwsAccountRegionContainer;
+  ): SimAwsAccountRegionContainer<TServices>;
 }
-
-export const SIM_AWS_SERVICE_NAMES = ["dynamodb", "s3"] as const;
-
-export type SimAwsServiceName = (typeof SIM_AWS_SERVICE_NAMES)[number];

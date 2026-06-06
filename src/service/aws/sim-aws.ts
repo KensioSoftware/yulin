@@ -14,30 +14,51 @@ import {
   type AwsRegionName,
 } from "./sim-aws-region.js";
 import type {
+  NoSimAwsServices,
   SimAwsAccountRegionScopes,
-  SimAwsServices,
+  SimAwsServiceFactory,
+  SimAwsServiceMap,
 } from "./sim-aws-services.js";
-import type { SimS3 } from "../s3/sim-s3.js";
-import type { SimDynamoDb } from "../dynamodb/sim-dynamodb.js";
 import {
   type SimAccountRegionScopeKey,
   SimAwsAccountRegionContainer,
 } from "./sim-aws-account-region-scope.js";
-import { Memo } from "../../util/memo/memo.js";
-import { SimS3GlobalRegistry } from "../s3/sim-s3-global-registry.js";
+import type {
+  SimAwsServiceController,
+  SimAwsServiceControllerFactory,
+} from "../../serve/controller/sim-service-controller.js";
 
 /**
  * Top-level container for simulated AWS.
+ * Contains Account scopes, Region scopes, Account/Region scopes.
  */
-export class SimAws implements SimAwsServices, SimAwsAccountRegionScopes {
-  private readonly accounts = new Map<SimAwsAccountId, SimAwsAccount>();
-  private readonly regions = new Map<AwsRegionName, SimAwsRegion>();
-  private readonly accountRegionScopes = new Map<
-    SimAccountRegionScopeKey,
-    SimAwsAccountRegionContainer
+export class SimAws<
+  TServices extends SimAwsServiceMap = NoSimAwsServices,
+> implements SimAwsAccountRegionScopes<TServices> {
+  private readonly accounts = new Map<
+    SimAwsAccountId,
+    SimAwsAccount<SimAwsServiceMap>
   >();
 
-  private readonly memo = new Memo<object>();
+  private readonly regions = new Map<
+    AwsRegionName,
+    SimAwsRegion<SimAwsServiceMap>
+  >();
+
+  private readonly accountRegionScopes = new Map<
+    SimAccountRegionScopeKey,
+    SimAwsAccountRegionContainer<SimAwsServiceMap>
+  >();
+
+  private readonly serviceFactories = new Map<
+    PropertyKey,
+    SimAwsServiceFactory
+  >();
+
+  private readonly serviceControllerFactories = new Map<
+    string,
+    SimAwsServiceControllerFactory
+  >();
 
   constructor(
     public readonly defaultAccountId = DEFAULT_SIM_AWS_ACCOUNT_ID,
@@ -49,29 +70,34 @@ export class SimAws implements SimAwsServices, SimAwsAccountRegionScopes {
   /**
    * Get a simulated AWS Account.
    */
-  account(accountId: string = this.defaultAccountId): SimAwsAccount {
+  account(accountId: string = this.defaultAccountId): SimAwsAccount<TServices> {
     let account = this.accounts.get(accountId as SimAwsAccountId);
 
     if (account === undefined) {
-      account = new SimAwsAccount(this, accountId as SimAwsAccountId);
+      account = new SimAwsAccount<SimAwsServiceMap>(
+        this,
+        accountId as SimAwsAccountId,
+      );
       this.accounts.set(accountId as SimAwsAccountId, account);
     }
 
-    return account;
+    return account as unknown as SimAwsAccount<TServices>;
   }
 
   /**
    * Get a simulated AWS Account Region scope.
    */
-  region(regionName: AwsRegionName = this.defaultRegionName): SimAwsRegion {
+  region(
+    regionName: AwsRegionName = this.defaultRegionName,
+  ): SimAwsRegion<TServices> {
     let region = this.regions.get(regionName);
 
     if (region === undefined) {
-      region = new SimAwsRegion(this, regionName);
+      region = new SimAwsRegion<SimAwsServiceMap>(this, regionName);
       this.regions.set(regionName, region);
     }
 
-    return region;
+    return region as unknown as SimAwsRegion<TServices>;
   }
 
   /**
@@ -80,45 +106,82 @@ export class SimAws implements SimAwsServices, SimAwsAccountRegionScopes {
   accountRegionScope(
     accountId: SimAwsAccountId = this.defaultAccountId,
     regionName: AwsRegionName = this.defaultRegionName,
-  ): SimAwsAccountRegionContainer {
+  ): SimAwsAccountRegionContainer<TServices> {
     const scopeKey = `${accountId}:${regionName}` as const;
     let accountRegionScope = this.accountRegionScopes.get(scopeKey);
 
     if (accountRegionScope === undefined) {
-      accountRegionScope = new SimAwsAccountRegionContainer(
+      accountRegionScope = new SimAwsAccountRegionContainer<SimAwsServiceMap>(
         this,
         this.account(accountId),
         this.region(regionName),
-        this.s3GlobalRegistry(),
       );
       this.accountRegionScopes.set(scopeKey, accountRegionScope);
     }
 
-    return accountRegionScope;
+    return accountRegionScope as unknown as SimAwsAccountRegionContainer<TServices>;
   }
 
   /**
-   * Get the simulated global S3 registry for this AWS environment.
+   * Install a simulated AWS service factory.
    */
-  s3GlobalRegistry(): SimS3GlobalRegistry {
-    return this.memo.getOrCreate(
-      "s3GlobalRegistry",
-      () => new SimS3GlobalRegistry(),
-    );
+  installService(
+    serviceName: PropertyKey,
+    factory: SimAwsServiceFactory,
+  ): void {
+    this.serviceFactories.set(serviceName, factory);
   }
 
   /**
-   * Get a simulated DynamoDB service in the default Account Region scope.
+   * Install a simulated AWS HTTP service controller factory.
    */
-  dynamoDb(): SimDynamoDb {
-    return this.accountRegionScope().dynamoDb();
+  installServiceController(
+    serviceName: string,
+    factory: SimAwsServiceControllerFactory,
+  ): void {
+    this.serviceControllerFactories.set(serviceName, factory);
   }
 
   /**
-   * Get a simulated S3 service in the default Account Region scope.
+   * Create an installed simulated AWS service for an Account Region scope.
    */
-  s3(): SimS3 {
-    return this.accountRegionScope().s3();
+  createService<TKey extends keyof TServices>(
+    serviceName: TKey,
+    scope: SimAwsAccountRegionContainer<TServices>,
+  ): TServices[TKey] {
+    const factory = this.serviceFactories.get(serviceName);
+
+    if (factory === undefined) {
+      throw new Error(
+        `Sim AWS service is not installed: ${String(serviceName)}. Call installer function to install it.`,
+      );
+    }
+
+    return factory(scope) as TServices[TKey];
+  }
+
+  /**
+   * Create an installed simulated AWS HTTP service controller.
+   */
+  createServiceController(serviceName: string): SimAwsServiceController {
+    const factory = this.serviceControllerFactories.get(serviceName);
+
+    if (factory === undefined) {
+      throw new Error(
+        `No controller installed for simulated AWS service ${serviceName}`,
+      );
+    }
+
+    return factory(this);
+  }
+
+  /**
+   * Get an installed simulated AWS service in the default Account Region scope.
+   * The service must be installed with the appropriate installer function
+   * first.
+   */
+  service<TKey extends keyof TServices>(serviceName: TKey): TServices[TKey] {
+    return this.accountRegionScope().service(serviceName);
   }
 
   /**

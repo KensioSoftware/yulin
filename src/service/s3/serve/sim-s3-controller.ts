@@ -1,4 +1,5 @@
 import type { SimAws } from "../../aws/sim-aws.js";
+import type { SimS3Services } from "../install-sim-s3.js";
 import type {
   SimAwsServiceController,
   SimAwsServiceTarget,
@@ -13,7 +14,7 @@ export class SimS3ServiceController implements SimAwsServiceController {
   private readonly router: SimS3RequestRouter;
   private readonly getObjectController: SimS3GetObjectController;
 
-  constructor(simAws: SimAws) {
+  constructor(simAws: SimAws<SimS3Services>) {
     this.router = new SimS3RequestRouter(simAws);
     this.getObjectController = new SimS3GetObjectController();
   }

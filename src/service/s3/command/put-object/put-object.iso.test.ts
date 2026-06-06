@@ -15,11 +15,14 @@ import { simS3BodyToBuffer } from "../../storage/s3-body-buffer.js";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { Readable } from "node:stream";
 import type { SimS3BucketName } from "../../bucket/s3-bucket.js";
+import { installSimS3 } from "../../install-sim-s3.js";
 
 describe("S3 PutObjectCommand", () => {
   it("puts an Object into an S3 Bucket", async () => {
     const simAws = new SimAws();
-    const simS3 = simAws.s3();
+    installSimS3(simAws);
+
+    const simS3 = simAws.service("s3");
 
     const bucketName = "bucket-a";
 
@@ -53,7 +56,9 @@ describe("S3 PutObjectCommand", () => {
 
   it("puts an Object with Uint8Array body", async () => {
     const simAws = new SimAws();
-    const simS3 = simAws.s3();
+    installSimS3(simAws);
+
+    const simS3 = simAws.service("s3");
 
     const bucketName = "bucket-a";
 
@@ -83,7 +88,9 @@ describe("S3 PutObjectCommand", () => {
 
   it("rejects undefined bucket name", async () => {
     const simAws = new SimAws();
-    const simS3 = simAws.s3();
+    installSimS3(simAws);
+
+    const simS3 = simAws.service("s3");
 
     const error = await assertThrowsErrorAsync(async () => {
       await simS3.putObject(
@@ -99,7 +106,9 @@ describe("S3 PutObjectCommand", () => {
 
   it("rejects undefined object key", async () => {
     const simAws = new SimAws();
-    const simS3 = simAws.s3();
+    installSimS3(simAws);
+
+    const simS3 = simAws.service("s3");
 
     const error = await assertThrowsErrorAsync(async () => {
       await simS3.putObject(
@@ -115,7 +124,9 @@ describe("S3 PutObjectCommand", () => {
 
   it("rejects non-existent bucket", async () => {
     const simAws = new SimAws();
-    const simS3 = simAws.s3();
+    installSimS3(simAws);
+
+    const simS3 = simAws.service("s3");
 
     const error = await assertThrowsErrorAsync(async () => {
       await simS3.putObject(
@@ -131,7 +142,9 @@ describe("S3 PutObjectCommand", () => {
 
   it("rejects unsupported body type", async () => {
     const simAws = new SimAws();
-    const simS3 = simAws.s3();
+    installSimS3(simAws);
+
+    const simS3 = simAws.service("s3");
 
     const bucketName = "bucket-a" as SimS3BucketName;
 
