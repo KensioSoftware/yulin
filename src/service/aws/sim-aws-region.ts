@@ -49,7 +49,10 @@ export type AwsRegionName = (typeof AWS_REGION_NAMES)[number];
 export const DEFAULT_SIM_AWS_REGION_NAME = "us-east-1" as const;
 
 /**
- * Simulated AWS Region.
+ * Container for simulated AWS services in one AWS Region.
+ * The real scope is Account/Region in SimAwsAccountRegionContainer.
+ * So SimAwsRegion is like an intermediate navigation handler on the way to a
+ * full Account/Region scope.
  */
 export class SimAwsRegion<
   TServices extends SimAwsServiceMap = NoSimAwsServices,

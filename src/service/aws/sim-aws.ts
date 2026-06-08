@@ -31,6 +31,11 @@ import type {
 /**
  * Top-level container for simulated AWS.
  * Contains Account scopes, Region scopes, Account/Region scopes.
+ * Installers for each simulated service install services into the SimAws
+ * container.
+ * This allows for individual services to be installed as necessary, without
+ * importing all of them from the root and requiring every AWS SDK to be
+ * installed.
  */
 export class SimAws<
   TServices extends SimAwsServiceMap = NoSimAwsServices,
@@ -129,6 +134,11 @@ export class SimAws<
     serviceName: PropertyKey,
     factory: SimAwsServiceFactory,
   ): void {
+    if (this.serviceFactories.has(serviceName)) {
+      throw new Error(
+        `Sim AWS service is already installed: ${String(serviceName)}`,
+      );
+    }
     this.serviceFactories.set(serviceName, factory);
   }
 
@@ -139,6 +149,11 @@ export class SimAws<
     serviceName: string,
     factory: SimAwsServiceControllerFactory,
   ): void {
+    if (this.serviceControllerFactories.has(serviceName)) {
+      throw new Error(
+        `Sim AWS service controller is already installed: ${serviceName}`,
+      );
+    }
     this.serviceControllerFactories.set(serviceName, factory);
   }
 

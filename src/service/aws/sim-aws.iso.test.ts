@@ -7,6 +7,8 @@ import {
 import { SimAws } from "./sim-aws.js";
 import { installSimS3 } from "../s3/index.js";
 import { installSimDynamoDb } from "../dynamodb/index.js";
+import { SimS3ServiceController } from "../s3/serve/sim-s3-controller.js";
+import type { SimS3Services } from "../s3/install/install-sim-s3.js";
 
 describe("SimAws", () => {
   it("returns same Account for same Account ID", () => {
@@ -103,5 +105,26 @@ describe("SimAws", () => {
     });
 
     assertStringIncludes(error.message, "Sim AWS service is not installed: s3");
+  });
+
+  it("throws on trying to install a duplicate service controller", () => {
+    const simAws = new SimAws();
+
+    simAws.installServiceController(
+      "s3",
+      (sa) => new SimS3ServiceController(sa as SimAws<SimS3Services>),
+    );
+
+    const error = assertThrowsError(() => {
+      simAws.installServiceController(
+        "s3",
+        (sa) => new SimS3ServiceController(sa as SimAws<SimS3Services>),
+      );
+    });
+
+    assertStringIncludes(
+      error.message,
+      "Sim AWS service controller is already installed: s3",
+    );
   });
 });

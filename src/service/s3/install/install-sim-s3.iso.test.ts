@@ -1,6 +1,10 @@
 import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
-import { assertInstanceOf, assertThrowsError } from "@kensio/smartass";
+import {
+  assertInstanceOf,
+  assertStringIncludes,
+  assertThrowsError,
+} from "@kensio/smartass";
 import { installSimS3, SimS3 } from "./install-sim-s3.js";
 
 describe("Sim S3 installer", () => {
@@ -64,5 +68,21 @@ describe("Sim S3 installer", () => {
       .service("s3");
 
     assertInstanceOf(simS3, SimS3);
+  });
+
+  it("errors on trying to install twice into the same SimAws", () => {
+    const simAws = new SimAws();
+
+    installSimS3(simAws);
+
+    const error = assertThrowsError(() => {
+      installSimS3(simAws);
+    });
+
+    assertInstanceOf(error, Error);
+    assertStringIncludes(
+      error.message,
+      "Sim AWS service is already installed: s3",
+    );
   });
 });

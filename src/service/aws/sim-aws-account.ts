@@ -14,6 +14,9 @@ export const DEFAULT_SIM_AWS_ACCOUNT_ID = "888888888888" as SimAwsAccountId;
 
 /**
  * Container for simulated AWS services in one AWS Account.
+ * The real scope is Account/Region in SimAwsAccountRegionContainer.
+ * So SimAwsAccount is like an intermediate navigation handler on the way to a
+ * full Account/Region scope.
  */
 export class SimAwsAccount<
   TServices extends SimAwsServiceMap = NoSimAwsServices,

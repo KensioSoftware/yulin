@@ -7,6 +7,7 @@ import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-sco
  * Note that despite the label "global", this is still encapsulated.
  * SimAws manages a singleton of this registry, but it can be freely
  * instantiated for isolated state.
+ * The word "global" here refers to the cross-region aspect of S3 Buckets.
  */
 export class SimS3GlobalRegistry {
   private readonly bucketScopes = new Map<

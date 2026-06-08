@@ -17,7 +17,7 @@ export type SimAccountRegionScopeKey = `${SimAwsAccountId}:${AwsRegionName}`;
 
 /**
  * Combined simulated AWS Account and Region scope.
- * This is the real container for simulated services.
+ * This is the real Account/Region scope container for simulated services.
  */
 export class SimAwsAccountRegionContainer<
   TServices extends SimAwsServiceMap = NoSimAwsServices,
