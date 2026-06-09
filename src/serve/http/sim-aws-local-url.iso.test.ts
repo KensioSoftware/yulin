@@ -48,4 +48,20 @@ describe("Simulated AWS local URL", () => {
       "http://my-site.s3-website.eu-west-2.sim-aws.localhost:12345/foo/",
     );
   });
+
+  it("removes the localhost suffix from a URL", () => {
+    const originalUrl = new SimAwsLocalUrl(
+      "http://ed4k18jw3kpctq.cloudfront.net.sim-aws.localhost/foo/",
+    );
+    assertIdentical(
+      originalUrl.toString(),
+      "http://ed4k18jw3kpctq.cloudfront.net.sim-aws.localhost/foo/",
+    );
+
+    const trimmedUrl = originalUrl.withoutLocalhostSuffix();
+    assertIdentical(
+      trimmedUrl.toString(),
+      "http://ed4k18jw3kpctq.cloudfront.net/foo/",
+    );
+  });
 });

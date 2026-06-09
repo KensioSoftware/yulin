@@ -47,6 +47,18 @@ export class SimAwsAccountRegionContainer<
       this.simAws.createService(serviceName, this),
     );
   }
+
+  /**
+   * Get an installed simulated AWS service by runtime service name.
+   *
+   * This is useful for optional cross-service dependencies, where one simulated
+   * service can use another if it has been independently installed.
+   */
+  _requireService<TService>(serviceName: PropertyKey): TService {
+    return this.memo.getOrCreate(String(serviceName), () =>
+      this.simAws._createRequiredService<TService>(serviceName, this),
+    );
+  }
 }
 
 export interface SimAwsAccountRegionScope {

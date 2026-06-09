@@ -9,7 +9,7 @@ import {
   type SimS3BucketName,
   SimS3Bucket,
 } from "../../bucket/sim-s3-bucket.js";
-import { assertDefined } from "../../../../util/defined.js";
+import { assertDefined } from "../../../../util/defined/defined.js";
 import { jitter } from "../../../../util/sleep.js";
 import type { SimS3GlobalRegistry } from "../../sim-s3-global-registry.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";

@@ -1,5 +1,5 @@
 import type { CreateTableInput, KeyType } from "@aws-sdk/client-dynamodb";
-import { assertDefined } from "../../../util/defined.js";
+import { assertDefined } from "../../../util/defined/defined.js";
 import type { DynamoDbItem } from "../item/dynamodb-item.js";
 import type { DynamoDBAttrType } from "../item/dynamodb-item-attribute.js";
 

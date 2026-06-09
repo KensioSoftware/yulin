@@ -72,6 +72,7 @@ export default defineConfig(
       "prefer-template": "error", // template literals over string concatenation
       "@typescript-eslint/prefer-readonly": "error", // flags private fields that are never reassigned
       "@typescript-eslint/require-array-sort-compare": "error", // prevents [1, 10, 2].sort() (lexicographic surprise)
+      "@typescript-eslint/no-unnecessary-type-parameters": "off", // obstructs service installer pattern
       "@typescript-eslint/naming-convention": [
         "error",
         {
@@ -178,7 +179,10 @@ export default defineConfig(
   {
     plugins: { "no-secrets": noSecrets },
     rules: {
-      "no-secrets/no-secrets": "error",
+      "no-secrets/no-secrets": [
+        "error",
+        { ignoreContent: [" * https://", "http://"] },
+      ],
     },
   },
 

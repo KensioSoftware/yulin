@@ -21,7 +21,7 @@ export class SimAwsLocalUrl {
    * Convert to a URL instance.
    */
   toURL(): URL {
-    return new URL(this.url);
+    return new URL(this.url.toString());
   }
 
   /**
@@ -29,6 +29,15 @@ export class SimAwsLocalUrl {
    */
   toString(): string {
     return this.url.toString();
+  }
+
+  /**
+   * Get a copy of the URL without the localhost suffix in the hostname.
+   */
+  withoutLocalhostSuffix(): URL {
+    const url = this.toURL();
+    url.hostname = url.hostname.replace(SimAwsLocalUrl.localhostSuffix, "");
+    return url;
   }
 
   private localHostname(hostname: string): string {
