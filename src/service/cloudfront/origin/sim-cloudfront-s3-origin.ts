@@ -1,10 +1,11 @@
 import type { SimAwsAccountRegionContainer } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimAwsServiceMap } from "../../aws/sim-aws-services.js";
-import type { SimS3 } from "../../s3/index.js";
 import type { SimS3Bucket } from "../../s3/bucket/sim-s3-bucket.js";
 import type { SimS3Object } from "../../s3/object/s3-object.js";
 import type { SimCloudFrontOriginRequest } from "./sim-cloudfront-req-res.js";
 import type { SimCloudFrontOrigin } from "./sim-cloudfront-origin.js";
+import type { SimAws } from "../../aws/sim-aws.js";
+import type { SimS3Services } from "../../s3/install/install-sim-s3.js";
 
 export type SimCloudFrontS3OriginResolver = (
   originDomainName: string,
@@ -22,14 +23,24 @@ export function emptyCloudFrontS3OriginResolver(): undefined {
  * Create an S3 Origin Resolver backed by a simulated AWS Account/Region scope.
  */
 export function createSimCloudFrontS3OriginResolver(
+  simAws: SimAws<SimS3Services>,
   scope: SimAwsAccountRegionContainer<SimAwsServiceMap>,
 ): SimCloudFrontS3OriginResolver {
-  return (originDomainName) => {
+  return (originDomainName: string) => {
     const bucketName =
       bucketNameFromCloudFrontS3OriginDomainName(originDomainName);
-    const s3 = scope._requireService<SimS3>("s3");
+    const bucketScope = simAws.service("s3").findBucketScope(bucketName);
+    if (bucketScope === undefined) {
+      throw new Error(
+        `Unable to find sim S3 Bucket ${bucketName} for sim CloudFront S3 Origin`,
+      );
+    }
 
-    return s3.getSimBucketByName(bucketName);
+    return simAws
+      .region(bucketScope.regionName)
+      .account(scope.account.accountId)
+      .service("s3")
+      .getSimBucketByName(bucketName);
   };
 }
 

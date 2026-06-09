@@ -145,35 +145,28 @@ describe("Sim CloudFront installer", () => {
         }),
       );
 
-    const error = await assertThrowsErrorAsync(async () => {
-      await simCloudFront.createDistribution(
-        new CreateDistributionCommand({
-          DistributionConfig: {
-            CallerReference: "lazy-s3-origin-test",
-            Comment: "Lazy S3 origin resolver test CDN",
-            Enabled: true,
-            Origins: {
-              Quantity: 1,
-              Items: [
-                {
-                  Id: "site-origin",
-                  DomainName: "lazy-s3-origin-bucket.s3.amazonaws.com",
-                  S3OriginConfig: { OriginAccessIdentity: "" },
-                },
-              ],
-            },
-            DefaultCacheBehavior: {
-              TargetOriginId: "site-origin",
-              ViewerProtocolPolicy: "allow-all",
-            },
+    await simCloudFront.createDistribution(
+      new CreateDistributionCommand({
+        DistributionConfig: {
+          CallerReference: "lazy-s3-origin-test",
+          Comment: "Lazy S3 origin resolver test CDN",
+          Enabled: true,
+          Origins: {
+            Quantity: 1,
+            Items: [
+              {
+                Id: "site-origin",
+                DomainName: "lazy-s3-origin-bucket.s3.amazonaws.com",
+                S3OriginConfig: { OriginAccessIdentity: "" },
+              },
+            ],
           },
-        }),
-      );
-    });
-
-    assertStringIncludes(
-      error.message,
-      "Sim S3 Bucket for CloudFront Origin lazy-s3-origin-bucket.s3.amazonaws.com",
+          DefaultCacheBehavior: {
+            TargetOriginId: "site-origin",
+            ViewerProtocolPolicy: "allow-all",
+          },
+        },
+      }),
     );
   });
 });

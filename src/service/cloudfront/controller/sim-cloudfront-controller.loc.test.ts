@@ -5,7 +5,13 @@ import { SimAwsLocalServer } from "../../../serve/index.js";
 import { installSimCloudFront } from "../install/install-sim-cloudfront.js";
 import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { CreateDistributionCommand } from "@aws-sdk/client-cloudfront";
-import { assertIdentical, assertNonNullable } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertNonNullable,
+  assertStringIncludes,
+  assertThrowsErrorAsync,
+} from "@kensio/smartass";
+import { makeAwsRegionName } from "../../aws/sim-aws-region.js";
 
 describe("sim CloudFront local server", () => {
   const simAws = new SimAws();
@@ -111,5 +117,84 @@ describe("sim CloudFront local server", () => {
       `http://${distributionId.toLowerCase()}.cloudfront.net.sim-aws.localhost:${srv.port}/missing/object.json`,
     );
     assertIdentical(missingRes.status, 404);
+  });
+
+  it("can use S3 Origin in any Region", async () => {
+    const regionA = makeAwsRegionName();
+    const regionB = makeAwsRegionName();
+
+    const simS3 = simAws.region(regionA).service("s3");
+    await simS3.createBucket(new CreateBucketCommand({ Bucket: "foo-bucket" }));
+    await simS3.putObject(
+      new PutObjectCommand({
+        Bucket: "foo-bucket",
+        Key: "assets/foo/object.json",
+        Body: JSON.stringify({ something: "foobar" }),
+      }),
+    );
+
+    const simCloudFront = simAws.region(regionB).service("cloudFront");
+    const createDistroOutput = await simCloudFront.createDistribution(
+      new CreateDistributionCommand({
+        DistributionConfig: {
+          CallerReference: "default-behavior",
+          Comment: "Foobar CDN",
+          Enabled: true,
+          Origins: {
+            Quantity: 1,
+            Items: [
+              {
+                Id: "foo-origin",
+                DomainName: "foo-bucket.s3.amazonaws.com",
+                S3OriginConfig: { OriginAccessIdentity: "" },
+              },
+            ],
+          },
+          DefaultCacheBehavior: {
+            TargetOriginId: "foo-origin",
+            ViewerProtocolPolicy: "allow-all",
+          },
+        },
+      }),
+    );
+    const distributionId = createDistroOutput.Distribution?.Id;
+    assertNonNullable(distributionId);
+  });
+
+  it("throws when Bucket for S3 Origin does not exist", async () => {
+    const simCloudFront = simAws
+      .region(makeAwsRegionName())
+      .service("cloudFront");
+
+    const error = await assertThrowsErrorAsync(async () => {
+      await simCloudFront.createDistribution(
+        new CreateDistributionCommand({
+          DistributionConfig: {
+            CallerReference: "default-behavior",
+            Comment: "Foobar CDN",
+            Enabled: true,
+            Origins: {
+              Quantity: 1,
+              Items: [
+                {
+                  Id: "foo-origin",
+                  DomainName: "missing-bucket.s3.amazonaws.com",
+                  S3OriginConfig: { OriginAccessIdentity: "" },
+                },
+              ],
+            },
+            DefaultCacheBehavior: {
+              TargetOriginId: "foo-origin",
+              ViewerProtocolPolicy: "allow-all",
+            },
+          },
+        }),
+      );
+    });
+
+    assertStringIncludes(
+      error.message,
+      "Unable to find sim S3 Bucket missing-bucket for sim CloudFront S3 Origin",
+    );
   });
 });
