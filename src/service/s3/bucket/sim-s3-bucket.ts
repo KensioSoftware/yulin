@@ -19,7 +19,7 @@ export class SimS3Bucket {
   public readonly bucketName: string;
 
   constructor(
-    createCommand: { input: { Bucket: string | undefined } },
+    createCommand: { input: { Bucket?: string | undefined } },
     private readonly accountRegionScope: SimAwsAccountRegionScope = simAwsAccountRegionScopeFactory.make(),
     private storage: SimS3BucketStorage = new MemoryS3BucketStorage(),
     private website: S3BucketWebsite = new S3BucketWebsite(),

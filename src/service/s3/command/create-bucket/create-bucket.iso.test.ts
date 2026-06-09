@@ -1,10 +1,5 @@
 import { describe, it } from "vitest";
-import {
-  BucketAlreadyExists,
-  BucketAlreadyOwnedByYou,
-  CreateBucketCommand,
-  ListBucketsCommand,
-} from "@aws-sdk/client-s3";
+import { CreateBucketCommand, ListBucketsCommand } from "@aws-sdk/client-s3";
 import {
   assertArrayLength,
   assertIdentical,
@@ -13,6 +8,10 @@ import {
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import { SimAws } from "../../../aws/sim-aws.js";
+import {
+  SimS3BucketAlreadyExists,
+  SimS3BucketAlreadyOwnedByYou,
+} from "../../error/s3.error.js";
 
 describe("S3 CreateBucketCommand", () => {
   it("creates new S3 Bucket", async () => {
@@ -62,8 +61,7 @@ describe("S3 CreateBucketCommand", () => {
       simS3.createBucket(new CreateBucketCommand({ Bucket: "foobar-bucket" })),
     );
 
-    assertInstanceOf(error, BucketAlreadyOwnedByYou);
-    assertIdentical(error.$fault, "client");
+    assertInstanceOf(error, SimS3BucketAlreadyOwnedByYou);
   });
 
   it("throws on duplicate Bucket name in another region in the same account", async () => {
@@ -82,8 +80,7 @@ describe("S3 CreateBucketCommand", () => {
       ),
     );
 
-    assertInstanceOf(error, BucketAlreadyOwnedByYou);
-    assertIdentical(error.$fault, "client");
+    assertInstanceOf(error, SimS3BucketAlreadyOwnedByYou);
     assertStringIncludes(error.message, "eu-west-1");
     assertStringIncludes(error.message, "555555555555");
   });
@@ -104,8 +101,7 @@ describe("S3 CreateBucketCommand", () => {
       ),
     );
 
-    assertInstanceOf(error, BucketAlreadyExists);
-    assertIdentical(error.$fault, "client");
+    assertInstanceOf(error, SimS3BucketAlreadyExists);
     assertStringIncludes(error.message, "eu-west-1");
     assertStringIncludes(error.message, "111111111111");
   });
@@ -132,8 +128,7 @@ describe("S3 CreateBucketCommand", () => {
       ),
     );
 
-    assertInstanceOf(error, BucketAlreadyExists);
-    assertIdentical(error.$fault, "client");
+    assertInstanceOf(error, SimS3BucketAlreadyExists);
     assertStringIncludes(error.message, "eu-west-1");
     assertStringIncludes(error.message, "555555555555");
   });

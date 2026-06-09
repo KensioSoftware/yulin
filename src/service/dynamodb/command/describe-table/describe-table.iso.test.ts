@@ -2,7 +2,6 @@ import { describe, it } from "vitest";
 import {
   CreateTableCommand,
   DescribeTableCommand,
-  ResourceNotFoundException,
 } from "@aws-sdk/client-dynamodb";
 import {
   assertIdentical,
@@ -12,6 +11,7 @@ import {
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import { SimAws } from "../../../aws/sim-aws.js";
+import { SimDynamoDbResourceNotFoundException } from "../../error/dynamodb.error.js";
 
 describe("DynamoDB DescribeTableCommand", () => {
   it("describes DynamoDB Table", async () => {
@@ -80,6 +80,6 @@ describe("DynamoDB DescribeTableCommand", () => {
         new DescribeTableCommand({ TableName: "NonExistentTable" }),
       ),
     );
-    assertInstanceOf(error, ResourceNotFoundException);
+    assertInstanceOf(error, SimDynamoDbResourceNotFoundException);
   });
 });

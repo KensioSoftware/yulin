@@ -1,4 +1,4 @@
-import type { AttributeValue } from "@aws-sdk/client-dynamodb";
+import type { SimDynamoDbAttributeValue } from "../command/put-item/put-item.cmd.js";
 
 export type DynamoDBAttrType =
   | boolean
@@ -22,37 +22,39 @@ export class DynamoDBItemAttribute {
    * Convert a DynamoDB AttributeValue structure to a DynamoDBItemAttribute
    * instance.
    */
-  static fromAttributeValue(value: AttributeValue): DynamoDBItemAttribute {
-    if (value.BOOL !== undefined) {
+  static fromAttributeValue(
+    value: SimDynamoDbAttributeValue,
+  ): DynamoDBItemAttribute {
+    if ("BOOL" in value) {
       return new DynamoDBItemAttribute(value.BOOL);
     }
-    if (value.NULL !== undefined) {
+    if ("NULL" in value) {
       return new DynamoDBItemAttribute(null);
     }
-    if (value.S !== undefined) {
+    if ("S" in value) {
       return new DynamoDBItemAttribute(value.S);
     }
-    if (value.N !== undefined) {
+    if ("N" in value) {
       return new DynamoDBItemAttribute(Number(value.N));
     }
-    if (value.B !== undefined) {
+    if ("B" in value) {
       return new DynamoDBItemAttribute(value.B);
     }
-    if (value.SS !== undefined) {
+    if ("SS" in value) {
       return new DynamoDBItemAttribute(new Set(value.SS));
     }
-    if (value.NS !== undefined) {
+    if ("NS" in value) {
       return new DynamoDBItemAttribute(new Set(value.NS.map(Number)));
     }
-    if (value.BS !== undefined) {
+    if ("BS" in value) {
       return new DynamoDBItemAttribute(new Set(value.BS));
     }
-    if (value.L !== undefined) {
+    if ("L" in value) {
       return new DynamoDBItemAttribute(
         value.L.map((el) => DynamoDBItemAttribute.fromAttributeValue(el).value),
       );
     }
-    if (value.M !== undefined) {
+    if ("M" in value) {
       return new DynamoDBItemAttribute(
         Object.fromEntries(
           Object.entries(value.M).map(([key, val]) => [
@@ -70,7 +72,7 @@ export class DynamoDBItemAttribute {
   /**
    * Convert this DynamoDBItemAttribute to a DynamoDB AttributeValue structure.
    */
-  toAttributeValue(): AttributeValue {
+  toAttributeValue(): SimDynamoDbAttributeValue {
     const value = this.value;
 
     if (value === null) {

@@ -2,7 +2,6 @@ import { describe, it } from "vitest";
 import {
   CreateTableCommand,
   ListTablesCommand,
-  ResourceInUseException,
 } from "@aws-sdk/client-dynamodb";
 import {
   assertArrayLength,
@@ -13,6 +12,7 @@ import {
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import { SimAws } from "../../../aws/sim-aws.js";
+import { SimDynamoDbResourceInUseException } from "../../error/dynamodb.error.js";
 
 describe("DynamoDB CreateTableCommand", () => {
   it("creates new DynamoDB Table", async () => {
@@ -100,7 +100,6 @@ describe("DynamoDB CreateTableCommand", () => {
         new CreateTableCommand({ TableName: "FoobarTable" }),
       ),
     );
-    assertInstanceOf(error, ResourceInUseException);
-    assertIdentical(error.$fault, "client");
+    assertInstanceOf(error, SimDynamoDbResourceInUseException);
   });
 });

@@ -1,14 +1,14 @@
-import {
-  ResourceNotFoundException,
-  type DescribeTableCommand,
-  type DescribeTableOutput,
-} from "@aws-sdk/client-dynamodb";
+import type {
+  SimDescribeTableCommand,
+  SimDescribeTableCommandOutput,
+} from "./describe-table.cmd.js";
 import type { CommandHandler } from "../../../../command/command-handler.js";
 import type {
   DynamoDbTableName,
   SimDynamoDbTable,
 } from "../../table/dynamodb-table.js";
 import { jitter } from "../../../../util/sleep.js";
+import { SimDynamoDbResourceNotFoundException } from "../../error/dynamodb.error.js";
 
 /**
  * DynamoDB DescribeTableCommand handler.
@@ -16,8 +16,8 @@ import { jitter } from "../../../../util/sleep.js";
  * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/dynamodb/command/DescribeTableCommand/
  */
 export class DescribeTableCommandHandler implements CommandHandler<
-  DescribeTableCommand,
-  DescribeTableOutput
+  SimDescribeTableCommand,
+  SimDescribeTableCommandOutput
 > {
   constructor(
     private readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>,
@@ -26,7 +26,9 @@ export class DescribeTableCommandHandler implements CommandHandler<
   /**
    * Simulate describing DynamoDB Table.
    */
-  async handle(cmd: DescribeTableCommand): Promise<DescribeTableOutput> {
+  async handle(
+    cmd: SimDescribeTableCommand,
+  ): Promise<SimDescribeTableCommandOutput> {
     if (cmd.input.TableName === undefined) {
       throw new Error("DescribeTableCommand.input.TableName is required");
     }
@@ -36,10 +38,9 @@ export class DescribeTableCommandHandler implements CommandHandler<
 
     const table = this.tables.get(tableName);
     if (table === undefined) {
-      throw new ResourceNotFoundException({
-        message: `No DynamoDB Table named ${tableName}`,
-        $metadata: {},
-      });
+      throw new SimDynamoDbResourceNotFoundException(
+        `No DynamoDB Table named ${tableName}`,
+      );
     }
 
     return {
@@ -47,6 +48,7 @@ export class DescribeTableCommandHandler implements CommandHandler<
         TableName: table.tableName,
         TableStatus: table.status,
       },
+      $metadata: {},
     };
   }
 }

@@ -1,8 +1,8 @@
 import type { CommandHandler } from "../../../../command/command-handler.js";
 import type {
-  ListTablesCommand,
-  ListTablesOutput,
-} from "@aws-sdk/client-dynamodb";
+  SimListTablesCommand,
+  SimListTablesCommandOutput,
+} from "./list-tables.cmd.js";
 import type {
   DynamoDbTableName,
   SimDynamoDbTable,
@@ -15,8 +15,8 @@ import { jitter } from "../../../../util/sleep.js";
  * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/dynamodb/command/ListTablesCommand/
  */
 export class ListTablesCommandHandler implements CommandHandler<
-  ListTablesCommand,
-  ListTablesOutput
+  SimListTablesCommand,
+  SimListTablesCommandOutput
 > {
   constructor(
     private readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>,
@@ -25,7 +25,7 @@ export class ListTablesCommandHandler implements CommandHandler<
   /**
    * Simulate listing DynamoDB Tables.
    */
-  async handle(cmd: ListTablesCommand): Promise<ListTablesOutput> {
+  async handle(cmd: SimListTablesCommand): Promise<SimListTablesCommandOutput> {
     await jitter();
 
     const tables = [...this.tables.values()];
@@ -48,6 +48,7 @@ export class ListTablesCommandHandler implements CommandHandler<
     return {
       TableNames: page.map((table) => table.tableName),
       LastEvaluatedTableName: page.at(-1)?.tableName,
+      $metadata: {},
     };
   }
 }

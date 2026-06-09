@@ -113,6 +113,26 @@ export default defineConfig(
     },
   },
 
+  // ── Runtime source must not depend on AWS SDK packages ───
+  {
+    files: ["src/**/*.ts"],
+    ignores: ["src/**/*.test.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@aws-sdk/*"],
+              message:
+                "Do not import AWS SDK packages from runtime source. Define yulin-owned structural types instead; SDK compatibility belongs in tests.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // ── Security (low-cost security checks) ────────────────
   securityRecommended,
 

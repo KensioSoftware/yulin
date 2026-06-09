@@ -1,6 +1,5 @@
 import {
   CreateBucketCommand,
-  NoSuchBucket,
   PutBucketWebsiteCommand,
 } from "@aws-sdk/client-s3";
 import {
@@ -15,6 +14,7 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
+import { SimS3NoSuchBucket } from "../../error/s3.error.js";
 
 describe("S3 PutBucketWebsiteCommand", () => {
   it("configures an index document for an S3 Bucket website", async () => {
@@ -288,7 +288,7 @@ describe("S3 PutBucketWebsiteCommand", () => {
       ),
     );
 
-    assertInstanceOf(error, NoSuchBucket);
+    assertInstanceOf(error, SimS3NoSuchBucket);
     assertStringIncludes(error.message, "No S3 Bucket named missing-site");
   });
 });

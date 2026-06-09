@@ -1,8 +1,8 @@
 import type { CommandHandler } from "../../../../command/command-handler.js";
 import type {
-  ListBucketsCommand,
-  ListBucketsCommandOutput,
-} from "@aws-sdk/client-s3";
+  SimListBucketsCommand,
+  SimListBucketsCommandOutput,
+} from "./list-buckets.cmd.js";
 import type {
   SimS3BucketName,
   SimS3Bucket,
@@ -15,15 +15,17 @@ import { jitter } from "../../../../util/sleep.js";
  * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/s3/command/ListBucketsCommand/
  */
 export class ListBucketsCommandHandler implements CommandHandler<
-  ListBucketsCommand,
-  ListBucketsCommandOutput
+  SimListBucketsCommand,
+  SimListBucketsCommandOutput
 > {
   constructor(private readonly buckets: Map<SimS3BucketName, SimS3Bucket>) {}
 
   /**
    * Simulate listing S3 Buckets.
    */
-  async handle(cmd: ListBucketsCommand): Promise<ListBucketsCommandOutput> {
+  async handle(
+    cmd: SimListBucketsCommand,
+  ): Promise<SimListBucketsCommandOutput> {
     await jitter();
 
     const buckets = [...this.buckets.values()];

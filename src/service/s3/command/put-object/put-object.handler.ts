@@ -1,9 +1,8 @@
 import type { CommandHandler } from "../../../../command/command-handler.js";
-import {
-  NoSuchBucket,
-  type PutObjectCommand,
-  type PutObjectCommandOutput,
-} from "@aws-sdk/client-s3";
+import type {
+  SimPutObjectCommand,
+  SimPutObjectCommandOutput,
+} from "./put-object.cmd.js";
 import type {
   SimS3BucketName,
   SimS3Bucket,
@@ -11,6 +10,7 @@ import type {
 import { SimS3Object, SimS3ObjectMetadata } from "../../object/s3-object.js";
 import { assertDefined } from "../../../../util/defined/defined.js";
 import { jitter } from "../../../../util/sleep.js";
+import { SimS3NoSuchBucket } from "../../error/s3.error.js";
 
 /**
  * Simulated S3 PutObjectCommand handler.
@@ -18,25 +18,22 @@ import { jitter } from "../../../../util/sleep.js";
  * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/s3/command/PutObjectCommand/
  */
 export class PutObjectCommandHandler implements CommandHandler<
-  PutObjectCommand,
-  PutObjectCommandOutput
+  SimPutObjectCommand,
+  SimPutObjectCommandOutput
 > {
   constructor(private readonly buckets: Map<SimS3BucketName, SimS3Bucket>) {}
 
   /**
    * Simulate putting an Object into an S3 Bucket.
    */
-  async handle(cmd: PutObjectCommand): Promise<PutObjectCommandOutput> {
+  async handle(cmd: SimPutObjectCommand): Promise<SimPutObjectCommandOutput> {
     assertDefined(cmd.input.Bucket, "PutObjectCommand.input.Bucket");
     assertDefined(cmd.input.Key, "PutObjectCommand.input.Key");
 
     const bucketName = cmd.input.Bucket as SimS3BucketName;
     const bucket = this.buckets.get(bucketName);
     if (bucket === undefined) {
-      throw new NoSuchBucket({
-        message: `No S3 Bucket named ${bucketName}`,
-        $metadata: {},
-      });
+      throw new SimS3NoSuchBucket(`No S3 Bucket named ${bucketName}`);
     }
 
     await jitter();
@@ -53,7 +50,7 @@ export class PutObjectCommandHandler implements CommandHandler<
     };
   }
 
-  private static toMetadata(cmd: PutObjectCommand): Record<string, string> {
+  private static toMetadata(cmd: SimPutObjectCommand): Record<string, string> {
     return {
       ...cmd.input.Metadata,
       ...(cmd.input.ContentType === undefined
@@ -62,7 +59,7 @@ export class PutObjectCommandHandler implements CommandHandler<
     };
   }
 
-  private static toBuffer(body: PutObjectCommand["input"]["Body"]): Buffer {
+  private static toBuffer(body: SimPutObjectCommand["input"]["Body"]): Buffer {
     if (body === undefined) {
       return Buffer.alloc(0);
     }
