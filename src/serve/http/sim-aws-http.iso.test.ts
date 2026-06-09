@@ -7,7 +7,6 @@ import { describe, it } from "vitest";
 import { assertIdentical, assertStringIncludes } from "@kensio/smartass";
 import { SimAwsHttp } from "./sim-aws-http.js";
 import { SimAws } from "../../service/aws/sim-aws.js";
-import { installSimS3 } from "../../service/s3/index.js";
 
 describe("Simulated AWS HTTP", () => {
   it("responds HTTP 501 for unknown host", async () => {
@@ -38,7 +37,7 @@ describe("Simulated AWS HTTP", () => {
 
   it("routes S3 website request to simulated S3 controller", async () => {
     const simAws = new SimAws();
-    installSimS3(simAws);
+
     const simAwsHttp = new SimAwsHttp(simAws);
 
     const res = await simAwsHttp.fetch(
@@ -54,9 +53,9 @@ describe("Simulated AWS HTTP", () => {
 
   it("serves an S3 Object over simulated HTTP when static website hosting is configured", async () => {
     const simAws = new SimAws();
-    installSimS3(simAws);
+
     const simAwsHttp = new SimAwsHttp(simAws);
-    const simS3 = simAws.region("eu-west-2").service("s3");
+    const simS3 = simAws.region("eu-west-2").s3();
 
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "foo-site" }));
     await simS3.putBucketWebsite(
@@ -92,9 +91,9 @@ describe("Simulated AWS HTTP", () => {
 
   it("serves HEAD requests without a response body when static website hosting is configured", async () => {
     const simAws = new SimAws();
-    installSimS3(simAws);
+
     const simAwsHttp = new SimAwsHttp(simAws);
-    const simS3 = simAws.region("eu-west-2").service("s3");
+    const simS3 = simAws.region("eu-west-2").s3();
 
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "head-site" }));
     await simS3.putBucketWebsite(

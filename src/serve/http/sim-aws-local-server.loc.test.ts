@@ -7,7 +7,6 @@ import {
   assertThrowsError,
 } from "@kensio/smartass";
 import { serveSimAws, SimAwsLocalServer } from "./sim-aws-local-server.js";
-import { installSimS3 } from "../../service/s3/index.js";
 
 describe("Simulated AWS local HTTP server", () => {
   const srv: SimAwsLocalServer = new SimAwsLocalServer();
@@ -51,8 +50,6 @@ describe("Simulated AWS local HTTP server", () => {
   });
 
   it("routes S3 website request to simulated S3 controller", async () => {
-    installSimS3(srv.simAws);
-
     const res = await fetch(
       `http://my-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/foobar-object.html`,
     );
@@ -87,7 +84,6 @@ describe("Simulated AWS local HTTP server", () => {
 
   it("serves via serveSimAws util function", async () => {
     const server = await serveSimAws();
-    installSimS3(server.simAws);
 
     const res = await fetch(
       `http://my-site.s3-website.eu-west-2.sim-aws.localhost:${server.port}/foobar-object.html`,

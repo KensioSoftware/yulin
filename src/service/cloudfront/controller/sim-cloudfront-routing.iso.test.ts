@@ -8,8 +8,6 @@ import { CreateDistributionCommand } from "@aws-sdk/client-cloudfront";
 import { describe, it } from "vitest";
 import type { SimAwsServiceTarget } from "../../../serve/controller/sim-service-controller.js";
 import { SimAws } from "../../aws/sim-aws.js";
-import { installSimS3 } from "../../s3/index.js";
-import { installSimCloudFront } from "../install/install-sim-cloudfront.js";
 import { SimCloudFrontServiceController } from "./sim-cloudfront-controller.js";
 import { SimCloudFront } from "../sim-cloudfront.js";
 
@@ -36,13 +34,11 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
 
   it("routes a request to a Distribution by CloudFront Distribution hostname", async () => {
     const simAws = new SimAws();
-    installSimS3(simAws);
-    installSimCloudFront(simAws);
 
     await simAws
-      .service("s3")
+      .s3()
       .createBucket(new CreateBucketCommand({ Bucket: "distro-host-bucket" }));
-    await simAws.service("s3").putObject(
+    await simAws.s3().putObject(
       new PutObjectCommand({
         Bucket: "distro-host-bucket",
         Key: "index.html",
@@ -51,7 +47,7 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
       }),
     );
 
-    const cloudFront = simAws.service("cloudFront");
+    const cloudFront = simAws.cloudFront();
     const createDistributionOutput = await cloudFront.createDistribution(
       new CreateDistributionCommand({
         DistributionConfig: {
@@ -100,16 +96,14 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
 
   it("uses the default Behavior when no explicit path pattern matches", async () => {
     const simAws = new SimAws();
-    installSimS3(simAws);
-    installSimCloudFront(simAws);
 
-    const simS3 = simAws.service("s3");
+    const simS3 = simAws.s3();
     await simS3.createBucket(
       new CreateBucketCommand({
         Bucket: "default-origin-bucket",
       }),
     );
-    await simAws.service("s3").putObject(
+    await simAws.s3().putObject(
       new PutObjectCommand({
         Bucket: "default-origin-bucket",
         Key: "page.html",
@@ -117,12 +111,12 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
       }),
     );
 
-    await simAws.service("s3").createBucket(
+    await simAws.s3().createBucket(
       new CreateBucketCommand({
         Bucket: "asset-origin-bucket",
       }),
     );
-    await simAws.service("s3").putObject(
+    await simAws.s3().putObject(
       new PutObjectCommand({
         Bucket: "asset-origin-bucket",
         Key: "page.html",
@@ -130,7 +124,7 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
       }),
     );
 
-    const cloudFront = simAws.service("cloudFront");
+    const cloudFront = simAws.cloudFront();
     const createDistributionOutput = await cloudFront.createDistribution(
       new CreateDistributionCommand({
         DistributionConfig: {
@@ -188,15 +182,13 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
 
   it("uses the most specific matching Behavior for the request path", async () => {
     const simAws = new SimAws();
-    installSimS3(simAws);
-    installSimCloudFront(simAws);
 
-    await simAws.service("s3").createBucket(
+    await simAws.s3().createBucket(
       new CreateBucketCommand({
         Bucket: "specific-default-bucket",
       }),
     );
-    await simAws.service("s3").putObject(
+    await simAws.s3().putObject(
       new PutObjectCommand({
         Bucket: "specific-default-bucket",
         Key: "assets/images/logo.png",
@@ -204,12 +196,12 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
       }),
     );
 
-    await simAws.service("s3").createBucket(
+    await simAws.s3().createBucket(
       new CreateBucketCommand({
         Bucket: "specific-assets-bucket",
       }),
     );
-    await simAws.service("s3").putObject(
+    await simAws.s3().putObject(
       new PutObjectCommand({
         Bucket: "specific-assets-bucket",
         Key: "assets/images/logo.png",
@@ -217,12 +209,12 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
       }),
     );
 
-    await simAws.service("s3").createBucket(
+    await simAws.s3().createBucket(
       new CreateBucketCommand({
         Bucket: "specific-images-bucket",
       }),
     );
-    await simAws.service("s3").putObject(
+    await simAws.s3().putObject(
       new PutObjectCommand({
         Bucket: "specific-images-bucket",
         Key: "public/assets/images/logo.png",
@@ -230,7 +222,7 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
       }),
     );
 
-    const cloudFront = simAws.service("cloudFront");
+    const cloudFront = simAws.cloudFront();
     const createDistributionOutput = await cloudFront.createDistribution(
       new CreateDistributionCommand({
         DistributionConfig: {

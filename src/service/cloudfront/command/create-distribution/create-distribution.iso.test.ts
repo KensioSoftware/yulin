@@ -12,18 +12,15 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
-import { installSimCloudFront } from "../../install/install-sim-cloudfront.js";
 import { SimCloudFrontS3Origin } from "../../origin/sim-cloudfront-s3-origin.js";
-import { installSimS3 } from "../../../s3/index.js";
 import { CreateBucketCommand } from "@aws-sdk/client-s3";
 import type { SimCloudFrontDistributionId } from "../../distribution/sim-cloudfront-distribution.js";
 
 describe("CloudFront CreateDistributionCommand", () => {
   it("creates new CloudFront Distribution", async () => {
     const simAws = new SimAws();
-    installSimCloudFront(simAws);
 
-    const simCloudFront = simAws.account("555555555555").service("cloudFront");
+    const simCloudFront = simAws.account("555555555555").cloudFront();
 
     const distributionConfig = {
       CallerReference: "test-distribution",
@@ -92,28 +89,25 @@ describe("CloudFront CreateDistributionCommand", () => {
 
   it("uses Account-global CloudFront state across Regions", () => {
     const simAws = new SimAws();
-    installSimCloudFront(simAws);
 
     const euWest1CloudFront = simAws
       .account("555555555555")
       .region("eu-west-1")
-      .service("cloudFront");
+      .cloudFront();
     const euWest2CloudFront = simAws
       .account("555555555555")
       .region("eu-west-2")
-      .service("cloudFront");
+      .cloudFront();
 
     assertIdentical(euWest1CloudFront, euWest2CloudFront);
   });
 
   it("configures aliases, S3 Origins, and cache Behaviors", async () => {
     const simAws = new SimAws();
-    installSimS3(simAws);
-    installSimCloudFront(simAws);
 
     const account = simAws.account("555555555555");
-    const simS3 = account.service("s3");
-    const simCloudFront = account.service("cloudFront");
+    const simS3 = account.s3();
+    const simCloudFront = account.cloudFront();
 
     await simS3.createBucket(
       new CreateBucketCommand({
@@ -244,12 +238,11 @@ describe("CloudFront CreateDistributionCommand", () => {
 
   it("creates Distribution ARN for selected Account", async () => {
     const simAws = new SimAws();
-    installSimCloudFront(simAws);
 
     const simCloudFront = simAws
       .account("666666666666")
       .region("ap-east-1")
-      .service("cloudFront");
+      .cloudFront();
 
     const createDistributionOutput = await simCloudFront.createDistribution(
       new CreateDistributionCommand({
@@ -290,9 +283,8 @@ describe("CloudFront CreateDistributionCommand", () => {
 
   it("throws error for unknown Origin type", async () => {
     const simAws = new SimAws();
-    installSimCloudFront(simAws);
 
-    const simCloudFront = simAws.service("cloudFront");
+    const simCloudFront = simAws.cloudFront();
 
     const error = await assertThrowsErrorAsync(async () => {
       await simCloudFront.createDistribution(
