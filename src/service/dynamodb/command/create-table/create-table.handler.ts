@@ -1,16 +1,16 @@
 import type { DynamoDbTableName } from "../../table/dynamodb-table.js";
 import { SimDynamoDbTable } from "../../table/dynamodb-table.js";
-import {
-  type CreateTableCommand,
-  type CreateTableCommandOutput,
-  ResourceInUseException,
-} from "@aws-sdk/client-dynamodb";
+import type {
+  SimCreateTableCommand,
+  SimCreateTableCommandOutput,
+} from "./create-table.cmd.js";
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import type { CommandHandler } from "../../../../command/command-handler.js";
 import { jitter } from "../../../../util/sleep.js";
 import { assertDefined } from "../../../../util/defined/defined.js";
 import type { SimArn } from "../../../aws/arn.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
+import { SimDynamoDbResourceInUseException } from "../../error/dynamodb.error.js";
 
 /**
  * DynamoDB CreateTableCommand handler.
@@ -18,8 +18,8 @@ import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-regi
  * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/dynamodb/command/CreateTableCommand/
  */
 export class CreateTableCommandHandler implements CommandHandler<
-  CreateTableCommand,
-  CreateTableCommandOutput
+  SimCreateTableCommand,
+  SimCreateTableCommandOutput
 > {
   constructor(
     private readonly accountRegionScope: SimAwsAccountRegionScope,
@@ -30,15 +30,16 @@ export class CreateTableCommandHandler implements CommandHandler<
   /**
    * Handle creation of a new DynamoDB Table.
    */
-  async handle(cmd: CreateTableCommand): Promise<CreateTableCommandOutput> {
+  async handle(
+    cmd: SimCreateTableCommand,
+  ): Promise<SimCreateTableCommandOutput> {
     assertDefined(cmd.input.TableName, "CreateTableCommand.input.TableName");
 
     const tableName = cmd.input.TableName as DynamoDbTableName;
     if (this.tables.has(tableName)) {
-      throw new ResourceInUseException({
-        message: `DynamoDB Table ${tableName} already exists`,
-        $metadata: {},
-      });
+      throw new SimDynamoDbResourceInUseException(
+        `DynamoDB Table ${tableName} already exists`,
+      );
     }
 
     await jitter();

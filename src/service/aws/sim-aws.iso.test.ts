@@ -1,14 +1,6 @@
 import { describe, it } from "vitest";
-import {
-  assertIdentical,
-  assertStringIncludes,
-  assertThrowsError,
-} from "@kensio/smartass";
+import { assertIdentical } from "@kensio/smartass";
 import { SimAws } from "./sim-aws.js";
-import { installSimS3 } from "../s3/index.js";
-import { installSimDynamoDb } from "../dynamodb/index.js";
-import { SimS3ServiceController } from "../s3/serve/sim-s3-controller.js";
-import type { SimS3Services } from "../s3/install/install-sim-s3.js";
 
 describe("SimAws", () => {
   it("returns same Account for same Account ID", () => {
@@ -61,70 +53,19 @@ describe("SimAws", () => {
 
   it("returns same default S3 from all default scope paths", () => {
     const simAws = new SimAws();
-    installSimS3(simAws);
 
-    assertIdentical(simAws.service("s3"), simAws.account().service("s3"));
-    assertIdentical(simAws.service("s3"), simAws.region().service("s3"));
-    assertIdentical(
-      simAws.service("s3"),
-      simAws.account().region().service("s3"),
-    );
-    assertIdentical(
-      simAws.service("s3"),
-      simAws.region().account().service("s3"),
-    );
+    assertIdentical(simAws.s3(), simAws.account().s3());
+    assertIdentical(simAws.s3(), simAws.region().s3());
+    assertIdentical(simAws.s3(), simAws.account().region().s3());
+    assertIdentical(simAws.s3(), simAws.region().account().s3());
   });
 
   it("returns same default DynamoDB from all default scope paths", () => {
     const simAws = new SimAws();
-    installSimDynamoDb(simAws);
 
-    assertIdentical(
-      simAws.service("dynamoDb"),
-      simAws.account().service("dynamoDb"),
-    );
-    assertIdentical(
-      simAws.service("dynamoDb"),
-      simAws.region().service("dynamoDb"),
-    );
-    assertIdentical(
-      simAws.service("dynamoDb"),
-      simAws.account().region().service("dynamoDb"),
-    );
-    assertIdentical(
-      simAws.service("dynamoDb"),
-      simAws.region().account().service("dynamoDb"),
-    );
-  });
-
-  it("throws when a service is not installed", () => {
-    const simAws = new SimAws();
-
-    const error = assertThrowsError(() => {
-      simAws.service("s3" as never);
-    });
-
-    assertStringIncludes(error.message, "Sim AWS service is not installed: s3");
-  });
-
-  it("throws on trying to install a duplicate service controller", () => {
-    const simAws = new SimAws();
-
-    simAws.installServiceController(
-      "s3",
-      (sa) => new SimS3ServiceController(sa as SimAws<SimS3Services>),
-    );
-
-    const error = assertThrowsError(() => {
-      simAws.installServiceController(
-        "s3",
-        (sa) => new SimS3ServiceController(sa as SimAws<SimS3Services>),
-      );
-    });
-
-    assertStringIncludes(
-      error.message,
-      "Sim AWS service controller is already installed: s3",
-    );
+    assertIdentical(simAws.dynamoDb(), simAws.account().dynamoDb());
+    assertIdentical(simAws.dynamoDb(), simAws.region().dynamoDb());
+    assertIdentical(simAws.dynamoDb(), simAws.account().region().dynamoDb());
+    assertIdentical(simAws.dynamoDb(), simAws.region().account().dynamoDb());
   });
 });

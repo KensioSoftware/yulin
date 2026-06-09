@@ -11,11 +11,10 @@ import {
 import { afterAll, beforeAll, describe, it } from "vitest";
 import { SimAwsLocalServer } from "../../../serve/index.js";
 import { SimAws } from "../../aws/sim-aws.js";
-import { installSimS3 } from "../install/install-sim-s3.js";
 
 describe("Simulated S3 local HTTP controller", () => {
   const simAws = new SimAws();
-  installSimS3(simAws);
+
   const srv: SimAwsLocalServer = new SimAwsLocalServer(simAws);
 
   beforeAll(async () => {
@@ -27,7 +26,7 @@ describe("Simulated S3 local HTTP controller", () => {
   });
 
   it("serves an S3 Object body and content type over HTTP GET", async () => {
-    const simS3 = simAws.region("eu-west-2").service("s3");
+    const simS3 = simAws.region("eu-west-2").s3();
 
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "foo-site" }));
     await simS3.putBucketWebsite(
@@ -67,7 +66,7 @@ describe("Simulated S3 local HTTP controller", () => {
   });
 
   it("serves S3 Object headers without a body over HTTP HEAD", async () => {
-    const simS3 = simAws.region("eu-west-2").service("s3");
+    const simS3 = simAws.region("eu-west-2").s3();
 
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "head-site" }));
     await simS3.putBucketWebsite(
@@ -106,7 +105,7 @@ describe("Simulated S3 local HTTP controller", () => {
   });
 
   it("decodes URL-encoded Object keys from the request path", async () => {
-    const simS3 = simAws.region("eu-west-2").service("s3");
+    const simS3 = simAws.region("eu-west-2").s3();
 
     await simS3.createBucket(
       new CreateBucketCommand({ Bucket: "encoded-path-site" }),
@@ -141,7 +140,7 @@ describe("Simulated S3 local HTTP controller", () => {
   });
 
   it("redirects folder requests without a trailing slash when an index document exists", async () => {
-    const simS3 = simAws.region("eu-west-2").service("s3");
+    const simS3 = simAws.region("eu-west-2").s3();
 
     await simS3.createBucket(
       new CreateBucketCommand({ Bucket: "folder-index-redirect-site" }),
@@ -180,7 +179,7 @@ describe("Simulated S3 local HTTP controller", () => {
   });
 
   it("serves the folder index document after following the trailing slash redirect", async () => {
-    const simS3 = simAws.region("eu-west-2").service("s3");
+    const simS3 = simAws.region("eu-west-2").s3();
 
     await simS3.createBucket(
       new CreateBucketCommand({ Bucket: "folder-index-follow-site" }),
@@ -220,7 +219,7 @@ describe("Simulated S3 local HTTP controller", () => {
   });
 
   it("does not serve S3 Bucket root requests when static website hosting is not enabled", async () => {
-    const simS3 = simAws.region("eu-west-2").service("s3");
+    const simS3 = simAws.region("eu-west-2").s3();
 
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "index-site" }));
 
@@ -234,7 +233,7 @@ describe("Simulated S3 local HTTP controller", () => {
   });
 
   it("responds HTTP 404 for missing S3 Objects when static website hosting is enabled", async () => {
-    const simS3 = simAws.region("eu-west-2").service("s3");
+    const simS3 = simAws.region("eu-west-2").s3();
 
     await simS3.createBucket(
       new CreateBucketCommand({ Bucket: "missing-object-site" }),
@@ -260,7 +259,7 @@ describe("Simulated S3 local HTTP controller", () => {
   });
 
   it("responds HTTP 404 when the hostname region differs from the Bucket region", async () => {
-    const simS3 = simAws.region("eu-west-2").service("s3");
+    const simS3 = simAws.region("eu-west-2").s3();
 
     await simS3.createBucket(
       new CreateBucketCommand({ Bucket: "wrong-region-site" }),

@@ -1,14 +1,14 @@
 import type { CommandHandler } from "../../../../command/command-handler.js";
-import {
-  type PutItemCommand,
-  type PutItemCommandOutput,
-  ResourceNotFoundException,
-} from "@aws-sdk/client-dynamodb";
+import type {
+  SimPutItemCommand,
+  SimPutItemCommandOutput,
+} from "./put-item.cmd.js";
 import type {
   DynamoDbTableName,
   SimDynamoDbTable,
 } from "../../table/dynamodb-table.js";
 import { DynamoDbItem } from "../../item/dynamodb-item.js";
+import { SimDynamoDbResourceNotFoundException } from "../../error/dynamodb.error.js";
 
 /**
  * DynamoDB PutItemCommand handler.
@@ -16,8 +16,8 @@ import { DynamoDbItem } from "../../item/dynamodb-item.js";
  * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/dynamodb/command/PutItemCommand/
  */
 export class PutItemCommandHandler implements CommandHandler<
-  PutItemCommand,
-  PutItemCommandOutput
+  SimPutItemCommand,
+  SimPutItemCommandOutput
 > {
   constructor(
     private readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>,
@@ -26,7 +26,7 @@ export class PutItemCommandHandler implements CommandHandler<
   /**
    * Put an Item into a DynamoDB Table.
    */
-  async handle(cmd: PutItemCommand): Promise<PutItemCommandOutput> {
+  async handle(cmd: SimPutItemCommand): Promise<SimPutItemCommandOutput> {
     const tableName = cmd.input.TableName as DynamoDbTableName | undefined;
     if (tableName === undefined) {
       throw new Error("PutItemCommand.input.TableName is required");
@@ -34,10 +34,9 @@ export class PutItemCommandHandler implements CommandHandler<
 
     const table = this.tables.get(tableName);
     if (table === undefined) {
-      throw new ResourceNotFoundException({
-        message: `No DynamoDB Table named ${tableName}`,
-        $metadata: {},
-      });
+      throw new SimDynamoDbResourceNotFoundException(
+        `No DynamoDB Table named ${tableName}`,
+      );
     }
 
     if (cmd.input.Item === undefined) {

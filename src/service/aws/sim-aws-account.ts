@@ -1,12 +1,11 @@
 import type { AwsRegionName } from "./sim-aws-region.js";
 import type { Brand } from "../../util/brand.type.js";
-import type {
-  NoSimAwsServices,
-  SimAwsAccountRegionScopes,
-  SimAwsServiceMap,
-} from "./sim-aws-services.js";
 import type { SimAwsAccountRegionContainer } from "./sim-aws-account-region-scope.js";
 import { faker } from "@faker-js/faker";
+import type { SimS3 } from "../s3/sim-s3.js";
+import type { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
+import type { SimDynamoDb } from "../dynamodb/sim-dynamodb.js";
+import type { SimAws } from "./sim-aws.js";
 
 export type SimAwsAccountId = Brand<string, "SimAwsAccountId">;
 
@@ -18,31 +17,38 @@ export const DEFAULT_SIM_AWS_ACCOUNT_ID = "888888888888" as SimAwsAccountId;
  * So SimAwsAccount is like an intermediate navigation handler on the way to a
  * full Account/Region scope.
  */
-export class SimAwsAccount<
-  TServices extends SimAwsServiceMap = NoSimAwsServices,
-> {
+export class SimAwsAccount {
   constructor(
-    private readonly accountRegionScopes: SimAwsAccountRegionScopes<TServices>,
+    private readonly simAws: Pick<SimAws, "accountRegionScope">,
     public readonly accountId: SimAwsAccountId = DEFAULT_SIM_AWS_ACCOUNT_ID,
   ) {}
 
   /**
    * Get a simulated AWS Region scoped for this Account.
    */
-  region(regionName?: AwsRegionName): SimAwsAccountRegionContainer<TServices> {
-    return this.accountRegionScopes.accountRegionScope(
-      this.accountId,
-      regionName,
-    );
+  region(regionName?: AwsRegionName): SimAwsAccountRegionContainer {
+    return this.simAws.accountRegionScope(this.accountId, regionName);
   }
 
   /**
-   * Get an installed simulated AWS service for this Account's default Region.
-   * The service must be installed with the appropriate installer function
-   * first.
+   * Get simulated S3 for this Account's default Region.
    */
-  service<TKey extends keyof TServices>(serviceName: TKey): TServices[TKey] {
-    return this.region().service(serviceName);
+  s3(): SimS3 {
+    return this.region().s3();
+  }
+
+  /**
+   * Get simulated CloudFront for this Account.
+   */
+  cloudFront(): SimCloudFront {
+    return this.region().cloudFront();
+  }
+
+  /**
+   * Get simulated DynamoDB for this Account's default Region.
+   */
+  dynamoDb(): SimDynamoDb {
+    return this.region().dynamoDb();
   }
 }
 

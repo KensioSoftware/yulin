@@ -1,14 +1,17 @@
 import type { Brand } from "../../../util/brand.type.js";
-import type { CreateTableCommand, TableStatus } from "@aws-sdk/client-dynamodb";
-import { DynamoDbKeySchema } from "./dynamodb-key-schema.js";
-import { assertDefined } from "../../../util/defined/defined.js";
-import type { DynamoDbItem } from "../item/dynamodb-item.js";
-import type { BackgroundScheduler } from "../../../util/background/background.js";
 import {
   makeSimArn,
   type SimArn,
   type SimArnComponents,
 } from "../../aws/arn.js";
+import { assertDefined } from "../../../util/defined/defined.js";
+import { DynamoDbKeySchema } from "./dynamodb-key-schema.js";
+import type { DynamoDbItem } from "../item/dynamodb-item.js";
+import type { BackgroundScheduler } from "../../../util/background/background.js";
+import type {
+  SimCreateTableCommand,
+  SimDynamoDbTableStatus,
+} from "../command/create-table/create-table.cmd.js";
 
 export type DynamoDbTableName = Brand<string, "DynamoDbTableName">;
 
@@ -21,12 +24,12 @@ export class SimDynamoDbTable {
   public readonly tableName: DynamoDbTableName;
 
   private readonly _keySchema: DynamoDbKeySchema;
-  private _status: TableStatus = "CREATING";
+  private _status: SimDynamoDbTableStatus = "CREATING";
 
   private readonly items = new Map<string, DynamoDbItem>();
 
   constructor(
-    createCommand: CreateTableCommand,
+    createCommand: SimCreateTableCommand,
     public readonly simArn: SimArn,
     private readonly background: BackgroundScheduler,
   ) {
@@ -57,7 +60,7 @@ export class SimDynamoDbTable {
   /**
    * Get the current table status.
    */
-  public get status(): TableStatus {
+  public get status(): SimDynamoDbTableStatus {
     return this._status;
   }
 
@@ -75,7 +78,7 @@ export class SimDynamoDbTable {
 }
 
 /**
- * Generate a fake ARN for a DynamoDB Table.
+ * Generate a fake simulated DynamoDB Table ARN.
  */
 export function makeSimDynamoDbTableArn(
   overrides?: Exclude<Partial<SimArnComponents>, "service" | "resourceType">,

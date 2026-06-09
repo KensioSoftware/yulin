@@ -1,8 +1,6 @@
 import { afterAll, beforeAll, describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
-import { installSimS3 } from "../../s3/index.js";
 import { SimAwsLocalServer } from "../../../serve/index.js";
-import { installSimCloudFront } from "../install/install-sim-cloudfront.js";
 import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { CreateDistributionCommand } from "@aws-sdk/client-cloudfront";
 import {
@@ -15,8 +13,7 @@ import { makeAwsRegionName } from "../../aws/sim-aws-region.js";
 
 describe("sim CloudFront local server", () => {
   const simAws = new SimAws();
-  installSimS3(simAws);
-  installSimCloudFront(simAws);
+
   const srv: SimAwsLocalServer = new SimAwsLocalServer(simAws);
 
   beforeAll(async () => {
@@ -28,7 +25,7 @@ describe("sim CloudFront local server", () => {
   });
 
   it("serves from multiple sim S3 Origins", async () => {
-    const simS3 = simAws.service("s3");
+    const simS3 = simAws.s3();
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "bucket-a" }));
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "bucket-b" }));
     await simS3.putObject(
@@ -53,7 +50,7 @@ describe("sim CloudFront local server", () => {
       }),
     );
 
-    const simCloudFront = simAws.service("cloudFront");
+    const simCloudFront = simAws.cloudFront();
     const createDistroOutput = await simCloudFront.createDistribution(
       new CreateDistributionCommand({
         DistributionConfig: {
@@ -123,7 +120,7 @@ describe("sim CloudFront local server", () => {
     const regionA = makeAwsRegionName();
     const regionB = makeAwsRegionName();
 
-    const simS3 = simAws.region(regionA).service("s3");
+    const simS3 = simAws.region(regionA).s3();
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "foo-bucket" }));
     await simS3.putObject(
       new PutObjectCommand({
@@ -133,7 +130,7 @@ describe("sim CloudFront local server", () => {
       }),
     );
 
-    const simCloudFront = simAws.region(regionB).service("cloudFront");
+    const simCloudFront = simAws.region(regionB).cloudFront();
     const createDistroOutput = await simCloudFront.createDistribution(
       new CreateDistributionCommand({
         DistributionConfig: {
@@ -162,9 +159,7 @@ describe("sim CloudFront local server", () => {
   });
 
   it("throws when Bucket for S3 Origin does not exist", async () => {
-    const simCloudFront = simAws
-      .region(makeAwsRegionName())
-      .service("cloudFront");
+    const simCloudFront = simAws.region(makeAwsRegionName()).cloudFront();
 
     const error = await assertThrowsErrorAsync(async () => {
       await simCloudFront.createDistribution(

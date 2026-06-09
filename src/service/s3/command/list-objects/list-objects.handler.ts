@@ -1,15 +1,15 @@
 import type { CommandHandler } from "../../../../command/command-handler.js";
-import {
-  NoSuchBucket,
-  type ListObjectsCommand,
-  type ListObjectsCommandOutput,
-} from "@aws-sdk/client-s3";
+import type {
+  SimListObjectsCommand,
+  SimListObjectsCommandOutput,
+} from "./list-objects.cmd.js";
 import type {
   SimS3BucketName,
   SimS3Bucket,
 } from "../../bucket/sim-s3-bucket.js";
 import { assertDefined } from "../../../../util/defined/defined.js";
 import { jitter } from "../../../../util/sleep.js";
+import { SimS3NoSuchBucket } from "../../error/s3.error.js";
 
 /**
  * Simulated S3 ListObjectsCommand handler.
@@ -17,24 +17,23 @@ import { jitter } from "../../../../util/sleep.js";
  * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/s3/command/ListObjectsCommand/
  */
 export class ListObjectsCommandHandler implements CommandHandler<
-  ListObjectsCommand,
-  ListObjectsCommandOutput
+  SimListObjectsCommand,
+  SimListObjectsCommandOutput
 > {
   constructor(private readonly buckets: Map<SimS3BucketName, SimS3Bucket>) {}
 
   /**
    * Simulate listing Objects in an S3 Bucket.
    */
-  async handle(cmd: ListObjectsCommand): Promise<ListObjectsCommandOutput> {
+  async handle(
+    cmd: SimListObjectsCommand,
+  ): Promise<SimListObjectsCommandOutput> {
     assertDefined(cmd.input.Bucket, "ListObjectsCommand.input.Bucket");
 
     const bucketName = cmd.input.Bucket as SimS3BucketName;
     const bucket = this.buckets.get(bucketName);
     if (bucket === undefined) {
-      throw new NoSuchBucket({
-        message: `No S3 Bucket named ${bucketName}`,
-        $metadata: {},
-      });
+      throw new SimS3NoSuchBucket(`No S3 Bucket named ${bucketName}`);
     }
 
     await jitter();

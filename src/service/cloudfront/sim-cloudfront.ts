@@ -9,9 +9,9 @@ import {
   simAwsAccountRegionScopeFactory,
 } from "../aws/sim-aws-account-region-scope.js";
 import type {
-  CreateDistributionCommand,
-  CreateDistributionCommandOutput,
-} from "@aws-sdk/client-cloudfront";
+  SimCreateDistributionCommand,
+  SimCreateDistributionCommandOutput,
+} from "./command/create-distribution/create-distribution.cmd.js";
 import {
   emptyCloudFrontS3OriginResolver,
   type SimCloudFrontS3OriginResolver,
@@ -46,8 +46,8 @@ export class SimCloudFront {
    * Handle a Create Distribution Command from the SDK.
    */
   async createDistribution(
-    cmd: CreateDistributionCommand,
-  ): Promise<CreateDistributionCommandOutput> {
+    cmd: SimCreateDistributionCommand,
+  ): Promise<SimCreateDistributionCommandOutput> {
     const handler = new CreateDistributionCommandHandler(
       this.accountRegionScope.accountId,
       this.distributions,

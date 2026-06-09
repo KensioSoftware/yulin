@@ -1,85 +1,91 @@
-import type { CreateTableInput, KeyType } from "@aws-sdk/client-dynamodb";
 import { assertDefined } from "../../../util/defined/defined.js";
-import type { DynamoDbItem } from "../item/dynamodb-item.js";
 import type { DynamoDBAttrType } from "../item/dynamodb-item-attribute.js";
+import type { DynamoDbItem } from "../item/dynamodb-item.js";
+import type {
+  SimCreateTableCommandInput,
+  SimDynamoDbKeySchemaElement,
+  SimDynamoDbKeyType,
+} from "../command/create-table/create-table.cmd.js";
 
-type DynamoDbKey = string | number;
+type DynamoDbKey = number | string;
+
+type RequiredSimDynamoDbKeySchemaElement = SimDynamoDbKeySchemaElement & {
+  readonly AttributeName: string;
+  readonly KeyType: SimDynamoDbKeyType;
+};
 
 /**
- * Extractor for DynamoDB KeySchema from CreateTableCommand input.
- *
- * https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_KeySchemaElement.html
+ * Simulated DynamoDB table key schema.
  */
 export class DynamoDbKeySchema {
-  public readonly partitionKey: { AttributeName: string; KeyType: KeyType };
+  private readonly hashKeyAttributeName: string;
+  private readonly rangeKeyAttributeName: string | undefined;
 
-  public readonly sortKey?: { AttributeName: string; KeyType: KeyType };
+  constructor(createTableInput: SimCreateTableCommandInput) {
+    const hashKey = this.requiredKeySchemaElement(createTableInput, "HASH");
+    this.hashKeyAttributeName = hashKey.AttributeName;
 
-  constructor(createTableInput: Pick<CreateTableInput, "KeySchema">) {
-    assertDefined(createTableInput.KeySchema, "createTableInput.KeySchema");
+    const rangeKey = this.keySchemaElement(createTableInput, "RANGE");
+    this.rangeKeyAttributeName = rangeKey?.AttributeName;
+  }
 
-    const partitionKeyElement = createTableInput.KeySchema.find(
-      (el) => el.KeyType === "HASH",
-    );
-    assertDefined(
-      partitionKeyElement,
-      '"CreateTableInput.KeySchema partition key (KeyType=HASH)',
-    );
-    assertDefined(
-      partitionKeyElement.AttributeName,
-      "Partition Key AttributeName",
-    );
-    assertDefined(partitionKeyElement.KeyType, "Partition Key KeyType");
-    this.partitionKey = {
-      AttributeName: partitionKeyElement.AttributeName,
-      KeyType: partitionKeyElement.KeyType,
-    };
+  private requiredKeySchemaElement(
+    createTableInput: SimCreateTableCommandInput,
+    keyType: SimDynamoDbKeyType,
+  ): RequiredSimDynamoDbKeySchemaElement {
+    const keySchemaElement = this.keySchemaElement(createTableInput, keyType);
 
-    const sortKeyElement = createTableInput.KeySchema.find(
-      (el) => el.KeyType === "RANGE",
+    assertDefined(keySchemaElement, `DynamoDB Table ${keyType} key schema`);
+
+    return keySchemaElement;
+  }
+
+  private keySchemaElement(
+    createTableInput: SimCreateTableCommandInput,
+    keyType: SimDynamoDbKeyType,
+  ): RequiredSimDynamoDbKeySchemaElement | undefined {
+    return createTableInput.KeySchema?.find(
+      (
+        keySchemaElement,
+      ): keySchemaElement is RequiredSimDynamoDbKeySchemaElement =>
+        keySchemaElement.KeyType === keyType &&
+        keySchemaElement.AttributeName !== undefined,
     );
-    if (sortKeyElement === undefined) {
-      return;
-    }
-    assertDefined(sortKeyElement.AttributeName, "Sort Key AttributeName");
-    assertDefined(sortKeyElement.KeyType, "Sort Key KeyType");
-    this.sortKey = {
-      AttributeName: sortKeyElement.AttributeName,
-      KeyType: sortKeyElement.KeyType,
-    };
   }
 
   /**
    * Make a primary key string for an item based on this key schema.
    */
   makeItemKey(item: DynamoDbItem): string {
-    const partitionKeyAttr = item.attributes[this.partitionKey.AttributeName];
+    const partitionKeyAttr = item.attributes[this.hashKeyAttributeName];
     assertDefined(
       partitionKeyAttr,
-      `DynamoDB Item partition key ${this.partitionKey.AttributeName}`,
+      `DynamoDB Item partition key ${this.hashKeyAttributeName}`,
     );
     const partitionKey = partitionKeyAttr.value;
     if (!DynamoDbKeySchema.canBeDynamoDbKey(partitionKey)) {
       throw new TypeError(
-        `DynamoDB Item partition key ${this.partitionKey.AttributeName} must be string or number`,
+        `DynamoDB Item partition key ${this.hashKeyAttributeName} must be string or number`,
       );
     }
 
-    const keyParts: Record<string, DynamoDbKey> = { partitionKey };
+    const keyParts: Record<string, DynamoDbKey> = {
+      [this.hashKeyAttributeName]: partitionKey,
+    };
 
-    if (this.sortKey?.AttributeName !== undefined) {
-      const sortKey = item.attributes[this.sortKey.AttributeName];
-      if (sortKey === undefined) {
+    if (this.rangeKeyAttributeName !== undefined) {
+      const sortKeyAttr = item.attributes[this.rangeKeyAttributeName];
+      if (sortKeyAttr === undefined) {
         throw new TypeError(
-          `DynamoDB Item sort key ${this.sortKey.AttributeName} is undefined`,
+          `DynamoDB Item sort key ${this.rangeKeyAttributeName} is undefined`,
         );
       }
-      if (!DynamoDbKeySchema.canBeDynamoDbKey(sortKey.value)) {
+      if (!DynamoDbKeySchema.canBeDynamoDbKey(sortKeyAttr.value)) {
         throw new TypeError(
-          `DynamoDB Item sort key ${this.sortKey.AttributeName} must be string or number`,
+          `DynamoDB Item sort key ${this.rangeKeyAttributeName} must be string or number`,
         );
       }
-      keyParts[this.sortKey.AttributeName] = sortKey.value;
+      keyParts[this.rangeKeyAttributeName] = sortKeyAttr.value;
     }
 
     return JSON.stringify(keyParts);

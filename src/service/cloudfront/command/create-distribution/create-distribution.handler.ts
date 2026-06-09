@@ -1,12 +1,13 @@
 import type { CommandHandler } from "../../../../command/command-handler.js";
 import type {
-  CacheBehavior,
-  CreateDistributionCommand,
-  CreateDistributionCommandOutput,
-  DefaultCacheBehavior,
-  DistributionConfig,
-  Origin,
-} from "@aws-sdk/client-cloudfront";
+  SimCloudFrontCacheBehaviorConfig,
+  SimCloudFrontDefaultCacheBehaviorConfig,
+  SimCloudFrontDistributionConfig,
+  SimCloudFrontMethodList,
+  SimCloudFrontOriginConfig,
+  SimCreateDistributionCommand,
+  SimCreateDistributionCommandOutput,
+} from "./create-distribution.cmd.js";
 import type { SimCloudFrontRegistry } from "../../sim-cloud-front-registry.js";
 import { jitter } from "../../../../util/sleep.js";
 import {
@@ -21,18 +22,14 @@ import {
   type SimCloudFrontS3OriginResolver,
 } from "../../origin/sim-cloudfront-s3-origin.js";
 
-interface CloudFrontMethodList {
-  Items?: readonly string[] | undefined;
-}
-
 /**
  * CloudFront CreateDistributionCommand handler.
  *
  * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/cloudfront/command/CreateDistributionCommand/
  */
 export class CreateDistributionCommandHandler implements CommandHandler<
-  CreateDistributionCommand,
-  CreateDistributionCommandOutput
+  SimCreateDistributionCommand,
+  SimCreateDistributionCommandOutput
 > {
   constructor(
     private readonly accountId: SimAwsAccountId,
@@ -48,8 +45,8 @@ export class CreateDistributionCommandHandler implements CommandHandler<
    * Handle creation of a new CloudFront Distribution.
    */
   async handle(
-    cmd: CreateDistributionCommand,
-  ): Promise<CreateDistributionCommandOutput> {
+    cmd: SimCreateDistributionCommand,
+  ): Promise<SimCreateDistributionCommandOutput> {
     await jitter();
 
     const distributionConfig = cmd.input.DistributionConfig;
@@ -77,7 +74,7 @@ export class CreateDistributionCommandHandler implements CommandHandler<
         LastModifiedTime: new Date(),
         InProgressInvalidationBatches: 0,
         DomainName: `${distribution.distributionId.toLowerCase()}.cloudfront.net`,
-        DistributionConfig: cmd.input.DistributionConfig,
+        DistributionConfig: distributionConfig,
       },
       Location: `https://cloudfront.amazonaws.com/2020-05-31/distribution/${distribution.distributionId}`,
       $metadata: {},
@@ -86,7 +83,7 @@ export class CreateDistributionCommandHandler implements CommandHandler<
 
   private configureDistribution(
     distribution: SimCloudFrontDistribution,
-    distributionConfig: DistributionConfig,
+    distributionConfig: SimCloudFrontDistributionConfig,
   ): void {
     for (const alias of distributionConfig.Aliases?.Items ?? []) {
       distribution.addAlternateDomainName(alias);
@@ -110,7 +107,7 @@ export class CreateDistributionCommandHandler implements CommandHandler<
 
   private configureOrigin(
     distribution: SimCloudFrontDistribution,
-    origin: Origin,
+    origin: SimCloudFrontOriginConfig,
   ): void {
     assertDefined(origin.Id, "CloudFront Origin Id");
     assertDefined(origin.DomainName, "CloudFront Origin DomainName");
@@ -136,7 +133,7 @@ export class CreateDistributionCommandHandler implements CommandHandler<
   }
 
   private behaviorFromDefaultCacheBehavior(
-    cacheBehavior: DefaultCacheBehavior | undefined,
+    cacheBehavior: SimCloudFrontDefaultCacheBehaviorConfig | undefined,
   ): SimCloudFrontBehavior {
     assertDefined(cacheBehavior, "CloudFront DefaultCacheBehavior");
 
@@ -159,7 +156,7 @@ export class CreateDistributionCommandHandler implements CommandHandler<
   }
 
   private behaviorFromCacheBehavior(
-    cacheBehavior: CacheBehavior,
+    cacheBehavior: SimCloudFrontCacheBehaviorConfig,
   ): SimCloudFrontBehavior {
     assertDefined(
       cacheBehavior.PathPattern,
@@ -192,7 +189,7 @@ export class CreateDistributionCommandHandler implements CommandHandler<
   }
 
   private methods(
-    methods: CloudFrontMethodList | undefined,
+    methods: SimCloudFrontMethodList | undefined,
     fallback: string[],
   ): Set<string> {
     return new Set(methods?.Items ?? fallback);

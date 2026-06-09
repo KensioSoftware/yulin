@@ -1,18 +1,4 @@
 import type { SimS3Bucket, SimS3BucketName } from "./bucket/sim-s3-bucket.js";
-import type {
-  CreateBucketCommand,
-  CreateBucketCommandOutput,
-  GetObjectCommand,
-  GetObjectCommandOutput,
-  ListBucketsCommand,
-  ListBucketsCommandOutput,
-  ListObjectsCommand,
-  ListObjectsCommandOutput,
-  PutBucketWebsiteCommand,
-  PutBucketWebsiteCommandOutput,
-  PutObjectCommand,
-  PutObjectCommandOutput,
-} from "@aws-sdk/client-s3";
 import { CreateBucketCommandHandler } from "./command/create-bucket/create-bucket.handler.js";
 import { ListBucketsCommandHandler } from "./command/list-buckets/list-buckets.handler.js";
 import { PutObjectCommandHandler } from "./command/put-object/put-object.handler.js";
@@ -26,6 +12,30 @@ import {
 import { PutBucketWebsiteCommandHandler } from "./command/put-bucket-website/put-bucket-website.handler.js";
 import { assertDefined } from "../../util/defined/defined.js";
 import { FilesystemS3BucketStorage } from "./storage/s3-filesystem-storage.js";
+import type {
+  SimPutObjectCommand,
+  SimPutObjectCommandOutput,
+} from "./command/put-object/put-object.cmd.js";
+import type {
+  SimPutBucketWebsiteCommand,
+  SimPutBucketWebsiteCommandOutput,
+} from "./command/put-bucket-website/put-bucket-website.cmd.js";
+import type {
+  SimListObjectsCommand,
+  SimListObjectsCommandOutput,
+} from "./command/list-objects/list-objects.cmd.js";
+import type {
+  SimListBucketsCommand,
+  SimListBucketsCommandOutput,
+} from "./command/list-buckets/list-buckets.cmd.js";
+import type {
+  SimGetObjectCommand,
+  SimGetObjectCommandOutput,
+} from "./command/get-object/get-object.cmd.js";
+import type {
+  SimCreateBucketCommand,
+  SimCreateBucketCommandOutput,
+} from "./command/create-bucket/create-bucket.cmd.js";
 
 /**
  * Simulated S3. Handles SDK commands. Emulates AWS behaviour and state.
@@ -44,8 +54,8 @@ export class SimS3 {
    * Handle a Create Bucket Command from the SDK.
    */
   async createBucket(
-    cmd: CreateBucketCommand,
-  ): Promise<CreateBucketCommandOutput> {
+    cmd: SimCreateBucketCommand,
+  ): Promise<SimCreateBucketCommandOutput> {
     const handler = new CreateBucketCommandHandler(
       this.accountRegionScope,
       this.buckets,
@@ -58,8 +68,8 @@ export class SimS3 {
    * Handle a Put Bucket Website Command from the SDK.
    */
   async putBucketWebsite(
-    cmd: PutBucketWebsiteCommand,
-  ): Promise<PutBucketWebsiteCommandOutput> {
+    cmd: SimPutBucketWebsiteCommand,
+  ): Promise<SimPutBucketWebsiteCommandOutput> {
     const handler = new PutBucketWebsiteCommandHandler(this.buckets);
     return await handler.handle(cmd);
   }
@@ -68,8 +78,8 @@ export class SimS3 {
    * Handle a List Buckets Command from the SDK.
    */
   async listBuckets(
-    cmd: ListBucketsCommand,
-  ): Promise<ListBucketsCommandOutput> {
+    cmd: SimListBucketsCommand,
+  ): Promise<SimListBucketsCommandOutput> {
     const handler = new ListBucketsCommandHandler(this.buckets);
     return await handler.handle(cmd);
   }
@@ -77,7 +87,9 @@ export class SimS3 {
   /**
    * Handle a Put Object Command from the SDK.
    */
-  async putObject(cmd: PutObjectCommand): Promise<PutObjectCommandOutput> {
+  async putObject(
+    cmd: SimPutObjectCommand,
+  ): Promise<SimPutObjectCommandOutput> {
     const handler = new PutObjectCommandHandler(this.buckets);
     return await handler.handle(cmd);
   }
@@ -85,7 +97,9 @@ export class SimS3 {
   /**
    * Handle a Get Object Command from the SDK.
    */
-  async getObject(cmd: GetObjectCommand): Promise<GetObjectCommandOutput> {
+  async getObject(
+    cmd: SimGetObjectCommand,
+  ): Promise<SimGetObjectCommandOutput> {
     const handler = new GetObjectCommandHandler(this.buckets);
     return await handler.handle(cmd);
   }
@@ -94,8 +108,8 @@ export class SimS3 {
    * Handle a List Objects Command from the SDK.
    */
   async listObjects(
-    cmd: ListObjectsCommand,
-  ): Promise<ListObjectsCommandOutput> {
+    cmd: SimListObjectsCommand,
+  ): Promise<SimListObjectsCommandOutput> {
     const handler = new ListObjectsCommandHandler(this.buckets);
     return await handler.handle(cmd);
   }

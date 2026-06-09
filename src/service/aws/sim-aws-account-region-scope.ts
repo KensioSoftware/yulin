@@ -8,10 +8,12 @@ import {
   makeAwsRegionName,
   type SimAwsRegion,
 } from "./sim-aws-region.js";
-import type { NoSimAwsServices, SimAwsServiceMap } from "./sim-aws-services.js";
 import { Memo } from "../../util/memo/memo.js";
 import { SimAws } from "./sim-aws.js";
 import { DynamicFactory } from "@kensio/part-factory";
+import type { SimS3 } from "../s3/sim-s3.js";
+import type { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
+import type { SimDynamoDb } from "../dynamodb/index.js";
 
 export type SimAccountRegionScopeKey = `${SimAwsAccountId}:${AwsRegionName}`;
 
@@ -19,17 +21,15 @@ export type SimAccountRegionScopeKey = `${SimAwsAccountId}:${AwsRegionName}`;
  * Combined simulated AWS Account and Region scope.
  * This is the real Account/Region scope container for simulated services.
  */
-export class SimAwsAccountRegionContainer<
-  TServices extends SimAwsServiceMap = NoSimAwsServices,
-> {
+export class SimAwsAccountRegionContainer {
   private readonly memo = new Memo<unknown>();
 
   public readonly accountRegionScope: SimAwsAccountRegionScope;
 
   constructor(
-    private readonly simAws: SimAws<TServices> = new SimAws<TServices>(),
-    public readonly account: SimAwsAccount<TServices> = this.simAws.account(),
-    public readonly region: SimAwsRegion<TServices> = this.simAws.region(),
+    private readonly simAws: SimAws = new SimAws(),
+    public readonly account: SimAwsAccount = this.simAws.account(),
+    public readonly region: SimAwsRegion = this.simAws.region(),
   ) {
     this.accountRegionScope = {
       accountId: this.account.accountId,
@@ -38,13 +38,27 @@ export class SimAwsAccountRegionContainer<
   }
 
   /**
-   * Get an installed simulated AWS service for this account and region.
-   * The service must be installed with the appropriate installer function
-   * first.
+   * Get simulated S3 for this account and region.
    */
-  service<TKey extends keyof TServices>(serviceName: TKey): TServices[TKey] {
-    return this.memo.getOrCreate(String(serviceName), () =>
-      this.simAws.createService(serviceName, this),
+  s3(): SimS3 {
+    return this.memo.getOrCreate("s3", () => this.simAws.createS3(this));
+  }
+
+  /**
+   * Get simulated CloudFront for this account.
+   */
+  cloudFront(): SimCloudFront {
+    return this.memo.getOrCreate("cloudFront", () =>
+      this.simAws.createCloudFront(this),
+    );
+  }
+
+  /**
+   * Get simulated DynamoDB for this account and region.
+   */
+  dynamoDb(): SimDynamoDb {
+    return this.memo.getOrCreate("dynamoDb", () =>
+      this.simAws.createDynamoDb(this),
     );
   }
 }

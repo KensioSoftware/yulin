@@ -1,18 +1,20 @@
 import type { CommandHandler } from "../../../../command/command-handler.js";
+import type {
+  SimCreateBucketCommand,
+  SimCreateBucketCommandOutput,
+} from "./create-bucket.cmd.js";
 import {
-  type CreateBucketCommand,
-  type CreateBucketCommandOutput,
-  BucketAlreadyExists,
-  BucketAlreadyOwnedByYou,
-} from "@aws-sdk/client-s3";
-import {
-  type SimS3BucketName,
   SimS3Bucket,
+  type SimS3BucketName,
 } from "../../bucket/sim-s3-bucket.js";
 import { assertDefined } from "../../../../util/defined/defined.js";
 import { jitter } from "../../../../util/sleep.js";
 import type { SimS3GlobalRegistry } from "../../sim-s3-global-registry.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
+import {
+  SimS3BucketAlreadyExists,
+  SimS3BucketAlreadyOwnedByYou,
+} from "../../error/s3.error.js";
 
 /**
  * S3 CreateBucketCommand handler.
@@ -20,8 +22,8 @@ import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-regi
  * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/s3/command/CreateBucketCommand/
  */
 export class CreateBucketCommandHandler implements CommandHandler<
-  CreateBucketCommand,
-  CreateBucketCommandOutput
+  SimCreateBucketCommand,
+  SimCreateBucketCommandOutput
 > {
   constructor(
     private readonly accountRegionScope: SimAwsAccountRegionScope,
@@ -32,7 +34,9 @@ export class CreateBucketCommandHandler implements CommandHandler<
   /**
    * Handle creation of a new S3 Bucket.
    */
-  async handle(cmd: CreateBucketCommand): Promise<CreateBucketCommandOutput> {
+  async handle(
+    cmd: SimCreateBucketCommand,
+  ): Promise<SimCreateBucketCommandOutput> {
     assertDefined(cmd.input.Bucket, "CreateBucketCommand.input.Bucket");
 
     await jitter();
@@ -43,25 +47,22 @@ export class CreateBucketCommandHandler implements CommandHandler<
       this.s3GlobalRegistry.findBucketScope(bucketName);
     if (existingBucketScope !== undefined) {
       if (existingBucketScope.accountId === this.accountRegionScope.accountId) {
-        throw new BucketAlreadyOwnedByYou({
-          message: `S3 Bucket ${bucketName} already exists in ${existingBucketScope.regionName} and is owned by ${existingBucketScope.accountId}`,
-          $metadata: {},
-        });
+        throw new SimS3BucketAlreadyOwnedByYou(
+          `S3 Bucket ${bucketName} already exists in ${existingBucketScope.regionName} and is owned by ${existingBucketScope.accountId}`,
+        );
       }
-      throw new BucketAlreadyExists({
-        message: `S3 Bucket ${bucketName} already exists in ${existingBucketScope.regionName} ${existingBucketScope.accountId}`,
-        $metadata: {},
-      });
+      throw new SimS3BucketAlreadyExists(
+        `S3 Bucket ${bucketName} already exists in ${existingBucketScope.regionName} ${existingBucketScope.accountId}`,
+      );
     }
 
     /* v8 ignore if -- safety catch for situation that cannot happen in normal usage */
     if (this.buckets.has(bucketName)) {
       // Somehow the Bucket was absent from the global registry.
       this.s3GlobalRegistry.registerBucket(bucketName, this.accountRegionScope);
-      throw new BucketAlreadyOwnedByYou({
-        message: `S3 Bucket ${bucketName} already exists in ${this.accountRegionScope.regionName} and is owned by ${this.accountRegionScope.accountId}`,
-        $metadata: {},
-      });
+      throw new SimS3BucketAlreadyOwnedByYou(
+        `S3 Bucket ${bucketName} already exists in ${this.accountRegionScope.regionName} and is owned by ${this.accountRegionScope.accountId}`,
+      );
     }
 
     const bucket = new SimS3Bucket(cmd, this.accountRegionScope);

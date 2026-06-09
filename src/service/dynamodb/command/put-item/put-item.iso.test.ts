@@ -10,14 +10,12 @@ import {
   assertTrue,
 } from "@kensio/smartass";
 import { SimAws } from "../../../aws/sim-aws.js";
-import { installSimDynamoDb } from "../../install/install-sim-dynamodb.js";
 
 describe("DynamoDB PutItemCommand", () => {
   it("puts new Item into DynamoDB Table, returns attributes", async () => {
     const simAws = new SimAws();
-    installSimDynamoDb(simAws);
 
-    const simDynamoDb = simAws.service("dynamoDb");
+    const simDynamoDb = simAws.dynamoDb();
 
     await simDynamoDb.createTable(
       new CreateTableCommand({
@@ -105,20 +103,20 @@ describe("DynamoDB PutItemCommand", () => {
 
     // Map
     assertIdentical(
-      putItemOutput.Attributes["address"]?.M?.["street"]?.S,
+      putItemOutput.Attributes["address"]?.M?.street?.S,
       "123 High Street",
     );
-    assertIdentical(putItemOutput.Attributes["address"].M["city"]?.S, "London");
+    assertIdentical(putItemOutput.Attributes["address"].M.city?.S, "London");
     assertIdentical(
-      putItemOutput.Attributes["address"].M["postcode"]?.S,
+      putItemOutput.Attributes["address"].M.postcode?.S,
       "AB1 2CD",
     );
     assertIdentical(
-      putItemOutput.Attributes["address"].M["coordinates"]?.M?.["lat"]?.N,
+      putItemOutput.Attributes["address"].M.coordinates?.M?.lat?.N,
       "51.5",
     );
     assertIdentical(
-      putItemOutput.Attributes["address"].M["coordinates"].M["lon"]?.N,
+      putItemOutput.Attributes["address"].M.coordinates.M.lon?.N,
       "-0.1",
     );
 
@@ -127,9 +125,8 @@ describe("DynamoDB PutItemCommand", () => {
 
   it("puts new Item into DynamoDB Table with partition key + sort key", async () => {
     const simAws = new SimAws();
-    installSimDynamoDb(simAws);
 
-    const simDynamoDb = simAws.service("dynamoDb");
+    const simDynamoDb = simAws.dynamoDb();
 
     await simDynamoDb.createTable(
       new CreateTableCommand({
@@ -166,9 +163,8 @@ describe("DynamoDB PutItemCommand", () => {
 
   it("rejects when missing partition key", async () => {
     const simAws = new SimAws();
-    installSimDynamoDb(simAws);
 
-    const simDynamoDb = simAws.service("dynamoDb");
+    const simDynamoDb = simAws.dynamoDb();
 
     await simDynamoDb.createTable(
       new CreateTableCommand({
@@ -198,9 +194,8 @@ describe("DynamoDB PutItemCommand", () => {
 
   it("rejects when missing sort key", async () => {
     const simAws = new SimAws();
-    installSimDynamoDb(simAws);
 
-    const simDynamoDb = simAws.service("dynamoDb");
+    const simDynamoDb = simAws.dynamoDb();
 
     await simDynamoDb.createTable(
       new CreateTableCommand({
@@ -233,9 +228,8 @@ describe("DynamoDB PutItemCommand", () => {
 
   it("rejects on invalid partition key type", async () => {
     const simAws = new SimAws();
-    installSimDynamoDb(simAws);
 
-    const simDynamoDb = simAws.service("dynamoDb");
+    const simDynamoDb = simAws.dynamoDb();
 
     await simDynamoDb.createTable(
       new CreateTableCommand({
@@ -264,9 +258,8 @@ describe("DynamoDB PutItemCommand", () => {
 
   it("rejects on invalid sort key type", async () => {
     const simAws = new SimAws();
-    installSimDynamoDb(simAws);
 
-    const simDynamoDb = simAws.service("dynamoDb");
+    const simDynamoDb = simAws.dynamoDb();
 
     await simDynamoDb.createTable(
       new CreateTableCommand({
@@ -299,9 +292,8 @@ describe("DynamoDB PutItemCommand", () => {
 
   it("rejects undefined table name", async () => {
     const simAws = new SimAws();
-    installSimDynamoDb(simAws);
 
-    const simDynamoDb = simAws.service("dynamoDb");
+    const simDynamoDb = simAws.dynamoDb();
 
     const error = await assertThrowsErrorAsync(async () => {
       await simDynamoDb.putItem(
@@ -323,9 +315,8 @@ describe("DynamoDB PutItemCommand", () => {
 
   it("rejects non-existent table", async () => {
     const simAws = new SimAws();
-    installSimDynamoDb(simAws);
 
-    const simDynamoDb = simAws.service("dynamoDb");
+    const simDynamoDb = simAws.dynamoDb();
 
     const error = await assertThrowsErrorAsync(async () => {
       await simDynamoDb.putItem(
@@ -344,9 +335,8 @@ describe("DynamoDB PutItemCommand", () => {
 
   it("rejects missing item", async () => {
     const simAws = new SimAws();
-    installSimDynamoDb(simAws);
 
-    const simDynamoDb = simAws.service("dynamoDb");
+    const simDynamoDb = simAws.dynamoDb();
 
     await simDynamoDb.createTable(
       new CreateTableCommand({

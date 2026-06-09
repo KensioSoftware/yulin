@@ -14,14 +14,12 @@ import {
 } from "@kensio/smartass";
 import { simS3BodyToBuffer } from "../../storage/s3-body-buffer.js";
 import { SimAws } from "../../../aws/sim-aws.js";
-import { installSimS3 } from "../../install/install-sim-s3.js";
 
 describe("S3 GetObjectCommand", () => {
   it("gets an Object from an S3 Bucket", async () => {
     const simAws = new SimAws();
-    installSimS3(simAws);
 
-    const simS3 = simAws.service("s3");
+    const simS3 = simAws.s3();
 
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "bucket-a" }));
 
@@ -53,9 +51,8 @@ describe("S3 GetObjectCommand", () => {
 
   it("rejects undefined bucket name", async () => {
     const simAws = new SimAws();
-    installSimS3(simAws);
 
-    const simS3 = simAws.service("s3");
+    const simS3 = simAws.s3();
 
     const error = await assertThrowsErrorAsync(async () => {
       await simS3.getObject(
@@ -71,9 +68,8 @@ describe("S3 GetObjectCommand", () => {
 
   it("rejects undefined object key", async () => {
     const simAws = new SimAws();
-    installSimS3(simAws);
 
-    const simS3 = simAws.service("s3");
+    const simS3 = simAws.s3();
 
     const error = await assertThrowsErrorAsync(async () => {
       await simS3.getObject(
@@ -89,9 +85,8 @@ describe("S3 GetObjectCommand", () => {
 
   it("rejects non-existent bucket", async () => {
     const simAws = new SimAws();
-    installSimS3(simAws);
 
-    const simS3 = simAws.service("s3");
+    const simS3 = simAws.s3();
 
     const error = await assertThrowsErrorAsync(async () => {
       await simS3.getObject(
@@ -107,9 +102,8 @@ describe("S3 GetObjectCommand", () => {
 
   it("rejects non-existent object", async () => {
     const simAws = new SimAws();
-    installSimS3(simAws);
 
-    const simS3 = simAws.service("s3");
+    const simS3 = simAws.s3();
 
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "bucket-a" }));
 

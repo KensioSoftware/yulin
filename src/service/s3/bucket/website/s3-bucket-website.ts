@@ -1,10 +1,8 @@
-import type { WebsiteConfiguration } from "@aws-sdk/client-s3";
-
-type WebsiteRoutingRule = NonNullable<
-  WebsiteConfiguration["RoutingRules"]
->[number];
-
-type WebsiteRedirect = NonNullable<WebsiteRoutingRule["Redirect"]>;
+import type {
+  SimS3WebsiteConfiguration,
+  SimS3WebsiteRedirect,
+  SimS3WebsiteRoutingRule,
+} from "../../command/put-bucket-website/put-bucket-website.cmd.js";
 
 /**
  * Static website configuration for simulated S3 bucket.
@@ -13,7 +11,7 @@ type WebsiteRedirect = NonNullable<WebsiteRoutingRule["Redirect"]>;
  */
 export class S3BucketWebsite {
   constructor(
-    private readonly websiteConfiguration: WebsiteConfiguration = {},
+    private readonly websiteConfiguration: SimS3WebsiteConfiguration = {},
   ) {}
 
   /**
@@ -130,7 +128,7 @@ export class S3BucketWebsite {
   }
 
   private routingRuleMatches(
-    rule: WebsiteRoutingRule,
+    rule: SimS3WebsiteRoutingRule,
     req: Request,
     res: Response,
   ): boolean {
@@ -153,7 +151,10 @@ export class S3BucketWebsite {
     );
   }
 
-  private redirectResponse(req: Request, redirect: WebsiteRedirect): Response {
+  private redirectResponse(
+    req: Request,
+    redirect: SimS3WebsiteRedirect,
+  ): Response {
     const url = new URL(req.url);
 
     if (redirect.Protocol !== undefined) {

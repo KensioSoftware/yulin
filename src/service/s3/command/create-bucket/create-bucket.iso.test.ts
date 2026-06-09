@@ -1,10 +1,5 @@
 import { describe, it } from "vitest";
-import {
-  BucketAlreadyExists,
-  BucketAlreadyOwnedByYou,
-  CreateBucketCommand,
-  ListBucketsCommand,
-} from "@aws-sdk/client-s3";
+import { CreateBucketCommand, ListBucketsCommand } from "@aws-sdk/client-s3";
 import {
   assertArrayLength,
   assertIdentical,
@@ -13,14 +8,16 @@ import {
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import { SimAws } from "../../../aws/sim-aws.js";
-import { installSimS3 } from "../../install/install-sim-s3.js";
+import {
+  SimS3BucketAlreadyExists,
+  SimS3BucketAlreadyOwnedByYou,
+} from "../../error/s3.error.js";
 
 describe("S3 CreateBucketCommand", () => {
   it("creates new S3 Bucket", async () => {
     const simAws = new SimAws();
-    installSimS3(simAws);
 
-    const simS3 = simAws.account("555555555555").service("s3");
+    const simS3 = simAws.account("555555555555").s3();
 
     const createBucketOutput = await simS3.createBucket(
       new CreateBucketCommand({ Bucket: "foobar-bucket" }),
@@ -37,9 +34,8 @@ describe("S3 CreateBucketCommand", () => {
 
   it("throws on undefined Bucket name", async () => {
     const simAws = new SimAws();
-    installSimS3(simAws);
 
-    const simS3 = simAws.region("ap-east-1").service("s3");
+    const simS3 = simAws.region("ap-east-1").s3();
 
     const error = await assertThrowsErrorAsync(async () =>
       simS3.createBucket(new CreateBucketCommand({ Bucket: undefined })),
@@ -54,9 +50,8 @@ describe("S3 CreateBucketCommand", () => {
 
   it("throws on duplicate Bucket name in same account and region", async () => {
     const simAws = new SimAws();
-    installSimS3(simAws);
 
-    const simS3 = simAws.service("s3");
+    const simS3 = simAws.s3();
 
     await simS3.createBucket(
       new CreateBucketCommand({ Bucket: "foobar-bucket" }),
@@ -66,22 +61,14 @@ describe("S3 CreateBucketCommand", () => {
       simS3.createBucket(new CreateBucketCommand({ Bucket: "foobar-bucket" })),
     );
 
-    assertInstanceOf(error, BucketAlreadyOwnedByYou);
-    assertIdentical(error.$fault, "client");
+    assertInstanceOf(error, SimS3BucketAlreadyOwnedByYou);
   });
 
   it("throws on duplicate Bucket name in another region in the same account", async () => {
     const simAws = new SimAws();
-    installSimS3(simAws);
 
-    const euWest1S3 = simAws
-      .account("555555555555")
-      .region("eu-west-1")
-      .service("s3");
-    const euWest2S3 = simAws
-      .account("555555555555")
-      .region("eu-west-2")
-      .service("s3");
+    const euWest1S3 = simAws.account("555555555555").region("eu-west-1").s3();
+    const euWest2S3 = simAws.account("555555555555").region("eu-west-2").s3();
 
     await euWest1S3.createBucket(
       new CreateBucketCommand({ Bucket: "foobar-bucket" }),
@@ -93,24 +80,16 @@ describe("S3 CreateBucketCommand", () => {
       ),
     );
 
-    assertInstanceOf(error, BucketAlreadyOwnedByYou);
-    assertIdentical(error.$fault, "client");
+    assertInstanceOf(error, SimS3BucketAlreadyOwnedByYou);
     assertStringIncludes(error.message, "eu-west-1");
     assertStringIncludes(error.message, "555555555555");
   });
 
   it("throws on duplicate Bucket name in another account in the same region", async () => {
     const simAws = new SimAws();
-    installSimS3(simAws);
 
-    const account1S3 = simAws
-      .account("111111111111")
-      .region("eu-west-1")
-      .service("s3");
-    const account2S3 = simAws
-      .account("222222222222")
-      .region("eu-west-1")
-      .service("s3");
+    const account1S3 = simAws.account("111111111111").region("eu-west-1").s3();
+    const account2S3 = simAws.account("222222222222").region("eu-west-1").s3();
 
     await account1S3.createBucket(
       new CreateBucketCommand({ Bucket: "foobar-bucket" }),
@@ -122,24 +101,22 @@ describe("S3 CreateBucketCommand", () => {
       ),
     );
 
-    assertInstanceOf(error, BucketAlreadyExists);
-    assertIdentical(error.$fault, "client");
+    assertInstanceOf(error, SimS3BucketAlreadyExists);
     assertStringIncludes(error.message, "eu-west-1");
     assertStringIncludes(error.message, "111111111111");
   });
 
   it("throws on duplicate Bucket name in another region and another account", async () => {
     const simAws = new SimAws();
-    installSimS3(simAws);
 
     const account5EuWest1S3 = simAws
       .account("555555555555")
       .region("eu-west-1")
-      .service("s3");
+      .s3();
     const account6EuWest2S3 = simAws
       .account("666666666666")
       .region("eu-west-2")
-      .service("s3");
+      .s3();
 
     await account5EuWest1S3.createBucket(
       new CreateBucketCommand({ Bucket: "foobar-bucket" }),
@@ -151,8 +128,7 @@ describe("S3 CreateBucketCommand", () => {
       ),
     );
 
-    assertInstanceOf(error, BucketAlreadyExists);
-    assertIdentical(error.$fault, "client");
+    assertInstanceOf(error, SimS3BucketAlreadyExists);
     assertStringIncludes(error.message, "eu-west-1");
     assertStringIncludes(error.message, "555555555555");
   });
