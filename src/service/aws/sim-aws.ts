@@ -176,6 +176,31 @@ export class SimAws<
   }
 
   /**
+   * Create an installed simulated AWS service by runtime service name.
+   *
+   * This is intended for optional cross-service dependencies where TypeScript
+   * cannot know that another independently installed service is available.
+   *
+   * E.g. sim CloudFront needs sim S3 for S3 Origins. This pattern throws a more
+   * helpful error message when the user tries to do that without installing
+   * both sim services.
+   */
+  _createRequiredService<TService>(
+    serviceName: PropertyKey,
+    scope: SimAwsAccountRegionContainer<SimAwsServiceMap>,
+  ): TService {
+    const factory = this.serviceFactories.get(serviceName);
+
+    if (factory === undefined) {
+      throw new Error(
+        `Sim AWS service is not installed: ${String(serviceName)}. Call installer function to install it.`,
+      );
+    }
+
+    return factory(scope) as TService;
+  }
+
+  /**
    * Create an installed simulated AWS HTTP service controller.
    */
   createServiceController(serviceName: string): SimAwsServiceController {

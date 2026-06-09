@@ -1,4 +1,7 @@
-import type { SimCloudFrontDistributionId } from "./distribution/sim-cloudfront-distribution.js";
+import {
+  makeDistributionId,
+  type SimCloudFrontDistributionId,
+} from "./distribution/sim-cloudfront-distribution.js";
 import type { SimAwsAccountId } from "../aws/sim-aws-account.js";
 
 /**
@@ -18,6 +21,20 @@ export class SimCloudFrontRegistry {
     SimAwsAccountId,
     Set<SimCloudFrontDistributionId>
   >();
+
+  /**
+   * Allocate a globally unique simulated CloudFront Distribution ID.
+   */
+  allocateDistributionId(): SimCloudFrontDistributionId {
+    let distributionId = makeDistributionId();
+
+    while (this.distributionAccountIds.has(distributionId)) {
+      /* v8 ignore next -- does not happen in practice */
+      distributionId = makeDistributionId();
+    }
+
+    return distributionId;
+  }
 
   /**
    * Register a simulated CloudFront Distribution ID to an Account ID.

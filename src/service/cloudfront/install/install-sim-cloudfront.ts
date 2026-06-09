@@ -4,6 +4,8 @@ import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
 import type { SimAwsAccountRegionContainer } from "../../aws/sim-aws-account-region-scope.js";
 import { SimCloudFront } from "../sim-cloudfront.js";
 import { SimCloudFrontRegistry } from "../sim-cloud-front-registry.js";
+import { createSimCloudFrontS3OriginResolver } from "../origin/sim-cloudfront-s3-origin.js";
+import { SimCloudFrontServiceController } from "../controller/sim-cloudfront-controller.js";
 
 export interface SimCloudFrontServices {
   cloudFront: SimCloudFront;
@@ -31,11 +33,18 @@ class SimCloudFrontInstallation {
       simCloudFront = new SimCloudFront(
         scope.accountRegionScope,
         this.cloudFrontRegistry,
+        createSimCloudFrontS3OriginResolver(scope),
       );
       this.cloudFrontServices.set(accountId, simCloudFront);
     }
 
     return simCloudFront;
+  }
+
+  createServiceController(
+    simAws: SimAws<SimCloudFrontServices>,
+  ): SimCloudFrontServiceController {
+    return new SimCloudFrontServiceController(simAws.service("cloudFront"));
   }
 }
 
@@ -58,11 +67,9 @@ export function installSimCloudFront<TServices extends SimAwsServiceMap>(
     return installation.createService(scope);
   });
 
-  // TODO
-  // simAws.installServiceController("cloudFront", (controllerSimAws) => {
-  //   return new SimCloudFrontServiceController(
-  //     controllerSimAws,
-  //     cloudFrontRegistry,
-  //   );
-  // });
+  simAws.installServiceController("cloudFront", (controllerSimAws) => {
+    return installation.createServiceController(
+      controllerSimAws as SimAws<SimCloudFrontServices>,
+    );
+  });
 }

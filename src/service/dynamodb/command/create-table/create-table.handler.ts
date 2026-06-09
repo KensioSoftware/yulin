@@ -8,7 +8,7 @@ import {
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import type { CommandHandler } from "../../../../command/command-handler.js";
 import { jitter } from "../../../../util/sleep.js";
-import { assertDefined } from "../../../../util/defined.js";
+import { assertDefined } from "../../../../util/defined/defined.js";
 import type { SimArn } from "../../../aws/arn.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 

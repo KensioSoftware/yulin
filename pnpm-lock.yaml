@@ -31,8 +31,8 @@ importers:
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.4.1(jiti@2.7.0))
       '@kensio/smartass':
-        specifier: ^1.2.0
-        version: 1.2.0
+        specifier: ^1.3.0
+        version: 1.3.0
       '@smithy/smithy-client':
         specifier: ^4.13.5
         version: 4.13.6
@@ -390,8 +390,8 @@ packages:
     resolution: {integrity: sha512-E2x8ERPCeK+5pLOpCFcGnupsLz2eaRsIVtB1B8NEQ07GTPymT4WY4OGdv2gZGIr1abwJIVY90gVnRs5SXBR1fw==}
     engines: {node: '>=24.14.0'}
 
-  '@kensio/smartass@1.2.0':
-    resolution: {integrity: sha512-HlIvphfzDP9iurlE2VCM8DYxfGpLP7JF5DzYlyjuHgjV8SPXH23/20wTf/SVMqDGSz7Z4sLRCTgIzB8ywWEIVA==}
+  '@kensio/smartass@1.3.0':
+    resolution: {integrity: sha512-CLwIIGqqS6+q97Izp6bjdheUKWMaCXs7un3ZDSXcNEpQEEHCFpYRVSjmGD0rTjTLXlK7Bj2XANK8L3cR4bUrcg==}
     engines: {node: '>=24.16.0'}
 
   '@napi-rs/wasm-runtime@1.1.4':
@@ -2016,7 +2016,7 @@ snapshots:
     dependencies:
       lodash: 4.18.1
 
-  '@kensio/smartass@1.2.0': {}
+  '@kensio/smartass@1.3.0': {}
 
   '@napi-rs/wasm-runtime@1.1.4(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)':
     dependencies:

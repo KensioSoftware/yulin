@@ -9,10 +9,9 @@ import type {
   SimS3BucketName,
 } from "../../bucket/sim-s3-bucket.js";
 import { S3BucketWebsite } from "../../bucket/website/s3-bucket-website.js";
-import { assertDefined } from "../../../../util/defined.js";
+import { assertDefined } from "../../../../util/defined/defined.js";
 import { jitter } from "../../../../util/sleep.js";
 
-// eslint-disable-next-line no-secrets/no-secrets -- false positive on URL
 /**
  * Simulated S3 PutBucketWebsiteCommand handler.
  *

@@ -11,11 +11,11 @@ import { SimS3GetObjectController } from "./sim-s3-get-obj-controller.js";
  * Localhost HTTP controller for simulated S3.
  */
 export class SimS3ServiceController implements SimAwsServiceController {
-  private readonly router: SimS3RequestRouter;
+  private readonly s3Router: SimS3RequestRouter;
   private readonly getObjectController: SimS3GetObjectController;
 
   constructor(simAws: SimAws<SimS3Services>) {
-    this.router = new SimS3RequestRouter(simAws);
+    this.s3Router = new SimS3RequestRouter(simAws);
     this.getObjectController = new SimS3GetObjectController();
   }
 
@@ -26,7 +26,7 @@ export class SimS3ServiceController implements SimAwsServiceController {
     target: SimAwsServiceTarget,
     request: Request,
   ): Promise<Response> {
-    const route = this.router.route(target, request);
+    const route = this.s3Router.route(target, request);
 
     if (route.action === "failure") {
       return new Response(route.message, {

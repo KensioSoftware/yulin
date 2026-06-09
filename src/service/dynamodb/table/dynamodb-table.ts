@@ -1,7 +1,7 @@
 import type { Brand } from "../../../util/brand.type.js";
 import type { CreateTableCommand, TableStatus } from "@aws-sdk/client-dynamodb";
 import { DynamoDbKeySchema } from "./dynamodb-key-schema.js";
-import { assertDefined } from "../../../util/defined.js";
+import { assertDefined } from "../../../util/defined/defined.js";
 import type { DynamoDbItem } from "../item/dynamodb-item.js";
 import type { BackgroundScheduler } from "../../../util/background/background.js";
 import {

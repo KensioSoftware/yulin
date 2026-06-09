@@ -3,6 +3,7 @@ import type { AwsRegionName } from "../../service/aws/sim-aws-region.js";
 import { SimAwsLocalUrl } from "../http/sim-aws-local-url.js";
 
 const s3WebsiteServiceLabel = "s3-website";
+const cloudFrontServiceLabel = "cloudfront";
 
 /**
  * Default resolver for localhost subdomains to simulated AWS services.
@@ -12,7 +13,10 @@ export class SimAwsLocalServiceResolver {
    * Resolve a localhost subdomain hostname to a simulated AWS service target.
    */
   resolveHost(hostname: string): SimAwsServiceTarget | undefined {
-    return this.builtinLocalhostServiceTarget(hostname);
+    return (
+      this.builtinLocalhostServiceTarget(hostname) ??
+      this.cloudFrontLocalhostServiceTarget(hostname)
+    );
   }
 
   private builtinLocalhostServiceTarget(
@@ -44,6 +48,38 @@ export class SimAwsLocalServiceResolver {
         service: "s3",
         resourceName,
         regionName,
+      };
+    }
+
+    return undefined;
+  }
+
+  private cloudFrontLocalhostServiceTarget(
+    hostname: string,
+  ): SimAwsServiceTarget | undefined {
+    if (!hostname.endsWith(SimAwsLocalUrl.localhostSuffix)) {
+      return undefined;
+    }
+
+    const labels = hostname
+      .slice(0, -SimAwsLocalUrl.localhostSuffix.length)
+      .split(".");
+
+    if (labels.length < 3) {
+      return undefined;
+    }
+
+    // Check for CloudFront with .net in the domain: <distro-id>.cloudfront.net.sim-aws.localhost
+    if (labels.at(-2) === cloudFrontServiceLabel && labels.at(-1) === "net") {
+      // Extract distribution ID from the subdomain before "cloudfront"
+      const distroId = labels.at(-3);
+      if (distroId === undefined || distroId.length === 0) {
+        return undefined;
+      }
+
+      return {
+        service: "cloudFront",
+        resourceName: distroId,
       };
     }
 
