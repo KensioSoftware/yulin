@@ -166,12 +166,12 @@ export class SimAws {
     let cloudFront = this.cloudFrontServices.get(accountId);
 
     if (cloudFront === undefined) {
-      cloudFront = new SimCloudFront(
-        scope.accountRegionScope,
-        this.cloudFrontRegistry,
-        createSimCloudFrontS3OriginResolver(this, scope),
-        this.background,
-      );
+      cloudFront = new SimCloudFront({
+        accountRegionScope: scope.accountRegionScope,
+        cloudFrontRegistry: this.cloudFrontRegistry,
+        s3OriginResolver: createSimCloudFrontS3OriginResolver(this, scope),
+        background: this.background,
+      });
       this.cloudFrontServices.set(accountId, cloudFront);
     }
 
@@ -193,11 +193,11 @@ export class SimAws {
       case "s3": {
         return new SimS3ServiceController(this);
       }
-
       case "cloudFront": {
-        return new SimCloudFrontServiceController(this.cloudFront());
+        return new SimCloudFrontServiceController({
+          cloudFront: this.cloudFront(),
+        });
       }
-
       default: {
         throw new Error(
           `No controller for simulated AWS service ${serviceName}`,

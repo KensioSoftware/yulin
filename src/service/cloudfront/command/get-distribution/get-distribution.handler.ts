@@ -10,6 +10,13 @@ import type {
 } from "../../distribution/sim-cloudfront-distribution.js";
 import { SimCloudFrontResourceNotFoundException } from "../../error/sim-cloudfront.error.js";
 
+interface GetDistributionCommandHandlerProps {
+  readonly distributions: Map<
+    SimCloudFrontDistributionId,
+    SimCloudFrontDistribution
+  >;
+}
+
 /**
  * CloudFront GetDistributionCommand handler.
  *
@@ -19,12 +26,14 @@ export class GetDistributionCommandHandler implements CommandHandler<
   SimGetDistributionCommand,
   SimGetDistributionCommandOutput
 > {
-  constructor(
-    private readonly distributions: Map<
-      SimCloudFrontDistributionId,
-      SimCloudFrontDistribution
-    >,
-  ) {}
+  private readonly distributions: Map<
+    SimCloudFrontDistributionId,
+    SimCloudFrontDistribution
+  >;
+
+  constructor(props: GetDistributionCommandHandlerProps) {
+    this.distributions = props.distributions;
+  }
 
   /**
    * Handle getting a CloudFront Distribution.

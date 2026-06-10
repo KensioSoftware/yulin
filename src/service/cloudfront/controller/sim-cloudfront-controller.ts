@@ -8,6 +8,12 @@ import type { SimCloudFrontBehaviorResolver } from "../resolver/sim-cloud-front-
 import { SimCloudFrontBehaviorResolver as DefaultSimCloudFrontBehaviorResolver } from "../resolver/sim-cloud-front-behavior-resolver.js";
 import { SimCloudFront } from "../sim-cloudfront.js";
 
+interface SimCloudFrontServiceControllerProps {
+  readonly cloudFront?: SimCloudFront;
+  readonly distroRouter?: SimCloudFrontDistroRouter;
+  readonly behaviourResolver?: SimCloudFrontBehaviorResolver;
+}
+
 /**
  * Root CloudFront request controller within an Account scope.
  * Controls the request processing workflow across the other simulated
@@ -17,13 +23,15 @@ export class SimCloudFrontServiceController implements SimAwsServiceController {
   private readonly distroRouter: SimCloudFrontDistroRouter;
   private readonly behaviourResolver: SimCloudFrontBehaviorResolver;
 
-  constructor(
-    cloudFront: SimCloudFront = new SimCloudFront(),
-    distroRouter: SimCloudFrontDistroRouter = new DefaultSimCloudFrontDistroRouter(
-      cloudFront.getDistributions(),
-    ),
-    behaviourResolver: SimCloudFrontBehaviorResolver = new DefaultSimCloudFrontBehaviorResolver(),
-  ) {
+  constructor(props: SimCloudFrontServiceControllerProps = {}) {
+    const {
+      cloudFront = new SimCloudFront(),
+      distroRouter = new DefaultSimCloudFrontDistroRouter({
+        distributions: cloudFront.getDistributions(),
+      }),
+      behaviourResolver = new DefaultSimCloudFrontBehaviorResolver(),
+    } = props;
+
     this.distroRouter = distroRouter;
     this.behaviourResolver = behaviourResolver;
   }

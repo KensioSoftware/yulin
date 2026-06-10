@@ -1,3 +1,7 @@
+interface SimCloudFrontPathPatternProps {
+  readonly pathPattern: string;
+}
+
 /**
  * CloudFront-style path pattern matcher.
  *
@@ -11,8 +15,11 @@ export class SimCloudFrontPathPattern {
   private readonly graphemeSegmenter = new Intl.Segmenter(undefined, {
     granularity: "grapheme",
   });
+  private readonly pathPattern: string;
 
-  constructor(private readonly pathPattern: string) {}
+  constructor(props: SimCloudFrontPathPatternProps) {
+    this.pathPattern = props.pathPattern;
+  }
 
   /**
    * Does this path pattern match a request path?

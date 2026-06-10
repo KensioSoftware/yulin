@@ -53,7 +53,7 @@ export class SimCloudFrontBehaviorResolver {
     const pathPattern = behaviour.pathPattern;
     assertDefined(pathPattern, "CloudFront Behavior path pattern");
 
-    return new SimCloudFrontPathPattern(pathPattern).matches(requestPath);
+    return new SimCloudFrontPathPattern({ pathPattern }).matches(requestPath);
   }
 
   private isDefaultBehaviour(behaviour: SimCloudFrontBehavior): boolean {
@@ -66,6 +66,6 @@ export class SimCloudFrontBehaviorResolver {
       return 0;
     }
 
-    return new SimCloudFrontPathPattern(pathPattern).specificity();
+    return new SimCloudFrontPathPattern({ pathPattern }).specificity();
   }
 }

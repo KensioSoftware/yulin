@@ -14,7 +14,9 @@ import { SimCloudFrontBehaviorResolver } from "./sim-cloud-front-behavior-resolv
 describe("sim CloudFront Behavior resolver", () => {
   it("resolves to the default Behavior when its path pattern is undefined", () => {
     const defaultBehavior = simCloudFrontBehaviorFactory.make();
-    const distribution = new SimCloudFrontDistribution(makeDistributionId());
+    const distribution = new SimCloudFrontDistribution({
+      distributionId: makeDistributionId(),
+    });
     distribution.addBehavior(defaultBehavior);
 
     const behavior = new SimCloudFrontBehaviorResolver().resolve(
@@ -29,7 +31,9 @@ describe("sim CloudFront Behavior resolver", () => {
     const defaultBehavior = simCloudFrontBehaviorFactory.make({
       pathPattern: "*",
     });
-    const distribution = new SimCloudFrontDistribution(makeDistributionId());
+    const distribution = new SimCloudFrontDistribution({
+      distributionId: makeDistributionId(),
+    });
     distribution.addBehavior(defaultBehavior);
 
     const behavior = new SimCloudFrontBehaviorResolver().resolve(
@@ -45,7 +49,9 @@ describe("sim CloudFront Behavior resolver", () => {
     const explicitBehavior = simCloudFrontBehaviorFactory.make({
       pathPattern: "/assets/*",
     });
-    const distribution = new SimCloudFrontDistribution(makeDistributionId());
+    const distribution = new SimCloudFrontDistribution({
+      distributionId: makeDistributionId(),
+    });
     distribution.addBehavior(defaultBehavior);
     distribution.addBehavior(explicitBehavior);
 
@@ -64,7 +70,9 @@ describe("sim CloudFront Behavior resolver", () => {
     const explicitBehavior = simCloudFrontBehaviorFactory.make({
       pathPattern: "/assets/*",
     });
-    const distribution = new SimCloudFrontDistribution(makeDistributionId());
+    const distribution = new SimCloudFrontDistribution({
+      distributionId: makeDistributionId(),
+    });
     distribution.addBehavior(defaultBehavior);
     distribution.addBehavior(explicitBehavior);
 
@@ -81,7 +89,9 @@ describe("sim CloudFront Behavior resolver", () => {
     const explicitBehavior = simCloudFrontBehaviorFactory.make({
       pathPattern: "/assets/?.css",
     });
-    const distribution = new SimCloudFrontDistribution(makeDistributionId());
+    const distribution = new SimCloudFrontDistribution({
+      distributionId: makeDistributionId(),
+    });
     distribution.addBehavior(defaultBehavior);
     distribution.addBehavior(explicitBehavior);
 
@@ -100,7 +110,9 @@ describe("sim CloudFront Behavior resolver", () => {
     const specificBehavior = simCloudFrontBehaviorFactory.make({
       pathPattern: "/assets/app.css",
     });
-    const distribution = new SimCloudFrontDistribution(makeDistributionId());
+    const distribution = new SimCloudFrontDistribution({
+      distributionId: makeDistributionId(),
+    });
     distribution.addBehavior(broadBehavior);
     distribution.addBehavior(specificBehavior);
 
@@ -113,7 +125,9 @@ describe("sim CloudFront Behavior resolver", () => {
   });
 
   it("throws when no explicit or default Behavior can be resolved", () => {
-    const distribution = new SimCloudFrontDistribution(makeDistributionId());
+    const distribution = new SimCloudFrontDistribution({
+      distributionId: makeDistributionId(),
+    });
     distribution.addBehavior(
       simCloudFrontBehaviorFactory.make({ pathPattern: "/assets/*" }),
     );

@@ -15,21 +15,42 @@ export type SimCloudFrontDistributionId = Brand<
 
 export type SimCloudFrontDistributionStatus = "Deploying" | "Deployed";
 
+interface SimCloudFrontDistributionProps {
+  readonly distributionId?: SimCloudFrontDistributionId;
+  readonly status?: SimCloudFrontDistributionStatus;
+  readonly accountId?: SimAwsAccountId;
+  readonly distributionConfig?: SimCloudFrontDistributionConfig;
+}
+
 /**
  * Simulated CloudFront Distribution.
  */
 export class SimCloudFrontDistribution {
+  public readonly distributionId: SimCloudFrontDistributionId;
+  private _status: SimCloudFrontDistributionStatus;
+  public readonly accountId: SimAwsAccountId;
+  public readonly distributionConfig:
+    | SimCloudFrontDistributionConfig
+    | undefined;
+
   private readonly alternateDomainNames = new Set<string>();
   public readonly behaviors: SimCloudFrontBehavior[] = [];
   private readonly origins = new Map<string, SimCloudFrontOrigin>();
   public readonly lastModifiedTime: Date = new Date();
 
-  constructor(
-    public readonly distributionId: SimCloudFrontDistributionId = makeDistributionId(),
-    private _status: SimCloudFrontDistributionStatus = "Deployed",
-    public readonly accountId: SimAwsAccountId = makeSimAwsAccountId(),
-    public readonly distributionConfig?: SimCloudFrontDistributionConfig,
-  ) {}
+  constructor(props: SimCloudFrontDistributionProps = {}) {
+    const {
+      distributionId = makeDistributionId(),
+      status = "Deployed",
+      accountId = makeSimAwsAccountId(),
+      distributionConfig,
+    } = props;
+
+    this.distributionId = distributionId;
+    this._status = status;
+    this.accountId = accountId;
+    this.distributionConfig = distributionConfig;
+  }
 
   /**
    * Get the current Status of this sim Distribution.

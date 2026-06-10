@@ -19,13 +19,15 @@ describe("SimCloudFrontDistribution", () => {
   it("sets the Distribution ID", () => {
     const distributionId = "E123456789ABCD" as SimCloudFrontDistributionId;
 
-    const distribution = new SimCloudFrontDistribution(distributionId);
+    const distribution = new SimCloudFrontDistribution({ distributionId });
 
     assertIdentical(distribution.distributionId, distributionId);
   });
 
   it("adds and checks alternate domain names", () => {
-    const distribution = new SimCloudFrontDistribution(makeDistributionId());
+    const distribution = new SimCloudFrontDistribution({
+      distributionId: makeDistributionId(),
+    });
 
     distribution.addAlternateDomainName("cdn.example.com");
     distribution.addAlternateDomainName("static.example.com");
@@ -36,7 +38,9 @@ describe("SimCloudFrontDistribution", () => {
   });
 
   it("stores alternate domain names as a Set", () => {
-    const distribution = new SimCloudFrontDistribution(makeDistributionId());
+    const distribution = new SimCloudFrontDistribution({
+      distributionId: makeDistributionId(),
+    });
 
     distribution.addAlternateDomainName("cdn.example.com");
     distribution.addAlternateDomainName("cdn.example.com");
@@ -48,7 +52,9 @@ describe("SimCloudFrontDistribution", () => {
   });
 
   it("adds Behaviors in insertion order", () => {
-    const distribution = new SimCloudFrontDistribution(makeDistributionId());
+    const distribution = new SimCloudFrontDistribution({
+      distributionId: makeDistributionId(),
+    });
     const firstBehavior: SimCloudFrontBehavior = {
       targetOriginName: "origin-a",
       allowedMethods: new Set(["GET", "HEAD"]),
@@ -70,7 +76,9 @@ describe("SimCloudFrontDistribution", () => {
   });
 
   it("adds and gets Origins by name", () => {
-    const distribution = new SimCloudFrontDistribution(makeDistributionId());
+    const distribution = new SimCloudFrontDistribution({
+      distributionId: makeDistributionId(),
+    });
     const origin = makeOrigin();
 
     distribution.addOrigin("origin-a", origin);
@@ -80,7 +88,9 @@ describe("SimCloudFrontDistribution", () => {
   });
 
   it("stores Origins in a map keyed by Origin name", () => {
-    const distribution = new SimCloudFrontDistribution(makeDistributionId());
+    const distribution = new SimCloudFrontDistribution({
+      distributionId: makeDistributionId(),
+    });
     const originA = makeOrigin();
     const originB = makeOrigin();
 
@@ -95,7 +105,9 @@ describe("SimCloudFrontDistribution", () => {
   });
 
   it("replaces an Origin with the same name", () => {
-    const distribution = new SimCloudFrontDistribution(makeDistributionId());
+    const distribution = new SimCloudFrontDistribution({
+      distributionId: makeDistributionId(),
+    });
     const originalOrigin = makeOrigin();
     const replacementOrigin = makeOrigin();
 
