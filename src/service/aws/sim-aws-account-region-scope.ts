@@ -56,7 +56,7 @@ export class SimAwsAccountRegionContainer {
    * Get simulated S3 for this account and region.
    */
   s3(): SimS3 {
-    return this.memo.getOrCreate("s3", () => this.simAws.createS3(this));
+    return this.memo.getOrCreate("s3", () => this.simAws._createS3(this));
   }
 
   /**
@@ -64,7 +64,7 @@ export class SimAwsAccountRegionContainer {
    */
   cloudFront(): SimCloudFront {
     return this.memo.getOrCreate("cloudFront", () =>
-      this.simAws.createCloudFront(this),
+      this.simAws._createCloudFront(this),
     );
   }
 
@@ -73,7 +73,7 @@ export class SimAwsAccountRegionContainer {
    */
   dynamoDb(): SimDynamoDb {
     return this.memo.getOrCreate("dynamoDb", () =>
-      this.simAws.createDynamoDb(this),
+      this.simAws._createDynamoDb(this),
     );
   }
 }

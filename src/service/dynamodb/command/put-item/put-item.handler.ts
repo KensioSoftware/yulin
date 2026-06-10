@@ -10,6 +10,10 @@ import type {
 import { DynamoDbItem } from "../../item/dynamodb-item.js";
 import { SimDynamoDbResourceNotFoundException } from "../../error/dynamodb.error.js";
 
+interface PutItemCommandHandlerProps {
+  readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>;
+}
+
 /**
  * DynamoDB PutItemCommand handler.
  *
@@ -19,9 +23,11 @@ export class PutItemCommandHandler implements CommandHandler<
   SimPutItemCommand,
   SimPutItemCommandOutput
 > {
-  constructor(
-    private readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>,
-  ) {}
+  private readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>;
+
+  constructor(props: PutItemCommandHandlerProps) {
+    this.tables = props.tables;
+  }
 
   /**
    * Put an Item into a DynamoDB Table.

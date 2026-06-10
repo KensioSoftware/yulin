@@ -10,6 +10,10 @@ import type {
 import { jitter } from "../../../../util/sleep.js";
 import { SimDynamoDbResourceNotFoundException } from "../../error/dynamodb.error.js";
 
+interface DescribeTableCommandHandlerProps {
+  readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>;
+}
+
 /**
  * DynamoDB DescribeTableCommand handler.
  *
@@ -19,9 +23,11 @@ export class DescribeTableCommandHandler implements CommandHandler<
   SimDescribeTableCommand,
   SimDescribeTableCommandOutput
 > {
-  constructor(
-    private readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>,
-  ) {}
+  private readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>;
+
+  constructor(props: DescribeTableCommandHandlerProps) {
+    this.tables = props.tables;
+  }
 
   /**
    * Simulate describing DynamoDB Table.

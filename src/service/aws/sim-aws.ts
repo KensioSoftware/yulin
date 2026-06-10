@@ -153,14 +153,14 @@ export class SimAws {
   /**
    * Create simulated S3 for an Account Region scope.
    */
-  createS3(scope: SimAwsAccountRegionContainer): SimS3 {
+  _createS3(scope: SimAwsAccountRegionContainer): SimS3 {
     return new SimS3(scope.accountRegionScope, this.s3GlobalRegistry);
   }
 
   /**
    * Create or get simulated CloudFront for an Account scope.
    */
-  createCloudFront(scope: SimAwsAccountRegionContainer): SimCloudFront {
+  _createCloudFront(scope: SimAwsAccountRegionContainer): SimCloudFront {
     const { accountId } = scope.accountRegionScope;
 
     let cloudFront = this.cloudFrontServices.get(accountId);
@@ -181,14 +181,17 @@ export class SimAws {
   /**
    * Create simulated DynamoDB for an Account Region scope.
    */
-  createDynamoDb(scope: SimAwsAccountRegionContainer): SimDynamoDb {
-    return new SimDynamoDb(scope.accountRegionScope, this.background);
+  _createDynamoDb(scope: SimAwsAccountRegionContainer): SimDynamoDb {
+    return new SimDynamoDb({
+      accountRegionScope: scope.accountRegionScope,
+      background: this.background,
+    });
   }
 
   /**
    * Create a simulated AWS HTTP service controller.
    */
-  createServiceController(serviceName: string): SimAwsServiceController {
+  _createServiceController(serviceName: string): SimAwsServiceController {
     switch (serviceName) {
       case "s3": {
         return new SimS3ServiceController(this);

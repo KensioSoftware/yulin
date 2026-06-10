@@ -23,7 +23,7 @@ export class SimAwsServiceControllerContainer {
    */
   controllerForService(service: string): SimAwsServiceController {
     return this.controllers.getOrCreate(service, () =>
-      this.simAws.createServiceController(service),
+      this.simAws._createServiceController(service),
     );
   }
 }

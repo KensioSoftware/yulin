@@ -7,13 +7,22 @@ import {
 import { assertDefined } from "../../../util/defined/defined.js";
 import { DynamoDbKeySchema } from "./dynamodb-key-schema.js";
 import type { DynamoDbItem } from "../item/dynamodb-item.js";
-import type { BackgroundScheduler } from "../../../util/background/background.js";
+import {
+  type BackgroundScheduler,
+  BackgroundTasks,
+} from "../../../util/background/background.js";
 import type {
   SimCreateTableCommand,
   SimDynamoDbTableStatus,
 } from "../command/create-table/create-table.cmd.js";
 
 export type DynamoDbTableName = Brand<string, "DynamoDbTableName">;
+
+interface SimDynamoDbTableProps {
+  readonly createCommand: SimCreateTableCommand;
+  readonly arn?: SimArn;
+  readonly background?: BackgroundScheduler;
+}
 
 /**
  * Simulated DynamoDB Table.
@@ -22,17 +31,24 @@ export class SimDynamoDbTable {
   public readonly creationDateTime: Date;
 
   public readonly tableName: DynamoDbTableName;
+  public readonly arn: SimArn;
 
+  private readonly background: BackgroundScheduler;
   private readonly _keySchema: DynamoDbKeySchema;
   private _status: SimDynamoDbTableStatus = "CREATING";
 
   private readonly items = new Map<string, DynamoDbItem>();
 
-  constructor(
-    createCommand: SimCreateTableCommand,
-    public readonly simArn: SimArn,
-    private readonly background: BackgroundScheduler,
-  ) {
+  constructor(props: SimDynamoDbTableProps) {
+    const {
+      createCommand,
+      arn = makeSimDynamoDbTableArn(),
+      background = new BackgroundTasks(),
+    } = props;
+
+    this.arn = arn;
+    this.background = background;
+
     assertDefined(
       createCommand.input.TableName,
       "createCommand.input.TableName",

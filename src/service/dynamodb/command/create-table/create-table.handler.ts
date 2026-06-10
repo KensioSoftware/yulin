@@ -12,6 +12,12 @@ import type { SimArn } from "../../../aws/arn.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import { SimDynamoDbResourceInUseException } from "../../error/dynamodb.error.js";
 
+interface CreateTableCommandHandlerProps {
+  readonly accountRegionScope: SimAwsAccountRegionScope;
+  readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>;
+  readonly background: BackgroundScheduler;
+}
+
 /**
  * DynamoDB CreateTableCommand handler.
  *
@@ -21,11 +27,15 @@ export class CreateTableCommandHandler implements CommandHandler<
   SimCreateTableCommand,
   SimCreateTableCommandOutput
 > {
-  constructor(
-    private readonly accountRegionScope: SimAwsAccountRegionScope,
-    private readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>,
-    private readonly background: BackgroundScheduler,
-  ) {}
+  private readonly accountRegionScope: SimAwsAccountRegionScope;
+  private readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>;
+  private readonly background: BackgroundScheduler;
+
+  constructor(props: CreateTableCommandHandlerProps) {
+    this.accountRegionScope = props.accountRegionScope;
+    this.tables = props.tables;
+    this.background = props.background;
+  }
 
   /**
    * Handle creation of a new DynamoDB Table.
@@ -45,7 +55,11 @@ export class CreateTableCommandHandler implements CommandHandler<
     await jitter();
 
     const tableArn: SimArn = `arn:aws:dynamodb:${this.accountRegionScope.regionName}:${this.accountRegionScope.accountId}:table/${tableName}`;
-    const table = new SimDynamoDbTable(cmd, tableArn, this.background);
+    const table = new SimDynamoDbTable({
+      createCommand: cmd,
+      arn: tableArn,
+      background: this.background,
+    });
     this.tables.set(tableName, table);
 
     this.background.schedule(() => table.activate());
@@ -54,7 +68,7 @@ export class CreateTableCommandHandler implements CommandHandler<
       TableDescription: {
         AttributeDefinitions: [],
         TableName: table.tableName,
-        TableArn: table.simArn,
+        TableArn: table.arn,
         KeySchema: [],
         TableStatus: table.status,
         CreationDateTime: table.creationDateTime,
