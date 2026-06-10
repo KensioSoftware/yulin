@@ -1,4 +1,4 @@
-import type { SimAws } from "../../service/aws/sim-aws.js";
+import { SimAws } from "../../service/aws/sim-aws.js";
 import { Memo } from "../../util/memo/memo.js";
 import type { SimAwsServiceController } from "./sim-service-controller.js";
 
@@ -8,7 +8,7 @@ import type { SimAwsServiceController } from "./sim-service-controller.js";
 export class SimAwsServiceControllerContainer {
   private readonly controllers = new Memo<SimAwsServiceController>();
 
-  constructor(private readonly simAws: SimAws) {}
+  constructor(private readonly simAws: SimAws = new SimAws()) {}
 
   /**
    * Get the singleton controller for a simulated AWS service.

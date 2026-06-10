@@ -14,7 +14,7 @@ export class SimCloudFrontDistroRouter {
     private readonly distributions: ReadonlyMap<
       SimCloudFrontDistributionId,
       SimCloudFrontDistribution
-    >,
+    > = new Map(),
   ) {}
 
   /**

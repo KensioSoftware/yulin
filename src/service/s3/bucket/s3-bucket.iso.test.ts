@@ -28,16 +28,13 @@ describe("Simulated S3 Bucket", () => {
   describe.each<StorageFactory>([
     {
       name: "default memory storage",
-      makeBucket: () =>
-        Promise.resolve(
-          new SimS3Bucket(new CreateBucketCommand({ Bucket: "bucket-a" })),
-        ),
+      makeBucket: () => Promise.resolve(new SimS3Bucket("bucket-a")),
     },
     {
       name: "filesystem storage",
       makeBucket: async () =>
         new SimS3Bucket(
-          new CreateBucketCommand({ Bucket: "bucket-a" }),
+          "bucket-a",
           simAwsAccountRegionScopeFactory.make(),
           await makeFilesystemStorage(),
         ),
@@ -111,9 +108,7 @@ describe("Simulated S3 Bucket", () => {
   });
 
   it("changes storage implementation before storing Objects", async () => {
-    const bucket = new SimS3Bucket(
-      new CreateBucketCommand({ Bucket: "bucket-a" }),
-    );
+    const bucket = new SimS3Bucket("bucket-a");
 
     bucket.configureSimStorage(await makeFilesystemStorage());
 
@@ -127,9 +122,7 @@ describe("Simulated S3 Bucket", () => {
   });
 
   it("rejects changing storage implementation after storing Objects", async () => {
-    const bucket = new SimS3Bucket(
-      new CreateBucketCommand({ Bucket: "bucket-a" }),
-    );
+    const bucket = new SimS3Bucket("bucket-a");
 
     await bucket.putObject(new SimS3Object("foo.txt", Buffer.from("foo")));
 
@@ -145,7 +138,7 @@ describe("Simulated S3 Bucket", () => {
 
   it("gets a static website URL", () => {
     const bucket = new SimS3Bucket(
-      new CreateBucketCommand({ Bucket: "bucket-a" }),
+      "bucket-a",
       {
         ...simAwsAccountRegionScopeFactory.make(),
         regionName: "eu-west-2",
@@ -167,9 +160,7 @@ describe("Simulated S3 Bucket", () => {
   });
 
   it("throws when getting a static website URL before website hosting is enabled", () => {
-    const bucket = new SimS3Bucket(
-      new CreateBucketCommand({ Bucket: "bucket-a" }),
-    );
+    const bucket = new SimS3Bucket("bucket-a");
 
     const error = assertThrowsError(() => {
       bucket.getWebsiteUrl();
@@ -182,13 +173,10 @@ describe("Simulated S3 Bucket", () => {
   });
 
   it("gets a static website URL after configuring website hosting", () => {
-    const bucket = new SimS3Bucket(
-      new CreateBucketCommand({ Bucket: "bucket-a" }),
-      {
-        ...simAwsAccountRegionScopeFactory.make(),
-        regionName: "ap-southeast-2",
-      },
-    );
+    const bucket = new SimS3Bucket("bucket-a", {
+      ...simAwsAccountRegionScopeFactory.make(),
+      regionName: "ap-southeast-2",
+    });
 
     bucket.configureWebsite(
       new S3BucketWebsite({

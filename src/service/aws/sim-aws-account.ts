@@ -5,7 +5,7 @@ import { faker } from "@faker-js/faker";
 import type { SimS3 } from "../s3/sim-s3.js";
 import type { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
 import type { SimDynamoDb } from "../dynamodb/sim-dynamodb.js";
-import type { SimAws } from "./sim-aws.js";
+import { SimAws } from "./sim-aws.js";
 
 export type SimAwsAccountId = Brand<string, "SimAwsAccountId">;
 
@@ -19,7 +19,7 @@ export const DEFAULT_SIM_AWS_ACCOUNT_ID = "888888888888" as SimAwsAccountId;
  */
 export class SimAwsAccount {
   constructor(
-    private readonly simAws: Pick<SimAws, "accountRegionScope">,
+    private readonly simAws: Pick<SimAws, "accountRegionScope"> = new SimAws(),
     public readonly accountId: SimAwsAccountId = DEFAULT_SIM_AWS_ACCOUNT_ID,
   ) {}
 

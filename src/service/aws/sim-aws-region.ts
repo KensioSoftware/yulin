@@ -4,7 +4,7 @@ import { faker } from "@faker-js/faker";
 import type { SimS3 } from "../s3/sim-s3.js";
 import type { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
 import type { SimDynamoDb } from "../dynamodb/index.js";
-import type { SimAws } from "./sim-aws.js";
+import { SimAws } from "./sim-aws.js";
 
 export const AWS_REGION_NAMES = [
   "us-east-1",
@@ -55,7 +55,10 @@ export const DEFAULT_SIM_AWS_REGION_NAME = "us-east-1" as const;
  */
 export class SimAwsRegion {
   constructor(
-    private readonly accountRegionScopes: Pick<SimAws, "accountRegionScope">,
+    private readonly accountRegionScopes: Pick<
+      SimAws,
+      "accountRegionScope"
+    > = new SimAws(),
     public readonly regionName: AwsRegionName = DEFAULT_SIM_AWS_REGION_NAME,
   ) {}
 
