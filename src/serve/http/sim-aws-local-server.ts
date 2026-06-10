@@ -19,7 +19,7 @@ export class SimAwsLocalServer {
   private readonly server: Server;
 
   constructor(public readonly simAws: SimAws = new SimAws()) {
-    this.simAwsHttp = new SimAwsHttp(simAws);
+    this.simAwsHttp = new SimAwsHttp({ simAws });
     this.server = http.createServer((request, response) => {
       void this.handleRequest(request, response);
     });
