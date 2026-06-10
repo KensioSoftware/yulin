@@ -11,7 +11,7 @@ import { SimAws } from "../../../aws/sim-aws.js";
 describe("Serve simulated S3 Bucket static website on localhost", () => {
   const simAws = new SimAws();
 
-  const srv = new SimAwsLocalServer(simAws);
+  const srv = new SimAwsLocalServer({ simAws });
 
   beforeAll(async () => {
     await srv.listen();

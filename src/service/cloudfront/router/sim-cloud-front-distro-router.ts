@@ -34,7 +34,7 @@ export class SimCloudFrontDistroRouter {
   distroForRequest(req: Request): SimCloudFrontDistribution | undefined {
     const hostname = req.headers.get("host") ?? new URL(req.url).hostname;
     assertNotNull(hostname, "distroForRequest.req.headers.host");
-    const simUrl = new SimAwsLocalUrl(`http://${hostname}/`);
+    const simUrl = new SimAwsLocalUrl({ input: `http://${hostname}/` });
     const baseHostname = simUrl.withoutLocalhostSuffix().hostname;
 
     const distributionId =
