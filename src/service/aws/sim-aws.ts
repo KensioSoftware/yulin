@@ -27,12 +27,22 @@ import { createSimCloudFrontS3OriginResolver } from "../cloudfront/origin/sim-cl
 import { SimCloudFrontServiceController } from "../cloudfront/controller/sim-cloudfront-controller.js";
 import { SimDynamoDb } from "../dynamodb/index.js";
 
+interface SimAwsProps {
+  readonly defaultAccountId?: SimAwsAccountId;
+  readonly defaultRegionName?: AwsRegionName;
+  readonly background?: BackgroundScheduler & BackgroundCompleter;
+}
+
 /**
  * Top-level container for simulated AWS.
  * Contains Account scopes, Region scopes, Account/Region scopes, and built-in
  * simulated AWS services.
  */
 export class SimAws {
+  public readonly defaultAccountId: SimAwsAccountId;
+  public readonly defaultRegionName: AwsRegionName;
+  private readonly background: BackgroundScheduler & BackgroundCompleter;
+
   private readonly accounts = new Map<SimAwsAccountId, SimAwsAccount>();
 
   private readonly regions = new Map<AwsRegionName, SimAwsRegion>();
@@ -51,12 +61,17 @@ export class SimAws {
     SimCloudFront
   >();
 
-  constructor(
-    public readonly defaultAccountId = DEFAULT_SIM_AWS_ACCOUNT_ID,
-    public readonly defaultRegionName = DEFAULT_SIM_AWS_REGION_NAME,
-    public readonly background: BackgroundScheduler &
-      BackgroundCompleter = new BackgroundTasks(),
-  ) {}
+  constructor(props: SimAwsProps = {}) {
+    const {
+      defaultAccountId = DEFAULT_SIM_AWS_ACCOUNT_ID,
+      defaultRegionName = DEFAULT_SIM_AWS_REGION_NAME,
+      background = new BackgroundTasks(),
+    } = props;
+
+    this.defaultAccountId = defaultAccountId;
+    this.defaultRegionName = defaultRegionName;
+    this.background = background;
+  }
 
   /**
    * Get a simulated AWS Account.
