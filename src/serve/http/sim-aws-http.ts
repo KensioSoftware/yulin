@@ -10,7 +10,7 @@ export class SimAwsHttp {
   private readonly controllers: SimAwsServiceControllerContainer;
 
   constructor(public readonly simAws: SimAws = new SimAws()) {
-    this.controllers = new SimAwsServiceControllerContainer(simAws);
+    this.controllers = new SimAwsServiceControllerContainer({ simAws });
   }
 
   /**

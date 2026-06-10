@@ -13,7 +13,7 @@ describe("SimAwsServiceControllerContainer", () => {
   it("returns S3 service controller", () => {
     const simAws = new SimAws();
 
-    const container = new SimAwsServiceControllerContainer(simAws);
+    const container = new SimAwsServiceControllerContainer({ simAws });
 
     const controller = container.controllerForService("s3");
 
@@ -23,7 +23,7 @@ describe("SimAwsServiceControllerContainer", () => {
   it("returns same controller for same service", () => {
     const simAws = new SimAws();
 
-    const container = new SimAwsServiceControllerContainer(simAws);
+    const container = new SimAwsServiceControllerContainer({ simAws });
 
     assertIdentical(
       container.controllerForService("s3"),
@@ -34,7 +34,7 @@ describe("SimAwsServiceControllerContainer", () => {
   it("throws for unimplemented service controller", () => {
     const simAws = new SimAws();
 
-    const container = new SimAwsServiceControllerContainer(simAws);
+    const container = new SimAwsServiceControllerContainer({ simAws });
 
     const error = assertThrowsError(() => {
       container.controllerForService("dynamodb");
