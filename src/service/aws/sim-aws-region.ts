@@ -47,6 +47,11 @@ export type AwsRegionName = (typeof AWS_REGION_NAMES)[number];
 
 export const DEFAULT_SIM_AWS_REGION_NAME = "us-east-1" as const;
 
+interface SimAwsRegionProps {
+  readonly simAws?: Pick<SimAws, "accountRegionScope">;
+  readonly regionName?: AwsRegionName;
+}
+
 /**
  * Container for simulated AWS services in one AWS Region.
  * The real scope is Account/Region in SimAwsAccountRegionContainer.
@@ -54,19 +59,22 @@ export const DEFAULT_SIM_AWS_REGION_NAME = "us-east-1" as const;
  * full Account/Region scope.
  */
 export class SimAwsRegion {
-  constructor(
-    private readonly accountRegionScopes: Pick<
-      SimAws,
-      "accountRegionScope"
-    > = new SimAws(),
-    public readonly regionName: AwsRegionName = DEFAULT_SIM_AWS_REGION_NAME,
-  ) {}
+  private readonly simAws: Pick<SimAws, "accountRegionScope">;
+  public readonly regionName: AwsRegionName;
+
+  constructor(props: SimAwsRegionProps = {}) {
+    const { simAws = new SimAws(), regionName = DEFAULT_SIM_AWS_REGION_NAME } =
+      props;
+
+    this.simAws = simAws;
+    this.regionName = regionName;
+  }
 
   /**
    * Get a simulated AWS Account scoped for this Region.
    */
   account(accountId?: SimAwsAccountId | string): SimAwsAccountRegionContainer {
-    return this.accountRegionScopes.accountRegionScope(
+    return this.simAws.accountRegionScope(
       accountId as SimAwsAccountId,
       this.regionName,
     );

@@ -4,12 +4,17 @@ import type { SimAwsAccountRegionContainer } from "./sim-aws-account-region-scop
 import { faker } from "@faker-js/faker";
 import type { SimS3 } from "../s3/sim-s3.js";
 import type { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
-import type { SimDynamoDb } from "../dynamodb/sim-dynamodb.js";
+import type { SimDynamoDb } from "../dynamodb/index.js";
 import { SimAws } from "./sim-aws.js";
 
 export type SimAwsAccountId = Brand<string, "SimAwsAccountId">;
 
 export const DEFAULT_SIM_AWS_ACCOUNT_ID = "888888888888" as SimAwsAccountId;
+
+interface SimAwsAccountProps {
+  readonly simAws?: Pick<SimAws, "accountRegionScope">;
+  readonly accountId?: SimAwsAccountId;
+}
 
 /**
  * Container for simulated AWS services in one AWS Account.
@@ -18,10 +23,16 @@ export const DEFAULT_SIM_AWS_ACCOUNT_ID = "888888888888" as SimAwsAccountId;
  * full Account/Region scope.
  */
 export class SimAwsAccount {
-  constructor(
-    private readonly simAws: Pick<SimAws, "accountRegionScope"> = new SimAws(),
-    public readonly accountId: SimAwsAccountId = DEFAULT_SIM_AWS_ACCOUNT_ID,
-  ) {}
+  private readonly simAws: Pick<SimAws, "accountRegionScope">;
+  public readonly accountId: SimAwsAccountId;
+
+  constructor(props: SimAwsAccountProps = {}) {
+    const { simAws = new SimAws(), accountId = DEFAULT_SIM_AWS_ACCOUNT_ID } =
+      props;
+
+    this.simAws = simAws;
+    this.accountId = accountId;
+  }
 
   /**
    * Get a simulated AWS Region scoped for this Account.

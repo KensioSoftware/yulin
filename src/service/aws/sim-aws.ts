@@ -80,7 +80,10 @@ export class SimAws {
     let account = this.accounts.get(accountId as SimAwsAccountId);
 
     if (account === undefined) {
-      account = new SimAwsAccount(this, accountId as SimAwsAccountId);
+      account = new SimAwsAccount({
+        simAws: this,
+        accountId: accountId as SimAwsAccountId,
+      });
       this.accounts.set(accountId as SimAwsAccountId, account);
     }
 
@@ -94,7 +97,10 @@ export class SimAws {
     let region = this.regions.get(regionName);
 
     if (region === undefined) {
-      region = new SimAwsRegion(this, regionName);
+      region = new SimAwsRegion({
+        simAws: this,
+        regionName,
+      });
       this.regions.set(regionName, region);
     }
 
@@ -112,11 +118,11 @@ export class SimAws {
     let accountRegionScope = this.accountRegionScopes.get(scopeKey);
 
     if (accountRegionScope === undefined) {
-      accountRegionScope = new SimAwsAccountRegionContainer(
-        this,
-        this.account(accountId),
-        this.region(regionName),
-      );
+      accountRegionScope = new SimAwsAccountRegionContainer({
+        simAws: this,
+        account: this.account(accountId),
+        region: this.region(regionName),
+      });
       this.accountRegionScopes.set(scopeKey, accountRegionScope);
     }
 
