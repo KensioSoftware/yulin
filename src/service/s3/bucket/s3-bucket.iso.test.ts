@@ -50,7 +50,7 @@ describe("Simulated S3 Bucket", () => {
       const bucket = await makeBucket();
       const body = Buffer.from("Hello, world!");
 
-      await bucket.putObject(new SimS3Object("foo.txt", body));
+      await bucket.putObject(new SimS3Object({ key: "foo.txt", body }));
 
       const object = await bucket.getObject("foo.txt");
 
@@ -70,11 +70,24 @@ describe("Simulated S3 Bucket", () => {
     it("lists Objects", async () => {
       const bucket = await makeBucket();
 
-      await Promise.all([
-        bucket.putObject(new SimS3Object("foo/a.txt", Buffer.from("a"))),
-        bucket.putObject(new SimS3Object("foo/b.txt", Buffer.from("b"))),
-        bucket.putObject(new SimS3Object("bar/c.txt", Buffer.from("c"))),
-      ]);
+      await bucket.putObject(
+        new SimS3Object({
+          key: "foo/a.txt",
+          body: Buffer.from("a"),
+        }),
+      );
+      await bucket.putObject(
+        new SimS3Object({
+          key: "foo/b.txt",
+          body: Buffer.from("b"),
+        }),
+      );
+      await bucket.putObject(
+        new SimS3Object({
+          key: "bar/c.txt",
+          body: Buffer.from("c"),
+        }),
+      );
 
       const objects = await bucket.listObjects();
       const keys = objects
@@ -90,11 +103,24 @@ describe("Simulated S3 Bucket", () => {
     it("lists Objects with prefix", async () => {
       const bucket = await makeBucket();
 
-      await Promise.all([
-        bucket.putObject(new SimS3Object("foo/a.txt", Buffer.from("a"))),
-        bucket.putObject(new SimS3Object("foo/b.txt", Buffer.from("b"))),
-        bucket.putObject(new SimS3Object("bar/c.txt", Buffer.from("c"))),
-      ]);
+      await bucket.putObject(
+        new SimS3Object({
+          key: "foo/a.txt",
+          body: Buffer.from("a"),
+        }),
+      );
+      await bucket.putObject(
+        new SimS3Object({
+          key: "foo/b.txt",
+          body: Buffer.from("b"),
+        }),
+      );
+      await bucket.putObject(
+        new SimS3Object({
+          key: "bar/c.txt",
+          body: Buffer.from("c"),
+        }),
+      );
 
       const objects = await bucket.listObjects("foo/");
       const keys = objects
@@ -112,7 +138,9 @@ describe("Simulated S3 Bucket", () => {
 
     bucket.configureSimStorage(await makeFilesystemStorage());
 
-    await bucket.putObject(new SimS3Object("foo.txt", Buffer.from("foo")));
+    await bucket.putObject(
+      new SimS3Object({ key: "foo.txt", body: Buffer.from("foo") }),
+    );
 
     const object = await bucket.getObject("foo.txt");
 
@@ -124,7 +152,9 @@ describe("Simulated S3 Bucket", () => {
   it("rejects changing storage implementation after storing Objects", async () => {
     const bucket = new SimS3Bucket({ bucketName: "bucket-a" });
 
-    await bucket.putObject(new SimS3Object("foo.txt", Buffer.from("foo")));
+    await bucket.putObject(
+      new SimS3Object({ key: "foo.txt", body: Buffer.from("foo") }),
+    );
 
     const error = assertThrowsError(() => {
       bucket.configureSimStorage(new MemoryS3BucketStorage());
@@ -228,5 +258,5 @@ async function makeFilesystemStorage(): Promise<FilesystemS3BucketStorage> {
   // eslint-disable-next-line security/detect-non-literal-fs-filename
   await mkdir(directoryPath);
 
-  return new FilesystemS3BucketStorage(directoryPath);
+  return new FilesystemS3BucketStorage({ directoryPath });
 }

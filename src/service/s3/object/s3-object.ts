@@ -5,13 +5,29 @@ export class SimS3ObjectMetadata {
   constructor(public readonly values: Record<string, string> = {}) {}
 }
 
+interface SimS3ObjectProps {
+  readonly key?: string;
+  readonly body?: Buffer;
+  readonly metadata?: SimS3ObjectMetadata;
+}
+
 /**
  * Simulated S3 object.
  */
 export class SimS3Object {
-  constructor(
-    public readonly key: string,
-    public readonly body: Buffer = Buffer.alloc(0),
-    public readonly metadata: SimS3ObjectMetadata = new SimS3ObjectMetadata(),
-  ) {}
+  public readonly key: string;
+  public readonly body: Buffer;
+  public readonly metadata: SimS3ObjectMetadata;
+
+  constructor(props: SimS3ObjectProps = {}) {
+    const {
+      key = "object.json",
+      body = Buffer.alloc(0),
+      metadata = new SimS3ObjectMetadata(),
+    } = props;
+
+    this.key = key;
+    this.body = body;
+    this.metadata = metadata;
+  }
 }

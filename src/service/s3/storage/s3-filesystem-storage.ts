@@ -4,6 +4,11 @@ import path from "node:path";
 import { homedir } from "node:os";
 import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 
+interface FilesystemS3BucketStorageProps {
+  readonly directoryPath: string;
+  readonly allowedDirectoryNames?: readonly string[];
+}
+
 /**
  * Maps simulated S3 Objects to files under a directory.
  * This is useful for local development, such as serving a static website
@@ -16,14 +21,11 @@ export class FilesystemS3BucketStorage implements SimS3BucketStorage {
   private readonly directoryPath: string;
   private readonly allowedDirectoryNames: readonly string[];
 
-  constructor(
-    directoryPath: string,
-    options: FilesystemS3BucketStorageOptions = {},
-  ) {
-    this.allowedDirectoryNames =
-      options.allowedDirectoryNames ?? defaultAllowedDirectoryNames;
-    this.assertSafeDirectoryPath(directoryPath);
-    this.directoryPath = path.resolve(directoryPath);
+  constructor(props: FilesystemS3BucketStorageProps) {
+    const { allowedDirectoryNames = defaultAllowedDirectoryNames } = props;
+    this.allowedDirectoryNames = allowedDirectoryNames;
+    this.assertSafeDirectoryPath(props.directoryPath);
+    this.directoryPath = path.resolve(props.directoryPath);
   }
 
   /**
@@ -40,7 +42,11 @@ export class FilesystemS3BucketStorage implements SimS3BucketStorage {
     try {
       // eslint-disable-next-line security/detect-non-literal-fs-filename
       const body = await readFile(filePath);
-      return new SimS3Object(key, body, this.metadataForObjectKey(key));
+      return new SimS3Object({
+        key,
+        body,
+        metadata: this.metadataForObjectKey(key),
+      });
     } catch (error) {
       if (
         error instanceof Error &&

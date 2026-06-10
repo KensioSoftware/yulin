@@ -6,6 +6,10 @@ import type {
 import { SimS3RequestRouter } from "./sim-s3-req-router.js";
 import { SimS3GetObjectController } from "./sim-s3-get-obj-controller.js";
 
+interface SimS3ServiceControllerProps {
+  readonly simAws?: SimAws;
+}
+
 /**
  * Localhost HTTP controller for simulated S3.
  */
@@ -13,8 +17,9 @@ export class SimS3ServiceController implements SimAwsServiceController {
   private readonly s3Router: SimS3RequestRouter;
   private readonly getObjectController: SimS3GetObjectController;
 
-  constructor(simAws: SimAws = new SimAws()) {
-    this.s3Router = new SimS3RequestRouter(simAws);
+  constructor(props: SimS3ServiceControllerProps = {}) {
+    const { simAws = new SimAws() } = props;
+    this.s3Router = new SimS3RequestRouter({ simAws });
     this.getObjectController = new SimS3GetObjectController();
   }
 

@@ -1,11 +1,10 @@
 import { assertIdentical, assertStringIncludes } from "@kensio/smartass";
 import { describe, it } from "vitest";
-import { SimAws } from "../../aws/sim-aws.js";
 import { SimS3ServiceController } from "./sim-s3-controller.js";
 
 describe("Simulated S3 local HTTP controller", () => {
   it("responds HTTP 400 for missing S3 Bucket name", async () => {
-    const res = await new SimS3ServiceController(new SimAws()).handleRequest(
+    const res = await new SimS3ServiceController().handleRequest(
       {
         service: "s3",
         resourceName: "",
@@ -21,7 +20,7 @@ describe("Simulated S3 local HTTP controller", () => {
   });
 
   it("responds HTTP 400 for missing S3 Bucket region", async () => {
-    const res = await new SimS3ServiceController(new SimAws()).handleRequest(
+    const res = await new SimS3ServiceController().handleRequest(
       {
         service: "s3",
         resourceName: "foo-site",

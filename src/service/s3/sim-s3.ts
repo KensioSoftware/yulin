@@ -37,6 +37,11 @@ import type {
   SimCreateBucketCommandOutput,
 } from "./command/create-bucket/create-bucket.cmd.js";
 
+interface SimS3Props {
+  readonly accountRegionScope?: SimAwsAccountRegionScope;
+  readonly s3GlobalRegistry?: SimS3GlobalRegistry;
+}
+
 /**
  * Simulated S3. Handles SDK commands. Emulates AWS behaviour and state.
  * Scoped to an Account and Region, but has access to a global (as in
@@ -45,10 +50,18 @@ import type {
 export class SimS3 {
   private readonly buckets = new Map<SimS3BucketName, SimS3Bucket>();
 
-  constructor(
-    private readonly accountRegionScope: SimAwsAccountRegionScope = simAwsAccountRegionScopeFactory.make(),
-    private readonly s3GlobalRegistry: SimS3GlobalRegistry = new SimS3GlobalRegistry(),
-  ) {}
+  private readonly accountRegionScope: SimAwsAccountRegionScope;
+  private readonly s3GlobalRegistry: SimS3GlobalRegistry;
+
+  constructor(props: SimS3Props = {}) {
+    const {
+      accountRegionScope = simAwsAccountRegionScopeFactory.make(),
+      s3GlobalRegistry = new SimS3GlobalRegistry(),
+    } = props;
+
+    this.accountRegionScope = accountRegionScope;
+    this.s3GlobalRegistry = s3GlobalRegistry;
+  }
 
   /**
    * Handle a Create Bucket Command from the SDK.
@@ -56,11 +69,11 @@ export class SimS3 {
   async createBucket(
     cmd: SimCreateBucketCommand,
   ): Promise<SimCreateBucketCommandOutput> {
-    const handler = new CreateBucketCommandHandler(
-      this.accountRegionScope,
-      this.buckets,
-      this.s3GlobalRegistry,
-    );
+    const handler = new CreateBucketCommandHandler({
+      accountRegionScope: this.accountRegionScope,
+      buckets: this.buckets,
+      s3GlobalRegistry: this.s3GlobalRegistry,
+    });
     return await handler.handle(cmd);
   }
 
@@ -70,7 +83,9 @@ export class SimS3 {
   async putBucketWebsite(
     cmd: SimPutBucketWebsiteCommand,
   ): Promise<SimPutBucketWebsiteCommandOutput> {
-    const handler = new PutBucketWebsiteCommandHandler(this.buckets);
+    const handler = new PutBucketWebsiteCommandHandler({
+      buckets: this.buckets,
+    });
     return await handler.handle(cmd);
   }
 
@@ -80,7 +95,7 @@ export class SimS3 {
   async listBuckets(
     cmd: SimListBucketsCommand,
   ): Promise<SimListBucketsCommandOutput> {
-    const handler = new ListBucketsCommandHandler(this.buckets);
+    const handler = new ListBucketsCommandHandler({ buckets: this.buckets });
     return await handler.handle(cmd);
   }
 
@@ -90,7 +105,7 @@ export class SimS3 {
   async putObject(
     cmd: SimPutObjectCommand,
   ): Promise<SimPutObjectCommandOutput> {
-    const handler = new PutObjectCommandHandler(this.buckets);
+    const handler = new PutObjectCommandHandler({ buckets: this.buckets });
     return await handler.handle(cmd);
   }
 
@@ -100,7 +115,7 @@ export class SimS3 {
   async getObject(
     cmd: SimGetObjectCommand,
   ): Promise<SimGetObjectCommandOutput> {
-    const handler = new GetObjectCommandHandler(this.buckets);
+    const handler = new GetObjectCommandHandler({ buckets: this.buckets });
     return await handler.handle(cmd);
   }
 
@@ -110,7 +125,7 @@ export class SimS3 {
   async listObjects(
     cmd: SimListObjectsCommand,
   ): Promise<SimListObjectsCommandOutput> {
-    const handler = new ListObjectsCommandHandler(this.buckets);
+    const handler = new ListObjectsCommandHandler({ buckets: this.buckets });
     return await handler.handle(cmd);
   }
 
@@ -151,6 +166,8 @@ export class SimS3 {
   ): void {
     const bucket = this.getSimBucketByName(bucketName);
     assertDefined(bucket, `Sim S3 Bucket named ${bucketName}`);
-    bucket.configureSimStorage(new FilesystemS3BucketStorage(directoryPath));
+    bucket.configureSimStorage(
+      new FilesystemS3BucketStorage({ directoryPath }),
+    );
   }
 }

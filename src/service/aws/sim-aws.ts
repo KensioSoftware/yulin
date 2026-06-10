@@ -154,7 +154,10 @@ export class SimAws {
    * Create simulated S3 for an Account Region scope.
    */
   _createS3(scope: SimAwsAccountRegionContainer): SimS3 {
-    return new SimS3(scope.accountRegionScope, this.s3GlobalRegistry);
+    return new SimS3({
+      accountRegionScope: scope.accountRegionScope,
+      s3GlobalRegistry: this.s3GlobalRegistry,
+    });
   }
 
   /**
@@ -194,7 +197,7 @@ export class SimAws {
   _createServiceController(serviceName: string): SimAwsServiceController {
     switch (serviceName) {
       case "s3": {
-        return new SimS3ServiceController(this);
+        return new SimS3ServiceController({ simAws: this });
       }
       case "cloudFront": {
         return new SimCloudFrontServiceController({
