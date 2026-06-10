@@ -174,13 +174,18 @@ export class SimAwsLocalServer {
   }
 }
 
+interface ServeSimAwsProps {
+  readonly simAws?: SimAws;
+  readonly port?: number;
+}
+
 /**
  * Serve a simulated AWS environment on localhost.
  */
 export async function serveSimAws(
-  simAws: SimAws = new SimAws(),
-  port: number = simAwsLocalConf.defaultPort,
+  props: ServeSimAwsProps = {},
 ): Promise<SimAwsLocalServer> {
+  const { simAws = new SimAws(), port = simAwsLocalConf.defaultPort } = props;
   const server = new SimAwsLocalServer({ simAws });
   return server.listen(port);
 }
