@@ -149,6 +149,7 @@ export class SimAws {
         scope.accountRegionScope,
         this.cloudFrontRegistry,
         createSimCloudFrontS3OriginResolver(this, scope),
+        this.background,
       );
       this.cloudFrontServices.set(accountId, cloudFront);
     }

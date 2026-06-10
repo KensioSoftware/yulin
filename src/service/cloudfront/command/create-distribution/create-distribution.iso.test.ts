@@ -1,9 +1,13 @@
-import { CreateDistributionCommand } from "@aws-sdk/client-cloudfront";
+import {
+  CreateDistributionCommand,
+  GetDistributionCommand,
+} from "@aws-sdk/client-cloudfront";
 import {
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
+  assertOneOf,
   assertStringIncludes,
   assertStringLength,
   assertThrowsErrorAsync,
@@ -64,7 +68,10 @@ describe("CloudFront CreateDistributionCommand", () => {
       createDistributionOutput.Distribution.ARN,
       `arn:aws:cloudfront::555555555555:distribution/${distributionId}`,
     );
-    assertIdentical(createDistributionOutput.Distribution.Status, "Deployed");
+    assertOneOf(createDistributionOutput.Distribution.Status, [
+      "Deploying",
+      "Deployed",
+    ]);
     assertInstanceOf(
       createDistributionOutput.Distribution.LastModifiedTime,
       Date,
@@ -84,6 +91,35 @@ describe("CloudFront CreateDistributionCommand", () => {
     assertIdentical(
       createDistributionOutput.Location,
       `https://cloudfront.amazonaws.com/2020-05-31/distribution/${distributionId}`,
+    );
+
+    await simAws.backgroundTasksComplete();
+
+    const getDistributionOutput = await simCloudFront.getDistribution(
+      new GetDistributionCommand({ Id: distributionId }),
+    );
+    assertNonNullable(getDistributionOutput.Distribution);
+    assertIdentical(getDistributionOutput.Distribution.Id, distributionId);
+    assertIdentical(
+      getDistributionOutput.Distribution.ARN,
+      `arn:aws:cloudfront::555555555555:distribution/${distributionId}`,
+    );
+    assertOneOf(getDistributionOutput.Distribution.Status, [
+      "Deploying",
+      "Deployed",
+    ]);
+    assertInstanceOf(getDistributionOutput.Distribution.LastModifiedTime, Date);
+    assertIdentical(
+      getDistributionOutput.Distribution.InProgressInvalidationBatches,
+      0,
+    );
+    assertIdentical(
+      getDistributionOutput.Distribution.DomainName,
+      `${distributionId.toLowerCase()}.cloudfront.net`,
+    );
+    assertIdentical(
+      getDistributionOutput.Distribution.DistributionConfig,
+      distributionConfig,
     );
   });
 

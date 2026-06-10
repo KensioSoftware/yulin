@@ -16,6 +16,15 @@ import {
   emptyCloudFrontS3OriginResolver,
   type SimCloudFrontS3OriginResolver,
 } from "./origin/sim-cloudfront-s3-origin.js";
+import {
+  type BackgroundScheduler,
+  BackgroundTasks,
+} from "../../util/background/background.js";
+import type {
+  SimGetDistributionCommand,
+  SimGetDistributionCommandOutput,
+} from "./command/get-distribution/get-distribution.cmd.js";
+import { GetDistributionCommandHandler } from "./command/get-distribution/get-distribution.handler.js";
 
 /**
  * Simulated CloudFront. Handles SDK commands. Emulates AWS behaviour and state.
@@ -30,6 +39,7 @@ export class SimCloudFront {
     private readonly accountRegionScope: SimAwsAccountRegionScope = simAwsAccountRegionScopeFactory.make(),
     private readonly cloudFrontRegistry: SimCloudFrontRegistry = new SimCloudFrontRegistry(),
     private readonly s3OriginResolver: SimCloudFrontS3OriginResolver = emptyCloudFrontS3OriginResolver,
+    private readonly background: BackgroundScheduler = new BackgroundTasks(),
   ) {}
 
   /**
@@ -53,7 +63,18 @@ export class SimCloudFront {
       this.distributions,
       this.cloudFrontRegistry,
       this.s3OriginResolver,
+      this.background,
     );
+    return await handler.handle(cmd);
+  }
+
+  /**
+   * Handle a Get Distribution Command from the SDK.
+   */
+  async getDistribution(
+    cmd: SimGetDistributionCommand,
+  ): Promise<SimGetDistributionCommandOutput> {
+    const handler = new GetDistributionCommandHandler(this.distributions);
     return await handler.handle(cmd);
   }
 }

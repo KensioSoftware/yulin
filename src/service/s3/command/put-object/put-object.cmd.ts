@@ -1,3 +1,5 @@
+import type { Readable } from "node:stream";
+
 /**
  * Minimal structural sim S3 PutObject command.
  */
@@ -9,11 +11,11 @@ export interface SimPutObjectCommand {
  * Minimal structural sim S3 PutObject input.
  */
 export interface SimPutObjectCommandInput {
-  readonly Bucket?: string;
-  readonly Key?: string;
+  readonly Bucket?: string | undefined;
+  readonly Key?: string | undefined;
   readonly Body?: SimPutObjectBody;
-  readonly Metadata?: Record<string, string>;
-  readonly ContentType?: string;
+  readonly Metadata?: Record<string, string> | undefined;
+  readonly ContentType?: string | undefined;
 }
 
 /**
@@ -25,5 +27,14 @@ export interface SimPutObjectCommandOutput {
 
 /**
  * Minimal supported sim S3 PutObject body type.
+ * This allows for different types that Body could be in the real SDK command,
+ * even though we will just use Readable internally.
  */
-export type SimPutObjectBody = string | Uint8Array | undefined;
+export type SimPutObjectBody =
+  | string
+  | Uint8Array
+  | Buffer
+  | Blob
+  | Readable
+  | ReadableStream<Uint8Array>
+  | undefined;

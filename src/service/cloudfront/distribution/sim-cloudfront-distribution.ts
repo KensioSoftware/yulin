@@ -2,11 +2,18 @@ import type { Brand } from "../../../util/brand.type.js";
 import type { SimCloudFrontOrigin } from "../origin/sim-cloudfront-origin.js";
 import type { SimCloudFrontBehavior } from "../behaviour/sim-cloud-front-behavior.js";
 import { faker } from "@faker-js/faker";
+import {
+  makeSimAwsAccountId,
+  type SimAwsAccountId,
+} from "../../aws/sim-aws-account.js";
+import type { SimCloudFrontDistributionConfig } from "../command/create-distribution/create-distribution.cmd.js";
 
 export type SimCloudFrontDistributionId = Brand<
   string,
   "SimCloudFrontDistributionId"
 >;
+
+export type SimCloudFrontDistributionStatus = "Deploying" | "Deployed";
 
 /**
  * Simulated CloudFront Distribution.
@@ -15,10 +22,29 @@ export class SimCloudFrontDistribution {
   private readonly alternateDomainNames = new Set<string>();
   public readonly behaviors: SimCloudFrontBehavior[] = [];
   private readonly origins = new Map<string, SimCloudFrontOrigin>();
+  public readonly lastModifiedTime: Date = new Date();
 
   constructor(
     public readonly distributionId: SimCloudFrontDistributionId = makeDistributionId(),
+    private _status: SimCloudFrontDistributionStatus = "Deployed",
+    public readonly accountId: SimAwsAccountId = makeSimAwsAccountId(),
+    public readonly distributionConfig?: SimCloudFrontDistributionConfig,
   ) {}
+
+  /**
+   * Get the current Status of this sim Distribution.
+   */
+  get status(): SimCloudFrontDistributionStatus {
+    return this._status;
+  }
+
+  /**
+   * Move the sim Distribution into Deployed status.
+   */
+  completeDeployment(): Promise<void> {
+    this._status = "Deployed";
+    return Promise.resolve();
+  }
 
   /**
    * Get the alternate domain names for this sim Distribution.
