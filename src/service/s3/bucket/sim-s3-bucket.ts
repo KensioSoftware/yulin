@@ -11,19 +11,34 @@ import {
 
 export type SimS3BucketName = Brand<string, "SimS3BucketName">;
 
+interface SimS3BucketProps {
+  readonly bucketName: SimS3BucketName | string;
+  readonly accountRegionScope?: SimAwsAccountRegionScope;
+  readonly storage?: SimS3BucketStorage;
+  readonly website?: S3BucketWebsite;
+}
+
 /**
  * Simulated S3 Bucket.
  */
 export class SimS3Bucket {
   public readonly bucketName: SimS3BucketName;
+  private readonly accountRegionScope: SimAwsAccountRegionScope;
+  private storage: SimS3BucketStorage;
+  private website: S3BucketWebsite;
 
-  constructor(
-    bucketName: SimS3BucketName | string,
-    private readonly accountRegionScope: SimAwsAccountRegionScope = simAwsAccountRegionScopeFactory.make(),
-    private storage: SimS3BucketStorage = new MemoryS3BucketStorage(),
-    private website: S3BucketWebsite = new S3BucketWebsite(),
-  ) {
+  constructor(props: SimS3BucketProps) {
+    const {
+      bucketName,
+      accountRegionScope = simAwsAccountRegionScopeFactory.make(),
+      storage = new MemoryS3BucketStorage(),
+      website = new S3BucketWebsite(),
+    } = props;
+
     this.bucketName = bucketName as SimS3BucketName;
+    this.accountRegionScope = accountRegionScope;
+    this.storage = storage;
+    this.website = website;
   }
 
   /**

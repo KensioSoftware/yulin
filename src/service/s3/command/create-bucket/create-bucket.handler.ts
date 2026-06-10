@@ -65,7 +65,10 @@ export class CreateBucketCommandHandler implements CommandHandler<
       );
     }
 
-    const bucket = new SimS3Bucket(bucketName, this.accountRegionScope);
+    const bucket = new SimS3Bucket({
+      bucketName,
+      accountRegionScope: this.accountRegionScope,
+    });
     this.buckets.set(bucketName, bucket);
     this.s3GlobalRegistry.registerBucket(bucketName, this.accountRegionScope);
 
