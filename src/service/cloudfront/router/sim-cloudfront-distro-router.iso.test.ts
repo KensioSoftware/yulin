@@ -42,7 +42,9 @@ describe("Sim CloudFront Distribution Router", () => {
     });
 
     it("returns undefined when distributions map is empty", () => {
-      const router = new SimCloudFrontDistroRouter(new Map());
+      const router = new SimCloudFrontDistroRouter({
+        distributions: new Map(),
+      });
 
       const request = new Request("http://distribution123.cloudfront.net/");
 
@@ -81,9 +83,9 @@ describe("Sim CloudFront Distribution Router", () => {
     });
 
     it("handles case-insensitive distribution ID matching", () => {
-      const distro = new SimCloudFrontDistribution(
-        "EOT12HUY8E5GFA" as SimCloudFrontDistributionId,
-      );
+      const distro = new SimCloudFrontDistribution({
+        distributionId: "EOT12HUY8E5GFA" as SimCloudFrontDistributionId,
+      });
 
       const router = SimCloudFrontDistroRouter.fromDistributions([distro]);
 

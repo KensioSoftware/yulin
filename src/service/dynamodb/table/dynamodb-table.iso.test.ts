@@ -1,38 +1,26 @@
 import { describe, it } from "vitest";
 import { CreateTableCommand } from "@aws-sdk/client-dynamodb";
-import { makeSimDynamoDbTableArn, SimDynamoDbTable } from "./dynamodb-table.js";
+import { SimDynamoDbTable } from "./dynamodb-table.js";
 import {
   assertIdentical,
   assertInstanceOf,
   assertThrowsError,
 } from "@kensio/smartass";
-import { BackgroundTasks } from "../../../util/background/background.js";
 
 describe("SimDynamoDbTable", () => {
   it("throws when TableName is undefined", () => {
-    const command = new CreateTableCommand({ TableName: undefined });
+    const createCommand = new CreateTableCommand({ TableName: undefined });
 
-    assertThrowsError(
-      () =>
-        new SimDynamoDbTable(
-          command,
-          makeSimDynamoDbTableArn(),
-          new BackgroundTasks(),
-        ),
-    );
+    assertThrowsError(() => new SimDynamoDbTable({ createCommand }));
   });
 
   it("creates table with CREATING status", () => {
-    const command = new CreateTableCommand({
+    const createCommand = new CreateTableCommand({
       TableName: "test-table",
       KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
     });
 
-    const table = new SimDynamoDbTable(
-      command,
-      makeSimDynamoDbTableArn(),
-      new BackgroundTasks(),
-    );
+    const table = new SimDynamoDbTable({ createCommand });
 
     assertIdentical(table.tableName, "test-table");
     assertIdentical(table.status, "CREATING");
@@ -40,16 +28,12 @@ describe("SimDynamoDbTable", () => {
   });
 
   it("activates table", async () => {
-    const command = new CreateTableCommand({
+    const createCommand = new CreateTableCommand({
       TableName: "test-table",
       KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
     });
 
-    const table = new SimDynamoDbTable(
-      command,
-      makeSimDynamoDbTableArn(),
-      new BackgroundTasks(),
-    );
+    const table = new SimDynamoDbTable({ createCommand });
     assertIdentical(table.status, "CREATING");
 
     await table.activate();

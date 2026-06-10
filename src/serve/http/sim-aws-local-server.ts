@@ -7,8 +7,11 @@ import { SimAws } from "../../service/aws/sim-aws.js";
 import { simAwsLocalConf } from "./sim-aws-local.conf.js";
 import { SimAwsHttp } from "./sim-aws-http.js";
 import { assertDefined } from "../../util/defined/defined.js";
-
 import { SimAwsLocalUrl } from "./sim-aws-local-url.js";
+
+interface SimAwsLocalServerProps {
+  readonly simAws?: SimAws;
+}
 
 /**
  * Local HTTP server for a simulated AWS environment.
@@ -18,8 +21,9 @@ export class SimAwsLocalServer {
   private readonly simAwsHttp: SimAwsHttp;
   private readonly server: Server;
 
-  constructor(public readonly simAws: SimAws = new SimAws()) {
-    this.simAwsHttp = new SimAwsHttp(simAws);
+  constructor(props: SimAwsLocalServerProps = {}) {
+    const { simAws = new SimAws() } = props;
+    this.simAwsHttp = new SimAwsHttp({ simAws });
     this.server = http.createServer((request, response) => {
       void this.handleRequest(request, response);
     });
@@ -69,7 +73,7 @@ export class SimAwsLocalServer {
    * Adapt a simulated AWS URL for this local server instance.
    */
   localUrl(input: string | URL): URL {
-    return new SimAwsLocalUrl(input, this.port).toURL();
+    return new SimAwsLocalUrl({ input, port: this.port }).toURL();
   }
 
   private async waitForListening(): Promise<void> {
@@ -170,13 +174,18 @@ export class SimAwsLocalServer {
   }
 }
 
+interface ServeSimAwsProps {
+  readonly simAws?: SimAws;
+  readonly port?: number;
+}
+
 /**
  * Serve a simulated AWS environment on localhost.
  */
 export async function serveSimAws(
-  simAws: SimAws = new SimAws(),
-  port: number = simAwsLocalConf.defaultPort,
+  props: ServeSimAwsProps = {},
 ): Promise<SimAwsLocalServer> {
-  const server = new SimAwsLocalServer(simAws);
+  const { simAws = new SimAws(), port = simAwsLocalConf.defaultPort } = props;
+  const server = new SimAwsLocalServer({ simAws });
   return server.listen(port);
 }

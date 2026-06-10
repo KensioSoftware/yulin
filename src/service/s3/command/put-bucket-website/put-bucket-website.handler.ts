@@ -12,6 +12,10 @@ import { assertDefined } from "../../../../util/defined/defined.js";
 import { jitter } from "../../../../util/sleep.js";
 import { SimS3NoSuchBucket } from "../../error/s3.error.js";
 
+interface PutBucketWebsiteCommandHandlerProps {
+  readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
+}
+
 /**
  * Simulated S3 PutBucketWebsiteCommand handler.
  *
@@ -21,7 +25,11 @@ export class PutBucketWebsiteCommandHandler implements CommandHandler<
   SimPutBucketWebsiteCommand,
   SimPutBucketWebsiteCommandOutput
 > {
-  constructor(private readonly buckets: Map<SimS3BucketName, SimS3Bucket>) {}
+  private readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
+
+  constructor(props: PutBucketWebsiteCommandHandlerProps) {
+    this.buckets = props.buckets;
+  }
 
   /**
    * Configure static website hosting for an S3 Bucket.

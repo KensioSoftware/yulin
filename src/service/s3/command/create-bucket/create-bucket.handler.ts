@@ -16,6 +16,12 @@ import {
   SimS3BucketAlreadyOwnedByYou,
 } from "../../error/s3.error.js";
 
+interface CreateBucketCommandHandlerProps {
+  readonly accountRegionScope: SimAwsAccountRegionScope;
+  readonly buckets: Map<string, SimS3Bucket>;
+  readonly s3GlobalRegistry: SimS3GlobalRegistry;
+}
+
 /**
  * S3 CreateBucketCommand handler.
  *
@@ -25,11 +31,15 @@ export class CreateBucketCommandHandler implements CommandHandler<
   SimCreateBucketCommand,
   SimCreateBucketCommandOutput
 > {
-  constructor(
-    private readonly accountRegionScope: SimAwsAccountRegionScope,
-    private readonly buckets: Map<string, SimS3Bucket>,
-    private readonly s3GlobalRegistry: SimS3GlobalRegistry,
-  ) {}
+  private readonly accountRegionScope: SimAwsAccountRegionScope;
+  private readonly buckets: Map<string, SimS3Bucket>;
+  private readonly s3GlobalRegistry: SimS3GlobalRegistry;
+
+  constructor(props: CreateBucketCommandHandlerProps) {
+    this.accountRegionScope = props.accountRegionScope;
+    this.buckets = props.buckets;
+    this.s3GlobalRegistry = props.s3GlobalRegistry;
+  }
 
   /**
    * Handle creation of a new S3 Bucket.
@@ -65,7 +75,10 @@ export class CreateBucketCommandHandler implements CommandHandler<
       );
     }
 
-    const bucket = new SimS3Bucket(cmd, this.accountRegionScope);
+    const bucket = new SimS3Bucket({
+      bucketName,
+      accountRegionScope: this.accountRegionScope,
+    });
     this.buckets.set(bucketName, bucket);
     this.s3GlobalRegistry.registerBucket(bucketName, this.accountRegionScope);
 

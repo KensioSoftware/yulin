@@ -38,7 +38,7 @@ describe("Simulated AWS HTTP", () => {
   it("routes S3 website request to simulated S3 controller", async () => {
     const simAws = new SimAws();
 
-    const simAwsHttp = new SimAwsHttp(simAws);
+    const simAwsHttp = new SimAwsHttp({ simAws });
 
     const res = await simAwsHttp.fetch(
       new Request(
@@ -54,7 +54,7 @@ describe("Simulated AWS HTTP", () => {
   it("serves an S3 Object over simulated HTTP when static website hosting is configured", async () => {
     const simAws = new SimAws();
 
-    const simAwsHttp = new SimAwsHttp(simAws);
+    const simAwsHttp = new SimAwsHttp({ simAws });
     const simS3 = simAws.region("eu-west-2").s3();
 
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "foo-site" }));
@@ -92,7 +92,7 @@ describe("Simulated AWS HTTP", () => {
   it("serves HEAD requests without a response body when static website hosting is configured", async () => {
     const simAws = new SimAws();
 
-    const simAwsHttp = new SimAwsHttp(simAws);
+    const simAwsHttp = new SimAwsHttp({ simAws });
     const simS3 = simAws.region("eu-west-2").s3();
 
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "head-site" }));

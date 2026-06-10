@@ -9,6 +9,10 @@ import type {
 } from "../../table/dynamodb-table.js";
 import { jitter } from "../../../../util/sleep.js";
 
+interface ListTablesCommandHandlerProps {
+  readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>;
+}
+
 /**
  * Simulated DynamoDB ListTablesCommand handler.
  *
@@ -18,9 +22,11 @@ export class ListTablesCommandHandler implements CommandHandler<
   SimListTablesCommand,
   SimListTablesCommandOutput
 > {
-  constructor(
-    private readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>,
-  ) {}
+  private readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>;
+
+  constructor(props: ListTablesCommandHandlerProps) {
+    this.tables = props.tables;
+  }
 
   /**
    * Simulate listing DynamoDB Tables.

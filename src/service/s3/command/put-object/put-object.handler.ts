@@ -12,6 +12,10 @@ import { assertDefined } from "../../../../util/defined/defined.js";
 import { jitter } from "../../../../util/sleep.js";
 import { SimS3NoSuchBucket } from "../../error/s3.error.js";
 
+interface PutObjectCommandHandlerProps {
+  readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
+}
+
 /**
  * Simulated S3 PutObjectCommand handler.
  *
@@ -21,7 +25,11 @@ export class PutObjectCommandHandler implements CommandHandler<
   SimPutObjectCommand,
   SimPutObjectCommandOutput
 > {
-  constructor(private readonly buckets: Map<SimS3BucketName, SimS3Bucket>) {}
+  private readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
+
+  constructor(props: PutObjectCommandHandlerProps) {
+    this.buckets = props.buckets;
+  }
 
   /**
    * Simulate putting an Object into an S3 Bucket.
@@ -38,11 +46,13 @@ export class PutObjectCommandHandler implements CommandHandler<
 
     await jitter();
 
-    const object = new SimS3Object(
-      cmd.input.Key,
-      PutObjectCommandHandler.toBuffer(cmd.input.Body),
-      new SimS3ObjectMetadata(PutObjectCommandHandler.toMetadata(cmd)),
-    );
+    const object = new SimS3Object({
+      key: cmd.input.Key,
+      body: PutObjectCommandHandler.toBuffer(cmd.input.Body),
+      metadata: new SimS3ObjectMetadata(
+        PutObjectCommandHandler.toMetadata(cmd),
+      ),
+    });
     await bucket.putObject(object);
 
     return {

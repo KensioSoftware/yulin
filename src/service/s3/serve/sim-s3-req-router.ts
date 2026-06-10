@@ -1,4 +1,4 @@
-import type { SimAws } from "../../aws/sim-aws.js";
+import { SimAws } from "../../aws/sim-aws.js";
 import type { SimS3Bucket, SimS3BucketName } from "../bucket/sim-s3-bucket.js";
 import type { SimAwsServiceTarget } from "../../../serve/controller/sim-service-controller.js";
 
@@ -16,11 +16,20 @@ export interface SimS3RouteFailure {
 
 export type SimS3Route = SimS3GetObjectRoute | SimS3RouteFailure;
 
+interface SimS3RequestRouterProps {
+  readonly simAws?: SimAws;
+}
+
 /**
  * Resolves HTTP requests into simulated S3 actions.
  */
 export class SimS3RequestRouter {
-  constructor(private readonly simAws: SimAws) {}
+  private readonly simAws: SimAws;
+
+  constructor(props: SimS3RequestRouterProps = {}) {
+    const { simAws = new SimAws() } = props;
+    this.simAws = simAws;
+  }
 
   /**
    * Route an incoming service target and HTTP request to a simulated S3 action.

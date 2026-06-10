@@ -11,8 +11,8 @@ export interface SimGetObjectCommand {
  * Minimal structural sim S3 GetObject input.
  */
 export interface SimGetObjectCommandInput {
-  readonly Bucket?: string;
-  readonly Key?: string;
+  readonly Bucket?: string | undefined;
+  readonly Key?: string | undefined;
 }
 
 /**

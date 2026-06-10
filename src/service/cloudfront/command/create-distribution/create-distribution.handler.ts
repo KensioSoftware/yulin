@@ -21,6 +21,18 @@ import {
   SimCloudFrontS3Origin,
   type SimCloudFrontS3OriginResolver,
 } from "../../origin/sim-cloudfront-s3-origin.js";
+import type { BackgroundScheduler } from "../../../../util/background/background.js";
+
+interface CreateDistributionCommandHandlerProps {
+  readonly accountId: SimAwsAccountId;
+  readonly distributions: Map<
+    SimCloudFrontDistributionId,
+    SimCloudFrontDistribution
+  >;
+  readonly cloudFrontRegistry: SimCloudFrontRegistry;
+  readonly s3OriginResolver: SimCloudFrontS3OriginResolver;
+  readonly background: BackgroundScheduler;
+}
 
 /**
  * CloudFront CreateDistributionCommand handler.
@@ -31,15 +43,22 @@ export class CreateDistributionCommandHandler implements CommandHandler<
   SimCreateDistributionCommand,
   SimCreateDistributionCommandOutput
 > {
-  constructor(
-    private readonly accountId: SimAwsAccountId,
-    private readonly distributions: Map<
-      SimCloudFrontDistributionId,
-      SimCloudFrontDistribution
-    >,
-    private readonly cloudFrontRegistry: SimCloudFrontRegistry,
-    private readonly s3OriginResolver: SimCloudFrontS3OriginResolver,
-  ) {}
+  private readonly accountId: SimAwsAccountId;
+  private readonly distributions: Map<
+    SimCloudFrontDistributionId,
+    SimCloudFrontDistribution
+  >;
+  private readonly cloudFrontRegistry: SimCloudFrontRegistry;
+  private readonly s3OriginResolver: SimCloudFrontS3OriginResolver;
+  private readonly background: BackgroundScheduler;
+
+  constructor(props: CreateDistributionCommandHandlerProps) {
+    this.accountId = props.accountId;
+    this.distributions = props.distributions;
+    this.cloudFrontRegistry = props.cloudFrontRegistry;
+    this.s3OriginResolver = props.s3OriginResolver;
+    this.background = props.background;
+  }
 
   /**
    * Handle creation of a new CloudFront Distribution.
@@ -56,7 +75,12 @@ export class CreateDistributionCommandHandler implements CommandHandler<
     );
 
     const distributionId = this.cloudFrontRegistry.allocateDistributionId();
-    const distribution = new SimCloudFrontDistribution(distributionId);
+    const distribution = new SimCloudFrontDistribution({
+      distributionId,
+      distributionConfig,
+      status: "Deploying",
+      accountId: this.accountId,
+    });
 
     this.configureDistribution(distribution, distributionConfig);
 
@@ -66,15 +90,18 @@ export class CreateDistributionCommandHandler implements CommandHandler<
       this.accountId,
     );
 
+    // Schedule background task to complete deployment of the sim Distribution.
+    this.background.schedule(() => distribution.completeDeployment());
+
     return {
       Distribution: {
         Id: distribution.distributionId,
         ARN: `arn:aws:cloudfront::${this.accountId}:distribution/${distribution.distributionId}`,
-        Status: "Deployed",
-        LastModifiedTime: new Date(),
+        Status: distribution.status,
+        LastModifiedTime: distribution.lastModifiedTime,
         InProgressInvalidationBatches: 0,
         DomainName: `${distribution.distributionId.toLowerCase()}.cloudfront.net`,
-        DistributionConfig: distributionConfig,
+        DistributionConfig: distribution.distributionConfig,
       },
       Location: `https://cloudfront.amazonaws.com/2020-05-31/distribution/${distribution.distributionId}`,
       $metadata: {},
@@ -122,7 +149,7 @@ export class CreateDistributionCommandHandler implements CommandHandler<
 
       distribution.addOrigin(
         origin.Id,
-        new SimCloudFrontS3Origin(bucket, origin.OriginPath),
+        new SimCloudFrontS3Origin({ bucket, originPath: origin.OriginPath }),
       );
       return;
     }

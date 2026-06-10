@@ -11,6 +11,10 @@ import { assertDefined } from "../../../../util/defined/defined.js";
 import { jitter } from "../../../../util/sleep.js";
 import { SimS3NoSuchBucket } from "../../error/s3.error.js";
 
+interface ListObjectsCommandHandlerProps {
+  readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
+}
+
 /**
  * Simulated S3 ListObjectsCommand handler.
  *
@@ -20,7 +24,11 @@ export class ListObjectsCommandHandler implements CommandHandler<
   SimListObjectsCommand,
   SimListObjectsCommandOutput
 > {
-  constructor(private readonly buckets: Map<SimS3BucketName, SimS3Bucket>) {}
+  private readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
+
+  constructor(props: ListObjectsCommandHandlerProps) {
+    this.buckets = props.buckets;
+  }
 
   /**
    * Simulate listing Objects in an S3 Bucket.

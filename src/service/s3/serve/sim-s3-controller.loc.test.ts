@@ -15,7 +15,7 @@ import { SimAws } from "../../aws/sim-aws.js";
 describe("Simulated S3 local HTTP controller", () => {
   const simAws = new SimAws();
 
-  const srv: SimAwsLocalServer = new SimAwsLocalServer(simAws);
+  const srv: SimAwsLocalServer = new SimAwsLocalServer({ simAws });
 
   beforeAll(async () => {
     await srv.listen();

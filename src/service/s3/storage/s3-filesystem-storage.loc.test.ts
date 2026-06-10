@@ -16,7 +16,7 @@ import { SimAws } from "../../aws/sim-aws.js";
 describe("Serve sim S3 Bucket on localhost with filesystem storage", () => {
   const simAws = new SimAws();
 
-  const srv: SimAwsLocalServer = new SimAwsLocalServer(simAws);
+  const srv: SimAwsLocalServer = new SimAwsLocalServer({ simAws });
 
   beforeAll(async () => {
     await srv.listen();
@@ -60,7 +60,9 @@ describe("Serve sim S3 Bucket on localhost with filesystem storage", () => {
 
     const simBucket = simS3.getSimBucketByName(bucketName);
     assertNonNullable(simBucket);
-    simBucket.configureSimStorage(new FilesystemS3BucketStorage(directoryPath));
+    simBucket.configureSimStorage(
+      new FilesystemS3BucketStorage({ directoryPath }),
+    );
 
     const okRes = await fetch(
       `http://foo-site.s3-website.${region}.sim-aws.localhost:${srv.port}/foobar.html`,
@@ -115,7 +117,9 @@ describe("Serve sim S3 Bucket on localhost with filesystem storage", () => {
 
     const simBucket = simS3.getSimBucketByName(bucketName);
     assertNonNullable(simBucket);
-    simBucket.configureSimStorage(new FilesystemS3BucketStorage(directoryPath));
+    simBucket.configureSimStorage(
+      new FilesystemS3BucketStorage({ directoryPath }),
+    );
 
     const redirectRes = await fetch(
       `http://folder-index-filesystem-site.s3-website.${region}.sim-aws.localhost:${srv.port}/dengji/a1`,

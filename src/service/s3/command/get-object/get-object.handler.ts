@@ -12,6 +12,10 @@ import { assertDefined } from "../../../../util/defined/defined.js";
 import { jitter } from "../../../../util/sleep.js";
 import { SimS3NoSuchBucket, SimS3NoSuchKey } from "../../error/s3.error.js";
 
+interface GetObjectCommandHandlerProps {
+  readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
+}
+
 /**
  * Simulated S3 GetObjectCommand handler.
  *
@@ -21,7 +25,11 @@ export class GetObjectCommandHandler implements CommandHandler<
   SimGetObjectCommand,
   SimGetObjectCommandOutput
 > {
-  constructor(private readonly buckets: Map<SimS3BucketName, SimS3Bucket>) {}
+  private readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
+
+  constructor(props: GetObjectCommandHandlerProps) {
+    this.buckets = props.buckets;
+  }
 
   /**
    * Simulate getting an Object from an S3 Bucket.

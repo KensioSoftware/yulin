@@ -9,23 +9,27 @@ export interface SimCreateDistributionCommand {
  * Minimal structural sim CloudFront CreateDistribution input.
  */
 export interface SimCreateDistributionCommandInput {
-  readonly DistributionConfig?: SimCloudFrontDistributionConfig;
+  readonly DistributionConfig?: SimCloudFrontDistributionConfig | undefined;
 }
 
 /**
  * Minimal structural sim CloudFront CreateDistribution output.
  */
 export interface SimCreateDistributionCommandOutput {
-  readonly Distribution?: {
-    readonly Id?: string;
-    readonly ARN?: string;
-    readonly Status?: string;
-    readonly LastModifiedTime?: Date;
-    readonly InProgressInvalidationBatches?: number;
-    readonly DomainName?: string;
-    readonly DistributionConfig?: SimCloudFrontDistributionConfig;
-  };
-  readonly Location?: string;
+  readonly Distribution?:
+    | {
+        readonly Id?: string | undefined;
+        readonly ARN?: string | undefined;
+        readonly Status?: string | undefined;
+        readonly LastModifiedTime?: Date | undefined;
+        readonly InProgressInvalidationBatches?: number | undefined;
+        readonly DomainName?: string | undefined;
+        readonly DistributionConfig?:
+          | SimCloudFrontDistributionConfig
+          | undefined;
+      }
+    | undefined;
+  readonly Location?: string | undefined;
   readonly $metadata: Record<string, unknown>;
 }
 
@@ -33,57 +37,67 @@ export interface SimCreateDistributionCommandOutput {
  * Minimal structural sim CloudFront DistributionConfig.
  */
 export interface SimCloudFrontDistributionConfig {
-  readonly Aliases?: {
-    readonly Items?: readonly string[];
-  };
-  readonly Origins?: {
-    readonly Items?: readonly SimCloudFrontOriginConfig[];
-  };
-  readonly DefaultCacheBehavior?: SimCloudFrontDefaultCacheBehaviorConfig;
-  readonly CacheBehaviors?: {
-    readonly Items?: readonly SimCloudFrontCacheBehaviorConfig[];
-  };
+  readonly Aliases?:
+    | {
+        readonly Items?: readonly string[] | undefined;
+      }
+    | undefined;
+  readonly Origins?:
+    | {
+        readonly Items?: readonly SimCloudFrontOriginConfig[] | undefined;
+      }
+    | undefined;
+  readonly DefaultCacheBehavior?:
+    | SimCloudFrontDefaultCacheBehaviorConfig
+    | undefined;
+  readonly CacheBehaviors?:
+    | {
+        readonly Items?:
+          | readonly SimCloudFrontCacheBehaviorConfig[]
+          | undefined;
+      }
+    | undefined;
 }
 
 /**
  * Minimal structural sim CloudFront Origin config.
  */
 export interface SimCloudFrontOriginConfig {
-  readonly Id?: string;
-  readonly DomainName?: string;
-  readonly OriginPath?: string;
-  readonly S3OriginConfig?: object;
+  readonly Id?: string | undefined;
+  readonly DomainName?: string | undefined;
+  readonly OriginPath?: string | undefined;
+  readonly S3OriginConfig?: object | undefined;
 }
 
 /**
  * Minimal structural sim CloudFront default cache behavior config.
  */
 export interface SimCloudFrontDefaultCacheBehaviorConfig {
-  readonly TargetOriginId?: string;
-  readonly AllowedMethods?: SimCloudFrontAllowedMethods;
-  readonly ViewerProtocolPolicy?: SimCloudFrontViewerProtocolPolicy;
+  readonly TargetOriginId?: string | undefined;
+  readonly AllowedMethods?: SimCloudFrontAllowedMethods | undefined;
+  readonly ViewerProtocolPolicy?: SimCloudFrontViewerProtocolPolicy | undefined;
 }
 
 /**
  * Minimal structural sim CloudFront cache behavior config.
  */
 export interface SimCloudFrontCacheBehaviorConfig extends SimCloudFrontDefaultCacheBehaviorConfig {
-  readonly PathPattern?: string;
+  readonly PathPattern?: string | undefined;
 }
 
 /**
  * Minimal structural sim CloudFront allowed methods list.
  */
 export interface SimCloudFrontAllowedMethods {
-  readonly Items?: readonly string[];
-  readonly CachedMethods?: SimCloudFrontMethodList;
+  readonly Items?: readonly string[] | undefined;
+  readonly CachedMethods?: SimCloudFrontMethodList | undefined;
 }
 
 /**
  * Minimal structural sim CloudFront method list.
  */
 export interface SimCloudFrontMethodList {
-  readonly Items?: readonly string[];
+  readonly Items?: readonly string[] | undefined;
 }
 
 /**

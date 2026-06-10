@@ -31,16 +31,29 @@ import type {
   SimDescribeTableCommandOutput,
 } from "./command/describe-table/describe-table.cmd.js";
 
+interface SimDynamoDbProps {
+  readonly accountRegionScope?: SimAwsAccountRegionScope;
+  readonly background?: BackgroundScheduler;
+}
+
 /**
  * Simulated DynamoDB. Handles SDK commands. Emulates AWS behaviour and state.
  */
 export class SimDynamoDb {
   private readonly tables = new Map<DynamoDbTableName, SimDynamoDbTable>();
 
-  constructor(
-    private readonly accountRegionScope: SimAwsAccountRegionScope = simAwsAccountRegionScopeFactory.make(),
-    private readonly background: BackgroundScheduler = new BackgroundTasks(),
-  ) {}
+  private readonly accountRegionScope: SimAwsAccountRegionScope;
+  private readonly background: BackgroundScheduler;
+
+  constructor(props: SimDynamoDbProps = {}) {
+    const {
+      accountRegionScope = simAwsAccountRegionScopeFactory.make(),
+      background = new BackgroundTasks(),
+    } = props;
+
+    this.accountRegionScope = accountRegionScope;
+    this.background = background;
+  }
 
   /**
    * Handle a Create Table Command from the SDK.
@@ -48,11 +61,11 @@ export class SimDynamoDb {
   async createTable(
     cmd: SimCreateTableCommand,
   ): Promise<SimCreateTableCommandOutput> {
-    const handler = new CreateTableCommandHandler(
-      this.accountRegionScope,
-      this.tables,
-      this.background,
-    );
+    const handler = new CreateTableCommandHandler({
+      accountRegionScope: this.accountRegionScope,
+      tables: this.tables,
+      background: this.background,
+    });
     return await handler.handle(cmd);
   }
 
@@ -62,7 +75,7 @@ export class SimDynamoDb {
   async listTables(
     cmd: SimListTablesCommand,
   ): Promise<SimListTablesCommandOutput> {
-    const handler = new ListTablesCommandHandler(this.tables);
+    const handler = new ListTablesCommandHandler({ tables: this.tables });
     return await handler.handle(cmd);
   }
 
@@ -72,7 +85,7 @@ export class SimDynamoDb {
   async describeTable(
     cmd: SimDescribeTableCommand,
   ): Promise<SimDescribeTableCommandOutput> {
-    const handler = new DescribeTableCommandHandler(this.tables);
+    const handler = new DescribeTableCommandHandler({ tables: this.tables });
     return await handler.handle(cmd);
   }
 
@@ -80,7 +93,7 @@ export class SimDynamoDb {
    * Handle a Put Item Command from the SDK.
    */
   async putItem(cmd: SimPutItemCommand): Promise<SimPutItemCommandOutput> {
-    const handler = new PutItemCommandHandler(this.tables);
+    const handler = new PutItemCommandHandler({ tables: this.tables });
     return await handler.handle(cmd);
   }
 }

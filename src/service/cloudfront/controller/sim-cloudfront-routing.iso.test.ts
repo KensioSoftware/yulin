@@ -9,7 +9,6 @@ import { describe, it } from "vitest";
 import type { SimAwsServiceTarget } from "../../../serve/controller/sim-service-controller.js";
 import { SimAws } from "../../aws/sim-aws.js";
 import { SimCloudFrontServiceController } from "./sim-cloudfront-controller.js";
-import { SimCloudFront } from "../sim-cloudfront.js";
 
 const cloudFrontTarget: SimAwsServiceTarget = {
   service: "cloudFront",
@@ -18,9 +17,7 @@ const cloudFrontTarget: SimAwsServiceTarget = {
 
 describe("Simulated CloudFront local HTTP controller routing", () => {
   it("responds HTTP 404 when no Distribution matches the request host", async () => {
-    const res = await new SimCloudFrontServiceController(
-      new SimCloudFront(),
-    ).handleRequest(
+    const res = await new SimCloudFrontServiceController().handleRequest(
       cloudFrontTarget,
       new Request("http://unknown.cloudfront.net.localhost/index.html"),
     );
@@ -75,9 +72,9 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
     const distributionId = createDistributionOutput.Distribution?.Id;
     assertNonNullable(distributionId);
 
-    const res = await new SimCloudFrontServiceController(
+    const res = await new SimCloudFrontServiceController({
       cloudFront,
-    ).handleRequest(
+    }).handleRequest(
       cloudFrontTarget,
       new Request(
         `http://${distributionId}.cloudfront.net.localhost/index.html`,
@@ -167,9 +164,9 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
     const distributionId = createDistributionOutput.Distribution?.Id;
     assertNonNullable(distributionId);
 
-    const res = await new SimCloudFrontServiceController(
+    const res = await new SimCloudFrontServiceController({
       cloudFront,
-    ).handleRequest(
+    }).handleRequest(
       cloudFrontTarget,
       new Request(
         `http://${distributionId}.cloudfront.net.localhost/page.html`,
@@ -276,9 +273,9 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
     const distributionId = createDistributionOutput.Distribution?.Id;
     assertNonNullable(distributionId);
 
-    const res = await new SimCloudFrontServiceController(
+    const res = await new SimCloudFrontServiceController({
       cloudFront,
-    ).handleRequest(
+    }).handleRequest(
       cloudFrontTarget,
       new Request(
         `http://${distributionId}.cloudfront.net.localhost/assets/images/logo.png`,

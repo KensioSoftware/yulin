@@ -17,20 +17,35 @@ import type { SimDynamoDb } from "../dynamodb/index.js";
 
 export type SimAccountRegionScopeKey = `${SimAwsAccountId}:${AwsRegionName}`;
 
+interface SimAwsAccountRegionContainerProps {
+  readonly simAws?: SimAws;
+  readonly account?: SimAwsAccount;
+  readonly region?: SimAwsRegion;
+}
+
 /**
  * Combined simulated AWS Account and Region scope.
  * This is the real Account/Region scope container for simulated services.
  */
 export class SimAwsAccountRegionContainer {
+  private readonly simAws: SimAws;
+  public readonly account: SimAwsAccount;
+  public readonly region: SimAwsRegion;
   private readonly memo = new Memo<unknown>();
 
   public readonly accountRegionScope: SimAwsAccountRegionScope;
 
-  constructor(
-    private readonly simAws: SimAws = new SimAws(),
-    public readonly account: SimAwsAccount = this.simAws.account(),
-    public readonly region: SimAwsRegion = this.simAws.region(),
-  ) {
+  constructor(props: SimAwsAccountRegionContainerProps = {}) {
+    const { simAws = new SimAws(), account, region } = props;
+
+    this.simAws = simAws;
+    this.account =
+      account ??
+      this.simAws.account((account as SimAwsAccount | undefined)?.accountId);
+    this.region =
+      region ??
+      this.simAws.region((region as SimAwsRegion | undefined)?.regionName);
+
     this.accountRegionScope = {
       accountId: this.account.accountId,
       regionName: this.region.regionName,
@@ -41,7 +56,7 @@ export class SimAwsAccountRegionContainer {
    * Get simulated S3 for this account and region.
    */
   s3(): SimS3 {
-    return this.memo.getOrCreate("s3", () => this.simAws.createS3(this));
+    return this.memo.getOrCreate("s3", () => this.simAws._createS3(this));
   }
 
   /**
@@ -49,7 +64,7 @@ export class SimAwsAccountRegionContainer {
    */
   cloudFront(): SimCloudFront {
     return this.memo.getOrCreate("cloudFront", () =>
-      this.simAws.createCloudFront(this),
+      this.simAws._createCloudFront(this),
     );
   }
 
@@ -58,7 +73,7 @@ export class SimAwsAccountRegionContainer {
    */
   dynamoDb(): SimDynamoDb {
     return this.memo.getOrCreate("dynamoDb", () =>
-      this.simAws.createDynamoDb(this),
+      this.simAws._createDynamoDb(this),
     );
   }
 }

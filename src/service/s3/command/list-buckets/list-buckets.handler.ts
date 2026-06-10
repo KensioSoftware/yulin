@@ -9,6 +9,10 @@ import type {
 } from "../../bucket/sim-s3-bucket.js";
 import { jitter } from "../../../../util/sleep.js";
 
+interface ListBucketsCommandHandlerProps {
+  readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
+}
+
 /**
  * Simulated S3 ListBucketsCommand handler.
  *
@@ -18,7 +22,11 @@ export class ListBucketsCommandHandler implements CommandHandler<
   SimListBucketsCommand,
   SimListBucketsCommandOutput
 > {
-  constructor(private readonly buckets: Map<SimS3BucketName, SimS3Bucket>) {}
+  private readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
+
+  constructor(props: ListBucketsCommandHandlerProps) {
+    this.buckets = props.buckets;
+  }
 
   /**
    * Simulate listing S3 Buckets.

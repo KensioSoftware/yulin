@@ -20,11 +20,11 @@ import { makeTempDir } from "../../../util/filesystem/temp-dir.js";
 describe("Filesystem simulated S3 storage", () => {
   it("puts and gets an Object from the filesystem", async () => {
     const directoryPath = await makeTempDir();
-    const storage = new FilesystemS3BucketStorage(directoryPath);
+    const storage = new FilesystemS3BucketStorage({ directoryPath });
 
     const body = Buffer.from("Hello, world!");
 
-    await storage.putObject(new SimS3Object("foo.txt", body));
+    await storage.putObject(new SimS3Object({ key: "foo.txt", body }));
 
     const object = await storage.getObject("foo.txt");
 
@@ -35,7 +35,7 @@ describe("Filesystem simulated S3 storage", () => {
 
   it("gets undefined for missing Object", async () => {
     const directoryPath = await makeTempDir();
-    const storage = new FilesystemS3BucketStorage(directoryPath);
+    const storage = new FilesystemS3BucketStorage({ directoryPath });
 
     const object = await storage.getObject("missing.txt");
 
@@ -46,7 +46,7 @@ describe("Filesystem simulated S3 storage", () => {
     const tempRootPath = await mkdtemp(path.join(tmpdir(), "yulin-s3-test-"));
     const directoryPath = path.join(tempRootPath, "public");
 
-    const storage = new FilesystemS3BucketStorage(directoryPath);
+    const storage = new FilesystemS3BucketStorage({ directoryPath });
     const objects = await storage.listObjects();
 
     assertArrayLength(objects, 0);
@@ -54,20 +54,24 @@ describe("Filesystem simulated S3 storage", () => {
 
   it("does not allow changing storage implementation", async () => {
     const directoryPath = await makeTempDir();
-    const storage = new FilesystemS3BucketStorage(directoryPath);
+    const storage = new FilesystemS3BucketStorage({ directoryPath });
 
     assertFalse(storage.allowChangeStorage());
   });
 
   it("lists Objects from the filesystem", async () => {
     const directoryPath = await makeTempDir();
-    const storage = new FilesystemS3BucketStorage(directoryPath);
+    const storage = new FilesystemS3BucketStorage({ directoryPath });
 
-    await Promise.all([
-      storage.putObject(new SimS3Object("foo/a.txt", Buffer.from("a"))),
-      storage.putObject(new SimS3Object("foo/b.txt", Buffer.from("b"))),
-      storage.putObject(new SimS3Object("bar/c.txt", Buffer.from("c"))),
-    ]);
+    await storage.putObject(
+      new SimS3Object({ key: "foo/a.txt", body: Buffer.from("a") }),
+    );
+    await storage.putObject(
+      new SimS3Object({ key: "foo/b.txt", body: Buffer.from("b") }),
+    );
+    await storage.putObject(
+      new SimS3Object({ key: "bar/c.txt", body: Buffer.from("c") }),
+    );
 
     const objects = await storage.listObjects();
     const keys = objects
@@ -82,13 +86,17 @@ describe("Filesystem simulated S3 storage", () => {
 
   it("lists Objects with prefix", async () => {
     const directoryPath = await makeTempDir();
-    const storage = new FilesystemS3BucketStorage(directoryPath);
+    const storage = new FilesystemS3BucketStorage({ directoryPath });
 
-    await Promise.all([
-      storage.putObject(new SimS3Object("foo/a.txt", Buffer.from("a"))),
-      storage.putObject(new SimS3Object("foo/b.txt", Buffer.from("b"))),
-      storage.putObject(new SimS3Object("bar/c.txt", Buffer.from("c"))),
-    ]);
+    await storage.putObject(
+      new SimS3Object({ key: "foo/a.txt", body: Buffer.from("a") }),
+    );
+    await storage.putObject(
+      new SimS3Object({ key: "foo/b.txt", body: Buffer.from("b") }),
+    );
+    await storage.putObject(
+      new SimS3Object({ key: "bar/c.txt", body: Buffer.from("c") }),
+    );
 
     const objects = await storage.listObjects("foo/");
     const keys = objects
@@ -102,10 +110,13 @@ describe("Filesystem simulated S3 storage", () => {
 
   it("makes up reasonable Object metadata from file extension", async () => {
     const directoryPath = await makeTempDir();
-    const storage = new FilesystemS3BucketStorage(directoryPath);
+    const storage = new FilesystemS3BucketStorage({ directoryPath });
 
     await storage.putObject(
-      new SimS3Object("index.html", Buffer.from("<h1>Hello</h1>")),
+      new SimS3Object({
+        key: "index.html",
+        body: Buffer.from("<h1>Hello</h1>"),
+      }),
     );
 
     const object = await storage.getObject("index.html");
@@ -138,9 +149,9 @@ describe("Filesystem simulated S3 storage", () => {
     ["feed.xml", "application/xml"],
   ])("makes up %s Object content type metadata", async (key, contentType) => {
     const directoryPath = await makeTempDir();
-    const storage = new FilesystemS3BucketStorage(directoryPath);
+    const storage = new FilesystemS3BucketStorage({ directoryPath });
 
-    await storage.putObject(new SimS3Object(key, Buffer.from(key)));
+    await storage.putObject(new SimS3Object({ key, body: Buffer.from(key) }));
 
     const object = await storage.getObject(key);
 
@@ -156,7 +167,7 @@ describe("Filesystem simulated S3 storage", () => {
     // eslint-disable-next-line security/detect-non-literal-fs-filename
     await writeFile(path.join(directoryPath, "unsafe.pem"), "unsafe");
 
-    const storage = new FilesystemS3BucketStorage(directoryPath);
+    const storage = new FilesystemS3BucketStorage({ directoryPath });
     const objects = await storage.listObjects();
 
     assertArrayLength(objects, 1);
@@ -179,7 +190,7 @@ describe("Filesystem simulated S3 storage", () => {
       path.join(directoryPath, "linked.txt"),
     );
 
-    const storage = new FilesystemS3BucketStorage(directoryPath);
+    const storage = new FilesystemS3BucketStorage({ directoryPath });
     const objects = await storage.listObjects();
 
     assertArrayLength(objects, 1);
@@ -188,7 +199,7 @@ describe("Filesystem simulated S3 storage", () => {
 
   it("rejects relative storage directory path", () => {
     const error = assertThrowsError(
-      () => new FilesystemS3BucketStorage("public"),
+      () => new FilesystemS3BucketStorage({ directoryPath: "public" }),
     );
 
     assertStringIncludes(error.message, "must be absolute");
@@ -196,7 +207,10 @@ describe("Filesystem simulated S3 storage", () => {
 
   it("rejects storage directory filesystem root", () => {
     const error = assertThrowsError(
-      () => new FilesystemS3BucketStorage(path.parse(tmpdir()).root),
+      () =>
+        new FilesystemS3BucketStorage({
+          directoryPath: path.parse(tmpdir()).root,
+        }),
     );
 
     assertStringIncludes(error.message, "must not be a filesystem root");
@@ -204,7 +218,7 @@ describe("Filesystem simulated S3 storage", () => {
 
   it("rejects storage directory user home directory", () => {
     const error = assertThrowsError(
-      () => new FilesystemS3BucketStorage(homedir()),
+      () => new FilesystemS3BucketStorage({ directoryPath: homedir() }),
     );
 
     assertStringIncludes(error.message, "must not be the user home directory");
@@ -212,7 +226,10 @@ describe("Filesystem simulated S3 storage", () => {
 
   it("rejects storage directory path with parent directory segment", () => {
     const error = assertThrowsError(
-      () => new FilesystemS3BucketStorage(`${tmpdir()}/../public`),
+      () =>
+        new FilesystemS3BucketStorage({
+          directoryPath: `${tmpdir()}/../public`,
+        }),
     );
 
     assertStringIncludes(error.message, "must not contain '..'");
@@ -223,7 +240,7 @@ describe("Filesystem simulated S3 storage", () => {
     const directoryPath = path.join(tempRootPath, "private");
 
     const error = assertThrowsError(
-      () => new FilesystemS3BucketStorage(directoryPath),
+      () => new FilesystemS3BucketStorage({ directoryPath }),
     );
 
     assertStringIncludes(error.message, "directory name must be one of");
@@ -231,11 +248,11 @@ describe("Filesystem simulated S3 storage", () => {
 
   it("rejects Object key with parent directory segment", async () => {
     const directoryPath = await makeTempDir();
-    const storage = new FilesystemS3BucketStorage(directoryPath);
+    const storage = new FilesystemS3BucketStorage({ directoryPath });
 
     const error = await assertThrowsErrorAsync(async () => {
       await storage.putObject(
-        new SimS3Object("../secret.txt", Buffer.from("secret")),
+        new SimS3Object({ key: "../secret.txt", body: Buffer.from("secret") }),
       );
     });
 
@@ -246,7 +263,8 @@ describe("Filesystem simulated S3 storage", () => {
     const tempRootPath = await mkdtemp(path.join(tmpdir(), "yulin-s3-test-"));
     const directoryPath = path.join(tempRootPath, "private");
 
-    const storage = new FilesystemS3BucketStorage(directoryPath, {
+    const storage = new FilesystemS3BucketStorage({
+      directoryPath,
       allowedDirectoryNames: ["private"],
     });
 
@@ -255,14 +273,14 @@ describe("Filesystem simulated S3 storage", () => {
 
   it("rejects absolute Object key", async () => {
     const directoryPath = await makeTempDir();
-    const storage = new FilesystemS3BucketStorage(directoryPath);
+    const storage = new FilesystemS3BucketStorage({ directoryPath });
 
     const error = await assertThrowsErrorAsync(async () => {
       await storage.putObject(
-        new SimS3Object(
-          path.join(tmpdir(), "secret.txt"),
-          Buffer.from("secret"),
-        ),
+        new SimS3Object({
+          key: path.join(tmpdir(), "secret.txt"),
+          body: Buffer.from("secret"),
+        }),
       );
     });
 
@@ -271,11 +289,11 @@ describe("Filesystem simulated S3 storage", () => {
 
   it("rejects Object key with unsupported file extension", async () => {
     const directoryPath = await makeTempDir();
-    const storage = new FilesystemS3BucketStorage(directoryPath);
+    const storage = new FilesystemS3BucketStorage({ directoryPath });
 
     const error = await assertThrowsErrorAsync(async () => {
       await storage.putObject(
-        new SimS3Object("secret.pem", Buffer.from("secret")),
+        new SimS3Object({ key: "secret.pem", body: Buffer.from("secret") }),
       );
     });
 

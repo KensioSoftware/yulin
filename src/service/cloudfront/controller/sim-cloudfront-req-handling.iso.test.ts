@@ -66,9 +66,9 @@ describe("Simulated CloudFront local HTTP controller request handling", () => {
     const distributionId = createDistributionOutput.Distribution?.Id;
     assertNonNullable(distributionId);
 
-    const res = await new SimCloudFrontServiceController(
+    const res = await new SimCloudFrontServiceController({
       cloudFront,
-    ).handleRequest(
+    }).handleRequest(
       {
         service: "cloudFront",
         resourceName: "",
@@ -130,9 +130,9 @@ describe("Simulated CloudFront local HTTP controller request handling", () => {
     const distributionId = createDistributionOutput.Distribution?.Id;
     assertNonNullable(distributionId);
 
-    const res = await new SimCloudFrontServiceController(
+    const res = await new SimCloudFrontServiceController({
       cloudFront,
-    ).handleRequest(
+    }).handleRequest(
       {
         service: "cloudFront",
         resourceName: "",
@@ -197,9 +197,9 @@ describe("Simulated CloudFront local HTTP controller request handling", () => {
     const distributionId = createDistributionOutput.Distribution?.Id;
     assertNonNullable(distributionId);
 
-    const res = await new SimCloudFrontServiceController(
+    const res = await new SimCloudFrontServiceController({
       cloudFront,
-    ).handleRequest(
+    }).handleRequest(
       {
         service: "cloudFront",
         resourceName: "",
@@ -241,9 +241,9 @@ describe("Simulated CloudFront local HTTP controller request handling", () => {
     const distributionId = createDistributionOutput.Distribution?.Id;
     assertNonNullable(distributionId);
 
-    const res = await new SimCloudFrontServiceController(
+    const res = await new SimCloudFrontServiceController({
       cloudFront,
-    ).handleRequest(
+    }).handleRequest(
       {
         service: "cloudFront",
         resourceName: "",

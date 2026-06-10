@@ -2,6 +2,10 @@ import { SimAwsLocalServiceResolver } from "../resolve/sim-aws-local-service-res
 import { SimAwsServiceControllerContainer } from "../controller/sim-aws-service-controller-container.js";
 import { SimAws } from "../../service/aws/sim-aws.js";
 
+interface SimAwsHttpProps {
+  readonly simAws?: SimAws;
+}
+
 /**
  * HTTP interface for sending requests into a simulated AWS environment.
  */
@@ -9,8 +13,9 @@ export class SimAwsHttp {
   private readonly serviceResolver = new SimAwsLocalServiceResolver();
   private readonly controllers: SimAwsServiceControllerContainer;
 
-  constructor(public readonly simAws: SimAws = new SimAws()) {
-    this.controllers = new SimAwsServiceControllerContainer(simAws);
+  constructor(props: SimAwsHttpProps = {}) {
+    const { simAws = new SimAws() } = props;
+    this.controllers = new SimAwsServiceControllerContainer({ simAws });
   }
 
   /**

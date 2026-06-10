@@ -78,16 +78,24 @@ function s3BucketNameFromOriginDomainName(
   return regionalS3DomainMatch?.groups?.["bucketName"] ?? originDomainName;
 }
 
+interface SimCloudFrontS3OriginProps {
+  readonly bucket: SimS3Bucket;
+  readonly originPath?: string | undefined;
+}
+
 /**
  * Simulated CloudFront S3 Origin.
  *
  * This represents a basic S3 object origin, not an S3 static website endpoint.
  */
 export class SimCloudFrontS3Origin implements SimCloudFrontOrigin {
-  constructor(
-    private readonly bucket: SimS3Bucket,
-    private readonly originPath = "",
-  ) {}
+  private readonly bucket: SimS3Bucket;
+  private readonly originPath: string;
+
+  constructor(props: SimCloudFrontS3OriginProps) {
+    this.bucket = props.bucket;
+    this.originPath = props.originPath ?? "";
+  }
 
   /**
    * Fetch an object from the backing simulated S3 Bucket.

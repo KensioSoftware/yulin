@@ -5,17 +5,27 @@ import type {
 import { assertNotNull } from "../../../util/defined/defined.js";
 import { SimAwsLocalUrl } from "../../../serve/http/sim-aws-local-url.js";
 
+interface SimCloudFrontDistroRouterProps {
+  readonly distributions?: ReadonlyMap<
+    SimCloudFrontDistributionId,
+    SimCloudFrontDistribution
+  >;
+}
+
 /**
  * Routes sim CloudFront requests to the appropriate sim Distribution.
  * Owns the Distribution lookup decision.
  */
 export class SimCloudFrontDistroRouter {
-  constructor(
-    private readonly distributions: ReadonlyMap<
-      SimCloudFrontDistributionId,
-      SimCloudFrontDistribution
-    >,
-  ) {}
+  private readonly distributions: ReadonlyMap<
+    SimCloudFrontDistributionId,
+    SimCloudFrontDistribution
+  >;
+
+  constructor(props: SimCloudFrontDistroRouterProps = {}) {
+    const { distributions = new Map() } = props;
+    this.distributions = distributions;
+  }
 
   /**
    * Construct from an array of Distributions instead of a Map.
@@ -23,9 +33,11 @@ export class SimCloudFrontDistroRouter {
   static fromDistributions(
     distributions: SimCloudFrontDistribution[],
   ): SimCloudFrontDistroRouter {
-    return new SimCloudFrontDistroRouter(
-      new Map(distributions.map((distro) => [distro.distributionId, distro])),
-    );
+    return new SimCloudFrontDistroRouter({
+      distributions: new Map(
+        distributions.map((distro) => [distro.distributionId, distro]),
+      ),
+    });
   }
 
   /**
@@ -34,7 +46,7 @@ export class SimCloudFrontDistroRouter {
   distroForRequest(req: Request): SimCloudFrontDistribution | undefined {
     const hostname = req.headers.get("host") ?? new URL(req.url).hostname;
     assertNotNull(hostname, "distroForRequest.req.headers.host");
-    const simUrl = new SimAwsLocalUrl(`http://${hostname}/`);
+    const simUrl = new SimAwsLocalUrl({ input: `http://${hostname}/` });
     const baseHostname = simUrl.withoutLocalhostSuffix().hostname;
 
     const distributionId =

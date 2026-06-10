@@ -14,7 +14,7 @@ import { makeAwsRegionName } from "../../aws/sim-aws-region.js";
 describe("sim CloudFront local server", () => {
   const simAws = new SimAws();
 
-  const srv: SimAwsLocalServer = new SimAwsLocalServer(simAws);
+  const srv: SimAwsLocalServer = new SimAwsLocalServer({ simAws });
 
   beforeAll(async () => {
     await srv.listen();

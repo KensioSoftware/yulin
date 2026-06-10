@@ -1,4 +1,3 @@
-import { assertDefined } from "../../../util/defined/defined.js";
 import type { Brand } from "../../../util/brand.type.js";
 import type { SimS3BucketStorage } from "../storage/s3-bucket-storage.js";
 import type { SimS3Object } from "../object/s3-object.js";
@@ -12,20 +11,34 @@ import {
 
 export type SimS3BucketName = Brand<string, "SimS3BucketName">;
 
+interface SimS3BucketProps {
+  readonly bucketName: SimS3BucketName | string;
+  readonly accountRegionScope?: SimAwsAccountRegionScope;
+  readonly storage?: SimS3BucketStorage;
+  readonly website?: S3BucketWebsite;
+}
+
 /**
  * Simulated S3 Bucket.
  */
 export class SimS3Bucket {
-  public readonly bucketName: string;
+  public readonly bucketName: SimS3BucketName;
+  private readonly accountRegionScope: SimAwsAccountRegionScope;
+  private storage: SimS3BucketStorage;
+  private website: S3BucketWebsite;
 
-  constructor(
-    createCommand: { input: { Bucket?: string | undefined } },
-    private readonly accountRegionScope: SimAwsAccountRegionScope = simAwsAccountRegionScopeFactory.make(),
-    private storage: SimS3BucketStorage = new MemoryS3BucketStorage(),
-    private website: S3BucketWebsite = new S3BucketWebsite(),
-  ) {
-    assertDefined(createCommand.input.Bucket, "createCommand.input.Bucket");
-    this.bucketName = createCommand.input.Bucket;
+  constructor(props: SimS3BucketProps) {
+    const {
+      bucketName,
+      accountRegionScope = simAwsAccountRegionScopeFactory.make(),
+      storage = new MemoryS3BucketStorage(),
+      website = new S3BucketWebsite(),
+    } = props;
+
+    this.bucketName = bucketName as SimS3BucketName;
+    this.accountRegionScope = accountRegionScope;
+    this.storage = storage;
+    this.website = website;
   }
 
   /**
