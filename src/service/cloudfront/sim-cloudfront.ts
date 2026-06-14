@@ -34,6 +34,8 @@ import type {
   SimCloudFrontFunction,
   SimCloudFrontFunctionName,
 } from "./cff/sim-cloudfront-function.js";
+import type { SimArn } from "../aws/arn.js";
+import { assertDefined } from "../../util/defined/defined.js";
 
 interface SimCloudFrontProps {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
@@ -128,7 +130,23 @@ export class SimCloudFront {
   /**
    * Get a sim CloudFront Function by name.
    */
-  getCloudFrontFunction(
+  getCloudFrontFunctionByArn(
+    cloudFrontFunctionArn: SimArn,
+  ): SimCloudFrontFunction | undefined {
+    const cloudFrontFunctionName = cloudFrontFunctionArn.split("/").pop();
+    assertDefined(
+      cloudFrontFunctionName,
+      `CloudFront Function name in ARN ${cloudFrontFunctionArn}`,
+    );
+    return this.cloudFrontFunctions.get(
+      cloudFrontFunctionName as SimCloudFrontFunctionName,
+    );
+  }
+
+  /**
+   * Get a sim CloudFront Function by name.
+   */
+  getCloudFrontFunctionByName(
     cloudFrontFunctionName: SimCloudFrontFunctionName,
   ): SimCloudFrontFunction | undefined {
     return this.cloudFrontFunctions.get(cloudFrontFunctionName);

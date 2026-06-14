@@ -7,7 +7,6 @@ import { SimCloudFrontDistroRouter as DefaultSimCloudFrontDistroRouter } from ".
 import type { SimCloudFrontBehaviorResolver } from "../resolver/sim-cloud-front-behavior-resolver.js";
 import { SimCloudFrontBehaviorResolver as DefaultSimCloudFrontBehaviorResolver } from "../resolver/sim-cloud-front-behavior-resolver.js";
 import { SimCloudFront } from "../sim-cloudfront.js";
-import type { SimCloudFrontFunctionName } from "../cff/sim-cloudfront-function.js";
 import { assertDefined } from "../../../util/defined/defined.js";
 import type { SimCloudFrontBehavior } from "../behaviour/sim-cloud-front-behavior.js";
 
@@ -100,17 +99,18 @@ export class SimCloudFrontServiceController implements SimAwsServiceController {
       return req;
     }
 
-    const viewerRequestCff = this.simCloudFront.getCloudFrontFunction(
-      viewerRequestCffArn.split("/").pop() as SimCloudFrontFunctionName,
-    );
+    const viewerRequestCff =
+      this.simCloudFront.getCloudFrontFunctionByArn(viewerRequestCffArn);
     assertDefined(
       viewerRequestCff,
       `CloudFront Function ${viewerRequestCffArn} for viewer-request`,
     );
+
     const viewerRequestCffResult = viewerRequestCff.handleViewerRequest(req);
     if (viewerRequestCffResult instanceof Response) {
       return viewerRequestCffResult;
     }
+
     return viewerRequestCffResult;
   }
 
@@ -127,13 +127,13 @@ export class SimCloudFrontServiceController implements SimAwsServiceController {
       return res;
     }
 
-    const viewerResponseCff = this.simCloudFront.getCloudFrontFunction(
-      viewerResponseCffArn.split("/").pop() as SimCloudFrontFunctionName,
-    );
+    const viewerResponseCff =
+      this.simCloudFront.getCloudFrontFunctionByArn(viewerResponseCffArn);
     assertDefined(
       viewerResponseCff,
       `CloudFront Function ${viewerResponseCffArn} for viewer-response`,
     );
+
     return viewerResponseCff.handleViewerResponse(req, res);
   }
 }

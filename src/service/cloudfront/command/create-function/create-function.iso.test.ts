@@ -27,7 +27,8 @@ describe("CloudFront CreateFunctionCommand", () => {
     );
     assertIdentical(createFunctionOutput.FunctionSummary.Status, "UNPUBLISHED");
 
-    const simCloudFrontFunction = simCloudFront.getCloudFrontFunction(cffName);
+    const simCloudFrontFunction =
+      simCloudFront.getCloudFrontFunctionByName(cffName);
     assertIdentical(simCloudFrontFunction?.name, cffName);
     assertIdentical(simCloudFrontFunction.status, "UNPUBLISHED");
 
@@ -64,7 +65,8 @@ describe("CloudFront CreateFunctionCommand", () => {
 
     await simAws.backgroundTasksComplete();
 
-    const simCloudFrontFunction = simCloudFront.getCloudFrontFunction(cffName);
+    const simCloudFrontFunction =
+      simCloudFront.getCloudFrontFunctionByName(cffName);
     assertInstanceOf(simCloudFrontFunction, SimCloudFrontFunction);
     const cffRes = simCloudFrontFunction.handleViewerRequest(
       new Request("http://foobar.cloudfront.net/foo/bar/object.json"),
@@ -90,7 +92,8 @@ describe("CloudFront CreateFunctionCommand", () => {
     );
     assertIdentical(createFunctionOutput.FunctionSummary.Status, "UNPUBLISHED");
 
-    const simCloudFrontFunction = simCloudFront.getCloudFrontFunction(cffName);
+    const simCloudFrontFunction =
+      simCloudFront.getCloudFrontFunctionByName(cffName);
     assertIdentical(simCloudFrontFunction?.name, cffName);
     assertIdentical(simCloudFrontFunction.status, "UNPUBLISHED");
 
@@ -128,7 +131,8 @@ describe("CloudFront CreateFunctionCommand", () => {
 
     await simAws.backgroundTasksComplete();
 
-    const simCloudFrontFunction = simCloudFront.getCloudFrontFunction(cffName);
+    const simCloudFrontFunction =
+      simCloudFront.getCloudFrontFunctionByName(cffName);
     assertInstanceOf(simCloudFrontFunction, SimCloudFrontFunction);
     const cffRes = simCloudFrontFunction.handleViewerResponse(
       new Request("http://foobar.cloudfront.net/foo/bar/object.json"),
