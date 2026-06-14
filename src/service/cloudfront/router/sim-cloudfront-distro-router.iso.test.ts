@@ -1,10 +1,19 @@
 import { describe, it } from "vitest";
 import { SimCloudFrontDistroRouter } from "./sim-cloud-front-distro-router.js";
-import { assertIdentical, assertUndefined } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertNonNullable,
+  assertUndefined,
+} from "@kensio/smartass";
 import {
   SimCloudFrontDistribution,
   type SimCloudFrontDistributionId,
 } from "../distribution/sim-cloudfront-distribution.js";
+import { SimAws } from "../../aws/sim-aws.js";
+import { CreateDistributionCommand } from "@aws-sdk/client-cloudfront";
+import { CreateBucketCommand } from "@aws-sdk/client-s3";
+import { SimCloudFrontRegistry } from "../sim-cloud-front-registry.js";
+import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
 
 describe("Sim CloudFront Distribution Router", () => {
   describe("route requests to distributions", () => {
@@ -94,6 +103,148 @@ describe("Sim CloudFront Distribution Router", () => {
       );
 
       assertIdentical(router.distroForRequest(request), distro);
+    });
+
+    it("routes request by registered CloudFront distribution ID", async () => {
+      const simAws = new SimAws();
+      const account = simAws.account("555555555555");
+      const simS3 = account.s3();
+      const simCloudFront = account.cloudFront();
+
+      await simS3.createBucket(
+        new CreateBucketCommand({
+          Bucket: "assets.example.test",
+        }),
+      );
+
+      const output = await simCloudFront.createDistribution(
+        new CreateDistributionCommand({
+          DistributionConfig: {
+            CallerReference: "registered-distribution-id",
+            Comment: "Registered Distribution",
+            Enabled: true,
+            Origins: {
+              Quantity: 1,
+              Items: [
+                {
+                  Id: "s3-assets",
+                  DomainName: "assets.example.test.s3.amazonaws.com",
+                  S3OriginConfig: {
+                    OriginAccessIdentity: "",
+                  },
+                },
+              ],
+            },
+            DefaultCacheBehavior: {
+              TargetOriginId: "s3-assets",
+              ViewerProtocolPolicy: "allow-all",
+            },
+          },
+        }),
+      );
+
+      assertNonNullable(output.Distribution);
+      assertNonNullable(output.Distribution.Id);
+
+      const distribution = simCloudFront
+        .getDistributions()
+        .get(output.Distribution.Id as SimCloudFrontDistributionId);
+
+      assertNonNullable(distribution);
+
+      const router = new SimCloudFrontDistroRouter({
+        simAws,
+        cloudFrontRegistry: simAws._cloudFrontRegistry(),
+      });
+
+      const request = new Request(
+        `http://${output.Distribution.Id.toLowerCase()}.cloudfront.net/`,
+      );
+
+      assertIdentical(router.distroForRequest(request), distribution);
+    });
+
+    it("returns undefined when registered distribution does not exist", () => {
+      const simAws = new SimAws();
+      const cloudFrontRegistry = new SimCloudFrontRegistry();
+      const distributionId = "ENOTREGISTERED1" as SimCloudFrontDistributionId;
+
+      cloudFrontRegistry.registerDistribution(
+        distributionId,
+        "555555555555" as SimAwsAccountId,
+      );
+
+      const router = new SimCloudFrontDistroRouter({
+        simAws,
+        cloudFrontRegistry,
+      });
+
+      const request = new Request(
+        `http://${distributionId.toLowerCase()}.cloudfront.net/`,
+      );
+
+      assertUndefined(router.distroForRequest(request));
+    });
+
+    it("routes request by registered alternate domain name", async () => {
+      const simAws = new SimAws();
+      const account = simAws.account("555555555555");
+      const simS3 = account.s3();
+      const simCloudFront = account.cloudFront();
+
+      await simS3.createBucket(
+        new CreateBucketCommand({
+          Bucket: "assets.example.test",
+        }),
+      );
+
+      const output = await simCloudFront.createDistribution(
+        new CreateDistributionCommand({
+          DistributionConfig: {
+            CallerReference: "registered-alternate-domain-name",
+            Comment: "Registered Distribution",
+            Enabled: true,
+            Aliases: {
+              Quantity: 1,
+              Items: ["cdn.example.test"],
+            },
+            Origins: {
+              Quantity: 1,
+              Items: [
+                {
+                  Id: "s3-assets",
+                  DomainName: "assets.example.test.s3.amazonaws.com",
+                  S3OriginConfig: {
+                    OriginAccessIdentity: "",
+                  },
+                },
+              ],
+            },
+            DefaultCacheBehavior: {
+              TargetOriginId: "s3-assets",
+              ViewerProtocolPolicy: "allow-all",
+            },
+          },
+        }),
+      );
+
+      assertNonNullable(output.Distribution);
+      assertNonNullable(output.Distribution.Id);
+
+      const distribution = simCloudFront
+        .getDistributions()
+        .get(output.Distribution.Id as SimCloudFrontDistributionId);
+
+      assertNonNullable(distribution);
+
+      const router = new SimCloudFrontDistroRouter({
+        simAws,
+        cloudFrontRegistry: simAws._cloudFrontRegistry(),
+      });
+
+      const request = new Request("http://cdn.example.test/foo/bar.json");
+
+      assertIdentical(router.distroForRequest(request), distribution);
     });
   });
 
