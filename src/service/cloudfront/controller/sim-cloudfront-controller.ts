@@ -9,6 +9,7 @@ import { SimCloudFrontBehaviorResolver as DefaultSimCloudFrontBehaviorResolver }
 import { SimCloudFront } from "../sim-cloudfront.js";
 import type { SimCloudFrontFunctionName } from "../cff/sim-cloudfront-function.js";
 import { assertDefined } from "../../../util/defined/defined.js";
+import type { SimCloudFrontBehavior } from "../behaviour/sim-cloud-front-behavior.js";
 
 interface SimCloudFrontServiceControllerProps {
   readonly cloudFront?: SimCloudFront;
@@ -60,22 +61,12 @@ export class SimCloudFrontServiceController implements SimAwsServiceController {
 
     const behaviour = this.behaviourResolver.resolve(req, distro);
 
-    // TODO: tidy up CFF resolution.
-    const viewerRequestCffArn = behaviour.functionAssociations?.viewerRequest;
-    if (viewerRequestCffArn !== undefined) {
-      const viewerRequestCff = this.simCloudFront.getCloudFrontFunction(
-        viewerRequestCffArn.split("/").pop() as SimCloudFrontFunctionName,
-      );
-      assertDefined(
-        viewerRequestCff,
-        `CloudFront Function ${viewerRequestCffArn} for viewer-request`,
-      );
-      const viewerRequestCffResult = viewerRequestCff.handleViewerRequest(req);
-      if (viewerRequestCffResult instanceof Response) {
-        return viewerRequestCffResult;
-      }
-      req = viewerRequestCffResult;
+    // Handle viewer request CFF
+    const cffResult = this.applyViewerRequestCff(req, behaviour);
+    if (cffResult instanceof Response) {
+      return cffResult;
     }
+    req = cffResult;
 
     const origin = distro.getOrigin(behaviour.targetOriginName);
     if (origin === undefined) {
@@ -107,5 +98,31 @@ export class SimCloudFrontServiceController implements SimAwsServiceController {
     }
 
     return res;
+  }
+
+  /**
+   * Apply viewer request CloudFront Function if configured.
+   */
+  private applyViewerRequestCff(
+    req: Request,
+    behaviour: SimCloudFrontBehavior,
+  ): Request | Response {
+    const viewerRequestCffArn = behaviour.functionAssociations?.viewerRequest;
+    if (viewerRequestCffArn === undefined) {
+      return req;
+    }
+
+    const viewerRequestCff = this.simCloudFront.getCloudFrontFunction(
+      viewerRequestCffArn.split("/").pop() as SimCloudFrontFunctionName,
+    );
+    assertDefined(
+      viewerRequestCff,
+      `CloudFront Function ${viewerRequestCffArn} for viewer-request`,
+    );
+    const viewerRequestCffResult = viewerRequestCff.handleViewerRequest(req);
+    if (viewerRequestCffResult instanceof Response) {
+      return viewerRequestCffResult;
+    }
+    return viewerRequestCffResult;
   }
 }
