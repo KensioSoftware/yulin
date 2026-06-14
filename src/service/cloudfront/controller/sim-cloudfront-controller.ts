@@ -61,7 +61,7 @@ export class SimCloudFrontServiceController implements SimAwsServiceController {
 
     const behaviour = this.behaviourResolver.resolve(req, distro);
 
-    // Handle viewer request CFF
+    // Handle viewer-request CFF, if any.
     const cffResult = this.applyViewerRequestCff(req, behaviour);
     if (cffResult instanceof Response) {
       return cffResult;
@@ -84,20 +84,8 @@ export class SimCloudFrontServiceController implements SimAwsServiceController {
       behavior: behaviour,
     });
 
-    // TODO: tidy up CFF resolution.
-    const viewerResponseCffArn = behaviour.functionAssociations?.viewerResponse;
-    if (viewerResponseCffArn !== undefined) {
-      const viewerResponseCff = this.simCloudFront.getCloudFrontFunction(
-        viewerResponseCffArn.split("/").pop() as SimCloudFrontFunctionName,
-      );
-      assertDefined(
-        viewerResponseCff,
-        `CloudFront Function ${viewerResponseCffArn} for viewer-response`,
-      );
-      return viewerResponseCff.handleViewerResponse(req, res);
-    }
-
-    return res;
+    // Handle viewer-response CFF, if any.
+    return this.applyViewerResponseCff(req, res, behaviour);
   }
 
   /**
@@ -124,5 +112,28 @@ export class SimCloudFrontServiceController implements SimAwsServiceController {
       return viewerRequestCffResult;
     }
     return viewerRequestCffResult;
+  }
+
+  /**
+   * Apply viewer response CloudFront Function if configured.
+   */
+  private applyViewerResponseCff(
+    req: Request,
+    res: Response,
+    behaviour: SimCloudFrontBehavior,
+  ): Response {
+    const viewerResponseCffArn = behaviour.functionAssociations?.viewerResponse;
+    if (viewerResponseCffArn === undefined) {
+      return res;
+    }
+
+    const viewerResponseCff = this.simCloudFront.getCloudFrontFunction(
+      viewerResponseCffArn.split("/").pop() as SimCloudFrontFunctionName,
+    );
+    assertDefined(
+      viewerResponseCff,
+      `CloudFront Function ${viewerResponseCffArn} for viewer-response`,
+    );
+    return viewerResponseCff.handleViewerResponse(req, res);
   }
 }
