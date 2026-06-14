@@ -14,6 +14,7 @@ import {
   type BackgroundScheduler,
   BackgroundTasks,
 } from "../../../../util/background/background.js";
+import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 
 export type SimCloudFrontFunctionMap = Map<
   SimCloudFrontFunctionName,
@@ -21,6 +22,7 @@ export type SimCloudFrontFunctionMap = Map<
 >;
 
 interface CreateFunctionCommandHandlerProps {
+  accountId: SimAwsAccountId;
   cloudFrontFunctions?: SimCloudFrontFunctionMap;
   background?: BackgroundScheduler;
 }
@@ -34,14 +36,17 @@ export class CreateFunctionCommandHandler implements CommandHandler<
   SimCreateFunctionCommand,
   SimCreateFunctionCommandOutput
 > {
+  private readonly accountId: SimAwsAccountId;
   private readonly cloudFrontFunctions: SimCloudFrontFunctionMap;
   private readonly background: BackgroundScheduler;
 
-  constructor(props: CreateFunctionCommandHandlerProps = {}) {
+  constructor(props: CreateFunctionCommandHandlerProps) {
     const {
+      accountId,
       cloudFrontFunctions = new Map() as SimCloudFrontFunctionMap,
       background = new BackgroundTasks(),
     } = props;
+    this.accountId = accountId;
     this.cloudFrontFunctions = cloudFrontFunctions;
     this.background = background;
   }
@@ -65,6 +70,7 @@ export class CreateFunctionCommandHandler implements CommandHandler<
     ).extractHandlerFunction();
     const simCff = new SimCloudFrontFunction({
       name: cmd.input.Name,
+      accountId: this.accountId,
       handlerFunction,
     });
 

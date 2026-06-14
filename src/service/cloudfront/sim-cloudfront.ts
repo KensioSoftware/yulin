@@ -121,6 +121,7 @@ export class SimCloudFront {
     cmd: SimCreateFunctionCommand,
   ): Promise<SimCreateFunctionCommandOutput> {
     const handler = new CreateFunctionCommandHandler({
+      accountId: this.accountRegionScope.accountId,
       cloudFrontFunctions: this.cloudFrontFunctions,
       background: this.background,
     });
@@ -133,6 +134,10 @@ export class SimCloudFront {
   getCloudFrontFunctionByArn(
     cloudFrontFunctionArn: SimArn,
   ): SimCloudFrontFunction | undefined {
+    const arnAccountId = cloudFrontFunctionArn.split(":")[4];
+    if (arnAccountId !== this.accountRegionScope.accountId) {
+      return undefined;
+    }
     const cloudFrontFunctionName = cloudFrontFunctionArn.split("/").pop();
     assertDefined(
       cloudFrontFunctionName,
