@@ -71,7 +71,7 @@ export class CffUint8ArrayFunctionCodeExtractor<
     handler;
     `);
     const handler: unknown = script.runInContext(context, {
-      timeout: 5, // Real CloudFront Functions have a short timeout.
+      timeout: 10, // Real CloudFront Functions have a short timeout.
       breakOnSigint: true,
     });
 
