@@ -75,14 +75,16 @@ const srv = await serveSimAws({ simAws }); // Chooses available port on localhos
 
 const simS3 = simAws.region("eu-west-2").s3();
 await simS3.createBucket(new CreateBucketCommand({ Bucket: "foo-site" }));
-await simS3.putBucketWebsite(new PutBucketWebsiteCommand({
-  Bucket: "foo-site",
-  WebsiteConfiguration: {
-    IndexDocument: {
-      Suffix: "index.html",
+await simS3.putBucketWebsite(
+  new PutBucketWebsiteCommand({
+    Bucket: "foo-site",
+    WebsiteConfiguration: {
+      IndexDocument: {
+        Suffix: "index.html",
+      },
     },
-  },
-}));
+  }),
+);
 await simS3.putObject(
   new PutObjectCommand({
     Bucket: "foo-site",
@@ -111,17 +113,17 @@ involved. This is what "isolated" refers to.
 
 This "isolated system" approach to testing has a few advantages:
 
- - Tests run fast as everything is in memory with no real networking.
- - Test set-up is fast and uncomplicated, as there are no containers or extra
-   dependencies to manage.
- - It's straightforward to use multiple other mocks and simulators alongside
-   yulin, such as [nock](https://github.com/nock/nock), as yulin makes no
-   assumptions about the environment.
- - You can control everything in each isolated test process, such as controlling
-   the current time, even when multiple different AWS services are simulated.
- - One test can cover **meaningful system behaviour** across multiple AWS
-   services and applications, such as Lambdas sending events to SQS queues to be
-   picked up by other Lambdas, or DynamoDB streams triggering Lambdas.
+- Tests run fast as everything is in memory with no real networking.
+- Test set-up is fast and uncomplicated, as there are no containers or extra
+  dependencies to manage.
+- It's straightforward to use multiple other mocks and simulators alongside
+  yulin, such as [nock](https://github.com/nock/nock), as yulin makes no
+  assumptions about the environment.
+- You can control everything in each isolated test process, such as controlling
+  the current time, even when multiple different AWS services are simulated.
+- One test can cover **meaningful system behaviour** across multiple AWS
+  services and applications, such as Lambdas sending events to SQS queues to be
+  picked up by other Lambdas, or DynamoDB streams triggering Lambdas.
 
 That last point is the most important. The motivation behind yulin is to enable
 efficient tests that cover the logical behaviour of a system. That is in

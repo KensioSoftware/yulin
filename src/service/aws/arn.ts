@@ -9,7 +9,7 @@ import { faker } from "@faker-js/faker";
 export type SimArnServiceName = string;
 
 export type SimArn =
-  `arn:aws:${SimArnServiceName}:${AwsRegionName}:${SimAwsAccountId}:${string}/${string}`;
+  `arn:aws:${SimArnServiceName}:${AwsRegionName | ""}:${SimAwsAccountId}:${string}/${string}`;
 
 export interface SimArnComponents {
   partition: "aws";
@@ -20,7 +20,7 @@ export interface SimArnComponents {
   resourceId: string;
 }
 
-const defaultSimArnServiceNames = ["s3", "dynamodb"] as const;
+const defaultSimArnServiceNames = ["cloudfront", "dynamodb", "s3"] as const;
 
 const simArnComponentsFactory = new DynamicFactory<SimArnComponents>(() => ({
   partition: "aws",

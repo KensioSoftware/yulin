@@ -4,6 +4,7 @@ export declare namespace CloudFrontFunction {
   }
 
   export interface MultiValue {
+    value: string;
     multiValue: Value[];
   }
 
@@ -24,14 +25,18 @@ export declare namespace CloudFrontFunction {
   export interface Response {
     statusCode: number;
     statusDescription?: string;
-    headers?: Headers;
+    headers: Headers;
+    body?: string;
+    bodyEncoding?: "text" | "base64";
   }
+
+  export type EventType = "viewer-request" | "viewer-response";
 
   export interface EventContext {
     distributionDomainName?: string;
     endpoint?: string;
     distributionId?: string;
-    eventType: "viewer-request" | "viewer-response";
+    eventType: EventType;
     requestId: string;
   }
 
@@ -39,9 +44,32 @@ export declare namespace CloudFrontFunction {
     ip: string;
   }
 
-  export interface Event {
+  interface BaseEvent {
     context: EventContext;
     viewer: Viewer;
     request: Request;
   }
+
+  export interface ViewerRequestEvent extends BaseEvent {
+    context: EventContext & {
+      eventType: "viewer-request";
+    };
+  }
+
+  export interface ViewerResponseEvent extends BaseEvent {
+    context: EventContext & {
+      eventType: "viewer-response";
+    };
+    response: Response;
+  }
+
+  export type Event = ViewerRequestEvent | ViewerResponseEvent;
+
+  export type ViewerRequestHandler = (
+    event: ViewerRequestEvent,
+  ) => Request | Response;
+
+  export type ViewerResponseHandler = (event: ViewerResponseEvent) => Response;
+
+  export type Handler = ViewerRequestHandler | ViewerResponseHandler;
 }

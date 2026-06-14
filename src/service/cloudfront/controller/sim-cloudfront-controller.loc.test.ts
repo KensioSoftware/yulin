@@ -95,23 +95,23 @@ describe("sim CloudFront local server", () => {
         },
       }),
     );
-    const distributionId = createDistroOutput.Distribution?.Id;
-    assertNonNullable(distributionId);
+    const distroId = createDistroOutput.Distribution?.Id;
+    assertNonNullable(distroId);
 
     const assetsRes = await fetch(
-      `http://${distributionId.toLowerCase()}.cloudfront.net.sim-aws.localhost:${srv.port}/assets/object.json`,
+      `http://${distroId.toLowerCase()}.cloudfront.net.sim-aws.localhost:${srv.port}/assets/object.json`,
     );
     assertIdentical(assetsRes.status, 200);
     assertIdentical(await assetsRes.text(), '{"something":"A"}');
 
     const assetsFooRes = await fetch(
-      `http://${distributionId.toLowerCase()}.cloudfront.net.sim-aws.localhost:${srv.port}/assets/foo/object.json`,
+      `http://${distroId.toLowerCase()}.cloudfront.net.sim-aws.localhost:${srv.port}/assets/foo/object.json`,
     );
     assertIdentical(assetsFooRes.status, 200);
     assertIdentical(await assetsFooRes.text(), '{"something":"foo-B"}');
 
     const missingRes = await fetch(
-      `http://${distributionId.toLowerCase()}.cloudfront.net.sim-aws.localhost:${srv.port}/missing/object.json`,
+      `http://${distroId.toLowerCase()}.cloudfront.net.sim-aws.localhost:${srv.port}/missing/object.json`,
     );
     assertIdentical(missingRes.status, 404);
   });
@@ -154,8 +154,8 @@ describe("sim CloudFront local server", () => {
         },
       }),
     );
-    const distributionId = createDistroOutput.Distribution?.Id;
-    assertNonNullable(distributionId);
+    const distroId = createDistroOutput.Distribution?.Id;
+    assertNonNullable(distroId);
   });
 
   it("throws when Bucket for S3 Origin does not exist", async () => {

@@ -1,0 +1,37 @@
+import { describe, it } from "vitest";
+import { SimCloudFrontFunction } from "./sim-cloudfront-function.js";
+import { assertIdentical, assertInstanceOf } from "@kensio/smartass";
+import type { CloudFrontFunction } from "../typings/cloudfront-functions.namespace.js";
+
+describe("sim CloudFront Function", () => {
+  it("applies default handler function", () => {
+    const simCff = new SimCloudFrontFunction({ name: "foo-cff" });
+
+    const cffRes = simCff.handleViewerRequest(
+      new Request("http://foobar.cloudfront.net/foo/bar/object.json"),
+    );
+
+    assertInstanceOf(cffRes, Request);
+    assertIdentical(new URL(cffRes.url).pathname, "/foo/bar/object.json");
+  });
+
+  it("applies injected handler function", () => {
+    const simCff = new SimCloudFrontFunction({
+      name: "foo-cff",
+      handlerFunction: (event: CloudFrontFunction.ViewerRequestEvent) => {
+        event.request.uri = event.request.uri.replace(
+          "object.json",
+          "foobar.html",
+        );
+        return event.request;
+      },
+    });
+
+    const cffRes = simCff.handleViewerRequest(
+      new Request("http://foobar.cloudfront.net/foo/bar/object.json"),
+    );
+
+    assertInstanceOf(cffRes, Request);
+    assertIdentical(new URL(cffRes.url).pathname, "/foo/bar/foobar.html");
+  });
+});

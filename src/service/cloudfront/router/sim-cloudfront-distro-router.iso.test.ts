@@ -22,11 +22,11 @@ describe("Sim CloudFront Distribution Router", () => {
 
     it("routes request by alternate domain name", () => {
       const distro = new SimCloudFrontDistribution();
-      distro.addAlternateDomainName("cdn.example.com");
+      distro.addAlternateDomainName("cdn.example.test");
 
       const router = SimCloudFrontDistroRouter.fromDistributions([distro]);
 
-      const request = new Request(`http://cdn.example.com/foo/bar.json`);
+      const request = new Request(`http://cdn.example.test/foo/bar.json`);
 
       assertIdentical(router.distroForRequest(request), distro);
     });
@@ -36,7 +36,7 @@ describe("Sim CloudFront Distribution Router", () => {
 
       const router = SimCloudFrontDistroRouter.fromDistributions([distro]);
 
-      const request = new Request("http://unknown.example.com/path/to/object");
+      const request = new Request("http://unknown.example.test/path/to/object");
 
       assertUndefined(router.distroForRequest(request));
     });
@@ -66,14 +66,14 @@ describe("Sim CloudFront Distribution Router", () => {
     it("prefers host header over req url host", () => {
       const distro1 = new SimCloudFrontDistribution();
       const distro2 = new SimCloudFrontDistribution();
-      distro2.addAlternateDomainName("cdn.example.com");
+      distro2.addAlternateDomainName("cdn.example.test");
 
       const router = SimCloudFrontDistroRouter.fromDistributions([
         distro1,
         distro2,
       ]);
 
-      const request = new Request("http://cdn.example.com/path/to/object", {
+      const request = new Request("http://cdn.example.test/path/to/object", {
         headers: {
           host: `${distro1.distributionId.toLowerCase()}.cloudfront.net.sim-aws.localhost`,
         },

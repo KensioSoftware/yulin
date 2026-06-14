@@ -85,7 +85,7 @@ describe("S3 PutBucketWebsiteCommand", () => {
         Bucket: "redirect-site",
         WebsiteConfiguration: {
           RedirectAllRequestsTo: {
-            HostName: "example.com",
+            HostName: "example.test",
             Protocol: "https",
           },
         },

@@ -40,7 +40,7 @@ describe("S3 Bucket static website configuration", () => {
   it("is enabled when all requests are redirected", () => {
     const website = new S3BucketWebsite({
       RedirectAllRequestsTo: {
-        HostName: "example.com",
+        HostName: "example.test",
         Protocol: "https",
       },
     });
@@ -153,7 +153,7 @@ describe("S3 Bucket static website configuration", () => {
   it("redirects all requests to the configured host and protocol", () => {
     const website = new S3BucketWebsite({
       RedirectAllRequestsTo: {
-        HostName: "example.com",
+        HostName: "example.test",
         Protocol: "https",
       },
     });
@@ -166,7 +166,7 @@ describe("S3 Bucket static website configuration", () => {
     assertIdentical(res.status, 301);
     assertIdentical(
       res.headers.get("location"),
-      "https://example.com/docs/index.html",
+      "https://example.test/docs/index.html",
     );
   });
 
@@ -414,7 +414,7 @@ describe("S3 Bucket static website configuration", () => {
             KeyPrefixEquals: "external/",
           },
           Redirect: {
-            HostName: "example.com",
+            HostName: "example.test",
             Protocol: "https",
             ReplaceKeyPrefixWith: "archive/",
           },
@@ -430,7 +430,7 @@ describe("S3 Bucket static website configuration", () => {
     assertIdentical(res.status, 301);
     assertIdentical(
       res.headers.get("location"),
-      "https://example.com/archive/page.html",
+      "https://example.test/archive/page.html",
     );
   });
 });

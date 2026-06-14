@@ -290,7 +290,7 @@ describe("Serve simulated S3 Bucket static website on localhost", () => {
         Bucket: "redirect-all-site",
         WebsiteConfiguration: {
           RedirectAllRequestsTo: {
-            HostName: "example.com",
+            HostName: "example.test",
             Protocol: "https",
           },
         },
@@ -305,7 +305,7 @@ describe("Serve simulated S3 Bucket static website on localhost", () => {
     assertIdentical(res.status, 301);
     assertIdentical(
       res.headers.get("location"),
-      "https://example.com/docs/page.html",
+      "https://example.test/docs/page.html",
     );
   });
 });

@@ -10,8 +10,8 @@ import { bucketNameFromCloudFrontS3OriginDomainName } from "./sim-cloudfront-s3-
 describe("sim CloudFront S3 Origin", () => {
   it("resolves bucket name fallback from non-S3 origin domain name", () => {
     assertIdentical(
-      bucketNameFromCloudFrontS3OriginDomainName("example.com"),
-      "example.com",
+      bucketNameFromCloudFrontS3OriginDomainName("example.test"),
+      "example.test",
     );
   });
 

@@ -22,6 +22,7 @@ import {
   type SimCloudFrontS3OriginResolver,
 } from "../../origin/sim-cloudfront-s3-origin.js";
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
+import type { SimArn } from "../../../aws/arn.js";
 
 interface CreateDistributionCommandHandlerProps {
   readonly accountId: SimAwsAccountId;
@@ -179,6 +180,8 @@ export class CreateDistributionCommandHandler implements CommandHandler<
       ...(cacheBehavior.ViewerProtocolPolicy === undefined
         ? {}
         : { viewerProtocolPolicy: cacheBehavior.ViewerProtocolPolicy }),
+      functionAssociations:
+        this.functionAssociationsFromCacheBehavior(cacheBehavior),
     };
   }
 
@@ -206,7 +209,53 @@ export class CreateDistributionCommandHandler implements CommandHandler<
       ...(cacheBehavior.ViewerProtocolPolicy === undefined
         ? {}
         : { viewerProtocolPolicy: cacheBehavior.ViewerProtocolPolicy }),
+      functionAssociations:
+        this.functionAssociationsFromCacheBehavior(cacheBehavior),
     };
+  }
+
+  private functionAssociationsFromCacheBehavior(
+    cacheBehavior:
+      | SimCloudFrontDefaultCacheBehaviorConfig
+      | SimCloudFrontCacheBehaviorConfig,
+  ): SimCloudFrontBehavior["functionAssociations"] | undefined {
+    if (cacheBehavior.FunctionAssociations?.Items === undefined) {
+      return undefined;
+    }
+    const associations: SimCloudFrontBehavior["functionAssociations"] = {};
+
+    for (const funcAssoc of cacheBehavior.FunctionAssociations.Items) {
+      assertDefined(
+        funcAssoc.EventType,
+        "CloudFront Function association EventType",
+      );
+      assertDefined(
+        funcAssoc.FunctionARN,
+        "CloudFront Function association FunctionARN",
+      );
+      switch (funcAssoc.EventType) {
+        case "viewer-request": {
+          associations.viewerRequest = funcAssoc.FunctionARN as SimArn;
+          break;
+        }
+        case "viewer-response": {
+          associations.viewerResponse = funcAssoc.FunctionARN as SimArn;
+          break;
+        }
+        case "origin-request": {
+          throw new Error(
+            "CloudFront Function association EventType origin-request not implemented",
+          );
+        }
+        case "origin-response": {
+          throw new Error(
+            "CloudFront Function association EventType origin-response not implemented",
+          );
+        }
+      }
+    }
+
+    return Object.keys(associations).length > 0 ? associations : undefined;
   }
 
   private requiredTargetOriginId(targetOriginId: string | undefined): string {
