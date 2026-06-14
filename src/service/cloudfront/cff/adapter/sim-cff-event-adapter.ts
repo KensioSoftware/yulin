@@ -91,11 +91,12 @@ export class SimCffEventAdapter {
     const url = new URL(originalReq.url);
     url.pathname = cffReq.uri;
     url.search = this.fromCffQueryString(cffReq.querystring);
+    const allowsBody = !/^(get|head)$/i.test(cffReq.method);
 
     return new Request(url, {
       method: cffReq.method,
       headers: this.fromCffHeaders(cffReq.headers, cffReq.cookies),
-      body: originalReq.body,
+      body: allowsBody ? originalReq.clone().body : null,
       redirect: originalReq.redirect,
       signal: originalReq.signal,
     });
@@ -109,12 +110,14 @@ export class SimCffEventAdapter {
     });
   }
 
-  private cffResponseBody(cffRes: CloudFrontFunction.Response): string | null {
+  private cffResponseBody(
+    cffRes: CloudFrontFunction.Response,
+  ): Buffer | string | null {
     if (cffRes.body === undefined) {
       return null;
     }
     if (cffRes.bodyEncoding === "base64") {
-      return Buffer.from(cffRes.body, "base64").toString("utf8");
+      return Buffer.from(cffRes.body, "base64");
     }
     return cffRes.body;
   }

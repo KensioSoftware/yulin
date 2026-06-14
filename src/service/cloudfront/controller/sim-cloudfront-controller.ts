@@ -12,13 +12,8 @@ import type { SimCloudFrontBehavior } from "../behaviour/sim-cloud-front-behavio
 import { SimAws } from "../../aws/sim-aws.js";
 import type { SimCloudFrontRegistry } from "../sim-cloud-front-registry.js";
 
-type SimCloudFrontControllerAws = Pick<
-  SimAws,
-  "accountRegionScope" | "_cloudFrontRegistry"
->;
-
 interface SimCloudFrontServiceControllerProps {
-  readonly simAws?: SimCloudFrontControllerAws;
+  readonly simAws?: SimAws;
   readonly cloudFrontRegistry?: SimCloudFrontRegistry;
   readonly distroRouter?: SimCloudFrontDistroRouter;
   readonly behaviourResolver?: SimCloudFrontBehaviorResolver;

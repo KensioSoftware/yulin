@@ -5,7 +5,7 @@ import type {
 import { assertNotNull } from "../../../util/defined/defined.js";
 import { SimAwsLocalUrl } from "../../../serve/http/sim-aws-local-url.js";
 import type { SimCloudFront } from "../sim-cloudfront.js";
-import { SimCloudFrontRegistry } from "../sim-cloud-front-registry.js";
+import type { SimCloudFrontRegistry } from "../sim-cloud-front-registry.js";
 import { SimAws } from "../../aws/sim-aws.js";
 import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
 
@@ -15,7 +15,7 @@ export interface SimCloudFrontDistroRoute {
 }
 
 interface SimCloudFrontDistroRouterProps {
-  readonly simAws?: Pick<SimAws, "accountRegionScope">;
+  readonly simAws?: SimAws;
   readonly cloudFrontRegistry?: SimCloudFrontRegistry;
   readonly distributions?: ReadonlyMap<
     SimCloudFrontDistributionId,
@@ -28,7 +28,7 @@ interface SimCloudFrontDistroRouterProps {
  * Owns the Distribution lookup decision.
  */
 export class SimCloudFrontDistroRouter {
-  private readonly simAws: Pick<SimAws, "accountRegionScope">;
+  private readonly simAws: SimAws;
   private readonly cloudFrontRegistry: SimCloudFrontRegistry;
   private readonly distributions?: ReadonlyMap<
     SimCloudFrontDistributionId,
@@ -36,15 +36,10 @@ export class SimCloudFrontDistroRouter {
   >;
 
   constructor(props: SimCloudFrontDistroRouterProps = {}) {
-    const {
-      simAws = new SimAws(),
-      cloudFrontRegistry = new SimCloudFrontRegistry(),
-      distributions = new Map(),
-    } = props;
-
-    this.simAws = simAws;
-    this.cloudFrontRegistry = cloudFrontRegistry;
-    this.distributions = distributions;
+    this.simAws = props.simAws ?? new SimAws();
+    this.cloudFrontRegistry =
+      props.cloudFrontRegistry ?? this.simAws._cloudFrontRegistry();
+    this.distributions = props.distributions ?? new Map();
   }
 
   /**

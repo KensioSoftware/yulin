@@ -25,9 +25,14 @@ interface SimCloudFrontFunctionProps {
   eventAdapter?: SimCffEventAdapter;
 }
 
-export const defaultCffHandler: CloudFrontFunction.ViewerRequestHandler = (
-  event,
-) => event.request;
+export const defaultCffHandler: CloudFrontFunction.Handler = (
+  event: CloudFrontFunction.Event,
+) => {
+  if (event.context.eventType === "viewer-response") {
+    return (event as CloudFrontFunction.ViewerResponseEvent).response;
+  }
+  return event.request;
+};
 
 /**
  * Simulated CloudFront Function resource.
