@@ -1,10 +1,5 @@
 import type { CommandHandler } from "../../../../command/command-handler.js";
 import type {
-  SimCloudFrontCacheBehaviorConfig,
-  SimCloudFrontDefaultCacheBehaviorConfig,
-  SimCloudFrontDistributionConfig,
-  SimCloudFrontMethodList,
-  SimCloudFrontOriginConfig,
   SimCreateDistributionCommand,
   SimCreateDistributionCommandOutput,
 } from "./create-distribution.cmd.js";
@@ -15,13 +10,12 @@ import {
   type SimCloudFrontDistributionId,
 } from "../../distribution/sim-cloudfront-distribution.js";
 import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
-import type { SimCloudFrontBehavior } from "../../behaviour/sim-cloud-front-behavior.js";
 import { assertDefined } from "../../../../util/defined/defined.js";
-import {
-  SimCloudFrontS3Origin,
-  type SimCloudFrontS3OriginResolver,
-} from "../../origin/sim-cloudfront-s3-origin.js";
+import type { SimCloudFrontS3OriginResolver } from "../../origin/sim-cloudfront-s3-origin.js";
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
+import { SimCloudFrontOriginConfigurator } from "../../distribution/configurator/sim-cloud-front-origin-configurator.js";
+import { SimCloudFrontBehaviorConfigurator } from "../../distribution/configurator/sim-cloud-front-behavior-configurator.js";
+import { SimCloudFrontDistributionConfigurator } from "../../distribution/configurator/sim-cloud-front-distribution-configurator.js";
 
 interface CreateDistributionCommandHandlerProps {
   readonly accountId: SimAwsAccountId;
@@ -49,14 +43,17 @@ export class CreateDistributionCommandHandler implements CommandHandler<
     SimCloudFrontDistribution
   >;
   private readonly cloudFrontRegistry: SimCloudFrontRegistry;
-  private readonly s3OriginResolver: SimCloudFrontS3OriginResolver;
+  private readonly distributionConfigurator: SimCloudFrontDistributionConfigurator;
   private readonly background: BackgroundScheduler;
 
   constructor(props: CreateDistributionCommandHandlerProps) {
     this.accountId = props.accountId;
     this.distributions = props.distributions;
     this.cloudFrontRegistry = props.cloudFrontRegistry;
-    this.s3OriginResolver = props.s3OriginResolver;
+    this.distributionConfigurator = new SimCloudFrontDistributionConfigurator(
+      new SimCloudFrontOriginConfigurator(props.s3OriginResolver),
+      new SimCloudFrontBehaviorConfigurator(),
+    );
     this.background = props.background;
   }
 
@@ -82,7 +79,7 @@ export class CreateDistributionCommandHandler implements CommandHandler<
       accountId: this.accountId,
     });
 
-    this.configureDistribution(distribution, distributionConfig);
+    this.distributionConfigurator.configure(distribution, distributionConfig);
 
     this.distributions.set(distribution.distributionId, distribution);
     this.cloudFrontRegistry.registerDistribution(
@@ -106,119 +103,5 @@ export class CreateDistributionCommandHandler implements CommandHandler<
       Location: `https://cloudfront.amazonaws.com/2020-05-31/distribution/${distribution.distributionId}`,
       $metadata: {},
     };
-  }
-
-  private configureDistribution(
-    distribution: SimCloudFrontDistribution,
-    distributionConfig: SimCloudFrontDistributionConfig,
-  ): void {
-    for (const alias of distributionConfig.Aliases?.Items ?? []) {
-      distribution.addAlternateDomainName(alias);
-    }
-
-    for (const origin of distributionConfig.Origins?.Items ?? []) {
-      this.configureOrigin(distribution, origin);
-    }
-
-    distribution.addBehavior(
-      this.behaviorFromDefaultCacheBehavior(
-        distributionConfig.DefaultCacheBehavior,
-      ),
-    );
-
-    for (const cacheBehavior of distributionConfig.CacheBehaviors?.Items ??
-      []) {
-      distribution.addBehavior(this.behaviorFromCacheBehavior(cacheBehavior));
-    }
-  }
-
-  private configureOrigin(
-    distribution: SimCloudFrontDistribution,
-    origin: SimCloudFrontOriginConfig,
-  ): void {
-    assertDefined(origin.Id, "CloudFront Origin Id");
-    assertDefined(origin.DomainName, "CloudFront Origin DomainName");
-
-    if (origin.S3OriginConfig !== undefined) {
-      const bucket = this.s3OriginResolver(origin.DomainName);
-
-      assertDefined(
-        bucket,
-        `Sim S3 Bucket for CloudFront Origin ${origin.DomainName}`,
-      );
-
-      distribution.addOrigin(
-        origin.Id,
-        new SimCloudFrontS3Origin({ bucket, originPath: origin.OriginPath }),
-      );
-      return;
-    }
-
-    throw new Error(
-      `Unsupported sim CloudFront Origin type for Origin ${origin.Id}`,
-    );
-  }
-
-  private behaviorFromDefaultCacheBehavior(
-    cacheBehavior: SimCloudFrontDefaultCacheBehaviorConfig | undefined,
-  ): SimCloudFrontBehavior {
-    assertDefined(cacheBehavior, "CloudFront DefaultCacheBehavior");
-
-    return {
-      targetOriginName: this.requiredTargetOriginId(
-        cacheBehavior.TargetOriginId,
-      ),
-      allowedMethods: this.methods(cacheBehavior.AllowedMethods, [
-        "GET",
-        "HEAD",
-      ]),
-      cachedMethods: this.methods(cacheBehavior.AllowedMethods?.CachedMethods, [
-        "GET",
-        "HEAD",
-      ]),
-      ...(cacheBehavior.ViewerProtocolPolicy === undefined
-        ? {}
-        : { viewerProtocolPolicy: cacheBehavior.ViewerProtocolPolicy }),
-    };
-  }
-
-  private behaviorFromCacheBehavior(
-    cacheBehavior: SimCloudFrontCacheBehaviorConfig,
-  ): SimCloudFrontBehavior {
-    assertDefined(
-      cacheBehavior.PathPattern,
-      "CloudFront CacheBehavior PathPattern",
-    );
-
-    return {
-      pathPattern: cacheBehavior.PathPattern,
-      targetOriginName: this.requiredTargetOriginId(
-        cacheBehavior.TargetOriginId,
-      ),
-      allowedMethods: this.methods(cacheBehavior.AllowedMethods, [
-        "GET",
-        "HEAD",
-      ]),
-      cachedMethods: this.methods(cacheBehavior.AllowedMethods?.CachedMethods, [
-        "GET",
-        "HEAD",
-      ]),
-      ...(cacheBehavior.ViewerProtocolPolicy === undefined
-        ? {}
-        : { viewerProtocolPolicy: cacheBehavior.ViewerProtocolPolicy }),
-    };
-  }
-
-  private requiredTargetOriginId(targetOriginId: string | undefined): string {
-    assertDefined(targetOriginId, "CloudFront CacheBehavior TargetOriginId");
-
-    return targetOriginId;
-  }
-
-  private methods(
-    methods: SimCloudFrontMethodList | undefined,
-    fallback: string[],
-  ): Set<string> {
-    return new Set(methods?.Items ?? fallback);
   }
 }

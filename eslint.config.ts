@@ -21,7 +21,13 @@ const securityRecommended = security.configs.recommended as Parameters<
 export default defineConfig(
   // ── Global ignores ──────────────────────────────────────
   {
-    ignores: ["dist/", "**/.coverage/*", "node_modules/", "*.config.ts"],
+    ignores: [
+      "dist/",
+      "coverage/",
+      "test/.coverage/",
+      "node_modules/",
+      "**/*.config.ts",
+    ],
   },
 
   // ── Base ESLint recommended ─────────────────────────────
@@ -179,11 +185,14 @@ export default defineConfig(
       "vitest/expect-expect": "off",
 
       // Relax some rules that are too strict for test files
+      "@typescript-eslint/explicit-function-return-type": "off",
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/no-unsafe-assignment": "off",
       "@typescript-eslint/no-unsafe-member-access": "off",
-      "@typescript-eslint/explicit-function-return-type": "off",
       "import-x/no-default-export": "off",
+      "unicorn/consistent-function-scoping": "off",
+      "unicorn/no-null": "off",
+      "unicorn/no-useless-undefined": "off",
     },
   },
 

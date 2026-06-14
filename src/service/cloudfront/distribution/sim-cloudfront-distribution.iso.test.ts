@@ -29,12 +29,12 @@ describe("SimCloudFrontDistribution", () => {
       distributionId: makeDistributionId(),
     });
 
-    distribution.addAlternateDomainName("cdn.example.com");
-    distribution.addAlternateDomainName("static.example.com");
+    distribution.addAlternateDomainName("cdn.example.test");
+    distribution.addAlternateDomainName("static.example.test");
 
-    assertTrue(distribution.hasAlternateDomainName("cdn.example.com"));
-    assertTrue(distribution.hasAlternateDomainName("static.example.com"));
-    assertFalse(distribution.hasAlternateDomainName("missing.example.com"));
+    assertTrue(distribution.hasAlternateDomainName("cdn.example.test"));
+    assertTrue(distribution.hasAlternateDomainName("static.example.test"));
+    assertFalse(distribution.hasAlternateDomainName("missing.example.test"));
   });
 
   it("stores alternate domain names as a Set", () => {
@@ -42,13 +42,13 @@ describe("SimCloudFrontDistribution", () => {
       distributionId: makeDistributionId(),
     });
 
-    distribution.addAlternateDomainName("cdn.example.com");
-    distribution.addAlternateDomainName("cdn.example.com");
+    distribution.addAlternateDomainName("cdn.example.test");
+    distribution.addAlternateDomainName("cdn.example.test");
 
     const alternateDomainNames = distribution.getAlternateDomainNames();
 
     assertIdentical(alternateDomainNames.size, 1);
-    assertTrue(alternateDomainNames.has("cdn.example.com"));
+    assertTrue(alternateDomainNames.has("cdn.example.test"));
   });
 
   it("adds Behaviors in insertion order", () => {

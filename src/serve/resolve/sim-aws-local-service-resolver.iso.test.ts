@@ -36,7 +36,9 @@ describe("SimAwsLocalServiceResolver", () => {
   it("returns undefined for non-localhost host", () => {
     const resolver = new SimAwsLocalServiceResolver();
     assertUndefined(
-      resolver.resolveHost("bucket-a.s3-website.eu-west-1.sim-aws.example.com"),
+      resolver.resolveHost(
+        "bucket-a.s3-website.eu-west-1.sim-aws.example.test",
+      ),
     );
   });
 
@@ -91,7 +93,7 @@ describe("SimAwsLocalServiceResolver", () => {
   it("returns undefined for CloudFront host without localhost suffix", () => {
     const resolver = new SimAwsLocalServiceResolver();
     assertUndefined(
-      resolver.resolveHost("abcd1234.cloudfront.net.sim-aws.example.com"),
+      resolver.resolveHost("abcd1234.cloudfront.net.sim-aws.example.test"),
     );
   });
 

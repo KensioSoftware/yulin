@@ -29,13 +29,13 @@ describe("Simulated AWS local URL", () => {
 
   it("adds the local hostname suffix to other hostnames", () => {
     const url = new SimAwsLocalUrl({
-      input: "https://www.example.com/foo/",
+      input: "https://www.example.test/foo/",
       port: "12345",
     });
 
     assertIdentical(
       url.toString(),
-      "http://www.example.com.sim-aws.localhost:12345/foo/",
+      "http://www.example.test.sim-aws.localhost:12345/foo/",
     );
   });
 

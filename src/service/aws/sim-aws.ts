@@ -182,6 +182,16 @@ export class SimAws {
   }
 
   /**
+   * Get the shared simulated CloudFront registry.
+   *
+   * This is intended for CloudFront service/controller wiring so request routing
+   * uses the same registry as CloudFront SDK command handling.
+   */
+  _cloudFrontRegistry(): SimCloudFrontRegistry {
+    return this.cloudFrontRegistry;
+  }
+
+  /**
    * Create simulated DynamoDB for an Account Region scope.
    */
   _createDynamoDb(scope: SimAwsAccountRegionContainer): SimDynamoDb {
@@ -201,7 +211,7 @@ export class SimAws {
       }
       case "cloudFront": {
         return new SimCloudFrontServiceController({
-          cloudFront: this.cloudFront(),
+          simAws: this,
         });
       }
       default: {

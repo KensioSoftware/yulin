@@ -25,6 +25,17 @@ import type {
   SimGetDistributionCommandOutput,
 } from "./command/get-distribution/get-distribution.cmd.js";
 import { GetDistributionCommandHandler } from "./command/get-distribution/get-distribution.handler.js";
+import type {
+  SimCreateFunctionCommand,
+  SimCreateFunctionCommandOutput,
+} from "./command/create-function/create-function.cmd.js";
+import { CreateFunctionCommandHandler } from "./command/create-function/create-function.handler.js";
+import type {
+  SimCloudFrontFunction,
+  SimCloudFrontFunctionName,
+} from "./cff/sim-cloudfront-function.js";
+import type { SimArn } from "../aws/arn.js";
+import { assertDefined } from "../../util/defined/defined.js";
 
 interface SimCloudFrontProps {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
@@ -40,6 +51,10 @@ export class SimCloudFront {
   private readonly distributions = new Map<
     SimCloudFrontDistributionId,
     SimCloudFrontDistribution
+  >();
+  private readonly cloudFrontFunctions = new Map<
+    SimCloudFrontFunctionName,
+    SimCloudFrontFunction
   >();
 
   private readonly accountRegionScope: SimAwsAccountRegionScope;
@@ -97,5 +112,48 @@ export class SimCloudFront {
       distributions: this.distributions,
     });
     return await handler.handle(cmd);
+  }
+
+  /**
+   * Handle a Create Function Command from the SDK.
+   */
+  async createFunction(
+    cmd: SimCreateFunctionCommand,
+  ): Promise<SimCreateFunctionCommandOutput> {
+    const handler = new CreateFunctionCommandHandler({
+      accountId: this.accountRegionScope.accountId,
+      cloudFrontFunctions: this.cloudFrontFunctions,
+      background: this.background,
+    });
+    return await handler.handle(cmd);
+  }
+
+  /**
+   * Get a sim CloudFront Function by name.
+   */
+  getCloudFrontFunctionByArn(
+    cloudFrontFunctionArn: SimArn,
+  ): SimCloudFrontFunction | undefined {
+    const arnAccountId = cloudFrontFunctionArn.split(":")[4];
+    if (arnAccountId !== this.accountRegionScope.accountId) {
+      return undefined;
+    }
+    const cloudFrontFunctionName = cloudFrontFunctionArn.split("/").pop();
+    assertDefined(
+      cloudFrontFunctionName,
+      `CloudFront Function name in ARN ${cloudFrontFunctionArn}`,
+    );
+    return this.cloudFrontFunctions.get(
+      cloudFrontFunctionName as SimCloudFrontFunctionName,
+    );
+  }
+
+  /**
+   * Get a sim CloudFront Function by name.
+   */
+  getCloudFrontFunctionByName(
+    cloudFrontFunctionName: SimCloudFrontFunctionName,
+  ): SimCloudFrontFunction | undefined {
+    return this.cloudFrontFunctions.get(cloudFrontFunctionName);
   }
 }

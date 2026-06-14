@@ -1,36 +1,39 @@
-import { DynamicFactory, VariantFactory } from "@kensio/part-factory";
+import { DynamicFactory } from "@kensio/part-factory";
 import { faker } from "@faker-js/faker";
-
-/**
- * Makes instances of the CloudFrontEvent object structure.
- */
-const cloudFrontEventFactory = new DynamicFactory<CloudFrontFunction.Event>(
-  () => ({
-    context: {
-      eventType: faker.helpers.arrayElement([
-        "viewer-request",
-        "viewer-response",
-      ]),
-      requestId: faker.string.uuid(),
-    },
-    request: cloudFrontRequestFactory.make(),
-    viewer: { ip: faker.internet.ipv4() },
-  }),
-);
+import type { CloudFrontFunction } from "../typings/cloudfront-functions.namespace.js";
 
 /**
  * Makes instances of the viewer-request CloudFrontEvent objects.
  */
 export const cloudFrontViewerRequestEventFactory =
-  new VariantFactory<CloudFrontFunction.Event>(cloudFrontEventFactory, {
-    context: { eventType: "viewer-request" },
-  });
+  new DynamicFactory<CloudFrontFunction.ViewerRequestEvent>(() => ({
+    context: {
+      eventType: "viewer-request",
+      requestId: faker.string.uuid(),
+    },
+    request: cloudFrontRequestFactory.make(),
+    viewer: { ip: faker.internet.ipv4() },
+  }));
+
+/**
+ * Makes instances of the viewer-response CloudFrontEvent objects.
+ */
+export const cloudFrontViewerResponseEventFactory =
+  new DynamicFactory<CloudFrontFunction.ViewerResponseEvent>(() => ({
+    context: {
+      eventType: "viewer-response",
+      requestId: faker.string.uuid(),
+    },
+    request: cloudFrontRequestFactory.make(),
+    response: cloudFrontResponseFactory.make(),
+    viewer: { ip: faker.internet.ipv4() },
+  }));
 
 /**
  * Makes instances of the CloudFrontRequest object structure.
  */
-const cloudFrontRequestFactory = new DynamicFactory<CloudFrontFunction.Request>(
-  () => ({
+export const cloudFrontRequestFactory =
+  new DynamicFactory<CloudFrontFunction.Request>(() => ({
     cookies: {
       sessionId: {
         value: faker.string.uuid(),
@@ -58,5 +61,13 @@ const cloudFrontRequestFactory = new DynamicFactory<CloudFrontFunction.Request>(
       },
     },
     uri: "/cloudfront/",
-  }),
-);
+  }));
+
+/**
+ * Makes instances of the CloudFrontResponse object structure.
+ */
+export const cloudFrontResponseFactory =
+  new DynamicFactory<CloudFrontFunction.Response>(() => ({
+    statusCode: faker.internet.httpStatusCode(),
+    headers: {},
+  }));

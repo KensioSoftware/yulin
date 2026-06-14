@@ -8,12 +8,14 @@
   "types": "./dist/index.d.ts",
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "fmt": "eslint --fix '{src,test}/**/*.{ts,js}' && prettier --write '{src,test}/**/*.{ts,js,json,md,css,html,yml,yaml}'",
-    "lint": "eslint '{src,test}/**/*.{ts,js}' && prettier --check '{src,test}/**/*.{ts,js,json,md,css,html,yml,yaml}'",
+    "build:check": "tsc -p tsconfig.json --noEmit",
+    "fmt": "eslint --fix . && prettier --write .",
+    "lint": "eslint . && prettier --check .",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:iso": "vitest run --project isolatedTests",
-    "test:local": "vitest run --project localTests"
+    "test:local": "vitest run --project localTests",
+    "check": "pnpm fmt && pnpm build:check && pnpm test:coverage"
   },
   "keywords": [
     "aws",
@@ -57,13 +59,13 @@
   ],
   "author": "Kensio Software",
   "license": "AGPL-3.0",
-  "packageManager": "pnpm@11.4.0",
+  "packageManager": "pnpm@11.6.0",
   "devDependencies": {
     "@aws-sdk/client-cloudfront": "^3.1063.0",
     "@aws-sdk/client-dynamodb": "^3.1057.0",
     "@aws-sdk/client-s3": "^3.1057.0",
     "@eslint/js": "^10.0.1",
-    "@kensio/smartass": "^1.3.0",
+    "@kensio/smartass": "^1.11.0",
     "@smithy/smithy-client": "^4.13.5",
     "@smithy/types": "^4.14.2",
     "@types/eslint-plugin-security": "^3.0.1",
@@ -84,26 +86,6 @@
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.60.0",
     "vitest": "^4.1.7"
-  },
-  "peerDependencies": {
-    "@aws-sdk/client-cloudfront": "^3.1063.0",
-    "@aws-sdk/client-dynamodb": "^3.1001.0",
-    "@aws-sdk/client-s3": "^3.1001.0",
-    "@smithy/smithy-client": "^4.12.1"
-  },
-  "peerDependenciesMeta": {
-    "@smithy/smithy-client": {
-      "optional": true
-    },
-    "@aws-sdk/client-cloudfront": {
-      "optional": true
-    },
-    "@aws-sdk/client-dynamodb": {
-      "optional": true
-    },
-    "@aws-sdk/client-s3": {
-      "optional": true
-    }
   },
   "dependencies": {
     "@faker-js/faker": "^10.4.0",

@@ -1,4 +1,5 @@
 import { StaticFactory } from "@kensio/part-factory";
+import type { SimArn } from "../../aws/arn.js";
 
 export interface SimCloudFrontBehavior {
   pathPattern?: string; // undefined/default = *
@@ -7,7 +8,14 @@ export interface SimCloudFrontBehavior {
   cachedMethods: Set<string>;
   viewerProtocolPolicy?: "allow-all" | "redirect-to-https" | "https-only";
   originPath?: string;
+  functionAssociations?:
+    | {
+        viewerRequest?: SimArn;
+        viewerResponse?: SimArn;
+      }
+    | undefined;
 }
+
 /**
  * Generate a fake SimCloudFrontBehavior.
  */

@@ -9,10 +9,10 @@ export interface SimListObjectsCommand {
  * Minimal structural sim S3 ListObjects input.
  */
 export interface SimListObjectsCommandInput {
-  readonly Bucket?: string;
-  readonly Prefix?: string;
-  readonly Marker?: string;
-  readonly MaxKeys?: number;
+  readonly Bucket?: string | undefined;
+  readonly Prefix?: string | undefined;
+  readonly Marker?: string | undefined;
+  readonly MaxKeys?: number | undefined;
 }
 
 /**

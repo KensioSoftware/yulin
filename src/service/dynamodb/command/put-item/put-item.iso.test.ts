@@ -103,20 +103,20 @@ describe("DynamoDB PutItemCommand", () => {
 
     // Map
     assertIdentical(
-      putItemOutput.Attributes["address"]?.M?.street?.S,
+      putItemOutput.Attributes["address"]?.M?.["street"]?.S,
       "123 High Street",
     );
-    assertIdentical(putItemOutput.Attributes["address"].M.city?.S, "London");
+    assertIdentical(putItemOutput.Attributes["address"].M["city"]?.S, "London");
     assertIdentical(
-      putItemOutput.Attributes["address"].M.postcode?.S,
+      putItemOutput.Attributes["address"].M["postcode"]?.S,
       "AB1 2CD",
     );
     assertIdentical(
-      putItemOutput.Attributes["address"].M.coordinates?.M?.lat?.N,
+      putItemOutput.Attributes["address"].M["coordinates"]?.M?.["lat"]?.N,
       "51.5",
     );
     assertIdentical(
-      putItemOutput.Attributes["address"].M.coordinates.M.lon?.N,
+      putItemOutput.Attributes["address"].M["coordinates"].M["lon"]?.N,
       "-0.1",
     );
 

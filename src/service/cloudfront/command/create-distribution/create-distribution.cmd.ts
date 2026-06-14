@@ -76,6 +76,7 @@ export interface SimCloudFrontDefaultCacheBehaviorConfig {
   readonly TargetOriginId?: string | undefined;
   readonly AllowedMethods?: SimCloudFrontAllowedMethods | undefined;
   readonly ViewerProtocolPolicy?: SimCloudFrontViewerProtocolPolicy | undefined;
+  readonly FunctionAssociations?: SimCloudFrontFunctionAssociations | undefined;
 }
 
 /**
@@ -83,6 +84,28 @@ export interface SimCloudFrontDefaultCacheBehaviorConfig {
  */
 export interface SimCloudFrontCacheBehaviorConfig extends SimCloudFrontDefaultCacheBehaviorConfig {
   readonly PathPattern?: string | undefined;
+  readonly FunctionAssociations?: SimCloudFrontFunctionAssociations | undefined;
+}
+
+/**
+ * Minimal structural sim CloudFront function associations list.
+ */
+export interface SimCloudFrontFunctionAssociations {
+  readonly Quantity?: number | undefined;
+  readonly Items?: readonly SimCloudFrontFunctionAssociation[] | undefined;
+}
+
+/**
+ * Minimal structural sim CloudFront function association.
+ */
+export interface SimCloudFrontFunctionAssociation {
+  readonly EventType?:
+    | "viewer-request"
+    | "viewer-response"
+    | "origin-request"
+    | "origin-response"
+    | undefined;
+  readonly FunctionARN?: string | undefined;
 }
 
 /**
