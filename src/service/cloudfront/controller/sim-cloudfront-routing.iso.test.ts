@@ -73,7 +73,7 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
     assertNonNullable(distributionId);
 
     const res = await new SimCloudFrontServiceController({
-      cloudFront,
+      simAws,
     }).handleRequest(
       cloudFrontTarget,
       new Request(
@@ -165,7 +165,7 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
     assertNonNullable(distributionId);
 
     const res = await new SimCloudFrontServiceController({
-      cloudFront,
+      simAws,
     }).handleRequest(
       cloudFrontTarget,
       new Request(
@@ -274,7 +274,7 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
     assertNonNullable(distributionId);
 
     const res = await new SimCloudFrontServiceController({
-      cloudFront,
+      simAws,
     }).handleRequest(
       cloudFrontTarget,
       new Request(

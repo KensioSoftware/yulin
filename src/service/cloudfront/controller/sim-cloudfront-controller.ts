@@ -6,36 +6,46 @@ import type { SimCloudFrontDistroRouter } from "../router/sim-cloud-front-distro
 import { SimCloudFrontDistroRouter as DefaultSimCloudFrontDistroRouter } from "../router/sim-cloud-front-distro-router.js";
 import type { SimCloudFrontBehaviorResolver } from "../resolver/sim-cloud-front-behavior-resolver.js";
 import { SimCloudFrontBehaviorResolver as DefaultSimCloudFrontBehaviorResolver } from "../resolver/sim-cloud-front-behavior-resolver.js";
-import { SimCloudFront } from "../sim-cloudfront.js";
+import type { SimCloudFront } from "../sim-cloudfront.js";
 import { assertDefined } from "../../../util/defined/defined.js";
 import type { SimCloudFrontBehavior } from "../behaviour/sim-cloud-front-behavior.js";
+import { SimAws } from "../../aws/sim-aws.js";
+import type { SimCloudFrontRegistry } from "../sim-cloud-front-registry.js";
+
+type SimCloudFrontControllerAws = Pick<
+  SimAws,
+  "accountRegionScope" | "_cloudFrontRegistry"
+>;
 
 interface SimCloudFrontServiceControllerProps {
-  readonly cloudFront?: SimCloudFront;
+  readonly simAws?: SimCloudFrontControllerAws;
+  readonly cloudFrontRegistry?: SimCloudFrontRegistry;
   readonly distroRouter?: SimCloudFrontDistroRouter;
   readonly behaviourResolver?: SimCloudFrontBehaviorResolver;
 }
 
 /**
- * Root CloudFront request controller within an Account scope.
+ * Root CloudFront request controller.
  * Controls the request processing workflow across the other simulated
  * CloudFront components.
  */
 export class SimCloudFrontServiceController implements SimAwsServiceController {
-  private readonly simCloudFront: SimCloudFront;
   private readonly distroRouter: SimCloudFrontDistroRouter;
   private readonly behaviourResolver: SimCloudFrontBehaviorResolver;
 
   constructor(props: SimCloudFrontServiceControllerProps = {}) {
+    const simAws = props.simAws ?? new SimAws();
+    const cloudFrontRegistry =
+      props.cloudFrontRegistry ?? simAws._cloudFrontRegistry();
+
     const {
-      cloudFront = new SimCloudFront(),
       distroRouter = new DefaultSimCloudFrontDistroRouter({
-        distributions: cloudFront.getDistributions(),
+        simAws,
+        cloudFrontRegistry,
       }),
       behaviourResolver = new DefaultSimCloudFrontBehaviorResolver(),
     } = props;
 
-    this.simCloudFront = cloudFront;
     this.distroRouter = distroRouter;
     this.behaviourResolver = behaviourResolver;
   }
@@ -50,18 +60,20 @@ export class SimCloudFrontServiceController implements SimAwsServiceController {
   ): Promise<Response> {
     let req = request;
 
-    const distro = this.distroRouter.distroForRequest(req);
+    const route = this.distroRouter.routeForRequest(req);
 
-    if (distro === undefined) {
+    if (route === undefined) {
       return new Response("Suitable sim CloudFront Distribution not found", {
         status: 404,
       });
     }
 
+    const { cloudFront, distribution: distro } = route;
+
     const behaviour = this.behaviourResolver.resolve(req, distro);
 
     // Handle viewer-request CFF, if any.
-    const cffResult = this.applyViewerRequestCff(req, behaviour);
+    const cffResult = this.applyViewerRequestCff(cloudFront, req, behaviour);
     if (cffResult instanceof Response) {
       return cffResult;
     }
@@ -84,13 +96,14 @@ export class SimCloudFrontServiceController implements SimAwsServiceController {
     });
 
     // Handle viewer-response CFF, if any.
-    return this.applyViewerResponseCff(req, res, behaviour);
+    return this.applyViewerResponseCff(cloudFront, req, res, behaviour);
   }
 
   /**
    * Apply viewer request CloudFront Function if configured.
    */
   private applyViewerRequestCff(
+    cloudFront: SimCloudFront,
     req: Request,
     behaviour: SimCloudFrontBehavior,
   ): Request | Response {
@@ -100,7 +113,7 @@ export class SimCloudFrontServiceController implements SimAwsServiceController {
     }
 
     const viewerRequestCff =
-      this.simCloudFront.getCloudFrontFunctionByArn(viewerRequestCffArn);
+      cloudFront.getCloudFrontFunctionByArn(viewerRequestCffArn);
     assertDefined(
       viewerRequestCff,
       `CloudFront Function ${viewerRequestCffArn} for viewer-request`,
@@ -118,6 +131,7 @@ export class SimCloudFrontServiceController implements SimAwsServiceController {
    * Apply viewer response CloudFront Function if configured.
    */
   private applyViewerResponseCff(
+    cloudFront: SimCloudFront,
     req: Request,
     res: Response,
     behaviour: SimCloudFrontBehavior,
@@ -128,7 +142,7 @@ export class SimCloudFrontServiceController implements SimAwsServiceController {
     }
 
     const viewerResponseCff =
-      this.simCloudFront.getCloudFrontFunctionByArn(viewerResponseCffArn);
+      cloudFront.getCloudFrontFunctionByArn(viewerResponseCffArn);
     assertDefined(
       viewerResponseCff,
       `CloudFront Function ${viewerResponseCffArn} for viewer-response`,

@@ -54,4 +54,20 @@ export class SimCloudFrontRegistry {
 
     accountDistributions.add(distributionId);
   }
+
+  /**
+   * Get the Account ID which owns a simulated CloudFront Distribution ID.
+   */
+  accountIdForDistribution(
+    distributionId: SimCloudFrontDistributionId,
+  ): SimAwsAccountId | undefined {
+    return this.distributionAccountIds.get(distributionId);
+  }
+
+  /**
+   * Get Account IDs which currently own simulated CloudFront Distributions.
+   */
+  accountIdsWithDistributions(): Iterable<SimAwsAccountId> {
+    return this.accountDistributionIds.keys();
+  }
 }
