@@ -15,7 +15,6 @@ export default defineConfig({
     "prefer-const": "off",
     "object-shorthand": "off",
     "prefer-template": "off",
-    "jsdoc/no-undefined-types": "off",
     "@typescript-eslint/explicit-function-return-type": "off",
     "@typescript-eslint/explicit-module-boundary-types": "off",
     "no-eval": "error",

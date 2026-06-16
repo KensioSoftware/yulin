@@ -261,6 +261,12 @@ export default defineConfig(
 
   // ── CloudFront Functions JS2
   ...cloudFrontFunctionsJs2,
+  {
+    files: ["**/*.cff.js"],
+    rules: {
+      "jsdoc/no-undefined-types": "off",
+    },
+  },
 
   // ── Prettier (must be last — disables conflicting rules)
   prettier,
