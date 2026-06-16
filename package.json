@@ -26,7 +26,6 @@
     "isolated"
   ],
   "exports": {
-    "./package.json": "./package.json",
     ".": {
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
@@ -43,6 +42,11 @@
       "import": "./dist/service/dynamodb/index.js",
       "types": "./dist/service/dynamodb/index.d.ts"
     },
+    "./eslint": {
+      "import": "./dist/config/eslint/index.js",
+      "types": "./dist/config/eslint/index.d.ts"
+    },
+    "./package.json": "./package.json",
     "./s3": {
       "import": "./dist/service/s3/index.js",
       "types": "./dist/service/s3/index.d.ts"
@@ -91,5 +95,17 @@
     "@faker-js/faker": "^10.4.0",
     "@kensio/part-factory": "^0.1.1",
     "lodash-es": "^4.18.1"
+  },
+  "peerDependencies": {
+    "eslint": "^10.4.1",
+    "typescript-eslint": "^8.60.0"
+  },
+  "peerDependenciesMeta": {
+    "eslint": {
+      "optional": true
+    },
+    "typescript-eslint": {
+      "optional": true
+    }
   }
 }

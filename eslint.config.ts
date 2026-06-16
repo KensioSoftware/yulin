@@ -12,6 +12,8 @@ import unicorn from "eslint-plugin-unicorn";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
+import { cloudFrontFunctionsJs2 } from "./src/config/eslint/index.js";
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const securityRecommended = security.configs.recommended as Parameters<
@@ -254,6 +256,15 @@ export default defineConfig(
           },
         },
       ],
+    },
+  },
+
+  // ── CloudFront Functions JS2
+  ...cloudFrontFunctionsJs2,
+  {
+    files: ["**/*.cff.js"],
+    rules: {
+      "jsdoc/no-undefined-types": "off",
     },
   },
 
