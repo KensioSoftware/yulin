@@ -1,4 +1,4 @@
-import { describe, it } from "vitest";
+import { describe, it, vi } from "vitest";
 import {
   BackgroundTasks,
   NonDeterministicBackgroundTasks,
@@ -113,39 +113,30 @@ describe("background sequencing", () => {
     });
 
     it("can execute scheduled tasks out of scheduling order", async () => {
-      const maxAttempts = 30;
-      const tasksPerAttempt = 10;
+      const random = vi.spyOn(Math, "random");
+      random.mockReturnValueOnce(1);
+      random.mockReturnValueOnce(0);
 
-      let foundNonDeterministicOrdering = false;
-
-      for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      try {
         const tasks = new NonDeterministicBackgroundTasks();
         const execOrder: number[] = [];
 
-        for (let taskIndex = 0; taskIndex < tasksPerAttempt; taskIndex += 1) {
-          const scheduledTaskIndex = taskIndex;
-          tasks.schedule(async () => {
-            execOrder.push(scheduledTaskIndex);
-            await Promise.resolve();
-          });
-        }
+        tasks.schedule(async () => {
+          execOrder.push(1);
+          await Promise.resolve();
+        });
+        tasks.schedule(async () => {
+          execOrder.push(2);
+          await Promise.resolve();
+        });
 
-        // eslint-disable-next-line no-await-in-loop
         await tasks.complete();
 
-        foundNonDeterministicOrdering = execOrder.some(
-          (taskIndex, execIndex) => taskIndex !== execIndex,
-        );
-
-        if (foundNonDeterministicOrdering) {
-          break;
-        }
+        assertIdentical(execOrder[0], 2);
+        assertIdentical(execOrder[1], 1);
+      } finally {
+        random.mockRestore();
       }
-
-      assertTrue(
-        foundNonDeterministicOrdering,
-        "Non-deterministic background sequencing",
-      );
     });
 
     it("handles tasks that schedule more tasks", async () => {
