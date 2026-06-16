@@ -36,10 +36,15 @@ import type {
   SimCreateBucketCommand,
   SimCreateBucketCommandOutput,
 } from "./command/create-bucket/create-bucket.cmd.js";
+import {
+  type BackgroundScheduler,
+  BackgroundTasks,
+} from "../../util/background/background.js";
 
 interface SimS3Props {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
   readonly s3GlobalRegistry?: SimS3GlobalRegistry;
+  readonly background?: BackgroundScheduler;
 }
 
 /**
@@ -52,15 +57,18 @@ export class SimS3 {
 
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly s3GlobalRegistry: SimS3GlobalRegistry;
+  private readonly background: BackgroundScheduler;
 
   constructor(props: SimS3Props = {}) {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       s3GlobalRegistry = new SimS3GlobalRegistry(),
+      background = new BackgroundTasks(),
     } = props;
 
     this.accountRegionScope = accountRegionScope;
     this.s3GlobalRegistry = s3GlobalRegistry;
+    this.background = background;
   }
 
   /**
@@ -73,6 +81,7 @@ export class SimS3 {
       accountRegionScope: this.accountRegionScope,
       buckets: this.buckets,
       s3GlobalRegistry: this.s3GlobalRegistry,
+      background: this.background,
     });
     return await handler.handle(cmd);
   }
@@ -85,6 +94,7 @@ export class SimS3 {
   ): Promise<SimPutBucketWebsiteCommandOutput> {
     const handler = new PutBucketWebsiteCommandHandler({
       buckets: this.buckets,
+      background: this.background,
     });
     return await handler.handle(cmd);
   }
@@ -95,7 +105,10 @@ export class SimS3 {
   async listBuckets(
     cmd: SimListBucketsCommand,
   ): Promise<SimListBucketsCommandOutput> {
-    const handler = new ListBucketsCommandHandler({ buckets: this.buckets });
+    const handler = new ListBucketsCommandHandler({
+      buckets: this.buckets,
+      background: this.background,
+    });
     return await handler.handle(cmd);
   }
 
@@ -105,7 +118,10 @@ export class SimS3 {
   async putObject(
     cmd: SimPutObjectCommand,
   ): Promise<SimPutObjectCommandOutput> {
-    const handler = new PutObjectCommandHandler({ buckets: this.buckets });
+    const handler = new PutObjectCommandHandler({
+      buckets: this.buckets,
+      background: this.background,
+    });
     return await handler.handle(cmd);
   }
 
@@ -115,7 +131,10 @@ export class SimS3 {
   async getObject(
     cmd: SimGetObjectCommand,
   ): Promise<SimGetObjectCommandOutput> {
-    const handler = new GetObjectCommandHandler({ buckets: this.buckets });
+    const handler = new GetObjectCommandHandler({
+      buckets: this.buckets,
+      background: this.background,
+    });
     return await handler.handle(cmd);
   }
 
@@ -125,7 +144,10 @@ export class SimS3 {
   async listObjects(
     cmd: SimListObjectsCommand,
   ): Promise<SimListObjectsCommandOutput> {
-    const handler = new ListObjectsCommandHandler({ buckets: this.buckets });
+    const handler = new ListObjectsCommandHandler({
+      buckets: this.buckets,
+      background: this.background,
+    });
     return await handler.handle(cmd);
   }
 

@@ -6,7 +6,6 @@ import type {
 } from "./create-table.cmd.js";
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import type { CommandHandler } from "../../../../command/command-handler.js";
-import { jitter } from "../../../../util/sleep.js";
 import { assertDefined } from "../../../../util/defined/defined.js";
 import type { SimArn } from "../../../aws/arn.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
@@ -52,7 +51,8 @@ export class CreateTableCommandHandler implements CommandHandler<
       );
     }
 
-    await jitter();
+    // Allow for potential non-deterministic sequencing of async events.
+    await this.background.sequence();
 
     const tableArn: SimArn = `arn:aws:dynamodb:${this.accountRegionScope.regionName}:${this.accountRegionScope.accountId}:table/${tableName}`;
     const table = new SimDynamoDbTable({

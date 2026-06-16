@@ -8,18 +8,22 @@ import {
   type SimS3BucketName,
 } from "../../bucket/sim-s3-bucket.js";
 import { assertDefined } from "../../../../util/defined/defined.js";
-import { jitter } from "../../../../util/sleep.js";
 import type { SimS3GlobalRegistry } from "../../sim-s3-global-registry.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import {
   SimS3BucketAlreadyExists,
   SimS3BucketAlreadyOwnedByYou,
 } from "../../error/s3.error.js";
+import {
+  type BackgroundScheduler,
+  BackgroundTasks,
+} from "../../../../util/background/background.js";
 
 interface CreateBucketCommandHandlerProps {
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly buckets: Map<string, SimS3Bucket>;
   readonly s3GlobalRegistry: SimS3GlobalRegistry;
+  readonly background?: BackgroundScheduler;
 }
 
 /**
@@ -34,11 +38,19 @@ export class CreateBucketCommandHandler implements CommandHandler<
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly buckets: Map<string, SimS3Bucket>;
   private readonly s3GlobalRegistry: SimS3GlobalRegistry;
+  private readonly background: BackgroundScheduler;
 
   constructor(props: CreateBucketCommandHandlerProps) {
-    this.accountRegionScope = props.accountRegionScope;
-    this.buckets = props.buckets;
-    this.s3GlobalRegistry = props.s3GlobalRegistry;
+    const {
+      accountRegionScope,
+      buckets,
+      s3GlobalRegistry,
+      background = new BackgroundTasks(),
+    } = props;
+    this.accountRegionScope = accountRegionScope;
+    this.buckets = buckets;
+    this.s3GlobalRegistry = s3GlobalRegistry;
+    this.background = background;
   }
 
   /**
@@ -49,7 +61,8 @@ export class CreateBucketCommandHandler implements CommandHandler<
   ): Promise<SimCreateBucketCommandOutput> {
     assertDefined(cmd.input.Bucket, "CreateBucketCommand.input.Bucket");
 
-    await jitter();
+    // Allow for potential non-deterministic sequencing of async events.
+    await this.background.sequence();
 
     const bucketName = cmd.input.Bucket as SimS3BucketName;
 

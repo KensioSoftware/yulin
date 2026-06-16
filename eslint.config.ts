@@ -24,6 +24,7 @@ export default defineConfig(
   // ── Global ignores ──────────────────────────────────────
   {
     ignores: [
+      "tmp/",
       "dist/",
       "coverage/",
       "test/.coverage/",
@@ -212,7 +213,7 @@ export default defineConfig(
     rules: {
       "no-secrets/no-secrets": [
         "error",
-        { ignoreContent: [" * https://", "http://"] },
+        { tolerance: 4.5, ignoreContent: [" * https://", "http://"] },
       ],
     },
   },

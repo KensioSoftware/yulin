@@ -4,13 +4,17 @@ import type {
   SimListBucketsCommandOutput,
 } from "./list-buckets.cmd.js";
 import type {
-  SimS3BucketName,
   SimS3Bucket,
+  SimS3BucketName,
 } from "../../bucket/sim-s3-bucket.js";
-import { jitter } from "../../../../util/sleep.js";
+import {
+  type BackgroundScheduler,
+  BackgroundTasks,
+} from "../../../../util/background/background.js";
 
 interface ListBucketsCommandHandlerProps {
   readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
+  readonly background?: BackgroundScheduler;
 }
 
 /**
@@ -23,9 +27,12 @@ export class ListBucketsCommandHandler implements CommandHandler<
   SimListBucketsCommandOutput
 > {
   private readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
+  private readonly background: BackgroundScheduler;
 
   constructor(props: ListBucketsCommandHandlerProps) {
-    this.buckets = props.buckets;
+    const { buckets, background = new BackgroundTasks() } = props;
+    this.buckets = buckets;
+    this.background = background;
   }
 
   /**
@@ -34,7 +41,8 @@ export class ListBucketsCommandHandler implements CommandHandler<
   async handle(
     cmd: SimListBucketsCommand,
   ): Promise<SimListBucketsCommandOutput> {
-    await jitter();
+    // Allow for potential non-deterministic sequencing of async events.
+    await this.background.sequence();
 
     const buckets = [...this.buckets.values()];
     buckets.sort((a, b) => a.bucketName.localeCompare(b.bucketName));

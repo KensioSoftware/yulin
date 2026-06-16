@@ -75,7 +75,10 @@ export class SimDynamoDb {
   async listTables(
     cmd: SimListTablesCommand,
   ): Promise<SimListTablesCommandOutput> {
-    const handler = new ListTablesCommandHandler({ tables: this.tables });
+    const handler = new ListTablesCommandHandler({
+      tables: this.tables,
+      background: this.background,
+    });
     return await handler.handle(cmd);
   }
 
@@ -85,7 +88,10 @@ export class SimDynamoDb {
   async describeTable(
     cmd: SimDescribeTableCommand,
   ): Promise<SimDescribeTableCommandOutput> {
-    const handler = new DescribeTableCommandHandler({ tables: this.tables });
+    const handler = new DescribeTableCommandHandler({
+      tables: this.tables,
+      background: this.background,
+    });
     return await handler.handle(cmd);
   }
 

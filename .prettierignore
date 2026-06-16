@@ -1,3 +1,4 @@
+tmp/
 dist/
 coverage/
 test/.coverage/

@@ -7,10 +7,14 @@ import type {
   DynamoDbTableName,
   SimDynamoDbTable,
 } from "../../table/dynamodb-table.js";
-import { jitter } from "../../../../util/sleep.js";
+import {
+  type BackgroundScheduler,
+  BackgroundTasks,
+} from "../../../../util/background/background.js";
 
 interface ListTablesCommandHandlerProps {
   readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>;
+  readonly background?: BackgroundScheduler;
 }
 
 /**
@@ -23,16 +27,20 @@ export class ListTablesCommandHandler implements CommandHandler<
   SimListTablesCommandOutput
 > {
   private readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>;
+  private readonly background: BackgroundScheduler;
 
   constructor(props: ListTablesCommandHandlerProps) {
-    this.tables = props.tables;
+    const { tables, background = new BackgroundTasks() } = props;
+    this.tables = tables;
+    this.background = background;
   }
 
   /**
    * Simulate listing DynamoDB Tables.
    */
   async handle(cmd: SimListTablesCommand): Promise<SimListTablesCommandOutput> {
-    await jitter();
+    // Allow for potential non-deterministic sequencing of async events.
+    await this.background.sequence();
 
     const tables = [...this.tables.values()];
     tables.sort((a, b) => a.tableName.localeCompare(b.tableName));
