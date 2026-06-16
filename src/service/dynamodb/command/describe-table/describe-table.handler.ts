@@ -7,11 +7,15 @@ import type {
   DynamoDbTableName,
   SimDynamoDbTable,
 } from "../../table/dynamodb-table.js";
-import { jitter } from "../../../../util/sleep.js";
 import { SimDynamoDbResourceNotFoundException } from "../../error/dynamodb.error.js";
+import {
+  type BackgroundScheduler,
+  BackgroundTasks,
+} from "../../../../util/background/background.js";
 
 interface DescribeTableCommandHandlerProps {
   readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>;
+  readonly background?: BackgroundScheduler;
 }
 
 /**
@@ -24,9 +28,12 @@ export class DescribeTableCommandHandler implements CommandHandler<
   SimDescribeTableCommandOutput
 > {
   private readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>;
+  private readonly background: BackgroundScheduler;
 
   constructor(props: DescribeTableCommandHandlerProps) {
-    this.tables = props.tables;
+    const { tables, background = new BackgroundTasks() } = props;
+    this.tables = tables;
+    this.background = background;
   }
 
   /**
@@ -40,7 +47,8 @@ export class DescribeTableCommandHandler implements CommandHandler<
     }
     const tableName = cmd.input.TableName as DynamoDbTableName;
 
-    await jitter();
+    // Allow for potential non-deterministic sequencing of async events.
+    await this.background.sequence();
 
     const table = this.tables.get(tableName);
     if (table === undefined) {

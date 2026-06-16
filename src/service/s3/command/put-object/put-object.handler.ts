@@ -9,11 +9,15 @@ import type {
 } from "../../bucket/sim-s3-bucket.js";
 import { SimS3Object, SimS3ObjectMetadata } from "../../object/s3-object.js";
 import { assertDefined } from "../../../../util/defined/defined.js";
-import { jitter } from "../../../../util/sleep.js";
+import {
+  type BackgroundScheduler,
+  BackgroundTasks,
+} from "../../../../util/background/background.js";
 import { SimS3NoSuchBucket } from "../../error/s3.error.js";
 
 interface PutObjectCommandHandlerProps {
   readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
+  readonly background?: BackgroundScheduler;
 }
 
 /**
@@ -26,9 +30,12 @@ export class PutObjectCommandHandler implements CommandHandler<
   SimPutObjectCommandOutput
 > {
   private readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
+  private readonly background: BackgroundScheduler;
 
   constructor(props: PutObjectCommandHandlerProps) {
-    this.buckets = props.buckets;
+    const { buckets, background = new BackgroundTasks() } = props;
+    this.buckets = buckets;
+    this.background = background;
   }
 
   /**
@@ -44,7 +51,8 @@ export class PutObjectCommandHandler implements CommandHandler<
       throw new SimS3NoSuchBucket(`No S3 Bucket named ${bucketName}`);
     }
 
-    await jitter();
+    // Allow for potential non-deterministic sequencing of async events.
+    await this.background.sequence();
 
     const object = new SimS3Object({
       key: cmd.input.Key,

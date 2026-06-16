@@ -297,3 +297,7 @@ dmypy.json
 .localstack-volume/
 .docker/
 .dockervolumes/
+
+tmp/
+*.tmp
+*.tmp.*

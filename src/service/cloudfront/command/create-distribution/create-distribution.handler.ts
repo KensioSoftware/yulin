@@ -4,7 +4,6 @@ import type {
   SimCreateDistributionCommandOutput,
 } from "./create-distribution.cmd.js";
 import type { SimCloudFrontRegistry } from "../../sim-cloud-front-registry.js";
-import { jitter } from "../../../../util/sleep.js";
 import {
   SimCloudFrontDistribution,
   type SimCloudFrontDistributionId,
@@ -63,13 +62,14 @@ export class CreateDistributionCommandHandler implements CommandHandler<
   async handle(
     cmd: SimCreateDistributionCommand,
   ): Promise<SimCreateDistributionCommandOutput> {
-    await jitter();
-
     const distributionConfig = cmd.input.DistributionConfig;
     assertDefined(
       distributionConfig,
       "CreateDistributionCommand.DistributionConfig",
     );
+
+    // Allow for potential non-deterministic sequencing of async events.
+    await this.background.sequence();
 
     const distributionId = this.cloudFrontRegistry.allocateDistributionId();
     const distribution = new SimCloudFrontDistribution({

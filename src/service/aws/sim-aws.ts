@@ -157,6 +157,7 @@ export class SimAws {
     return new SimS3({
       accountRegionScope: scope.accountRegionScope,
       s3GlobalRegistry: this.s3GlobalRegistry,
+      background: this.background,
     });
   }
 

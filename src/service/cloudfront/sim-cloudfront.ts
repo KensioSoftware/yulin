@@ -110,6 +110,7 @@ export class SimCloudFront {
   ): Promise<SimGetDistributionCommandOutput> {
     const handler = new GetDistributionCommandHandler({
       distributions: this.distributions,
+      background: this.background,
     });
     return await handler.handle(cmd);
   }

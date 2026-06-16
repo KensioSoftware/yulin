@@ -3,18 +3,22 @@ import type {
   SimGetDistributionCommandOutput,
 } from "./get-distribution.cmd.js";
 import type { CommandHandler } from "../../../../command/command-handler.js";
-import { jitter } from "../../../../util/sleep.js";
 import type {
   SimCloudFrontDistribution,
   SimCloudFrontDistributionId,
 } from "../../distribution/sim-cloudfront-distribution.js";
 import { SimCloudFrontResourceNotFoundException } from "../../error/sim-cloudfront.error.js";
+import {
+  type BackgroundScheduler,
+  BackgroundTasks,
+} from "../../../../util/background/background.js";
 
 interface GetDistributionCommandHandlerProps {
   readonly distributions: Map<
     SimCloudFrontDistributionId,
     SimCloudFrontDistribution
   >;
+  readonly background?: BackgroundScheduler;
 }
 
 /**
@@ -30,9 +34,12 @@ export class GetDistributionCommandHandler implements CommandHandler<
     SimCloudFrontDistributionId,
     SimCloudFrontDistribution
   >;
+  private readonly background: BackgroundScheduler;
 
   constructor(props: GetDistributionCommandHandlerProps) {
-    this.distributions = props.distributions;
+    const { distributions, background = new BackgroundTasks() } = props;
+    this.distributions = distributions;
+    this.background = background;
   }
 
   /**
@@ -46,7 +53,8 @@ export class GetDistributionCommandHandler implements CommandHandler<
     }
     const distributionId = cmd.input.Id as SimCloudFrontDistributionId;
 
-    await jitter();
+    // Allow for potential non-deterministic sequencing of async events.
+    await this.background.sequence();
 
     const distribution = this.distributions.get(distributionId);
     if (distribution === undefined) {

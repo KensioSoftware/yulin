@@ -3,7 +3,6 @@ import type {
   SimCreateFunctionCommand,
   SimCreateFunctionCommandOutput,
 } from "./create-function.cmd.js";
-import { jitter } from "../../../../util/sleep.js";
 import { assertDefined } from "../../../../util/defined/defined.js";
 import {
   SimCloudFrontFunction,
@@ -63,7 +62,8 @@ export class CreateFunctionCommandHandler implements CommandHandler<
       "CreateFunctionCommand.input.FunctionCode",
     );
 
-    await jitter();
+    // Allow for potential non-deterministic sequencing of async events.
+    await this.background.sequence();
 
     const handlerFunction = new CffUint8ArrayFunctionCodeExtractor(
       cmd.input.FunctionCode,
