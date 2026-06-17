@@ -35,5 +35,5 @@
     "outDir": "dist",
     "rootDir": "."
   },
-  "include": ["src/**/*", "test/**/*", "typings/**/*.d.ts"]
+  "include": ["src/**/*", "test/**/*", "scripts/**/*.mts", "typings/**/*.d.ts"]
 }

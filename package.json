@@ -15,7 +15,11 @@
     "test:coverage": "vitest run --coverage",
     "test:iso": "vitest run --project isolatedTests",
     "test:local": "vitest run --project localTests",
-    "check": "pnpm fmt && pnpm build:check && pnpm test:coverage"
+    "examples:extract": "pnpm tsx scripts/mts/extract-docs-examples.mts",
+    "examples:tsc": "tsc -p tsconfig.examples.json",
+    "examples:lint": "eslint \"docs/**/*.example.ts\"",
+    "examples:check": "pnpm examples:extract && pnpm examples:tsc && pnpm examples:lint",
+    "check": "pnpm fmt && pnpm build:check && pnpm examples:check && pnpm test:coverage"
   },
   "keywords": [
     "aws",
@@ -63,7 +67,7 @@
   ],
   "author": "Kensio Software",
   "license": "AGPL-3.0",
-  "packageManager": "pnpm@11.6.0",
+  "packageManager": "pnpm@11.7.0",
   "devDependencies": {
     "@aws-sdk/client-cloudfront": "^3.1063.0",
     "@aws-sdk/client-dynamodb": "^3.1057.0",
@@ -87,6 +91,7 @@
     "globals": "^17.6.0",
     "jiti": "^2.7.0",
     "prettier": "^3.8.3",
+    "tsx": "^4.22.4",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.60.0",
     "vitest": "^4.1.7"
