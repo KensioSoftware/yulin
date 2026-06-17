@@ -26,6 +26,7 @@ import { SimCloudFrontRegistry } from "../cloudfront/sim-cloud-front-registry.js
 import { createSimCloudFrontS3OriginResolver } from "../cloudfront/origin/sim-cloudfront-s3-origin.js";
 import { SimCloudFrontServiceController } from "../cloudfront/controller/sim-cloudfront-controller.js";
 import { SimDynamoDb } from "../dynamodb/index.js";
+import { SimCloudFormation } from "../cloudformation/index.js";
 
 interface SimAwsProps {
   readonly defaultAccountId?: SimAwsAccountId;
@@ -130,10 +131,10 @@ export class SimAws {
   }
 
   /**
-   * Get simulated S3 in the default Account Region scope.
+   * Get simulated CloudFormation in the default Account Region scope.
    */
-  s3(): SimS3 {
-    return this.accountRegionScope().s3();
+  cloudFormation(): SimCloudFormation {
+    return this.accountRegionScope().cloudFormation();
   }
 
   /**
@@ -151,12 +152,21 @@ export class SimAws {
   }
 
   /**
-   * Create simulated S3 for an Account Region scope.
+   * Get simulated S3 in the default Account Region scope.
    */
-  _createS3(scope: SimAwsAccountRegionContainer): SimS3 {
-    return new SimS3({
+  s3(): SimS3 {
+    return this.accountRegionScope().s3();
+  }
+
+  /**
+   * Create simulated CloudFormation for an Account Region scope.
+   */
+  _createCloudFormation(
+    scope: SimAwsAccountRegionContainer,
+  ): SimCloudFormation {
+    return new SimCloudFormation({
+      simAws: this,
       accountRegionScope: scope.accountRegionScope,
-      s3GlobalRegistry: this.s3GlobalRegistry,
       background: this.background,
     });
   }
@@ -198,6 +208,17 @@ export class SimAws {
   _createDynamoDb(scope: SimAwsAccountRegionContainer): SimDynamoDb {
     return new SimDynamoDb({
       accountRegionScope: scope.accountRegionScope,
+      background: this.background,
+    });
+  }
+
+  /**
+   * Create simulated S3 for an Account Region scope.
+   */
+  _createS3(scope: SimAwsAccountRegionContainer): SimS3 {
+    return new SimS3({
+      accountRegionScope: scope.accountRegionScope,
+      s3GlobalRegistry: this.s3GlobalRegistry,
       background: this.background,
     });
   }

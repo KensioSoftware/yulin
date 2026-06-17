@@ -34,6 +34,10 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     },
+    "./cloudformation": {
+      "import": "./dist/service/cloudformation/index.js",
+      "types": "./dist/service/cloudformation/index.d.ts"
+    },
     "./cloudfront": {
       "import": "./dist/service/cloudfront/index.js",
       "types": "./dist/service/cloudfront/index.d.ts"
