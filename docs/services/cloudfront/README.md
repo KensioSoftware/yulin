@@ -30,7 +30,11 @@ depending on whether the simulator needs them to model the requested behaviour s
 Create a simulated AWS environment, add a sim S3 Bucket, and create a sim CloudFront Distribution
 pointing at that Bucket.
 
-```typescript
+```typescript sim-cloudfront-distribution-s3-origin
+/**
+ * Creating a simulated CloudFront Distribution with a simulated S3 Origin.
+ */
+
 import { CreateDistributionCommand } from "@aws-sdk/client-cloudfront";
 import { CreateBucketCommand } from "@aws-sdk/client-s3";
 
@@ -79,7 +83,11 @@ console.log(createDistroOut.Distribution?.DomainName);
 
 Use `serveSimAws` when you want to make real HTTP requests to the simulated system on localhost.
 
-```typescript
+```typescript serve-sim-cloudfront-localhost
+/**
+ * Serving a simulated CloudFront Distribution on localhost.
+ */
+
 import { CreateDistributionCommand } from "@aws-sdk/client-cloudfront";
 import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 
@@ -158,7 +166,11 @@ The sim CloudFront supports `viewer-request` and `viewer-response` CloudFront Fu
 
 Use `makeCffFunctionCodeInput` to pass a JavaScript handler function to `CreateFunctionCommand`.
 
-```typescript
+```typescript sim-cloudfront-function
+/**
+ * Simulated CloudFront Functions.
+ */
+
 import {
   CreateDistributionCommand,
   CreateFunctionCommand,

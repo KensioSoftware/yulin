@@ -49,7 +49,10 @@ export default defineConfig(
         ...globals.node,
       },
       parserOptions: {
-        projectService: true,
+        projectService: {
+          allowDefaultProject: ["docs/*/*/*.example.ts"],
+          defaultProject: "tsconfig.examples.json",
+        },
         tsconfigRootDir: __dirname,
       },
     },
@@ -204,6 +207,23 @@ export default defineConfig(
     files: ["*.config.ts", "*.config.js"],
     rules: {
       "import-x/no-default-export": "off",
+    },
+  },
+
+  // ── Documentation examples ─────────────────────────────
+  {
+    files: ["docs/**/*.example.ts", "docs/**/*.examples.ts"],
+    rules: {
+      "no-console": "off",
+    },
+  },
+
+  // ── Project scripts ────────────────────────────────────
+  {
+    files: ["scripts/**/*.mts"],
+    rules: {
+      "no-await-in-loop": "off",
+      "security/detect-non-literal-fs-filename": "off",
     },
   },
 
