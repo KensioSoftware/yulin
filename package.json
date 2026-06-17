@@ -77,7 +77,7 @@
     "@aws-sdk/client-dynamodb": "^3.1057.0",
     "@aws-sdk/client-s3": "^3.1057.0",
     "@eslint/js": "^10.0.1",
-    "@kensio/smartass": "^1.11.0",
+    "@kensio/smartass": "^1.20.0",
     "@smithy/smithy-client": "^4.13.5",
     "@smithy/types": "^4.14.2",
     "@types/eslint-plugin-security": "^3.0.1",

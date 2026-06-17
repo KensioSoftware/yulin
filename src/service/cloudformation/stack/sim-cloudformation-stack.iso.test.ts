@@ -7,15 +7,16 @@ describe("SimCloudFormationStack", () => {
     const simAws = new SimAws();
 
     const cloudFormation = simAws.cloudFormation();
-    const stack = cloudFormation.createStack({
-      template: {},
+    const createStackOutput = await cloudFormation.createStack({
+      input: {
+        StackName: "TestStack",
+        TemplateBody: JSON.stringify({}),
+      },
     });
+    const stack = cloudFormation.stacks.get("TestStack" as never);
 
-    assertIdentical(stack.status, "REVIEW_IN_PROGRESS");
-
-    await stack.deploy();
-
-    assertIdentical(stack.status, "CREATE_IN_PROGRESS");
+    assertIdentical(createStackOutput.StackId, "TestStack");
+    assertIdentical(stack?.status, "CREATE_IN_PROGRESS");
 
     await simAws.backgroundTasksComplete();
 

@@ -4,15 +4,26 @@ import {
   simAwsAccountRegionScopeFactory,
 } from "../aws/sim-aws-account-region-scope.js";
 import type { SimAws } from "../aws/sim-aws.js";
-import {
+import type {
   SimCloudFormationStack,
-  type SimCloudFormationStackName,
-  type SimCloudFormationTemplate,
+  SimCloudFormationStackName,
+  SimCloudFormationTemplate,
 } from "./stack/sim-cloudformation-stack.js";
 import type {
   BackgroundCompleter,
   BackgroundScheduler,
 } from "../../util/background/background.js";
+import { assertDefined } from "../../util/defined/defined.js";
+import { CreateStackCommandHandler } from "./command/create-stack/create-stack.handler.js";
+import type {
+  SimCreateStackCommand,
+  SimCreateStackCommandOutput,
+} from "./command/create-stack/create-stack.cmd.js";
+import type {
+  SimDescribeStacksCommand,
+  SimDescribeStacksCommandOutput,
+} from "./command/describe-stacks/describe-stacks.cmd.js";
+import { DescribeStacksCommandHandler } from "./command/describe-stacks/describe-stacks.handler.js";
 
 interface SimCloudFormationProps {
   readonly simAws: SimAws;
@@ -50,36 +61,52 @@ export class SimCloudFormation {
   }
 
   /**
-   * Create a simulated CloudFormation Stack from a parsed template object.
+   * Handle a Create Stack Command from the SDK.
    */
-  createStack(
-    props: SimCloudFormationCreateStackProps,
-  ): SimCloudFormationStack {
-    const { stackName = makeSimCloudFormationStackName(), template } = props;
-    const simStackName = stackName as SimCloudFormationStackName;
-    const stack = new SimCloudFormationStack({
+  async createStack(
+    cmd: SimCreateStackCommand,
+  ): Promise<SimCreateStackCommandOutput> {
+    const handler = new CreateStackCommandHandler({
       simAws: this.simAws,
+      stacks: this.stacks,
       background: this.background,
-      stackName: simStackName,
-      template,
     });
-
-    this.stacks.set(stack.stackName, stack);
-
-    return stack;
+    return await handler.handle(cmd);
   }
 
   /**
-   * Create and deploy a simulated CloudFormation Stack from a parsed template
-   * object.
+   * Handle a Describe Stacks Command from the SDK.
+   */
+  async describeStacks(
+    cmd: SimDescribeStacksCommand,
+  ): Promise<SimDescribeStacksCommandOutput> {
+    const handler = new DescribeStacksCommandHandler({
+      stacks: this.stacks,
+      background: this.background,
+    });
+    return await handler.handle(cmd);
+  }
+
+  /**
+   * Convenience wrapper method to create and deploy a simulated CloudFormation
+   * Stack from a parsed template object.
    */
   async deployTemplate(
     props: SimCloudFormationCreateStackProps,
   ): Promise<SimCloudFormationStack> {
-    const stack = this.createStack(props);
+    const stackName = props.stackName ?? makeSimCloudFormationStackName();
 
-    await stack.deploy();
+    await this.createStack({
+      input: {
+        StackName: stackName,
+        TemplateBody: JSON.stringify(props.template),
+      },
+    });
+
     await this.background.complete();
+
+    const stack = this.stacks.get(stackName as SimCloudFormationStackName);
+    assertDefined(stack, `Sim CloudFormation Stack named ${stackName}`);
 
     return stack;
   }
