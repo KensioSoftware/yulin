@@ -14,13 +14,6 @@ commands.
 
 A `SimDynamoDb` instance owns an in-memory map of tables:
 
-## Entry points
-
-- `sim-dynamodb.ts` is the main in-memory service object for one account/region scope.
-- `index.ts` exports the public DynamoDB simulator API for `@kensio/yulin/dynamodb`.
-
-A `SimDynamoDb` instance owns an in-memory map of tables:
-
 ```typescript
 Map<DynamoDbTableName, SimDynamoDbTable>;
 ```
