@@ -1,0 +1,11 @@
+# Simulated AWS usage documentation
+
+This directory contains area-specific documentation for Yulin.
+
+Each section includes explanations of the simulated behaviour and example code that can be copied
+into tests, local development scripts, or small experiments.
+
+## Service documentation
+
+- [CloudFront](./services/cloudfront/ "Simulated CloudFront usage docs")
+- [S3](./services/s3/ "Simulated S3 usage docs")

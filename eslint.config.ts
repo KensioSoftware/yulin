@@ -49,10 +49,7 @@ export default defineConfig(
         ...globals.node,
       },
       parserOptions: {
-        projectService: {
-          allowDefaultProject: ["docs/*/*/*.example.ts"],
-          defaultProject: "tsconfig.examples.json",
-        },
+        projectService: true,
         tsconfigRootDir: __dirname,
       },
     },

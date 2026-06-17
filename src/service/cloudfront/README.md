@@ -1,4 +1,4 @@
-# CloudFront implementation
+# Simulated CloudFront implementation
 
 Sim CloudFront usage docs: [`../../../docs/services/cloudfront/README.md`](../../../docs/services/cloudfront/README.md)
 
@@ -25,6 +25,11 @@ Each supported command has its own directory containing:
 - command input/output typing
 - a handler that applies AWS-like validation and state changes
 - tests for the simulated command Behavior
+
+It's important that nothing under `src/` imports from the real AWS SDK packages. Otherwise, users
+would have to install all AWS SDKs to be able to use Yulin. Instead, we define interfaces that have
+a similar shape to the real AWS SDK types. The tests use the real AWS SDK classes to confirm that
+those shapes fit the real AWS SDK types.
 
 Current command areas include:
 
