@@ -44,14 +44,14 @@ describe("SimCfnParameters", () => {
     assertIdentical(parameters.value("BucketName"), "default-bucket-name");
   });
 
-  it("resolves explicit Parameter override values", () => {
+  it("resolves explicit Parameter values", () => {
     const parameters = new SimCfnParameters({
       definitions: {
         BucketName: {
           Type: "String",
         },
       },
-      overrides: {
+      values: {
         BucketName: "override-bucket-name",
       },
     });
@@ -59,7 +59,7 @@ describe("SimCfnParameters", () => {
     assertIdentical(parameters.value("BucketName"), "override-bucket-name");
   });
 
-  it("prefers explicit Parameter override values over defaults", () => {
+  it("prefers explicit Parameter values over defaults", () => {
     const parameters = new SimCfnParameters({
       definitions: {
         BucketName: {
@@ -67,7 +67,7 @@ describe("SimCfnParameters", () => {
           Default: "default-bucket-name",
         },
       },
-      overrides: {
+      values: {
         BucketName: "override-bucket-name",
       },
     });
@@ -77,13 +77,126 @@ describe("SimCfnParameters", () => {
 
   it("records explicit Parameter values even when they are not defined in the template", () => {
     const parameters = new SimCfnParameters({
-      overrides: {
+      values: {
         ExternalParameter: "external-value",
       },
     });
 
     assertFalse(parameters.has("ExternalParameter"));
     assertIdentical(parameters.value("ExternalParameter"), "external-value");
+  });
+
+  it("creates Parameters from already-normalized values", () => {
+    const parameters = SimCfnParameters.fromValues(
+      {
+        BucketName: "override-bucket-name",
+      },
+      {
+        definitions: {
+          BucketName: {
+            Type: "String",
+          },
+        },
+      },
+    );
+
+    assertTrue(parameters.has("BucketName"));
+    assertIdentical(parameters.value("BucketName"), "override-bucket-name");
+  });
+
+  it("creates Parameters from command-style input", () => {
+    const parameters = SimCfnParameters.fromInput(
+      {
+        Parameters: [
+          {
+            ParameterKey: "BucketName",
+            ParameterValue: "override-bucket-name",
+          },
+          {
+            ParameterKey: "Environment",
+            ParameterValue: "test",
+          },
+        ],
+      },
+      {
+        definitions: {
+          BucketName: {
+            Type: "String",
+          },
+          Environment: {
+            Type: "String",
+          },
+        },
+      },
+    );
+
+    assertTrue(parameters.has("BucketName"));
+    assertTrue(parameters.has("Environment"));
+    assertIdentical(parameters.value("BucketName"), "override-bucket-name");
+    assertIdentical(parameters.value("Environment"), "test");
+  });
+
+  it("ignores incomplete command-style Parameter input entries", () => {
+    const parameters = SimCfnParameters.fromInput({
+      Parameters: [
+        {
+          ParameterKey: "BucketName",
+          ParameterValue: "override-bucket-name",
+        },
+        {
+          ParameterKey: "MissingValue",
+        },
+        {
+          ParameterValue: "missing-key-value",
+        },
+      ],
+    });
+
+    assertIdentical(parameters.value("BucketName"), "override-bucket-name");
+
+    const missingValueError = assertThrowsError(() => {
+      parameters.value("MissingValue");
+    });
+
+    assertIdentical(
+      missingValueError.message,
+      "Sim CloudFormation Stack unknown parameter MissingValue is missing a value",
+    );
+
+    const missingKeyError = assertThrowsError(() => {
+      parameters.value("missing-key-value");
+    });
+
+    assertIdentical(
+      missingKeyError.message,
+      "Sim CloudFormation Stack unknown parameter missing-key-value is missing a value",
+    );
+  });
+
+  it("copies existing values when adding definitions", () => {
+    const parameters = SimCfnParameters.fromValues({
+      BucketName: "override-bucket-name",
+    });
+
+    const parametersWithDefinitions = parameters.withDefinitions({
+      BucketName: {
+        Type: "String",
+        Default: "default-bucket-name",
+      },
+      Environment: {
+        Type: "String",
+        Default: "test",
+      },
+    });
+
+    assertFalse(parameters.has("BucketName"));
+    assertTrue(parametersWithDefinitions.has("BucketName"));
+    assertTrue(parametersWithDefinitions.has("Environment"));
+    assertIdentical(
+      parametersWithDefinitions.value("BucketName"),
+      "override-bucket-name",
+    );
+    assertIdentical(parametersWithDefinitions.value("Environment"), "test");
   });
 
   it("throws when a defined Parameter has no value", () => {

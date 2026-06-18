@@ -1,13 +1,22 @@
-export type SimCloudFormationParameterValue = string;
+type SimCloudFormationParameterValue = string;
 
-export type SimCloudFormationParameterValues = Record<
+type SimCloudFormationParameterValues = Record<
   string,
   SimCloudFormationParameterValue
 >;
 
+export interface SimCloudFormationParameterInput {
+  readonly Parameters?:
+    | readonly {
+        readonly ParameterKey?: string | undefined;
+        readonly ParameterValue?: string | undefined;
+      }[]
+    | undefined;
+}
+
 interface SimCfnParametersProps {
   readonly definitions?: Record<string, unknown> | undefined;
-  readonly overrides?: SimCloudFormationParameterValues | undefined;
+  readonly values?: SimCloudFormationParameterValues | undefined;
   readonly stackName?: string | undefined;
 }
 
@@ -20,13 +29,65 @@ export class SimCfnParameters {
   private readonly stackName: string | undefined;
 
   constructor(props: SimCfnParametersProps = {}) {
-    const { definitions, overrides = {}, stackName } = props;
+    const { definitions, values = {}, stackName } = props;
 
     this.stackName = stackName;
 
     this.recordDefinitions(definitions);
-    this.recordOverrides(overrides);
+    this.recordValues(values);
     this.recordDefaultValues();
+  }
+
+  /**
+   * Create Parameters from CloudFormation command-style Parameter inputs.
+   */
+  static fromInput(
+    input: SimCloudFormationParameterInput,
+    props: Pick<SimCfnParametersProps, "definitions" | "stackName"> = {},
+  ): SimCfnParameters {
+    const values: SimCloudFormationParameterValues = {};
+
+    for (const parameter of input.Parameters ?? []) {
+      if (
+        parameter.ParameterKey === undefined ||
+        parameter.ParameterValue === undefined
+      ) {
+        continue;
+      }
+
+      values[parameter.ParameterKey] = parameter.ParameterValue;
+    }
+
+    return new SimCfnParameters({
+      ...props,
+      values,
+    });
+  }
+
+  /**
+   * Create Parameters from already-normalized Parameter values.
+   */
+  static fromValues(
+    values: SimCloudFormationParameterValues,
+    props: Pick<SimCfnParametersProps, "definitions" | "stackName"> = {},
+  ): SimCfnParameters {
+    return new SimCfnParameters({
+      ...props,
+      values,
+    });
+  }
+
+  /**
+   * Return a copy of this Parameters wrapper with template definitions attached.
+   */
+  withDefinitions(
+    definitions: Record<string, unknown> | undefined,
+  ): SimCfnParameters {
+    return new SimCfnParameters({
+      definitions,
+      values: Object.fromEntries(this.values),
+      stackName: this.stackName,
+    });
   }
 
   /**
@@ -71,8 +132,8 @@ export class SimCfnParameters {
     }
   }
 
-  private recordOverrides(overrides: SimCloudFormationParameterValues): void {
-    for (const [parameterName, parameterValue] of Object.entries(overrides)) {
+  private recordValues(values: SimCloudFormationParameterValues): void {
+    for (const [parameterName, parameterValue] of Object.entries(values)) {
       this.values.set(parameterName, parameterValue);
     }
   }

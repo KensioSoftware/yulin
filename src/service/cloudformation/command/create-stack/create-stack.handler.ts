@@ -1,8 +1,8 @@
 import type { CommandHandler } from "../../../../command/command-handler.js";
 import { assertDefined } from "../../../../util/defined/defined.js";
 import type {
-  BackgroundScheduler,
   BackgroundCompleter,
+  BackgroundScheduler,
 } from "../../../../util/background/background.js";
 import type { SimAws } from "../../../aws/sim-aws.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
@@ -16,7 +16,7 @@ import type {
   SimCreateStackCommandOutput,
 } from "./create-stack.cmd.js";
 import { SimCfnTemplate } from "../../template/sim-cfn-template.js";
-import type { SimCloudFormationParameterValues } from "../../parameters/sim-cfn-parameters.js";
+import { SimCfnParameters } from "../../parameters/sim-cfn-parameters.js";
 
 interface CreateStackCommandHandlerProps {
   readonly simAws: SimAws;
@@ -72,7 +72,9 @@ export class CreateStackCommandHandler implements CommandHandler<
 
     const template = SimCfnTemplate.fromJson(cmd.input.TemplateBody, {
       stackName,
-      parameters: CreateStackCommandHandler.parseParameters(cmd),
+      parameters: SimCfnParameters.fromInput(cmd.input, {
+        stackName,
+      }),
     });
 
     const stack = new SimCfnStack({
@@ -91,27 +93,5 @@ export class CreateStackCommandHandler implements CommandHandler<
       StackId: stack.stackName,
       $metadata: {},
     };
-  }
-
-  private static parseParameters(
-    cmd: SimCreateStackCommand,
-  ): SimCloudFormationParameterValues {
-    return Object.fromEntries(
-      (cmd.input.Parameters ?? [])
-        .filter((parameter) => {
-          return (
-            parameter.ParameterKey !== undefined &&
-            parameter.ParameterValue !== undefined
-          );
-        })
-        .map((parameter) => {
-          assertDefined(parameter.ParameterKey, "CFN parameter.ParameterKey");
-          assertDefined(
-            parameter.ParameterValue,
-            "CFN parameter.ParameterValue",
-          );
-          return [parameter.ParameterKey, parameter.ParameterValue];
-        }),
-    );
   }
 }

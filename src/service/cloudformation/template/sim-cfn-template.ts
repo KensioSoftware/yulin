@@ -1,7 +1,4 @@
-import {
-  SimCfnParameters,
-  type SimCloudFormationParameterValues,
-} from "../parameters/sim-cfn-parameters.js";
+import { SimCfnParameters } from "../parameters/sim-cfn-parameters.js";
 
 /**
  * Parsed CloudFormation template body accepted by the simulator.
@@ -21,13 +18,13 @@ export interface SimCfnResourceTemplateRecord {
 
 interface SimCfnTemplateProps {
   readonly template: CfnTemplateBodyRecord;
-  readonly parameters?: SimCloudFormationParameterValues | undefined;
+  readonly parameters?: SimCfnParameters | undefined;
   readonly stackName?: string | undefined;
 }
 
 interface SimCfnTemplateFromJsonProps {
   readonly stackName?: string | undefined;
-  readonly parameters?: SimCloudFormationParameterValues | undefined;
+  readonly parameters?: SimCfnParameters | undefined;
 }
 
 /**
@@ -41,18 +38,16 @@ export class SimCfnTemplate {
   private readonly stackName: string | undefined;
 
   constructor(props: SimCfnTemplateProps) {
-    const { template, parameters = {}, stackName } = props;
+    const { template, parameters, stackName } = props;
 
     this.template = template;
     this.stackName = stackName;
 
     this.validateTemplateBody();
 
-    this.parameters = new SimCfnParameters({
-      definitions: this.template.Parameters,
-      overrides: parameters,
-      stackName,
-    });
+    this.parameters = (
+      parameters ?? new SimCfnParameters({ stackName })
+    ).withDefinitions(this.template.Parameters);
   }
 
   /**

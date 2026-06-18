@@ -24,7 +24,6 @@ import type {
 } from "./command/describe-stacks/describe-stacks.cmd.js";
 import { DescribeStacksCommandHandler } from "./command/describe-stacks/describe-stacks.handler.js";
 import type { CfnTemplateBodyRecord } from "./template/sim-cfn-template.js";
-import type { SimCloudFormationParameterValues } from "./parameters/sim-cfn-parameters.js";
 
 interface SimCloudFormationProps {
   readonly simAws: SimAws;
@@ -35,7 +34,7 @@ interface SimCloudFormationProps {
 interface SimCloudFormationCreateStackProps {
   readonly stackName?: SimCloudFormationStackName | string;
   readonly template: CfnTemplateBodyRecord;
-  readonly parameters?: SimCloudFormationParameterValues | undefined;
+  readonly parameters?: Record<string, string> | undefined;
 }
 
 /**

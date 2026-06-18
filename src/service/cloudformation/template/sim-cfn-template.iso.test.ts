@@ -6,6 +6,7 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimCfnTemplate } from "./sim-cfn-template.js";
+import { SimCfnParameters } from "../parameters/sim-cfn-parameters.js";
 
 describe("SimCfnTemplate", () => {
   it("accepts an empty Resources object", () => {
@@ -219,9 +220,14 @@ describe("SimCfnTemplate", () => {
           },
         },
       },
-      parameters: {
-        BucketName: "override-bucket-name",
-      },
+      parameters: SimCfnParameters.fromValues(
+        {
+          BucketName: "override-bucket-name",
+        },
+        {
+          stackName: "TestStack",
+        },
+      ),
     });
 
     const resourceTemplates = template.resourceTemplates();
