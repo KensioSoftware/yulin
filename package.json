@@ -19,7 +19,8 @@
     "examples:tsc": "tsc -p docs/tsconfig.json",
     "examples:lint": "eslint \"docs/**/*.example.ts\"",
     "examples:check": "pnpm examples:extract && pnpm examples:tsc && pnpm examples:lint",
-    "check": "pnpm fmt && pnpm build:check && pnpm examples:check && pnpm test:coverage"
+    "fta": "fta ./src",
+    "check": "pnpm fmt && pnpm build:check && pnpm examples:check && pnpm test:coverage && pnpm fta"
   },
   "keywords": [
     "aws",
@@ -93,6 +94,7 @@
     "eslint-plugin-no-secrets": "^2.3.3",
     "eslint-plugin-security": "^4.0.0",
     "eslint-plugin-unicorn": "^63.0.0",
+    "fta-cli": "^3.0.0",
     "globals": "^17.6.0",
     "jiti": "^2.7.0",
     "prettier": "^3.8.3",
