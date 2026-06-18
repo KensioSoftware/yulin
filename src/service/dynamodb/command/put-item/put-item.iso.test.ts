@@ -9,116 +9,174 @@ import {
 import { SimAws } from "../../../aws/sim-aws.js";
 
 describe("DynamoDB PutItemCommand", () => {
-  it("puts new Item into DynamoDB Table, returns attributes", async () => {
-    const simAws = new SimAws();
-
-    const simDynamoDb = simAws.dynamoDb();
-
-    await simDynamoDb.createTable(
-      new CreateTableCommand({
-        TableName: "FooTable",
-        KeySchema: [{ AttributeName: "userId", KeyType: "HASH" }],
-      }),
-    );
-
-    const putItemOutput = await simDynamoDb.putItem(
-      new PutItemCommand({
-        TableName: "FooTable",
-        Item: {
-          userId: { S: "4fad1110-e6dd-46ed-966b-356ba12f8102" },
-
-          // Scalars
-          userName: { S: "Foo McBar" },
-          favouriteNumber: { N: "42" },
-          likesPizza: { BOOL: true },
-          missingValue: { NULL: true },
-
-          // Binary
-          profilePicture: {
-            B: new Uint8Array([137, 80, 78, 71]), // "PNG" header bytes
-          },
-
-          // Sets
-          favouriteColours: { SS: ["purple", "red"] },
-          luckyNumbers: { NS: ["7", "13", "42"] },
-          binaryTags: {
-            BS: [new Uint8Array([1, 2, 3]), new Uint8Array([4, 5, 6])],
-          },
-
-          // List
-          shoppingList: {
-            L: [{ S: "milk" }, { S: "eggs" }],
-          },
-
-          // Map
-          address: {
-            M: {
-              street: { S: "123 High Street" },
-              city: { S: "London" },
-              postcode: { S: "AB1 2CD" },
-              coordinates: {
-                M: {
-                  lat: { N: "51.5" },
-                  lon: { N: "-0.1" },
-                },
+  it.each([
+    {
+      name: "string scalar",
+      item: {
+        userName: { S: "Foo McBar" },
+      },
+      assertAttribute: (attributes: { userName?: { S: unknown } }) => {
+        assertIdentical(attributes.userName?.S, "Foo McBar");
+      },
+    },
+    {
+      name: "number scalar",
+      item: {
+        favouriteNumber: { N: "42" },
+      },
+      assertAttribute: (attributes: { favouriteNumber?: { N: unknown } }) => {
+        assertIdentical(attributes.favouriteNumber?.N, "42");
+      },
+    },
+    {
+      name: "boolean scalar",
+      item: {
+        likesPizza: { BOOL: true },
+      },
+      assertAttribute: (attributes: { likesPizza?: { BOOL: unknown } }) => {
+        assertTrue(attributes.likesPizza?.BOOL);
+      },
+    },
+    {
+      name: "null scalar",
+      item: {
+        missingValue: { NULL: true },
+      },
+      assertAttribute: (attributes: { missingValue?: { NULL: unknown } }) => {
+        assertTrue(attributes.missingValue?.NULL);
+      },
+    },
+    {
+      name: "binary",
+      item: {
+        profilePicture: {
+          B: new Uint8Array([137, 80, 78, 71]),
+        },
+      },
+      assertAttribute: (attributes: { profilePicture?: { B: unknown } }) => {
+        assertBufferEqual(
+          attributes.profilePicture?.B,
+          new Uint8Array([137, 80, 78, 71]),
+        );
+      },
+    },
+    {
+      name: "string set",
+      item: {
+        favouriteColours: { SS: ["purple", "red"] },
+      },
+      assertAttribute: (attributes: {
+        favouriteColours?: { SS?: unknown[] };
+      }) => {
+        assertIdentical(attributes.favouriteColours?.SS?.[0], "purple");
+      },
+    },
+    {
+      name: "number set",
+      item: {
+        luckyNumbers: { NS: ["7", "13", "42"] },
+      },
+      assertAttribute: (attributes: { luckyNumbers?: { NS?: unknown[] } }) => {
+        assertIdentical(attributes.luckyNumbers?.NS?.[2], "42");
+      },
+    },
+    {
+      name: "binary set",
+      item: {
+        binaryTags: {
+          BS: [new Uint8Array([1, 2, 3]), new Uint8Array([4, 5, 6])],
+        },
+      },
+      assertAttribute: (attributes: { binaryTags?: { BS?: unknown[] } }) => {
+        assertBufferEqual(
+          attributes.binaryTags?.BS?.[1],
+          new Uint8Array([4, 5, 6]),
+        );
+      },
+    },
+    {
+      name: "list",
+      item: {
+        shoppingList: {
+          L: [{ S: "milk" }, { S: "eggs" }],
+        },
+      },
+      assertAttribute: (attributes: {
+        shoppingList?: { L?: { S?: unknown }[] };
+      }) => {
+        assertIdentical(attributes.shoppingList?.L?.[0]?.S, "milk");
+      },
+    },
+    {
+      name: "nested map",
+      item: {
+        address: {
+          M: {
+            street: { S: "123 High Street" },
+            city: { S: "London" },
+            postcode: { S: "AB1 2CD" },
+            coordinates: {
+              M: {
+                lat: { N: "51.5" },
+                lon: { N: "-0.1" },
               },
             },
           },
         },
-      }),
-    );
+      },
+      assertAttribute: (attributes: {
+        address?: {
+          M?: {
+            street?: { S?: unknown };
+            city?: { S?: unknown };
+            postcode?: { S?: unknown };
+            coordinates?: {
+              M?: { lat: { N?: unknown }; lon: { N?: unknown } };
+            };
+          };
+        };
+      }) => {
+        assertIdentical(attributes.address?.M?.street?.S, "123 High Street");
+        assertIdentical(attributes.address.M.city?.S, "London");
+        assertIdentical(attributes.address.M.postcode?.S, "AB1 2CD");
+        assertIdentical(attributes.address.M.coordinates?.M?.lat.N, "51.5");
+        assertIdentical(attributes.address.M.coordinates.M.lon.N, "-0.1");
+      },
+    },
+  ])(
+    "puts new $name Item attribute into DynamoDB Table, returns attributes",
+    async ({ item, assertAttribute }) => {
+      const simAws = new SimAws();
+      const simDynamoDb = simAws.dynamoDb();
 
-    assertNonNullable(putItemOutput.Attributes);
+      await simDynamoDb.createTable(
+        new CreateTableCommand({
+          TableName: "FooTable",
+          KeySchema: [{ AttributeName: "userId", KeyType: "HASH" }],
+        }),
+      );
 
-    // Scalars
-    assertIdentical(
-      putItemOutput.Attributes["userId"]?.S,
-      "4fad1110-e6dd-46ed-966b-356ba12f8102",
-    );
-    assertIdentical(putItemOutput.Attributes["userName"]?.S, "Foo McBar");
-    assertIdentical(putItemOutput.Attributes["favouriteNumber"]?.N, "42");
-    assertTrue(putItemOutput.Attributes["likesPizza"]?.BOOL);
-    assertTrue(putItemOutput.Attributes["missingValue"]?.NULL);
+      const putItemOutput = await simDynamoDb.putItem(
+        new PutItemCommand({
+          TableName: "FooTable",
+          Item: {
+            userId: { S: "4fad1110-e6dd-46ed-966b-356ba12f8102" },
+            ...item,
+          },
+        }),
+      );
 
-    // Binary
-    assertBufferEqual(
-      putItemOutput.Attributes["profilePicture"]?.B,
-      new Uint8Array([137, 80, 78, 71]),
-    );
+      assertNonNullable(putItemOutput.Attributes);
+      assertIdentical(
+        putItemOutput.Attributes["userId"]?.S,
+        "4fad1110-e6dd-46ed-966b-356ba12f8102",
+      );
 
-    // Sets
-    assertIdentical(
-      putItemOutput.Attributes["favouriteColours"]?.SS?.[0],
-      "purple",
-    );
+      assertAttribute(putItemOutput.Attributes);
 
-    // List
-    assertIdentical(
-      putItemOutput.Attributes["shoppingList"]?.L?.[0]?.S,
-      "milk",
-    );
-
-    // Map
-    assertIdentical(
-      putItemOutput.Attributes["address"]?.M?.["street"]?.S,
-      "123 High Street",
-    );
-    assertIdentical(putItemOutput.Attributes["address"].M["city"]?.S, "London");
-    assertIdentical(
-      putItemOutput.Attributes["address"].M["postcode"]?.S,
-      "AB1 2CD",
-    );
-    assertIdentical(
-      putItemOutput.Attributes["address"].M["coordinates"]?.M?.["lat"]?.N,
-      "51.5",
-    );
-    assertIdentical(
-      putItemOutput.Attributes["address"].M["coordinates"].M["lon"]?.N,
-      "-0.1",
-    );
-
-    await simAws.backgroundTasksComplete();
-  });
+      await simAws.backgroundTasksComplete();
+    },
+  );
 
   it("puts new Item into DynamoDB Table with partition key + sort key", async () => {
     const simAws = new SimAws();
