@@ -79,13 +79,20 @@ export class SimCloudFormationStack {
   }
 
   /**
-   * Deploy this Stack into simulated AWS.
+   * Deploy this simulated Stack into simulated AWS.
    */
   async deploy(): Promise<void> {
-    await this.background.sequence();
+    if (this._status !== "REVIEW_IN_PROGRESS") {
+      throw new Error(
+        `Sim CloudFormation Stack ${this.stackName} cannot be deployed from ${this._status} status`,
+      );
+    }
 
     this._status = "CREATE_IN_PROGRESS";
     this.deployError = undefined;
+
+    await this.background.sequence();
+
     this.deployCompletePromise = new Promise<void>((resolve) => {
       this.background.schedule(async () => {
         try {
