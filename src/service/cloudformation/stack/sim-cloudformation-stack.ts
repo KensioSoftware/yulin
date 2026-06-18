@@ -11,6 +11,13 @@ import { SimCfnResource } from "../resource/sim-cfn-resource.js";
  */
 export type SimCloudFormationTemplate = Record<string, unknown>;
 
+export type SimCloudFormationParameterValue = string;
+
+export type SimCloudFormationParameterValues = Record<
+  string,
+  SimCloudFormationParameterValue
+>;
+
 export type SimCloudFormationStackName = Brand<
   string,
   "SimCloudFormationStackName"
@@ -28,20 +35,17 @@ interface SimCloudFormationStackProps {
   readonly background: BackgroundScheduler;
   readonly stackName: SimCloudFormationStackName;
   readonly template: SimCloudFormationTemplate;
+  readonly parameters?: SimCloudFormationParameterValues | undefined;
 }
 
 /**
  * Lightweight simulated CloudFormation Stack.
- *
- * This is intentionally not a detailed simulation of CloudFormation Stack
- * mechanics. It is a small container for the Stack identity, template, status,
- * and resources, so CloudFormation template interpretation has a stable concept
- * to build on later.
  */
 export class SimCloudFormationStack {
   private readonly simAws: SimAws;
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly background: BackgroundScheduler;
+  private readonly parameters: SimCloudFormationParameterValues;
   private _status: SimCloudFormationStackStatus = "REVIEW_IN_PROGRESS";
 
   private deployCompletePromise: Promise<void> | undefined;
@@ -52,14 +56,21 @@ export class SimCloudFormationStack {
   public readonly resources = new Map<string, SimCfnResource>();
 
   constructor(props: SimCloudFormationStackProps) {
-    const { simAws, accountRegionScope, background, stackName, template } =
-      props;
+    const {
+      simAws,
+      accountRegionScope,
+      background,
+      stackName,
+      template,
+      parameters = {},
+    } = props;
 
     this.simAws = simAws;
     this.accountRegionScope = accountRegionScope;
     this.background = background;
     this.stackName = stackName;
     this.template = template;
+    this.parameters = this.resolveParameterValues(parameters);
 
     this.recordTemplateResources();
   }
@@ -181,10 +192,92 @@ export class SimCloudFormationStack {
           accountRegionScope: this.accountRegionScope,
           background: this.background,
           logicalId,
-          template: resourceTemplate,
+          template: this.resolveTemplateParameterRefs(resourceTemplate),
         }),
       );
     }
+  }
+
+  private resolveParameterValues(
+    parameterOverrides: SimCloudFormationParameterValues,
+  ): SimCloudFormationParameterValues {
+    const templateParameters = this.template["Parameters"];
+    const resolvedParameters: SimCloudFormationParameterValues = {
+      ...parameterOverrides,
+    };
+
+    if (templateParameters === undefined) {
+      return resolvedParameters;
+    }
+
+    if (!isRecord(templateParameters)) {
+      throw new Error(
+        `Sim CloudFormation Stack ${this.stackName} Parameters must be an object`,
+      );
+    }
+
+    for (const [parameterName, parameterDefinition] of Object.entries(
+      templateParameters,
+    )) {
+      if (resolvedParameters[parameterName] !== undefined) {
+        continue;
+      }
+
+      if (!isRecord(parameterDefinition)) {
+        throw new Error(
+          `Sim CloudFormation Stack ${this.stackName} parameter ${parameterName} definition must be an object`,
+        );
+      }
+
+      const defaultValue = parameterDefinition["Default"];
+
+      if (typeof defaultValue === "string") {
+        resolvedParameters[parameterName] = defaultValue;
+      }
+    }
+
+    return resolvedParameters;
+  }
+
+  private resolveTemplateParameterRefs(
+    value: Record<string, unknown>,
+  ): Record<string, unknown>;
+  private resolveTemplateParameterRefs(value: unknown): unknown;
+  private resolveTemplateParameterRefs(value: unknown): unknown {
+    if (Array.isArray(value)) {
+      return value.map((item) => this.resolveTemplateParameterRefs(item));
+    }
+
+    if (!isRecord(value)) {
+      return value;
+    }
+
+    const ref = value["Ref"];
+
+    if (typeof ref === "string" && this.hasTemplateParameter(ref)) {
+      const parameterValue = this.parameters[ref];
+
+      if (parameterValue === undefined) {
+        throw new Error(
+          `Sim CloudFormation Stack ${this.stackName} parameter ${ref} is missing a value`,
+        );
+      }
+
+      return parameterValue;
+    }
+
+    return Object.fromEntries(
+      Object.entries(value).map(([key, entryValue]) => [
+        key,
+        this.resolveTemplateParameterRefs(entryValue),
+      ]),
+    );
+  }
+
+  private hasTemplateParameter(parameterName: string): boolean {
+    const templateParameters = this.template["Parameters"];
+
+    return isRecord(templateParameters) && parameterName in templateParameters;
   }
 }
 

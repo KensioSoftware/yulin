@@ -5,6 +5,7 @@ import {
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import { SimAws } from "../../aws/sim-aws.js";
+import type { SimCloudFormationStackName } from "./sim-cloudformation-stack.js";
 
 describe("SimCloudFormationStack", () => {
   it("deploys an empty Stack from the default SimAws CloudFormation scope", async () => {
@@ -161,5 +162,244 @@ describe("SimCloudFormationStack", () => {
     await simAws.backgroundTasksComplete();
 
     assertIdentical(stack.status, "CREATE_COMPLETE");
+  });
+
+  it("resolves CloudFormation Parameter default values in Resource templates", async () => {
+    const simAws = new SimAws();
+
+    const stack = await simAws.cloudFormation().deployTemplate({
+      template: {
+        Parameters: {
+          BucketName: {
+            Type: "String",
+            Default: "default-bucket-name",
+          },
+        },
+        Resources: {
+          TestBucket: {
+            Type: "AWS::S3::Bucket",
+            Properties: {
+              BucketName: {
+                Ref: "BucketName",
+              },
+            },
+          },
+        },
+      },
+    });
+    const resource = stack.resources.get("TestBucket");
+
+    assertNonNullable(resource);
+    assertIdentical(resource.properties["BucketName"], "default-bucket-name");
+    assertIdentical(stack.status, "CREATE_COMPLETE");
+  });
+
+  it("resolves CreateStack Parameter values in Resource templates", async () => {
+    const simAws = new SimAws();
+
+    const stackName = "TestStack" as SimCloudFormationStackName;
+
+    const cloudFormation = simAws.cloudFormation();
+    await cloudFormation.createStack({
+      input: {
+        StackName: stackName,
+        TemplateBody: JSON.stringify({
+          Parameters: {
+            BucketName: {
+              Type: "String",
+              Default: "default-bucket-name",
+            },
+          },
+          Resources: {
+            TestBucket: {
+              Type: "AWS::S3::Bucket",
+              Properties: {
+                BucketName: {
+                  Ref: "BucketName",
+                },
+              },
+            },
+          },
+        }),
+        Parameters: [
+          {
+            ParameterKey: "BucketName",
+            ParameterValue: "override-bucket-name",
+          },
+        ],
+      },
+    });
+
+    await simAws.backgroundTasksComplete();
+
+    const stack = cloudFormation.stacks.get(stackName);
+    assertNonNullable(stack);
+
+    const resource = stack.resources.get("TestBucket");
+    assertNonNullable(resource);
+
+    assertIdentical(resource.properties["BucketName"], "override-bucket-name");
+    assertIdentical(stack.status, "CREATE_COMPLETE");
+  });
+
+  it("resolves deployTemplate Parameter values in Resource templates", async () => {
+    const simAws = new SimAws();
+
+    const stack = await simAws.cloudFormation().deployTemplate({
+      template: {
+        Parameters: {
+          BucketName: {
+            Type: "String",
+          },
+        },
+        Resources: {
+          TestBucket: {
+            Type: "AWS::S3::Bucket",
+            Properties: {
+              BucketName: {
+                Ref: "BucketName",
+              },
+            },
+          },
+        },
+      },
+      parameters: {
+        BucketName: "deploy-template-bucket-name",
+      },
+    });
+    const resource = stack.resources.get("TestBucket");
+
+    assertNonNullable(resource);
+    assertIdentical(
+      resource.properties["BucketName"],
+      "deploy-template-bucket-name",
+    );
+    assertIdentical(stack.status, "CREATE_COMPLETE");
+  });
+
+  it("resolves CloudFormation Parameter refs recursively in Resource templates", async () => {
+    const simAws = new SimAws();
+
+    const stack = await simAws.cloudFormation().deployTemplate({
+      template: {
+        Parameters: {
+          FirstValue: {
+            Type: "String",
+            Default: "first",
+          },
+          SecondValue: {
+            Type: "String",
+            Default: "second",
+          },
+        },
+        Resources: {
+          TestResource: {
+            Type: "AWS::CloudFormation::WaitConditionHandle",
+            Properties: {
+              Nested: {
+                Values: [
+                  {
+                    Ref: "FirstValue",
+                  },
+                  {
+                    Ref: "SecondValue",
+                  },
+                ],
+              },
+            },
+          },
+        },
+      },
+    });
+    const resource = stack.resources.get("TestResource");
+
+    assertNonNullable(resource);
+
+    const nested = resource.properties["Nested"] as Record<string, unknown>;
+    const values = nested["Values"] as unknown[];
+
+    assertIdentical(values[0], "first");
+    assertIdentical(values[1], "second");
+    assertIdentical(stack.status, "CREATE_COMPLETE");
+  });
+
+  it("fails deployment when a referenced CloudFormation Parameter has no value", async () => {
+    const simAws = new SimAws();
+
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws.cloudFormation().deployTemplate({
+        stackName: "TestStack",
+        template: {
+          Parameters: {
+            BucketName: {
+              Type: "String",
+            },
+          },
+          Resources: {
+            TestBucket: {
+              Type: "AWS::S3::Bucket",
+              Properties: {
+                BucketName: {
+                  Ref: "BucketName",
+                },
+              },
+            },
+          },
+        },
+      });
+    });
+
+    assertIdentical(
+      error.message,
+      "Sim CloudFormation Stack TestStack parameter BucketName is missing a value",
+    );
+  });
+
+  it("fails deployment when a CloudFormation Parameter definition is not an object", async () => {
+    const simAws = new SimAws();
+
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws.cloudFormation().deployTemplate({
+        stackName: "TestStack",
+        template: {
+          Parameters: {
+            BucketName: "not-a-parameter-definition",
+          },
+          Resources: {
+            TestBucket: {
+              Type: "AWS::S3::Bucket",
+            },
+          },
+        },
+      });
+    });
+
+    assertIdentical(
+      error.message,
+      "Sim CloudFormation Stack TestStack parameter BucketName definition must be an object",
+    );
+  });
+
+  it("fails deployment when CloudFormation Parameters is not an object", async () => {
+    const simAws = new SimAws();
+
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws.cloudFormation().deployTemplate({
+        stackName: "TestStack",
+        template: {
+          Parameters: ["not", "a", "parameters", "object"],
+          Resources: {
+            TestBucket: {
+              Type: "AWS::S3::Bucket",
+            },
+          },
+        },
+      });
+    });
+
+    assertIdentical(
+      error.message,
+      "Sim CloudFormation Stack TestStack Parameters must be an object",
+    );
   });
 });

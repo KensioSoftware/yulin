@@ -5,6 +5,7 @@ import {
 } from "../aws/sim-aws-account-region-scope.js";
 import type { SimAws } from "../aws/sim-aws.js";
 import type {
+  SimCloudFormationParameterValues,
   SimCloudFormationStack,
   SimCloudFormationStackName,
   SimCloudFormationTemplate,
@@ -34,6 +35,7 @@ interface SimCloudFormationProps {
 interface SimCloudFormationCreateStackProps {
   readonly stackName?: SimCloudFormationStackName | string;
   readonly template: SimCloudFormationTemplate;
+  readonly parameters?: SimCloudFormationParameterValues | undefined;
 }
 
 /**
@@ -113,6 +115,12 @@ export class SimCloudFormation {
       input: {
         StackName: stackName,
         TemplateBody: JSON.stringify(props.template),
+        Parameters: Object.entries(props.parameters ?? {}).map(
+          ([parameterKey, parameterValue]) => ({
+            ParameterKey: parameterKey,
+            ParameterValue: parameterValue,
+          }),
+        ),
       },
     });
 

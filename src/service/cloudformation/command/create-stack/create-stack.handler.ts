@@ -7,6 +7,7 @@ import type {
 import type { SimAws } from "../../../aws/sim-aws.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import {
+  type SimCloudFormationParameterValues,
   SimCloudFormationStack,
   type SimCloudFormationStackName,
   type SimCloudFormationTemplate,
@@ -75,6 +76,7 @@ export class CreateStackCommandHandler implements CommandHandler<
     const template = CreateStackCommandHandler.parseTemplateBody(
       cmd.input.TemplateBody,
     );
+    const parameters = CreateStackCommandHandler.parseParameters(cmd);
 
     const stack = new SimCloudFormationStack({
       simAws: this.simAws,
@@ -82,6 +84,7 @@ export class CreateStackCommandHandler implements CommandHandler<
       background: this.background,
       stackName,
       template,
+      parameters,
     });
 
     this.stacks.set(stack.stackName, stack);
@@ -98,5 +101,27 @@ export class CreateStackCommandHandler implements CommandHandler<
     templateBody: string,
   ): SimCloudFormationTemplate {
     return JSON.parse(templateBody) as SimCloudFormationTemplate;
+  }
+
+  private static parseParameters(
+    cmd: SimCreateStackCommand,
+  ): SimCloudFormationParameterValues {
+    return Object.fromEntries(
+      (cmd.input.Parameters ?? [])
+        .filter((parameter) => {
+          return (
+            parameter.ParameterKey !== undefined &&
+            parameter.ParameterValue !== undefined
+          );
+        })
+        .map((parameter) => {
+          assertDefined(parameter.ParameterKey, "CFN parameter.ParameterKey");
+          assertDefined(
+            parameter.ParameterValue,
+            "CFN parameter.ParameterValue",
+          );
+          return [parameter.ParameterKey, parameter.ParameterValue];
+        }),
+    );
   }
 }
