@@ -34,7 +34,6 @@ describe("SimS3CloudFormationResourceFactory", () => {
     });
     const context: SimCloudFormationResourceCreateContext = {
       simAws,
-      background,
       resources: new Map(),
     };
     const factory = new SimS3CloudFormationResourceFactory(simS3);
@@ -52,8 +51,7 @@ describe("SimS3CloudFormationResourceFactory", () => {
   it("creates an S3 Bucket using the lower-case logical ID by default", async () => {
     // Given an S3 CloudFormation Resource factory and a Bucket resource without a
     // BucketName.
-    const background = new BackgroundTasks();
-    const simAws = new SimAws({ background });
+    const simAws = new SimAws();
     const simS3 = simAws.s3();
     const resource = new SimCfnResource({
       accountRegionScope: {
@@ -67,7 +65,6 @@ describe("SimS3CloudFormationResourceFactory", () => {
     });
     const context: SimCloudFormationResourceCreateContext = {
       simAws,
-      background,
       resources: new Map(),
     };
     const factory = new SimS3CloudFormationResourceFactory(simS3);
@@ -84,8 +81,7 @@ describe("SimS3CloudFormationResourceFactory", () => {
 
   it("rejects unsupported S3 resource types", async () => {
     // Given an S3 CloudFormation Resource factory and an unsupported Resource type.
-    const background = new BackgroundTasks();
-    const simAws = new SimAws({ background });
+    const simAws = new SimAws();
     const simS3 = simAws.s3();
     const resource = new SimCfnResource({
       accountRegionScope: {
@@ -99,7 +95,6 @@ describe("SimS3CloudFormationResourceFactory", () => {
     });
     const context: SimCloudFormationResourceCreateContext = {
       simAws,
-      background,
       resources: new Map(),
     };
     const factory = new SimS3CloudFormationResourceFactory(simS3);

@@ -147,7 +147,6 @@ export class SimCloudFormationStack {
         creatableResources.map(async (resource) => {
           await resource.create({
             simAws: this.simAws,
-            background: this.background,
             resources: this.resources,
           });
         }),
@@ -180,6 +179,7 @@ export class SimCloudFormationStack {
         logicalId,
         new SimCfnResource({
           accountRegionScope: this.accountRegionScope,
+          background: this.background,
           logicalId,
           template: resourceTemplate,
         }),
