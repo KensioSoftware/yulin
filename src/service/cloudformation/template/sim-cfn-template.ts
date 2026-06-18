@@ -135,7 +135,11 @@ export class SimCfnTemplate {
 
     const ref = value["Ref"];
 
-    if (typeof ref === "string" && this.parameters.has(ref)) {
+    if (
+      Object.keys(value).length === 1 &&
+      typeof ref === "string" &&
+      this.parameters.has(ref)
+    ) {
       return this.parameters.value(ref);
     }
 

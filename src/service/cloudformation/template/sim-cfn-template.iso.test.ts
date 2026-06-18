@@ -314,6 +314,43 @@ describe("SimCfnTemplate", () => {
     });
   });
 
+  it("does not replace Ref-containing objects with sibling keys", () => {
+    const template = new SimCfnTemplate({
+      stackName: "TestStack",
+      template: {
+        Parameters: {
+          BucketName: {
+            Type: "String",
+            Default: "default-bucket-name",
+          },
+        },
+        Resources: {
+          TestResource: {
+            Type: "AWS::CloudFormation::WaitConditionHandle",
+            Properties: {
+              NotAnIntrinsicRef: {
+                Ref: "BucketName",
+                Extra: 1,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const resourceTemplates = template.resourceTemplates();
+
+    assertObjectMatches(resourceTemplates[0]?.template, {
+      Type: "AWS::CloudFormation::WaitConditionHandle",
+      Properties: {
+        NotAnIntrinsicRef: {
+          Ref: "BucketName",
+          Extra: 1,
+        },
+      },
+    });
+  });
+
   it("throws when a referenced CloudFormation Parameter has no value", () => {
     const template = new SimCfnTemplate({
       stackName: "TestStack",
