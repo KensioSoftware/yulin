@@ -19,7 +19,7 @@
     "examples:tsc": "tsc -p docs/tsconfig.json",
     "examples:lint": "eslint \"docs/**/*.example.ts\"",
     "examples:check": "pnpm examples:extract && pnpm examples:tsc && pnpm examples:lint",
-    "fta": "fta ./src",
+    "fta": "fta ./src --json | jq '.[] | select(.fta_score >= 50)'",
     "check": "pnpm fmt && pnpm build:check && pnpm examples:check && pnpm test:coverage && pnpm fta"
   },
   "keywords": [
