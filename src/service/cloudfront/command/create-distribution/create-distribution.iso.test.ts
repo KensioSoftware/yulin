@@ -9,6 +9,7 @@ import {
   assertInstanceOf,
   assertNonNullable,
   assertOneOf,
+  assertSetSize,
   assertStringIncludes,
   assertStringLength,
   assertThrowsErrorAsync,
@@ -244,10 +245,10 @@ describe("CloudFront CreateDistributionCommand", () => {
     assertUndefined(defaultBehavior.pathPattern);
     assertIdentical(defaultBehavior.targetOriginName, "s3-assets");
     assertIdentical(defaultBehavior.viewerProtocolPolicy, "redirect-to-https");
-    assertArrayLength([...defaultBehavior.allowedMethods], 2);
+    assertSetSize(defaultBehavior.allowedMethods, 2);
     assertTrue(defaultBehavior.allowedMethods.has("GET"));
     assertTrue(defaultBehavior.allowedMethods.has("HEAD"));
-    assertArrayLength([...defaultBehavior.cachedMethods], 2);
+    assertSetSize(defaultBehavior.cachedMethods, 2);
     assertTrue(defaultBehavior.cachedMethods.has("GET"));
     assertTrue(defaultBehavior.cachedMethods.has("HEAD"));
 
@@ -257,11 +258,11 @@ describe("CloudFront CreateDistributionCommand", () => {
     assertIdentical(imageBehavior.pathPattern, "/images/*");
     assertIdentical(imageBehavior.targetOriginName, "s3-assets");
     assertIdentical(imageBehavior.viewerProtocolPolicy, "https-only");
-    assertArrayLength([...imageBehavior.allowedMethods], 3);
+    assertSetSize(imageBehavior.allowedMethods, 3);
     assertTrue(imageBehavior.allowedMethods.has("GET"));
     assertTrue(imageBehavior.allowedMethods.has("HEAD"));
     assertTrue(imageBehavior.allowedMethods.has("OPTIONS"));
-    assertArrayLength([...imageBehavior.cachedMethods], 2);
+    assertSetSize(imageBehavior.cachedMethods, 2);
     assertTrue(imageBehavior.cachedMethods.has("GET"));
     assertTrue(imageBehavior.cachedMethods.has("HEAD"));
   });

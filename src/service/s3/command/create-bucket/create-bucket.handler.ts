@@ -13,7 +13,7 @@ import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-regi
 import {
   SimS3BucketAlreadyExists,
   SimS3BucketAlreadyOwnedByYou,
-} from "../../error/s3.error.js";
+} from "../../error/sim-s3.error.js";
 import {
   type BackgroundScheduler,
   BackgroundTasks,

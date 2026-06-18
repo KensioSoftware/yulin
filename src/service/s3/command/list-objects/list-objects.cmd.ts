@@ -19,7 +19,7 @@ export interface SimListObjectsCommandInput {
  * Minimal structural sim S3 ListObjects output.
  */
 export interface SimListObjectsCommandOutput {
-  readonly Contents?: readonly SimS3ObjectSummary[];
+  readonly Contents?: SimS3ObjectSummary[];
   readonly Name?: string;
   readonly Prefix?: string | undefined;
   readonly Marker?: string | undefined;

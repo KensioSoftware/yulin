@@ -11,7 +11,7 @@ import { SimAws } from "../../../aws/sim-aws.js";
 import {
   SimS3BucketAlreadyExists,
   SimS3BucketAlreadyOwnedByYou,
-} from "../../error/s3.error.js";
+} from "../../error/sim-s3.error.js";
 
 describe("S3 CreateBucketCommand", () => {
   it("creates new S3 Bucket", async () => {

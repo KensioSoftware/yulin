@@ -5,6 +5,7 @@ import type { SimS3 } from "../s3/sim-s3.js";
 import type { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
 import type { SimDynamoDb } from "../dynamodb/index.js";
 import { SimAws } from "./sim-aws.js";
+import type { SimCloudFormation } from "../cloudformation/index.js";
 
 export const AWS_REGION_NAMES = [
   "us-east-1",
@@ -81,10 +82,10 @@ export class SimAwsRegion {
   }
 
   /**
-   * Get simulated S3 for this Region's default Account.
+   * Get simulated CloudFormation for this Region's default Account.
    */
-  s3(): SimS3 {
-    return this.account().s3();
+  cloudFormation(): SimCloudFormation {
+    return this.account().cloudFormation();
   }
 
   /**
@@ -99,6 +100,13 @@ export class SimAwsRegion {
    */
   dynamoDb(): SimDynamoDb {
     return this.account().dynamoDb();
+  }
+
+  /**
+   * Get simulated S3 for this Region's default Account.
+   */
+  s3(): SimS3 {
+    return this.account().s3();
   }
 }
 

@@ -14,7 +14,7 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
-import { SimS3NoSuchBucket } from "../../error/s3.error.js";
+import { SimS3NoSuchBucket } from "../../error/sim-s3.error.js";
 
 describe("S3 PutBucketWebsiteCommand", () => {
   it("configures an index document for an S3 Bucket website", async () => {

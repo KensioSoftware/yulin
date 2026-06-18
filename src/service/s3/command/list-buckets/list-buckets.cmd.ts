@@ -18,7 +18,7 @@ export interface SimListBucketsCommandInput {
  * Minimal structural sim S3 ListBuckets output.
  */
 export interface SimListBucketsCommandOutput {
-  readonly Buckets?: readonly SimS3BucketSummary[] | undefined;
+  readonly Buckets?: SimS3BucketSummary[] | undefined;
   readonly ContinuationToken?: string | undefined;
   readonly Prefix?: string | undefined;
   readonly $metadata: Record<string, unknown>;
