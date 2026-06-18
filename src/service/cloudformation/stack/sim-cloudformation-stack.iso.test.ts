@@ -6,18 +6,19 @@ import {
 } from "@kensio/smartass";
 import { SimAws } from "../../aws/sim-aws.js";
 import type { SimCloudFormationStackName } from "./sim-cloudformation-stack.js";
+import { CreateStackCommand } from "@aws-sdk/client-cloudformation";
 
 describe("SimCloudFormationStack", () => {
   it("deploys an empty Stack from the default SimAws CloudFormation scope", async () => {
     const simAws = new SimAws();
 
     const cloudFormation = simAws.cloudFormation();
-    const createStackOutput = await cloudFormation.createStack({
-      input: {
+    const createStackOutput = await cloudFormation.createStack(
+      new CreateStackCommand({
         StackName: "TestStack",
         TemplateBody: JSON.stringify({}),
-      },
-    });
+      }),
+    );
     const stack = cloudFormation.getStackByName("TestStack");
 
     assertIdentical(createStackOutput.StackId, "TestStack");
@@ -95,8 +96,8 @@ describe("SimCloudFormationStack", () => {
     const simAws = new SimAws();
 
     const cloudFormation = simAws.cloudFormation();
-    await cloudFormation.createStack({
-      input: {
+    await cloudFormation.createStack(
+      new CreateStackCommand({
         StackName: "TestStack",
         TemplateBody: JSON.stringify({
           Resources: {
@@ -110,8 +111,8 @@ describe("SimCloudFormationStack", () => {
             },
           },
         }),
-      },
-    });
+      }),
+    );
 
     const stack = cloudFormation.getStackByName("TestStack");
     assertNonNullable(stack);
@@ -130,8 +131,8 @@ describe("SimCloudFormationStack", () => {
     const simAws = new SimAws();
 
     const cloudFormation = simAws.cloudFormation();
-    await cloudFormation.createStack({
-      input: {
+    await cloudFormation.createStack(
+      new CreateStackCommand({
         StackName: "TestStack",
         TemplateBody: JSON.stringify({
           Resources: {
@@ -143,8 +144,8 @@ describe("SimCloudFormationStack", () => {
             },
           },
         }),
-      },
-    });
+      }),
+    );
 
     const stack = cloudFormation.getStackByName("TestStack");
     assertNonNullable(stack);
@@ -200,8 +201,8 @@ describe("SimCloudFormationStack", () => {
     const stackName = "TestStack" as SimCloudFormationStackName;
 
     const cloudFormation = simAws.cloudFormation();
-    await cloudFormation.createStack({
-      input: {
+    await cloudFormation.createStack(
+      new CreateStackCommand({
         StackName: stackName,
         TemplateBody: JSON.stringify({
           Parameters: {
@@ -227,8 +228,8 @@ describe("SimCloudFormationStack", () => {
             ParameterValue: "override-bucket-name",
           },
         ],
-      },
-    });
+      }),
+    );
 
     await simAws.backgroundTasksComplete();
 
