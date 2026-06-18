@@ -121,14 +121,7 @@ export default defineConfig(
       "@typescript-eslint/only-throw-error": "error",
 
       // ── Max lines per file ───────────────────────────
-      "max-lines": [
-        "error",
-        {
-          max: 300,
-          skipBlankLines: true,
-          skipComments: true,
-        },
-      ],
+      "max-lines": "error",
     },
   },
 
