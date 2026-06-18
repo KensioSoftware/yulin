@@ -13,13 +13,11 @@ import {
   SimCloudFormationWaitConditionHandle,
 } from "./sim-cfn-cfn-resource-factory.js";
 import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
-import { BackgroundTasks } from "../../../../util/background/background.js";
 
 describe("SimCfnCfnResourceFactory", () => {
   it("creates a WaitConditionHandle resource", async () => {
     // Given a CloudFormation Resource factory and a WaitConditionHandle Resource.
-    const background = new BackgroundTasks();
-    const simAws = new SimAws({ background });
+    const simAws = new SimAws();
     const resource = new SimCfnResource({
       accountRegionScope: {
         accountId: "111111111111" as SimAwsAccountId,
@@ -32,7 +30,6 @@ describe("SimCfnCfnResourceFactory", () => {
     });
     const context: SimCloudFormationResourceCreateContext = {
       simAws,
-      background,
       resources: new Map(),
     };
     const factory = new SimCfnCfnResourceFactory();
@@ -51,8 +48,7 @@ describe("SimCfnCfnResourceFactory", () => {
 
   it("rejects unsupported CloudFormation resource types", async () => {
     // Given a CloudFormation Resource factory and an unsupported Resource type.
-    const background = new BackgroundTasks();
-    const simAws = new SimAws({ background });
+    const simAws = new SimAws();
     const resource = new SimCfnResource({
       accountRegionScope: {
         accountId: "111111111111" as SimAwsAccountId,
@@ -65,7 +61,6 @@ describe("SimCfnCfnResourceFactory", () => {
     });
     const context: SimCloudFormationResourceCreateContext = {
       simAws,
-      background,
       resources: new Map(),
     };
     const factory = new SimCfnCfnResourceFactory();

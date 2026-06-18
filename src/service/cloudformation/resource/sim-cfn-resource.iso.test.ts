@@ -6,7 +6,6 @@ import {
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
-import { BackgroundTasks } from "../../../util/background/background.js";
 import { SimAws } from "../../aws/sim-aws.js";
 import {
   SimCfnResource,
@@ -19,7 +18,6 @@ describe("SimCfnResource", () => {
     // Given a CloudFormation Resource template with Type, Properties and
     // DependsOn fields.
     const simAws = new SimAws();
-    const simResource = { bucketName: "existing-bucket" };
     const resource = new SimCfnResource({
       accountRegionScope: simAws.accountRegionScope().accountRegionScope,
       logicalId: "TestResource",
@@ -30,7 +28,6 @@ describe("SimCfnResource", () => {
         },
         DependsOn: ["FirstDependency", 123, "SecondDependency"],
       },
-      simResource,
     });
 
     // When the Resource is inspected before creation.
@@ -43,7 +40,7 @@ describe("SimCfnResource", () => {
     assertIdentical(resource.createComplete, false);
     assertIdentical(resource.type, "AWS::S3::Bucket");
     assertIdentical(resource.properties["BucketName"], "test-bucket");
-    assertIdentical(resource.simResource, simResource);
+    assertUndefined(resource.simResource);
     assertUndefined(resource.error);
     assertArrayLength(dependencies, 2);
     assertIdentical(dependencies[0], "FirstDependency");
@@ -132,7 +129,7 @@ describe("SimCfnResource", () => {
   });
 
   it("marks creation status transitions explicitly", () => {
-    // Given a Resource that already has a simulated backing object.
+    // Given a Resource and two simulated backing objects.
     const simAws = new SimAws();
     const originalSimResource = { bucketName: "original-bucket" };
     const replacementSimResource = { bucketName: "replacement-bucket" };
@@ -141,7 +138,6 @@ describe("SimCfnResource", () => {
       accountRegionScope: simAws.accountRegionScope().accountRegionScope,
       logicalId: "TestResource",
       template: {},
-      simResource: originalSimResource,
     });
 
     // When explicit creation status helpers are used.
@@ -154,6 +150,9 @@ describe("SimCfnResource", () => {
     const failedStatus = resource.status;
     const failedCreateComplete = resource.createComplete;
     const failedError = resource.error;
+
+    resource.markCreateComplete(originalSimResource);
+    const completeWithOriginal = resource.simResource;
 
     resource.markCreateComplete();
     const completeWithoutReplacement = resource.simResource;
@@ -171,6 +170,7 @@ describe("SimCfnResource", () => {
     assertIdentical(failedCreateComplete, true);
     assertIdentical(failedError, createError);
 
+    assertIdentical(completeWithOriginal, originalSimResource);
     assertIdentical(completeWithoutReplacement, originalSimResource);
     assertIdentical(completeWithReplacement, replacementSimResource);
     assertIdentical(resource.status, "CREATE_COMPLETE");
@@ -182,19 +182,13 @@ describe("SimCfnResource", () => {
   it("creates the backing simulated Resource through an injected factory", async () => {
     // Given a Resource with an isolated factory injected for creation.
     const simAws = new SimAws();
-    const background = new BackgroundTasks();
     const createdSimResource = { bucketName: "created-bucket" };
 
     const cfnResourceFactory: SimCfnServiceResourceFactory = {
-      async create(
-        resourceTypeName,
-        _resourceFromFactory,
-        context,
-      ): Promise<object> {
+      async create(resourceTypeName): Promise<object> {
         await Promise.resolve();
 
         assertIdentical(resourceTypeName, "Bucket");
-        assertIdentical(context.background, background);
 
         return createdSimResource;
       },
@@ -210,7 +204,6 @@ describe("SimCfnResource", () => {
     });
     const context: SimCloudFormationResourceCreateContext = {
       simAws,
-      background,
       resources: new Map([["TestResource", resource]]),
     };
 
@@ -232,7 +225,6 @@ describe("SimCfnResource", () => {
   it("fails creation when Type is missing", async () => {
     // Given a Resource template without a Type field.
     const simAws = new SimAws();
-    const background = new BackgroundTasks();
     const resource = new SimCfnResource({
       accountRegionScope: simAws.accountRegionScope().accountRegionScope,
       logicalId: "TestResource",
@@ -240,7 +232,6 @@ describe("SimCfnResource", () => {
     });
     const context: SimCloudFormationResourceCreateContext = {
       simAws,
-      background,
       resources: new Map([["TestResource", resource]]),
     };
 
@@ -264,7 +255,6 @@ describe("SimCfnResource", () => {
   it("wraps non-Error creation failures", async () => {
     // Given an injected factory that rejects with a non-Error value.
     const simAws = new SimAws();
-    const background = new BackgroundTasks();
     const resource = new SimCfnResource({
       accountRegionScope: simAws.accountRegionScope().accountRegionScope,
       logicalId: "TestResource",
@@ -282,7 +272,6 @@ describe("SimCfnResource", () => {
     });
     const context: SimCloudFormationResourceCreateContext = {
       simAws,
-      background,
       resources: new Map([["TestResource", resource]]),
     };
 

@@ -1,15 +1,21 @@
 import type { SimAws } from "../../aws/sim-aws.js";
-import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
-import type { BackgroundScheduler } from "../../../util/background/background.js";
+import {
+  type SimAwsAccountRegionScope,
+  simAwsAccountRegionScopeFactory,
+} from "../../aws/sim-aws-account-region-scope.js";
+import {
+  type BackgroundScheduler,
+  BackgroundTasks,
+} from "../../../util/background/background.js";
 import type { SimCfnServiceResourceFactory } from "./factory/sim-cfn-resource-factory.type.js";
 import { parseSimCloudFormationResourceType } from "./parser/sim-cfn-resource-parser.js";
 import { resolveSimCloudFormationServiceResourceFactory } from "./resolver/sim-cfn-service-resolver.js";
 
-interface SimCloudFormationResourceProps<T extends object = object> {
-  readonly accountRegionScope: SimAwsAccountRegionScope;
-  readonly logicalId: string;
-  readonly template: Record<string, unknown>;
-  readonly simResource?: T | undefined;
+interface SimCloudFormationResourceProps {
+  readonly accountRegionScope?: SimAwsAccountRegionScope;
+  readonly background?: BackgroundScheduler;
+  readonly logicalId?: string;
+  readonly template?: Record<string, unknown>;
   readonly cfnResourceFactory?: SimCfnServiceResourceFactory | undefined;
 }
 
@@ -24,7 +30,6 @@ export type SimCloudFormationResourceStatus =
 
 export interface SimCloudFormationResourceCreateContext {
   readonly simAws: SimAws;
-  readonly background: BackgroundScheduler;
   readonly resources: ReadonlyMap<string, SimCfnResource>;
 }
 
@@ -41,21 +46,22 @@ export class SimCfnResource<T extends object = object> {
   private _status: SimCloudFormationResourceStatus = "CREATE_PENDING";
   private _simResource: T | undefined;
   private deployError: Error | undefined;
+  private readonly background: BackgroundScheduler;
   private readonly cfnResourceFactory: SimCfnServiceResourceFactory | undefined;
 
-  constructor(props: SimCloudFormationResourceProps<T>) {
+  constructor(props: SimCloudFormationResourceProps = {}) {
     const {
-      accountRegionScope,
-      logicalId,
-      template,
-      simResource,
+      accountRegionScope = simAwsAccountRegionScopeFactory.make(),
+      background = new BackgroundTasks(),
+      logicalId = "Resource",
+      template = {},
       cfnResourceFactory,
     } = props;
 
     this.accountRegionScope = accountRegionScope;
+    this.background = background;
     this.logicalId = logicalId;
     this.template = template;
-    this._simResource = simResource;
     this.cfnResourceFactory = cfnResourceFactory;
   }
 
@@ -152,9 +158,9 @@ export class SimCfnResource<T extends object = object> {
     this.markCreateInProgress();
 
     return new Promise<void>((resolve, reject) => {
-      context.background.schedule(async () => {
+      this.background.schedule(async () => {
         try {
-          await context.background.sequence();
+          await this.background.sequence();
 
           const simResource = await this.createSimResource(context);
           this.markCreateComplete(simResource as T | undefined);
