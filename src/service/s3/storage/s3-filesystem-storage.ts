@@ -199,32 +199,31 @@ export class FilesystemS3BucketStorage implements SimS3BucketStorage {
   private contentTypeForObjectKey(key: string): string | undefined {
     const extension = path.extname(key).toLowerCase();
 
-    const contentTypesByExtension: Readonly<Record<string, string>> = {
-      ".css": "text/css",
-      ".eot": "application/vnd.ms-fontobject",
-      ".gif": "image/gif",
-      ".html": "text/html",
-      ".htm": "text/html",
-      ".ico": "image/x-icon",
-      ".jpeg": "image/jpeg",
-      ".jpg": "image/jpeg",
-      ".js": "text/javascript",
-      ".mjs": "text/javascript",
-      ".json": "application/json",
-      ".map": "application/json",
-      ".png": "image/png",
-      ".otf": "font/otf",
-      ".svg": "image/svg+xml",
-      ".ttc": "font/collection",
-      ".ttf": "font/ttf",
-      ".txt": "text/plain",
-      ".webp": "image/webp",
-      ".woff": "font/woff",
-      ".woff2": "font/woff2",
-      ".xml": "application/xml",
-    };
-
-    // eslint-disable-next-line security/detect-object-injection
-    return contentTypesByExtension[extension];
+    return contentTypesByExtension.get(extension);
   }
 }
+
+const contentTypesByExtension: ReadonlyMap<string, string> = new Map([
+  [".css", "text/css"],
+  [".eot", "application/vnd.ms-fontobject"],
+  [".gif", "image/gif"],
+  [".html", "text/html"],
+  [".htm", "text/html"],
+  [".ico", "image/x-icon"],
+  [".jpeg", "image/jpeg"],
+  [".jpg", "image/jpeg"],
+  [".js", "text/javascript"],
+  [".mjs", "text/javascript"],
+  [".json", "application/json"],
+  [".map", "application/json"],
+  [".png", "image/png"],
+  [".otf", "font/otf"],
+  [".svg", "image/svg+xml"],
+  [".ttc", "font/collection"],
+  [".ttf", "font/ttf"],
+  [".txt", "text/plain"],
+  [".webp", "image/webp"],
+  [".woff", "font/woff"],
+  [".woff2", "font/woff2"],
+  [".xml", "application/xml"],
+]);
