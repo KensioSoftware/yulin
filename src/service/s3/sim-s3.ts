@@ -40,6 +40,8 @@ import {
   type BackgroundScheduler,
   BackgroundTasks,
 } from "../../util/background/background.js";
+import { SimS3CloudFormationResourceFactory } from "./cfn/sim-cfn-s3-resource-factory.js";
+import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 
 interface SimS3Props {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
@@ -58,6 +60,7 @@ export class SimS3 {
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly s3GlobalRegistry: SimS3GlobalRegistry;
   private readonly background: BackgroundScheduler;
+  private readonly cfnFactory = new SimS3CloudFormationResourceFactory(this);
 
   constructor(props: SimS3Props = {}) {
     const {
@@ -191,5 +194,12 @@ export class SimS3 {
     bucket.configureSimStorage(
       new FilesystemS3BucketStorage({ directoryPath }),
     );
+  }
+
+  /**
+   * Get this service's CloudFormation Resource factory.
+   */
+  cfnResourceFactory(): SimCfnServiceResourceFactory {
+    return this.cfnFactory;
   }
 }

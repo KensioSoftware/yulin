@@ -77,6 +77,7 @@ export class DescribeStacksCommandHandler implements CommandHandler<
       StackId: stack.stackName,
       StackName: stack.stackName,
       StackStatus: stack.status,
+      StackStatusReason: stack.error?.message,
     };
   }
 }

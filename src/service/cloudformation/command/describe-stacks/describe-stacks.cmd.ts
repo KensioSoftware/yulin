@@ -34,4 +34,5 @@ export interface SimCloudFormationStackDescription {
   readonly StackId?: string | undefined;
   readonly StackName?: SimCloudFormationStackName | undefined;
   readonly StackStatus?: SimCloudFormationStackStatus | undefined;
+  readonly StackStatusReason?: string | undefined;
 }

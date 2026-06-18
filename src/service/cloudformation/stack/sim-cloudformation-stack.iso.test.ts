@@ -1,5 +1,9 @@
 import { describe, it } from "vitest";
-import { assertIdentical } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertNonNullable,
+  assertThrowsErrorAsync,
+} from "@kensio/smartass";
 import { SimAws } from "../../aws/sim-aws.js";
 
 describe("SimCloudFormationStack", () => {
@@ -83,6 +87,79 @@ describe("SimCloudFormationStack", () => {
       cloudFormation.accountRegionScope.regionName,
       "ap-southeast-2",
     );
+    assertIdentical(stack.status, "CREATE_COMPLETE");
+  });
+
+  it("fails deployment when Resource dependencies cannot be resolved", async () => {
+    const simAws = new SimAws();
+
+    const cloudFormation = simAws.cloudFormation();
+    await cloudFormation.createStack({
+      input: {
+        StackName: "TestStack",
+        TemplateBody: JSON.stringify({
+          Resources: {
+            FirstBucket: {
+              Type: "AWS::S3::Bucket",
+              DependsOn: "SecondBucket",
+            },
+            SecondBucket: {
+              Type: "AWS::S3::Bucket",
+              DependsOn: "FirstBucket",
+            },
+          },
+        }),
+      },
+    });
+
+    const stack = cloudFormation.stacks.get("TestStack" as never);
+    assertNonNullable(stack);
+
+    await simAws.backgroundTasksComplete();
+
+    assertIdentical(stack.status, "CREATE_FAILED");
+    assertNonNullable(stack.error);
+    assertIdentical(
+      stack.error.message,
+      "Could not resolve simulated CloudFormation Resource dependencies in Stack TestStack",
+    );
+  });
+
+  it("throws when deploy is called while create is in progress", async () => {
+    const simAws = new SimAws();
+
+    const cloudFormation = simAws.cloudFormation();
+    await cloudFormation.createStack({
+      input: {
+        StackName: "TestStack",
+        TemplateBody: JSON.stringify({
+          Resources: {
+            TestBucket: {
+              Type: "AWS::S3::Bucket",
+              Properties: {
+                BucketName: "test-bucket",
+              },
+            },
+          },
+        }),
+      },
+    });
+
+    const stack = cloudFormation.stacks.get("TestStack" as never);
+    assertNonNullable(stack);
+    assertIdentical(stack.status, "CREATE_IN_PROGRESS");
+
+    const error = await assertThrowsErrorAsync(async () => {
+      await stack.deploy();
+    });
+
+    assertIdentical(
+      error.message,
+      "Sim CloudFormation Stack TestStack cannot be deployed from CREATE_IN_PROGRESS status",
+    );
+
+    await simAws.backgroundTasksComplete();
+
     assertIdentical(stack.status, "CREATE_COMPLETE");
   });
 });
