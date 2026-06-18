@@ -199,71 +199,31 @@ export class FilesystemS3BucketStorage implements SimS3BucketStorage {
   private contentTypeForObjectKey(key: string): string | undefined {
     const extension = path.extname(key).toLowerCase();
 
-    switch (extension) {
-      case ".css": {
-        return "text/css";
-      }
-      case ".eot": {
-        return "application/vnd.ms-fontobject";
-      }
-      case ".gif": {
-        return "image/gif";
-      }
-      case ".html":
-      case ".htm": {
-        return "text/html";
-      }
-      case ".ico": {
-        return "image/x-icon";
-      }
-      case ".jpeg":
-      case ".jpg": {
-        return "image/jpeg";
-      }
-      case ".js":
-      case ".mjs": {
-        return "text/javascript";
-      }
-      case ".json": {
-        return "application/json";
-      }
-      case ".map": {
-        return "application/json";
-      }
-      case ".png": {
-        return "image/png";
-      }
-      case ".otf": {
-        return "font/otf";
-      }
-      case ".svg": {
-        return "image/svg+xml";
-      }
-      case ".ttc": {
-        return "font/collection";
-      }
-      case ".ttf": {
-        return "font/ttf";
-      }
-      case ".txt": {
-        return "text/plain";
-      }
-      case ".webp": {
-        return "image/webp";
-      }
-      case ".woff": {
-        return "font/woff";
-      }
-      case ".woff2": {
-        return "font/woff2";
-      }
-      case ".xml": {
-        return "application/xml";
-      }
-      default: {
-        /* v8 ignore next */
-        return undefined;
-      }
-    }
+    return contentTypesByExtension.get(extension);
   }
 }
+
+const contentTypesByExtension: ReadonlyMap<string, string> = new Map([
+  [".css", "text/css"],
+  [".eot", "application/vnd.ms-fontobject"],
+  [".gif", "image/gif"],
+  [".html", "text/html"],
+  [".htm", "text/html"],
+  [".ico", "image/x-icon"],
+  [".jpeg", "image/jpeg"],
+  [".jpg", "image/jpeg"],
+  [".js", "text/javascript"],
+  [".mjs", "text/javascript"],
+  [".json", "application/json"],
+  [".map", "application/json"],
+  [".png", "image/png"],
+  [".otf", "font/otf"],
+  [".svg", "image/svg+xml"],
+  [".ttc", "font/collection"],
+  [".ttf", "font/ttf"],
+  [".txt", "text/plain"],
+  [".webp", "image/webp"],
+  [".woff", "font/woff"],
+  [".woff2", "font/woff2"],
+  [".xml", "application/xml"],
+]);

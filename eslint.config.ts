@@ -122,6 +122,9 @@ export default defineConfig(
 
       // ── Max lines per file ───────────────────────────
       "max-lines": "error",
+
+      // ── Complexity ───────────────────────────────────
+      complexity: "error",
     },
   },
 
