@@ -119,6 +119,9 @@ export default defineConfig(
       eqeqeq: ["error", "always"],
       curly: ["error", "all"],
       "@typescript-eslint/only-throw-error": "error",
+
+      // ── Max lines per file ───────────────────────────
+      "max-lines": "error",
     },
   },
 
