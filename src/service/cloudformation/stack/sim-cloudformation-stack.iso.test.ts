@@ -1,5 +1,5 @@
 import { describe, it } from "vitest";
-import { assertIdentical } from "@kensio/smartass";
+import { assertIdentical, assertNonNullable } from "@kensio/smartass";
 import { SimAws } from "../../aws/sim-aws.js";
 
 describe("SimCloudFormationStack", () => {
@@ -84,5 +84,40 @@ describe("SimCloudFormationStack", () => {
       "ap-southeast-2",
     );
     assertIdentical(stack.status, "CREATE_COMPLETE");
+  });
+
+  it("fails deployment when Resource dependencies cannot be resolved", async () => {
+    const simAws = new SimAws();
+
+    const cloudFormation = simAws.cloudFormation();
+    await cloudFormation.createStack({
+      input: {
+        StackName: "TestStack",
+        TemplateBody: JSON.stringify({
+          Resources: {
+            FirstBucket: {
+              Type: "AWS::S3::Bucket",
+              DependsOn: "SecondBucket",
+            },
+            SecondBucket: {
+              Type: "AWS::S3::Bucket",
+              DependsOn: "FirstBucket",
+            },
+          },
+        }),
+      },
+    });
+
+    const stack = cloudFormation.stacks.get("TestStack" as never);
+    assertNonNullable(stack);
+
+    await simAws.backgroundTasksComplete();
+
+    assertIdentical(stack.status, "CREATE_FAILED");
+    assertNonNullable(stack.error);
+    assertIdentical(
+      stack.error.message,
+      "Could not resolve simulated CloudFormation Resource dependencies in Stack TestStack",
+    );
   });
 });

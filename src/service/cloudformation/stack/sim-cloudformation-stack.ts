@@ -1,6 +1,8 @@
 import type { SimAws } from "../../aws/sim-aws.js";
 import type { Brand } from "../../../util/brand.type.js";
 import type { BackgroundScheduler } from "../../../util/background/background.js";
+import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
+import { SimCfnResource } from "../resource/sim-cfn-resource.js";
 
 /**
  * Parsed CloudFormation template object.
@@ -17,15 +19,12 @@ export type SimCloudFormationStackName = Brand<
 export type SimCloudFormationStackStatus =
   | "REVIEW_IN_PROGRESS"
   | "CREATE_IN_PROGRESS"
-  | "CREATE_COMPLETE";
-
-export interface SimCloudFormationResource {
-  readonly logicalId: string;
-  readonly template: Record<string, unknown>;
-}
+  | "CREATE_COMPLETE"
+  | "CREATE_FAILED";
 
 interface SimCloudFormationStackProps {
   readonly simAws: SimAws;
+  readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly background: BackgroundScheduler;
   readonly stackName: SimCloudFormationStackName;
   readonly template: SimCloudFormationTemplate;
@@ -41,16 +40,23 @@ interface SimCloudFormationStackProps {
  */
 export class SimCloudFormationStack {
   private readonly simAws: SimAws;
+  private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly background: BackgroundScheduler;
   private _status: SimCloudFormationStackStatus = "REVIEW_IN_PROGRESS";
+
+  private deployCompletePromise: Promise<void> | undefined;
+  private deployError: Error | undefined;
+
   public readonly stackName: SimCloudFormationStackName;
   public readonly template: SimCloudFormationTemplate;
-  public readonly resources = new Map<string, SimCloudFormationResource>();
+  public readonly resources = new Map<string, SimCfnResource>();
 
   constructor(props: SimCloudFormationStackProps) {
-    const { simAws, background, stackName, template } = props;
+    const { simAws, accountRegionScope, background, stackName, template } =
+      props;
 
     this.simAws = simAws;
+    this.accountRegionScope = accountRegionScope;
     this.background = background;
     this.stackName = stackName;
     this.template = template;
@@ -66,19 +72,86 @@ export class SimCloudFormationStack {
   }
 
   /**
+   * Get the deployment error, if Stack deployment failed.
+   */
+  public get error(): Error | undefined {
+    return this.deployError;
+  }
+
+  /**
    * Deploy this Stack into simulated AWS.
    */
   async deploy(): Promise<void> {
     await this.background.sequence();
 
     this._status = "CREATE_IN_PROGRESS";
-    this.background.schedule(async () => this.deployResources());
+    this.deployError = undefined;
+    this.deployCompletePromise = new Promise<void>((resolve) => {
+      this.background.schedule(async () => {
+        try {
+          await this.deployResources();
+          this._status = "CREATE_COMPLETE";
+        } catch (error) {
+          const stackError =
+            error instanceof Error
+              ? error
+              : new Error(
+                  `Sim CloudFormation Stack deploy failed: ${String(error)}`,
+                );
+
+          this._status = "CREATE_FAILED";
+          this.deployError = stackError;
+        } finally {
+          resolve();
+        }
+      });
+    });
+  }
+
+  /**
+   * Wait for the stack to finish deploying.
+   */
+  async waitForDeployComplete(): Promise<void> {
+    if (this.deployCompletePromise !== undefined) {
+      await this.deployCompletePromise;
+    }
+
+    if (this.deployError !== undefined) {
+      throw this.deployError;
+    }
   }
 
   private async deployResources(): Promise<void> {
-    void this.simAws;
+    let pendingResources = new Set(this.resources.values());
 
-    await Promise.resolve();
+    while (pendingResources.size > 0) {
+      const creatableResources = [...pendingResources].filter((resource) => {
+        return resource.canCreate(this.resources);
+      });
+
+      if (creatableResources.length === 0) {
+        throw new Error(
+          `Could not resolve simulated CloudFormation Resource dependencies in Stack ${this.stackName}`,
+        );
+      }
+
+      // eslint-disable-next-line no-await-in-loop
+      await Promise.all(
+        creatableResources.map(async (resource) => {
+          await resource.create({
+            simAws: this.simAws,
+            background: this.background,
+            resources: this.resources,
+          });
+        }),
+      );
+
+      pendingResources = new Set(
+        [...pendingResources].filter((resource) => {
+          return !resource.createComplete;
+        }),
+      );
+    }
 
     this._status = "CREATE_COMPLETE";
   }
@@ -90,18 +163,21 @@ export class SimCloudFormationStack {
       return;
     }
 
-    /* v8 ignore start -- not implemented yet TODO */
     for (const [logicalId, resourceTemplate] of Object.entries(resources)) {
+      /* v8 ignore if -- safety catch */
       if (!isRecord(resourceTemplate)) {
         continue;
       }
 
-      this.resources.set(logicalId, {
+      this.resources.set(
         logicalId,
-        template: resourceTemplate,
-      });
+        new SimCfnResource({
+          accountRegionScope: this.accountRegionScope,
+          logicalId,
+          template: resourceTemplate,
+        }),
+      );
     }
-    /* v8 ignore stop -- not implemented yet TODO */
   }
 }
 

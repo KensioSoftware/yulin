@@ -5,6 +5,7 @@ import type {
   BackgroundCompleter,
 } from "../../../../util/background/background.js";
 import type { SimAws } from "../../../aws/sim-aws.js";
+import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import {
   SimCloudFormationStack,
   type SimCloudFormationStackName,
@@ -18,6 +19,7 @@ import { SimCloudFormationAlreadyExistsException } from "../../error/sim-cloudfr
 
 interface CreateStackCommandHandlerProps {
   readonly simAws: SimAws;
+  readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly stacks: Map<SimCloudFormationStackName, SimCloudFormationStack>;
   readonly background: BackgroundScheduler & BackgroundCompleter;
 }
@@ -32,6 +34,7 @@ export class CreateStackCommandHandler implements CommandHandler<
   SimCreateStackCommandOutput
 > {
   private readonly simAws: SimAws;
+  private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly stacks: Map<
     SimCloudFormationStackName,
     SimCloudFormationStack
@@ -39,9 +42,10 @@ export class CreateStackCommandHandler implements CommandHandler<
   private readonly background: BackgroundScheduler & BackgroundCompleter;
 
   constructor(props: CreateStackCommandHandlerProps) {
-    const { simAws, stacks, background } = props;
+    const { simAws, accountRegionScope, stacks, background } = props;
 
     this.simAws = simAws;
+    this.accountRegionScope = accountRegionScope;
     this.stacks = stacks;
     this.background = background;
   }
@@ -74,6 +78,7 @@ export class CreateStackCommandHandler implements CommandHandler<
 
     const stack = new SimCloudFormationStack({
       simAws: this.simAws,
+      accountRegionScope: this.accountRegionScope,
       background: this.background,
       stackName,
       template,

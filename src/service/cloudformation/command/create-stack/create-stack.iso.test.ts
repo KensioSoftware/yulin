@@ -56,7 +56,7 @@ describe("CloudFormation CreateStackCommand", () => {
         TemplateBody: JSON.stringify({
           Resources: {
             ExampleResource: {
-              Type: "Custom::Example",
+              Type: "AWS::CloudFormation::WaitConditionHandle",
               Properties: {
                 Value: "example",
               },
@@ -65,6 +65,8 @@ describe("CloudFormation CreateStackCommand", () => {
         }),
       },
     });
+
+    await cloudFormation.waitForStackDeployComplete("test-stack");
 
     // Then the Stack records the template Resources by logical ID.
     const stack = cloudFormation.stacks.get("test-stack" as never);
@@ -76,7 +78,10 @@ describe("CloudFormation CreateStackCommand", () => {
 
     assertNonNullable(resource);
     assertIdentical(resource.logicalId, "ExampleResource");
-    assertIdentical(resource.template["Type"], "Custom::Example");
+    assertIdentical(
+      resource.template["Type"],
+      "AWS::CloudFormation::WaitConditionHandle",
+    );
   });
 
   it("completes Stack deployment in background tasks", async () => {

@@ -68,6 +68,7 @@ export class SimCloudFormation {
   ): Promise<SimCreateStackCommandOutput> {
     const handler = new CreateStackCommandHandler({
       simAws: this.simAws,
+      accountRegionScope: this.accountRegionScope,
       stacks: this.stacks,
       background: this.background,
     });
@@ -88,6 +89,18 @@ export class SimCloudFormation {
   }
 
   /**
+   * Wait for a simulated CloudFormation Stack deploy operation to complete.
+   */
+  async waitForStackDeployComplete(
+    stackName: SimCloudFormationStackName | string,
+  ): Promise<void> {
+    const stack = this.stacks.get(stackName as SimCloudFormationStackName);
+    assertDefined(stack, `Sim CloudFormation Stack named ${stackName}`);
+
+    await stack.waitForDeployComplete();
+  }
+
+  /**
    * Convenience wrapper method to create and deploy a simulated CloudFormation
    * Stack from a parsed template object.
    */
@@ -103,10 +116,10 @@ export class SimCloudFormation {
       },
     });
 
-    await this.background.complete();
-
     const stack = this.stacks.get(stackName as SimCloudFormationStackName);
     assertDefined(stack, `Sim CloudFormation Stack named ${stackName}`);
+
+    await stack.waitForDeployComplete();
 
     return stack;
   }
