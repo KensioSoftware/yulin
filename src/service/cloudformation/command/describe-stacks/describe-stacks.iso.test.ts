@@ -20,19 +20,19 @@ describe("CloudFormation DescribeStacksCommand", () => {
     await cloudFormation.createStack(
       new CreateStackCommand({
         StackName: "stack-a",
-        TemplateBody: JSON.stringify({}),
+        TemplateBody: JSON.stringify({ Resources: {} }),
       }),
     );
     await cloudFormation.createStack(
       new CreateStackCommand({
         StackName: "stack-b",
-        TemplateBody: JSON.stringify({}),
+        TemplateBody: JSON.stringify({ Resources: {} }),
       }),
     );
     await cloudFormation.createStack(
       new CreateStackCommand({
         StackName: "stack-c",
-        TemplateBody: JSON.stringify({}),
+        TemplateBody: JSON.stringify({ Resources: {} }),
       }),
     );
 
@@ -75,13 +75,13 @@ describe("CloudFormation DescribeStacksCommand", () => {
     await cloudFormation.createStack(
       new CreateStackCommand({
         StackName: "stack-a",
-        TemplateBody: JSON.stringify({}),
+        TemplateBody: JSON.stringify({ Resources: {} }),
       }),
     );
     await cloudFormation.createStack(
       new CreateStackCommand({
         StackName: "stack-b",
-        TemplateBody: JSON.stringify({}),
+        TemplateBody: JSON.stringify({ Resources: {} }),
       }),
     );
 
@@ -112,7 +112,7 @@ describe("CloudFormation DescribeStacksCommand", () => {
     await cloudFormation.createStack(
       new CreateStackCommand({
         StackName: "test-stack",
-        TemplateBody: JSON.stringify({}),
+        TemplateBody: JSON.stringify({ Resources: {} }),
       }),
     );
 
@@ -145,7 +145,7 @@ describe("CloudFormation DescribeStacksCommand", () => {
     await cloudFormation.createStack(
       new CreateStackCommand({
         StackName: "test-stack",
-        TemplateBody: JSON.stringify({}),
+        TemplateBody: JSON.stringify({ Resources: {} }),
       }),
     );
 

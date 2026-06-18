@@ -7,21 +7,21 @@ import type {
 import type { SimAws } from "../../../aws/sim-aws.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import {
-  type SimCloudFormationParameterValues,
-  SimCloudFormationStack,
+  SimCfnStack,
   type SimCloudFormationStackName,
-  type SimCloudFormationTemplate,
-} from "../../stack/sim-cloudformation-stack.js";
+} from "../../stack/sim-cfn-stack.js";
+import { SimCloudFormationAlreadyExistsException } from "../../error/sim-cloudfront.error.js";
 import type {
   SimCreateStackCommand,
   SimCreateStackCommandOutput,
 } from "./create-stack.cmd.js";
-import { SimCloudFormationAlreadyExistsException } from "../../error/sim-cloudfront.error.js";
+import { SimCfnTemplate } from "../../template/sim-cfn-template.js";
+import type { SimCloudFormationParameterValues } from "../../parameters/sim-cfn-parameters.js";
 
 interface CreateStackCommandHandlerProps {
   readonly simAws: SimAws;
   readonly accountRegionScope: SimAwsAccountRegionScope;
-  readonly stacks: Map<SimCloudFormationStackName, SimCloudFormationStack>;
+  readonly stacks: Map<SimCloudFormationStackName, SimCfnStack>;
   readonly background: BackgroundScheduler & BackgroundCompleter;
 }
 
@@ -36,10 +36,7 @@ export class CreateStackCommandHandler implements CommandHandler<
 > {
   private readonly simAws: SimAws;
   private readonly accountRegionScope: SimAwsAccountRegionScope;
-  private readonly stacks: Map<
-    SimCloudFormationStackName,
-    SimCloudFormationStack
-  >;
+  private readonly stacks: Map<SimCloudFormationStackName, SimCfnStack>;
   private readonly background: BackgroundScheduler & BackgroundCompleter;
 
   constructor(props: CreateStackCommandHandlerProps) {
@@ -73,18 +70,17 @@ export class CreateStackCommandHandler implements CommandHandler<
       );
     }
 
-    const template = CreateStackCommandHandler.parseTemplateBody(
-      cmd.input.TemplateBody,
-    );
-    const parameters = CreateStackCommandHandler.parseParameters(cmd);
+    const template = SimCfnTemplate.fromJson(cmd.input.TemplateBody, {
+      stackName,
+      parameters: CreateStackCommandHandler.parseParameters(cmd),
+    });
 
-    const stack = new SimCloudFormationStack({
+    const stack = new SimCfnStack({
       simAws: this.simAws,
       accountRegionScope: this.accountRegionScope,
       background: this.background,
       stackName,
       template,
-      parameters,
     });
 
     this.stacks.set(stack.stackName, stack);
@@ -95,12 +91,6 @@ export class CreateStackCommandHandler implements CommandHandler<
       StackId: stack.stackName,
       $metadata: {},
     };
-  }
-
-  private static parseTemplateBody(
-    templateBody: string,
-  ): SimCloudFormationTemplate {
-    return JSON.parse(templateBody) as SimCloudFormationTemplate;
   }
 
   private static parseParameters(

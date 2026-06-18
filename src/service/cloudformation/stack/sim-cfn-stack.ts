@@ -3,20 +3,10 @@ import type { Brand } from "../../../util/brand.type.js";
 import type { BackgroundScheduler } from "../../../util/background/background.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import { SimCfnResource } from "../resource/sim-cfn-resource.js";
-
-/**
- * Parsed CloudFormation template object.
- *
- * Yulin accepts already-parsed templates and does not parse JSON or YAML itself.
- */
-export type SimCloudFormationTemplate = Record<string, unknown>;
-
-export type SimCloudFormationParameterValue = string;
-
-export type SimCloudFormationParameterValues = Record<
-  string,
-  SimCloudFormationParameterValue
->;
+import type {
+  CfnTemplateBodyRecord,
+  SimCfnTemplate,
+} from "../template/sim-cfn-template.js";
 
 export type SimCloudFormationStackName = Brand<
   string,
@@ -34,43 +24,36 @@ interface SimCloudFormationStackProps {
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly background: BackgroundScheduler;
   readonly stackName: SimCloudFormationStackName;
-  readonly template: SimCloudFormationTemplate;
-  readonly parameters?: SimCloudFormationParameterValues | undefined;
+  readonly template: SimCfnTemplate;
 }
 
 /**
  * Lightweight simulated CloudFormation Stack.
  */
-export class SimCloudFormationStack {
+export class SimCfnStack {
   private readonly simAws: SimAws;
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly background: BackgroundScheduler;
-  private readonly parameters: SimCloudFormationParameterValues;
+  private readonly cfnTemplate: SimCfnTemplate;
   private _status: SimCloudFormationStackStatus = "REVIEW_IN_PROGRESS";
 
   private deployCompletePromise: Promise<void> | undefined;
   private deployError: Error | undefined;
 
   public readonly stackName: SimCloudFormationStackName;
-  public readonly template: SimCloudFormationTemplate;
+  public readonly template: CfnTemplateBodyRecord;
   public readonly resources = new Map<string, SimCfnResource>();
 
   constructor(props: SimCloudFormationStackProps) {
-    const {
-      simAws,
-      accountRegionScope,
-      background,
-      stackName,
-      template,
-      parameters = {},
-    } = props;
+    const { simAws, accountRegionScope, background, stackName, template } =
+      props;
 
     this.simAws = simAws;
     this.accountRegionScope = accountRegionScope;
     this.background = background;
     this.stackName = stackName;
-    this.template = template;
-    this.parameters = this.resolveParameterValues(parameters);
+    this.cfnTemplate = template;
+    this.template = this.cfnTemplate.template;
 
     this.recordTemplateResources();
   }
@@ -174,113 +157,16 @@ export class SimCloudFormationStack {
   }
 
   private recordTemplateResources(): void {
-    const resources = this.template["Resources"];
-
-    if (!isRecord(resources)) {
-      return;
-    }
-
-    for (const [logicalId, resourceTemplate] of Object.entries(resources)) {
-      /* v8 ignore if -- safety catch */
-      if (!isRecord(resourceTemplate)) {
-        continue;
-      }
-
+    for (const resourceTemplate of this.cfnTemplate.resourceTemplates()) {
       this.resources.set(
-        logicalId,
+        resourceTemplate.logicalId,
         new SimCfnResource({
           accountRegionScope: this.accountRegionScope,
           background: this.background,
-          logicalId,
-          template: this.resolveTemplateParameterRefs(resourceTemplate),
+          logicalId: resourceTemplate.logicalId,
+          template: resourceTemplate.template,
         }),
       );
     }
   }
-
-  private resolveParameterValues(
-    parameterOverrides: SimCloudFormationParameterValues,
-  ): SimCloudFormationParameterValues {
-    const templateParameters = this.template["Parameters"];
-    const resolvedParameters: SimCloudFormationParameterValues = {
-      ...parameterOverrides,
-    };
-
-    if (templateParameters === undefined) {
-      return resolvedParameters;
-    }
-
-    if (!isRecord(templateParameters)) {
-      throw new Error(
-        `Sim CloudFormation Stack ${this.stackName} Parameters must be an object`,
-      );
-    }
-
-    for (const [parameterName, parameterDefinition] of Object.entries(
-      templateParameters,
-    )) {
-      if (resolvedParameters[parameterName] !== undefined) {
-        continue;
-      }
-
-      if (!isRecord(parameterDefinition)) {
-        throw new Error(
-          `Sim CloudFormation Stack ${this.stackName} parameter ${parameterName} definition must be an object`,
-        );
-      }
-
-      const defaultValue = parameterDefinition["Default"];
-
-      if (typeof defaultValue === "string") {
-        resolvedParameters[parameterName] = defaultValue;
-      }
-    }
-
-    return resolvedParameters;
-  }
-
-  private resolveTemplateParameterRefs(
-    value: Record<string, unknown>,
-  ): Record<string, unknown>;
-  private resolveTemplateParameterRefs(value: unknown): unknown;
-  private resolveTemplateParameterRefs(value: unknown): unknown {
-    if (Array.isArray(value)) {
-      return value.map((item) => this.resolveTemplateParameterRefs(item));
-    }
-
-    if (!isRecord(value)) {
-      return value;
-    }
-
-    const ref = value["Ref"];
-
-    if (typeof ref === "string" && this.hasTemplateParameter(ref)) {
-      const parameterValue = this.parameters[ref];
-
-      if (parameterValue === undefined) {
-        throw new Error(
-          `Sim CloudFormation Stack ${this.stackName} parameter ${ref} is missing a value`,
-        );
-      }
-
-      return parameterValue;
-    }
-
-    return Object.fromEntries(
-      Object.entries(value).map(([key, entryValue]) => [
-        key,
-        this.resolveTemplateParameterRefs(entryValue),
-      ]),
-    );
-  }
-
-  private hasTemplateParameter(parameterName: string): boolean {
-    const templateParameters = this.template["Parameters"];
-
-    return isRecord(templateParameters) && parameterName in templateParameters;
-  }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

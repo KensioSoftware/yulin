@@ -4,9 +4,9 @@ import {
   BackgroundTasks,
 } from "../../../../util/background/background.js";
 import type {
-  SimCloudFormationStack,
+  SimCfnStack,
   SimCloudFormationStackName,
-} from "../../stack/sim-cloudformation-stack.js";
+} from "../../stack/sim-cfn-stack.js";
 import type {
   SimCloudFormationStackDescription,
   SimDescribeStacksCommand,
@@ -14,7 +14,7 @@ import type {
 } from "./describe-stacks.cmd.js";
 
 interface DescribeStacksCommandHandlerProps {
-  readonly stacks: Map<SimCloudFormationStackName, SimCloudFormationStack>;
+  readonly stacks: Map<SimCloudFormationStackName, SimCfnStack>;
   readonly background?: BackgroundScheduler;
 }
 
@@ -27,10 +27,7 @@ export class DescribeStacksCommandHandler implements CommandHandler<
   SimDescribeStacksCommand,
   SimDescribeStacksCommandOutput
 > {
-  private readonly stacks: Map<
-    SimCloudFormationStackName,
-    SimCloudFormationStack
-  >;
+  private readonly stacks: Map<SimCloudFormationStackName, SimCfnStack>;
   private readonly background: BackgroundScheduler;
 
   constructor(props: DescribeStacksCommandHandlerProps) {
@@ -70,9 +67,7 @@ export class DescribeStacksCommandHandler implements CommandHandler<
     };
   }
 
-  private describeStack(
-    stack: SimCloudFormationStack,
-  ): SimCloudFormationStackDescription {
+  private describeStack(stack: SimCfnStack): SimCloudFormationStackDescription {
     return {
       StackId: stack.stackName,
       StackName: stack.stackName,

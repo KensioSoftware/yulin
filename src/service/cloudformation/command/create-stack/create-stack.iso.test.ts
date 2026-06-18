@@ -25,7 +25,7 @@ describe("CloudFormation CreateStackCommand", () => {
     const createStackOutput = await cloudFormation.createStack(
       new CreateStackCommand({
         StackName: "test-stack",
-        TemplateBody: JSON.stringify({}),
+        TemplateBody: JSON.stringify({ Resources: {} }),
       }),
     );
 
@@ -97,7 +97,7 @@ describe("CloudFormation CreateStackCommand", () => {
     await cloudFormation.createStack(
       new CreateStackCommand({
         StackName: "test-stack",
-        TemplateBody: JSON.stringify({}),
+        TemplateBody: JSON.stringify({ Resources: {} }),
       }),
     );
 
@@ -160,7 +160,7 @@ describe("CloudFormation CreateStackCommand", () => {
     await cloudFormation.createStack(
       new CreateStackCommand({
         StackName: "test-stack",
-        TemplateBody: JSON.stringify({}),
+        TemplateBody: JSON.stringify({ Resources: {} }),
       }),
     );
 
@@ -170,7 +170,7 @@ describe("CloudFormation CreateStackCommand", () => {
       cloudFormation.createStack(
         new CreateStackCommand({
           StackName: "test-stack",
-          TemplateBody: JSON.stringify({}),
+          TemplateBody: JSON.stringify({ Resources: {} }),
         }),
       ),
     );
@@ -179,5 +179,25 @@ describe("CloudFormation CreateStackCommand", () => {
     assertIdentical(error.name, "AlreadyExistsException");
     assertIdentical(error.$fault, "client");
     assertIdentical(error.$metadata.httpStatusCode, 400);
+  });
+
+  it("throws a clear error when TemplateBody is missing Resources", async () => {
+    const simAws = new SimAws();
+
+    const cloudFormation = simAws.cloudFormation();
+
+    const error = await assertThrowsErrorAsync(async () => {
+      await cloudFormation.createStack(
+        new CreateStackCommand({
+          StackName: "TestStack",
+          TemplateBody: JSON.stringify({}),
+        }),
+      );
+    });
+
+    assertIdentical(
+      error.message,
+      "Sim CloudFormation Stack TestStack TemplateBody must include a Resources object",
+    );
   });
 });

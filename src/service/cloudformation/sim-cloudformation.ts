@@ -5,11 +5,9 @@ import {
 } from "../aws/sim-aws-account-region-scope.js";
 import type { SimAws } from "../aws/sim-aws.js";
 import type {
-  SimCloudFormationParameterValues,
-  SimCloudFormationStack,
+  SimCfnStack,
   SimCloudFormationStackName,
-  SimCloudFormationTemplate,
-} from "./stack/sim-cloudformation-stack.js";
+} from "./stack/sim-cfn-stack.js";
 import type {
   BackgroundCompleter,
   BackgroundScheduler,
@@ -25,6 +23,8 @@ import type {
   SimDescribeStacksCommandOutput,
 } from "./command/describe-stacks/describe-stacks.cmd.js";
 import { DescribeStacksCommandHandler } from "./command/describe-stacks/describe-stacks.handler.js";
+import type { CfnTemplateBodyRecord } from "./template/sim-cfn-template.js";
+import type { SimCloudFormationParameterValues } from "./parameters/sim-cfn-parameters.js";
 
 interface SimCloudFormationProps {
   readonly simAws: SimAws;
@@ -34,7 +34,7 @@ interface SimCloudFormationProps {
 
 interface SimCloudFormationCreateStackProps {
   readonly stackName?: SimCloudFormationStackName | string;
-  readonly template: SimCloudFormationTemplate;
+  readonly template: CfnTemplateBodyRecord;
   readonly parameters?: SimCloudFormationParameterValues | undefined;
 }
 
@@ -45,10 +45,7 @@ export class SimCloudFormation {
   private readonly simAws: SimAws;
   private readonly background: BackgroundScheduler & BackgroundCompleter;
   public readonly accountRegionScope: SimAwsAccountRegionScope;
-  private readonly stacks = new Map<
-    SimCloudFormationStackName,
-    SimCloudFormationStack
-  >();
+  private readonly stacks = new Map<SimCloudFormationStackName, SimCfnStack>();
 
   constructor(props: SimCloudFormationProps) {
     const {
@@ -67,7 +64,7 @@ export class SimCloudFormation {
    */
   getStackByName(
     stackName: SimCloudFormationStackName | string,
-  ): SimCloudFormationStack | undefined {
+  ): SimCfnStack | undefined {
     return this.stacks.get(stackName as SimCloudFormationStackName);
   }
 
@@ -117,7 +114,7 @@ export class SimCloudFormation {
    */
   async deployTemplate(
     props: SimCloudFormationCreateStackProps,
-  ): Promise<SimCloudFormationStack> {
+  ): Promise<SimCfnStack> {
     const stackName = props.stackName ?? makeSimCloudFormationStackName();
 
     await this.createStack({
