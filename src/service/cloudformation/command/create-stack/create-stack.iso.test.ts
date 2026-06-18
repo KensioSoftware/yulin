@@ -5,8 +5,10 @@ import {
   assertNonNullable,
   assertThrowsErrorAsync,
   assertMapSize,
+  assertInstanceOf,
 } from "@kensio/smartass";
 import { SimAws } from "../../../aws/sim-aws.js";
+import { SimCloudFormationAlreadyExistsException } from "../../error/sim-cloudfront.error.js";
 
 describe("CloudFormation CreateStackCommand", () => {
   it("creates a CloudFormation Stack from a template body", async () => {
@@ -137,5 +139,35 @@ describe("CloudFormation CreateStackCommand", () => {
         },
       }),
     );
+  });
+
+  it("throws AlreadyExistsException when StackName already exists", async () => {
+    // Given a CloudFormation Stack already exists.
+    const simAws = new SimAws();
+
+    const cloudFormation = simAws.cloudFormation();
+
+    await cloudFormation.createStack({
+      input: {
+        StackName: "test-stack",
+        TemplateBody: JSON.stringify({}),
+      },
+    });
+
+    // When CreateStackCommand is handled with the same StackName, then it rejects
+    // with the SDK-shaped AlreadyExistsException.
+    const error = await assertThrowsErrorAsync(async () =>
+      cloudFormation.createStack({
+        input: {
+          StackName: "test-stack",
+          TemplateBody: JSON.stringify({}),
+        },
+      }),
+    );
+
+    assertInstanceOf(error, SimCloudFormationAlreadyExistsException);
+    assertIdentical(error.name, "AlreadyExistsException");
+    assertIdentical(error.$fault, "client");
+    assertIdentical(error.$metadata.httpStatusCode, 400);
   });
 });

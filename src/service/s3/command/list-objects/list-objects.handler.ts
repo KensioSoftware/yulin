@@ -8,7 +8,7 @@ import type {
   SimS3BucketName,
 } from "../../bucket/sim-s3-bucket.js";
 import { assertDefined } from "../../../../util/defined/defined.js";
-import { SimS3NoSuchBucket } from "../../error/s3.error.js";
+import { SimS3NoSuchBucket } from "../../error/sim-s3.error.js";
 import {
   type BackgroundScheduler,
   BackgroundTasks,

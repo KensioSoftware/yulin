@@ -14,6 +14,7 @@ import type {
   SimCreateStackCommand,
   SimCreateStackCommandOutput,
 } from "./create-stack.cmd.js";
+import { SimCloudFormationAlreadyExistsException } from "../../error/sim-cloudfront.error.js";
 
 interface CreateStackCommandHandlerProps {
   readonly simAws: SimAws;
@@ -61,6 +62,12 @@ export class CreateStackCommandHandler implements CommandHandler<
     await this.background.sequence();
 
     const stackName = cmd.input.StackName as SimCloudFormationStackName;
+    if (this.stacks.has(stackName)) {
+      throw new SimCloudFormationAlreadyExistsException(
+        `Stack [${stackName}] already exists`,
+      );
+    }
+
     const template = CreateStackCommandHandler.parseTemplateBody(
       cmd.input.TemplateBody,
     );

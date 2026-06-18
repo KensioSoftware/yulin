@@ -13,7 +13,7 @@ import {
   type BackgroundScheduler,
   BackgroundTasks,
 } from "../../../../util/background/background.js";
-import { SimS3NoSuchBucket } from "../../error/s3.error.js";
+import { SimS3NoSuchBucket } from "../../error/sim-s3.error.js";
 
 interface PutObjectCommandHandlerProps {
   readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
