@@ -12,7 +12,7 @@ import type {
   BackgroundCompleter,
   BackgroundScheduler,
 } from "../../util/background/background.js";
-import { assertDefined } from "../../util/defined/defined.js";
+import { assertDefined } from "../../util/type-guard/defined.js";
 import { CreateStackCommandHandler } from "./command/create-stack/create-stack.handler.js";
 import type {
   SimCreateStackCommand,

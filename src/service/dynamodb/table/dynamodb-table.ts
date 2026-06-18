@@ -4,7 +4,7 @@ import {
   type SimArn,
   type SimArnComponents,
 } from "../../aws/arn.js";
-import { assertDefined } from "../../../util/defined/defined.js";
+import { assertDefined } from "../../../util/type-guard/defined.js";
 import { DynamoDbKeySchema } from "./dynamodb-key-schema.js";
 import type { DynamoDbItem } from "../item/dynamodb-item.js";
 import {

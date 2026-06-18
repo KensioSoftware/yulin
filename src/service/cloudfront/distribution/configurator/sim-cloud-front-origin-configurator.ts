@@ -1,6 +1,6 @@
 import type { SimCloudFrontOriginConfig } from "../../command/create-distribution/create-distribution.cmd.js";
 import type { SimCloudFrontDistribution } from "../sim-cloudfront-distribution.js";
-import { assertDefined } from "../../../../util/defined/defined.js";
+import { assertDefined } from "../../../../util/type-guard/defined.js";
 import {
   SimCloudFrontS3Origin,
   type SimCloudFrontS3OriginResolver,

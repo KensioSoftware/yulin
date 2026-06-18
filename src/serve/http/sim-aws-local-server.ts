@@ -6,7 +6,7 @@ import http, {
 import { SimAws } from "../../service/aws/sim-aws.js";
 import { simAwsLocalConf } from "./sim-aws-local.conf.js";
 import { SimAwsHttp } from "./sim-aws-http.js";
-import { assertDefined } from "../../util/defined/defined.js";
+import { assertDefined } from "../../util/type-guard/defined.js";
 import { SimAwsLocalUrl } from "./sim-aws-local-url.js";
 
 interface SimAwsLocalServerProps {

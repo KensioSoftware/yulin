@@ -2,7 +2,7 @@ import type {
   SimCloudFrontDistribution,
   SimCloudFrontDistributionId,
 } from "../distribution/sim-cloudfront-distribution.js";
-import { assertNotNull } from "../../../util/defined/defined.js";
+import { assertNotNull } from "../../../util/type-guard/defined.js";
 import { SimAwsLocalUrl } from "../../../serve/http/sim-aws-local-url.js";
 import type { SimCloudFront } from "../sim-cloudfront.js";
 import type { SimCloudFrontRegistry } from "../sim-cloud-front-registry.js";

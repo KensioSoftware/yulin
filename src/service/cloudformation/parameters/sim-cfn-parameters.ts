@@ -1,3 +1,5 @@
+import { isRecord } from "../../../util/type-guard/record.js";
+
 type SimCloudFormationParameterValue = string;
 
 type SimCloudFormationParameterValues = Record<
@@ -155,8 +157,4 @@ export class SimCfnParameters {
   private stackNameLabel(): string {
     return this.stackName ?? "unknown";
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

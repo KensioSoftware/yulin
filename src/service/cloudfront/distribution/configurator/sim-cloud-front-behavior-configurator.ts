@@ -4,7 +4,7 @@ import type {
   SimCloudFrontMethodList,
 } from "../../command/create-distribution/create-distribution.cmd.js";
 import type { SimCloudFrontBehavior } from "../../behaviour/sim-cloud-front-behavior.js";
-import { assertDefined } from "../../../../util/defined/defined.js";
+import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type { SimArn } from "../../../aws/arn.js";
 import type { SimCloudFrontDistribution } from "../sim-cloudfront-distribution.js";
 

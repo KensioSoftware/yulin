@@ -1,4 +1,6 @@
 import { SimCfnParameters } from "../parameters/sim-cfn-parameters.js";
+import { resolveSimCfnTemplateParamRefs } from "./sim-cfn-template-param-refs.js";
+import { isRecord } from "../../../util/type-guard/record.js";
 
 /**
  * Parsed CloudFormation template body accepted by the simulator.
@@ -87,7 +89,10 @@ export class SimCfnTemplate {
       })
       .map(([logicalId, resourceTemplate]) => ({
         logicalId,
-        template: this.resolveParameterRefs(resourceTemplate),
+        template: resolveSimCfnTemplateParamRefs(
+          resourceTemplate,
+          this.parameters,
+        ),
       }));
   }
 
@@ -120,42 +125,7 @@ export class SimCfnTemplate {
     }
   }
 
-  private resolveParameterRefs(
-    value: Record<string, unknown>,
-  ): Record<string, unknown>;
-  private resolveParameterRefs(value: unknown): unknown;
-  private resolveParameterRefs(value: unknown): unknown {
-    if (Array.isArray(value)) {
-      return value.map((item) => this.resolveParameterRefs(item));
-    }
-
-    if (!isRecord(value)) {
-      return value;
-    }
-
-    const ref = value["Ref"];
-
-    if (
-      Object.keys(value).length === 1 &&
-      typeof ref === "string" &&
-      this.parameters.has(ref)
-    ) {
-      return this.parameters.value(ref);
-    }
-
-    return Object.fromEntries(
-      Object.entries(value).map(([key, entryValue]) => [
-        key,
-        this.resolveParameterRefs(entryValue),
-      ]),
-    );
-  }
-
   private stackNameLabel(): string {
     return this.stackName ?? "unknown";
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

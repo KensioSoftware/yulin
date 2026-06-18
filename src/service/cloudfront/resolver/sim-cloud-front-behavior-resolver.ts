@@ -1,6 +1,6 @@
 import type { SimCloudFrontBehavior } from "../behaviour/sim-cloud-front-behavior.js";
 import type { SimCloudFrontDistribution } from "../distribution/sim-cloudfront-distribution.js";
-import { assertDefined } from "../../../util/defined/defined.js";
+import { assertDefined } from "../../../util/type-guard/defined.js";
 import { SimCloudFrontPathPattern } from "./sim-cloudfront-path-pattern.js";
 
 /**

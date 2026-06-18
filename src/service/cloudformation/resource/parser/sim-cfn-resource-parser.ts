@@ -1,5 +1,5 @@
 import type { SimCloudFormationParsedResourceType } from "../factory/sim-cfn-resource-factory.type.js";
-import { assertDefined } from "../../../../util/defined/defined.js";
+import { assertDefined } from "../../../../util/type-guard/defined.js";
 
 /**
  * Parse a sim CloudFormation Resource type label like AWS::S3::Bucket to

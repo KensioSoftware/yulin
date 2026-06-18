@@ -8,7 +8,7 @@ import type {
   SimS3Bucket,
 } from "../../bucket/sim-s3-bucket.js";
 import { SimS3Object, SimS3ObjectMetadata } from "../../object/s3-object.js";
-import { assertDefined } from "../../../../util/defined/defined.js";
+import { assertDefined } from "../../../../util/type-guard/defined.js";
 import {
   type BackgroundScheduler,
   BackgroundTasks,

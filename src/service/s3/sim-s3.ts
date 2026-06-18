@@ -10,7 +10,7 @@ import {
   simAwsAccountRegionScopeFactory,
 } from "../aws/sim-aws-account-region-scope.js";
 import { PutBucketWebsiteCommandHandler } from "./command/put-bucket-website/put-bucket-website.handler.js";
-import { assertDefined } from "../../util/defined/defined.js";
+import { assertDefined } from "../../util/type-guard/defined.js";
 import { FilesystemS3BucketStorage } from "./storage/s3-filesystem-storage.js";
 import type {
   SimPutObjectCommand,

@@ -1,5 +1,5 @@
 import type { CommandHandler } from "../../../../command/command-handler.js";
-import { assertDefined } from "../../../../util/defined/defined.js";
+import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type {
   BackgroundCompleter,
   BackgroundScheduler,

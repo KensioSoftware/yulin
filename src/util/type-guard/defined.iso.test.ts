@@ -2,7 +2,7 @@ import { describe, it } from "vitest";
 import { assertIdentical, assertThrowsError } from "@kensio/smartass";
 import { assertDefined, assertNotNull } from "./defined.js";
 
-describe("defined assertion util functions", () => {
+describe("type-guard assertion util functions", () => {
   describe("assertDefined", () => {
     it("throws on undefined value", () => {
       const error = assertThrowsError(() => {
