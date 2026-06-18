@@ -5,6 +5,11 @@ export interface SimCreateStackCommand {
   readonly input: SimCreateStackCommandInput;
 }
 
+export interface SimCreateStackParameter {
+  readonly ParameterKey?: string | undefined;
+  readonly ParameterValue?: string | undefined;
+}
+
 /**
  * Minimal structural sim CloudFormation CreateStack input.
  *
@@ -13,6 +18,7 @@ export interface SimCreateStackCommand {
 export interface SimCreateStackCommandInput {
   readonly StackName?: string | undefined;
   readonly TemplateBody?: string | undefined;
+  readonly Parameters?: readonly SimCreateStackParameter[] | undefined;
 }
 
 /**

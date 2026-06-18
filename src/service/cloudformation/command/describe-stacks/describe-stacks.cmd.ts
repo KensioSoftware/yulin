@@ -1,7 +1,7 @@
 import type {
   SimCloudFormationStackName,
   SimCloudFormationStackStatus,
-} from "../../stack/sim-cloudformation-stack.js";
+} from "../../stack/sim-cfn-stack.js";
 
 /**
  * Minimal structural sim CloudFormation DescribeStacks command.

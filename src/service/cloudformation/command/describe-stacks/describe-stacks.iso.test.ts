@@ -5,6 +5,10 @@ import {
   assertUndefined,
 } from "@kensio/smartass";
 import { SimAws } from "../../../aws/sim-aws.js";
+import {
+  CreateStackCommand,
+  DescribeStacksCommand,
+} from "@aws-sdk/client-cloudformation";
 
 describe("CloudFormation DescribeStacksCommand", () => {
   it("describes all CloudFormation Stacks", async () => {
@@ -13,29 +17,29 @@ describe("CloudFormation DescribeStacksCommand", () => {
 
     const cloudFormation = simAws.cloudFormation();
 
-    await cloudFormation.createStack({
-      input: {
+    await cloudFormation.createStack(
+      new CreateStackCommand({
         StackName: "stack-a",
-        TemplateBody: JSON.stringify({}),
-      },
-    });
-    await cloudFormation.createStack({
-      input: {
+        TemplateBody: JSON.stringify({ Resources: {} }),
+      }),
+    );
+    await cloudFormation.createStack(
+      new CreateStackCommand({
         StackName: "stack-b",
-        TemplateBody: JSON.stringify({}),
-      },
-    });
-    await cloudFormation.createStack({
-      input: {
+        TemplateBody: JSON.stringify({ Resources: {} }),
+      }),
+    );
+    await cloudFormation.createStack(
+      new CreateStackCommand({
         StackName: "stack-c",
-        TemplateBody: JSON.stringify({}),
-      },
-    });
+        TemplateBody: JSON.stringify({ Resources: {} }),
+      }),
+    );
 
     // When DescribeStacksCommand is handled without a StackName filter.
-    const describeStacksOutput = await cloudFormation.describeStacks({
-      input: {},
-    });
+    const describeStacksOutput = await cloudFormation.describeStacks(
+      new DescribeStacksCommand(),
+    );
 
     // Then all existing Stacks are returned in creation order.
     assertArrayLength(describeStacksOutput.Stacks, 3);
@@ -68,25 +72,25 @@ describe("CloudFormation DescribeStacksCommand", () => {
 
     const cloudFormation = simAws.cloudFormation();
 
-    await cloudFormation.createStack({
-      input: {
+    await cloudFormation.createStack(
+      new CreateStackCommand({
         StackName: "stack-a",
-        TemplateBody: JSON.stringify({}),
-      },
-    });
-    await cloudFormation.createStack({
-      input: {
+        TemplateBody: JSON.stringify({ Resources: {} }),
+      }),
+    );
+    await cloudFormation.createStack(
+      new CreateStackCommand({
         StackName: "stack-b",
-        TemplateBody: JSON.stringify({}),
-      },
-    });
+        TemplateBody: JSON.stringify({ Resources: {} }),
+      }),
+    );
 
     // When DescribeStacksCommand is handled with a StackName filter.
-    const describeStacksOutput = await cloudFormation.describeStacks({
-      input: {
+    const describeStacksOutput = await cloudFormation.describeStacks(
+      new DescribeStacksCommand({
         StackName: "stack-b",
-      },
-    });
+      }),
+    );
 
     // Then only the matching Stack description is returned.
     assertArrayLength(describeStacksOutput.Stacks, 1);
@@ -105,21 +109,21 @@ describe("CloudFormation DescribeStacksCommand", () => {
 
     const cloudFormation = simAws.cloudFormation();
 
-    await cloudFormation.createStack({
-      input: {
+    await cloudFormation.createStack(
+      new CreateStackCommand({
         StackName: "test-stack",
-        TemplateBody: JSON.stringify({}),
-      },
-    });
+        TemplateBody: JSON.stringify({ Resources: {} }),
+      }),
+    );
 
     await simAws.backgroundTasksComplete();
 
     // When DescribeStacksCommand is handled for the completed Stack.
-    const describeStacksOutput = await cloudFormation.describeStacks({
-      input: {
+    const describeStacksOutput = await cloudFormation.describeStacks(
+      new DescribeStacksCommand({
         StackName: "test-stack",
-      },
-    });
+      }),
+    );
 
     // Then the Stack description includes the completed Stack status.
     assertArrayLength(describeStacksOutput.Stacks, 1);
@@ -138,19 +142,19 @@ describe("CloudFormation DescribeStacksCommand", () => {
 
     const cloudFormation = simAws.cloudFormation();
 
-    await cloudFormation.createStack({
-      input: {
+    await cloudFormation.createStack(
+      new CreateStackCommand({
         StackName: "test-stack",
-        TemplateBody: JSON.stringify({}),
-      },
-    });
+        TemplateBody: JSON.stringify({ Resources: {} }),
+      }),
+    );
 
     // When DescribeStacksCommand is handled with an unknown StackName filter.
-    const describeStacksOutput = await cloudFormation.describeStacks({
-      input: {
+    const describeStacksOutput = await cloudFormation.describeStacks(
+      new DescribeStacksCommand({
         StackName: "unknown-stack",
-      },
-    });
+      }),
+    );
 
     // Then an empty Stacks list is returned.
     assertArrayLength(describeStacksOutput.Stacks, 0);

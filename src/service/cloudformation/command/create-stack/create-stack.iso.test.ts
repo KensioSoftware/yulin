@@ -9,6 +9,10 @@ import {
 } from "@kensio/smartass";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimCloudFormationAlreadyExistsException } from "../../error/sim-cloudfront.error.js";
+import {
+  CreateStackCommand,
+  DescribeStacksCommand,
+} from "@aws-sdk/client-cloudformation";
 
 describe("CloudFormation CreateStackCommand", () => {
   it("creates a CloudFormation Stack from a template body", async () => {
@@ -18,21 +22,21 @@ describe("CloudFormation CreateStackCommand", () => {
     const cloudFormation = simAws.cloudFormation();
 
     // When CreateStackCommand is handled with a StackName and TemplateBody.
-    const createStackOutput = await cloudFormation.createStack({
-      input: {
+    const createStackOutput = await cloudFormation.createStack(
+      new CreateStackCommand({
         StackName: "test-stack",
-        TemplateBody: JSON.stringify({}),
-      },
-    });
+        TemplateBody: JSON.stringify({ Resources: {} }),
+      }),
+    );
 
     // Then the Stack is registered and starts deploying in the background.
     assertIdentical(createStackOutput.StackId, "test-stack");
 
-    const describeStacksOut = await cloudFormation.describeStacks({
-      input: {
+    const describeStacksOut = await cloudFormation.describeStacks(
+      new DescribeStacksCommand({
         StackName: "test-stack",
-      },
-    });
+      }),
+    );
 
     assertArrayLength(describeStacksOut.Stacks, 1);
     assertIdentical(describeStacksOut.Stacks[0].StackId, "test-stack");
@@ -50,8 +54,8 @@ describe("CloudFormation CreateStackCommand", () => {
     const cloudFormation = simAws.cloudFormation();
 
     // When CreateStackCommand is handled with the template body.
-    await cloudFormation.createStack({
-      input: {
+    await cloudFormation.createStack(
+      new CreateStackCommand({
         StackName: "test-stack",
         TemplateBody: JSON.stringify({
           Resources: {
@@ -63,13 +67,13 @@ describe("CloudFormation CreateStackCommand", () => {
             },
           },
         }),
-      },
-    });
+      }),
+    );
 
     await cloudFormation.waitForStackDeployComplete("test-stack");
 
     // Then the Stack records the template Resources by logical ID.
-    const stack = cloudFormation.stacks.get("test-stack" as never);
+    const stack = cloudFormation.getStackByName("test-stack");
 
     assertNonNullable(stack);
     assertMapSize(stack.resources, 1);
@@ -90,22 +94,22 @@ describe("CloudFormation CreateStackCommand", () => {
 
     const cloudFormation = simAws.cloudFormation();
 
-    await cloudFormation.createStack({
-      input: {
+    await cloudFormation.createStack(
+      new CreateStackCommand({
         StackName: "test-stack",
-        TemplateBody: JSON.stringify({}),
-      },
-    });
+        TemplateBody: JSON.stringify({ Resources: {} }),
+      }),
+    );
 
     // When all scheduled background tasks complete.
     await simAws.backgroundTasksComplete();
 
     // Then the Stack reaches CREATE_COMPLETE status.
-    const describeStacksOutput = await cloudFormation.describeStacks({
-      input: {
+    const describeStacksOutput = await cloudFormation.describeStacks(
+      new DescribeStacksCommand({
         StackName: "test-stack",
-      },
-    });
+      }),
+    );
 
     assertArrayLength(describeStacksOutput.Stacks, 1);
     assertIdentical(
@@ -122,11 +126,12 @@ describe("CloudFormation CreateStackCommand", () => {
 
     // When CreateStackCommand is handled without StackName, then it rejects.
     await assertThrowsErrorAsync(async () =>
-      cloudFormation.createStack({
-        input: {
+      cloudFormation.createStack(
+        // @ts-expect-error -- testing missing StackName
+        new CreateStackCommand({
           TemplateBody: JSON.stringify({}),
-        },
-      }),
+        }),
+      ),
     );
   });
 
@@ -138,11 +143,11 @@ describe("CloudFormation CreateStackCommand", () => {
 
     // When CreateStackCommand is handled without TemplateBody, then it rejects.
     await assertThrowsErrorAsync(async () =>
-      cloudFormation.createStack({
-        input: {
+      cloudFormation.createStack(
+        new CreateStackCommand({
           StackName: "test-stack",
-        },
-      }),
+        }),
+      ),
     );
   });
 
@@ -152,27 +157,47 @@ describe("CloudFormation CreateStackCommand", () => {
 
     const cloudFormation = simAws.cloudFormation();
 
-    await cloudFormation.createStack({
-      input: {
+    await cloudFormation.createStack(
+      new CreateStackCommand({
         StackName: "test-stack",
-        TemplateBody: JSON.stringify({}),
-      },
-    });
+        TemplateBody: JSON.stringify({ Resources: {} }),
+      }),
+    );
 
     // When CreateStackCommand is handled with the same StackName, then it rejects
     // with the SDK-shaped AlreadyExistsException.
     const error = await assertThrowsErrorAsync(async () =>
-      cloudFormation.createStack({
-        input: {
+      cloudFormation.createStack(
+        new CreateStackCommand({
           StackName: "test-stack",
-          TemplateBody: JSON.stringify({}),
-        },
-      }),
+          TemplateBody: JSON.stringify({ Resources: {} }),
+        }),
+      ),
     );
 
     assertInstanceOf(error, SimCloudFormationAlreadyExistsException);
     assertIdentical(error.name, "AlreadyExistsException");
     assertIdentical(error.$fault, "client");
     assertIdentical(error.$metadata.httpStatusCode, 400);
+  });
+
+  it("throws a clear error when TemplateBody is missing Resources", async () => {
+    const simAws = new SimAws();
+
+    const cloudFormation = simAws.cloudFormation();
+
+    const error = await assertThrowsErrorAsync(async () => {
+      await cloudFormation.createStack(
+        new CreateStackCommand({
+          StackName: "TestStack",
+          TemplateBody: JSON.stringify({}),
+        }),
+      );
+    });
+
+    assertIdentical(
+      error.message,
+      "Sim CloudFormation Stack TestStack TemplateBody must include a Resources object",
+    );
   });
 });

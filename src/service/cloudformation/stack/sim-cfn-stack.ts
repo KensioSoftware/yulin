@@ -3,13 +3,10 @@ import type { Brand } from "../../../util/brand.type.js";
 import type { BackgroundScheduler } from "../../../util/background/background.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import { SimCfnResource } from "../resource/sim-cfn-resource.js";
-
-/**
- * Parsed CloudFormation template object.
- *
- * Yulin accepts already-parsed templates and does not parse JSON or YAML itself.
- */
-export type SimCloudFormationTemplate = Record<string, unknown>;
+import type {
+  CfnTemplateBodyRecord,
+  SimCfnTemplate,
+} from "../template/sim-cfn-template.js";
 
 export type SimCloudFormationStackName = Brand<
   string,
@@ -27,28 +24,24 @@ interface SimCloudFormationStackProps {
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly background: BackgroundScheduler;
   readonly stackName: SimCloudFormationStackName;
-  readonly template: SimCloudFormationTemplate;
+  readonly template: SimCfnTemplate;
 }
 
 /**
  * Lightweight simulated CloudFormation Stack.
- *
- * This is intentionally not a detailed simulation of CloudFormation Stack
- * mechanics. It is a small container for the Stack identity, template, status,
- * and resources, so CloudFormation template interpretation has a stable concept
- * to build on later.
  */
-export class SimCloudFormationStack {
+export class SimCfnStack {
   private readonly simAws: SimAws;
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly background: BackgroundScheduler;
+  private readonly cfnTemplate: SimCfnTemplate;
   private _status: SimCloudFormationStackStatus = "REVIEW_IN_PROGRESS";
 
   private deployCompletePromise: Promise<void> | undefined;
   private deployError: Error | undefined;
 
   public readonly stackName: SimCloudFormationStackName;
-  public readonly template: SimCloudFormationTemplate;
+  public readonly template: CfnTemplateBodyRecord;
   public readonly resources = new Map<string, SimCfnResource>();
 
   constructor(props: SimCloudFormationStackProps) {
@@ -59,7 +52,8 @@ export class SimCloudFormationStack {
     this.accountRegionScope = accountRegionScope;
     this.background = background;
     this.stackName = stackName;
-    this.template = template;
+    this.cfnTemplate = template;
+    this.template = this.cfnTemplate.template;
 
     this.recordTemplateResources();
   }
@@ -163,31 +157,16 @@ export class SimCloudFormationStack {
   }
 
   private recordTemplateResources(): void {
-    const resources = this.template["Resources"];
-
-    if (!isRecord(resources)) {
-      return;
-    }
-
-    for (const [logicalId, resourceTemplate] of Object.entries(resources)) {
-      /* v8 ignore if -- safety catch */
-      if (!isRecord(resourceTemplate)) {
-        continue;
-      }
-
+    for (const resourceTemplate of this.cfnTemplate.resourceTemplates()) {
       this.resources.set(
-        logicalId,
+        resourceTemplate.logicalId,
         new SimCfnResource({
           accountRegionScope: this.accountRegionScope,
           background: this.background,
-          logicalId,
-          template: resourceTemplate,
+          logicalId: resourceTemplate.logicalId,
+          template: resourceTemplate.template,
         }),
       );
     }
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
