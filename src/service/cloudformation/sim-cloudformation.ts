@@ -45,7 +45,7 @@ export class SimCloudFormation {
   private readonly simAws: SimAws;
   private readonly background: BackgroundScheduler & BackgroundCompleter;
   public readonly accountRegionScope: SimAwsAccountRegionScope;
-  public readonly stacks = new Map<
+  private readonly stacks = new Map<
     SimCloudFormationStackName,
     SimCloudFormationStack
   >();
@@ -60,6 +60,15 @@ export class SimCloudFormation {
     this.simAws = simAws;
     this.background = background;
     this.accountRegionScope = accountRegionScope;
+  }
+
+  /**
+   * Get a simulated CloudFormation Stack by name.
+   */
+  getStackByName(
+    stackName: SimCloudFormationStackName | string,
+  ): SimCloudFormationStack | undefined {
+    return this.stacks.get(stackName as SimCloudFormationStackName);
   }
 
   /**
@@ -96,7 +105,7 @@ export class SimCloudFormation {
   async waitForStackDeployComplete(
     stackName: SimCloudFormationStackName | string,
   ): Promise<void> {
-    const stack = this.stacks.get(stackName as SimCloudFormationStackName);
+    const stack = this.getStackByName(stackName);
     assertDefined(stack, `Sim CloudFormation Stack named ${stackName}`);
 
     await stack.waitForDeployComplete();
@@ -124,7 +133,7 @@ export class SimCloudFormation {
       },
     });
 
-    const stack = this.stacks.get(stackName as SimCloudFormationStackName);
+    const stack = this.getStackByName(stackName);
     assertDefined(stack, `Sim CloudFormation Stack named ${stackName}`);
 
     await stack.waitForDeployComplete();

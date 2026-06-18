@@ -18,7 +18,7 @@ describe("SimCloudFormationStack", () => {
         TemplateBody: JSON.stringify({}),
       },
     });
-    const stack = cloudFormation.stacks.get("TestStack" as never);
+    const stack = cloudFormation.getStackByName("TestStack");
 
     assertIdentical(createStackOutput.StackId, "TestStack");
     assertIdentical(stack?.status, "CREATE_IN_PROGRESS");
@@ -113,7 +113,7 @@ describe("SimCloudFormationStack", () => {
       },
     });
 
-    const stack = cloudFormation.stacks.get("TestStack" as never);
+    const stack = cloudFormation.getStackByName("TestStack");
     assertNonNullable(stack);
 
     await simAws.backgroundTasksComplete();
@@ -146,7 +146,7 @@ describe("SimCloudFormationStack", () => {
       },
     });
 
-    const stack = cloudFormation.stacks.get("TestStack" as never);
+    const stack = cloudFormation.getStackByName("TestStack");
     assertNonNullable(stack);
     assertIdentical(stack.status, "CREATE_IN_PROGRESS");
 
@@ -232,7 +232,7 @@ describe("SimCloudFormationStack", () => {
 
     await simAws.backgroundTasksComplete();
 
-    const stack = cloudFormation.stacks.get(stackName);
+    const stack = cloudFormation.getStackByName(stackName);
     assertNonNullable(stack);
 
     const resource = stack.resources.get("TestBucket");

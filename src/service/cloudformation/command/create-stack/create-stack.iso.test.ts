@@ -69,7 +69,7 @@ describe("CloudFormation CreateStackCommand", () => {
     await cloudFormation.waitForStackDeployComplete("test-stack");
 
     // Then the Stack records the template Resources by logical ID.
-    const stack = cloudFormation.stacks.get("test-stack" as never);
+    const stack = cloudFormation.getStackByName("test-stack");
 
     assertNonNullable(stack);
     assertMapSize(stack.resources, 1);
