@@ -3,7 +3,7 @@ import type {
   SimCreateFunctionCommand,
   SimCreateFunctionCommandOutput,
 } from "./create-function.cmd.js";
-import { assertDefined } from "../../../../util/defined/defined.js";
+import { assertDefined } from "../../../../util/type-guard/defined.js";
 import {
   SimCloudFrontFunction,
   type SimCloudFrontFunctionName,

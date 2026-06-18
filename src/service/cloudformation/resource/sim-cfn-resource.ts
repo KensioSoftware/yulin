@@ -10,6 +10,7 @@ import {
 import type { SimCfnServiceResourceFactory } from "./factory/sim-cfn-resource-factory.type.js";
 import { parseSimCloudFormationResourceType } from "./parser/sim-cfn-resource-parser.js";
 import { resolveSimCloudFormationServiceResourceFactory } from "./resolver/sim-cfn-service-resolver.js";
+import { isRecord } from "../../../util/type-guard/record.js";
 
 interface SimCloudFormationResourceProps {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
@@ -230,8 +231,4 @@ export class SimCfnResource<T extends object = object> {
 
     return await factory.create(resourceType.resourceTypeName, this, context);
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

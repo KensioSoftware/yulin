@@ -6,7 +6,7 @@ import type {
 } from "./create-table.cmd.js";
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import type { CommandHandler } from "../../../../command/command-handler.js";
-import { assertDefined } from "../../../../util/defined/defined.js";
+import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type { SimArn } from "../../../aws/arn.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import { SimDynamoDbResourceInUseException } from "../../error/dynamodb.error.js";

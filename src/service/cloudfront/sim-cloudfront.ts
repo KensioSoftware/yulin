@@ -35,7 +35,7 @@ import type {
   SimCloudFrontFunctionName,
 } from "./cff/sim-cloudfront-function.js";
 import type { SimArn } from "../aws/arn.js";
-import { assertDefined } from "../../util/defined/defined.js";
+import { assertDefined } from "../../util/type-guard/defined.js";
 
 interface SimCloudFrontProps {
   readonly accountRegionScope?: SimAwsAccountRegionScope;

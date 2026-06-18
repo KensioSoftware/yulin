@@ -7,17 +7,14 @@ import {
   SimS3Bucket,
   type SimS3BucketName,
 } from "../../bucket/sim-s3-bucket.js";
-import { assertDefined } from "../../../../util/defined/defined.js";
+import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type { SimS3GlobalRegistry } from "../../sim-s3-global-registry.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
-import {
-  SimS3BucketAlreadyExists,
-  SimS3BucketAlreadyOwnedByYou,
-} from "../../error/sim-s3.error.js";
 import {
   type BackgroundScheduler,
   BackgroundTasks,
 } from "../../../../util/background/background.js";
+import { SimS3BucketNameAvailability } from "../../bucket/name-availability/sim-s3-bucket-name-availability.js";
 
 interface CreateBucketCommandHandlerProps {
   readonly accountRegionScope: SimAwsAccountRegionScope;
@@ -66,27 +63,11 @@ export class CreateBucketCommandHandler implements CommandHandler<
 
     const bucketName = cmd.input.Bucket as SimS3BucketName;
 
-    const existingBucketScope =
-      this.s3GlobalRegistry.findBucketScope(bucketName);
-    if (existingBucketScope !== undefined) {
-      if (existingBucketScope.accountId === this.accountRegionScope.accountId) {
-        throw new SimS3BucketAlreadyOwnedByYou(
-          `S3 Bucket ${bucketName} already exists in ${existingBucketScope.regionName} and is owned by ${existingBucketScope.accountId}`,
-        );
-      }
-      throw new SimS3BucketAlreadyExists(
-        `S3 Bucket ${bucketName} already exists in ${existingBucketScope.regionName} ${existingBucketScope.accountId}`,
-      );
-    }
-
-    /* v8 ignore if -- safety catch for situation that cannot happen in normal usage */
-    if (this.buckets.has(bucketName)) {
-      // Somehow the Bucket was absent from the global registry.
-      this.s3GlobalRegistry.registerBucket(bucketName, this.accountRegionScope);
-      throw new SimS3BucketAlreadyOwnedByYou(
-        `S3 Bucket ${bucketName} already exists in ${this.accountRegionScope.regionName} and is owned by ${this.accountRegionScope.accountId}`,
-      );
-    }
+    new SimS3BucketNameAvailability({
+      accountRegionScope: this.accountRegionScope,
+      buckets: this.buckets,
+      s3GlobalRegistry: this.s3GlobalRegistry,
+    }).ensureCanCreateBucketNamed(bucketName);
 
     const bucket = new SimS3Bucket({
       bucketName,

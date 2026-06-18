@@ -1,4 +1,4 @@
-import { assertDefined } from "../../../util/defined/defined.js";
+import { assertDefined } from "../../../util/type-guard/defined.js";
 import type { DynamoDBAttrType } from "../item/dynamodb-item-attribute.js";
 import type { DynamoDbItem } from "../item/dynamodb-item.js";
 import type {

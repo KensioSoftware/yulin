@@ -7,7 +7,7 @@ import { SimCloudFrontDistroRouter as DefaultSimCloudFrontDistroRouter } from ".
 import type { SimCloudFrontBehaviorResolver } from "../resolver/sim-cloud-front-behavior-resolver.js";
 import { SimCloudFrontBehaviorResolver as DefaultSimCloudFrontBehaviorResolver } from "../resolver/sim-cloud-front-behavior-resolver.js";
 import type { SimCloudFront } from "../sim-cloudfront.js";
-import { assertDefined } from "../../../util/defined/defined.js";
+import { assertDefined } from "../../../util/type-guard/defined.js";
 import type { SimCloudFrontBehavior } from "../behaviour/sim-cloud-front-behavior.js";
 import { SimAws } from "../../aws/sim-aws.js";
 import type { SimCloudFrontRegistry } from "../sim-cloud-front-registry.js";
