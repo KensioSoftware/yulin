@@ -10,11 +10,14 @@ THRESHOLD=50
 # Always print the normal FTA table output for humans / CI logs.
 fta "${SRC_DIR}"
 
-# Use JSON output only to decide whether the script should fail.
+# Use JSON output to find files that violate the threshold.
 FINDINGS="$(
   fta "${SRC_DIR}" --json |
-    jq --argjson threshold "${THRESHOLD}" \
-      'map(select(.fta_score >= $threshold))'
+    jq --argjson threshold "${THRESHOLD}" '
+      map(select(.fta_score >= $threshold))
+      | sort_by(.fta_score)
+      | reverse
+    '
 )"
 
 FINDING_COUNT="$(jq 'length' <<<"${FINDINGS}")"
@@ -22,6 +25,9 @@ FINDING_COUNT="$(jq 'length' <<<"${FINDINGS}")"
 if [[ "${FINDING_COUNT}" -gt 0 ]]; then
   echo
   echo "Found ${FINDING_COUNT} file(s) with FTA score >= ${THRESHOLD}."
+  echo
+  echo "FTA findings:"
+  jq '.' <<<"${FINDINGS}"
   exit 1
 fi
 
