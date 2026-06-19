@@ -8,10 +8,9 @@ import {
   BackgroundTasks,
 } from "../../../util/background/background.js";
 import type { SimCfnServiceResourceFactory } from "./factory/sim-cfn-resource-factory.type.js";
-import { isRecord } from "../../../util/type-guard/record.js";
-import { parseSimCfnResourceDependencies } from "./dependency/sim-cfn-resource-dependencies.js";
 import { SimCfnResourceCreateOperation } from "./create/sim-cfn-resource-create-operation.js";
 import { SimCfnResourceCreationState } from "./state/sim-cfn-resource-creation-state.js";
+import { SimCfnResourceTemplateReader } from "./template/sim-cfn-resource-template-reader.js";
 
 interface SimCloudFormationResourceProps {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
@@ -23,6 +22,9 @@ interface SimCloudFormationResourceProps {
 
 /**
  * Simulated CloudFormation Resource status.
+ *
+ * These states model the CloudFormation creation lifecycle for one Resource
+ * entry, not the lifecycle of the underlying simulated AWS service object.
  */
 export type SimCloudFormationResourceStatus =
   | "CREATE_PENDING"
@@ -36,16 +38,28 @@ export interface SimCloudFormationResourceCreateContext {
 }
 
 /**
- * Lightweight simulated CloudFormation Resource record.
+ * Runtime representation of one CloudFormation Resource entry.
  *
- * This represents a Resource entry from a CloudFormation template and can point
- * at the actual simulated AWS resource created from it, such as a SimS3Bucket.
+ * A SimCfnResource is created from one item in a stack template's Resources map.
+ * It keeps the Resource logical ID, account/region scope, original Resource
+ * template object, CloudFormation creation state, and the simulated AWS object
+ * produced by Resource creation.
+ *
+ * This class stays small:
+ * - whole-template validation and Parameter resolution belong to SimCfnTemplate;
+ * - Resource-field reading belongs to SimCfnResourceTemplateReader;
+ * - asynchronous creation orchestration belongs to SimCfnResourceCreateOperation;
+ * - service-specific object construction belongs to SimCfnServiceResourceFactory.
+ *
+ * As a result, SimCfnResource acts as the stable Resource record passed between
+ * stack creation, dependency resolution, and service-specific factories.
  */
 export class SimCfnResource<T extends object = object> {
   public readonly accountRegionScope: SimAwsAccountRegionScope;
   public readonly logicalId: string;
   public readonly template: Record<string, unknown>;
   private readonly creationState = new SimCfnResourceCreationState<T>();
+  private readonly resourceTemplateReader: SimCfnResourceTemplateReader;
   private readonly background: BackgroundScheduler;
   private readonly cfnResourceFactory: SimCfnServiceResourceFactory | undefined;
 
@@ -62,74 +76,81 @@ export class SimCfnResource<T extends object = object> {
     this.background = background;
     this.logicalId = logicalId;
     this.template = template;
+    this.resourceTemplateReader = new SimCfnResourceTemplateReader(template);
     this.cfnResourceFactory = cfnResourceFactory;
   }
 
   /**
-   * Get the current Resource status.
+   * Get the current CloudFormation creation status for this Resource.
    */
   public get status(): SimCloudFormationResourceStatus {
     return this.creationState.status;
   }
 
   /**
-   * Whether this Resource has been deployed into simulated AWS.
+   * Whether this Resource has successfully created its simulated AWS object.
    */
   public get deployed(): boolean {
     return this.creationState.deployed;
   }
 
   /**
-   * Whether this Resource has reached a terminal creation status.
+   * Whether this Resource has reached a terminal successful creation status.
    */
   public get createComplete(): boolean {
     return this.creationState.createComplete;
   }
 
   /**
-   * The CloudFormation Resource type.
+   * The CloudFormation Resource type from the Resource template.
+   *
+   * E.g. AWS::S3::Bucket
    */
   public get type(): string | undefined {
-    const type = this.template["Type"];
-    return typeof type === "string" ? type : undefined;
+    return this.resourceTemplateReader.type();
   }
 
   /**
-   * The CloudFormation Resource properties.
+   * The CloudFormation Resource properties object from the Resource template.
+   *
+   * Missing or non-object Properties are treated as an empty object by the
+   * Resource template reader.
    */
   public get properties(): Record<string, unknown> {
-    const properties = this.template["Properties"];
-
-    if (isRecord(properties)) {
-      return properties;
-    }
-
-    return {};
+    return this.resourceTemplateReader.properties();
   }
 
   /**
-   * The simulated AWS resource represented by this CloudFormation Resource.
+   * The simulated AWS object created for this CloudFormation Resource.
+   *
+   * For example, an AWS::S3::Bucket Resource may point at a simulated S3 Bucket
+   * after creation completes. Resources that do not produce a concrete service
+   * object may leave this undefined.
    */
   public get simResource(): T | undefined {
     return this.creationState.simResource;
   }
 
   /**
-   * Get the deployment error, if Resource creation failed.
+   * The creation failure captured for this Resource, if creation failed.
    */
   public get error(): Error | undefined {
     return this.creationState.error;
   }
 
   /**
-   * Return logical IDs this Resource depends on.
+   * Logical IDs of Resources that must complete before this Resource can
+   * create.
    */
   dependencies(): string[] {
-    return parseSimCfnResourceDependencies(this.template["DependsOn"]);
+    return this.resourceTemplateReader.dependencies();
   }
 
   /**
-   * Whether this Resource can be created based on Resource dependency status.
+   * Whether every declared dependency has reached CREATE_COMPLETE.
+   *
+   * Missing dependencies are treated as not ready because they cannot report a
+   * successful creation status.
    */
   canCreate(resources: ReadonlyMap<string, SimCfnResource>): boolean {
     return this.dependencies().every((dependency) => {
@@ -138,7 +159,10 @@ export class SimCfnResource<T extends object = object> {
   }
 
   /**
-   * Create this Resource into simulated AWS as a background operation.
+   * Start creating this Resource into simulated AWS.
+   *
+   * The actual work is delegated to SimCfnResourceCreateOperation so this class
+   * remains a lifecycle record rather than an async workflow implementation.
    */
   create(context: SimCloudFormationResourceCreateContext): Promise<void> {
     return new SimCfnResourceCreateOperation({
@@ -150,20 +174,29 @@ export class SimCfnResource<T extends object = object> {
 
   /**
    * Mark this Resource as creation in progress.
+   *
+   * Intended for use by the creation operation while it runs the simulated
+   * CloudFormation lifecycle.
    */
   markCreateInProgress(): void {
     this.creationState.markCreateInProgress();
   }
 
   /**
-   * Mark this Resource as successfully created.
+   * Mark this Resource as successfully created and store its simulated AWS object.
+   *
+   * Intended for use by the creation operation after the appropriate
+   * service-specific factory has created the simulated resource.
    */
   markCreateComplete(simResource?: T): void {
     this.creationState.markCreateComplete(simResource);
   }
 
   /**
-   * Mark this Resource as failed to create.
+   * Mark this Resource as failed to create and store the failure reason.
+   *
+   * Intended for use by the creation operation when service-specific creation
+   * throws or rejects.
    */
   markCreateFailed(error?: Error): void {
     this.creationState.markCreateFailed(error);
