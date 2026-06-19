@@ -58,7 +58,18 @@ export class NonDeterministicBackgroundTasks
   public async complete(): Promise<void> {
     while (this.pending.size > 0) {
       // eslint-disable-next-line no-await-in-loop
-      await Promise.all(this.pending);
+      const results = await Promise.allSettled(this.pending);
+      // Check if any promises rejected and capture the first error
+      let firstError: unknown;
+      for (const result of results) {
+        if (result.status === "rejected") {
+          firstError = result.reason;
+          break;
+        }
+      }
+      if (firstError !== undefined) {
+        throw firstError as Error;
+      }
     }
   }
 
