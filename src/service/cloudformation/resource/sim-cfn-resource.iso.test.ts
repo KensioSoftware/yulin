@@ -172,7 +172,7 @@ describe("SimCfnResource", () => {
     assertIdentical(failedError, createError);
 
     assertIdentical(completeWithOriginal, originalSimResource);
-    assertIdentical(completeWithoutReplacement, originalSimResource);
+    assertUndefined(completeWithoutReplacement);
     assertIdentical(completeWithReplacement, replacementSimResource);
     assertIdentical(resource.status, "CREATE_COMPLETE");
     assertIdentical(resource.deployed, true);

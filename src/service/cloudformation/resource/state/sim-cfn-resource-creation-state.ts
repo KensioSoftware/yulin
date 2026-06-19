@@ -50,6 +50,7 @@ export class SimCfnResourceCreationState<T extends object = object> {
    */
   markCreateInProgress(): void {
     this.deployError = undefined;
+    this._simResource = undefined;
     this._status = "CREATE_IN_PROGRESS";
   }
 
@@ -57,10 +58,7 @@ export class SimCfnResourceCreationState<T extends object = object> {
    * Mark this Resource as successfully created.
    */
   markCreateComplete(simResource?: T): void {
-    if (simResource !== undefined) {
-      this._simResource = simResource;
-    }
-
+    this._simResource = simResource;
     this.deployError = undefined;
     this._status = "CREATE_COMPLETE";
   }
@@ -70,6 +68,7 @@ export class SimCfnResourceCreationState<T extends object = object> {
    */
   markCreateFailed(error?: Error): void {
     this.deployError = error;
+    this._simResource = undefined;
     this._status = "CREATE_FAILED";
   }
 }
