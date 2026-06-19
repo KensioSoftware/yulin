@@ -6,7 +6,7 @@ import type { CommandHandler } from "../../../../command/command-handler.js";
 import type {
   DynamoDbTableName,
   SimDynamoDbTable,
-} from "../../table/dynamodb-table.js";
+} from "../../table/sim-dynamodb-table.js";
 import { SimDynamoDbResourceNotFoundException } from "../../error/dynamodb.error.js";
 import {
   type BackgroundScheduler,

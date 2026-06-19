@@ -1,7 +1,7 @@
 import type {
   DynamoDbTableName,
   SimDynamoDbTable,
-} from "./table/dynamodb-table.js";
+} from "./table/sim-dynamodb-table.js";
 import { CreateTableCommandHandler } from "./command/create-table/create-table.handler.js";
 import {
   type BackgroundScheduler,

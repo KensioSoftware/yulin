@@ -6,7 +6,7 @@ import type {
 import type {
   DynamoDbTableName,
   SimDynamoDbTable,
-} from "../../table/dynamodb-table.js";
+} from "../../table/sim-dynamodb-table.js";
 import { DynamoDbItem } from "../../item/dynamodb-item.js";
 import { SimDynamoDbResourceNotFoundException } from "../../error/dynamodb.error.js";
 
