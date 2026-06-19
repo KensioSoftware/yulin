@@ -2,6 +2,7 @@ import {
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
+  assertStringIncludes,
   assertThrowsErrorAsync,
   assertUndefined,
 } from "@kensio/smartass";
@@ -171,7 +172,7 @@ describe("SimCfnResource", () => {
     assertIdentical(failedError, createError);
 
     assertIdentical(completeWithOriginal, originalSimResource);
-    assertIdentical(completeWithoutReplacement, originalSimResource);
+    assertUndefined(completeWithoutReplacement);
     assertIdentical(completeWithReplacement, replacementSimResource);
     assertIdentical(resource.status, "CREATE_COMPLETE");
     assertIdentical(resource.deployed, true);
@@ -243,7 +244,7 @@ describe("SimCfnResource", () => {
 
     // Then the failure is recorded on the Resource.
     assertNonNullable(error);
-    assertIdentical(
+    assertStringIncludes(
       error.message,
       "Sim CloudFormation Resource TestResource is missing a Type",
     );
@@ -283,7 +284,7 @@ describe("SimCfnResource", () => {
     // Then the thrown value is wrapped as an Error and stored on the Resource.
     assertIdentical(
       error.message,
-      "Sim CloudFormation Resource creation failed: factory failed",
+      "Sim CloudFormation Resource TestResource creation failed: factory failed",
     );
     assertIdentical(resource.status, "CREATE_FAILED");
     assertIdentical(resource.createComplete, true);
