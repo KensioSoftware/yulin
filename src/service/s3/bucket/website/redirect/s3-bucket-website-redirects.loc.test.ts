@@ -5,8 +5,8 @@ import {
 } from "@aws-sdk/client-s3";
 import { assertIdentical } from "@kensio/smartass";
 import { afterAll, beforeAll, describe, it } from "vitest";
-import { SimAwsLocalServer } from "../../../../serve/index.js";
-import { SimAws } from "../../../aws/sim-aws.js";
+import { SimAwsLocalServer } from "../../../../../serve/index.js";
+import { SimAws } from "../../../../aws/sim-aws.js";
 
 describe("Serve simulated S3 Bucket static website on localhost", () => {
   const simAws = new SimAws();

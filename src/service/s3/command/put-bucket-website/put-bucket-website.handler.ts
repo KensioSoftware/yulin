@@ -7,7 +7,7 @@ import type {
   SimS3Bucket,
   SimS3BucketName,
 } from "../../bucket/sim-s3-bucket.js";
-import { S3BucketWebsite } from "../../bucket/website/s3-bucket-website.js";
+import { SimS3BucketWebsite } from "../../bucket/website/sim-s3-bucket-website.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import { SimS3NoSuchBucket } from "../../error/sim-s3.error.js";
 import {
@@ -61,7 +61,7 @@ export class PutBucketWebsiteCommandHandler implements CommandHandler<
     await this.background.sequence();
 
     bucket.configureWebsite(
-      new S3BucketWebsite(cmd.input.WebsiteConfiguration),
+      new SimS3BucketWebsite(cmd.input.WebsiteConfiguration),
     );
 
     return {

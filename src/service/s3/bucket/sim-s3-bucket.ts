@@ -2,7 +2,7 @@ import type { Brand } from "../../../util/brand.type.js";
 import type { SimS3BucketStorage } from "../storage/s3-bucket-storage.js";
 import type { SimS3Object } from "../object/s3-object.js";
 import { MemoryS3BucketStorage } from "../storage/s3-memory-storage.js";
-import { S3BucketWebsite } from "./website/s3-bucket-website.js";
+import { SimS3BucketWebsite } from "./website/sim-s3-bucket-website.js";
 import {
   type SimAwsAccountRegionScope,
   simAwsAccountRegionScopeFactory,
@@ -15,7 +15,7 @@ interface SimS3BucketProps {
   readonly bucketName: SimS3BucketName | string;
   readonly accountRegionScope?: SimAwsAccountRegionScope;
   readonly storage?: SimS3BucketStorage;
-  readonly website?: S3BucketWebsite;
+  readonly website?: SimS3BucketWebsite;
 }
 
 /**
@@ -25,14 +25,14 @@ export class SimS3Bucket {
   public readonly bucketName: SimS3BucketName;
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private storage: SimS3BucketStorage;
-  private website: S3BucketWebsite;
+  private website: SimS3BucketWebsite;
 
   constructor(props: SimS3BucketProps) {
     const {
       bucketName,
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       storage = new MemoryS3BucketStorage(),
-      website = new S3BucketWebsite(),
+      website = new SimS3BucketWebsite(),
     } = props;
 
     this.bucketName = bucketName as SimS3BucketName;
@@ -75,14 +75,14 @@ export class SimS3Bucket {
   /**
    * Configure static website hosting for this simulated S3 Bucket.
    */
-  configureWebsite(website: S3BucketWebsite): void {
+  configureWebsite(website: SimS3BucketWebsite): void {
     this.website = website;
   }
 
   /**
    * Get static website configuration for this simulated S3 Bucket.
    */
-  getWebsite(): S3BucketWebsite {
+  getWebsite(): SimS3BucketWebsite {
     return this.website;
   }
 

@@ -22,7 +22,7 @@ import { SimS3 } from "../sim-s3.js";
 import { Readable } from "node:stream";
 import { simS3BodyToBuffer } from "../storage/s3-body-buffer.js";
 import { simAwsAccountRegionScopeFactory } from "../../aws/sim-aws-account-region-scope.js";
-import { S3BucketWebsite } from "./website/s3-bucket-website.js";
+import { SimS3BucketWebsite } from "./website/sim-s3-bucket-website.js";
 
 describe("Simulated S3 Bucket", () => {
   describe.each<StorageFactory>([
@@ -172,7 +172,7 @@ describe("Simulated S3 Bucket", () => {
       accountRegionScope: simAwsAccountRegionScopeFactory.make({
         regionName: "eu-west-2",
       }),
-      website: new S3BucketWebsite({
+      website: new SimS3BucketWebsite({
         IndexDocument: {
           Suffix: "index.html",
         },
@@ -209,7 +209,7 @@ describe("Simulated S3 Bucket", () => {
     });
 
     bucket.configureWebsite(
-      new S3BucketWebsite({
+      new SimS3BucketWebsite({
         ErrorDocument: {
           Key: "error.html",
         },

@@ -1,10 +1,10 @@
 import { assertIdentical, assertUndefined } from "@kensio/smartass";
 import { describe, it } from "vitest";
-import { S3BucketWebsite } from "./s3-bucket-website.js";
+import { SimS3BucketWebsite } from "../sim-s3-bucket-website.js";
 
 describe("S3 Bucket static website redirects", () => {
   it("resolves a non-slash folder request to its redirect target index document", () => {
-    const website = new S3BucketWebsite({
+    const website = new SimS3BucketWebsite({
       IndexDocument: {
         Suffix: "index.html",
       },
@@ -17,13 +17,13 @@ describe("S3 Bucket static website redirects", () => {
   });
 
   it("does not resolve a redirect target index document when no index document is configured", () => {
-    const website = new S3BucketWebsite();
+    const website = new SimS3BucketWebsite();
 
     assertUndefined(website.folderIndexDocumentKeyForRequest("foo"));
   });
 
   it("does not resolve a redirect target index document for slash-terminated folder requests", () => {
-    const website = new S3BucketWebsite({
+    const website = new SimS3BucketWebsite({
       IndexDocument: {
         Suffix: "index.html",
       },
@@ -33,7 +33,7 @@ describe("S3 Bucket static website redirects", () => {
   });
 
   it("redirects all requests to the configured host and protocol", () => {
-    const website = new S3BucketWebsite({
+    const website = new SimS3BucketWebsite({
       RedirectAllRequestsTo: {
         HostName: "example.test",
         Protocol: "https",
@@ -53,7 +53,7 @@ describe("S3 Bucket static website redirects", () => {
   });
 
   it("redirects to the same path with a trailing slash", () => {
-    const website = new S3BucketWebsite({
+    const website = new SimS3BucketWebsite({
       IndexDocument: {
         Suffix: "index.html",
       },
@@ -71,7 +71,7 @@ describe("S3 Bucket static website redirects", () => {
   });
 
   it("leaves the response unchanged when the website is disabled", () => {
-    const website = new S3BucketWebsite();
+    const website = new SimS3BucketWebsite();
     const originalResponse = new Response("Original response", { status: 404 });
 
     const res = website.redirectForRequestResponse(
@@ -83,7 +83,7 @@ describe("S3 Bucket static website redirects", () => {
   });
 
   it("redirects when HttpErrorCodeReturnedEquals matches the response status", () => {
-    const website = new S3BucketWebsite({
+    const website = new SimS3BucketWebsite({
       RoutingRules: [
         {
           Condition: {
@@ -109,7 +109,7 @@ describe("S3 Bucket static website redirects", () => {
   });
 
   it("does not redirect when HttpErrorCodeReturnedEquals does not match the response status", () => {
-    const website = new S3BucketWebsite({
+    const website = new SimS3BucketWebsite({
       RoutingRules: [
         {
           Condition: {
@@ -132,7 +132,7 @@ describe("S3 Bucket static website redirects", () => {
   });
 
   it("redirects when KeyPrefixEquals matches the request key", () => {
-    const website = new S3BucketWebsite({
+    const website = new SimS3BucketWebsite({
       RoutingRules: [
         {
           Condition: {
@@ -158,7 +158,7 @@ describe("S3 Bucket static website redirects", () => {
   });
 
   it("redirects when a routing rule has no condition", () => {
-    const website = new S3BucketWebsite({
+    const website = new SimS3BucketWebsite({
       RoutingRules: [
         {
           Redirect: {
@@ -181,7 +181,7 @@ describe("S3 Bucket static website redirects", () => {
   });
 
   it("does not redirect when KeyPrefixEquals does not match the request key", () => {
-    const website = new S3BucketWebsite({
+    const website = new SimS3BucketWebsite({
       RoutingRules: [
         {
           Condition: {

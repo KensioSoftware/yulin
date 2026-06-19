@@ -1,10 +1,10 @@
 import { assertIdentical } from "@kensio/smartass";
 import { describe, it } from "vitest";
-import { S3BucketWebsite } from "./s3-bucket-website.js";
+import { SimS3BucketWebsite } from "./sim-s3-bucket-website.js";
 
 describe("S3 Bucket static website routing", () => {
   it("resolves the root request to the index document", () => {
-    const website = new S3BucketWebsite({
+    const website = new SimS3BucketWebsite({
       IndexDocument: {
         Suffix: "index.html",
       },
@@ -14,7 +14,7 @@ describe("S3 Bucket static website routing", () => {
   });
 
   it("resolves a folder request to the folder index document", () => {
-    const website = new S3BucketWebsite({
+    const website = new SimS3BucketWebsite({
       IndexDocument: {
         Suffix: "index.html",
       },
@@ -24,7 +24,7 @@ describe("S3 Bucket static website routing", () => {
   });
 
   it("leaves a non-folder object key unchanged when an index document is configured", () => {
-    const website = new S3BucketWebsite({
+    const website = new SimS3BucketWebsite({
       IndexDocument: {
         Suffix: "index.html",
       },
@@ -37,7 +37,7 @@ describe("S3 Bucket static website routing", () => {
   });
 
   it("leaves object keys unchanged when no index document is configured", () => {
-    const website = new S3BucketWebsite();
+    const website = new SimS3BucketWebsite();
 
     assertIdentical(website.objectKeyForRequest("foo/"), "foo/");
     assertIdentical(
@@ -47,7 +47,7 @@ describe("S3 Bucket static website routing", () => {
   });
 
   it("requires all specified routing rule conditions to match", () => {
-    const website = new S3BucketWebsite({
+    const website = new SimS3BucketWebsite({
       RoutingRules: [
         {
           Condition: {
@@ -71,7 +71,7 @@ describe("S3 Bucket static website routing", () => {
   });
 
   it("uses the first matching routing rule", () => {
-    const website = new S3BucketWebsite({
+    const website = new SimS3BucketWebsite({
       RoutingRules: [
         {
           Condition: {
@@ -105,7 +105,7 @@ describe("S3 Bucket static website routing", () => {
   });
 
   it("uses the configured redirect status code", () => {
-    const website = new S3BucketWebsite({
+    const website = new SimS3BucketWebsite({
       RoutingRules: [
         {
           Condition: {
@@ -132,7 +132,7 @@ describe("S3 Bucket static website routing", () => {
   });
 
   it("redirects to the configured host and protocol from a routing rule", () => {
-    const website = new S3BucketWebsite({
+    const website = new SimS3BucketWebsite({
       RoutingRules: [
         {
           Condition: {
