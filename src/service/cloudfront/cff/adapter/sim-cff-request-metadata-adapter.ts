@@ -8,7 +8,7 @@ export class SimCffRequestMetadataAdapter {
    * Convert Node fetch Headers to CFF Headers.
    */
   toCffHeaders(headers: Headers): CloudFrontFunction.Headers {
-    const cffHeaders: CloudFrontFunction.Headers = {};
+    const cffHeaders = Object.create(null) as CloudFrontFunction.Headers;
 
     for (const [name, value] of headers.entries()) {
       cffHeaders[name.toLowerCase()] = { value };
@@ -44,7 +44,7 @@ export class SimCffRequestMetadataAdapter {
   toCffQueryString(
     searchParams: URLSearchParams,
   ): CloudFrontFunction.QueryString {
-    const queryString: CloudFrontFunction.QueryString = {};
+    const queryString = Object.create(null) as CloudFrontFunction.QueryString;
 
     for (const key of new Set(searchParams.keys())) {
       const values = searchParams.getAll(key).map((value) => ({ value }));
@@ -94,7 +94,7 @@ export class SimCffRequestMetadataAdapter {
       return {};
     }
 
-    const cookies: CloudFrontFunction.Cookies = {};
+    const cookies = Object.create(null) as CloudFrontFunction.Cookies;
 
     for (const cookiePair of cookieHeader.split(";")) {
       const [rawName, ...rawValueParts] = cookiePair.trim().split("=");
