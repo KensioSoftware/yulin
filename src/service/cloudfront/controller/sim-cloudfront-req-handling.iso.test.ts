@@ -74,7 +74,7 @@ describe("Simulated CloudFront local HTTP controller request handling", () => {
         resourceName: "",
       },
       new Request(
-        `http://${distributionId}.cloudfront.net.localhost/api/users.json`,
+        `http://${distributionId}.cloudfront.net.sim-aws.localhost/api/users.json`,
         { method: "HEAD" },
       ),
     );
@@ -138,7 +138,7 @@ describe("Simulated CloudFront local HTTP controller request handling", () => {
         resourceName: "",
       },
       new Request(
-        `http://${distributionId}.cloudfront.net.localhost/index.html`,
+        `http://${distributionId}.cloudfront.net.sim-aws.localhost/index.html`,
         { method: "POST" },
       ),
     );
@@ -205,7 +205,7 @@ describe("Simulated CloudFront local HTTP controller request handling", () => {
         resourceName: "",
       },
       new Request(
-        `http://${distributionId}.cloudfront.net.localhost/missing.html`,
+        `http://${distributionId}.cloudfront.net.sim-aws.localhost/missing.html`,
       ),
     );
 
@@ -249,10 +249,10 @@ describe("Simulated CloudFront local HTTP controller request handling", () => {
         resourceName: "",
       },
       new Request(
-        `http://${distributionId}.cloudfront.net.localhost/index.html`,
+        `http://${distributionId}.cloudfront.net.sim-aws.localhost/index.html`,
         {
           headers: {
-            host: `${distributionId}.cloudfront.net.localhost`,
+            host: `${distributionId}.cloudfront.net.sim-aws.localhost`,
           },
         },
       ),

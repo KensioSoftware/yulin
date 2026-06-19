@@ -10,15 +10,19 @@ import type { SimCloudFrontDistributionId } from "../distribution/sim-cloudfront
 export function extractCloudFrontHostDistroId(
   hostname: string,
 ): SimCloudFrontDistributionId | undefined {
-  const subdomains = hostname.split(".").slice(0, 3);
-  if (subdomains.length !== 3) {
+  const subdomains = hostname.split(".");
+  // E.g. "distro123" "cloudfront" "net" ["sim-aws", "localhost"]
+  if (subdomains.length !== 5 && subdomains.length !== 3) {
     return undefined;
   }
-  if (subdomains[1] !== "cloudfront" || subdomains[2] !== "net") {
+  if (
+    subdomains[1]?.toLowerCase() !== "cloudfront" ||
+    subdomains[2]?.toLowerCase() !== "net"
+  ) {
     return undefined;
   }
-  /* v8 ignore if -- redundant safety */
-  if (subdomains[0] === undefined) {
+  /* v8 ignore if -- redundant safety catch */
+  if (subdomains[0] === undefined || subdomains[0] === "") {
     return undefined;
   }
 
