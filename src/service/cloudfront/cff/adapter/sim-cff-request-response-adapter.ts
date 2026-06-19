@@ -53,6 +53,7 @@ export class SimCffRequestResponseAdapter {
         cffReq.cookies,
       ),
       body: allowsBody ? originalReq.clone().body : null,
+      duplex: "half",
       redirect: originalReq.redirect,
       signal: originalReq.signal,
     });
