@@ -11,8 +11,8 @@ import {
   assertUndefined,
 } from "@kensio/smartass";
 import { FilesystemS3BucketStorage } from "./s3-filesystem-storage.js";
-import { SimS3Object } from "../object/s3-object.js";
-import { makeTempDir } from "../../../util/filesystem/temp-dir.js";
+import { SimS3Object } from "../../object/s3-object.js";
+import { makeTempDir } from "../../../../util/filesystem/temp-dir.js";
 
 describe("Filesystem simulated S3 storage", () => {
   it("puts and gets an Object from the filesystem", async () => {

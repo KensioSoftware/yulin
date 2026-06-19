@@ -14,7 +14,7 @@ import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
 import { SimS3Object } from "../object/s3-object.js";
-import { FilesystemS3BucketStorage } from "../storage/s3-filesystem-storage.js";
+import { FilesystemS3BucketStorage } from "../storage/filesystem/s3-filesystem-storage.js";
 import { SimS3Bucket } from "./sim-s3-bucket.js";
 import { MemoryS3BucketStorage } from "../storage/s3-memory-storage.js";
 import { makeTempDir } from "../../../util/filesystem/temp-dir.js";

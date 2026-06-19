@@ -1,17 +1,17 @@
 import { afterAll, beforeAll, describe, it } from "vitest";
-import { SimAwsLocalServer } from "../../../serve/index.js";
-import { makeTempDir } from "../../../util/filesystem/temp-dir.js";
+import { SimAwsLocalServer } from "../../../../serve/index.js";
+import { makeTempDir } from "../../../../util/filesystem/temp-dir.js";
 import * as fs from "node:fs/promises";
 import path from "node:path";
 import {
   CreateBucketCommand,
   PutBucketWebsiteCommand,
 } from "@aws-sdk/client-s3";
-import type { SimS3BucketName } from "../bucket/sim-s3-bucket.js";
+import type { SimS3BucketName } from "../../bucket/sim-s3-bucket.js";
 import { assertIdentical, assertNonNullable } from "@kensio/smartass";
 import { FilesystemS3BucketStorage } from "./s3-filesystem-storage.js";
-import { makeAwsRegionName } from "../../aws/sim-aws-region.js";
-import { SimAws } from "../../aws/sim-aws.js";
+import { makeAwsRegionName } from "../../../aws/sim-aws-region.js";
+import { SimAws } from "../../../aws/sim-aws.js";
 
 describe("Serve sim S3 Bucket on localhost with filesystem storage", () => {
   const simAws = new SimAws();

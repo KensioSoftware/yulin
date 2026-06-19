@@ -11,7 +11,7 @@ import {
 } from "../aws/sim-aws-account-region-scope.js";
 import { PutBucketWebsiteCommandHandler } from "./command/put-bucket-website/put-bucket-website.handler.js";
 import { assertDefined } from "../../util/type-guard/defined.js";
-import { FilesystemS3BucketStorage } from "./storage/s3-filesystem-storage.js";
+import { FilesystemS3BucketStorage } from "./storage/filesystem/s3-filesystem-storage.js";
 import type {
   SimPutObjectCommand,
   SimPutObjectCommandOutput,
