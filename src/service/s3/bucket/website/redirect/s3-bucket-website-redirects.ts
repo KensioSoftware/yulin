@@ -2,32 +2,18 @@ import type {
   SimS3WebsiteConfiguration,
   SimS3WebsiteRedirect,
   SimS3WebsiteRoutingRule,
-} from "../../command/put-bucket-website/put-bucket-website.cmd.js";
+} from "../../../command/put-bucket-website/put-bucket-website.cmd.js";
 
 /**
- * Static website configuration for simulated S3 bucket.
- *
- * https://docs.aws.amazon.com/AmazonS3/latest/userguide/HostingWebsiteOnS3Setup.html
+ * Redirect handling for simulated S3 Bucket static website configuration.
  */
-export class S3BucketWebsite {
+export class S3BucketWebsiteRedirects {
   constructor(
     private readonly websiteConfiguration: SimS3WebsiteConfiguration = {},
   ) {}
 
   /**
-   * Is static website hosting enabled for this simulated S3 bucket?
-   */
-  websiteEnabled(): boolean {
-    return (
-      this.indexDocumentSpecified() ||
-      this.errorDocumentSpecified() ||
-      this.redirectsAllRequests() ||
-      this.routingRulesSpecified()
-    );
-  }
-
-  /**
-   * Does this website configuration redirect all requests?
+   * Whether this S3 Bucket Website is configured to redirect all requests.
    */
   redirectsAllRequests(): boolean {
     return (
@@ -36,73 +22,26 @@ export class S3BucketWebsite {
   }
 
   /**
-   * Choose the S3 object key that should be served for a website request.
+   * Whether this S3 Bucket Website is configured with routing rules.
    */
-  objectKeyForRequest(objectKey: string): string {
-    const indexSuffix = this.websiteConfiguration.IndexDocument?.Suffix;
-
-    if (indexSuffix === undefined) {
-      return objectKey;
-    }
-
-    if (objectKey === "") {
-      return indexSuffix;
-    }
-
-    if (objectKey.endsWith("/")) {
-      return `${objectKey}${indexSuffix}`;
-    }
-
-    return objectKey;
+  routingRulesSpecified(): boolean {
+    return Boolean(
+      this.websiteConfiguration.RoutingRules?.some(
+        (rule) => rule.Redirect !== undefined,
+      ),
+    );
   }
 
   /**
-   * Get the index document key that would be served after redirecting this
-   * request to a slash-terminated folder URL, if an index document is configured.
+   * Get the Response for a request and response pair based on this S3 Bucket
+   * Website configuration.
    */
-  folderIndexDocumentKeyForRequest(objectKey: string): string | undefined {
-    const indexSuffix = this.websiteConfiguration.IndexDocument?.Suffix;
-
-    if (
-      indexSuffix === undefined ||
-      objectKey === "" ||
-      objectKey.endsWith("/")
-    ) {
-      return undefined;
-    }
-
-    return `${objectKey}/${indexSuffix}`;
-  }
-
-  /**
-   * Redirect this request to the same URL with a trailing slash on the path.
-   */
-  trailingSlashRedirect(req: Request): Response {
-    const url = new URL(req.url);
-
-    url.pathname = `${url.pathname}/`;
-
-    return new Response(undefined, {
-      status: 301,
-      headers: {
-        location: url.toString(),
-      },
-    });
-  }
-
-  /**
-   * Get the S3 object key for this website's error document, if configured.
-   */
-  errorDocumentKey(): string | undefined {
-    return this.websiteConfiguration.ErrorDocument?.Key;
-  }
-
-  /**
-   * Choose an appropriate response for a request response pair based on static
-   * website configuration for this simulated S3 bucket.
-   */
-  redirectForRequestResponse(req: Request, res: Response): Response {
-    if (!this.websiteEnabled()) {
+  redirectForRequestResponse(
+    req: Request,
+    res: Response,
+    websiteEnabled: boolean,
+  ): Response {
+    if (!websiteEnabled) {
       return res;
     }
 
@@ -195,22 +134,6 @@ export class S3BucketWebsite {
         const keyPrefix = rule.Condition?.KeyPrefixEquals;
         return keyPrefix !== undefined && requestKey.startsWith(keyPrefix);
       })?.Condition?.KeyPrefixEquals ?? ""
-    );
-  }
-
-  private indexDocumentSpecified(): boolean {
-    return this.websiteConfiguration.IndexDocument?.Suffix !== undefined;
-  }
-
-  private errorDocumentSpecified(): boolean {
-    return this.errorDocumentKey() !== undefined;
-  }
-
-  private routingRulesSpecified(): boolean {
-    return Boolean(
-      this.websiteConfiguration.RoutingRules?.some(
-        (rule) => rule.Redirect !== undefined,
-      ),
     );
   }
 }

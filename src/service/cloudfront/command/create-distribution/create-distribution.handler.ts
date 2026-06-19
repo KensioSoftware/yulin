@@ -10,7 +10,7 @@ import {
 } from "../../distribution/sim-cloudfront-distribution.js";
 import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
-import type { SimCloudFrontS3OriginResolver } from "../../origin/sim-cloudfront-s3-origin.js";
+import type { SimCloudFrontS3OriginResolver } from "../../origin/s3/sim-cloudfront-s3-origin.js";
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import { SimCloudFrontOriginConfigurator } from "../../distribution/configurator/sim-cloud-front-origin-configurator.js";
 import { SimCloudFrontBehaviorConfigurator } from "../../distribution/configurator/sim-cloud-front-behavior-configurator.js";

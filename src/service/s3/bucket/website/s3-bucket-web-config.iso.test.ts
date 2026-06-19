@@ -5,11 +5,11 @@ import {
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
-import { S3BucketWebsite } from "./s3-bucket-website.js";
+import { SimS3BucketWebsite } from "./sim-s3-bucket-website.js";
 
 describe("S3 Bucket static website configuration", () => {
   it("is disabled when no website configuration is specified", () => {
-    const website = new S3BucketWebsite();
+    const website = new SimS3BucketWebsite();
 
     assertFalse(website.websiteEnabled());
     assertFalse(website.redirectsAllRequests());
@@ -17,7 +17,7 @@ describe("S3 Bucket static website configuration", () => {
   });
 
   it("is enabled when an index document is specified", () => {
-    const website = new S3BucketWebsite({
+    const website = new SimS3BucketWebsite({
       IndexDocument: {
         Suffix: "index.html",
       },
@@ -27,7 +27,7 @@ describe("S3 Bucket static website configuration", () => {
   });
 
   it("is enabled when an error document is specified", () => {
-    const website = new S3BucketWebsite({
+    const website = new SimS3BucketWebsite({
       ErrorDocument: {
         Key: "error.html",
       },
@@ -38,7 +38,7 @@ describe("S3 Bucket static website configuration", () => {
   });
 
   it("is enabled when all requests are redirected", () => {
-    const website = new S3BucketWebsite({
+    const website = new SimS3BucketWebsite({
       RedirectAllRequestsTo: {
         HostName: "example.test",
         Protocol: "https",
@@ -50,7 +50,7 @@ describe("S3 Bucket static website configuration", () => {
   });
 
   it("is enabled when a routing rule redirect is specified", () => {
-    const website = new S3BucketWebsite({
+    const website = new SimS3BucketWebsite({
       RoutingRules: [
         {
           Redirect: {
@@ -64,7 +64,7 @@ describe("S3 Bucket static website configuration", () => {
   });
 
   it("is disabled when routing rules do not specify redirects", () => {
-    const website = new S3BucketWebsite({
+    const website = new SimS3BucketWebsite({
       RoutingRules: [
         {
           Condition: {

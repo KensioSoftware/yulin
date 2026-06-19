@@ -85,7 +85,7 @@ describe("Simulated CloudFront local HTTP controller CFF", () => {
         resourceName: "",
       },
       new Request(
-        `http://${distributionId}.cloudfront.net.localhost/index.html`,
+        `http://${distributionId}.cloudfront.net.sim-aws.localhost/index.html`,
       ),
     );
 
@@ -183,7 +183,7 @@ describe("Simulated CloudFront local HTTP controller CFF", () => {
           resourceName: "",
         },
         new Request(
-          `http://${distributionId}.cloudfront.net.localhost/index.html`,
+          `http://${distributionId}.cloudfront.net.sim-aws.localhost/index.html`,
         ),
       );
     });

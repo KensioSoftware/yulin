@@ -1,16 +1,16 @@
-import { describe, it } from "vitest";
-import { BackgroundTasks } from "./background.js";
+import { describe, it, vi } from "vitest";
 import {
   assertFalse,
   assertIdentical,
   assertThrowsErrorAsync,
   assertTrue,
 } from "@kensio/smartass";
+import { NonDeterministicBackgroundTasks } from "./non-deterministic-background.js";
 
 describe("background sequencing", () => {
-  describe("BackgroundTasks", () => {
+  describe("NonDeterministicBackgroundTasks", () => {
     it("executes scheduled tasks", async () => {
-      const tasks = new BackgroundTasks();
+      const tasks = new NonDeterministicBackgroundTasks({});
       let executed = false;
 
       tasks.schedule(async () => {
@@ -24,7 +24,7 @@ describe("background sequencing", () => {
     });
 
     it("tracks pending task count", async () => {
-      const tasks = new BackgroundTasks();
+      const tasks = new NonDeterministicBackgroundTasks({});
 
       assertIdentical(tasks.size, 0);
 
@@ -43,8 +43,35 @@ describe("background sequencing", () => {
       assertIdentical(tasks.size, 0);
     });
 
+    it("can execute scheduled tasks out of scheduling order", async () => {
+      const random = vi.spyOn(Math, "random");
+      random.mockReturnValueOnce(1);
+      random.mockReturnValueOnce(0);
+
+      try {
+        const tasks = new NonDeterministicBackgroundTasks();
+        const execOrder: number[] = [];
+
+        tasks.schedule(async () => {
+          execOrder.push(1);
+          await Promise.resolve();
+        });
+        tasks.schedule(async () => {
+          execOrder.push(2);
+          await Promise.resolve();
+        });
+
+        await tasks.complete();
+
+        assertIdentical(execOrder[0], 2);
+        assertIdentical(execOrder[1], 1);
+      } finally {
+        random.mockRestore();
+      }
+    });
+
     it("handles tasks that schedule more tasks", async () => {
-      const tasks = new BackgroundTasks();
+      const tasks = new NonDeterministicBackgroundTasks({});
       const execOrder: number[] = [];
 
       tasks.schedule(async () => {
@@ -58,12 +85,12 @@ describe("background sequencing", () => {
 
       await tasks.complete();
       assertIdentical(execOrder.length, 2);
-      assertIdentical(execOrder[0], 1);
-      assertIdentical(execOrder[1], 2);
+      assertTrue(execOrder.includes(1));
+      assertTrue(execOrder.includes(2));
     });
 
     it("propagates task errors", async () => {
-      const tasks = new BackgroundTasks();
+      const tasks = new NonDeterministicBackgroundTasks({});
 
       tasks.schedule(async () => {
         await Promise.resolve();

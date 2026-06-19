@@ -16,7 +16,7 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
         service: "cloudFront",
         resourceName: "",
       },
-      new Request("http://unknown.cloudfront.net.localhost/index.html"),
+      new Request("http://unknown.cloudfront.net.sim-aws.localhost/index.html"),
     );
 
     assertIdentical(res.status, 404);
@@ -77,10 +77,10 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
         resourceName: "",
       },
       new Request(
-        `http://${distributionId}.cloudfront.net.localhost/index.html`,
+        `http://${distributionId}.cloudfront.net.sim-aws.localhost/index.html`,
         {
           headers: {
-            host: `${distributionId}.cloudfront.net.localhost`,
+            host: `${distributionId}.cloudfront.net.sim-aws.localhost`,
           },
         },
       ),
@@ -172,7 +172,7 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
         resourceName: "",
       },
       new Request(
-        `http://${distributionId}.cloudfront.net.localhost/page.html`,
+        `http://${distributionId}.cloudfront.net.sim-aws.localhost/page.html`,
       ),
     );
 
@@ -284,7 +284,7 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
         resourceName: "",
       },
       new Request(
-        `http://${distributionId}.cloudfront.net.localhost/assets/images/logo.png`,
+        `http://${distributionId}.cloudfront.net.sim-aws.localhost/assets/images/logo.png`,
       ),
     );
 
