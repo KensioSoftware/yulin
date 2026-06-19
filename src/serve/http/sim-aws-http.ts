@@ -1,5 +1,5 @@
 import { SimAwsLocalServiceResolver } from "../resolve/sim-aws-local-service-resolver.js";
-import { SimAwsServiceControllerContainer } from "../controller/sim-aws-service-controller-container.js";
+import { SimAwsServiceControllerContainer } from "../controller/container/sim-aws-service-controller-container.js";
 import { SimAws } from "../../service/aws/sim-aws.js";
 
 interface SimAwsHttpProps {
