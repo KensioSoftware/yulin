@@ -7,7 +7,9 @@ import { SimAwsLocalUrl } from "../../../serve/http/sim-aws-local-url.js";
 import type { SimCloudFront } from "../sim-cloudfront.js";
 import type { SimCloudFrontRegistry } from "../sim-cloud-front-registry.js";
 import { SimAws } from "../../aws/sim-aws.js";
-import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
+import { extractCloudFrontHostDistroId } from "./extract-cf-host-distro-id.js";
+import { SimCloudFrontAlternateDomainRouter } from "./sim-cf-alternate-domain-router.js";
+import { SimCloudFrontDistroIdRouter } from "./sim-cf-distro-id-router.js";
 
 export interface SimCloudFrontDistroRoute {
   readonly cloudFront: SimCloudFront;
@@ -26,20 +28,34 @@ interface SimCloudFrontDistroRouterProps {
 /**
  * Routes sim CloudFront requests to the appropriate sim Distribution.
  * Owns the Distribution lookup decision.
+ *
+ * Routing is attempted in priority order:
+ * 1. CloudFront hostname (e.g. `<id>.cloudfront.net`) — handled by SimCloudFrontDistroIdRouter.
+ * 2. Alternate domain name (e.g. `cdn.example.com`) — handled by SimCloudFrontAlternateDomainRouter.
  */
 export class SimCloudFrontDistroRouter {
   private readonly simAws: SimAws;
-  private readonly cloudFrontRegistry: SimCloudFrontRegistry;
-  private readonly distributions?: ReadonlyMap<
-    SimCloudFrontDistributionId,
-    SimCloudFrontDistribution
-  >;
+  private readonly alternateDomainRouter: SimCloudFrontAlternateDomainRouter;
+  private readonly distroIdRouter: SimCloudFrontDistroIdRouter;
 
   constructor(props: SimCloudFrontDistroRouterProps = {}) {
     this.simAws = props.simAws ?? new SimAws();
-    this.cloudFrontRegistry =
+    const cloudFrontRegistry =
       props.cloudFrontRegistry ?? this.simAws._cloudFrontRegistry();
-    this.distributions = props.distributions ?? new Map();
+    const distributions = props.distributions ?? new Map();
+
+    // Both sub-routers share the same SimAws, Registry and Distributions
+    // snapshot so their lookups stay consistent within a single request.
+    this.alternateDomainRouter = new SimCloudFrontAlternateDomainRouter({
+      simAws: this.simAws,
+      cloudFrontRegistry,
+      distributions,
+    });
+    this.distroIdRouter = new SimCloudFrontDistroIdRouter({
+      simAws: this.simAws,
+      cloudFrontRegistry,
+      distributions,
+    });
   }
 
   /**
@@ -57,6 +73,10 @@ export class SimCloudFrontDistroRouter {
 
   /**
    * Select the appropriate CloudFront route for a request.
+   *
+   * Prefers the Host header over the URL hostname, then strips the
+   * `.sim-aws.localhost` suffix so both real and sim-local hostnames
+   * are handled identically.
    */
   routeForRequest(req: Request): SimCloudFrontDistroRoute | undefined {
     const hostname = req.headers.get("host") ?? new URL(req.url).hostname;
@@ -64,13 +84,12 @@ export class SimCloudFrontDistroRouter {
     const simUrl = new SimAwsLocalUrl({ input: `http://${hostname}/` });
     const baseHostname = simUrl.withoutLocalhostSuffix().hostname;
 
-    const distributionId =
-      SimCloudFrontDistroRouter.extractHostDistroId(baseHostname);
+    const distributionId = extractCloudFrontHostDistroId(baseHostname);
     if (distributionId !== undefined) {
-      return this.routeForDistributionId(distributionId);
+      return this.distroIdRouter.routeForDistributionId(distributionId);
     }
 
-    return this.routeForAlternateDomainName(baseHostname);
+    return this.alternateDomainRouter.routeForAlternateDomainName(baseHostname);
   }
 
   /**
@@ -78,91 +97,5 @@ export class SimCloudFrontDistroRouter {
    */
   distroForRequest(req: Request): SimCloudFrontDistribution | undefined {
     return this.routeForRequest(req)?.distribution;
-  }
-
-  private routeForDistributionId(
-    distributionId: SimCloudFrontDistributionId,
-  ): SimCloudFrontDistroRoute | undefined {
-    const fallbackDistribution = this.distributions?.get(distributionId);
-    if (fallbackDistribution !== undefined) {
-      return {
-        cloudFront: this.cloudFrontForAccount(fallbackDistribution.accountId),
-        distribution: fallbackDistribution,
-      };
-    }
-
-    const accountId =
-      this.cloudFrontRegistry.accountIdForDistribution(distributionId);
-    if (accountId === undefined) {
-      return undefined;
-    }
-
-    const cloudFront = this.cloudFrontForAccount(accountId);
-    const distribution = cloudFront.getDistributions().get(distributionId);
-
-    if (distribution === undefined) {
-      return undefined;
-    }
-
-    return { cloudFront, distribution };
-  }
-
-  private routeForAlternateDomainName(
-    alternateDomainName: string,
-  ): SimCloudFrontDistroRoute | undefined {
-    if (this.distributions !== undefined) {
-      const distribution = [...this.distributions.values()].find((distro) =>
-        distro.hasAlternateDomainName(alternateDomainName),
-      );
-
-      if (distribution !== undefined) {
-        return {
-          cloudFront: this.cloudFrontForAccount(distribution.accountId),
-          distribution,
-        };
-      }
-    }
-
-    for (const accountId of this.cloudFrontRegistry.accountIdsWithDistributions()) {
-      const cloudFront = this.cloudFrontForAccount(accountId);
-      const distribution = [...cloudFront.getDistributions().values()].find(
-        (distro) => distro.hasAlternateDomainName(alternateDomainName),
-      );
-
-      if (distribution !== undefined) {
-        return { cloudFront, distribution };
-      }
-    }
-
-    return undefined;
-  }
-
-  private cloudFrontForAccount(accountId: SimAwsAccountId): SimCloudFront {
-    return this.simAws.accountRegionScope(accountId).cloudFront();
-  }
-
-  /**
-   * Try to extract a CloudFront Distribution ID from a hostname which could
-   * start with
-   * distro123.cloudfront.net
-   * Such as
-   * distro123.cloudfront.net.sim-aws.localhost
-   */
-  public static extractHostDistroId(
-    hostname: string,
-  ): SimCloudFrontDistributionId | undefined {
-    const subdomains = hostname.split(".").slice(0, 3);
-    if (subdomains.length !== 3) {
-      return undefined;
-    }
-    if (subdomains[1] !== "cloudfront" || subdomains[2] !== "net") {
-      return undefined;
-    }
-    /* v8 ignore if -- redundant safety */
-    if (subdomains[0] === undefined) {
-      return undefined;
-    }
-
-    return subdomains[0].toUpperCase() as SimCloudFrontDistributionId;
   }
 }
