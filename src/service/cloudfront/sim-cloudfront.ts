@@ -15,7 +15,7 @@ import type {
 import {
   emptyCloudFrontS3OriginResolver,
   type SimCloudFrontS3OriginResolver,
-} from "./origin/sim-cloudfront-s3-origin.js";
+} from "./origin/s3/sim-cloudfront-s3-origin.js";
 import {
   type BackgroundScheduler,
   BackgroundTasks,

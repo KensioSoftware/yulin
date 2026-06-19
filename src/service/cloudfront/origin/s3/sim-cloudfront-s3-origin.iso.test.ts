@@ -5,19 +5,20 @@ import {
   assertThrowsError,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
-import { bucketNameFromCloudFrontS3OriginDomainName } from "./sim-cloudfront-s3-origin.js";
+
+import { bucketNameFromCfS3OriginDomainName } from "./sim-cf-s3-origin-bucket-name.js";
 
 describe("sim CloudFront S3 Origin", () => {
   it("resolves bucket name fallback from non-S3 origin domain name", () => {
     assertIdentical(
-      bucketNameFromCloudFrontS3OriginDomainName("example.test"),
+      bucketNameFromCfS3OriginDomainName("example.test"),
       "example.test",
     );
   });
 
   it("throws on bad S3 Origin domain name", () => {
     const error = assertThrowsError(() => {
-      bucketNameFromCloudFrontS3OriginDomainName(".s3.amazonaws.com");
+      bucketNameFromCfS3OriginDomainName(".s3.amazonaws.com");
     });
 
     assertInstanceOf(error, Error);

@@ -10,7 +10,7 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
-import { SimCloudFrontS3Origin } from "../../origin/sim-cloudfront-s3-origin.js";
+import { SimCloudFrontS3Origin } from "../../origin/s3/sim-cloudfront-s3-origin.js";
 import { CreateBucketCommand } from "@aws-sdk/client-s3";
 import type { SimCloudFrontDistributionId } from "../../distribution/sim-cloudfront-distribution.js";
 

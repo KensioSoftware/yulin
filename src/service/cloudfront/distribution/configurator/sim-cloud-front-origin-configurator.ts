@@ -4,7 +4,7 @@ import { assertDefined } from "../../../../util/type-guard/defined.js";
 import {
   SimCloudFrontS3Origin,
   type SimCloudFrontS3OriginResolver,
-} from "../../origin/sim-cloudfront-s3-origin.js";
+} from "../../origin/s3/sim-cloudfront-s3-origin.js";
 
 /**
  * Applies Origin configuration to a sim CloudFront Distribution.

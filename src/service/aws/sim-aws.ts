@@ -23,10 +23,10 @@ import { SimS3GlobalRegistry } from "../s3/sim-s3-global-registry.js";
 import { SimS3ServiceController } from "../s3/serve/sim-s3-controller.js";
 import { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
 import { SimCloudFrontRegistry } from "../cloudfront/sim-cloud-front-registry.js";
-import { createSimCloudFrontS3OriginResolver } from "../cloudfront/origin/sim-cloudfront-s3-origin.js";
 import { SimCloudFrontServiceController } from "../cloudfront/controller/sim-cloudfront-controller.js";
 import { SimDynamoDb } from "../dynamodb/index.js";
 import { SimCloudFormation } from "../cloudformation/index.js";
+import { makeSimCfS3OriginResolver } from "../cloudfront/origin/s3/sim-cf-s3-origin-resolver-factory.js";
 
 interface SimAwsProps {
   readonly defaultAccountId?: SimAwsAccountId;
@@ -183,7 +183,7 @@ export class SimAws {
       cloudFront = new SimCloudFront({
         accountRegionScope: scope.accountRegionScope,
         cloudFrontRegistry: this.cloudFrontRegistry,
-        s3OriginResolver: createSimCloudFrontS3OriginResolver(this, scope),
+        s3OriginResolver: makeSimCfS3OriginResolver(this, scope),
         background: this.background,
       });
       this.cloudFrontServices.set(accountId, cloudFront);

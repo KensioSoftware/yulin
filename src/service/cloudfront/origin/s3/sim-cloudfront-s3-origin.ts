@@ -1,9 +1,7 @@
-import type { SimAwsAccountRegionContainer } from "../../aws/sim-aws-account-region-scope.js";
-import type { SimS3Bucket } from "../../s3/bucket/sim-s3-bucket.js";
-import type { SimS3Object } from "../../s3/object/s3-object.js";
-import type { SimCloudFrontOriginRequest } from "./sim-cloudfront-req-res.js";
-import type { SimCloudFrontOrigin } from "./sim-cloudfront-origin.js";
-import type { SimAws } from "../../aws/sim-aws.js";
+import type { SimS3Bucket } from "../../../s3/bucket/sim-s3-bucket.js";
+import type { SimS3Object } from "../../../s3/object/s3-object.js";
+import type { SimCloudFrontOriginRequest } from "../sim-cloudfront-req-res.js";
+import type { SimCloudFrontOrigin } from "../sim-cloudfront-origin.js";
 
 export type SimCloudFrontS3OriginResolver = (
   originDomainName: string,
@@ -15,67 +13,6 @@ export type SimCloudFrontS3OriginResolver = (
 export function emptyCloudFrontS3OriginResolver(): undefined {
   /* v8 ignore next */
   return undefined;
-}
-
-/**
- * Create an S3 Origin Resolver backed by a simulated AWS Account/Region scope.
- */
-export function createSimCloudFrontS3OriginResolver(
-  simAws: SimAws,
-  scope: SimAwsAccountRegionContainer,
-): SimCloudFrontS3OriginResolver {
-  return (originDomainName: string) => {
-    const bucketName =
-      bucketNameFromCloudFrontS3OriginDomainName(originDomainName);
-    const bucketScope = simAws.s3().findBucketScope(bucketName);
-    if (bucketScope === undefined) {
-      throw new Error(
-        `Unable to find sim S3 Bucket ${bucketName} for sim CloudFront S3 Origin`,
-      );
-    }
-
-    return simAws
-      .region(bucketScope.regionName)
-      .account(scope.account.accountId)
-      .s3()
-      .getSimBucketByName(bucketName);
-  };
-}
-
-/**
- * Resolve a simulated S3 Bucket name from a CloudFront S3 Origin domain name.
- */
-export function bucketNameFromCloudFrontS3OriginDomainName(
-  originDomainName: string,
-): string {
-  const bucketName = s3BucketNameFromOriginDomainName(originDomainName);
-
-  if (bucketName === undefined || bucketName === "") {
-    throw new Error(
-      `Unable to resolve S3 bucket name from CloudFront origin domain name: ${originDomainName}`,
-    );
-  }
-
-  return bucketName;
-}
-
-function s3BucketNameFromOriginDomainName(
-  originDomainName: string,
-): string | undefined {
-  const s3DomainSuffixes = [".s3.amazonaws.com", ".s3.dualstack.amazonaws.com"];
-
-  for (const suffix of s3DomainSuffixes) {
-    if (originDomainName.endsWith(suffix)) {
-      return originDomainName.slice(0, -suffix.length);
-    }
-  }
-
-  const regionalS3DomainMatch =
-    /^(?<bucketName>.+)\.s3[.-][a-z0-9-]+\.amazonaws\.com$/u.exec(
-      originDomainName,
-    );
-
-  return regionalS3DomainMatch?.groups?.["bucketName"] ?? originDomainName;
 }
 
 interface SimCloudFrontS3OriginProps {
