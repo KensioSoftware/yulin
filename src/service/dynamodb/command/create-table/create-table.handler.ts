@@ -1,5 +1,5 @@
-import type { DynamoDbTableName } from "../../table/dynamodb-table.js";
-import { SimDynamoDbTable } from "../../table/dynamodb-table.js";
+import type { DynamoDbTableName } from "../../table/sim-dynamodb-table.js";
+import { SimDynamoDbTable } from "../../table/sim-dynamodb-table.js";
 import type {
   SimCreateTableCommand,
   SimCreateTableCommandOutput,

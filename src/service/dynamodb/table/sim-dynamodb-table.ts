@@ -4,8 +4,7 @@ import {
   type SimArn,
   type SimArnComponents,
 } from "../../aws/arn.js";
-import { assertDefined } from "../../../util/type-guard/defined.js";
-import { DynamoDbKeySchema } from "./dynamodb-key-schema.js";
+import type { DynamoDbKeySchema } from "./dynamodb-key-schema.js";
 import type { DynamoDbItem } from "../item/dynamodb-item.js";
 import {
   type BackgroundScheduler,
@@ -15,6 +14,7 @@ import type {
   SimCreateTableCommand,
   SimDynamoDbTableStatus,
 } from "../command/create-table/create-table.cmd.js";
+import { DynamoDbTableCreateInput } from "./dynamodb-table-create-input.js";
 
 export type DynamoDbTableName = Brand<string, "DynamoDbTableName">;
 
@@ -45,24 +45,14 @@ export class SimDynamoDbTable {
       arn = makeSimDynamoDbTableArn(),
       background = new BackgroundTasks(),
     } = props;
+    const createInput = new DynamoDbTableCreateInput(createCommand);
 
     this.arn = arn;
     this.background = background;
 
-    assertDefined(
-      createCommand.input.TableName,
-      "createCommand.input.TableName",
-    );
-    this.tableName = createCommand.input.TableName as DynamoDbTableName;
+    this.tableName = createInput.tableName();
     this.creationDateTime = new Date();
-
-    if (
-      createCommand.input.KeySchema === undefined ||
-      createCommand.input.KeySchema.length === 0
-    ) {
-      throw new Error("Table KeySchema is not defined");
-    }
-    this._keySchema = new DynamoDbKeySchema(createCommand.input);
+    this._keySchema = createInput.keySchema();
   }
 
   /**

@@ -1,6 +1,6 @@
 import { describe, it } from "vitest";
 import { CreateTableCommand } from "@aws-sdk/client-dynamodb";
-import { SimDynamoDbTable } from "./dynamodb-table.js";
+import { SimDynamoDbTable } from "./sim-dynamodb-table.js";
 import {
   assertIdentical,
   assertInstanceOf,
