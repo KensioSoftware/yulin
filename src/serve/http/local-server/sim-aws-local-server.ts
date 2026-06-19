@@ -27,7 +27,9 @@ export class SimAwsLocalServer {
     const { simAws = new SimAws() } = props;
     this.simAwsHttp = new SimAwsHttp({ simAws });
     this.server = http.createServer((request, response) => {
-      void this.handleRequest(request, response);
+      this.handleRequest(request, response).catch((error: unknown) => {
+        this.handleRequestError(error, response);
+      });
     });
   }
 
@@ -87,6 +89,26 @@ export class SimAwsLocalServer {
     const response = await this.simAwsHttp.handleRequest(request);
 
     await this.nodeFetchHttpAdapter.sendFetchResponse(nodeResponse, response);
+  }
+
+  private handleRequestError(
+    error: unknown,
+    nodeResponse: ServerResponse,
+  ): void {
+    const message =
+      error instanceof Error ? error.message : "HTTP request processing failed";
+
+    /* v8 ignore if */
+    if (nodeResponse.writableEnded) {
+      return;
+    }
+
+    if (!nodeResponse.headersSent) {
+      nodeResponse.statusCode = 400;
+      nodeResponse.setHeader("content-type", "text/plain; charset=utf-8");
+    }
+
+    nodeResponse.end(message);
   }
 }
 

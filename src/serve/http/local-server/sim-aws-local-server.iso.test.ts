@@ -1,0 +1,75 @@
+import net from "node:net";
+import { assertIdentical, assertStringIncludes } from "@kensio/smartass";
+import { describe, it } from "vitest";
+import { SimAwsLocalServer } from "./sim-aws-local-server.js";
+
+describe("SimAwsLocalServer", () => {
+  it("responds HTTP 400 when request processing rejects", async () => {
+    const server = await new SimAwsLocalServer().listen(0);
+
+    try {
+      const responseText = await sendRawHttpRequest(
+        Number(server.port),
+        "GET / HTTP/1.0\r\n\r\n",
+      );
+
+      assertStringIncludes(responseText, "HTTP/1.1 400 Bad Request");
+      assertStringIncludes(
+        responseText,
+        "local sim server nodeRequest.headers.host must be defined",
+      );
+    } finally {
+      server.close();
+    }
+  });
+
+  it("sets a plain text response for request processing errors", async () => {
+    const server = await new SimAwsLocalServer().listen(0);
+
+    try {
+      const responseText = await sendRawHttpRequest(
+        Number(server.port),
+        "GET / HTTP/1.0\r\n\r\n",
+      );
+
+      assertStringIncludes(
+        responseText.toLowerCase(),
+        "content-type: text/plain; charset=utf-8",
+      );
+      assertIdentical(
+        responseText.endsWith(
+          "local sim server nodeRequest.headers.host must be defined",
+        ),
+        true,
+      );
+    } finally {
+      server.close();
+    }
+  });
+});
+
+function sendRawHttpRequest(
+  port: number,
+  requestText: string,
+): Promise<string> {
+  return new Promise<string>((resolve, reject) => {
+    const socket = net.createConnection({ host: "localhost", port }, () => {
+      socket.end(requestText);
+    });
+
+    let responseText = "";
+
+    socket.setEncoding("utf8");
+
+    socket.on("data", (chunk) => {
+      // eslint-disable-next-line @typescript-eslint/restrict-plus-operands
+      responseText += chunk;
+    });
+
+    socket.on("error", reject);
+
+    socket.on("end", () => {
+      resolve(responseText);
+    });
+  });
+}
