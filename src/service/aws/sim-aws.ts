@@ -17,16 +17,12 @@ import {
   type SimAccountRegionScopeKey,
   SimAwsAccountRegionContainer,
 } from "./sim-aws-account-region-scope.js";
-import type { SimAwsServiceController } from "../../serve/controller/sim-service-controller.js";
-import { SimS3 } from "../s3/sim-s3.js";
-import { SimS3GlobalRegistry } from "../s3/sim-s3-global-registry.js";
-import { SimS3ServiceController } from "../s3/serve/sim-s3-controller.js";
-import { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
-import { SimCloudFrontRegistry } from "../cloudfront/sim-cloud-front-registry.js";
-import { SimCloudFrontServiceController } from "../cloudfront/controller/sim-cloudfront-controller.js";
-import { SimDynamoDb } from "../dynamodb/index.js";
-import { SimCloudFormation } from "../cloudformation/index.js";
-import { makeSimCfS3OriginResolver } from "../cloudfront/origin/s3/sim-cf-s3-origin-resolver-factory.js";
+import type { SimS3 } from "../s3/sim-s3.js";
+import type { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
+import type { SimCloudFrontRegistry } from "../cloudfront/sim-cloud-front-registry.js";
+import type { SimDynamoDb } from "../dynamodb/index.js";
+import type { SimCloudFormation } from "../cloudformation/index.js";
+import { SimAwsServiceFactory } from "./factory/sim-aws-service-factory.js";
 
 interface SimAwsProps {
   readonly defaultAccountId?: SimAwsAccountId;
@@ -42,6 +38,7 @@ interface SimAwsProps {
 export class SimAws {
   public readonly defaultAccountId: SimAwsAccountId;
   public readonly defaultRegionName: AwsRegionName;
+  public readonly _serviceFactory: SimAwsServiceFactory;
   private readonly background: BackgroundScheduler & BackgroundCompleter;
 
   private readonly accounts = new Map<SimAwsAccountId, SimAwsAccount>();
@@ -51,15 +48,6 @@ export class SimAws {
   private readonly accountRegionScopes = new Map<
     SimAccountRegionScopeKey,
     SimAwsAccountRegionContainer
-  >();
-
-  private readonly s3GlobalRegistry = new SimS3GlobalRegistry();
-
-  private readonly cloudFrontRegistry = new SimCloudFrontRegistry();
-
-  private readonly cloudFrontServices = new Map<
-    SimAwsAccountId,
-    SimCloudFront
   >();
 
   constructor(props: SimAwsProps = {}) {
@@ -72,6 +60,10 @@ export class SimAws {
     this.defaultAccountId = defaultAccountId;
     this.defaultRegionName = defaultRegionName;
     this.background = background;
+    this._serviceFactory = new SimAwsServiceFactory({
+      simAws: this,
+      background,
+    });
   }
 
   /**
@@ -159,89 +151,13 @@ export class SimAws {
   }
 
   /**
-   * Create simulated CloudFormation for an Account Region scope.
-   */
-  _createCloudFormation(
-    scope: SimAwsAccountRegionContainer,
-  ): SimCloudFormation {
-    return new SimCloudFormation({
-      simAws: this,
-      accountRegionScope: scope.accountRegionScope,
-      background: this.background,
-    });
-  }
-
-  /**
-   * Create or get simulated CloudFront for an Account scope.
-   */
-  _createCloudFront(scope: SimAwsAccountRegionContainer): SimCloudFront {
-    const { accountId } = scope.accountRegionScope;
-
-    let cloudFront = this.cloudFrontServices.get(accountId);
-
-    if (cloudFront === undefined) {
-      cloudFront = new SimCloudFront({
-        accountRegionScope: scope.accountRegionScope,
-        cloudFrontRegistry: this.cloudFrontRegistry,
-        s3OriginResolver: makeSimCfS3OriginResolver(this, scope),
-        background: this.background,
-      });
-      this.cloudFrontServices.set(accountId, cloudFront);
-    }
-
-    return cloudFront;
-  }
-
-  /**
    * Get the shared simulated CloudFront registry.
    *
    * This is intended for CloudFront service/controller wiring so request routing
    * uses the same registry as CloudFront SDK command handling.
    */
   _cloudFrontRegistry(): SimCloudFrontRegistry {
-    return this.cloudFrontRegistry;
-  }
-
-  /**
-   * Create simulated DynamoDB for an Account Region scope.
-   */
-  _createDynamoDb(scope: SimAwsAccountRegionContainer): SimDynamoDb {
-    return new SimDynamoDb({
-      accountRegionScope: scope.accountRegionScope,
-      background: this.background,
-    });
-  }
-
-  /**
-   * Create simulated S3 for an Account Region scope.
-   */
-  _createS3(scope: SimAwsAccountRegionContainer): SimS3 {
-    return new SimS3({
-      accountRegionScope: scope.accountRegionScope,
-      s3GlobalRegistry: this.s3GlobalRegistry,
-      background: this.background,
-    });
-  }
-
-  /**
-   * Create a simulated AWS HTTP service controller.
-   */
-  _createServiceController(serviceName: string): SimAwsServiceController {
-    switch (serviceName) {
-      case "s3": {
-        return new SimS3ServiceController({ simAws: this });
-      }
-      case "cloudFront": {
-        return new SimCloudFrontServiceController({
-          simAws: this,
-        });
-      }
-      default: {
-        throw new Error(
-          `No controller for simulated AWS service ${serviceName}`,
-        );
-      }
-    }
+    return this._serviceFactory.cloudFrontRegistry();
   }
 
   /**
