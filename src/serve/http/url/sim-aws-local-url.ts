@@ -1,4 +1,4 @@
-import { simAwsLocalConf } from "./sim-aws-local.conf.js";
+import { simAwsLocalConf } from "../local-server/sim-aws-local.conf.js";
 
 interface SimAwsLocalUrlProps {
   readonly input: string | URL;

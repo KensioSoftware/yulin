@@ -1,5 +1,5 @@
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
-import { simAwsLocalConf } from "../../../../serve/http/sim-aws-local.conf.js";
+import { simAwsLocalConf } from "../../../../serve/http/local-server/sim-aws-local.conf.js";
 import type { SimS3BucketName } from "../sim-s3-bucket.js";
 import type { SimS3BucketWebsite } from "./sim-s3-bucket-website.js";
 
