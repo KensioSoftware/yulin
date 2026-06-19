@@ -21,11 +21,11 @@ describe("SimCfnStack", () => {
     const stack = cloudFormation.getStackByName("TestStack");
 
     assertIdentical(createStackOutput.StackId, "TestStack");
-    assertIdentical(stack?.status, "CREATE_IN_PROGRESS");
+    assertIdentical(stack?.lifecycle.status, "CREATE_IN_PROGRESS");
 
     await simAws.backgroundTasksComplete();
 
-    assertIdentical(stack.status, "CREATE_COMPLETE");
+    assertIdentical(stack.lifecycle.status, "CREATE_COMPLETE");
   });
 
   it("deploys a template through SimCloudFormation", async () => {
@@ -35,7 +35,7 @@ describe("SimCfnStack", () => {
       template: { Resources: {} },
     });
 
-    assertIdentical(stack.status, "CREATE_COMPLETE");
+    assertIdentical(stack.lifecycle.status, "CREATE_COMPLETE");
   });
 
   it("deploys a template through SimCloudFormation with Parameter values", async () => {
@@ -68,7 +68,7 @@ describe("SimCfnStack", () => {
     const resource = stack.resources.get("TestBucket");
     assertNonNullable(resource);
     assertIdentical(resource.properties["BucketName"], "override-bucket-name");
-    assertIdentical(stack.status, "CREATE_COMPLETE");
+    assertIdentical(stack.lifecycle.status, "CREATE_COMPLETE");
   });
 
   it("deploys a template in a specific Account's default Region scope", async () => {
@@ -87,7 +87,7 @@ describe("SimCfnStack", () => {
       cloudFormation.accountRegionScope.regionName,
       simAws.defaultRegionName,
     );
-    assertIdentical(stack.status, "CREATE_COMPLETE");
+    assertIdentical(stack.lifecycle.status, "CREATE_COMPLETE");
   });
 
   it("deploys a template in a specific Region scope", async () => {
@@ -99,7 +99,7 @@ describe("SimCfnStack", () => {
     });
 
     assertIdentical(cloudFormation.accountRegionScope.regionName, "eu-west-1");
-    assertIdentical(stack.status, "CREATE_COMPLETE");
+    assertIdentical(stack.lifecycle.status, "CREATE_COMPLETE");
   });
 
   it("deploys a template in a specific Account and Region scope", async () => {
@@ -121,7 +121,7 @@ describe("SimCfnStack", () => {
       cloudFormation.accountRegionScope.regionName,
       "ap-southeast-2",
     );
-    assertIdentical(stack.status, "CREATE_COMPLETE");
+    assertIdentical(stack.lifecycle.status, "CREATE_COMPLETE");
   });
 
   it("fails deployment when Resource dependencies cannot be resolved", async () => {
@@ -151,10 +151,10 @@ describe("SimCfnStack", () => {
 
     await simAws.backgroundTasksComplete();
 
-    assertIdentical(stack.status, "CREATE_FAILED");
-    assertNonNullable(stack.error);
+    assertIdentical(stack.lifecycle.status, "CREATE_FAILED");
+    assertNonNullable(stack.lifecycle.error);
     assertIdentical(
-      stack.error.message,
+      stack.lifecycle.error.message,
       "Could not resolve simulated CloudFormation Resource dependencies in Stack TestStack",
     );
   });
@@ -181,7 +181,7 @@ describe("SimCfnStack", () => {
 
     const stack = cloudFormation.getStackByName("TestStack");
     assertNonNullable(stack);
-    assertIdentical(stack.status, "CREATE_IN_PROGRESS");
+    assertIdentical(stack.lifecycle.status, "CREATE_IN_PROGRESS");
 
     const error = await assertThrowsErrorAsync(async () => {
       await stack.deploy();
@@ -194,6 +194,6 @@ describe("SimCfnStack", () => {
 
     await simAws.backgroundTasksComplete();
 
-    assertIdentical(stack.status, "CREATE_COMPLETE");
+    assertIdentical(stack.lifecycle.status, "CREATE_COMPLETE");
   });
 });
