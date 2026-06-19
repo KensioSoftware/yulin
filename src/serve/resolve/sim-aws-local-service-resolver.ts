@@ -1,6 +1,6 @@
 import type { SimAwsServiceTarget } from "../controller/sim-service-controller.js";
 import type { AwsRegionName } from "../../service/aws/sim-aws-region.js";
-import { SimAwsLocalUrl } from "../http/sim-aws-local-url.js";
+import { SimAwsLocalUrl } from "../http/url/sim-aws-local-url.js";
 
 const s3WebsiteServiceLabel = "s3-website";
 const cloudFrontServiceLabel = "cloudfront";
