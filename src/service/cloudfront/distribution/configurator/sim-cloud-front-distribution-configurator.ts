@@ -5,6 +5,14 @@ import type { SimCloudFrontBehaviorConfigurator } from "./sim-cloud-front-behavi
 
 /**
  * Applies top-level Distribution configuration to a sim CloudFront Distribution.
+ *
+ * Orchestrates the three configuration steps in the order CloudFront requires:
+ * 1. Alternate domain names (Aliases)
+ * 2. Origins
+ * 3. Cache Behaviors (default first, then named patterns)
+ *
+ * Named Cache Behaviors must be added after the default so that the default
+ * always acts as the fallback when no path pattern matches.
  */
 export class SimCloudFrontDistributionConfigurator {
   constructor(
