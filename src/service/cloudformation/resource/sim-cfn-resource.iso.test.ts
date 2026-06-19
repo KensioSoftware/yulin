@@ -283,7 +283,7 @@ describe("SimCfnResource", () => {
     // Then the thrown value is wrapped as an Error and stored on the Resource.
     assertIdentical(
       error.message,
-      "Sim CloudFormation Resource creation failed: factory failed",
+      "Sim CloudFormation Resource TestResource creation failed: factory failed",
     );
     assertIdentical(resource.status, "CREATE_FAILED");
     assertIdentical(resource.createComplete, true);

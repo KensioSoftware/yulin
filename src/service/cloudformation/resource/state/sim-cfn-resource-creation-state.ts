@@ -1,0 +1,75 @@
+import type { SimCloudFormationResourceStatus } from "../sim-cfn-resource.js";
+
+/**
+ * Tracks CloudFormation Resource creation status, backing sim Resource and error.
+ */
+export class SimCfnResourceCreationState<T extends object = object> {
+  private _status: SimCloudFormationResourceStatus = "CREATE_PENDING";
+  private _simResource: T | undefined;
+  private deployError: Error | undefined;
+
+  /**
+   * Get the current Resource status.
+   */
+  public get status(): SimCloudFormationResourceStatus {
+    return this._status;
+  }
+
+  /**
+   * Whether this Resource has been deployed into simulated AWS.
+   */
+  public get deployed(): boolean {
+    return this._status === "CREATE_COMPLETE";
+  }
+
+  /**
+   * Whether this Resource has reached a terminal creation status.
+   */
+  public get createComplete(): boolean {
+    return (
+      this._status === "CREATE_COMPLETE" || this._status === "CREATE_FAILED"
+    );
+  }
+
+  /**
+   * The simulated AWS resource represented by this CloudFormation Resource.
+   */
+  public get simResource(): T | undefined {
+    return this._simResource;
+  }
+
+  /**
+   * Get the deployment error, if Resource creation failed.
+   */
+  public get error(): Error | undefined {
+    return this.deployError;
+  }
+
+  /**
+   * Mark this Resource as creation in progress.
+   */
+  markCreateInProgress(): void {
+    this.deployError = undefined;
+    this._status = "CREATE_IN_PROGRESS";
+  }
+
+  /**
+   * Mark this Resource as successfully created.
+   */
+  markCreateComplete(simResource?: T): void {
+    if (simResource !== undefined) {
+      this._simResource = simResource;
+    }
+
+    this.deployError = undefined;
+    this._status = "CREATE_COMPLETE";
+  }
+
+  /**
+   * Mark this Resource as failed to create.
+   */
+  markCreateFailed(error?: Error): void {
+    this.deployError = error;
+    this._status = "CREATE_FAILED";
+  }
+}

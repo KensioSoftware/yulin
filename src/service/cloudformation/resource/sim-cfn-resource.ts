@@ -8,9 +8,10 @@ import {
   BackgroundTasks,
 } from "../../../util/background/background.js";
 import type { SimCfnServiceResourceFactory } from "./factory/sim-cfn-resource-factory.type.js";
-import { parseSimCloudFormationResourceType } from "./parser/sim-cfn-resource-parser.js";
-import { resolveSimCloudFormationServiceResourceFactory } from "./resolver/sim-cfn-service-resolver.js";
 import { isRecord } from "../../../util/type-guard/record.js";
+import { parseSimCfnResourceDependencies } from "./dependency/sim-cfn-resource-dependencies.js";
+import { SimCfnResourceCreateOperation } from "./create/sim-cfn-resource-create-operation.js";
+import { SimCfnResourceCreationState } from "./state/sim-cfn-resource-creation-state.js";
 
 interface SimCloudFormationResourceProps {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
@@ -44,9 +45,7 @@ export class SimCfnResource<T extends object = object> {
   public readonly accountRegionScope: SimAwsAccountRegionScope;
   public readonly logicalId: string;
   public readonly template: Record<string, unknown>;
-  private _status: SimCloudFormationResourceStatus = "CREATE_PENDING";
-  private _simResource: T | undefined;
-  private deployError: Error | undefined;
+  private readonly creationState = new SimCfnResourceCreationState<T>();
   private readonly background: BackgroundScheduler;
   private readonly cfnResourceFactory: SimCfnServiceResourceFactory | undefined;
 
@@ -70,23 +69,21 @@ export class SimCfnResource<T extends object = object> {
    * Get the current Resource status.
    */
   public get status(): SimCloudFormationResourceStatus {
-    return this._status;
+    return this.creationState.status;
   }
 
   /**
    * Whether this Resource has been deployed into simulated AWS.
    */
   public get deployed(): boolean {
-    return this._status === "CREATE_COMPLETE";
+    return this.creationState.deployed;
   }
 
   /**
    * Whether this Resource has reached a terminal creation status.
    */
   public get createComplete(): boolean {
-    return (
-      this._status === "CREATE_COMPLETE" || this._status === "CREATE_FAILED"
-    );
+    return this.creationState.createComplete;
   }
 
   /**
@@ -114,33 +111,21 @@ export class SimCfnResource<T extends object = object> {
    * The simulated AWS resource represented by this CloudFormation Resource.
    */
   public get simResource(): T | undefined {
-    return this._simResource;
+    return this.creationState.simResource;
   }
 
   /**
    * Get the deployment error, if Resource creation failed.
    */
   public get error(): Error | undefined {
-    return this.deployError;
+    return this.creationState.error;
   }
 
   /**
    * Return logical IDs this Resource depends on.
    */
   dependencies(): string[] {
-    const dependsOn = this.template["DependsOn"];
-
-    if (typeof dependsOn === "string") {
-      return [dependsOn];
-    }
-
-    if (Array.isArray(dependsOn)) {
-      return dependsOn.filter((dependency): dependency is string => {
-        return typeof dependency === "string";
-      });
-    }
-
-    return [];
+    return parseSimCfnResourceDependencies(this.template["DependsOn"]);
   }
 
   /**
@@ -156,79 +141,31 @@ export class SimCfnResource<T extends object = object> {
    * Create this Resource into simulated AWS as a background operation.
    */
   create(context: SimCloudFormationResourceCreateContext): Promise<void> {
-    this.markCreateInProgress();
-
-    return new Promise<void>((resolve, reject) => {
-      this.background.schedule(async () => {
-        try {
-          await this.background.sequence();
-
-          const simResource = await this.createSimResource(context);
-          this.markCreateComplete(simResource as T | undefined);
-          resolve();
-        } catch (error) {
-          const resourceError =
-            error instanceof Error
-              ? error
-              : new Error(
-                  `Sim CloudFormation Resource creation failed: ${String(error)}`,
-                );
-
-          this.markCreateFailed(resourceError);
-          reject(resourceError);
-        }
-      });
-    });
+    return new SimCfnResourceCreateOperation({
+      background: this.background,
+      resource: this,
+      cfnResourceFactory: this.cfnResourceFactory,
+    }).run(context);
   }
 
   /**
    * Mark this Resource as creation in progress.
    */
   markCreateInProgress(): void {
-    this.deployError = undefined;
-    this._status = "CREATE_IN_PROGRESS";
+    this.creationState.markCreateInProgress();
   }
 
   /**
    * Mark this Resource as successfully created.
    */
   markCreateComplete(simResource?: T): void {
-    if (simResource !== undefined) {
-      this._simResource = simResource;
-    }
-
-    this.deployError = undefined;
-    this._status = "CREATE_COMPLETE";
+    this.creationState.markCreateComplete(simResource);
   }
 
   /**
    * Mark this Resource as failed to create.
    */
   markCreateFailed(error?: Error): void {
-    this.deployError = error;
-    this._status = "CREATE_FAILED";
-  }
-
-  private async createSimResource(
-    context: SimCloudFormationResourceCreateContext,
-  ): Promise<object | undefined> {
-    const { type } = this;
-
-    if (type === undefined) {
-      throw new Error(
-        `Sim CloudFormation Resource ${this.logicalId} is missing a Type`,
-      );
-    }
-
-    const resourceType = parseSimCloudFormationResourceType(type);
-    const factory =
-      this.cfnResourceFactory ??
-      resolveSimCloudFormationServiceResourceFactory(
-        context.simAws,
-        this.accountRegionScope,
-        resourceType,
-      );
-
-    return await factory.create(resourceType.resourceTypeName, this, context);
+    this.creationState.markCreateFailed(error);
   }
 }
