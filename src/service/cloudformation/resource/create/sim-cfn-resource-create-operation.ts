@@ -79,12 +79,14 @@ export class SimCfnResourceCreateOperation<T extends object = object> {
   }
 
   private resourceCreationError(error: unknown): Error {
+    const messagePrefix = `Sim CloudFormation Resource ${this.resource.logicalId} creation failed`;
+
     if (error instanceof Error) {
+      error.message = `${messagePrefix}: ${error.message}`;
+
       return error;
     }
 
-    return new Error(
-      `Sim CloudFormation Resource ${this.resource.logicalId} creation failed: ${String(error)}`,
-    );
+    return new Error(`${messagePrefix}: ${String(error)}`);
   }
 }

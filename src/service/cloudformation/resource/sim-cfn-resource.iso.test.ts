@@ -2,6 +2,7 @@ import {
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
+  assertStringIncludes,
   assertThrowsErrorAsync,
   assertUndefined,
 } from "@kensio/smartass";
@@ -243,7 +244,7 @@ describe("SimCfnResource", () => {
 
     // Then the failure is recorded on the Resource.
     assertNonNullable(error);
-    assertIdentical(
+    assertStringIncludes(
       error.message,
       "Sim CloudFormation Resource TestResource is missing a Type",
     );
