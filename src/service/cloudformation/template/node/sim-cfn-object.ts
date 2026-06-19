@@ -1,0 +1,20 @@
+import { SimCfnNode, type SimCfnResolveContext } from "./sim-cfn-node.js";
+import type { SimCfnTemplateValueRecord } from "../value/sim-cfn-template-value.js";
+
+/**
+ * A plain CloudFormation template object (one that is not an intrinsic function).
+ */
+export class SimCfnObject extends SimCfnNode {
+  constructor(private readonly entries: ReadonlyMap<string, SimCfnNode>) {
+    super();
+  }
+
+  /**
+   * Resolve each property value in the object.
+   */
+  resolve(context: SimCfnResolveContext): SimCfnTemplateValueRecord {
+    return Object.fromEntries(
+      [...this.entries].map(([key, node]) => [key, node.resolve(context)]),
+    );
+  }
+}

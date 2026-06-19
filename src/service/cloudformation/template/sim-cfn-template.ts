@@ -1,6 +1,11 @@
 import { SimCfnParameters } from "../parameters/sim-cfn-parameters.js";
-import { resolveSimCfnTemplateParamRefs } from "./sim-cfn-template-param-refs.js";
+import { SimCfnTemplateValueResolver } from "./value/sim-cfn-template-value-resolver.js";
+import type {
+  SimCfnTemplateValue,
+  SimCfnTemplateValueRecord,
+} from "./value/sim-cfn-template-value.js";
 import { isRecord } from "../../../util/type-guard/record.js";
+import { SimCfnTemplateBodyValidator } from "./sim-cfn-template-body-validator.js";
 
 /**
  * Parsed CloudFormation template body accepted by the simulator.
@@ -9,13 +14,13 @@ import { isRecord } from "../../../util/type-guard/record.js";
  */
 export interface CfnTemplateBodyRecord {
   readonly Parameters?: Record<string, unknown> | undefined;
-  readonly Resources: Record<string, unknown>;
+  readonly Resources: Record<string, SimCfnTemplateValue>;
   readonly [sectionName: string]: unknown;
 }
 
 export interface SimCfnResourceTemplateRecord {
   readonly logicalId: string;
-  readonly template: Record<string, unknown>;
+  readonly template: SimCfnTemplateValueRecord;
 }
 
 interface SimCfnTemplateProps {
@@ -36,8 +41,8 @@ interface SimCfnTemplateFromJsonProps {
  */
 export class SimCfnTemplate {
   public readonly template: CfnTemplateBodyRecord;
+  public readonly stackName: string | undefined;
   private readonly parameters: SimCfnParameters;
-  private readonly stackName: string | undefined;
 
   constructor(props: SimCfnTemplateProps) {
     const { template, parameters, stackName } = props;
@@ -45,7 +50,7 @@ export class SimCfnTemplate {
     this.template = template;
     this.stackName = stackName;
 
-    this.validateTemplateBody();
+    new SimCfnTemplateBodyValidator({ template, stackName }).validate();
 
     this.parameters = (
       parameters ?? new SimCfnParameters({ stackName })
@@ -80,52 +85,20 @@ export class SimCfnTemplate {
   }
 
   /**
-   * Get Resource template entries with CloudFormation Parameter refs resolved.
+   * Get Resource template entries with CloudFormation value expressions resolved.
    */
   resourceTemplates(): SimCfnResourceTemplateRecord[] {
+    const valueResolver = new SimCfnTemplateValueResolver({
+      parameters: this.parameters,
+    });
+
     return Object.entries(this.template.Resources)
-      .filter((entry): entry is [string, Record<string, unknown>] => {
+      .filter((entry): entry is [string, SimCfnTemplateValueRecord] => {
         return isRecord(entry[1]);
       })
       .map(([logicalId, resourceTemplate]) => ({
         logicalId,
-        template: resolveSimCfnTemplateParamRefs(
-          resourceTemplate,
-          this.parameters,
-        ),
+        template: valueResolver.resolveRecord(resourceTemplate),
       }));
-  }
-
-  private validateTemplateBody(): void {
-    if (!isRecord(this.template)) {
-      throw new Error(
-        `Sim CloudFormation Stack ${this.stackNameLabel()} TemplateBody must parse to an object`,
-      );
-    }
-
-    if (!("Resources" in this.template)) {
-      throw new Error(
-        `Sim CloudFormation Stack ${this.stackNameLabel()} TemplateBody must include a Resources object`,
-      );
-    }
-
-    if (!isRecord(this.template.Resources)) {
-      throw new Error(
-        `Sim CloudFormation Stack ${this.stackNameLabel()} TemplateBody Resources must be an object`,
-      );
-    }
-
-    if (
-      this.template.Parameters !== undefined &&
-      !isRecord(this.template.Parameters)
-    ) {
-      throw new Error(
-        `Sim CloudFormation Stack ${this.stackNameLabel()} Parameters must be an object`,
-      );
-    }
-  }
-
-  private stackNameLabel(): string {
-    return this.stackName ?? "unknown";
   }
 }
