@@ -1,7 +1,7 @@
 import type { SimAws } from "../../../aws/sim-aws.js";
 import type { SimCfnResource } from "../../resource/sim-cfn-resource.js";
 
-interface SimCfnStackResourceDeployerProps {
+interface SimCfnStackResourceCreatorProps {
   readonly simAws: SimAws;
   readonly resources: ReadonlyMap<string, SimCfnResource>;
   readonly stackName: string;
@@ -10,17 +10,23 @@ interface SimCfnStackResourceDeployerProps {
 /**
  * Creates simulated CloudFormation Stack resources in dependency order.
  *
- * This class does not schedule deployment work or update Stack status. That is
- * the responsibility of SimCfnStack and SimCfnStackDeploymentScheduler. This
- * deployer only decides which resources can be created, creates each ready
- * batch, and fails if the remaining resource dependencies cannot be resolved.
+ * This class owns only the resource creation algorithm:
+ *
+ * - identify resources whose dependencies are already satisfied
+ * - create each currently-ready batch in parallel
+ * - repeat until every resource reports creation complete
+ * - fail when no remaining resource can be created
+ *
+ * It does not start Stack deployment, schedule background work, update Stack
+ * status, or capture deployment errors. Those lifecycle concerns belong to
+ * SimCfnStackDeploymentLifecycle and SimCfnStackDeploymentScheduler.
  */
-export class SimCfnStackResourceDeployer {
+export class SimCfnStackResourceCreator {
   private readonly simAws: SimAws;
   private readonly resources: ReadonlyMap<string, SimCfnResource>;
   private readonly stackName: string;
 
-  constructor(props: SimCfnStackResourceDeployerProps) {
+  constructor(props: SimCfnStackResourceCreatorProps) {
     const { simAws, resources, stackName } = props;
 
     this.simAws = simAws;
@@ -29,14 +35,14 @@ export class SimCfnStackResourceDeployer {
   }
 
   /**
-   * Create all Stack resources whose dependencies become satisfiable.
+   * Create every Stack resource once its dependencies become satisfiable.
    *
-   * Deployment proceeds in batches. Each loop creates every currently creatable
-   * resource in parallel, then checks which resources are still incomplete. If
-   * no pending resource can be created, the template contains unresolved or
-   * cyclic dependencies and deployment fails.
+   * Resources are created in dependency-respecting batches rather than one at a
+   * time. After each batch completes, the creator recalculates which resources
+   * are still incomplete. If none of the pending resources can be created, the
+   * template contains unresolved or cyclic dependencies.
    */
-  async deploy(): Promise<void> {
+  async createAll(): Promise<void> {
     let pendingResources = new Set(this.resources.values());
 
     while (pendingResources.size > 0) {
