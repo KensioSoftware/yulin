@@ -176,6 +176,38 @@ describe("SimCfnNodeParser", () => {
       Name: "my-bucket",
     });
   });
+
+  it("throws when an intrinsic function object has extra properties", () => {
+    const parser = new SimCfnNodeParser();
+
+    const error = assertThrowsError(() => {
+      parser.parse({
+        "Fn::Join": ["-", ["my", "bucket"]],
+        ExtraProperty: "unexpected",
+      });
+    });
+
+    assertIdentical(
+      error.message,
+      "Malformed Sim CloudFormation intrinsic function object Fn::Join",
+    );
+  });
+
+  it("throws when an unsupported intrinsic function object has extra properties", () => {
+    const parser = new SimCfnNodeParser();
+
+    const error = assertThrowsError(() => {
+      parser.parse({
+        "Fn::Unsupported": "value",
+        ExtraProperty: "unexpected",
+      });
+    });
+
+    assertIdentical(
+      error.message,
+      "Malformed Sim CloudFormation intrinsic function object Fn::Unsupported",
+    );
+  });
 });
 
 function emptyContext(): SimCfnResolveContext {

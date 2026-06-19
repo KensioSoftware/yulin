@@ -65,14 +65,30 @@ export class SimCfnNodeParser {
   ): SimCfnNode | undefined {
     const entries = Object.entries(value);
 
-    if (entries.length !== 1) {
+    if (entries.length === 0) {
       return undefined;
     }
 
     const [functionName, functionValue] = this.requiredSingleEntry(entries);
 
     if (!functionName.startsWith("Fn::")) {
+      const intrinsicEntry = entries.find((entry) =>
+        entry[0].startsWith("Fn::"),
+      );
+
+      if (intrinsicEntry !== undefined) {
+        throw new Error(
+          `Malformed Sim CloudFormation intrinsic function object ${intrinsicEntry[0]}`,
+        );
+      }
+
       return undefined;
+    }
+
+    if (entries.length !== 1) {
+      throw new Error(
+        `Malformed Sim CloudFormation intrinsic function object ${functionName}`,
+      );
     }
 
     if (functionName === "Fn::Join") {
