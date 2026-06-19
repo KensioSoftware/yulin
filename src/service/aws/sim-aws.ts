@@ -1,6 +1,6 @@
 import {
   DEFAULT_SIM_AWS_ACCOUNT_ID,
-  SimAwsAccount,
+  type SimAwsAccount,
   type SimAwsAccountId,
 } from "./sim-aws-account.js";
 import {
@@ -11,18 +11,16 @@ import {
 import {
   type AwsRegionName,
   DEFAULT_SIM_AWS_REGION_NAME,
-  SimAwsRegion,
+  type SimAwsRegion,
 } from "./sim-aws-region.js";
-import {
-  type SimAccountRegionScopeKey,
-  SimAwsAccountRegionContainer,
-} from "./sim-aws-account-region-scope.js";
+import type { SimAwsAccountRegionContainer } from "./sim-aws-account-region-scope.js";
 import type { SimS3 } from "../s3/sim-s3.js";
 import type { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
 import type { SimCloudFrontRegistry } from "../cloudfront/sim-cloud-front-registry.js";
 import type { SimDynamoDb } from "../dynamodb/index.js";
 import type { SimCloudFormation } from "../cloudformation/index.js";
 import { SimAwsServiceFactory } from "./factory/sim-aws-service-factory.js";
+import { SimAwsScopeRegistry } from "./scope/sim-aws-scope-registry.js";
 
 interface SimAwsProps {
   readonly defaultAccountId?: SimAwsAccountId;
@@ -40,15 +38,7 @@ export class SimAws {
   public readonly defaultRegionName: AwsRegionName;
   public readonly _serviceFactory: SimAwsServiceFactory;
   private readonly background: BackgroundScheduler & BackgroundCompleter;
-
-  private readonly accounts = new Map<SimAwsAccountId, SimAwsAccount>();
-
-  private readonly regions = new Map<AwsRegionName, SimAwsRegion>();
-
-  private readonly accountRegionScopes = new Map<
-    SimAccountRegionScopeKey,
-    SimAwsAccountRegionContainer
-  >();
+  private readonly scopes: SimAwsScopeRegistry;
 
   constructor(props: SimAwsProps = {}) {
     const {
@@ -64,40 +54,23 @@ export class SimAws {
       simAws: this,
       background,
     });
+    this.scopes = new SimAwsScopeRegistry({ simAws: this });
   }
 
   /**
    * Get a simulated AWS Account.
    */
-  account(accountId: string = this.defaultAccountId): SimAwsAccount {
-    let account = this.accounts.get(accountId as SimAwsAccountId);
-
-    if (account === undefined) {
-      account = new SimAwsAccount({
-        simAws: this,
-        accountId: accountId as SimAwsAccountId,
-      });
-      this.accounts.set(accountId as SimAwsAccountId, account);
-    }
-
-    return account;
+  account(
+    accountId: SimAwsAccountId | string = this.defaultAccountId,
+  ): SimAwsAccount {
+    return this.scopes.account(accountId as SimAwsAccountId);
   }
 
   /**
    * Get a simulated AWS Account Region scope.
    */
   region(regionName: AwsRegionName = this.defaultRegionName): SimAwsRegion {
-    let region = this.regions.get(regionName);
-
-    if (region === undefined) {
-      region = new SimAwsRegion({
-        simAws: this,
-        regionName,
-      });
-      this.regions.set(regionName, region);
-    }
-
-    return region;
+    return this.scopes.region(regionName);
   }
 
   /**
@@ -107,19 +80,7 @@ export class SimAws {
     accountId: SimAwsAccountId = this.defaultAccountId,
     regionName: AwsRegionName = this.defaultRegionName,
   ): SimAwsAccountRegionContainer {
-    const scopeKey = `${accountId}:${regionName}` as const;
-    let accountRegionScope = this.accountRegionScopes.get(scopeKey);
-
-    if (accountRegionScope === undefined) {
-      accountRegionScope = new SimAwsAccountRegionContainer({
-        simAws: this,
-        account: this.account(accountId),
-        region: this.region(regionName),
-      });
-      this.accountRegionScopes.set(scopeKey, accountRegionScope);
-    }
-
-    return accountRegionScope;
+    return this.scopes.accountRegionScope(accountId, regionName);
   }
 
   /**
