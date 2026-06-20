@@ -70,10 +70,10 @@ export class CffUint8ArrayFunctionCodeExtractor<
     ${source}
     handler;
     `);
-    const handler: unknown = script.runInContext(context, {
+    const handler = script.runInContext(context, {
       timeout: 50, // Real CloudFront Functions have a short timeout.
       breakOnSigint: true,
-    });
+    }) as CloudFrontFunction.Handler;
 
     if (typeof handler !== "function") {
       throw new TypeError(
