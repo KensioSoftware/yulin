@@ -3,6 +3,7 @@ import type { SimCfnTemplateValue } from "../../value/sim-cfn-template-value.js"
 import { SimCfnFnGetAttParser } from "./get-att/sim-cfn-fn-get-att-parser.js";
 import { SimCfnFnJoinParser } from "./join/sim-cfn-fn-join-parser.js";
 import type { SimCfnValueParser } from "../value/sim-cfn-value-parser.type.js";
+import { SimCfnFnSubParser } from "./sub/sim-cfn-fn-sub-parser.js";
 
 /**
  * Parses CloudFormation intrinsic function objects.
@@ -19,11 +20,14 @@ import type { SimCfnValueParser } from "../value/sim-cfn-value-parser.type.js";
  * that need child values parsed recursively.
  */
 export class SimCfnFunctionParser {
-  private readonly fnGetAttParser = new SimCfnFnGetAttParser();
+  private readonly fnGetAttParser: SimCfnFnGetAttParser;
   private readonly fnJoinParser: SimCfnFnJoinParser;
+  private readonly fnSubParser: SimCfnFnSubParser;
 
   constructor(valueParser: SimCfnValueParser) {
+    this.fnGetAttParser = new SimCfnFnGetAttParser();
     this.fnJoinParser = new SimCfnFnJoinParser(valueParser);
+    this.fnSubParser = new SimCfnFnSubParser(valueParser);
   }
 
   /**
@@ -59,6 +63,10 @@ export class SimCfnFunctionParser {
   ): SimCfnNode {
     if (functionName === "Fn::Join") {
       return this.fnJoinParser.parse(value);
+    }
+
+    if (functionName === "Fn::Sub") {
+      return this.fnSubParser.parse(value);
     }
 
     if (functionName === "Fn::GetAtt") {
