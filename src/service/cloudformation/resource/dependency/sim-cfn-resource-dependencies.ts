@@ -1,5 +1,5 @@
 import type { SimCfnTemplateValueRecord } from "../../template/value/sim-cfn-template-value.js";
-import { parseSimCfnNode } from "../../template/parse/sim-cfn-node-parser.js";
+import { parseSimCfnNode } from "../../template/parse/node/sim-cfn-node-parser.js";
 
 /**
  * Return CloudFormation Resource logical IDs from a DependsOn template value.

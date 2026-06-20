@@ -6,13 +6,13 @@ import {
   assertThrowsError,
 } from "@kensio/smartass";
 import { describe, it, vi } from "vitest";
-import { SimCfnParameters } from "../../parameters/sim-cfn-parameters.js";
-import { SimCfnFnJoin } from "../node/fn/join/sim-cfn-fn-join.js";
-import { SimCfnList } from "../node/sim-cfn-list.js";
-import { SimCfnLiteral } from "../node/sim-cfn-literal.js";
-import { SimCfnNode, SimCfnResolveContext } from "../node/sim-cfn-node.js";
-import { SimCfnObject } from "../node/sim-cfn-object.js";
-import { SimCfnRef } from "../node/sim-cfn-ref.js";
+import { SimCfnParameters } from "../../../parameters/sim-cfn-parameters.js";
+import { SimCfnFnJoin } from "../../node/fn/join/sim-cfn-fn-join.js";
+import { SimCfnList } from "../../node/sim-cfn-list.js";
+import { SimCfnLiteral } from "../../node/sim-cfn-literal.js";
+import { SimCfnNode, SimCfnResolveContext } from "../../node/sim-cfn-node.js";
+import { SimCfnObject } from "../../node/sim-cfn-object.js";
+import { SimCfnRef } from "../../node/sim-cfn-ref.js";
 import { parseSimCfnNode, SimCfnNodeParser } from "./sim-cfn-node-parser.js";
 
 describe("SimCfnNodeParser", () => {

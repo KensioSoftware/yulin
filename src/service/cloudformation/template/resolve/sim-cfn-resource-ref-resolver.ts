@@ -1,11 +1,12 @@
 import type { SimCfnTemplateValue } from "../value/sim-cfn-template-value.js";
 
 /**
- * Resolves a `{ "Ref": "LogicalId" }` to another Resource's Ref value.
+ * Resolves Resource-backed intrinsic functions such as `{ "Ref": "LogicalId" }`
+ * and `{ "Fn::GetAtt": ["LogicalId", "AttributeName"] }`.
  *
  * This is only available once Resources exist at creation time. During the
- * up-front template resolution pass it is omitted, so Resource Refs are left
- * unresolved until the referenced Resource has been created.
+ * up-front template resolution pass it is omitted, so Resource intrinsics are
+ * left unresolved until the referenced Resource has been created.
  */
 export interface SimCfnResourceRefResolver {
   /**
@@ -17,4 +18,9 @@ export interface SimCfnResourceRefResolver {
    * The value the referenced Resource returns for Ref.
    */
   refValue(logicalId: string): SimCfnTemplateValue;
+
+  /**
+   * The value the referenced Resource returns for Fn::GetAtt.
+   */
+  attributeValue(logicalId: string, attributeName: string): SimCfnTemplateValue;
 }

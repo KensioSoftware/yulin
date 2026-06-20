@@ -11,10 +11,16 @@ import type { SimCfnServiceResourceFactory } from "./factory/sim-cfn-resource-fa
 import { SimCfnResourceCreateOperation } from "./create/sim-cfn-resource-create-operation.js";
 import { SimCfnResourceCreationState } from "./state/sim-cfn-resource-creation-state.js";
 import { SimCfnResourceTemplateReader } from "./template/sim-cfn-resource-template-reader.js";
-import type { SimCfnTemplateValueRecord } from "../template/value/sim-cfn-template-value.js";
+import type {
+  SimCfnTemplateValue,
+  SimCfnTemplateValueRecord,
+} from "../template/value/sim-cfn-template-value.js";
 import type { SimCfnParameters } from "../parameters/sim-cfn-parameters.js";
 import { SimCfnResourcePropertyResolver } from "./resolve/property/sim-cfn-resource-property-resolver.js";
-import { simCfnResourceRefValue } from "./ref/sim-cfn-resource-ref-value.js";
+import {
+  type SimCfnResourceValueAdapter,
+  simCfnResourceValueAdapter,
+} from "./cfn/sim-cfn-resource-value-adapter.js";
 
 interface SimCloudFormationResourceProps {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
@@ -136,13 +142,23 @@ export class SimCfnResource<T extends object = object> {
   /**
    * The value returned when this Resource is referenced via { "Ref": logicalId }.
    *
-   * Mirroring CloudFormation, not every Resource type defines a meaningful Ref
-   * value. A created sim Resource may expose refValue() to override this (for
-   * example, an S3 Bucket returns its bucket name); otherwise the logical ID is
-   * used as a stand-in for the physical ID.
+   * Mirroring CloudFormation, Resource Ref behavior is Resource-type specific.
+   * CloudFormation-specific value behavior is delegated to a Resource adapter so
+   * simulated service objects do not need to know about CloudFormation.
    */
-  public get refValue(): string {
-    return simCfnResourceRefValue(this.logicalId, this.simResource);
+  public get refValue(): SimCfnTemplateValue {
+    return this.cfnValueAdapter().refValue();
+  }
+
+  /**
+   * The value returned when this Resource is referenced via Fn::GetAtt.
+   *
+   * Mirroring CloudFormation, Resource attributes are Resource-type specific.
+   * CloudFormation-specific value behavior is delegated to a Resource adapter so
+   * simulated service objects do not need to know about CloudFormation.
+   */
+  public attributeValue(attributeName: string): SimCfnTemplateValue {
+    return this.cfnValueAdapter().attributeValue(attributeName);
   }
 
   /**
@@ -240,5 +256,13 @@ export class SimCfnResource<T extends object = object> {
    */
   markCreateFailed(error?: Error): void {
     this.creationState.markCreateFailed(error);
+  }
+
+  private cfnValueAdapter(): SimCfnResourceValueAdapter {
+    return simCfnResourceValueAdapter({
+      logicalId: this.logicalId,
+      type: this.type,
+      simResource: this.simResource,
+    });
   }
 }

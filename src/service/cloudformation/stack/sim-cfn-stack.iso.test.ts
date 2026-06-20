@@ -160,6 +160,26 @@ describe("SimCfnStack", () => {
     );
   });
 
+  it("uses a logical ID attribute stand-in for unsupported Resource GetAtt values", async () => {
+    const simAws = new SimAws();
+
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "TestStack",
+      template: {
+        Resources: {
+          WaitHandle: {
+            Type: "AWS::CloudFormation::WaitConditionHandle",
+          },
+        },
+      },
+    });
+
+    const resource = stack.resources.get("WaitHandle");
+
+    assertNonNullable(resource);
+    assertIdentical(resource.attributeValue("Arn"), "WaitHandle.Arn");
+  });
+
   it("throws when deploy is called while create is in progress", async () => {
     const simAws = new SimAws();
 
