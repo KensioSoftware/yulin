@@ -5,6 +5,7 @@ import type {
 import type { SimS3 } from "../sim-s3.js";
 import type { SimCfnServiceResourceFactory } from "../../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import type { SimS3Bucket } from "../bucket/sim-s3-bucket.js";
+import type { SimS3WebsiteConfiguration } from "../command/put-bucket-website/put-bucket-website.cmd.js";
 
 /**
  * CloudFormation Resource factory for simulated S3 resources.
@@ -53,6 +54,20 @@ export class SimS3CloudFormationResourceFactory implements SimCfnServiceResource
       );
     }
 
+    const websiteConfiguration = this.websiteConfigurationForResource(
+      resource,
+      context,
+    );
+
+    if (websiteConfiguration !== undefined) {
+      await this.simS3.putBucketWebsite({
+        input: {
+          Bucket: bucketName,
+          WebsiteConfiguration: websiteConfiguration,
+        },
+      });
+    }
+
     return bucket;
   }
 
@@ -68,5 +83,24 @@ export class SimS3CloudFormationResourceFactory implements SimCfnServiceResource
     }
 
     return resource.logicalId.toLowerCase();
+  }
+
+  private websiteConfigurationForResource(
+    resource: SimCfnResource,
+    context: SimCloudFormationResourceCreateContext,
+  ): SimS3WebsiteConfiguration | undefined {
+    const properties = context.resolvedProperties ?? resource.properties;
+    const websiteConfiguration = properties["WebsiteConfiguration"];
+
+    if (
+      websiteConfiguration === undefined ||
+      websiteConfiguration === null ||
+      typeof websiteConfiguration !== "object" ||
+      Array.isArray(websiteConfiguration)
+    ) {
+      return undefined;
+    }
+
+    return websiteConfiguration;
   }
 }
