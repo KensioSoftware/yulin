@@ -140,7 +140,7 @@ Important behavior:
 - the returned table description reports the table status at creation time, usually `CREATING`.
 - activation is scheduled as a background task.
 
-The current returned `TableDescription` is intentionally minimal. It includes fields such as:
+The current returned `TableDescription` is minimal. It includes fields such as:
 
 - `TableName`
 - `TableArn`

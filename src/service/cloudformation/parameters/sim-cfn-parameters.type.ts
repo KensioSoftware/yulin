@@ -20,7 +20,7 @@ export type SimCloudFormationParameterValues = Record<
 /**
  * Minimal structural shape accepted from CloudFormation command inputs.
  *
- * This intentionally models only the Parameters collection used by
+ * This models only the Parameters collection used by
  * create/update style commands, rather than a complete AWS SDK command input
  * type.
  */

@@ -1,6 +1,6 @@
 import type { SimCfnParameters } from "../../parameters/sim-cfn-parameters.js";
 import { SimCfnResolveContext } from "../node/sim-cfn-node.js";
-import { parseSimCfnNode } from "../parse/sim-cfn-node-parser.js";
+import { parseSimCfnNode } from "../parse/node/sim-cfn-node-parser.js";
 import type {
   SimCfnTemplateValue,
   SimCfnTemplateValueRecord,

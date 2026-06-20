@@ -1,4 +1,7 @@
-import { ListBucketsCommand } from "@aws-sdk/client-s3";
+import {
+  ListBucketsCommand,
+  PutBucketWebsiteCommand,
+} from "@aws-sdk/client-s3";
 import {
   assertArrayLength,
   assertIdentical,
@@ -11,6 +14,7 @@ import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
 import { SimS3BucketAlreadyExists } from "../../error/sim-s3.error.js";
+import { makeAwsRegionName } from "../../../aws/sim-aws-region.js";
 
 describe("S3 CloudFormation Bucket Resource", () => {
   it("creates a simulated S3 Bucket from an AWS::S3::Bucket Resource", async () => {
@@ -141,5 +145,51 @@ describe("S3 CloudFormation Bucket Resource", () => {
       }),
     );
     assertInstanceOf(error, SimS3BucketAlreadyExists);
+  });
+
+  it("returns an S3 Bucket WebsiteURL attribute value", async () => {
+    // Given an S3 Bucket Resource deployed by sim CloudFormation.
+    const simAws = new SimAws();
+    const region = makeAwsRegionName();
+    const simCloudFormation = simAws.region(region).cloudFormation();
+    const simS3 = simAws.region(region).s3();
+    const stack = await simCloudFormation.deployTemplate({
+      stackName: "test-stack",
+      template: {
+        Resources: {
+          WebsiteBucket: {
+            Type: "AWS::S3::Bucket",
+            Properties: {
+              BucketName: "website-bucket",
+            },
+          },
+        },
+      },
+    });
+
+    // And static website hosting enabled on the Bucket.
+    await simS3.putBucketWebsite(
+      new PutBucketWebsiteCommand({
+        Bucket: "website-bucket",
+        WebsiteConfiguration: {
+          IndexDocument: {
+            Suffix: "index.html",
+          },
+        },
+      }),
+    );
+
+    // When the Resource's WebsiteURL attribute is read.
+    const bucketResource = stack.resources.get("WebsiteBucket");
+    const bucket = simS3.getSimBucketByName("website-bucket");
+
+    assertNonNullable(bucketResource);
+    assertNonNullable(bucket);
+
+    // Then the CloudFormation S3 adapter returns the simulated website URL.
+    assertIdentical(
+      bucketResource.attributeValue("WebsiteURL"),
+      `http://website-bucket.s3-website.${region}.sim-aws.localhost/`,
+    );
   });
 });

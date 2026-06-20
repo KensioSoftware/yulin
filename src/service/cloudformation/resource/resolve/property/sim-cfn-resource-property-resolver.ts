@@ -1,6 +1,9 @@
 import { SimCfnParameters } from "../../../parameters/sim-cfn-parameters.js";
 import { SimCfnTemplateValueResolver } from "../../../template/value/sim-cfn-template-value-resolver.js";
-import type { SimCfnTemplateValueRecord } from "../../../template/value/sim-cfn-template-value.js";
+import type {
+  SimCfnTemplateValue,
+  SimCfnTemplateValueRecord,
+} from "../../../template/value/sim-cfn-template-value.js";
 import type { SimCloudFormationResourceCreateContext } from "../../sim-cfn-resource.js";
 
 interface SimCfnResourcePropertyResolverProps {
@@ -46,7 +49,7 @@ export class SimCfnResourcePropertyResolver {
       parameters: this.parameters ?? new SimCfnParameters(),
       resources: {
         has: (id): boolean => context.resources.has(id),
-        refValue: (id): string | { Ref: string } => {
+        refValue: (id): SimCfnTemplateValue => {
           const dependency = context.resources.get(id);
 
           /* v8 ignore if -- defensive catch for inconsistent context */
@@ -55,6 +58,16 @@ export class SimCfnResourcePropertyResolver {
           }
 
           return dependency.refValue;
+        },
+        attributeValue: (id, attributeName): SimCfnTemplateValue => {
+          const dependency = context.resources.get(id);
+
+          /* v8 ignore if -- defensive catch for inconsistent context */
+          if (dependency === undefined) {
+            return { "Fn::GetAtt": [id, attributeName] };
+          }
+
+          return dependency.attributeValue(attributeName);
         },
       },
     });

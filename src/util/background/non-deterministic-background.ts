@@ -7,8 +7,8 @@ import type {
 /**
  * Non-deterministic async background tasks scheduler.
  *
- * Use this when you deliberately want to simulate asynchronous distributed
- * operations completing in a random order.
+ * Use this when you want to simulate asynchronous distributed operations
+ * potentially completing out of sequence.
  */
 export class NonDeterministicBackgroundTasks
   implements BackgroundScheduler, BackgroundCompleter

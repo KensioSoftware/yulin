@@ -57,8 +57,8 @@ export class SimCloudFrontAlternateDomainRouter {
     }
 
     // Tier 2: walk every registered account and search their live distributions.
-    // This is intentionally exhaustive — alternate domain names are not indexed
-    // in the registry, so a full scan is required.
+    // This is exhaustive — alternate domain names are not indexed in the
+    // registry, so a full scan is required.
     for (const accountId of this.cloudFrontRegistry.accountIdsWithDistributions()) {
       const cloudFront = this.simAws.accountRegionScope(accountId).cloudFront();
       const distribution = [...cloudFront.getDistributions().values()].find(
