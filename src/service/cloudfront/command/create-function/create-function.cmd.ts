@@ -3,6 +3,7 @@
  */
 
 import type { SimArn } from "../../../aws/arn.js";
+import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
 
 /**
  * Minimal structural sim CloudFront CreateFunction command.
@@ -29,7 +30,7 @@ export interface SimCreateFunctionCommandInput {
  * Minimal structural sim CloudFront CreateFunction output.
  */
 export interface SimCreateFunctionCommandOutput {
-  readonly $metadata: Record<string, unknown>;
+  readonly $metadata: SimResponseMetadata;
   FunctionSummary: SimCloudFrontFunctionSummary;
   FunctionMetadata: SimCloudFrontFunctionMetadata;
 }

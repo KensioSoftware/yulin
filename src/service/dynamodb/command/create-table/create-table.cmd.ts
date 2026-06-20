@@ -1,4 +1,5 @@
 import type { SimArn } from "../../../aws/arn.js";
+import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
 
 /**
  * Minimal structural sim DynamoDB CreateTable command.
@@ -21,7 +22,7 @@ export interface SimCreateTableCommandInput {
  */
 export interface SimCreateTableCommandOutput {
   readonly TableDescription?: SimDynamoDbTableDescription;
-  readonly $metadata: Record<string, unknown>;
+  readonly $metadata: SimResponseMetadata;
 }
 
 /**

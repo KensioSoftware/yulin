@@ -1,3 +1,5 @@
+import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
+
 /**
  * Minimal structural sim S3 ListObjects command.
  */
@@ -26,7 +28,7 @@ export interface SimListObjectsCommandOutput {
   readonly MaxKeys?: number;
   readonly IsTruncated?: boolean;
   readonly NextMarker?: string | undefined;
-  readonly $metadata: Record<string, unknown>;
+  readonly $metadata: SimResponseMetadata;
 }
 
 /**

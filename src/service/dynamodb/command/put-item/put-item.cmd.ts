@@ -1,3 +1,5 @@
+import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
+
 /**
  * Minimal structural sim DynamoDB PutItem command.
  */
@@ -18,7 +20,7 @@ export interface SimPutItemCommandInput {
  */
 export interface SimPutItemCommandOutput {
   readonly Attributes?: Record<string, SimDynamoDbAttributeValue> | undefined;
-  readonly $metadata: Record<string, unknown>;
+  readonly $metadata: SimResponseMetadata;
 }
 
 /**

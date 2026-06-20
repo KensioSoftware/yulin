@@ -1,3 +1,5 @@
+import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
+
 /**
  * Minimal structural sim DynamoDB ListTables command.
  */
@@ -19,5 +21,5 @@ export interface SimListTablesCommandInput {
 export interface SimListTablesCommandOutput {
   readonly TableNames?: readonly string[] | undefined;
   readonly LastEvaluatedTableName?: string | undefined;
-  readonly $metadata: Record<string, unknown>;
+  readonly $metadata: SimResponseMetadata;
 }
