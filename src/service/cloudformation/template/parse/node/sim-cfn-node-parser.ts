@@ -65,7 +65,7 @@ export class SimCfnNodeParser {
     const name = value["Ref"];
 
     if (typeof name !== "string") {
-      return undefined;
+      throw new TypeError("Sim CloudFormation Ref value must be a string");
     }
 
     return new SimCfnRef(name);

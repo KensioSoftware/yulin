@@ -4,6 +4,7 @@ import {
   assertInstanceOf,
   assertObjectMatches,
   assertThrowsError,
+  assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import { describe, it, vi } from "vitest";
 import { SimCfnParameters } from "../../../parameters/sim-cfn-parameters.js";
@@ -14,6 +15,7 @@ import { SimCfnNode, SimCfnResolveContext } from "../../node/sim-cfn-node.js";
 import { SimCfnObject } from "../../node/sim-cfn-object.js";
 import { SimCfnRef } from "../../node/sim-cfn-ref.js";
 import { parseSimCfnNode, SimCfnNodeParser } from "./sim-cfn-node-parser.js";
+import { SimAws } from "../../../../aws/sim-aws.js";
 
 describe("SimCfnNodeParser", () => {
   it("parses arrays into CloudFormation list nodes recursively", () => {
@@ -42,17 +44,6 @@ describe("SimCfnNodeParser", () => {
     assertInstanceOf(node, SimCfnRef);
     assertObjectMatches(node.resolve(emptyContext()), {
       Ref: "BucketName",
-    });
-  });
-
-  it("leaves Ref objects with non-string names as plain CloudFormation objects", () => {
-    const parser = new SimCfnNodeParser();
-
-    const node = parser.parse({ Ref: 123 });
-
-    assertInstanceOf(node, SimCfnObject);
-    assertObjectMatches(node.resolve(emptyContext()), {
-      Ref: 123,
     });
   });
 
@@ -231,6 +222,33 @@ describe("SimCfnNodeParser", () => {
     assertIdentical(
       error.message,
       "Malformed Sim CloudFormation intrinsic function object Fn::Unsupported",
+    );
+  });
+
+  it("rejects Ref values that are not strings", async () => {
+    const simAws = new SimAws();
+
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws.cloudFormation().deployTemplate({
+        stackName: "test-stack",
+        template: {
+          Resources: {
+            TestBucket: {
+              Type: "AWS::S3::Bucket",
+              Properties: {
+                BucketName: {
+                  Ref: 123,
+                },
+              },
+            },
+          },
+        },
+      });
+    });
+
+    assertIdentical(
+      error.message,
+      "Sim CloudFormation Ref value must be a string",
     );
   });
 });
