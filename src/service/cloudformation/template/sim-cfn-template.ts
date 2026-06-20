@@ -69,10 +69,10 @@ export class SimCfnTemplate {
     templateBody: string,
     props: SimCfnTemplateFromJsonProps = {},
   ): SimCfnTemplate {
-    let template: unknown;
+    let template: CfnTemplateBodyRecord;
 
     try {
-      template = JSON.parse(templateBody);
+      template = JSON.parse(templateBody) as CfnTemplateBodyRecord;
     } catch (error) {
       throw new Error(
         `Sim CloudFormation Stack ${props.stackName ?? "unknown"} TemplateBody must be valid JSON`,
@@ -83,7 +83,7 @@ export class SimCfnTemplate {
     }
 
     return new SimCfnTemplate({
-      template: template as CfnTemplateBodyRecord,
+      template,
       parameters: props.parameters,
       stackName: props.stackName,
     });
