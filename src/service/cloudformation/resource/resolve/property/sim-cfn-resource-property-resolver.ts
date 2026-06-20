@@ -1,4 +1,4 @@
-import type { SimCfnParameters } from "../../../parameters/sim-cfn-parameters.js";
+import { SimCfnParameters } from "../../../parameters/sim-cfn-parameters.js";
 import { SimCfnTemplateValueResolver } from "../../../template/value/sim-cfn-template-value-resolver.js";
 import type { SimCfnTemplateValueRecord } from "../../../template/value/sim-cfn-template-value.js";
 import type { SimCloudFormationResourceCreateContext } from "../../sim-cfn-resource.js";
@@ -30,10 +30,9 @@ export class SimCfnResourcePropertyResolver {
   /**
    * Resolve the Resource Properties object for service-specific creation.
    *
-   * If no Parameters are available, the raw Properties object is returned
-   * because there is no late Resource-level substitution to perform. Otherwise,
    * Parameters and Resource Refs are resolved through
-   * {@link SimCfnTemplateValueResolver}.
+   * {@link SimCfnTemplateValueResolver}. If no Parameters are available, an empty
+   * Parameter resolver is used so Resource Refs can still resolve.
    *
    * Resource Refs are read from the creation context. If a referenced Resource
    * is unexpectedly absent, the Ref is preserved as `{ Ref: logicalId }` rather
@@ -43,12 +42,8 @@ export class SimCfnResourcePropertyResolver {
     properties: SimCfnTemplateValueRecord,
     context: SimCloudFormationResourceCreateContext,
   ): SimCfnTemplateValueRecord {
-    if (this.parameters === undefined) {
-      return properties;
-    }
-
     const resolver = new SimCfnTemplateValueResolver({
-      parameters: this.parameters,
+      parameters: this.parameters ?? new SimCfnParameters(),
       resources: {
         has: (id): boolean => context.resources.has(id),
         refValue: (id): string | { Ref: string } => {
