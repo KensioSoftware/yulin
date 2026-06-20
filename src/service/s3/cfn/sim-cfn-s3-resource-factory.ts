@@ -101,6 +101,13 @@ export class SimS3CloudFormationResourceFactory implements SimCfnServiceResource
       return undefined;
     }
 
+    if (
+      "RoutingRules" in websiteConfiguration &&
+      !Array.isArray(websiteConfiguration["RoutingRules"])
+    ) {
+      return undefined;
+    }
+
     return websiteConfiguration;
   }
 }
