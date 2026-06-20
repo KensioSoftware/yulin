@@ -35,7 +35,7 @@ export interface SimDynamoDbTableDescription {
   readonly KeySchema?: SimDynamoDbKeySchemaElement[] | undefined;
   readonly TableStatus?: SimDynamoDbTableStatus;
   readonly CreationDateTime?: Date;
-  readonly GlobalSecondaryIndexes?: readonly unknown[];
+  readonly GlobalSecondaryIndexes?: readonly SimDynamoDbGlobalSecondaryIndexDescription[];
 }
 
 /**
@@ -75,3 +75,38 @@ export type SimDynamoDbTableStatus =
   | "INACCESSIBLE_ENCRYPTION_CREDENTIALS"
   | "ARCHIVING"
   | "ARCHIVED";
+
+/**
+ * Minimal structural sim DynamoDB global secondary index description.
+ */
+export interface SimDynamoDbGlobalSecondaryIndexDescription {
+  readonly IndexName?: string | undefined;
+  readonly KeySchema?: readonly SimDynamoDbKeySchemaElement[] | undefined;
+  readonly Projection?: SimDynamoDbProjection | undefined;
+  readonly IndexStatus?: SimDynamoDbIndexStatus | undefined;
+  readonly IndexArn?: SimArn | undefined;
+  readonly ItemCount?: number | undefined;
+  readonly IndexSizeBytes?: number | undefined;
+}
+
+/**
+ * Minimal structural sim DynamoDB projection.
+ */
+export interface SimDynamoDbProjection {
+  readonly ProjectionType?: SimDynamoDbProjectionType | undefined;
+  readonly NonKeyAttributes?: readonly string[] | undefined;
+}
+
+/**
+ * Minimal structural sim DynamoDB projection type.
+ */
+export type SimDynamoDbProjectionType = "ALL" | "KEYS_ONLY" | "INCLUDE";
+
+/**
+ * Minimal structural sim DynamoDB index status.
+ */
+export type SimDynamoDbIndexStatus =
+  | "CREATING"
+  | "UPDATING"
+  | "DELETING"
+  | "ACTIVE";
