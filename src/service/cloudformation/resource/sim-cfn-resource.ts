@@ -12,6 +12,9 @@ import { SimCfnResourceCreateOperation } from "./create/sim-cfn-resource-create-
 import { SimCfnResourceCreationState } from "./state/sim-cfn-resource-creation-state.js";
 import { SimCfnResourceTemplateReader } from "./template/sim-cfn-resource-template-reader.js";
 import type { SimCfnTemplateValueRecord } from "../template/value/sim-cfn-template-value.js";
+import type { SimCfnParameters } from "../parameters/sim-cfn-parameters.js";
+import { SimCfnResourcePropertyResolver } from "./resolve/property/sim-cfn-resource-property-resolver.js";
+import { simCfnResourceRefValue } from "./ref/sim-cfn-resource-ref-value.js";
 
 interface SimCloudFormationResourceProps {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
@@ -19,6 +22,8 @@ interface SimCloudFormationResourceProps {
   readonly logicalId?: string;
   readonly template?: SimCfnTemplateValueRecord;
   readonly cfnResourceFactory?: SimCfnServiceResourceFactory | undefined;
+  readonly parameters?: SimCfnParameters | undefined;
+  readonly resourceLogicalIds?: ReadonlySet<string> | undefined;
 }
 
 /**
@@ -36,6 +41,7 @@ export type SimCloudFormationResourceStatus =
 export interface SimCloudFormationResourceCreateContext {
   readonly simAws: SimAws;
   readonly resources: ReadonlyMap<string, SimCfnResource>;
+  readonly resolvedProperties?: SimCfnTemplateValueRecord | undefined;
 }
 
 /**
@@ -61,8 +67,10 @@ export class SimCfnResource<T extends object = object> {
   public readonly template: SimCfnTemplateValueRecord;
   private readonly creationState = new SimCfnResourceCreationState<T>();
   private readonly resourceTemplateReader: SimCfnResourceTemplateReader;
+  private readonly propertyResolver: SimCfnResourcePropertyResolver;
   private readonly background: BackgroundScheduler;
   private readonly cfnResourceFactory: SimCfnServiceResourceFactory | undefined;
+  private readonly resourceLogicalIds: ReadonlySet<string>;
 
   constructor(props: SimCloudFormationResourceProps = {}) {
     const {
@@ -71,6 +79,8 @@ export class SimCfnResource<T extends object = object> {
       logicalId = "Resource",
       template = {},
       cfnResourceFactory,
+      parameters,
+      resourceLogicalIds = new Set(),
     } = props;
 
     this.accountRegionScope = accountRegionScope;
@@ -78,7 +88,9 @@ export class SimCfnResource<T extends object = object> {
     this.logicalId = logicalId;
     this.template = template;
     this.resourceTemplateReader = new SimCfnResourceTemplateReader(template);
+    this.propertyResolver = new SimCfnResourcePropertyResolver({ parameters });
     this.cfnResourceFactory = cfnResourceFactory;
+    this.resourceLogicalIds = resourceLogicalIds;
   }
 
   /**
@@ -122,6 +134,18 @@ export class SimCfnResource<T extends object = object> {
   }
 
   /**
+   * The value returned when this Resource is referenced via { "Ref": logicalId }.
+   *
+   * Mirroring CloudFormation, not every Resource type defines a meaningful Ref
+   * value. A created sim Resource may expose refValue() to override this (for
+   * example, an S3 Bucket returns its bucket name); otherwise the logical ID is
+   * used as a stand-in for the physical ID.
+   */
+  public get refValue(): string {
+    return simCfnResourceRefValue(this.logicalId, this.simResource);
+  }
+
+  /**
    * The simulated AWS object created for this CloudFormation Resource.
    *
    * For example, an AWS::S3::Bucket Resource may point at a simulated S3 Bucket
@@ -142,9 +166,24 @@ export class SimCfnResource<T extends object = object> {
   /**
    * Logical IDs of Resources that must complete before this Resource can
    * create.
+   *
+   * Includes both explicit DependsOn entries and implicit dependencies from Ref
+   * expressions that target other Resources.
    */
   dependencies(): string[] {
-    return this.resourceTemplateReader.dependencies();
+    return this.resourceTemplateReader.dependencies(this.resourceLogicalIds);
+  }
+
+  /**
+   * Resolve this Resource's Properties, including Refs to other Resources.
+   *
+   * Called by the creation operation once every dependency has reached
+   * CREATE_COMPLETE, so referenced Resources have valid Ref values.
+   */
+  resolvedProperties(
+    context: SimCloudFormationResourceCreateContext,
+  ): SimCfnTemplateValueRecord {
+    return this.propertyResolver.resolve(this.properties, context);
   }
 
   /**

@@ -4,8 +4,7 @@ import type {
   SimCloudFormationResourceCreateContext,
 } from "../sim-cfn-resource.js";
 import type { SimCfnServiceResourceFactory } from "../factory/sim-cfn-resource-factory.type.js";
-import { parseSimCloudFormationResourceType } from "../parser/sim-cfn-resource-parser.js";
-import { resolveSimCloudFormationServiceResourceFactory } from "../resolver/sim-cfn-service-resolver.js";
+import { SimCfnResourceCreator } from "./sim-cfn-resource-creator.js";
 
 interface SimCfnResourceCreateOperationProps<T extends object> {
   readonly background: BackgroundScheduler;
@@ -15,20 +14,35 @@ interface SimCfnResourceCreateOperationProps<T extends object> {
 
 /**
  * Runs the asynchronous CloudFormation Resource creation lifecycle.
+ *
+ * This class owns the CloudFormation-facing operation concerns: scheduling the
+ * create work in the background, moving the Resource through create states, and
+ * translating thrown creation errors into Resource failure state.
+ *
+ * It does not know how to construct the underlying simulated AWS service
+ * Resource. That responsibility belongs to {@link SimCfnResourceCreator}.
  */
 export class SimCfnResourceCreateOperation<T extends object = object> {
   private readonly background: BackgroundScheduler;
   private readonly resource: SimCfnResource<T>;
-  private readonly cfnResourceFactory: SimCfnServiceResourceFactory | undefined;
+  private readonly creator: SimCfnResourceCreator<T>;
 
   constructor(props: SimCfnResourceCreateOperationProps<T>) {
     this.background = props.background;
     this.resource = props.resource;
-    this.cfnResourceFactory = props.cfnResourceFactory;
+    this.creator = new SimCfnResourceCreator({
+      resource: props.resource,
+      cfnResourceFactory: props.cfnResourceFactory,
+    });
   }
 
   /**
-   * Create the Resource into simulated AWS as a background operation.
+   * Start Resource creation as a background operation.
+   *
+   * The returned Promise resolves or rejects with the background creation work,
+   * while the Resource itself is updated through CloudFormation create states:
+   * in progress before scheduling, complete after the creator returns, or
+   * failed if the creator or background sequence throws.
    */
   run(context: SimCloudFormationResourceCreateContext): Promise<void> {
     this.resource.markCreateInProgress();
@@ -38,7 +52,7 @@ export class SimCfnResourceCreateOperation<T extends object = object> {
         try {
           await this.background.sequence();
 
-          const simResource = await this.createSimResource(context);
+          const simResource = await this.creator.create(context);
           this.resource.markCreateComplete(simResource as T | undefined);
           resolve();
         } catch (error) {
@@ -49,33 +63,6 @@ export class SimCfnResourceCreateOperation<T extends object = object> {
         }
       });
     });
-  }
-
-  private async createSimResource(
-    context: SimCloudFormationResourceCreateContext,
-  ): Promise<object | undefined> {
-    const { type } = this.resource;
-
-    if (type === undefined) {
-      throw new Error(
-        `Sim CloudFormation Resource ${this.resource.logicalId} is missing a Type`,
-      );
-    }
-
-    const resourceType = parseSimCloudFormationResourceType(type);
-    const factory =
-      this.cfnResourceFactory ??
-      resolveSimCloudFormationServiceResourceFactory(
-        context.simAws,
-        this.resource.accountRegionScope,
-        resourceType,
-      );
-
-    return await factory.create(
-      resourceType.resourceTypeName,
-      this.resource,
-      context,
-    );
   }
 
   private resourceCreationError(error: unknown): Error {

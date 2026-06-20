@@ -48,7 +48,7 @@ interface SimCfnTemplateFromJsonProps {
 export class SimCfnTemplate {
   public readonly template: CfnTemplateBodyRecord;
   public readonly stackName: string | undefined;
-  private readonly parameters: SimCfnParameters;
+  public readonly parameters: SimCfnParameters;
 
   constructor(props: SimCfnTemplateProps) {
     const { template, parameters, stackName } = props;
@@ -92,6 +92,9 @@ export class SimCfnTemplate {
 
   /**
    * Get Resource template entries with CloudFormation value expressions resolved.
+   *
+   * Parameters and parameter-only intrinsic functions are resolved here.
+   * Refs to other Resources are left unresolved because the referenced Resources do not exist yet; they are resolved at Resource creation time.
    */
   resourceTemplates(): SimCfnResourceTemplateRecord[] {
     const valueResolver = new SimCfnTemplateValueResolver({

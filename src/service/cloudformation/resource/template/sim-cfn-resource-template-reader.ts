@@ -1,5 +1,8 @@
 import { isRecord } from "../../../../util/type-guard/record.js";
-import { parseSimCfnResourceDependencies } from "../dependency/sim-cfn-resource-dependencies.js";
+import {
+  parseSimCfnResourceDependencies,
+  parseSimCfnResourceRefDependencies,
+} from "../dependency/sim-cfn-resource-dependencies.js";
 import type {
   SimCfnTemplateValue,
   SimCfnTemplateValueRecord,
@@ -45,13 +48,25 @@ export class SimCfnResourceTemplateReader {
   }
 
   /**
-   * Logical IDs this Resource depends on.
+   * Logical IDs on which this Resource depends.
+   *
+   * Combines explicit DependsOn entries with implicit dependencies introduced
+   * by Ref expressions that point at other Resources. The set of Resource
+   * logical IDs distinguishes Resource Refs from Parameter Refs.
    *
    * DependsOn may be absent, a string, or a list of strings. Dependency parsing
    * is delegated so this reader only exposes the normalized string list.
    */
-  dependencies(): string[] {
-    return parseSimCfnResourceDependencies(this.template["DependsOn"]);
+  dependencies(resourceLogicalIds: ReadonlySet<string> = new Set()): string[] {
+    const dependsOn = parseSimCfnResourceDependencies(
+      this.template["DependsOn"],
+    );
+    const refDependencies = parseSimCfnResourceRefDependencies(
+      this.template,
+      resourceLogicalIds,
+    );
+
+    return [...new Set([...dependsOn, ...refDependencies])];
   }
 }
 

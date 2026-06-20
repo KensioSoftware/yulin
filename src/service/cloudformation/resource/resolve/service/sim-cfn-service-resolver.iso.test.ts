@@ -5,11 +5,11 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
-import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
-import { SimAws } from "../../../aws/sim-aws.js";
-import { SimCfnCfnResourceFactory } from "../factory/sim-cfn-cfn-resource-factory.js";
+import type { SimAwsAccountRegionScope } from "../../../../aws/sim-aws-account-region-scope.js";
+import { SimAws } from "../../../../aws/sim-aws.js";
+import { SimCfnCfnResourceFactory } from "../../factory/sim-cfn-cfn-resource-factory.js";
 import { resolveSimCloudFormationServiceResourceFactory } from "./sim-cfn-service-resolver.js";
-import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
+import type { SimAwsAccountId } from "../../../../aws/sim-aws-account.js";
 
 describe("resolveSimCloudFormationServiceResourceFactory", () => {
   it("resolves the CloudFormation Resource factory", () => {

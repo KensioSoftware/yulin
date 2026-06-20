@@ -20,11 +20,9 @@ export class SimS3CloudFormationResourceFactory implements SimCfnServiceResource
     resource: SimCfnResource,
     context: SimCloudFormationResourceCreateContext,
   ): Promise<object | undefined> {
-    void context;
-
     switch (resourceTypeName) {
       case "Bucket": {
-        return await this.createBucket(resource);
+        return await this.createBucket(resource, context);
       }
       default: {
         throw new Error(
@@ -34,8 +32,11 @@ export class SimS3CloudFormationResourceFactory implements SimCfnServiceResource
     }
   }
 
-  private async createBucket(resource: SimCfnResource): Promise<SimS3Bucket> {
-    const bucketName = this.bucketNameForResource(resource);
+  private async createBucket(
+    resource: SimCfnResource,
+    context: SimCloudFormationResourceCreateContext,
+  ): Promise<SimS3Bucket> {
+    const bucketName = this.bucketNameForResource(resource, context);
 
     await this.simS3.createBucket({
       input: {
@@ -55,8 +56,12 @@ export class SimS3CloudFormationResourceFactory implements SimCfnServiceResource
     return bucket;
   }
 
-  private bucketNameForResource(resource: SimCfnResource): string {
-    const bucketName = resource.properties["BucketName"];
+  private bucketNameForResource(
+    resource: SimCfnResource,
+    context: SimCloudFormationResourceCreateContext,
+  ): string {
+    const properties = context.resolvedProperties ?? resource.properties;
+    const bucketName = properties["BucketName"];
 
     if (typeof bucketName === "string") {
       return bucketName;
