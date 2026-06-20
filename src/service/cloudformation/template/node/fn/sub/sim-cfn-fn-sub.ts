@@ -1,9 +1,7 @@
 import { SimCfnNode, type SimCfnResolveContext } from "../../sim-cfn-node.js";
-import { SimCfnGetAtt } from "../get-att/sim-cfn-fn-get-att.js";
 import type { SimCfnTemplateValue } from "../../../value/sim-cfn-template-value.js";
-import { SimCfnRef } from "../../sim-cfn-ref.js";
-import { assertDefined } from "../../../../../../util/type-guard/defined.js";
 import { SimCfnFnSubTemplate } from "./template/sim-cfn-fn-sub-template.js";
+import { SimCfnFnSubVariableResolver } from "./resolve/sim-cfn-fn-sub-variable-resolver.js";
 
 /**
  * Simulated CloudFormation `Fn::Sub` intrinsic function.
@@ -20,6 +18,7 @@ import { SimCfnFnSubTemplate } from "./template/sim-cfn-fn-sub-template.js";
  */
 export class SimCfnFnSub extends SimCfnNode {
   private readonly subTemplate: SimCfnFnSubTemplate;
+  private readonly variableResolver: SimCfnFnSubVariableResolver;
 
   constructor(
     private readonly template: string,
@@ -28,6 +27,7 @@ export class SimCfnFnSub extends SimCfnNode {
     super();
 
     this.subTemplate = new SimCfnFnSubTemplate(template);
+    this.variableResolver = new SimCfnFnSubVariableResolver(variables);
   }
 
   /**
@@ -37,22 +37,10 @@ export class SimCfnFnSub extends SimCfnNode {
    * template form so a later Resource resolution pass can finish it.
    */
   resolve(context: SimCfnResolveContext): SimCfnTemplateValue {
-    const resolvedVariables = new Map<string, SimCfnTemplateValue>();
-
-    for (const variableName of this.subTemplate.variableNames()) {
-      const resolved = this.resolveVariable(variableName, context);
-
-      if (
-        typeof resolved !== "string" &&
-        !this.isDeferredExpression(resolved)
-      ) {
-        throw new TypeError(
-          `Sim CloudFormation Fn::Sub variable ${variableName} must resolve to a string, got ${typeof resolved}`,
-        );
-      }
-
-      resolvedVariables.set(variableName, resolved);
-    }
+    const resolvedVariables = this.variableResolver.resolveAll(
+      this.subTemplate.variableNames(),
+      context,
+    );
 
     // Resource Refs/GetAtts can be unresolved during the initial template pass,
     // before Resources have been created. Preserve the Fn::Sub expression so
@@ -64,7 +52,9 @@ export class SimCfnFnSub extends SimCfnNode {
       return this.unresolvedTemplateValue(resolvedVariables);
     }
 
-    return this.subTemplate.substitute(this.stringVariables(resolvedVariables));
+    return this.subTemplate.substitute(
+      this.variableResolver.stringVariables(resolvedVariables),
+    );
   }
 
   /**
@@ -77,33 +67,10 @@ export class SimCfnFnSub extends SimCfnNode {
         value.referencedNames(),
       ),
       ...this.subTemplate
-        .logicalNames()
-        .filter((name) => !this.variables.has(name)),
+        .variableNames()
+        .filter((variableName) => !this.variables.has(variableName))
+        .map((variableName) => variableName.split(".")[0] ?? variableName),
     ];
-  }
-
-  private resolveVariable(
-    variableName: string,
-    context: SimCfnResolveContext,
-  ): SimCfnTemplateValue {
-    const explicitVariable = this.variables.get(variableName);
-
-    if (explicitVariable !== undefined) {
-      return explicitVariable.resolve(context);
-    }
-
-    if (variableName.includes(".")) {
-      const [logicalId, ...attributeParts] = variableName.split(".");
-      assertDefined(
-        logicalId,
-        `Logical ID in CFN Fn::Sub variable ${variableName}`,
-      );
-      const attributeName = attributeParts.join(".");
-
-      return new SimCfnGetAtt(logicalId, attributeName).resolve(context);
-    }
-
-    return new SimCfnRef(variableName).resolve(context);
   }
 
   private unresolvedTemplateValue(
@@ -139,29 +106,5 @@ export class SimCfnFnSub extends SimCfnNode {
     }
 
     return resolved;
-  }
-
-  private stringVariables(
-    resolvedVariables: ReadonlyMap<string, SimCfnTemplateValue>,
-  ): ReadonlyMap<string, string> {
-    return new Map(
-      [...resolvedVariables].map(([name, value]) => {
-        /* v8 ignore if -- unreachable defensive check */
-        if (typeof value !== "string") {
-          throw new TypeError(
-            `Sim CloudFormation Fn::Sub variable ${name} must resolve to a string, got ${typeof value}`,
-          );
-        }
-
-        return [name, value];
-      }),
-    );
-  }
-
-  /**
-   * Whether a resolved value is still an unresolved intrinsic expression.
-   */
-  private isDeferredExpression(value: SimCfnTemplateValue): boolean {
-    return typeof value === "object" && value !== null;
   }
 }
