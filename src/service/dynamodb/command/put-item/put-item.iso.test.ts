@@ -87,7 +87,7 @@ describe("DynamoDB PutItemCommand", () => {
           BS: [new Uint8Array([1, 2, 3]), new Uint8Array([4, 5, 6])],
         },
       },
-      assertAttribute: (attributes: { binaryTags?: { BS?: string[] } }) => {
+      assertAttribute: (attributes: { binaryTags?: { BS?: Uint8Array[] } }) => {
         assertBufferEqual(
           attributes.binaryTags?.BS?.[1],
           new Uint8Array([4, 5, 6]),
