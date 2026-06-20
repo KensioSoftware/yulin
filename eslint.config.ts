@@ -116,7 +116,7 @@ export default defineConfig(
 
       // ── Discourage lazy `unknown` typing ─────────────
       "no-restricted-syntax": [
-        "warn",
+        "error",
         {
           selector:
             "TSUnknownKeyword:not(.params > TSTypeAnnotation > TSUnknownKeyword)",
