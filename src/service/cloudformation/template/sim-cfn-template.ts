@@ -7,6 +7,7 @@ import type {
 import { isRecord } from "../../../util/type-guard/record.js";
 import { SimCfnTemplateBodyValidator } from "./sim-cfn-template-body-validator.js";
 import type { SimCfnParameterDefinition } from "../parameters/sim-cfn-parameters.type.js";
+import { jsonParse, type JSONString } from "../../../util/type-guard/json.js";
 
 /**
  * Parsed CloudFormation template body accepted by the simulator.
@@ -66,13 +67,13 @@ export class SimCfnTemplate {
    * Parse a JSON CloudFormation template body.
    */
   static fromJson(
-    templateBody: string,
+    templateBody: JSONString<CfnTemplateBodyRecord>,
     props: SimCfnTemplateFromJsonProps = {},
   ): SimCfnTemplate {
     let template: CfnTemplateBodyRecord;
 
     try {
-      template = JSON.parse(templateBody) as CfnTemplateBodyRecord;
+      template = jsonParse(templateBody);
     } catch (error) {
       throw new Error(
         `Sim CloudFormation Stack ${props.stackName ?? "unknown"} TemplateBody must be valid JSON`,

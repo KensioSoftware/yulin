@@ -1,4 +1,5 @@
 import type { SimDynamoDbAttributeValue } from "../command/put-item/put-item.cmd.js";
+import { jsonStringify } from "../../../util/type-guard/json.js";
 
 export type DynamoDBAttrType =
   | boolean
@@ -64,9 +65,7 @@ export class DynamoDBItemAttribute {
         ),
       );
     }
-    throw new Error(
-      `Unsupported AttributeValue type: ${JSON.stringify(value)}`,
-    );
+    throw new Error(`Unsupported AttributeValue type: ${jsonStringify(value)}`);
   }
 
   /**

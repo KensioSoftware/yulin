@@ -10,6 +10,7 @@ import {
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import { makeAwsRegionName } from "../../aws/sim-aws-region.js";
+import { jsonStringify } from "../../../util/type-guard/json.js";
 
 describe("sim CloudFront local server", () => {
   const simAws = new SimAws();
@@ -32,21 +33,21 @@ describe("sim CloudFront local server", () => {
       new PutObjectCommand({
         Bucket: "bucket-a",
         Key: "assets/foo/object.json",
-        Body: JSON.stringify({ something: "foo-A" }),
+        Body: jsonStringify({ something: "foo-A" }),
       }),
     );
     await simS3.putObject(
       new PutObjectCommand({
         Bucket: "bucket-a",
         Key: "assets/object.json",
-        Body: JSON.stringify({ something: "A" }),
+        Body: jsonStringify({ something: "A" }),
       }),
     );
     await simS3.putObject(
       new PutObjectCommand({
         Bucket: "bucket-b",
         Key: "public/assets/foo/object.json",
-        Body: JSON.stringify({ something: "foo-B" }),
+        Body: jsonStringify({ something: "foo-B" }),
       }),
     );
 
@@ -126,7 +127,7 @@ describe("sim CloudFront local server", () => {
       new PutObjectCommand({
         Bucket: "foo-bucket",
         Key: "assets/foo/object.json",
-        Body: JSON.stringify({ something: "foobar" }),
+        Body: jsonStringify({ something: "foobar" }),
       }),
     );
 

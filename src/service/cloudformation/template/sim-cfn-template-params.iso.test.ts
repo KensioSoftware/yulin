@@ -6,12 +6,14 @@ import {
 import { describe, it } from "vitest";
 import { SimCfnTemplate } from "./sim-cfn-template.js";
 import { SimCfnParameters } from "../parameters/sim-cfn-parameters.js";
+import { jsonStringify } from "../../../util/type-guard/json.js";
 
 describe("SimCfnTemplate params", () => {
   it("throws a clear error when TemplateBody Parameters is not an object", () => {
     const error = assertThrowsError(() => {
       SimCfnTemplate.fromJson(
-        JSON.stringify({
+        // @ts-expect-error -- testing bad input
+        jsonStringify({
           Parameters: ["not", "a", "parameters", "object"],
           Resources: {},
         }),

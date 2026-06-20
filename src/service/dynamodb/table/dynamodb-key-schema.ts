@@ -6,6 +6,7 @@ import type {
   SimDynamoDbKeySchemaElement,
   SimDynamoDbKeyType,
 } from "../command/create-table/create-table.cmd.js";
+import { jsonStringify } from "../../../util/type-guard/json.js";
 
 type DynamoDbKey = number | string;
 
@@ -88,7 +89,7 @@ export class DynamoDbKeySchema {
       keyParts[this.rangeKeyAttributeName] = sortKeyAttr.value;
     }
 
-    return JSON.stringify(keyParts);
+    return jsonStringify(keyParts);
   }
 
   /**

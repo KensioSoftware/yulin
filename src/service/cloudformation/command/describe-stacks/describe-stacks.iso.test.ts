@@ -9,6 +9,7 @@ import {
   CreateStackCommand,
   DescribeStacksCommand,
 } from "@aws-sdk/client-cloudformation";
+import { jsonStringify } from "../../../../util/type-guard/json.js";
 
 describe("CloudFormation DescribeStacksCommand", () => {
   it("describes all CloudFormation Stacks", async () => {
@@ -20,19 +21,19 @@ describe("CloudFormation DescribeStacksCommand", () => {
     await cloudFormation.createStack(
       new CreateStackCommand({
         StackName: "stack-a",
-        TemplateBody: JSON.stringify({ Resources: {} }),
+        TemplateBody: jsonStringify({ Resources: {} }),
       }),
     );
     await cloudFormation.createStack(
       new CreateStackCommand({
         StackName: "stack-b",
-        TemplateBody: JSON.stringify({ Resources: {} }),
+        TemplateBody: jsonStringify({ Resources: {} }),
       }),
     );
     await cloudFormation.createStack(
       new CreateStackCommand({
         StackName: "stack-c",
-        TemplateBody: JSON.stringify({ Resources: {} }),
+        TemplateBody: jsonStringify({ Resources: {} }),
       }),
     );
 
@@ -75,13 +76,13 @@ describe("CloudFormation DescribeStacksCommand", () => {
     await cloudFormation.createStack(
       new CreateStackCommand({
         StackName: "stack-a",
-        TemplateBody: JSON.stringify({ Resources: {} }),
+        TemplateBody: jsonStringify({ Resources: {} }),
       }),
     );
     await cloudFormation.createStack(
       new CreateStackCommand({
         StackName: "stack-b",
-        TemplateBody: JSON.stringify({ Resources: {} }),
+        TemplateBody: jsonStringify({ Resources: {} }),
       }),
     );
 
@@ -112,7 +113,7 @@ describe("CloudFormation DescribeStacksCommand", () => {
     await cloudFormation.createStack(
       new CreateStackCommand({
         StackName: "test-stack",
-        TemplateBody: JSON.stringify({ Resources: {} }),
+        TemplateBody: jsonStringify({ Resources: {} }),
       }),
     );
 
@@ -145,7 +146,7 @@ describe("CloudFormation DescribeStacksCommand", () => {
     await cloudFormation.createStack(
       new CreateStackCommand({
         StackName: "test-stack",
-        TemplateBody: JSON.stringify({ Resources: {} }),
+        TemplateBody: jsonStringify({ Resources: {} }),
       }),
     );
 

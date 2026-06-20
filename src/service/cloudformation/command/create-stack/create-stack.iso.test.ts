@@ -13,6 +13,7 @@ import {
   CreateStackCommand,
   DescribeStacksCommand,
 } from "@aws-sdk/client-cloudformation";
+import { jsonStringify } from "../../../../util/type-guard/json.js";
 
 describe("CloudFormation CreateStackCommand", () => {
   it("creates a CloudFormation Stack from a template body", async () => {
@@ -25,7 +26,7 @@ describe("CloudFormation CreateStackCommand", () => {
     const createStackOutput = await cloudFormation.createStack(
       new CreateStackCommand({
         StackName: "test-stack",
-        TemplateBody: JSON.stringify({ Resources: {} }),
+        TemplateBody: jsonStringify({ Resources: {} }),
       }),
     );
 
@@ -57,7 +58,7 @@ describe("CloudFormation CreateStackCommand", () => {
     await cloudFormation.createStack(
       new CreateStackCommand({
         StackName: "test-stack",
-        TemplateBody: JSON.stringify({
+        TemplateBody: jsonStringify({
           Resources: {
             ExampleResource: {
               Type: "AWS::CloudFormation::WaitConditionHandle",
@@ -97,7 +98,7 @@ describe("CloudFormation CreateStackCommand", () => {
     await cloudFormation.createStack(
       new CreateStackCommand({
         StackName: "test-stack",
-        TemplateBody: JSON.stringify({ Resources: {} }),
+        TemplateBody: jsonStringify({ Resources: {} }),
       }),
     );
 
@@ -129,7 +130,7 @@ describe("CloudFormation CreateStackCommand", () => {
       cloudFormation.createStack(
         // @ts-expect-error -- testing missing StackName
         new CreateStackCommand({
-          TemplateBody: JSON.stringify({}),
+          TemplateBody: jsonStringify({}),
         }),
       ),
     );
@@ -160,7 +161,7 @@ describe("CloudFormation CreateStackCommand", () => {
     await cloudFormation.createStack(
       new CreateStackCommand({
         StackName: "test-stack",
-        TemplateBody: JSON.stringify({ Resources: {} }),
+        TemplateBody: jsonStringify({ Resources: {} }),
       }),
     );
 
@@ -170,7 +171,7 @@ describe("CloudFormation CreateStackCommand", () => {
       cloudFormation.createStack(
         new CreateStackCommand({
           StackName: "test-stack",
-          TemplateBody: JSON.stringify({ Resources: {} }),
+          TemplateBody: jsonStringify({ Resources: {} }),
         }),
       ),
     );
@@ -190,7 +191,7 @@ describe("CloudFormation CreateStackCommand", () => {
       await cloudFormation.createStack(
         new CreateStackCommand({
           StackName: "TestStack",
-          TemplateBody: JSON.stringify({}),
+          TemplateBody: jsonStringify({}),
         }),
       );
     });
