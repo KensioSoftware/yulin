@@ -56,6 +56,15 @@ describe("SimCfnNodeParser", () => {
     });
   });
 
+  it("leaves empty objects as plain CloudFormation objects", () => {
+    const parser = new SimCfnNodeParser();
+
+    const node = parser.parse({});
+
+    assertInstanceOf(node, SimCfnObject);
+    assertObjectMatches(node.resolve(emptyContext()), {});
+  });
+
   it("leaves non-function single-entry objects as plain CloudFormation objects", () => {
     const parser = new SimCfnNodeParser();
 
@@ -90,6 +99,22 @@ describe("SimCfnNodeParser", () => {
     assertIdentical(
       error.message,
       "Unsupported Sim CloudFormation intrinsic function Fn::Unsupported",
+    );
+  });
+
+  it("throws when an intrinsic function is not the only object entry", () => {
+    const parser = new SimCfnNodeParser();
+
+    const error = assertThrowsError(() => {
+      parser.parse({
+        Name: "test-bucket",
+        "Fn::Join": ["-", ["my", "bucket"]],
+      });
+    });
+
+    assertIdentical(
+      error.message,
+      "Malformed Sim CloudFormation intrinsic function object Fn::Join",
     );
   });
 

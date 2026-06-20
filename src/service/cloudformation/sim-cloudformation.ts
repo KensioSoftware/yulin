@@ -24,6 +24,7 @@ import type {
 } from "./command/describe-stacks/describe-stacks.cmd.js";
 import { DescribeStacksCommandHandler } from "./command/describe-stacks/describe-stacks.handler.js";
 import type { CfnTemplateBodyRecord } from "./template/sim-cfn-template.js";
+import { jsonStringify } from "../../util/type-guard/json.js";
 
 interface SimCloudFormationProps {
   readonly simAws: SimAws;
@@ -119,7 +120,7 @@ export class SimCloudFormation {
     await this.createStack({
       input: {
         StackName: stackName,
-        TemplateBody: JSON.stringify(props.template),
+        TemplateBody: jsonStringify(props.template),
         Parameters: Object.entries(props.parameters ?? {}).map(
           ([parameterKey, parameterValue]) => ({
             ParameterKey: parameterKey,

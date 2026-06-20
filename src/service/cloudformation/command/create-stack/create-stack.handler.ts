@@ -15,8 +15,12 @@ import type {
   SimCreateStackCommand,
   SimCreateStackCommandOutput,
 } from "./create-stack.cmd.js";
-import { SimCfnTemplate } from "../../template/sim-cfn-template.js";
+import {
+  type CfnTemplateBodyRecord,
+  SimCfnTemplate,
+} from "../../template/sim-cfn-template.js";
 import { SimCfnParameters } from "../../parameters/sim-cfn-parameters.js";
+import type { JSONString } from "../../../../util/type-guard/json.js";
 
 interface CreateStackCommandHandlerProps {
   readonly simAws: SimAws;
@@ -70,12 +74,15 @@ export class CreateStackCommandHandler implements CommandHandler<
       );
     }
 
-    const template = SimCfnTemplate.fromJson(cmd.input.TemplateBody, {
-      stackName,
-      parameters: SimCfnParameters.fromInput(cmd.input, {
+    const template = SimCfnTemplate.fromJson(
+      cmd.input.TemplateBody as JSONString<CfnTemplateBodyRecord>,
+      {
         stackName,
-      }),
-    });
+        parameters: SimCfnParameters.fromInput(cmd.input, {
+          stackName,
+        }),
+      },
+    );
 
     const stack = new SimCfnStack({
       simAws: this.simAws,

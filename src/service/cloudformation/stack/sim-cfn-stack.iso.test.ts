@@ -6,6 +6,7 @@ import {
 } from "@kensio/smartass";
 import { SimAws } from "../../aws/sim-aws.js";
 import { CreateStackCommand } from "@aws-sdk/client-cloudformation";
+import { jsonStringify } from "../../../util/type-guard/json.js";
 
 describe("SimCfnStack", () => {
   it("deploys an empty Stack from the default SimAws CloudFormation scope", async () => {
@@ -15,7 +16,7 @@ describe("SimCfnStack", () => {
     const createStackOutput = await cloudFormation.createStack(
       new CreateStackCommand({
         StackName: "TestStack",
-        TemplateBody: JSON.stringify({ Resources: {} }),
+        TemplateBody: jsonStringify({ Resources: {} }),
       }),
     );
     const stack = cloudFormation.getStackByName("TestStack");
@@ -131,7 +132,7 @@ describe("SimCfnStack", () => {
     await cloudFormation.createStack(
       new CreateStackCommand({
         StackName: "TestStack",
-        TemplateBody: JSON.stringify({
+        TemplateBody: jsonStringify({
           Resources: {
             FirstBucket: {
               Type: "AWS::S3::Bucket",
@@ -166,7 +167,7 @@ describe("SimCfnStack", () => {
     await cloudFormation.createStack(
       new CreateStackCommand({
         StackName: "TestStack",
-        TemplateBody: JSON.stringify({
+        TemplateBody: jsonStringify({
           Resources: {
             TestBucket: {
               Type: "AWS::S3::Bucket",

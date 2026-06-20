@@ -19,10 +19,10 @@ export default defineConfig({
       reporter: ["text", "lcov"],
       reportsDirectory: "./test/.coverage",
       thresholds: {
-        statements: 99,
+        statements: 100,
         branches: 95,
         functions: 99,
-        lines: 99,
+        lines: 100,
       },
     },
     restoreMocks: true,

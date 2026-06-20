@@ -6,6 +6,7 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimCfnTemplate } from "./sim-cfn-template.js";
+import { jsonStringify } from "../../../util/type-guard/json.js";
 
 describe("SimCfnTemplate", () => {
   it("accepts an empty Resources object", () => {
@@ -71,7 +72,7 @@ describe("SimCfnTemplate", () => {
 
   it("parses from JSON", () => {
     const template = SimCfnTemplate.fromJson(
-      JSON.stringify({
+      jsonStringify({
         Resources: {
           TestBucket: {
             Type: "AWS::S3::Bucket",
@@ -91,6 +92,7 @@ describe("SimCfnTemplate", () => {
 
   it("throws a clear error when TemplateBody is not valid JSON", () => {
     const error = assertThrowsError(() => {
+      // @ts-expect-error -- testing bad input
       SimCfnTemplate.fromJson("{not-json", {
         stackName: "TestStack",
       });
@@ -104,6 +106,7 @@ describe("SimCfnTemplate", () => {
 
   it("throws a clear error when TemplateBody does not parse to an object", () => {
     const error = assertThrowsError(() => {
+      // @ts-expect-error -- testing bad input
       SimCfnTemplate.fromJson("null", {
         stackName: "TestStack",
       });
@@ -117,7 +120,8 @@ describe("SimCfnTemplate", () => {
 
   it("throws a clear error when TemplateBody is missing Resources", () => {
     const error = assertThrowsError(() => {
-      SimCfnTemplate.fromJson(JSON.stringify({}), {
+      // @ts-expect-error -- testing bad input
+      SimCfnTemplate.fromJson(jsonStringify({}), {
         stackName: "TestStack",
       });
     });
@@ -131,7 +135,8 @@ describe("SimCfnTemplate", () => {
   it("throws a clear error when TemplateBody Resources is not an object", () => {
     const error = assertThrowsError(() => {
       SimCfnTemplate.fromJson(
-        JSON.stringify({
+        // @ts-expect-error -- testing bad input
+        jsonStringify({
           Resources: ["not", "a", "resources", "object"],
         }),
         {

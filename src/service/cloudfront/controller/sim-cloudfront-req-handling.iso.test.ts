@@ -8,6 +8,7 @@ import { CreateDistributionCommand } from "@aws-sdk/client-cloudfront";
 import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
 import { SimCloudFrontServiceController } from "./sim-cloudfront-controller.js";
+import { jsonStringify } from "../../../util/type-guard/json.js";
 
 describe("Simulated CloudFront local HTTP controller request handling", () => {
   it("passes HEAD requests through to the S3 Origin without a response body", async () => {
@@ -24,7 +25,7 @@ describe("Simulated CloudFront local HTTP controller request handling", () => {
         Bucket: "head-request-bucket",
         Key: "api/users.json",
         ContentType: "application/json",
-        Body: JSON.stringify([{ name: "Ada" }]),
+        Body: jsonStringify([{ name: "Ada" }]),
       }),
     );
 
