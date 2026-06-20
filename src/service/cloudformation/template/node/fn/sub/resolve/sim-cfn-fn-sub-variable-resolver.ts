@@ -100,6 +100,12 @@ export class SimCfnFnSubVariableResolver {
    * Whether a resolved value is still an unresolved intrinsic expression.
    */
   private isDeferredExpression(value: SimCfnTemplateValue): boolean {
-    return typeof value === "object" && value !== null;
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+      return false;
+    }
+
+    const keys = Object.keys(value);
+
+    return keys.includes("Ref") || keys.some((key) => key.startsWith("Fn::"));
   }
 }
