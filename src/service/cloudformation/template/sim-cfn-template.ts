@@ -16,7 +16,11 @@ import type { SimCfnParameterDefinition } from "../parameters/sim-cfn-parameters
 export interface CfnTemplateBodyRecord {
   readonly Parameters?: Record<string, SimCfnParameterDefinition> | undefined;
   readonly Resources: Record<string, SimCfnTemplateValue>;
-  readonly [sectionName: string]: unknown;
+  readonly [sectionName: string]:
+    | Record<string, SimCfnParameterDefinition>
+    | Record<string, SimCfnTemplateValue>
+    | SimCfnTemplateValue
+    | undefined;
 }
 
 export interface SimCfnResourceTemplateRecord {
