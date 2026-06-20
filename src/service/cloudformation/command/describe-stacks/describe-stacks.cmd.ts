@@ -2,6 +2,7 @@ import type {
   SimCloudFormationStackName,
   SimCloudFormationStackStatus,
 } from "../../stack/sim-cfn-stack.js";
+import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
 
 /**
  * Minimal structural sim CloudFormation DescribeStacks command.
@@ -24,7 +25,7 @@ export interface SimDescribeStacksCommandInput {
  */
 export interface SimDescribeStacksCommandOutput {
   readonly Stacks?: SimCloudFormationStackDescription[] | undefined;
-  readonly $metadata: Record<string, unknown>;
+  readonly $metadata: SimResponseMetadata;
 }
 
 /**

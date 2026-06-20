@@ -32,7 +32,7 @@ export class SimAwsAccountRegionContainer {
   private readonly simAws: SimAws;
   public readonly account: SimAwsAccount;
   public readonly region: SimAwsRegion;
-  private readonly memo = new Memo<unknown>();
+  private readonly memo = new Memo<object>();
 
   public readonly accountRegionScope: SimAwsAccountRegionScope;
 

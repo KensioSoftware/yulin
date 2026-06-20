@@ -1,3 +1,5 @@
+import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
+
 /**
  * Minimal structural sim S3 ListBuckets command.
  */
@@ -21,7 +23,7 @@ export interface SimListBucketsCommandOutput {
   readonly Buckets?: SimS3BucketSummary[] | undefined;
   readonly ContinuationToken?: string | undefined;
   readonly Prefix?: string | undefined;
-  readonly $metadata: Record<string, unknown>;
+  readonly $metadata: SimResponseMetadata;
 }
 
 /**

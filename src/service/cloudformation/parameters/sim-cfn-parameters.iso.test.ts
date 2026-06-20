@@ -239,6 +239,7 @@ describe("SimCfnParameters", () => {
       new SimCfnParameters({
         stackName: "TestStack",
         definitions: {
+          // @ts-expect-error -- testing bad input
           BucketName: "not-a-parameter-definition",
         },
       });

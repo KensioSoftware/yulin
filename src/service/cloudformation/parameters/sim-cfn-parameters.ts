@@ -1,32 +1,21 @@
 import { isRecord } from "../../../util/type-guard/record.js";
-
-type SimCloudFormationParameterValue = string;
-
-type SimCloudFormationParameterValues = Record<
-  string,
-  SimCloudFormationParameterValue
->;
-
-export interface SimCloudFormationParameterInput {
-  readonly Parameters?:
-    | readonly {
-        readonly ParameterKey?: string | undefined;
-        readonly ParameterValue?: string | undefined;
-      }[]
-    | undefined;
-}
-
-interface SimCfnParametersProps {
-  readonly definitions?: Record<string, unknown> | undefined;
-  readonly values?: SimCloudFormationParameterValues | undefined;
-  readonly stackName?: string | undefined;
-}
+import type {
+  SimCfnParameterDefinition,
+  SimCfnParametersProps,
+  SimCloudFormationParameterInput,
+  SimCloudFormationParameterValue,
+  SimCloudFormationParameterValues,
+} from "./sim-cfn-parameters.type.js";
 
 /**
- * Convenience wrapper for a CloudFormation template Parameters section.
+ * Resolves CloudFormation Parameters for a simulated Stack.
+ *
+ * This class keeps the template Parameter definitions and the runtime Parameter
+ * values together. Values supplied by command input take precedence, then any
+ * missing values are filled from string defaults in the template definitions.
  */
 export class SimCfnParameters {
-  private readonly definitions = new Map<string, Record<string, unknown>>();
+  private readonly definitions = new Map<string, SimCfnParameterDefinition>();
   private readonly values = new Map<string, SimCloudFormationParameterValue>();
   private readonly stackName: string | undefined;
 
@@ -41,7 +30,11 @@ export class SimCfnParameters {
   }
 
   /**
-   * Create Parameters from CloudFormation command-style Parameter inputs.
+   * Create Parameters from a CloudFormation command-like input object.
+   *
+   * AWS command inputs carry Parameters as an array of key/value objects, while
+   * this wrapper stores values in a map keyed by Parameter name. Incomplete
+   * array entries are ignored because they cannot contribute a usable runtime value.
    */
   static fromInput(
     input: SimCloudFormationParameterInput,
@@ -67,7 +60,11 @@ export class SimCfnParameters {
   }
 
   /**
-   * Create Parameters from already-normalized Parameter values.
+   * Create Parameters from already-normalized values.
+   *
+   * This is useful for tests and internal callers that already have a plain
+   * Parameter-name-to-value record and do not need AWS command input
+   * conversion.
    */
   static fromValues(
     values: SimCloudFormationParameterValues,
@@ -80,10 +77,15 @@ export class SimCfnParameters {
   }
 
   /**
-   * Return a copy of this Parameters wrapper with template definitions attached.
+   * Return a copy of this Parameters wrapper with template definitions
+   * attached.
+   *
+   * Template parsing can happen after command input normalization, so this
+   * keeps existing explicit values while adding the definitions needed for
+   * presence checks and default-value resolution.
    */
   withDefinitions(
-    definitions: Record<string, unknown> | undefined,
+    definitions: Record<string, SimCfnParameterDefinition> | undefined,
   ): SimCfnParameters {
     return new SimCfnParameters({
       definitions,
@@ -93,14 +95,22 @@ export class SimCfnParameters {
   }
 
   /**
-   * Whether the template defines a Parameter with this name.
+   * Whether the template declares a Parameter with this name.
+   *
+   * This checks definitions only. A Parameter can be declared even when no
+   * runtime value has been supplied or defaulted.
    */
   has(parameterName: string): boolean {
     return this.definitions.has(parameterName);
   }
 
   /**
-   * Resolve a template Parameter value.
+   * Resolve the runtime value for a declared or referenced Parameter.
+   *
+   * The returned value may have come from command input or from a string
+   * Default in the template definition. Missing values are treated as
+   * template/runtime errors because a Ref to a Parameter must resolve to a
+   * concrete value.
    */
   value(parameterName: string): SimCloudFormationParameterValue {
     const value = this.values.get(parameterName);
@@ -115,7 +125,7 @@ export class SimCfnParameters {
   }
 
   private recordDefinitions(
-    definitions: Record<string, unknown> | undefined,
+    definitions: Record<string, SimCfnParameterDefinition> | undefined,
   ): void {
     if (definitions === undefined) {
       return;
@@ -146,7 +156,7 @@ export class SimCfnParameters {
         continue;
       }
 
-      const defaultValue = parameterDefinition["Default"];
+      const defaultValue = parameterDefinition.Default;
 
       if (typeof defaultValue === "string") {
         this.values.set(parameterName, defaultValue);

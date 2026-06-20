@@ -6,6 +6,7 @@ import type {
 } from "./value/sim-cfn-template-value.js";
 import { isRecord } from "../../../util/type-guard/record.js";
 import { SimCfnTemplateBodyValidator } from "./sim-cfn-template-body-validator.js";
+import type { SimCfnParameterDefinition } from "../parameters/sim-cfn-parameters.type.js";
 
 /**
  * Parsed CloudFormation template body accepted by the simulator.
@@ -13,9 +14,13 @@ import { SimCfnTemplateBodyValidator } from "./sim-cfn-template-body-validator.j
  * Yulin accepts already-parsed templates and does not parse JSON or YAML itself.
  */
 export interface CfnTemplateBodyRecord {
-  readonly Parameters?: Record<string, unknown> | undefined;
+  readonly Parameters?: Record<string, SimCfnParameterDefinition> | undefined;
   readonly Resources: Record<string, SimCfnTemplateValue>;
-  readonly [sectionName: string]: unknown;
+  readonly [sectionName: string]:
+    | Record<string, SimCfnParameterDefinition>
+    | Record<string, SimCfnTemplateValue>
+    | SimCfnTemplateValue
+    | undefined;
 }
 
 export interface SimCfnResourceTemplateRecord {
@@ -64,10 +69,10 @@ export class SimCfnTemplate {
     templateBody: string,
     props: SimCfnTemplateFromJsonProps = {},
   ): SimCfnTemplate {
-    let template: unknown;
+    let template: CfnTemplateBodyRecord;
 
     try {
-      template = JSON.parse(templateBody);
+      template = JSON.parse(templateBody) as CfnTemplateBodyRecord;
     } catch (error) {
       throw new Error(
         `Sim CloudFormation Stack ${props.stackName ?? "unknown"} TemplateBody must be valid JSON`,
@@ -78,7 +83,7 @@ export class SimCfnTemplate {
     }
 
     return new SimCfnTemplate({
-      template: template as CfnTemplateBodyRecord,
+      template,
       parameters: props.parameters,
       stackName: props.stackName,
     });

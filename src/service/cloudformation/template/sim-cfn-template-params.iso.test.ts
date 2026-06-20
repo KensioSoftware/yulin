@@ -250,6 +250,7 @@ describe("SimCfnTemplate params", () => {
         stackName: "TestStack",
         template: {
           Parameters: {
+            // @ts-expect-error -- testing bad input
             BucketName: "not-a-parameter-definition",
           },
           Resources: {

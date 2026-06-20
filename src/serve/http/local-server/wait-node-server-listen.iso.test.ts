@@ -41,6 +41,7 @@ describe("waitNodeServerListen", () => {
 
     server.emit("error", cause);
 
+    // @ts-expect-error -- testing error
     const error = await promiseError(wait);
 
     assertIdentical(error, cause);
@@ -54,15 +55,22 @@ class TestServer extends EventEmitter {
   readonly listening = false;
 
   asNodeServer(): Server {
-    return this as unknown as Server;
+    // @ts-expect-error -- test mock
+    return this;
   }
 }
 
-async function promiseError(promise: Promise<unknown>): Promise<unknown> {
+async function promiseError(promise: Promise<never>): Promise<Error> {
   try {
     await promise;
   } catch (error) {
-    return error;
+    if (error instanceof Error) {
+      return error;
+    }
+
+    throw new TypeError("Expected promise to reject with an Error", {
+      cause: error,
+    });
   }
 
   throw new Error("Expected promise to reject");

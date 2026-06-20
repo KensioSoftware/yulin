@@ -15,7 +15,7 @@ describe("DynamoDB PutItemCommand", () => {
       item: {
         userName: { S: "Foo McBar" },
       },
-      assertAttribute: (attributes: { userName?: { S: unknown } }) => {
+      assertAttribute: (attributes: { userName?: { S: string } }) => {
         assertIdentical(attributes.userName?.S, "Foo McBar");
       },
     },
@@ -24,7 +24,7 @@ describe("DynamoDB PutItemCommand", () => {
       item: {
         favouriteNumber: { N: "42" },
       },
-      assertAttribute: (attributes: { favouriteNumber?: { N: unknown } }) => {
+      assertAttribute: (attributes: { favouriteNumber?: { N: string } }) => {
         assertIdentical(attributes.favouriteNumber?.N, "42");
       },
     },
@@ -33,7 +33,7 @@ describe("DynamoDB PutItemCommand", () => {
       item: {
         likesPizza: { BOOL: true },
       },
-      assertAttribute: (attributes: { likesPizza?: { BOOL: unknown } }) => {
+      assertAttribute: (attributes: { likesPizza?: { BOOL: boolean } }) => {
         assertTrue(attributes.likesPizza?.BOOL);
       },
     },
@@ -42,7 +42,7 @@ describe("DynamoDB PutItemCommand", () => {
       item: {
         missingValue: { NULL: true },
       },
-      assertAttribute: (attributes: { missingValue?: { NULL: unknown } }) => {
+      assertAttribute: (attributes: { missingValue?: { NULL: boolean } }) => {
         assertTrue(attributes.missingValue?.NULL);
       },
     },
@@ -53,7 +53,7 @@ describe("DynamoDB PutItemCommand", () => {
           B: new Uint8Array([137, 80, 78, 71]),
         },
       },
-      assertAttribute: (attributes: { profilePicture?: { B: unknown } }) => {
+      assertAttribute: (attributes: { profilePicture?: { B: Uint8Array } }) => {
         assertBufferEqual(
           attributes.profilePicture?.B,
           new Uint8Array([137, 80, 78, 71]),
@@ -66,7 +66,7 @@ describe("DynamoDB PutItemCommand", () => {
         favouriteColours: { SS: ["purple", "red"] },
       },
       assertAttribute: (attributes: {
-        favouriteColours?: { SS?: unknown[] };
+        favouriteColours?: { SS?: string[] };
       }) => {
         assertIdentical(attributes.favouriteColours?.SS?.[0], "purple");
       },
@@ -76,7 +76,7 @@ describe("DynamoDB PutItemCommand", () => {
       item: {
         luckyNumbers: { NS: ["7", "13", "42"] },
       },
-      assertAttribute: (attributes: { luckyNumbers?: { NS?: unknown[] } }) => {
+      assertAttribute: (attributes: { luckyNumbers?: { NS?: string[] } }) => {
         assertIdentical(attributes.luckyNumbers?.NS?.[2], "42");
       },
     },
@@ -87,7 +87,7 @@ describe("DynamoDB PutItemCommand", () => {
           BS: [new Uint8Array([1, 2, 3]), new Uint8Array([4, 5, 6])],
         },
       },
-      assertAttribute: (attributes: { binaryTags?: { BS?: unknown[] } }) => {
+      assertAttribute: (attributes: { binaryTags?: { BS?: Uint8Array[] } }) => {
         assertBufferEqual(
           attributes.binaryTags?.BS?.[1],
           new Uint8Array([4, 5, 6]),
@@ -102,7 +102,7 @@ describe("DynamoDB PutItemCommand", () => {
         },
       },
       assertAttribute: (attributes: {
-        shoppingList?: { L?: { S?: unknown }[] };
+        shoppingList?: { L?: { S?: string }[] };
       }) => {
         assertIdentical(attributes.shoppingList?.L?.[0]?.S, "milk");
       },
@@ -127,11 +127,11 @@ describe("DynamoDB PutItemCommand", () => {
       assertAttribute: (attributes: {
         address?: {
           M?: {
-            street?: { S?: unknown };
-            city?: { S?: unknown };
-            postcode?: { S?: unknown };
+            street?: { S?: string };
+            city?: { S?: string };
+            postcode?: { S?: string };
             coordinates?: {
-              M?: { lat: { N?: unknown }; lon: { N?: unknown } };
+              M?: { lat: { N?: string }; lon: { N?: string } };
             };
           };
         };

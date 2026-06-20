@@ -1,3 +1,5 @@
+import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
+
 /**
  * Minimal structural sim S3 PutBucketWebsite command.
  */
@@ -17,7 +19,7 @@ export interface SimPutBucketWebsiteCommandInput {
  * Minimal structural sim S3 PutBucketWebsite output.
  */
 export interface SimPutBucketWebsiteCommandOutput {
-  readonly $metadata: Record<string, unknown>;
+  readonly $metadata: SimResponseMetadata;
 }
 
 /**

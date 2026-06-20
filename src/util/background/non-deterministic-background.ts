@@ -60,15 +60,13 @@ export class NonDeterministicBackgroundTasks
       // eslint-disable-next-line no-await-in-loop
       const results = await Promise.allSettled(this.pending);
       // Check if any promises rejected and capture the first error
-      let firstError: unknown;
-      for (const result of results) {
-        if (result.status === "rejected") {
-          firstError = result.reason;
-          break;
-        }
-      }
-      if (firstError !== undefined) {
-        throw firstError as Error;
+      const firstRejected = results.find(
+        (result): result is PromiseRejectedResult =>
+          result.status === "rejected",
+      );
+
+      if (firstRejected !== undefined) {
+        throw firstRejected.reason;
       }
     }
   }

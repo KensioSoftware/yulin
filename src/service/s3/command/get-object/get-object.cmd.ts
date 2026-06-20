@@ -1,4 +1,5 @@
 import type { Readable } from "node:stream";
+import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
 
 /**
  * Minimal structural sim S3 GetObject command.
@@ -21,5 +22,5 @@ export interface SimGetObjectCommandInput {
 export interface SimGetObjectCommandOutput {
   readonly Body?: Readable;
   readonly Metadata?: Record<string, string>;
-  readonly $metadata: Record<string, unknown>;
+  readonly $metadata: SimResponseMetadata;
 }

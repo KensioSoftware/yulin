@@ -1,11 +1,15 @@
 import { isRecord } from "../../../../util/type-guard/record.js";
 import { parseSimCfnResourceDependencies } from "../dependency/sim-cfn-resource-dependencies.js";
+import type {
+  SimCfnTemplateValue,
+  SimCfnTemplateValueRecord,
+} from "../../template/value/sim-cfn-template-value.js";
 
 /**
  * Reads CloudFormation Resource-level fields from one Resource template object.
  *
- * This is intentionally narrower than SimCfnTemplate. SimCfnTemplate represents
- * the whole stack template body: it validates top-level template shape, resolves
+ * This is narrower than SimCfnTemplate. SimCfnTemplate represents the whole
+ * stack template body: it validates top-level template shape, resolves
  * Parameters, and extracts Resource entries.
  *
  * SimCfnResourceTemplateReader only works after that extraction step. It reads
@@ -13,7 +17,7 @@ import { parseSimCfnResourceDependencies } from "../dependency/sim-cfn-resource-
  * DependsOn, so SimCfnResource can stay focused on Resource lifecycle state.
  */
 export class SimCfnResourceTemplateReader {
-  constructor(private readonly template: Record<string, unknown>) {}
+  constructor(private readonly template: SimCfnTemplateValueRecord) {}
 
   /**
    * The CloudFormation Resource type, for example AWS::S3::Bucket.
@@ -30,14 +34,14 @@ export class SimCfnResourceTemplateReader {
    * CloudFormation Resources may omit Properties. In that case, and when the
    * field is not an object, the simulator treats it as an empty object.
    */
-  properties(): Record<string, unknown> {
+  properties(): SimCfnTemplateValueRecord {
     const properties = this.template["Properties"];
 
-    if (isRecord(properties)) {
-      return properties;
+    if (!isSimCfnTemplateValueRecord(properties)) {
+      return {};
     }
 
-    return {};
+    return properties;
   }
 
   /**
@@ -49,4 +53,10 @@ export class SimCfnResourceTemplateReader {
   dependencies(): string[] {
     return parseSimCfnResourceDependencies(this.template["DependsOn"]);
   }
+}
+
+function isSimCfnTemplateValueRecord(
+  value: SimCfnTemplateValue | undefined,
+): value is SimCfnTemplateValueRecord {
+  return isRecord(value);
 }

@@ -148,7 +148,8 @@ describe("S3 PutObjectCommand", () => {
         new PutObjectCommand({
           Bucket: bucketName,
           Key: "foo.txt",
-          Body: 123 as unknown as Uint8Array,
+          // @ts-expect-error -- testing bad input
+          Body: 123,
         }),
       );
     });

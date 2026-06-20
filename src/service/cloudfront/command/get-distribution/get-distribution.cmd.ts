@@ -1,4 +1,5 @@
 import type { SimCloudFrontDistributionConfig } from "../create-distribution/create-distribution.cmd.js";
+import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
 
 /**
  * Minimal structural sim CloudFront GetDistribution command.
@@ -31,5 +32,5 @@ export interface SimGetDistributionCommandOutput {
           | undefined;
       }
     | undefined;
-  readonly $metadata: Record<string, unknown>;
+  readonly $metadata: SimResponseMetadata;
 }

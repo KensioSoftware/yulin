@@ -1,3 +1,5 @@
+import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
+
 /**
  * Minimal structural sim CloudFormation CreateStack command.
  */
@@ -26,5 +28,5 @@ export interface SimCreateStackCommandInput {
  */
 export interface SimCreateStackCommandOutput {
   readonly StackId?: string;
-  readonly $metadata: Record<string, unknown>;
+  readonly $metadata: SimResponseMetadata;
 }

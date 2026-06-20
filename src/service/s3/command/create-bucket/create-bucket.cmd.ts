@@ -1,3 +1,5 @@
+import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
+
 /**
  * Minimal structural sim S3 CreateBucket command.
  */
@@ -18,5 +20,5 @@ export interface SimCreateBucketCommandInput {
 export interface SimCreateBucketCommandOutput {
   readonly BucketArn?: string;
   readonly Location?: string;
-  readonly $metadata: Record<string, unknown>;
+  readonly $metadata: SimResponseMetadata;
 }

@@ -1,3 +1,5 @@
+import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
+
 /**
  * Minimal structural sim CloudFront CreateDistribution command.
  */
@@ -30,7 +32,7 @@ export interface SimCreateDistributionCommandOutput {
       }
     | undefined;
   readonly Location?: string | undefined;
-  readonly $metadata: Record<string, unknown>;
+  readonly $metadata: SimResponseMetadata;
 }
 
 /**

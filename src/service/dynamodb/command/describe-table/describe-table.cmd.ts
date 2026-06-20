@@ -1,4 +1,5 @@
 import type { SimDynamoDbTableDescription } from "../create-table/create-table.cmd.js";
+import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
 
 /**
  * Minimal structural sim DynamoDB DescribeTable command.
@@ -19,5 +20,5 @@ export interface SimDescribeTableCommandInput {
  */
 export interface SimDescribeTableCommandOutput {
   readonly Table?: SimDynamoDbTableDescription | undefined;
-  readonly $metadata: Record<string, unknown>;
+  readonly $metadata: SimResponseMetadata;
 }

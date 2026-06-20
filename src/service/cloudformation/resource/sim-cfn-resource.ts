@@ -11,12 +11,13 @@ import type { SimCfnServiceResourceFactory } from "./factory/sim-cfn-resource-fa
 import { SimCfnResourceCreateOperation } from "./create/sim-cfn-resource-create-operation.js";
 import { SimCfnResourceCreationState } from "./state/sim-cfn-resource-creation-state.js";
 import { SimCfnResourceTemplateReader } from "./template/sim-cfn-resource-template-reader.js";
+import type { SimCfnTemplateValueRecord } from "../template/value/sim-cfn-template-value.js";
 
 interface SimCloudFormationResourceProps {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
   readonly background?: BackgroundScheduler;
   readonly logicalId?: string;
-  readonly template?: Record<string, unknown>;
+  readonly template?: SimCfnTemplateValueRecord;
   readonly cfnResourceFactory?: SimCfnServiceResourceFactory | undefined;
 }
 
@@ -57,7 +58,7 @@ export interface SimCloudFormationResourceCreateContext {
 export class SimCfnResource<T extends object = object> {
   public readonly accountRegionScope: SimAwsAccountRegionScope;
   public readonly logicalId: string;
-  public readonly template: Record<string, unknown>;
+  public readonly template: SimCfnTemplateValueRecord;
   private readonly creationState = new SimCfnResourceCreationState<T>();
   private readonly resourceTemplateReader: SimCfnResourceTemplateReader;
   private readonly background: BackgroundScheduler;
@@ -116,7 +117,7 @@ export class SimCfnResource<T extends object = object> {
    * Missing or non-object Properties are treated as an empty object by the
    * Resource template reader.
    */
-  public get properties(): Record<string, unknown> {
+  public get properties(): SimCfnTemplateValueRecord {
     return this.resourceTemplateReader.properties();
   }
 
