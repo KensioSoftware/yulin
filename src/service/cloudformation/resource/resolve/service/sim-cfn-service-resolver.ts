@@ -1,10 +1,10 @@
-import type { SimAws } from "../../../aws/sim-aws.js";
-import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
+import type { SimAws } from "../../../../aws/sim-aws.js";
+import type { SimAwsAccountRegionScope } from "../../../../aws/sim-aws-account-region-scope.js";
 import type {
   SimCloudFormationParsedResourceType,
   SimCfnServiceResourceFactory,
-} from "../factory/sim-cfn-resource-factory.type.js";
-import { SimCfnCfnResourceFactory } from "../factory/sim-cfn-cfn-resource-factory.js";
+} from "../../factory/sim-cfn-resource-factory.type.js";
+import { SimCfnCfnResourceFactory } from "../../factory/sim-cfn-cfn-resource-factory.js";
 
 /**
  * Resolve a scoped simulated service CloudFormation Resource factory.

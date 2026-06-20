@@ -99,4 +99,13 @@ export class SimS3Bucket {
       this.website,
     );
   }
+
+  /**
+   * The value CloudFormation returns for { "Ref": "<Bucket logical ID>" }.
+   *
+   * Mirroring AWS, a referenced S3 Bucket resolves to its bucket name.
+   */
+  refValue(): string {
+    return this.bucketName;
+  }
 }

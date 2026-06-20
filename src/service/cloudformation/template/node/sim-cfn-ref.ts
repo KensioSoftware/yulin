@@ -10,13 +10,28 @@ export class SimCfnRef extends SimCfnNode {
   }
 
   /**
-   * Resolve the reference from parameters, or preserve it if it is unknown.
+   * Resolve the reference.
+   *
+   * Parameters take precedence, then a referenced Resource's Ref value when a
+   * Resource resolve is available. Otherwise the Ref is preserved unresolved,
+   * which happens during the up-front pass before Resources exist.
    */
   resolve(context: SimCfnResolveContext): SimCfnTemplateValue {
     if (context.parameters.has(this.name)) {
       return context.parameters.value(this.name);
     }
 
+    if (context.resources?.has(this.name) === true) {
+      return context.resources.refValue(this.name);
+    }
+
     return { Ref: this.name };
+  }
+
+  /**
+   * Expose the referenced name for implicit dependency discovery.
+   */
+  override referencedNames(): string[] {
+    return [this.name];
   }
 }

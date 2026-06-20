@@ -15,4 +15,11 @@ export class SimCfnList extends SimCfnNode {
   resolve(context: SimCfnResolveContext): SimCfnTemplateValue[] {
     return this.items.map((item) => item.resolve(context));
   }
+
+  /**
+   * Collect referenced names from every item.
+   */
+  override referencedNames(): string[] {
+    return this.items.flatMap((item) => item.referencedNames());
+  }
 }

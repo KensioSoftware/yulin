@@ -18,7 +18,12 @@ export function makeSimCfnStackResourceMap(
   const { accountRegionScope, background, template } = props;
   const resources = new Map<string, SimCfnResource>();
 
-  for (const resourceTemplate of template.resourceTemplates()) {
+  const resourceTemplates = template.resourceTemplates();
+  const resourceLogicalIds = new Set(
+    resourceTemplates.map((resourceTemplate) => resourceTemplate.logicalId),
+  );
+
+  for (const resourceTemplate of resourceTemplates) {
     resources.set(
       resourceTemplate.logicalId,
       new SimCfnResource({
@@ -26,6 +31,8 @@ export function makeSimCfnStackResourceMap(
         background,
         logicalId: resourceTemplate.logicalId,
         template: resourceTemplate.template,
+        parameters: template.parameters,
+        resourceLogicalIds,
       }),
     );
   }
