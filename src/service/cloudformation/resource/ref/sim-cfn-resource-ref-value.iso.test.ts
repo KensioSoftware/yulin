@@ -49,6 +49,7 @@ describe("CloudFormation Resource Ref value", () => {
     assertNonNullable(sourceResource);
     assertNonNullable(derivedResource);
     assertIdentical(sourceResource.refValue, "source-bucket");
+    assertIdentical(derivedResource.refValue, "derived-from-source-bucket");
   });
 
   it("falls back to the Resource logical ID when the created sim Resource has no refValue()", async () => {
