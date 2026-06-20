@@ -117,7 +117,7 @@ export class SimCfnResource<T extends object = object> {
    * Missing or non-object Properties are treated as an empty object by the
    * Resource template reader.
    */
-  public get properties(): Record<string, unknown> {
+  public get properties(): SimCfnTemplateValueRecord {
     return this.resourceTemplateReader.properties();
   }
 
