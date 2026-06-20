@@ -114,6 +114,17 @@ export default defineConfig(
         },
       ],
 
+      // ── Discourage lazy `unknown` typing ─────────────
+      "no-restricted-syntax": [
+        "warn",
+        {
+          selector:
+            "TSUnknownKeyword:not(.params > TSTypeAnnotation > TSUnknownKeyword)",
+          message:
+            "Avoid `unknown` as a type, except when narrowing a function parameter to a concrete type.",
+        },
+      ],
+
       // ── General quality ──────────────────────────────
       "no-console": "warn",
       eqeqeq: ["error", "always"],
