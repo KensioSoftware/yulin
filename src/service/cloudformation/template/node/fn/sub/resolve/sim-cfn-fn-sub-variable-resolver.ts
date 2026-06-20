@@ -82,6 +82,12 @@ export class SimCfnFnSubVariableResolver {
         `Logical ID in CFN Fn::Sub variable ${variableName}`,
       );
 
+      if (logicalId === "") {
+        throw new Error(
+          `Logical ID in CFN Fn::Sub variable ${variableName} must be non-empty`,
+        );
+      }
+
       return new SimCfnGetAtt(logicalId, attributeParts.join(".")).resolve(
         context,
       );

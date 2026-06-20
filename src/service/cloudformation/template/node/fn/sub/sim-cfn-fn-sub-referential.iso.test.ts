@@ -260,4 +260,33 @@ describe("CloudFormation Fn::Sub Resource referential", () => {
       "Sim CloudFormation Fn::Sub variable UnusedName was not resolved",
     );
   });
+
+  it("throws when a dotted Fn::Sub variable has an empty logical ID", async () => {
+    const invalidSubTemplate = {
+      Resources: {
+        DerivedBucket: {
+          Type: "AWS::S3::Bucket",
+          Properties: {
+            BucketName: {
+              "Fn::Sub": "${.AttributeName}",
+            },
+          },
+        },
+      },
+    };
+
+    const simAws = new SimAws();
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws.cloudFormation().deployTemplate({
+        stackName: "test-stack",
+        template: invalidSubTemplate,
+      }),
+    );
+
+    assertInstanceOf(error, Error);
+    assertIdentical(
+      error.message,
+      "Logical ID in CFN Fn::Sub variable .AttributeName must be non-empty",
+    );
+  });
 });
