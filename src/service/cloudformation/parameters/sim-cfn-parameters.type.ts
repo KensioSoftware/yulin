@@ -40,7 +40,7 @@ export interface SimCloudFormationParameterInput {
  * command input or already-normalized test/setup data.
  */
 export interface SimCfnParametersProps {
-  readonly definitions?: Record<string, unknown> | undefined;
+  readonly definitions?: Record<string, SimCfnParameterDefinition> | undefined;
   readonly values?: SimCloudFormationParameterValues | undefined;
   readonly stackName?: string | undefined;
 }

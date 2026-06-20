@@ -6,6 +6,7 @@ import type {
 } from "./value/sim-cfn-template-value.js";
 import { isRecord } from "../../../util/type-guard/record.js";
 import { SimCfnTemplateBodyValidator } from "./sim-cfn-template-body-validator.js";
+import type { SimCfnParameterDefinition } from "../parameters/sim-cfn-parameters.type.js";
 
 /**
  * Parsed CloudFormation template body accepted by the simulator.
@@ -13,7 +14,7 @@ import { SimCfnTemplateBodyValidator } from "./sim-cfn-template-body-validator.j
  * Yulin accepts already-parsed templates and does not parse JSON or YAML itself.
  */
 export interface CfnTemplateBodyRecord {
-  readonly Parameters?: Record<string, unknown> | undefined;
+  readonly Parameters?: Record<string, SimCfnParameterDefinition> | undefined;
   readonly Resources: Record<string, SimCfnTemplateValue>;
   readonly [sectionName: string]: unknown;
 }

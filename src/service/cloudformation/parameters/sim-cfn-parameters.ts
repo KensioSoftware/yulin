@@ -85,7 +85,7 @@ export class SimCfnParameters {
    * presence checks and default-value resolution.
    */
   withDefinitions(
-    definitions: Record<string, unknown> | undefined,
+    definitions: Record<string, SimCfnParameterDefinition> | undefined,
   ): SimCfnParameters {
     return new SimCfnParameters({
       definitions,
@@ -125,7 +125,7 @@ export class SimCfnParameters {
   }
 
   private recordDefinitions(
-    definitions: Record<string, unknown> | undefined,
+    definitions: Record<string, SimCfnParameterDefinition> | undefined,
   ): void {
     if (definitions === undefined) {
       return;
