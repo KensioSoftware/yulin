@@ -66,7 +66,29 @@ export class SimCdkBucketDeploySource {
       );
     }
 
-    return path.resolve(templateDirectoryPath, fileAsset.source.path);
+    const resolvedTemplateDirectoryPath = path.resolve(templateDirectoryPath);
+    const resolvedAssetPath = path.resolve(
+      resolvedTemplateDirectoryPath,
+      fileAsset.source.path,
+    );
+
+    if (
+      resolvedAssetPath !== resolvedTemplateDirectoryPath &&
+      !resolvedAssetPath.startsWith(
+        `${resolvedTemplateDirectoryPath}${path.sep}`,
+      )
+    ) {
+      throw new Error(
+        new SimCdkBucketDeployErrorMessage({
+          resource,
+          sourceObjectKey,
+          cdkOutContext,
+          reason: `CDK file asset source path escapes the template directory: ${fileAsset.source.path}`,
+        }).toString(),
+      );
+    }
+
+    return resolvedAssetPath;
   }
 
   private fileAssetForObjectKey(

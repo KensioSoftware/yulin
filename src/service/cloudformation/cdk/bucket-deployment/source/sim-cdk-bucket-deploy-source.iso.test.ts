@@ -229,6 +229,63 @@ describe("SimCdkBucketDeploySource", () => {
       'Expected CDK file asset packaging "zip", got file.',
     );
   });
+
+  it("fails when the matching file asset source path escapes the template directory", () => {
+    // Given a CDK assets manifest with a matching zip file asset whose source path
+    // attempts to traverse outside the synthesized template directory.
+    const source = new SimCdkBucketDeploySource();
+    const templateDirectoryPath = path.join("tmp", "cdk.out");
+    const assetsManifestPath = path.join(
+      templateDirectoryPath,
+      "FooStack.assets.json",
+    );
+    const cdkOutContext: SimCdkOutContext = {
+      templateDirectoryPath,
+      assetsManifestPath,
+      assetsManifest: {
+        files: {
+          abc123: {
+            source: {
+              path: path.join("..", "..", "outside-template"),
+              packaging: "zip",
+            },
+            destinations: {
+              "current_account-current_region": {
+                objectKey: "abc123.zip",
+              },
+            },
+          },
+        },
+      },
+    };
+
+    // When the source directory is resolved, then path traversal outside the
+    // template directory is rejected with a diagnostic error.
+    const error = assertThrowsError(() =>
+      source.sourceDirectoryPathForObjectKey(
+        makeResource("DeploySite"),
+        "abc123.zip",
+        cdkOutContext,
+      ),
+    );
+
+    assertStringIncludes(
+      error.message,
+      "Could not configure Custom::CDKBucketDeployment DeploySite.",
+    );
+    assertStringIncludes(error.message, "Referenced source object key:");
+    assertStringIncludes(error.message, "abc123.zip");
+    assertStringIncludes(error.message, "Expected asset metadata in:");
+    assertStringIncludes(error.message, assetsManifestPath);
+    assertStringIncludes(
+      error.message,
+      "CDK file asset source path escapes the template directory:",
+    );
+    assertStringIncludes(
+      error.message,
+      path.join("..", "..", "outside-template"),
+    );
+  });
 });
 
 function makeResource(logicalId = "DeploySite"): SimCfnResource {
