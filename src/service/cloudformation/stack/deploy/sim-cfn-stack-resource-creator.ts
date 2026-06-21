@@ -1,10 +1,13 @@
 import type { SimAws } from "../../../aws/sim-aws.js";
 import type { SimCfnResource } from "../../resource/sim-cfn-resource.js";
+import type { SimCdkOutContext } from "../../cdk/sim-cdk-out-context.js";
 
 interface SimCfnStackResourceCreatorProps {
   readonly simAws: SimAws;
   readonly resources: ReadonlyMap<string, SimCfnResource>;
   readonly stackName: string;
+  readonly cdkOutContext?: SimCdkOutContext | undefined;
+  readonly skippedResources?: SimCfnResource[] | undefined;
 }
 
 /**
@@ -25,13 +28,23 @@ export class SimCfnStackResourceCreator {
   private readonly simAws: SimAws;
   private readonly resources: ReadonlyMap<string, SimCfnResource>;
   private readonly stackName: string;
+  private readonly cdkOutContext: SimCdkOutContext | undefined;
+  private readonly skippedResources: SimCfnResource[];
 
   constructor(props: SimCfnStackResourceCreatorProps) {
-    const { simAws, resources, stackName } = props;
+    const {
+      simAws,
+      resources,
+      stackName,
+      cdkOutContext,
+      skippedResources = [],
+    } = props;
 
     this.simAws = simAws;
     this.resources = resources;
     this.stackName = stackName;
+    this.cdkOutContext = cdkOutContext;
+    this.skippedResources = skippedResources;
   }
 
   /**
@@ -77,7 +90,12 @@ export class SimCfnStackResourceCreator {
         await resource.create({
           simAws: this.simAws,
           resources: this.resources,
+          cdkOutContext: this.cdkOutContext,
         });
+
+        if (resource.skipped) {
+          this.skippedResources.push(resource);
+        }
       }),
     );
   }

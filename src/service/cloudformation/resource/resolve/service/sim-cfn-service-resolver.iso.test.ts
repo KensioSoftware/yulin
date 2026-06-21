@@ -86,7 +86,7 @@ describe("resolveSimCloudFormationServiceResourceFactory", () => {
     // Then the unsupported provider name is included for diagnosis.
     assertIdentical(
       error.message,
-      "Unsupported sim CloudFormation Resource provider Custom",
+      "Unsupported sim CloudFormation Custom Resource Bucket",
     );
   });
 
@@ -115,6 +115,34 @@ describe("resolveSimCloudFormationServiceResourceFactory", () => {
     assertIdentical(
       error.message,
       "Unsupported sim CloudFormation Resource service DynamoDB",
+    );
+  });
+
+  it("rejects non-AWS and non-Custom Resource providers", () => {
+    // Given a parsed Resource type with a provider other than AWS or Custom.
+    const simAws = new SimAws();
+    const accountRegionScope: SimAwsAccountRegionScope = {
+      accountId: "111111111111" as SimAwsAccountId,
+      regionName: "eu-west-2",
+    };
+
+    // When resolution is attempted, then it throws an unsupported provider error.
+    const error = assertThrowsError(() =>
+      resolveSimCloudFormationServiceResourceFactory(
+        simAws,
+        accountRegionScope,
+        {
+          providerName: "ThirdParty",
+          serviceName: "S3",
+          resourceTypeName: "Bucket",
+        },
+      ),
+    );
+
+    // Then the unsupported provider name is included for diagnosis.
+    assertIdentical(
+      error.message,
+      "Unsupported sim CloudFormation Resource provider ThirdParty",
     );
   });
 });

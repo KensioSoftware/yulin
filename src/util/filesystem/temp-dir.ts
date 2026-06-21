@@ -1,16 +1,67 @@
-import { mkdir, mkdtemp } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { tmpdir } from "node:os";
+import { repoPath } from "./path.js";
 
 /**
  * Create a temporary directory and return its path.
  */
 export async function makeTempDir(): Promise<string> {
-  const tempRootPath = await mkdtemp(path.join(tmpdir(), "yulin-test-"));
-  const directoryPath = path.join(tempRootPath, "public");
+  return mkdtemp(path.join(repoPath(".tmp"), "yulin-test-"));
+}
 
-  // eslint-disable-next-line security/detect-non-literal-fs-filename
-  await mkdir(directoryPath);
+/**
+ * Convenience wrapper for working with a temporary test directory.
+ */
+export class TempDir {
+  private readonly dirPathPromise: Promise<string>;
+  private dirPath: string | undefined;
 
-  return directoryPath;
+  constructor() {
+    this.dirPathPromise = makeTempDir();
+  }
+
+  /**
+   * Return the absolute path to this temporary directory.
+   */
+  path(): string {
+    if (this.dirPath === undefined) {
+      throw new Error(
+        "TempDir path has not yet been resolved. Call resolvePath() or writeFile() first.",
+      );
+    }
+    return this.dirPath;
+  }
+
+  /**
+   * Return the absolute path to a file or directory inside this temporary directory.
+   */
+  join(...pathParts: string[]): string {
+    return path.join(this.path(), ...pathParts);
+  }
+
+  /**
+   * Wait for the temporary directory path to resolve and return it.
+   */
+  async resolvePath(): Promise<string> {
+    this.dirPath = await this.dirPathPromise;
+    return this.dirPath;
+  }
+
+  /**
+   * Write a file inside this temporary directory, creating parent directories as needed.
+   */
+  async writeFile(
+    pathParts: string | string[],
+    content: string,
+  ): Promise<void> {
+    await this.resolvePath();
+    const filePath = this.join(
+      ...(Array.isArray(pathParts) ? pathParts : [pathParts]),
+    );
+
+    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    await mkdir(path.dirname(filePath), { recursive: true });
+    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    await writeFile(filePath, content);
+  }
 }

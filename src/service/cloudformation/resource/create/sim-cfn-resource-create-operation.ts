@@ -56,6 +56,16 @@ export class SimCfnResourceCreateOperation<T extends object = object> {
           this.resource.markCreateComplete(simResource as T | undefined);
           resolve();
         } catch (error) {
+          if (this.isUnsupportedResourceError(error)) {
+            const reason =
+              error instanceof Error ? error.message : String(error);
+
+            this.resource.markCreateSkipped(reason);
+            resolve();
+
+            return;
+          }
+
           const resourceError = this.resourceCreationError(error);
 
           this.resource.markCreateFailed(resourceError);
@@ -63,6 +73,13 @@ export class SimCfnResourceCreateOperation<T extends object = object> {
         }
       });
     });
+  }
+
+  private isUnsupportedResourceError(error: unknown): boolean {
+    return (
+      error instanceof Error &&
+      error.message.startsWith("Unsupported sim CloudFormation")
+    );
   }
 
   private resourceCreationError(error: unknown): Error {

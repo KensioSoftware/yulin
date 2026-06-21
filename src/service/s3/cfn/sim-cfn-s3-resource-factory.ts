@@ -108,6 +108,20 @@ export class SimS3CloudFormationResourceFactory implements SimCfnServiceResource
       return undefined;
     }
 
-    return websiteConfiguration;
+    return {
+      ...websiteConfiguration,
+      IndexDocument:
+        typeof websiteConfiguration["IndexDocument"] === "string"
+          ? {
+              Suffix: websiteConfiguration["IndexDocument"],
+            }
+          : websiteConfiguration["IndexDocument"],
+      ErrorDocument:
+        typeof websiteConfiguration["ErrorDocument"] === "string"
+          ? {
+              Key: websiteConfiguration["ErrorDocument"],
+            }
+          : websiteConfiguration["ErrorDocument"],
+    } as SimS3WebsiteConfiguration;
   }
 }

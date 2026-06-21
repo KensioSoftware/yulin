@@ -10,14 +10,14 @@ import {
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp } from "node:fs/promises";
 import path from "node:path";
 import { tmpdir } from "node:os";
 import { SimS3Object } from "../object/s3-object.js";
 import { FilesystemS3BucketStorage } from "../storage/filesystem/s3-filesystem-storage.js";
 import { SimS3Bucket } from "./sim-s3-bucket.js";
 import { MemoryS3BucketStorage } from "../storage/s3-memory-storage.js";
-import { makeTempDir } from "../../../util/filesystem/temp-dir.js";
+import { TempDir } from "../../../util/filesystem/temp-dir.js";
 import { SimS3 } from "../sim-s3.js";
 import { Readable } from "node:stream";
 import { simS3BodyToBuffer } from "../storage/s3-body-buffer.js";
@@ -228,11 +228,11 @@ describe("Simulated S3 Bucket", () => {
     const simS3 = new SimS3();
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "foobar" }));
 
-    const directoryPath = await makeTempDir();
-    simS3.mountBucketFilesystem("foobar", directoryPath);
+    const testDir = new TempDir();
+    await testDir.resolvePath();
+    simS3.mountBucketFilesystem("foobar", testDir.join("public"));
 
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
-    await writeFile(path.join(directoryPath, "hello.txt"), "hello!");
+    await testDir.writeFile(["public", "hello.txt"], "hello!");
 
     const getObject = await simS3.getObject(
       new GetObjectCommand({ Bucket: "foobar", Key: "hello.txt" }),

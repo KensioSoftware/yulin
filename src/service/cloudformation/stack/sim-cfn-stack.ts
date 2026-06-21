@@ -10,6 +10,7 @@ import type {
 import { SimCfnStackResourceCreator } from "./deploy/sim-cfn-stack-resource-creator.js";
 import { makeSimCfnStackResourceMap } from "./resource-map/sim-cfn-stack-resource-map.js";
 import { SimCfnStackDeploymentLifecycle } from "./deploy/sim-cfn-stack-deployment-lifecycle.js";
+import type { SimCdkOutContext } from "../cdk/sim-cdk-out-context.js";
 
 export type SimCloudFormationStackName = Brand<
   string,
@@ -28,6 +29,7 @@ interface SimCloudFormationStackProps {
   readonly background: BackgroundScheduler;
   readonly stackName: SimCloudFormationStackName;
   readonly template: SimCfnTemplate;
+  readonly cdkOutContext?: SimCdkOutContext | undefined;
 }
 
 /**
@@ -46,6 +48,8 @@ interface SimCloudFormationStackProps {
 export class SimCfnStack {
   private readonly simAws: SimAws;
   private readonly cfnTemplate: SimCfnTemplate;
+  private readonly cdkOutContext: SimCdkOutContext | undefined;
+  private readonly skippedResourceList: SimCfnResource[] = [];
   public readonly lifecycle: SimCfnStackDeploymentLifecycle;
 
   public readonly stackName: SimCloudFormationStackName;
@@ -53,12 +57,19 @@ export class SimCfnStack {
   public readonly resources: Map<string, SimCfnResource>;
 
   constructor(props: SimCloudFormationStackProps) {
-    const { simAws, accountRegionScope, background, stackName, template } =
-      props;
+    const {
+      simAws,
+      accountRegionScope,
+      background,
+      stackName,
+      template,
+      cdkOutContext,
+    } = props;
 
     this.simAws = simAws;
     this.stackName = stackName;
     this.cfnTemplate = template;
+    this.cdkOutContext = cdkOutContext;
     this.template = this.cfnTemplate.template;
     this.resources = makeSimCfnStackResourceMap({
       accountRegionScope,
@@ -89,6 +100,14 @@ export class SimCfnStack {
   }
 
   /**
+   * Resources that were skipped because their sim implementation is not yet
+   * available.
+   */
+  public get skippedResources(): readonly SimCfnResource[] {
+    return this.skippedResourceList;
+  }
+
+  /**
    * Delegate resource dependency ordering and creation to the resource
    * creator.
    */
@@ -97,6 +116,8 @@ export class SimCfnStack {
       simAws: this.simAws,
       resources: this.resources,
       stackName: this.stackName,
+      cdkOutContext: this.cdkOutContext,
+      skippedResources: this.skippedResourceList,
     });
 
     await resourceCreator.createAll();
