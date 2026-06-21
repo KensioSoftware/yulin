@@ -17,6 +17,7 @@ export function resolveSimCloudFormationServiceResourceFactory(
 ): SimCfnServiceResourceFactory {
   if (
     resourceType.providerName === "Custom" &&
+    resourceType.serviceName === "Custom" &&
     resourceType.resourceTypeName === "CDKBucketDeployment"
   ) {
     return new SimCdkBucketDeploymentResourceFactory();
