@@ -1,7 +1,5 @@
 import { describe, it } from "vitest";
-import { mkdir, mkdtemp, symlink, writeFile } from "node:fs/promises";
-import path from "node:path";
-import { tmpdir } from "node:os";
+import { symlink } from "node:fs/promises";
 import {
   assertArrayLength,
   assertBufferEqual,
@@ -12,12 +10,20 @@ import {
 } from "@kensio/smartass";
 import { FilesystemS3BucketStorage } from "./s3-filesystem-storage.js";
 import { SimS3Object } from "../../object/s3-object.js";
-import { makeTempDir } from "../../../../util/filesystem/temp-dir.js";
+import { TempDir } from "../../../../util/filesystem/temp-dir.js";
 
 describe("Filesystem simulated S3 storage", () => {
+  async function makeFilesystemStorage(): Promise<FilesystemS3BucketStorage> {
+    const testDir = new TempDir();
+    await testDir.resolvePath();
+
+    return new FilesystemS3BucketStorage({
+      directoryPath: testDir.join("public"),
+    });
+  }
+
   it("puts and gets an Object from the filesystem", async () => {
-    const directoryPath = await makeTempDir();
-    const storage = new FilesystemS3BucketStorage({ directoryPath });
+    const storage = await makeFilesystemStorage();
 
     const body = Buffer.from("Hello, world!");
 
@@ -31,8 +37,7 @@ describe("Filesystem simulated S3 storage", () => {
   });
 
   it("gets undefined for missing Object", async () => {
-    const directoryPath = await makeTempDir();
-    const storage = new FilesystemS3BucketStorage({ directoryPath });
+    const storage = await makeFilesystemStorage();
 
     const object = await storage.getObject("missing.txt");
 
@@ -40,25 +45,20 @@ describe("Filesystem simulated S3 storage", () => {
   });
 
   it("lists no Objects when storage directory does not exist", async () => {
-    const tempRootPath = await mkdtemp(path.join(tmpdir(), "yulin-s3-test-"));
-    const directoryPath = path.join(tempRootPath, "public");
-
-    const storage = new FilesystemS3BucketStorage({ directoryPath });
+    const storage = await makeFilesystemStorage();
     const objects = await storage.listObjects();
 
     assertArrayLength(objects, 0);
   });
 
   it("does not allow changing storage implementation", async () => {
-    const directoryPath = await makeTempDir();
-    const storage = new FilesystemS3BucketStorage({ directoryPath });
+    const storage = await makeFilesystemStorage();
 
     assertFalse(storage.allowChangeStorage());
   });
 
   it("lists Objects from the filesystem", async () => {
-    const directoryPath = await makeTempDir();
-    const storage = new FilesystemS3BucketStorage({ directoryPath });
+    const storage = await makeFilesystemStorage();
 
     await storage.putObject(
       new SimS3Object({ key: "foo/a.txt", body: Buffer.from("a") }),
@@ -82,8 +82,7 @@ describe("Filesystem simulated S3 storage", () => {
   });
 
   it("lists Objects with prefix", async () => {
-    const directoryPath = await makeTempDir();
-    const storage = new FilesystemS3BucketStorage({ directoryPath });
+    const storage = await makeFilesystemStorage();
 
     await storage.putObject(
       new SimS3Object({ key: "foo/a.txt", body: Buffer.from("a") }),
@@ -106,8 +105,7 @@ describe("Filesystem simulated S3 storage", () => {
   });
 
   it("makes up reasonable Object metadata from file extension", async () => {
-    const directoryPath = await makeTempDir();
-    const storage = new FilesystemS3BucketStorage({ directoryPath });
+    const storage = await makeFilesystemStorage();
 
     await storage.putObject(
       new SimS3Object({
@@ -145,8 +143,7 @@ describe("Filesystem simulated S3 storage", () => {
     ["font.woff2", "font/woff2"],
     ["feed.xml", "application/xml"],
   ])("makes up %s Object content type metadata", async (key, contentType) => {
-    const directoryPath = await makeTempDir();
-    const storage = new FilesystemS3BucketStorage({ directoryPath });
+    const storage = await makeFilesystemStorage();
 
     await storage.putObject(new SimS3Object({ key, body: Buffer.from(key) }));
 
@@ -157,14 +154,13 @@ describe("Filesystem simulated S3 storage", () => {
   });
 
   it("ignores unsupported file extensions when listing Objects", async () => {
-    const directoryPath = await makeTempDir();
+    const testDir = new TempDir();
+    await testDir.writeFile(["public", "safe.txt"], "safe");
+    await testDir.writeFile(["public", "unsafe.pem"], "unsafe");
 
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
-    await writeFile(path.join(directoryPath, "safe.txt"), "safe");
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
-    await writeFile(path.join(directoryPath, "unsafe.pem"), "unsafe");
-
-    const storage = new FilesystemS3BucketStorage({ directoryPath });
+    const storage = new FilesystemS3BucketStorage({
+      directoryPath: testDir.join("public"),
+    });
     const objects = await storage.listObjects();
 
     assertArrayLength(objects, 1);
@@ -172,22 +168,19 @@ describe("Filesystem simulated S3 storage", () => {
   });
 
   it("ignores symlinks when listing Objects", async () => {
-    const tempRootPath = await mkdtemp(path.join(tmpdir(), "yulin-s3-test-"));
-    const directoryPath = path.join(tempRootPath, "public");
+    const testDir = new TempDir();
+    await testDir.writeFile(["public", "safe.txt"], "safe");
+    await testDir.writeFile("outside.txt", "outside");
 
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
-    await mkdir(directoryPath);
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
-    await writeFile(path.join(directoryPath, "safe.txt"), "safe");
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
-    await writeFile(path.join(tempRootPath, "outside.txt"), "outside");
     // eslint-disable-next-line security/detect-non-literal-fs-filename
     await symlink(
-      path.join(tempRootPath, "outside.txt"),
-      path.join(directoryPath, "linked.txt"),
+      testDir.join("outside.txt"),
+      testDir.join("public", "linked.txt"),
     );
 
-    const storage = new FilesystemS3BucketStorage({ directoryPath });
+    const storage = new FilesystemS3BucketStorage({
+      directoryPath: testDir.join("public"),
+    });
     const objects = await storage.listObjects();
 
     assertArrayLength(objects, 1);

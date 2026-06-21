@@ -7,6 +7,7 @@ export class SimCfnResourceCreationState<T extends object = object> {
   private _status: SimCloudFormationResourceStatus = "CREATE_PENDING";
   private _simResource: T | undefined;
   private deployError: Error | undefined;
+  private _skippedReason: string | undefined;
 
   /**
    * Get the current Resource status.
@@ -19,7 +20,24 @@ export class SimCfnResourceCreationState<T extends object = object> {
    * Whether this Resource has been deployed into simulated AWS.
    */
   public get deployed(): boolean {
-    return this._status === "CREATE_COMPLETE";
+    return (
+      this._status === "CREATE_COMPLETE" && this._skippedReason === undefined
+    );
+  }
+
+  /**
+   * Whether this Resource was skipped because sim CloudFormation does not yet
+   * support creating its service or Resource type.
+   */
+  public get skipped(): boolean {
+    return this._skippedReason !== undefined;
+  }
+
+  /**
+   * The reason this Resource was skipped, if it was skipped.
+   */
+  public get skippedReason(): string | undefined {
+    return this._skippedReason;
   }
 
   /**
@@ -51,6 +69,7 @@ export class SimCfnResourceCreationState<T extends object = object> {
   markCreateInProgress(): void {
     this.deployError = undefined;
     this._simResource = undefined;
+    this._skippedReason = undefined;
     this._status = "CREATE_IN_PROGRESS";
   }
 
@@ -60,6 +79,18 @@ export class SimCfnResourceCreationState<T extends object = object> {
   markCreateComplete(simResource?: T): void {
     this._simResource = simResource;
     this.deployError = undefined;
+    this._skippedReason = undefined;
+    this._status = "CREATE_COMPLETE";
+  }
+
+  /**
+   * Mark this Resource as skipped because its sim implementation is not yet
+   * available.
+   */
+  markCreateSkipped(reason: string): void {
+    this._simResource = undefined;
+    this.deployError = undefined;
+    this._skippedReason = reason;
     this._status = "CREATE_COMPLETE";
   }
 
@@ -69,6 +100,7 @@ export class SimCfnResourceCreationState<T extends object = object> {
   markCreateFailed(error?: Error): void {
     this.deployError = error;
     this._simResource = undefined;
+    this._skippedReason = undefined;
     this._status = "CREATE_FAILED";
   }
 }

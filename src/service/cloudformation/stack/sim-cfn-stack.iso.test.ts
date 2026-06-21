@@ -217,4 +217,31 @@ describe("SimCfnStack", () => {
 
     assertIdentical(stack.lifecycle.status, "CREATE_COMPLETE");
   });
+
+  it("records unsupported Resources as skipped", async () => {
+    const simAws = new SimAws();
+
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "TestStack",
+      template: {
+        Resources: {
+          TestTopic: {
+            Type: "AWS::SNS::Topic",
+          },
+        },
+      },
+    });
+
+    const skippedResource = stack.skippedResources[0];
+
+    assertIdentical(stack.lifecycle.status, "CREATE_COMPLETE");
+    assertIdentical(stack.skippedResources.length, 1);
+    assertNonNullable(skippedResource);
+    assertIdentical(skippedResource.logicalId, "TestTopic");
+    assertIdentical(skippedResource.skipped, true);
+    assertIdentical(
+      skippedResource.skippedReason,
+      "Unsupported sim CloudFormation Resource service SNS",
+    );
+  });
 });

@@ -1,8 +1,6 @@
 import { afterAll, beforeAll, describe, it } from "vitest";
 import { SimAwsLocalServer } from "../../../../serve/index.js";
-import { makeTempDir } from "../../../../util/filesystem/temp-dir.js";
-import * as fs from "node:fs/promises";
-import path from "node:path";
+import { TempDir } from "../../../../util/filesystem/temp-dir.js";
 import {
   CreateBucketCommand,
   PutBucketWebsiteCommand,
@@ -27,20 +25,11 @@ describe("Serve sim S3 Bucket on localhost with filesystem storage", () => {
   });
 
   it("reads files from filesystem and serves on localhost", async () => {
-    const directoryPath = await makeTempDir();
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
-    await fs.writeFile(
-      path.join(directoryPath, "foobar.html"),
-      "<h1>Hello</h1>",
-    );
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
-    await fs.writeFile(
-      path.join(directoryPath, "index.html"),
-      "<h1>Filesystem index</h1>",
-    );
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
-    await fs.writeFile(
-      path.join(directoryPath, "error.html"),
+    const testDir = new TempDir();
+    await testDir.writeFile("public/foobar.html", "<h1>Hello</h1>");
+    await testDir.writeFile("public/index.html", "<h1>Filesystem index</h1>");
+    await testDir.writeFile(
+      "public/error.html",
       "<h1>Not found on filesystem</h1>",
     );
 
@@ -61,7 +50,9 @@ describe("Serve sim S3 Bucket on localhost with filesystem storage", () => {
     const simBucket = simS3.getSimBucketByName(bucketName);
     assertNonNullable(simBucket);
     simBucket.configureSimStorage(
-      new FilesystemS3BucketStorage({ directoryPath }),
+      new FilesystemS3BucketStorage({
+        directoryPath: testDir.join("public"),
+      }),
     );
 
     const okRes = await fetch(
@@ -90,14 +81,9 @@ describe("Serve sim S3 Bucket on localhost with filesystem storage", () => {
   });
 
   it("redirects extensionless filesystem folder paths to a trailing slash when an index document exists", async () => {
-    const directoryPath = await makeTempDir();
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
-    await fs.mkdir(path.join(directoryPath, "dengji", "a1"), {
-      recursive: true,
-    });
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
-    await fs.writeFile(
-      path.join(directoryPath, "dengji", "a1", "index.html"),
+    const testDir = new TempDir();
+    await testDir.writeFile(
+      ["public", "dengji", "a1", "index.html"],
       "<h1>A1 index</h1>",
     );
 
@@ -118,7 +104,7 @@ describe("Serve sim S3 Bucket on localhost with filesystem storage", () => {
     const simBucket = simS3.getSimBucketByName(bucketName);
     assertNonNullable(simBucket);
     simBucket.configureSimStorage(
-      new FilesystemS3BucketStorage({ directoryPath }),
+      new FilesystemS3BucketStorage({ directoryPath: testDir.join("public") }),
     );
 
     const redirectRes = await fetch(

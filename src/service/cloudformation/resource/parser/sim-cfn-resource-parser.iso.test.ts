@@ -80,4 +80,20 @@ describe("parseSimCloudFormationResourceType", () => {
       "Invalid sim CloudFormation Resource type AWS::S3::",
     );
   });
+
+  it("rejects a Resource type with too many parts", () => {
+    // Given a Resource type label with an unexpected extra segment.
+    const resourceType = "AWS::S3::Bucket::Extra";
+
+    // When parsing is attempted, then it throws an invalid Resource type error.
+    const error = assertThrowsError(() =>
+      parseSimCloudFormationResourceType(resourceType),
+    );
+
+    // Then the original invalid Resource type is included for diagnosis.
+    assertIdentical(
+      error.message,
+      "Invalid sim CloudFormation Resource type AWS::S3::Bucket::Extra",
+    );
+  });
 });

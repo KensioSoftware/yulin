@@ -21,6 +21,7 @@ import {
   type SimCfnResourceValueAdapter,
   simCfnResourceValueAdapter,
 } from "./cfn/sim-cfn-resource-value-adapter.js";
+import type { SimCdkOutContext } from "../cdk/sim-cdk-out-context.js";
 
 interface SimCloudFormationResourceProps {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
@@ -48,6 +49,7 @@ export interface SimCloudFormationResourceCreateContext {
   readonly simAws: SimAws;
   readonly resources: ReadonlyMap<string, SimCfnResource>;
   readonly resolvedProperties?: SimCfnTemplateValueRecord | undefined;
+  readonly cdkOutContext?: SimCdkOutContext | undefined;
 }
 
 /**
@@ -107,10 +109,25 @@ export class SimCfnResource<T extends object = object> {
   }
 
   /**
-   * Whether this Resource has successfully created its simulated AWS object.
+   * Whether this Resource has been deployed into simulated AWS.
    */
   public get deployed(): boolean {
     return this.creationState.deployed;
+  }
+
+  /**
+   * Whether this Resource was skipped because sim CloudFormation does not yet
+   * support creating its service or Resource type.
+   */
+  public get skipped(): boolean {
+    return this.creationState.skipped;
+  }
+
+  /**
+   * The reason this Resource was skipped, if it was skipped.
+   */
+  public get skippedReason(): string | undefined {
+    return this.creationState.skippedReason;
   }
 
   /**
@@ -246,6 +263,17 @@ export class SimCfnResource<T extends object = object> {
    */
   markCreateComplete(simResource?: T): void {
     this.creationState.markCreateComplete(simResource);
+  }
+
+  /**
+   * Mark this Resource as skipped because sim CloudFormation does not yet
+   * support creating its service or Resource type.
+   *
+   * Skipped Resources are treated as CREATE_COMPLETE so unsupported Resources do
+   * not block local simulation of the rest of the Stack.
+   */
+  markCreateSkipped(reason: string): void {
+    this.creationState.markCreateSkipped(reason);
   }
 
   /**

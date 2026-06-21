@@ -169,4 +169,40 @@ describe("S3 CloudFormation Bucket WebsiteConfiguration", () => {
       "http://routing-rules-website-config-bucket.s3-website.localhost/not-found.html",
     );
   });
+
+  it("configures a CloudFormation string index document from AWS::S3::Bucket WebsiteConfiguration", async () => {
+    // Given a CloudFormation template using the AWS::S3::Bucket
+    // WebsiteConfiguration shape emitted by CDK.
+    const simAws = new SimAws();
+
+    // When the template is deployed through sim CloudFormation.
+    await simAws.cloudFormation().deployTemplate({
+      stackName: "website-string-index-stack",
+      template: {
+        Resources: {
+          WebsiteBucket: {
+            Type: "AWS::S3::Bucket",
+            Properties: {
+              BucketName: "website-string-index-config-bucket",
+              WebsiteConfiguration: {
+                IndexDocument: "index.html",
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Then static website hosting is configured on the simulated S3 Bucket.
+    const bucket = simAws
+      .s3()
+      .getSimBucketByName("website-string-index-config-bucket");
+
+    assertNonNullable(bucket);
+    assertTrue(bucket.getWebsite().websiteEnabled());
+    assertIdentical(
+      bucket.getWebsite().objectKeyForRequest("docs/"),
+      "docs/index.html",
+    );
+  });
 });

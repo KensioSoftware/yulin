@@ -10,7 +10,7 @@ import {
 } from "@kensio/smartass";
 import { FilesystemS3BucketStorage } from "./s3-filesystem-storage.js";
 import { SimS3Object } from "../../object/s3-object.js";
-import { makeTempDir } from "../../../../util/filesystem/temp-dir.js";
+import { TempDir } from "../../../../util/filesystem/temp-dir.js";
 
 describe("Filesystem simulated S3 storage safety", () => {
   it("rejects relative storage directory path", () => {
@@ -63,8 +63,11 @@ describe("Filesystem simulated S3 storage safety", () => {
   });
 
   it("rejects Object key with parent directory segment", async () => {
-    const directoryPath = await makeTempDir();
-    const storage = new FilesystemS3BucketStorage({ directoryPath });
+    const testDir = new TempDir();
+    await testDir.resolvePath();
+    const storage = new FilesystemS3BucketStorage({
+      directoryPath: testDir.join("public"),
+    });
 
     const error = await assertThrowsErrorAsync(async () => {
       await storage.putObject(
@@ -88,8 +91,11 @@ describe("Filesystem simulated S3 storage safety", () => {
   });
 
   it("rejects absolute Object key", async () => {
-    const directoryPath = await makeTempDir();
-    const storage = new FilesystemS3BucketStorage({ directoryPath });
+    const testDir = new TempDir();
+    await testDir.resolvePath();
+    const storage = new FilesystemS3BucketStorage({
+      directoryPath: testDir.join("public"),
+    });
 
     const error = await assertThrowsErrorAsync(async () => {
       await storage.putObject(
@@ -104,8 +110,11 @@ describe("Filesystem simulated S3 storage safety", () => {
   });
 
   it("rejects Object key with unsupported file extension", async () => {
-    const directoryPath = await makeTempDir();
-    const storage = new FilesystemS3BucketStorage({ directoryPath });
+    const testDir = new TempDir();
+    await testDir.resolvePath();
+    const storage = new FilesystemS3BucketStorage({
+      directoryPath: testDir.join("public"),
+    });
 
     const error = await assertThrowsErrorAsync(async () => {
       await storage.putObject(
