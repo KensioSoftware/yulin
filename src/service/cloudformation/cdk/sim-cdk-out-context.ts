@@ -50,13 +50,32 @@ export async function loadSiblingCdkAssetsManifest(
 
   const assetsManifestPath = path.join(templateDirectoryPath, assetsFileName);
 
-  // eslint-disable-next-line security/detect-non-literal-fs-filename
-  const manifestBody = await readFile(assetsManifestPath, "utf8");
+  let assetsManifest: SimCdkAssetsManifest;
+
+  try {
+    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    const manifestBody = await readFile(assetsManifestPath, "utf8");
+
+    assetsManifest = jsonParse(
+      manifestBody as JSONString<SimCdkAssetsManifest>,
+    );
+  } catch (error) {
+    if (isNodeErrorCode(error, "ENOENT")) {
+      assetsManifest = {};
+    } else {
+      /* v8 ignore next */
+      throw error;
+    }
+  }
 
   return {
     templatePath: resolvedTemplatePath,
     templateDirectoryPath,
     assetsManifestPath,
-    assetsManifest: jsonParse(manifestBody as JSONString<SimCdkAssetsManifest>),
+    assetsManifest,
   };
+}
+
+function isNodeErrorCode(error: unknown, code: string): boolean {
+  return error instanceof Error && "code" in error && error.code === code;
 }

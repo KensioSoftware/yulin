@@ -187,4 +187,35 @@ describe("SimCfnTemplateFileLoader", () => {
     assertUndefined(loadedTemplate.cdkOutContext.assetsManifestPath);
     assertUndefined(loadedTemplate.cdkOutContext.assetsManifest);
   });
+
+  it("loads a synthesized template with an empty assets manifest context when the sibling assets manifest is missing", async () => {
+    // Given a synthesized stack template with no sibling CDK assets manifest.
+    const tempDir = new TempDir();
+    const templatePath = "NoAssetsStack.template.json";
+    const assetsPath = "NoAssetsStack.assets.json";
+
+    await tempDir.writeFile(
+      templatePath,
+      jsonStringify({
+        Resources: {
+          TestBucket: {
+            Type: "AWS::S3::Bucket",
+          },
+        },
+      }),
+    );
+
+    // When the template file is loaded.
+    const loadedTemplate = await new SimCfnTemplateFileLoader().load(
+      tempDir.join(templatePath),
+    );
+
+    // Then loading continues with an empty assets manifest context.
+    assertObjectMatches(loadedTemplate.cdkOutContext, {
+      templatePath: path.resolve(tempDir.join(templatePath)),
+      templateDirectoryPath: tempDir.path(),
+      assetsManifestPath: tempDir.join(assetsPath),
+      assetsManifest: {},
+    });
+  });
 });
