@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, writeFile as fsWriteFile } from "node:fs/promises";
 import path from "node:path";
 import { repoPath } from "./path.js";
 
@@ -6,7 +6,12 @@ import { repoPath } from "./path.js";
  * Create a temporary directory and return its path.
  */
 export async function makeTempDir(): Promise<string> {
-  return mkdtemp(path.join(repoPath(".tmp"), "yulin-test-"));
+  const tmpDirPath = repoPath(".tmp");
+
+  // eslint-disable-next-line security/detect-non-literal-fs-filename
+  await mkdir(tmpDirPath, { recursive: true });
+
+  return await mkdtemp(path.join(tmpDirPath, "yulin-test-"));
 }
 
 /**
@@ -62,6 +67,6 @@ export class TempDir {
     // eslint-disable-next-line security/detect-non-literal-fs-filename
     await mkdir(path.dirname(filePath), { recursive: true });
     // eslint-disable-next-line security/detect-non-literal-fs-filename
-    await writeFile(filePath, content);
+    await fsWriteFile(filePath, content);
   }
 }
