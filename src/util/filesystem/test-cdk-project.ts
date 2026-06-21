@@ -31,11 +31,12 @@ export class TestCdkProject {
     await this.projectDir.resolvePath();
     const cdkAppFile = this.projectDir.join("cdkApp.mjs");
     const cdkOutDir = this.projectDir.join(relativeOutputPath);
+    const appCommand = `node ${JSON.stringify(cdkAppFile)}`;
 
     await execa(cdkBinPath(), [
       "synth",
       "--app",
-      `node ${cdkAppFile}`,
+      appCommand,
       "--output",
       cdkOutDir,
     ]);
