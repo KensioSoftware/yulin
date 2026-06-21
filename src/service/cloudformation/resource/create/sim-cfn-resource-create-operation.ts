@@ -78,7 +78,8 @@ export class SimCfnResourceCreateOperation<T extends object = object> {
   private isUnsupportedResourceError(error: unknown): boolean {
     return (
       error instanceof Error &&
-      error.message.startsWith("Unsupported sim CloudFormation")
+      error.message.includes("Unsupported sim") &&
+      error.message.includes("CloudFormation")
     );
   }
 
