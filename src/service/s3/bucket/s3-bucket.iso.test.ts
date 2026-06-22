@@ -10,9 +10,6 @@ import {
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
-import { mkdir, mkdtemp } from "node:fs/promises";
-import path from "node:path";
-import { tmpdir } from "node:os";
 import { SimS3Object } from "../object/s3-object.js";
 import { FilesystemS3BucketStorage } from "../storage/filesystem/s3-filesystem-storage.js";
 import { SimS3Bucket } from "./sim-s3-bucket.js";
@@ -234,11 +231,10 @@ interface StorageFactory {
 }
 
 async function makeFilesystemStorage(): Promise<FilesystemS3BucketStorage> {
-  const tempRootPath = await mkdtemp(path.join(tmpdir(), "yulin-s3-test-"));
-  const directoryPath = path.join(tempRootPath, "public");
+  const tempDir = new TempDir();
+  await tempDir.resolvePath();
 
-  // eslint-disable-next-line security/detect-non-literal-fs-filename
-  await mkdir(directoryPath);
-
-  return new FilesystemS3BucketStorage({ directoryPath });
+  return new FilesystemS3BucketStorage({
+    directoryPath: tempDir.join("public"),
+  });
 }

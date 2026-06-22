@@ -1,7 +1,6 @@
 import { describe, it } from "vitest";
-import { mkdtemp } from "node:fs/promises";
 import path from "node:path";
-import { homedir, tmpdir } from "node:os";
+import { homedir } from "node:os";
 import {
   assertStringIncludes,
   assertThrowsError,
@@ -24,7 +23,7 @@ describe("Filesystem simulated S3 storage safety", () => {
     const error = assertThrowsError(
       () =>
         new FilesystemS3BucketStorage({
-          directoryPath: path.parse(tmpdir()).root,
+          directoryPath: path.parse(homedir()).root,
         }),
     );
 
@@ -39,11 +38,14 @@ describe("Filesystem simulated S3 storage safety", () => {
     assertStringIncludes(error.message, "must not be the user home directory");
   });
 
-  it("rejects storage directory path with parent directory segment", () => {
+  it("rejects storage directory path with parent directory segment", async () => {
+    const testDir = new TempDir();
+    await testDir.resolvePath();
+
     const error = assertThrowsError(
       () =>
         new FilesystemS3BucketStorage({
-          directoryPath: `${tmpdir()}/../public`,
+          directoryPath: `${testDir.path()}/../public`,
         }),
     );
 
@@ -51,8 +53,9 @@ describe("Filesystem simulated S3 storage safety", () => {
   });
 
   it("rejects storage directory path with unsafe directory name", async () => {
-    const tempRootPath = await mkdtemp(path.join(tmpdir(), "yulin-s3-test-"));
-    const directoryPath = path.join(tempRootPath, "private");
+    const testDir = new TempDir();
+    await testDir.resolvePath();
+    const directoryPath = testDir.join("private");
 
     const error = assertThrowsError(
       () => new FilesystemS3BucketStorage({ directoryPath }),
@@ -87,7 +90,7 @@ describe("Filesystem simulated S3 storage safety", () => {
     const error = await assertThrowsErrorAsync(async () => {
       await storage.putObject(
         new SimS3Object({
-          key: path.join(tmpdir(), "secret.txt"),
+          key: testDir.join("secret.txt"),
           body: Buffer.from("secret"),
         }),
       );
