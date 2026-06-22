@@ -66,9 +66,6 @@ export class SimS3Bucket {
    * Change the storage implementation for this simulated S3 Bucket.
    */
   configureSimStorage(storage: SimS3BucketStorage): void {
-    if (!this.storage.allowChangeStorage()) {
-      throw new Error("Cannot change simulated S3 storage implementation");
-    }
     this.storage = storage;
   }
 

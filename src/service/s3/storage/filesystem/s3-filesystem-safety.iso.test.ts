@@ -3,7 +3,6 @@ import { mkdtemp } from "node:fs/promises";
 import path from "node:path";
 import { homedir, tmpdir } from "node:os";
 import {
-  assertFalse,
   assertStringIncludes,
   assertThrowsError,
   assertThrowsErrorAsync,
@@ -76,18 +75,6 @@ describe("Filesystem simulated S3 storage safety", () => {
     });
 
     assertStringIncludes(error.message, "must not contain '..'");
-  });
-
-  it("allows custom safe storage directory names", async () => {
-    const tempRootPath = await mkdtemp(path.join(tmpdir(), "yulin-s3-test-"));
-    const directoryPath = path.join(tempRootPath, "private");
-
-    const storage = new FilesystemS3BucketStorage({
-      directoryPath,
-      allowedDirectoryNames: ["private"],
-    });
-
-    assertFalse(storage.allowChangeStorage());
   });
 
   it("rejects absolute Object key", async () => {

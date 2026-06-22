@@ -16,7 +16,6 @@ import { tmpdir } from "node:os";
 import { SimS3Object } from "../object/s3-object.js";
 import { FilesystemS3BucketStorage } from "../storage/filesystem/s3-filesystem-storage.js";
 import { SimS3Bucket } from "./sim-s3-bucket.js";
-import { MemoryS3BucketStorage } from "../storage/s3-memory-storage.js";
 import { TempDir } from "../../../util/filesystem/temp-dir.js";
 import { SimS3 } from "../sim-s3.js";
 import { Readable } from "node:stream";
@@ -147,23 +146,6 @@ describe("Simulated S3 Bucket", () => {
     assertNonNullable(object);
     assertIdentical(object.key, "foo.txt");
     assertBufferEqual(object.body, Buffer.from("foo"));
-  });
-
-  it("rejects changing storage implementation after storing Objects", async () => {
-    const bucket = new SimS3Bucket({ bucketName: "bucket-a" });
-
-    await bucket.putObject(
-      new SimS3Object({ key: "foo.txt", body: Buffer.from("foo") }),
-    );
-
-    const error = assertThrowsError(() => {
-      bucket.configureSimStorage(new MemoryS3BucketStorage());
-    });
-
-    assertStringIncludes(
-      error.message,
-      "Cannot change simulated S3 storage implementation",
-    );
   });
 
   it("gets a static website URL", () => {

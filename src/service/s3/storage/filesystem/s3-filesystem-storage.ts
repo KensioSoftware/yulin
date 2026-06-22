@@ -98,15 +98,6 @@ export class FilesystemS3BucketStorage implements SimS3BucketStorage {
     await writeFile(filePath, object.body);
   }
 
-  /**
-   * Is it OK to change to a different storage implementation?
-   * For now, we're assuming that a user should not need to change from a
-   * filesystem storage at runtime, so this is always false.
-   */
-  allowChangeStorage(): boolean {
-    return false;
-  }
-
   private filePathForObjectKey(key: string): string {
     this.safety.assertSafeObjectKey(key);
 

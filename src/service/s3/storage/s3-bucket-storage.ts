@@ -15,9 +15,4 @@ export interface SimS3BucketStorage {
    * List simulated Objects in storage.
    */
   listObjects(prefix?: string): Promise<SimS3Object[]>;
-
-  /**
-   * Is it OK to change to a different storage implementation?
-   */
-  allowChangeStorage(): boolean;
 }
