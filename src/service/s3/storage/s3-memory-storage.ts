@@ -32,13 +32,4 @@ export class MemoryS3BucketStorage implements SimS3BucketStorage {
     this.objects.set(object.key, object);
     return Promise.resolve();
   }
-
-  /**
-   * Is it OK to change to a different storage implementation?
-   * To reduce unexpected behaviours, we disallow changing from in-memory
-   * storage if it currently contains any objects.
-   */
-  allowChangeStorage(): boolean {
-    return this.objects.size === 0;
-  }
 }

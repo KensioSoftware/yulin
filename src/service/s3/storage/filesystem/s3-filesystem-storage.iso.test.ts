@@ -3,7 +3,6 @@ import { symlink } from "node:fs/promises";
 import {
   assertArrayLength,
   assertBufferEqual,
-  assertFalse,
   assertIdentical,
   assertNonNullable,
   assertUndefined,
@@ -49,12 +48,6 @@ describe("Filesystem simulated S3 storage", () => {
     const objects = await storage.listObjects();
 
     assertArrayLength(objects, 0);
-  });
-
-  it("does not allow changing storage implementation", async () => {
-    const storage = await makeFilesystemStorage();
-
-    assertFalse(storage.allowChangeStorage());
   });
 
   it("lists Objects from the filesystem", async () => {
