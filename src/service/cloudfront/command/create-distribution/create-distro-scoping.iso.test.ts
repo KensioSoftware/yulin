@@ -6,6 +6,7 @@ import {
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
+  assertObjectMatches,
   assertOneOf,
   assertStringIncludes,
   assertStringLength,
@@ -77,9 +78,15 @@ describe("CloudFront CreateDistributionCommand scoping", () => {
       createDistributionOutput.Distribution.DomainName,
       `${distributionId.toLowerCase()}.cloudfront.net`,
     );
-    assertIdentical(
+    assertObjectMatches(
       createDistributionOutput.Distribution.DistributionConfig,
-      distributionConfig,
+      {
+        CallerReference: distributionConfig.CallerReference,
+        Comment: distributionConfig.Comment,
+        Enabled: distributionConfig.Enabled,
+        Origins: distributionConfig.Origins,
+        DefaultCacheBehavior: distributionConfig.DefaultCacheBehavior,
+      },
     );
     assertIdentical(
       createDistributionOutput.Location,
@@ -110,10 +117,13 @@ describe("CloudFront CreateDistributionCommand scoping", () => {
       getDistributionOutput.Distribution.DomainName,
       `${distributionId.toLowerCase()}.cloudfront.net`,
     );
-    assertIdentical(
-      getDistributionOutput.Distribution.DistributionConfig,
-      distributionConfig,
-    );
+    assertObjectMatches(getDistributionOutput.Distribution.DistributionConfig, {
+      CallerReference: distributionConfig.CallerReference,
+      Comment: distributionConfig.Comment,
+      Enabled: distributionConfig.Enabled,
+      Origins: distributionConfig.Origins,
+      DefaultCacheBehavior: distributionConfig.DefaultCacheBehavior,
+    });
   });
 
   it("uses Account-global CloudFront state across Regions", () => {

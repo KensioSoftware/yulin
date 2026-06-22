@@ -36,6 +36,8 @@ import type {
 } from "./cff/sim-cloudfront-function.js";
 import type { SimArn } from "../aws/arn.js";
 import { assertDefined } from "../../util/type-guard/defined.js";
+import { SimCloudFrontCloudFormationResourceFactory } from "./cfn/sim-cfn-cloudfront-resource-factory.js";
+import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 
 interface SimCloudFrontProps {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
@@ -61,6 +63,9 @@ export class SimCloudFront {
   private readonly cloudFrontRegistry: SimCloudFrontRegistry;
   private readonly s3OriginResolver: SimCloudFrontS3OriginResolver;
   private readonly background: BackgroundScheduler;
+  private readonly cfnFactory = new SimCloudFrontCloudFormationResourceFactory(
+    this,
+  );
 
   constructor(props: SimCloudFrontProps = {}) {
     const {
@@ -84,6 +89,17 @@ export class SimCloudFront {
     SimCloudFrontDistribution
   > {
     return this.distributions;
+  }
+
+  /**
+   * Get a simulated CloudFront Distribution by ID.
+   */
+  getSimDistributionById(
+    distributionId: SimCloudFrontDistributionId | string,
+  ): SimCloudFrontDistribution | undefined {
+    return this.distributions.get(
+      distributionId as SimCloudFrontDistributionId,
+    );
   }
 
   /**
@@ -156,5 +172,12 @@ export class SimCloudFront {
     cloudFrontFunctionName: SimCloudFrontFunctionName,
   ): SimCloudFrontFunction | undefined {
     return this.cloudFrontFunctions.get(cloudFrontFunctionName);
+  }
+
+  /**
+   * Get this service's CloudFormation Resource factory.
+   */
+  cfnResourceFactory(): SimCfnServiceResourceFactory {
+    return this.cfnFactory;
   }
 }

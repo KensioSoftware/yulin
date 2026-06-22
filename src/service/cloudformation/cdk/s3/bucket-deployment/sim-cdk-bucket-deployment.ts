@@ -1,11 +1,11 @@
 import path from "node:path";
 
-import { FilesystemS3BucketStorage } from "../../../s3/storage/filesystem/s3-filesystem-storage.js";
-import type { SimCfnServiceResourceFactory } from "../../resource/factory/sim-cfn-resource-factory.type.js";
+import { FilesystemS3BucketStorage } from "../../../../s3/storage/filesystem/s3-filesystem-storage.js";
+import type { SimCfnServiceResourceFactory } from "../../../resource/factory/sim-cfn-resource-factory.type.js";
 import type {
   SimCfnResource,
   SimCloudFormationResourceCreateContext,
-} from "../../resource/sim-cfn-resource.js";
+} from "../../../resource/sim-cfn-resource.js";
 import { SimCdkBucketDeploySource } from "./source/sim-cdk-bucket-deploy-source.js";
 
 /**

@@ -15,6 +15,7 @@ import type { BackgroundScheduler } from "../../../../util/background/background
 import { SimCloudFrontOriginConfigurator } from "../../distribution/configurator/sim-cloud-front-origin-configurator.js";
 import { SimCloudFrontBehaviorConfigurator } from "../../distribution/configurator/sim-cloud-front-behavior-configurator.js";
 import { SimCloudFrontDistributionConfigurator } from "../../distribution/configurator/sim-cloud-front-distribution-configurator.js";
+import { SimCloudFrontDistributionConfigNormalizer } from "./sim-cf-distro-config-normalizer.js";
 
 interface CreateDistributionCommandHandlerProps {
   readonly accountId: SimAwsAccountId;
@@ -62,11 +63,15 @@ export class CreateDistributionCommandHandler implements CommandHandler<
   async handle(
     cmd: SimCreateDistributionCommand,
   ): Promise<SimCreateDistributionCommandOutput> {
-    const distributionConfig = cmd.input.DistributionConfig;
+    const distributionConfigInput = cmd.input.DistributionConfig;
     assertDefined(
-      distributionConfig,
+      distributionConfigInput,
       "CreateDistributionCommand.DistributionConfig",
     );
+
+    const distributionConfig = new SimCloudFrontDistributionConfigNormalizer(
+      distributionConfigInput,
+    ).normalize();
 
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();

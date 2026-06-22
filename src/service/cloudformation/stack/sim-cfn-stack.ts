@@ -100,6 +100,13 @@ export class SimCfnStack {
   }
 
   /**
+   * Get a Stack Resource by logical ID.
+   */
+  getResource(logicalId: string): SimCfnResource | undefined {
+    return this.resources.get(logicalId);
+  }
+
+  /**
    * Resources that were skipped because their sim implementation is not yet
    * available.
    */
