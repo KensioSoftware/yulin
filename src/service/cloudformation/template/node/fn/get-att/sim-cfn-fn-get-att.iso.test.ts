@@ -25,7 +25,7 @@ describe("CloudFormation Fn::GetAtt Resource value", () => {
             BucketName: {
               "Fn::Join": [
                 "-",
-                [{ "Fn::GetAtt": ["SourceBucket", "Arn"] }, "derived"],
+                [{ "Fn::GetAtt": ["SourceBucket", "foo"] }, "derived"],
               ],
             },
           },
@@ -44,14 +44,14 @@ describe("CloudFormation Fn::GetAtt Resource value", () => {
     const sourceBucket = simAws.s3().getSimBucketByName("source-bucket");
     const derivedBucket = simAws
       .s3()
-      .getSimBucketByName("source-bucket.Arn-derived");
+      .getSimBucketByName("source-bucket.foo-derived");
 
     assertNonNullable(sourceBucket);
     assertNonNullable(derivedBucket);
     assertInstanceOf(sourceBucket, SimS3Bucket);
     assertInstanceOf(derivedBucket, SimS3Bucket);
     assertIdentical(sourceBucket.bucketName, "source-bucket");
-    assertIdentical(derivedBucket.bucketName, "source-bucket.Arn-derived");
+    assertIdentical(derivedBucket.bucketName, "source-bucket.foo-derived");
 
     const sourceResource = stack.resources.get("SourceBucket");
     const derivedResource = stack.resources.get("DerivedBucket");
@@ -80,7 +80,7 @@ describe("CloudFormation Fn::GetAtt Resource value", () => {
             BucketName: {
               "Fn::Join": [
                 "-",
-                [{ "Fn::GetAtt": "SourceBucket.Arn" }, "derived"],
+                [{ "Fn::GetAtt": "SourceBucket.foo" }, "derived"],
               ],
             },
           },
@@ -98,11 +98,11 @@ describe("CloudFormation Fn::GetAtt Resource value", () => {
     // Then the dotted GetAtt resolves the same as the array form.
     const derivedBucket = simAws
       .s3()
-      .getSimBucketByName("source-bucket.Arn-derived");
+      .getSimBucketByName("source-bucket.foo-derived");
 
     assertNonNullable(derivedBucket);
     assertInstanceOf(derivedBucket, SimS3Bucket);
-    assertIdentical(derivedBucket.bucketName, "source-bucket.Arn-derived");
+    assertIdentical(derivedBucket.bucketName, "source-bucket.foo-derived");
   });
 
   it("creates implicit Resource dependencies from Fn::GetAtt", async () => {
@@ -116,7 +116,7 @@ describe("CloudFormation Fn::GetAtt Resource value", () => {
             BucketName: {
               "Fn::Join": [
                 "-",
-                [{ "Fn::GetAtt": ["SourceBucket", "Arn"] }, "derived"],
+                [{ "Fn::GetAtt": ["SourceBucket", "foo"] }, "derived"],
               ],
             },
           },
@@ -142,7 +142,7 @@ describe("CloudFormation Fn::GetAtt Resource value", () => {
     const derivedResource = stack.resources.get("DerivedBucket");
     const derivedBucket = simAws
       .s3()
-      .getSimBucketByName("source-bucket.Arn-derived");
+      .getSimBucketByName("source-bucket.foo-derived");
 
     assertNonNullable(sourceResource);
     assertNonNullable(derivedResource);

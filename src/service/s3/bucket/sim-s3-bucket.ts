@@ -8,6 +8,7 @@ import {
   simAwsAccountRegionScopeFactory,
 } from "../../aws/sim-aws-account-region-scope.js";
 import { simS3BucketWebsiteUrl } from "./website/sim-s3-bucket-website-url.js";
+import { validateS3BucketName } from "./validate/validate-s3-bucket-name.js";
 
 export type SimS3BucketName = Brand<string, "SimS3BucketName">;
 
@@ -35,7 +36,9 @@ export class SimS3Bucket {
       website = new SimS3BucketWebsite(),
     } = props;
 
-    this.bucketName = bucketName as SimS3BucketName;
+    validateS3BucketName(bucketName);
+
+    this.bucketName = bucketName;
     this.accountRegionScope = accountRegionScope;
     this.storage = storage;
     this.website = website;
