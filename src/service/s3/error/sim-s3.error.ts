@@ -60,3 +60,14 @@ export class SimS3BucketAlreadyOwnedByYou extends SimS3Error {
     super(message, { httpStatusCode: 409 });
   }
 }
+
+/**
+ * Simulated S3 InvalidBucketName error.
+ */
+export class SimS3InvalidBucketName extends SimS3Error {
+  public override readonly name = "InvalidBucketName";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}

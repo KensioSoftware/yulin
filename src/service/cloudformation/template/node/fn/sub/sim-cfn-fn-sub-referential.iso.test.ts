@@ -178,7 +178,7 @@ describe("CloudFormation Fn::Sub Resource referential", () => {
           Type: "AWS::S3::Bucket",
           Properties: {
             BucketName: {
-              "Fn::Sub": "${SourceBucket.Arn}-derived",
+              "Fn::Sub": "${SourceBucket.foo}-derived",
             },
           },
         },
@@ -197,14 +197,14 @@ describe("CloudFormation Fn::Sub Resource referential", () => {
     const sourceBucket = simAws.s3().getSimBucketByName("source-bucket");
     const derivedBucket = simAws
       .s3()
-      .getSimBucketByName("source-bucket.Arn-derived");
+      .getSimBucketByName("source-bucket.foo-derived");
 
     assertNonNullable(sourceBucket);
     assertNonNullable(derivedBucket);
     assertInstanceOf(sourceBucket, SimS3Bucket);
     assertInstanceOf(derivedBucket, SimS3Bucket);
     assertIdentical(sourceBucket.bucketName, "source-bucket");
-    assertIdentical(derivedBucket.bucketName, "source-bucket.Arn-derived");
+    assertIdentical(derivedBucket.bucketName, "source-bucket.foo-derived");
 
     const sourceResource = stack.resources.get("SourceBucket");
     const derivedResource = stack.resources.get("DerivedBucket");

@@ -3,10 +3,7 @@ import type {
   SimCreateBucketCommand,
   SimCreateBucketCommandOutput,
 } from "./create-bucket.cmd.js";
-import {
-  SimS3Bucket,
-  type SimS3BucketName,
-} from "../../bucket/sim-s3-bucket.js";
+import { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type { SimS3GlobalRegistry } from "../../sim-s3-global-registry.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
@@ -15,6 +12,7 @@ import {
   BackgroundTasks,
 } from "../../../../util/background/background.js";
 import { SimS3BucketNameAvailability } from "../../bucket/name-availability/sim-s3-bucket-name-availability.js";
+import { validateS3BucketName } from "../../bucket/validate/validate-s3-bucket-name.js";
 
 interface CreateBucketCommandHandlerProps {
   readonly accountRegionScope: SimAwsAccountRegionScope;
@@ -61,7 +59,8 @@ export class CreateBucketCommandHandler implements CommandHandler<
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    const bucketName = cmd.input.Bucket as SimS3BucketName;
+    const bucketName = cmd.input.Bucket;
+    validateS3BucketName(bucketName);
 
     new SimS3BucketNameAvailability({
       accountRegionScope: this.accountRegionScope,

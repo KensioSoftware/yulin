@@ -6,6 +6,7 @@ import type { SimS3 } from "../sim-s3.js";
 import type { SimCfnServiceResourceFactory } from "../../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import type { SimS3Bucket } from "../bucket/sim-s3-bucket.js";
 import type { SimS3WebsiteConfiguration } from "../command/put-bucket-website/put-bucket-website.cmd.js";
+import { validateS3BucketName } from "../bucket/validate/validate-s3-bucket-name.js";
 
 /**
  * CloudFormation Resource factory for simulated S3 resources.
@@ -38,6 +39,7 @@ export class SimS3CloudFormationResourceFactory implements SimCfnServiceResource
     context: SimCloudFormationResourceCreateContext,
   ): Promise<SimS3Bucket> {
     const bucketName = this.bucketNameForResource(resource, context);
+    validateS3BucketName(bucketName);
 
     await this.simS3.createBucket({
       input: {
