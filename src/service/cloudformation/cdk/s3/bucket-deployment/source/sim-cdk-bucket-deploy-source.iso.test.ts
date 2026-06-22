@@ -5,8 +5,8 @@ import {
   assertThrowsError,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
-import type { SimCfnResource } from "../../../resource/sim-cfn-resource.js";
-import type { SimCdkOutContext } from "../../sim-cdk-out-context.js";
+import type { SimCfnResource } from "../../../../resource/sim-cfn-resource.js";
+import type { SimCdkOutContext } from "../../../sim-cdk-out-context.js";
 import { SimCdkBucketDeploySource } from "./sim-cdk-bucket-deploy-source.js";
 
 describe("SimCdkBucketDeploySource", () => {

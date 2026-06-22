@@ -1,10 +1,10 @@
 import { afterAll, beforeAll, describe, it } from "vitest";
-import { SimAws } from "../../../aws/sim-aws.js";
-import { SimAwsLocalServer } from "../../../../serve/index.js";
-import { TempDir } from "../../../../util/filesystem/temp-dir.js";
+import { SimAws } from "../../../../aws/sim-aws.js";
+import { SimAwsLocalServer } from "../../../../../serve/index.js";
+import { TempDir } from "../../../../../util/filesystem/temp-dir.js";
 import path from "node:path";
 import { assertIdentical, assertStringIncludes } from "@kensio/smartass";
-import { TestCdkProject } from "../../../../util/filesystem/test-cdk-project.js";
+import { TestCdkProject } from "../../../../../util/filesystem/test-cdk-project.js";
 
 /**
  * Slower local integration test. Calls the real CDK CLI to synth the output

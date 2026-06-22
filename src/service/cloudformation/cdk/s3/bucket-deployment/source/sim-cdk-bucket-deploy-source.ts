@@ -1,10 +1,10 @@
 import path from "node:path";
 
-import type { SimCfnResource } from "../../../resource/sim-cfn-resource.js";
+import type { SimCfnResource } from "../../../../resource/sim-cfn-resource.js";
 import type {
   SimCdkAssetsManifest,
   SimCdkOutContext,
-} from "../../sim-cdk-out-context.js";
+} from "../../../sim-cdk-out-context.js";
 import { SimCdkBucketDeployErrorMessage } from "../error-message/sim-cdk-bucket-deploy-error-message.js";
 
 /**

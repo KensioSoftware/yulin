@@ -1,5 +1,5 @@
-import type { SimCfnResource } from "../../../resource/sim-cfn-resource.js";
-import type { SimCdkOutContext } from "../../sim-cdk-out-context.js";
+import type { SimCfnResource } from "../../../../resource/sim-cfn-resource.js";
+import type { SimCdkOutContext } from "../../../sim-cdk-out-context.js";
 
 interface SimCdkBucketDeploymentAssetErrorMessageProps {
   readonly resource: SimCfnResource;

@@ -5,14 +5,14 @@ import {
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
-import { SimAws } from "../../../aws/sim-aws.js";
-import { jsonStringify } from "../../../../util/type-guard/json.js";
-import { TempDir } from "../../../../util/filesystem/temp-dir.js";
+import { SimAws } from "../../../../aws/sim-aws.js";
+import { jsonStringify } from "../../../../../util/type-guard/json.js";
+import { TempDir } from "../../../../../util/filesystem/temp-dir.js";
 import { SimCdkBucketDeploymentResourceFactory } from "./sim-cdk-bucket-deployment.js";
 import type {
   SimCfnResource,
   SimCloudFormationResourceCreateContext,
-} from "../../resource/sim-cfn-resource.js";
+} from "../../../resource/sim-cfn-resource.js";
 
 /**
  * Faster "isolated" test that assumes structure of /cdk.out/ manifest and

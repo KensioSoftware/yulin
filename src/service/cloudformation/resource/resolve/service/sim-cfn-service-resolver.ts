@@ -5,7 +5,7 @@ import type {
   SimCfnServiceResourceFactory,
 } from "../../factory/sim-cfn-resource-factory.type.js";
 import { SimCfnCfnResourceFactory } from "../../factory/sim-cfn-cfn-resource-factory.js";
-import { SimCdkBucketDeploymentResourceFactory } from "../../../cdk/bucket-deployment/sim-cdk-bucket-deployment.js";
+import { SimCdkBucketDeploymentResourceFactory } from "../../../cdk/s3/bucket-deployment/sim-cdk-bucket-deployment.js";
 
 /**
  * Resolve a scoped simulated service CloudFormation Resource factory.
@@ -43,6 +43,9 @@ export function resolveSimCloudFormationServiceResourceFactory(
   switch (resourceType.serviceName) {
     case "CloudFormation": {
       return new SimCfnCfnResourceFactory();
+    }
+    case "CloudFront": {
+      return scopedAws.cloudFront().cfnResourceFactory();
     }
     case "S3": {
       return scopedAws.s3().cfnResourceFactory();
