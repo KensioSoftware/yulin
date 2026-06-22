@@ -57,7 +57,13 @@ export class SimCloudFrontDistributionConfigNormalizer {
     }
 
     if (isRecord(value)) {
-      return value;
+      return {
+        ...value,
+        // Keep downstream for..of iteration safe when Items is malformed.
+        Items: Array.isArray(value["Items"])
+          ? (value["Items"] as readonly T[])
+          : undefined,
+      };
     }
 
     /* v8 ignore next -- defensive fallback */
