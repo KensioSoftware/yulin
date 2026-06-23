@@ -22,6 +22,7 @@ import {
 import { SimCfnParameters } from "../../parameters/sim-cfn-parameters.js";
 import type { JSONString } from "../../../../util/type-guard/json.js";
 import type { SimCdkOutContext } from "../../cdk/sim-cdk-out-context.js";
+import type { SimCfnExecutableResourceBinding } from "../../bind/sim-cfn-exec-binding.type.js";
 
 interface CreateStackCommandHandlerProps {
   readonly simAws: SimAws;
@@ -29,6 +30,7 @@ interface CreateStackCommandHandlerProps {
   readonly stacks: Map<SimCloudFormationStackName, SimCfnStack>;
   readonly background: BackgroundScheduler & BackgroundCompleter;
   readonly cdkOutContext?: SimCdkOutContext | undefined;
+  readonly bindings?: readonly SimCfnExecutableResourceBinding[] | undefined;
 }
 
 /**
@@ -45,16 +47,26 @@ export class CreateStackCommandHandler implements CommandHandler<
   private readonly stacks: Map<SimCloudFormationStackName, SimCfnStack>;
   private readonly background: BackgroundScheduler & BackgroundCompleter;
   private readonly cdkOutContext: SimCdkOutContext | undefined;
+  private readonly bindings:
+    | readonly SimCfnExecutableResourceBinding[]
+    | undefined;
 
   constructor(props: CreateStackCommandHandlerProps) {
-    const { simAws, accountRegionScope, stacks, background, cdkOutContext } =
-      props;
+    const {
+      simAws,
+      accountRegionScope,
+      stacks,
+      background,
+      cdkOutContext,
+      bindings,
+    } = props;
 
     this.simAws = simAws;
     this.accountRegionScope = accountRegionScope;
     this.stacks = stacks;
     this.background = background;
     this.cdkOutContext = cdkOutContext;
+    this.bindings = bindings;
   }
 
   /**
@@ -96,6 +108,7 @@ export class CreateStackCommandHandler implements CommandHandler<
       stackName,
       template,
       cdkOutContext: this.cdkOutContext,
+      bindings: this.bindings,
     });
 
     this.stacks.set(stack.stackName, stack);

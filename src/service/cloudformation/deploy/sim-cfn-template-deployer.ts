@@ -8,11 +8,13 @@ import { jsonStringify } from "../../../util/type-guard/json.js";
 import { assertDefined } from "../../../util/type-guard/defined.js";
 import type { SimCdkOutContext } from "../cdk/sim-cdk-out-context.js";
 import { SimCfnTemplateFileLoader } from "./sim-cfn-template-file-loader.js";
+import type { SimCfnExecutableResourceBinding } from "../bind/sim-cfn-exec-binding.type.js";
 
 export interface SimCloudFormationCreateStackProps {
   readonly stackName?: SimCloudFormationStackName | string;
   readonly template: CfnTemplateBodyRecord;
   readonly parameters?: Record<string, string> | undefined;
+  readonly bindings?: readonly SimCfnExecutableResourceBinding[] | undefined;
 }
 
 export interface SimCloudFormationDeployTemplateFileProps {
@@ -34,6 +36,7 @@ interface SimCloudFormationTemplateDeployerProps {
       };
     },
     cdkOutContext?: SimCdkOutContext,
+    bindings?: readonly SimCfnExecutableResourceBinding[],
   ) => Promise<SimCreateStackCommandOutput>;
   readonly getStackByName: (
     stackName: SimCloudFormationStackName | string,
@@ -67,6 +70,7 @@ export class SimCloudFormationTemplateDeployer {
       stackName: props.stackName ?? this.props.defaultStackName(),
       template: props.template,
       parameters: props.parameters,
+      bindings: props.bindings,
     });
   }
 
@@ -86,6 +90,7 @@ export class SimCloudFormationTemplateDeployer {
     readonly stackName: SimCloudFormationStackName | string;
     readonly template: CfnTemplateBodyRecord;
     readonly parameters?: Record<string, string> | undefined;
+    readonly bindings?: readonly SimCfnExecutableResourceBinding[] | undefined;
     readonly cdkOutContext?: SimCdkOutContext | undefined;
   }): Promise<SimCfnStack> {
     await this.props.createStackWithContext(
@@ -102,6 +107,7 @@ export class SimCloudFormationTemplateDeployer {
         },
       },
       props.cdkOutContext,
+      props.bindings,
     );
 
     const stack = this.props.getStackByName(props.stackName);

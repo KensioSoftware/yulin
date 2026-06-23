@@ -1,12 +1,9 @@
-import { isRecord } from "../../../../util/type-guard/record.js";
 import {
   parseSimCfnResourceDependencies,
   parseSimCfnResourceRefDependencies,
 } from "../dependency/sim-cfn-resource-dependencies.js";
-import type {
-  SimCfnTemplateValue,
-  SimCfnTemplateValueRecord,
-} from "../../template/value/sim-cfn-template-value.js";
+import type { SimCfnTemplateValueRecord } from "../../template/value/sim-cfn-template-value.js";
+import { isCfnTemplateValueRecord } from "./sim-cfn-templ-val-record.js";
 
 /**
  * Reads CloudFormation Resource-level fields from one Resource template object.
@@ -40,7 +37,7 @@ export class SimCfnResourceTemplateReader {
   properties(): SimCfnTemplateValueRecord {
     const properties = this.template["Properties"];
 
-    if (!isSimCfnTemplateValueRecord(properties)) {
+    if (!isCfnTemplateValueRecord(properties)) {
       return {};
     }
 
@@ -68,10 +65,4 @@ export class SimCfnResourceTemplateReader {
 
     return [...new Set([...dependsOn, ...refDependencies])];
   }
-}
-
-function isSimCfnTemplateValueRecord(
-  value: SimCfnTemplateValue | undefined,
-): value is SimCfnTemplateValueRecord {
-  return isRecord(value);
 }

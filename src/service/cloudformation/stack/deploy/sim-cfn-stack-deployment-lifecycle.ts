@@ -30,10 +30,10 @@ interface SimCfnStackDeploymentProps {
  * - capturing any background deployment error
  * - rethrowing the captured error when callers wait for completion
  *
- * It does not interpret templates, resolve resource dependencies, or create
- * resources. The injected deployResources callback performs the actual resource
- * deployment, and SimCfnStackDeploymentScheduler controls when that callback
- * runs on the background scheduler.
+ * It does not interpret templates, resolve resource dependencies, create
+ * resources, or choose background execution order. The injected runDeployment
+ * callback performs the actual resource deployment, and
+ * SimCfnStackDeploymentScheduler controls when that callback runs.
  */
 export class SimCfnStackDeploymentLifecycle {
   private readonly background: BackgroundScheduler;

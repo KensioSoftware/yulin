@@ -14,10 +14,14 @@ interface ScheduleDeploymentProps {
 /**
  * Coordinates when Stack deployment work runs on the background scheduler.
  *
- * This class does not create CloudFormation resources or resolve resource
- * dependencies. That is the responsibility of SimCfnStackResourceDeployer.
- * Instead, this class wraps a deployment task with background scheduling,
- * completion notification, and consistent error conversion.
+ * This class does not create CloudFormation resources, resolve resource
+ * dependencies, or update Stack lifecycle state. SimCfnStackResourceCreator
+ * owns dependency-ordered Resource creation, while
+ * SimCfnStackDeploymentLifecycle owns Stack status, completion tracking, and
+ * captured deployment errors.
+ *
+ * This scheduler only wraps a deployment task with background scheduling,
+ * completion notification callbacks, and consistent non-Error conversion.
  */
 export class SimCfnStackDeploymentScheduler {
   private readonly background: BackgroundScheduler;

@@ -7,17 +7,20 @@ import {
   loadSiblingCdkAssetsManifest,
   type SimCdkOutContext,
 } from "../cdk/sim-cdk-out-context.js";
+import type { SimCfnExecutableResourceBinding } from "../bind/sim-cfn-exec-binding.type.js";
 
 export interface SimCloudFormationDeployTemplateFileProps {
   readonly templatePath: string;
   readonly stackName?: SimCloudFormationStackName | string | undefined;
   readonly parameters?: Record<string, string> | undefined;
+  readonly bindings?: readonly SimCfnExecutableResourceBinding[] | undefined;
 }
 
 export interface SimCfnLoadedTemplateFile {
   readonly stackName: SimCloudFormationStackName | string;
   readonly template: CfnTemplateBodyRecord;
   readonly parameters?: Record<string, string> | undefined;
+  readonly bindings?: readonly SimCfnExecutableResourceBinding[] | undefined;
   readonly cdkOutContext?: SimCdkOutContext | undefined;
 }
 
@@ -35,6 +38,7 @@ export class SimCfnTemplateFileLoader {
   ): Promise<SimCfnLoadedTemplateFile> {
     const templatePath = typeof props === "string" ? props : props.templatePath;
     const parameters = typeof props === "string" ? undefined : props.parameters;
+    const bindings = typeof props === "string" ? undefined : props.bindings;
     const stackName =
       typeof props === "string"
         ? stackNameFromTemplatePath(templatePath)
@@ -51,6 +55,7 @@ export class SimCfnTemplateFileLoader {
       stackName,
       template,
       parameters,
+      bindings,
       cdkOutContext,
     };
   }
