@@ -28,6 +28,18 @@ export class SimS3BucketCfn implements SimCfnResourceValueAdapter {
    * CloudFormation attributes for AWS::S3::Bucket.
    */
   attributeValue(attributeName: string): SimCfnTemplateValue {
+    if (attributeName === "Arn") {
+      return `arn:aws:s3:::${this.props.bucket.bucketName}`;
+    }
+
+    if (attributeName === "DomainName") {
+      return `${this.props.bucket.bucketName}.s3.amazonaws.com`;
+    }
+
+    if (attributeName === "RegionalDomainName") {
+      return `${this.props.bucket.bucketName}.s3.${this.props.bucket.getAccountRegionScope().regionName}.amazonaws.com`;
+    }
+
     if (attributeName === "WebsiteURL") {
       return this.props.bucket.getWebsiteUrl().toString();
     }

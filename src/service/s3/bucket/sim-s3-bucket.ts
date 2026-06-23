@@ -87,8 +87,12 @@ export class SimS3Bucket {
   }
 
   /**
-   * Get the simulated S3 static website URL for this Bucket.
+   * Get the simulated AWS account Region scope for this Bucket.
    */
+  getAccountRegionScope(): SimAwsAccountRegionScope {
+    return this.accountRegionScope;
+  }
+
   /**
    * Get the simulated S3 static website URL for this Bucket.
    */
