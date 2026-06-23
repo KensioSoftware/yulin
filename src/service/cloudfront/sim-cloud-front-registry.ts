@@ -22,6 +22,11 @@ export class SimCloudFrontRegistry {
     Set<SimCloudFrontDistributionId>
   >();
 
+  private readonly alternateDomainDistributionIds = new Map<
+    string,
+    SimCloudFrontDistributionId
+  >();
+
   /**
    * Allocate a globally unique simulated CloudFront Distribution ID.
    */
@@ -56,18 +61,33 @@ export class SimCloudFrontRegistry {
   }
 
   /**
+   * Register an alternate domain name to a simulated CloudFront Distribution ID.
+   */
+  registerAlternateDomainName(
+    alternateDomainName: string,
+    distributionId: SimCloudFrontDistributionId,
+  ): void {
+    this.alternateDomainDistributionIds.set(
+      alternateDomainName,
+      distributionId,
+    );
+  }
+
+  /**
+   * Get the Distribution ID registered for an alternate domain name.
+   */
+  distributionIdForAlternateDomainName(
+    alternateDomainName: string,
+  ): SimCloudFrontDistributionId | undefined {
+    return this.alternateDomainDistributionIds.get(alternateDomainName);
+  }
+
+  /**
    * Get the Account ID which owns a simulated CloudFront Distribution ID.
    */
   accountIdForDistribution(
     distributionId: SimCloudFrontDistributionId,
   ): SimAwsAccountId | undefined {
     return this.distributionAccountIds.get(distributionId);
-  }
-
-  /**
-   * Get Account IDs which currently own simulated CloudFront Distributions.
-   */
-  accountIdsWithDistributions(): Iterable<SimAwsAccountId> {
-    return this.accountDistributionIds.keys();
   }
 }

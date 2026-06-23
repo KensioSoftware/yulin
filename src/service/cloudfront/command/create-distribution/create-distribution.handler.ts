@@ -92,6 +92,13 @@ export class CreateDistributionCommandHandler implements CommandHandler<
       this.accountId,
     );
 
+    for (const alternateDomainName of distribution.getAlternateDomainNames()) {
+      this.cloudFrontRegistry.registerAlternateDomainName(
+        alternateDomainName,
+        distribution.distributionId,
+      );
+    }
+
     // Schedule background task to complete deployment of the sim Distribution.
     this.background.schedule(() => distribution.completeDeployment());
 
