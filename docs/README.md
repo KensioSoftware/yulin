@@ -7,5 +7,6 @@ into tests, local development scripts, or small experiments.
 
 ## Service documentation
 
+- [CloudFormation](./services/cloudformation/ "Simulated CloudFormation usage docs")
 - [CloudFront](./services/cloudfront/ "Simulated CloudFront usage docs")
 - [S3](./services/s3/ "Simulated S3 usage docs")
