@@ -22,6 +22,7 @@ import {
   simCfnResourceValueAdapter,
 } from "./cfn/sim-cfn-resource-value-adapter.js";
 import type { SimCdkOutContext } from "../cdk/sim-cdk-out-context.js";
+import type { SimCfnExecutableResourceBinding } from "../bind/sim-cfn-exec-binding.type.js";
 
 interface SimCloudFormationResourceProps {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
@@ -50,6 +51,7 @@ export interface SimCloudFormationResourceCreateContext {
   readonly resources: ReadonlyMap<string, SimCfnResource>;
   readonly resolvedProperties?: SimCfnTemplateValueRecord | undefined;
   readonly cdkOutContext?: SimCdkOutContext | undefined;
+  readonly bindings?: readonly SimCfnExecutableResourceBinding[] | undefined;
 }
 
 /**

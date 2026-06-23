@@ -1,6 +1,8 @@
 import type {
   SimCloudFrontCacheBehaviorConfig,
+  SimCloudFrontDefaultCacheBehaviorConfig,
   SimCloudFrontDistributionConfig,
+  SimCloudFrontFunctionAssociation,
   SimCloudFrontOriginConfig,
 } from "./create-distribution.cmd.js";
 import { isRecord } from "../../../../util/type-guard/record.js";
@@ -9,12 +11,16 @@ interface SimCloudFrontConfigList<T> {
   readonly Items?: readonly T[] | undefined;
 }
 
+type SimCloudFrontBehaviorConfig =
+  | SimCloudFrontDefaultCacheBehaviorConfig
+  | SimCloudFrontCacheBehaviorConfig;
+
 /**
  * Normalizes tolerated CloudFront DistributionConfig input shapes into the
  * simulator's internal CreateDistribution shape.
  *
- * This is intentionally forgiving: CloudFormation/CDK commonly emits array
- * values for list-like properties, while CloudFront SDK-style inputs use
+ * This is forgiving: CloudFormation/CDK commonly emits array values for
+ * list-like properties, while CloudFront SDK-style inputs use
  * `{ Items: [...] }` containers.
  */
 export class SimCloudFrontDistributionConfigNormalizer {
@@ -30,6 +36,9 @@ export class SimCloudFrontDistributionConfigNormalizer {
       string,
       object
     >;
+    const cacheBehaviors = this.normalizeList<SimCloudFrontCacheBehaviorConfig>(
+      distributionConfig["CacheBehaviors"],
+    );
 
     return {
       ...this.distributionConfig,
@@ -37,9 +46,35 @@ export class SimCloudFrontDistributionConfigNormalizer {
       Origins: this.normalizeList<SimCloudFrontOriginConfig>(
         distributionConfig["Origins"],
       ),
-      CacheBehaviors: this.normalizeList<SimCloudFrontCacheBehaviorConfig>(
-        distributionConfig["CacheBehaviors"],
-      ),
+      DefaultCacheBehavior:
+        this.distributionConfig.DefaultCacheBehavior === undefined
+          ? undefined
+          : this.normalizeCacheBehavior(
+              this.distributionConfig.DefaultCacheBehavior,
+            ),
+      CacheBehaviors:
+        cacheBehaviors === undefined
+          ? undefined
+          : {
+              ...cacheBehaviors,
+              Items: cacheBehaviors.Items?.map((cacheBehavior) =>
+                this.normalizeCacheBehavior(cacheBehavior),
+              ),
+            },
+    };
+  }
+
+  private normalizeCacheBehavior<T extends SimCloudFrontBehaviorConfig>(
+    cacheBehavior: T,
+  ): T {
+    const cacheBehaviorRecord = cacheBehavior as Record<string, object>;
+
+    return {
+      ...cacheBehavior,
+      FunctionAssociations:
+        this.normalizeList<SimCloudFrontFunctionAssociation>(
+          cacheBehaviorRecord["FunctionAssociations"],
+        ),
     };
   }
 

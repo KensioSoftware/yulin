@@ -11,6 +11,7 @@ import { SimCfnStackResourceCreator } from "./deploy/sim-cfn-stack-resource-crea
 import { makeSimCfnStackResourceMap } from "./resource-map/sim-cfn-stack-resource-map.js";
 import { SimCfnStackDeploymentLifecycle } from "./deploy/sim-cfn-stack-deployment-lifecycle.js";
 import type { SimCdkOutContext } from "../cdk/sim-cdk-out-context.js";
+import type { SimCfnExecutableResourceBinding } from "../bind/sim-cfn-exec-binding.type.js";
 
 export type SimCloudFormationStackName = Brand<
   string,
@@ -30,6 +31,7 @@ interface SimCloudFormationStackProps {
   readonly stackName: SimCloudFormationStackName;
   readonly template: SimCfnTemplate;
   readonly cdkOutContext?: SimCdkOutContext | undefined;
+  readonly bindings?: readonly SimCfnExecutableResourceBinding[] | undefined;
 }
 
 /**
@@ -49,6 +51,9 @@ export class SimCfnStack {
   private readonly simAws: SimAws;
   private readonly cfnTemplate: SimCfnTemplate;
   private readonly cdkOutContext: SimCdkOutContext | undefined;
+  private readonly bindings:
+    | readonly SimCfnExecutableResourceBinding[]
+    | undefined;
   private readonly skippedResourceList: SimCfnResource[] = [];
   public readonly lifecycle: SimCfnStackDeploymentLifecycle;
 
@@ -64,12 +69,14 @@ export class SimCfnStack {
       stackName,
       template,
       cdkOutContext,
+      bindings,
     } = props;
 
     this.simAws = simAws;
     this.stackName = stackName;
     this.cfnTemplate = template;
     this.cdkOutContext = cdkOutContext;
+    this.bindings = bindings;
     this.template = this.cfnTemplate.template;
     this.resources = makeSimCfnStackResourceMap({
       accountRegionScope,
@@ -124,6 +131,7 @@ export class SimCfnStack {
       resources: this.resources,
       stackName: this.stackName,
       cdkOutContext: this.cdkOutContext,
+      bindings: this.bindings,
       skippedResources: this.skippedResourceList,
     });
 

@@ -29,6 +29,7 @@ import {
   SimCloudFormationTemplateDeployer,
 } from "./deploy/sim-cfn-template-deployer.js";
 import type { SimCloudFormationDeployTemplateFileProps } from "./deploy/sim-cfn-template-file-loader.js";
+import type { SimCfnExecutableResourceBinding } from "./bind/sim-cfn-exec-binding.type.js";
 
 interface SimCloudFormationProps {
   readonly simAws: SimAws;
@@ -60,8 +61,9 @@ export class SimCloudFormation {
       createStackWithContext: async (
         cmd,
         cdkOutContext,
+        bindings,
       ): Promise<SimCreateStackCommandOutput> =>
-        await this.createStackWithContext(cmd, cdkOutContext),
+        await this.createStackWithContext(cmd, cdkOutContext, bindings),
       getStackByName: (stackName): SimCfnStack | undefined =>
         this.getStackByName(stackName),
       defaultStackName: makeSimCloudFormationStackName,
@@ -89,6 +91,7 @@ export class SimCloudFormation {
   private async createStackWithContext(
     cmd: SimCreateStackCommand,
     cdkOutContext?: SimCdkOutContext,
+    bindings?: readonly SimCfnExecutableResourceBinding[],
   ): Promise<SimCreateStackCommandOutput> {
     const handler = new CreateStackCommandHandler({
       simAws: this.simAws,
@@ -96,6 +99,7 @@ export class SimCloudFormation {
       stacks: this.stacks,
       background: this.background,
       cdkOutContext,
+      bindings,
     });
     return await handler.handle(cmd);
   }

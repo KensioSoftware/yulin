@@ -4,6 +4,8 @@ import { SimS3BucketCfn } from "./s3/sim-s3-bucket-cfn.js";
 import { SimCfnDefaultResourceValueAdapter } from "./sim-cfn-default-resource-value-adapter.js";
 import { SimCloudFrontDistribution } from "../../../cloudfront/distribution/sim-cloudfront-distribution.js";
 import { SimCloudFrontDistributionCfn } from "./cloudfront/sim-cloudfront-distribution-cfn.js";
+import { SimCloudFrontFunction } from "../../../cloudfront/cff/sim-cloudfront-function.js";
+import { SimCloudFrontFunctionCfn } from "./cloudfront/sim-cloudfront-function-cfn.js";
 
 export interface SimCfnResourceValueAdapter {
   refValue(): SimCfnTemplateValue;
@@ -43,6 +45,15 @@ export function simCfnResourceValueAdapter(
   ) {
     return new SimCloudFrontDistributionCfn({
       distribution: props.simResource,
+    });
+  }
+
+  if (
+    props.type === "AWS::CloudFront::Function" &&
+    props.simResource instanceof SimCloudFrontFunction
+  ) {
+    return new SimCloudFrontFunctionCfn({
+      cloudFrontFunction: props.simResource,
     });
   }
 
