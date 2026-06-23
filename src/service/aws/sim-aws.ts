@@ -16,7 +16,7 @@ import {
 import type { SimAwsAccountRegionContainer } from "./sim-aws-account-region-scope.js";
 import type { SimS3 } from "../s3/sim-s3.js";
 import type { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
-import type { SimCloudFrontRegistry } from "../cloudfront/sim-cloud-front-registry.js";
+import type { SimCloudFrontRegistry } from "../cloudfront/registry/sim-cloud-front-registry.js";
 import type { SimDynamoDb } from "../dynamodb/index.js";
 import type { SimCloudFormation } from "../cloudformation/index.js";
 import { SimAwsServiceFactory } from "./factory/sim-aws-service-factory.js";

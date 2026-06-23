@@ -12,9 +12,9 @@ import {
 import { SimAws } from "../../aws/sim-aws.js";
 import { CreateDistributionCommand } from "@aws-sdk/client-cloudfront";
 import { CreateBucketCommand } from "@aws-sdk/client-s3";
-import { SimCloudFrontRegistry } from "../sim-cloud-front-registry.js";
+import { SimCloudFrontRegistry } from "../registry/sim-cloud-front-registry.js";
 import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
-import { extractCloudFrontHostDistroId } from "./extract-cf-host-distro-id.js";
+import { extractCloudFrontHostDistroId } from "./distro-id/extract-cf-host-distro-id.js";
 
 describe("Sim CloudFront Distribution Router", () => {
   describe("route requests to distributions", () => {

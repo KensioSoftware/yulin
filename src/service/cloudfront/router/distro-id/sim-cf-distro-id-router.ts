@@ -1,12 +1,12 @@
 import type {
   SimCloudFrontDistribution,
   SimCloudFrontDistributionId,
-} from "../distribution/sim-cloudfront-distribution.js";
-import type { SimCloudFrontRegistry } from "../sim-cloud-front-registry.js";
-import type { SimAws } from "../../aws/sim-aws.js";
-import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
-import type { SimCloudFront } from "../sim-cloudfront.js";
-import type { SimCloudFrontDistroRoute } from "./sim-cloud-front-distro-router.js";
+} from "../../distribution/sim-cloudfront-distribution.js";
+import type { SimCloudFrontRegistry } from "../../registry/sim-cloud-front-registry.js";
+import type { SimAws } from "../../../aws/sim-aws.js";
+import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
+import type { SimCloudFront } from "../../sim-cloudfront.js";
+import type { SimCloudFrontDistroRoute } from "../sim-cloud-front-distro-router.js";
 
 /**
  * Routes a CloudFront Distribution ID to the appropriate sim Distribution.

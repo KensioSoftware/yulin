@@ -1,18 +1,18 @@
 import type {
   SimCloudFrontDistribution,
   SimCloudFrontDistributionId,
-} from "../distribution/sim-cloudfront-distribution.js";
-import type { SimCloudFrontRegistry } from "../sim-cloud-front-registry.js";
-import type { SimAws } from "../../aws/sim-aws.js";
-import type { SimCloudFrontDistroRoute } from "./sim-cloud-front-distro-router.js";
+} from "../../distribution/sim-cloudfront-distribution.js";
+import type { SimCloudFrontRegistry } from "../../registry/sim-cloud-front-registry.js";
+import type { SimAws } from "../../../aws/sim-aws.js";
+import type { SimCloudFrontDistroRoute } from "../sim-cloud-front-distro-router.js";
 
 /**
  * Routes CloudFront alternate domain names to matching simulated Distributions.
  *
  * Lookup is attempted in two tiers:
  * 1. The inline `distributions` map — fast path for directly supplied distributions.
- * 2. All accounts known to the SimCloudFrontRegistry — needed when distributions
- *    were created through the sim CloudFront API rather than supplied inline.
+ * 2. The SimCloudFrontRegistry alternate-domain index — lookup for
+ *    distributions created through the sim CloudFront API.
  */
 export class SimCloudFrontAlternateDomainRouter {
   private readonly simAws: SimAws;
@@ -56,20 +56,29 @@ export class SimCloudFrontAlternateDomainRouter {
       }
     }
 
-    // Tier 2: walk every registered account and search their live distributions.
-    // This is exhaustive — alternate domain names are not indexed in the
-    // registry, so a full scan is required.
-    for (const accountId of this.cloudFrontRegistry.accountIdsWithDistributions()) {
-      const cloudFront = this.simAws.accountRegionScope(accountId).cloudFront();
-      const distribution = [...cloudFront.getDistributions().values()].find(
-        (distro) => distro.hasAlternateDomainName(alternateDomainName),
+    const distributionId =
+      this.cloudFrontRegistry.distributionIdForAlternateDomainName(
+        alternateDomainName,
       );
 
-      if (distribution !== undefined) {
-        return { cloudFront, distribution };
-      }
+    if (distributionId === undefined) {
+      return undefined;
     }
 
-    return undefined;
+    const accountId =
+      this.cloudFrontRegistry.accountIdForDistribution(distributionId);
+
+    if (accountId === undefined) {
+      return undefined;
+    }
+
+    const cloudFront = this.simAws.accountRegionScope(accountId).cloudFront();
+    const distribution = cloudFront.getSimDistributionById(distributionId);
+
+    if (distribution === undefined) {
+      return undefined;
+    }
+
+    return { cloudFront, distribution };
   }
 }

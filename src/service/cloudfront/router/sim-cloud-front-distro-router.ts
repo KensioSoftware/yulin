@@ -5,11 +5,11 @@ import type {
 import { assertNotNull } from "../../../util/type-guard/defined.js";
 import { SimAwsLocalUrl } from "../../../serve/http/url/sim-aws-local-url.js";
 import type { SimCloudFront } from "../sim-cloudfront.js";
-import type { SimCloudFrontRegistry } from "../sim-cloud-front-registry.js";
+import type { SimCloudFrontRegistry } from "../registry/sim-cloud-front-registry.js";
 import { SimAws } from "../../aws/sim-aws.js";
-import { extractCloudFrontHostDistroId } from "./extract-cf-host-distro-id.js";
-import { SimCloudFrontAlternateDomainRouter } from "./sim-cf-alternate-domain-router.js";
-import { SimCloudFrontDistroIdRouter } from "./sim-cf-distro-id-router.js";
+import { extractCloudFrontHostDistroId } from "./distro-id/extract-cf-host-distro-id.js";
+import { SimCloudFrontAlternateDomainRouter } from "./alternate-domain/sim-cf-alternate-domain-router.js";
+import { SimCloudFrontDistroIdRouter } from "./distro-id/sim-cf-distro-id-router.js";
 
 export interface SimCloudFrontDistroRoute {
   readonly cloudFront: SimCloudFront;

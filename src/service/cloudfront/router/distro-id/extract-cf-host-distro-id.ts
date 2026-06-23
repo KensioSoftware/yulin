@@ -1,4 +1,4 @@
-import type { SimCloudFrontDistributionId } from "../distribution/sim-cloudfront-distribution.js";
+import type { SimCloudFrontDistributionId } from "../../distribution/sim-cloudfront-distribution.js";
 
 /**
  * Try to extract a CloudFront Distribution ID from a hostname which could

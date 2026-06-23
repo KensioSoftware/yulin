@@ -3,7 +3,7 @@ import type {
   SimCreateDistributionCommand,
   SimCreateDistributionCommandOutput,
 } from "./create-distribution.cmd.js";
-import type { SimCloudFrontRegistry } from "../../sim-cloud-front-registry.js";
+import type { SimCloudFrontRegistry } from "../../registry/sim-cloud-front-registry.js";
 import {
   SimCloudFrontDistribution,
   type SimCloudFrontDistributionId,
@@ -91,6 +91,13 @@ export class CreateDistributionCommandHandler implements CommandHandler<
       distribution.distributionId,
       this.accountId,
     );
+
+    for (const alternateDomainName of distribution.getAlternateDomainNames()) {
+      this.cloudFrontRegistry.registerAlternateDomainName(
+        alternateDomainName,
+        distribution.distributionId,
+      );
+    }
 
     // Schedule background task to complete deployment of the sim Distribution.
     this.background.schedule(() => distribution.completeDeployment());

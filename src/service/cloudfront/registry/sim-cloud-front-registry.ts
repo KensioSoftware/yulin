@@ -1,8 +1,8 @@
 import {
   makeDistributionId,
   type SimCloudFrontDistributionId,
-} from "./distribution/sim-cloudfront-distribution.js";
-import type { SimAwsAccountId } from "../aws/sim-aws-account.js";
+} from "../distribution/sim-cloudfront-distribution.js";
+import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
 
 /**
  * Simulated CloudFront cross-Account registry of Distribution IDs.
@@ -20,6 +20,11 @@ export class SimCloudFrontRegistry {
   private readonly accountDistributionIds = new Map<
     SimAwsAccountId,
     Set<SimCloudFrontDistributionId>
+  >();
+
+  private readonly alternateDomainDistributionIds = new Map<
+    string,
+    SimCloudFrontDistributionId
   >();
 
   /**
@@ -56,18 +61,45 @@ export class SimCloudFrontRegistry {
   }
 
   /**
+   * Register an alternate domain name to a simulated CloudFront Distribution ID.
+   */
+  registerAlternateDomainName(
+    alternateDomainName: string,
+    distributionId: SimCloudFrontDistributionId,
+  ): void {
+    const existingDistributionId =
+      this.alternateDomainDistributionIds.get(alternateDomainName);
+
+    if (
+      existingDistributionId !== undefined &&
+      existingDistributionId !== distributionId
+    ) {
+      throw new Error(
+        `Sim CloudFront alternate domain name ${alternateDomainName} is already registered to Distribution ${existingDistributionId}`,
+      );
+    }
+
+    this.alternateDomainDistributionIds.set(
+      alternateDomainName,
+      distributionId,
+    );
+  }
+
+  /**
+   * Get the Distribution ID registered for an alternate domain name.
+   */
+  distributionIdForAlternateDomainName(
+    alternateDomainName: string,
+  ): SimCloudFrontDistributionId | undefined {
+    return this.alternateDomainDistributionIds.get(alternateDomainName);
+  }
+
+  /**
    * Get the Account ID which owns a simulated CloudFront Distribution ID.
    */
   accountIdForDistribution(
     distributionId: SimCloudFrontDistributionId,
   ): SimAwsAccountId | undefined {
     return this.distributionAccountIds.get(distributionId);
-  }
-
-  /**
-   * Get Account IDs which currently own simulated CloudFront Distributions.
-   */
-  accountIdsWithDistributions(): Iterable<SimAwsAccountId> {
-    return this.accountDistributionIds.keys();
   }
 }
