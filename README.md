@@ -8,6 +8,12 @@ AWS system behaviour simulation for isolated unit testing, local development and
 npm i -D @kensio/yulin
 ```
 
+## Service specific docs
+
+- [CloudFormation](./docs/services/cloudformation "Simulated CloudFormation docs")
+- [CloudFront](./docs/services/cloudfront "Simulated CloudFront docs")
+- [S3](./docs/services/s3 "Simulated S3 docs")
+
 ## Usage
 
 ### Direct interaction with simulated AWS

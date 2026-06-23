@@ -159,7 +159,7 @@ Yulin accepts parsed template objects in helper APIs and JSON strings for `Creat
 A valid simulated template must contain a usable `Resources` section. The template may also contain
 `Parameters` and other CloudFormation sections, but only the implemented parts affect deployment.
 
-Template responsibilities are deliberately limited:
+Template responsibilities are limited:
 
 - validate broad template body shape
 - attach parameter definitions
@@ -421,8 +421,8 @@ There are several scheduling levels:
 - service-specific factories may call into simulated services that schedule their own background
   work
 
-This layering is deliberate. It lets CloudFormation model asynchronous stack/resource creation while
-still integrating with the broader simulator's deterministic test controls.
+This layering lets sim CloudFormation model asynchronous stack/resource creation while still
+integrating with the broader simulator's deterministic test controls.
 
 Tests that need final state should use one of the explicit wait/drain helpers, for example:
 
