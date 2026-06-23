@@ -50,6 +50,9 @@ new s3deploy.BucketDeployment(stack, "DeploySite", {
   destinationBucket: bucket,
   prune: true,
 });
+new cdk.CfnOutput(stack, "SiteBucketWebsiteUrl", {
+  value: bucket.bucketWebsiteUrl,
+});
 app.synth();
 `,
     );
@@ -59,21 +62,24 @@ app.synth();
 
     // When we deploy the template into sim CloudFormation.
     const simCfn = simAws.cloudFormation();
-    await simCfn.deployTemplateFile(
+    const stack = await simCfn.deployTemplateFile(
       path.join(cdkOutDir, "TestStack.template.json"),
     );
 
-    // Then we should be able to fetch the objects from the local sim server.
-    const rootRes = await fetch(
-      `http://foo-bucket.s3-website.us-east-1.sim-aws.localhost:${srv.port}/`,
+    const websiteUrlOut = stack.outputs.get("SiteBucketWebsiteUrl")?.value;
+    assertIdentical(
+      websiteUrlOut,
+      "http://foo-bucket.s3-website.us-east-1.sim-aws.localhost/",
     );
+    const websiteRoot = srv.localUrl(websiteUrlOut).toString().trimEnd();
+
+    // Then we should be able to fetch the objects from the local sim server.
+    const rootRes = await fetch(websiteRoot);
     assertIdentical(rootRes.status, 200);
     assertStringIncludes(rootRes.headers.get("content-type"), "text/html");
     assertStringIncludes(await rootRes.text(), "<h1>Root</h1>");
 
-    const fooRes = await fetch(
-      `http://foo-bucket.s3-website.us-east-1.sim-aws.localhost:${srv.port}/foo/`,
-    );
+    const fooRes = await fetch(`${websiteRoot}foo/`);
     assertIdentical(fooRes.status, 200);
     assertStringIncludes(fooRes.headers.get("content-type"), "text/html");
     assertStringIncludes(await fooRes.text(), "<h1>Foo</h1>");

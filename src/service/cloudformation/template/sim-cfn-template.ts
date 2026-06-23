@@ -17,6 +17,7 @@ import { jsonParse, type JSONString } from "../../../util/type-guard/json.js";
 export interface CfnTemplateBodyRecord {
   readonly Parameters?: Record<string, SimCfnParameterDefinition> | undefined;
   readonly Resources: Record<string, SimCfnTemplateValue>;
+  readonly Outputs?: Record<string, SimCfnTemplateValue> | undefined;
   readonly [sectionName: string]:
     | Record<string, SimCfnParameterDefinition>
     | Record<string, SimCfnTemplateValue>
@@ -26,6 +27,11 @@ export interface CfnTemplateBodyRecord {
 
 export interface SimCfnResourceTemplateRecord {
   readonly logicalId: string;
+  readonly template: SimCfnTemplateValueRecord;
+}
+
+export interface SimCfnOutputTemplateRecord {
+  readonly outputKey: string;
   readonly template: SimCfnTemplateValueRecord;
 }
 
@@ -108,6 +114,27 @@ export class SimCfnTemplate {
       .map(([logicalId, resourceTemplate]) => ({
         logicalId,
         template: valueResolver.resolveRecord(resourceTemplate),
+      }));
+  }
+
+  /**
+   * Get Output template entries with parameter-only expressions resolved.
+   *
+   * Resource-backed intrinsic functions are intentionally left unresolved here
+   * because Outputs are resolved after Resource creation.
+   */
+  outputTemplates(): SimCfnOutputTemplateRecord[] {
+    const valueResolver = new SimCfnTemplateValueResolver({
+      parameters: this.parameters,
+    });
+
+    return Object.entries(this.template.Outputs ?? {})
+      .filter((entry): entry is [string, SimCfnTemplateValueRecord] => {
+        return isRecord(entry[1]);
+      })
+      .map(([outputKey, outputTemplate]) => ({
+        outputKey,
+        template: valueResolver.resolveRecord(outputTemplate),
       }));
   }
 }

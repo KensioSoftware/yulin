@@ -3,6 +3,7 @@ import type {
   SimCloudFormationStackStatus,
 } from "../../stack/sim-cfn-stack.js";
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
+import type { SimCfnTemplateValue } from "../../template/value/sim-cfn-template-value.js";
 
 /**
  * Minimal structural sim CloudFormation DescribeStacks command.
@@ -36,4 +37,15 @@ export interface SimCloudFormationStackDescription {
   readonly StackName?: SimCloudFormationStackName | undefined;
   readonly StackStatus?: SimCloudFormationStackStatus | undefined;
   readonly StackStatusReason?: string | undefined;
+  readonly Outputs?: SimCloudFormationStackOutputDescription[] | undefined;
+}
+
+/**
+ * Minimal structural sim CloudFormation Stack Output description.
+ */
+export interface SimCloudFormationStackOutputDescription {
+  readonly OutputKey?: string | undefined;
+  readonly OutputValue?: SimCfnTemplateValue | undefined;
+  readonly Description?: string | undefined;
+  readonly ExportName?: SimCfnTemplateValue | undefined;
 }

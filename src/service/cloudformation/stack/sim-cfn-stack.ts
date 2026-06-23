@@ -12,6 +12,8 @@ import { makeSimCfnStackResourceMap } from "./resource-map/sim-cfn-stack-resourc
 import { SimCfnStackDeploymentLifecycle } from "./deploy/sim-cfn-stack-deployment-lifecycle.js";
 import type { SimCdkOutContext } from "../cdk/sim-cdk-out-context.js";
 import type { SimCfnExecutableResourceBinding } from "../bind/sim-cfn-exec-binding.type.js";
+import type { SimCfnStackOutput } from "./output/sim-cfn-stack-output.js";
+import { SimCfnStackOutputResolver } from "./output/sim-cfn-stack-output-resolver.js";
 
 export type SimCloudFormationStackName = Brand<
   string,
@@ -60,6 +62,7 @@ export class SimCfnStack {
   public readonly stackName: SimCloudFormationStackName;
   public readonly template: CfnTemplateBodyRecord;
   public readonly resources: Map<string, SimCfnResource>;
+  public outputs = new Map<string, SimCfnStackOutput>();
 
   constructor(props: SimCloudFormationStackProps) {
     const {
@@ -136,5 +139,13 @@ export class SimCfnStack {
     });
 
     await resourceCreator.createAll();
+    this.resolveOutputs();
+  }
+
+  private resolveOutputs(): void {
+    this.outputs = new SimCfnStackOutputResolver({
+      template: this.cfnTemplate,
+      resources: this.resources,
+    }).resolve();
   }
 }
