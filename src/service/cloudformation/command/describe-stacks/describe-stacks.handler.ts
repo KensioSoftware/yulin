@@ -8,14 +8,15 @@ import type {
   SimCloudFormationStackName,
 } from "../../stack/sim-cfn-stack.js";
 import type {
-  SimCloudFormationStackDescription,
   SimDescribeStacksCommand,
   SimDescribeStacksCommandOutput,
 } from "./describe-stacks.cmd.js";
+import { SimCfnStackDescriber } from "./sim-cfn-stack-describer.js";
 
 interface DescribeStacksCommandHandlerProps {
   readonly stacks: Map<SimCloudFormationStackName, SimCfnStack>;
   readonly background?: BackgroundScheduler;
+  readonly describer?: SimCfnStackDescriber;
 }
 
 /**
@@ -29,12 +30,18 @@ export class DescribeStacksCommandHandler implements CommandHandler<
 > {
   private readonly stacks: Map<SimCloudFormationStackName, SimCfnStack>;
   private readonly background: BackgroundScheduler;
+  private readonly describer: SimCfnStackDescriber;
 
   constructor(props: DescribeStacksCommandHandlerProps) {
-    const { stacks, background = new BackgroundTasks() } = props;
+    const {
+      stacks,
+      background = new BackgroundTasks(),
+      describer = new SimCfnStackDescriber(),
+    } = props;
 
     this.stacks = stacks;
     this.background = background;
+    this.describer = describer;
   }
 
   /**
@@ -54,25 +61,16 @@ export class DescribeStacksCommandHandler implements CommandHandler<
       const stack = this.stacks.get(stackName);
 
       return {
-        Stacks: stack === undefined ? [] : [this.describeStack(stack)],
+        Stacks: stack === undefined ? [] : [this.describer.describe(stack)],
         $metadata: {},
       };
     }
 
     return {
       Stacks: [...this.stacks.values()].map((stack) =>
-        this.describeStack(stack),
+        this.describer.describe(stack),
       ),
       $metadata: {},
-    };
-  }
-
-  private describeStack(stack: SimCfnStack): SimCloudFormationStackDescription {
-    return {
-      StackId: stack.stackName,
-      StackName: stack.stackName,
-      StackStatus: stack.lifecycle.status,
-      StackStatusReason: stack.lifecycle.error?.message,
     };
   }
 }
