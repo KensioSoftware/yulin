@@ -1,4 +1,4 @@
-import { SimCloudFrontRegistry } from "./sim-cloud-front-registry.js";
+import { SimCloudFrontRegistry } from "./registry/sim-cloud-front-registry.js";
 import { CreateDistributionCommandHandler } from "./command/create-distribution/create-distribution.handler.js";
 import type {
   SimCloudFrontDistribution,

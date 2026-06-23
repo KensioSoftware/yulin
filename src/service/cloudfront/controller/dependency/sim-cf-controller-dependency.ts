@@ -1,5 +1,5 @@
 import { SimAws } from "../../../aws/sim-aws.js";
-import type { SimCloudFrontRegistry } from "../../sim-cloud-front-registry.js";
+import type { SimCloudFrontRegistry } from "../../registry/sim-cloud-front-registry.js";
 import type { SimCloudFrontDistroRouter } from "../../router/sim-cloud-front-distro-router.js";
 import { SimCloudFrontDistroRouter as DefaultSimCloudFrontDistroRouter } from "../../router/sim-cloud-front-distro-router.js";
 import type { SimCloudFrontBehaviorResolver } from "../../resolver/sim-cloud-front-behavior-resolver.js";

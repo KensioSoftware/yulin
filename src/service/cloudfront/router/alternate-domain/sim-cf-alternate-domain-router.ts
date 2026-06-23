@@ -2,7 +2,7 @@ import type {
   SimCloudFrontDistribution,
   SimCloudFrontDistributionId,
 } from "../../distribution/sim-cloudfront-distribution.js";
-import type { SimCloudFrontRegistry } from "../../sim-cloud-front-registry.js";
+import type { SimCloudFrontRegistry } from "../../registry/sim-cloud-front-registry.js";
 import type { SimAws } from "../../../aws/sim-aws.js";
 import type { SimCloudFrontDistroRoute } from "../sim-cloud-front-distro-router.js";
 

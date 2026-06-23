@@ -7,7 +7,7 @@ import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-sco
 import type { SimAws } from "../sim-aws.js";
 import { SimCloudFormation } from "../../cloudformation/index.js";
 import { SimCloudFront } from "../../cloudfront/sim-cloudfront.js";
-import { SimCloudFrontRegistry } from "../../cloudfront/sim-cloud-front-registry.js";
+import { SimCloudFrontRegistry } from "../../cloudfront/registry/sim-cloud-front-registry.js";
 import { makeSimCfS3OriginResolver } from "../../cloudfront/origin/s3/sim-cf-s3-origin-resolver-factory.js";
 import { SimDynamoDb } from "../../dynamodb/index.js";
 import { SimS3 } from "../../s3/sim-s3.js";

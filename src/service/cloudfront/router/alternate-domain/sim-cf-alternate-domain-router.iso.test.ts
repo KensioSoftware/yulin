@@ -1,7 +1,7 @@
 import { describe, it } from "vitest";
 import { assertUndefined } from "@kensio/smartass";
 import { SimAws } from "../../../aws/sim-aws.js";
-import { SimCloudFrontRegistry } from "../../sim-cloud-front-registry.js";
+import { SimCloudFrontRegistry } from "../../registry/sim-cloud-front-registry.js";
 import { SimCloudFrontAlternateDomainRouter } from "./sim-cf-alternate-domain-router.js";
 import type { SimCloudFrontDistributionId } from "../../distribution/sim-cloudfront-distribution.js";
 import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";

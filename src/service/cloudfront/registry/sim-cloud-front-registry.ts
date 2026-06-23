@@ -1,8 +1,8 @@
 import {
   makeDistributionId,
   type SimCloudFrontDistributionId,
-} from "./distribution/sim-cloudfront-distribution.js";
-import type { SimAwsAccountId } from "../aws/sim-aws-account.js";
+} from "../distribution/sim-cloudfront-distribution.js";
+import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
 
 /**
  * Simulated CloudFront cross-Account registry of Distribution IDs.
@@ -67,6 +67,18 @@ export class SimCloudFrontRegistry {
     alternateDomainName: string,
     distributionId: SimCloudFrontDistributionId,
   ): void {
+    const existingDistributionId =
+      this.alternateDomainDistributionIds.get(alternateDomainName);
+
+    if (
+      existingDistributionId !== undefined &&
+      existingDistributionId !== distributionId
+    ) {
+      throw new Error(
+        `Sim CloudFront alternate domain name ${alternateDomainName} is already registered to Distribution ${existingDistributionId}`,
+      );
+    }
+
     this.alternateDomainDistributionIds.set(
       alternateDomainName,
       distributionId,

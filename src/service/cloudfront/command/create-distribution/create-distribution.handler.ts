@@ -3,7 +3,7 @@ import type {
   SimCreateDistributionCommand,
   SimCreateDistributionCommandOutput,
 } from "./create-distribution.cmd.js";
-import type { SimCloudFrontRegistry } from "../../sim-cloud-front-registry.js";
+import type { SimCloudFrontRegistry } from "../../registry/sim-cloud-front-registry.js";
 import {
   SimCloudFrontDistribution,
   type SimCloudFrontDistributionId,
