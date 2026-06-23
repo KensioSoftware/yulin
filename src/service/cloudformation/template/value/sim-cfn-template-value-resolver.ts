@@ -6,10 +6,12 @@ import type {
   SimCfnTemplateValueRecord,
 } from "./sim-cfn-template-value.js";
 import type { SimCfnResourceRefResolver } from "../resolve/sim-cfn-resource-ref-resolver.js";
+import type { SimCfnPseudoParameters } from "../../parameters/pseudo/sim-cfn-pseudo-parameters.js";
 
 interface SimCfnTemplateValueResolverProps {
   readonly parameters: SimCfnParameters;
   readonly resources?: SimCfnResourceRefResolver | undefined;
+  readonly pseudoParameters?: SimCfnPseudoParameters | undefined;
 }
 
 /**
@@ -19,7 +21,11 @@ export class SimCfnTemplateValueResolver {
   private readonly context: SimCfnResolveContext;
 
   constructor(props: SimCfnTemplateValueResolverProps) {
-    this.context = new SimCfnResolveContext(props.parameters, props.resources);
+    this.context = new SimCfnResolveContext(
+      props.parameters,
+      props.resources,
+      props.pseudoParameters,
+    );
   }
 
   /**

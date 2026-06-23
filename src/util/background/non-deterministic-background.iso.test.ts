@@ -1,5 +1,7 @@
 import { describe, it, vi } from "vitest";
 import {
+  assertArrayIncludesAll,
+  assertArrayLength,
   assertFalse,
   assertIdentical,
   assertThrowsErrorAsync,
@@ -84,9 +86,8 @@ describe("background sequencing", () => {
       });
 
       await tasks.complete();
-      assertIdentical(execOrder.length, 2);
-      assertTrue(execOrder.includes(1));
-      assertTrue(execOrder.includes(2));
+      assertArrayLength(execOrder, 2);
+      assertArrayIncludesAll(execOrder, [1, 2]);
     });
 
     it("propagates task errors", async () => {

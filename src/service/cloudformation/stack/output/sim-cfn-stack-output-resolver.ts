@@ -71,6 +71,7 @@ export class SimCfnStackOutputResolver {
   ): SimCfnTemplateValueRecord {
     return new SimCfnTemplateValueResolver({
       parameters: this.template.parameters,
+      pseudoParameters: this.template.pseudoParameters(),
       resources: {
         has: (id): boolean => this.resources.has(id),
         refValue: (id): SimCfnTemplateValue => {

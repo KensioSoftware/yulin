@@ -21,6 +21,12 @@ export class SimCfnRef extends SimCfnNode {
       return context.parameters.value(this.name);
     }
 
+    const pseudoParameterValue = context.pseudoParameters?.value(this.name);
+
+    if (pseudoParameterValue !== undefined) {
+      return pseudoParameterValue;
+    }
+
     if (context.resources?.has(this.name) === true) {
       return context.resources.refValue(this.name);
     }

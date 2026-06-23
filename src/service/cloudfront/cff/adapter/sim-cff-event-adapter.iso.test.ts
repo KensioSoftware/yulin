@@ -24,7 +24,7 @@ describe("sim CFF event structure adapter", () => {
       const event = adapter.toViewerRequestEvent(req);
 
       assertIdentical(event.context.eventType, "viewer-request");
-      assertTrue("requestId" in event.context);
+      assertObjectHasProperty(event.context, "requestId");
       assertIdentical(event.viewer.ip, "127.0.0.1");
       assertIdentical(event.request.method, "GET");
       assertIdentical(event.request.uri, "/path/to/resource");
@@ -43,7 +43,7 @@ describe("sim CFF event structure adapter", () => {
       const event = adapter.toViewerResponseEvent(req, res);
 
       assertIdentical(event.context.eventType, "viewer-response");
-      assertTrue("requestId" in event.context);
+      assertObjectHasProperty(event.context, "requestId");
       assertIdentical(event.request.method, "GET");
       assertIdentical(event.response.statusCode, 201);
       assertIdentical(event.response.statusDescription, "Created");

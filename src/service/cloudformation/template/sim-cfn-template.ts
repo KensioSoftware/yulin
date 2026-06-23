@@ -8,6 +8,8 @@ import { isRecord } from "../../../util/type-guard/record.js";
 import { SimCfnTemplateBodyValidator } from "./sim-cfn-template-body-validator.js";
 import type { SimCfnParameterDefinition } from "../parameters/sim-cfn-parameters.type.js";
 import { jsonParse, type JSONString } from "../../../util/type-guard/json.js";
+import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
+import { SimCfnPseudoParameters } from "../parameters/pseudo/sim-cfn-pseudo-parameters.js";
 
 /**
  * Parsed CloudFormation template body accepted by the simulator.
@@ -39,11 +41,13 @@ interface SimCfnTemplateProps {
   readonly template: CfnTemplateBodyRecord;
   readonly parameters?: SimCfnParameters | undefined;
   readonly stackName?: string | undefined;
+  readonly accountRegionScope?: SimAwsAccountRegionScope | undefined;
 }
 
 interface SimCfnTemplateFromJsonProps {
   readonly stackName?: string | undefined;
   readonly parameters?: SimCfnParameters | undefined;
+  readonly accountRegionScope?: SimAwsAccountRegionScope | undefined;
 }
 
 /**
@@ -55,12 +59,14 @@ export class SimCfnTemplate {
   public readonly template: CfnTemplateBodyRecord;
   public readonly stackName: string | undefined;
   public readonly parameters: SimCfnParameters;
+  private readonly accountRegionScope: SimAwsAccountRegionScope | undefined;
 
   constructor(props: SimCfnTemplateProps) {
-    const { template, parameters, stackName } = props;
+    const { template, parameters, stackName, accountRegionScope } = props;
 
     this.template = template;
     this.stackName = stackName;
+    this.accountRegionScope = accountRegionScope;
 
     new SimCfnTemplateBodyValidator({ template, stackName }).validate();
 
@@ -93,6 +99,7 @@ export class SimCfnTemplate {
       template,
       parameters: props.parameters,
       stackName: props.stackName,
+      accountRegionScope: props.accountRegionScope,
     });
   }
 
@@ -105,6 +112,7 @@ export class SimCfnTemplate {
   resourceTemplates(): SimCfnResourceTemplateRecord[] {
     const valueResolver = new SimCfnTemplateValueResolver({
       parameters: this.parameters,
+      pseudoParameters: this.pseudoParameters(),
     });
 
     return Object.entries(this.template.Resources)
@@ -126,6 +134,7 @@ export class SimCfnTemplate {
   outputTemplates(): SimCfnOutputTemplateRecord[] {
     const valueResolver = new SimCfnTemplateValueResolver({
       parameters: this.parameters,
+      pseudoParameters: this.pseudoParameters(),
     });
 
     return Object.entries(this.template.Outputs ?? {})
@@ -136,5 +145,17 @@ export class SimCfnTemplate {
         outputKey,
         template: valueResolver.resolveRecord(outputTemplate),
       }));
+  }
+
+  /**
+   * Get the sim CFN pseudo parameters for this template.
+   *
+   * https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/pseudo-parameter-reference.html
+   */
+  pseudoParameters(): SimCfnPseudoParameters {
+    return new SimCfnPseudoParameters({
+      accountRegionScope: this.accountRegionScope,
+      stackName: this.stackName,
+    });
   }
 }

@@ -98,6 +98,7 @@ export class CreateStackCommandHandler implements CommandHandler<
         parameters: SimCfnParameters.fromInput(cmd.input, {
           stackName,
         }),
+        accountRegionScope: this.accountRegionScope,
       },
     );
 
