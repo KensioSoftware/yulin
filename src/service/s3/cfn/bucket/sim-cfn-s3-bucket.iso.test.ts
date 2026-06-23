@@ -192,4 +192,46 @@ describe("S3 CloudFormation Bucket Resource", () => {
       `http://website-bucket.s3-website.${region}.sim-aws.localhost/`,
     );
   });
+
+  it("returns S3 Bucket Arn, DomainName, and RegionalDomainName attribute values", async () => {
+    // Given an S3 Bucket Resource deployed by sim CloudFormation in a specific
+    // Region.
+    const simAws = new SimAws();
+    const region = makeAwsRegionName();
+    const stack = await simAws
+      .region(region)
+      .cloudFormation()
+      .deployTemplate({
+        stackName: "test-stack",
+        template: {
+          Resources: {
+            AttributeBucket: {
+              Type: "AWS::S3::Bucket",
+              Properties: {
+                BucketName: "attribute-bucket",
+              },
+            },
+          },
+        },
+      });
+
+    // When the Resource's S3 Bucket attributes are read.
+    const bucketResource = stack.resources.get("AttributeBucket");
+
+    assertNonNullable(bucketResource);
+
+    // Then the CloudFormation S3 adapter returns AWS-compatible values.
+    assertIdentical(
+      bucketResource.attributeValue("Arn"),
+      "arn:aws:s3:::attribute-bucket",
+    );
+    assertIdentical(
+      bucketResource.attributeValue("DomainName"),
+      "attribute-bucket.s3.amazonaws.com",
+    );
+    assertIdentical(
+      bucketResource.attributeValue("RegionalDomainName"),
+      `attribute-bucket.s3.${region}.amazonaws.com`,
+    );
+  });
 });
