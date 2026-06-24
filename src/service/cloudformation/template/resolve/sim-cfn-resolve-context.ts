@@ -1,7 +1,7 @@
 import type { SimCfnParameters } from "../../parameters/sim-cfn-parameters.js";
 import type { SimCfnResourceRefResolver } from "./sim-cfn-resource-ref-resolver.js";
 import type { SimCfnPseudoParameters } from "../../parameters/pseudo/sim-cfn-pseudo-parameters.js";
-import type { SimCfnTemplateValueRecord } from "../value/sim-cfn-template-value.js";
+import type { SimCfnMappings } from "../mapping/sim-cfn-mappings.js";
 
 /**
  * Context available while resolving a parsed CloudFormation node tree.
@@ -11,6 +11,6 @@ export class SimCfnResolveContext {
     readonly parameters: SimCfnParameters,
     readonly resources?: SimCfnResourceRefResolver | undefined,
     readonly pseudoParameters?: SimCfnPseudoParameters | undefined,
-    readonly mappings?: Record<string, SimCfnTemplateValueRecord> | undefined,
+    readonly mappings?: SimCfnMappings | undefined,
   ) {}
 }

@@ -10,6 +10,7 @@ import type { SimCfnParameterDefinition } from "../parameters/sim-cfn-parameters
 import { jsonParse, type JSONString } from "../../../util/type-guard/json.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import { SimCfnPseudoParameters } from "../parameters/pseudo/sim-cfn-pseudo-parameters.js";
+import type { SimCfnMappings } from "./mapping/sim-cfn-mappings.js";
 
 /**
  * Parsed CloudFormation template body accepted by the simulator.
@@ -18,7 +19,7 @@ import { SimCfnPseudoParameters } from "../parameters/pseudo/sim-cfn-pseudo-para
  */
 export interface CfnTemplateBodyRecord {
   readonly Parameters?: Record<string, SimCfnParameterDefinition> | undefined;
-  readonly Mappings?: Record<string, SimCfnTemplateValueRecord> | undefined;
+  readonly Mappings?: SimCfnMappings | undefined;
   readonly Resources: Record<string, SimCfnTemplateValue>;
   readonly Outputs?: Record<string, SimCfnTemplateValue> | undefined;
   readonly [sectionName: string]:

@@ -7,12 +7,13 @@ import type {
 import type { SimCfnResourceRefResolver } from "../resolve/sim-cfn-resource-ref-resolver.js";
 import type { SimCfnPseudoParameters } from "../../parameters/pseudo/sim-cfn-pseudo-parameters.js";
 import { SimCfnResolveContext } from "../resolve/sim-cfn-resolve-context.js";
+import type { SimCfnMappings } from "../mapping/sim-cfn-mappings.js";
 
 interface SimCfnTemplateValueResolverProps {
   readonly parameters: SimCfnParameters;
   readonly resources?: SimCfnResourceRefResolver | undefined;
   readonly pseudoParameters?: SimCfnPseudoParameters | undefined;
-  readonly mappings?: Record<string, SimCfnTemplateValueRecord> | undefined;
+  readonly mappings?: SimCfnMappings | undefined;
 }
 
 /**
