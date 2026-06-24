@@ -178,6 +178,13 @@ dist
 # *.iml
 # *.ipr
 
+# Junie
+.junie/cache/
+.junie/tmp/
+.junie/local.*
+.junie/*.log
+.junie/
+
 # CMake
 cmake-build-*/
 

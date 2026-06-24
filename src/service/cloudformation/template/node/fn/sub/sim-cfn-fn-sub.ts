@@ -1,7 +1,8 @@
-import { SimCfnNode, type SimCfnResolveContext } from "../../sim-cfn-node.js";
+import { SimCfnNode } from "../../sim-cfn-node.js";
 import type { SimCfnTemplateValue } from "../../../value/sim-cfn-template-value.js";
 import { SimCfnFnSubTemplate } from "./template/sim-cfn-fn-sub-template.js";
 import { SimCfnFnSubVariableResolver } from "./resolve/sim-cfn-fn-sub-variable-resolver.js";
+import type { SimCfnResolveContext } from "../../../resolve/sim-cfn-resolve-context.js";
 
 /**
  * Simulated CloudFormation `Fn::Sub` intrinsic function.

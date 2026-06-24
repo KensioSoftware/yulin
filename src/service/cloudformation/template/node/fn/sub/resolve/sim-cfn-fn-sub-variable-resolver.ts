@@ -1,11 +1,9 @@
-import type {
-  SimCfnNode,
-  SimCfnResolveContext,
-} from "../../../sim-cfn-node.js";
+import type { SimCfnNode } from "../../../sim-cfn-node.js";
 import type { SimCfnTemplateValue } from "../../../../value/sim-cfn-template-value.js";
 import { assertDefined } from "../../../../../../../util/type-guard/defined.js";
 import { SimCfnGetAtt } from "../../get-att/sim-cfn-fn-get-att.js";
 import { SimCfnRef } from "../../../sim-cfn-ref.js";
+import type { SimCfnResolveContext } from "../../../../resolve/sim-cfn-resolve-context.js";
 
 /**
  * Resolves Fn::Sub variables from explicit overrides or implicit Ref/GetAtt
