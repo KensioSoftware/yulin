@@ -1,0 +1,62 @@
+---
+name: Coverage Badge
+
+on:
+  push:
+    branches:
+      - main
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CI: true
+
+jobs:
+  coverage-badge:
+    name: Coverage Badge
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - run: pnpm test:coverage
+
+      - name: Read coverage
+        id: coverage
+        run: |
+          COVERAGE=$(jq '.total.lines.pct | floor' test/.coverage/coverage-summary.json)
+
+          if [ "$COVERAGE" -ge 90 ]; then
+            COLOR=brightgreen
+          elif [ "$COVERAGE" -ge 80 ]; then
+            COLOR=green
+          elif [ "$COVERAGE" -ge 70 ]; then
+            COLOR=yellow
+          else
+            COLOR=red
+          fi
+
+          echo "coverage=$COVERAGE" >> "$GITHUB_OUTPUT"
+          echo "color=$COLOR" >> "$GITHUB_OUTPUT"
+
+      - name: Update coverage badge
+        uses: schneegans/dynamic-badges-action@v1.7.0
+        with:
+          auth: ${{ secrets.GIST_SECRET }}
+          gistID: 60631670004a3f173e7b379bfb9d5072
+          filename: coverage.json
+          label: coverage
+          message: ${{ steps.coverage.outputs.coverage }}%
+          color: ${{ steps.coverage.outputs.color }}
