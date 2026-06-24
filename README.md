@@ -4,7 +4,7 @@
 ![CI](https://img.shields.io/github/actions/workflow/status/kensioSoftware/yulin/pr.yml?label=CI)
 ![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/hughgrigg/60631670004a3f173e7b379bfb9d5072/raw/coverage.json)
 ![Node](https://img.shields.io/node/v/%40kensio%2Fyulin)
-![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue)
+![TypeScript](https://img.shields.io/badge/TS-TypeScript-3178C6)
 ![License](https://img.shields.io/npm/l/%40kensio%2Fyulin)
 
 AWS system behaviour simulation for isolated unit testing, local development and CI.
