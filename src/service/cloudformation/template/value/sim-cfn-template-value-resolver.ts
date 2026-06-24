@@ -1,5 +1,4 @@
 import type { SimCfnParameters } from "../../parameters/sim-cfn-parameters.js";
-import { SimCfnResolveContext } from "../node/sim-cfn-node.js";
 import { parseSimCfnNode } from "../parse/node/sim-cfn-node-parser.js";
 import type {
   SimCfnTemplateValue,
@@ -7,6 +6,7 @@ import type {
 } from "./sim-cfn-template-value.js";
 import type { SimCfnResourceRefResolver } from "../resolve/sim-cfn-resource-ref-resolver.js";
 import type { SimCfnPseudoParameters } from "../../parameters/pseudo/sim-cfn-pseudo-parameters.js";
+import { SimCfnResolveContext } from "../resolve/sim-cfn-resolve-context.js";
 
 interface SimCfnTemplateValueResolverProps {
   readonly parameters: SimCfnParameters;

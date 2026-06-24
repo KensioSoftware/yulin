@@ -1,5 +1,6 @@
-import { SimCfnNode, type SimCfnResolveContext } from "../../sim-cfn-node.js";
+import { SimCfnNode } from "../../sim-cfn-node.js";
 import type { SimCfnTemplateValue } from "../../../value/sim-cfn-template-value.js";
+import type { SimCfnResolveContext } from "../../../resolve/sim-cfn-resolve-context.js";
 
 /**
  * Simulated CloudFormation `Fn::Join` intrinsic function.
