@@ -77,7 +77,7 @@ export class SimCfnFnFindInMap extends SimCfnNode {
       return value;
     }
 
-    if (typeof value === "object" && value !== null) {
+    if (this.isUnresolvedIntrinsicExpression(value)) {
       return value;
     }
 
@@ -85,6 +85,26 @@ export class SimCfnFnFindInMap extends SimCfnNode {
     throw new TypeError(
       `Sim CloudFormation Fn::FindInMap keys must each resolve to a string, got ${typeof value}`,
     );
+  }
+
+  private isUnresolvedIntrinsicExpression(
+    value: SimCfnTemplateValue,
+  ): value is Record<string, SimCfnTemplateValue> {
+    /* v8 ignore if */
+    if (!isRecord(value) || Array.isArray(value)) {
+      return false;
+    }
+
+    const entries = Object.entries(value);
+
+    /* v8 ignore if */
+    if (entries.length !== 1) {
+      return false;
+    }
+
+    const functionName = entries[0]?.[0];
+
+    return functionName === "Ref" || functionName?.startsWith("Fn::") === true;
   }
 
   private isResolvedKey(value: SimCfnTemplateValue): value is string {
