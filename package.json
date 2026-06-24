@@ -71,7 +71,7 @@
     "LICENSE"
   ],
   "author": "Kensio Software",
-  "license": "AGPL-3.0",
+  "license": "Apache-2.0",
   "packageManager": "pnpm@11.7.0",
   "devDependencies": {
     "@aws-sdk/client-cloudformation": "^3.1070.0",
