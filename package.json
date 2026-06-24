@@ -30,6 +30,9 @@
     "simulator",
     "isolated"
   ],
+  "engines": {
+    "node": ">=22.0.0"
+  },
   "exports": {
     ".": {
       "import": "./dist/index.js",
