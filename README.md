@@ -1,5 +1,6 @@
 # Yulin local AWS simulator
 
+[![npm version](https://img.shields.io/npm/v/%40kensio%2Fyulin)](https://www.npmjs.com/package/@kensio/yulin)
 ![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/hughgrigg/60631670004a3f173e7b379bfb9d5072/raw/coverage.json)
 
 AWS system behaviour simulation for isolated unit testing, local development and CI.
