@@ -8,11 +8,11 @@ SRC_DIR="${ROOT_DIR}/src"
 THRESHOLD=50
 
 # Always print the normal FTA table output for humans / CI logs.
-fta "${SRC_DIR}"
+fta "${SRC_DIR}" --config-path "${ROOT_DIR}/fta.json"
 
 # Use JSON output to find files that violate the threshold.
 FINDINGS="$(
-  fta "${SRC_DIR}" --json |
+  fta "${SRC_DIR}" --config-path "${ROOT_DIR}/fta.json" --json |
     jq --argjson threshold "${THRESHOLD}" '
       map(select(.fta_score >= $threshold))
       | sort_by(.fta_score)

@@ -18,6 +18,7 @@ import { SimCfnPseudoParameters } from "../parameters/pseudo/sim-cfn-pseudo-para
  */
 export interface CfnTemplateBodyRecord {
   readonly Parameters?: Record<string, SimCfnParameterDefinition> | undefined;
+  readonly Mappings?: Record<string, SimCfnTemplateValueRecord> | undefined;
   readonly Resources: Record<string, SimCfnTemplateValue>;
   readonly Outputs?: Record<string, SimCfnTemplateValue> | undefined;
   readonly [sectionName: string]:
@@ -113,6 +114,7 @@ export class SimCfnTemplate {
     const valueResolver = new SimCfnTemplateValueResolver({
       parameters: this.parameters,
       pseudoParameters: this.pseudoParameters(),
+      mappings: this.template.Mappings,
     });
 
     return Object.entries(this.template.Resources)
@@ -135,6 +137,7 @@ export class SimCfnTemplate {
     const valueResolver = new SimCfnTemplateValueResolver({
       parameters: this.parameters,
       pseudoParameters: this.pseudoParameters(),
+      mappings: this.template.Mappings,
     });
 
     return Object.entries(this.template.Outputs ?? {})

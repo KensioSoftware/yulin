@@ -4,6 +4,7 @@ import { SimCfnFnGetAttParser } from "./get-att/sim-cfn-fn-get-att-parser.js";
 import { SimCfnFnJoinParser } from "./join/sim-cfn-fn-join-parser.js";
 import type { SimCfnValueParser } from "../value/sim-cfn-value-parser.type.js";
 import { SimCfnFnSubParser } from "./sub/sim-cfn-fn-sub-parser.js";
+import { SimCfnFnFindInMapParser } from "./find-in-map/sim-cfn-fn-find-in-map-parser.js";
 
 /**
  * Parses CloudFormation intrinsic function objects.
@@ -21,11 +22,13 @@ import { SimCfnFnSubParser } from "./sub/sim-cfn-fn-sub-parser.js";
  */
 export class SimCfnFunctionParser {
   private readonly fnGetAttParser: SimCfnFnGetAttParser;
+  private readonly fnFindInMapParser: SimCfnFnFindInMapParser;
   private readonly fnJoinParser: SimCfnFnJoinParser;
   private readonly fnSubParser: SimCfnFnSubParser;
 
   constructor(valueParser: SimCfnValueParser) {
     this.fnGetAttParser = new SimCfnFnGetAttParser();
+    this.fnFindInMapParser = new SimCfnFnFindInMapParser(valueParser);
     this.fnJoinParser = new SimCfnFnJoinParser(valueParser);
     this.fnSubParser = new SimCfnFnSubParser(valueParser);
   }
@@ -71,6 +74,10 @@ export class SimCfnFunctionParser {
 
     if (functionName === "Fn::GetAtt") {
       return this.fnGetAttParser.parse(value);
+    }
+
+    if (functionName === "Fn::FindInMap") {
+      return this.fnFindInMapParser.parse(value);
     }
 
     throw new Error(

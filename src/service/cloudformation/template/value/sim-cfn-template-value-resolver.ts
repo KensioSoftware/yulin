@@ -12,6 +12,7 @@ interface SimCfnTemplateValueResolverProps {
   readonly parameters: SimCfnParameters;
   readonly resources?: SimCfnResourceRefResolver | undefined;
   readonly pseudoParameters?: SimCfnPseudoParameters | undefined;
+  readonly mappings?: Record<string, SimCfnTemplateValueRecord> | undefined;
 }
 
 /**
@@ -25,6 +26,7 @@ export class SimCfnTemplateValueResolver {
       props.parameters,
       props.resources,
       props.pseudoParameters,
+      props.mappings,
     );
   }
 

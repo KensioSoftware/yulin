@@ -8,6 +8,7 @@ import {
 } from "@kensio/smartass";
 import { describe, it, vi } from "vitest";
 import { SimCfnParameters } from "../../../parameters/sim-cfn-parameters.js";
+import { SimCfnFnFindInMap } from "../../node/fn/find-in-map/sim-cfn-fn-find-in-map.js";
 import { SimCfnFnJoin } from "../../node/fn/join/sim-cfn-fn-join.js";
 import { SimCfnList } from "../../node/sim-cfn-list.js";
 import { SimCfnLiteral } from "../../node/sim-cfn-literal.js";
@@ -77,6 +78,33 @@ describe("SimCfnNodeParser", () => {
 
     assertInstanceOf(node, SimCfnFnJoin);
     assertIdentical(node.resolve(emptyContext()), "my-test-bucket");
+  });
+
+  it("parses Fn::FindInMap objects into CloudFormation Fn::FindInMap nodes", () => {
+    const parser = new SimCfnNodeParser();
+
+    const node = parser.parse({
+      "Fn::FindInMap": ["RegionMap", "us-east-1", "AMI"],
+    });
+
+    assertInstanceOf(node, SimCfnFnFindInMap);
+    assertIdentical(
+      node.resolve(
+        new SimCfnResolveContext(
+          SimCfnParameters.fromValues({}),
+          undefined,
+          undefined,
+          {
+            RegionMap: {
+              "us-east-1": {
+                AMI: "ami-1234567890abcdef0",
+              },
+            },
+          },
+        ),
+      ),
+      "ami-1234567890abcdef0",
+    );
   });
 
   it("throws when an intrinsic function is unsupported", () => {
