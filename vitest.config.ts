@@ -16,7 +16,7 @@ export default defineConfig({
       provider: "v8",
       include: ["src/**/*.ts"],
       exclude: [...configDefaults.exclude],
-      reporter: ["text", "lcov"],
+      reporter: ["text", "lcov", "json-summary"],
       reportsDirectory: "./test/.coverage",
       thresholds: {
         statements: 100,

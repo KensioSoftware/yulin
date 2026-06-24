@@ -1,4 +1,6 @@
-# yulin
+# Yulin local AWS simulator
+
+![Coverage](https://img.shields.io/endpoint?url=https://gist.githubusercontent.com/hughgrigg/60631670004a3f173e7b379bfb9d5072/raw/coverage.json)
 
 AWS system behaviour simulation for isolated unit testing, local development and CI.
 
