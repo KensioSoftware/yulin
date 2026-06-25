@@ -35,7 +35,18 @@ export class SimRoute53Zone {
     name: string,
     type: SimRoute53RecordType,
   ): SimRoute53Record | undefined {
-    return this.records.get(recordKey(normaliseSimRoute53Name(name), type));
+    const record = this.records.get(
+      recordKey(normaliseSimRoute53Name(name), type),
+    );
+
+    if (record === undefined) {
+      return undefined;
+    }
+
+    return {
+      ...record,
+      values: [...record.values],
+    };
   }
 }
 
