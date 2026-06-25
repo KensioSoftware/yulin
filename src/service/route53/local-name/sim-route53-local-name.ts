@@ -20,8 +20,10 @@ export function simRoute53LogicalName(localName: string): string | undefined {
   }
 
   const logicalName = normalisedName.slice(0, -simRoute53LocalSuffix.length);
+  const logicalNameLabels = logicalName.split(".");
 
-  if (logicalName.length === 0 || logicalName.includes("..")) {
+  // Reject empty labels before normalization can hide malformed hostnames.
+  if (logicalNameLabels.some((label) => label.length === 0)) {
     return undefined;
   }
 

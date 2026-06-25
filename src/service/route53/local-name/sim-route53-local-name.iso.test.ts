@@ -28,6 +28,28 @@ describe("sim Route53 local name utils", () => {
       // Then no logical DNS name is returned.
       assertUndefined(logicalName);
     });
+
+    it("returns undefined for logical names with leading empty labels", () => {
+      // Given a local Route53 name whose logical name starts with an empty label.
+      const localName = ".www.foo.com.sim-aws.localhost";
+
+      // When converting the local name to a logical DNS name.
+      const logicalName = simRoute53LogicalName(localName);
+
+      // Then no logical DNS name is returned.
+      assertUndefined(logicalName);
+    });
+
+    it("returns undefined for logical names with trailing empty labels", () => {
+      // Given a local Route53 name whose logical name ends with an empty label.
+      const localName = "www.foo.com..sim-aws.localhost";
+
+      // When converting the local name to a logical DNS name.
+      const logicalName = simRoute53LogicalName(localName);
+
+      // Then no logical DNS name is returned.
+      assertUndefined(logicalName);
+    });
   });
 
   describe("simRoute53LocalName", () => {
