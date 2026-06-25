@@ -116,15 +116,16 @@ export class SimRoute53Resolver {
   ): SimAwsServiceTarget | undefined {
     const labels = logicalName.split(".");
 
-    if (labels.length < 3) {
+    if (labels.length !== 3) {
       return undefined;
     }
 
-    if (labels.at(-2) !== cloudFrontServiceLabel || labels.at(-1) !== "net") {
+    const [distroId, service, topLevelDomain] = labels;
+
+    if (service !== cloudFrontServiceLabel || topLevelDomain !== "net") {
       return undefined;
     }
 
-    const distroId = labels.at(-3);
     /* v8 ignore if -- defensive check */
     if (distroId === undefined || distroId.length === 0) {
       return undefined;
