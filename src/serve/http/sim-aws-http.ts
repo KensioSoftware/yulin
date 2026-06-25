@@ -1,4 +1,3 @@
-import { SimAwsLocalServiceResolver } from "../resolve/sim-aws-local-service-resolver.js";
 import { SimAwsServiceControllerContainer } from "../controller/container/sim-aws-service-controller-container.js";
 import { SimAws } from "../../service/aws/sim-aws.js";
 
@@ -10,11 +9,12 @@ interface SimAwsHttpProps {
  * HTTP interface for sending requests into a simulated AWS environment.
  */
 export class SimAwsHttp {
-  private readonly serviceResolver = new SimAwsLocalServiceResolver();
+  private readonly simAws: SimAws;
   private readonly controllers: SimAwsServiceControllerContainer;
 
   constructor(props: SimAwsHttpProps = {}) {
     const { simAws = new SimAws() } = props;
+    this.simAws = simAws;
     this.controllers = new SimAwsServiceControllerContainer({ simAws });
   }
 
@@ -38,7 +38,7 @@ export class SimAwsHttp {
         return new Response("Missing Host header\n", { status: 400 });
       }
 
-      const target = this.serviceResolver.resolveHost(hostname);
+      const target = this.simAws.route53().resolveHttpHost(hostname);
       if (target === undefined) {
         return new Response(`Unknown simulated AWS host ${hostname} \n`, {
           status: 501,

@@ -15,6 +15,7 @@ import type { SimS3 } from "../s3/sim-s3.js";
 import type { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
 import type { SimDynamoDb } from "../dynamodb/index.js";
 import type { SimCloudFormation } from "../cloudformation/index.js";
+import type { SimRoute53 } from "../route53/index.js";
 
 export type SimAccountRegionScopeKey = `${SimAwsAccountId}:${AwsRegionName}`;
 
@@ -77,6 +78,15 @@ export class SimAwsAccountRegionContainer {
   dynamoDb(): SimDynamoDb {
     return this.memo.getOrCreate("dynamoDb", () =>
       this.simAws._serviceFactory.createDynamoDb(this),
+    );
+  }
+
+  /**
+   * Get simulated Route53 for this account.
+   */
+  route53(): SimRoute53 {
+    return this.memo.getOrCreate("route53", () =>
+      this.simAws._serviceFactory.createRoute53(this),
     );
   }
 

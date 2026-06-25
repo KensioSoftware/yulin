@@ -19,6 +19,7 @@ import type { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
 import type { SimCloudFrontRegistry } from "../cloudfront/registry/sim-cloud-front-registry.js";
 import type { SimDynamoDb } from "../dynamodb/index.js";
 import type { SimCloudFormation } from "../cloudformation/index.js";
+import type { SimRoute53 } from "../route53/index.js";
 import { SimAwsServiceFactory } from "./factory/sim-aws-service-factory.js";
 import { SimAwsScopeRegistry } from "./scope/sim-aws-scope-registry.js";
 
@@ -102,6 +103,13 @@ export class SimAws {
    */
   dynamoDb(): SimDynamoDb {
     return this.accountRegionScope().dynamoDb();
+  }
+
+  /**
+   * Get simulated Route53 in the default Account scope.
+   */
+  route53(): SimRoute53 {
+    return this.accountRegionScope().route53();
   }
 
   /**
