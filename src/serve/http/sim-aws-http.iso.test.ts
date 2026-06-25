@@ -51,6 +51,28 @@ describe("Simulated AWS HTTP", () => {
     assertStringIncludes(resBody, "S3 bucket named my-site not found");
   });
 
+  it("routes custom domains to CloudFront through simulated Route53", async () => {
+    const simAws = new SimAws();
+    simAws.route53().upsertRecord({
+      name: "www.foo.com",
+      type: "CNAME",
+      values: ["d123.cloudfront.net"],
+    });
+
+    const simAwsHttp = new SimAwsHttp({ simAws });
+
+    const res = await simAwsHttp.fetch(
+      new Request("http://www.foo.com.sim-aws.localhost/"),
+    );
+
+    assertIdentical(res.status, 404);
+    const resBody = await res.text();
+    assertStringIncludes(
+      resBody,
+      "Suitable sim CloudFront Distribution not found",
+    );
+  });
+
   it("serves an S3 Object over simulated HTTP when static website hosting is configured", async () => {
     const simAws = new SimAws();
 

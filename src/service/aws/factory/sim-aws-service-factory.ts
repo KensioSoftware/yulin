@@ -2,16 +2,16 @@ import type {
   BackgroundCompleter,
   BackgroundScheduler,
 } from "../../../util/background/background.js";
-import type { SimAwsAccountId } from "../sim-aws-account.js";
 import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-scope.js";
 import type { SimAws } from "../sim-aws.js";
 import { SimCloudFormation } from "../../cloudformation/index.js";
-import { SimCloudFront } from "../../cloudfront/sim-cloudfront.js";
 import { SimCloudFrontRegistry } from "../../cloudfront/registry/sim-cloud-front-registry.js";
-import { makeSimCfS3OriginResolver } from "../../cloudfront/origin/s3/sim-cf-s3-origin-resolver-factory.js";
+import type { SimCloudFront } from "../../cloudfront/sim-cloudfront.js";
 import { SimDynamoDb } from "../../dynamodb/index.js";
+import type { SimRoute53 } from "../../route53/index.js";
 import { SimS3 } from "../../s3/sim-s3.js";
 import { SimS3GlobalRegistry } from "../../s3/sim-s3-global-registry.js";
+import { SimAwsAccountServiceCache } from "./sim-aws-account-service-cache.js";
 
 interface SimAwsServiceFactoryProps {
   readonly simAws: SimAws;
@@ -32,14 +32,16 @@ export class SimAwsServiceFactory {
 
   private readonly _cloudFrontRegistry = new SimCloudFrontRegistry();
 
-  private readonly cloudFrontServices = new Map<
-    SimAwsAccountId,
-    SimCloudFront
-  >();
+  private readonly accountServices: SimAwsAccountServiceCache;
 
   constructor(props: SimAwsServiceFactoryProps) {
     this.simAws = props.simAws;
     this.background = props.background;
+    this.accountServices = new SimAwsAccountServiceCache({
+      simAws: props.simAws,
+      background: props.background,
+      cloudFrontRegistry: this._cloudFrontRegistry,
+    });
   }
 
   /**
@@ -57,21 +59,7 @@ export class SimAwsServiceFactory {
    * Create or get simulated CloudFront for an Account scope.
    */
   createCloudFront(scope: SimAwsAccountRegionContainer): SimCloudFront {
-    const { accountId } = scope.accountRegionScope;
-
-    let cloudFront = this.cloudFrontServices.get(accountId);
-
-    if (cloudFront === undefined) {
-      cloudFront = new SimCloudFront({
-        accountRegionScope: scope.accountRegionScope,
-        cloudFrontRegistry: this._cloudFrontRegistry,
-        s3OriginResolver: makeSimCfS3OriginResolver(this.simAws, scope),
-        background: this.background,
-      });
-      this.cloudFrontServices.set(accountId, cloudFront);
-    }
-
-    return cloudFront;
+    return this.accountServices.createCloudFront(scope);
   }
 
   /**
@@ -92,6 +80,13 @@ export class SimAwsServiceFactory {
       accountRegionScope: scope.accountRegionScope,
       background: this.background,
     });
+  }
+
+  /**
+   * Create or get simulated Route53 for an Account scope.
+   */
+  createRoute53(scope: SimAwsAccountRegionContainer): SimRoute53 {
+    return this.accountServices.createRoute53(scope);
   }
 
   /**
