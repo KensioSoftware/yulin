@@ -1,19 +1,29 @@
+import { normaliseSimRoute53Name } from "../local-name/sim-route53-local-name.js";
 import type {
   SimRoute53Record,
   SimRoute53RecordType,
 } from "../record/sim-route53-record.js";
-import { normaliseSimRoute53Name } from "../local-name/sim-route53-local-name.js";
 
 /**
- * Internal storage for simulated Route53 records.
+ * Stores and normalises records for a simulated Route53 Hosted Zone.
+ * @internal
  */
-export class SimRoute53Zone {
+export class SimRoute53HostedZoneRecords {
   private readonly records = new Map<string, SimRoute53Record>();
 
   /**
-   * Create or replace a record in this zone.
+   * Current number of records in the hosted zone.
+   * @internal
    */
-  upsertRecord(record: SimRoute53Record): void {
+  get count(): number {
+    return this.records.size;
+  }
+
+  /**
+   * Create or replace a record.
+   * @internal
+   */
+  upsert(record: SimRoute53Record): void {
     const normalisedRecord = {
       ...record,
       name: normaliseSimRoute53Name(record.name),
@@ -29,12 +39,18 @@ export class SimRoute53Zone {
   }
 
   /**
-   * Get a record by logical name and type.
+   * Delete a record by logical name and type.
+   * @internal
    */
-  record(
-    name: string,
-    type: SimRoute53RecordType,
-  ): SimRoute53Record | undefined {
+  delete(name: string, type: SimRoute53RecordType): void {
+    this.records.delete(recordKey(normaliseSimRoute53Name(name), type));
+  }
+
+  /**
+   * Get a record by logical name and type.
+   * @internal
+   */
+  get(name: string, type: SimRoute53RecordType): SimRoute53Record | undefined {
     const record = this.records.get(
       recordKey(normaliseSimRoute53Name(name), type),
     );

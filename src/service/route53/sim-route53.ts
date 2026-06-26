@@ -1,34 +1,87 @@
-import type {
-  SimRoute53Record,
-  SimRoute53RecordType,
-} from "./record/sim-route53-record.js";
 import type { SimAwsServiceTarget } from "../../serve/controller/sim-service-controller.js";
-import { SimRoute53Zone } from "./zone/sim-route53-zone.js";
 import { SimRoute53Resolver } from "./resolve/sim-route53-resolver.js";
-import { normaliseSimRoute53Name } from "./local-name/sim-route53-local-name.js";
+import { CreateHostedZoneCommandHandler } from "./command/create-hosted-zone/create-hosted-zone.handler.js";
+import type {
+  SimCreateHostedZoneCommand,
+  SimCreateHostedZoneCommandOutput,
+} from "./command/create-hosted-zone/create-hosted-zone.cmd.js";
+import type { SimRoute53HostedZone } from "./hosted-zone/sim-route53-hosted-zone.js";
+import type { SimRoute53HostedZoneId } from "./command/create-hosted-zone/sim-route53-zone-id.js";
+import type {
+  SimGetHostedZoneCommand,
+  SimGetHostedZoneCommandOutput,
+} from "./command/get-hosted-zone/get-hosted-zone.cmd.js";
+import { GetHostedZoneCommandHandler } from "./command/get-hosted-zone/get-hosted-zone.handler.js";
+import type {
+  SimListHostedZonesByNameCommand,
+  SimListHostedZonesByNameCommandOutput,
+} from "./command/list-hosted-zones-by-name/list-hosted-zones-by-name.cmd.js";
+import { ListHostedZonesByNameCommandHandler } from "./command/list-hosted-zones-by-name/list-hosted-zones-by-name.handler.js";
+import type {
+  SimChangeResourceRecordSetsCommand,
+  SimChangeResourceRecordSetsCommandOutput,
+} from "./command/change-resource-record-sets/change-resource-record-sets.cmd.js";
+import { ChangeResourceRecordSetsCommandHandler } from "./command/change-resource-record-sets/change-resource-record-sets.handler.js";
 
 /**
  * Simulated Route53 service for Yulin-local name resolution.
  */
 export class SimRoute53 {
-  private readonly zone = new SimRoute53Zone();
-  private readonly resolver = new SimRoute53Resolver({ zone: this.zone });
+  public readonly hostedZones = new Map<
+    SimRoute53HostedZoneId,
+    SimRoute53HostedZone
+  >();
+
+  private readonly resolver = new SimRoute53Resolver({
+    hostedZones: this.hostedZones,
+  });
 
   /**
-   * Create or replace a simulated Route53 record.
+   * Create a new simulated Route53 Hosted Zone.
    */
-  upsertRecord(record: SimRoute53Record): void {
-    this.zone.upsertRecord(record);
+  async createHostedZone(
+    cmd: SimCreateHostedZoneCommand,
+  ): Promise<SimCreateHostedZoneCommandOutput> {
+    const handler = new CreateHostedZoneCommandHandler({
+      hostedZones: this.hostedZones,
+    });
+    return await handler.handle(cmd);
   }
 
   /**
-   * Get a simulated Route53 record by logical name and type.
+   * Handle a Get Hosted Zone command from the SDK.
    */
-  record(
-    name: string,
-    type: SimRoute53RecordType,
-  ): SimRoute53Record | undefined {
-    return this.zone.record(normaliseSimRoute53Name(name), type);
+  async getHostedZone(
+    cmd: SimGetHostedZoneCommand,
+  ): Promise<SimGetHostedZoneCommandOutput> {
+    const handler = new GetHostedZoneCommandHandler({
+      hostedZones: this.hostedZones,
+    });
+    return await handler.handle(cmd);
+  }
+
+  /**
+   * Handle a List Hosted Zones By Name command from the SDK.
+   */
+  async listHostedZonesByName(
+    cmd: SimListHostedZonesByNameCommand,
+  ): Promise<SimListHostedZonesByNameCommandOutput> {
+    const handler = new ListHostedZonesByNameCommandHandler({
+      hostedZones: this.hostedZones,
+    });
+    return await handler.handle(cmd);
+  }
+
+  /**
+   * Handle a Change Resource Record Sets command from the SDK.
+   */
+  async changeResourceRecordSets(
+    cmd: SimChangeResourceRecordSetsCommand,
+  ): Promise<SimChangeResourceRecordSetsCommandOutput> {
+    const handler = new ChangeResourceRecordSetsCommandHandler({
+      hostedZones: this.hostedZones,
+    });
+    return await handler.handle(cmd);
   }
 
   /**
