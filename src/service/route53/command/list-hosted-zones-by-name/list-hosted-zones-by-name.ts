@@ -5,6 +5,7 @@ import {
   isAtOrAfterMarker,
   normaliseHostedZoneListMarker,
 } from "../change-resource-record-sets/list-zones-marker.js";
+import { parseZoneMaxItems } from "./zone-max-items/parse-zone-max-items.js";
 
 export interface HostedZoneListEntry {
   readonly hostedZoneId: SimRoute53HostedZoneId;
@@ -30,7 +31,7 @@ interface HostedZoneListPage {
 export function getHostedZoneListPage(
   props: HostedZoneListPageProps,
 ): HostedZoneListPage {
-  const maxItems = parseMaxItems(props.maxItemsInput);
+  const maxItems = parseZoneMaxItems(props.maxItemsInput);
   const marker = normaliseHostedZoneListMarker({
     markerNameInput: props.markerNameInput,
     markerHostedZoneId: props.markerHostedZoneId,
@@ -67,20 +68,6 @@ function compareHostedZoneListEntries(
   }
 
   return left.hostedZoneId.localeCompare(right.hostedZoneId);
-}
-
-function parseMaxItems(maxItemsInput: string | undefined): number {
-  if (maxItemsInput === undefined) {
-    return 100;
-  }
-
-  const maxItems = Number.parseInt(maxItemsInput, 10);
-
-  if (!Number.isSafeInteger(maxItems) || maxItems < 1) {
-    throw new Error("ListHostedZonesByNameCommand.input.MaxItems is invalid");
-  }
-
-  return maxItems;
 }
 
 function toHostedZoneOutput(
