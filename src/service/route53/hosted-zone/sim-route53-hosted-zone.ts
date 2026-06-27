@@ -28,7 +28,8 @@ export class SimRoute53HostedZone {
     this.hostedZoneId = props.id;
     this.hostedZoneName = `${normaliseSimRoute53Name(props.name)}.`;
     this.hostedZoneCallerReference = props.callerReference;
-    this.hostedZoneConfig = props.config;
+    this.hostedZoneConfig =
+      props.config === undefined ? undefined : { ...props.config };
   }
 
   /**
@@ -57,6 +58,8 @@ export class SimRoute53HostedZone {
    * Hosted zone config supplied when the hosted zone was created.
    */
   get config(): SimRoute53HostedZoneConfig | undefined {
-    return this.hostedZoneConfig;
+    return this.hostedZoneConfig === undefined
+      ? undefined
+      : { ...this.hostedZoneConfig };
   }
 }
