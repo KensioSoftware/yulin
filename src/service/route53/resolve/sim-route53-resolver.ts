@@ -4,8 +4,8 @@ import {
   simRoute53LocalName,
   simRoute53LogicalName,
 } from "../local-name/sim-route53-local-name.js";
-import type { SimRoute53Record } from "../record/sim-route53-record.js";
 import type { SimRoute53HostedZone } from "../hosted-zone/sim-route53-hosted-zone.js";
+import { SimRoute53HostedZoneRecordFinder } from "./sim-r53-zone-record-finder.js";
 
 const s3WebsiteServiceLabel = "s3-website";
 const cloudFrontServiceLabel = "cloudfront";
@@ -19,10 +19,10 @@ interface SimRoute53ResolverProps {
  * Resolves Yulin-local hostnames through simulated Route53 hosted-zone records.
  */
 export class SimRoute53Resolver {
-  private readonly hostedZones: ReadonlyMap<string, SimRoute53HostedZone>;
+  private readonly recordFinder: SimRoute53HostedZoneRecordFinder;
 
   constructor(props: SimRoute53ResolverProps) {
-    this.hostedZones = props.hostedZones;
+    this.recordFinder = new SimRoute53HostedZoneRecordFinder(props.hostedZones);
   }
 
   /**
@@ -58,7 +58,7 @@ export class SimRoute53Resolver {
         return undefined;
       }
 
-      const cname = this.record(logicalName, "CNAME");
+      const cname = this.recordFinder.findRecord(logicalName, "CNAME");
       const cnameTarget = cname?.values[0];
       if (cnameTarget === undefined || cnameTarget.length === 0) {
         return undefined;
@@ -69,17 +69,6 @@ export class SimRoute53Resolver {
 
     /* v8 ignore next -- defensive fallback */
     return undefined;
-  }
-
-  private record(name: string, type: "CNAME"): SimRoute53Record | undefined {
-    for (const hostedZone of this.hostedZones.values()) {
-      const record = hostedZone.records.get(name, type);
-      if (record !== undefined) {
-        return record;
-      }
-    }
-
-    return;
   }
 
   private builtinLocalServiceTarget(
