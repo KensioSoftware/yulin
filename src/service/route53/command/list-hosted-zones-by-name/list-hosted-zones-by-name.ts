@@ -1,9 +1,12 @@
 import type { SimRoute53HostedZoneOutput } from "../create-hosted-zone/create-hosted-zone.cmd.js";
 import type { SimRoute53HostedZoneId } from "../create-hosted-zone/sim-route53-zone-id.js";
 import type { SimRoute53HostedZone } from "../../hosted-zone/sim-route53-hosted-zone.js";
-import { normaliseSimRoute53Name } from "../../local-name/sim-route53-local-name.js";
+import {
+  isAtOrAfterMarker,
+  normaliseHostedZoneListMarker,
+} from "../change-resource-record-sets/list-zones-marker.js";
 
-interface HostedZoneListEntry {
+export interface HostedZoneListEntry {
   readonly hostedZoneId: SimRoute53HostedZoneId;
   readonly hostedZone: SimRoute53HostedZone;
 }
@@ -28,7 +31,10 @@ export function getHostedZoneListPage(
   props: HostedZoneListPageProps,
 ): HostedZoneListPage {
   const maxItems = parseMaxItems(props.maxItemsInput);
-  const markerName = normaliseMarkerName(props.markerNameInput);
+  const marker = normaliseHostedZoneListMarker({
+    markerNameInput: props.markerNameInput,
+    markerHostedZoneId: props.markerHostedZoneId,
+  });
 
   const matchingEntries = [...props.hostedZones.entries()]
     .map(([hostedZoneId, hostedZone]) => ({
@@ -36,9 +42,7 @@ export function getHostedZoneListPage(
       hostedZone,
     }))
     .toSorted(compareHostedZoneListEntries)
-    .filter((entry) =>
-      isAtOrAfterMarker(entry, markerName, props.markerHostedZoneId),
-    );
+    .filter((entry) => isAtOrAfterMarker(entry, marker));
 
   const pageEntries = matchingEntries.slice(0, maxItems);
   const nextEntry = matchingEntries.at(maxItems);
@@ -63,40 +67,6 @@ function compareHostedZoneListEntries(
   }
 
   return left.hostedZoneId.localeCompare(right.hostedZoneId);
-}
-
-function isAtOrAfterMarker(
-  entry: HostedZoneListEntry,
-  markerName: string | undefined,
-  markerHostedZoneId: string | undefined,
-): boolean {
-  if (markerName === undefined) {
-    return true;
-  }
-
-  const nameComparison = entry.hostedZone.name.localeCompare(markerName);
-
-  if (nameComparison > 0) {
-    return true;
-  }
-
-  if (nameComparison < 0) {
-    return false;
-  }
-
-  if (markerHostedZoneId === undefined) {
-    return true;
-  }
-
-  return entry.hostedZoneId.localeCompare(markerHostedZoneId) > 0;
-}
-
-function normaliseMarkerName(name: string | undefined): string | undefined {
-  if (name === undefined) {
-    return undefined;
-  }
-
-  return `${normaliseSimRoute53Name(name)}.`;
 }
 
 function parseMaxItems(maxItemsInput: string | undefined): number {
