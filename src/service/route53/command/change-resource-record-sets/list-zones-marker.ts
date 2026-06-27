@@ -52,7 +52,7 @@ export function isAtOrAfterMarker(
     return true;
   }
 
-  return entry.hostedZoneId.localeCompare(marker.markerHostedZoneId) > 0;
+  return entry.hostedZoneId.localeCompare(marker.markerHostedZoneId) >= 0;
 }
 
 function normaliseMarkerName(name: string | undefined): string | undefined {

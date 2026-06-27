@@ -54,7 +54,7 @@ describe("Route53 ListHostedZonesByNameCommand", () => {
     assertIdentical(listHostedZonesOutput.MaxItems, "1");
   });
 
-  it("continues after a DNSName and HostedZoneId marker for duplicate names", async () => {
+  it("continues at a DNSName and HostedZoneId marker for duplicate names", async () => {
     // Given multiple Hosted Zones with the same DNS name.
     const simAws = new SimAws();
     const simRoute53 = simAws.route53();
@@ -82,7 +82,7 @@ describe("Route53 ListHostedZonesByNameCommand", () => {
       firstHostedZoneId.localeCompare(secondHostedZoneId) < 0
         ? firstHostedZoneId
         : secondHostedZoneId;
-    const expectedHostedZoneId =
+    const nextHostedZoneId =
       markerHostedZoneId === firstHostedZoneId
         ? secondHostedZoneId
         : firstHostedZoneId;
@@ -95,14 +95,19 @@ describe("Route53 ListHostedZonesByNameCommand", () => {
       },
     });
 
-    // Then only duplicate-name Hosted Zones after that HostedZoneId are returned.
-    assertArrayLength(listHostedZonesOutput.HostedZones, 1);
+    // Then duplicate-name Hosted Zones at and after that HostedZoneId are returned.
+    assertArrayLength(listHostedZonesOutput.HostedZones, 2);
     assertIdentical(
       listHostedZonesOutput.HostedZones[0].Id,
-      expectedHostedZoneId,
+      markerHostedZoneId,
     );
+    assertIdentical(listHostedZonesOutput.HostedZones[1].Id, nextHostedZoneId);
     assertIdentical(
       listHostedZonesOutput.HostedZones[0].Name,
+      "duplicate.example.com.",
+    );
+    assertIdentical(
+      listHostedZonesOutput.HostedZones[1].Name,
       "duplicate.example.com.",
     );
     assertIdentical(listHostedZonesOutput.HostedZoneId, markerHostedZoneId);
