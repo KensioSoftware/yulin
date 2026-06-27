@@ -25,7 +25,11 @@ export function applyChangeResourceRecordSet(
   const record = toSimRoute53Record(resourceRecordSet);
 
   switch (action) {
-    case "CREATE":
+    case "CREATE": {
+      hostedZone.records.create(record);
+      return;
+    }
+
     case "UPSERT": {
       hostedZone.records.upsert(record);
       return;

@@ -20,17 +20,29 @@ export class SimRoute53HostedZoneRecords {
   }
 
   /**
+   * Create a record, rejecting duplicate name/type pairs.
+   * @internal
+   */
+  create(record: SimRoute53Record): void {
+    const normalisedRecord = normaliseRecord(record);
+    const key = recordKey(normalisedRecord.name, normalisedRecord.type);
+
+    /* v8 ignore if */
+    if (this.records.has(key)) {
+      throw new Error(
+        `Route53 record ${normalisedRecord.type} ${normalisedRecord.name} already exists`,
+      );
+    }
+
+    this.records.set(key, normalisedRecord);
+  }
+
+  /**
    * Create or replace a record.
    * @internal
    */
   upsert(record: SimRoute53Record): void {
-    const normalisedRecord = {
-      ...record,
-      name: normaliseSimRoute53Name(record.name),
-      values: record.values.map((value) =>
-        normaliseRecordValue(record.type, value),
-      ),
-    };
+    const normalisedRecord = normaliseRecord(record);
 
     this.records.set(
       recordKey(normalisedRecord.name, normalisedRecord.type),
@@ -64,6 +76,16 @@ export class SimRoute53HostedZoneRecords {
       values: [...record.values],
     };
   }
+}
+
+function normaliseRecord(record: SimRoute53Record): SimRoute53Record {
+  return {
+    ...record,
+    name: normaliseSimRoute53Name(record.name),
+    values: record.values.map((value) =>
+      normaliseRecordValue(record.type, value),
+    ),
+  };
 }
 
 function recordKey(name: string, type: SimRoute53RecordType): string {
