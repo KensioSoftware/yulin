@@ -52,7 +52,7 @@ function toSimRoute53Record(
   assertDefined(type, "ChangeResourceRecordSetsCommand.ResourceRecordSet.Type");
 
   const values =
-    resourceRecordSet.AliasTarget?.DNSName === undefined
+    resourceRecordSet.AliasTarget === undefined
       ? resourceRecordSet.ResourceRecords?.map((record) => {
           assertDefined(
             record.Value,
@@ -60,7 +60,14 @@ function toSimRoute53Record(
           );
           return record.Value;
         })
-      : [resourceRecordSet.AliasTarget.DNSName];
+      : ((): string[] => {
+          const dnsName = resourceRecordSet.AliasTarget.DNSName;
+          assertDefined(
+            dnsName,
+            "ChangeResourceRecordSetsCommand.ResourceRecordSet.AliasTarget.DNSName",
+          );
+          return [dnsName];
+        })();
 
   assertDefined(
     values,
