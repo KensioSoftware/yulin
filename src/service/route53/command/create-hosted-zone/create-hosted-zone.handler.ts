@@ -90,7 +90,7 @@ export class CreateHostedZoneCommandHandler implements CommandHandler<
           "ns-4.sim-aws.localhost",
         ],
       },
-      Location: `https://route53.amazonaws.com/2013-04-01${hostedZoneId}`,
+      Location: `https://route53.sim-aws.localhost/2013-04-01/hostedzone/${hostedZoneId}`,
       $metadata: {},
     };
   }

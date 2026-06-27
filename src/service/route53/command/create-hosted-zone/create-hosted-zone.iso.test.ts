@@ -56,7 +56,7 @@ describe("Route53 CreateHostedZoneCommand", () => {
     assertArrayLength(createHostedZoneOutput.DelegationSet.NameServers, 4);
     assertIdentical(
       createHostedZoneOutput.Location,
-      `https://route53.amazonaws.com/2013-04-01${hostedZoneId}`,
+      `https://route53.sim-aws.localhost/2013-04-01/hostedzone/${hostedZoneId}`,
     );
     assertObjectMatches(createHostedZoneOutput.$metadata, {});
   });
