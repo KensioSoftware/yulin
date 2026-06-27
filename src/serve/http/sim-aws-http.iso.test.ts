@@ -53,10 +53,29 @@ describe("Simulated AWS HTTP", () => {
 
   it("routes custom domains to CloudFront through simulated Route53", async () => {
     const simAws = new SimAws();
-    simAws.route53().upsertRecord({
-      name: "www.foo.com",
-      type: "CNAME",
-      values: ["d123.cloudfront.net"],
+    const createHostedZoneOutput = await simAws.route53().createHostedZone({
+      input: {
+        Name: "foo.com",
+        CallerReference: "foo-com-test",
+      },
+    });
+
+    await simAws.route53().changeResourceRecordSets({
+      input: {
+        HostedZoneId: createHostedZoneOutput.HostedZone?.Id,
+        ChangeBatch: {
+          Changes: [
+            {
+              Action: "UPSERT",
+              ResourceRecordSet: {
+                Name: "www.foo.com",
+                Type: "CNAME",
+                ResourceRecords: [{ Value: "d123.cloudfront.net" }],
+              },
+            },
+          ],
+        },
+      },
     });
 
     const simAwsHttp = new SimAwsHttp({ simAws });

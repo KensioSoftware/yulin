@@ -12,7 +12,7 @@ export interface SimRoute53Record {
   readonly name: string;
   readonly type: SimRoute53RecordType;
   readonly values: readonly string[];
-  readonly ttl?: number;
+  readonly ttl?: number | undefined;
 }
 
 export interface SimRoute53HttpResolution {
