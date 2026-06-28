@@ -1,7 +1,6 @@
 import {
   assertIdentical,
   assertInstanceOf,
-  assertNonNullable,
   assertObjectMatches,
   assertStringStartsWith,
   assertUndefined,
@@ -15,9 +14,11 @@ import {
 } from "../create-hosted-zone/sim-route53-zone-id.js";
 
 describe("Route53 ChangeResourceRecordSetsCommand", () => {
-  async function createHostedZone(
-    name: string,
-  ): Promise<{ simRoute53: SimRoute53; hostedZoneId: SimRoute53HostedZoneId }> {
+  async function createHostedZone(name: string): Promise<{
+    simAws: SimAws;
+    simRoute53: SimRoute53;
+    hostedZoneId: SimRoute53HostedZoneId;
+  }> {
     const simAws = new SimAws();
     const simRoute53 = simAws.route53();
 
@@ -31,12 +32,15 @@ describe("Route53 ChangeResourceRecordSetsCommand", () => {
     const hostedZoneId = createHostedZoneOutput.HostedZone?.Id;
     assertIsSimRoute53HostedZoneId(hostedZoneId);
 
-    return { simRoute53, hostedZoneId };
+    await simAws.backgroundTasksComplete();
+
+    return { simAws, simRoute53, hostedZoneId };
   }
 
-  it("creates an A record and returns INSYNC ChangeInfo", async () => {
+  it("creates an A record and returns PENDING ChangeInfo", async () => {
     // Given a Hosted Zone in simulated Route53.
-    const { simRoute53, hostedZoneId } = await createHostedZone("example.com");
+    const { simAws, simRoute53, hostedZoneId } =
+      await createHostedZone("example.com");
 
     // When an A record is created in the Hosted Zone.
     const changeOutput = await simRoute53.changeResourceRecordSets({
@@ -59,17 +63,24 @@ describe("Route53 ChangeResourceRecordSetsCommand", () => {
       },
     });
 
-    // Then the change output is successful and the record is stored.
+    // Then the change output shows the async change is pending.
     assertStringStartsWith(
       changeOutput.ChangeInfo?.Id ?? "",
       `/change/${hostedZoneId}-`,
     );
-    assertIdentical(changeOutput.ChangeInfo?.Status, "INSYNC");
+    assertIdentical(changeOutput.ChangeInfo?.Status, "PENDING");
     assertInstanceOf(changeOutput.ChangeInfo.SubmittedAt, Date);
     assertObjectMatches(changeOutput.$metadata, {});
 
     const hostedZone = simRoute53.hostedZones.get(hostedZoneId);
-    assertNonNullable(hostedZone, "Stored Hosted Zone");
+    assertIdentical(hostedZone?.status, "PENDING");
+    assertIdentical(hostedZone.records.count, 0);
+
+    // When scheduled background work completes.
+    await simAws.backgroundTasksComplete();
+
+    // Then the Hosted Zone is INSYNC and the record is stored.
+    assertIdentical(hostedZone.status, "INSYNC");
     assertIdentical(hostedZone.records.count, 1);
     assertObjectMatches(hostedZone.records.get("www.example.com", "A"), {
       name: "www.example.com",
@@ -81,7 +92,7 @@ describe("Route53 ChangeResourceRecordSetsCommand", () => {
 
   it("applies multiple changes in one ChangeBatch", async () => {
     // Given a Hosted Zone in simulated Route53.
-    const { simRoute53, hostedZoneId } =
+    const { simAws, simRoute53, hostedZoneId } =
       await createHostedZone("batch.example.com");
 
     // When multiple records are created in one ChangeBatch.
@@ -113,10 +124,11 @@ describe("Route53 ChangeResourceRecordSetsCommand", () => {
       },
     });
 
+    await simAws.backgroundTasksComplete();
+
     // Then both records are stored and Hosted Zone record count is updated.
     const hostedZone = simRoute53.hostedZones.get(hostedZoneId);
-    assertNonNullable(hostedZone, "Stored Hosted Zone");
-    assertIdentical(hostedZone.records.count, 2);
+    assertIdentical(hostedZone?.records.count, 2);
     assertObjectMatches(hostedZone.records.get("one.batch.example.com", "A"), {
       values: ["192.0.2.3"],
     });
@@ -137,7 +149,7 @@ describe("Route53 ChangeResourceRecordSetsCommand", () => {
 
   it("upserts an existing record by replacing its values and TTL", async () => {
     // Given a Hosted Zone with an existing A record.
-    const { simRoute53, hostedZoneId } =
+    const { simAws, simRoute53, hostedZoneId } =
       await createHostedZone("upsert.example.com");
 
     await simRoute53.changeResourceRecordSets({
@@ -159,6 +171,8 @@ describe("Route53 ChangeResourceRecordSetsCommand", () => {
       },
     });
 
+    await simAws.backgroundTasksComplete();
+
     // When the same record name and type is upserted.
     await simRoute53.changeResourceRecordSets({
       input: {
@@ -179,10 +193,11 @@ describe("Route53 ChangeResourceRecordSetsCommand", () => {
       },
     });
 
+    await simAws.backgroundTasksComplete();
+
     // Then the existing record is replaced rather than duplicated.
     const hostedZone = simRoute53.hostedZones.get(hostedZoneId);
-    assertNonNullable(hostedZone, "Stored Hosted Zone");
-    assertIdentical(hostedZone.records.count, 1);
+    assertIdentical(hostedZone?.records.count, 1);
     assertObjectMatches(hostedZone.records.get("www.upsert.example.com", "A"), {
       values: ["192.0.2.5"],
       ttl: 60,
@@ -241,14 +256,13 @@ describe("Route53 ChangeResourceRecordSetsCommand", () => {
 
     // Then the Hosted Zone is empty and deleting the missing record did not fail.
     const hostedZone = simRoute53.hostedZones.get(hostedZoneId);
-    assertNonNullable(hostedZone, "Stored Hosted Zone");
-    assertIdentical(hostedZone.records.count, 0);
+    assertIdentical(hostedZone?.records.count, 0);
     assertUndefined(hostedZone.records.get("www.delete.example.com", "A"));
   });
 
   it("stores AliasTarget DNSName as the record value", async () => {
     // Given a Hosted Zone in simulated Route53.
-    const { simRoute53, hostedZoneId } =
+    const { simAws, simRoute53, hostedZoneId } =
       await createHostedZone("alias.example.com");
 
     // When an alias record is created.
@@ -274,10 +288,11 @@ describe("Route53 ChangeResourceRecordSetsCommand", () => {
       },
     });
 
+    await simAws.backgroundTasksComplete();
+
     // Then the alias DNSName is normalized and stored as the record value.
     const hostedZone = simRoute53.hostedZones.get(hostedZoneId);
-    assertNonNullable(hostedZone, "Stored Hosted Zone");
-    assertObjectMatches(hostedZone.records.get("app.alias.example.com", "A"), {
+    assertObjectMatches(hostedZone?.records.get("app.alias.example.com", "A"), {
       values: ["dualstack.example-load-balancer.amazonaws.com"],
     });
   });

@@ -13,8 +13,8 @@ import type {
   SimChangeResourceRecordSetsCommand,
   SimChangeResourceRecordSetsCommandOutput,
 } from "./change-resource-record-sets.cmd.js";
-import { applyChangeResourceRecordSet } from "./change-resource-record-sets.js";
 import { getChangeResourceRecordSetsHostedZone } from "./change-res-rec-sets-zone.js";
+import { scheduleChangeResourceRecordSets } from "./schedule/schedule-change-res-rec-sets.js";
 
 interface ChangeResourceRecordSetsCommandHandlerProps {
   readonly hostedZones: Map<SimRoute53HostedZoneId, SimRoute53HostedZone>;
@@ -68,14 +68,16 @@ export class ChangeResourceRecordSetsCommandHandler implements CommandHandler<
 
     const submittedAt = new Date();
 
-    for (const change of changes) {
-      applyChangeResourceRecordSet(hostedZone, change);
-    }
+    await scheduleChangeResourceRecordSets(
+      this.background,
+      hostedZone,
+      changes,
+    );
 
     return {
       ChangeInfo: {
         Id: `/change/${hostedZoneId}-${String(submittedAt.getTime())}`,
-        Status: "INSYNC",
+        Status: hostedZone.status,
         SubmittedAt: submittedAt,
       },
       $metadata: {},

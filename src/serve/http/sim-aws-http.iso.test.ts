@@ -77,6 +77,7 @@ describe("Simulated AWS HTTP", () => {
         },
       },
     });
+    await simAws.backgroundTasksComplete();
 
     const simAwsHttp = new SimAwsHttp({ simAws });
 

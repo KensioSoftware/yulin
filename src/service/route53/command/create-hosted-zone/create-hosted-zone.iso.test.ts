@@ -4,13 +4,16 @@ import {
   assertInstanceOf,
   assertNonNullable,
   assertObjectMatches,
+  assertOneOf,
   assertStringIncludes,
   assertStringStartsWith,
   assertThrowsErrorAsync,
   assertUndefined,
+  oneOf,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
+import { assertIsSimRoute53HostedZoneId } from "./sim-route53-zone-id.js";
 
 describe("Route53 CreateHostedZoneCommand", () => {
   it("creates a Hosted Zone in SimRoute53", async () => {
@@ -48,7 +51,7 @@ describe("Route53 CreateHostedZoneCommand", () => {
 
     assertObjectMatches(createHostedZoneOutput.ChangeInfo, {
       Id: `/change/${hostedZoneId}`,
-      Status: "INSYNC",
+      Status: oneOf(["PENDING", "INSYNC"]),
     });
     assertInstanceOf(createHostedZoneOutput.ChangeInfo.SubmittedAt, Date);
 
@@ -198,5 +201,38 @@ describe("Route53 CreateHostedZoneCommand", () => {
       error.message,
       "CreateHostedZoneCommand.CallerReference",
     );
+  });
+
+  it("moves the created Hosted Zone into INSYNC status as a background task", async () => {
+    // Given a simulated AWS environment.
+    const simAws = new SimAws();
+    const simRoute53 = simAws.route53();
+
+    // When a Hosted Zone is created.
+    const createHostedZoneOutput = await simRoute53.createHostedZone({
+      input: {
+        Name: "async.example.com",
+        CallerReference: "async-zone-test",
+      },
+    });
+
+    // Then the immediate CreateHostedZone ChangeInfo is still pending.
+    assertOneOf(createHostedZoneOutput.ChangeInfo?.Status, [
+      "PENDING",
+      "INSYNC",
+    ]);
+
+    const hostedZoneId = createHostedZoneOutput.HostedZone?.Id;
+    assertIsSimRoute53HostedZoneId(hostedZoneId);
+
+    const hostedZone = simRoute53.hostedZones.get(hostedZoneId);
+    assertNonNullable(hostedZone, "Created Hosted Zone");
+    assertOneOf(hostedZone.status, ["PENDING", "INSYNC"]);
+
+    // When scheduled background work completes.
+    await simAws.backgroundTasksComplete();
+
+    // Then the Hosted Zone has moved to INSYNC.
+    assertIdentical(hostedZone.status, "INSYNC");
   });
 });

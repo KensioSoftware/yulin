@@ -69,6 +69,9 @@ export class CreateHostedZoneCommandHandler implements CommandHandler<
 
     this.hostedZones.set(hostedZoneId, hostedZone);
 
+    // Schedule background task to complete creation of the sim Hosted Zone.
+    this.background.schedule(() => hostedZone.completeSynchronization());
+
     return {
       HostedZone: {
         Id: hostedZone.id,
@@ -79,7 +82,7 @@ export class CreateHostedZoneCommandHandler implements CommandHandler<
       },
       ChangeInfo: {
         Id: `/change/${hostedZoneId}`,
-        Status: "INSYNC",
+        Status: hostedZone.status,
         SubmittedAt: submittedAt,
       },
       DelegationSet: {
