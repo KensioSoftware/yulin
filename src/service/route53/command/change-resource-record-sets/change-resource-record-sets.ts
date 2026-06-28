@@ -21,6 +21,23 @@ export function validateChangeResourceRecordSet(
     "ChangeResourceRecordSetsCommand.Change.ResourceRecordSet",
   );
 
+  switch (action) {
+    case "CREATE":
+    case "UPSERT":
+    case "DELETE": {
+      break;
+    }
+
+    default: {
+      /* v8 ignore next */
+      throw new Error(
+        `Unsupported ChangeResourceRecordSetsCommand.Change.Action ${String(
+          action,
+        )}`,
+      );
+    }
+  }
+
   toSimRoute53Record(resourceRecordSet);
 }
 
