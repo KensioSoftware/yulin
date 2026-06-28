@@ -90,6 +90,8 @@ describe("Route53 GetHostedZoneCommand", () => {
       },
     });
 
+    await simAws.backgroundTasksComplete();
+
     // When the Hosted Zone is requested after the record change.
     const getHostedZoneOutput = await simRoute53.getHostedZone({
       input: {

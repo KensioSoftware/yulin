@@ -1,7 +1,6 @@
 import {
   assertIdentical,
   assertInstanceOf,
-  assertNonNullable,
   assertObjectMatches,
   assertStringIncludes,
   assertThrowsErrorAsync,
@@ -18,9 +17,11 @@ import type { SimRoute53Change } from "./change-resource-record-sets.cmd.js";
 import type { SimRoute53 } from "../../sim-route53.js";
 
 describe("ChangeResourceRecordSetsCommand validation", () => {
-  async function createHostedZone(
-    name: string,
-  ): Promise<{ simRoute53: SimRoute53; hostedZoneId: SimRoute53HostedZoneId }> {
+  async function createHostedZone(name: string): Promise<{
+    simAws: SimAws;
+    simRoute53: SimRoute53;
+    hostedZoneId: SimRoute53HostedZoneId;
+  }> {
     const simAws = new SimAws();
     const simRoute53 = simAws.route53();
 
@@ -34,7 +35,9 @@ describe("ChangeResourceRecordSetsCommand validation", () => {
     const hostedZoneId = createHostedZoneOutput.HostedZone?.Id;
     assertIsSimRoute53HostedZoneId(hostedZoneId);
 
-    return { simRoute53, hostedZoneId };
+    await simAws.backgroundTasksComplete();
+
+    return { simAws, simRoute53, hostedZoneId };
   }
 
   it("throws when the Hosted Zone does not exist", async () => {
@@ -204,7 +207,7 @@ describe("ChangeResourceRecordSetsCommand validation", () => {
 
   it("accepts a /hostedzone/ prefixed HostedZoneId", async () => {
     // Given a Hosted Zone in simulated Route53.
-    const { simRoute53, hostedZoneId } = await createHostedZone(
+    const { simAws, simRoute53, hostedZoneId } = await createHostedZone(
       "prefixed.example.com",
     );
 
@@ -227,12 +230,12 @@ describe("ChangeResourceRecordSetsCommand validation", () => {
         },
       },
     });
+    await simAws.backgroundTasksComplete();
 
     // Then the record is applied to the existing Hosted Zone.
     const hostedZone = simRoute53.hostedZones.get(hostedZoneId);
-    assertNonNullable(hostedZone, "Stored Hosted Zone");
     assertObjectMatches(
-      hostedZone.records.get("www.prefixed.example.com", "A"),
+      hostedZone?.records.get("www.prefixed.example.com", "A"),
       {
         values: ["192.0.2.2"],
         ttl: 60,
@@ -242,7 +245,7 @@ describe("ChangeResourceRecordSetsCommand validation", () => {
 
   it("normalizes record names and non-TXT values while preserving TXT values", async () => {
     // Given a Hosted Zone in simulated Route53.
-    const { simRoute53, hostedZoneId } = await createHostedZone(
+    const { simAws, simRoute53, hostedZoneId } = await createHostedZone(
       "normalize.example.com",
     );
 
@@ -274,12 +277,12 @@ describe("ChangeResourceRecordSetsCommand validation", () => {
         },
       },
     });
+    await simAws.backgroundTasksComplete();
 
     // Then DNS-like names are normalized but TXT content is preserved.
     const hostedZone = simRoute53.hostedZones.get(hostedZoneId);
-    assertNonNullable(hostedZone, "Stored Hosted Zone");
     assertObjectMatches(
-      hostedZone.records.get("www.normalize.example.com", "CNAME"),
+      hostedZone?.records.get("www.normalize.example.com", "CNAME"),
       {
         name: "www.normalize.example.com",
         values: ["target.normalize.example.com"],

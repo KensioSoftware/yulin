@@ -22,6 +22,14 @@ import type {
   SimChangeResourceRecordSetsCommandOutput,
 } from "./command/change-resource-record-sets/change-resource-record-sets.cmd.js";
 import { ChangeResourceRecordSetsCommandHandler } from "./command/change-resource-record-sets/change-resource-record-sets.handler.js";
+import {
+  type BackgroundScheduler,
+  BackgroundTasks,
+} from "../../util/background/background.js";
+
+interface SimRoute53Props {
+  readonly background?: BackgroundScheduler | undefined;
+}
 
 /**
  * Simulated Route53 service for Yulin-local name resolution.
@@ -31,10 +39,17 @@ export class SimRoute53 {
     SimRoute53HostedZoneId,
     SimRoute53HostedZone
   >();
+  private readonly background: BackgroundScheduler;
 
   private readonly resolver = new SimRoute53Resolver({
     hostedZones: this.hostedZones,
   });
+
+  constructor(props: SimRoute53Props = {}) {
+    const { background = new BackgroundTasks() } = props;
+
+    this.background = background;
+  }
 
   /**
    * Create a new simulated Route53 Hosted Zone.
@@ -44,6 +59,7 @@ export class SimRoute53 {
   ): Promise<SimCreateHostedZoneCommandOutput> {
     const handler = new CreateHostedZoneCommandHandler({
       hostedZones: this.hostedZones,
+      background: this.background,
     });
     return await handler.handle(cmd);
   }
@@ -56,6 +72,7 @@ export class SimRoute53 {
   ): Promise<SimGetHostedZoneCommandOutput> {
     const handler = new GetHostedZoneCommandHandler({
       hostedZones: this.hostedZones,
+      background: this.background,
     });
     return await handler.handle(cmd);
   }
@@ -80,6 +97,7 @@ export class SimRoute53 {
   ): Promise<SimChangeResourceRecordSetsCommandOutput> {
     const handler = new ChangeResourceRecordSetsCommandHandler({
       hostedZones: this.hostedZones,
+      background: this.background,
     });
     return await handler.handle(cmd);
   }

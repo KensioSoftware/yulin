@@ -2,6 +2,8 @@ import { normaliseSimRoute53Name } from "../local-name/sim-route53-local-name.js
 import type { SimRoute53HostedZoneConfig } from "../command/create-hosted-zone/create-hosted-zone.cmd.js";
 import { SimRoute53HostedZoneRecords } from "./sim-route53-hosted-zone-records.js";
 
+export type SimRoute53HostedZoneStatus = "PENDING" | "INSYNC";
+
 interface SimRoute53HostedZoneProps {
   readonly id: string;
   readonly name: string;
@@ -23,6 +25,7 @@ export class SimRoute53HostedZone {
   // Route53 Hosted Zone caller reference is like an idempotency key.
   private readonly hostedZoneCallerReference: string;
   private readonly hostedZoneConfig: SimRoute53HostedZoneConfig | undefined;
+  private _status: SimRoute53HostedZoneStatus = "PENDING";
 
   constructor(props: SimRoute53HostedZoneProps) {
     this.hostedZoneId = props.id;
@@ -61,5 +64,28 @@ export class SimRoute53HostedZone {
     return this.hostedZoneConfig === undefined
       ? undefined
       : { ...this.hostedZoneConfig };
+  }
+
+  /**
+   * Get the current creation status of this sim Hosted Zone.
+   */
+  get status(): SimRoute53HostedZoneStatus {
+    return this._status;
+  }
+
+  /**
+   * Move the sim Hosted Zone into PENDING status.
+   */
+  beginSynchronization(): Promise<void> {
+    this._status = "PENDING";
+    return Promise.resolve();
+  }
+
+  /**
+   * Move the sim Hosted Zone into INSYNC status.
+   */
+  completeSynchronization(): Promise<void> {
+    this._status = "INSYNC";
+    return Promise.resolve();
   }
 }

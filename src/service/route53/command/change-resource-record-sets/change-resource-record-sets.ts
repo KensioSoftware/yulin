@@ -7,6 +7,24 @@ import type {
 } from "./change-resource-record-sets.cmd.js";
 
 /**
+ * Validate a Route53 resource record set change without mutating the Hosted Zone.
+ */
+export function validateChangeResourceRecordSet(
+  change: SimRoute53Change,
+): void {
+  const action = change.Action;
+  assertDefined(action, "ChangeResourceRecordSetsCommand.Change.Action");
+
+  const resourceRecordSet = change.ResourceRecordSet;
+  assertDefined(
+    resourceRecordSet,
+    "ChangeResourceRecordSetsCommand.Change.ResourceRecordSet",
+  );
+
+  toSimRoute53Record(resourceRecordSet);
+}
+
+/**
  * Applies a Route53 resource record set change to a simulated hosted zone.
  */
 export function applyChangeResourceRecordSet(

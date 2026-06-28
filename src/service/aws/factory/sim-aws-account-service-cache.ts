@@ -66,7 +66,7 @@ export class SimAwsAccountServiceCache {
     let route53 = this.route53Services.get(accountId);
 
     if (route53 === undefined) {
-      route53 = new SimRoute53();
+      route53 = new SimRoute53({ background: this.background });
       this.route53Services.set(accountId, route53);
     }
 
