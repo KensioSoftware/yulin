@@ -27,8 +27,13 @@ export class SimRoute53HostedZoneCfn implements SimCfnResourceValueAdapter {
       case "Id": {
         return this.props.hostedZone.id;
       }
-      case "Name": {
-        return this.props.hostedZone.name;
+      case "NameServers": {
+        return [
+          "ns-1.sim-aws.localhost",
+          "ns-2.sim-aws.localhost",
+          "ns-3.sim-aws.localhost",
+          "ns-4.sim-aws.localhost",
+        ];
       }
       default: {
         throw new Error(

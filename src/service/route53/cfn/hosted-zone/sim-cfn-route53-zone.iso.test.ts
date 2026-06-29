@@ -1,4 +1,5 @@
 import {
+  assertArrayIncludes,
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
@@ -153,9 +154,9 @@ describe("Route53 CloudFormation HostedZone", () => {
     );
   });
 
-  it("uses Hosted Zone ID for Ref and exposes Id and Name via Fn::GetAtt", async () => {
-    // Given a CloudFormation template with a Hosted Zone, a dependent resource, and
-    // Outputs that exercise Ref and Fn::GetAtt resolution.
+  it("uses Hosted Zone ID for Ref and exposes Id and NameServers via Fn::GetAtt", async () => {
+    // Given a CloudFormation template with a Hosted Zone, a dependent resource,
+    // and Outputs that exercise Ref and Fn::GetAtt resolution.
     const simAws = new SimAws();
 
     // When the template is deployed through sim CloudFormation.
@@ -178,8 +179,8 @@ describe("Route53 CloudFormation HostedZone", () => {
               HostedZoneIdAttribute: {
                 "Fn::GetAtt": ["OutputZone", "Id"],
               },
-              HostedZoneNameAttribute: {
-                "Fn::GetAtt": ["OutputZone", "Name"],
+              HostedZoneNameServersAttribute: {
+                "Fn::GetAtt": ["OutputZone", "NameServers"],
               },
             },
           },
@@ -195,9 +196,9 @@ describe("Route53 CloudFormation HostedZone", () => {
               "Fn::GetAtt": ["OutputZone", "Id"],
             },
           },
-          HostedZoneNameAttribute: {
+          HostedZoneNameServersAttribute: {
             Value: {
-              "Fn::GetAtt": ["OutputZone", "Name"],
+              "Fn::GetAtt": ["OutputZone", "NameServers"],
             },
           },
         },
@@ -226,19 +227,15 @@ describe("Route53 CloudFormation HostedZone", () => {
       resolvedWaitHandleProperties["HostedZoneIdAttribute"],
       hostedZoneId,
     );
-    assertIdentical(
-      resolvedWaitHandleProperties["HostedZoneNameAttribute"],
-      "outputs.example.test.",
-    );
 
     assertIdentical(stack.outputs.get("HostedZoneId")?.value, hostedZoneId);
     assertIdentical(
       stack.outputs.get("HostedZoneIdAttribute")?.value,
       hostedZoneId,
     );
-    assertIdentical(
-      stack.outputs.get("HostedZoneNameAttribute")?.value,
-      "outputs.example.test.",
+    assertArrayIncludes(
+      stack.outputs.get("HostedZoneNameServersAttribute")?.value,
+      "ns-3.sim-aws.localhost",
     );
   });
 
