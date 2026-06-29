@@ -228,4 +228,27 @@ describe("SimCfnRoute53RecordSetBuilder", () => {
       );
     }
   });
+
+  it("throws when TTL is an empty or whitespace-only string", () => {
+    // Given RecordSets with blank TTL strings.
+    const invalidTtls = ["", "   ", "\t\n"];
+
+    for (const ttl of invalidTtls) {
+      // When the RecordSet is built.
+      const error = assertThrowsError(() =>
+        buildRecordSet({
+          Name: "www.example.com",
+          Type: "A",
+          TTL: ttl,
+        }),
+      );
+
+      // Then a clear validation error is thrown.
+      assertInstanceOf(error, TypeError);
+      assertStringIncludes(
+        error.message,
+        "Invalid AWS::Route53::RecordSet TestRecordSet: TTL must be a non-negative integer",
+      );
+    }
+  });
 });

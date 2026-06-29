@@ -72,6 +72,12 @@ export class SimCfnRoute53RecordSetBuilder {
       );
     }
 
+    if (typeof ttl === "string" && ttl.trim().length === 0) {
+      throw new TypeError(
+        `Invalid AWS::Route53::RecordSet ${this.resource.logicalId}: TTL must be a non-negative integer`,
+      );
+    }
+
     const parsedTtl = Number(ttl);
 
     if (!Number.isInteger(parsedTtl) || parsedTtl < 0) {
