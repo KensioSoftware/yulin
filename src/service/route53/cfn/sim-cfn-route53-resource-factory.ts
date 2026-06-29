@@ -67,23 +67,22 @@ export class SimRoute53CloudFormationResourceFactory implements SimCfnServiceRes
       );
     }
 
+    const route53HostedZoneConfig =
+      hostedZoneConfig === undefined || hostedZoneConfig === null
+        ? undefined
+        : {
+            Comment: this.hostedZoneConfigComment(resource, hostedZoneConfig),
+            PrivateZone: this.hostedZoneConfigPrivateZone(
+              resource,
+              hostedZoneConfig,
+            ),
+          };
+
     const createOutput = await this.props.route53.createHostedZone({
       input: {
         Name: name,
         CallerReference: resource.logicalId,
-        HostedZoneConfig:
-          hostedZoneConfig === undefined || hostedZoneConfig === null
-            ? undefined
-            : {
-                Comment:
-                  typeof hostedZoneConfig["Comment"] === "string"
-                    ? hostedZoneConfig["Comment"]
-                    : undefined,
-                PrivateZone:
-                  typeof hostedZoneConfig["PrivateZone"] === "boolean"
-                    ? hostedZoneConfig["PrivateZone"]
-                    : undefined,
-              },
+        HostedZoneConfig: route53HostedZoneConfig,
       },
     });
 
@@ -100,5 +99,43 @@ export class SimRoute53CloudFormationResourceFactory implements SimCfnServiceRes
     }
 
     return hostedZone;
+  }
+
+  private hostedZoneConfigComment(
+    resource: SimCfnResource,
+    hostedZoneConfig: SimCfnTemplateValueRecord,
+  ): string | undefined {
+    const comment = hostedZoneConfig["Comment"];
+
+    if (comment === undefined) {
+      return undefined;
+    }
+
+    if (typeof comment !== "string") {
+      throw new TypeError(
+        `Invalid AWS::Route53::HostedZone ${resource.logicalId}: HostedZoneConfig.Comment must be a string`,
+      );
+    }
+
+    return comment;
+  }
+
+  private hostedZoneConfigPrivateZone(
+    resource: SimCfnResource,
+    hostedZoneConfig: SimCfnTemplateValueRecord,
+  ): boolean | undefined {
+    const privateZone = hostedZoneConfig["PrivateZone"];
+
+    if (privateZone === undefined) {
+      return undefined;
+    }
+
+    if (typeof privateZone !== "boolean") {
+      throw new TypeError(
+        `Invalid AWS::Route53::HostedZone ${resource.logicalId}: HostedZoneConfig.PrivateZone must be a boolean`,
+      );
+    }
+
+    return privateZone;
   }
 }

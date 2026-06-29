@@ -23,6 +23,7 @@ describe("SimRoute53CloudFormationResourceFactory", () => {
           Name: "example.test",
           HostedZoneConfig: {
             Comment: "Example hosted zone",
+            PrivateZone: true,
           },
         },
       },
@@ -39,6 +40,7 @@ describe("SimRoute53CloudFormationResourceFactory", () => {
     assertIdentical(hostedZone.name, "example.test.");
     assertIdentical(hostedZone.callerReference, "ExampleHostedZone");
     assertIdentical(hostedZone.config?.Comment, "Example hosted zone");
+    assertIdentical(hostedZone.config.PrivateZone, true);
     assertIdentical(route53.hostedZones.get(hostedZone.id), hostedZone);
   });
 
@@ -118,5 +120,98 @@ describe("SimRoute53CloudFormationResourceFactory", () => {
       error.message,
       "Invalid AWS::Route53::HostedZone InvalidHostedZone: Name must be a string",
     );
+  });
+
+  it("rejects a Hosted Zone with a non-object HostedZoneConfig", async () => {
+    const simAws = new SimAws();
+    const route53 = simAws.route53();
+    const resource = new SimCfnResource({
+      logicalId: "InvalidHostedZoneConfig",
+      template: {
+        Type: "AWS::Route53::HostedZone",
+        Properties: {
+          Name: "invalid.example.test",
+          HostedZoneConfig: "not-an-object",
+        },
+      },
+    });
+    const context: SimCloudFormationResourceCreateContext = {
+      simAws,
+      resources: new Map(),
+    };
+    const factory = new SimRoute53CloudFormationResourceFactory({ route53 });
+
+    const error = await assertThrowsErrorAsync(async () =>
+      factory.create("HostedZone", resource, context),
+    );
+
+    assertIdentical(
+      error.message,
+      "Invalid AWS::Route53::HostedZone InvalidHostedZoneConfig: HostedZoneConfig must be an object",
+    );
+  });
+
+  it("rejects a Hosted Zone with a non-string HostedZoneConfig Comment", async () => {
+    const simAws = new SimAws();
+    const route53 = simAws.route53();
+    const resource = new SimCfnResource({
+      logicalId: "InvalidHostedZoneConfigComment",
+      template: {
+        Type: "AWS::Route53::HostedZone",
+        Properties: {
+          Name: "invalid-comment.example.test",
+          HostedZoneConfig: {
+            Comment: 123,
+          },
+        },
+      },
+    });
+    const context: SimCloudFormationResourceCreateContext = {
+      simAws,
+      resources: new Map(),
+    };
+    const factory = new SimRoute53CloudFormationResourceFactory({ route53 });
+
+    const error = await assertThrowsErrorAsync(async () =>
+      factory.create("HostedZone", resource, context),
+    );
+
+    assertIdentical(
+      error.message,
+      "Invalid AWS::Route53::HostedZone InvalidHostedZoneConfigComment: HostedZoneConfig.Comment must be a string",
+    );
+    assertIdentical(route53.hostedZones.size, 0);
+  });
+
+  it("rejects a Hosted Zone with a non-boolean HostedZoneConfig PrivateZone", async () => {
+    const simAws = new SimAws();
+    const route53 = simAws.route53();
+    const resource = new SimCfnResource({
+      logicalId: "InvalidHostedZoneConfigPrivateZone",
+      template: {
+        Type: "AWS::Route53::HostedZone",
+        Properties: {
+          Name: "invalid-private-zone.example.test",
+          HostedZoneConfig: {
+            PrivateZone: "true",
+          },
+        },
+      },
+    });
+    const context: SimCloudFormationResourceCreateContext = {
+      simAws,
+      resources: new Map(),
+    };
+    const factory = new SimRoute53CloudFormationResourceFactory({ route53 });
+
+    const error = await assertThrowsErrorAsync(async () =>
+      factory.create("HostedZone", resource, context),
+    );
+
+    assertIdentical(
+      error.message,
+      "Invalid AWS::Route53::HostedZone InvalidHostedZoneConfigPrivateZone: HostedZoneConfig.PrivateZone must be a boolean",
+    );
+    assertIdentical(route53.hostedZones.size, 0);
   });
 });
