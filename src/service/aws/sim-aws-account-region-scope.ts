@@ -59,7 +59,7 @@ export class SimAwsAccountRegionContainer {
    */
   cloudFormation(): SimCloudFormation {
     return this.memo.getOrCreate("cloudFormation", () =>
-      this.simAws._serviceFactory.createCloudFormation(this),
+      this.simAws.serviceFactory.createCloudFormation(this),
     );
   }
 
@@ -68,7 +68,7 @@ export class SimAwsAccountRegionContainer {
    */
   cloudFront(): SimCloudFront {
     return this.memo.getOrCreate("cloudFront", () =>
-      this.simAws._serviceFactory.createCloudFront(this),
+      this.simAws.serviceFactory.createCloudFront(this),
     );
   }
 
@@ -77,7 +77,7 @@ export class SimAwsAccountRegionContainer {
    */
   dynamoDb(): SimDynamoDb {
     return this.memo.getOrCreate("dynamoDb", () =>
-      this.simAws._serviceFactory.createDynamoDb(this),
+      this.simAws.serviceFactory.createDynamoDb(this),
     );
   }
 
@@ -86,7 +86,7 @@ export class SimAwsAccountRegionContainer {
    */
   route53(): SimRoute53 {
     return this.memo.getOrCreate("route53", () =>
-      this.simAws._serviceFactory.createRoute53(this),
+      this.simAws.serviceFactory.createRoute53(this),
     );
   }
 
@@ -95,7 +95,7 @@ export class SimAwsAccountRegionContainer {
    */
   s3(): SimS3 {
     return this.memo.getOrCreate("s3", () =>
-      this.simAws._serviceFactory.createS3(this),
+      this.simAws.serviceFactory.createS3(this),
     );
   }
 }

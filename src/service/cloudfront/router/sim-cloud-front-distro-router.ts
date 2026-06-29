@@ -41,7 +41,7 @@ export class SimCloudFrontDistroRouter {
   constructor(props: SimCloudFrontDistroRouterProps = {}) {
     this.simAws = props.simAws ?? new SimAws();
     const cloudFrontRegistry =
-      props.cloudFrontRegistry ?? this.simAws._cloudFrontRegistry();
+      props.cloudFrontRegistry ?? this.simAws.cloudFrontRegistry();
     const distributions = props.distributions ?? new Map();
 
     // Both sub-routers share the same SimAws, Registry and Distributions

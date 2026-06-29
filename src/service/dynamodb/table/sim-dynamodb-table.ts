@@ -34,8 +34,8 @@ export class SimDynamoDbTable {
   public readonly arn: SimArn;
 
   private readonly background: BackgroundScheduler;
-  private readonly _keySchema: DynamoDbKeySchema;
-  private _status: SimDynamoDbTableStatus = "CREATING";
+  readonly #keySchema: DynamoDbKeySchema;
+  #status: SimDynamoDbTableStatus = "CREATING";
 
   private readonly items = new Map<string, DynamoDbItem>();
 
@@ -52,14 +52,14 @@ export class SimDynamoDbTable {
 
     this.tableName = createInput.tableName();
     this.creationDateTime = new Date();
-    this._keySchema = createInput.keySchema();
+    this.#keySchema = createInput.keySchema();
   }
 
   /**
    * Simulate the table entering ACTIVE status.
    */
   activate(): Promise<void> {
-    this._status = "ACTIVE";
+    this.#status = "ACTIVE";
     return Promise.resolve();
   }
 
@@ -67,14 +67,14 @@ export class SimDynamoDbTable {
    * Get the current table status.
    */
   public get status(): SimDynamoDbTableStatus {
-    return this._status;
+    return this.#status;
   }
 
   /**
    * Put an item into the table.
    */
   public putItem(item: DynamoDbItem): Promise<void> {
-    const keyString = this._keySchema.makeItemKey(item);
+    const keyString = this.#keySchema.makeItemKey(item);
     this.background.schedule(() => {
       this.items.set(keyString, item);
       return Promise.resolve();

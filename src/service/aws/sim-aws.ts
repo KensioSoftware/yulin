@@ -37,7 +37,11 @@ interface SimAwsProps {
 export class SimAws {
   public readonly defaultAccountId: SimAwsAccountId;
   public readonly defaultRegionName: AwsRegionName;
-  public readonly _serviceFactory: SimAwsServiceFactory;
+  /**
+   * Internal service factory used to wire simulated AWS services.
+   * @internal
+   */
+  public readonly serviceFactory: SimAwsServiceFactory;
   private readonly background: BackgroundScheduler & BackgroundCompleter;
   private readonly scopes: SimAwsScopeRegistry;
 
@@ -51,7 +55,7 @@ export class SimAws {
     this.defaultAccountId = defaultAccountId;
     this.defaultRegionName = defaultRegionName;
     this.background = background;
-    this._serviceFactory = new SimAwsServiceFactory({
+    this.serviceFactory = new SimAwsServiceFactory({
       simAws: this,
       background,
     });
@@ -124,9 +128,10 @@ export class SimAws {
    *
    * This is intended for CloudFront service/controller wiring so request routing
    * uses the same registry as CloudFront SDK command handling.
+   * @internal
    */
-  _cloudFrontRegistry(): SimCloudFrontRegistry {
-    return this._serviceFactory.cloudFrontRegistry();
+  cloudFrontRegistry(): SimCloudFrontRegistry {
+    return this.serviceFactory.cloudFrontRegistry;
   }
 
   /**

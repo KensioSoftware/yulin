@@ -27,7 +27,7 @@ interface SimCloudFrontDistributionProps {
  */
 export class SimCloudFrontDistribution {
   public readonly distributionId: SimCloudFrontDistributionId;
-  private _status: SimCloudFrontDistributionStatus;
+  #status: SimCloudFrontDistributionStatus;
   public readonly accountId: SimAwsAccountId;
   public readonly distributionConfig:
     SimCloudFrontDistributionConfig | undefined;
@@ -46,7 +46,7 @@ export class SimCloudFrontDistribution {
     } = props;
 
     this.distributionId = distributionId;
-    this._status = status;
+    this.#status = status;
     this.accountId = accountId;
     this.distributionConfig = distributionConfig;
   }
@@ -55,14 +55,14 @@ export class SimCloudFrontDistribution {
    * Get the current Status of this sim Distribution.
    */
   get status(): SimCloudFrontDistributionStatus {
-    return this._status;
+    return this.#status;
   }
 
   /**
    * Move the sim Distribution into Deployed status.
    */
   completeDeployment(): Promise<void> {
-    this._status = "Deployed";
+    this.#status = "Deployed";
     return Promise.resolve();
   }
 
