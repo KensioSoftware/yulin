@@ -5,6 +5,7 @@ import {
   assertIsSimRoute53HostedZoneId,
   type SimRoute53HostedZoneId,
 } from "../command/create-hosted-zone/sim-route53-zone-id.js";
+import type { BackgroundScheduler } from "../../../util/background/background.js";
 
 export type SimRoute53HostedZoneStatus = "PENDING" | "INSYNC";
 
@@ -30,6 +31,7 @@ export class SimRoute53HostedZone {
   private readonly hostedZoneCallerReference: string;
   private readonly hostedZoneConfig: SimRoute53HostedZoneConfig | undefined;
   #status: SimRoute53HostedZoneStatus = "PENDING";
+  private synchronizationComplete: Promise<void> | undefined;
 
   constructor(props: SimRoute53HostedZoneProps) {
     assertIsSimRoute53HostedZoneId(props.id);
@@ -84,6 +86,37 @@ export class SimRoute53HostedZone {
   beginSynchronization(): Promise<void> {
     this.#status = "PENDING";
     return Promise.resolve();
+  }
+
+  /**
+   * Schedule Hosted Zone synchronization work and remember its completion.
+   */
+  scheduleSynchronization(
+    background: BackgroundScheduler,
+    synchronize: () => Promise<void>,
+  ): void {
+    this.synchronizationComplete = new Promise<void>((resolve, reject) => {
+      background.schedule(async () => {
+        try {
+          await synchronize();
+          resolve();
+        } catch (error) {
+          /* v8 ignore start */
+          reject(error instanceof Error ? error : new Error(String(error)));
+          throw error;
+          /* v8 ignore stop */
+        }
+      });
+    });
+  }
+
+  /**
+   * Wait for outstanding Hosted Zone synchronization operations.
+   */
+  async waitForSynchronizationComplete(): Promise<void> {
+    if (this.synchronizationComplete !== undefined) {
+      await this.synchronizationComplete;
+    }
   }
 
   /**
