@@ -116,7 +116,7 @@
   },
   "dependencies": {
     "@faker-js/faker": "^10.4.0",
-    "@kensio/part-factory": "^0.1.1",
+    "@kensio/part-factory": "^1.1.0",
     "lodash-es": "^4.18.1"
   },
   "peerDependencies": {
