@@ -13,6 +13,7 @@ import {
   makeSimRoute53HostedZoneId,
   type SimRoute53HostedZoneId,
 } from "./sim-route53-zone-id.js";
+import { SimRoute53HostedZoneAlreadyExists } from "../../error/sim-route53.error.js";
 
 interface CreateHostedZoneCommandHandlerProps {
   readonly hostedZones: Map<SimRoute53HostedZoneId, SimRoute53HostedZone>;
@@ -59,6 +60,15 @@ export class CreateHostedZoneCommandHandler implements CommandHandler<
 
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
+
+    const existingHostedZone = [...this.hostedZones.values()].find(
+      (hostedZone) => hostedZone.callerReference === callerReference,
+    );
+    if (existingHostedZone !== undefined) {
+      throw new SimRoute53HostedZoneAlreadyExists(
+        `A sim Route53 Hosted Zone with caller reference ${callerReference} already exists`,
+      );
+    }
 
     const hostedZone = new SimRoute53HostedZone({
       id: hostedZoneId,

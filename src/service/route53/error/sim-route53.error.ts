@@ -27,3 +27,14 @@ export class SimRoute53NoSuchHostedZone extends SimRoute53Error {
     super(message, { httpStatusCode: 404 });
   }
 }
+
+/**
+ * Simulated Route53 HostedZoneAlreadyExists error.
+ */
+export class SimRoute53HostedZoneAlreadyExists extends SimRoute53Error {
+  public override readonly name = "HostedZoneAlreadyExists";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 409 });
+  }
+}
