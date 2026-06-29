@@ -103,7 +103,7 @@
     "eslint-plugin-jsdoc": "^63.0.0",
     "eslint-plugin-no-secrets": "^2.3.3",
     "eslint-plugin-security": "^4.0.0",
-    "eslint-plugin-unicorn": "^63.0.0",
+    "eslint-plugin-unicorn": "^64.0.0",
     "execa": "^9.6.1",
     "fta-cli": "^3.0.0",
     "globals": "^17.6.0",
