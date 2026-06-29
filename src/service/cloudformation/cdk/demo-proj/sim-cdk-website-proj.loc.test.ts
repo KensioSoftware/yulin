@@ -15,7 +15,7 @@ import {
   assertStringStartsWith,
 } from "@kensio/smartass";
 
-describe("Sim CDK BucketDeployment local integration", () => {
+describe("Sim CDK website deployment local integration", () => {
   const simAws = new SimAws();
 
   const srv: SimAwsLocalServer = new SimAwsLocalServer({ simAws });
@@ -70,6 +70,7 @@ import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
 import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
+import * as route53 from "aws-cdk-lib/aws-route53";
 
 const app = new cdk.App();
 const stack = new cdk.Stack(app, "TestStack", {
@@ -95,8 +96,13 @@ const redirectFunction = new cloudfront.Function(
   },
 );
 
+const hostedZone = new route53.HostedZone(stack, "SiteHostedZone", {
+  zoneName: "example.test",
+});
+
 const distribution = new cloudfront.Distribution(stack, "SiteDistribution", {
   defaultRootObject: "index.html",
+  domainNames: ["www.example.test"],
   defaultBehavior: {
     origin: origins.S3BucketOrigin.withOriginAccessControl(siteBucket),
     viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
@@ -126,6 +132,13 @@ const distribution = new cloudfront.Distribution(stack, "SiteDistribution", {
   ],
 });
 
+new route53.CnameRecord(stack, "SiteCnameRecord", {
+  zone: hostedZone,
+  recordName: "www",
+  domainName: distribution.distributionDomainName,
+  ttl: cdk.Duration.minutes(5),
+});
+
 new s3deploy.BucketDeployment(stack, "DeploySite", {
   sources: [s3deploy.Source.asset(${JSON.stringify(publicDir)})],
   destinationBucket: siteBucket,
@@ -146,6 +159,10 @@ new cdk.CfnOutput(stack, "DistributionDomainName", {
   value: distribution.distributionDomainName,
 });
 
+new cdk.CfnOutput(stack, "SiteHostname", {
+  value: "www.example.test",
+});
+
 app.synth();
       `,
     );
@@ -158,6 +175,7 @@ app.synth();
     const stack = await simCfn.deployTemplateFile(
       path.join(cdkOutDir, "TestStack.template.json"),
     );
+    await simAws.backgroundTasksComplete();
 
     // Then the Outputs should be available.
     assertStringStartsWith(
@@ -171,16 +189,22 @@ app.synth();
       distroSubdomain,
       `${distroId.toLowerCase()}.cloudfront.net`,
     );
+    const siteHostname = stack.outputs.get("SiteHostname")?.value;
+    assertIdentical(siteHostname, "www.example.test");
 
     // And we should be able to interact with the test demo project.
+    const distroRes = await fetch(
+      `http://${distroSubdomain}.sim-aws.localhost:${srv.port}/foo/`,
+    );
+    assertIdentical(distroRes.status, 200);
     const redirectedRes = await fetch(
-      `http://${distroSubdomain}.sim-aws.localhost:${srv.port}/redirect-me.html`,
+      `http://${siteHostname}.sim-aws.localhost:${srv.port}/redirect-me.html`,
       { redirect: "manual" },
     );
     assertIdentical(redirectedRes.status, 302);
 
     const fooRes = await fetch(
-      `http://${distroSubdomain}.sim-aws.localhost:${srv.port}/foo/`,
+      `http://${siteHostname}.sim-aws.localhost:${srv.port}/foo/`,
     );
     assertIdentical(fooRes.status, 200);
     assertIdentical(await fooRes.text(), "<h1>Foo</h1>");

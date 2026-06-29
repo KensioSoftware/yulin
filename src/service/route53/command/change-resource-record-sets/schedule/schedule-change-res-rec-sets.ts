@@ -20,7 +20,7 @@ export async function scheduleChangeResourceRecordSets(
 
   await hostedZone.beginSynchronization();
 
-  background.schedule(async () => {
+  hostedZone.scheduleSynchronization(background, async () => {
     for (const change of changes) {
       applyChangeResourceRecordSet(hostedZone, change);
     }
