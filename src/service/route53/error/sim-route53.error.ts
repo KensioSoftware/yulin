@@ -35,6 +35,6 @@ export class SimRoute53HostedZoneAlreadyExists extends SimRoute53Error {
   public override readonly name = "HostedZoneAlreadyExists";
 
   constructor(message: string) {
-    super(message, { httpStatusCode: 400 });
+    super(message, { httpStatusCode: 409 });
   }
 }
