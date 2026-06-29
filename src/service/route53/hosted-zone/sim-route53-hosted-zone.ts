@@ -1,11 +1,15 @@
 import { normaliseSimRoute53Name } from "../local-name/sim-route53-local-name.js";
 import type { SimRoute53HostedZoneConfig } from "../command/create-hosted-zone/create-hosted-zone.cmd.js";
 import { SimRoute53HostedZoneRecords } from "./sim-route53-hosted-zone-records.js";
+import {
+  assertIsSimRoute53HostedZoneId,
+  type SimRoute53HostedZoneId,
+} from "../command/create-hosted-zone/sim-route53-zone-id.js";
 
 export type SimRoute53HostedZoneStatus = "PENDING" | "INSYNC";
 
 interface SimRoute53HostedZoneProps {
-  readonly id: string;
+  readonly id: SimRoute53HostedZoneId | string;
   readonly name: string;
   // Route53 Hosted Zone caller reference is like an idempotency key.
   readonly callerReference: string;
@@ -20,7 +24,7 @@ interface SimRoute53HostedZoneProps {
 export class SimRoute53HostedZone {
   /* @internal */
   public readonly records = new SimRoute53HostedZoneRecords();
-  private readonly hostedZoneId: string;
+  private readonly hostedZoneId: SimRoute53HostedZoneId;
   private readonly hostedZoneName: string;
   // Route53 Hosted Zone caller reference is like an idempotency key.
   private readonly hostedZoneCallerReference: string;
@@ -28,6 +32,7 @@ export class SimRoute53HostedZone {
   #status: SimRoute53HostedZoneStatus = "PENDING";
 
   constructor(props: SimRoute53HostedZoneProps) {
+    assertIsSimRoute53HostedZoneId(props.id);
     this.hostedZoneId = props.id;
     this.hostedZoneName = `${normaliseSimRoute53Name(props.name)}.`;
     this.hostedZoneCallerReference = props.callerReference;
@@ -38,7 +43,7 @@ export class SimRoute53HostedZone {
   /**
    * AWS Route53 Hosted Zone ID.
    */
-  get id(): string {
+  get id(): SimRoute53HostedZoneId {
     return this.hostedZoneId;
   }
 
