@@ -14,6 +14,7 @@ import {
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { assertIsSimRoute53HostedZoneId } from "./sim-route53-zone-id.js";
+import { SimRoute53HostedZoneAlreadyExists } from "../../error/sim-route53.error.js";
 
 describe("Route53 CreateHostedZoneCommand", () => {
   it("creates a Hosted Zone in SimRoute53", async () => {
@@ -234,5 +235,33 @@ describe("Route53 CreateHostedZoneCommand", () => {
 
     // Then the Hosted Zone has moved to INSYNC.
     assertIdentical(hostedZone.status, "INSYNC");
+  });
+
+  it("throws when a Hosted Zone already exists for the same caller reference", async () => {
+    // Given a simulated Route53 service with an existing Hosted Zone.
+    const simAws = new SimAws();
+    const simRoute53 = simAws.route53();
+
+    await simRoute53.createHostedZone({
+      input: {
+        Name: "first.example.com",
+        CallerReference: "duplicate-caller-reference",
+      },
+    });
+
+    // When another Hosted Zone is created with the same CallerReference.
+    const error = await assertThrowsErrorAsync(async () =>
+      simRoute53.createHostedZone({
+        input: {
+          Name: "second.example.com",
+          CallerReference: "duplicate-caller-reference",
+        },
+      }),
+    );
+
+    // Then the duplicate CallerReference is rejected.
+    assertInstanceOf(error, SimRoute53HostedZoneAlreadyExists);
+    assertIdentical(error.name, "HostedZoneAlreadyExists");
+    assertStringIncludes(error.message, "duplicate-caller-reference");
   });
 });
