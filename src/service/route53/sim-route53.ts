@@ -26,6 +26,8 @@ import {
   type BackgroundScheduler,
   BackgroundTasks,
 } from "../../util/background/background.js";
+import { SimRoute53CloudFormationResourceFactory } from "./cfn/sim-cfn-route53-resource-factory.js";
+import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 
 interface SimRoute53Props {
   readonly background?: BackgroundScheduler | undefined;
@@ -40,6 +42,9 @@ export class SimRoute53 {
     SimRoute53HostedZone
   >();
   private readonly background: BackgroundScheduler;
+  private readonly cfnFactory = new SimRoute53CloudFormationResourceFactory({
+    route53: this,
+  });
 
   private readonly resolver = new SimRoute53Resolver({
     hostedZones: this.hostedZones,
@@ -107,5 +112,12 @@ export class SimRoute53 {
    */
   resolveHttpHost(hostname: string): SimAwsServiceTarget | undefined {
     return this.resolver.resolveHttpHost(hostname);
+  }
+
+  /**
+   * Get this service's CloudFormation Resource factory.
+   */
+  cfnResourceFactory(): SimCfnServiceResourceFactory {
+    return this.cfnFactory;
   }
 }

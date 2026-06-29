@@ -47,6 +47,9 @@ export function resolveSimCloudFormationServiceResourceFactory(
     case "CloudFront": {
       return scopedAws.cloudFront().cfnResourceFactory();
     }
+    case "Route53": {
+      return scopedAws.route53().cfnResourceFactory();
+    }
     case "S3": {
       return scopedAws.s3().cfnResourceFactory();
     }

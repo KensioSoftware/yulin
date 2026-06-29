@@ -6,6 +6,8 @@ import { SimCloudFrontDistribution } from "../../../cloudfront/distribution/sim-
 import { SimCloudFrontDistributionCfn } from "./cloudfront/sim-cloudfront-distribution-cfn.js";
 import { SimCloudFrontFunction } from "../../../cloudfront/cff/sim-cloudfront-function.js";
 import { SimCloudFrontFunctionCfn } from "./cloudfront/sim-cloudfront-function-cfn.js";
+import { SimRoute53HostedZone } from "../../../route53/hosted-zone/sim-route53-hosted-zone.js";
+import { SimRoute53HostedZoneCfn } from "./route53/sim-route53-hosted-zone-cfn.js";
 
 export interface SimCfnResourceValueAdapter {
   refValue(): SimCfnTemplateValue;
@@ -54,6 +56,15 @@ export function simCfnResourceValueAdapter(
   ) {
     return new SimCloudFrontFunctionCfn({
       cloudFrontFunction: props.simResource,
+    });
+  }
+
+  if (
+    props.type === "AWS::Route53::HostedZone" &&
+    props.simResource instanceof SimRoute53HostedZone
+  ) {
+    return new SimRoute53HostedZoneCfn({
+      hostedZone: props.simResource,
     });
   }
 
