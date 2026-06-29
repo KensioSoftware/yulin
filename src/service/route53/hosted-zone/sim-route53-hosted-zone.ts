@@ -95,7 +95,7 @@ export class SimRoute53HostedZone {
     background: BackgroundScheduler,
     synchronize: () => Promise<void>,
   ): void {
-    this.synchronizationComplete = new Promise<void>((resolve, reject) => {
+    const synchronizationComplete = new Promise<void>((resolve, reject) => {
       background.schedule(async () => {
         try {
           await synchronize();
@@ -108,6 +108,16 @@ export class SimRoute53HostedZone {
         }
       });
     });
+
+    this.synchronizationComplete =
+      this.synchronizationComplete === undefined
+        ? synchronizationComplete
+        : Promise.all([
+            this.synchronizationComplete,
+            synchronizationComplete,
+          ]).then(() => {
+            //
+          });
   }
 
   /**
