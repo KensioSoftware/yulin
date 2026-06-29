@@ -30,7 +30,14 @@ export class SimAwsServiceFactory {
 
   private readonly s3GlobalRegistry = new SimS3GlobalRegistry();
 
-  private readonly _cloudFrontRegistry = new SimCloudFrontRegistry();
+  /**
+   * Shared simulated CloudFront registry.
+   *
+   * This is intended for CloudFront service/controller wiring so request
+   * routing uses the same registry as CloudFront SDK command handling.
+   * @internal
+   */
+  public readonly cloudFrontRegistry = new SimCloudFrontRegistry();
 
   private readonly accountServices: SimAwsAccountServiceCache;
 
@@ -40,7 +47,7 @@ export class SimAwsServiceFactory {
     this.accountServices = new SimAwsAccountServiceCache({
       simAws: props.simAws,
       background: props.background,
-      cloudFrontRegistry: this._cloudFrontRegistry,
+      cloudFrontRegistry: this.cloudFrontRegistry,
     });
   }
 
@@ -60,16 +67,6 @@ export class SimAwsServiceFactory {
    */
   createCloudFront(scope: SimAwsAccountRegionContainer): SimCloudFront {
     return this.accountServices.createCloudFront(scope);
-  }
-
-  /**
-   * Get the shared simulated CloudFront registry.
-   *
-   * This is intended for CloudFront service/controller wiring so request routing
-   * uses the same registry as CloudFront SDK command handling.
-   */
-  cloudFrontRegistry(): SimCloudFrontRegistry {
-    return this._cloudFrontRegistry;
   }
 
   /**

@@ -37,7 +37,7 @@ export const defaultCffHandler: CloudFrontFunction.Handler = (
  */
 export class SimCloudFrontFunction {
   public readonly name: SimCloudFrontFunctionName;
-  private _status: CloudFrontFunctionStatus;
+  #status: CloudFrontFunctionStatus;
   public readonly accountId: SimAwsAccountId;
 
   private readonly handlerFunction: CloudFrontFunction.Handler;
@@ -52,7 +52,7 @@ export class SimCloudFrontFunction {
       eventAdapter = new SimCffEventAdapter(),
     } = props;
     this.name = name as SimCloudFrontFunctionName;
-    this._status = status;
+    this.#status = status;
     this.accountId = accountId;
     this.handlerFunction = handlerFunction;
     this.eventAdapter = eventAdapter;
@@ -62,7 +62,7 @@ export class SimCloudFrontFunction {
    * Get the current status of this sim CloudFront Function.
    */
   get status(): CloudFrontFunctionStatus {
-    return this._status;
+    return this.#status;
   }
 
   /**
@@ -76,7 +76,7 @@ export class SimCloudFrontFunction {
    * Move this sim CloudFront Function to the PUBLISHED status.
    */
   publish(): Promise<void> {
-    this._status = "UNASSOCIATED";
+    this.#status = "UNASSOCIATED";
     return Promise.resolve();
   }
 

@@ -25,7 +25,7 @@ export class SimRoute53HostedZone {
   // Route53 Hosted Zone caller reference is like an idempotency key.
   private readonly hostedZoneCallerReference: string;
   private readonly hostedZoneConfig: SimRoute53HostedZoneConfig | undefined;
-  private _status: SimRoute53HostedZoneStatus = "PENDING";
+  #status: SimRoute53HostedZoneStatus = "PENDING";
 
   constructor(props: SimRoute53HostedZoneProps) {
     this.hostedZoneId = props.id;
@@ -70,14 +70,14 @@ export class SimRoute53HostedZone {
    * Get the current creation status of this sim Hosted Zone.
    */
   get status(): SimRoute53HostedZoneStatus {
-    return this._status;
+    return this.#status;
   }
 
   /**
    * Move the sim Hosted Zone into PENDING status.
    */
   beginSynchronization(): Promise<void> {
-    this._status = "PENDING";
+    this.#status = "PENDING";
     return Promise.resolve();
   }
 
@@ -85,7 +85,7 @@ export class SimRoute53HostedZone {
    * Move the sim Hosted Zone into INSYNC status.
    */
   completeSynchronization(): Promise<void> {
-    this._status = "INSYNC";
+    this.#status = "INSYNC";
     return Promise.resolve();
   }
 }

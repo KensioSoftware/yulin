@@ -39,7 +39,7 @@ export class SimCfnStackDeploymentLifecycle {
   private readonly background: BackgroundScheduler;
   private readonly stackName: SimCloudFormationStackName;
   private readonly runDeployment: () => Promise<void>;
-  private _status: SimCloudFormationStackStatus = "REVIEW_IN_PROGRESS";
+  #status: SimCloudFormationStackStatus = "REVIEW_IN_PROGRESS";
 
   private completePromise: Promise<void> | undefined;
   private deployError: Error | undefined;
@@ -59,7 +59,7 @@ export class SimCfnStackDeploymentLifecycle {
    * CREATE_FAILED.
    */
   public get status(): SimCloudFormationStackStatus {
-    return this._status;
+    return this.#status;
   }
 
   /**
@@ -86,13 +86,13 @@ export class SimCfnStackDeploymentLifecycle {
    * deployment error.
    */
   public async deploy(): Promise<void> {
-    if (this._status !== "REVIEW_IN_PROGRESS") {
+    if (this.#status !== "REVIEW_IN_PROGRESS") {
       throw new Error(
-        `Sim CloudFormation Stack ${this.stackName} cannot be deployed from ${this._status} status`,
+        `Sim CloudFormation Stack ${this.stackName} cannot be deployed from ${this.#status} status`,
       );
     }
 
-    this._status = "CREATE_IN_PROGRESS";
+    this.#status = "CREATE_IN_PROGRESS";
     this.deployError = undefined;
 
     const scheduler = new SimCfnStackDeploymentScheduler({
@@ -105,10 +105,10 @@ export class SimCfnStackDeploymentLifecycle {
     this.completePromise = scheduler.schedule({
       deploy: this.runDeployment,
       onSuccess: () => {
-        this._status = "CREATE_COMPLETE";
+        this.#status = "CREATE_COMPLETE";
       },
       onFailure: (error) => {
-        this._status = "CREATE_FAILED";
+        this.#status = "CREATE_FAILED";
         this.deployError = error;
       },
     });

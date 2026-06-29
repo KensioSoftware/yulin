@@ -1,19 +1,20 @@
 import type { SimCloudFormationResourceStatus } from "../sim-cfn-resource.js";
 
 /**
- * Tracks CloudFormation Resource creation status, backing sim Resource and error.
+ * Tracks CloudFormation Resource creation status, backing sim Resource and
+ * error.
  */
 export class SimCfnResourceCreationState<T extends object = object> {
-  private _status: SimCloudFormationResourceStatus = "CREATE_PENDING";
-  private _simResource: T | undefined;
+  #status: SimCloudFormationResourceStatus = "CREATE_PENDING";
+  #simResource: T | undefined;
   private deployError: Error | undefined;
-  private _skippedReason: string | undefined;
+  #skippedReason: string | undefined;
 
   /**
    * Get the current Resource status.
    */
   public get status(): SimCloudFormationResourceStatus {
-    return this._status;
+    return this.#status;
   }
 
   /**
@@ -21,7 +22,7 @@ export class SimCfnResourceCreationState<T extends object = object> {
    */
   public get deployed(): boolean {
     return (
-      this._status === "CREATE_COMPLETE" && this._skippedReason === undefined
+      this.#status === "CREATE_COMPLETE" && this.#skippedReason === undefined
     );
   }
 
@@ -30,14 +31,14 @@ export class SimCfnResourceCreationState<T extends object = object> {
    * support creating its service or Resource type.
    */
   public get skipped(): boolean {
-    return this._skippedReason !== undefined;
+    return this.#skippedReason !== undefined;
   }
 
   /**
    * The reason this Resource was skipped, if it was skipped.
    */
   public get skippedReason(): string | undefined {
-    return this._skippedReason;
+    return this.#skippedReason;
   }
 
   /**
@@ -45,7 +46,7 @@ export class SimCfnResourceCreationState<T extends object = object> {
    */
   public get createComplete(): boolean {
     return (
-      this._status === "CREATE_COMPLETE" || this._status === "CREATE_FAILED"
+      this.#status === "CREATE_COMPLETE" || this.#status === "CREATE_FAILED"
     );
   }
 
@@ -53,7 +54,7 @@ export class SimCfnResourceCreationState<T extends object = object> {
    * The simulated AWS resource represented by this CloudFormation Resource.
    */
   public get simResource(): T | undefined {
-    return this._simResource;
+    return this.#simResource;
   }
 
   /**
@@ -68,19 +69,19 @@ export class SimCfnResourceCreationState<T extends object = object> {
    */
   markCreateInProgress(): void {
     this.deployError = undefined;
-    this._simResource = undefined;
-    this._skippedReason = undefined;
-    this._status = "CREATE_IN_PROGRESS";
+    this.#simResource = undefined;
+    this.#skippedReason = undefined;
+    this.#status = "CREATE_IN_PROGRESS";
   }
 
   /**
    * Mark this Resource as successfully created.
    */
   markCreateComplete(simResource?: T): void {
-    this._simResource = simResource;
+    this.#simResource = simResource;
     this.deployError = undefined;
-    this._skippedReason = undefined;
-    this._status = "CREATE_COMPLETE";
+    this.#skippedReason = undefined;
+    this.#status = "CREATE_COMPLETE";
   }
 
   /**
@@ -88,10 +89,10 @@ export class SimCfnResourceCreationState<T extends object = object> {
    * available.
    */
   markCreateSkipped(reason: string): void {
-    this._simResource = undefined;
+    this.#simResource = undefined;
     this.deployError = undefined;
-    this._skippedReason = reason;
-    this._status = "CREATE_COMPLETE";
+    this.#skippedReason = reason;
+    this.#status = "CREATE_COMPLETE";
   }
 
   /**
@@ -99,8 +100,8 @@ export class SimCfnResourceCreationState<T extends object = object> {
    */
   markCreateFailed(error?: Error): void {
     this.deployError = error;
-    this._simResource = undefined;
-    this._skippedReason = undefined;
-    this._status = "CREATE_FAILED";
+    this.#simResource = undefined;
+    this.#skippedReason = undefined;
+    this.#status = "CREATE_FAILED";
   }
 }

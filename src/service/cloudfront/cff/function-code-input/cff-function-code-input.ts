@@ -22,13 +22,13 @@ export function makeCffFunctionCodeInput(
  * input as if it were a Uint8Array without TypeScript complaining.
  */
 export class CffUint8ArrayStowaway extends Uint8Array {
-  private _handlerFunction: CloudFrontFunction.Handler = defaultCffHandler;
+  #handlerFunction: CloudFrontFunction.Handler = defaultCffHandler;
 
   /**
    * Stowaway the real handler function in this Uint8Array disguise.
    */
   stowawayHandlerFunction(handlerFunction: CloudFrontFunction.Handler): this {
-    this._handlerFunction = handlerFunction;
+    this.#handlerFunction = handlerFunction;
     return this;
   }
 
@@ -36,7 +36,7 @@ export class CffUint8ArrayStowaway extends Uint8Array {
    * Get the handler function stowed away in this Uint8Array disguise.
    */
   get handlerFunction(): CloudFrontFunction.Handler {
-    return this._handlerFunction;
+    return this.#handlerFunction;
   }
 }
 
