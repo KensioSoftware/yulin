@@ -1,12 +1,7 @@
 import type { SimAwsServiceTarget } from "../../../serve/controller/sim-service-controller.js";
 
 export type SimRoute53RecordType =
-  | "A"
-  | "AAAA"
-  | "CNAME"
-  | "TXT"
-  | "NS"
-  | "SOA";
+  "A" | "AAAA" | "CNAME" | "TXT" | "NS" | "SOA";
 
 export interface SimRoute53Record {
   readonly name: string;

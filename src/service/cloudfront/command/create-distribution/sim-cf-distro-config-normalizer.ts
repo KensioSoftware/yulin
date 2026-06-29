@@ -12,8 +12,7 @@ interface SimCloudFrontConfigList<T> {
 }
 
 type SimCloudFrontBehaviorConfig =
-  | SimCloudFrontDefaultCacheBehaviorConfig
-  | SimCloudFrontCacheBehaviorConfig;
+  SimCloudFrontDefaultCacheBehaviorConfig | SimCloudFrontCacheBehaviorConfig;
 
 /**
  * Normalizes tolerated CloudFront DistributionConfig input shapes into the

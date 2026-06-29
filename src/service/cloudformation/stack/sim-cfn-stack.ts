@@ -54,8 +54,7 @@ export class SimCfnStack {
   private readonly cfnTemplate: SimCfnTemplate;
   private readonly cdkOutContext: SimCdkOutContext | undefined;
   private readonly bindings:
-    | readonly SimCfnExecutableResourceBinding[]
-    | undefined;
+    readonly SimCfnExecutableResourceBinding[] | undefined;
   private readonly skippedResourceList: SimCfnResource[] = [];
   public readonly lifecycle: SimCfnStackDeploymentLifecycle;
 

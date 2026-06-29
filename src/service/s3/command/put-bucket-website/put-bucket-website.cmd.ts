@@ -29,8 +29,7 @@ export interface SimS3WebsiteConfiguration {
   readonly IndexDocument?: SimS3WebsiteIndexDocument | undefined;
   readonly ErrorDocument?: SimS3WebsiteErrorDocument | undefined;
   readonly RedirectAllRequestsTo?:
-    | SimS3WebsiteRedirectAllRequestsTo
-    | undefined;
+    SimS3WebsiteRedirectAllRequestsTo | undefined;
   readonly RoutingRules?: readonly SimS3WebsiteRoutingRule[] | undefined;
 }
 

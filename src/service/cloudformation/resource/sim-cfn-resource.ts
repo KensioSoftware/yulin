@@ -41,10 +41,7 @@ interface SimCloudFormationResourceProps {
  * entry, not the lifecycle of the underlying simulated AWS service object.
  */
 export type SimCloudFormationResourceStatus =
-  | "CREATE_PENDING"
-  | "CREATE_IN_PROGRESS"
-  | "CREATE_COMPLETE"
-  | "CREATE_FAILED";
+  "CREATE_PENDING" | "CREATE_IN_PROGRESS" | "CREATE_COMPLETE" | "CREATE_FAILED";
 
 export interface SimCloudFormationResourceCreateContext {
   readonly simAws: SimAws;

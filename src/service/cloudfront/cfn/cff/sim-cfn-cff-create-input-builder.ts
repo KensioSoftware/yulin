@@ -46,8 +46,7 @@ export class SimCfnCffCreateInputBuilder {
   private readonly resource: SimCfnResource;
   private readonly properties: SimCfnTemplateValueRecord;
   private readonly bindings:
-    | readonly SimCfnExecutableResourceBinding[]
-    | undefined;
+    readonly SimCfnExecutableResourceBinding[] | undefined;
 
   constructor(props: SimCfnCfFunctionCreateInputBuilderProps) {
     this.resource = props.resource;

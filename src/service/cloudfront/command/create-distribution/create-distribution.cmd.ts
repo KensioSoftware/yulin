@@ -27,8 +27,7 @@ export interface SimCreateDistributionCommandOutput {
         readonly InProgressInvalidationBatches?: number | undefined;
         readonly DomainName?: string | undefined;
         readonly DistributionConfig?:
-          | SimCloudFrontDistributionConfig
-          | undefined;
+          SimCloudFrontDistributionConfig | undefined;
       }
     | undefined;
   readonly Location?: string | undefined;
@@ -50,13 +49,11 @@ export interface SimCloudFrontDistributionConfig {
       }
     | undefined;
   readonly DefaultCacheBehavior?:
-    | SimCloudFrontDefaultCacheBehaviorConfig
-    | undefined;
+    SimCloudFrontDefaultCacheBehaviorConfig | undefined;
   readonly CacheBehaviors?:
     | {
         readonly Items?:
-          | readonly SimCloudFrontCacheBehaviorConfig[]
-          | undefined;
+          readonly SimCloudFrontCacheBehaviorConfig[] | undefined;
       }
     | undefined;
 }
@@ -129,6 +126,4 @@ export interface SimCloudFrontMethodList {
  * Minimal structural sim CloudFront viewer protocol policy.
  */
 export type SimCloudFrontViewerProtocolPolicy =
-  | "allow-all"
-  | "redirect-to-https"
-  | "https-only";
+  "allow-all" | "redirect-to-https" | "https-only";

@@ -30,8 +30,7 @@ export class SimCloudFrontDistribution {
   private _status: SimCloudFrontDistributionStatus;
   public readonly accountId: SimAwsAccountId;
   public readonly distributionConfig:
-    | SimCloudFrontDistributionConfig
-    | undefined;
+    SimCloudFrontDistributionConfig | undefined;
 
   private readonly alternateDomainNames = new Set<string>();
   public readonly behaviors: SimCloudFrontBehavior[] = [];

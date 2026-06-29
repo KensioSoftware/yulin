@@ -47,8 +47,7 @@ export class SimCloudFrontBehaviorConfigurator {
  */
 function buildBaseBehaviorProps(
   cacheBehavior:
-    | SimCloudFrontDefaultCacheBehaviorConfig
-    | SimCloudFrontCacheBehaviorConfig,
+    SimCloudFrontDefaultCacheBehaviorConfig | SimCloudFrontCacheBehaviorConfig,
 ): SimCloudFrontBehavior {
   assertDefined(
     cacheBehavior.TargetOriginId,

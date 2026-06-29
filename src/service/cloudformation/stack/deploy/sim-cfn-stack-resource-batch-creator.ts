@@ -31,8 +31,7 @@ export class SimCfnStackResourceBatchCreator {
   private readonly resources: ReadonlyMap<string, SimCfnResource>;
   private readonly cdkOutContext: SimCdkOutContext | undefined;
   private readonly bindings:
-    | readonly SimCfnExecutableResourceBinding[]
-    | undefined;
+    readonly SimCfnExecutableResourceBinding[] | undefined;
   private readonly skippedResources: SimCfnResource[];
 
   constructor(props: SimCfnStackResourceBatchCreatorProps) {
