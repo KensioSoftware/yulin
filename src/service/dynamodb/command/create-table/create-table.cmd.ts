@@ -106,7 +106,4 @@ export type SimDynamoDbProjectionType = "ALL" | "KEYS_ONLY" | "INCLUDE";
  * Minimal structural sim DynamoDB index status.
  */
 export type SimDynamoDbIndexStatus =
-  | "CREATING"
-  | "UPDATING"
-  | "DELETING"
-  | "ACTIVE";
+  "CREATING" | "UPDATING" | "DELETING" | "ACTIVE";

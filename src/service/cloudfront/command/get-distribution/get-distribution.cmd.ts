@@ -28,8 +28,7 @@ export interface SimGetDistributionCommandOutput {
         readonly InProgressInvalidationBatches?: number | undefined;
         readonly DomainName?: string | undefined;
         readonly DistributionConfig?:
-          | SimCloudFrontDistributionConfig
-          | undefined;
+          SimCloudFrontDistributionConfig | undefined;
       }
     | undefined;
   readonly $metadata: SimResponseMetadata;

@@ -12,7 +12,7 @@ export type SimCloudFrontS3OriginResolver = (
  */
 export function emptyCloudFrontS3OriginResolver(): undefined {
   /* v8 ignore next */
-  return undefined;
+  return;
 }
 
 interface SimCloudFrontS3OriginProps {

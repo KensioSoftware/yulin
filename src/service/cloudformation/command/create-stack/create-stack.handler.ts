@@ -48,8 +48,7 @@ export class CreateStackCommandHandler implements CommandHandler<
   private readonly background: BackgroundScheduler & BackgroundCompleter;
   private readonly cdkOutContext: SimCdkOutContext | undefined;
   private readonly bindings:
-    | readonly SimCfnExecutableResourceBinding[]
-    | undefined;
+    readonly SimCfnExecutableResourceBinding[] | undefined;
 
   constructor(props: CreateStackCommandHandlerProps) {
     const {
