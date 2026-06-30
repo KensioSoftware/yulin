@@ -1,14 +1,10 @@
 import type { SimCfnResource } from "../../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../../cloudformation/template/value/sim-cfn-template-value.js";
-import {
-  normalizeSimRoute53HostedZoneId,
-  type SimRoute53HostedZoneId,
-} from "../../../command/create-hosted-zone/sim-route53-zone-id.js";
-import { normaliseSimRoute53Name } from "../../../local-name/sim-route53-local-name.js";
 import type { SimRoute53Record } from "../../../record/sim-route53-record.js";
 import type { SimRoute53 } from "../../../sim-route53.js";
 import { assertDefined } from "../../../../../util/type-guard/defined.js";
 import { SimCfnRoute53RecordSetBuilder } from "../build/sim-cfn-r53-record-set-builder.js";
+import { SimCfnRoute53RecordSetHostedZoneResolver } from "../resolve/sim-cfn-r53-rec-set-zone-resolver.js";
 
 interface SimCfnRoute53RecordSetApplicatorProps {
   readonly route53: SimRoute53;
@@ -19,9 +15,13 @@ interface SimCfnRoute53RecordSetApplicatorProps {
  */
 export class SimCfnRoute53RecordSetApplicator {
   private readonly route53: SimRoute53;
+  private readonly hostedZoneResolver: SimCfnRoute53RecordSetHostedZoneResolver;
 
   constructor(props: SimCfnRoute53RecordSetApplicatorProps) {
     this.route53 = props.route53;
+    this.hostedZoneResolver = new SimCfnRoute53RecordSetHostedZoneResolver({
+      route53: this.route53,
+    });
   }
 
   /**
@@ -31,7 +31,10 @@ export class SimCfnRoute53RecordSetApplicator {
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
   ): Promise<SimRoute53Record> {
-    const hostedZoneId = this.hostedZoneId(resource, properties);
+    const hostedZoneId = this.hostedZoneResolver.hostedZoneId(
+      resource,
+      properties,
+    );
     const recordSet = new SimCfnRoute53RecordSetBuilder(
       resource,
       properties,
@@ -63,44 +66,5 @@ export class SimCfnRoute53RecordSetApplicator {
     assertDefined(record, "Sim Route53 Record after update");
 
     return record;
-  }
-
-  private hostedZoneId(
-    resource: SimCfnResource,
-    properties: SimCfnTemplateValueRecord,
-  ): SimRoute53HostedZoneId {
-    const hostedZoneId = properties["HostedZoneId"];
-
-    if (hostedZoneId !== undefined) {
-      if (typeof hostedZoneId !== "string") {
-        throw new TypeError(
-          `Invalid AWS::Route53::RecordSet ${resource.logicalId}: HostedZoneId must be a string`,
-        );
-      }
-
-      return normalizeSimRoute53HostedZoneId(hostedZoneId);
-    }
-
-    const hostedZoneName = properties["HostedZoneName"];
-
-    if (typeof hostedZoneName !== "string") {
-      throw new TypeError(
-        `Invalid AWS::Route53::RecordSet ${resource.logicalId}: HostedZoneId or HostedZoneName must be a string`,
-      );
-    }
-
-    const normalizedHostedZoneName = `${normaliseSimRoute53Name(hostedZoneName)}.`;
-
-    const hostedZone = [...this.route53.hostedZones.values()].find(
-      (candidate) => candidate.name === normalizedHostedZoneName,
-    );
-
-    if (hostedZone === undefined) {
-      throw new Error(
-        `Invalid AWS::Route53::RecordSet ${resource.logicalId}: HostedZoneName ${hostedZoneName} was not found`,
-      );
-    }
-
-    return hostedZone.id;
   }
 }

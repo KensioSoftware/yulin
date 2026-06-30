@@ -31,7 +31,11 @@ interface SimCfnCfFunctionCreatorProps {
  * with template parsing and executable binding selection.
  */
 export class SimCfnCffCreator {
-  constructor(private readonly props: SimCfnCfFunctionCreatorProps) {}
+  private readonly cloudFront;
+
+  constructor(props: SimCfnCfFunctionCreatorProps) {
+    this.cloudFront = props.cloudFront;
+  }
 
   /**
    * Create a simulated CloudFront Function from one resolved
@@ -53,14 +57,14 @@ export class SimCfnCffCreator {
       bindings: context?.bindings,
     }).build();
 
-    const output = await this.props.cloudFront.createFunction({
+    const output = await this.cloudFront.createFunction({
       input: createInput,
     });
 
     const createdFunctionName = output.FunctionSummary
       .Name as SimCloudFrontFunctionName;
     const cloudFrontFunction =
-      this.props.cloudFront.getCloudFrontFunctionByName(createdFunctionName);
+      this.cloudFront.getCloudFrontFunctionByName(createdFunctionName);
 
     assertDefined(
       cloudFrontFunction,

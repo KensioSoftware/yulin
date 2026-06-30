@@ -1,5 +1,5 @@
 import net from "node:net";
-import { assertIdentical, assertStringIncludes } from "@kensio/smartass";
+import { assertStringEndsWith, assertStringIncludes } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAwsLocalServer } from "./sim-aws-local-server.js";
 
@@ -16,7 +16,7 @@ describe("SimAwsLocalServer", () => {
       assertStringIncludes(responseText, "HTTP/1.1 400 Bad Request");
       assertStringIncludes(
         responseText,
-        "local sim server nodeRequest.headers.host must be defined",
+        "local sim server nodeRequest.headers.host required",
       );
     } finally {
       server.close();
@@ -36,11 +36,9 @@ describe("SimAwsLocalServer", () => {
         responseText.toLowerCase(),
         "content-type: text/plain; charset=utf-8",
       );
-      assertIdentical(
-        responseText.endsWith(
-          "local sim server nodeRequest.headers.host must be defined",
-        ),
-        true,
+      assertStringEndsWith(
+        responseText,
+        "local sim server nodeRequest.headers.host required",
       );
     } finally {
       server.close();

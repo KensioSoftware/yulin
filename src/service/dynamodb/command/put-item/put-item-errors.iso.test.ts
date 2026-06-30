@@ -35,7 +35,7 @@ describe("DynamoDB PutItemCommand errors", () => {
     assertInstanceOf(error, Error);
     assertStringIncludes(
       error.message,
-      "DynamoDB Item partition key userId must be defined",
+      "DynamoDB Item partition key userId required",
     );
   });
 
@@ -156,7 +156,7 @@ describe("DynamoDB PutItemCommand errors", () => {
     assertInstanceOf(error, Error);
     assertStringIncludes(
       error.message,
-      "PutItemCommand.input.TableName is required",
+      "PutItemCommand.input.TableName required",
     );
   });
 
@@ -202,9 +202,6 @@ describe("DynamoDB PutItemCommand errors", () => {
     });
 
     assertInstanceOf(error, Error);
-    assertStringIncludes(
-      error.message,
-      "PutItemCommand.input.Item is required",
-    );
+    assertStringIncludes(error.message, "PutItemCommand.input.Item required");
   });
 });

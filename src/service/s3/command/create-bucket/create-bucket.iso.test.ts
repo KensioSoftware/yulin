@@ -44,7 +44,7 @@ describe("S3 CreateBucketCommand", () => {
     assertInstanceOf(error, Error);
     assertStringIncludes(
       error.message,
-      "CreateBucketCommand.input.Bucket must be defined",
+      "CreateBucketCommand.input.Bucket required",
     );
   });
 

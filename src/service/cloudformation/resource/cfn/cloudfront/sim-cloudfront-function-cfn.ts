@@ -10,13 +10,17 @@ interface SimCloudFrontFunctionCfnProps {
  * CloudFormation-facing behavior for an AWS::CloudFront::Function Resource.
  */
 export class SimCloudFrontFunctionCfn implements SimCfnResourceValueAdapter {
-  constructor(private readonly props: SimCloudFrontFunctionCfnProps) {}
+  private readonly cloudFrontFunction;
+
+  constructor(props: SimCloudFrontFunctionCfnProps) {
+    this.cloudFrontFunction = props.cloudFrontFunction;
+  }
 
   /**
    * CloudFormation Ref for AWS::CloudFront::Function returns the Function name.
    */
   refValue(): SimCfnTemplateValue {
-    return this.props.cloudFrontFunction.name;
+    return this.cloudFrontFunction.name;
   }
 
   /**
@@ -26,11 +30,11 @@ export class SimCloudFrontFunctionCfn implements SimCfnResourceValueAdapter {
     switch (attributeName) {
       case "FunctionARN":
       case "FunctionMetadata.FunctionARN": {
-        return this.props.cloudFrontFunction.arn;
+        return this.cloudFrontFunction.arn;
       }
       default: {
         /* v8 ignore next */
-        return `${this.props.cloudFrontFunction.name}.${attributeName}`;
+        return `${this.cloudFrontFunction.name}.${attributeName}`;
       }
     }
   }

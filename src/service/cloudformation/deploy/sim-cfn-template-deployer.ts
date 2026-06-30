@@ -2,13 +2,21 @@ import type {
   SimCfnStack,
   SimCloudFormationStackName,
 } from "../stack/sim-cfn-stack.js";
-import type { SimCreateStackCommandOutput } from "../command/create-stack/create-stack.cmd.js";
 import type { CfnTemplateBodyRecord } from "../template/sim-cfn-template.js";
 import { jsonStringify } from "../../../util/type-guard/json.js";
 import { assertDefined } from "../../../util/type-guard/defined.js";
 import type { SimCdkOutContext } from "../cdk/sim-cdk-out-context.js";
 import { SimCfnTemplateFileLoader } from "./sim-cfn-template-file-loader.js";
 import type { SimCfnExecutableResourceBinding } from "../bind/sim-cfn-exec-binding.type.js";
+import type { SimAws } from "../../aws/sim-aws.js";
+import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
+import type {
+  BackgroundCompleter,
+  BackgroundScheduler,
+} from "../../../util/background/background.js";
+import type { SimCreateStackCommandOutput } from "../command/create-stack/create-stack.cmd.js";
+import { CreateStackCommandHandler } from "../command/create-stack/create-stack.handler.js";
+import { faker } from "@faker-js/faker";
 
 export interface SimCloudFormationCreateStackProps {
   readonly stackName?: SimCloudFormationStackName | string;
@@ -24,24 +32,10 @@ export interface SimCloudFormationDeployTemplateFileProps {
 }
 
 interface SimCloudFormationTemplateDeployerProps {
-  readonly createStackWithContext: (
-    cmd: {
-      readonly input: {
-        readonly StackName: SimCloudFormationStackName | string;
-        readonly TemplateBody: string;
-        readonly Parameters: readonly {
-          readonly ParameterKey: string;
-          readonly ParameterValue: string;
-        }[];
-      };
-    },
-    cdkOutContext?: SimCdkOutContext,
-    bindings?: readonly SimCfnExecutableResourceBinding[],
-  ) => Promise<SimCreateStackCommandOutput>;
-  readonly getStackByName: (
-    stackName: SimCloudFormationStackName | string,
-  ) => SimCfnStack | undefined;
-  readonly defaultStackName: () => SimCloudFormationStackName;
+  readonly simAws: SimAws;
+  readonly accountRegionScope: SimAwsAccountRegionScope;
+  readonly stacks: Map<SimCloudFormationStackName, SimCfnStack>;
+  readonly background: BackgroundScheduler & BackgroundCompleter;
 }
 
 /**
@@ -55,9 +49,18 @@ interface SimCloudFormationTemplateDeployerProps {
  * - return the created Stack.
  */
 export class SimCloudFormationTemplateDeployer {
+  private readonly simAws: SimAws;
+  private readonly accountRegionScope: SimAwsAccountRegionScope;
+  private readonly stacks: Map<SimCloudFormationStackName, SimCfnStack>;
+  private readonly background: BackgroundScheduler & BackgroundCompleter;
   private readonly templateFileLoader = new SimCfnTemplateFileLoader();
 
-  constructor(private readonly props: SimCloudFormationTemplateDeployerProps) {}
+  constructor(props: SimCloudFormationTemplateDeployerProps) {
+    this.simAws = props.simAws;
+    this.accountRegionScope = props.accountRegionScope;
+    this.stacks = props.stacks;
+    this.background = props.background;
+  }
 
   /**
    * Create and deploy a simulated CloudFormation Stack from a parsed template
@@ -67,7 +70,7 @@ export class SimCloudFormationTemplateDeployer {
     props: SimCloudFormationCreateStackProps,
   ): Promise<SimCfnStack> {
     return await this.deployTemplateWithContext({
-      stackName: props.stackName ?? this.props.defaultStackName(),
+      stackName: props.stackName ?? makeSimCloudFormationStackName(),
       template: props.template,
       parameters: props.parameters,
       bindings: props.bindings,
@@ -93,7 +96,7 @@ export class SimCloudFormationTemplateDeployer {
     readonly bindings?: readonly SimCfnExecutableResourceBinding[] | undefined;
     readonly cdkOutContext?: SimCdkOutContext | undefined;
   }): Promise<SimCfnStack> {
-    await this.props.createStackWithContext(
+    await this.createStackWithContext(
       {
         input: {
           StackName: props.stackName,
@@ -110,11 +113,46 @@ export class SimCloudFormationTemplateDeployer {
       props.bindings,
     );
 
-    const stack = this.props.getStackByName(props.stackName);
+    const stack = this.stacks.get(
+      props.stackName as SimCloudFormationStackName,
+    );
     assertDefined(stack, `Sim CloudFormation Stack named ${props.stackName}`);
 
     await stack.waitForDeployComplete();
 
     return stack;
   }
+
+  private async createStackWithContext(
+    cmd: {
+      readonly input: {
+        readonly StackName: SimCloudFormationStackName | string;
+        readonly TemplateBody: string;
+        readonly Parameters: readonly {
+          readonly ParameterKey: string;
+          readonly ParameterValue: string;
+        }[];
+      };
+    },
+    cdkOutContext?: SimCdkOutContext,
+    bindings?: readonly SimCfnExecutableResourceBinding[],
+  ): Promise<SimCreateStackCommandOutput> {
+    const handler = new CreateStackCommandHandler({
+      simAws: this.simAws,
+      accountRegionScope: this.accountRegionScope,
+      stacks: this.stacks,
+      background: this.background,
+      cdkOutContext,
+      bindings,
+    });
+
+    return await handler.handle(cmd);
+  }
+}
+
+/**
+ * Generate a fake CloudFormation Stack name.
+ */
+function makeSimCloudFormationStackName(): SimCloudFormationStackName {
+  return `SimStack${faker.string.alphanumeric({ length: 8 })}` as SimCloudFormationStackName;
 }

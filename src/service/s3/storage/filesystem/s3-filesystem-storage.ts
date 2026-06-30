@@ -5,6 +5,7 @@ import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { FilesystemS3StorageSafety } from "./s3-filesystem-safety.js";
 import { metadataForFilesystemS3ObjectKey } from "./s3-filesystem-object-metadata.js";
 import { filesystemPathExists } from "./filesystem-path-exists.js";
+import { assertDefined } from "../../../../util/type-guard/defined.js";
 
 interface FilesystemS3BucketStorageProps {
   readonly directoryPath: string;
@@ -75,11 +76,7 @@ export class FilesystemS3BucketStorage implements SimS3BucketStorage {
         .filter((key) => prefix === undefined || key.startsWith(prefix))
         .map(async (key) => {
           const object = await this.getObject(key);
-
-          /* v8 ignore next -- defensive guard for filesystem race */
-          if (object === undefined) {
-            throw new Error(`Object listed but not found: ${key}`);
-          }
+          assertDefined(object, "Sim S3 filesystem storage listed object");
 
           return object;
         }),

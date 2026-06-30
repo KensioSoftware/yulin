@@ -11,10 +11,10 @@ class RequiredValueNullError extends Error {
  */
 export function assertDefined<T>(
   value: T | undefined,
-  description: string,
+  message: string,
 ): asserts value is T {
   if (value === undefined) {
-    throw new RequiredValueUndefinedError(`${description} must be defined`);
+    throw new RequiredValueUndefinedError(message);
   }
 }
 
@@ -23,9 +23,9 @@ export function assertDefined<T>(
  */
 export function assertNotNull<T>(
   value: T | null,
-  description: string,
+  message: string,
 ): asserts value is T {
   if (value === null) {
-    throw new RequiredValueNullError(`${description} must not be null`);
+    throw new RequiredValueNullError(message);
   }
 }

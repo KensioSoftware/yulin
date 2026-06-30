@@ -36,7 +36,6 @@ export function simCfnResourceValueAdapter(
     props.simResource instanceof SimS3Bucket
   ) {
     return new SimS3BucketCfn({
-      logicalId: props.logicalId,
       bucket: props.simResource,
     });
   }
@@ -46,7 +45,7 @@ export function simCfnResourceValueAdapter(
     props.simResource instanceof SimCloudFrontDistribution
   ) {
     return new SimCloudFrontDistributionCfn({
-      distribution: props.simResource,
+      distro: props.simResource,
     });
   }
 

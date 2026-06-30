@@ -42,7 +42,10 @@ export class CreateTableCommandHandler implements CommandHandler<
   async handle(
     cmd: SimCreateTableCommand,
   ): Promise<SimCreateTableCommandOutput> {
-    assertDefined(cmd.input.TableName, "CreateTableCommand.input.TableName");
+    assertDefined(
+      cmd.input.TableName,
+      "CreateTableCommand.input.TableName required",
+    );
 
     const tableName = cmd.input.TableName as DynamoDbTableName;
     if (this.tables.has(tableName)) {

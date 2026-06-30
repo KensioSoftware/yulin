@@ -12,6 +12,7 @@ import {
   type BackgroundScheduler,
   BackgroundTasks,
 } from "../../../../util/background/background.js";
+import { assertDefined } from "../../../../util/type-guard/defined.js";
 
 interface DescribeTableCommandHandlerProps {
   readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>;
@@ -42,9 +43,7 @@ export class DescribeTableCommandHandler implements CommandHandler<
   async handle(
     cmd: SimDescribeTableCommand,
   ): Promise<SimDescribeTableCommandOutput> {
-    if (cmd.input.TableName === undefined) {
-      throw new Error("DescribeTableCommand.input.TableName is required");
-    }
+    assertDefined(cmd.input.TableName, "DescribeTableCommand.input.TableName");
     const tableName = cmd.input.TableName as DynamoDbTableName;
 
     // Allow for potential non-deterministic sequencing of async events.

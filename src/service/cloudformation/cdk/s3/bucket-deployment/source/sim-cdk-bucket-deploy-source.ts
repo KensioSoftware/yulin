@@ -42,6 +42,7 @@ export class SimCdkBucketDeploySource {
       sourceObjectKey,
     );
 
+    // eslint-disable-next-line no-restricted-syntax
     if (fileAsset?.source?.path === undefined) {
       throw new Error(
         new SimCdkBucketDeployErrorMessage({

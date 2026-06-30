@@ -3,6 +3,7 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import { assertIsSimRoute53HostedZoneId } from "../../command/create-hosted-zone/sim-route53-zone-id.js";
 import type { SimRoute53HostedZone } from "../../hosted-zone/sim-route53-hosted-zone.js";
 import type { SimRoute53 } from "../../sim-route53.js";
+import { assertDefined } from "../../../../util/type-guard/defined.js";
 
 interface SimCfnRoute53HostedZoneCreatorProps {
   readonly route53: SimRoute53;
@@ -68,13 +69,10 @@ export class SimCfnRoute53HostedZoneCreator {
     assertIsSimRoute53HostedZoneId(hostedZoneId);
 
     const hostedZone = this.route53.hostedZones.get(hostedZoneId);
-
-    /* v8 ignore if -- defensive diagnostic */
-    if (hostedZone === undefined) {
-      throw new Error(
-        `Expected sim Route53 Hosted Zone ${hostedZoneId} to exist after CloudFormation creation`,
-      );
-    }
+    assertDefined(
+      hostedZone,
+      `Sim Route53 Hosted Zone ${hostedZoneId} after CloudFormation creation`,
+    );
 
     return hostedZone;
   }

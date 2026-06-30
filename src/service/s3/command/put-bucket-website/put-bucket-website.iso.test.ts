@@ -245,7 +245,7 @@ describe("S3 PutBucketWebsiteCommand", () => {
     assertInstanceOf(error, Error);
     assertStringIncludes(
       error.message,
-      "PutBucketWebsiteCommand.input.Bucket must be defined",
+      "PutBucketWebsiteCommand.input.Bucket required",
     );
   });
 
@@ -266,7 +266,7 @@ describe("S3 PutBucketWebsiteCommand", () => {
     assertInstanceOf(error, Error);
     assertStringIncludes(
       error.message,
-      "PutBucketWebsiteCommand.input.WebsiteConfiguration must be defined",
+      "PutBucketWebsiteCommand.input.WebsiteConfiguration required",
     );
   });
 

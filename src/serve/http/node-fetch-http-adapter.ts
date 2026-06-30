@@ -10,7 +10,7 @@ export class NodeFetchHttpAdapter {
    */
   nodeRequestToFetchRequest(nodeRequest: IncomingMessage): Request {
     const host = nodeRequest.headers.host;
-    assertDefined(host, "local sim server nodeRequest.headers.host");
+    assertDefined(host, "local sim server nodeRequest.headers.host required");
     const url = new URL(nodeRequest.url ?? "/", `http://${host}`);
 
     return new Request(url, {

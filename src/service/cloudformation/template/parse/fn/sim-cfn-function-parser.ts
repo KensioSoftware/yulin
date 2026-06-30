@@ -5,6 +5,7 @@ import { SimCfnFnJoinParser } from "./join/sim-cfn-fn-join-parser.js";
 import type { SimCfnValueParser } from "../value/sim-cfn-value-parser.type.js";
 import { SimCfnFnSubParser } from "./sub/sim-cfn-fn-sub-parser.js";
 import { SimCfnFnFindInMapParser } from "./find-in-map/sim-cfn-fn-find-in-map-parser.js";
+import { assertDefined } from "../../../../../util/type-guard/defined.js";
 
 /**
  * Parses CloudFormation intrinsic function objects.
@@ -114,10 +115,10 @@ export class SimCfnFunctionParser {
     entries: readonly (readonly [string, SimCfnTemplateValue])[],
   ): readonly [string, SimCfnTemplateValue] {
     const entry = entries[0];
-
-    if (entry === undefined) {
-      throw new Error("Expected exactly one Sim CloudFormation template entry");
-    }
+    assertDefined(
+      entry,
+      "Expected one Sim CloudFormation template entry, got none",
+    );
 
     return entry;
   }

@@ -29,6 +29,7 @@ export class TempDir {
    * Return the absolute path to this temporary directory.
    */
   path(): string {
+    // eslint-disable-next-line no-restricted-syntax
     if (this.dirPath === undefined) {
       throw new Error(
         "TempDir path has not yet been resolved. Call resolvePath() or writeFile() first.",

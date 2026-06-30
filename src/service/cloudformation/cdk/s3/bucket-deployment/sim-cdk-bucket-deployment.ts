@@ -7,6 +7,7 @@ import type {
   SimCloudFormationResourceCreateContext,
 } from "../../../resource/sim-cfn-resource.js";
 import { SimCdkBucketDeploySource } from "./source/sim-cdk-bucket-deploy-source.js";
+import { assertDefined } from "../../../../../util/type-guard/defined.js";
 
 /**
  * CloudFormation Resource factory for CDK BucketDeployment compatibility.
@@ -88,12 +89,10 @@ export class SimCdkBucketDeploymentResourceFactory implements SimCfnServiceResou
       )
       .s3()
       .getSimBucketByName(destinationBucketName);
-
-    if (bucket === undefined) {
-      throw new Error(
-        `Custom::CDKBucketDeployment destination Bucket ${destinationBucketName} does not exist`,
-      );
-    }
+    assertDefined(
+      bucket,
+      `Custom::CDKBucketDeployment destination Bucket ${destinationBucketName} does not exist`,
+    );
 
     bucket.configureSimStorage(
       new FilesystemS3BucketStorage({

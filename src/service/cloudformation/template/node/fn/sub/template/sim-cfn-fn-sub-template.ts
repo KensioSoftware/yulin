@@ -1,3 +1,5 @@
+import { assertDefined } from "../../../../../../../util/type-guard/defined.js";
+
 /**
  * Template-string helper for CloudFormation Fn::Sub.
  *
@@ -35,12 +37,10 @@ export class SimCfnFnSubTemplate {
         }
 
         const resolved = variables.get(variableName);
-
-        if (resolved === undefined) {
-          throw new Error(
-            `Sim CloudFormation Fn::Sub variable ${variableName} was not resolved`,
-          );
-        }
+        assertDefined(
+          resolved,
+          `Sim CloudFormation Fn::Sub variable ${variableName} was not resolved`,
+        );
 
         return resolved;
       },

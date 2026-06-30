@@ -3,6 +3,7 @@ import type { SimCfnTemplateValue } from "../../../value/sim-cfn-template-value.
 import { SimCfnFnSubTemplate } from "./template/sim-cfn-fn-sub-template.js";
 import { SimCfnFnSubVariableResolver } from "./resolve/sim-cfn-fn-sub-variable-resolver.js";
 import type { SimCfnResolveContext } from "../../../resolve/sim-cfn-resolve-context.js";
+import { SimCfnFnSubUnresolvedValue } from "./resolve/sim-cfn-fn-sub-unresolved-value.js";
 
 /**
  * Simulated CloudFormation `Fn::Sub` intrinsic function.
@@ -20,15 +21,20 @@ import type { SimCfnResolveContext } from "../../../resolve/sim-cfn-resolve-cont
 export class SimCfnFnSub extends SimCfnNode {
   private readonly subTemplate: SimCfnFnSubTemplate;
   private readonly variableResolver: SimCfnFnSubVariableResolver;
+  private readonly unresolvedValue: SimCfnFnSubUnresolvedValue;
 
   constructor(
-    private readonly template: string,
+    template: string,
     private readonly variables: ReadonlyMap<string, SimCfnNode> = new Map(),
   ) {
     super();
 
     this.subTemplate = new SimCfnFnSubTemplate(template);
     this.variableResolver = new SimCfnFnSubVariableResolver(variables);
+    this.unresolvedValue = new SimCfnFnSubUnresolvedValue({
+      template,
+      variables,
+    });
   }
 
   /**
@@ -50,7 +56,7 @@ export class SimCfnFnSub extends SimCfnNode {
     if (
       [...resolvedVariables.values()].some((value) => typeof value !== "string")
     ) {
-      return this.unresolvedTemplateValue(resolvedVariables);
+      return this.unresolvedValue.toTemplateValue(resolvedVariables);
     }
 
     return this.subTemplate.substitute(
@@ -72,40 +78,5 @@ export class SimCfnFnSub extends SimCfnNode {
         .filter((variableName) => !this.variables.has(variableName))
         .map((variableName) => variableName.split(".")[0] ?? variableName),
     ];
-  }
-
-  private unresolvedTemplateValue(
-    resolvedVariables: ReadonlyMap<string, SimCfnTemplateValue>,
-  ): SimCfnTemplateValue {
-    if (this.variables.size === 0) {
-      return { "Fn::Sub": this.template };
-    }
-
-    return {
-      "Fn::Sub": [
-        this.template,
-        Object.fromEntries(
-          [...this.variables.keys()].map((name) => [
-            name,
-            this.requiredResolvedVariable(name, resolvedVariables),
-          ]),
-        ),
-      ],
-    };
-  }
-
-  private requiredResolvedVariable(
-    name: string,
-    resolvedVariables: ReadonlyMap<string, SimCfnTemplateValue>,
-  ): SimCfnTemplateValue {
-    const resolved = resolvedVariables.get(name);
-
-    if (resolved === undefined) {
-      throw new Error(
-        `Sim CloudFormation Fn::Sub variable ${name} was not resolved`,
-      );
-    }
-
-    return resolved;
   }
 }
