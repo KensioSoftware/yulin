@@ -1,6 +1,7 @@
 import {
   assertArrayIncludes,
   assertArrayLength,
+  assertFalse,
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
@@ -94,7 +95,7 @@ describe("Route53 CloudFormation HostedZone", () => {
     assertIdentical(listOutput.HostedZones[0].Name, "a.example.test.");
     assertIdentical(listOutput.HostedZones[1].Name, "m.example.test.");
     assertIdentical(listOutput.HostedZones[2].Name, "z.example.test.");
-    assertIdentical(listOutput.IsTruncated, false);
+    assertFalse(listOutput.IsTruncated);
   });
 
   it("uses Parameters in Hosted Zone properties", async () => {

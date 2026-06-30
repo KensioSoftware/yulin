@@ -6,6 +6,7 @@ import {
 import {
   assertBufferEqual,
   assertIdentical,
+  assertStringEndsWith,
   assertStringIncludes,
 } from "@kensio/smartass";
 import { afterAll, beforeAll, describe, it } from "vitest";
@@ -210,7 +211,7 @@ describe("Simulated S3 local HTTP controller", () => {
     );
 
     assertIdentical(res.status, 200);
-    assertIdentical(res.url.endsWith("/docs/"), true);
+    assertStringEndsWith(res.url, "/docs/");
     assertIdentical(
       res.headers.get("content-type"),
       "text/html; charset=utf-8",

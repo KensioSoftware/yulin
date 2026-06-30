@@ -1,6 +1,7 @@
 import { describe, it } from "vitest";
 import { BackgroundTasks } from "./background.js";
 import {
+  assertArrayLength,
   assertFalse,
   assertIdentical,
   assertThrowsErrorAsync,
@@ -26,7 +27,7 @@ describe("background sequencing", () => {
     it("tracks pending task count", async () => {
       const tasks = new BackgroundTasks();
 
-      assertIdentical(tasks.size, 0);
+      assertIdentical(tasks.pendingTaskCount, 0);
 
       tasks.schedule(async () => {
         /* empty */
@@ -38,9 +39,9 @@ describe("background sequencing", () => {
         /* empty */
       });
 
-      assertIdentical(tasks.size, 3);
+      assertIdentical(tasks.pendingTaskCount, 3);
       await tasks.complete();
-      assertIdentical(tasks.size, 0);
+      assertIdentical(tasks.pendingTaskCount, 0);
     });
 
     it("handles tasks that schedule more tasks", async () => {
@@ -57,7 +58,7 @@ describe("background sequencing", () => {
       });
 
       await tasks.complete();
-      assertIdentical(execOrder.length, 2);
+      assertArrayLength(execOrder, 2);
       assertIdentical(execOrder[0], 1);
       assertIdentical(execOrder[1], 2);
     });

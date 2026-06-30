@@ -12,6 +12,8 @@ import unicorn from "eslint-plugin-unicorn";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
+import { smartassPreferSpecificAssertions } from "@kensio/smartass/eslint";
+
 import { cloudFrontFunctionsJs2 } from "./src/config/eslint/index.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -313,6 +315,9 @@ export default defineConfig(
       ],
     },
   },
+
+  // ── More specific smartass assertions
+  ...smartassPreferSpecificAssertions,
 
   // ── CloudFront Functions JS2
   ...cloudFrontFunctionsJs2,

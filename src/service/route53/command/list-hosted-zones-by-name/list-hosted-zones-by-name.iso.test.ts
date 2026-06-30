@@ -1,5 +1,6 @@
 import {
   assertArrayLength,
+  assertFalse,
   assertIdentical,
   assertObjectMatches,
   assertThrowsErrorAsync,
@@ -53,7 +54,7 @@ describe("Route53 ListHostedZonesByNameCommand", () => {
       listHostedZonesOutput.HostedZones[2].Name,
       "z.example.com.",
     );
-    assertIdentical(listHostedZonesOutput.IsTruncated, false);
+    assertFalse(listHostedZonesOutput.IsTruncated);
     assertIdentical(listHostedZonesOutput.MaxItems, "100");
     assertObjectMatches(listHostedZonesOutput.$metadata, {});
   });
@@ -102,7 +103,7 @@ describe("Route53 ListHostedZonesByNameCommand", () => {
       "charlie.example.com.",
     );
     assertIdentical(listHostedZonesOutput.DNSName, "bravo.example.com");
-    assertIdentical(listHostedZonesOutput.IsTruncated, false);
+    assertFalse(listHostedZonesOutput.IsTruncated);
   });
 
   it("throws when MaxItems is invalid", async () => {

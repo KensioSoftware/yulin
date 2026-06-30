@@ -2,7 +2,7 @@ import { EventEmitter } from "node:events";
 import type { Server } from "node:http";
 import http from "node:http";
 import { describe, it } from "vitest";
-import { assertIdentical } from "@kensio/smartass";
+import { assertIdentical, assertTrue } from "@kensio/smartass";
 import { waitNodeServerListen } from "./wait-node-server-listen.js";
 
 describe("waitNodeServerListen", () => {
@@ -16,7 +16,7 @@ describe("waitNodeServerListen", () => {
     try {
       await waitNodeServerListen(server);
 
-      assertIdentical(server.listening, true);
+      assertTrue(server.listening);
     } finally {
       server.close();
     }

@@ -3,6 +3,7 @@ import {
   assertArrayLength,
   assertIdentical,
   assertInstanceOf,
+  assertMapSize,
   assertNonNullable,
   assertSetSize,
   assertTrue,
@@ -102,11 +103,11 @@ describe("CloudFront CreateDistributionCommand origin", () => {
 
     assertNonNullable(distribution);
 
-    assertIdentical(distribution.getAlternateDomainNames().size, 2);
+    assertSetSize(distribution.getAlternateDomainNames(), 2);
     assertTrue(distribution.hasAlternateDomainName("cdn.example.test"));
     assertTrue(distribution.hasAlternateDomainName("static.example.test"));
 
-    assertIdentical(distribution.getOrigins().size, 1);
+    assertMapSize(distribution.getOrigins(), 1);
     assertInstanceOf(
       distribution.getOrigin("s3-assets"),
       SimCloudFrontS3Origin,
