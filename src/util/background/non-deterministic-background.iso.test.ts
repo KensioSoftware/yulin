@@ -28,7 +28,7 @@ describe("background sequencing", () => {
     it("tracks pending task count", async () => {
       const tasks = new NonDeterministicBackgroundTasks({});
 
-      assertIdentical(tasks.size, 0);
+      assertIdentical(tasks.pendingTaskCount, 0);
 
       tasks.schedule(async () => {
         /* empty */
@@ -40,9 +40,9 @@ describe("background sequencing", () => {
         /* empty */
       });
 
-      assertIdentical(tasks.size, 3);
+      assertIdentical(tasks.pendingTaskCount, 3);
       await tasks.complete();
-      assertIdentical(tasks.size, 0);
+      assertIdentical(tasks.pendingTaskCount, 0);
     });
 
     it("can execute scheduled tasks out of scheduling order", async () => {

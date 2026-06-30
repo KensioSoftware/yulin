@@ -2,6 +2,8 @@ import {
   assertArrayLength,
   assertFalse,
   assertIdentical,
+  assertMapSize,
+  assertSetSize,
   assertStringLength,
   assertTrue,
   assertUndefined,
@@ -47,7 +49,7 @@ describe("SimCloudFrontDistribution", () => {
 
     const alternateDomainNames = distribution.getAlternateDomainNames();
 
-    assertIdentical(alternateDomainNames.size, 1);
+    assertSetSize(alternateDomainNames, 1);
     assertTrue(alternateDomainNames.has("cdn.example.test"));
   });
 
@@ -99,7 +101,7 @@ describe("SimCloudFrontDistribution", () => {
 
     const origins = distribution.getOrigins();
 
-    assertIdentical(origins.size, 2);
+    assertMapSize(origins, 2);
     assertIdentical(origins.get("origin-a"), originA);
     assertIdentical(origins.get("origin-b"), originB);
   });
@@ -114,7 +116,7 @@ describe("SimCloudFrontDistribution", () => {
     distribution.addOrigin("origin-a", originalOrigin);
     distribution.addOrigin("origin-a", replacementOrigin);
 
-    assertIdentical(distribution.getOrigins().size, 1);
+    assertMapSize(distribution.getOrigins(), 1);
     assertIdentical(distribution.getOrigin("origin-a"), replacementOrigin);
   });
 

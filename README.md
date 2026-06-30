@@ -34,7 +34,7 @@ import { CreateTableCommand } from "@aws-sdk/client-dynamodb";
 const simAws = new SimAws();
 
 // Default Account and Region.
-await simAws.service("dynamoDb").createTable(
+await simAws.dynamoDb().createTable(
  new CreateTableCommand({
    TableName: "FoobarTable",
    KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
@@ -42,13 +42,13 @@ await simAws.service("dynamoDb").createTable(
 );
 
 // Specify Account.
-await simAws.account("111111111111").service("dynamoDb").createTable({ ... });
+await simAws.account("111111111111").dynamoDb().createTable({ ... });
 
 // Specify Region.
-await simAws.region("eu-west-2").service("dynamoDb").createTable({ ... });
+await simAws.region("eu-west-2").dynamoDb().createTable({ ... });
 
 // Specify Account and Region.
-await simAws.account("111111111111").region("eu-west-2").service("dynamoDb").createTable({ ... });
+await simAws.account("111111111111").region("eu-west-2").dynamoDb().createTable({ ... });
 ```
 
 AWS state is simulated internally, so you can test realistic interactions with multiple AWS

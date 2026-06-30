@@ -6,7 +6,11 @@ import {
   PutBucketWebsiteCommand,
 } from "@aws-sdk/client-s3";
 import type { SimS3BucketName } from "../../bucket/sim-s3-bucket.js";
-import { assertIdentical, assertNonNullable } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertNonNullable,
+  assertStringEndsWith,
+} from "@kensio/smartass";
 import { FilesystemS3BucketStorage } from "./s3-filesystem-storage.js";
 import { makeAwsRegionName } from "../../../aws/sim-aws-region.js";
 import { SimAws } from "../../../aws/sim-aws.js";
@@ -123,7 +127,7 @@ describe("Serve sim S3 Bucket on localhost with filesystem storage", () => {
     );
 
     assertIdentical(indexRes.status, 200);
-    assertIdentical(indexRes.url.endsWith("/dengji/a1/"), true);
+    assertStringEndsWith(indexRes.url, "/dengji/a1/");
     assertIdentical(indexRes.headers.get("content-type"), "text/html");
     assertIdentical(await indexRes.text(), "<h1>A1 index</h1>");
   });

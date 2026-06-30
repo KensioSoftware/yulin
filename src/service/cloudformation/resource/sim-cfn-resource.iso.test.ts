@@ -1,9 +1,11 @@
 import {
   assertArrayLength,
+  assertFalse,
   assertIdentical,
   assertNonNullable,
   assertStringIncludes,
   assertThrowsErrorAsync,
+  assertTrue,
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -37,8 +39,8 @@ describe("SimCfnResource", () => {
     // Then the raw template values are exposed in Resource-shaped form.
     assertIdentical(resource.logicalId, "TestResource");
     assertIdentical(resource.status, "CREATE_PENDING");
-    assertIdentical(resource.deployed, false);
-    assertIdentical(resource.createComplete, false);
+    assertFalse(resource.deployed);
+    assertFalse(resource.createComplete);
     assertIdentical(resource.type, "AWS::S3::Bucket");
     assertIdentical(resource.properties["BucketName"], "test-bucket");
     assertUndefined(resource.simResource);
@@ -67,7 +69,7 @@ describe("SimCfnResource", () => {
 
     // Then invalid optional fields are treated as absent.
     assertUndefined(resource.type);
-    assertIdentical(Object.keys(properties).length, 0);
+    assertArrayLength(Object.keys(properties), 0);
     assertArrayLength(dependencies, 0);
   });
 
@@ -125,8 +127,8 @@ describe("SimCfnResource", () => {
     pendingDependency.markCreateComplete();
 
     // Then creation becomes allowed only once every dependency is complete.
-    assertIdentical(canCreateBefore, false);
-    assertIdentical(resource.canCreate(resources), true);
+    assertFalse(canCreateBefore);
+    assertTrue(resource.canCreate(resources));
   });
 
   it("marks creation status transitions explicitly", () => {
@@ -164,19 +166,19 @@ describe("SimCfnResource", () => {
     // Then each helper updates status, terminal flags, error and sim Resource
     // state consistently.
     assertIdentical(inProgressStatus, "CREATE_IN_PROGRESS");
-    assertIdentical(inProgressDeployed, false);
-    assertIdentical(inProgressCreateComplete, false);
+    assertFalse(inProgressDeployed);
+    assertFalse(inProgressCreateComplete);
 
     assertIdentical(failedStatus, "CREATE_FAILED");
-    assertIdentical(failedCreateComplete, true);
+    assertTrue(failedCreateComplete);
     assertIdentical(failedError, createError);
 
     assertIdentical(completeWithOriginal, originalSimResource);
     assertUndefined(completeWithoutReplacement);
     assertIdentical(completeWithReplacement, replacementSimResource);
     assertIdentical(resource.status, "CREATE_COMPLETE");
-    assertIdentical(resource.deployed, true);
-    assertIdentical(resource.createComplete, true);
+    assertTrue(resource.deployed);
+    assertTrue(resource.createComplete);
     assertUndefined(resource.error);
   });
 
@@ -218,8 +220,8 @@ describe("SimCfnResource", () => {
     // Then the injected factory result is recorded and the Resource completes.
     assertIdentical(resource.status, "CREATE_COMPLETE");
     assertIdentical(resource.simResource, createdSimResource);
-    assertIdentical(resource.deployed, true);
-    assertIdentical(resource.createComplete, true);
+    assertTrue(resource.deployed);
+    assertTrue(resource.createComplete);
     assertUndefined(resource.error);
   });
 
@@ -249,7 +251,7 @@ describe("SimCfnResource", () => {
       "Sim CloudFormation Resource TestResource is missing a Type",
     );
     assertIdentical(resource.status, "CREATE_FAILED");
-    assertIdentical(resource.createComplete, true);
+    assertTrue(resource.createComplete);
     assertIdentical(resource.error, error);
   });
 
@@ -287,7 +289,7 @@ describe("SimCfnResource", () => {
       "Sim CloudFormation Resource TestResource creation failed: factory failed",
     );
     assertIdentical(resource.status, "CREATE_FAILED");
-    assertIdentical(resource.createComplete, true);
+    assertTrue(resource.createComplete);
     assertIdentical(resource.error, error);
   });
 });

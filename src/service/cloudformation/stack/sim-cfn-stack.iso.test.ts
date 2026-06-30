@@ -1,8 +1,10 @@
 import { describe, it } from "vitest";
 import {
+  assertArrayLength,
   assertIdentical,
   assertNonNullable,
   assertThrowsErrorAsync,
+  assertTrue,
 } from "@kensio/smartass";
 import { SimAws } from "../../aws/sim-aws.js";
 import { CreateStackCommand } from "@aws-sdk/client-cloudformation";
@@ -235,10 +237,10 @@ describe("SimCfnStack", () => {
     const skippedResource = stack.skippedResources[0];
 
     assertIdentical(stack.lifecycle.status, "CREATE_COMPLETE");
-    assertIdentical(stack.skippedResources.length, 1);
+    assertArrayLength(stack.skippedResources, 1);
     assertNonNullable(skippedResource);
     assertIdentical(skippedResource.logicalId, "TestTopic");
-    assertIdentical(skippedResource.skipped, true);
+    assertTrue(skippedResource.skipped);
     assertIdentical(
       skippedResource.skippedReason,
       "Unsupported sim CloudFormation Resource service SNS",

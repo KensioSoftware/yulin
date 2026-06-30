@@ -10,6 +10,7 @@ import {
   assertIdentical,
   assertStringIncludes,
   assertThrowsErrorAsync,
+  assertTrue,
   assertUndefined,
 } from "@kensio/smartass";
 import { SimS3 } from "../../sim-s3.js";
@@ -140,7 +141,7 @@ describe("S3 ListObjectsCommand", () => {
     assertIdentical(listObjectsOutput.Contents[0].Key, "a.txt");
     assertIdentical(listObjectsOutput.Contents[1].Key, "b.txt");
     assertIdentical(listObjectsOutput.MaxKeys, 2);
-    assertIdentical(listObjectsOutput.IsTruncated, true);
+    assertTrue(listObjectsOutput.IsTruncated);
     assertIdentical(listObjectsOutput.NextMarker, "b.txt");
   });
 

@@ -1,7 +1,9 @@
 import {
   assertIdentical,
   assertInstanceOf,
+  assertMapSize,
   assertThrowsErrorAsync,
+  assertTrue,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -40,7 +42,7 @@ describe("SimRoute53CloudFormationResourceFactory", () => {
     assertIdentical(hostedZone.name, "example.test.");
     assertIdentical(hostedZone.callerReference, "ExampleHostedZone");
     assertIdentical(hostedZone.config?.Comment, "Example hosted zone");
-    assertIdentical(hostedZone.config.PrivateZone, true);
+    assertTrue(hostedZone.config.PrivateZone);
     assertIdentical(route53.hostedZones.get(hostedZone.id), hostedZone);
   });
 
@@ -180,7 +182,7 @@ describe("SimRoute53CloudFormationResourceFactory", () => {
       error.message,
       "Invalid AWS::Route53::HostedZone InvalidHostedZoneConfigComment: HostedZoneConfig.Comment must be a string",
     );
-    assertIdentical(route53.hostedZones.size, 0);
+    assertMapSize(route53.hostedZones, 0);
   });
 
   it("rejects a Hosted Zone with a non-boolean HostedZoneConfig PrivateZone", async () => {
@@ -212,6 +214,6 @@ describe("SimRoute53CloudFormationResourceFactory", () => {
       error.message,
       "Invalid AWS::Route53::HostedZone InvalidHostedZoneConfigPrivateZone: HostedZoneConfig.PrivateZone must be a boolean",
     );
-    assertIdentical(route53.hostedZones.size, 0);
+    assertMapSize(route53.hostedZones, 0);
   });
 });

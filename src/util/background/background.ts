@@ -74,7 +74,7 @@ export class BackgroundTasks
   /**
    * See how many outstanding background tasks are scheduled.
    */
-  public get size(): number {
+  public get pendingTaskCount(): number {
     return this.pending.size;
   }
 }

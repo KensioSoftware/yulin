@@ -7,6 +7,7 @@ import {
   assertObjectMatches,
   assertTrue,
   assertObjectHasProperty,
+  assertTypeString,
 } from "@kensio/smartass";
 import {
   cloudFrontRequestFactory,
@@ -49,8 +50,8 @@ describe("sim CFF event structure adapter", () => {
       assertIdentical(event.response.statusDescription, "Created");
 
       const headers = event.response.headers;
-      assertTrue("content-type" in headers);
-      assertIdentical(headers["content-type"]?.value, "text/plain");
+      assertObjectHasProperty(headers, "content-type");
+      assertIdentical(headers["content-type"].value, "text/plain");
     });
   });
 
@@ -216,8 +217,8 @@ describe("sim CFF event structure adapter", () => {
       const requestEvent2 = adapter.toViewerRequestEvent(req);
       const responseEvent1 = adapter.toViewerResponseEvent(req, res);
 
-      assertIdentical(typeof requestEvent1.context.requestId, "string");
-      assertIdentical(typeof responseEvent1.context.requestId, "string");
+      assertTypeString(requestEvent1.context.requestId);
+      assertTypeString(responseEvent1.context.requestId);
 
       assertTrue(
         requestEvent1.context.requestId !== requestEvent2.context.requestId,

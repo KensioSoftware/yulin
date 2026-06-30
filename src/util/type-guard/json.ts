@@ -15,8 +15,7 @@ type Jsonify<T> = T extends { toJSON(): infer R }
     : // eslint-disable-next-line @typescript-eslint/no-explicit-any
       T extends undefined | ((...args: any[]) => any) | symbol
       ? never // dropped in objects
-      : // eslint-disable-next-line no-restricted-syntax
-        T extends [unknown, ...unknown[]]
+      : T extends [unknown, ...unknown[]]
         ? { [K in keyof T]: Jsonify<T[K]> } // preserve tuples
         : T extends readonly (infer U)[]
           ? Jsonify<U>[] // undefined slots -> null is ignored here

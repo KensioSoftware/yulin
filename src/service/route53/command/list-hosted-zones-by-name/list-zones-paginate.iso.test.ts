@@ -1,7 +1,9 @@
 import {
   assertArrayLength,
+  assertFalse,
   assertIdentical,
   assertNonNullable,
+  assertTrue,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
@@ -49,7 +51,7 @@ describe("Route53 ListHostedZonesByNameCommand", () => {
       listHostedZonesOutput.HostedZones[0].Name,
       "one.example.com.",
     );
-    assertIdentical(listHostedZonesOutput.IsTruncated, true);
+    assertTrue(listHostedZonesOutput.IsTruncated);
     assertIdentical(listHostedZonesOutput.NextDNSName, "three.example.com.");
     assertIdentical(listHostedZonesOutput.MaxItems, "1");
   });
@@ -111,6 +113,6 @@ describe("Route53 ListHostedZonesByNameCommand", () => {
       "duplicate.example.com.",
     );
     assertIdentical(listHostedZonesOutput.HostedZoneId, markerHostedZoneId);
-    assertIdentical(listHostedZonesOutput.IsTruncated, false);
+    assertFalse(listHostedZonesOutput.IsTruncated);
   });
 });

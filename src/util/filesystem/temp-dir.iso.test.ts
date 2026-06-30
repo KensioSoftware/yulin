@@ -1,15 +1,13 @@
-import { stat } from "node:fs/promises";
 import path from "node:path";
 import {
+  assertDirectoryExists,
   assertFileEquals,
-  assertIdentical,
   assertStringIncludes,
+  assertStringStartsWith,
   assertThrowsError,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { makeTempDir, TempDir } from "./temp-dir.js";
-
-/* eslint-disable security/detect-non-literal-fs-filename */
 
 describe("Temp dir helper", () => {
   it("creates a temporary directory", async () => {
@@ -18,10 +16,8 @@ describe("Temp dir helper", () => {
     const tempDirPath = await makeTempDir();
 
     // Then it exists on disk with the expected test prefix.
-    const tempDirStats = await stat(tempDirPath);
-
-    assertIdentical(tempDirStats.isDirectory(), true);
-    assertIdentical(path.basename(tempDirPath).startsWith("yulin-test-"), true);
+    assertDirectoryExists(tempDirPath);
+    assertStringStartsWith(path.basename(tempDirPath), "yulin-test-");
   });
 
   it("throws when reading a TempDir path before it is resolved", () => {
