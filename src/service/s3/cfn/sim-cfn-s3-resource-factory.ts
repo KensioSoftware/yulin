@@ -7,6 +7,7 @@ import type { SimCfnServiceResourceFactory } from "../../cloudformation/resource
 import type { SimS3Bucket } from "../bucket/sim-s3-bucket.js";
 import type { SimS3WebsiteConfiguration } from "../command/put-bucket-website/put-bucket-website.cmd.js";
 import { validateS3BucketName } from "../bucket/validate/validate-s3-bucket-name.js";
+import { assertDefined } from "../../../util/type-guard/defined.js";
 
 /**
  * CloudFormation Resource factory for simulated S3 resources.
@@ -48,13 +49,10 @@ export class SimS3CloudFormationResourceFactory implements SimCfnServiceResource
     });
 
     const bucket = this.simS3.getSimBucketByName(bucketName);
-
-    /* v8 ignore if -- cannot happen in practice */
-    if (bucket === undefined) {
-      throw new Error(
-        `Expected sim S3 Bucket ${bucketName} to exist after CloudFormation creation`,
-      );
-    }
+    assertDefined(
+      bucket,
+      `sim S3 Bucket ${bucketName} after CloudFormation creation`,
+    );
 
     const websiteConfiguration = this.websiteConfigurationForResource(
       resource,

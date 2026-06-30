@@ -5,6 +5,7 @@ import type {
 import type { SimCfnServiceResourceFactory } from "../factory/sim-cfn-resource-factory.type.js";
 import { parseSimCloudFormationResourceType } from "../parser/sim-cfn-resource-parser.js";
 import { resolveSimCloudFormationServiceResourceFactory } from "../resolve/service/sim-cfn-service-resolver.js";
+import { assertDefined } from "../../../../util/type-guard/defined.js";
 
 interface SimCfnResourceCreatorProps<T extends object> {
   readonly resource: SimCfnResource<T>;
@@ -45,12 +46,10 @@ export class SimCfnResourceCreator<T extends object = object> {
     context: SimCloudFormationResourceCreateContext,
   ): Promise<object | undefined> {
     const { type } = this.resource;
-
-    if (type === undefined) {
-      throw new Error(
-        `Sim CloudFormation Resource ${this.resource.logicalId} is missing a Type`,
-      );
-    }
+    assertDefined(
+      type,
+      `Sim CloudFormation Resource ${this.resource.logicalId} is missing a Type`,
+    );
 
     const resourceType = parseSimCloudFormationResourceType(type);
     const factory =

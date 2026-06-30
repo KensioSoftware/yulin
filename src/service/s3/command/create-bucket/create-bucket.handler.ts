@@ -54,7 +54,10 @@ export class CreateBucketCommandHandler implements CommandHandler<
   async handle(
     cmd: SimCreateBucketCommand,
   ): Promise<SimCreateBucketCommandOutput> {
-    assertDefined(cmd.input.Bucket, "CreateBucketCommand.input.Bucket");
+    assertDefined(
+      cmd.input.Bucket,
+      "CreateBucketCommand.input.Bucket required",
+    );
 
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();

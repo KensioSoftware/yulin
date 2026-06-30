@@ -9,6 +9,7 @@ import type {
 } from "../../table/sim-dynamodb-table.js";
 import { DynamoDbItem } from "../../item/dynamodb-item.js";
 import { SimDynamoDbResourceNotFoundException } from "../../error/dynamodb.error.js";
+import { assertDefined } from "../../../../util/type-guard/defined.js";
 
 interface PutItemCommandHandlerProps {
   readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>;
@@ -34,9 +35,7 @@ export class PutItemCommandHandler implements CommandHandler<
    */
   async handle(cmd: SimPutItemCommand): Promise<SimPutItemCommandOutput> {
     const tableName = cmd.input.TableName as DynamoDbTableName | undefined;
-    if (tableName === undefined) {
-      throw new Error("PutItemCommand.input.TableName is required");
-    }
+    assertDefined(tableName, "PutItemCommand.input.TableName required");
 
     const table = this.tables.get(tableName);
     if (table === undefined) {
@@ -45,9 +44,7 @@ export class PutItemCommandHandler implements CommandHandler<
       );
     }
 
-    if (cmd.input.Item === undefined) {
-      throw new Error("PutItemCommand.input.Item is required");
-    }
+    assertDefined(cmd.input.Item, "PutItemCommand.input.Item required");
 
     const item = DynamoDbItem.fromAttributeValues(cmd.input.Item);
 

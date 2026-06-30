@@ -6,7 +6,7 @@ describe("type-guard assertion util functions", () => {
   describe("assertDefined", () => {
     it("throws on undefined value", () => {
       const error = assertThrowsError(() => {
-        assertDefined(undefined, "foo value");
+        assertDefined(undefined, "foo value must be defined");
       });
       assertIdentical(error.message, "foo value must be defined");
     });
@@ -19,7 +19,7 @@ describe("type-guard assertion util functions", () => {
   describe("assertNotNull", () => {
     it("throws on null value", () => {
       const error = assertThrowsError(() => {
-        assertNotNull(null, "foo value");
+        assertNotNull(null, "foo value must not be null");
       });
       assertIdentical(error.message, "foo value must not be null");
     });

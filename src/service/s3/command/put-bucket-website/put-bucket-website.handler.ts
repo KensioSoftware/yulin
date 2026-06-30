@@ -44,10 +44,13 @@ export class PutBucketWebsiteCommandHandler implements CommandHandler<
   async handle(
     cmd: SimPutBucketWebsiteCommand,
   ): Promise<SimPutBucketWebsiteCommandOutput> {
-    assertDefined(cmd.input.Bucket, "PutBucketWebsiteCommand.input.Bucket");
+    assertDefined(
+      cmd.input.Bucket,
+      "PutBucketWebsiteCommand.input.Bucket required",
+    );
     assertDefined(
       cmd.input.WebsiteConfiguration,
-      "PutBucketWebsiteCommand.input.WebsiteConfiguration",
+      "PutBucketWebsiteCommand.input.WebsiteConfiguration required",
     );
 
     const bucketName = cmd.input.Bucket as SimS3BucketName;

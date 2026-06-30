@@ -61,7 +61,7 @@ describe("DynamoDB CreateTableCommand", () => {
     assertInstanceOf(error, Error);
     assertStringIncludes(
       error.message,
-      "CreateTableCommand.input.TableName must be defined",
+      "CreateTableCommand.input.TableName required",
     );
   });
 

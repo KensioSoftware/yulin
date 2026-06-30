@@ -115,7 +115,7 @@ export default defineConfig(
         },
       ],
 
-      // ── Discourage lazy `unknown` typing ─────────────
+      // ── Discourage various undesirable patterns ─────────────
       "no-restricted-syntax": [
         "error",
         {
@@ -123,6 +123,18 @@ export default defineConfig(
             "TSUnknownKeyword:not(.params > TSTypeAnnotation > TSUnknownKeyword)",
           message:
             "Avoid `unknown` as a type, except when narrowing a function parameter to a concrete type.",
+        },
+        {
+          selector:
+            "IfStatement[test.type='BinaryExpression'][test.operator='===']:matches([test.left.type='Identifier'][test.left.name='undefined'], [test.right.type='Identifier'][test.right.name='undefined']):has(ThrowStatement[argument.type='NewExpression'][argument.callee.name='Error'])",
+          message:
+            "Use `assertDefined(value, description)` instead of throwing `Error` from an `undefined` guard.",
+        },
+        {
+          selector:
+            "IfStatement[test.type='BinaryExpression'][test.operator='===']:matches([test.left.type='Literal'][test.left.value=null], [test.right.type='Literal'][test.right.value=null]):has(ThrowStatement[argument.type='NewExpression'][argument.callee.name='Error'])",
+          message:
+            "Use `assertNotNull(value, description)` instead of throwing `Error` from a `null` guard.",
         },
       ],
 
@@ -230,6 +242,7 @@ export default defineConfig(
     files: ["docs/**/*.example.ts", "docs/**/*.examples.ts"],
     rules: {
       "no-console": "off",
+      "@typescript-eslint/no-non-null-assertion": "off",
     },
   },
 

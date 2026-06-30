@@ -55,11 +55,7 @@ try {
     }),
   );
 
-  const distroHostname = createDistributionOutput.Distribution?.DomainName;
-
-  if (distroHostname === undefined) {
-    throw new Error("Expected sim CloudFront Distribution hostname");
-  }
+  const distroHostname = createDistributionOutput.Distribution!.DomainName!;
 
   const url = srv.localUrl(`http://${distroHostname}/hello.txt`);
   const response = await fetch(url);

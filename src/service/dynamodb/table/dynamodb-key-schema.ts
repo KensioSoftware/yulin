@@ -61,7 +61,7 @@ export class DynamoDbKeySchema {
     const partitionKeyAttr = item.attributes[this.hashKeyAttributeName];
     assertDefined(
       partitionKeyAttr,
-      `DynamoDB Item partition key ${this.hashKeyAttributeName}`,
+      `DynamoDB Item partition key ${this.hashKeyAttributeName} required`,
     );
     const partitionKey = partitionKeyAttr.value;
     if (!DynamoDbKeySchema.canBeDynamoDbKey(partitionKey)) {

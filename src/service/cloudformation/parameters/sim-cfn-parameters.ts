@@ -6,6 +6,7 @@ import type {
   SimCloudFormationParameterValue,
   SimCloudFormationParameterValues,
 } from "./sim-cfn-parameters.type.js";
+import { assertDefined } from "../../../util/type-guard/defined.js";
 
 /**
  * Resolves CloudFormation Parameters for a simulated Stack.
@@ -114,12 +115,10 @@ export class SimCfnParameters {
    */
   value(parameterName: string): SimCloudFormationParameterValue {
     const value = this.values.get(parameterName);
-
-    if (value === undefined) {
-      throw new Error(
-        `Sim CloudFormation Stack ${this.stackNameLabel()} parameter ${parameterName} is missing a value`,
-      );
-    }
+    assertDefined(
+      value,
+      `Sim CloudFormation Stack ${this.stackNameLabel()} parameter ${parameterName} is missing a value`,
+    );
 
     return value;
   }

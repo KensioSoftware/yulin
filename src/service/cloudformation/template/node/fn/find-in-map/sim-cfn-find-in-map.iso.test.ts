@@ -33,10 +33,7 @@ describe("SimCfnTemplate Fn::FindInMap Resources", () => {
 
     const resourceTemplates = template.resourceTemplates();
     const resourceTemplate = resourceTemplates[0];
-
-    if (resourceTemplate === undefined) {
-      throw new Error("Expected TestInstance Resource template");
-    }
+    assertNonNullable(resourceTemplate);
 
     assertObjectMatches(resourceTemplate.template, {
       Type: "AWS::EC2::Instance",
@@ -81,10 +78,7 @@ describe("SimCfnTemplate Fn::FindInMap Resources", () => {
 
     const resourceTemplates = template.resourceTemplates();
     const resourceTemplate = resourceTemplates[0];
-
-    if (resourceTemplate === undefined) {
-      throw new Error("Expected TestBucket Resource template");
-    }
+    assertNonNullable(resourceTemplate);
 
     assertObjectMatches(resourceTemplate.template, {
       Type: "AWS::S3::Bucket",

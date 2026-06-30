@@ -2,6 +2,7 @@ import { SimCfnNode } from "../../sim-cfn-node.js";
 import type { SimCfnResolveContext } from "../../../resolve/sim-cfn-resolve-context.js";
 import type { SimCfnTemplateValue } from "../../../value/sim-cfn-template-value.js";
 import { isRecord } from "../../../../../../util/type-guard/record.js";
+import { assertDefined } from "../../../../../../util/type-guard/defined.js";
 
 /**
  * Simulated CloudFormation `Fn::FindInMap` intrinsic function.
@@ -45,12 +46,10 @@ export class SimCfnFnFindInMap extends SimCfnNode {
 
     // eslint-disable-next-line security/detect-object-injection
     const value = topLevel[secondLevelKey];
-
-    if (value === undefined) {
-      throw new Error(
-        `Sim CloudFormation Fn::FindInMap could not find map ${mapName}.${topLevelKey}.${secondLevelKey}`,
-      );
-    }
+    assertDefined(
+      value,
+      `Sim CloudFormation Fn::FindInMap could not find map ${mapName}.${topLevelKey}.${secondLevelKey}`,
+    );
 
     return value;
   }

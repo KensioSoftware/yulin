@@ -12,6 +12,7 @@ import {
   type BackgroundScheduler,
   BackgroundTasks,
 } from "../../../../util/background/background.js";
+import { assertDefined } from "../../../../util/type-guard/defined.js";
 
 interface GetDistributionCommandHandlerProps {
   readonly distributions: Map<
@@ -48,9 +49,7 @@ export class GetDistributionCommandHandler implements CommandHandler<
   async handle(
     cmd: SimGetDistributionCommand,
   ): Promise<SimGetDistributionCommandOutput> {
-    if (cmd.input.Id === undefined) {
-      throw new Error("GetDistributionCommand.input.Id is required");
-    }
+    assertDefined(cmd.input.Id, "GetDistributionCommand.input.Id");
     const distributionId = cmd.input.Id as SimCloudFrontDistributionId;
 
     // Allow for potential non-deterministic sequencing of async events.

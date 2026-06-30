@@ -3,6 +3,7 @@ import {
   assertIdentical,
   assertInstanceOf,
   assertObjectMatches,
+  assertStringIncludes,
   assertThrowsError,
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
@@ -153,9 +154,9 @@ describe("SimCfnNodeParser", () => {
         });
       });
 
-      assertIdentical(
+      assertStringIncludes(
         error.message,
-        "Expected exactly one Sim CloudFormation template entry",
+        "Expected one Sim CloudFormation template entry",
       );
     } finally {
       objectEntries.mockRestore();
