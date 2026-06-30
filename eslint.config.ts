@@ -136,6 +136,12 @@ export default defineConfig(
           message:
             "Use `assertNotNull(value, description)` instead of throwing `Error` from a `null` guard.",
         },
+        {
+          selector:
+            "MemberExpression[object.type='ThisExpression'][property.type='Identifier'][property.name='props']",
+          message:
+            "Do not reuse `this.props`. Destructure constructor props into class members instead.",
+        },
       ],
 
       // ── General quality ──────────────────────────────

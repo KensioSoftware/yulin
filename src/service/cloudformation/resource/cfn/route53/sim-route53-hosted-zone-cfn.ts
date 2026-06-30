@@ -10,13 +10,17 @@ interface SimRoute53HostedZoneCfnProps {
  * CloudFormation-facing values for a simulated Route53 Hosted Zone.
  */
 export class SimRoute53HostedZoneCfn implements SimCfnResourceValueAdapter {
-  constructor(private readonly props: SimRoute53HostedZoneCfnProps) {}
+  private readonly hostedZone: SimRoute53HostedZone;
+
+  constructor(props: SimRoute53HostedZoneCfnProps) {
+    this.hostedZone = props.hostedZone;
+  }
 
   /**
    * AWS::Route53::HostedZone Ref returns the hosted zone ID.
    */
   refValue(): SimCfnTemplateValue {
-    return this.props.hostedZone.id;
+    return this.hostedZone.id;
   }
 
   /**
@@ -25,7 +29,7 @@ export class SimRoute53HostedZoneCfn implements SimCfnResourceValueAdapter {
   attributeValue(attributeName: string): SimCfnTemplateValue {
     switch (attributeName) {
       case "Id": {
-        return this.props.hostedZone.id;
+        return this.hostedZone.id;
       }
       case "NameServers": {
         return [

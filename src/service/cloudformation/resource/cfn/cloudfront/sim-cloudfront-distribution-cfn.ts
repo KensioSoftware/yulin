@@ -3,20 +3,24 @@ import type { SimCloudFrontDistribution } from "../../../../cloudfront/distribut
 import type { SimCfnResourceValueAdapter } from "../sim-cfn-resource-value-adapter.js";
 
 interface SimCloudFrontDistributionCfnProps {
-  readonly distribution: SimCloudFrontDistribution;
+  readonly distro: SimCloudFrontDistribution;
 }
 
 /**
  * CloudFormation-facing behavior for an AWS::CloudFront::Distribution Resource.
  */
 export class SimCloudFrontDistributionCfn implements SimCfnResourceValueAdapter {
-  constructor(private readonly props: SimCloudFrontDistributionCfnProps) {}
+  private readonly distro: SimCloudFrontDistribution;
+
+  constructor(props: SimCloudFrontDistributionCfnProps) {
+    this.distro = props.distro;
+  }
 
   /**
    * CloudFormation Ref for AWS::CloudFront::Distribution returns the Distribution ID.
    */
   refValue(): SimCfnTemplateValue {
-    return this.props.distribution.distributionId;
+    return this.distro.distributionId;
   }
 
   /**
@@ -25,13 +29,13 @@ export class SimCloudFrontDistributionCfn implements SimCfnResourceValueAdapter 
   attributeValue(attributeName: string): SimCfnTemplateValue {
     switch (attributeName) {
       case "DomainName": {
-        return `${this.props.distribution.distributionId.toLowerCase()}.cloudfront.net`;
+        return `${this.distro.distributionId.toLowerCase()}.cloudfront.net`;
       }
       case "Id": {
-        return this.props.distribution.distributionId;
+        return this.distro.distributionId;
       }
       default: {
-        return `${this.props.distribution.distributionId}.${attributeName}`;
+        return `${this.distro.distributionId}.${attributeName}`;
       }
     }
   }

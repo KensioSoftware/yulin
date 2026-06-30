@@ -10,19 +10,23 @@ interface SimCfnDefaultResourceValueAdapterProps {
  * simulator support.
  */
 export class SimCfnDefaultResourceValueAdapter implements SimCfnResourceValueAdapter {
-  constructor(private readonly props: SimCfnDefaultResourceValueAdapterProps) {}
+  private readonly logicalId: string;
+
+  constructor(props: SimCfnDefaultResourceValueAdapterProps) {
+    this.logicalId = props.logicalId;
+  }
 
   /**
    * Default physical-ID stand-in.
    */
   refValue(): SimCfnTemplateValue {
-    return this.props.logicalId;
+    return this.logicalId;
   }
 
   /**
    * Default attribute stand-in.
    */
   attributeValue(attributeName: string): SimCfnTemplateValue {
-    return `${this.props.logicalId}.${attributeName}`;
+    return `${this.logicalId}.${attributeName}`;
   }
 }

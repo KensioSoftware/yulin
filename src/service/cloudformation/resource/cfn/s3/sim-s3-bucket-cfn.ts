@@ -3,7 +3,6 @@ import type { SimS3Bucket } from "../../../../s3/bucket/sim-s3-bucket.js";
 import type { SimCfnResourceValueAdapter } from "../sim-cfn-resource-value-adapter.js";
 
 interface SimS3BucketCfnProps {
-  readonly logicalId: string;
   readonly bucket: SimS3Bucket;
 }
 
@@ -15,13 +14,17 @@ interface SimS3BucketCfnProps {
  * Fn::GetAtt values.
  */
 export class SimS3BucketCfn implements SimCfnResourceValueAdapter {
-  constructor(private readonly props: SimS3BucketCfnProps) {}
+  private readonly bucket: SimS3Bucket;
+
+  constructor(props: SimS3BucketCfnProps) {
+    this.bucket = props.bucket;
+  }
 
   /**
    * CloudFormation Ref for AWS::S3::Bucket returns the bucket name.
    */
   refValue(): SimCfnTemplateValue {
-    return this.props.bucket.bucketName;
+    return this.bucket.bucketName;
   }
 
   /**
@@ -29,21 +32,21 @@ export class SimS3BucketCfn implements SimCfnResourceValueAdapter {
    */
   attributeValue(attributeName: string): SimCfnTemplateValue {
     if (attributeName === "Arn") {
-      return `arn:aws:s3:::${this.props.bucket.bucketName}`;
+      return `arn:aws:s3:::${this.bucket.bucketName}`;
     }
 
     if (attributeName === "DomainName") {
-      return `${this.props.bucket.bucketName}.s3.amazonaws.com`;
+      return `${this.bucket.bucketName}.s3.amazonaws.com`;
     }
 
     if (attributeName === "RegionalDomainName") {
-      return `${this.props.bucket.bucketName}.s3.${this.props.bucket.getAccountRegionScope().regionName}.amazonaws.com`;
+      return `${this.bucket.bucketName}.s3.${this.bucket.getAccountRegionScope().regionName}.amazonaws.com`;
     }
 
     if (attributeName === "WebsiteURL") {
-      return this.props.bucket.getWebsiteUrl().toString();
+      return this.bucket.getWebsiteUrl().toString();
     }
 
-    return `${this.props.bucket.bucketName}.${attributeName}`;
+    return `${this.bucket.bucketName}.${attributeName}`;
   }
 }

@@ -16,7 +16,11 @@ interface SimCfnCfDistroCreatorProps {
  * Creates simulated CloudFront Distributions from CloudFormation Resources.
  */
 export class SimCfnCfDistroCreator {
-  constructor(private readonly props: SimCfnCfDistroCreatorProps) {}
+  private readonly cloudFront: SimCloudFront;
+
+  constructor(props: SimCfnCfDistroCreatorProps) {
+    this.cloudFront = props.cloudFront;
+  }
 
   /**
    * Create a simulated CloudFront Distribution from an
@@ -42,7 +46,7 @@ export class SimCfnCfDistroCreator {
       distributionConfig: distributionConfigValue,
     }).validate();
 
-    const output = await this.props.cloudFront.createDistribution({
+    const output = await this.cloudFront.createDistribution({
       input: {
         DistributionConfig: distributionConfig,
       },
@@ -54,8 +58,7 @@ export class SimCfnCfDistroCreator {
       `AWS::CloudFront::Distribution ${resource.logicalId} created Distribution Id`,
     );
 
-    const distribution =
-      this.props.cloudFront.getSimDistributionById(distributionId);
+    const distribution = this.cloudFront.getSimDistributionById(distributionId);
 
     assertDefined(
       distribution,

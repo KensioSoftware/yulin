@@ -1,4 +1,3 @@
-import { faker } from "@faker-js/faker";
 import {
   type SimAwsAccountRegionScope,
   simAwsAccountRegionScopeFactory,
@@ -58,15 +57,10 @@ export class SimCloudFormation {
     this.background = background;
     this.accountRegionScope = accountRegionScope;
     this.templateDeployer = new SimCloudFormationTemplateDeployer({
-      createStackWithContext: async (
-        cmd,
-        cdkOutContext,
-        bindings,
-      ): Promise<SimCreateStackCommandOutput> =>
-        await this.createStackWithContext(cmd, cdkOutContext, bindings),
-      getStackByName: (stackName): SimCfnStack | undefined =>
-        this.getStackByName(stackName),
-      defaultStackName: makeSimCloudFormationStackName,
+      simAws: this.simAws,
+      accountRegionScope: this.accountRegionScope,
+      stacks: this.stacks,
+      background: this.background,
     });
   }
 
@@ -148,11 +142,4 @@ export class SimCloudFormation {
   ): Promise<SimCfnStack> {
     return await this.templateDeployer.deployTemplateFile(props);
   }
-}
-
-/**
- * Generate a fake CloudFormation Stack name.
- */
-export function makeSimCloudFormationStackName(): SimCloudFormationStackName {
-  return `SimStack${faker.string.alphanumeric({ length: 8 })}` as SimCloudFormationStackName;
 }

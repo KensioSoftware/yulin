@@ -12,24 +12,32 @@ interface SimCdkBucketDeploymentAssetErrorMessageProps {
  * Formats CDK BucketDeployment asset resolution error messages.
  */
 export class SimCdkBucketDeployErrorMessage {
-  constructor(
-    private readonly props: SimCdkBucketDeploymentAssetErrorMessageProps,
-  ) {}
+  private readonly resource: SimCfnResource;
+  private readonly sourceObjectKey: string;
+  private readonly cdkOutContext: SimCdkOutContext | undefined;
+  private readonly reason: string;
+
+  constructor(props: SimCdkBucketDeploymentAssetErrorMessageProps) {
+    this.resource = props.resource;
+    this.sourceObjectKey = props.sourceObjectKey;
+    this.cdkOutContext = props.cdkOutContext;
+    this.reason = props.reason;
+  }
 
   /**
    * Build the complete asset resolution error message.
    */
   toString(): string {
     return [
-      `Could not configure Custom::CDKBucketDeployment ${this.props.resource.logicalId}.`,
+      `Could not configure Custom::CDKBucketDeployment ${this.resource.logicalId}.`,
       "",
       "Referenced source object key:",
-      this.props.sourceObjectKey,
+      this.sourceObjectKey,
       "",
       "Expected asset metadata in:",
-      this.props.cdkOutContext?.assetsManifestPath ?? "unknown assets manifest",
+      this.cdkOutContext?.assetsManifestPath ?? "unknown assets manifest",
       "",
-      this.props.reason,
+      this.reason,
       "",
       "Run `cdk synth` and ensure the cloud assembly is available.",
     ].join("\n");
