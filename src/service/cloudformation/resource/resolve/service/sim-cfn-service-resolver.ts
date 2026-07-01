@@ -41,6 +41,10 @@ export function resolveSimCloudFormationServiceResourceFactory(
   );
 
   switch (resourceType.serviceName) {
+    case "ACM":
+    case "CertificateManager": {
+      return scopedAws.acm().cfnResourceFactory();
+    }
     case "CloudFormation": {
       return new SimCfnCfnResourceFactory();
     }

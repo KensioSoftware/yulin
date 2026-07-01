@@ -67,6 +67,7 @@ function handler(event) {
       `
 import * as cdk from "aws-cdk-lib/core";
 import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
+import { aws_certificatemanager as acm } from "aws-cdk-lib";
 import * as origins from "aws-cdk-lib/aws-cloudfront-origins";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as s3deploy from "aws-cdk-lib/aws-s3-deployment";
@@ -74,7 +75,7 @@ import * as route53 from "aws-cdk-lib/aws-route53";
 
 const app = new cdk.App();
 const stack = new cdk.Stack(app, "TestStack", {
-  env: { account: "111111111111", region: "eu-west-2" },
+  env: { account: "111111111111", region: "us-east-1" },
 });
 
 const siteBucket = new s3.Bucket(stack, "SiteBucket", {
@@ -96,13 +97,19 @@ const redirectFunction = new cloudfront.Function(
   },
 );
 
+const domainName = "example.test";
 const hostedZone = new route53.HostedZone(stack, "SiteHostedZone", {
-  zoneName: "example.test",
+  zoneName: domainName,
+});
+const certificate = new acm.Certificate(stack, "Certificate", {
+  domainName,
+  validation: acm.CertificateValidation.fromDns(hostedZone),
 });
 
 const distribution = new cloudfront.Distribution(stack, "SiteDistribution", {
   defaultRootObject: "index.html",
   domainNames: ["www.example.test"],
+  certificate,
   defaultBehavior: {
     origin: origins.S3BucketOrigin.withOriginAccessControl(siteBucket),
     viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
@@ -150,17 +157,17 @@ new s3deploy.BucketDeployment(stack, "DeploySite", {
 new cdk.CfnOutput(stack, "SiteBucketName", {
   value: siteBucket.bucketName,
 });
-
 new cdk.CfnOutput(stack, "CloudFrontDistributionId", {
   value: distribution.distributionId,
 });
-
 new cdk.CfnOutput(stack, "DistributionDomainName", {
   value: distribution.distributionDomainName,
 });
-
 new cdk.CfnOutput(stack, "SiteHostname", {
   value: "www.example.test",
+});
+new cdk.CfnOutput(stack, "CertArn", {
+  value: certificate.certificateArn,
 });
 
 app.synth();
@@ -191,6 +198,8 @@ app.synth();
     );
     const siteHostname = stack.outputs.get("SiteHostname")?.value;
     assertIdentical(siteHostname, "www.example.test");
+    const certArn = stack.outputs.get("CertArn")?.value;
+    assertStringStartsWith(certArn, "arn:aws:acm:");
 
     // And we should be able to interact with the test demo project.
     const distroRes = await fetch(
