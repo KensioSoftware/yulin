@@ -128,7 +128,6 @@ export class SimCfnAcmCertificatePropertyListReader {
   private tag(value: unknown, index: number): SimRequestCertificateTag {
     const propertyPath = `Tags[${String(index)}]`;
 
-    /* v8 ignore if */
     if (!isRecord(value)) {
       throw this.propertyError(propertyPath, "must be an object");
     }
