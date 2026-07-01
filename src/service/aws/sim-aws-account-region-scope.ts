@@ -16,6 +16,7 @@ import type { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
 import type { SimDynamoDb } from "../dynamodb/index.js";
 import type { SimCloudFormation } from "../cloudformation/index.js";
 import type { SimRoute53 } from "../route53/index.js";
+import type { SimAcm } from "../acm/sim-acm.js";
 
 export type SimAccountRegionScopeKey = `${SimAwsAccountId}:${AwsRegionName}`;
 
@@ -52,6 +53,15 @@ export class SimAwsAccountRegionContainer {
       accountId: this.account.accountId,
       regionName: this.region.regionName,
     };
+  }
+
+  /**
+   * Get simulated ACM for this account and region.
+   */
+  acm(): SimAcm {
+    return this.memo.getOrCreate("acm", () =>
+      this.simAws.serviceFactory.createAcm(this),
+    );
   }
 
   /**

@@ -1,0 +1,492 @@
+## MVP plan: simulated ACM support in Yulin
+
+### Goal
+
+Add a lightweight simulated ACM service that is useful for CDK/local-dev/testing workflows without trying to fully reproduce real ACM or real TLS.
+
+The primary public surface should be SDK-style command support, matching the pattern already used by other Yulin services. Users should be able to create, list, describe, and delete simulated ACM certificates, then assert against those certificates in tests.
+
+Real TLS, local CA setup, browser certificate trust, and HTML/app-response modification are explicitly out of scope for the MVP.
+
+---
+
+## Design principles
+
+### 1. SDK commands first
+
+Prioritise command-handler compatibility over custom Yulin APIs.
+
+Users should be able to write tests like:
+
+```ts
+const certs = await simAws.acm().listCertificates(
+  new ListCertificatesCommand({}),
+);
+
+const described = await simAws.acm().describeCertificate(
+  new DescribeCertificateCommand({
+    CertificateArn: certArn,
+  }),
+);
+```
+
+This matches the existing Yulin service style, where simulated services expose command-like methods and maintain in-memory state.
+
+### 2. CloudFormation/CDK support should use the same internal state
+
+`AWS::CertificateManager::Certificate` should create the same internal certificate representation as `RequestCertificateCommand`.
+
+That way, certificates created through CDK/CloudFormation are visible through the ACM SDK-style commands.
+
+This is important for common CDK code such as:
+
+```ts
+const certificate = new acm.Certificate(this, "Certificate", {
+  domainName,
+  validation: acm.CertificateValidation.fromDns(hostedZone),
+});
+```
+
+### 3. Keep validation lightweight
+
+The MVP should represent DNS validation data, but not fully enforce real-world validation rules.
+
+The useful behaviour is:
+
+* create a simulated certificate;
+* generate deterministic validation CNAMEs;
+* expose those CNAMEs through `DescribeCertificate`;
+* optionally create matching simulated Route53 records when the CloudFormation resource includes hosted-zone-backed validation;
+* allow users to assert against ACM and/or Route53 state.
+
+### 4. Avoid global low-level service config on `SimAws`
+
+Do not add detailed ACM configuration directly to the `SimAws` constructor. That could become unmanageable as more services gain options.
+
+If stricter validation modes or diagnostics are added later, prefer service-local APIs or explicit diagnostic helpers rather than global constructor config.
+
+---
+
+## New service structure
+
+Add a new service directory:
+
+```txt
+src/service/acm
+```
+
+Suggested structure:
+
+```txt
+src/service/acm/
+  sim-acm.ts
+  certificate/
+    sim-acm-certificate.ts
+    sim-acm-certificate-arn.ts
+    sim-acm-validation-record.ts
+  command/
+    request-certificate/
+      request-certificate.cmd.ts
+      request-certificate.handler.ts
+      request-certificate.iso.test.ts
+    describe-certificate/
+      describe-certificate.cmd.ts
+      describe-certificate.handler.ts
+      describe-certificate.iso.test.ts
+    list-certificates/
+      list-certificates.cmd.ts
+      list-certificates.handler.ts
+      list-certificates.iso.test.ts
+    delete-certificate/
+      delete-certificate.cmd.ts
+      delete-certificate.handler.ts
+      delete-certificate.iso.test.ts
+  cfn/
+    sim-cfn-acm-resource-factory.ts
+    certificate/
+      sim-cfn-acm-certificate-creator.ts
+      sim-cfn-acm-certificate.iso.test.ts
+```
+
+The exact naming should follow existing service conventions.
+
+---
+
+## SimAcm class
+
+Add a `SimAcm` service similar in shape to existing service classes.
+
+It should own certificate state:
+
+```ts
+export class SimAcm {
+  public readonly certificates = new Map<SimAcmCertificateArn, SimAcmCertificate>();
+
+  async requestCertificate(cmd: SimRequestCertificateCommand): Promise<SimRequestCertificateCommandOutput>;
+  async describeCertificate(cmd: SimDescribeCertificateCommand): Promise<SimDescribeCertificateCommandOutput>;
+  async listCertificates(cmd: SimListCertificatesCommand): Promise<SimListCertificatesCommandOutput>;
+  async deleteCertificate(cmd: SimDeleteCertificateCommand): Promise<SimDeleteCertificateCommandOutput>;
+
+  cfnResourceFactory(): SimCfnServiceResourceFactory;
+}
+```
+
+This mirrors the style used by `SimRoute53`, which owns hosted-zone state, exposes command methods, and exposes a CloudFormation resource factory.
+
+---
+
+## Internal certificate model
+
+Use an internal representation roughly like:
+
+```ts
+export interface SimAcmCertificate {
+  readonly certificateArn: SimAcmCertificateArn;
+  readonly domainName: string;
+  readonly subjectAlternativeNames: readonly string[];
+  readonly status: "PENDING_VALIDATION" | "ISSUED";
+  readonly validationMethod?: "DNS" | "EMAIL" | undefined;
+  readonly domainValidationOptions: readonly SimAcmDomainValidationOption[];
+  readonly createdAt: Date;
+  readonly issuedAt?: Date | undefined;
+  readonly tags?: readonly SimAcmTag[] | undefined;
+}
+
+export interface SimAcmDomainValidationOption {
+  readonly domainName: string;
+  readonly validationMethod?: "DNS" | "EMAIL" | undefined;
+  readonly resourceRecord?: SimAcmValidationRecord | undefined;
+}
+
+export interface SimAcmValidationRecord {
+  readonly name: string;
+  readonly type: "CNAME";
+  readonly value: string;
+}
+```
+
+For MVP, `status` can usually be `ISSUED` immediately. If the implementation naturally needs `PENDING_VALIDATION`, it can be used, but do not make strict validation the default.
+
+---
+
+## ARN generation
+
+Generate deterministic ACM ARNs in the correct general shape:
+
+```txt
+arn:aws:acm:{region}:{account}:certificate/{certificate-id}
+```
+
+Yulin already has AWS account/region concepts and ARN utilities in the codebase, so use the existing style where possible. The manifest shows existing AWS scope and ARN-related files such as `src/service/aws/arn.ts`, account, region, and scope registry files.
+
+Certificate IDs can be deterministic enough for tests, for example based on an incrementing counter, domain hash, or existing Yulin ID pattern.
+
+---
+
+## Validation record generation
+
+For DNS validation, generate deterministic CNAME records.
+
+Example:
+
+```txt
+Name:  _yulin-acm-<hash>.example.com.
+Type:  CNAME
+Value: _yulin-acm-<hash>.acm-validations.aws.
+```
+
+Important properties:
+
+* deterministic for stable tests;
+* unique enough across domain/cert/account/region;
+* exposed through `DescribeCertificate`;
+* compatible with Route53’s existing `CNAME` support.
+
+Route53 records already support `CNAME` and values/TTL, so this should integrate cleanly.
+
+---
+
+## SDK commands to implement first
+
+### 1. RequestCertificate
+
+Support:
+
+```ts
+DomainName
+SubjectAlternativeNames
+ValidationMethod
+DomainValidationOptions
+Tags
+```
+
+Minimum behaviour:
+
+* require `DomainName`;
+* create a certificate ARN;
+* create internal certificate state;
+* create domain validation options for the primary domain and SANs;
+* if validation method is `DNS`, include generated CNAME records;
+* return `{ CertificateArn }`.
+
+For unsupported fields, either ignore them or preserve them if easy. Avoid over-validating.
+
+### 2. DescribeCertificate
+
+Support:
+
+```ts
+CertificateArn
+```
+
+Return an AWS-ish shape containing:
+
+```ts
+Certificate: {
+  CertificateArn
+  DomainName
+  SubjectAlternativeNames
+  Status
+  DomainValidationOptions
+  CreatedAt
+  IssuedAt
+}
+```
+
+This is probably the most important command for user assertions.
+
+### 3. ListCertificates
+
+Return summary objects:
+
+```ts
+CertificateSummaryList: [
+  {
+    CertificateArn,
+    DomainName
+  }
+]
+```
+
+MVP pagination can be minimal or absent unless existing command patterns make pagination easy.
+
+### 4. DeleteCertificate
+
+Remove the certificate from internal state.
+
+Return an empty output shape.
+
+### 5. Tags, optional
+
+If low-effort, support:
+
+```txt
+AddTagsToCertificate
+ListTagsForCertificate
+RemoveTagsFromCertificate
+```
+
+But these are not necessary for the first useful MVP.
+
+---
+
+## CloudFormation support
+
+Add support for:
+
+```txt
+AWS::CertificateManager::Certificate
+```
+
+The CloudFormation creator should:
+
+1. resolve `DomainName`;
+2. resolve `SubjectAlternativeNames`;
+3. inspect `ValidationMethod`;
+4. inspect `DomainValidationOptions`;
+5. create a simulated ACM certificate through the same internal service path used by `RequestCertificate`;
+6. return the certificate ARN for `Ref`.
+
+For CDK DNS validation, the synthesized resource is likely to include hosted zone information in `DomainValidationOptions`. The MVP should use that to create matching Route53 CNAME records when feasible.
+
+Route53 already exposes record-changing behaviour through its service and command handler surface. `SimRoute53` has a `changeResourceRecordSets` command method and owns hosted-zone state.
+
+Expected useful outcome:
+
+* CDK creates `AWS::CertificateManager::Certificate`;
+* Yulin creates the sim ACM certificate;
+* Yulin creates DNS validation CNAMEs in sim Route53 when hosted-zone-backed validation is present;
+* tests can assert through ACM `DescribeCertificate` and/or Route53 state.
+
+---
+
+## SimAws wiring
+
+Add `simAws.acm()` alongside existing service accessors.
+
+The service should be account/region scoped in the same way as other regional services.
+
+CloudFront certificates are often expected to be in `us-east-1` in real AWS, but do not enforce this in the MVP. At most, preserve region in the ARN so future diagnostics can warn about it.
+
+---
+
+## HTTP/browser diagnostics
+
+Do not modify normal simulated service responses.
+
+`SimAwsHttp` currently routes requests by hostname through Route53 and dispatches to the target service controller. Injecting ACM warnings into arbitrary HTML responses would be too messy because requests might hit CloudFront, API Gateway, Lambda, S3, or other future services.
+
+For MVP, browser diagnostics can wait.
+
+A later diagnostic controller could expose read-only Yulin admin paths such as:
+
+```txt
+/_yulin/acm
+/_yulin/acm/certificates
+/_yulin/acm/certificates/:arn
+/_yulin/acm/domains/:domain
+```
+
+But this should not block the MVP. The MVP should focus on command support and CloudFormation support.
+
+---
+
+## Future diagnostics layer
+
+After MVP, add Yulin-specific helpers such as:
+
+```ts
+simAws.acm().diagnostics().checkCertificate(certificateArn);
+simAws.acm().diagnostics().checkDomain("www.example.com");
+```
+
+Possible checks:
+
+```txt
+- certificate exists
+- certificate status is ISSUED
+- certificate covers the domain
+- wildcard certificate covers the domain
+- DNS validation record exists in simulated Route53
+- CloudFront distribution uses a certificate covering its alternate domain
+- certificate region is unusual for CloudFront
+```
+
+These should produce warnings/errors as structured data, not hard failures during normal simulation.
+
+Example shape:
+
+```ts
+{
+  status: "ok" | "warning" | "error",
+  checks: [
+    {
+      id: "certificate-exists",
+      status: "ok",
+      message: "Certificate exists."
+    },
+    {
+      id: "dns-validation-record-present",
+      status: "ok",
+      message: "DNS validation CNAME exists in Route53."
+    },
+    {
+      id: "cloudfront-certificate-region",
+      status: "warning",
+      message: "CloudFront public certificates usually live in us-east-1."
+    }
+  ]
+}
+```
+
+---
+
+## Toy CA / PKI concept
+
+Do not implement real TLS.
+
+But the internal ACM model can include toy PKI metadata to make diagnostics and browser views more intuitive later:
+
+```ts
+issuer: "Yulin Sim Public CA"
+serialNumber: string
+fingerprint: string
+notBefore: Date
+notAfter: Date
+```
+
+This gives users something realistic-looking to inspect without introducing private keys, trust stores, mkcert, local CA installation, or actual HTTPS termination.
+
+For MVP, this metadata is optional. It should not be required for command compatibility.
+
+---
+
+## Testing priorities
+
+Add tests for:
+
+### RequestCertificate
+
+* creates a certificate with primary domain;
+* creates certificate with SANs;
+* returns an ARN;
+* stores DNS validation options;
+* generated validation records are deterministic.
+
+### DescribeCertificate
+
+* returns created certificate;
+* includes domain, SANs, status, validation records;
+* errors on unknown ARN.
+
+### ListCertificates
+
+* returns multiple created certificates;
+* respects account/region scoping if applicable.
+
+### DeleteCertificate
+
+* deletes certificate;
+* describing deleted cert fails.
+
+### CloudFormation/CDK
+
+* `AWS::CertificateManager::Certificate` creates a sim ACM cert;
+* `Ref` returns the cert ARN;
+* DNS validation creates expected Route53 CNAMEs when hosted-zone validation is present;
+* CDK-style certificate with `CertificateValidation.fromDns(hostedZone)` is represented well enough for assertions.
+
+---
+
+## MVP cut line
+
+Include:
+
+```txt
+- SimAcm service
+- RequestCertificate
+- DescribeCertificate
+- ListCertificates
+- DeleteCertificate
+- AWS::CertificateManager::Certificate CloudFormation support
+- deterministic DNS validation records
+- Route53 CNAME creation when CFN has hosted zone validation info
+- simAws.acm()
+```
+
+Exclude:
+
+```txt
+- real TLS
+- local CA setup
+- browser trust
+- HTML injection
+- strict CloudFront certificate enforcement
+- renewal lifecycle
+- email validation realism
+- complex pagination
+- global SimAws ACM config
+- mandatory diagnostics API
+```
+
+The result should be a boring but useful sim ACM: users can create certs via SDK or CDK, inspect them through SDK commands, and assert that their local infrastructure created the ACM and Route53 resources they expected.

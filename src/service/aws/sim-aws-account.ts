@@ -7,6 +7,7 @@ import type { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
 import type { SimDynamoDb } from "../dynamodb/index.js";
 import { SimAws } from "./sim-aws.js";
 import type { SimCloudFormation } from "../cloudformation/index.js";
+import type { SimAcm } from "../acm/sim-acm.js";
 
 export type SimAwsAccountId = Brand<string, "SimAwsAccountId">;
 
@@ -40,6 +41,13 @@ export class SimAwsAccount {
    */
   region(regionName?: AwsRegionName): SimAwsAccountRegionContainer {
     return this.simAws.accountRegionScope(this.accountId, regionName);
+  }
+
+  /**
+   * Get simulated ACM for this Account's default Region.
+   */
+  acm(): SimAcm {
+    return this.region().acm();
   }
 
   /**
