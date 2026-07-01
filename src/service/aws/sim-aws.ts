@@ -22,6 +22,7 @@ import type { SimCloudFormation } from "../cloudformation/index.js";
 import type { SimRoute53 } from "../route53/index.js";
 import { SimAwsServiceFactory } from "./factory/sim-aws-service-factory.js";
 import { SimAwsScopeRegistry } from "./scope/sim-aws-scope-registry.js";
+import type { SimAcm } from "../acm/sim-acm.js";
 
 interface SimAwsProps {
   readonly defaultAccountId?: SimAwsAccountId;
@@ -86,6 +87,13 @@ export class SimAws {
     regionName: AwsRegionName = this.defaultRegionName,
   ): SimAwsAccountRegionContainer {
     return this.scopes.accountRegionScope(accountId, regionName);
+  }
+
+  /**
+   * Get simulated ACM in the default Account Region scope.
+   */
+  acm(): SimAcm {
+    return this.accountRegionScope().acm();
   }
 
   /**

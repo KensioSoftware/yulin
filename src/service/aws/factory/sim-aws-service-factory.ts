@@ -12,6 +12,7 @@ import type { SimRoute53 } from "../../route53/index.js";
 import { SimS3 } from "../../s3/sim-s3.js";
 import { SimS3GlobalRegistry } from "../../s3/sim-s3-global-registry.js";
 import { SimAwsAccountServiceCache } from "./sim-aws-account-service-cache.js";
+import { SimAcm } from "../../acm/sim-acm.js";
 
 interface SimAwsServiceFactoryProps {
   readonly simAws: SimAws;
@@ -48,6 +49,16 @@ export class SimAwsServiceFactory {
       simAws: props.simAws,
       background: props.background,
       cloudFrontRegistry: this.cloudFrontRegistry,
+    });
+  }
+
+  /**
+   * Create simulated ACM for an Account Region scope.
+   */
+  createAcm(scope: SimAwsAccountRegionContainer): SimAcm {
+    return new SimAcm({
+      accountRegionScope: scope.accountRegionScope,
+      background: this.background,
     });
   }
 

@@ -9,7 +9,7 @@ import { faker } from "@faker-js/faker";
 export type SimArnServiceName = string;
 
 export type SimArn =
-  `arn:aws:${SimArnServiceName}:${AwsRegionName | ""}:${SimAwsAccountId}:${string}/${string}`;
+  `arn:aws:${string}:${string}:${string}:${string}/${string}`;
 
 export interface SimArnComponents {
   partition: "aws";
