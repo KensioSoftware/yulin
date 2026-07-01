@@ -23,6 +23,7 @@ import type {
   SimListCertificatesCommandOutput,
 } from "./command/list-certificates/list-certificates.cmd.js";
 import { ListCertificatesCommandHandler } from "./command/list-certificates/list-certificates.handler.js";
+import { SimAcmCfnResourceFactory } from "./cfn/sim-cfn-acm-resource-factory.js";
 
 interface SimAcmProps {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
@@ -37,6 +38,9 @@ export class SimAcm {
 
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly background: BackgroundScheduler;
+  private readonly cfnFactory = new SimAcmCfnResourceFactory({
+    acm: this,
+  });
 
   constructor(props: SimAcmProps = {}) {
     const {
@@ -86,5 +90,12 @@ export class SimAcm {
       background: this.background,
     });
     return await handler.handle(cmd);
+  }
+
+  /**
+   * Get this service's CloudFormation Resource factory.
+   */
+  cfnResourceFactory(): SimAcmCfnResourceFactory {
+    return this.cfnFactory;
   }
 }

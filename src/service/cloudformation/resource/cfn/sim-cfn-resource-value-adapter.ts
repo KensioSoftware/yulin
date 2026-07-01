@@ -8,6 +8,8 @@ import { SimCloudFrontFunction } from "../../../cloudfront/cff/sim-cloudfront-fu
 import { SimCloudFrontFunctionCfn } from "./cloudfront/sim-cloudfront-function-cfn.js";
 import { SimRoute53HostedZone } from "../../../route53/hosted-zone/sim-route53-hosted-zone.js";
 import { SimRoute53HostedZoneCfn } from "./route53/sim-route53-hosted-zone-cfn.js";
+import { SimAcmCertificateCfn } from "./acm/sim-acm-certificate-cfn.js";
+import { SimAcmCertificate } from "../../../acm/certificate/sim-acm-certificate.js";
 
 export interface SimCfnResourceValueAdapter {
   refValue(): SimCfnTemplateValue;
@@ -31,6 +33,15 @@ interface SimCfnResourceValueAdapterProps {
 export function simCfnResourceValueAdapter(
   props: SimCfnResourceValueAdapterProps,
 ): SimCfnResourceValueAdapter {
+  if (
+    props.type === "AWS::CertificateManager::Certificate" &&
+    props.simResource instanceof SimAcmCertificate
+  ) {
+    return new SimAcmCertificateCfn({
+      certificate: props.simResource,
+    });
+  }
+
   if (
     props.type === "AWS::S3::Bucket" &&
     props.simResource instanceof SimS3Bucket
