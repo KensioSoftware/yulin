@@ -194,9 +194,8 @@ sorted by:
 The secondary ID sort is necessary because hosted-zone names are not unique. It keeps pagination
 stable even when multiple zones share the same name.
 
-Pagination support is implemented around Route53-style DNSName/HostedZoneId markers and `MaxItems`.
-`MaxItems` is parsed from the AWS-shaped string input, matching the command shape rather than
-exposing a simulator-specific number API.
+Pagination support is implemented around Route53-style DNSName/HostedZoneId markers and numeric
+`MaxItems`.
 
 ## Yulin-local name model
 
