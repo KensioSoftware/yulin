@@ -12,6 +12,10 @@ import {
   SimAcmInvalidArgsException,
   SimAcmTooManyTagsException,
 } from "../../error/sim-acm.error.js";
+import {
+  ListCertificatesCommand,
+  RequestCertificateCommand,
+} from "@aws-sdk/client-acm";
 
 describe("ACM RequestCertificateCommand", () => {
   it("requests a certificate for a domain name", async () => {
@@ -20,11 +24,11 @@ describe("ACM RequestCertificateCommand", () => {
     const simAcm = simAws.account("555555555555").region("eu-west-1").acm();
 
     // When a certificate is requested for a domain name.
-    const requestOutput = await simAcm.requestCertificate({
-      input: {
+    const requestOutput = await simAcm.requestCertificate(
+      new RequestCertificateCommand({
         DomainName: "example.com",
-      },
-    });
+      }),
+    );
 
     // Then the certificate ARN is returned and the certificate is present.
     assertIdentical(
@@ -32,9 +36,9 @@ describe("ACM RequestCertificateCommand", () => {
       "arn:aws:acm:eu-west-1:555555555555:certificate/00000001",
     );
 
-    const listOutput = await simAcm.listCertificates({
-      input: {},
-    });
+    const listOutput = await simAcm.listCertificates(
+      new ListCertificatesCommand(),
+    );
 
     assertArrayLength(listOutput.CertificateSummaryList, 1);
     assertIdentical(
@@ -57,19 +61,19 @@ describe("ACM RequestCertificateCommand", () => {
     const simAcm = simAws.region("me-south-1").acm();
 
     // When a certificate is requested with subject alternative names.
-    const requestOutput = await simAcm.requestCertificate({
-      input: {
+    const requestOutput = await simAcm.requestCertificate(
+      new RequestCertificateCommand({
         DomainName: "example.com",
         SubjectAlternativeNames: ["www.example.com", "api.example.com"],
-      },
-    });
+      }),
+    );
 
     // Then the certificate summary includes the requested names.
     assertNonNullable(requestOutput.CertificateArn);
 
-    const listOutput = await simAcm.listCertificates({
-      input: {},
-    });
+    const listOutput = await simAcm.listCertificates(
+      new ListCertificatesCommand(),
+    );
 
     assertArrayLength(listOutput.CertificateSummaryList, 1);
     assertIdentical(
@@ -100,16 +104,16 @@ describe("ACM RequestCertificateCommand", () => {
     const simAcm = simAws.account("123456789012").acm();
 
     // When the same domain is requested twice.
-    const firstOutput = await simAcm.requestCertificate({
-      input: {
+    const firstOutput = await simAcm.requestCertificate(
+      new RequestCertificateCommand({
         DomainName: "duplicate.example.com",
-      },
-    });
-    const secondOutput = await simAcm.requestCertificate({
-      input: {
+      }),
+    );
+    const secondOutput = await simAcm.requestCertificate(
+      new RequestCertificateCommand({
         DomainName: "duplicate.example.com",
-      },
-    });
+      }),
+    );
 
     // Then both requests succeed with distinct certificate ARNs.
     assertIdentical(
@@ -121,9 +125,9 @@ describe("ACM RequestCertificateCommand", () => {
       "arn:aws:acm:us-east-1:123456789012:certificate/00000002",
     );
 
-    const listOutput = await simAcm.listCertificates({
-      input: {},
-    });
+    const listOutput = await simAcm.listCertificates(
+      new ListCertificatesCommand(),
+    );
 
     assertArrayLength(listOutput.CertificateSummaryList, 2);
     assertIdentical(
@@ -151,9 +155,9 @@ describe("ACM RequestCertificateCommand", () => {
 
     // When a certificate is requested without a domain name.
     const error = await assertThrowsErrorAsync(async () =>
-      simAcm.requestCertificate({
-        input: {},
-      }),
+      simAcm.requestCertificate(
+        new RequestCertificateCommand({ DomainName: undefined }),
+      ),
     );
 
     // Then ACM rejects the request as invalid.
@@ -170,11 +174,11 @@ describe("ACM RequestCertificateCommand", () => {
 
     // When a certificate is requested with an empty domain name.
     const error = await assertThrowsErrorAsync(async () =>
-      simAcm.requestCertificate({
-        input: {
+      simAcm.requestCertificate(
+        new RequestCertificateCommand({
           DomainName: "",
-        },
-      }),
+        }),
+      ),
     );
 
     // Then ACM rejects the request as invalid.
@@ -196,12 +200,12 @@ describe("ACM RequestCertificateCommand", () => {
 
     // When a certificate is requested with too many tags.
     const error = await assertThrowsErrorAsync(async () =>
-      simAcm.requestCertificate({
-        input: {
+      simAcm.requestCertificate(
+        new RequestCertificateCommand({
           DomainName: "too-many-tags.example.com",
           Tags: tags,
-        },
-      }),
+        }),
+      ),
     );
 
     // Then ACM rejects the request with the tag limit error.
@@ -222,19 +226,19 @@ describe("ACM RequestCertificateCommand", () => {
     }));
 
     // When a certificate is requested with exactly 50 tags.
-    const requestOutput = await simAcm.requestCertificate({
-      input: {
+    const requestOutput = await simAcm.requestCertificate(
+      new RequestCertificateCommand({
         DomainName: "fifty-tags.example.com",
         Tags: tags,
-      },
-    });
+      }),
+    );
 
     // Then the request succeeds and the certificate is present.
     assertNonNullable(requestOutput.CertificateArn);
 
-    const listOutput = await simAcm.listCertificates({
-      input: {},
-    });
+    const listOutput = await simAcm.listCertificates(
+      new ListCertificatesCommand(),
+    );
 
     assertArrayLength(listOutput.CertificateSummaryList, 1);
     assertIdentical(

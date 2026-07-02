@@ -1,7 +1,14 @@
 import type { SimArn } from "../../aws/arn.js";
 
-export type SimAcmCertificateStatus = "PENDING_VALIDATION" | "ISSUED";
-export type SimAcmValidationMethod = "DNS" | "EMAIL";
+export type SimAcmCertificateStatus =
+  | "EXPIRED"
+  | "FAILED"
+  | "INACTIVE"
+  | "ISSUED"
+  | "PENDING_VALIDATION"
+  | "REVOKED"
+  | "VALIDATION_TIMED_OUT";
+export type SimAcmValidationMethod = "DNS" | "EMAIL" | "HTTP";
 
 export interface SimAcmTag {
   readonly Key?: string | undefined;

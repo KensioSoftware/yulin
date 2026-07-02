@@ -18,7 +18,7 @@ export interface SimDescribeCertificateCommand {
  * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/acm/command/DescribeCertificateCommand/
  */
 export interface SimDescribeCertificateCommandInput {
-  readonly CertificateArn?: SimArn | undefined;
+  readonly CertificateArn?: string | undefined;
 }
 
 /**

@@ -7,6 +7,7 @@ into tests, local development scripts, or small experiments.
 
 ## Service documentation
 
+- [ACM](./services/acm/ "Simulated ACM usage docs")
 - [CloudFormation](./services/cloudformation/ "Simulated CloudFormation usage docs")
 - [CloudFront](./services/cloudfront/ "Simulated CloudFront usage docs")
 - [Route53](./services/route53/ "Simulated Route53 usage docs")

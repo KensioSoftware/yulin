@@ -8,6 +8,10 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
+import {
+  ListCertificatesCommand,
+  RequestCertificateCommand,
+} from "@aws-sdk/client-acm";
 
 describe("ACM ListCertificatesCommand", () => {
   it("lists no certificates when ACM has none", async () => {
@@ -16,9 +20,9 @@ describe("ACM ListCertificatesCommand", () => {
     const simAcm = simAws.acm();
 
     // When certificates are listed.
-    const listOutput = await simAcm.listCertificates({
-      input: {},
-    });
+    const listOutput = await simAcm.listCertificates(
+      new ListCertificatesCommand(),
+    );
 
     // Then an empty certificate summary list is returned.
     assertArrayLength(listOutput.CertificateSummaryList, 0);
@@ -30,26 +34,26 @@ describe("ACM ListCertificatesCommand", () => {
     const simAws = new SimAws();
     const simAcm = simAws.account("555555555555").region("eu-west-1").acm();
 
-    const firstOutput = await simAcm.requestCertificate({
-      input: {
+    const firstOutput = await simAcm.requestCertificate(
+      new RequestCertificateCommand({
         DomainName: "one.example.com",
-      },
-    });
-    const secondOutput = await simAcm.requestCertificate({
-      input: {
+      }),
+    );
+    const secondOutput = await simAcm.requestCertificate(
+      new RequestCertificateCommand({
         DomainName: "two.example.com",
-      },
-    });
-    const thirdOutput = await simAcm.requestCertificate({
-      input: {
+      }),
+    );
+    const thirdOutput = await simAcm.requestCertificate(
+      new RequestCertificateCommand({
         DomainName: "three.example.com",
-      },
-    });
+      }),
+    );
 
     // When certificates are listed.
-    const listOutput = await simAcm.listCertificates({
-      input: {},
-    });
+    const listOutput = await simAcm.listCertificates(
+      new ListCertificatesCommand(),
+    );
 
     // Then the certificate summaries are returned in creation order.
     assertArrayLength(listOutput.CertificateSummaryList, 3);
@@ -89,17 +93,17 @@ describe("ACM ListCertificatesCommand", () => {
     const simAws = new SimAws();
     const simAcm = simAws.acm();
 
-    const requestOutput = await simAcm.requestCertificate({
-      input: {
+    const requestOutput = await simAcm.requestCertificate(
+      new RequestCertificateCommand({
         DomainName: "summary.example.com",
         SubjectAlternativeNames: ["www.summary.example.com"],
-      },
-    });
+      }),
+    );
 
     // When certificates are listed.
-    const listOutput = await simAcm.listCertificates({
-      input: {},
-    });
+    const listOutput = await simAcm.listCertificates(
+      new ListCertificatesCommand(),
+    );
 
     // Then the certificate summary contains the expected fields.
     assertArrayLength(listOutput.CertificateSummaryList, 1);
@@ -146,17 +150,17 @@ describe("ACM ListCertificatesCommand", () => {
       (_, index) => `san-${String(index).padStart(3, "0")}.example.com`,
     );
 
-    await simAcm.requestCertificate({
-      input: {
+    await simAcm.requestCertificate(
+      new RequestCertificateCommand({
         DomainName: "many-sans.example.com",
         SubjectAlternativeNames: subjectAlternativeNames,
-      },
-    });
+      }),
+    );
 
     // When certificates are listed.
-    const listOutput = await simAcm.listCertificates({
-      input: {},
-    });
+    const listOutput = await simAcm.listCertificates(
+      new ListCertificatesCommand(),
+    );
 
     // Then only the first 100 subject alternative names are summarized.
     assertArrayLength(listOutput.CertificateSummaryList, 1);
