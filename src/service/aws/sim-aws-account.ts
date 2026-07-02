@@ -73,7 +73,7 @@ export class SimAwsAccount {
   }
 
   /**
-   * Get simulated S3 for this Account's default Region.
+   * Get simulated Route53 for this Account's default Region.
    */
   route53(): SimRoute53 {
     return this.region().route53();
