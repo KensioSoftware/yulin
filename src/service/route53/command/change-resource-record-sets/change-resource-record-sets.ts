@@ -87,7 +87,6 @@ function toSimRoute53Record(
   const type = resourceRecordSet.Type;
   assertDefined(type, "ChangeResourceRecordSetsCommand.ResourceRecordSet.Type");
 
-  /* v8 ignore if */
   if (!isSimRoute53RecordType(type)) {
     throw new Error(
       `Unsupported ChangeResourceRecordSetsCommand.ResourceRecordSet.Type ${type}`,
