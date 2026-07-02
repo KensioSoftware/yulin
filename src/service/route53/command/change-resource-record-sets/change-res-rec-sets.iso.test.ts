@@ -256,7 +256,7 @@ describe("Route53 ChangeResourceRecordSetsCommand", () => {
       }),
     );
 
-    // Then the Hosted Zone is empty and deleting the missing record did not fail.
+    // Then the deleted A record is absent, and deleting the missing record did not fail.
     const hostedZone = simRoute53.hostedZones.get(hostedZoneId);
     assertUndefined(hostedZone?.records.get("www.delete.example.com", "A"));
   });
