@@ -7,6 +7,10 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
+import {
+  CreateHostedZoneCommand,
+  ListHostedZonesByNameCommand,
+} from "@aws-sdk/client-route-53";
 
 describe("Route53 ListHostedZonesByNameCommand", () => {
   it("paginates Hosted Zones using MaxItems and returns the next marker", async () => {
@@ -14,36 +18,36 @@ describe("Route53 ListHostedZonesByNameCommand", () => {
     const simAws = new SimAws();
     const simRoute53 = simAws.route53();
 
-    await simRoute53.createHostedZone({
-      input: {
+    await simRoute53.createHostedZone(
+      new CreateHostedZoneCommand({
         Name: "one.example.com",
         CallerReference: "one-zone",
-      },
-    });
+      }),
+    );
 
-    const secondZoneOutput = await simRoute53.createHostedZone({
-      input: {
+    const secondZoneOutput = await simRoute53.createHostedZone(
+      new CreateHostedZoneCommand({
         Name: "two.example.com",
         CallerReference: "two-zone",
-      },
-    });
+      }),
+    );
 
-    await simRoute53.createHostedZone({
-      input: {
+    await simRoute53.createHostedZone(
+      new CreateHostedZoneCommand({
         Name: "three.example.com",
         CallerReference: "three-zone",
-      },
-    });
+      }),
+    );
 
     const secondHostedZoneId = secondZoneOutput.HostedZone?.Id;
     assertNonNullable(secondHostedZoneId, "Second Hosted Zone ID");
 
     // When Hosted Zones are listed with a one-item page size.
-    const listHostedZonesOutput = await simRoute53.listHostedZonesByName({
-      input: {
-        MaxItems: "1",
-      },
-    });
+    const listHostedZonesOutput = await simRoute53.listHostedZonesByName(
+      new ListHostedZonesByNameCommand({
+        MaxItems: 1,
+      }),
+    );
 
     // Then only the first sorted Hosted Zone is returned with the next marker.
     assertArrayLength(listHostedZonesOutput.HostedZones, 1);
@@ -53,7 +57,7 @@ describe("Route53 ListHostedZonesByNameCommand", () => {
     );
     assertTrue(listHostedZonesOutput.IsTruncated);
     assertIdentical(listHostedZonesOutput.NextDNSName, "three.example.com.");
-    assertIdentical(listHostedZonesOutput.MaxItems, "1");
+    assertIdentical(listHostedZonesOutput.MaxItems, 1);
   });
 
   it("continues at a DNSName and HostedZoneId marker for duplicate names", async () => {
@@ -61,19 +65,19 @@ describe("Route53 ListHostedZonesByNameCommand", () => {
     const simAws = new SimAws();
     const simRoute53 = simAws.route53();
 
-    const firstZoneOutput = await simRoute53.createHostedZone({
-      input: {
+    const firstZoneOutput = await simRoute53.createHostedZone(
+      new CreateHostedZoneCommand({
         Name: "duplicate.example.com",
         CallerReference: "first-duplicate-zone",
-      },
-    });
+      }),
+    );
 
-    const secondZoneOutput = await simRoute53.createHostedZone({
-      input: {
+    const secondZoneOutput = await simRoute53.createHostedZone(
+      new CreateHostedZoneCommand({
         Name: "duplicate.example.com",
         CallerReference: "second-duplicate-zone",
-      },
-    });
+      }),
+    );
 
     const firstHostedZoneId = firstZoneOutput.HostedZone?.Id;
     const secondHostedZoneId = secondZoneOutput.HostedZone?.Id;
@@ -90,12 +94,12 @@ describe("Route53 ListHostedZonesByNameCommand", () => {
         : firstHostedZoneId;
 
     // When Hosted Zones are listed from a duplicate-name HostedZoneId marker.
-    const listHostedZonesOutput = await simRoute53.listHostedZonesByName({
-      input: {
+    const listHostedZonesOutput = await simRoute53.listHostedZonesByName(
+      new ListHostedZonesByNameCommand({
         DNSName: "duplicate.example.com",
         HostedZoneId: markerHostedZoneId,
-      },
-    });
+      }),
+    );
 
     // Then duplicate-name Hosted Zones at and after that HostedZoneId are returned.
     assertArrayLength(listHostedZonesOutput.HostedZones, 2);

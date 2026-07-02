@@ -1,6 +1,9 @@
 import type { SimCfnResource } from "../../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../../cloudformation/template/value/sim-cfn-template-value.js";
-import type { SimRoute53Record } from "../../../record/sim-route53-record.js";
+import type {
+  SimRoute53Record,
+  SimRoute53RecordType,
+} from "../../../record/sim-route53-record.js";
 import type { SimRoute53 } from "../../../sim-route53.js";
 import { assertDefined } from "../../../../../util/type-guard/defined.js";
 import { SimCfnRoute53RecordSetBuilder } from "../build/sim-cfn-r53-record-set-builder.js";
@@ -62,7 +65,10 @@ export class SimCfnRoute53RecordSetApplicator {
 
     await hostedZone.waitForSynchronizationComplete();
 
-    const record = hostedZone.records.get(recordSet.Name, recordSet.Type);
+    const record = hostedZone.records.get(
+      recordSet.Name,
+      recordSet.Type as SimRoute53RecordType,
+    );
     assertDefined(record, "Sim Route53 Record after update");
 
     return record;

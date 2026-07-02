@@ -1,0 +1,677 @@
+# Simulated Route53
+
+Yulin includes a simulated Route53 service for tests and local development.
+
+Sim Route53 can be used directly through `SimAws`, instantiated on its own as `SimRoute53`, and used
+by sim CloudFormation when deploying Route53 resources from CloudFormation or CDK templates. When
+served on localhost, Route53 records can route custom local hostnames to other simulated AWS
+services, such as simulated CloudFront distributions or simulated S3 bucket websites.
+
+## Available functionality
+
+Sim Route53 currently supports:
+
+- Creating Hosted Zones with `CreateHostedZoneCommand`
+- Getting Hosted Zones with `GetHostedZoneCommand`
+- Listing Hosted Zones by name with `ListHostedZonesByNameCommand`
+- Changing record sets with `ChangeResourceRecordSetsCommand`
+- `CREATE`, `UPSERT`, and `DELETE` record changes
+- Stored record types: `A`, `AAAA`, `CNAME`, `TXT`, `NS`, and `SOA`
+- Local HTTP hostname routing through `CNAME` records that point to simulated service hostnames
+- Alias records, with `AliasTarget.DNSName` stored as the record value
+- Local hostname resolution through `*.sim-aws.localhost`
+- CloudFormation resources:
+  - `AWS::Route53::HostedZone`
+  - `AWS::Route53::RecordSet`
+- CDK-created Route53 Hosted Zones and records in synthesized templates
+
+The simulator focuses on useful behavior for isolated tests and local development rather than full
+Route53 feature parity. Unsupported Route53 options may be ignored or may throw errors depending on
+whether the simulator needs them to model the requested behavior.
+
+## Basic Hosted Zone usage
+
+Create a simulated AWS environment, get simulated Route53, and create a Hosted Zone.
+
+```typescript sim-route53-hosted-zone
+/**
+ * Creating a simulated Route53 Hosted Zone.
+ */
+
+import {
+  CreateHostedZoneCommand,
+  GetHostedZoneCommand,
+} from "@aws-sdk/client-route-53";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const route53 = simAws.route53();
+
+const createHostedZoneOutput = await route53.createHostedZone(
+  new CreateHostedZoneCommand({
+    Name: "example.test",
+    CallerReference: "example-test-zone",
+    HostedZoneConfig: {
+      Comment: "Example local test zone",
+      PrivateZone: false,
+    },
+  }),
+);
+
+const hostedZoneId = createHostedZoneOutput.HostedZone!.Id!;
+
+await simAws.backgroundTasksComplete();
+
+const getHostedZoneOutput = await route53.getHostedZone(
+  new GetHostedZoneCommand({
+    Id: hostedZoneId,
+  }),
+);
+
+console.log(getHostedZoneOutput.HostedZone?.Name);
+console.log(getHostedZoneOutput.HostedZone?.ResourceRecordSetCount);
+```
+
+Hosted Zone names are normalised with a trailing dot in Route53-style outputs, so `example.test`
+becomes `example.test.`.
+
+Hosted Zone creation uses background tasks to move the zone to `INSYNC`. If your test needs final
+state, call `await simAws.backgroundTasksComplete()` before continuing.
+
+## Creating records
+
+Use `ChangeResourceRecordSetsCommand` to add records to a Hosted Zone.
+
+```typescript sim-route53-create-record
+/**
+ * Creating a simulated Route53 record.
+ */
+
+import {
+  ChangeResourceRecordSetsCommand,
+  CreateHostedZoneCommand,
+} from "@aws-sdk/client-route-53";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const route53 = simAws.route53();
+
+const createHostedZoneOutput = await route53.createHostedZone(
+  new CreateHostedZoneCommand({
+    Name: "example.test",
+    CallerReference: "record-zone",
+  }),
+);
+
+const hostedZoneId = createHostedZoneOutput.HostedZone!.Id!;
+
+await simAws.backgroundTasksComplete();
+
+await route53.changeResourceRecordSets(
+  new ChangeResourceRecordSetsCommand({
+    HostedZoneId: hostedZoneId,
+    ChangeBatch: {
+      Comment: "Create web record",
+      Changes: [
+        {
+          Action: "CREATE",
+          ResourceRecordSet: {
+            Name: "www.example.test",
+            Type: "A",
+            TTL: 300,
+            ResourceRecords: [{ Value: "192.0.2.1" }],
+          },
+        },
+      ],
+    },
+  }),
+);
+
+await simAws.backgroundTasksComplete();
+```
+
+Record changes are applied through background tasks. The command returns a `ChangeInfo` with a
+pending or synced status, and the record is available after the scheduled work has completed.
+
+## Upserting and deleting records
+
+`UPSERT` replaces an existing record with the same name and type. `DELETE` removes the matching
+record. Deleting a missing record is a no-op.
+
+```typescript sim-route53-upsert-delete-record
+/**
+ * Upserting and deleting simulated Route53 records.
+ */
+
+import {
+  ChangeResourceRecordSetsCommand,
+  CreateHostedZoneCommand,
+} from "@aws-sdk/client-route-53";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const route53 = simAws.route53();
+
+const createHostedZoneOutput = await route53.createHostedZone(
+  new CreateHostedZoneCommand({
+    Name: "example.test",
+    CallerReference: "upsert-delete-zone",
+  }),
+);
+
+const hostedZoneId = createHostedZoneOutput.HostedZone!.Id!;
+
+await simAws.backgroundTasksComplete();
+
+await route53.changeResourceRecordSets(
+  new ChangeResourceRecordSetsCommand({
+    HostedZoneId: hostedZoneId,
+    ChangeBatch: {
+      Changes: [
+        {
+          Action: "UPSERT",
+          ResourceRecordSet: {
+            Name: "www.example.test",
+            Type: "A",
+            TTL: 60,
+            ResourceRecords: [{ Value: "192.0.2.2" }],
+          },
+        },
+      ],
+    },
+  }),
+);
+
+await simAws.backgroundTasksComplete();
+
+await route53.changeResourceRecordSets(
+  new ChangeResourceRecordSetsCommand({
+    HostedZoneId: hostedZoneId,
+    ChangeBatch: {
+      Changes: [
+        {
+          Action: "DELETE",
+          ResourceRecordSet: {
+            Name: "www.example.test",
+            Type: "A",
+            ResourceRecords: [{ Value: "192.0.2.2" }],
+          },
+        },
+      ],
+    },
+  }),
+);
+
+await simAws.backgroundTasksComplete();
+```
+
+## Alias records
+
+Alias records store the alias target DNS name as the simulated record value. This is useful when a
+Route53 record should point to another simulated service hostname, such as a CloudFront
+distribution.
+
+```typescript sim-route53-alias-record
+/**
+ * Creating a simulated Route53 alias record.
+ */
+
+import {
+  ChangeResourceRecordSetsCommand,
+  CreateHostedZoneCommand,
+} from "@aws-sdk/client-route-53";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const route53 = simAws.route53();
+
+const createHostedZoneOutput = await route53.createHostedZone(
+  new CreateHostedZoneCommand({
+    Name: "example.test",
+    CallerReference: "alias-zone",
+  }),
+);
+
+const hostedZoneId = createHostedZoneOutput.HostedZone!.Id!;
+
+await simAws.backgroundTasksComplete();
+
+await route53.changeResourceRecordSets(
+  new ChangeResourceRecordSetsCommand({
+    HostedZoneId: hostedZoneId,
+    ChangeBatch: {
+      Changes: [
+        {
+          Action: "CREATE",
+          ResourceRecordSet: {
+            Name: "app.example.test",
+            Type: "A",
+            AliasTarget: {
+              HostedZoneId: "Z2FDTNDATAQYW2",
+              DNSName: "d111111abcdef8.cloudfront.net.",
+              EvaluateTargetHealth: false,
+            },
+          },
+        },
+      ],
+    },
+  }),
+);
+
+await simAws.backgroundTasksComplete();
+```
+
+The stored alias value is normalized without the trailing dot.
+
+## Listing Hosted Zones by name
+
+Use `ListHostedZonesByNameCommand` to inspect zones in sorted Route53 order.
+
+```typescript sim-route53-list-hosted-zones-by-name
+/**
+ * Listing simulated Route53 Hosted Zones by name.
+ */
+
+import {
+  CreateHostedZoneCommand,
+  ListHostedZonesByNameCommand,
+} from "@aws-sdk/client-route-53";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const route53 = simAws.route53();
+
+await route53.createHostedZone(
+  new CreateHostedZoneCommand({
+    Name: "z.example.test",
+    CallerReference: "z-zone",
+  }),
+);
+
+await route53.createHostedZone(
+  new CreateHostedZoneCommand({
+    Name: "a.example.test",
+    CallerReference: "a-zone",
+  }),
+);
+
+await simAws.backgroundTasksComplete();
+
+const listOutput = await route53.listHostedZonesByName(
+  new ListHostedZonesByNameCommand({
+    DNSName: "example.test",
+  }),
+);
+
+for (const hostedZone of listOutput.HostedZones ?? []) {
+  console.log(hostedZone.Name, hostedZone.Id);
+}
+```
+
+The simulator supports duplicate Hosted Zone names when they have different caller references or
+CloudFormation logical IDs.
+
+## Local hostname resolution
+
+When Yulin is served on localhost, Route53 can map your own test hostnames to simulated service
+targets. Request the local server using the hostname plus the `sim-aws.localhost` suffix.
+
+For example, if Route53 contains a record for `www.example.test`, request:
+
+```text
+http://www.example.test.sim-aws.localhost:<port>/
+```
+
+The local server resolves the logical hostname `www.example.test` through sim Route53 and routes the
+request to the simulated target named by the record.
+
+This is most useful with CloudFront aliases. You can create a CloudFront distribution, create a
+Route53 record pointing at the distribution hostname, then fetch through your application hostname.
+
+```typescript sim-route53-cloudfront-localhost
+/**
+ * Serving a CloudFront distribution through a simulated Route53 hostname.
+ */
+
+import { CreateDistributionCommand } from "@aws-sdk/client-cloudfront";
+import {
+  ChangeResourceRecordSetsCommand,
+  CreateHostedZoneCommand,
+} from "@aws-sdk/client-route-53";
+import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const srv = await serveSimAws({ simAws });
+
+try {
+  const s3 = simAws.s3();
+  const cloudFront = simAws.cloudFront();
+  const route53 = simAws.route53();
+
+  await s3.createBucket(
+    new CreateBucketCommand({
+      Bucket: "site-bucket",
+    }),
+  );
+
+  await s3.putObject(
+    new PutObjectCommand({
+      Bucket: "site-bucket",
+      Key: "index.html",
+      Body: "<h1>Hello from a Route53 hostname</h1>",
+      ContentType: "text/html; charset=utf-8",
+    }),
+  );
+
+  const createDistributionOutput = await cloudFront.createDistribution(
+    new CreateDistributionCommand({
+      DistributionConfig: {
+        CallerReference: "route53-site-distribution",
+        Comment: "Route53 local site distribution",
+        Enabled: true,
+        Origins: {
+          Quantity: 1,
+          Items: [
+            {
+              Id: "site-origin",
+              DomainName: "site-bucket.s3.amazonaws.com",
+              S3OriginConfig: {
+                OriginAccessIdentity: "",
+              },
+            },
+          ],
+        },
+        DefaultCacheBehavior: {
+          TargetOriginId: "site-origin",
+          ViewerProtocolPolicy: "allow-all",
+        },
+      },
+    }),
+  );
+
+  const distributionHostname =
+    createDistributionOutput.Distribution!.DomainName!;
+
+  const createHostedZoneOutput = await route53.createHostedZone(
+    new CreateHostedZoneCommand({
+      Name: "example.test",
+      CallerReference: "route53-localhost-zone",
+    }),
+  );
+
+  const hostedZoneId = createHostedZoneOutput.HostedZone!.Id!;
+
+  await route53.changeResourceRecordSets(
+    new ChangeResourceRecordSetsCommand({
+      HostedZoneId: hostedZoneId,
+      ChangeBatch: {
+        Changes: [
+          {
+            Action: "CREATE",
+            ResourceRecordSet: {
+              Name: "www.example.test",
+              Type: "CNAME",
+              TTL: 300,
+              ResourceRecords: [{ Value: distributionHostname }],
+            },
+          },
+        ],
+      },
+    }),
+  );
+
+  await simAws.backgroundTasksComplete();
+
+  const response = await fetch(
+    `http://www.example.test.sim-aws.localhost:${srv.port}/`,
+  );
+
+  console.log(response.status);
+  console.log(await response.text());
+} finally {
+  srv.close();
+}
+```
+
+You can also call `srv.localUrl(...)` with a URL that contains the simulated hostname when you want
+the server to adapt it to the selected local port.
+
+## CloudFormation Hosted Zones
+
+Sim CloudFormation can create Route53 Hosted Zones from `AWS::Route53::HostedZone`.
+
+```typescript sim-route53-cloudformation-hosted-zone
+/**
+ * Creating a Route53 Hosted Zone through simulated CloudFormation.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "route53-zone-stack",
+  template: {
+    Resources: {
+      SiteZone: {
+        Type: "AWS::Route53::HostedZone",
+        Properties: {
+          Name: "example.test",
+          HostedZoneConfig: {
+            Comment: "Example hosted zone",
+          },
+        },
+      },
+    },
+    Outputs: {
+      HostedZoneId: {
+        Value: {
+          Ref: "SiteZone",
+        },
+      },
+      HostedZoneNameServers: {
+        Value: {
+          "Fn::GetAtt": ["SiteZone", "NameServers"],
+        },
+      },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+
+console.log(stack.outputs.get("HostedZoneId")?.value);
+console.log(stack.outputs.get("HostedZoneNameServers")?.value);
+```
+
+For `AWS::Route53::HostedZone`, `Ref` returns the simulated Hosted Zone ID. `Fn::GetAtt` supports
+`Id` and `NameServers`.
+
+## CloudFormation RecordSets
+
+Sim CloudFormation can create sim Route53 records from `AWS::Route53::RecordSet`.
+
+```typescript sim-route53-cloudformation-record-set
+/**
+ * Creating Route53 records through simulated CloudFormation.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "route53-record-stack",
+  template: {
+    Resources: {
+      SiteZone: {
+        Type: "AWS::Route53::HostedZone",
+        Properties: {
+          Name: "example.test",
+        },
+      },
+      SiteRecord: {
+        Type: "AWS::Route53::RecordSet",
+        Properties: {
+          HostedZoneId: {
+            Ref: "SiteZone",
+          },
+          Name: "www.example.test",
+          Type: "A",
+          TTL: "300",
+          ResourceRecords: ["192.0.2.1"],
+        },
+      },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+await simAws.backgroundTasksComplete();
+```
+
+Record sets can use either `HostedZoneId` or `HostedZoneName`. `HostedZoneId` is usually the
+clearest option in templates because it can reference the zone resource directly.
+
+## CDK integration
+
+You can synthesize a CDK app and deploy the generated template with sim CloudFormation. CDK Route53
+Hosted Zones and records can then participate in the same local simulated AWS environment as S3 and
+CloudFront.
+
+A common pattern for local website tests is:
+
+1. Create a CDK stack with an S3 Bucket, CloudFront Distribution, Route53 Hosted Zone, and Route53
+   record.
+2. Synthesize the CDK app.
+3. Deploy the synthesized template through `simAws.cloudFormation().deployTemplateFile(...)`.
+4. Serve the simulated AWS environment with `serveSimAws(...)`.
+5. Fetch the site through the Route53 hostname using the `sim-aws.localhost` suffix.
+
+```typescript sim-route53-cdk-template-file
+/**
+ * Deploying a CDK template with Route53 resources into simulated AWS.
+ */
+
+import path from "node:path";
+
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const srv = await serveSimAws({ simAws });
+
+try {
+  const stack = await simAws
+    .cloudFormation()
+    .deployTemplateFile(
+      path.join(process.cwd(), "cdk.out", "TestStack.template.json"),
+    );
+
+  await stack.waitForDeployComplete();
+  await simAws.backgroundTasksComplete();
+
+  const response = await fetch(
+    `http://www.example.test.sim-aws.localhost:${srv.port}/`,
+  );
+
+  console.log(response.status);
+  console.log(await response.text());
+} finally {
+  srv.close();
+}
+```
+
+This lets local integration tests use the same CDK infrastructure shape as production while keeping
+the test process local.
+
+## Accounts and Regions
+
+Use `SimAws` scopes to create Route53 state in different simulated Accounts and Regions.
+
+```typescript sim-route53-account-region-scoping
+/**
+ * Simulated Route53 Account and Region scoping.
+ */
+
+import { CreateHostedZoneCommand } from "@aws-sdk/client-route-53";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const defaultRoute53 = simAws.route53();
+const euWest2Route53 = simAws.region("eu-west-2").route53();
+const accountRoute53 = simAws.account("111111111111").route53();
+const scopedRoute53 = simAws
+  .account("222222222222")
+  .region("ap-east-1")
+  .route53();
+
+await defaultRoute53.createHostedZone(
+  new CreateHostedZoneCommand({
+    Name: "default.example.test",
+    CallerReference: "default-zone",
+  }),
+);
+
+await euWest2Route53.createHostedZone(
+  new CreateHostedZoneCommand({
+    Name: "eu-west-2.example.test",
+    CallerReference: "eu-west-2-zone",
+  }),
+);
+
+await accountRoute53.createHostedZone(
+  new CreateHostedZoneCommand({
+    Name: "account.example.test",
+    CallerReference: "account-zone",
+  }),
+);
+
+await scopedRoute53.createHostedZone(
+  new CreateHostedZoneCommand({
+    Name: "scoped.example.test",
+    CallerReference: "scoped-zone",
+  }),
+);
+```
+
+Each `SimAws` instance has its own isolated state, so you can create a fresh instance per test or
+share one across related local setup.
+
+## Standalone SimRoute53
+
+If you only need Route53 alone, instantiate `SimRoute53` directly.
+
+```typescript sim-route53-standalone
+/**
+ * Standalone simulated Route53 instance.
+ */
+
+import { CreateHostedZoneCommand } from "@aws-sdk/client-route-53";
+
+import { SimRoute53 } from "@kensio/yulin/route53";
+
+const route53 = new SimRoute53();
+
+const createHostedZoneOutput = await route53.createHostedZone(
+  new CreateHostedZoneCommand({
+    Name: "standalone.example.test",
+    CallerReference: "standalone-zone",
+  }),
+);
+
+console.log(createHostedZoneOutput.HostedZone?.Id);
+```
+
+A standalone `SimRoute53` instance has its own isolated state and is not connected to a wider
+`SimAws` environment. Use `SimAws` when Route53 needs to resolve names to other simulated services.

@@ -1,6 +1,9 @@
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type { SimRoute53HostedZone } from "../../hosted-zone/sim-route53-hosted-zone.js";
-import type { SimRoute53Record } from "../../record/sim-route53-record.js";
+import type {
+  SimRoute53Record,
+  SimRoute53RecordType,
+} from "../../record/sim-route53-record.js";
 import type {
   SimRoute53Change,
   SimRoute53ResourceRecordSet,
@@ -31,9 +34,7 @@ export function validateChangeResourceRecordSet(
     default: {
       /* v8 ignore next */
       throw new Error(
-        `Unsupported ChangeResourceRecordSetsCommand.Change.Action ${String(
-          action,
-        )}`,
+        `Unsupported ChangeResourceRecordSetsCommand.Change.Action ${action}`,
       );
     }
   }
@@ -86,6 +87,13 @@ function toSimRoute53Record(
   const type = resourceRecordSet.Type;
   assertDefined(type, "ChangeResourceRecordSetsCommand.ResourceRecordSet.Type");
 
+  /* v8 ignore if */
+  if (!isSimRoute53RecordType(type)) {
+    throw new Error(
+      `Unsupported ChangeResourceRecordSetsCommand.ResourceRecordSet.Type ${type}`,
+    );
+  }
+
   const values =
     resourceRecordSet.AliasTarget === undefined
       ? resourceRecordSet.ResourceRecords?.map((record) => {
@@ -115,4 +123,15 @@ function toSimRoute53Record(
     values,
     ttl: resourceRecordSet.TTL,
   };
+}
+
+function isSimRoute53RecordType(value: string): value is SimRoute53RecordType {
+  return (
+    value === "A" ||
+    value === "AAAA" ||
+    value === "CNAME" ||
+    value === "TXT" ||
+    value === "NS" ||
+    value === "SOA"
+  );
 }

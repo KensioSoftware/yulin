@@ -14,7 +14,7 @@ export interface SimListHostedZonesByNameCommand {
 export interface SimListHostedZonesByNameCommandInput {
   readonly DNSName?: string | undefined;
   readonly HostedZoneId?: string | undefined;
-  readonly MaxItems?: string | undefined;
+  readonly MaxItems?: number | undefined;
 }
 
 /**
@@ -27,6 +27,6 @@ export interface SimListHostedZonesByNameCommandOutput {
   readonly IsTruncated?: boolean | undefined;
   readonly NextDNSName?: string | undefined;
   readonly NextHostedZoneId?: string | undefined;
-  readonly MaxItems?: string | undefined;
+  readonly MaxItems?: number | undefined;
   readonly $metadata: SimResponseMetadata;
 }
