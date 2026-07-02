@@ -34,7 +34,7 @@ export function validateChangeResourceRecordSet(
     default: {
       /* v8 ignore next */
       throw new Error(
-        `Unsupported ChangeResourceRecordSetsCommand.Change.Action ${action}`,
+        `Unsupported ChangeResourceRecordSetsCommand.Change.Action ${String(action)}`,
       );
     }
   }

@@ -43,7 +43,7 @@ export interface SimRoute53Change {
 /**
  * Minimal structural sim Route53 Change action.
  */
-export type SimRoute53ChangeAction = string;
+export type SimRoute53ChangeAction = "CREATE" | "UPSERT" | "DELETE";
 
 /**
  * Minimal structural sim Route53 ResourceRecordSet.
