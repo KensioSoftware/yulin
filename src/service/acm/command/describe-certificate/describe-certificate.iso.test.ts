@@ -11,6 +11,10 @@ import {
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimAcmResourceNotFoundException } from "../../error/sim-acm.error.js";
+import {
+  DescribeCertificateCommand,
+  RequestCertificateCommand,
+} from "@aws-sdk/client-acm";
 
 describe("ACM DescribeCertificateCommand", () => {
   it("describes a requested DNS validated certificate", async () => {
@@ -18,19 +22,19 @@ describe("ACM DescribeCertificateCommand", () => {
     const simAws = new SimAws();
     const simAcm = simAws.account("555555555555").region("eu-west-1").acm();
 
-    const requestOutput = await simAcm.requestCertificate({
-      input: {
+    const requestOutput = await simAcm.requestCertificate(
+      new RequestCertificateCommand({
         DomainName: "example.com",
-      },
-    });
+      }),
+    );
     assertNonNullable(requestOutput.CertificateArn);
 
     // When the certificate is described.
-    const describeOutput = await simAcm.describeCertificate({
-      input: {
+    const describeOutput = await simAcm.describeCertificate(
+      new DescribeCertificateCommand({
         CertificateArn: requestOutput.CertificateArn,
-      },
-    });
+      }),
+    );
 
     // Then the certificate detail is returned.
     assertNonNullable(describeOutput.Certificate);
@@ -57,20 +61,20 @@ describe("ACM DescribeCertificateCommand", () => {
     const simAws = new SimAws();
     const simAcm = simAws.acm();
 
-    const requestOutput = await simAcm.requestCertificate({
-      input: {
+    const requestOutput = await simAcm.requestCertificate(
+      new RequestCertificateCommand({
         DomainName: "example.com",
         SubjectAlternativeNames: ["www.example.com", "api.example.com"],
-      },
-    });
+      }),
+    );
     assertNonNullable(requestOutput.CertificateArn);
 
     // When the certificate is described.
-    const describeOutput = await simAcm.describeCertificate({
-      input: {
+    const describeOutput = await simAcm.describeCertificate(
+      new DescribeCertificateCommand({
         CertificateArn: requestOutput.CertificateArn,
-      },
-    });
+      }),
+    );
 
     // Then all requested names have DNS validation details.
     assertNonNullable(describeOutput.Certificate);
@@ -116,20 +120,20 @@ describe("ACM DescribeCertificateCommand", () => {
     const simAws = new SimAws();
     const simAcm = simAws.acm();
 
-    const requestOutput = await simAcm.requestCertificate({
-      input: {
+    const requestOutput = await simAcm.requestCertificate(
+      new RequestCertificateCommand({
         DomainName: "email.example.com",
         ValidationMethod: "EMAIL",
-      },
-    });
+      }),
+    );
     assertNonNullable(requestOutput.CertificateArn);
 
     // When the certificate is described.
-    const describeOutput = await simAcm.describeCertificate({
-      input: {
+    const describeOutput = await simAcm.describeCertificate(
+      new DescribeCertificateCommand({
         CertificateArn: requestOutput.CertificateArn,
-      },
-    });
+      }),
+    );
 
     // Then the validation method is EMAIL and no DNS record is included.
     assertNonNullable(describeOutput.Certificate);
@@ -156,11 +160,11 @@ describe("ACM DescribeCertificateCommand", () => {
     const simAws = new SimAws();
     const simAcm = simAws.acm();
 
-    const requestOutput = await simAcm.requestCertificate({
-      input: {
+    const requestOutput = await simAcm.requestCertificate(
+      new RequestCertificateCommand({
         DomainName: "issued.example.com",
-      },
-    });
+      }),
+    );
     assertNonNullable(requestOutput.CertificateArn);
 
     await new Promise((resolve) => {
@@ -168,11 +172,11 @@ describe("ACM DescribeCertificateCommand", () => {
     });
 
     // When the certificate is described after background issuance.
-    const describeOutput = await simAcm.describeCertificate({
-      input: {
+    const describeOutput = await simAcm.describeCertificate(
+      new DescribeCertificateCommand({
         CertificateArn: requestOutput.CertificateArn,
-      },
-    });
+      }),
+    );
 
     // Then the certificate detail shows ISSUED status.
     assertNonNullable(describeOutput.Certificate);
@@ -192,9 +196,11 @@ describe("ACM DescribeCertificateCommand", () => {
 
     // When a certificate is described without an ARN.
     const error = await assertThrowsErrorAsync(async () =>
-      simAcm.describeCertificate({
-        input: {},
-      }),
+      simAcm.describeCertificate(
+        new DescribeCertificateCommand({
+          CertificateArn: undefined,
+        }),
+      ),
     );
 
     // Then the request is rejected.
@@ -209,12 +215,12 @@ describe("ACM DescribeCertificateCommand", () => {
 
     // When a non-existent certificate ARN is described.
     const error = await assertThrowsErrorAsync(async () =>
-      simAcm.describeCertificate({
-        input: {
+      simAcm.describeCertificate(
+        new DescribeCertificateCommand({
           CertificateArn:
             "arn:aws:acm:eu-west-1:555555555555:certificate/does-not-exist",
-        },
-      }),
+        }),
+      ),
     );
 
     // Then ACM returns ResourceNotFoundException.

@@ -19,6 +19,7 @@ npm i -D @kensio/yulin
 
 ## Service specific docs
 
+- [ACM](./docs/services/acm "Simulated ACM docs")
 - [CloudFormation](./docs/services/cloudformation "Simulated CloudFormation docs")
 - [CloudFront](./docs/services/cloudfront "Simulated CloudFront docs")
 - [Route53](./docs/services/route53 "Simulated Route53 docs")

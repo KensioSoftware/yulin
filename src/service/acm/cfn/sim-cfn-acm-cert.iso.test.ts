@@ -9,7 +9,10 @@ import {
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
-import type { SimArn } from "../../aws/arn.js";
+import {
+  DescribeCertificateCommand,
+  ListCertificatesCommand,
+} from "@aws-sdk/client-acm";
 
 describe("Sim ACM CloudFormation Certificate", () => {
   it("deploys an ACM Certificate and exposes CloudFormation values", async () => {
@@ -65,9 +68,9 @@ describe("Sim ACM CloudFormation Certificate", () => {
     // command.
     await simAws.backgroundTasksComplete();
 
-    const listOutput = await simAws.acm().listCertificates({
-      input: {},
-    });
+    const listOutput = await simAws
+      .acm()
+      .listCertificates(new ListCertificatesCommand());
 
     assertArrayLength(listOutput.CertificateSummaryList, 1);
     assertIdentical(
@@ -135,11 +138,11 @@ describe("Sim ACM CloudFormation Certificate", () => {
     const certificateArn = stack.outputs.get("CertificateArn")?.value;
     assertStringStartsWith(certificateArn, "arn:aws:acm:");
 
-    const describeOutput = await simAws.acm().describeCertificate({
-      input: {
-        CertificateArn: certificateArn as SimArn,
-      },
-    });
+    const describeOutput = await simAws.acm().describeCertificate(
+      new DescribeCertificateCommand({
+        CertificateArn: certificateArn,
+      }),
+    );
 
     const certificate = describeOutput.Certificate;
     assertNonNullable(certificate);
@@ -219,11 +222,11 @@ describe("Sim ACM CloudFormation Certificate", () => {
     const certificateArn = stack.outputs.get("CertificateArn")?.value;
     assertStringStartsWith(certificateArn, "arn:aws:acm:");
 
-    const describeOutput = await simAws.acm().describeCertificate({
-      input: {
-        CertificateArn: certificateArn as SimArn,
-      },
-    });
+    const describeOutput = await simAws.acm().describeCertificate(
+      new DescribeCertificateCommand({
+        CertificateArn: certificateArn,
+      }),
+    );
 
     const validation = describeOutput.Certificate?.DomainValidationOptions?.[0];
 

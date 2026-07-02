@@ -53,7 +53,9 @@ export class DescribeCertificateCommandHandler implements CommandHandler<
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    const certificate = this.certificates.get(cmd.input.CertificateArn);
+    const certificate = this.certificates.get(
+      cmd.input.CertificateArn as SimArn,
+    );
     if (certificate === undefined) {
       throw new SimAcmResourceNotFoundException(
         `No sim ACM Certificate with ARN ${cmd.input.CertificateArn}`,
