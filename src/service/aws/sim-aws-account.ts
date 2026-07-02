@@ -8,6 +8,7 @@ import type { SimDynamoDb } from "../dynamodb/index.js";
 import { SimAws } from "./sim-aws.js";
 import type { SimCloudFormation } from "../cloudformation/index.js";
 import type { SimAcm } from "../acm/sim-acm.js";
+import type { SimRoute53 } from "../route53/index.js";
 
 export type SimAwsAccountId = Brand<string, "SimAwsAccountId">;
 
@@ -69,6 +70,13 @@ export class SimAwsAccount {
    */
   dynamoDb(): SimDynamoDb {
     return this.region().dynamoDb();
+  }
+
+  /**
+   * Get simulated Route53 for this Account's default Region.
+   */
+  route53(): SimRoute53 {
+    return this.region().route53();
   }
 
   /**

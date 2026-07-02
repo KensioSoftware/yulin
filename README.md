@@ -1,4 +1,4 @@
-# Yulin local AWS simulator
+# <img src="https://yulinsim.dev/favicon.png" alt="Yulin logo" width="28" height="28">&nbsp;&nbsp;Yulin local AWS simulator
 
 [![npm version](https://img.shields.io/npm/v/%40kensio%2Fyulin)](https://www.npmjs.com/package/@kensio/yulin)
 ![CI](https://img.shields.io/github/actions/workflow/status/kensioSoftware/yulin/pr.yml?label=CI)
@@ -8,6 +8,8 @@
 ![License](https://img.shields.io/npm/l/%40kensio%2Fyulin)
 
 AWS system behaviour simulation for isolated unit testing, local development and CI.
+
+[https://yulinsim.dev/](https://yulinsim.dev/ "Yulin local AWS simulator docs website")
 
 ## Installation
 
@@ -19,6 +21,7 @@ npm i -D @kensio/yulin
 
 - [CloudFormation](./docs/services/cloudformation "Simulated CloudFormation docs")
 - [CloudFront](./docs/services/cloudfront "Simulated CloudFront docs")
+- [Route53](./docs/services/route53 "Simulated Route53 docs")
 - [S3](./docs/services/s3 "Simulated S3 docs")
 
 ## Usage

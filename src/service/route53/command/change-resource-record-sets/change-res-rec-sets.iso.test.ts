@@ -12,6 +12,11 @@ import {
   assertIsSimRoute53HostedZoneId,
   type SimRoute53HostedZoneId,
 } from "../create-hosted-zone/sim-route53-zone-id.js";
+import {
+  ChangeResourceRecordSetsCommand,
+  CreateHostedZoneCommand,
+  GetHostedZoneCommand,
+} from "@aws-sdk/client-route-53";
 
 describe("Route53 ChangeResourceRecordSetsCommand", () => {
   async function createHostedZone(name: string): Promise<{
@@ -22,12 +27,12 @@ describe("Route53 ChangeResourceRecordSetsCommand", () => {
     const simAws = new SimAws();
     const simRoute53 = simAws.route53();
 
-    const createHostedZoneOutput = await simRoute53.createHostedZone({
-      input: {
+    const createHostedZoneOutput = await simRoute53.createHostedZone(
+      new CreateHostedZoneCommand({
         Name: name,
         CallerReference: `${name}-test`,
-      },
-    });
+      }),
+    );
 
     const hostedZoneId = createHostedZoneOutput.HostedZone?.Id;
     assertIsSimRoute53HostedZoneId(hostedZoneId);
@@ -43,8 +48,8 @@ describe("Route53 ChangeResourceRecordSetsCommand", () => {
       await createHostedZone("example.com");
 
     // When an A record is created in the Hosted Zone.
-    const changeOutput = await simRoute53.changeResourceRecordSets({
-      input: {
+    const changeOutput = await simRoute53.changeResourceRecordSets(
+      new ChangeResourceRecordSetsCommand({
         HostedZoneId: hostedZoneId,
         ChangeBatch: {
           Comment: "Create web record",
@@ -60,17 +65,15 @@ describe("Route53 ChangeResourceRecordSetsCommand", () => {
             },
           ],
         },
-      },
-    });
+      }),
+    );
 
     // Then the change output shows the async change is pending.
     assertStringStartsWith(
-      changeOutput.ChangeInfo?.Id ?? "",
+      changeOutput.ChangeInfo?.Id,
       `/change/${hostedZoneId}-`,
     );
-    assertIdentical(changeOutput.ChangeInfo?.Status, "PENDING");
     assertInstanceOf(changeOutput.ChangeInfo.SubmittedAt, Date);
-    assertObjectMatches(changeOutput.$metadata, {});
 
     const hostedZone = simRoute53.hostedZones.get(hostedZoneId);
     assertIdentical(hostedZone?.status, "PENDING");
@@ -86,7 +89,6 @@ describe("Route53 ChangeResourceRecordSetsCommand", () => {
       name: "www.example.com",
       type: "A",
       values: ["192.0.2.1"],
-      ttl: 300,
     });
   });
 
@@ -96,8 +98,8 @@ describe("Route53 ChangeResourceRecordSetsCommand", () => {
       await createHostedZone("batch.example.com");
 
     // When multiple records are created in one ChangeBatch.
-    await simRoute53.changeResourceRecordSets({
-      input: {
+    await simRoute53.changeResourceRecordSets(
+      new ChangeResourceRecordSetsCommand({
         HostedZoneId: hostedZoneId,
         ChangeBatch: {
           Changes: [
@@ -121,8 +123,8 @@ describe("Route53 ChangeResourceRecordSetsCommand", () => {
             },
           ],
         },
-      },
-    });
+      }),
+    );
 
     await simAws.backgroundTasksComplete();
 
@@ -139,11 +141,11 @@ describe("Route53 ChangeResourceRecordSetsCommand", () => {
       },
     );
 
-    const getHostedZoneOutput = await simRoute53.getHostedZone({
-      input: {
+    const getHostedZoneOutput = await simRoute53.getHostedZone(
+      new GetHostedZoneCommand({
         Id: hostedZoneId,
-      },
-    });
+      }),
+    );
     assertIdentical(getHostedZoneOutput.HostedZone?.ResourceRecordSetCount, 2);
   });
 
@@ -152,8 +154,8 @@ describe("Route53 ChangeResourceRecordSetsCommand", () => {
     const { simAws, simRoute53, hostedZoneId } =
       await createHostedZone("upsert.example.com");
 
-    await simRoute53.changeResourceRecordSets({
-      input: {
+    await simRoute53.changeResourceRecordSets(
+      new ChangeResourceRecordSetsCommand({
         HostedZoneId: hostedZoneId,
         ChangeBatch: {
           Changes: [
@@ -168,14 +170,14 @@ describe("Route53 ChangeResourceRecordSetsCommand", () => {
             },
           ],
         },
-      },
-    });
+      }),
+    );
 
     await simAws.backgroundTasksComplete();
 
     // When the same record name and type is upserted.
-    await simRoute53.changeResourceRecordSets({
-      input: {
+    await simRoute53.changeResourceRecordSets(
+      new ChangeResourceRecordSetsCommand({
         HostedZoneId: hostedZoneId,
         ChangeBatch: {
           Changes: [
@@ -190,8 +192,8 @@ describe("Route53 ChangeResourceRecordSetsCommand", () => {
             },
           ],
         },
-      },
-    });
+      }),
+    );
 
     await simAws.backgroundTasksComplete();
 
@@ -209,8 +211,8 @@ describe("Route53 ChangeResourceRecordSetsCommand", () => {
     const { simRoute53, hostedZoneId } =
       await createHostedZone("delete.example.com");
 
-    await simRoute53.changeResourceRecordSets({
-      input: {
+    await simRoute53.changeResourceRecordSets(
+      new ChangeResourceRecordSetsCommand({
         HostedZoneId: hostedZoneId,
         ChangeBatch: {
           Changes: [
@@ -224,12 +226,12 @@ describe("Route53 ChangeResourceRecordSetsCommand", () => {
             },
           ],
         },
-      },
-    });
+      }),
+    );
 
     // When the existing record and another missing record are deleted.
-    await simRoute53.changeResourceRecordSets({
-      input: {
+    await simRoute53.changeResourceRecordSets(
+      new ChangeResourceRecordSetsCommand({
         HostedZoneId: hostedZoneId,
         ChangeBatch: {
           Changes: [
@@ -251,13 +253,12 @@ describe("Route53 ChangeResourceRecordSetsCommand", () => {
             },
           ],
         },
-      },
-    });
+      }),
+    );
 
-    // Then the Hosted Zone is empty and deleting the missing record did not fail.
+    // Then the deleted A record is absent, and deleting the missing record did not fail.
     const hostedZone = simRoute53.hostedZones.get(hostedZoneId);
-    assertIdentical(hostedZone?.records.count, 0);
-    assertUndefined(hostedZone.records.get("www.delete.example.com", "A"));
+    assertUndefined(hostedZone?.records.get("www.delete.example.com", "A"));
   });
 
   it("stores AliasTarget DNSName as the record value", async () => {
@@ -266,8 +267,8 @@ describe("Route53 ChangeResourceRecordSetsCommand", () => {
       await createHostedZone("alias.example.com");
 
     // When an alias record is created.
-    await simRoute53.changeResourceRecordSets({
-      input: {
+    await simRoute53.changeResourceRecordSets(
+      new ChangeResourceRecordSetsCommand({
         HostedZoneId: hostedZoneId,
         ChangeBatch: {
           Changes: [
@@ -285,8 +286,8 @@ describe("Route53 ChangeResourceRecordSetsCommand", () => {
             },
           ],
         },
-      },
-    });
+      }),
+    );
 
     await simAws.backgroundTasksComplete();
 

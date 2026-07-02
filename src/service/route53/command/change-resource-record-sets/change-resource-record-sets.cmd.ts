@@ -1,6 +1,5 @@
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
 import type { SimRoute53ChangeInfo } from "../create-hosted-zone/create-hosted-zone.cmd.js";
-import type { SimRoute53RecordType } from "../../record/sim-route53-record.js";
 
 /**
  * Minimal structural sim Route53 ChangeResourceRecordSets command.
@@ -44,14 +43,14 @@ export interface SimRoute53Change {
 /**
  * Minimal structural sim Route53 Change action.
  */
-export type SimRoute53ChangeAction = "CREATE" | "DELETE" | "UPSERT";
+export type SimRoute53ChangeAction = "CREATE" | "UPSERT" | "DELETE";
 
 /**
  * Minimal structural sim Route53 ResourceRecordSet.
  */
 export interface SimRoute53ResourceRecordSet {
   readonly Name?: string | undefined;
-  readonly Type?: SimRoute53RecordType | undefined;
+  readonly Type?: string | undefined;
   readonly TTL?: number | undefined;
   readonly ResourceRecords?: readonly SimRoute53ResourceRecord[] | undefined;
   readonly AliasTarget?: SimRoute53AliasTarget | undefined;

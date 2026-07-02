@@ -9,11 +9,13 @@ import type { SimCloudFrontRegistry } from "../../cloudfront/registry/sim-cloud-
 import { makeSimCfS3OriginResolver } from "../../cloudfront/origin/s3/sim-cf-s3-origin-resolver-factory.js";
 import { SimCloudFront } from "../../cloudfront/sim-cloudfront.js";
 import { SimRoute53 } from "../../route53/index.js";
+import type { SimRoute53Registry } from "../../route53/registry/sim-route53-registry.js";
 
 interface SimAwsAccountServiceCacheProps {
   readonly simAws: SimAws;
   readonly background: BackgroundScheduler & BackgroundCompleter;
   readonly cloudFrontRegistry: SimCloudFrontRegistry;
+  readonly route53Registry: SimRoute53Registry;
 }
 
 /**
@@ -23,6 +25,7 @@ export class SimAwsAccountServiceCache {
   private readonly simAws: SimAws;
   private readonly background: BackgroundScheduler & BackgroundCompleter;
   private readonly cloudFrontRegistry: SimCloudFrontRegistry;
+  private readonly route53Registry: SimRoute53Registry;
 
   private readonly cloudFrontServices = new Map<
     SimAwsAccountId,
@@ -34,6 +37,7 @@ export class SimAwsAccountServiceCache {
     this.simAws = props.simAws;
     this.background = props.background;
     this.cloudFrontRegistry = props.cloudFrontRegistry;
+    this.route53Registry = props.route53Registry;
   }
 
   /**
@@ -66,7 +70,10 @@ export class SimAwsAccountServiceCache {
     let route53 = this.route53Services.get(accountId);
 
     if (route53 === undefined) {
-      route53 = new SimRoute53({ background: this.background });
+      route53 = new SimRoute53({
+        background: this.background,
+        route53Registry: this.route53Registry,
+      });
       this.route53Services.set(accountId, route53);
     }
 

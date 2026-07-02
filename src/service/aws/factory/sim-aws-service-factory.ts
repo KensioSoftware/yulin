@@ -13,6 +13,7 @@ import { SimS3 } from "../../s3/sim-s3.js";
 import { SimS3GlobalRegistry } from "../../s3/sim-s3-global-registry.js";
 import { SimAwsAccountServiceCache } from "./sim-aws-account-service-cache.js";
 import { SimAcm } from "../../acm/sim-acm.js";
+import { SimRoute53Registry } from "../../route53/registry/sim-route53-registry.js";
 
 interface SimAwsServiceFactoryProps {
   readonly simAws: SimAws;
@@ -30,6 +31,7 @@ export class SimAwsServiceFactory {
   private readonly background: BackgroundScheduler & BackgroundCompleter;
 
   private readonly s3GlobalRegistry = new SimS3GlobalRegistry();
+  private readonly route53Registry = new SimRoute53Registry();
 
   /**
    * Shared simulated CloudFront registry.
@@ -49,6 +51,7 @@ export class SimAwsServiceFactory {
       simAws: props.simAws,
       background: props.background,
       cloudFrontRegistry: this.cloudFrontRegistry,
+      route53Registry: this.route53Registry,
     });
   }
 

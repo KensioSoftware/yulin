@@ -5,7 +5,6 @@ import {
   isAtOrAfterMarker,
   normaliseHostedZoneListMarker,
 } from "../change-resource-record-sets/list-zones-marker.js";
-import { parseZoneMaxItems } from "./zone-max-items/parse-zone-max-items.js";
 
 export interface HostedZoneListEntry {
   readonly hostedZoneId: SimRoute53HostedZoneId;
@@ -14,7 +13,7 @@ export interface HostedZoneListEntry {
 
 interface HostedZoneListPageProps {
   readonly hostedZones: Map<SimRoute53HostedZoneId, SimRoute53HostedZone>;
-  readonly maxItemsInput?: string | undefined;
+  readonly maxItemsInput?: number | undefined;
   readonly markerNameInput?: string | undefined;
   readonly markerHostedZoneId?: string | undefined;
 }
@@ -31,7 +30,7 @@ interface HostedZoneListPage {
 export function getHostedZoneListPage(
   props: HostedZoneListPageProps,
 ): HostedZoneListPage {
-  const maxItems = parseZoneMaxItems(props.maxItemsInput);
+  const maxItems = props.maxItemsInput ?? 100;
   const marker = normaliseHostedZoneListMarker({
     markerNameInput: props.markerNameInput,
     markerHostedZoneId: props.markerHostedZoneId,

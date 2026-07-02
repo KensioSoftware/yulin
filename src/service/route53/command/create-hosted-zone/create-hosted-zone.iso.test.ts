@@ -16,6 +16,10 @@ import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { assertIsSimRoute53HostedZoneId } from "./sim-route53-zone-id.js";
 import { SimRoute53HostedZoneAlreadyExists } from "../../error/sim-route53.error.js";
+import {
+  CreateHostedZoneCommand,
+  GetHostedZoneCommand,
+} from "@aws-sdk/client-route-53";
 
 describe("Route53 CreateHostedZoneCommand", () => {
   it("creates a Hosted Zone in SimRoute53", async () => {
@@ -24,16 +28,16 @@ describe("Route53 CreateHostedZoneCommand", () => {
     const simRoute53 = simAws.route53();
 
     // When a Hosted Zone is created.
-    const createHostedZoneOutput = await simRoute53.createHostedZone({
-      input: {
+    const createHostedZoneOutput = await simRoute53.createHostedZone(
+      new CreateHostedZoneCommand({
         Name: "example.com",
         CallerReference: "test-caller-reference",
         HostedZoneConfig: {
           Comment: "Test hosted zone",
           PrivateZone: false,
         },
-      },
-    });
+      }),
+    );
 
     // Then the created Hosted Zone output contains the normalized zone details.
     const hostedZoneId = createHostedZoneOutput.HostedZone?.Id;
@@ -72,12 +76,12 @@ describe("Route53 CreateHostedZoneCommand", () => {
     const simRoute53 = simAws.route53();
 
     // When a Hosted Zone is created without optional config.
-    const createHostedZoneOutput = await simRoute53.createHostedZone({
-      input: {
+    const createHostedZoneOutput = await simRoute53.createHostedZone(
+      new CreateHostedZoneCommand({
         Name: "example.org",
         CallerReference: "no-config-test",
-      },
-    });
+      }),
+    );
 
     // Then the Hosted Zone is created and config remains undefined.
     const hostedZoneId = createHostedZoneOutput.HostedZone?.Id;
@@ -98,26 +102,26 @@ describe("Route53 CreateHostedZoneCommand", () => {
     const simRoute53 = simAws.route53();
 
     // When a Hosted Zone is created.
-    const createHostedZoneOutput = await simRoute53.createHostedZone({
-      input: {
+    const createHostedZoneOutput = await simRoute53.createHostedZone(
+      new CreateHostedZoneCommand({
         Name: "stored.example.com",
         CallerReference: "stored-zone-test",
         HostedZoneConfig: {
           Comment: "Stored hosted zone",
           PrivateZone: true,
         },
-      },
-    });
+      }),
+    );
 
     const hostedZoneId = createHostedZoneOutput.HostedZone?.Id;
     assertNonNullable(hostedZoneId, "Created Hosted Zone ID");
 
     // Then the Hosted Zone can be read back from the same SimRoute53 service.
-    const getHostedZoneOutput = await simRoute53.getHostedZone({
-      input: {
+    const getHostedZoneOutput = await simRoute53.getHostedZone(
+      new GetHostedZoneCommand({
         Id: hostedZoneId,
-      },
-    });
+      }),
+    );
 
     assertObjectMatches(getHostedZoneOutput.HostedZone, {
       Id: hostedZoneId,
@@ -137,19 +141,19 @@ describe("Route53 CreateHostedZoneCommand", () => {
     const simRoute53 = simAws.route53();
 
     // When two Hosted Zones are created with the same DNS name.
-    const firstOutput = await simRoute53.createHostedZone({
-      input: {
+    const firstOutput = await simRoute53.createHostedZone(
+      new CreateHostedZoneCommand({
         Name: "duplicate.example.com",
         CallerReference: "first-duplicate-zone",
-      },
-    });
+      }),
+    );
 
-    const secondOutput = await simRoute53.createHostedZone({
-      input: {
+    const secondOutput = await simRoute53.createHostedZone(
+      new CreateHostedZoneCommand({
         Name: "duplicate.example.com",
         CallerReference: "second-duplicate-zone",
-      },
-    });
+      }),
+    );
 
     // Then both Hosted Zones are created with distinct IDs.
     const firstHostedZoneId = firstOutput.HostedZone?.Id;
@@ -210,12 +214,12 @@ describe("Route53 CreateHostedZoneCommand", () => {
     const simRoute53 = simAws.route53();
 
     // When a Hosted Zone is created.
-    const createHostedZoneOutput = await simRoute53.createHostedZone({
-      input: {
+    const createHostedZoneOutput = await simRoute53.createHostedZone(
+      new CreateHostedZoneCommand({
         Name: "async.example.com",
         CallerReference: "async-zone-test",
-      },
-    });
+      }),
+    );
 
     // Then the immediate CreateHostedZone ChangeInfo is still pending.
     assertOneOf(createHostedZoneOutput.ChangeInfo?.Status, [
@@ -242,12 +246,12 @@ describe("Route53 CreateHostedZoneCommand", () => {
     const simAws = new SimAws();
     const simRoute53 = simAws.route53();
 
-    await simRoute53.createHostedZone({
-      input: {
+    await simRoute53.createHostedZone(
+      new CreateHostedZoneCommand({
         Name: "first.example.com",
         CallerReference: "duplicate-caller-reference",
-      },
-    });
+      }),
+    );
 
     // When another Hosted Zone is created with the same CallerReference.
     const error = await assertThrowsErrorAsync(async () =>

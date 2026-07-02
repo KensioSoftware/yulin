@@ -7,6 +7,7 @@ import type { SimDynamoDb } from "../dynamodb/index.js";
 import { SimAws } from "./sim-aws.js";
 import type { SimCloudFormation } from "../cloudformation/index.js";
 import type { SimAcm } from "../acm/sim-acm.js";
+import type { SimRoute53 } from "../route53/index.js";
 
 export const AWS_REGION_NAMES = [
   "us-east-1",
@@ -108,6 +109,13 @@ export class SimAwsRegion {
    */
   dynamoDb(): SimDynamoDb {
     return this.account().dynamoDb();
+  }
+
+  /**
+   * Get simulated Route53 for this Region's default Account.
+   */
+  route53(): SimRoute53 {
+    return this.account().route53();
   }
 
   /**

@@ -60,7 +60,7 @@ export class ListHostedZonesByNameCommandHandler implements CommandHandler<
       IsTruncated: page.nextEntry !== undefined,
       NextDNSName: page.nextEntry?.hostedZone.name,
       NextHostedZoneId: page.nextEntry?.hostedZone.id,
-      MaxItems: String(page.maxItems),
+      MaxItems: page.maxItems,
       $metadata: {},
     };
   }

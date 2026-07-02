@@ -14,10 +14,12 @@ import {
   type SimRoute53HostedZoneId,
 } from "./sim-route53-zone-id.js";
 import { SimRoute53HostedZoneAlreadyExists } from "../../error/sim-route53.error.js";
+import { SimRoute53Registry } from "../../registry/sim-route53-registry.js";
 
 interface CreateHostedZoneCommandHandlerProps {
   readonly hostedZones: Map<SimRoute53HostedZoneId, SimRoute53HostedZone>;
   readonly background?: BackgroundScheduler;
+  readonly route53Registry?: SimRoute53Registry;
 }
 
 /**
@@ -34,11 +36,17 @@ export class CreateHostedZoneCommandHandler implements CommandHandler<
     SimRoute53HostedZone
   >;
   private readonly background: BackgroundScheduler;
+  private readonly route53Registry: SimRoute53Registry;
 
   constructor(props: CreateHostedZoneCommandHandlerProps) {
-    const { hostedZones, background = new BackgroundTasks() } = props;
+    const {
+      hostedZones,
+      background = new BackgroundTasks(),
+      route53Registry = new SimRoute53Registry(),
+    } = props;
     this.hostedZones = hostedZones;
     this.background = background;
+    this.route53Registry = route53Registry;
   }
 
   /**
@@ -78,6 +86,7 @@ export class CreateHostedZoneCommandHandler implements CommandHandler<
     });
 
     this.hostedZones.set(hostedZoneId, hostedZone);
+    this.route53Registry.registerHostedZone(hostedZoneId, hostedZone);
 
     // Schedule background task to complete creation of the sim Hosted Zone.
     this.background.schedule(() => hostedZone.completeSynchronization());
