@@ -20,9 +20,14 @@ import { readFileSync } from "node:fs";
 export function cloudFrontFunctionSourceFromModule(filePath: string): string {
   // eslint-disable-next-line security/detect-non-literal-fs-filename
   const source = readFileSync(filePath, "utf8");
+  const handlerPattern =
+    /\b(?:export[\t ]+function|function)[\t ]+handler[\t ]*\(/;
 
-  return source.replace(
-    /\bexport\s+function\s+handler\s*\(/,
-    "function handler(",
-  );
+  if (!handlerPattern.test(source)) {
+    throw new Error(
+      `CloudFront Function handler export pattern was not found in module: ${filePath}`,
+    );
+  }
+
+  return source.replace(handlerPattern, "function handler(");
 }
