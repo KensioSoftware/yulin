@@ -11,8 +11,10 @@ import { TestCdkProject } from "../../../../util/filesystem/test-cdk-project.js"
 import path from "node:path";
 import {
   assertIdentical,
+  assertResponseStatus,
   assertStringLength,
   assertStringStartsWith,
+  describeResponse,
 } from "@kensio/smartass";
 
 describe("Sim CDK website deployment local integration", () => {
@@ -205,17 +207,21 @@ app.synth();
     const distroRes = await fetch(
       `http://${distroSubdomain}.sim-aws.localhost:${srv.port}/foo/`,
     );
-    assertIdentical(distroRes.status, 200);
+    assertResponseStatus(distroRes, 200, await describeResponse(distroRes));
     const redirectedRes = await fetch(
       `http://${siteHostname}.sim-aws.localhost:${srv.port}/redirect-me.html`,
       { redirect: "manual" },
     );
-    assertIdentical(redirectedRes.status, 302);
+    assertResponseStatus(
+      redirectedRes,
+      302,
+      await describeResponse(redirectedRes),
+    );
 
     const fooRes = await fetch(
       `http://${siteHostname}.sim-aws.localhost:${srv.port}/foo/`,
     );
-    assertIdentical(fooRes.status, 200);
+    assertResponseStatus(fooRes, 200, await describeResponse(fooRes));
     assertIdentical(await fooRes.text(), "<h1>Foo</h1>");
   });
 });
