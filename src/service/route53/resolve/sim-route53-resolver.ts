@@ -1,4 +1,3 @@
-import type { AwsRegionName } from "../../aws/sim-aws-region.js";
 import type { SimAwsServiceTarget } from "../../../serve/controller/sim-service-controller.js";
 import {
   simRoute53LocalName,
@@ -6,9 +5,9 @@ import {
 } from "../local-name/sim-route53-local-name.js";
 import type { SimRoute53HostedZone } from "../hosted-zone/sim-route53-hosted-zone.js";
 import { SimRoute53HostedZoneRecordFinder } from "./sim-r53-zone-record-finder.js";
+import type { SimRoute53Record } from "../record/sim-route53-record.js";
+import { SimRoute53ServiceTargetResolver } from "./sim-r53-service-target-resolver.js";
 
-const s3WebsiteServiceLabel = "s3-website";
-const cloudFrontServiceLabel = "cloudfront";
 const maxCnameDepth = 8;
 
 interface SimRoute53ResolverProps {
@@ -20,6 +19,8 @@ interface SimRoute53ResolverProps {
  */
 export class SimRoute53Resolver {
   private readonly recordFinder: SimRoute53HostedZoneRecordFinder;
+  private readonly serviceTargetResolver =
+    new SimRoute53ServiceTargetResolver();
 
   constructor(props: SimRoute53ResolverProps) {
     this.recordFinder = new SimRoute53HostedZoneRecordFinder(props.hostedZones);
@@ -27,6 +28,14 @@ export class SimRoute53Resolver {
 
   /**
    * Resolve a Yulin-local HTTP hostname to a simulated AWS service target.
+   *
+   * Resolution follows the same shape used by local integration tests:
+   *
+   * 1. Strip the Yulin localhost suffix to get the logical Route53 name.
+   * 2. Check whether that name already points at a built-in simulated service.
+   * 3. If not, follow CNAME or alias records to the next hostname.
+   * 4. Stop when a service target is found, a chain breaks, a cycle appears, or
+   *    the maximum CNAME depth is reached.
    */
   resolveHttpHost(hostname: string): SimAwsServiceTarget | undefined {
     const initialLogicalName = simRoute53LogicalName(hostname);
@@ -47,7 +56,7 @@ export class SimRoute53Resolver {
       }
       visitedNames.add(localName);
 
-      const directTarget = this.builtinLocalServiceTarget(localName);
+      const directTarget = this.serviceTargetResolver.resolve(localName);
       if (directTarget !== undefined) {
         return directTarget;
       }
@@ -58,87 +67,45 @@ export class SimRoute53Resolver {
         return undefined;
       }
 
-      const cname = this.recordFinder.findRecord(logicalName, "CNAME");
-      const cnameTarget = cname?.values[0];
-      if (cnameTarget === undefined || cnameTarget.length === 0) {
+      const nextRecord = this.findNextResolutionRecord(logicalName);
+      const nextTarget = nextRecord?.values[0];
+      if (nextTarget === undefined || nextTarget.length === 0) {
         return undefined;
       }
 
-      localName = simRoute53LocalName(cnameTarget);
+      localName = simRoute53LocalName(nextTarget);
     }
 
     /* v8 ignore next -- defensive fallback */
     return undefined;
   }
 
-  private builtinLocalServiceTarget(
-    hostname: string,
-  ): SimAwsServiceTarget | undefined {
-    const logicalName = simRoute53LogicalName(hostname);
-    /* v8 ignore if -- defensive check */
-    if (logicalName === undefined) {
-      return undefined;
-    }
-
-    return (
-      this.s3WebsiteServiceTarget(logicalName) ??
-      this.cloudFrontServiceTarget(logicalName)
-    );
-  }
-
-  private s3WebsiteServiceTarget(
+  /**
+   * Find the next record to follow while resolving a local HTTP hostname.
+   *
+   * CNAME records are checked first because they are the direct name-to-name
+   * Route53 mechanism. Alias A and AAAA records are then accepted only when the
+   * stored record is marked as an alias, because ordinary address records do not
+   * contain another simulated service hostname.
+   */
+  private findNextResolutionRecord(
     logicalName: string,
-  ): SimAwsServiceTarget | undefined {
-    const labels = logicalName.split(".");
-
-    if (labels.length < 3) {
-      return undefined;
+  ): SimRoute53Record | undefined {
+    const cname = this.recordFinder.findRecord(logicalName, "CNAME");
+    if (cname !== undefined) {
+      return cname;
     }
 
-    const service = labels.at(-2);
-    const regionName = labels.at(-1) as AwsRegionName | undefined;
-
-    if (service !== s3WebsiteServiceLabel || regionName === undefined) {
-      return undefined;
+    const aAlias = this.recordFinder.findRecord(logicalName, "A");
+    if (aAlias?.alias === true) {
+      return aAlias;
     }
 
-    const resourceName = labels.slice(0, -2).join(".");
-
-    /* v8 ignore if -- defensive check */
-    if (resourceName.length === 0 || regionName.length === 0) {
-      return undefined;
+    const aaaaAlias = this.recordFinder.findRecord(logicalName, "AAAA");
+    if (aaaaAlias?.alias === true) {
+      return aaaaAlias;
     }
 
-    return {
-      service: "s3",
-      resourceName,
-      regionName,
-    };
-  }
-
-  private cloudFrontServiceTarget(
-    logicalName: string,
-  ): SimAwsServiceTarget | undefined {
-    const labels = logicalName.split(".");
-
-    if (labels.length !== 3) {
-      return undefined;
-    }
-
-    const [distroId, service, topLevelDomain] = labels;
-
-    if (service !== cloudFrontServiceLabel || topLevelDomain !== "net") {
-      return undefined;
-    }
-
-    /* v8 ignore if -- defensive check */
-    if (distroId === undefined || distroId.length === 0) {
-      return undefined;
-    }
-
-    return {
-      service: "cloudFront",
-      resourceName: distroId,
-    };
+    return undefined;
   }
 }

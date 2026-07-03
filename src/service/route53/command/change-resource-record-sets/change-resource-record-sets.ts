@@ -93,6 +93,7 @@ function toSimRoute53Record(
     );
   }
 
+  const alias = resourceRecordSet.AliasTarget !== undefined;
   const values =
     resourceRecordSet.AliasTarget === undefined
       ? resourceRecordSet.ResourceRecords?.map((record) => {
@@ -121,6 +122,7 @@ function toSimRoute53Record(
     type,
     values,
     ttl: resourceRecordSet.TTL,
+    alias,
   };
 }
 
