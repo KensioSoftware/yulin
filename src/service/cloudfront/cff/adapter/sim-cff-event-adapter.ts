@@ -63,8 +63,14 @@ export class SimCffEventAdapter {
   /**
    * Adapt a viewer-response CFF result into a Response.
    */
-  fromViewerResponseResult(result: CloudFrontFunction.Response): Response {
-    return this.requestResponseAdapter.fromCffResponse(result);
+  fromViewerResponseResult(
+    result: CloudFrontFunction.Response,
+    originalResponse: Response,
+  ): Response {
+    return this.requestResponseAdapter.fromCffViewerResponse(
+      result,
+      originalResponse,
+    );
   }
 
   private isCffResponse(
