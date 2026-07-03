@@ -14,6 +14,7 @@ import type { SimCdkOutContext } from "../cdk/sim-cdk-out-context.js";
 import type { SimCfnExecutableResourceBinding } from "../bind/sim-cfn-exec-binding.type.js";
 import type { SimCfnStackOutput } from "./output/sim-cfn-stack-output.js";
 import { SimCfnStackOutputResolver } from "./output/sim-cfn-stack-output-resolver.js";
+import { validateSimCfnExecutableResourceBindings } from "../bind/validate/sim-cfn-exec-binding-validator.js";
 
 export type SimCloudFormationStackName = Brand<
   string,
@@ -84,6 +85,11 @@ export class SimCfnStack {
       accountRegionScope,
       background,
       template: this.cfnTemplate,
+    });
+    validateSimCfnExecutableResourceBindings({
+      stackName,
+      resources: this.resources,
+      bindings,
     });
     this.lifecycle = new SimCfnStackDeploymentLifecycle({
       background,
