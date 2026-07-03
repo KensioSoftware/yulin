@@ -268,3 +268,65 @@ try {
   srv.close();
 }
 ```
+
+If your CloudFront Function code lives in a module that exports the handler, use
+`cloudFrontFunctionSourceFromModule` in your CDK Stack to load it as inline CloudFront Function
+code. This lets the same function file use an export like `export function handler(...)` while
+still being accepted by CloudFront Function inline code.
+
+```typescript sim-cloudfront-function-module-export
+/**
+ * cloudFrontFunctionSourceFromModule util function
+ */
+
+import * as cloudfront from "aws-cdk-lib/aws-cloudfront";
+import { Stack } from "aws-cdk-lib";
+import type { Construct } from "constructs";
+
+import { cloudFrontFunctionSourceFromModule } from "@kensio/yulin/cloudfront";
+
+/**
+ * Example CDK stack using cloudFrontFunctionSourceFromModule to extract source
+ * code for a CloudFront Function handler from a module that uses `export`.
+ */
+export class WebsiteStack extends Stack {
+  constructor(scope: Construct, id: string) {
+    super(scope, id);
+
+    new cloudfront.Function(this, "RewriteFunction", {
+      code: cloudfront.FunctionCode.fromInline(
+        cloudFrontFunctionSourceFromModule("src/cff/rewrite.cff.js"),
+      ),
+      runtime: cloudfront.FunctionRuntime.JS_2_0,
+    });
+  }
+}
+```
+
+The referenced CloudFront Function module can then keep an exported handler:
+
+```javascript
+/**
+ * @typedef {import("@kensio/yulin/cloudfront").CloudFrontFunction.Event} CloudFrontEvent
+ * @typedef {import("@kensio/yulin/cloudfront").CloudFrontFunction.Request} CloudFrontRequest
+ * @typedef {import("@kensio/yulin/cloudfront").CloudFrontFunction.Response} CloudFrontResponse
+ */
+
+/**
+ * Handles a CloudFront Functions viewer request event.
+ * @param {CloudFrontEvent} event - The CloudFront Functions event object.
+ * @returns {CloudFrontRequest|CloudFrontResponse} A CloudFront request object or response object.
+ */
+export function handler(event) {
+  var request = event.request;
+  var uri = request.uri;
+
+  if (uri.endsWith("/")) {
+    request.uri += "index.html";
+  } else if (!uri.includes(".") && !uri.endsWith("/")) {
+    request.uri += "/index.html";
+  }
+
+  return request;
+}
+```
