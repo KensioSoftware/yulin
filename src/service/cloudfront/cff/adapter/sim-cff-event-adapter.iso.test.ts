@@ -88,13 +88,17 @@ describe("sim CFF event structure adapter", () => {
 
   describe("fromViewerResponseResult", () => {
     it("converts CFF Response to native Response", () => {
+      const originalResponse = new Response("Original body");
       const cffResponse = cloudFrontResponseFactory.make({
         statusCode: 200,
         statusDescription: "OK",
         headers: { "content-type": { value: "application/json" } },
       });
 
-      const result = adapter.fromViewerResponseResult(cffResponse);
+      const result = adapter.fromViewerResponseResult(
+        cffResponse,
+        originalResponse,
+      );
 
       assertInstanceOf(result, Response);
       assertIdentical(result.status, 200);
@@ -115,12 +119,16 @@ describe("sim CFF event structure adapter", () => {
     });
 
     it("deserializes cookies back to native headers", () => {
+      const originalResponse = new Response("Original body");
       const cffResponse = cloudFrontResponseFactory.make({
         statusCode: 200,
         headers: { "set-cookie": { value: "session=abc123; Path=/" } },
       });
 
-      const result = adapter.fromViewerResponseResult(cffResponse);
+      const result = adapter.fromViewerResponseResult(
+        cffResponse,
+        originalResponse,
+      );
 
       assertIdentical(
         result.headers.get("set-cookie"),
@@ -182,6 +190,7 @@ describe("sim CFF event structure adapter", () => {
 
   describe("base64 body encoding", () => {
     it("decodes base64-encoded response bodies", async () => {
+      const originalReq = new Request("https://example.test/test");
       const encodedBody = Buffer.from("Hello, world!").toString("base64");
       const cffResponse = cloudFrontResponseFactory.make({
         statusCode: 200,
@@ -189,19 +198,20 @@ describe("sim CFF event structure adapter", () => {
         bodyEncoding: "base64",
       });
 
-      const result = adapter.fromViewerResponseResult(cffResponse);
+      const result = adapter.fromViewerRequestResult(cffResponse, originalReq);
 
       assertInstanceOf(result, Response);
       assertIdentical(await result.text(), "Hello, world!");
     });
 
     it("returns plain string response bodies when no encoding is specified", async () => {
+      const originalReq = new Request("https://example.test/test");
       const cffResponse = cloudFrontResponseFactory.make({
         statusCode: 200,
         body: "Plain text response",
       });
 
-      const result = adapter.fromViewerResponseResult(cffResponse);
+      const result = adapter.fromViewerRequestResult(cffResponse, originalReq);
 
       assertInstanceOf(result, Response);
       assertIdentical(await result.text(), "Plain text response");

@@ -70,6 +70,27 @@ export class SimCffRequestResponseAdapter {
     });
   }
 
+  /**
+   * Convert a viewer-response CFF result to a Node fetch Response while preserving
+   * the original response body.
+   *
+   * CloudFront Functions viewer-response events expose response metadata, but not
+   * the body. A handler that returns event.response therefore normally returns no
+   * body field. The simulator must not interpret that as "send an empty body",
+   * because the returned headers may still include the origin response
+   * content-length.
+   */
+  fromCffViewerResponse(
+    cffRes: CloudFrontFunction.Response,
+    originalResponse: Response,
+  ): Response {
+    return new Response(originalResponse.body, {
+      status: cffRes.statusCode,
+      statusText: cffRes.statusDescription ?? "",
+      headers: this.metadataAdapter.fromCffHeaders(cffRes.headers, {}),
+    });
+  }
+
   private cffResponseBody(
     cffRes: CloudFrontFunction.Response,
   ): Buffer | string | null {

@@ -103,6 +103,6 @@ export class SimCloudFrontFunction {
       .handlerFunction as CloudFrontFunction.ViewerResponseHandler;
     const cffResult = handlerFunction(cffEvent);
 
-    return this.eventAdapter.fromViewerResponseResult(cffResult);
+    return this.eventAdapter.fromViewerResponseResult(cffResult, res);
   }
 }

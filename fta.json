@@ -1,6 +1,7 @@
 {
   "exclude_filenames": [
     "sim-cfn-find-in-map.iso.test.ts",
-    "list-zones-paginate.iso.test.ts"
+    "list-zones-paginate.iso.test.ts",
+    "sim-cf-controller-viewer-res-cff.iso.test.ts"
   ]
 }
