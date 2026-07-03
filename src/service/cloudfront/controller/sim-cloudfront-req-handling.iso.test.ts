@@ -1,7 +1,9 @@
 import {
   assertIdentical,
   assertNonNullable,
+  assertResponseStatus,
   assertStringIncludes,
+  describeResponse,
 } from "@kensio/smartass";
 import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { CreateDistributionCommand } from "@aws-sdk/client-cloudfront";
@@ -80,7 +82,7 @@ describe("Simulated CloudFront local HTTP controller request handling", () => {
       ),
     );
 
-    assertIdentical(res.status, 200);
+    assertResponseStatus(res, 200, await describeResponse(res));
     assertIdentical(await res.text(), "");
     assertIdentical(res.headers.get("content-type"), "application/json");
   });
@@ -144,7 +146,7 @@ describe("Simulated CloudFront local HTTP controller request handling", () => {
       ),
     );
 
-    assertIdentical(res.status, 405);
+    assertResponseStatus(res, 405, await describeResponse(res));
     assertIdentical(res.headers.get("allow"), "GET, HEAD");
     assertIdentical(
       res.headers.get("content-type"),
@@ -210,7 +212,7 @@ describe("Simulated CloudFront local HTTP controller request handling", () => {
       ),
     );
 
-    assertIdentical(res.status, 404);
+    assertResponseStatus(res, 404, await describeResponse(res));
     assertStringIncludes(
       await res.text(),
       "Object missing.html not found in sim S3 Bucket not-found-bucket",
@@ -259,7 +261,7 @@ describe("Simulated CloudFront local HTTP controller request handling", () => {
       ),
     );
 
-    assertIdentical(res.status, 501);
+    assertResponseStatus(res, 501, await describeResponse(res));
     assertStringIncludes(
       await res.text(),
       "Sim CloudFront Distribution misconfigured for Origin missing-origin",

@@ -1,4 +1,8 @@
-import { assertIdentical, assertUndefined } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertResponseStatus,
+  assertUndefined,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimS3BucketWebsite } from "../sim-s3-bucket-website.js";
 
@@ -45,7 +49,7 @@ describe("S3 Bucket static website redirects", () => {
       new Response("Original response", { status: 200 }),
     );
 
-    assertIdentical(res.status, 301);
+    assertResponseStatus(res, 301);
     assertIdentical(
       res.headers.get("location"),
       "https://example.test/docs/index.html",
@@ -63,7 +67,7 @@ describe("S3 Bucket static website redirects", () => {
       new Request("http://foo-site.s3-website.localhost/docs?x=1"),
     );
 
-    assertIdentical(res.status, 301);
+    assertResponseStatus(res, 301);
     assertIdentical(
       res.headers.get("location"),
       "http://foo-site.s3-website.localhost/docs/?x=1",
@@ -101,7 +105,7 @@ describe("S3 Bucket static website redirects", () => {
       new Response("Missing", { status: 404 }),
     );
 
-    assertIdentical(res.status, 301);
+    assertResponseStatus(res, 301);
     assertIdentical(
       res.headers.get("location"),
       "http://foo-site.s3-website.localhost/not-found.html",
@@ -150,7 +154,7 @@ describe("S3 Bucket static website redirects", () => {
       new Response("OK", { status: 200 }),
     );
 
-    assertIdentical(res.status, 301);
+    assertResponseStatus(res, 301);
     assertIdentical(
       res.headers.get("location"),
       "http://foo-site.s3-website.localhost/new/page.html",
@@ -173,7 +177,7 @@ describe("S3 Bucket static website redirects", () => {
       new Response("OK", { status: 200 }),
     );
 
-    assertIdentical(res.status, 301);
+    assertResponseStatus(res, 301);
     assertIdentical(
       res.headers.get("location"),
       "http://foo-site.s3-website.localhost/redirected.html",

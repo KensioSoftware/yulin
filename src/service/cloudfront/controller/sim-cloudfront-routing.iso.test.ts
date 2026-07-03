@@ -1,7 +1,9 @@
 import {
   assertIdentical,
   assertNonNullable,
+  assertResponseStatus,
   assertStringIncludes,
+  describeResponse,
 } from "@kensio/smartass";
 import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { CreateDistributionCommand } from "@aws-sdk/client-cloudfront";
@@ -19,7 +21,7 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
       new Request("http://unknown.cloudfront.net.sim-aws.localhost/index.html"),
     );
 
-    assertIdentical(res.status, 404);
+    assertResponseStatus(res, 404, await describeResponse(res));
     assertStringIncludes(
       await res.text(),
       "Suitable sim CloudFront Distribution not found",
@@ -86,7 +88,7 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
       ),
     );
 
-    assertIdentical(res.status, 200);
+    assertResponseStatus(res, 200, await describeResponse(res));
     assertIdentical(await res.text(), "<h1>From Distribution host</h1>");
     assertIdentical(res.headers.get("content-type"), "text/html");
   });
@@ -176,7 +178,7 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
       ),
     );
 
-    assertIdentical(res.status, 200);
+    assertResponseStatus(res, 200, await describeResponse(res));
     assertIdentical(await res.text(), "<h1>Default origin page</h1>");
   });
 
@@ -288,7 +290,7 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
       ),
     );
 
-    assertIdentical(res.status, 200);
+    assertResponseStatus(res, 200, await describeResponse(res));
     assertIdentical(await res.text(), "image logo");
   });
 });

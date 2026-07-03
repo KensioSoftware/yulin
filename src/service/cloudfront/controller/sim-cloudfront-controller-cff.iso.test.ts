@@ -1,6 +1,7 @@
 import {
   assertIdentical,
   assertNonNullable,
+  assertResponseStatus,
   assertStringIncludes,
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
@@ -89,7 +90,7 @@ describe("Simulated CloudFront local HTTP controller CFF", () => {
       ),
     );
 
-    assertIdentical(res.status, 204);
+    assertResponseStatus(res, 204);
     assertIdentical(res.headers.get("x-cff-resolved"), "same-account");
   });
 

@@ -7,10 +7,12 @@ import {
   assertInstanceOf,
   assertNonNullable,
   assertObjectEquals,
+  assertResponseStatus,
   assertStringIncludes,
   assertThrowsError,
   assertThrowsErrorAsync,
   assertTrue,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
@@ -134,7 +136,7 @@ describe("S3 PutBucketWebsiteCommand", () => {
       );
 
     assertNonNullable(res);
-    assertIdentical(res.status, 301);
+    assertResponseStatus(res, 301, await describeResponse(res));
     assertIdentical(
       res.headers.get("location"),
       "http://rules-site.s3-website.localhost/not-found.html",
