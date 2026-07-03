@@ -4,7 +4,12 @@ import {
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
 import { describe, it } from "vitest";
-import { assertIdentical, assertStringIncludes } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertStringIncludes,
+  assertResponseStatus,
+  describeResponse,
+} from "@kensio/smartass";
 import { SimAwsHttp } from "./sim-aws-http.js";
 import { SimAws } from "../../service/aws/sim-aws.js";
 
@@ -16,7 +21,7 @@ describe("Simulated AWS HTTP", () => {
       new URL("http://foobar.sim-aws.localhost/"),
     );
 
-    assertIdentical(res.status, 501);
+    assertResponseStatus(res, 501, await describeResponse(res));
     const resBody = await res.text();
     assertStringIncludes(
       resBody,
@@ -31,7 +36,7 @@ describe("Simulated AWS HTTP", () => {
       new Request("data:text/plain,hello"),
     );
 
-    assertIdentical(res.status, 400);
+    assertResponseStatus(res, 400, await describeResponse(res));
     assertIdentical(await res.text(), "Missing Host header\n");
   });
 
@@ -46,7 +51,7 @@ describe("Simulated AWS HTTP", () => {
       ),
     );
 
-    assertIdentical(res.status, 404);
+    assertResponseStatus(res, 404);
     const resBody = await res.text();
     assertStringIncludes(resBody, "S3 bucket named my-site not found");
   });
@@ -85,7 +90,7 @@ describe("Simulated AWS HTTP", () => {
       new Request("http://www.foo.com.sim-aws.localhost/"),
     );
 
-    assertIdentical(res.status, 404);
+    assertResponseStatus(res, 404);
     const resBody = await res.text();
     assertStringIncludes(
       resBody,
@@ -123,7 +128,7 @@ describe("Simulated AWS HTTP", () => {
       "http://foo-site.s3-website.eu-west-2.sim-aws.localhost/index.html",
     );
 
-    assertIdentical(res.status, 200);
+    assertResponseStatus(res, 200);
     assertIdentical(
       res.headers.get("content-type"),
       "text/html; charset=utf-8",
@@ -162,7 +167,7 @@ describe("Simulated AWS HTTP", () => {
       { method: "HEAD" },
     );
 
-    assertIdentical(res.status, 200);
+    assertResponseStatus(res, 200);
     assertIdentical(
       res.headers.get("content-type"),
       "text/html; charset=utf-8",

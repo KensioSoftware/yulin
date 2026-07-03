@@ -1,4 +1,8 @@
-import { assertIdentical, assertStringIncludes } from "@kensio/smartass";
+import {
+  assertResponseStatus,
+  assertStringIncludes,
+  describeResponse,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimS3ServiceController } from "./sim-s3-controller.js";
 
@@ -15,7 +19,7 @@ describe("Simulated S3 local HTTP controller", () => {
       }),
     );
 
-    assertIdentical(res.status, 400);
+    assertResponseStatus(res, 400, await describeResponse(res));
     assertStringIncludes(await res.text(), "Missing S3 Bucket name");
   });
 
@@ -30,7 +34,7 @@ describe("Simulated S3 local HTTP controller", () => {
       }),
     );
 
-    assertIdentical(res.status, 400);
+    assertResponseStatus(res, 400, await describeResponse(res));
     assertStringIncludes(await res.text(), "Missing S3 Bucket region");
   });
 });

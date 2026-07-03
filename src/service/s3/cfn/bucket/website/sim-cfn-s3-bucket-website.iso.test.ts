@@ -1,7 +1,9 @@
 import {
   assertIdentical,
   assertNonNullable,
+  assertResponseStatus,
   assertTrue,
+  describeResponse,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -163,7 +165,7 @@ describe("S3 CloudFormation Bucket WebsiteConfiguration", () => {
         new Response("Missing", { status: 404 }),
       );
 
-    assertIdentical(res.status, 301);
+    assertResponseStatus(res, 301, await describeResponse(res));
     assertIdentical(
       res.headers.get("location"),
       "http://routing-rules-website-config-bucket.s3-website.localhost/not-found.html",

@@ -1,4 +1,4 @@
-import { assertIdentical } from "@kensio/smartass";
+import { assertIdentical, assertResponseStatus } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimS3BucketWebsite } from "./sim-s3-bucket-website.js";
 
@@ -97,7 +97,7 @@ describe("S3 Bucket static website routing", () => {
       new Response("Missing", { status: 404 }),
     );
 
-    assertIdentical(res.status, 301);
+    assertResponseStatus(res, 301);
     assertIdentical(
       res.headers.get("location"),
       "http://foo-site.s3-website.localhost/first.html",
@@ -124,7 +124,7 @@ describe("S3 Bucket static website routing", () => {
       new Response("Missing", { status: 404 }),
     );
 
-    assertIdentical(res.status, 302);
+    assertResponseStatus(res, 302);
     assertIdentical(
       res.headers.get("location"),
       "http://foo-site.s3-website.localhost/temporary.html",
@@ -152,7 +152,7 @@ describe("S3 Bucket static website routing", () => {
       new Response("OK", { status: 200 }),
     );
 
-    assertIdentical(res.status, 301);
+    assertResponseStatus(res, 301);
     assertIdentical(
       res.headers.get("location"),
       "https://example.test/archive/page.html",
