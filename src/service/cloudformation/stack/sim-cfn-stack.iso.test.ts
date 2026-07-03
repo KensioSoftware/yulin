@@ -3,6 +3,7 @@ import {
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
+  assertStringIncludes,
   assertThrowsErrorAsync,
   assertTrue,
 } from "@kensio/smartass";
@@ -244,6 +245,44 @@ describe("SimCfnStack", () => {
     assertIdentical(
       skippedResource.skippedReason,
       "Unsupported sim CloudFormation Resource service SNS",
+    );
+  });
+
+  it("throws a diagnostic error when an executable binding does not resolve to a Stack Resource", async () => {
+    const simAws = new SimAws();
+
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws.cloudFormation().deployTemplate({
+        stackName: "invalid-binding-stack",
+        template: {
+          Resources: {
+            RewriteFunction: {
+              Type: "AWS::CloudFront::Function",
+              Properties: {
+                Name: "rewrite-function",
+                FunctionCode:
+                  "function handler(event) { return event.request; }",
+                FunctionConfig: {
+                  Runtime: "cloudfront-js-2.0",
+                },
+              },
+            },
+          },
+        },
+        bindings: [
+          {
+            logicalId: "MissingFunction",
+            handler() {
+              throw new Error("should not run");
+            },
+          },
+        ],
+      }),
+    );
+
+    assertStringIncludes(
+      error.message,
+      'Invalid sim CloudFormation executable binding in Stack invalid-binding-stack: logicalId "MissingFunction" does not resolve to a Resource in the Stack',
     );
   });
 });
