@@ -2,10 +2,7 @@ import {
   type BackgroundScheduler,
   BackgroundTasks,
 } from "../../util/background/background.js";
-import {
-  type SimAwsAccountRegionScope,
-  simAwsAccountRegionScopeFactory,
-} from "../aws/sim-aws-account-region-scope.js";
+import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import type { SimArn } from "../aws/arn.js";
 import type {
   SimRequestCertificateCommand,
@@ -24,6 +21,7 @@ import type {
 } from "./command/list-certificates/list-certificates.cmd.js";
 import { ListCertificatesCommandHandler } from "./command/list-certificates/list-certificates.handler.js";
 import { SimAcmCfnResourceFactory } from "./cfn/sim-cfn-acm-resource-factory.js";
+import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 
 interface SimAcmProps {
   readonly accountRegionScope?: SimAwsAccountRegionScope;

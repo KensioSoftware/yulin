@@ -1,16 +1,7 @@
-import {
-  makeSimAwsAccountId,
-  type SimAwsAccount,
-  type SimAwsAccountId,
-} from "./sim-aws-account.js";
-import {
-  type AwsRegionName,
-  makeAwsRegionName,
-  type SimAwsRegion,
-} from "./sim-aws-region.js";
+import type { SimAwsAccount, SimAwsAccountId } from "./sim-aws-account.js";
+import type { AwsRegionName, SimAwsRegion } from "./sim-aws-region.js";
 import { Memo } from "../../util/memo/memo.js";
 import { SimAws } from "./sim-aws.js";
-import { DynamicFactory } from "@kensio/part-factory";
 import type { SimS3 } from "../s3/sim-s3.js";
 import type { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
 import type { SimDynamoDb } from "../dynamodb/index.js";
@@ -114,12 +105,3 @@ export interface SimAwsAccountRegionScope {
   accountId: SimAwsAccountId;
   regionName: AwsRegionName;
 }
-
-/**
- * Generates fake simulated AWS resource scopes.
- */
-export const simAwsAccountRegionScopeFactory =
-  new DynamicFactory<SimAwsAccountRegionScope>(() => ({
-    accountId: makeSimAwsAccountId(),
-    regionName: makeAwsRegionName(),
-  }));

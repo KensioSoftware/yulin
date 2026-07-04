@@ -1,7 +1,4 @@
-import {
-  type SimAwsAccountRegionScope,
-  simAwsAccountRegionScopeFactory,
-} from "../aws/sim-aws-account-region-scope.js";
+import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import type { SimAws } from "../aws/sim-aws.js";
 import type {
   SimCfnStack,
@@ -29,6 +26,7 @@ import {
 } from "./deploy/sim-cfn-template-deployer.js";
 import type { SimCloudFormationDeployTemplateFileProps } from "./deploy/sim-cfn-template-file-loader.js";
 import type { SimCfnExecutableResourceBinding } from "./bind/sim-cfn-exec-binding.type.js";
+import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 
 interface SimCloudFormationProps {
   readonly simAws: SimAws;

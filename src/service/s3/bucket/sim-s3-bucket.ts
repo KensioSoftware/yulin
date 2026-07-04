@@ -3,12 +3,10 @@ import type { SimS3BucketStorage } from "../storage/s3-bucket-storage.js";
 import type { SimS3Object } from "../object/s3-object.js";
 import { MemoryS3BucketStorage } from "../storage/s3-memory-storage.js";
 import { SimS3BucketWebsite } from "./website/sim-s3-bucket-website.js";
-import {
-  type SimAwsAccountRegionScope,
-  simAwsAccountRegionScopeFactory,
-} from "../../aws/sim-aws-account-region-scope.js";
+import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import { simS3BucketWebsiteUrl } from "./website/sim-s3-bucket-website-url.js";
 import { validateS3BucketName } from "./validate/validate-s3-bucket-name.js";
+import { simAwsAccountRegionScopeFactory } from "../../aws/sim-aws-account-region-scope.factory.js";
 
 export type SimS3BucketName = Brand<string, "SimS3BucketName">;
 

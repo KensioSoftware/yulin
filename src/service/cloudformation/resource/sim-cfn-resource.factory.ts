@@ -1,10 +1,10 @@
 import { MappedFactory } from "@kensio/part-factory";
 
-import { simAwsAccountRegionScopeFactory } from "../../aws/sim-aws-account-region-scope.js";
 import {
   SimCfnResource,
   type SimCloudFormationResourceProps,
 } from "./sim-cfn-resource.js";
+import { simAwsAccountRegionScopeFactory } from "../../aws/sim-aws-account-region-scope.factory.js";
 
 /**
  * Generate fake SimCfnResource instances.

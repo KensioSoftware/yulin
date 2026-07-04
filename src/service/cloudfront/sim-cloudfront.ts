@@ -4,10 +4,7 @@ import type {
   SimCloudFrontDistribution,
   SimCloudFrontDistributionId,
 } from "./distribution/sim-cloudfront-distribution.js";
-import {
-  type SimAwsAccountRegionScope,
-  simAwsAccountRegionScopeFactory,
-} from "../aws/sim-aws-account-region-scope.js";
+import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import type {
   SimCreateDistributionCommand,
   SimCreateDistributionCommandOutput,
@@ -38,6 +35,7 @@ import type { SimArn } from "../aws/arn.js";
 import { assertDefined } from "../../util/type-guard/defined.js";
 import { SimCloudFrontCloudFormationResourceFactory } from "./cfn/sim-cfn-cloudfront-resource-factory.js";
 import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
+import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 
 interface SimCloudFrontProps {
   readonly accountRegionScope?: SimAwsAccountRegionScope;

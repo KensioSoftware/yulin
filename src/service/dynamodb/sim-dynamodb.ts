@@ -10,10 +10,7 @@ import {
 import { ListTablesCommandHandler } from "./command/list-tables/list-tables.handler.js";
 import { DescribeTableCommandHandler } from "./command/describe-table/describe-table.handler.js";
 import { PutItemCommandHandler } from "./command/put-item/put-item.handler.js";
-import {
-  type SimAwsAccountRegionScope,
-  simAwsAccountRegionScopeFactory,
-} from "../aws/sim-aws-account-region-scope.js";
+import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import type {
   SimCreateTableCommand,
   SimCreateTableCommandOutput,
@@ -30,6 +27,7 @@ import type {
   SimDescribeTableCommand,
   SimDescribeTableCommandOutput,
 } from "./command/describe-table/describe-table.cmd.js";
+import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 
 interface SimDynamoDbProps {
   readonly accountRegionScope?: SimAwsAccountRegionScope;

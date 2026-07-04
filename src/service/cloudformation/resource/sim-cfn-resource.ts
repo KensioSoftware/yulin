@@ -1,8 +1,5 @@
 import type { SimAws } from "../../aws/sim-aws.js";
-import {
-  type SimAwsAccountRegionScope,
-  simAwsAccountRegionScopeFactory,
-} from "../../aws/sim-aws-account-region-scope.js";
+import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import {
   type BackgroundScheduler,
   BackgroundTasks,
@@ -23,6 +20,7 @@ import {
 } from "./cfn/sim-cfn-resource-value-adapter.js";
 import type { SimCdkOutContext } from "../cdk/sim-cdk-out-context.js";
 import type { SimCfnExecutableResourceBinding } from "../bind/sim-cfn-exec-binding.type.js";
+import { simAwsAccountRegionScopeFactory } from "../../aws/sim-aws-account-region-scope.factory.js";
 
 export interface SimCloudFormationResourceProps {
   readonly accountRegionScope?: SimAwsAccountRegionScope;

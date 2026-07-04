@@ -17,8 +17,8 @@ import { TempDir } from "../../../util/filesystem/temp-dir.js";
 import { SimS3 } from "../sim-s3.js";
 import { Readable } from "node:stream";
 import { simS3BodyToBuffer } from "../storage/s3-body-buffer.js";
-import { simAwsAccountRegionScopeFactory } from "../../aws/sim-aws-account-region-scope.js";
 import { SimS3BucketWebsite } from "./website/sim-s3-bucket-website.js";
+import { simAwsAccountRegionScopeFactory } from "../../aws/sim-aws-account-region-scope.factory.js";
 
 describe("Simulated S3 Bucket", () => {
   describe.each<StorageFactory>([

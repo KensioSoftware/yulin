@@ -5,10 +5,7 @@ import { PutObjectCommandHandler } from "./command/put-object/put-object.handler
 import { GetObjectCommandHandler } from "./command/get-object/get-object.handler.js";
 import { ListObjectsCommandHandler } from "./command/list-objects/list-objects.handler.js";
 import { SimS3GlobalRegistry } from "./sim-s3-global-registry.js";
-import {
-  type SimAwsAccountRegionScope,
-  simAwsAccountRegionScopeFactory,
-} from "../aws/sim-aws-account-region-scope.js";
+import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { PutBucketWebsiteCommandHandler } from "./command/put-bucket-website/put-bucket-website.handler.js";
 import { assertDefined } from "../../util/type-guard/defined.js";
 import { FilesystemS3BucketStorage } from "./storage/filesystem/s3-filesystem-storage.js";
@@ -42,6 +39,7 @@ import {
 } from "../../util/background/background.js";
 import { SimS3CloudFormationResourceFactory } from "./cfn/sim-cfn-s3-resource-factory.js";
 import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
+import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 
 interface SimS3Props {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
