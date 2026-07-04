@@ -2,10 +2,7 @@ import {
   assertDefined,
   assertNotNull,
 } from "../../../../util/type-guard/defined.js";
-import type {
-  SimCfnCfBinding,
-  SimCfnExecutableResourceBinding,
-} from "../../../cloudformation/bind/sim-cfn-exec-binding.type.js";
+import type { SimCfnExecutableResourceBinding } from "../../../cloudformation/bind/sim-cfn-exec-binding.type.js";
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import { makeCffFunctionCodeInput } from "../../cff/function-code-input/cff-function-code-input.js";
@@ -13,6 +10,7 @@ import {
   simCfnCffFunctionConfig,
   type SimCfnCffFunctionConfig,
 } from "./sim-cfn-cff-function-config.js";
+import { SimCfnCffBindingFinder } from "../../../cloudformation/bind/validate/sim-cfn-exec-binding-finder.js";
 
 interface SimCfnCfFunctionCreateInputBuilderProps {
   readonly resource: SimCfnResource;
@@ -65,11 +63,14 @@ export class SimCfnCffCreateInputBuilder {
    */
   build(): SimCfnCfFunctionCreateInput {
     const functionCodeValue = this.functionCode();
-    const functionName = this.functionName();
-    const binding = this.findBinding(functionName);
+    const cffName = this.cffName();
+    const binding = new SimCfnCffBindingFinder({
+      resource: this.resource,
+      bindings: this.bindings,
+    }).findBinding(cffName);
 
     return {
-      Name: functionName,
+      Name: cffName,
       FunctionCode:
         binding === undefined
           ? Buffer.from(functionCodeValue)
@@ -115,34 +116,11 @@ export class SimCfnCffCreateInputBuilder {
    * not provided, the simulator uses the Resource logical ID as a predictable
    * local fallback.
    */
-  private functionName(): string {
+  private cffName(): string {
     const nameValue = this.properties["Name"];
 
     return typeof nameValue === "string" && nameValue.length > 0
       ? nameValue
       : this.resource.logicalId;
-  }
-
-  /**
-   * Find an executable binding for this Function Resource.
-   *
-   * Bindings may target either the CloudFormation logical ID or the resolved
-   * CloudFront Function name. Logical ID matching is checked first because it
-   * is stable even when the template omits the Name property and the name is
-   * derived by this builder.
-   */
-  private findBinding(functionName: string): SimCfnCfBinding | undefined {
-    return this.bindings?.find((binding) => {
-      if ("logicalId" in binding) {
-        return binding.logicalId === this.resource.logicalId;
-      }
-
-      if ("functionName" in binding) {
-        return binding.functionName === functionName;
-      }
-
-      /* v8 ignore next */
-      return false;
-    }) as SimCfnCfBinding | undefined;
   }
 }
