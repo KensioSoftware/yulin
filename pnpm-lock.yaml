@@ -13,7 +13,7 @@ importers:
         version: 10.5.0
       '@kensio/part-factory':
         specifier: ^1.4.0
-        version: 1.4.0
+        version: 1.5.0
       lodash-es:
         specifier: ^4.18.1
         version: 4.18.1
@@ -41,7 +41,7 @@ importers:
         version: 10.0.1(eslint@10.6.0(jiti@2.7.0))
       '@kensio/smartass':
         specifier: ^1.30.0
-        version: 1.30.0
+        version: 1.31.0
       '@smithy/smithy-client':
         specifier: ^4.14.6
         version: 4.14.6
@@ -511,12 +511,12 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@kensio/part-factory@1.4.0':
-    resolution: {integrity: sha512-yGrtdqbi1rdx0jMwwfK6kn/hCZuZO8Aj9xCQ2Vr798LquAwib/UWiOLQJxvx7cHDOAc5jcagcFKw4CHgJl9CJg==}
+  '@kensio/part-factory@1.5.0':
+    resolution: {integrity: sha512-8vORkAb12/mv0QIhtGuhCPCbaFkh/sXHV9dNQBqsV6QiILxbB7gOmbyOZwYgyZNUPmaflImAFvvBdIy0cgH38A==}
     engines: {node: '>=22.0.0'}
 
-  '@kensio/smartass@1.30.0':
-    resolution: {integrity: sha512-ROd2lrOVMciYNV3pMFZVXKYXGsvWiCvLGfEkMXxbGHOB2qDDpE6IvxSdVsHoPoiWwOrYruIb39fz9aLdE2GQmA==}
+  '@kensio/smartass@1.31.0':
+    resolution: {integrity: sha512-6LjyDCHTBZ1mDFcyHhIMW7+tBWIjU+fIRBel34/ul8c98IH6RmhJs0mdjdIP0f0wHQ5uoQEImoSlY3Z3/NWbWw==}
     engines: {node: '>=22.0.0'}
 
   '@napi-rs/wasm-runtime@1.1.6':
@@ -2127,11 +2127,11 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@kensio/part-factory@1.4.0':
+  '@kensio/part-factory@1.5.0':
     dependencies:
       lodash: 4.18.1
 
-  '@kensio/smartass@1.30.0': {}
+  '@kensio/smartass@1.31.0': {}
 
   '@napi-rs/wasm-runtime@1.1.6(@emnapi/core@1.10.0)(@emnapi/runtime@1.10.0)':
     dependencies:
