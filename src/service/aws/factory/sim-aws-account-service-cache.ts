@@ -10,6 +10,7 @@ import { makeSimCfS3OriginResolver } from "../../cloudfront/origin/s3/sim-cf-s3-
 import { SimCloudFront } from "../../cloudfront/sim-cloudfront.js";
 import { SimRoute53 } from "../../route53/index.js";
 import type { SimRoute53Registry } from "../../route53/registry/sim-route53-registry.js";
+import { SimIam } from "../../iam/index.js";
 
 interface SimAwsAccountServiceCacheProps {
   readonly simAws: SimAws;
@@ -23,8 +24,11 @@ interface SimAwsAccountServiceCacheProps {
  */
 export class SimAwsAccountServiceCache {
   private readonly simAws: SimAws;
+  // TODO: SimAwsAccountServiceCache sometimes uses its own background instance,
+  // and sometimes has one passed in to methods. Should be unified.
   private readonly background: BackgroundScheduler & BackgroundCompleter;
   private readonly cloudFrontRegistry: SimCloudFrontRegistry;
+  private readonly iamServices = new Map<SimAwsAccountId, SimIam>();
   private readonly route53Registry: SimRoute53Registry;
 
   private readonly cloudFrontServices = new Map<
@@ -59,6 +63,28 @@ export class SimAwsAccountServiceCache {
     }
 
     return cloudFront;
+  }
+
+  /**
+   * Create or get simulated IAM for an Account scope.
+   */
+  createIam(
+    scope: SimAwsAccountRegionContainer,
+    background: BackgroundScheduler,
+  ): SimIam {
+    const { accountId } = scope.accountRegionScope;
+
+    let iam = this.iamServices.get(accountId);
+
+    if (iam === undefined) {
+      iam = new SimIam({
+        accountRegionScope: scope.accountRegionScope,
+        background,
+      });
+      this.iamServices.set(accountId, iam);
+    }
+
+    return iam;
   }
 
   /**

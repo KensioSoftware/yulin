@@ -5,9 +5,9 @@ import {
   assertThrowsError,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
-import type { SimCfnResource } from "../../../../resource/sim-cfn-resource.js";
 import type { SimCdkOutContext } from "../../../sim-cdk-out-context.js";
 import { SimCdkBucketDeploySource } from "./sim-cdk-bucket-deploy-source.js";
+import { simCfnResourceFactory } from "../../../../resource/sim-cfn-resource.factory.js";
 
 describe("SimCdkBucketDeploySource", () => {
   it("resolves the filesystem source directory for a matching zip asset object key", () => {
@@ -39,7 +39,7 @@ describe("SimCdkBucketDeploySource", () => {
 
     // When the source directory is resolved for the object key.
     const sourceDirectoryPath = source.sourceDirectoryPathForObjectKey(
-      makeResource(),
+      simCfnResourceFactory.make({ logicalId: "DeploySite" }),
       "abc123.zip",
       cdkOutContext,
     );
@@ -91,7 +91,7 @@ describe("SimCdkBucketDeploySource", () => {
 
     // When the second asset destination object key is resolved.
     const sourceDirectoryPath = source.sourceDirectoryPathForObjectKey(
-      makeResource(),
+      simCfnResourceFactory.make({ logicalId: "DeploySite" }),
       "second.zip",
       cdkOutContext,
     );
@@ -111,7 +111,7 @@ describe("SimCdkBucketDeploySource", () => {
     // diagnostic message explaining how to provide CDK assembly metadata.
     const error = assertThrowsError(() =>
       source.sourceDirectoryPathForObjectKey(
-        makeResource("DeploySite"),
+        simCfnResourceFactory.make({ logicalId: "DeploySite" }),
         "abc123.zip",
         undefined,
       ),
@@ -162,7 +162,7 @@ describe("SimCdkBucketDeploySource", () => {
     // formatted BucketDeployment asset resolution error.
     const error = assertThrowsError(() =>
       source.sourceDirectoryPathForObjectKey(
-        makeResource("DeploySite"),
+        simCfnResourceFactory.make({ logicalId: "DeploySite" }),
         "missing.zip",
         cdkOutContext,
       ),
@@ -218,7 +218,7 @@ describe("SimCdkBucketDeploySource", () => {
     // rejected with a diagnostic error.
     const error = assertThrowsError(() =>
       source.sourceDirectoryPathForObjectKey(
-        makeResource("DeploySite"),
+        simCfnResourceFactory.make({ logicalId: "DeploySite" }),
         "abc123.zip",
         cdkOutContext,
       ),
@@ -263,7 +263,7 @@ describe("SimCdkBucketDeploySource", () => {
     // template directory is rejected with a diagnostic error.
     const error = assertThrowsError(() =>
       source.sourceDirectoryPathForObjectKey(
-        makeResource("DeploySite"),
+        simCfnResourceFactory.make({ logicalId: "DeploySite" }),
         "abc123.zip",
         cdkOutContext,
       ),
@@ -287,9 +287,3 @@ describe("SimCdkBucketDeploySource", () => {
     );
   });
 });
-
-function makeResource(logicalId = "DeploySite"): SimCfnResource {
-  return {
-    logicalId,
-  } as SimCfnResource;
-}

@@ -59,6 +59,10 @@
       "import": "./dist/config/eslint/index.js",
       "types": "./dist/config/eslint/index.d.ts"
     },
+    "./iam": {
+      "import": "./dist/service/iam/index.js",
+      "types": "./dist/service/iam/index.d.ts"
+    },
     "./package.json": "./package.json",
     "./s3": {
       "import": "./dist/service/s3/index.js",
@@ -86,24 +90,25 @@
     "@aws-sdk/client-cloudformation": "^3.1079.0",
     "@aws-sdk/client-cloudfront": "^3.1079.0",
     "@aws-sdk/client-dynamodb": "^3.1079.0",
+    "@aws-sdk/client-iam": "^3.1079.0",
     "@aws-sdk/client-route-53": "^3.1079.0",
     "@aws-sdk/client-s3": "^3.1079.0",
     "@eslint/js": "^10.0.1",
-    "@kensio/smartass": "^1.30.0",
+    "@kensio/smartass": "^1.31.0",
     "@smithy/smithy-client": "^4.14.6",
     "@smithy/types": "^4.15.1",
     "@types/eslint-plugin-security": "^3.0.1",
     "@types/lodash-es": "^4.17.12",
     "@types/node": "^25.9.4",
     "@vitest/coverage-v8": "^4.1.9",
-    "@vitest/eslint-plugin": "^1.6.20",
+    "@vitest/eslint-plugin": "^1.6.21",
     "aws-cdk": "^2.1129.0",
     "aws-cdk-lib": "^2.261.0",
     "aws-sdk-client-mock": "^4.1.0",
     "constructs": "^10.6.0",
     "eslint": "^10.6.0",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-jsdoc": "^63.0.10",
+    "eslint-plugin-jsdoc": "^63.0.11",
     "eslint-plugin-no-secrets": "^2.3.3",
     "eslint-plugin-security": "^4.0.1",
     "eslint-plugin-unicorn": "^64.0.0",
@@ -119,7 +124,7 @@
   },
   "dependencies": {
     "@faker-js/faker": "^10.5.0",
-    "@kensio/part-factory": "^1.4.0",
+    "@kensio/part-factory": "^1.5.0",
     "lodash-es": "^4.18.1"
   },
   "peerDependencies": {

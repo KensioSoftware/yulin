@@ -8,6 +8,7 @@ import type { SimDynamoDb } from "../dynamodb/index.js";
 import type { SimCloudFormation } from "../cloudformation/index.js";
 import type { SimRoute53 } from "../route53/index.js";
 import type { SimAcm } from "../acm/sim-acm.js";
+import type { SimIam } from "../iam/index.js";
 
 export type SimAccountRegionScopeKey = `${SimAwsAccountId}:${AwsRegionName}`;
 
@@ -79,6 +80,15 @@ export class SimAwsAccountRegionContainer {
   dynamoDb(): SimDynamoDb {
     return this.memo.getOrCreate("dynamoDb", () =>
       this.simAws.serviceFactory.createDynamoDb(this),
+    );
+  }
+
+  /**
+   * Get simulated IAM for this account.
+   */
+  iam(): SimIam {
+    return this.memo.getOrCreate("iam", () =>
+      this.simAws.serviceFactory.createIam(this),
     );
   }
 

@@ -23,6 +23,7 @@ import type { SimRoute53 } from "../route53/index.js";
 import { SimAwsServiceFactory } from "./factory/sim-aws-service-factory.js";
 import { SimAwsScopeRegistry } from "./scope/sim-aws-scope-registry.js";
 import type { SimAcm } from "../acm/sim-acm.js";
+import type { SimIam } from "../iam/index.js";
 
 interface SimAwsProps {
   readonly defaultAccountId?: SimAwsAccountId;
@@ -115,6 +116,13 @@ export class SimAws {
    */
   dynamoDb(): SimDynamoDb {
     return this.accountRegionScope().dynamoDb();
+  }
+
+  /**
+   * Get simulated IAM in the default Account scope.
+   */
+  iam(): SimIam {
+    return this.accountRegionScope().iam();
   }
 
   /**
