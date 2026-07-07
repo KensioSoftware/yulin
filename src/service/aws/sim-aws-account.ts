@@ -9,6 +9,7 @@ import { SimAws } from "./sim-aws.js";
 import type { SimCloudFormation } from "../cloudformation/index.js";
 import type { SimAcm } from "../acm/sim-acm.js";
 import type { SimRoute53 } from "../route53/index.js";
+import type { SimIam } from "../iam/index.js";
 
 export type SimAwsAccountId = Brand<string, "SimAwsAccountId">;
 
@@ -70,6 +71,13 @@ export class SimAwsAccount {
    */
   dynamoDb(): SimDynamoDb {
     return this.region().dynamoDb();
+  }
+
+  /**
+   * Get simulated IAM for this Account.
+   */
+  iam(): SimIam {
+    return this.region().iam();
   }
 
   /**

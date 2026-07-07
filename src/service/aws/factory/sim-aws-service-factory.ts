@@ -14,6 +14,7 @@ import { SimS3GlobalRegistry } from "../../s3/sim-s3-global-registry.js";
 import { SimAwsAccountServiceCache } from "./sim-aws-account-service-cache.js";
 import { SimAcm } from "../../acm/sim-acm.js";
 import { SimRoute53Registry } from "../../route53/registry/sim-route53-registry.js";
+import type { SimIam } from "../../iam/index.js";
 
 interface SimAwsServiceFactoryProps {
   readonly simAws: SimAws;
@@ -91,6 +92,13 @@ export class SimAwsServiceFactory {
       accountRegionScope: scope.accountRegionScope,
       background: this.background,
     });
+  }
+
+  /**
+   * Create or get simulated IAM for an Account scope.
+   */
+  createIam(scope: SimAwsAccountRegionContainer): SimIam {
+    return this.accountServices.createIam(scope);
   }
 
   /**
