@@ -24,6 +24,8 @@ interface SimAwsAccountServiceCacheProps {
  */
 export class SimAwsAccountServiceCache {
   private readonly simAws: SimAws;
+  // TODO: SimAwsAccountServiceCache sometimes uses its own background instance,
+  // and sometimes has one passed in to methods. Should be unified.
   private readonly background: BackgroundScheduler & BackgroundCompleter;
   private readonly cloudFrontRegistry: SimCloudFrontRegistry;
   private readonly iamServices = new Map<SimAwsAccountId, SimIam>();
@@ -66,7 +68,10 @@ export class SimAwsAccountServiceCache {
   /**
    * Create or get simulated IAM for an Account scope.
    */
-  createIam(scope: SimAwsAccountRegionContainer): SimIam {
+  createIam(
+    scope: SimAwsAccountRegionContainer,
+    background: BackgroundScheduler,
+  ): SimIam {
     const { accountId } = scope.accountRegionScope;
 
     let iam = this.iamServices.get(accountId);
@@ -74,6 +79,7 @@ export class SimAwsAccountServiceCache {
     if (iam === undefined) {
       iam = new SimIam({
         accountRegionScope: scope.accountRegionScope,
+        background,
       });
       this.iamServices.set(accountId, iam);
     }

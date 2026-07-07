@@ -17,9 +17,14 @@ import type {
   SimListPoliciesCommandOutput,
 } from "./command/list-policies/list-policies.cmd.js";
 import { ListPoliciesCommandHandler } from "./command/list-policies/list-policies.handler.js";
+import {
+  type BackgroundScheduler,
+  BackgroundTasks,
+} from "../../util/background/background.js";
 
 interface SimIamProps {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
+  readonly background?: BackgroundScheduler;
 }
 
 /**
@@ -33,12 +38,16 @@ export class SimIam {
   private readonly policies = new Map<SimArn, SimIamPolicy>();
 
   private readonly accountRegionScope: SimAwsAccountRegionScope;
+  private readonly background: BackgroundScheduler;
 
   constructor(props: SimIamProps = {}) {
-    const { accountRegionScope = simAwsAccountRegionScopeFactory.make() } =
-      props;
+    const {
+      accountRegionScope = simAwsAccountRegionScopeFactory.make(),
+      background = new BackgroundTasks(),
+    } = props;
 
     this.accountRegionScope = accountRegionScope;
+    this.background = background;
   }
 
   /**
@@ -50,6 +59,7 @@ export class SimIam {
     const handler = new CreatePolicyCommandHandler({
       accountId: this.accountRegionScope.accountId,
       policies: this.policies,
+      background: this.background,
     });
     return await handler.handle(cmd);
   }
@@ -62,6 +72,7 @@ export class SimIam {
   ): Promise<SimGetPolicyCommandOutput> {
     const handler = new GetPolicyCommandHandler({
       policies: this.policies,
+      background: this.background,
     });
     return await handler.handle(cmd);
   }
@@ -74,6 +85,7 @@ export class SimIam {
   ): Promise<SimListPoliciesCommandOutput> {
     const handler = new ListPoliciesCommandHandler({
       policies: this.policies,
+      background: this.background,
     });
     return await handler.handle(cmd);
   }

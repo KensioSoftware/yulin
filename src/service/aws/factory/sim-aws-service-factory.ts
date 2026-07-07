@@ -98,7 +98,7 @@ export class SimAwsServiceFactory {
    * Create or get simulated IAM for an Account scope.
    */
   createIam(scope: SimAwsAccountRegionContainer): SimIam {
-    return this.accountServices.createIam(scope);
+    return this.accountServices.createIam(scope, this.background);
   }
 
   /**

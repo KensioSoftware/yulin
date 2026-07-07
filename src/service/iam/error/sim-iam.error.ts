@@ -27,3 +27,14 @@ export class SimIamNoSuchEntity extends SimIamError {
     super(message, { httpStatusCode: 404 });
   }
 }
+
+/**
+ * Simulated IAM EntityAlreadyExists error.
+ */
+export class SimIamEntityAlreadyExists extends SimIamError {
+  public override readonly name = "EntityAlreadyExists";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 409 });
+  }
+}
