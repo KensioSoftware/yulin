@@ -24,6 +24,7 @@ import { SimAwsServiceFactory } from "./factory/sim-aws-service-factory.js";
 import { SimAwsScopeRegistry } from "./scope/sim-aws-scope-registry.js";
 import type { SimAcm } from "../acm/sim-acm.js";
 import type { SimIam } from "../iam/index.js";
+import type { SimIamRegistry } from "../iam/registry/sim-iam-registry.js";
 
 interface SimAwsProps {
   readonly defaultAccountId?: SimAwsAccountId;
@@ -44,6 +45,12 @@ export class SimAws {
    * @internal
    */
   public readonly serviceFactory: SimAwsServiceFactory;
+
+  /**
+   * Sim IAM registry for this sim AWS instance.
+   */
+  public readonly iamRegistry: SimIamRegistry;
+
   private readonly background: BackgroundScheduler & BackgroundCompleter;
   private readonly scopes: SimAwsScopeRegistry;
 
@@ -61,6 +68,7 @@ export class SimAws {
       simAws: this,
       background,
     });
+    this.iamRegistry = this.serviceFactory.iamRegistry;
     this.scopes = new SimAwsScopeRegistry({ simAws: this });
   }
 
