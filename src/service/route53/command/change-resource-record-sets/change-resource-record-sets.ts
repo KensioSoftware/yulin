@@ -1,13 +1,11 @@
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type { SimRoute53HostedZone } from "../../hosted-zone/sim-route53-hosted-zone.js";
-import type {
-  SimRoute53Record,
-  SimRoute53RecordType,
-} from "../../record/sim-route53-record.js";
+import type { SimRoute53Record } from "../../record/sim-route53-record.js";
 import type {
   SimRoute53Change,
   SimRoute53ResourceRecordSet,
 } from "./change-resource-record-sets.cmd.js";
+import { isSimRoute53RecordType } from "../../record/sim-route53-record-type.js";
 
 /**
  * Validate a Route53 resource record set change without mutating the Hosted Zone.
@@ -124,15 +122,4 @@ function toSimRoute53Record(
     ttl: resourceRecordSet.TTL,
     alias,
   };
-}
-
-function isSimRoute53RecordType(value: string): value is SimRoute53RecordType {
-  return (
-    value === "A" ||
-    value === "AAAA" ||
-    value === "CNAME" ||
-    value === "TXT" ||
-    value === "NS" ||
-    value === "SOA"
-  );
 }

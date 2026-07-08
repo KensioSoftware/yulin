@@ -191,6 +191,7 @@ export default defineConfig(
       "unicorn/better-regex": "warn",
       "unicorn/prevent-abbreviations": "off",
       "unicorn/no-null": "off",
+      "unicorn/prefer-https": "off",
     },
   },
   {

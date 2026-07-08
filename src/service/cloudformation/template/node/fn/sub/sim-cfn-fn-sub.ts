@@ -76,7 +76,7 @@ export class SimCfnFnSub extends SimCfnNode {
       ...this.subTemplate
         .variableNames()
         .filter((variableName) => !this.variables.has(variableName))
-        .map((variableName) => variableName.split(".")[0] ?? variableName),
+        .map((variableName) => variableName.split(".", 1)[0] ?? variableName),
     ];
   }
 }

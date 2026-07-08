@@ -121,7 +121,6 @@ export class SimCloudFrontDistribution {
  */
 export function makeDistributionId(): SimCloudFrontDistributionId {
   return faker.helpers.fromRegExp(
-    // eslint-disable-next-line unicorn/better-regex -- fromRegExp needs 0-9 not \d
     /E[0-9A-Z]{13}/,
   ) as SimCloudFrontDistributionId;
 }
