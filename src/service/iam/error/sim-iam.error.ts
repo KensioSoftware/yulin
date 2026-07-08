@@ -38,3 +38,14 @@ export class SimIamEntityAlreadyExists extends SimIamError {
     super(message, { httpStatusCode: 409 });
   }
 }
+
+/**
+ * Simulated IAM InvalidMarker error.
+ */
+export class SimIamInvalidMarkerException extends SimIamError {
+  public override readonly name = "InvalidMarkerException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}

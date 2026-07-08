@@ -5,6 +5,7 @@ import {
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
+  assertThrowsErrorAsync,
   assertTrue,
   assertUndefined,
 } from "@kensio/smartass";
@@ -175,5 +176,55 @@ describe("IAM ListRolesCommand", () => {
     assertIdentical(allRoleNames[0], "AlphaRole");
     assertIdentical(allRoleNames[1], "BetaRole");
     assertIdentical(allRoleNames[2], "GammaRole");
+  });
+
+  it("rejects invalid MaxItems values", async () => {
+    const simAws = new SimAws();
+    const simIam = simAws.iam();
+
+    // When ListRolesCommand is handled with MaxItems below the AWS range, then
+    // it rejects instead of returning a truncated page without a usable marker.
+    const error = await assertThrowsErrorAsync(async () => {
+      await simIam.listRoles(
+        new ListRolesCommand({
+          MaxItems: 0,
+        }),
+      );
+    });
+
+    assertInstanceOf(error, RangeError);
+    assertIdentical(
+      error.message,
+      "ListRolesCommand.input.MaxItems must be an integer between 1 and 1000",
+    );
+  });
+
+  it("rejects a stale Marker", async () => {
+    const simAws = new SimAws();
+    const simIam = simAws.iam();
+
+    await simIam.createRole(
+      new CreateRoleCommand({
+        RoleName: "CurrentRole",
+        AssumeRolePolicyDocument: "{}",
+      }),
+    );
+
+    const staleMarker = Buffer.from("DeletedRole", "utf8").toString(
+      "base64url",
+    );
+
+    // When ListRolesCommand is handled with a marker for a Role that is no
+    // longer present, then it rejects instead of restarting from the first page.
+    const error = await assertThrowsErrorAsync(async () => {
+      await simIam.listRoles(
+        new ListRolesCommand({
+          Marker: staleMarker,
+        }),
+      );
+    });
+
+    assertIdentical(error.name, "InvalidMarkerException");
+    assertIdentical(error.message, "ListRolesCommand.input.Marker is invalid");
   });
 });

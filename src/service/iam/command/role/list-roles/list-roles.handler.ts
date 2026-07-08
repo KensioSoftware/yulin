@@ -8,6 +8,7 @@ import type {
   SimListRolesCommandOutput,
 } from "./list-roles.cmd.js";
 import type { SimIamRole, SimIamRoleName } from "../../../role/sim-iam-role.js";
+import { SimIamInvalidMarkerException } from "../../../error/sim-iam.error.js";
 
 interface ListRolesCommandHandlerProps {
   readonly roles: Map<SimIamRoleName, SimIamRole>;
@@ -40,7 +41,7 @@ export class ListRolesCommandHandler implements CommandHandler<
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    const maxItems = cmd.input.MaxItems ?? 100;
+    const maxItems = this.getMaxItems(cmd);
     const roles = this.matchingRoles(cmd);
 
     const startRoleName =
@@ -48,13 +49,7 @@ export class ListRolesCommandHandler implements CommandHandler<
         ? undefined
         : ListRolesCommandHandler.parseMarker(cmd.input.Marker);
 
-    const startIndex =
-      startRoleName === undefined
-        ? 0
-        : Math.max(
-            0,
-            roles.findIndex((role) => role.roleName === startRoleName) + 1,
-          );
+    const startIndex = this.getStartIndex(roles, startRoleName);
 
     const page = roles.slice(startIndex, startIndex + maxItems);
     const lastRole = page.at(-1);
@@ -93,6 +88,39 @@ export class ListRolesCommandHandler implements CommandHandler<
 
       return true;
     });
+  }
+
+  private getMaxItems(cmd: SimListRolesCommand): number {
+    const maxItems = cmd.input.MaxItems ?? 100;
+
+    if (!Number.isInteger(maxItems) || maxItems < 1 || maxItems > 1000) {
+      throw new RangeError(
+        "ListRolesCommand.input.MaxItems must be an integer between 1 and 1000",
+      );
+    }
+
+    return maxItems;
+  }
+
+  private getStartIndex(
+    roles: readonly SimIamRole[],
+    startRoleName: SimIamRoleName | undefined,
+  ): number {
+    if (startRoleName === undefined) {
+      return 0;
+    }
+
+    const markerIndex = roles.findIndex(
+      (role) => role.roleName === startRoleName,
+    );
+
+    if (markerIndex === -1) {
+      throw new SimIamInvalidMarkerException(
+        "ListRolesCommand.input.Marker is invalid",
+      );
+    }
+
+    return markerIndex + 1;
   }
 
   private static makeMarker(roleName: SimIamRoleName): string {
