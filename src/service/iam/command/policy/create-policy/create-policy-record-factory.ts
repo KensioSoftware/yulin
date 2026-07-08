@@ -1,15 +1,15 @@
-import type { SimArn } from "../../../aws/arn.js";
+import type { SimArn } from "../../../../aws/arn.js";
 import type {
   SimIamPolicy,
   SimIamPolicyDocument,
   SimIamPolicyName,
-} from "../../policy/sim-iam-policy.js";
-import { makeSimPolicyId } from "../../policy/sim-iam-policy-arn.js";
+} from "../../../policy/sim-iam-policy.js";
+import { makeSimPolicyId } from "../../../policy/sim-iam-policy-arn.js";
 import type {
   SimCreatePolicyCommand,
   SimCreatePolicyCommandOutput,
 } from "./create-policy.cmd.js";
-import type { JSONString } from "../../../../util/type-guard/json.js";
+import type { JSONString } from "../../../../../util/type-guard/json.js";
 
 interface CreatePolicyRecordFactoryProps {
   readonly arn: SimArn;

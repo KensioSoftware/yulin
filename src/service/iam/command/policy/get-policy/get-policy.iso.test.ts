@@ -7,8 +7,8 @@ import {
   assertTrue,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
-import { SimAws } from "../../../aws/sim-aws.js";
-import { SimIamNoSuchEntity } from "../../error/sim-iam.error.js";
+import { SimAws } from "../../../../aws/sim-aws.js";
+import { SimIamNoSuchEntity } from "../../../error/sim-iam.error.js";
 
 describe("IAM GetPolicyCommand", () => {
   it("gets an IAM Policy through the top-level SimIam service", async () => {

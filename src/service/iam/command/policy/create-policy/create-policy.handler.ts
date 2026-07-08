@@ -1,6 +1,6 @@
-import type { CommandHandler } from "../../../../command/command-handler.js";
-import type { SimArn } from "../../../aws/arn.js";
-import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
+import type { CommandHandler } from "../../../../../command/command-handler.js";
+import type { SimArn } from "../../../../aws/arn.js";
+import type { SimAwsAccountId } from "../../../../aws/sim-aws-account.js";
 import type {
   SimCreatePolicyCommand,
   SimCreatePolicyCommandOutput,
@@ -8,15 +8,15 @@ import type {
 import {
   type BackgroundScheduler,
   BackgroundTasks,
-} from "../../../../util/background/background.js";
+} from "../../../../../util/background/background.js";
 import type {
   SimIamPolicy,
   SimIamPolicyName,
-} from "../../policy/sim-iam-policy.js";
-import { makeSimPolicyArn } from "../../policy/sim-iam-policy-arn.js";
-import { normalisePolicyPath } from "../../policy/sim-iam-policy-path.js";
+} from "../../../policy/sim-iam-policy.js";
+import { makeSimPolicyArn } from "../../../policy/sim-iam-policy-arn.js";
+import { normalisePolicyPath } from "../../../policy/sim-iam-policy-path.js";
 import { CreatePolicyRecordFactory } from "./create-policy-record-factory.js";
-import { SimIamEntityAlreadyExists } from "../../error/sim-iam.error.js";
+import { SimIamEntityAlreadyExists } from "../../../error/sim-iam.error.js";
 
 interface CreatePolicyCommandHandlerProps {
   readonly accountId: SimAwsAccountId;

@@ -1,4 +1,4 @@
-import type { SimArn } from "../../../aws/arn.js";
+import type { SimArn } from "../../../../aws/arn.js";
 
 export interface SimGetPolicyCommandInput {
   readonly PolicyArn?: string | undefined;

@@ -1,4 +1,4 @@
-import type { SimArn } from "../../../aws/arn.js";
+import type { SimArn } from "../../../../aws/arn.js";
 
 export type SimIamPolicyScopeType = "All" | "AWS" | "Local";
 export type SimIamPolicyUsageType = "PermissionsPolicy" | "PermissionsBoundary";
