@@ -15,6 +15,7 @@ import { SimAwsAccountServiceCache } from "./sim-aws-account-service-cache.js";
 import { SimAcm } from "../../acm/sim-acm.js";
 import { SimRoute53Registry } from "../../route53/registry/sim-route53-registry.js";
 import type { SimIam } from "../../iam/index.js";
+import { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
 
 interface SimAwsServiceFactoryProps {
   readonly simAws: SimAws;
@@ -22,17 +23,22 @@ interface SimAwsServiceFactoryProps {
 }
 
 /**
- * Factory for simulated AWS services.
+ * Factory for simulated AWS services used by one SimAws instance.
  *
- * This keeps service construction, shared service registries, and service-level
- * singleton caches out of the top-level SimAws facade.
+ * This class is the top-level construction boundary behind the SimAws facade.
+ * It wires shared collaborators such as background tasks and service
+ * registries, creates new account/region-scoped service instances, and
+ * delegates account-scoped singleton lifetimes to SimAwsAccountServiceCache.
+ *
+ * SimAwsAccountServiceCache is deliberately narrower: it only caches services
+ * that should be reused for an entire account. This factory decides whether a
+ * service should be created fresh for the requested account/region scope, such
+ * as ACM, CloudFormation, DynamoDB, and S3, or routed through that
+ * account-level cache, such as IAM, Route53, and CloudFront.
  */
 export class SimAwsServiceFactory {
   private readonly simAws: SimAws;
   private readonly background: BackgroundScheduler & BackgroundCompleter;
-
-  private readonly s3GlobalRegistry = new SimS3GlobalRegistry();
-  private readonly route53Registry = new SimRoute53Registry();
 
   /**
    * Shared simulated CloudFront registry.
@@ -42,6 +48,31 @@ export class SimAwsServiceFactory {
    * @internal
    */
   public readonly cloudFrontRegistry = new SimCloudFrontRegistry();
+
+  /**
+   * Shared simulated IAM registry.
+   *
+   * This owns IAM state that is global within one SimAws instance, including
+   * activation state and activation diagnostics.
+   */
+  public readonly iamRegistry = new SimIamRegistry();
+
+  /**
+   * Shared simulated Route53 registry.
+   *
+   * This owns hosted zone and DNS record state that is shared by the
+   * account-scoped Route53 service instances created for one SimAws instance.
+   */
+  private readonly route53Registry = new SimRoute53Registry();
+
+  /**
+   * Shared simulated S3 registry.
+   *
+   * This tracks Bucket ownership across account and region scopes for one
+   * SimAws instance, so region-scoped S3 service instances can enforce the
+   * cross-region uniqueness and lookup behavior of S3 Bucket names.
+   */
+  private readonly s3Registry = new SimS3GlobalRegistry();
 
   private readonly accountServices: SimAwsAccountServiceCache;
 
@@ -53,6 +84,7 @@ export class SimAwsServiceFactory {
       background: props.background,
       cloudFrontRegistry: this.cloudFrontRegistry,
       route53Registry: this.route53Registry,
+      iamRegistry: this.iamRegistry,
     });
   }
 
@@ -98,7 +130,7 @@ export class SimAwsServiceFactory {
    * Create or get simulated IAM for an Account scope.
    */
   createIam(scope: SimAwsAccountRegionContainer): SimIam {
-    return this.accountServices.createIam(scope, this.background);
+    return this.accountServices.createIam(scope);
   }
 
   /**
@@ -114,7 +146,7 @@ export class SimAwsServiceFactory {
   createS3(scope: SimAwsAccountRegionContainer): SimS3 {
     return new SimS3({
       accountRegionScope: scope.accountRegionScope,
-      s3GlobalRegistry: this.s3GlobalRegistry,
+      s3GlobalRegistry: this.s3Registry,
       background: this.background,
     });
   }

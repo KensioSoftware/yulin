@@ -21,10 +21,12 @@ import {
   type BackgroundScheduler,
   BackgroundTasks,
 } from "../../util/background/background.js";
+import { SimIamRegistry } from "./registry/sim-iam-registry.js";
 
 interface SimIamProps {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
   readonly background?: BackgroundScheduler;
+  readonly iamRegistry?: SimIamRegistry;
 }
 
 /**
@@ -39,15 +41,18 @@ export class SimIam {
 
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly background: BackgroundScheduler;
+  private readonly iamRegistry: SimIamRegistry;
 
   constructor(props: SimIamProps = {}) {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       background = new BackgroundTasks(),
+      iamRegistry = new SimIamRegistry(),
     } = props;
 
     this.accountRegionScope = accountRegionScope;
     this.background = background;
+    this.iamRegistry = iamRegistry;
   }
 
   /**
@@ -56,6 +61,8 @@ export class SimIam {
   async createPolicy(
     cmd: SimCreatePolicyCommand,
   ): Promise<SimCreatePolicyCommandOutput> {
+    this.iamRegistry.activate("IAM SDK API", "CreatePolicy");
+
     const handler = new CreatePolicyCommandHandler({
       accountId: this.accountRegionScope.accountId,
       policies: this.policies,
@@ -70,6 +77,8 @@ export class SimIam {
   async getPolicy(
     cmd: SimGetPolicyCommand,
   ): Promise<SimGetPolicyCommandOutput> {
+    this.iamRegistry.activate("IAM SDK API", "GetPolicy");
+
     const handler = new GetPolicyCommandHandler({
       policies: this.policies,
       background: this.background,
@@ -83,6 +92,8 @@ export class SimIam {
   async listPolicies(
     cmd: SimListPoliciesCommand,
   ): Promise<SimListPoliciesCommandOutput> {
+    this.iamRegistry.activate("IAM SDK API", "ListPolicies");
+
     const handler = new ListPoliciesCommandHandler({
       policies: this.policies,
       background: this.background,

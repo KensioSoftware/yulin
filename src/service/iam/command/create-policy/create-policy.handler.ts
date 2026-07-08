@@ -67,8 +67,6 @@ export class CreatePolicyCommandHandler implements CommandHandler<
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    // TODO: when we later have sim IAM Registry, uniqueness check should be
-    // cross-account.
     if (this.policies.has(arn)) {
       throw new SimIamEntityAlreadyExists(
         `Sim IAM Policy already exists: ${arn}`,
