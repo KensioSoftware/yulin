@@ -1,11 +1,11 @@
-import type { CommandHandler } from "../../../../command/command-handler.js";
-import type { SimArn } from "../../../aws/arn.js";
+import type { CommandHandler } from "../../../../../command/command-handler.js";
+import type { SimArn } from "../../../../aws/arn.js";
 import {
   type BackgroundScheduler,
   BackgroundTasks,
-} from "../../../../util/background/background.js";
-import type { SimIamPolicy } from "../../policy/sim-iam-policy.js";
-import { SimIamNoSuchEntity } from "../../error/sim-iam.error.js";
+} from "../../../../../util/background/background.js";
+import type { SimIamPolicy } from "../../../policy/sim-iam-policy.js";
+import { SimIamNoSuchEntity } from "../../../error/sim-iam.error.js";
 import type {
   SimGetPolicyCommand,
   SimGetPolicyCommandOutput,
