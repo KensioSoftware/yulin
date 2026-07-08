@@ -149,7 +149,7 @@ export class SimCloudFront {
   getCloudFrontFunctionByArn(
     cloudFrontFunctionArn: SimArn,
   ): SimCloudFrontFunction | undefined {
-    const arnAccountId = cloudFrontFunctionArn.split(":")[4];
+    const arnAccountId = cloudFrontFunctionArn.split(":", 5)[4];
     if (arnAccountId !== this.accountRegionScope.accountId) {
       return undefined;
     }

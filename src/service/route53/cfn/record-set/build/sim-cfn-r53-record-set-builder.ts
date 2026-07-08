@@ -6,6 +6,7 @@ import type {
 } from "../../../command/change-resource-record-sets/change-resource-record-sets.cmd.js";
 import type { SimRoute53RecordType } from "../../../record/sim-route53-record.js";
 import { SimCfnRoute53AliasTargetParser } from "../parse/sim-cfn-r53-alias-target-parser.js";
+import { isSimRoute53RecordType } from "../../../record/sim-route53-record-type.js";
 
 /**
  * Builds Route53 ResourceRecordSet command input from CloudFormation
@@ -50,7 +51,7 @@ export class SimCfnRoute53RecordSetBuilder {
   private type(): SimRoute53RecordType {
     const type = this.properties["Type"];
 
-    if (!this.isRoute53RecordType(type)) {
+    if (!isSimRoute53RecordType(type)) {
       throw new TypeError(
         `Invalid AWS::Route53::RecordSet ${this.resource.logicalId}: Type must be a supported Route53 record type`,
       );
@@ -115,16 +116,5 @@ export class SimCfnRoute53RecordSetBuilder {
     return {
       Value: value,
     };
-  }
-
-  private isRoute53RecordType(value: unknown): value is SimRoute53RecordType {
-    return (
-      value === "A" ||
-      value === "AAAA" ||
-      value === "CNAME" ||
-      value === "TXT" ||
-      value === "NS" ||
-      value === "SOA"
-    );
   }
 }

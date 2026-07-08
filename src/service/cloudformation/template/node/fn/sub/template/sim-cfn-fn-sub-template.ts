@@ -55,6 +55,6 @@ export class SimCfnFnSubTemplate {
   }
 
   private logicalName(variableName: string): string {
-    return variableName.split(".")[0] ?? variableName;
+    return variableName.split(".", 1)[0] ?? variableName;
   }
 }

@@ -94,8 +94,8 @@ importers:
         specifier: ^4.0.1
         version: 4.0.1
       eslint-plugin-unicorn:
-        specifier: ^64.0.0
-        version: 64.0.0(eslint@10.6.0(jiti@2.7.0))
+        specifier: ^65.0.0
+        version: 65.0.0(eslint@10.6.0(jiti@2.7.0))
       execa:
         specifier: ^9.6.1
         version: 9.6.1
@@ -928,10 +928,6 @@ packages:
     resolution: {integrity: sha512-77PSwercCZU2Fc4sX94eF8k8Pxte6JAwL4/ICZLFjJLqegs7kCuAsqqj/70NQF6TvDpgFjkubQB2FW2ZZddvQg==}
     engines: {node: '>=8'}
 
-  clean-regexp@1.0.0:
-    resolution: {integrity: sha512-GfisEZEJvzKrmGWkvfhgzcz/BllN1USeqD2V6tg14OAOgaCD2Z/PUEuxnAZ/nPvmaHRG7a8y77p1T/IRQ4D1Hw==}
-    engines: {node: '>=4'}
-
   comment-parser@1.4.7:
     resolution: {integrity: sha512-0h+uSNtQGW3D98eQt3jJ8L06Fves8hncB4V/PKdw/Qb8Hnk19VaKuTr55UNRYiSoVa7WwrFls+rh3ux9agmkeQ==}
     engines: {node: '>= 12.0.0'}
@@ -961,6 +957,10 @@ packages:
   deep-is@0.1.4:
     resolution: {integrity: sha512-oIPzksmTg4/MriiaYGO+okXDT7ztn/w3Eptv/+gSIdMdKsJo0u4CfYNFJPy+4SKMuCqGw2wxnA+URMg3t8a/bQ==}
 
+  detect-indent@7.0.2:
+    resolution: {integrity: sha512-y+8xyqdGLL+6sh0tVeHcfP/QDd8gUgbasolJJpY7NgeQGSZ739bDtSiaiDgtoicy+mtYB81dKLxO9xRhCyIB3A==}
+    engines: {node: '>=12.20'}
+
   detect-libc@2.1.2:
     resolution: {integrity: sha512-Btj2BOOO83o3WyH59e8MgXsxEQVcarkUOpEYrubB0urwnN10yQ364rsiByU11nZlqWYZm05i/of7io4mzihBtQ==}
     engines: {node: '>=8'}
@@ -983,10 +983,6 @@ packages:
   escalade@3.2.0:
     resolution: {integrity: sha512-WUj2qlxaQtO4g6Pq5c29GTcWGDyd8itL8zTlipgECz3JesAiiOKotd8JU6otB3PACgG6xkJUyVhboMS+bje/jA==}
     engines: {node: '>=6'}
-
-  escape-string-regexp@1.0.5:
-    resolution: {integrity: sha512-vbRorB5FUQWvla16U8R/qgaFIya2qGzwDrNmCZuYKrbdSUMG6I1ZCGQRefkRVhuOkIGVne7BQ35DSfo1qvJqFg==}
-    engines: {node: '>=0.8.0'}
 
   escape-string-regexp@4.0.0:
     resolution: {integrity: sha512-TtpcNJ3XAzx3Gq8sWRzJaVajRs0uVxA2YAkdb1jm2YkPz4G6egUFAyA3n5vtEIZefPk5Wa4UXbKuS5fKkJWdgA==}
@@ -1014,8 +1010,8 @@ packages:
     resolution: {integrity: sha512-/lZCkOxPOWaf1jXAqgICrS8St3BMBccIPvhOSUYuV6VCr1o5nFVG998FnTLt6w2Nxb8Uo0nM8fzmnhp+GY/aEg==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
-  eslint-plugin-unicorn@64.0.0:
-    resolution: {integrity: sha512-rNZwalHh8i0UfPlhNwg5BTUO1CMdKNmjqe+TgzOTZnpKoi8VBgsW7u9qCHIdpxEzZ1uwrJrPF0uRb7l//K38gA==}
+  eslint-plugin-unicorn@65.0.0:
+    resolution: {integrity: sha512-wE75x2QqMuPgZXcoc8LgTz7+gk5+SZK93Cxe6jkfouKp6+FwYwjMGrbYQTMRH8HK8X6jeTBhPPI2Cun923EMLQ==}
     engines: {node: ^20.10.0 || >=21.0.0}
     peerDependencies:
       eslint: '>=9.38.0'
@@ -2542,10 +2538,6 @@ snapshots:
 
   ci-info@4.4.0: {}
 
-  clean-regexp@1.0.0:
-    dependencies:
-      escape-string-regexp: 1.0.5
-
   comment-parser@1.4.7: {}
 
   constructs@10.6.0: {}
@@ -2567,6 +2559,8 @@ snapshots:
       ms: 2.1.3
 
   deep-is@0.1.4: {}
+
+  detect-indent@7.0.2: {}
 
   detect-libc@2.1.2: {}
 
@@ -2607,8 +2601,6 @@ snapshots:
 
   escalade@3.2.0: {}
 
-  escape-string-regexp@1.0.5: {}
-
   escape-string-regexp@4.0.0: {}
 
   eslint-config-prettier@10.1.8(eslint@10.6.0(jiti@2.7.0)):
@@ -2643,14 +2635,14 @@ snapshots:
     dependencies:
       safe-regex: 2.1.1
 
-  eslint-plugin-unicorn@64.0.0(eslint@10.6.0(jiti@2.7.0)):
+  eslint-plugin-unicorn@65.0.0(eslint@10.6.0(jiti@2.7.0)):
     dependencies:
       '@babel/helper-validator-identifier': 7.29.7
       '@eslint-community/eslint-utils': 4.9.1(eslint@10.6.0(jiti@2.7.0))
       change-case: 5.4.4
       ci-info: 4.4.0
-      clean-regexp: 1.0.0
       core-js-compat: 3.49.0
+      detect-indent: 7.0.2
       eslint: 10.6.0(jiti@2.7.0)
       find-up-simple: 1.0.1
       globals: 17.7.0
@@ -2658,7 +2650,6 @@ snapshots:
       is-builtin-module: 5.0.0
       jsesc: 3.1.0
       pluralize: 8.0.0
-      regexp-tree: 0.1.27
       regjsparser: 0.13.2
       semver: 7.8.5
       strip-indent: 4.1.1
