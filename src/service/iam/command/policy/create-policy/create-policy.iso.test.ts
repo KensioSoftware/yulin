@@ -8,8 +8,8 @@ import {
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
-import { SimAws } from "../../../aws/sim-aws.js";
-import { makeSimAwsAccountId } from "../../../aws/sim-aws-account.js";
+import { SimAws } from "../../../../aws/sim-aws.js";
+import { makeSimAwsAccountId } from "../../../../aws/sim-aws-account.js";
 
 describe("IAM CreatePolicyCommand", () => {
   it("creates an IAM Policy through the top-level SimIam service", async () => {
