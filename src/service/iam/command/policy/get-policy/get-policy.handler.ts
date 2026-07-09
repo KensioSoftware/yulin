@@ -4,7 +4,7 @@ import {
   type BackgroundScheduler,
   BackgroundTasks,
 } from "../../../../../util/background/background.js";
-import type { SimIamPolicy } from "../../../policy/sim-iam-policy.js";
+import type { SimIamManagedPolicy } from "../../../policy/sim-iam-policy.js";
 import { SimIamNoSuchEntity } from "../../../error/sim-iam.error.js";
 import type {
   SimGetPolicyCommand,
@@ -12,7 +12,7 @@ import type {
 } from "./get-policy.cmd.js";
 
 interface GetPolicyCommandHandlerProps {
-  readonly policies: Map<SimArn, SimIamPolicy>;
+  readonly policies: Map<SimArn, SimIamManagedPolicy>;
   readonly background?: BackgroundScheduler;
 }
 
@@ -25,7 +25,7 @@ export class GetPolicyCommandHandler implements CommandHandler<
   SimGetPolicyCommand,
   SimGetPolicyCommandOutput
 > {
-  private readonly policies: Map<SimArn, SimIamPolicy>;
+  private readonly policies: Map<SimArn, SimIamManagedPolicy>;
   private readonly background: BackgroundScheduler;
 
   constructor(props: GetPolicyCommandHandlerProps) {

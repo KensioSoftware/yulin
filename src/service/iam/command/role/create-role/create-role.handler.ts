@@ -20,8 +20,14 @@ interface CreateRoleCommandHandlerProps {
   readonly background?: BackgroundScheduler;
 }
 
+// TODO: trust policies
+
 /**
  * IAM CreateRoleCommand handler.
+ *
+ * CreateRole accepts an AssumeRolePolicyDocument, which is the role trust
+ * policy.
+ * Inline identity permissions policies are added separately with PutRolePolicy.
  *
  * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/iam/command/CreateRoleCommand/
  */

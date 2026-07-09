@@ -131,8 +131,8 @@ export class SimCfnTemplate {
   /**
    * Get Output template entries with parameter-only expressions resolved.
    *
-   * Resource-backed intrinsic functions are intentionally left unresolved here
-   * because Outputs are resolved after Resource creation.
+   * Resource-backed intrinsic functions are left unresolved here because
+   * Outputs are resolved after Resource creation.
    */
   outputTemplates(): SimCfnOutputTemplateRecord[] {
     const valueResolver = new SimCfnTemplateValueResolver({

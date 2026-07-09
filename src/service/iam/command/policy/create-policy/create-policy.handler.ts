@@ -10,7 +10,7 @@ import {
   BackgroundTasks,
 } from "../../../../../util/background/background.js";
 import type {
-  SimIamPolicy,
+  SimIamManagedPolicy,
   SimIamPolicyName,
 } from "../../../policy/sim-iam-policy.js";
 import { makeSimPolicyArn } from "../../../policy/sim-iam-policy-arn.js";
@@ -20,9 +20,13 @@ import { SimIamEntityAlreadyExists } from "../../../error/sim-iam.error.js";
 
 interface CreatePolicyCommandHandlerProps {
   readonly accountId: SimAwsAccountId;
-  readonly policies: Map<SimArn, SimIamPolicy>;
+  readonly policies: Map<SimArn, SimIamManagedPolicy>;
   readonly background?: BackgroundScheduler;
 }
+
+// TODO: basic policy validation, i.e.:
+//  IAM policy statement must define either Action or NotAction
+//  IAM policy statement must define either Resource or NotResource
 
 /**
  * IAM CreatePolicyCommand handler.
@@ -34,7 +38,7 @@ export class CreatePolicyCommandHandler implements CommandHandler<
   SimCreatePolicyCommandOutput
 > {
   private readonly accountId: SimAwsAccountId;
-  private readonly policies: Map<SimArn, SimIamPolicy>;
+  private readonly policies: Map<SimArn, SimIamManagedPolicy>;
   private readonly background: BackgroundScheduler;
   private readonly policyFactory = new CreatePolicyRecordFactory();
 
