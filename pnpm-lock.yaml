@@ -95,7 +95,7 @@ importers:
         version: 4.0.1
       eslint-plugin-unicorn:
         specifier: ^65.0.0
-        version: 65.0.0(eslint@10.6.0(jiti@2.7.0))
+        version: 65.0.1(eslint@10.6.0(jiti@2.7.0))
       execa:
         specifier: ^9.6.1
         version: 9.6.1
@@ -969,8 +969,8 @@ packages:
     resolution: {integrity: sha512-vtcDfH3TOjP8UekytvnHH1o1P4FcUdt4eQ1Y+Abap1tk/OB2MWQvcwS2ClCd1zuIhc3JKOx6p3kod8Vfys3E+A==}
     engines: {node: '>=0.3.1'}
 
-  electron-to-chromium@1.5.388:
-    resolution: {integrity: sha512-Pl/aJaqOOxYxda3vcx1IKSJimwYXHDkEnGn0F+kG2EE68dDtx2uCinaS+Vih8Z91B9t8CSAbiF/HKyWcnXjhzw==}
+  electron-to-chromium@1.5.389:
+    resolution: {integrity: sha512-cEto7aeOqBfU1D+c5py5pE+ooscKE75JifxLBdFUZsqAxRS6y7kebtxAZvICszSl05gPjYHDTjY+lXpyGvpJbg==}
 
   es-module-lexer@2.3.0:
     resolution: {integrity: sha512-KLdwQm2NvGLDkQDCGvmiQrhkd0JbMzXthwQAUgWjQuQdBLFa3eiBP5arXZyA+f8x+x7OXgud6bq2rxjGtHV2tw==}
@@ -1010,8 +1010,8 @@ packages:
     resolution: {integrity: sha512-/lZCkOxPOWaf1jXAqgICrS8St3BMBccIPvhOSUYuV6VCr1o5nFVG998FnTLt6w2Nxb8Uo0nM8fzmnhp+GY/aEg==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
-  eslint-plugin-unicorn@65.0.0:
-    resolution: {integrity: sha512-wE75x2QqMuPgZXcoc8LgTz7+gk5+SZK93Cxe6jkfouKp6+FwYwjMGrbYQTMRH8HK8X6jeTBhPPI2Cun923EMLQ==}
+  eslint-plugin-unicorn@65.0.1:
+    resolution: {integrity: sha512-daCrQrgxOoOz2uMPWB3Y3vvv/5q+ncwICI8IjoebiwtW87CaY4tAN5EEiRXTYVnf7qi1v1BGBdHOSnZLV0rx6A==}
     engines: {node: ^20.10.0 || >=21.0.0}
     peerDependencies:
       eslint: '>=9.38.0'
@@ -2524,7 +2524,7 @@ snapshots:
     dependencies:
       baseline-browser-mapping: 2.10.42
       caniuse-lite: 1.0.30001803
-      electron-to-chromium: 1.5.388
+      electron-to-chromium: 1.5.389
       node-releases: 2.0.50
       update-browserslist-db: 1.2.3(browserslist@4.28.5)
 
@@ -2566,7 +2566,7 @@ snapshots:
 
   diff@5.2.2: {}
 
-  electron-to-chromium@1.5.388: {}
+  electron-to-chromium@1.5.389: {}
 
   es-module-lexer@2.3.0: {}
 
@@ -2635,7 +2635,7 @@ snapshots:
     dependencies:
       safe-regex: 2.1.1
 
-  eslint-plugin-unicorn@65.0.0(eslint@10.6.0(jiti@2.7.0)):
+  eslint-plugin-unicorn@65.0.1(eslint@10.6.0(jiti@2.7.0)):
     dependencies:
       '@babel/helper-validator-identifier': 7.29.7
       '@eslint-community/eslint-utils': 4.9.1(eslint@10.6.0(jiti@2.7.0))
