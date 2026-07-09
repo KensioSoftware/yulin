@@ -3,6 +3,9 @@ import {
   assertArrayLength,
   assertFalse,
   assertIdentical,
+  assertInstanceOf,
+  assertStringIncludes,
+  assertThrowsError,
   assertTrue,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -214,19 +217,19 @@ describe("Sim IAM inline identity policy authorization", () => {
       }),
     );
 
-    const decision = simIam.authorize({
-      action: "s3:GetObject",
-      resource: "arn:aws:s3:::example-bucket/example-key.txt",
-      principal: createRoleOutput.Role.Arn,
+    const error = assertThrowsError(() => {
+      simIam.authorize({
+        action: "s3:GetObject",
+        resource: "arn:aws:s3:::example-bucket/example-key.txt",
+        principal: createRoleOutput.Role.Arn,
+      });
     });
 
-    assertIdentical(decision.value, SimIamPolicyDecisionValue.ImplicitDeny);
-    assertTrue(decision.isDenied);
-    assertTrue(decision.isImplicitDeny);
-    assertFalse(decision.isAllowed);
-    assertFalse(decision.isExplicitDeny);
-    assertArrayLength(decision.allowStatements, 0);
-    assertArrayLength(decision.explicitDenyStatements, 0);
+    assertInstanceOf(error, TypeError);
+    assertStringIncludes(
+      error.message,
+      "IAM policy statement must define either Resource or NotResource",
+    );
   });
 
   it("explicitly denies a role through an inline identity policy", async () => {

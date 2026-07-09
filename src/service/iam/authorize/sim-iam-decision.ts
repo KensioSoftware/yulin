@@ -174,7 +174,6 @@ export class SimIamPolicyDecision {
       );
     }
 
-    /* v8 ignore next -- defensive diagnostic error */
     throw new TypeError(
       "IAM policy statement must define either Resource or NotResource",
     );
