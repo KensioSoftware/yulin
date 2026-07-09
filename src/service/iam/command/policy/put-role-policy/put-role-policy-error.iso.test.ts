@@ -174,7 +174,15 @@ describe("IAM PutRolePolicyCommand errors", () => {
         new PutRolePolicyCommand({
           RoleName: "MissingRole",
           PolicyName: "ReadObjects",
-          PolicyDocument: "{}",
+          PolicyDocument: JSON.stringify({
+            Statement: [
+              {
+                Effect: "Allow",
+                Action: "s3:GetObject",
+                Resource: "*",
+              },
+            ],
+          }),
         }),
       ),
     );

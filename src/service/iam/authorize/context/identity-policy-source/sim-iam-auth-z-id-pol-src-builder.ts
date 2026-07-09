@@ -35,12 +35,13 @@ export class SimIamAuthZIdentityPolicySourceBuilder {
   /**
    * Return the policy sources attached to the principal ARN.
    *
-   * The incoming principal is optional because some authorization checks are made
-   * without an IAM identity. In that case there are no identity policies to
-   * evaluate, but resource policies may still contribute to the final decision.
+   * The incoming principal ARN is optional because some authorization checks
+   * are made without an IAM identity. In that case there are no identity
+   * policies to evaluate, but resource policies may still contribute to the
+   * final decision.
    */
-  build(principal: string | undefined): readonly SimIamAuthZPolicySource[] {
-    const principalRole = this.principalRole(principal);
+  build(principalArn: string | undefined): readonly SimIamAuthZPolicySource[] {
+    const principalRole = this.principalRole(principalArn);
 
     if (principalRole === undefined) {
       return [];
@@ -56,16 +57,18 @@ export class SimIamAuthZIdentityPolicySourceBuilder {
    * Resolve a principal ARN to the simulated IAM role that owns the identity
    * policies.
    *
-   * Roles are keyed by role name in the IAM store, while authorization input uses
-   * a principal ARN. The scan bridges those two representations without changing
-   * the storage map used by command handlers.
+   * Roles are keyed by role name in the IAM store, while authorization input
+   * uses a principal ARN. The scan bridges those two representations without
+   * changing the storage map used by command handlers.
    */
-  private principalRole(principal: string | undefined): SimIamRole | undefined {
-    if (principal === undefined) {
+  private principalRole(
+    principalArn: string | undefined,
+  ): SimIamRole | undefined {
+    if (principalArn === undefined) {
       return undefined;
     }
 
-    return [...this.roles.values()].find((role) => role.arn === principal);
+    return [...this.roles.values()].find((role) => role.arn === principalArn);
   }
 
   /**

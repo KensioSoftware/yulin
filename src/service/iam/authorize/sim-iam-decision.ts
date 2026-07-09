@@ -1,10 +1,10 @@
 import type { SimIamPolicyDocumentStatement } from "../policy/sim-iam-policy.js";
-import type { SimIamAuthZContext } from "./context/sim-iam-auth-z-context.js";
-import {
-  SimIamPolicyDocumentParser,
-  type SimIamParsedPolicyStatement,
-} from "../policy/parse/sim-iam-doc-parser.js";
-import { simIamWildcardMatch } from "./sim-iam-wildcard.js";
+import type {
+  SimIamAuthZContext,
+  SimIamAuthZPolicySource,
+} from "./context/sim-iam-auth-z-context.js";
+import { SimIamPolicyDocumentParser } from "../policy/parse/sim-iam-doc-parser.js";
+import { SimIamPolicyStatementMatcher } from "./match/sim-iam-policy-statement-matcher.js";
 
 export const SimIamPolicyDecisionValue = {
   ExplicitDeny: "ExplicitDeny",
@@ -15,18 +15,27 @@ export const SimIamPolicyDecisionValue = {
 export type SimIamPolicyDecisionValue =
   (typeof SimIamPolicyDecisionValue)[keyof typeof SimIamPolicyDecisionValue];
 
-// TODO: resource-based policies
-
 /**
  * Decision for one simulated IAM policy authorization attempt.
  *
- * This evaluates already-discovered policy documents. It does not fetch
- * attached policies, apply trust policy semantics, evaluate permissions
- * boundaries, or enforce service command access.
+ * This evaluates already-discovered identity and resource policy documents. It
+ * does not fetch attached policies itself, apply trust policy semantics,
+ * evaluate permissions boundaries, evaluate SCPs, or enforce service command
+ * access.
+ *
+ * The simulator currently models the common IAM authorization union:
+ *
+ * - an explicit Deny in any evaluated policy wins;
+ * - an Allow in an identity policy or resource policy allows the request;
+ * - otherwise the request is implicitly denied.
+ *
+ * Resource policies are expected to be supplied by the service that owns the
+ * target resource.
  */
 export class SimIamPolicyDecision {
   private readonly request: SimIamAuthZContext;
   private readonly policyDocumentParser: SimIamPolicyDocumentParser;
+  private readonly statementMatcher: SimIamPolicyStatementMatcher;
   private readonly explicitDenyStatementRecords: SimIamPolicyDocumentStatement[] =
     [];
   private readonly allowStatementRecords: SimIamPolicyDocumentStatement[] = [];
@@ -37,6 +46,7 @@ export class SimIamPolicyDecision {
   ) {
     this.request = request;
     this.policyDocumentParser = policyDocumentParser;
+    this.statementMatcher = new SimIamPolicyStatementMatcher(request);
 
     this.evaluate();
   }
@@ -99,83 +109,28 @@ export class SimIamPolicyDecision {
   }
 
   private evaluate(): void {
-    for (const policy of this.request.identityPolicies) {
-      const parsedPolicy = this.policyDocumentParser.parse(policy.document);
+    for (const policy of [
+      ...this.request.identityPolicies,
+      ...this.request.resourcePolicies,
+    ]) {
+      this.evaluatePolicy(policy);
+    }
+  }
 
-      for (const statement of parsedPolicy.statements) {
-        if (!this.statementMatches(statement)) {
-          continue;
-        }
+  private evaluatePolicy(policy: SimIamAuthZPolicySource): void {
+    const parsedPolicy = this.policyDocumentParser.parse(policy.document);
 
-        if (statement.effect === "Deny") {
-          this.explicitDenyStatementRecords.push(statement.source);
-          continue;
-        }
-
-        this.allowStatementRecords.push(statement.source);
+    for (const statement of parsedPolicy.statements) {
+      if (!this.statementMatcher.matches(policy, statement)) {
+        continue;
       }
+
+      if (statement.effect === "Deny") {
+        this.explicitDenyStatementRecords.push(statement.source);
+        continue;
+      }
+
+      this.allowStatementRecords.push(statement.source);
     }
-  }
-
-  private statementMatches(statement: SimIamParsedPolicyStatement): boolean {
-    /* v8 ignore if -- policy conditions are TODO */
-    if (statement.condition !== undefined) {
-      return false;
-    }
-
-    /* v8 ignore if -- resource-based policies are TODO */
-    if (
-      statement.principal !== undefined ||
-      statement.notPrincipal !== undefined
-    ) {
-      return false;
-    }
-
-    return this.actionMatches(statement) && this.resourceMatches(statement);
-  }
-
-  private actionMatches(statement: SimIamParsedPolicyStatement): boolean {
-    if (statement.actions !== undefined) {
-      return statement.actions.some((pattern) =>
-        simIamWildcardMatch(pattern, this.request.action, {
-          caseSensitive: false,
-        }),
-      );
-    }
-
-    if (statement.notActions !== undefined) {
-      return !statement.notActions.some((pattern) =>
-        simIamWildcardMatch(pattern, this.request.action, {
-          caseSensitive: false,
-        }),
-      );
-    }
-
-    /* v8 ignore next -- defensive diagnostic error */
-    throw new TypeError(
-      "IAM policy statement must define either Action or NotAction",
-    );
-  }
-
-  private resourceMatches(statement: SimIamParsedPolicyStatement): boolean {
-    if (statement.resources !== undefined) {
-      return statement.resources.some((pattern) =>
-        simIamWildcardMatch(pattern, this.request.resource, {
-          caseSensitive: true,
-        }),
-      );
-    }
-
-    if (statement.notResources !== undefined) {
-      return !statement.notResources.some((pattern) =>
-        simIamWildcardMatch(pattern, this.request.resource, {
-          caseSensitive: true,
-        }),
-      );
-    }
-
-    throw new TypeError(
-      "IAM policy statement must define either Resource or NotResource",
-    );
   }
 }

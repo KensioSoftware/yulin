@@ -1,4 +1,5 @@
 import type { SimArn } from "../../../aws/arn.js";
+import type { SimAwsPrincipal } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimIamPolicyDocument } from "../../policy/sim-iam-policy.js";
 
 export type SimIamAuthZPolicySourceType =
@@ -14,6 +15,7 @@ export interface SimIamAuthZPolicySource {
   readonly document: SimIamPolicyDocument;
   readonly policyName?: string | undefined;
   readonly policyArn?: SimArn | undefined;
+  readonly resourceArn?: string | undefined;
 }
 
 export interface SimIamAuthZContext {
@@ -33,5 +35,15 @@ export interface SimIamAuthZContext {
 
   readonly action: string;
   readonly resource: string;
-  readonly principal?: string | undefined;
+
+  /**
+   * Resolved caller principal, if the simulated request has one.
+   */
+  readonly callerPrincipal?: SimAwsPrincipal | undefined;
+
+  /**
+   * Normalized ARN derived from callerPrincipal and used for current principal
+   * matching and identity-policy lookup.
+   */
+  readonly callerPrincipalArn?: string | undefined;
 }

@@ -3,23 +3,18 @@ import {
   type BackgroundScheduler,
   BackgroundTasks,
 } from "../../../../../util/background/background.js";
-import type { JSONString } from "../../../../../util/type-guard/json.js";
 import { SimIamNoSuchEntity } from "../../../error/sim-iam.error.js";
-import type { SimIamPolicyDocument } from "../../../policy/sim-iam-policy.js";
 import type { SimIamRole, SimIamRoleName } from "../../../role/sim-iam-role.js";
 import type {
   SimPutRolePolicyCommand,
   SimPutRolePolicyCommandOutput,
 } from "./put-role-policy.cmd.js";
+import { SimIamPolicyDocumentValidator } from "../../../validate/sim-iam-policy-doc-validator.js";
 
 interface PutRolePolicyCommandHandlerProps {
   readonly roles: Map<SimIamRoleName, SimIamRole>;
   readonly background?: BackgroundScheduler;
 }
-
-// TODO: basic policy validation, i.e.:
-//  IAM policy statement must define either Action or NotAction
-//  IAM policy statement must define either Resource or NotResource
 
 /**
  * IAM PutRolePolicyCommand handler.
@@ -36,12 +31,14 @@ export class PutRolePolicyCommandHandler implements CommandHandler<
 > {
   private readonly roles: Map<SimIamRoleName, SimIamRole>;
   private readonly background: BackgroundScheduler;
+  private readonly policyDocValidator: SimIamPolicyDocumentValidator;
 
   constructor(props: PutRolePolicyCommandHandlerProps) {
     const { roles, background = new BackgroundTasks() } = props;
 
     this.roles = roles;
     this.background = background;
+    this.policyDocValidator = new SimIamPolicyDocumentValidator();
   }
 
   /**
@@ -52,8 +49,7 @@ export class PutRolePolicyCommandHandler implements CommandHandler<
   ): Promise<SimPutRolePolicyCommandOutput> {
     const roleName = cmd.input.RoleName as SimIamRoleName | undefined;
     const policyName = cmd.input.PolicyName;
-    const policyDocument = cmd.input.PolicyDocument as
-      JSONString<SimIamPolicyDocument> | undefined;
+    const policyDocument = cmd.input.PolicyDocument;
 
     if (roleName === undefined || roleName.length === 0) {
       throw new Error("RoleName is required");
@@ -63,9 +59,7 @@ export class PutRolePolicyCommandHandler implements CommandHandler<
       throw new Error("PolicyName is required");
     }
 
-    if (policyDocument === undefined || policyDocument.length === 0) {
-      throw new Error("PolicyDocument is required");
-    }
+    this.policyDocValidator.validateRequired(policyDocument);
 
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();

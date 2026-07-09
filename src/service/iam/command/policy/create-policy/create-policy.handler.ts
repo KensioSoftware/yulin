@@ -17,16 +17,13 @@ import { makeSimPolicyArn } from "../../../policy/sim-iam-policy-arn.js";
 import { normalisePolicyPath } from "../../../policy/sim-iam-policy-path.js";
 import { CreatePolicyRecordFactory } from "./create-policy-record-factory.js";
 import { SimIamEntityAlreadyExists } from "../../../error/sim-iam.error.js";
+import { SimIamPolicyDocumentValidator } from "../../../validate/sim-iam-policy-doc-validator.js";
 
 interface CreatePolicyCommandHandlerProps {
   readonly accountId: SimAwsAccountId;
   readonly policies: Map<SimArn, SimIamManagedPolicy>;
   readonly background?: BackgroundScheduler;
 }
-
-// TODO: basic policy validation, i.e.:
-//  IAM policy statement must define either Action or NotAction
-//  IAM policy statement must define either Resource or NotResource
 
 /**
  * IAM CreatePolicyCommand handler.
@@ -41,12 +38,14 @@ export class CreatePolicyCommandHandler implements CommandHandler<
   private readonly policies: Map<SimArn, SimIamManagedPolicy>;
   private readonly background: BackgroundScheduler;
   private readonly policyFactory = new CreatePolicyRecordFactory();
+  private readonly policyDocValidator: SimIamPolicyDocumentValidator;
 
   constructor(props: CreatePolicyCommandHandlerProps) {
     const { accountId, policies, background = new BackgroundTasks() } = props;
     this.accountId = accountId;
     this.policies = policies;
     this.background = background;
+    this.policyDocValidator = new SimIamPolicyDocumentValidator();
   }
 
   /**
@@ -60,6 +59,8 @@ export class CreatePolicyCommandHandler implements CommandHandler<
     if (policyName === undefined || policyName.length === 0) {
       throw new Error("PolicyName is required");
     }
+
+    this.policyDocValidator.validateOptional(cmd.input.PolicyDocument);
 
     const path = normalisePolicyPath(cmd.input.Path);
     const arn = makeSimPolicyArn({

@@ -7,11 +7,14 @@ import {
   assertArrayLength,
   assertFalse,
   assertIdentical,
+  assertInstanceOf,
+  assertThrowsErrorAsync,
   assertTrue,
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../../aws/sim-aws.js";
+import { SimIamMalformedPolicyDocument } from "../../../error/sim-iam.error.js";
 
 describe("IAM PutRolePolicyCommand", () => {
   it("adds an inline identity policy to a role without creating a managed policy", async () => {
@@ -57,7 +60,9 @@ describe("IAM PutRolePolicyCommand", () => {
     );
 
     const decision = simIam.authorize({
-      principal: createRoleOutput.Role.Arn,
+      caller: {
+        principal: createRoleOutput.Role.Arn,
+      },
       action: "s3:GetObject",
       resource: "arn:aws:s3:::example-bucket/object.txt",
     });
@@ -126,7 +131,9 @@ describe("IAM PutRolePolicyCommand", () => {
     );
 
     const decision = simIam.authorize({
-      principal: createRoleOutput.Role.Arn,
+      caller: {
+        principal: createRoleOutput.Role.Arn,
+      },
       action: "s3:GetObject",
       resource: "arn:aws:s3:::example-bucket/object.txt",
     });
@@ -134,5 +141,85 @@ describe("IAM PutRolePolicyCommand", () => {
     // Then the existing inline policy is replaced.
     assertTrue(decision.isExplicitDeny);
     assertIdentical(decision.value, "ExplicitDeny");
+  });
+
+  it("throws when a policy statement has neither Action nor NotAction", async () => {
+    // Given an IAM Role exists.
+    const simAws = new SimAws();
+
+    const simIam = simAws.iam();
+
+    await simIam.createRole(
+      new CreateRoleCommand({
+        RoleName: "ApplicationRole",
+        AssumeRolePolicyDocument: "{}",
+      }),
+    );
+
+    // When an inline policy statement omits Action and NotAction.
+    const error = await assertThrowsErrorAsync(async () =>
+      simIam.putRolePolicy(
+        new PutRolePolicyCommand({
+          RoleName: "ApplicationRole",
+          PolicyName: "InvalidPolicy",
+          PolicyDocument: JSON.stringify({
+            Version: "2012-10-17",
+            Statement: [
+              {
+                Effect: "Allow",
+                Resource: "*",
+              },
+            ],
+          }),
+        }),
+      ),
+    );
+
+    // Then the policy document is rejected.
+    assertInstanceOf(error, SimIamMalformedPolicyDocument);
+    assertIdentical(
+      error.message,
+      "IAM policy statement must define either Action or NotAction",
+    );
+  });
+
+  it("throws when a policy statement has neither Resource nor NotResource", async () => {
+    // Given an IAM Role exists.
+    const simAws = new SimAws();
+
+    const simIam = simAws.iam();
+
+    await simIam.createRole(
+      new CreateRoleCommand({
+        RoleName: "ApplicationRole",
+        AssumeRolePolicyDocument: "{}",
+      }),
+    );
+
+    // When an inline policy statement omits Resource and NotResource.
+    const error = await assertThrowsErrorAsync(async () =>
+      simIam.putRolePolicy(
+        new PutRolePolicyCommand({
+          RoleName: "ApplicationRole",
+          PolicyName: "InvalidPolicy",
+          PolicyDocument: JSON.stringify({
+            Version: "2012-10-17",
+            Statement: [
+              {
+                Effect: "Allow",
+                Action: "s3:GetObject",
+              },
+            ],
+          }),
+        }),
+      ),
+    );
+
+    // Then the policy document is rejected.
+    assertInstanceOf(error, SimIamMalformedPolicyDocument);
+    assertIdentical(
+      error.message,
+      "IAM policy statement must define either Resource or NotResource",
+    );
   });
 });
