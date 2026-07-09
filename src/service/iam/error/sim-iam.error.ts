@@ -49,3 +49,14 @@ export class SimIamInvalidMarkerException extends SimIamError {
     super(message, { httpStatusCode: 400 });
   }
 }
+
+/**
+ * Simulated IAM MalformedPolicyDocument error.
+ */
+export class SimIamMalformedPolicyDocument extends SimIamError {
+  public override readonly name = "MalformedPolicyDocument";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}

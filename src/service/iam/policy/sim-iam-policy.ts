@@ -8,7 +8,7 @@ export type SimIamPolicyId = Brand<string, "SimIamPolicyId">;
 export interface SimIamPolicyDocument {
   readonly Version?: string | undefined;
   readonly Id?: string | undefined;
-  readonly Statement:
+  readonly Statement?:
     SimIamPolicyDocumentStatement | readonly SimIamPolicyDocumentStatement[];
 }
 

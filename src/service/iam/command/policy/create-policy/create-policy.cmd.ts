@@ -1,9 +1,12 @@
 import type { SimArn } from "../../../../aws/arn.js";
+import type { JSONString } from "../../../../../util/type-guard/json.js";
+import type { SimIamPolicyDocument } from "../../../policy/sim-iam-policy.js";
 
 export interface SimCreatePolicyCommandInput {
   readonly PolicyName?: string | undefined;
   readonly Path?: string | undefined;
-  readonly PolicyDocument?: string | undefined;
+  readonly PolicyDocument?:
+    JSONString<SimIamPolicyDocument> | string | undefined;
   readonly Description?: string | undefined;
 }
 

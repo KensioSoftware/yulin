@@ -98,14 +98,30 @@ describe("IAM ListPoliciesCommand", () => {
       new CreatePolicyCommand({
         PolicyName: "ServiceRolePolicy",
         Path: "/service-role/",
-        PolicyDocument: "{}",
+        PolicyDocument: JSON.stringify({
+          Statement: [
+            {
+              Effect: "Allow",
+              Action: "s3:GetObject",
+              Resource: "*",
+            },
+          ],
+        }),
       }),
     );
     await simIam.createPolicy(
       new CreatePolicyCommand({
         PolicyName: "ApplicationPolicy",
         Path: "/application/",
-        PolicyDocument: "{}",
+        PolicyDocument: JSON.stringify({
+          Statement: [
+            {
+              Effect: "Allow",
+              Action: "s3:GetObject",
+              Resource: "*",
+            },
+          ],
+        }),
       }),
     );
 
@@ -133,7 +149,15 @@ describe("IAM ListPoliciesCommand", () => {
     await simIam.createPolicy(
       new CreatePolicyCommand({
         PolicyName: "LocalPolicy",
-        PolicyDocument: "{}",
+        PolicyDocument: JSON.stringify({
+          Statement: [
+            {
+              Effect: "Allow",
+              Action: "s3:GetObject",
+              Resource: "*",
+            },
+          ],
+        }),
       }),
     );
 
@@ -156,19 +180,43 @@ describe("IAM ListPoliciesCommand", () => {
     await simIam.createPolicy(
       new CreatePolicyCommand({
         PolicyName: "AlphaPolicy",
-        PolicyDocument: "{}",
+        PolicyDocument: JSON.stringify({
+          Statement: [
+            {
+              Effect: "Allow",
+              Action: "s3:GetObject",
+              Resource: "*",
+            },
+          ],
+        }),
       }),
     );
     await simIam.createPolicy(
       new CreatePolicyCommand({
         PolicyName: "BetaPolicy",
-        PolicyDocument: "{}",
+        PolicyDocument: JSON.stringify({
+          Statement: [
+            {
+              Effect: "Allow",
+              Action: "s3:GetObject",
+              Resource: "*",
+            },
+          ],
+        }),
       }),
     );
     await simIam.createPolicy(
       new CreatePolicyCommand({
         PolicyName: "GammaPolicy",
-        PolicyDocument: "{}",
+        PolicyDocument: JSON.stringify({
+          Statement: [
+            {
+              Effect: "Allow",
+              Action: "s3:GetObject",
+              Resource: "*",
+            },
+          ],
+        }),
       }),
     );
 
@@ -215,7 +263,15 @@ describe("IAM ListPoliciesCommand", () => {
     await simIam.createPolicy(
       new CreatePolicyCommand({
         PolicyName: "UnattachedPolicy",
-        PolicyDocument: "{}",
+        PolicyDocument: JSON.stringify({
+          Statement: [
+            {
+              Effect: "Allow",
+              Action: "s3:GetObject",
+              Resource: "*",
+            },
+          ],
+        }),
       }),
     );
 

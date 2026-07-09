@@ -82,7 +82,11 @@ export class SimIam {
 
   /**
    * Evaluate an IAM authorization attempt against policies relevant to the
-   * requested principal.
+   * request caller.
+   *
+   * New simulated service integrations should pass caller.principal when they
+   * have a resolved simulated caller context. If caller is omitted, the request
+   * is evaluated without a resolved principal.
    */
   authorize(input: SimIamAuthorizationInput): SimIamPolicyDecision {
     return new SimIamAuthorizer({

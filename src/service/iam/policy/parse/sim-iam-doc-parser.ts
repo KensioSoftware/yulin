@@ -4,6 +4,7 @@ import type {
   SimIamPolicyDocumentPrincipal,
   SimIamPolicyDocumentStatement,
 } from "../sim-iam-policy.js";
+import { simIamPolicyDocumentStatements } from "../sim-iam-pol-doc-statements.js";
 
 export interface SimIamParsedPolicyDocument {
   readonly statements: readonly SimIamParsedPolicyStatement[];
@@ -34,7 +35,7 @@ export class SimIamPolicyDocumentParser {
    */
   parse(policy: SimIamPolicyDocument): SimIamParsedPolicyDocument {
     return {
-      statements: this.statements(policy).map((statement) =>
+      statements: simIamPolicyDocumentStatements(policy).map((statement) =>
         this.parseStatement(statement),
       ),
     };
@@ -55,16 +56,6 @@ export class SimIamPolicyDocumentParser {
       notPrincipal: statement.NotPrincipal,
       condition: statement.Condition,
     };
-  }
-
-  private statements(
-    policy: SimIamPolicyDocument,
-  ): readonly SimIamPolicyDocumentStatement[] {
-    if ("Effect" in policy.Statement) {
-      return [policy.Statement];
-    }
-
-    return policy.Statement;
   }
 
   private stringList(
