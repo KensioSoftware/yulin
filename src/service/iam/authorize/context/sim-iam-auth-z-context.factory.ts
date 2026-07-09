@@ -12,7 +12,9 @@ export const simIamAuthZContextFactory = new StaticFactory<SimIamAuthZContext>({
   resourcePolicies: [],
   action: "s3:GetObject",
   resource: "arn:aws:s3:::test-bucket/test-key",
-  callerPrincipalArn: "arn:aws:iam::123456789012:role/TestRole",
+  callerPrincipal: {
+    arn: "arn:aws:iam::123456789012:role/TestRole",
+  },
 });
 
 /**

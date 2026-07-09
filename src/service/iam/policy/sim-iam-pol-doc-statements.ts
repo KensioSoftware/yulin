@@ -15,7 +15,9 @@ export function simIamPolicyDocumentStatements(
 ): readonly SimIamPolicyDocumentStatement[] {
   const policyStatement = policyDocument.Statement;
 
-  if (policyStatement === undefined) {
+  // JSON parse can still produce null at runtime
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+  if (policyStatement === undefined || policyStatement === null) {
     throw new SimIamMalformedPolicyDocument(
       "IAM policy document must define Statement",
     );

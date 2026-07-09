@@ -119,11 +119,11 @@ export class SimIamPolicyStatementMatcher {
       return true;
     }
 
-    if (this.context.callerPrincipalArn === undefined) {
+    if (this.context.callerPrincipal?.arn === undefined) {
       return false;
     }
 
-    return simIamWildcardMatch(pattern, this.context.callerPrincipalArn, {
+    return simIamWildcardMatch(pattern, this.context.callerPrincipal.arn, {
       caseSensitive: true,
     });
   }

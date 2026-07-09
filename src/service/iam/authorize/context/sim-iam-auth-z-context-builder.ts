@@ -83,16 +83,15 @@ export class SimIamAuthZContextBuilder {
    */
   build(input: SimIamAuthorizationInput): SimIamAuthZContext {
     const callerPrincipal = this.callerPrincipal(input.caller);
-    const callerPrincipalArn = callerPrincipal?.arn;
 
     return {
-      identityPolicies:
-        this.identityPolicySourceBuilder.build(callerPrincipalArn),
+      identityPolicies: this.identityPolicySourceBuilder.build(
+        callerPrincipal?.arn,
+      ),
       resourcePolicies: this.resourcePolicySources(input),
       action: input.action,
       resource: input.resource,
       callerPrincipal,
-      callerPrincipalArn,
     };
   }
 

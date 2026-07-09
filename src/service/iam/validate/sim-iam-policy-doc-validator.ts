@@ -45,6 +45,13 @@ export class SimIamPolicyDocumentValidator {
 
   private validateParsed(policyDocument: SimIamPolicyDocument): void {
     for (const statement of simIamPolicyDocumentStatements(policyDocument)) {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (statement.Effect !== "Allow" && statement.Effect !== "Deny") {
+        throw new SimIamMalformedPolicyDocument(
+          'IAM policy statement Effect must be either "Allow" or "Deny"',
+        );
+      }
+
       if (statement.Action === undefined && statement.NotAction === undefined) {
         throw new SimIamMalformedPolicyDocument(
           "IAM policy statement must define either Action or NotAction",

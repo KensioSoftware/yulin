@@ -13,7 +13,9 @@ describe("SimIamPolicyStatementMatcher", () => {
     // Given a resource policy Principal array with one non-matching ARN and one matching ARN.
     const callerPrincipalArn = "arn:aws:iam::123456789012:role/TestRole";
     const matcher = new SimIamPolicyStatementMatcher(
-      simIamAuthZContextFactory.make({ callerPrincipalArn }),
+      simIamAuthZContextFactory.make({
+        callerPrincipal: { arn: callerPrincipalArn },
+      }),
     );
     const policy = simIamAuthZResourcePolicySourceFactory.make();
     const statement = simIamParsedPolicyStatementFactory.make({
@@ -53,7 +55,9 @@ describe("SimIamPolicyStatementMatcher", () => {
     // Given a resource policy AWS Principal array with one non-matching ARN and one matching ARN.
     const callerPrincipalArn = "arn:aws:iam::123456789012:role/TestRole";
     const matcher = new SimIamPolicyStatementMatcher(
-      simIamAuthZContextFactory.make({ callerPrincipalArn }),
+      simIamAuthZContextFactory.make({
+        callerPrincipal: { arn: callerPrincipalArn },
+      }),
     );
     const policy = simIamAuthZResourcePolicySourceFactory.make();
     const statement = simIamParsedPolicyStatementFactory.make({
@@ -73,7 +77,7 @@ describe("SimIamPolicyStatementMatcher", () => {
     // Given a resource policy Principal that requires a caller ARN to compare.
     const context = simIamAuthZContextFactory.make();
     // @ts-expect-error -- testing undefined caller principal ARN
-    context.callerPrincipalArn = undefined;
+    context.callerPrincipal.arn = undefined;
     const matcher = new SimIamPolicyStatementMatcher(context);
     const policy = simIamAuthZResourcePolicySourceFactory.make();
     const statement = simIamParsedPolicyStatementFactory.make({

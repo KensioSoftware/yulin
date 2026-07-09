@@ -40,10 +40,4 @@ export interface SimIamAuthZContext {
    * Resolved caller principal, if the simulated request has one.
    */
   readonly callerPrincipal?: SimAwsPrincipal | undefined;
-
-  /**
-   * Normalized ARN derived from callerPrincipal and used for current principal
-   * matching and identity-policy lookup.
-   */
-  readonly callerPrincipalArn?: string | undefined;
 }
