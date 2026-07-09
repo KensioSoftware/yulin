@@ -36,7 +36,15 @@ export type SimIamPolicyDocumentCondition = Readonly<
   >
 >;
 
-export interface SimIamPolicy {
+/**
+ * IAM managed policy record.
+ *
+ * This represents customer-managed or AWS-managed IAM policy metadata and its
+ * default policy document. Inline policies and resource policies are stored on
+ * their owning identity/resource instead of in this global managed-policy
+ * store.
+ */
+export interface SimIamManagedPolicy {
   readonly arn: SimArn;
   readonly policyId: SimIamPolicyId;
   readonly policyName: SimIamPolicyName;
@@ -50,3 +58,8 @@ export interface SimIamPolicy {
   readonly updateDate: Date;
   readonly policyDocument?: JSONString<SimIamPolicyDocument> | undefined;
 }
+
+/**
+ * Backwards-compatible alias while the IAM command handlers are migrated.
+ */
+export type SimIamPolicy = SimIamManagedPolicy;

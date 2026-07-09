@@ -4,14 +4,14 @@ import {
   type BackgroundScheduler,
   BackgroundTasks,
 } from "../../../../../util/background/background.js";
-import type { SimIamPolicy } from "../../../policy/sim-iam-policy.js";
+import type { SimIamManagedPolicy } from "../../../policy/sim-iam-policy.js";
 import type {
   SimListPoliciesCommand,
   SimListPoliciesCommandOutput,
 } from "./list-policies.cmd.js";
 
 interface ListPoliciesCommandHandlerProps {
-  readonly policies: Map<SimArn, SimIamPolicy>;
+  readonly policies: Map<SimArn, SimIamManagedPolicy>;
   readonly background?: BackgroundScheduler;
 }
 
@@ -24,7 +24,7 @@ export class ListPoliciesCommandHandler implements CommandHandler<
   SimListPoliciesCommand,
   SimListPoliciesCommandOutput
 > {
-  private readonly policies: Map<SimArn, SimIamPolicy>;
+  private readonly policies: Map<SimArn, SimIamManagedPolicy>;
   private readonly background: BackgroundScheduler;
 
   constructor(props: ListPoliciesCommandHandlerProps) {
@@ -85,7 +85,7 @@ export class ListPoliciesCommandHandler implements CommandHandler<
     };
   }
 
-  private matchingPolicies(cmd: SimListPoliciesCommand): SimIamPolicy[] {
+  private matchingPolicies(cmd: SimListPoliciesCommand): SimIamManagedPolicy[] {
     const policies = [...this.policies.values()].toSorted((a, b) =>
       a.arn.localeCompare(b.arn),
     );

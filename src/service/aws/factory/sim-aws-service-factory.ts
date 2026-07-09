@@ -30,11 +30,11 @@ interface SimAwsServiceFactoryProps {
  * registries, creates new account/region-scoped service instances, and
  * delegates account-scoped singleton lifetimes to SimAwsAccountServiceCache.
  *
- * SimAwsAccountServiceCache is deliberately narrower: it only caches services
- * that should be reused for an entire account. This factory decides whether a
- * service should be created fresh for the requested account/region scope, such
- * as ACM, CloudFormation, DynamoDB, and S3, or routed through that
- * account-level cache, such as IAM, Route53, and CloudFront.
+ * SimAwsAccountServiceCache is narrower: it only caches services that should be
+ * reused for an entire account. This factory decides whether a service should
+ * be created fresh for the requested account/region scope, such as ACM,
+ * CloudFormation, DynamoDB, and S3, or routed through that account-level cache,
+ * such as IAM, Route53, and CloudFront.
  */
 export class SimAwsServiceFactory {
   private readonly simAws: SimAws;

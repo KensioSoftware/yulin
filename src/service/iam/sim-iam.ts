@@ -6,7 +6,7 @@ import type {
   SimCreatePolicyCommand,
   SimCreatePolicyCommandOutput,
 } from "./command/policy/create-policy/create-policy.cmd.js";
-import type { SimIamPolicy } from "./policy/sim-iam-policy.js";
+import type { SimIamManagedPolicy } from "./policy/sim-iam-policy.js";
 import { GetPolicyCommandHandler } from "./command/policy/get-policy/get-policy.handler.js";
 import type {
   SimGetPolicyCommand,
@@ -38,6 +38,14 @@ import type {
   SimListRolesCommandOutput,
 } from "./command/role/list-roles/list-roles.cmd.js";
 import { ListRolesCommandHandler } from "./command/role/list-roles/list-roles.handler.js";
+import type { SimIamAuthorizationInput } from "./authorize/context/sim-iam-auth-z-context-builder.js";
+import type { SimIamPolicyDecision } from "./authorize/sim-iam-decision.js";
+import { SimIamAuthorizer } from "./authorize/sim-iam-authorizer.js";
+import type {
+  SimPutRolePolicyCommand,
+  SimPutRolePolicyCommandOutput,
+} from "./command/policy/put-role-policy/put-role-policy.cmd.js";
+import { PutRolePolicyCommandHandler } from "./command/policy/put-role-policy/put-role-policy.handler.js";
 
 interface SimIamProps {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
@@ -53,7 +61,7 @@ interface SimIamProps {
  * service facade per Account.
  */
 export class SimIam {
-  private readonly policies = new Map<SimArn, SimIamPolicy>();
+  private readonly policies = new Map<SimArn, SimIamManagedPolicy>();
   private readonly roles = new Map<SimIamRoleName, SimIamRole>();
 
   private readonly accountRegionScope: SimAwsAccountRegionScope;
@@ -70,6 +78,17 @@ export class SimIam {
     this.accountRegionScope = accountRegionScope;
     this.background = background;
     this.iamRegistry = iamRegistry;
+  }
+
+  /**
+   * Evaluate an IAM authorization attempt against policies relevant to the
+   * requested principal.
+   */
+  authorize(input: SimIamAuthorizationInput): SimIamPolicyDecision {
+    return new SimIamAuthorizer({
+      policies: this.policies,
+      roles: this.roles,
+    }).authorize(input);
   }
 
   /**
@@ -113,6 +132,21 @@ export class SimIam {
 
     const handler = new ListPoliciesCommandHandler({
       policies: this.policies,
+      background: this.background,
+    });
+    return await handler.handle(cmd);
+  }
+
+  /**
+   * Handle a Put Role Policy Command from the SDK.
+   */
+  async putRolePolicy(
+    cmd: SimPutRolePolicyCommand,
+  ): Promise<SimPutRolePolicyCommandOutput> {
+    this.iamRegistry.activate("IAM SDK API", "PutRolePolicy");
+
+    const handler = new PutRolePolicyCommandHandler({
+      roles: this.roles,
       background: this.background,
     });
     return await handler.handle(cmd);

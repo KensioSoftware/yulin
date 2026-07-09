@@ -1,6 +1,6 @@
 import type { SimArn } from "../../../../aws/arn.js";
 import type {
-  SimIamPolicy,
+  SimIamManagedPolicy,
   SimIamPolicyDocument,
   SimIamPolicyName,
 } from "../../../policy/sim-iam-policy.js";
@@ -34,7 +34,7 @@ export class CreatePolicyRecordFactory {
    * created IAM policy has not had a later update event. The default version
    * starts at v1, matching IAM's managed policy version model.
    */
-  makePolicy(props: CreatePolicyRecordFactoryProps): SimIamPolicy {
+  makePolicy(props: CreatePolicyRecordFactoryProps): SimIamManagedPolicy {
     const { arn, path, policyName, cmd } = props;
     const now = new Date();
 
@@ -63,7 +63,7 @@ export class CreatePolicyRecordFactory {
    * so this method exposes only the metadata fields included in CreatePolicy
    * output.
    */
-  makeOutput(policy: SimIamPolicy): SimCreatePolicyCommandOutput {
+  makeOutput(policy: SimIamManagedPolicy): SimCreatePolicyCommandOutput {
     return {
       Policy: {
         PolicyName: policy.policyName,
