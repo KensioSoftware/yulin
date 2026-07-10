@@ -146,4 +146,17 @@ export type SimDynamoDbAttributeValue =
       readonly NS?: never;
       readonly NULL?: never;
       readonly S?: never;
+    }
+  | {
+      readonly $unknown: readonly [string, unknown];
+      readonly B?: never;
+      readonly BOOL?: never;
+      readonly BS?: never;
+      readonly L?: never;
+      readonly M?: never;
+      readonly N?: never;
+      readonly NS?: never;
+      readonly NULL?: never;
+      readonly S?: never;
+      readonly SS?: never;
     };
