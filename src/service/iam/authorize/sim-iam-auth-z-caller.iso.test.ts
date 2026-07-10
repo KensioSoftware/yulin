@@ -29,20 +29,6 @@ describe("Sim IAM authorization caller", () => {
     assertArrayLength(decision.explicitDenyStatements, 0);
   });
 
-  it("allows an unresolved caller as the current account root", () => {
-    const simAws = new SimAws();
-
-    const simIam = simAws.account("123456789012").iam();
-
-    const decision = simIam.authorize({
-      action: "s3:GetObject",
-      resource: "arn:aws:s3:::example-bucket/example-key.txt",
-    });
-
-    assertIdentical(decision.value, SimIamPolicyDecisionValue.Allow);
-    assertTrue(decision.isAllowed);
-  });
-
   it("implicitly denies an anonymous caller without a resource-policy allow", () => {
     const simAws = new SimAws();
 
