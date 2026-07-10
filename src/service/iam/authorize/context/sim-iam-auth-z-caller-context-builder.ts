@@ -77,7 +77,10 @@ export class SimIamAuthZCallerContextBuilder {
   private rootPolicySources(
     callerPrincipal: SimAwsPrincipal | undefined,
   ): readonly SimIamAuthZPolicySource[] {
-    if (callerPrincipal?.arn !== this.defaultCallerPrincipal?.arn) {
+    if (
+      this.defaultCallerPrincipal === undefined ||
+      callerPrincipal?.arn !== this.defaultCallerPrincipal.arn
+    ) {
       return [];
     }
 
