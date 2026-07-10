@@ -46,6 +46,7 @@ import type {
   SimPutRolePolicyCommandOutput,
 } from "./command/policy/put-role-policy/put-role-policy.cmd.js";
 import { PutRolePolicyCommandHandler } from "./command/policy/put-role-policy/put-role-policy.handler.js";
+import { makeSimAwsAccountRootPrincipal } from "../aws/caller/sim-aws-account-root-principal.js";
 
 interface SimIamProps {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
@@ -84,14 +85,17 @@ export class SimIam {
    * Evaluate an IAM authorization attempt against policies relevant to the
    * request caller.
    *
-   * New simulated service integrations should pass caller.principal when they
-   * have a resolved simulated caller context. If caller is omitted, the request
-   * is evaluated without a resolved principal.
+   * If the caller is omitted, authorization defaults to the root principal of
+   * the sim Account owning this sim IAM instance. An explicit anonymous caller
+   * suppresses that fallback and is evaluated without identity policies.
    */
   authorize(input: SimIamAuthorizationInput): SimIamPolicyDecision {
     return new SimIamAuthorizer({
       policies: this.policies,
       roles: this.roles,
+      defaultCallerPrincipal: makeSimAwsAccountRootPrincipal(
+        this.accountRegionScope.accountId,
+      ),
     }).authorize(input);
   }
 

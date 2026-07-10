@@ -14,24 +14,35 @@ import { SimAws } from "../../aws/sim-aws.js";
 import { SimIamPolicyDecisionValue } from "./sim-iam-decision.js";
 
 describe("Sim IAM authorization", () => {
-  it("implicitly denies when no principal is supplied", () => {
+  it("explicitly denies the default root when a resource policy denies it", () => {
     const simAws = new SimAws();
 
     const simIam = simAws.account("123456789012").iam();
 
     const decision = simIam.authorize({
       action: "s3:GetObject",
-      resource: "arn:aws:s3:::example-bucket/example-key.txt",
-      caller: { principal: undefined },
+      resource: "arn:aws:s3:::example-bucket/private/example-key.txt",
+      resourcePolicies: [
+        {
+          document: {
+            Version: "2012-10-17",
+            Statement: {
+              Effect: "Deny",
+              Principal: "arn:aws:iam::123456789012:root",
+              Action: "s3:GetObject",
+              Resource: "arn:aws:s3:::example-bucket/private/*",
+            },
+          },
+        },
+      ],
     });
 
-    assertIdentical(decision.value, SimIamPolicyDecisionValue.ImplicitDeny);
+    assertIdentical(decision.value, SimIamPolicyDecisionValue.ExplicitDeny);
     assertTrue(decision.isDenied);
-    assertTrue(decision.isImplicitDeny);
+    assertTrue(decision.isExplicitDeny);
     assertFalse(decision.isAllowed);
-    assertFalse(decision.isExplicitDeny);
-    assertArrayLength(decision.allowStatements, 0);
-    assertArrayLength(decision.explicitDenyStatements, 0);
+    assertArrayLength(decision.allowStatements, 1);
+    assertArrayLength(decision.explicitDenyStatements, 1);
   });
 
   it("implicitly denies an unknown principal", () => {

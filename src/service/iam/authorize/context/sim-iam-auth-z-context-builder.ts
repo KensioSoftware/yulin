@@ -13,6 +13,7 @@ import type {
   SimIamAuthZPolicySource,
 } from "./sim-iam-auth-z-context.js";
 import { SimIamAuthZIdentityPolicySourceBuilder } from "./identity-policy-source/sim-iam-auth-z-id-pol-src-builder.js";
+import { SimIamAuthZCallerContextBuilder } from "./sim-iam-auth-z-caller-context-builder.js";
 
 export interface SimIamResourcePolicyInput {
   readonly document: SimIamPolicyDocument;
@@ -30,9 +31,9 @@ export interface SimIamAuthorizationInput {
   /**
    * Simulated request caller context.
    *
-   * Services should pass this when they know who is making the request. If it is
-   * omitted, the request is evaluated as having no resolved principal. Resource
-   * policies with Principal "*" may still match; identity policies will not.
+   * If omitted, authorization defaults to the root principal of the sim Account
+   * owning the sim IAM instance. An explicit anonymous caller suppresses that
+   * fallback and is evaluated without an authenticated principal.
    */
   readonly caller?: SimAwsCallerContext | undefined;
 
@@ -68,12 +69,17 @@ export interface SimIamAuthorizationInput {
  * focused on composing the authorization request.
  */
 export class SimIamAuthZContextBuilder {
+  private readonly callerContextBuilder: SimIamAuthZCallerContextBuilder;
   private readonly identityPolicySourceBuilder: SimIamAuthZIdentityPolicySourceBuilder;
 
   constructor(
     policies: ReadonlyMap<SimArn, SimIamPolicy>,
     roles: ReadonlyMap<SimIamRoleName, SimIamRole>,
+    defaultCallerPrincipal?: SimAwsPrincipal,
   ) {
+    this.callerContextBuilder = new SimIamAuthZCallerContextBuilder(
+      defaultCallerPrincipal,
+    );
     this.identityPolicySourceBuilder =
       new SimIamAuthZIdentityPolicySourceBuilder({ policies, roles });
   }
@@ -82,29 +88,20 @@ export class SimIamAuthZContextBuilder {
    * Build the context consumed by SimIamAuthorizer.
    */
   build(input: SimIamAuthorizationInput): SimIamAuthZContext {
-    const callerPrincipal = this.callerPrincipal(input.caller);
+    const callerContext = this.callerContextBuilder.build(input.caller);
 
     return {
-      identityPolicies: this.identityPolicySourceBuilder.build(
-        callerPrincipal?.arn,
-      ),
+      identityPolicies: [
+        ...this.identityPolicySourceBuilder.build(
+          callerContext.callerPrincipal?.arn,
+        ),
+        ...callerContext.rootPolicySources,
+      ],
       resourcePolicies: this.resourcePolicySources(input),
       action: input.action,
       resource: input.resource,
-      callerPrincipal,
+      callerPrincipal: callerContext.callerPrincipal,
     };
-  }
-
-  private callerPrincipal(
-    caller: SimAwsCallerContext | undefined,
-  ): SimAwsPrincipal | undefined {
-    if (typeof caller?.principal === "string") {
-      return {
-        arn: caller.principal,
-      };
-    }
-
-    return caller?.principal;
   }
 
   /**

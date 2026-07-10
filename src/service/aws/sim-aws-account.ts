@@ -10,6 +10,8 @@ import type { SimCloudFormation } from "../cloudformation/index.js";
 import type { SimAcm } from "../acm/sim-acm.js";
 import type { SimRoute53 } from "../route53/index.js";
 import type { SimIam } from "../iam/index.js";
+import type { SimAwsPrincipal } from "./caller/sim-aws-caller.js";
+import { makeSimAwsAccountRootPrincipal } from "./caller/sim-aws-account-root-principal.js";
 
 export type SimAwsAccountId = Brand<string, "SimAwsAccountId">;
 
@@ -36,6 +38,13 @@ export class SimAwsAccount {
 
     this.simAws = simAws;
     this.accountId = accountId;
+  }
+
+  /**
+   * Intrinsic root principal for this simulated AWS Account.
+   */
+  get rootPrincipal(): SimAwsPrincipal {
+    return makeSimAwsAccountRootPrincipal(this.accountId);
   }
 
   /**

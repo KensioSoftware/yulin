@@ -1,7 +1,7 @@
 import type { SimAwsAccountId } from "../sim-aws-account.js";
 
 export type SimAwsPrincipalType =
-  "anonymous" | "root" | "user" | "role" | "assumed-role" | "service";
+  "root" | "user" | "role" | "assumed-role" | "service";
 
 /**
  * Simulated AWS principal making a request.
@@ -18,13 +18,32 @@ export interface SimAwsPrincipal {
 }
 
 /**
- * Optional caller context for simulated AWS service operations.
- *
- * This is the authoritative place for request identity. The principal field
- * identifies who is making the request when that has been resolved. Additional
- * request attributes can be added here later for IAM condition keys without
- * changing individual service command shapes.
+ * A request made by an authenticated simulated AWS principal.
  */
-export interface SimAwsCallerContext {
-  readonly principal?: SimAwsPrincipal | string | undefined;
+export interface SimAwsPrincipalCallerContext {
+  readonly kind?: "principal" | undefined;
+  readonly principal: SimAwsPrincipal | string;
 }
+
+/**
+ * A request made without an authenticated AWS principal.
+ */
+export interface SimAwsAnonymousCallerContext {
+  readonly kind: "anonymous";
+}
+
+/**
+ * Caller context for a simulated AWS service operation.
+ *
+ * Omitting the caller allows the service to apply its default caller. Supplying
+ * an anonymous caller explicitly suppresses that fallback.
+ */
+export type SimAwsCallerContext =
+  SimAwsPrincipalCallerContext | SimAwsAnonymousCallerContext;
+
+/**
+ * Reusable caller context for an explicitly anonymous request.
+ */
+export const SIM_AWS_ANONYMOUS_CALLER = {
+  kind: "anonymous",
+} as const satisfies SimAwsAnonymousCallerContext;
