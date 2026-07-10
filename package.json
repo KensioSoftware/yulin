@@ -1,6 +1,6 @@
 {
   "name": "@kensio/yulin",
-  "version": "0.31.0",
+  "version": "0.32.0",
   "description": "AWS system behaviour simulation for isolated unit testing",
   "repository": "https://github.com/KensioSoftware/yulin",
   "homepage": "https://yulinsim.dev/",
@@ -100,6 +100,7 @@
     "@types/eslint-plugin-security": "^3.0.1",
     "@types/lodash-es": "^4.17.12",
     "@types/node": "^25.9.5",
+    "@typescript/native": "npm:typescript@^7.0.2",
     "@vitest/coverage-v8": "^4.1.10",
     "@vitest/eslint-plugin": "^1.6.22",
     "aws-cdk": "^2.1129.0",
@@ -118,7 +119,6 @@
     "jiti": "^2.7.0",
     "prettier": "^3.9.4",
     "tsx": "^4.23.0",
-    "@typescript/native": "npm:typescript@^7.0.2",
     "typescript": "npm:@typescript/typescript6@^6.0.2",
     "typescript-eslint": "^8.63.0",
     "vitest": "^4.1.10"
