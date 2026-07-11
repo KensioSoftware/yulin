@@ -16,6 +16,7 @@ import { SimAcm } from "../../acm/sim-acm.js";
 import { SimRoute53Registry } from "../../route53/registry/sim-route53-registry.js";
 import type { SimIam } from "../../iam/index.js";
 import { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
+import { SimSts } from "../../sts/sim-sts.js";
 
 interface SimAwsServiceFactoryProps {
   readonly simAws: SimAws;
@@ -52,8 +53,8 @@ export class SimAwsServiceFactory {
   /**
    * Shared simulated IAM registry.
    *
-   * This owns IAM state that is global within one SimAws instance, including
-   * activation state and activation diagnostics.
+   * This indexes the account-scoped IAM facades created for one SimAws
+   * instance so cross-account services can resolve Account-owned IAM state.
    */
   public readonly iamRegistry = new SimIamRegistry();
 
@@ -148,6 +149,19 @@ export class SimAwsServiceFactory {
       accountRegionScope: scope.accountRegionScope,
       s3GlobalRegistry: this.s3Registry,
       background: this.background,
+    });
+  }
+
+  /**
+   * Create simulated STS for an Account/Region scope.
+   */
+  createSts(scope: SimAwsAccountRegionContainer): SimSts {
+    this.createIam(scope);
+
+    return new SimSts({
+      accountRegionScope: scope.accountRegionScope,
+      background: this.background,
+      iamResolver: this.iamRegistry,
     });
   }
 }

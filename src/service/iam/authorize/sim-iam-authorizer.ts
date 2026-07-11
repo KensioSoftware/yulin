@@ -11,7 +11,7 @@ import type { SimAwsPrincipal } from "../../aws/caller/sim-aws-caller.js";
 interface SimIamAuthorizerProps {
   readonly policies: ReadonlyMap<SimArn, SimIamPolicy>;
   readonly roles: ReadonlyMap<SimIamRoleName, SimIamRole>;
-  readonly defaultCallerPrincipal?: SimAwsPrincipal | undefined;
+  readonly defaultCallerPrincipal: SimAwsPrincipal;
 }
 
 /**

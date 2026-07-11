@@ -156,9 +156,7 @@ describe("Sim IAM authorization caller", () => {
     const decision = account.iam().authorize({
       action: "s3:GetObject",
       resource: "arn:aws:s3:::example-bucket/example-key.txt",
-      caller: {
-        principal: account.rootPrincipal,
-      },
+      caller: account.rootPrincipal,
     });
 
     assertIdentical(decision.value, SimIamPolicyDecisionValue.Allow);
@@ -175,9 +173,7 @@ describe("Sim IAM authorization caller", () => {
     const decision = resourceAccount.iam().authorize({
       action: "s3:GetObject",
       resource: "arn:aws:s3:::example-bucket/example-key.txt",
-      caller: {
-        principal: callerAccount.rootPrincipal,
-      },
+      caller: callerAccount.rootPrincipal,
     });
 
     assertIdentical(decision.value, SimIamPolicyDecisionValue.ImplicitDeny);

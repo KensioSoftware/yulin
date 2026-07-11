@@ -1,230 +1,106 @@
-import {
-  assertArrayLength,
-  assertFalse,
-  assertIdentical,
-  assertInstanceOf,
-  assertNonNullable,
-  assertStringIncludes,
-  assertTrue,
-  assertUndefined,
-} from "@kensio/smartass";
+import { assertIdentical, assertThrowsError } from "@kensio/smartass";
 import { describe, it } from "vitest";
+import { makeSimAwsAccountId } from "../../aws/sim-aws-account.js";
+import { SimIam } from "../sim-iam.js";
 import { SimIamRegistry } from "./sim-iam-registry.js";
 
+const firstAccountId = makeSimAwsAccountId();
+const secondAccountId = makeSimAwsAccountId();
+
 describe("SimIamRegistry", () => {
-  it("starts not activated and not disabled", () => {
+  it("throws a diagnostic error for an unregistered Account", () => {
     // Given a new sim IAM registry.
     const registry = new SimIamRegistry();
 
-    // When its initial state is inspected.
-    const activationEvents = registry.activationEvents;
+    // When IAM is resolved for an unregistered Account.
+    const error = assertThrowsError(() => {
+      registry.iamForAccount(firstAccountId);
+    });
 
-    // Then it reports the default unactivated state.
-    assertFalse(registry.isActivated);
-    assertFalse(registry.isDisabled);
-    assertArrayLength(activationEvents, 0);
-    assertUndefined(registry.disableEvent);
+    // Then the missing registration is identified.
     assertIdentical(
-      registry.statusReason,
-      "Sim IAM is not activated because it has not been activated.",
+      error.message,
+      `Sim IAM is not registered for Account ${firstAccountId}`,
     );
   });
 
-  it("activates with the default activation reason", () => {
-    // Given a new sim IAM registry.
+  it("registers and resolves IAM for an Account", () => {
+    // Given a new sim IAM registry and IAM facade.
     const registry = new SimIamRegistry();
+    const iam = new SimIam();
 
-    // When sim IAM is manually activated without an explicit reason.
-    registry.activate();
+    // When IAM is registered for an Account.
+    registry.register(firstAccountId, iam);
 
-    // Then it becomes activated and records the default activation event.
-    assertTrue(registry.isActivated);
-    assertFalse(registry.isDisabled);
-    assertArrayLength(registry.activationEvents, 1);
-    assertIdentical(registry.activationEvents[0].reason, "Manual activation");
-    assertUndefined(registry.activationEvents[0].detail);
-    assertInstanceOf(registry.activationEvents[0].activatedAt, Date);
-    assertTrue(registry.activationEvents[0].activated);
-    assertFalse(registry.activationEvents[0].registryDisabled);
-    assertUndefined(registry.activationEvents[0].ignoredReason);
-    assertIdentical(
-      registry.statusReason,
-      "Sim IAM is activated: Manual activation",
-    );
+    // Then the exact IAM facade is resolved for that Account.
+    assertIdentical(registry.iamForAccount(firstAccountId), iam);
   });
 
-  it("activates with a diagnostic reason and detail", () => {
-    // Given a new sim IAM registry.
+  it("resolves separate IAM facades for separate Accounts", () => {
+    // Given IAM facades belonging to two Accounts.
     const registry = new SimIamRegistry();
+    const firstIam = new SimIam();
+    const secondIam = new SimIam();
 
-    // When sim IAM is activated with a reason and detail.
-    registry.activate("IAM SDK API", "CreatePolicy");
+    // When both facades are registered.
+    registry.register(firstAccountId, firstIam);
+    registry.register(secondAccountId, secondIam);
 
-    // Then it records the diagnostic activation information.
-    assertTrue(registry.isActivated);
-    assertArrayLength(registry.activationEvents, 1);
-    assertIdentical(registry.activationEvents[0].reason, "IAM SDK API");
-    assertIdentical(registry.activationEvents[0].detail, "CreatePolicy");
-    assertTrue(registry.activationEvents[0].activated);
-    assertFalse(registry.activationEvents[0].registryDisabled);
-    assertIdentical(
-      registry.statusReason,
-      "Sim IAM is activated: IAM SDK API (CreatePolicy)",
-    );
+    // Then each Account resolves its own IAM facade.
+    assertIdentical(registry.iamForAccount(firstAccountId), firstIam);
+    assertIdentical(registry.iamForAccount(secondAccountId), secondIam);
   });
 
-  it("keeps activation idempotent while recording every activation attempt", () => {
-    // Given an already activated sim IAM registry.
+  it("allows the same IAM facade to be registered again", () => {
+    // Given an IAM facade already registered for an Account.
     const registry = new SimIamRegistry();
-    registry.activate("IAM SDK API", "CreatePolicy");
+    const iam = new SimIam();
+    registry.register(firstAccountId, iam);
 
-    // When activation is attempted again.
-    registry.activate("IAM SDK API", "ListPolicies");
+    // When the same registration is repeated.
+    registry.register(firstAccountId, iam);
 
-    // Then it stays activated and records both successful activation attempts.
-    assertTrue(registry.isActivated);
-    assertFalse(registry.isDisabled);
-    assertArrayLength(registry.activationEvents, 2);
-    assertIdentical(registry.activationEvents[0].detail, "CreatePolicy");
-    assertIdentical(registry.activationEvents[1].detail, "ListPolicies");
-    assertTrue(registry.activationEvents[0].activated);
-    assertTrue(registry.activationEvents[1].activated);
-    assertFalse(registry.activationEvents[0].registryDisabled);
-    assertFalse(registry.activationEvents[1].registryDisabled);
-    assertIdentical(
-      registry.statusReason,
-      "Sim IAM is activated: IAM SDK API (ListPolicies)",
-    );
+    // Then the original IAM facade remains registered.
+    assertIdentical(registry.iamForAccount(firstAccountId), iam);
   });
 
-  it("disables with the default disable reason", () => {
-    // Given an activated sim IAM registry.
+  it("rejects a different IAM facade for an already registered Account", () => {
+    // Given an Account with a registered IAM facade.
     const registry = new SimIamRegistry();
-    registry.activate();
+    const firstIam = new SimIam();
+    const secondIam = new SimIam();
+    registry.register(firstAccountId, firstIam);
 
-    // When sim IAM is manually disabled without an explicit reason.
-    registry.disable();
+    // When a different facade is registered for the same Account.
+    const error = assertThrowsError(() => {
+      registry.register(firstAccountId, secondIam);
+    });
 
-    // Then it becomes permanently disabled and records the default disable event.
-    assertFalse(registry.isActivated);
-    assertTrue(registry.isDisabled);
-    assertIdentical(registry.disableEvent?.reason, "Manual disable");
-    assertUndefined(registry.disableEvent.detail);
-    assertInstanceOf(registry.disableEvent.disabledAt, Date);
+    // Then the conflicting registration fails without replacing the first facade.
     assertIdentical(
-      registry.statusReason,
-      "Sim IAM is permanently disabled: Manual disable",
+      error.message,
+      `A different SimIam is already registered for Account ${firstAccountId}`,
     );
+    assertIdentical(registry.iamForAccount(firstAccountId), firstIam);
   });
 
-  it("disables with a diagnostic reason and detail", () => {
-    // Given an activated sim IAM registry.
-    const registry = new SimIamRegistry();
-    registry.activate("IAM SDK API", "CreatePolicy");
+  it("keeps registrations isolated between registry instances", () => {
+    // Given two independent sim IAM registries.
+    const firstRegistry = new SimIamRegistry();
+    const secondRegistry = new SimIamRegistry();
+    const iam = new SimIam();
 
-    // When sim IAM is disabled with a reason and detail.
-    registry.disable("Test setup", "Opt out of IAM semantics");
+    // When IAM is registered in only the first registry.
+    firstRegistry.register(firstAccountId, iam);
 
-    // Then it records the diagnostic disable information.
-    assertFalse(registry.isActivated);
-    assertTrue(registry.isDisabled);
-    assertIdentical(registry.disableEvent?.reason, "Test setup");
-    assertIdentical(registry.disableEvent.detail, "Opt out of IAM semantics");
-    assertInstanceOf(registry.disableEvent.disabledAt, Date);
+    // Then the first registry resolves it and the second reports it as missing.
+    assertIdentical(firstRegistry.iamForAccount(firstAccountId), iam);
+    const error = assertThrowsError(() => {
+      secondRegistry.iamForAccount(firstAccountId);
+    });
     assertIdentical(
-      registry.statusReason,
-      "Sim IAM is permanently disabled: Test setup (Opt out of IAM semantics)",
-    );
-  });
-
-  it("keeps disable permanent and idempotent", () => {
-    // Given a permanently disabled sim IAM registry.
-    const registry = new SimIamRegistry();
-    registry.disable("First disable", "Original reason");
-    const firstDisableEvent = registry.disableEvent;
-    assertNonNullable(firstDisableEvent);
-
-    // When disable is attempted again with a different reason.
-    registry.disable("Second disable", "Replacement reason");
-
-    // Then it stays disabled and preserves the original permanent disable event.
-    assertFalse(registry.isActivated);
-    assertTrue(registry.isDisabled);
-    assertIdentical(registry.disableEvent, firstDisableEvent);
-    assertIdentical(registry.disableEvent.reason, "First disable");
-    assertIdentical(registry.disableEvent.detail, "Original reason");
-    assertIdentical(
-      registry.statusReason,
-      "Sim IAM is permanently disabled: First disable (Original reason)",
-    );
-  });
-
-  it("records activation attempts after permanent disable without reactivating", () => {
-    // Given a sim IAM registry that has been permanently disabled.
-    const registry = new SimIamRegistry();
-    registry.disable("Manual disable", "Test opt-out");
-
-    // When activation is attempted after disable.
-    registry.activate("IAM SDK API", "CreatePolicy");
-
-    // Then the activation attempt is recorded but IAM remains permanently disabled.
-    assertFalse(registry.isActivated);
-    assertTrue(registry.isDisabled);
-    assertArrayLength(registry.activationEvents, 1);
-    assertIdentical(registry.activationEvents[0].reason, "IAM SDK API");
-    assertIdentical(registry.activationEvents[0].detail, "CreatePolicy");
-    assertInstanceOf(registry.activationEvents[0].activatedAt, Date);
-    assertFalse(registry.activationEvents[0].activated);
-    assertTrue(registry.activationEvents[0].registryDisabled);
-    assertIdentical(
-      registry.activationEvents[0].ignoredReason,
-      "Sim IAM was permanently disabled by explicit user action.",
-    );
-    assertIdentical(
-      registry.statusReason,
-      "Sim IAM is permanently disabled: Manual disable (Test opt-out)",
-    );
-  });
-
-  it("preserves activation history when disabled", () => {
-    // Given a sim IAM registry with activation history.
-    const registry = new SimIamRegistry();
-    registry.activate("IAM SDK API", "CreatePolicy");
-    registry.activate("IAM SDK API", "ListPolicies");
-
-    // When sim IAM is permanently disabled.
-    registry.disable("Manual disable");
-
-    // Then the previous activation history remains available for diagnostics.
-    assertFalse(registry.isActivated);
-    assertTrue(registry.isDisabled);
-    assertArrayLength(registry.activationEvents, 2);
-    assertIdentical(registry.activationEvents[0].detail, "CreatePolicy");
-    assertIdentical(registry.activationEvents[1].detail, "ListPolicies");
-    assertTrue(registry.activationEvents[0].activated);
-    assertTrue(registry.activationEvents[1].activated);
-  });
-
-  it("records both successful and ignored activation attempts in order", () => {
-    // Given a sim IAM registry that is activated and then permanently disabled.
-    const registry = new SimIamRegistry();
-    registry.activate("IAM SDK API", "CreatePolicy");
-    registry.disable("Manual disable");
-
-    // When activation is attempted after permanent disable.
-    registry.activate("IAM SDK API", "GetPolicy");
-
-    // Then all activation attempts are retained in chronological order.
-    assertArrayLength(registry.activationEvents, 2);
-    assertIdentical(registry.activationEvents[0].detail, "CreatePolicy");
-    assertTrue(registry.activationEvents[0].activated);
-    assertFalse(registry.activationEvents[0].registryDisabled);
-    assertIdentical(registry.activationEvents[1].detail, "GetPolicy");
-    assertFalse(registry.activationEvents[1].activated);
-    assertTrue(registry.activationEvents[1].registryDisabled);
-    assertStringIncludes(
-      registry.activationEvents[1].ignoredReason ?? "",
-      "permanently disabled",
+      error.message,
+      `Sim IAM is not registered for Account ${firstAccountId}`,
     );
   });
 });

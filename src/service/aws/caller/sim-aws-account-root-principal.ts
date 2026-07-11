@@ -8,9 +8,7 @@ export function makeSimAwsAccountRootPrincipal(
   accountId: SimAwsAccountId,
 ): SimAwsPrincipal {
   return {
+    kind: "arn",
     arn: `arn:aws:iam::${accountId}:root`,
-    accountId,
-    principalType: "root",
-    name: "root",
   };
 }

@@ -39,6 +39,8 @@ export class SimIamPolicyDecision {
   private readonly explicitDenyStatementRecords: SimIamPolicyDocumentStatement[] =
     [];
   private readonly allowStatementRecords: SimIamPolicyDocumentStatement[] = [];
+  private readonly trustAllowStatementRecords: SimIamPolicyDocumentStatement[] =
+    [];
 
   constructor(
     request: SimIamAuthZContext,
@@ -95,6 +97,15 @@ export class SimIamPolicyDecision {
   }
 
   /**
+   * Whether a matching trust-policy statement explicitly allows the request.
+   *
+   * An identity-policy Allow cannot substitute for the target role's trust.
+   */
+  get isAllowedByTrustPolicy(): boolean {
+    return this.trustAllowStatementRecords.length > 0;
+  }
+
+  /**
    * Matching explicit Deny statements.
    */
   get explicitDenyStatements(): readonly SimIamPolicyDocumentStatement[] {
@@ -131,6 +142,10 @@ export class SimIamPolicyDecision {
       }
 
       this.allowStatementRecords.push(statement.source);
+
+      if (policy.sourceType === "trust") {
+        this.trustAllowStatementRecords.push(statement.source);
+      }
     }
   }
 }

@@ -202,7 +202,7 @@ describe("sim IAM StringLike authorization", () => {
     const decision = simIam.authorize({
       action: "s3:GetObject",
       resource: "arn:aws:s3:::example-bucket/example-key.txt",
-      caller: { principal: callerPrincipalArn },
+      caller: { kind: "arn", arn: callerPrincipalArn },
       resourcePolicies: [policy],
     });
 

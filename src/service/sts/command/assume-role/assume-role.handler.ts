@@ -1,0 +1,124 @@
+import type { CommandHandler } from "../../../../command/command-handler.js";
+import type { SimIamAccountResolver } from "../../../iam/registry/sim-iam-account-resolver.js";
+import type {
+  SimAssumeRoleCommand,
+  SimAssumeRoleCommandOutput,
+} from "./assume-role.cmd.js";
+import {
+  type BackgroundScheduler,
+  BackgroundTasks,
+} from "../../../../util/background/background.js";
+import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
+import { AssumeRoleSourcePrincipalAuthorizer } from "../../auth-z/assume-role-src-acc-auth-z.js";
+import { AssumeRoleTargetRoleAuthorizer } from "../../auth-z/assume-role-target-auth-z.js";
+import { makeSimAwsAccountRootPrincipal } from "../../../aws/caller/sim-aws-account-root-principal.js";
+import { SimStsAssumeRoleSessionCreator } from "../../assume/sim-sts-assume-role-session-creator.js";
+import { SimStsAssumeRoleRequestParser } from "../../assume/sim-sts-assume-role-request-parser.js";
+import { SimAwsCallerResolver } from "../../../aws/caller/sim-aws-caller-resolver.js";
+import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
+import type { SimAwsPrincipal } from "../../../aws/caller/sim-aws-caller.js";
+import { assertDefined } from "../../../../util/type-guard/defined.js";
+
+interface AssumeRoleCommandHandlerProps {
+  readonly sourceAccountId: SimAwsAccountId;
+  readonly iamResolver: SimIamAccountResolver;
+  readonly background?: BackgroundScheduler;
+}
+
+/**
+ * STS AssumeRoleCommand handler.
+ *
+ * Resolves the source caller and target Role, authorizes the caller's identity
+ * policies and the Role trust policy, then delegates temporary session creation
+ * and response mapping to `AssumeRoleSessionCreator`.
+ *
+ * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/sts/command/AssumeRoleCommand/
+ */
+export class AssumeRoleCommandHandler implements CommandHandler<
+  SimAssumeRoleCommand,
+  SimAssumeRoleCommandOutput
+> {
+  private readonly background: BackgroundScheduler;
+  private readonly callerResolver = new SimAwsCallerResolver();
+  private readonly requestParser = new SimStsAssumeRoleRequestParser();
+  private readonly sourcePrincipalAuthorizer: AssumeRoleSourcePrincipalAuthorizer;
+  private readonly targetRoleAuthorizer: AssumeRoleTargetRoleAuthorizer;
+  private readonly sessionCreator: SimStsAssumeRoleSessionCreator;
+  private readonly sourceAccountId: SimAwsAccountId;
+
+  constructor(props: AssumeRoleCommandHandlerProps) {
+    const {
+      sourceAccountId,
+      iamResolver,
+      background = new BackgroundTasks(),
+    } = props;
+
+    this.sourceAccountId = sourceAccountId;
+    this.background = background;
+    this.sourcePrincipalAuthorizer = new AssumeRoleSourcePrincipalAuthorizer({
+      sourceAccountId,
+      iamResolver,
+    });
+    this.targetRoleAuthorizer = new AssumeRoleTargetRoleAuthorizer({
+      iamResolver,
+    });
+    this.sessionCreator = new SimStsAssumeRoleSessionCreator({
+      iamResolver,
+    });
+  }
+
+  /**
+   * Handle an AssumeRoleCommand from the SDK.
+   *
+   * The request parser validates and normalizes SDK input before this method
+   * coordinates source-account authorization, target-role authorization, and
+   * temporary session creation.
+   */
+  async handle(
+    cmd: SimAssumeRoleCommand,
+    opts?: {
+      caller?: SimAwsPrincipal;
+    },
+  ): Promise<SimAssumeRoleCommandOutput> {
+    const request = this.requestParser.parse(cmd);
+    const caller = this.callerResolver.resolve(
+      opts?.caller,
+      makeSimAwsAccountRootPrincipal(this.sourceAccountId),
+    );
+    assertDefined(caller.arn, "Caller ARN for AssumeRoleCommand");
+
+    // Allow for potential non-deterministic sequencing of async events.
+    await this.background.sequence();
+
+    if (caller.principal.kind === "anonymous") {
+      throw new SimIamAccessDenied({
+        caller: caller.principal,
+        action: "sts:AssumeRole",
+        resource: request.roleArn,
+      });
+    }
+
+    this.sourcePrincipalAuthorizer.authorize({
+      roleArn: request.roleArn,
+      callerPrincipal: caller.principal,
+    });
+
+    const role = await this.targetRoleAuthorizer.authorize({
+      roleArn: request.roleArn,
+      target: request.roleArnParts,
+      caller: caller.principal,
+      conditionContext: request.conditionContext,
+    });
+
+    return this.sessionCreator.create({
+      roleArnParts: request.roleArnParts,
+      role,
+      roleSessionName: request.roleSessionName,
+      sourcePrincipal: {
+        kind: "arn",
+        arn: caller.arn,
+      },
+      durationSeconds: request.durationSeconds,
+    });
+  }
+}

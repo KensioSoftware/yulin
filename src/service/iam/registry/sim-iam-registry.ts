@@ -1,152 +1,54 @@
-export interface SimIamDisableEvent {
-  readonly reason: string;
-  readonly detail?: string | undefined;
-  readonly disabledAt: Date;
-}
+import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
+import type { SimIam } from "../sim-iam.js";
+import type { SimIamAccountResolver } from "./sim-iam-account-resolver.js";
 
 /**
- * Simulated IAM registry for state that is global within one SimAws instance.
+ * Simulation-wide registry of account-scoped IAM facades.
  *
- * IAM service facades are Account-scoped, but IAM activation is sim AWS-wide so
- * cross-account behaviour does not depend on which Account first interacted
- * with sim IAM.
+ * One registry belongs to one SimAws environment. It allows cross-account
+ * services to resolve IAM state owned by a particular Account.
+ *
+ * The registry indexes IAM facades but does not create or own them.
  */
-export class SimIamRegistry {
-  private activated = false;
-  private disableEventRecord: SimIamDisableEvent | undefined;
-  private readonly activationEventRecords: SimIamActivationEvent[] = [];
+export class SimIamRegistry implements SimIamAccountResolver {
+  private readonly iamByAccountId = new Map<SimAwsAccountId, SimIam>();
 
   /**
-   * Whether sim IAM is currently activated for this sim AWS instance.
-   */
-  get isActivated(): boolean {
-    return this.activated && this.disableEventRecord === undefined;
-  }
-
-  /**
-   * Whether sim IAM has been explicitly and permanently disabled for this sim
-   * AWS instance.
-   */
-  get isDisabled(): boolean {
-    return this.disableEventRecord !== undefined;
-  }
-
-  /**
-   * Recorded reasons why sim IAM activation was attempted.
+   * Register the IAM facade belonging to an Account.
    *
-   * Events include both successful activations and later activation attempts that
-   * were ignored because sim IAM had been permanently disabled.
+   * Re-registering the same facade is harmless. Registering a different facade
+   * for an Account that already has one fails rather than silently replacing
+   * account-owned IAM state.
    */
-  get activationEvents(): SimIamActivationEvent[] {
-    return this.activationEventRecords;
-  }
+  register(accountId: SimAwsAccountId, iam: SimIam): void {
+    const existingIam = this.iamByAccountId.get(accountId);
 
-  /**
-   * The permanent disable event, if the user explicitly disabled sim IAM.
-   */
-  get disableEvent(): SimIamDisableEvent | undefined {
-    return this.disableEventRecord;
-  }
-
-  /**
-   * Human-readable diagnostic summary of why sim IAM is activated or not yet
-   * activated.
-   */
-  get statusReason(): string {
-    if (this.disableEventRecord !== undefined) {
-      return `Sim IAM is permanently disabled: ${this.formatEventReason(
-        this.disableEventRecord.reason,
-        this.disableEventRecord.detail,
-      )}`;
+    if (existingIam === iam) {
+      return;
     }
 
-    const latestActivationEvent = this.latestSuccessfulActivationEvent();
-
-    if (latestActivationEvent !== undefined) {
-      return `Sim IAM is activated: ${this.formatEventReason(
-        latestActivationEvent.reason,
-        latestActivationEvent.detail,
-      )}`;
+    if (existingIam !== undefined) {
+      throw new Error(
+        `A different SimIam is already registered for Account ${accountId}`,
+      );
     }
 
-    return "Sim IAM is not activated because it has not been activated.";
+    this.iamByAccountId.set(accountId, iam);
   }
 
   /**
-   * Activate sim IAM for this simulated AWS instance.
+   * Resolve the registered IAM facade belonging to an Account.
    *
-   * If sim IAM has previously been explicitly disabled, the activation attempt is
-   * recorded for diagnostics but does not reactivate IAM semantics.
+   * Throws a diagnostic error when no IAM facade is registered so callers can
+   * rely on receiving a usable account-scoped service.
    */
-  activate(reason = "Manual activation", detail?: string): void {
-    const registryDisabled = this.disableEventRecord !== undefined;
-    const ignoredReason = registryDisabled
-      ? "Sim IAM was permanently disabled by explicit user action."
-      : undefined;
+  iamForAccount(accountId: SimAwsAccountId): SimIam {
+    const iam = this.iamByAccountId.get(accountId);
 
-    this.activationEventRecords.push({
-      reason,
-      detail,
-      activatedAt: new Date(),
-      activated: !registryDisabled,
-      registryDisabled,
-      ignoredReason,
-    });
-
-    if (!registryDisabled) {
-      this.activated = true;
+    if (iam === undefined) {
+      throw new Error(`Sim IAM is not registered for Account ${accountId}`);
     }
+
+    return iam;
   }
-
-  /**
-   * Disable IAM semantics for this simulated AWS instance.
-   *
-   * Disabling is permanent for the lifetime of this sim AWS instance. Automatic
-   * activations from other simulated services are still recorded after disable,
-   * but they are ignored.
-   *
-   * Disabling does not clear activation history because the history is useful
-   * diagnostic information for tests and debugging.
-   */
-  disable(reason = "Manual disable", detail?: string): void {
-    this.activated = false;
-
-    this.disableEventRecord ??= {
-      reason,
-      detail,
-      disabledAt: new Date(),
-    };
-  }
-
-  private latestSuccessfulActivationEvent(): SimIamActivationEvent | undefined {
-    return this.activationEventRecords.findLast((event) => event.activated);
-  }
-
-  private formatEventReason(reason: string, detail?: string): string {
-    return detail === undefined ? reason : `${reason} (${detail})`;
-  }
-}
-
-interface SimIamActivationEvent {
-  readonly reason: string;
-  readonly detail?: string | undefined;
-  readonly activatedAt: Date;
-
-  /**
-   * Whether this activation attempt actually made sim IAM activated.
-   *
-   * This is false when the registry had previously been permanently disabled.
-   */
-  readonly activated: boolean;
-
-  /**
-   * Whether sim IAM had already been permanently disabled when this activation
-   * was attempted.
-   */
-  readonly registryDisabled: boolean;
-
-  /**
-   * Diagnostic explanation when an activation attempt was recorded but ignored.
-   */
-  readonly ignoredReason?: string | undefined;
 }

@@ -12,6 +12,7 @@ import type { SimRoute53 } from "../route53/index.js";
 import type { SimIam } from "../iam/index.js";
 import type { SimAwsPrincipal } from "./caller/sim-aws-caller.js";
 import { makeSimAwsAccountRootPrincipal } from "./caller/sim-aws-account-root-principal.js";
+import type { SimSts } from "../sts/sim-sts.js";
 
 export type SimAwsAccountId = Brand<string, "SimAwsAccountId">;
 
@@ -101,6 +102,13 @@ export class SimAwsAccount {
    */
   s3(): SimS3 {
     return this.region().s3();
+  }
+
+  /**
+   * Get simulated STS for this Account's default Region.
+   */
+  sts(): SimSts {
+    return this.region().sts();
   }
 }
 

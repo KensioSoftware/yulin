@@ -1,9 +1,9 @@
 import type { SimArn } from "../../../aws/arn.js";
-import type { SimAwsPrincipal } from "../../../aws/caller/sim-aws-caller.js";
 import type {
   SimIamConditionValue,
   SimIamPolicyDocument,
 } from "../../policy/sim-iam-policy.js";
+import type { SimAwsResolvedCaller } from "../../../aws/caller/sim-aws-caller-resolver.js";
 
 export type SimIamAuthZPolicySourceType =
   | "identity-inline"
@@ -20,6 +20,19 @@ export interface SimIamAuthZPolicySource {
   readonly policyArn?: SimArn | undefined;
   readonly resourceArn?: string | undefined;
 }
+
+/**
+ * A policy source that can participate as a resource or trust policy.
+ */
+export type SimIamAuthZResourcePolicySource = Omit<
+  SimIamAuthZPolicySource,
+  "sourceType"
+> & {
+  readonly sourceType: Extract<
+    SimIamAuthZPolicySourceType,
+    "resource" | "trust"
+  >;
+};
 
 export interface SimIamAuthZContext {
   /**
@@ -41,7 +54,7 @@ export interface SimIamAuthZContext {
   readonly conditionContext: Readonly<Record<string, SimIamConditionValue>>;
 
   /**
-   * Resolved caller principal, if the simulated request has one.
+   * Resolved caller and any metadata derived from its principal.
    */
-  readonly callerPrincipal?: SimAwsPrincipal | undefined;
+  readonly caller: SimAwsResolvedCaller;
 }

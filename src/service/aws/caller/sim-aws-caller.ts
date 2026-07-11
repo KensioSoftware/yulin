@@ -1,49 +1,45 @@
-import type { SimAwsAccountId } from "../sim-aws-account.js";
-
-export type SimAwsPrincipalType =
-  "root" | "user" | "role" | "assumed-role" | "service";
-
 /**
- * Simulated AWS principal making a request.
- *
- * This is the resolved AWS identity, not SDK command input. Real AWS derives
- * this from credentials/signing; Yulin can resolve it from test options, local
- * HTTP headers, future simulated credentials, or service-to-service context.
+ * Resolved sim principal with an ARN, such as an IAM user or role.
  */
-export interface SimAwsPrincipal {
+export interface SimArnPrincipal {
+  readonly kind: "arn";
   readonly arn: string;
-  readonly accountId?: SimAwsAccountId | undefined;
-  readonly principalType?: SimAwsPrincipalType | undefined;
-  readonly name?: string | undefined;
 }
 
 /**
- * A request made by an authenticated simulated AWS principal.
+ * Resolved sim principal with a service name, such as lambda.amazonaws.com.
  */
-export interface SimAwsPrincipalCallerContext {
-  readonly kind?: "principal" | undefined;
-  readonly principal: SimAwsPrincipal | string;
+export interface SimServicePrincipal {
+  readonly kind: "service";
+  readonly service: string;
 }
 
 /**
- * A request made without an authenticated AWS principal.
+ * Resolved sim principal with an anonymous identity.
  */
-export interface SimAwsAnonymousCallerContext {
+export interface SimAnonymousPrincipal {
   readonly kind: "anonymous";
 }
 
 /**
- * Caller context for a simulated AWS service operation.
- *
- * Omitting the caller allows the service to apply its default caller. Supplying
- * an anonymous caller explicitly suppresses that fallback.
+ * Resolved simulated AWS identity making a request.
  */
-export type SimAwsCallerContext =
-  SimAwsPrincipalCallerContext | SimAwsAnonymousCallerContext;
+export type SimAwsPrincipal =
+  SimArnPrincipal | SimServicePrincipal | SimAnonymousPrincipal;
 
 /**
- * Reusable caller context for an explicitly anonymous request.
+ * Return the principal ARN when the principal is ARN-based.
+ */
+export function simAwsPrincipalArn(
+  principal: SimAwsPrincipal | undefined,
+): string | undefined {
+  return principal?.kind === "arn" ? principal.arn : undefined;
+}
+
+/**
+ * TODO: inline this everywhere it's used?
+ * Reusable principal for an explicitly anonymous request.
  */
 export const SIM_AWS_ANONYMOUS_CALLER = {
   kind: "anonymous",
-} as const satisfies SimAwsAnonymousCallerContext;
+} as const satisfies SimAwsPrincipal;

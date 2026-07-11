@@ -25,6 +25,7 @@ import { SimAwsScopeRegistry } from "./scope/sim-aws-scope-registry.js";
 import type { SimAcm } from "../acm/sim-acm.js";
 import type { SimIam } from "../iam/index.js";
 import type { SimIamRegistry } from "../iam/registry/sim-iam-registry.js";
+import type { SimSts } from "../sts/sim-sts.js";
 
 interface SimAwsProps {
   readonly defaultAccountId?: SimAwsAccountId;
@@ -145,6 +146,13 @@ export class SimAws {
    */
   s3(): SimS3 {
     return this.accountRegionScope().s3();
+  }
+
+  /**
+   * Get simulated STS in the default Account Region scope.
+   */
+  sts(): SimSts {
+    return this.accountRegionScope().sts();
   }
 
   /**
