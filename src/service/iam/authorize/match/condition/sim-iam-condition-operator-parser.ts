@@ -8,18 +8,26 @@ import { SimIamStringLike } from "./string/like/sim-iam-string-like.js";
 
 type SimIamConditionOperatorFactory = () => SimIamConditionOperator;
 
-/* eslint-disable @typescript-eslint/naming-convention */
-
-const operatorFactories: Readonly<
-  Record<string, SimIamConditionOperatorFactory>
-> = {
-  StringEquals: () => new SimIamStringEquals(),
-  StringLike: () => new SimIamStringLike(),
-  "ForAnyValue:StringEquals": () => new SimIamForAnyValueStringEquals(),
-  "ForAnyValue:StringLike": () => new SimIamForAnyValueStringLike(),
-  "ForAllValues:StringEquals": () => new SimIamForAllValuesStringEquals(),
-  "ForAllValues:StringLike": () => new SimIamForAllValuesStringLike(),
-};
+const operatorFactories = new Map<string, SimIamConditionOperatorFactory>([
+  ["StringEquals", (): SimIamConditionOperator => new SimIamStringEquals()],
+  ["StringLike", (): SimIamConditionOperator => new SimIamStringLike()],
+  [
+    "ForAnyValue:StringEquals",
+    (): SimIamConditionOperator => new SimIamForAnyValueStringEquals(),
+  ],
+  [
+    "ForAnyValue:StringLike",
+    (): SimIamConditionOperator => new SimIamForAnyValueStringLike(),
+  ],
+  [
+    "ForAllValues:StringEquals",
+    (): SimIamConditionOperator => new SimIamForAllValuesStringEquals(),
+  ],
+  [
+    "ForAllValues:StringLike",
+    (): SimIamConditionOperator => new SimIamForAllValuesStringLike(),
+  ],
+]);
 
 /**
  * Parses IAM condition operator keywords into their behavior objects.
@@ -32,7 +40,6 @@ export class SimIamConditionOperatorParser {
    * Parse a keyword into a condition operator, if supported.
    */
   parse(keyword: string): SimIamConditionOperator | undefined {
-    // eslint-disable-next-line security/detect-object-injection
-    return operatorFactories[keyword]?.();
+    return operatorFactories.get(keyword)?.();
   }
 }
