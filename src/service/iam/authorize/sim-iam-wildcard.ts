@@ -5,7 +5,7 @@ interface SimIamWildcardMatchOptions {
 /**
  * Match an IAM-style wildcard pattern.
  *
- * Initial support is small: "*" means zero or more characters.
+ * "*" means zero or more characters and "?" means exactly one character.
  */
 export function simIamWildcardMatch(
   pattern: string,
@@ -22,12 +22,13 @@ function wildcardMatch(
 ): boolean {
   const regexPattern = pattern
     .replaceAll(/[\\^$.*+?()[\]{}|]/gu, String.raw`\$&`)
-    .replaceAll(String.raw`\*`, ".*");
+    .replaceAll(String.raw`\*`, ".*")
+    .replaceAll(String.raw`\?`, ".");
 
   /*
    * IAM wildcard patterns are not accepted as regex syntax. They are converted
-   * from a small wildcard language where only "*" has special meaning. All other
-   * characters are escaped above.
+   * from a small wildcard language where "*" and "?" have special meaning. All
+   * other regex characters are escaped above.
    */
   // eslint-disable-next-line security/detect-non-literal-regexp
   return new RegExp(

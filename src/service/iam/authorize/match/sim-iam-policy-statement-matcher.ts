@@ -5,6 +5,7 @@ import type {
 } from "../context/sim-iam-auth-z-context.js";
 import type { SimIamParsedPolicyStatement } from "../../policy/parse/sim-iam-doc-parser.js";
 import { simIamWildcardMatch } from "../sim-iam-wildcard.js";
+import { SimIamPolicyConditionMatcher } from "./condition/sim-iam-policy-condition-matcher.js";
 
 /**
  * Matches one parsed IAM policy statement against one authorization request.
@@ -13,18 +14,21 @@ import { simIamWildcardMatch } from "../sim-iam-wildcard.js";
  * `SimIamPolicyDecision` can stay focused on policy iteration and final
  * Deny/Allow/ImplicitDeny aggregation.
  *
- * The matcher currently covers the IAM dimensions supported by the simulator:
+ * The matcher covers:
  *
  * - Principal and NotPrincipal for resource policies;
  * - Action and NotAction;
- * - Resource and NotResource.
- *
- * Conditions are not evaluated yet. A statement with a Condition is treated as
- * non-matching so the simulator does not grant access from a statement whose
- * condition semantics it cannot prove.
+ * - Resource and NotResource;
+ * - supported IAM string conditions.
  */
 export class SimIamPolicyStatementMatcher {
-  constructor(private readonly context: SimIamAuthZContext) {}
+  private readonly conditionMatcher: SimIamPolicyConditionMatcher;
+
+  constructor(private readonly context: SimIamAuthZContext) {
+    this.conditionMatcher = new SimIamPolicyConditionMatcher(
+      context.conditionContext,
+    );
+  }
 
   /**
    * Check whether a parsed statement applies to the current request.
@@ -33,15 +37,11 @@ export class SimIamPolicyStatementMatcher {
     policy: SimIamAuthZPolicySource,
     statement: SimIamParsedPolicyStatement,
   ): boolean {
-    /* v8 ignore if -- policy conditions are TODO */
-    if (statement.condition !== undefined) {
-      return false;
-    }
-
     return (
       this.principalMatches(policy, statement) &&
       this.actionMatches(statement) &&
-      this.resourceMatches(statement)
+      this.resourceMatches(statement) &&
+      this.conditionMatcher.matches(statement.condition)
     );
   }
 

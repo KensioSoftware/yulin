@@ -12,6 +12,7 @@ export const simIamAuthZContextFactory = new StaticFactory<SimIamAuthZContext>({
   resourcePolicies: [],
   action: "s3:GetObject",
   resource: "arn:aws:s3:::test-bucket/test-key",
+  conditionContext: {},
   callerPrincipal: {
     arn: "arn:aws:iam::123456789012:role/TestRole",
   },
@@ -24,6 +25,7 @@ export const simIamAuthZResourcePolicySourceFactory =
   new StaticFactory<SimIamAuthZPolicySource>({
     sourceType: "resource",
     document: {
+      Version: "2012-10-17",
       Statement: {
         Effect: "Allow",
         Action: "s3:GetObject",
