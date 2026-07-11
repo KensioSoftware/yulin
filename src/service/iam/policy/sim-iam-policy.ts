@@ -29,11 +29,11 @@ export type SimIamPolicyDocumentPrincipal =
   | readonly string[]
   | Readonly<Record<string, string | readonly string[]>>;
 
+export type SimIamConditionValue =
+  string | number | boolean | readonly string[];
+
 export type SimIamPolicyDocumentCondition = Readonly<
-  Record<
-    string,
-    Readonly<Record<string, string | number | boolean | readonly string[]>>
-  >
+  Record<string, Readonly<Record<string, SimIamConditionValue>>>
 >;
 
 /**

@@ -4,6 +4,7 @@ import type {
   SimAwsPrincipal,
 } from "../../../aws/caller/sim-aws-caller.js";
 import type {
+  SimIamConditionValue,
   SimIamPolicy,
   SimIamPolicyDocument,
 } from "../../policy/sim-iam-policy.js";
@@ -27,6 +28,18 @@ export interface SimIamResourcePolicyInput {
 export interface SimIamAuthorizationInput {
   readonly action: string;
   readonly resource: string;
+
+  /**
+   * Condition values known by the service handling the simulated request, such
+   * as S3 object tags. Sim IAM automatically supplies global condition values
+   * that it can derive itself, such as aws:PrincipalArn.
+   *
+   * Context-key names are matched case-insensitively by the condition matcher,
+   * while string values remain case-sensitive. IAM-derived values take
+   * precedence over supplied values for equivalent keys.
+   */
+  readonly conditionContext?:
+    Readonly<Record<string, SimIamConditionValue>> | undefined;
 
   /**
    * Simulated request caller context.
@@ -100,7 +113,29 @@ export class SimIamAuthZContextBuilder {
       resourcePolicies: this.resourcePolicySources(input),
       action: input.action,
       resource: input.resource,
+      conditionContext: this.conditionContext(
+        input,
+        callerContext.callerPrincipal,
+      ),
       callerPrincipal: callerContext.callerPrincipal,
+    };
+  }
+
+  /**
+   * Combine service-provided condition values with global values that IAM can
+   * derive from the resolved caller.
+   */
+  private conditionContext(
+    input: SimIamAuthorizationInput,
+    callerPrincipal: SimAwsPrincipal | undefined,
+  ): Readonly<Record<string, SimIamConditionValue>> {
+    if (callerPrincipal === undefined) {
+      return input.conditionContext ?? {};
+    }
+
+    return {
+      ...input.conditionContext,
+      "aws:PrincipalArn": callerPrincipal.arn,
     };
   }
 

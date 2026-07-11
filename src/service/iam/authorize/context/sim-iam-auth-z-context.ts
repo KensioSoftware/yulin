@@ -1,6 +1,9 @@
 import type { SimArn } from "../../../aws/arn.js";
 import type { SimAwsPrincipal } from "../../../aws/caller/sim-aws-caller.js";
-import type { SimIamPolicyDocument } from "../../policy/sim-iam-policy.js";
+import type {
+  SimIamConditionValue,
+  SimIamPolicyDocument,
+} from "../../policy/sim-iam-policy.js";
 
 export type SimIamAuthZPolicySourceType =
   | "identity-inline"
@@ -35,6 +38,7 @@ export interface SimIamAuthZContext {
 
   readonly action: string;
   readonly resource: string;
+  readonly conditionContext: Readonly<Record<string, SimIamConditionValue>>;
 
   /**
    * Resolved caller principal, if the simulated request has one.
