@@ -9,15 +9,13 @@ import {
   BackgroundTasks,
 } from "../../../../util/background/background.js";
 import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
-import { AssumeRoleSourcePrincipalAuthorizer } from "../../auth-z/assume-role-src-acc-auth-z.js";
-import { AssumeRoleTargetRoleAuthorizer } from "../../auth-z/assume-role-target-auth-z.js";
 import { makeSimAwsAccountRootPrincipal } from "../../../aws/caller/sim-aws-account-root-principal.js";
 import { SimStsAssumeRoleSessionCreator } from "../../assume/sim-sts-assume-role-session-creator.js";
 import { SimStsAssumeRoleRequestParser } from "../../assume/sim-sts-assume-role-request-parser.js";
 import { SimAwsCallerResolver } from "../../../aws/caller/sim-aws-caller-resolver.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import type { SimAwsPrincipal } from "../../../aws/caller/sim-aws-caller.js";
-import { assertDefined } from "../../../../util/type-guard/defined.js";
+import { AssumeRoleAuthorizationCoordinator } from "../../auth-z/assume-role-auth-z-coordinator.js";
 
 interface AssumeRoleCommandHandlerProps {
   readonly sourceAccountId: SimAwsAccountId;
@@ -41,8 +39,7 @@ export class AssumeRoleCommandHandler implements CommandHandler<
   private readonly background: BackgroundScheduler;
   private readonly callerResolver = new SimAwsCallerResolver();
   private readonly requestParser = new SimStsAssumeRoleRequestParser();
-  private readonly sourcePrincipalAuthorizer: AssumeRoleSourcePrincipalAuthorizer;
-  private readonly targetRoleAuthorizer: AssumeRoleTargetRoleAuthorizer;
+  private readonly authorizationCoordinator: AssumeRoleAuthorizationCoordinator;
   private readonly sessionCreator: SimStsAssumeRoleSessionCreator;
   private readonly sourceAccountId: SimAwsAccountId;
 
@@ -55,11 +52,8 @@ export class AssumeRoleCommandHandler implements CommandHandler<
 
     this.sourceAccountId = sourceAccountId;
     this.background = background;
-    this.sourcePrincipalAuthorizer = new AssumeRoleSourcePrincipalAuthorizer({
+    this.authorizationCoordinator = new AssumeRoleAuthorizationCoordinator({
       sourceAccountId,
-      iamResolver,
-    });
-    this.targetRoleAuthorizer = new AssumeRoleTargetRoleAuthorizer({
       iamResolver,
     });
     this.sessionCreator = new SimStsAssumeRoleSessionCreator({
@@ -71,8 +65,7 @@ export class AssumeRoleCommandHandler implements CommandHandler<
    * Handle an AssumeRoleCommand from the SDK.
    *
    * The request parser validates and normalizes SDK input before this method
-   * coordinates source-account authorization, target-role authorization, and
-   * temporary session creation.
+   * coordinates authorization and temporary session creation.
    */
   async handle(
     cmd: SimAssumeRoleCommand,
@@ -96,16 +89,10 @@ export class AssumeRoleCommandHandler implements CommandHandler<
         resource: request.roleArn,
       });
     }
-    assertDefined(caller.arn, "Caller ARN for AssumeRoleCommand");
 
-    this.sourcePrincipalAuthorizer.authorize({
+    const role = await this.authorizationCoordinator.authorize({
       roleArn: request.roleArn,
-      callerPrincipal: caller.principal,
-    });
-
-    const role = await this.targetRoleAuthorizer.authorize({
-      roleArn: request.roleArn,
-      target: request.roleArnParts,
+      roleArnParts: request.roleArnParts,
       caller: caller.principal,
       conditionContext: request.conditionContext,
     });
@@ -114,10 +101,7 @@ export class AssumeRoleCommandHandler implements CommandHandler<
       roleArnParts: request.roleArnParts,
       role,
       roleSessionName: request.roleSessionName,
-      sourcePrincipal: {
-        kind: "arn",
-        arn: caller.arn,
-      },
+      sourcePrincipal: caller.principal,
       durationSeconds: request.durationSeconds,
     });
   }

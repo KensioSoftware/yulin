@@ -119,6 +119,13 @@ export class SimIamPolicyDecision {
     return this.allowStatementRecords;
   }
 
+  /**
+   * Matching Allow statements originating from trust policies.
+   */
+  get trustAllowStatements(): readonly SimIamPolicyDocumentStatement[] {
+    return this.trustAllowStatementRecords;
+  }
+
   private evaluate(): void {
     for (const policy of [
       ...this.request.identityPolicies,

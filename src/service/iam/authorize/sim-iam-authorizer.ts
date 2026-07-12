@@ -7,10 +7,12 @@ import {
 } from "./context/sim-iam-auth-z-context-builder.js";
 import { SimIamPolicyDecision } from "./sim-iam-decision.js";
 import type { SimAwsPrincipal } from "../../aws/caller/sim-aws-caller.js";
+import type { SimIamUser, SimIamUsername } from "../user/sim-iam-user.js";
 
 interface SimIamAuthorizerProps {
   readonly policies: ReadonlyMap<SimArn, SimIamPolicy>;
   readonly roles: ReadonlyMap<SimIamRoleName, SimIamRole>;
+  readonly users: ReadonlyMap<SimIamUsername, SimIamUser>;
   readonly defaultCallerPrincipal: SimAwsPrincipal;
 }
 
@@ -29,6 +31,7 @@ export class SimIamAuthorizer {
     this.contextBuilder = new SimIamAuthZContextBuilder(
       props.policies,
       props.roles,
+      props.users,
       props.defaultCallerPrincipal,
     );
   }

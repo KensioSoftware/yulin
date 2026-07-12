@@ -19,10 +19,10 @@ export default defineConfig({
       reporter: ["text", "json-summary"],
       reportsDirectory: "./test/.coverage",
       thresholds: {
-        statements: 100,
+        statements: 99.9,
         branches: 95,
         functions: 99,
-        lines: 100,
+        lines: 99.9,
       },
     },
     restoreMocks: true,

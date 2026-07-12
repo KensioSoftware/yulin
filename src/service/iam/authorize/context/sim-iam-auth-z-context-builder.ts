@@ -11,9 +11,10 @@ import type {
   SimIamAuthZPolicySource,
   SimIamAuthZPolicySourceType,
 } from "./sim-iam-auth-z-context.js";
-import { SimIamAuthZIdentityPolicySourceBuilder } from "./identity-policy-source/sim-iam-auth-z-id-pol-src-builder.js";
+import { SimIamAuthZIdentityPolicyCoordinator } from "./identity-policy-source/sim-iam-auth-z-id-pol-coordinator.js";
 import { SimIamAuthZCallerContextBuilder } from "./sim-iam-auth-z-caller-context-builder.js";
 import type { SimAwsResolvedCaller } from "../../../aws/caller/sim-aws-caller-resolver.js";
+import type { SimIamUser, SimIamUsername } from "../../user/sim-iam-user.js";
 
 export interface SimIamResourcePolicyInput {
   readonly document: SimIamPolicyDocument;
@@ -86,18 +87,22 @@ export interface SimIamAuthorizationInput {
  */
 export class SimIamAuthZContextBuilder {
   private readonly callerContextBuilder: SimIamAuthZCallerContextBuilder;
-  private readonly identityPolicySourceBuilder: SimIamAuthZIdentityPolicySourceBuilder;
+  private readonly identityPolicyCoordinator: SimIamAuthZIdentityPolicyCoordinator;
 
   constructor(
     policies: ReadonlyMap<SimArn, SimIamPolicy>,
     roles: ReadonlyMap<SimIamRoleName, SimIamRole>,
+    users: ReadonlyMap<SimIamUsername, SimIamUser>,
     defaultCallerPrincipal: SimAwsPrincipal,
   ) {
     this.callerContextBuilder = new SimIamAuthZCallerContextBuilder(
       defaultCallerPrincipal,
     );
-    this.identityPolicySourceBuilder =
-      new SimIamAuthZIdentityPolicySourceBuilder({ policies, roles });
+    this.identityPolicyCoordinator = new SimIamAuthZIdentityPolicyCoordinator({
+      policies,
+      roles,
+      users,
+    });
   }
 
   /**
@@ -108,7 +113,7 @@ export class SimIamAuthZContextBuilder {
 
     return {
       identityPolicies: [
-        ...this.identityPolicySourceBuilder.build(callerContext.caller.arn),
+        ...this.identityPolicyCoordinator.build(callerContext.caller.arn),
         ...callerContext.rootPolicySources,
       ],
       resourcePolicies: this.resourcePolicySources(input),

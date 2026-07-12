@@ -56,12 +56,28 @@ import {
   type SimIamSessionCredentialGenerator,
 } from "./credential/session/sim-iam-session-cred-gen.js";
 import { SimIamSessionManager } from "./credential/session/sim-iam-session-manager.js";
+import {
+  SimIamRandomUserCredentialGenerator,
+  type SimIamUserCredentialGenerator,
+} from "./credential/user/sim-iam-user-credential-generator.js";
+import type { SimIamUser, SimIamUsername } from "./user/sim-iam-user.js";
+import type {
+  SimCreateUserCommand,
+  SimCreateUserCommandOutput,
+} from "./command/user/create-user/create-user.cmd.js";
+import { CreateUserCommandHandler } from "./command/user/create-user/create-user.handler.js";
+import type {
+  SimCreateAccessKeyCommand,
+  SimCreateAccessKeyCommandOutput,
+} from "./command/user/create-access-key/create-access-key.cmd.js";
+import { CreateAccessKeyCommandHandler } from "./command/user/create-access-key/create-access-key.handler.js";
 
 interface SimIamProps {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
   readonly background?: BackgroundScheduler;
   readonly credentialRegistry?: SimIamCredentialRegistry;
   readonly sessionCredentialGenerator?: SimIamSessionCredentialGenerator;
+  readonly userCredentialGenerator?: SimIamUserCredentialGenerator;
 }
 
 /**
@@ -75,10 +91,12 @@ interface SimIamProps {
 export class SimIam {
   private readonly policies = new Map<SimArn, SimIamManagedPolicy>();
   private readonly roles = new Map<SimIamRoleName, SimIamRole>();
+  private readonly users = new Map<SimIamUsername, SimIamUser>();
 
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly background: BackgroundScheduler;
   private readonly credentialRegistry: SimIamCredentialRegistry;
+  private readonly userCredentialGenerator: SimIamUserCredentialGenerator;
 
   /**
    * Manage temporary sessions belonging to this simulated IAM Account.
@@ -91,11 +109,13 @@ export class SimIam {
       background = new BackgroundTasks(),
       credentialRegistry = new SimIamCredentialRegistry(),
       sessionCredentialGenerator = new SimIamRandomSessionCredentialGenerator(),
+      userCredentialGenerator = new SimIamRandomUserCredentialGenerator(),
     } = props;
 
     this.accountRegionScope = accountRegionScope;
     this.background = background;
     this.credentialRegistry = credentialRegistry;
+    this.userCredentialGenerator = userCredentialGenerator;
     this.sessionManager = new SimIamSessionManager({
       accountId: accountRegionScope.accountId,
       roles: this.roles,
@@ -126,6 +146,7 @@ export class SimIam {
     return new SimIamAuthorizer({
       policies: this.policies,
       roles: this.roles,
+      users: this.users,
       defaultCallerPrincipal: makeSimAwsAccountRootPrincipal(
         this.accountRegionScope.accountId,
       ),
@@ -220,6 +241,37 @@ export class SimIam {
       roles: this.roles,
       background: this.background,
     });
+    return await handler.handle(cmd);
+  }
+
+  /**
+   * Handle an IAM CreateUser command.
+   */
+  async createUser(
+    cmd: SimCreateUserCommand,
+  ): Promise<SimCreateUserCommandOutput> {
+    const handler = new CreateUserCommandHandler({
+      accountId: this.accountRegionScope.accountId,
+      users: this.users,
+      background: this.background,
+    });
+
+    return await handler.handle(cmd);
+  }
+
+  /**
+   * Handle an IAM CreateAccessKey command.
+   */
+  async createAccessKey(
+    cmd: SimCreateAccessKeyCommand,
+  ): Promise<SimCreateAccessKeyCommandOutput> {
+    const handler = new CreateAccessKeyCommandHandler({
+      users: this.users,
+      credentialRegistry: this.credentialRegistry,
+      credentialGenerator: this.userCredentialGenerator,
+      background: this.background,
+    });
+
     return await handler.handle(cmd);
   }
 }

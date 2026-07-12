@@ -32,7 +32,7 @@ describe("STS AssumeRole in the same sim Account", () => {
       }),
     );
 
-    // When Account root assumes the Role through the top-level STS facade.
+    // When Account root assumes the Role through the STS facade.
     const assumeRoleOut = await simAws.sts().assumeRole(
       new AssumeRoleCommand({
         RoleArn: targetRoleArn,

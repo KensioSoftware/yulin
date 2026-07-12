@@ -5,7 +5,10 @@ import type { IamRoleArnParts } from "../../iam/role/arn/sim-iam-role-arn-parser
 import type { SimGetRoleCommandOutput } from "../../iam/command/role/get-role/get-role.cmd.js";
 import type { SimIamConditionValue } from "../../iam/policy/sim-iam-policy.js";
 import { AssumeRoleTargetResolver } from "./resolve/assume-role-target-resolver.js";
-import { AssumeRoleTrustPolicyAuthorizer } from "./assume-role-trust-policy-authorizer.js";
+import {
+  type AssumeRoleTrustPolicyAuthorization,
+  AssumeRoleTrustPolicyAuthorizer,
+} from "./assume-role-trust-policy-authorizer.js";
 
 interface AssumeRoleTargetRoleAuthorizerProps {
   readonly iamResolver: SimIamAccountResolver;
@@ -19,6 +22,11 @@ interface AssumeRoleTargetAuthorizationInput {
   readonly caller: SimAwsPrincipal;
   readonly conditionContext?:
     Readonly<Record<string, SimIamConditionValue>> | undefined;
+}
+
+interface AssumeRoleTargetAuthorization {
+  readonly role: AssumeRoleTargetRole;
+  readonly trust: AssumeRoleTrustPolicyAuthorization;
 }
 
 /**
@@ -51,7 +59,7 @@ export class AssumeRoleTargetRoleAuthorizer {
    */
   async authorize(
     input: AssumeRoleTargetAuthorizationInput,
-  ): Promise<AssumeRoleTargetRole> {
+  ): Promise<AssumeRoleTargetAuthorization> {
     const roleArnParts = this.targetResolver.resolve(
       input.roleArn,
       input.target,
@@ -64,7 +72,7 @@ export class AssumeRoleTargetRoleAuthorizer {
     });
     const role = getRoleOutput.Role;
 
-    this.trustPolicyAuthorizer.authorize({
+    const trust = this.trustPolicyAuthorizer.authorize({
       roleArn: input.roleArn,
       role,
       targetIam,
@@ -72,6 +80,9 @@ export class AssumeRoleTargetRoleAuthorizer {
       conditionContext: input.conditionContext,
     });
 
-    return role;
+    return {
+      role,
+      trust,
+    };
   }
 }

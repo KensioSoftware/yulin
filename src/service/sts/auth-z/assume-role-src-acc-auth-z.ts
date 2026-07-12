@@ -12,6 +12,14 @@ interface AssumeRoleSourceAccountAuthorizerProps {
 export interface AssumeRoleSourceAuthorizationInput {
   readonly roleArn: string;
   readonly callerPrincipal?: SimAwsPrincipal | undefined;
+
+  /**
+   * Whether the caller must have an identity-policy Allow for sts:AssumeRole.
+   *
+   * This is false when a same-account Role trust policy grants permission
+   * directly to an IAM User. Explicit identity-policy denies always apply.
+   */
+  readonly identityPolicyAllowRequired?: boolean | undefined;
 }
 
 /**
@@ -54,7 +62,10 @@ export class AssumeRoleSourcePrincipalAuthorizer {
       caller: callerPrincipal,
     });
 
-    if (decision.isDenied) {
+    if (
+      decision.isExplicitDeny ||
+      (decision.isImplicitDeny && Boolean(input.identityPolicyAllowRequired))
+    ) {
       throw new SimIamAccessDenied({
         caller: callerPrincipal,
         action: "sts:AssumeRole",

@@ -12,7 +12,7 @@ import { SimAws } from "../../../../aws/sim-aws.js";
 import { makeSimAwsAccountId } from "../../../../aws/sim-aws-account.js";
 
 describe("IAM CreatePolicyCommand", () => {
-  it("creates an IAM Policy through the top-level SimIam service", async () => {
+  it("creates an IAM Policy through the SimIam service", async () => {
     const simAws = new SimAws();
 
     const simIam = simAws.account("123456789012").iam();
