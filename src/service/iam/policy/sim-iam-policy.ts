@@ -24,10 +24,12 @@ export interface SimIamPolicyDocumentStatement {
   readonly Condition?: SimIamPolicyDocumentCondition | undefined;
 }
 
+export type SimIamPolicyDocumentPrincipalObject = Readonly<
+  Record<string, string | readonly string[]>
+>;
+
 export type SimIamPolicyDocumentPrincipal =
-  | string
-  | readonly string[]
-  | Readonly<Record<string, string | readonly string[]>>;
+  string | readonly string[] | SimIamPolicyDocumentPrincipalObject;
 
 export type SimIamConditionValue =
   string | number | boolean | readonly string[];
