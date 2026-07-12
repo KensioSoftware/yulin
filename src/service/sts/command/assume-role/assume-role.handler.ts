@@ -84,7 +84,7 @@ export class AssumeRoleCommandHandler implements CommandHandler<
 
     if (caller.principal.kind !== "arn") {
       throw new SimIamAccessDenied({
-        caller: caller.principal,
+        principal: caller.principal,
         action: "sts:AssumeRole",
         resource: request.roleArn,
       });

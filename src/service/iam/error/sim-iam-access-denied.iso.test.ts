@@ -11,7 +11,7 @@ import { SimIamAccessDenied, SimIamError } from "./sim-iam.error.js";
 describe("SimIamAccessDenied", () => {
   it("uses an AWS-style authorization failure message", () => {
     const error = new SimIamAccessDenied({
-      caller: {
+      principal: {
         kind: "arn",
         arn: "arn:aws:iam::123456789012:user/mateojackson",
       },
@@ -27,7 +27,7 @@ describe("SimIamAccessDenied", () => {
 
   it("identifies an AWS service principal in the authorization failure message", () => {
     const error = new SimIamAccessDenied({
-      caller: {
+      principal: {
         kind: "service",
         service: "lambda.amazonaws.com",
       },
@@ -43,7 +43,7 @@ describe("SimIamAccessDenied", () => {
 
   it("exposes AWS SDK-style error information", () => {
     const error = new SimIamAccessDenied({
-      caller: {
+      principal: {
         kind: "arn",
         arn: "arn:aws:iam::123456789012:role/ApplicationRole",
       },

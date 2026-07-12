@@ -57,7 +57,7 @@ export class AssumeRoleTrustPolicyAuthorizer {
   ): AssumeRoleTrustPolicyAuthorization {
     if (input.role.AssumeRolePolicyDocument === undefined) {
       throw new SimIamAccessDenied({
-        caller: input.caller,
+        principal: input.caller,
         action: "sts:AssumeRole",
         resource: input.roleArn,
       });
@@ -84,7 +84,7 @@ export class AssumeRoleTrustPolicyAuthorizer {
 
     if (decision.isDenied || !decision.isAllowedByTrustPolicy) {
       throw new SimIamAccessDenied({
-        caller: input.caller,
+        principal: input.caller,
         action: "sts:AssumeRole",
         resource: input.roleArn,
       });

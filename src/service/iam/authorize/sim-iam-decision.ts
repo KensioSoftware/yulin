@@ -5,6 +5,7 @@ import type {
 } from "./context/sim-iam-auth-z-context.js";
 import { SimIamPolicyDocumentParser } from "../policy/parse/sim-iam-doc-parser.js";
 import { SimIamPolicyStatementMatcher } from "./match/sim-iam-policy-statement-matcher.js";
+import type { SimAwsResolvedCaller } from "../../aws/caller/sim-aws-caller-resolver.js";
 
 export const SimIamPolicyDecisionValue = {
   ExplicitDeny: "ExplicitDeny",
@@ -51,6 +52,16 @@ export class SimIamPolicyDecision {
     this.statementMatcher = new SimIamPolicyStatementMatcher(request);
 
     this.evaluate();
+  }
+
+  /**
+   * Resolved caller against which this authorization decision was evaluated.
+   *
+   * This includes IAM's default account-root caller when the authorization input
+   * omitted a caller.
+   */
+  get caller(): SimAwsResolvedCaller {
+    return this.request.caller;
   }
 
   /**
