@@ -3,7 +3,6 @@ import { describe, it } from "vitest";
 
 import { simIamAuthZResourcePolicySourceFactory } from "../../../../context/sim-iam-auth-z-context.factory.js";
 import { SimIam } from "../../../../../sim-iam.js";
-import { SIM_AWS_ANONYMOUS_CALLER } from "../../../../../../aws/caller/sim-aws-caller.js";
 
 describe("sim IAM StringEquals authorization", () => {
   it("allows a request when the context value exactly equals the policy value", () => {
@@ -29,7 +28,9 @@ describe("sim IAM StringEquals authorization", () => {
     const decision = simIam.authorize({
       action: "s3:GetObject",
       resource: "arn:aws:s3:::example-bucket/example-key.txt",
-      caller: SIM_AWS_ANONYMOUS_CALLER,
+      caller: {
+        kind: "anonymous",
+      },
       conditionContext: {
         "s3:ExistingObjectTag/classification": "public",
       },
@@ -63,7 +64,9 @@ describe("sim IAM StringEquals authorization", () => {
     const decision = simIam.authorize({
       action: "s3:GetObject",
       resource: "arn:aws:s3:::example-bucket/example-key.txt",
-      caller: SIM_AWS_ANONYMOUS_CALLER,
+      caller: {
+        kind: "anonymous",
+      },
       conditionContext: {
         "s3:ExistingObjectTag/classification": "Public",
       },
@@ -97,7 +100,9 @@ describe("sim IAM StringEquals authorization", () => {
     const decision = simIam.authorize({
       action: "s3:GetObject",
       resource: "arn:aws:s3:::example-bucket/example-key.txt",
-      caller: SIM_AWS_ANONYMOUS_CALLER,
+      caller: {
+        kind: "anonymous",
+      },
       conditionContext: {
         "s3:ExistingObjectTag/classification": "public",
       },
@@ -198,7 +203,9 @@ describe("sim IAM StringEquals authorization", () => {
     const decision = simIam.authorize({
       action: "s3:GetObject",
       resource: "arn:aws:s3:::example-bucket/example-key.txt",
-      caller: SIM_AWS_ANONYMOUS_CALLER,
+      caller: {
+        kind: "anonymous",
+      },
       conditionContext: {
         "s3:existingobjecttag/classification": "public",
       },
@@ -233,7 +240,9 @@ describe("sim IAM StringEquals authorization", () => {
     const decision = simIam.authorize({
       action: "s3:GetObject",
       resource: "arn:aws:s3:::example-bucket/example-key.txt",
-      caller: SIM_AWS_ANONYMOUS_CALLER,
+      caller: {
+        kind: "anonymous",
+      },
       conditionContext: {
         "s3:ExistingObjectTag/classification": "public",
       },

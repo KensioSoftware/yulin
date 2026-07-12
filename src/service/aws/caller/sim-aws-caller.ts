@@ -26,11 +26,3 @@ export interface SimAnonymousPrincipal {
  */
 export type SimAwsPrincipal =
   SimArnPrincipal | SimServicePrincipal | SimAnonymousPrincipal;
-
-/**
- * TODO: inline this everywhere it's used?
- * Reusable principal for an explicitly anonymous request.
- */
-export const SIM_AWS_ANONYMOUS_CALLER = {
-  kind: "anonymous",
-} as const satisfies SimAwsPrincipal;
