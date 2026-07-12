@@ -88,12 +88,16 @@ export class SimAwsAccountServiceCache {
   createIam(scope: SimAwsAccountRegionContainer): SimIam {
     return this.services.getOrCreate(
       accountServiceCacheKey("iam", scope.accountRegionScope.accountId),
-      () =>
-        new SimIam({
+      () => {
+        const iam = new SimIam({
           accountRegionScope: scope.accountRegionScope,
           background: this.background,
-          iamRegistry: this.iamRegistry,
-        }),
+        });
+
+        this.iamRegistry.register(scope.accountRegionScope.accountId, iam);
+
+        return iam;
+      },
     );
   }
 

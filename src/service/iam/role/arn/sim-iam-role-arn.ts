@@ -1,6 +1,6 @@
-import type { SimArn } from "../../aws/arn.js";
-import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
-import type { SimIamRoleName } from "./sim-iam-role.js";
+import type { SimArn } from "../../../aws/arn.js";
+import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
+import type { SimIamRoleName } from "../sim-iam-role.js";
 
 interface MakeSimRoleArnProps {
   readonly accountId: SimAwsAccountId;

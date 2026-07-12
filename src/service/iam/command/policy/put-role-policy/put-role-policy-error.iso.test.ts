@@ -7,13 +7,14 @@ import {
 import { describe, it } from "vitest";
 import { SimAws } from "../../../../aws/sim-aws.js";
 import { SimIamNoSuchEntity } from "../../../error/sim-iam.error.js";
+import { makeSimAwsAccountId } from "../../../../aws/sim-aws-account.js";
 
 describe("IAM PutRolePolicyCommand errors", () => {
   it("throws when RoleName is undefined", async () => {
     // Given an IAM service.
     const simAws = new SimAws();
-
-    const simIam = simAws.iam();
+    const accountId = makeSimAwsAccountId();
+    const simIam = simAws.account(accountId).iam();
 
     // When an inline policy is put without a RoleName.
     const error = await assertThrowsErrorAsync(async () =>
@@ -33,8 +34,8 @@ describe("IAM PutRolePolicyCommand errors", () => {
   it("throws when RoleName is empty", async () => {
     // Given an IAM service.
     const simAws = new SimAws();
-
-    const simIam = simAws.iam();
+    const accountId = makeSimAwsAccountId();
+    const simIam = simAws.account(accountId).iam();
 
     // When an inline policy is put with an empty RoleName.
     const error = await assertThrowsErrorAsync(async () =>
@@ -54,13 +55,19 @@ describe("IAM PutRolePolicyCommand errors", () => {
   it("throws when PolicyName is undefined", async () => {
     // Given an IAM Role exists.
     const simAws = new SimAws();
-
-    const simIam = simAws.iam();
+    const accountId = makeSimAwsAccountId();
+    const simIam = simAws.account(accountId).iam();
 
     await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ApplicationRole",
-        AssumeRolePolicyDocument: "{}",
+        AssumeRolePolicyDocument: JSON.stringify({
+          Statement: {
+            Effect: "Allow",
+            Action: "sts:AssumeRole",
+            Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+          },
+        }),
       }),
     );
 
@@ -82,13 +89,19 @@ describe("IAM PutRolePolicyCommand errors", () => {
   it("throws when PolicyName is empty", async () => {
     // Given an IAM Role exists.
     const simAws = new SimAws();
-
-    const simIam = simAws.iam();
+    const accountId = makeSimAwsAccountId();
+    const simIam = simAws.account(accountId).iam();
 
     await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ApplicationRole",
-        AssumeRolePolicyDocument: "{}",
+        AssumeRolePolicyDocument: JSON.stringify({
+          Statement: {
+            Effect: "Allow",
+            Action: "sts:AssumeRole",
+            Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+          },
+        }),
       }),
     );
 
@@ -110,13 +123,19 @@ describe("IAM PutRolePolicyCommand errors", () => {
   it("throws when PolicyDocument is undefined", async () => {
     // Given an IAM Role exists.
     const simAws = new SimAws();
-
-    const simIam = simAws.iam();
+    const accountId = makeSimAwsAccountId();
+    const simIam = simAws.account(accountId).iam();
 
     await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ApplicationRole",
-        AssumeRolePolicyDocument: "{}",
+        AssumeRolePolicyDocument: JSON.stringify({
+          Statement: {
+            Effect: "Allow",
+            Action: "sts:AssumeRole",
+            Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+          },
+        }),
       }),
     );
 
@@ -138,13 +157,19 @@ describe("IAM PutRolePolicyCommand errors", () => {
   it("throws when PolicyDocument is empty", async () => {
     // Given an IAM Role exists.
     const simAws = new SimAws();
-
-    const simIam = simAws.iam();
+    const accountId = makeSimAwsAccountId();
+    const simIam = simAws.account(accountId).iam();
 
     await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ApplicationRole",
-        AssumeRolePolicyDocument: "{}",
+        AssumeRolePolicyDocument: JSON.stringify({
+          Statement: {
+            Effect: "Allow",
+            Action: "sts:AssumeRole",
+            Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+          },
+        }),
       }),
     );
 

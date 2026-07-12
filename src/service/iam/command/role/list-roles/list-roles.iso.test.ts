@@ -11,20 +11,27 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../../aws/sim-aws.js";
+import { makeSimAwsAccountId } from "../../../../aws/sim-aws-account.js";
 
 describe("IAM ListRolesCommand", () => {
   it("lists IAM Roles through the top-level SimIam service", async () => {
     // Given multiple IAM Roles exist.
     const simAws = new SimAws();
-
-    const simIam = simAws.account("123456789012").iam();
+    const accountId = makeSimAwsAccountId();
+    const simIam = simAws.account(accountId).iam();
 
     const readRoleOutput = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ReadRole",
         Path: "/service-role/",
         Description: "Allows reads",
-        AssumeRolePolicyDocument: undefined,
+        AssumeRolePolicyDocument: JSON.stringify({
+          Statement: {
+            Effect: "Allow",
+            Action: "sts:AssumeRole",
+            Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+          },
+        }),
       }),
     );
     const writeRoleOutput = await simIam.createRole(
@@ -32,7 +39,13 @@ describe("IAM ListRolesCommand", () => {
         RoleName: "WriteRole",
         Path: "/application/",
         Description: "Allows writes",
-        AssumeRolePolicyDocument: undefined,
+        AssumeRolePolicyDocument: JSON.stringify({
+          Statement: {
+            Effect: "Allow",
+            Action: "sts:AssumeRole",
+            Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+          },
+        }),
       }),
     );
 
@@ -83,21 +96,33 @@ describe("IAM ListRolesCommand", () => {
   it("filters IAM Roles by path prefix", async () => {
     // Given IAM Roles exist in different paths.
     const simAws = new SimAws();
-
-    const simIam = simAws.iam();
+    const accountId = makeSimAwsAccountId();
+    const simIam = simAws.account(accountId).iam();
 
     await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ServiceRole",
         Path: "/service-role/",
-        AssumeRolePolicyDocument: "{}",
+        AssumeRolePolicyDocument: JSON.stringify({
+          Statement: {
+            Effect: "Allow",
+            Action: "sts:AssumeRole",
+            Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+          },
+        }),
       }),
     );
     await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ApplicationRole",
         Path: "/application/",
-        AssumeRolePolicyDocument: "{}",
+        AssumeRolePolicyDocument: JSON.stringify({
+          Statement: {
+            Effect: "Allow",
+            Action: "sts:AssumeRole",
+            Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+          },
+        }),
       }),
     );
 
@@ -119,25 +144,43 @@ describe("IAM ListRolesCommand", () => {
   it("paginates IAM Roles with markers", async () => {
     // Given more IAM Roles exist than a single requested page can hold.
     const simAws = new SimAws();
-
-    const simIam = simAws.iam();
+    const accountId = makeSimAwsAccountId();
+    const simIam = simAws.account(accountId).iam();
 
     await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "AlphaRole",
-        AssumeRolePolicyDocument: "{}",
+        AssumeRolePolicyDocument: JSON.stringify({
+          Statement: {
+            Effect: "Allow",
+            Action: "sts:AssumeRole",
+            Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+          },
+        }),
       }),
     );
     await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "BetaRole",
-        AssumeRolePolicyDocument: "{}",
+        AssumeRolePolicyDocument: JSON.stringify({
+          Statement: {
+            Effect: "Allow",
+            Action: "sts:AssumeRole",
+            Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+          },
+        }),
       }),
     );
     await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "GammaRole",
-        AssumeRolePolicyDocument: "{}",
+        AssumeRolePolicyDocument: JSON.stringify({
+          Statement: {
+            Effect: "Allow",
+            Action: "sts:AssumeRole",
+            Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+          },
+        }),
       }),
     );
 
@@ -201,12 +244,19 @@ describe("IAM ListRolesCommand", () => {
 
   it("rejects a stale Marker", async () => {
     const simAws = new SimAws();
-    const simIam = simAws.iam();
+    const accountId = makeSimAwsAccountId();
+    const simIam = simAws.account(accountId).iam();
 
     await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "CurrentRole",
-        AssumeRolePolicyDocument: "{}",
+        AssumeRolePolicyDocument: JSON.stringify({
+          Statement: {
+            Effect: "Allow",
+            Action: "sts:AssumeRole",
+            Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+          },
+        }),
       }),
     );
 

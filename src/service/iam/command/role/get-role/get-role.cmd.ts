@@ -1,4 +1,5 @@
 import type { SimArn } from "../../../../aws/arn.js";
+import type { SimIamRoleName } from "../../../role/sim-iam-role.js";
 
 export interface SimGetRoleCommandInput {
   readonly RoleName?: string | undefined;
@@ -11,7 +12,7 @@ export interface SimGetRoleCommand {
 export interface SimGetRoleCommandOutput {
   readonly Role: {
     readonly Path: string;
-    readonly RoleName: string;
+    readonly RoleName: SimIamRoleName;
     readonly RoleId: string;
     readonly Arn: SimArn;
     readonly CreateDate: Date;

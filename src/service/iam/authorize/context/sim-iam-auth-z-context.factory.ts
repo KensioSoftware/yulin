@@ -1,7 +1,7 @@
 import { StaticFactory } from "@kensio/part-factory";
 import type {
   SimIamAuthZContext,
-  SimIamAuthZPolicySource,
+  SimIamAuthZResourcePolicySource,
 } from "./sim-iam-auth-z-context.js";
 
 /**
@@ -13,8 +13,13 @@ export const simIamAuthZContextFactory = new StaticFactory<SimIamAuthZContext>({
   action: "s3:GetObject",
   resource: "arn:aws:s3:::test-bucket/test-key",
   conditionContext: {},
-  callerPrincipal: {
+  caller: {
+    principal: {
+      kind: "arn",
+      arn: "arn:aws:iam::123456789012:role/TestRole",
+    },
     arn: "arn:aws:iam::123456789012:role/TestRole",
+    accountId: "123456789012",
   },
 });
 
@@ -22,7 +27,7 @@ export const simIamAuthZContextFactory = new StaticFactory<SimIamAuthZContext>({
  * Generates simulated IAM resource-policy sources for tests.
  */
 export const simIamAuthZResourcePolicySourceFactory =
-  new StaticFactory<SimIamAuthZPolicySource>({
+  new StaticFactory<SimIamAuthZResourcePolicySource>({
     sourceType: "resource",
     document: {
       Version: "2012-10-17",

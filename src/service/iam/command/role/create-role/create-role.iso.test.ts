@@ -15,8 +15,8 @@ describe("IAM CreateRoleCommand", () => {
   it("creates an IAM Role through the top-level SimIam service", async () => {
     // Given an IAM service in a known account.
     const simAws = new SimAws();
-
-    const simIam = simAws.account("123456789012").iam();
+    const accountId = makeSimAwsAccountId();
+    const simIam = simAws.account(accountId).iam();
 
     // When an IAM Role is created.
     const createRoleOutput = await simIam.createRole(
@@ -24,7 +24,13 @@ describe("IAM CreateRoleCommand", () => {
         RoleName: "TestRole",
         Path: "/service-role/",
         Description: "Role used by CreateRoleCommand tests",
-        AssumeRolePolicyDocument: "{}",
+        AssumeRolePolicyDocument: JSON.stringify({
+          Statement: {
+            Effect: "Allow",
+            Action: "sts:AssumeRole",
+            Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+          },
+        }),
       }),
     );
 
@@ -37,7 +43,7 @@ describe("IAM CreateRoleCommand", () => {
     );
     assertIdentical(
       createRoleOutput.Role.Arn,
-      "arn:aws:iam::123456789012:role/service-role/TestRole",
+      `arn:aws:iam::${accountId}:role/service-role/TestRole`,
     );
     assertStringLength(createRoleOutput.Role.RoleId, 21);
     assertNonNullable(createRoleOutput.Role.AssumeRolePolicyDocument);
@@ -47,14 +53,20 @@ describe("IAM CreateRoleCommand", () => {
   it("defaults optional values when creating an IAM Role", async () => {
     // Given an IAM service in a known account.
     const simAws = new SimAws();
-
-    const simIam = simAws.account("123456789012").iam();
+    const accountId = makeSimAwsAccountId();
+    const simIam = simAws.account(accountId).iam();
 
     // When an IAM Role is created with optional fields omitted.
     const createRoleOutput = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "DefaultedRole",
-        AssumeRolePolicyDocument: undefined,
+        AssumeRolePolicyDocument: JSON.stringify({
+          Statement: {
+            Effect: "Allow",
+            Action: "sts:AssumeRole",
+            Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+          },
+        }),
       }),
     );
 
@@ -63,40 +75,58 @@ describe("IAM CreateRoleCommand", () => {
     assertIdentical(createRoleOutput.Role.Path, "/");
     assertIdentical(
       createRoleOutput.Role.Arn,
-      "arn:aws:iam::123456789012:role/DefaultedRole",
+      `arn:aws:iam::${accountId}:role/DefaultedRole`,
     );
     assertStringLength(createRoleOutput.Role.RoleId, 21);
     assertUndefined(createRoleOutput.Role.Description);
-    assertUndefined(createRoleOutput.Role.AssumeRolePolicyDocument);
+    assertNonNullable(createRoleOutput.Role.AssumeRolePolicyDocument);
     assertInstanceOf(createRoleOutput.Role.CreateDate, Date);
   });
 
   it("normalises IAM Role paths", async () => {
     // Given an IAM service in a known account.
     const simAws = new SimAws();
-
-    const simIam = simAws.account("123456789012").iam();
+    const accountId = makeSimAwsAccountId();
+    const simIam = simAws.account(accountId).iam();
 
     // When Roles are created with differently formatted paths.
     const withoutSlashes = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "WithoutSlashes",
         Path: "application",
-        AssumeRolePolicyDocument: undefined,
+        AssumeRolePolicyDocument: JSON.stringify({
+          Statement: {
+            Effect: "Allow",
+            Action: "sts:AssumeRole",
+            Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+          },
+        }),
       }),
     );
     const withoutTrailingSlash = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "WithoutTrailingSlash",
         Path: "/service-role",
-        AssumeRolePolicyDocument: undefined,
+        AssumeRolePolicyDocument: JSON.stringify({
+          Statement: {
+            Effect: "Allow",
+            Action: "sts:AssumeRole",
+            Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+          },
+        }),
       }),
     );
     const emptyPath = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "EmptyPath",
         Path: "",
-        AssumeRolePolicyDocument: undefined,
+        AssumeRolePolicyDocument: JSON.stringify({
+          Statement: {
+            Effect: "Allow",
+            Action: "sts:AssumeRole",
+            Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+          },
+        }),
       }),
     );
 
@@ -104,17 +134,17 @@ describe("IAM CreateRoleCommand", () => {
     assertIdentical(withoutSlashes.Role.Path, "/application/");
     assertIdentical(
       withoutSlashes.Role.Arn,
-      "arn:aws:iam::123456789012:role/application/WithoutSlashes",
+      `arn:aws:iam::${accountId}:role/application/WithoutSlashes`,
     );
     assertIdentical(withoutTrailingSlash.Role.Path, "/service-role/");
     assertIdentical(
       withoutTrailingSlash.Role.Arn,
-      "arn:aws:iam::123456789012:role/service-role/WithoutTrailingSlash",
+      `arn:aws:iam::${accountId}:role/service-role/WithoutTrailingSlash`,
     );
     assertIdentical(emptyPath.Role.Path, "/");
     assertIdentical(
       emptyPath.Role.Arn,
-      "arn:aws:iam::123456789012:role/EmptyPath",
+      `arn:aws:iam::${accountId}:role/EmptyPath`,
     );
   });
 
@@ -132,7 +162,13 @@ describe("IAM CreateRoleCommand", () => {
       new CreateRoleCommand({
         RoleName: "AccountScopedRole",
         Path: "/application/",
-        AssumeRolePolicyDocument: undefined,
+        AssumeRolePolicyDocument: JSON.stringify({
+          Statement: {
+            Effect: "Allow",
+            Action: "sts:AssumeRole",
+            Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+          },
+        }),
       }),
     );
 
@@ -146,15 +182,21 @@ describe("IAM CreateRoleCommand", () => {
   it("throws when RoleName is undefined", async () => {
     // Given an IAM service.
     const simAws = new SimAws();
-
-    const simIam = simAws.iam();
+    const accountId = makeSimAwsAccountId();
+    const simIam = simAws.account(accountId).iam();
 
     // When CreateRole is called without a RoleName.
     const error = await assertThrowsErrorAsync(async () =>
       simIam.createRole(
         new CreateRoleCommand({
           RoleName: undefined,
-          AssumeRolePolicyDocument: undefined,
+          AssumeRolePolicyDocument: JSON.stringify({
+            Statement: {
+              Effect: "Allow",
+              Action: "sts:AssumeRole",
+              Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+            },
+          }),
         }),
       ),
     );
@@ -166,15 +208,21 @@ describe("IAM CreateRoleCommand", () => {
   it("throws when RoleName is empty", async () => {
     // Given an IAM service.
     const simAws = new SimAws();
-
-    const simIam = simAws.iam();
+    const accountId = makeSimAwsAccountId();
+    const simIam = simAws.account(accountId).iam();
 
     // When CreateRole is called with an empty RoleName.
     const error = await assertThrowsErrorAsync(async () =>
       simIam.createRole(
         new CreateRoleCommand({
           RoleName: "",
-          AssumeRolePolicyDocument: undefined,
+          AssumeRolePolicyDocument: JSON.stringify({
+            Statement: {
+              Effect: "Allow",
+              Action: "sts:AssumeRole",
+              Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+            },
+          }),
         }),
       ),
     );
@@ -186,14 +234,20 @@ describe("IAM CreateRoleCommand", () => {
   it("throws when creating a duplicate IAM Role", async () => {
     // Given an IAM Role already exists.
     const simAws = new SimAws();
-
-    const simIam = simAws.iam();
+    const accountId = makeSimAwsAccountId();
+    const simIam = simAws.account(accountId).iam();
 
     await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "DuplicateRole",
         Path: "/application/",
-        AssumeRolePolicyDocument: undefined,
+        AssumeRolePolicyDocument: JSON.stringify({
+          Statement: {
+            Effect: "Allow",
+            Action: "sts:AssumeRole",
+            Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+          },
+        }),
       }),
     );
 
@@ -203,7 +257,13 @@ describe("IAM CreateRoleCommand", () => {
         new CreateRoleCommand({
           RoleName: "DuplicateRole",
           Path: "/service-role/",
-          AssumeRolePolicyDocument: undefined,
+          AssumeRolePolicyDocument: JSON.stringify({
+            Statement: {
+              Effect: "Allow",
+              Action: "sts:AssumeRole",
+              Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+            },
+          }),
         }),
       ),
     );

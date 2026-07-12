@@ -12,15 +12,14 @@ import { CreateRoleRecordFactory } from "./create-role-record-factory.js";
 import { SimIamEntityAlreadyExists } from "../../../error/sim-iam.error.js";
 import type { SimIamRole, SimIamRoleName } from "../../../role/sim-iam-role.js";
 import { normaliseRolePath } from "../../../role/sim-iam-role-path.js";
-import { makeSimRoleArn } from "../../../role/sim-iam-role-arn.js";
+import { makeSimRoleArn } from "../../../role/arn/sim-iam-role-arn.js";
+import { SimIamTrustPolicyDocumentValidator } from "../../../validate/trust/sim-iam-trust-policy-doc-validator.js";
 
 interface CreateRoleCommandHandlerProps {
   readonly accountId: SimAwsAccountId;
   readonly roles: Map<SimIamRoleName, SimIamRole>;
   readonly background?: BackgroundScheduler;
 }
-
-// TODO: trust policies
 
 /**
  * IAM CreateRoleCommand handler.
@@ -37,14 +36,16 @@ export class CreateRoleCommandHandler implements CommandHandler<
 > {
   private readonly accountId: SimAwsAccountId;
   private readonly roles: Map<SimIamRoleName, SimIamRole>;
-  private readonly background: BackgroundScheduler;
   private readonly roleFactory = new CreateRoleRecordFactory();
+  private readonly trustPolicyValidator: SimIamTrustPolicyDocumentValidator;
+  private readonly background: BackgroundScheduler;
 
   constructor(props: CreateRoleCommandHandlerProps) {
     const { accountId, roles, background = new BackgroundTasks() } = props;
 
     this.accountId = accountId;
     this.roles = roles;
+    this.trustPolicyValidator = new SimIamTrustPolicyDocumentValidator();
     this.background = background;
   }
 
@@ -57,6 +58,10 @@ export class CreateRoleCommandHandler implements CommandHandler<
     if (roleName === undefined || roleName.length === 0) {
       throw new Error("RoleName is required");
     }
+
+    this.trustPolicyValidator.validateRequired(
+      cmd.input.AssumeRolePolicyDocument,
+    );
 
     const path = normaliseRolePath(cmd.input.Path);
     const arn = makeSimRoleArn({

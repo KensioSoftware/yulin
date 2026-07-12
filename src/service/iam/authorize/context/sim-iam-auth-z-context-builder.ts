@@ -1,8 +1,5 @@
 import type { SimArn } from "../../../aws/arn.js";
-import type {
-  SimAwsCallerContext,
-  SimAwsPrincipal,
-} from "../../../aws/caller/sim-aws-caller.js";
+import type { SimAwsPrincipal } from "../../../aws/caller/sim-aws-caller.js";
 import type {
   SimIamConditionValue,
   SimIamPolicy,
@@ -12,12 +9,18 @@ import type { SimIamRole, SimIamRoleName } from "../../role/sim-iam-role.js";
 import type {
   SimIamAuthZContext,
   SimIamAuthZPolicySource,
+  SimIamAuthZPolicySourceType,
 } from "./sim-iam-auth-z-context.js";
 import { SimIamAuthZIdentityPolicySourceBuilder } from "./identity-policy-source/sim-iam-auth-z-id-pol-src-builder.js";
 import { SimIamAuthZCallerContextBuilder } from "./sim-iam-auth-z-caller-context-builder.js";
+import type { SimAwsResolvedCaller } from "../../../aws/caller/sim-aws-caller-resolver.js";
 
 export interface SimIamResourcePolicyInput {
   readonly document: SimIamPolicyDocument;
+  readonly sourceType?: Extract<
+    SimIamAuthZPolicySourceType,
+    "resource" | "trust"
+  >;
   readonly policyName?: string | undefined;
   readonly resourceArn?: string | undefined;
 }
@@ -42,13 +45,13 @@ export interface SimIamAuthorizationInput {
     Readonly<Record<string, SimIamConditionValue>> | undefined;
 
   /**
-   * Simulated request caller context.
+   * Simulated request caller.
    *
    * If omitted, authorization defaults to the root principal of the sim Account
-   * owning the sim IAM instance. An explicit anonymous caller suppresses that
+   * owning the sim IAM instance. An explicit anonymous principal suppresses that
    * fallback and is evaluated without an authenticated principal.
    */
-  readonly caller?: SimAwsCallerContext | undefined;
+  readonly caller?: SimAwsPrincipal | undefined;
 
   /**
    * Resource policies supplied by the service that owns the target resource.
@@ -88,7 +91,7 @@ export class SimIamAuthZContextBuilder {
   constructor(
     policies: ReadonlyMap<SimArn, SimIamPolicy>,
     roles: ReadonlyMap<SimIamRoleName, SimIamRole>,
-    defaultCallerPrincipal?: SimAwsPrincipal,
+    defaultCallerPrincipal: SimAwsPrincipal,
   ) {
     this.callerContextBuilder = new SimIamAuthZCallerContextBuilder(
       defaultCallerPrincipal,
@@ -105,19 +108,14 @@ export class SimIamAuthZContextBuilder {
 
     return {
       identityPolicies: [
-        ...this.identityPolicySourceBuilder.build(
-          callerContext.callerPrincipal?.arn,
-        ),
+        ...this.identityPolicySourceBuilder.build(callerContext.caller.arn),
         ...callerContext.rootPolicySources,
       ],
       resourcePolicies: this.resourcePolicySources(input),
       action: input.action,
       resource: input.resource,
-      conditionContext: this.conditionContext(
-        input,
-        callerContext.callerPrincipal,
-      ),
-      callerPrincipal: callerContext.callerPrincipal,
+      conditionContext: this.conditionContext(input, callerContext.caller),
+      caller: callerContext.caller,
     };
   }
 
@@ -127,15 +125,15 @@ export class SimIamAuthZContextBuilder {
    */
   private conditionContext(
     input: SimIamAuthorizationInput,
-    callerPrincipal: SimAwsPrincipal | undefined,
+    caller: SimAwsResolvedCaller,
   ): Readonly<Record<string, SimIamConditionValue>> {
-    if (callerPrincipal === undefined) {
+    if (caller.arn === undefined) {
       return input.conditionContext ?? {};
     }
 
     return {
       ...input.conditionContext,
-      "aws:PrincipalArn": callerPrincipal.arn,
+      "aws:PrincipalArn": caller.arn,
     };
   }
 
@@ -152,7 +150,7 @@ export class SimIamAuthZContextBuilder {
     input: SimIamAuthorizationInput,
   ): readonly SimIamAuthZPolicySource[] {
     return (input.resourcePolicies ?? []).map((policy) => ({
-      sourceType: "resource",
+      sourceType: policy.sourceType ?? "resource",
       document: policy.document,
       policyName: policy.policyName,
       resourceArn: policy.resourceArn,

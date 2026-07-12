@@ -1,7 +1,5 @@
 import { assertTrue } from "@kensio/smartass";
 import { describe, it } from "vitest";
-
-import { SIM_AWS_ANONYMOUS_CALLER } from "../../../../../../aws/caller/sim-aws-caller.js";
 import { simIamAuthZResourcePolicySourceFactory } from "../../../../context/sim-iam-auth-z-context.factory.js";
 import { SimIam } from "../../../../../sim-iam.js";
 
@@ -29,7 +27,9 @@ describe("sim IAM ForAllValues:StringLike authorization", () => {
     const decision = simIam.authorize({
       action: "s3:PutObjectTagging",
       resource: "arn:aws:s3:::example-bucket/example-key.txt",
-      caller: SIM_AWS_ANONYMOUS_CALLER,
+      caller: {
+        kind: "anonymous",
+      },
       conditionContext: {
         "aws:TagKeys": ["application:name", "team-a"],
       },
@@ -63,7 +63,9 @@ describe("sim IAM ForAllValues:StringLike authorization", () => {
     const decision = simIam.authorize({
       action: "s3:PutObjectTagging",
       resource: "arn:aws:s3:::example-bucket/example-key.txt",
-      caller: SIM_AWS_ANONYMOUS_CALLER,
+      caller: {
+        kind: "anonymous",
+      },
       conditionContext: {
         "aws:TagKeys": "application:name",
       },
@@ -97,7 +99,9 @@ describe("sim IAM ForAllValues:StringLike authorization", () => {
     const decision = simIam.authorize({
       action: "s3:PutObjectTagging",
       resource: "arn:aws:s3:::example-bucket/example-key.txt",
-      caller: SIM_AWS_ANONYMOUS_CALLER,
+      caller: {
+        kind: "anonymous",
+      },
       conditionContext: {
         "aws:TagKeys": ["application:name", "environment"],
       },
@@ -131,7 +135,9 @@ describe("sim IAM ForAllValues:StringLike authorization", () => {
     const decision = simIam.authorize({
       action: "s3:PutObjectTagging",
       resource: "arn:aws:s3:::example-bucket/example-key.txt",
-      caller: SIM_AWS_ANONYMOUS_CALLER,
+      caller: {
+        kind: "anonymous",
+      },
       conditionContext: {
         "aws:TagKeys": ["application:name", "Application:owner"],
       },
@@ -165,7 +171,9 @@ describe("sim IAM ForAllValues:StringLike authorization", () => {
     const decision = simIam.authorize({
       action: "s3:PutObjectTagging",
       resource: "arn:aws:s3:::example-bucket/example-key.txt",
-      caller: SIM_AWS_ANONYMOUS_CALLER,
+      caller: {
+        kind: "anonymous",
+      },
       resourcePolicies: [policy],
     });
 
@@ -199,7 +207,7 @@ describe("sim IAM ForAllValues:StringLike authorization", () => {
     const decision = simIam.authorize({
       action: "s3:GetObject",
       resource: "arn:aws:s3:::example-bucket/example-key.txt",
-      caller: { principal: callerPrincipalArn },
+      caller: { kind: "arn", arn: callerPrincipalArn },
       resourcePolicies: [policy],
     });
 

@@ -14,7 +14,7 @@ describe("SimIamPolicyStatementMatcher", () => {
     const callerPrincipalArn = "arn:aws:iam::123456789012:role/TestRole";
     const matcher = new SimIamPolicyStatementMatcher(
       simIamAuthZContextFactory.make({
-        callerPrincipal: { arn: callerPrincipalArn },
+        caller: { arn: callerPrincipalArn },
       }),
     );
     const policy = simIamAuthZResourcePolicySourceFactory.make();
@@ -56,7 +56,7 @@ describe("SimIamPolicyStatementMatcher", () => {
     const callerPrincipalArn = "arn:aws:iam::123456789012:role/TestRole";
     const matcher = new SimIamPolicyStatementMatcher(
       simIamAuthZContextFactory.make({
-        callerPrincipal: { arn: callerPrincipalArn },
+        caller: { arn: callerPrincipalArn },
       }),
     );
     const policy = simIamAuthZResourcePolicySourceFactory.make();
@@ -76,15 +76,15 @@ describe("SimIamPolicyStatementMatcher", () => {
   it("does not match a concrete Principal when the request has no caller ARN", () => {
     // Given a resource policy Principal that requires a caller ARN to compare.
     const context = simIamAuthZContextFactory.make();
-    // @ts-expect-error -- testing undefined caller principal ARN
-    context.callerPrincipal.arn = undefined;
+    // @ts-expect-error -- testing undefined resolved caller ARN
+    context.caller.arn = undefined;
     const matcher = new SimIamPolicyStatementMatcher(context);
     const policy = simIamAuthZResourcePolicySourceFactory.make();
     const statement = simIamParsedPolicyStatementFactory.make({
       principal: "arn:aws:iam::123456789012:role/TestRole",
     });
 
-    // When the request has no caller principal ARN.
+    // When the request has no caller ARN.
     const matches = matcher.matches(policy, statement);
 
     // Then the concrete Principal cannot match.

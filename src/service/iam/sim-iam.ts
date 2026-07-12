@@ -21,7 +21,6 @@ import {
   type BackgroundScheduler,
   BackgroundTasks,
 } from "../../util/background/background.js";
-import { SimIamRegistry } from "./registry/sim-iam-registry.js";
 import type {
   SimCreateRoleCommand,
   SimCreateRoleCommandOutput,
@@ -47,15 +46,27 @@ import type {
 } from "./command/policy/put-role-policy/put-role-policy.cmd.js";
 import { PutRolePolicyCommandHandler } from "./command/policy/put-role-policy/put-role-policy.handler.js";
 import { makeSimAwsAccountRootPrincipal } from "../aws/caller/sim-aws-account-root-principal.js";
+import { SimIamCredentialRegistry } from "./credential/sim-iam-credential-registry.js";
+import type {
+  SimAwsCredentials,
+  SimIamCredentialIdentity,
+} from "./credential/sim-aws-credentials.js";
+import {
+  SimIamRandomSessionCredentialGenerator,
+  type SimIamSessionCredentialGenerator,
+} from "./credential/session/sim-iam-session-cred-gen.js";
+import { SimIamSessionManager } from "./credential/session/sim-iam-session-manager.js";
 
 interface SimIamProps {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
   readonly background?: BackgroundScheduler;
-  readonly iamRegistry?: SimIamRegistry;
+  readonly credentialRegistry?: SimIamCredentialRegistry;
+  readonly sessionCredentialGenerator?: SimIamSessionCredentialGenerator;
 }
 
 /**
- * Simulated IAM. Handles SDK commands. Emulates AWS behaviour and state.
+ * Simulated IAM service facade. Handles SDK commands. Emulates AWS behaviour
+ * and state.
  *
  * IAM is account-scoped in AWS. Yulin constructs it from an Account/Region
  * scope for consistency with the other service factories, but memoises one
@@ -67,18 +78,40 @@ export class SimIam {
 
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly background: BackgroundScheduler;
-  private readonly iamRegistry: SimIamRegistry;
+  private readonly credentialRegistry: SimIamCredentialRegistry;
+
+  /**
+   * Manage temporary sessions belonging to this simulated IAM Account.
+   */
+  public readonly sessionManager: SimIamSessionManager;
 
   constructor(props: SimIamProps = {}) {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       background = new BackgroundTasks(),
-      iamRegistry = new SimIamRegistry(),
+      credentialRegistry = new SimIamCredentialRegistry(),
+      sessionCredentialGenerator = new SimIamRandomSessionCredentialGenerator(),
     } = props;
 
     this.accountRegionScope = accountRegionScope;
     this.background = background;
-    this.iamRegistry = iamRegistry;
+    this.credentialRegistry = credentialRegistry;
+    this.sessionManager = new SimIamSessionManager({
+      accountId: accountRegionScope.accountId,
+      roles: this.roles,
+      credentialRegistry,
+      credentialGenerator: sessionCredentialGenerator,
+    });
+  }
+
+  /**
+   * Authenticate simulated AWS credentials.
+   */
+  resolveCredentials(
+    credentials: SimAwsCredentials,
+    now?: Date,
+  ): SimIamCredentialIdentity {
+    return this.credentialRegistry.resolve(credentials, now);
   }
 
   /**
@@ -105,8 +138,6 @@ export class SimIam {
   async createPolicy(
     cmd: SimCreatePolicyCommand,
   ): Promise<SimCreatePolicyCommandOutput> {
-    this.iamRegistry.activate("IAM SDK API", "CreatePolicy");
-
     const handler = new CreatePolicyCommandHandler({
       accountId: this.accountRegionScope.accountId,
       policies: this.policies,
@@ -121,8 +152,6 @@ export class SimIam {
   async getPolicy(
     cmd: SimGetPolicyCommand,
   ): Promise<SimGetPolicyCommandOutput> {
-    this.iamRegistry.activate("IAM SDK API", "GetPolicy");
-
     const handler = new GetPolicyCommandHandler({
       policies: this.policies,
       background: this.background,
@@ -136,8 +165,6 @@ export class SimIam {
   async listPolicies(
     cmd: SimListPoliciesCommand,
   ): Promise<SimListPoliciesCommandOutput> {
-    this.iamRegistry.activate("IAM SDK API", "ListPolicies");
-
     const handler = new ListPoliciesCommandHandler({
       policies: this.policies,
       background: this.background,
@@ -151,8 +178,6 @@ export class SimIam {
   async putRolePolicy(
     cmd: SimPutRolePolicyCommand,
   ): Promise<SimPutRolePolicyCommandOutput> {
-    this.iamRegistry.activate("IAM SDK API", "PutRolePolicy");
-
     const handler = new PutRolePolicyCommandHandler({
       roles: this.roles,
       background: this.background,
@@ -166,8 +191,6 @@ export class SimIam {
   async createRole(
     cmd: SimCreateRoleCommand,
   ): Promise<SimCreateRoleCommandOutput> {
-    this.iamRegistry.activate("IAM SDK API", "CreateRole");
-
     const handler = new CreateRoleCommandHandler({
       accountId: this.accountRegionScope.accountId,
       roles: this.roles,
@@ -180,8 +203,6 @@ export class SimIam {
    * Handle a Get Role Command from the SDK.
    */
   async getRole(cmd: SimGetRoleCommand): Promise<SimGetRoleCommandOutput> {
-    this.iamRegistry.activate("IAM SDK API", "GetRole");
-
     const handler = new GetRoleCommandHandler({
       roles: this.roles,
       background: this.background,
@@ -195,8 +216,6 @@ export class SimIam {
   async listRoles(
     cmd: SimListRolesCommand,
   ): Promise<SimListRolesCommandOutput> {
-    this.iamRegistry.activate("IAM SDK API", "ListRoles");
-
     const handler = new ListRolesCommandHandler({
       roles: this.roles,
       background: this.background,

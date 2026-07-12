@@ -12,6 +12,7 @@ import {
 import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
 import { SimIamPolicyDecisionValue } from "./sim-iam-decision.js";
+import { makeSimAwsAccountId } from "../../aws/sim-aws-account.js";
 
 describe("Sim IAM authorization", () => {
   it("explicitly denies the default root when a resource policy denies it", () => {
@@ -53,7 +54,10 @@ describe("Sim IAM authorization", () => {
     const decision = simIam.authorize({
       action: "s3:GetObject",
       resource: "arn:aws:s3:::example-bucket/example-key.txt",
-      caller: { principal: "arn:aws:iam::123456789012:role/MissingRole" },
+      caller: {
+        kind: "arn",
+        arn: "arn:aws:iam::123456789012:role/MissingRole",
+      },
     });
 
     assertIdentical(decision.value, SimIamPolicyDecisionValue.ImplicitDeny);
@@ -91,7 +95,7 @@ describe("Sim IAM authorization", () => {
     const decision = simIam.authorize({
       action: "s3:GetObject",
       resource: "arn:aws:s3:::example-bucket/example-key.txt",
-      caller: { principal: createRoleOutput.Role.Arn },
+      caller: { kind: "arn", arn: createRoleOutput.Role.Arn },
     });
 
     assertIdentical(decision.value, SimIamPolicyDecisionValue.ImplicitDeny);
@@ -105,13 +109,19 @@ describe("Sim IAM authorization", () => {
 
   it("does not authorize from an unattached managed policy", async () => {
     const simAws = new SimAws();
-
-    const simIam = simAws.account("123456789012").iam();
+    const accountId = makeSimAwsAccountId();
+    const simIam = simAws.account(accountId).iam();
 
     const createRoleOutput = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "UnattachedPolicyRole",
-        AssumeRolePolicyDocument: "{}",
+        AssumeRolePolicyDocument: JSON.stringify({
+          Statement: {
+            Effect: "Allow",
+            Action: "sts:AssumeRole",
+            Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+          },
+        }),
       }),
     );
 
@@ -132,7 +142,7 @@ describe("Sim IAM authorization", () => {
     const decision = simIam.authorize({
       action: "s3:GetObject",
       resource: "arn:aws:s3:::example-bucket/example-key.txt",
-      caller: { principal: createRoleOutput.Role.Arn },
+      caller: { kind: "arn", arn: createRoleOutput.Role.Arn },
     });
 
     assertIdentical(decision.value, SimIamPolicyDecisionValue.ImplicitDeny);
@@ -146,21 +156,28 @@ describe("Sim IAM authorization", () => {
 
   it("uses account-scoped IAM state when authorizing through SimAws account services", async () => {
     const simAws = new SimAws();
-
-    const sourceIam = simAws.account("123456789012").iam();
-    const otherIam = simAws.account("210987654321").iam();
+    const sourceAccountId = makeSimAwsAccountId();
+    const otherAccountId = makeSimAwsAccountId();
+    const sourceIam = simAws.account(sourceAccountId).iam();
+    const otherIam = simAws.account(otherAccountId).iam();
 
     const createRoleOutput = await sourceIam.createRole(
       new CreateRoleCommand({
         RoleName: "AccountScopedRole",
-        AssumeRolePolicyDocument: "{}",
+        AssumeRolePolicyDocument: JSON.stringify({
+          Statement: {
+            Effect: "Allow",
+            Action: "sts:AssumeRole",
+            Principal: { AWS: `arn:aws:iam::${sourceAccountId}:root` },
+          },
+        }),
       }),
     );
 
     const decision = otherIam.authorize({
       action: "s3:GetObject",
       resource: "arn:aws:s3:::example-bucket/example-key.txt",
-      caller: { principal: createRoleOutput.Role.Arn },
+      caller: { kind: "arn", arn: createRoleOutput.Role.Arn },
     });
 
     assertIdentical(decision.value, SimIamPolicyDecisionValue.ImplicitDeny);
@@ -174,13 +191,19 @@ describe("Sim IAM authorization", () => {
 
   it("explicit deny from an inline identity policy overrides an inline allow", async () => {
     const simAws = new SimAws();
-
-    const simIam = simAws.account("123456789012").iam();
+    const accountId = makeSimAwsAccountId();
+    const simIam = simAws.account(accountId).iam();
 
     const createRoleOutput = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "InlineAllowAndDenyRole",
-        AssumeRolePolicyDocument: "{}",
+        AssumeRolePolicyDocument: JSON.stringify({
+          Statement: {
+            Effect: "Allow",
+            Action: "sts:AssumeRole",
+            Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+          },
+        }),
       }),
     );
 
@@ -221,7 +244,7 @@ describe("Sim IAM authorization", () => {
     const decision = simIam.authorize({
       action: "s3:GetObject",
       resource: "arn:aws:s3:::example-bucket/private/example-key.txt",
-      caller: { principal: createRoleOutput.Role.Arn },
+      caller: { kind: "arn", arn: createRoleOutput.Role.Arn },
     });
 
     assertIdentical(decision.value, SimIamPolicyDecisionValue.ExplicitDeny);

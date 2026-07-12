@@ -20,7 +20,13 @@ describe("sim IAM authorization principal", () => {
     const createRoleOutput = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "CallerContextRole",
-        AssumeRolePolicyDocument: "{}",
+        AssumeRolePolicyDocument: JSON.stringify({
+          Statement: {
+            Effect: "Allow",
+            Action: "sts:AssumeRole",
+            Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+          },
+        }),
       }),
     );
 
@@ -28,7 +34,8 @@ describe("sim IAM authorization principal", () => {
       action: "s3:GetObject",
       resource: "arn:aws:s3:::example-bucket/example-key.txt",
       caller: {
-        principal: createRoleOutput.Role.Arn,
+        kind: "arn",
+        arn: createRoleOutput.Role.Arn,
       },
       resourcePolicies: [
         {
@@ -69,7 +76,13 @@ describe("sim IAM authorization principal", () => {
     const createRoleOutput = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "CallerContextIdentityRole",
-        AssumeRolePolicyDocument: "{}",
+        AssumeRolePolicyDocument: JSON.stringify({
+          Statement: {
+            Effect: "Allow",
+            Action: "sts:AssumeRole",
+            Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+          },
+        }),
       }),
     );
 
@@ -94,12 +107,8 @@ describe("sim IAM authorization principal", () => {
       action: "s3:GetObject",
       resource: "arn:aws:s3:::example-bucket/example-key.txt",
       caller: {
-        principal: {
-          arn: createRoleOutput.Role.Arn,
-          accountId,
-          principalType: "role",
-          name: "CallerContextIdentityRole",
-        },
+        kind: "arn",
+        arn: createRoleOutput.Role.Arn,
       },
     });
 
