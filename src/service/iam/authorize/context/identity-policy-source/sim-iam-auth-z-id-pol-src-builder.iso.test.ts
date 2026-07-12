@@ -2,7 +2,7 @@ import { assertArrayLength, assertIdentical } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import type { SimArn } from "../../../../aws/arn.js";
 import type { SimIamPolicyDocument } from "../../../policy/sim-iam-policy.js";
-import { SimIamAuthZIdentityPolicySourceBuilder } from "./sim-iam-auth-z-id-pol-src-builder.js";
+import { SimIamAuthZIdentityPolicyCoordinator } from "./sim-iam-auth-z-id-pol-coordinator.js";
 import { simIamPolicyFactory } from "../../../policy/sim-iam-policy.factory.js";
 import { simIamRoleFactory } from "../../../role/sim-iam-role.factory.js";
 
@@ -21,13 +21,13 @@ describe("SimIamAuthZIdentityPolicySourceBuilder", () => {
       policyName: "PolicyWithoutDocument",
       policyDocument: undefined,
     });
-    const builder = new SimIamAuthZIdentityPolicySourceBuilder({
+    const policyCoordinator = new SimIamAuthZIdentityPolicyCoordinator({
       policies: new Map([[policyWithoutDocumentArn, policyWithoutDocument]]),
       roles: new Map([[role.roleName, role]]),
     });
 
     // When policy sources are built for the Role principal.
-    const sources = builder.build(role.arn);
+    const sources = policyCoordinator.build(role.arn);
 
     // Then neither missing nor document-less managed policies contribute sources.
     assertArrayLength(sources, 0);
@@ -54,13 +54,13 @@ describe("SimIamAuthZIdentityPolicySourceBuilder", () => {
       policyName: "ReadObjects",
       policyDocument: JSON.stringify(policyDocument),
     });
-    const builder = new SimIamAuthZIdentityPolicySourceBuilder({
+    const policyCoordinator = new SimIamAuthZIdentityPolicyCoordinator({
       policies: new Map([[policyArn, policy]]),
       roles: new Map([[role.roleName, role]]),
     });
 
     // When policy sources are built for the Role principal.
-    const sources = builder.build(role.arn);
+    const sources = policyCoordinator.build(role.arn);
 
     // Then the attached managed policy is converted into an identity-managed source.
     assertArrayLength(sources, 1);
