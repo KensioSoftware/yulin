@@ -67,7 +67,7 @@ export class AssumeRoleSourcePrincipalAuthorizer {
       (decision.isImplicitDeny && Boolean(input.identityPolicyAllowRequired))
     ) {
       throw new SimIamAccessDenied({
-        caller: callerPrincipal,
+        principal: callerPrincipal,
         action: "sts:AssumeRole",
         resource: input.roleArn,
       });

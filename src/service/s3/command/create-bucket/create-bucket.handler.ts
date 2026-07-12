@@ -13,12 +13,21 @@ import {
 } from "../../../../util/background/background.js";
 import { SimS3BucketNameAvailability } from "../../bucket/name-availability/sim-s3-bucket-name-availability.js";
 import { validateS3BucketName } from "../../bucket/validate/validate-s3-bucket-name.js";
+import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimAwsPrincipal } from "../../../aws/caller/sim-aws-caller.js";
+import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
+import { SimIam } from "../../../iam/index.js";
 
 interface CreateBucketCommandHandlerProps {
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly buckets: Map<string, SimS3Bucket>;
   readonly s3GlobalRegistry: SimS3GlobalRegistry;
+  readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
+}
+
+interface CreateBucketCommandHandlerOptions {
+  readonly caller?: SimAwsPrincipal;
 }
 
 /**
@@ -33,6 +42,7 @@ export class CreateBucketCommandHandler implements CommandHandler<
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly buckets: Map<string, SimS3Bucket>;
   private readonly s3GlobalRegistry: SimS3GlobalRegistry;
+  private readonly iam: SimIamInterServiceAuthZ;
   private readonly background: BackgroundScheduler;
 
   constructor(props: CreateBucketCommandHandlerProps) {
@@ -40,11 +50,13 @@ export class CreateBucketCommandHandler implements CommandHandler<
       accountRegionScope,
       buckets,
       s3GlobalRegistry,
+      iam = new SimIam(),
       background = new BackgroundTasks(),
     } = props;
     this.accountRegionScope = accountRegionScope;
     this.buckets = buckets;
     this.s3GlobalRegistry = s3GlobalRegistry;
+    this.iam = iam;
     this.background = background;
   }
 
@@ -53,6 +65,7 @@ export class CreateBucketCommandHandler implements CommandHandler<
    */
   async handle(
     cmd: SimCreateBucketCommand,
+    opts?: CreateBucketCommandHandlerOptions,
   ): Promise<SimCreateBucketCommandOutput> {
     assertDefined(
       cmd.input.Bucket,
@@ -64,6 +77,21 @@ export class CreateBucketCommandHandler implements CommandHandler<
 
     const bucketName = cmd.input.Bucket;
     validateS3BucketName(bucketName);
+
+    const resource = `arn:aws:s3:::${bucketName}`;
+    const decision = this.iam.authorize({
+      action: "s3:CreateBucket",
+      resource,
+      caller: opts?.caller,
+    });
+
+    if (decision.isDenied) {
+      throw new SimIamAccessDenied({
+        principal: decision.caller.principal,
+        action: "s3:CreateBucket",
+        resource,
+      });
+    }
 
     new SimS3BucketNameAvailability({
       accountRegionScope: this.accountRegionScope,
@@ -79,7 +107,7 @@ export class CreateBucketCommandHandler implements CommandHandler<
     this.s3GlobalRegistry.registerBucket(bucketName, this.accountRegionScope);
 
     return {
-      BucketArn: `arn:aws:s3:::${bucketName}`,
+      BucketArn: resource,
       Location: `/${bucketName}`,
       $metadata: {},
     };

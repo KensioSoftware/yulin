@@ -145,9 +145,12 @@ export class SimAwsServiceFactory {
    * Create simulated S3 for an Account Region scope.
    */
   createS3(scope: SimAwsAccountRegionContainer): SimS3 {
+    const iam = this.createIam(scope);
+
     return new SimS3({
       accountRegionScope: scope.accountRegionScope,
       s3GlobalRegistry: this.s3Registry,
+      iam,
       background: this.background,
     });
   }

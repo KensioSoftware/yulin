@@ -40,10 +40,18 @@ import {
 import { SimS3CloudFormationResourceFactory } from "./cfn/sim-cfn-s3-resource-factory.js";
 import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
+import type { SimAwsPrincipal } from "../aws/caller/sim-aws-caller.js";
+import type { SimIamInterServiceAuthZ } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { SimIam } from "../iam/index.js";
+
+export interface SimS3RequestOptions {
+  readonly caller?: SimAwsPrincipal;
+}
 
 interface SimS3Props {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
   readonly s3GlobalRegistry?: SimS3GlobalRegistry;
+  readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
 }
 
@@ -57,6 +65,7 @@ export class SimS3 {
 
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly s3GlobalRegistry: SimS3GlobalRegistry;
+  private readonly iam: SimIamInterServiceAuthZ;
   private readonly background: BackgroundScheduler;
   private readonly cfnFactory = new SimS3CloudFormationResourceFactory(this);
 
@@ -64,11 +73,13 @@ export class SimS3 {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       s3GlobalRegistry = new SimS3GlobalRegistry(),
+      iam = new SimIam(),
       background = new BackgroundTasks(),
     } = props;
 
     this.accountRegionScope = accountRegionScope;
     this.s3GlobalRegistry = s3GlobalRegistry;
+    this.iam = iam;
     this.background = background;
   }
 
@@ -77,14 +88,16 @@ export class SimS3 {
    */
   async createBucket(
     cmd: SimCreateBucketCommand,
+    opts?: SimS3RequestOptions,
   ): Promise<SimCreateBucketCommandOutput> {
     const handler = new CreateBucketCommandHandler({
       accountRegionScope: this.accountRegionScope,
       buckets: this.buckets,
       s3GlobalRegistry: this.s3GlobalRegistry,
+      iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd);
+    return await handler.handle(cmd, opts);
   }
 
   /**
@@ -92,7 +105,10 @@ export class SimS3 {
    */
   async putBucketWebsite(
     cmd: SimPutBucketWebsiteCommand,
+    opts?: SimS3RequestOptions,
   ): Promise<SimPutBucketWebsiteCommandOutput> {
+    void opts;
+
     const handler = new PutBucketWebsiteCommandHandler({
       buckets: this.buckets,
       background: this.background,
@@ -105,7 +121,10 @@ export class SimS3 {
    */
   async listBuckets(
     cmd: SimListBucketsCommand,
+    opts?: SimS3RequestOptions,
   ): Promise<SimListBucketsCommandOutput> {
+    void opts;
+
     const handler = new ListBucketsCommandHandler({
       buckets: this.buckets,
       background: this.background,
@@ -118,7 +137,10 @@ export class SimS3 {
    */
   async putObject(
     cmd: SimPutObjectCommand,
+    opts?: SimS3RequestOptions,
   ): Promise<SimPutObjectCommandOutput> {
+    void opts;
+
     const handler = new PutObjectCommandHandler({
       buckets: this.buckets,
       background: this.background,
@@ -131,7 +153,10 @@ export class SimS3 {
    */
   async getObject(
     cmd: SimGetObjectCommand,
+    opts?: SimS3RequestOptions,
   ): Promise<SimGetObjectCommandOutput> {
+    void opts;
+
     const handler = new GetObjectCommandHandler({
       buckets: this.buckets,
       background: this.background,
@@ -144,7 +169,10 @@ export class SimS3 {
    */
   async listObjects(
     cmd: SimListObjectsCommand,
+    opts?: SimS3RequestOptions,
   ): Promise<SimListObjectsCommandOutput> {
+    void opts;
+
     const handler = new ListObjectsCommandHandler({
       buckets: this.buckets,
       background: this.background,
