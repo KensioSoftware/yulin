@@ -6,6 +6,7 @@ import type { SimIamSessionCredentialGenerator } from "./sim-iam-session-cred-ge
 import type { SimArnPrincipal } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimAwsCredentials } from "../sim-aws-credentials.js";
 import { SimIamAccessKey } from "../sim-iam-access-key.js";
+import { SimIamAssumedRolePrincipalFactory } from "./sim-iam-assumed-role-principal-factory.js";
 
 interface SimIamSessionManagerProps {
   readonly accountId: SimAwsAccountId;
@@ -34,16 +35,18 @@ export interface SimIamCreatedRoleSession {
  * sessions, and the credential registry.
  */
 export class SimIamSessionManager {
-  private readonly accountId: SimAwsAccountId;
   private readonly roles: ReadonlyMap<SimIamRoleName, SimIamRole>;
   private readonly credentialRegistry: SimIamCredentialRegistry;
   private readonly credentialGenerator: SimIamSessionCredentialGenerator;
+  private readonly principalFactory: SimIamAssumedRolePrincipalFactory;
 
   constructor(props: SimIamSessionManagerProps) {
-    this.accountId = props.accountId;
     this.roles = props.roles;
     this.credentialRegistry = props.credentialRegistry;
     this.credentialGenerator = props.credentialGenerator;
+    this.principalFactory = new SimIamAssumedRolePrincipalFactory(
+      props.accountId,
+    );
   }
 
   /**
@@ -54,7 +57,7 @@ export class SimIamSessionManager {
   ): SimIamCreatedRoleSession {
     const role = this.role(input.roleName);
     const credentials = this.credentialGenerator.generate();
-    const principal = this.assumedRolePrincipal(role, input.sessionName);
+    const principal = this.principalFactory.make(role, input.sessionName);
     const session = new SimIamSession({
       principal,
       sourcePrincipal: input.sourcePrincipal,
@@ -94,17 +97,5 @@ export class SimIamSessionManager {
     }
 
     return role;
-  }
-
-  private assumedRolePrincipal(
-    role: SimIamRole,
-    sessionName: string,
-  ): SimArnPrincipal {
-    return {
-      kind: "arn",
-      arn:
-        `arn:aws:sts::${this.accountId}:assumed-role/` +
-        `${role.roleName}/${sessionName}`,
-    };
   }
 }
