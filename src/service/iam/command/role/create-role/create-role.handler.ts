@@ -12,8 +12,8 @@ import { CreateRoleRecordFactory } from "./create-role-record-factory.js";
 import { SimIamEntityAlreadyExists } from "../../../error/sim-iam.error.js";
 import type { SimIamRole, SimIamRoleName } from "../../../role/sim-iam-role.js";
 import { normaliseRolePath } from "../../../role/sim-iam-role-path.js";
-import { makeSimRoleArn } from "../../../role/sim-iam-role-arn.js";
-import { SimIamTrustPolicyDocumentValidator } from "../../../validate/sim-iam-trust-policy-doc-validator.js";
+import { makeSimRoleArn } from "../../../role/arn/sim-iam-role-arn.js";
+import { SimIamTrustPolicyDocumentValidator } from "../../../validate/trust/sim-iam-trust-policy-doc-validator.js";
 
 interface CreateRoleCommandHandlerProps {
   readonly accountId: SimAwsAccountId;

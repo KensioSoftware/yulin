@@ -25,6 +25,22 @@ describe("SimIamAccessDenied", () => {
     );
   });
 
+  it("identifies an AWS service principal in the authorization failure message", () => {
+    const error = new SimIamAccessDenied({
+      caller: {
+        kind: "service",
+        service: "lambda.amazonaws.com",
+      },
+      action: "sts:AssumeRole",
+      resource: "arn:aws:iam::123456789012:role/LambdaExecutionRole",
+    });
+
+    assertIdentical(
+      error.message,
+      "User: lambda.amazonaws.com is not authorized to perform: sts:AssumeRole on resource: arn:aws:iam::123456789012:role/LambdaExecutionRole",
+    );
+  });
+
   it("exposes AWS SDK-style error information", () => {
     const error = new SimIamAccessDenied({
       caller: {

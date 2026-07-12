@@ -28,15 +28,6 @@ export type SimAwsPrincipal =
   SimArnPrincipal | SimServicePrincipal | SimAnonymousPrincipal;
 
 /**
- * Return the principal ARN when the principal is ARN-based.
- */
-export function simAwsPrincipalArn(
-  principal: SimAwsPrincipal | undefined,
-): string | undefined {
-  return principal?.kind === "arn" ? principal.arn : undefined;
-}
-
-/**
  * TODO: inline this everywhere it's used?
  * Reusable principal for an explicitly anonymous request.
  */

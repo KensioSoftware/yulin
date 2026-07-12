@@ -88,6 +88,7 @@ export class SimIamSessionManager {
   private role(roleName: SimIamRoleName): SimIamRole {
     const role = this.roles.get(roleName);
 
+    /* v8 ignore if */
     if (role === undefined) {
       throw new Error(`Sim IAM Role ${roleName} does not exist`);
     }

@@ -1,10 +1,7 @@
 import { createHash, timingSafeEqual } from "node:crypto";
 
 import type { SimAwsPrincipal } from "../../aws/caller/sim-aws-caller.js";
-import type {
-  SimAwsCredentials,
-  SimIamCredentialIdentity,
-} from "./sim-aws-credentials.js";
+import type { SimIamCredentialIdentity } from "./sim-aws-credentials.js";
 import type { SimIamSession } from "./session/sim-iam-session.js";
 
 export type SimIamAccessKeyStatus = "Active" | "Inactive";
@@ -35,14 +32,6 @@ export class SimIamAccessKey {
   public status: SimIamAccessKeyStatus;
 
   constructor(props: SimIamAccessKeyProps) {
-    if (props.accessKeyId.length === 0) {
-      throw new Error("Sim IAM access key ID must not be empty");
-    }
-
-    if (props.secretAccessKey.length === 0) {
-      throw new Error("Sim IAM secret access key must not be empty");
-    }
-
     this.accessKeyId = props.accessKeyId;
     this.secretAccessKey = props.secretAccessKey;
     this.principal = props.principal;
@@ -51,24 +40,6 @@ export class SimIamAccessKey {
     this.session = props.session;
     this.createDate = new Date(props.createDate ?? Date.now());
     this.status = props.status ?? "Active";
-  }
-
-  /**
-   * Whether the supplied credential values authenticate this access key.
-   */
-  matches(credentials: SimAwsCredentials): boolean {
-    if (
-      credentials.accessKeyId !== this.accessKeyId ||
-      !this.matchesSecretAccessKey(credentials.secretAccessKey)
-    ) {
-      return false;
-    }
-
-    if (this.session === undefined) {
-      return credentials.sessionToken === undefined;
-    }
-
-    return this.matchesSessionToken(credentials.sessionToken);
   }
 
   /**

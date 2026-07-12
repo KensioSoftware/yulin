@@ -1,11 +1,11 @@
-import type { JSONString } from "../../../util/type-guard/json.js";
-import { jsonParse } from "../../../util/type-guard/json.js";
-import { SimIamMalformedPolicyDocument } from "../error/sim-iam.error.js";
+import type { JSONString } from "../../../../util/type-guard/json.js";
+import { jsonParse } from "../../../../util/type-guard/json.js";
+import { SimIamMalformedPolicyDocument } from "../../error/sim-iam.error.js";
 import type {
   SimIamPolicyDocument,
   SimIamPolicyDocumentPrincipal,
-} from "../policy/sim-iam-policy.js";
-import { simIamPolicyDocumentStatements } from "../policy/sim-iam-pol-doc-statements.js";
+} from "../../policy/sim-iam-policy.js";
+import { simIamPolicyDocumentStatements } from "../../policy/sim-iam-pol-doc-statements.js";
 
 /**
  * Validates an IAM Role trust policy.

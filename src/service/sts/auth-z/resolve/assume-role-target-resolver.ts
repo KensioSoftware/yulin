@@ -1,8 +1,8 @@
-import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
+import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import {
   IamRoleArnParser,
   type IamRoleArnParts,
-} from "../../iam/role/sim-iam-role-arn-parser.js";
+} from "../../../iam/role/arn/sim-iam-role-arn-parser.js";
 
 /**
  * Resolves and validates the target identity used by an AssumeRole request.

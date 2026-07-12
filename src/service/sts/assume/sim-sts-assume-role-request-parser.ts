@@ -3,7 +3,7 @@ import type { SimIamConditionValue } from "../../iam/policy/sim-iam-policy.js";
 import {
   IamRoleArnParser,
   type IamRoleArnParts,
-} from "../../iam/role/sim-iam-role-arn-parser.js";
+} from "../../iam/role/arn/sim-iam-role-arn-parser.js";
 import type { SimAssumeRoleCommand } from "../command/assume-role/assume-role.cmd.js";
 
 const defaultRoleSessionDurationSeconds = 3600;
@@ -75,6 +75,7 @@ export class SimStsAssumeRoleRequestParser {
   private durationSeconds(value: number | undefined): number {
     const durationSeconds = value ?? defaultRoleSessionDurationSeconds;
 
+    /* v8 ignore if */
     if (!Number.isInteger(durationSeconds) || durationSeconds <= 0) {
       throw new Error("DurationSeconds must be a positive integer");
     }

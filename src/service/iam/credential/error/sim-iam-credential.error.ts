@@ -1,4 +1,4 @@
-import type { SimIamAccessKeyStatus } from "./sim-iam-access-key.js";
+import type { SimIamAccessKeyStatus } from "../sim-iam-access-key.js";
 
 /**
  * Base error for simulated IAM credential operations.

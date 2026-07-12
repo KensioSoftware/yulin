@@ -1,4 +1,4 @@
-import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
+import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 
 export interface IamRoleArnParts {
   readonly accountId: SimAwsAccountId;

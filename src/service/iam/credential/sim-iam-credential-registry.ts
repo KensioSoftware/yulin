@@ -6,7 +6,7 @@ import type { SimIamAccessKey } from "./sim-iam-access-key.js";
 import {
   SimIamDuplicateAccessKey,
   SimIamInvalidCredentials,
-} from "./sim-iam-credential.error.js";
+} from "./error/sim-iam-credential.error.js";
 
 /**
  * Stores and authenticates simulated IAM access keys.

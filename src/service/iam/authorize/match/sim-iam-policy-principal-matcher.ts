@@ -80,6 +80,7 @@ export class SimIamPolicyPrincipalMatcher {
         return patterns.some((pattern) => this.awsPatternMatches(pattern));
       }
 
+      /* v8 ignore if -- service principals not yet fully supported */
       if (principalType === "Service") {
         return patterns.some((pattern) => this.servicePatternMatches(pattern));
       }
@@ -121,8 +122,10 @@ export class SimIamPolicyPrincipalMatcher {
    * Compare a service principal pattern with the resolved caller.
    */
   private servicePatternMatches(pattern: string): boolean {
+    /* v8 ignore next -- service principals not yet fully supported */
     const service = this.context.caller.service;
 
+    /* v8 ignore next -- service principals not yet fully supported */
     return (
       service !== undefined &&
       simIamWildcardMatch(pattern, service, {

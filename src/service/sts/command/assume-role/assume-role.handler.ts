@@ -85,18 +85,18 @@ export class AssumeRoleCommandHandler implements CommandHandler<
       opts?.caller,
       makeSimAwsAccountRootPrincipal(this.sourceAccountId),
     );
-    assertDefined(caller.arn, "Caller ARN for AssumeRoleCommand");
 
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    if (caller.principal.kind === "anonymous") {
+    if (caller.principal.kind !== "arn") {
       throw new SimIamAccessDenied({
         caller: caller.principal,
         action: "sts:AssumeRole",
         resource: request.roleArn,
       });
     }
+    assertDefined(caller.arn, "Caller ARN for AssumeRoleCommand");
 
     this.sourcePrincipalAuthorizer.authorize({
       roleArn: request.roleArn,
