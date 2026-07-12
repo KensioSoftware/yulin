@@ -4,12 +4,16 @@ import {
   assertIdentical,
   assertInstanceOf,
   assertObjectMatches,
+  assertThrowsError,
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
 import { SimIamAccessDenied } from "../../iam/error/sim-iam.error.js";
 import { makeSimAwsAccountId } from "../../aws/sim-aws-account.js";
+import { AssumeRoleTrustPolicyAuthorizer } from "../auth-z/assume-role-trust-policy-authorizer.js";
+
+/* eslint-disable max-lines */
 
 describe("STS AssumeRole denial", () => {
   it("denies Account root when the target Role does not trust it", async () => {
@@ -265,6 +269,53 @@ describe("STS AssumeRole denial", () => {
     assertIdentical(
       error.message,
       `User: lambda.amazonaws.com is not authorized to perform: sts:AssumeRole on resource: ${targetRoleArn}`,
+    );
+  });
+
+  it("throws AccessDenied when the target Role has no trust policy", async () => {
+    const accountId = makeSimAwsAccountId();
+    const targetRoleArn = `arn:aws:iam::${accountId}:role/TargetRole`;
+    const caller = {
+      kind: "arn" as const,
+      arn: `arn:aws:iam::${accountId}:root`,
+    };
+    const simIam = new SimAws({ defaultAccountId: accountId }).iam();
+    const createRoleOutput = await simIam.createRole(
+      new CreateRoleCommand({
+        RoleName: "TargetRole",
+        AssumeRolePolicyDocument: JSON.stringify({
+          Statement: {
+            Effect: "Allow",
+            Principal: { AWS: caller.arn },
+            Action: "sts:AssumeRole",
+          },
+        }),
+      }),
+    );
+    const role = {
+      ...createRoleOutput.Role,
+      AssumeRolePolicyDocument: undefined,
+    };
+
+    const error = assertThrowsError(() => {
+      new AssumeRoleTrustPolicyAuthorizer().authorize({
+        roleArn: targetRoleArn,
+        // @ts-expect-error TS2322 -- testing invalid role
+        role,
+        targetIam: simIam,
+        caller,
+      });
+    });
+
+    assertInstanceOf(error, SimIamAccessDenied);
+    assertObjectMatches(error, {
+      caller,
+      action: "sts:AssumeRole",
+      resource: targetRoleArn,
+    });
+    assertIdentical(
+      error.message,
+      `User: ${caller.arn} is not authorized to perform: sts:AssumeRole on resource: ${targetRoleArn}`,
     );
   });
 });

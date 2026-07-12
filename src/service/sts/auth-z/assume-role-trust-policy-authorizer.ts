@@ -1,6 +1,5 @@
 import type { JSONString } from "../../../util/type-guard/json.js";
 import { jsonParse } from "../../../util/type-guard/json.js";
-import { assertDefined } from "../../../util/type-guard/defined.js";
 import type { SimAwsPrincipal } from "../../aws/caller/sim-aws-caller.js";
 import type { SimGetRoleCommandOutput } from "../../iam/command/role/get-role/get-role.cmd.js";
 import { SimIamAccessDenied } from "../../iam/error/sim-iam.error.js";
@@ -45,10 +44,13 @@ export class AssumeRoleTrustPolicyAuthorizer {
    * no trust-policy statement grants access, even if no explicit Deny matched.
    */
   authorize(input: AssumeRoleTrustPolicyAuthorizationInput): void {
-    assertDefined(
-      input.role.AssumeRolePolicyDocument,
-      `Access denied for sts:AssumeRole on ${input.roleArn}: target Role has no trust policy`,
-    );
+    if (input.role.AssumeRolePolicyDocument === undefined) {
+      throw new SimIamAccessDenied({
+        caller: input.caller,
+        action: "sts:AssumeRole",
+        resource: input.roleArn,
+      });
+    }
 
     const trustPolicy = jsonParse(
       input.role.AssumeRolePolicyDocument as JSONString<SimIamPolicyDocument>,
