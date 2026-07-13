@@ -13,10 +13,12 @@ import {
 } from "../../../../util/background/background.js";
 import { SimS3BucketNameAvailability } from "../../bucket/name-availability/sim-s3-bucket-name-availability.js";
 import { validateS3BucketName } from "../../bucket/validate/validate-s3-bucket-name.js";
-import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
+import {
+  SimIamAllowAllAuth,
+  type SimIamInterServiceAuthZ,
+} from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import type { SimAwsPrincipal } from "../../../aws/caller/sim-aws-caller.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
-import { SimIam } from "../../../iam/index.js";
 
 interface CreateBucketCommandHandlerProps {
   readonly accountRegionScope: SimAwsAccountRegionScope;
@@ -50,7 +52,7 @@ export class CreateBucketCommandHandler implements CommandHandler<
       accountRegionScope,
       buckets,
       s3GlobalRegistry,
-      iam = new SimIam(),
+      iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
     } = props;
     this.accountRegionScope = accountRegionScope;

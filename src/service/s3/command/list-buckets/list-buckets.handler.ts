@@ -11,10 +11,22 @@ import {
   type BackgroundScheduler,
   BackgroundTasks,
 } from "../../../../util/background/background.js";
+import {
+  SimIamAllowAllAuth,
+  type SimIamInterServiceAuthZ,
+} from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimAwsPrincipal } from "../../../aws/caller/sim-aws-caller.js";
+import { ListBucketsAuthorizer } from "./list-buckets-authorizer.js";
+import { ListBucketsPageBuilder } from "./list-buckets-page-builder.js";
 
 interface ListBucketsCommandHandlerProps {
   readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
+  readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
+}
+
+interface ListBucketsCommandHandlerOptions {
+  readonly caller?: SimAwsPrincipal;
 }
 
 /**
@@ -26,75 +38,43 @@ export class ListBucketsCommandHandler implements CommandHandler<
   SimListBucketsCommand,
   SimListBucketsCommandOutput
 > {
-  private readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
+  private readonly authorizer: ListBucketsAuthorizer;
+  private readonly pageBuilder: ListBucketsPageBuilder;
   private readonly background: BackgroundScheduler;
 
   constructor(props: ListBucketsCommandHandlerProps) {
-    const { buckets, background = new BackgroundTasks() } = props;
-    this.buckets = buckets;
+    const {
+      buckets,
+      iam = new SimIamAllowAllAuth(),
+      background = new BackgroundTasks(),
+    } = props;
+    this.authorizer = new ListBucketsAuthorizer({ iam });
+    this.pageBuilder = new ListBucketsPageBuilder({ buckets });
     this.background = background;
   }
 
   /**
    * Simulate listing S3 Buckets.
+   *
+   * Authorization happens before the page builder reads Bucket state. AWS treats
+   * ListBuckets as one account-level operation and does not return a partial
+   * result containing only Bucket ARNs matched by the caller's policies.
+   *
+   * Once authorized, page construction is delegated so this handler remains
+   * focused on coordinating request-level concerns.
    */
   async handle(
     cmd: SimListBucketsCommand,
+    opts?: ListBucketsCommandHandlerOptions,
   ): Promise<SimListBucketsCommandOutput> {
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    const buckets = [...this.buckets.values()];
-    buckets.sort((a, b) => a.bucketName.localeCompare(b.bucketName));
-
-    const prefix = cmd.input.Prefix;
-    const continuationToken = cmd.input.ContinuationToken;
-    const maxBuckets = cmd.input.MaxBuckets ?? 10_000;
-
-    const matchingBuckets =
-      prefix === undefined
-        ? buckets
-        : buckets.filter((bucket) => bucket.bucketName.startsWith(prefix));
-
-    const startBucketName =
-      continuationToken === undefined
-        ? undefined
-        : ListBucketsCommandHandler.parseContinuationToken(continuationToken);
-
-    const startIndex =
-      startBucketName === undefined
-        ? 0
-        : Math.max(
-            0,
-            matchingBuckets.findIndex(
-              (bucket) => bucket.bucketName === startBucketName,
-            ) + 1,
-          );
-
-    const page = matchingBuckets.slice(startIndex, startIndex + maxBuckets);
-    const lastBucket = page.at(-1);
-    const hasMoreBuckets = startIndex + page.length < matchingBuckets.length;
+    this.authorizer.authorize(opts?.caller);
 
     return {
-      Buckets: page.map((bucket) => ({
-        Name: bucket.bucketName,
-      })),
-      ContinuationToken:
-        hasMoreBuckets && lastBucket !== undefined
-          ? ListBucketsCommandHandler.makeContinuationToken(
-              lastBucket.bucketName,
-            )
-          : undefined,
-      Prefix: prefix,
+      ...this.pageBuilder.build(cmd.input),
       $metadata: {},
     };
-  }
-
-  private static makeContinuationToken(bucketName: string): string {
-    return Buffer.from(bucketName, "utf8").toString("base64url");
-  }
-
-  private static parseContinuationToken(token: string): string {
-    return Buffer.from(token, "base64url").toString("utf8");
   }
 }

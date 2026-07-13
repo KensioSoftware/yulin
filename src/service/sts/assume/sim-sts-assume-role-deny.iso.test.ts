@@ -13,8 +13,6 @@ import { SimIamAccessDenied } from "../../iam/error/sim-iam.error.js";
 import { makeSimAwsAccountId } from "../../aws/sim-aws-account.js";
 import { AssumeRoleTrustPolicyAuthorizer } from "../auth-z/assume-role-trust-policy-authorizer.js";
 
-/* eslint-disable max-lines */
-
 describe("STS AssumeRole denial", () => {
   it("denies Account root when the target Role does not trust it", async () => {
     // Given a target Role whose trust policy allows only another principal.

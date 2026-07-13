@@ -16,8 +16,6 @@ import { SimAws } from "../../../aws/sim-aws.js";
 import { makeSimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 
-/* eslint-disable max-lines */
-
 describe("S3 PutBucketWebsiteCommand IAM authorization", () => {
   it("allows the default Account root caller", async () => {
     // Given an S3 Bucket in a simulated AWS Account.

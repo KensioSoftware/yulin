@@ -71,6 +71,7 @@ import type {
   SimCreateAccessKeyCommandOutput,
 } from "./command/user/create-access-key/create-access-key.cmd.js";
 import { CreateAccessKeyCommandHandler } from "./command/user/create-access-key/create-access-key.handler.js";
+import type { SimIamInterServiceAuthZ } from "./authorize/sim-iam-inter-service-auth-z.js";
 
 interface SimIamProps {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
@@ -88,7 +89,7 @@ interface SimIamProps {
  * scope for consistency with the other service factories, but memoises one
  * service facade per Account.
  */
-export class SimIam {
+export class SimIam implements SimIamInterServiceAuthZ {
   private readonly policies = new Map<SimArn, SimIamManagedPolicy>();
   private readonly roles = new Map<SimIamRoleName, SimIamRole>();
   private readonly users = new Map<SimIamUsername, SimIamUser>();

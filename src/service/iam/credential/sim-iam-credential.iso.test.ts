@@ -17,8 +17,6 @@ import {
 import { SimIamCredentialRegistry } from "./sim-iam-credential-registry.js";
 import { SimIamSession } from "./session/sim-iam-session.js";
 
-/* eslint-disable max-lines */
-
 describe("SimIamCredentialRegistry", () => {
   it("resolves the identity for valid long-lived credentials", () => {
     // Given an active long-lived access key registered for a principal.
