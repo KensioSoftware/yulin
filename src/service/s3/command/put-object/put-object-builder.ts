@@ -1,0 +1,78 @@
+import { SimS3Object, SimS3ObjectMetadata } from "../../object/s3-object.js";
+import type { SimPutObjectCommand } from "./put-object.cmd.js";
+import { assertDefined } from "../../../../util/type-guard/defined.js";
+
+/**
+ * Converts the supported PutObject request fields into a stored sim S3 Object.
+ *
+ * The command handler coordinates validation, Bucket lookup, authorization, and
+ * storage. This builder owns the separate translation between the AWS SDK request
+ * representation and the simulation's storage representation. Keeping that
+ * translation here prevents body-format and metadata-normalization rules from
+ * increasing the command handler's control-flow complexity.
+ *
+ * The simulation currently supports the request body forms used by its S3
+ * boundary: strings and Uint8Array values. Node.js Buffer values are also covered
+ * because Buffer extends Uint8Array. Other SDK streaming body forms should be
+ * added here when the simulation gains support for them.
+ */
+export class PutObjectBuilder {
+  /**
+   * Build the Object that will be written to Bucket storage.
+   *
+   * This method performs conversion only. Callers must complete request
+   * validation and authorization before invoking it so failed authorization
+   * cannot trigger body processing or lead to storage mutation.
+   */
+  build(cmd: SimPutObjectCommand): SimS3Object {
+    assertDefined(cmd.input.Key, "PutObjectCommand.input.Key");
+    return new SimS3Object({
+      key: cmd.input.Key,
+      body: this.toBuffer(cmd.input.Body),
+      metadata: new SimS3ObjectMetadata(this.toMetadata(cmd)),
+    });
+  }
+
+  /**
+   * Convert SDK metadata fields to the string map stored by SimS3ObjectMetadata.
+   *
+   * User-defined metadata is retained as supplied. ContentType is represented by
+   * the standard lowercase metadata key used by the existing GetObject response
+   * path. Omitting ContentType leaves that key absent rather than assigning an
+   * undefined value.
+   */
+  private toMetadata(cmd: SimPutObjectCommand): Record<string, string> {
+    return {
+      ...cmd.input.Metadata,
+      ...(cmd.input.ContentType === undefined
+        ? {}
+        : { "content-type": cmd.input.ContentType }),
+    };
+  }
+
+  /**
+   * Materialize a supported SDK request body as a Buffer for Bucket storage.
+   *
+   * An omitted body represents an empty S3 Object. Strings use Node.js's default
+   * UTF-8 encoding. Uint8Array input is copied into a Buffer so storage receives
+   * one consistent binary representation and does not depend on the caller's
+   * mutable typed-array instance.
+   */
+  private toBuffer(body: SimPutObjectCommand["input"]["Body"]): Buffer {
+    if (body === undefined) {
+      return Buffer.alloc(0);
+    }
+
+    if (typeof body === "string") {
+      return Buffer.from(body);
+    }
+
+    if (body instanceof Uint8Array) {
+      return Buffer.from(body);
+    }
+
+    throw new Error(
+      "PutObjectCommand.input.Body must be a string or Uint8Array",
+    );
+  }
+}

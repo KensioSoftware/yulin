@@ -139,13 +139,12 @@ export class SimS3 {
     cmd: SimPutObjectCommand,
     opts?: SimS3RequestOptions,
   ): Promise<SimPutObjectCommandOutput> {
-    void opts;
-
     const handler = new PutObjectCommandHandler({
       buckets: this.buckets,
+      iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd);
+    return await handler.handle(cmd, opts);
   }
 
   /**
