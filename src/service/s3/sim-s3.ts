@@ -107,13 +107,12 @@ export class SimS3 {
     cmd: SimPutBucketWebsiteCommand,
     opts?: SimS3RequestOptions,
   ): Promise<SimPutBucketWebsiteCommandOutput> {
-    void opts;
-
     const handler = new PutBucketWebsiteCommandHandler({
       buckets: this.buckets,
+      iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd);
+    return await handler.handle(cmd, opts);
   }
 
   /**
