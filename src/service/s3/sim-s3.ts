@@ -169,13 +169,12 @@ export class SimS3 {
     cmd: SimListObjectsCommand,
     opts?: SimS3RequestOptions,
   ): Promise<SimListObjectsCommandOutput> {
-    void opts;
-
     const handler = new ListObjectsCommandHandler({
       buckets: this.buckets,
+      iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd);
+    return await handler.handle(cmd, opts);
   }
 
   /**
