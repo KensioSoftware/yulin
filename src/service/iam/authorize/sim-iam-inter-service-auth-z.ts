@@ -54,10 +54,18 @@ export class SimIamAllowAllAuth implements SimIamInterServiceAuthZ {
    * the result because no policies or principal rules are evaluated here.
    */
   authorize(input: SimIamAuthorizationInput): SimIamAuthorizationDecision {
+    const caller =
+      input.caller?.kind === "credentials"
+        ? this.callerResolver.resolve(
+            { kind: "anonymous" },
+            { kind: "anonymous" },
+          )
+        : this.callerResolver.resolve(input.caller, {
+            kind: "anonymous",
+          });
+
     return {
-      caller: this.callerResolver.resolve(input.caller, {
-        kind: "anonymous",
-      }),
+      caller,
       isAllowed: true,
       isDenied: false,
     };

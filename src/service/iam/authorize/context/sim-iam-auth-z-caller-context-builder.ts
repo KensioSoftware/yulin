@@ -1,8 +1,12 @@
 import {
   SimAwsCallerResolver,
+  type SimAwsCredentialIdentityResolver,
   type SimAwsResolvedCaller,
 } from "../../../aws/caller/sim-aws-caller-resolver.js";
-import type { SimAwsPrincipal } from "../../../aws/caller/sim-aws-caller.js";
+import type {
+  SimAwsCaller,
+  SimAwsPrincipal,
+} from "../../../aws/caller/sim-aws-caller.js";
 import type { SimIamAuthZPolicySource } from "./sim-iam-auth-z-context.js";
 
 interface SimIamAuthZCallerContext {
@@ -18,18 +22,22 @@ interface SimIamAuthZCallerContext {
  * not fall back to root.
  */
 export class SimIamAuthZCallerContextBuilder {
-  private readonly callerResolver = new SimAwsCallerResolver();
+  private readonly callerResolver: SimAwsCallerResolver;
   private readonly defaultCallerPrincipal: SimAwsPrincipal;
 
-  constructor(defaultCallerPrincipal: SimAwsPrincipal) {
+  constructor(
+    defaultCallerPrincipal: SimAwsPrincipal,
+    credentialIdentityResolver: SimAwsCredentialIdentityResolver,
+  ) {
     this.defaultCallerPrincipal = defaultCallerPrincipal;
+    this.callerResolver = new SimAwsCallerResolver(credentialIdentityResolver);
   }
 
   /**
    * Resolve request caller data and add the simulated root policy when
    * applicable.
    */
-  build(caller: SimAwsPrincipal | undefined): SimIamAuthZCallerContext {
+  build(caller: SimAwsCaller | undefined): SimIamAuthZCallerContext {
     const resolvedCaller = this.callerResolver.resolve(
       caller,
       this.defaultCallerPrincipal,

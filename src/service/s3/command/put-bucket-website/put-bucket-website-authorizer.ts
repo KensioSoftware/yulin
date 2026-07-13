@@ -1,4 +1,4 @@
-import type { SimAwsPrincipal } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import type { SimS3BucketName } from "../../bucket/sim-s3-bucket.js";
@@ -39,7 +39,7 @@ export class PutBucketWebsiteAuthorizer {
    * This method returns only for an allowed decision. A denied decision becomes
    * the service-shaped access error expected by callers of the S3 simulation.
    */
-  authorize(bucketName: SimS3BucketName, caller?: SimAwsPrincipal): void {
+  authorize(bucketName: SimS3BucketName, caller?: SimAwsCaller): void {
     const resource = `arn:aws:s3:::${bucketName}`;
     const decision = this.iam.authorize({
       action: PutBucketWebsiteAuthorizer.action,

@@ -1,17 +1,17 @@
-import type { SimAwsPrincipal } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
-import type { SimS3BucketName } from "../../bucket/sim-s3-bucket.js";
+import type { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
 
 interface ListObjectsAuthorizerProps {
   readonly iam: SimIamInterServiceAuthZ;
 }
 
 interface ListObjectsAuthorizationInput {
-  readonly bucketName: SimS3BucketName;
+  readonly bucket: SimS3Bucket;
   readonly prefix?: string | undefined;
   readonly maxKeys: number;
-  readonly caller?: SimAwsPrincipal | undefined;
+  readonly caller?: SimAwsCaller | undefined;
 }
 
 /**
@@ -39,7 +39,8 @@ export class ListObjectsAuthorizer {
    * Ensure the caller may list the requested portion of the Bucket namespace.
    */
   authorize(input: ListObjectsAuthorizationInput): void {
-    const resource = `arn:aws:s3:::${input.bucketName}`;
+    const resource = `arn:aws:s3:::${input.bucket.bucketName}`;
+    const policy = input.bucket.getPolicy();
     const decision = this.iam.authorize({
       action: ListObjectsAuthorizer.action,
       resource,
@@ -48,6 +49,16 @@ export class ListObjectsAuthorizer {
         "s3:prefix": input.prefix ?? "",
         "s3:max-keys": input.maxKeys,
       },
+      resourcePolicies:
+        policy === undefined
+          ? []
+          : [
+              {
+                document: policy,
+                policyName: "BucketPolicy",
+                resourceArn: resource,
+              },
+            ],
     });
 
     if (decision.isDenied) {

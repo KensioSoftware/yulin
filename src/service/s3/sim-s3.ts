@@ -40,14 +40,19 @@ import {
 import { SimS3CloudFormationResourceFactory } from "./cfn/sim-cfn-s3-resource-factory.js";
 import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
-import type { SimAwsPrincipal } from "../aws/caller/sim-aws-caller.js";
+import type { SimAwsCaller } from "../aws/caller/sim-aws-caller.js";
 import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type {
+  SimPutBucketPolicyCommand,
+  SimPutBucketPolicyCommandOutput,
+} from "./command/put-bucket-policy/put-bucket-policy.cmd.js";
+import { PutBucketPolicyCommandHandler } from "./command/put-bucket-policy/put-bucket-policy.handler.js";
 
 export interface SimS3RequestOptions {
-  readonly caller?: SimAwsPrincipal;
+  readonly caller?: SimAwsCaller;
 }
 
 interface SimS3Props {
@@ -96,6 +101,21 @@ export class SimS3 {
       accountRegionScope: this.accountRegionScope,
       buckets: this.buckets,
       s3GlobalRegistry: this.s3GlobalRegistry,
+      iam: this.iam,
+      background: this.background,
+    });
+    return await handler.handle(cmd, opts);
+  }
+
+  /**
+   * Handle a Put Bucket Policy Command from the SDK.
+   */
+  async putBucketPolicy(
+    cmd: SimPutBucketPolicyCommand,
+    opts?: SimS3RequestOptions,
+  ): Promise<SimPutBucketPolicyCommandOutput> {
+    const handler = new PutBucketPolicyCommandHandler({
+      buckets: this.buckets,
       iam: this.iam,
       background: this.background,
     });

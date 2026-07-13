@@ -8,12 +8,14 @@ import {
 import { SimIamPolicyDecision } from "./sim-iam-decision.js";
 import type { SimAwsPrincipal } from "../../aws/caller/sim-aws-caller.js";
 import type { SimIamUser, SimIamUsername } from "../user/sim-iam-user.js";
+import type { SimAwsCredentialIdentityResolver } from "../../aws/caller/sim-aws-caller-resolver.js";
 
 interface SimIamAuthorizerProps {
   readonly policies: ReadonlyMap<SimArn, SimIamPolicy>;
   readonly roles: ReadonlyMap<SimIamRoleName, SimIamRole>;
   readonly users: ReadonlyMap<SimIamUsername, SimIamUser>;
   readonly defaultCallerPrincipal: SimAwsPrincipal;
+  readonly credentialIdentityResolver: SimAwsCredentialIdentityResolver;
 }
 
 /**
@@ -33,6 +35,7 @@ export class SimIamAuthorizer {
       props.roles,
       props.users,
       props.defaultCallerPrincipal,
+      props.credentialIdentityResolver,
     );
   }
 

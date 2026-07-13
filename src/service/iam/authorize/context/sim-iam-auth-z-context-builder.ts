@@ -1,5 +1,8 @@
 import type { SimArn } from "../../../aws/arn.js";
-import type { SimAwsPrincipal } from "../../../aws/caller/sim-aws-caller.js";
+import type {
+  SimAwsCaller,
+  SimAwsPrincipal,
+} from "../../../aws/caller/sim-aws-caller.js";
 import type {
   SimIamConditionValue,
   SimIamPolicy,
@@ -13,7 +16,10 @@ import type {
 } from "./sim-iam-auth-z-context.js";
 import { SimIamAuthZIdentityPolicyCoordinator } from "./identity-policy-source/sim-iam-auth-z-id-pol-coordinator.js";
 import { SimIamAuthZCallerContextBuilder } from "./sim-iam-auth-z-caller-context-builder.js";
-import type { SimAwsResolvedCaller } from "../../../aws/caller/sim-aws-caller-resolver.js";
+import type {
+  SimAwsCredentialIdentityResolver,
+  SimAwsResolvedCaller,
+} from "../../../aws/caller/sim-aws-caller-resolver.js";
 import type { SimIamUser, SimIamUsername } from "../../user/sim-iam-user.js";
 
 export interface SimIamResourcePolicyInput {
@@ -48,11 +54,10 @@ export interface SimIamAuthorizationInput {
   /**
    * Simulated request caller.
    *
-   * If omitted, authorization defaults to the root principal of the sim Account
-   * owning the sim IAM instance. An explicit anonymous principal suppresses that
-   * fallback and is evaluated without an authenticated principal.
+   * If credentials are supplied, they are authenticated before policy
+   * evaluation. If omitted, authorization defaults to the Account root.
    */
-  readonly caller?: SimAwsPrincipal | undefined;
+  readonly caller?: SimAwsCaller | undefined;
 
   /**
    * Resource policies supplied by the service that owns the target resource.
@@ -94,9 +99,11 @@ export class SimIamAuthZContextBuilder {
     roles: ReadonlyMap<SimIamRoleName, SimIamRole>,
     users: ReadonlyMap<SimIamUsername, SimIamUser>,
     defaultCallerPrincipal: SimAwsPrincipal,
+    credentialIdentityResolver: SimAwsCredentialIdentityResolver,
   ) {
     this.callerContextBuilder = new SimIamAuthZCallerContextBuilder(
       defaultCallerPrincipal,
+      credentialIdentityResolver,
     );
     this.identityPolicyCoordinator = new SimIamAuthZIdentityPolicyCoordinator({
       policies,
@@ -113,7 +120,9 @@ export class SimIamAuthZContextBuilder {
 
     return {
       identityPolicies: [
-        ...this.identityPolicyCoordinator.build(callerContext.caller.arn),
+        ...this.identityPolicyCoordinator.build(
+          callerContext.caller.identityPolicyArn,
+        ),
         ...callerContext.rootPolicySources,
       ],
       resourcePolicies: this.resourcePolicySources(input),
@@ -126,19 +135,24 @@ export class SimIamAuthZContextBuilder {
 
   /**
    * Combine service-provided condition values with global values that IAM can
-   * derive from the resolved caller.
+   * derive from the resolved caller. aws:PrincipalArn identifies the IAM
+   * identity whose policies apply; for temporary Role credentials this is the
+   * underlying Role ARN, rather than the STS assumed-role session ARN retained
+   * as the effective caller for diagnostics.
    */
   private conditionContext(
     input: SimIamAuthorizationInput,
     caller: SimAwsResolvedCaller,
   ): Readonly<Record<string, SimIamConditionValue>> {
-    if (caller.arn === undefined) {
+    const principalArn = caller.identityPolicyArn ?? caller.arn;
+
+    if (principalArn === undefined) {
       return input.conditionContext ?? {};
     }
 
     return {
       ...input.conditionContext,
-      "aws:PrincipalArn": caller.arn,
+      "aws:PrincipalArn": principalArn,
     };
   }
 
