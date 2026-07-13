@@ -17,7 +17,7 @@ import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
 } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
-import type { SimAwsPrincipal } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 
 interface CreateBucketCommandHandlerProps {
@@ -29,7 +29,7 @@ interface CreateBucketCommandHandlerProps {
 }
 
 interface CreateBucketCommandHandlerOptions {
-  readonly caller?: SimAwsPrincipal;
+  readonly caller?: SimAwsCaller;
 }
 
 /**

@@ -72,6 +72,11 @@ import type {
 } from "./command/user/create-access-key/create-access-key.cmd.js";
 import { CreateAccessKeyCommandHandler } from "./command/user/create-access-key/create-access-key.handler.js";
 import type { SimIamInterServiceAuthZ } from "./authorize/sim-iam-inter-service-auth-z.js";
+import type {
+  SimPutUserPolicyCommand,
+  SimPutUserPolicyCommandOutput,
+} from "./command/policy/put-user-policy/put-user-policy.cmd.js";
+import { PutUserPolicyCommandHandler } from "./command/policy/put-user-policy/put-user-policy.handler.js";
 
 interface SimIamProps {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
@@ -151,6 +156,7 @@ export class SimIam implements SimIamInterServiceAuthZ {
       defaultCallerPrincipal: makeSimAwsAccountRootPrincipal(
         this.accountRegionScope.accountId,
       ),
+      credentialIdentityResolver: this,
     }).authorize(input);
   }
 
@@ -202,6 +208,19 @@ export class SimIam implements SimIamInterServiceAuthZ {
   ): Promise<SimPutRolePolicyCommandOutput> {
     const handler = new PutRolePolicyCommandHandler({
       roles: this.roles,
+      background: this.background,
+    });
+    return await handler.handle(cmd);
+  }
+
+  /**
+   * Handle an IAM PutUserPolicy command.
+   */
+  async putUserPolicy(
+    cmd: SimPutUserPolicyCommand,
+  ): Promise<SimPutUserPolicyCommandOutput> {
+    const handler = new PutUserPolicyCommandHandler({
+      users: this.users,
       background: this.background,
     });
     return await handler.handle(cmd);

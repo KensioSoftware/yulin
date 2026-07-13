@@ -1,14 +1,28 @@
-import type { SimAwsPrincipal } from "./sim-aws-caller.js";
+import type {
+  SimAwsCaller,
+  SimAwsPrincipal,
+  SimCredentialCaller,
+} from "./sim-aws-caller.js";
+import type { SimIamCredentialIdentity } from "../../iam/credential/sim-aws-credentials.js";
+
+export interface SimAwsCredentialIdentityResolver {
+  resolveCredentials(
+    credentials: SimCredentialCaller["credentials"],
+    now?: Date,
+  ): SimIamCredentialIdentity;
+}
 
 /**
  * Caller information normalized for simulated AWS service operations.
  *
- * Metadata that cannot be derived from the supplied principal is left
- * undefined.
+ * The effective principal is used for request context and diagnostics. The
+ * identity-policy principal identifies the IAM entity whose policies apply.
  */
 export interface SimAwsResolvedCaller {
   readonly principal: SimAwsPrincipal;
+  readonly identityPolicyPrincipal: SimAwsPrincipal;
   readonly arn?: string | undefined;
+  readonly identityPolicyArn?: string | undefined;
   readonly accountId?: string | undefined;
   readonly service?: string | undefined;
 }
@@ -17,22 +31,60 @@ export interface SimAwsResolvedCaller {
  * Resolves caller input at a simulated AWS operation boundary.
  *
  * An omitted caller resolves to the supplied operation default. Explicit
- * anonymity is preserved.
+ * anonymity is preserved. Credential callers are authenticated before a
+ * resolved caller is returned.
  */
 export class SimAwsCallerResolver {
+  private readonly credentialIdentityResolver?:
+    SimAwsCredentialIdentityResolver | undefined;
+
+  constructor(credentialIdentityResolver?: SimAwsCredentialIdentityResolver) {
+    this.credentialIdentityResolver = credentialIdentityResolver;
+  }
+
   /**
    * Resolve and normalize a simulated AWS caller.
    */
   resolve(
-    caller: SimAwsPrincipal | undefined,
+    caller: SimAwsCaller | undefined,
     defaultPrincipal: SimAwsPrincipal,
   ): SimAwsResolvedCaller {
-    const principal = caller ?? defaultPrincipal;
+    if (caller?.kind === "credentials") {
+      if (this.credentialIdentityResolver === undefined) {
+        throw new Error(
+          "Simulated credential callers require an IAM credential resolver",
+        );
+      }
 
+      const identity = this.credentialIdentityResolver.resolveCredentials(
+        caller.credentials,
+      );
+
+      return this.normalized(
+        identity.principal,
+        identity.identityPolicyPrincipal,
+      );
+    }
+
+    const principal = caller ?? defaultPrincipal;
+    return this.normalized(principal, principal);
+  }
+
+  private normalized(
+    principal: SimAwsPrincipal,
+    identityPolicyPrincipal: SimAwsPrincipal,
+  ): SimAwsResolvedCaller {
     if (principal.kind === "arn") {
+      const identityPolicyArn =
+        identityPolicyPrincipal.kind === "arn"
+          ? identityPolicyPrincipal.arn
+          : undefined;
+
       return {
         principal,
+        identityPolicyPrincipal,
         arn: principal.arn,
+        identityPolicyArn,
         accountId: this.accountId(principal.arn),
       };
     }
@@ -40,11 +92,15 @@ export class SimAwsCallerResolver {
     if (principal.kind === "service") {
       return {
         principal,
+        identityPolicyPrincipal,
         service: principal.service,
       };
     }
 
-    return { principal };
+    return {
+      principal,
+      identityPolicyPrincipal,
+    };
   }
 
   /**

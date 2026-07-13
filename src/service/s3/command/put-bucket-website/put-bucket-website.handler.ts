@@ -15,7 +15,7 @@ import {
   BackgroundTasks,
 } from "../../../../util/background/background.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
-import type { SimAwsPrincipal } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { SimIam } from "../../../iam/index.js";
 import { PutBucketWebsiteAuthorizer } from "./put-bucket-website-authorizer.js";
 
@@ -26,7 +26,7 @@ interface PutBucketWebsiteCommandHandlerProps {
 }
 
 interface PutBucketWebsiteCommandHandlerOptions {
-  readonly caller?: SimAwsPrincipal;
+  readonly caller?: SimAwsCaller;
 }
 
 /**

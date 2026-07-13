@@ -1,3 +1,5 @@
+import type { SimAwsCredentials } from "../../iam/credential/sim-aws-credentials.js";
+
 /**
  * Resolved sim principal with an ARN, such as an IAM user or role.
  */
@@ -22,7 +24,23 @@ export interface SimAnonymousPrincipal {
 }
 
 /**
- * Resolved simulated AWS identity making a request.
+ * Simulated credentials supplied at an AWS operation boundary.
+ *
+ * Credentials are authentication material rather than a resolved principal.
+ * They must be authenticated before authorization.
+ */
+export interface SimCredentialCaller {
+  readonly kind: "credentials";
+  readonly credentials: SimAwsCredentials;
+}
+
+/**
+ * Resolved simulated AWS identity.
  */
 export type SimAwsPrincipal =
   SimArnPrincipal | SimServicePrincipal | SimAnonymousPrincipal;
+
+/**
+ * Caller accepted by simulated AWS service operations.
+ */
+export type SimAwsCaller = SimAwsPrincipal | SimCredentialCaller;

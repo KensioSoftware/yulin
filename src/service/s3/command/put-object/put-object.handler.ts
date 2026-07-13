@@ -17,7 +17,7 @@ import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
 } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
-import type { SimAwsPrincipal } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { PutObjectAuthorizer } from "./put-object-authorizer.js";
 import { PutObjectBuilder } from "./put-object-builder.js";
 
@@ -28,7 +28,7 @@ interface PutObjectCommandHandlerProps {
 }
 
 interface PutObjectCommandHandlerOptions {
-  readonly caller?: SimAwsPrincipal;
+  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -84,7 +84,7 @@ export class PutObjectCommandHandler implements CommandHandler<
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    this.authorizer.authorize(bucketName, cmd.input.Key, opts?.caller);
+    this.authorizer.authorize(bucket, cmd.input.Key, opts?.caller);
 
     const object = this.objectBuilder.build(cmd);
     await bucket.putObject(object);

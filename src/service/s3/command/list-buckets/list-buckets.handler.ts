@@ -15,7 +15,7 @@ import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
 } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
-import type { SimAwsPrincipal } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { ListBucketsAuthorizer } from "./list-buckets-authorizer.js";
 import { ListBucketsPageBuilder } from "./list-buckets-page-builder.js";
 
@@ -26,7 +26,7 @@ interface ListBucketsCommandHandlerProps {
 }
 
 interface ListBucketsCommandHandlerOptions {
-  readonly caller?: SimAwsPrincipal;
+  readonly caller?: SimAwsCaller;
 }
 
 /**

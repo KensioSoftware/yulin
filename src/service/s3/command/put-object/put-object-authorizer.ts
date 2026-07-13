@@ -1,7 +1,7 @@
-import type { SimAwsPrincipal } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
-import type { SimS3BucketName } from "../../bucket/sim-s3-bucket.js";
+import type { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
 
 interface PutObjectAuthorizerProps {
   readonly iam: SimIamInterServiceAuthZ;
@@ -26,16 +26,23 @@ export class PutObjectAuthorizer {
   /**
    * Ensure the caller may create or replace the requested S3 Object.
    */
-  authorize(
-    bucketName: SimS3BucketName,
-    key: string,
-    caller?: SimAwsPrincipal,
-  ): void {
-    const resource = `arn:aws:s3:::${bucketName}/${key}`;
+  authorize(bucket: SimS3Bucket, key: string, caller?: SimAwsCaller): void {
+    const resource = `arn:aws:s3:::${bucket.bucketName}/${key}`;
+    const policy = bucket.getPolicy();
     const decision = this.iam.authorize({
       action: PutObjectAuthorizer.action,
       resource,
       caller,
+      resourcePolicies:
+        policy === undefined
+          ? []
+          : [
+              {
+                document: policy,
+                policyName: "BucketPolicy",
+                resourceArn: `arn:aws:s3:::${bucket.bucketName}`,
+              },
+            ],
     });
 
     if (decision.isDenied) {

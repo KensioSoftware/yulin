@@ -17,7 +17,7 @@ import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
 } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
-import type { SimAwsPrincipal } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { GetObjectAuthorizer } from "./get-object-authorizer.js";
 import { GetObjectLoader } from "./get-object-loader.js";
 
@@ -28,7 +28,7 @@ interface GetObjectCommandHandlerProps {
 }
 
 interface GetObjectCommandHandlerOptions {
-  readonly caller?: SimAwsPrincipal;
+  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -83,7 +83,7 @@ export class GetObjectCommandHandler implements CommandHandler<
     // Complete request sequencing before authorization and storage access.
     await this.background.sequence();
 
-    this.authorizer.authorize(bucketName, cmd.input.Key, opts?.caller);
+    this.authorizer.authorize(bucket, cmd.input.Key, opts?.caller);
 
     return await this.loader.load(bucket, cmd.input.Key);
   }

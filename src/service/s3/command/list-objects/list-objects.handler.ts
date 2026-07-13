@@ -17,7 +17,7 @@ import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
 } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
-import type { SimAwsPrincipal } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { ListObjectsAuthorizer } from "./list-objects-authorizer.js";
 import { ListObjectsPageBuilder } from "./list-objects-page-builder.js";
 
@@ -28,7 +28,7 @@ interface ListObjectsCommandHandlerProps {
 }
 
 interface ListObjectsCommandHandlerOptions {
-  readonly caller?: SimAwsPrincipal;
+  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -81,7 +81,7 @@ export class ListObjectsCommandHandler implements CommandHandler<
 
     const maxKeys = cmd.input.MaxKeys ?? 1000;
     this.authorizer.authorize({
-      bucketName,
+      bucket,
       prefix: cmd.input.Prefix,
       maxKeys,
       caller: opts?.caller,

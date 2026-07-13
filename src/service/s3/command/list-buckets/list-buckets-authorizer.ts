@@ -1,4 +1,4 @@
-import type { SimAwsPrincipal } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 
@@ -36,7 +36,7 @@ export class ListBucketsAuthorizer {
    * omitted caller, which defaults to Account root, from an explicit anonymous
    * caller, which has no identity policy permissions.
    */
-  authorize(caller?: SimAwsPrincipal): void {
+  authorize(caller?: SimAwsCaller): void {
     const decision = this.iam.authorize({
       action: ListBucketsAuthorizer.action,
       resource: ListBucketsAuthorizer.resource,
