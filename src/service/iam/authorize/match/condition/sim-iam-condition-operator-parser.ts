@@ -5,10 +5,15 @@ import { SimIamForAnyValueStringEquals } from "./string/any-value/sim-iam-for-an
 import { SimIamForAnyValueStringLike } from "./string/any-value/sim-iam-for-any-value-string-like.js";
 import { SimIamStringEquals } from "./string/equals/sim-iam-string-equals.js";
 import { SimIamStringLike } from "./string/like/sim-iam-string-like.js";
+import { SimIamNumericLessThanEquals } from "./numeric/less-than-equals/sim-iam-num-lte.js";
 
 type SimIamConditionOperatorFactory = () => SimIamConditionOperator;
 
 const operatorFactories = new Map<string, SimIamConditionOperatorFactory>([
+  [
+    "NumericLessThanEquals",
+    (): SimIamConditionOperator => new SimIamNumericLessThanEquals(),
+  ],
   ["StringEquals", (): SimIamConditionOperator => new SimIamStringEquals()],
   ["StringLike", (): SimIamConditionOperator => new SimIamStringLike()],
   [

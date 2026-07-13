@@ -216,6 +216,7 @@ export default defineConfig(
     },
     rules: {
       ...vitest.configs.recommended.rules,
+      "max-lines": ["error", 400],
       "vitest/consistent-test-it": ["error", { fn: "it" }],
       "vitest/no-focused-tests": "error",
       "vitest/no-disabled-tests": "warn",

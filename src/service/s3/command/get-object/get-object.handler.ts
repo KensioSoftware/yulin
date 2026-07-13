@@ -3,21 +3,32 @@ import type {
   SimGetObjectCommand,
   SimGetObjectCommandOutput,
 } from "./get-object.cmd.js";
-import { Readable } from "node:stream";
 import type {
   SimS3Bucket,
   SimS3BucketName,
 } from "../../bucket/sim-s3-bucket.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
-import { SimS3NoSuchBucket, SimS3NoSuchKey } from "../../error/sim-s3.error.js";
+import { SimS3NoSuchBucket } from "../../error/sim-s3.error.js";
 import {
   type BackgroundScheduler,
   BackgroundTasks,
 } from "../../../../util/background/background.js";
+import {
+  SimIamAllowAllAuth,
+  type SimIamInterServiceAuthZ,
+} from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimAwsPrincipal } from "../../../aws/caller/sim-aws-caller.js";
+import { GetObjectAuthorizer } from "./get-object-authorizer.js";
+import { GetObjectLoader } from "./get-object-loader.js";
 
 interface GetObjectCommandHandlerProps {
   readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
+  readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
+}
+
+interface GetObjectCommandHandlerOptions {
+  readonly caller?: SimAwsPrincipal;
 }
 
 /**
@@ -30,18 +41,36 @@ export class GetObjectCommandHandler implements CommandHandler<
   SimGetObjectCommandOutput
 > {
   private readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
+  private readonly authorizer: GetObjectAuthorizer;
+  private readonly loader = new GetObjectLoader();
   private readonly background: BackgroundScheduler;
 
   constructor(props: GetObjectCommandHandlerProps) {
-    const { buckets, background = new BackgroundTasks() } = props;
+    const {
+      buckets,
+      iam = new SimIamAllowAllAuth(),
+      background = new BackgroundTasks(),
+    } = props;
     this.buckets = buckets;
+    this.authorizer = new GetObjectAuthorizer({ iam });
     this.background = background;
   }
 
   /**
-   * Simulate getting an Object from an S3 Bucket.
+   * Coordinate validation, Bucket resolution, authorization, and Object loading.
+   *
+   * The order of these stages is significant:
+   *
+   * - validation reports malformed requests before service processing;
+   * - Bucket resolution preserves the existing NoSuchBucket behavior;
+   * - authorization occurs before key lookup so denied callers cannot determine
+   *   whether an Object exists;
+   * - the loader performs storage access only after authorization succeeds.
    */
-  async handle(cmd: SimGetObjectCommand): Promise<SimGetObjectCommandOutput> {
+  async handle(
+    cmd: SimGetObjectCommand,
+    opts?: GetObjectCommandHandlerOptions,
+  ): Promise<SimGetObjectCommandOutput> {
     assertDefined(cmd.input.Bucket, "GetObjectCommand.input.Bucket");
     assertDefined(cmd.input.Key, "GetObjectCommand.input.Key");
 
@@ -51,18 +80,11 @@ export class GetObjectCommandHandler implements CommandHandler<
       throw new SimS3NoSuchBucket(`No S3 Bucket named ${bucketName}`);
     }
 
-    // Allow for potential non-deterministic sequencing of async events.
+    // Complete request sequencing before authorization and storage access.
     await this.background.sequence();
 
-    const object = await bucket.getObject(cmd.input.Key);
-    if (object === undefined) {
-      throw new SimS3NoSuchKey(`No S3 Object named ${cmd.input.Key}`);
-    }
+    this.authorizer.authorize(bucketName, cmd.input.Key, opts?.caller);
 
-    return {
-      Body: Readable.from([object.body]),
-      Metadata: object.metadata.values,
-      $metadata: {},
-    };
+    return await this.loader.load(bucket, cmd.input.Key);
   }
 }

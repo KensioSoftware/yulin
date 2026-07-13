@@ -13,10 +13,22 @@ import {
   type BackgroundScheduler,
   BackgroundTasks,
 } from "../../../../util/background/background.js";
+import {
+  SimIamAllowAllAuth,
+  type SimIamInterServiceAuthZ,
+} from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimAwsPrincipal } from "../../../aws/caller/sim-aws-caller.js";
+import { ListObjectsAuthorizer } from "./list-objects-authorizer.js";
+import { ListObjectsPageBuilder } from "./list-objects-page-builder.js";
 
 interface ListObjectsCommandHandlerProps {
   readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
+  readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
+}
+
+interface ListObjectsCommandHandlerOptions {
+  readonly caller?: SimAwsPrincipal;
 }
 
 /**
@@ -29,19 +41,32 @@ export class ListObjectsCommandHandler implements CommandHandler<
   SimListObjectsCommandOutput
 > {
   private readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
+  private readonly authorizer: ListObjectsAuthorizer;
+  private readonly pageBuilder = new ListObjectsPageBuilder();
   private readonly background: BackgroundScheduler;
 
   constructor(props: ListObjectsCommandHandlerProps) {
-    const { buckets, background = new BackgroundTasks() } = props;
+    const {
+      buckets,
+      iam = new SimIamAllowAllAuth(),
+      background = new BackgroundTasks(),
+    } = props;
+
     this.buckets = buckets;
+    this.authorizer = new ListObjectsAuthorizer({ iam });
     this.background = background;
   }
 
   /**
-   * Simulate listing Objects in an S3 Bucket.
+   * Coordinate validation, Bucket resolution, authorization, and pagination.
+   *
+   * Bucket lookup occurs before authorization so missing Buckets retain their
+   * existing S3 error behavior. Authorization occurs before storage listing so
+   * a denied caller cannot inspect Object keys or sizes.
    */
   async handle(
     cmd: SimListObjectsCommand,
+    opts?: ListObjectsCommandHandlerOptions,
   ): Promise<SimListObjectsCommandOutput> {
     assertDefined(cmd.input.Bucket, "ListObjectsCommand.input.Bucket");
 
@@ -51,38 +76,22 @@ export class ListObjectsCommandHandler implements CommandHandler<
       throw new SimS3NoSuchBucket(`No S3 Bucket named ${bucketName}`);
     }
 
-    // Allow for potential non-deterministic sequencing of async events.
+    // Complete request sequencing before authorization and storage access.
     await this.background.sequence();
 
-    const prefix = cmd.input.Prefix;
-    const marker = cmd.input.Marker;
     const maxKeys = cmd.input.MaxKeys ?? 1000;
+    this.authorizer.authorize({
+      bucketName,
+      prefix: cmd.input.Prefix,
+      maxKeys,
+      caller: opts?.caller,
+    });
 
-    const objects = await bucket.listObjects(prefix);
-    objects.sort((a, b) => a.key.localeCompare(b.key));
-
-    const startIndex =
-      marker === undefined
-        ? 0
-        : Math.max(0, objects.findIndex((object) => object.key === marker) + 1);
-
-    const page = objects.slice(startIndex, startIndex + maxKeys);
-    const lastObject = page.at(-1);
-    const isTruncated = startIndex + page.length < objects.length;
-
-    return {
-      Contents: page.map((object) => ({
-        Key: object.key,
-        Size: object.body.length,
-      })),
-      Name: bucket.bucketName,
-      Prefix: prefix,
-      Marker: marker,
-      MaxKeys: maxKeys,
-      IsTruncated: isTruncated,
-      NextMarker:
-        isTruncated && lastObject !== undefined ? lastObject.key : undefined,
-      $metadata: {},
-    };
+    return await this.pageBuilder.build({
+      bucket,
+      prefix: cmd.input.Prefix,
+      marker: cmd.input.Marker,
+      maxKeys,
+    });
   }
 }

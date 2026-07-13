@@ -41,8 +41,10 @@ import { SimS3CloudFormationResourceFactory } from "./cfn/sim-cfn-s3-resource-fa
 import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import type { SimAwsPrincipal } from "../aws/caller/sim-aws-caller.js";
-import type { SimIamInterServiceAuthZ } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
-import { SimIam } from "../iam/index.js";
+import {
+  SimIamAllowAllAuth,
+  type SimIamInterServiceAuthZ,
+} from "../iam/authorize/sim-iam-inter-service-auth-z.js";
 
 export interface SimS3RequestOptions {
   readonly caller?: SimAwsPrincipal;
@@ -73,7 +75,7 @@ export class SimS3 {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       s3GlobalRegistry = new SimS3GlobalRegistry(),
-      iam = new SimIam(),
+      iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
     } = props;
 
@@ -107,13 +109,12 @@ export class SimS3 {
     cmd: SimPutBucketWebsiteCommand,
     opts?: SimS3RequestOptions,
   ): Promise<SimPutBucketWebsiteCommandOutput> {
-    void opts;
-
     const handler = new PutBucketWebsiteCommandHandler({
       buckets: this.buckets,
+      iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd);
+    return await handler.handle(cmd, opts);
   }
 
   /**
@@ -123,13 +124,12 @@ export class SimS3 {
     cmd: SimListBucketsCommand,
     opts?: SimS3RequestOptions,
   ): Promise<SimListBucketsCommandOutput> {
-    void opts;
-
     const handler = new ListBucketsCommandHandler({
       buckets: this.buckets,
+      iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd);
+    return await handler.handle(cmd, opts);
   }
 
   /**
@@ -139,13 +139,12 @@ export class SimS3 {
     cmd: SimPutObjectCommand,
     opts?: SimS3RequestOptions,
   ): Promise<SimPutObjectCommandOutput> {
-    void opts;
-
     const handler = new PutObjectCommandHandler({
       buckets: this.buckets,
+      iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd);
+    return await handler.handle(cmd, opts);
   }
 
   /**
@@ -155,13 +154,12 @@ export class SimS3 {
     cmd: SimGetObjectCommand,
     opts?: SimS3RequestOptions,
   ): Promise<SimGetObjectCommandOutput> {
-    void opts;
-
     const handler = new GetObjectCommandHandler({
       buckets: this.buckets,
+      iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd);
+    return await handler.handle(cmd, opts);
   }
 
   /**
@@ -171,13 +169,12 @@ export class SimS3 {
     cmd: SimListObjectsCommand,
     opts?: SimS3RequestOptions,
   ): Promise<SimListObjectsCommandOutput> {
-    void opts;
-
     const handler = new ListObjectsCommandHandler({
       buckets: this.buckets,
+      iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd);
+    return await handler.handle(cmd, opts);
   }
 
   /**

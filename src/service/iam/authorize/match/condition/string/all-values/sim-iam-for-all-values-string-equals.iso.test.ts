@@ -3,8 +3,6 @@ import { describe, it } from "vitest";
 import { simIamAuthZResourcePolicySourceFactory } from "../../../../context/sim-iam-auth-z-context.factory.js";
 import { SimIam } from "../../../../../sim-iam.js";
 
-/* eslint-disable max-lines */
-
 describe("sim IAM ForAllValues:StringEquals authorization", () => {
   it("allows a request when every context value equals a policy value", () => {
     // Given a policy accepting either of two tag keys.

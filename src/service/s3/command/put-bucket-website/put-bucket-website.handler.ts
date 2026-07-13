@@ -14,10 +14,19 @@ import {
   type BackgroundScheduler,
   BackgroundTasks,
 } from "../../../../util/background/background.js";
+import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimAwsPrincipal } from "../../../aws/caller/sim-aws-caller.js";
+import { SimIam } from "../../../iam/index.js";
+import { PutBucketWebsiteAuthorizer } from "./put-bucket-website-authorizer.js";
 
 interface PutBucketWebsiteCommandHandlerProps {
   readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
+  readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
+}
+
+interface PutBucketWebsiteCommandHandlerOptions {
+  readonly caller?: SimAwsPrincipal;
 }
 
 /**
@@ -30,19 +39,31 @@ export class PutBucketWebsiteCommandHandler implements CommandHandler<
   SimPutBucketWebsiteCommandOutput
 > {
   private readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
+  private readonly authorizer: PutBucketWebsiteAuthorizer;
   private readonly background: BackgroundScheduler;
 
   constructor(props: PutBucketWebsiteCommandHandlerProps) {
-    const { buckets, background = new BackgroundTasks() } = props;
+    const {
+      buckets,
+      iam = new SimIam(),
+      background = new BackgroundTasks(),
+    } = props;
     this.buckets = buckets;
+    this.authorizer = new PutBucketWebsiteAuthorizer({ iam });
     this.background = background;
   }
 
   /**
    * Configure static website hosting for an S3 Bucket.
+   *
+   * Validation and Bucket lookup happen before authorization so malformed
+   * commands and missing Buckets retain their existing S3 error behavior.
+   * Authorization happens before configureWebsite so denied requests cannot
+   * create or replace website state.
    */
   async handle(
     cmd: SimPutBucketWebsiteCommand,
+    opts?: PutBucketWebsiteCommandHandlerOptions,
   ): Promise<SimPutBucketWebsiteCommandOutput> {
     assertDefined(
       cmd.input.Bucket,
@@ -62,6 +83,8 @@ export class PutBucketWebsiteCommandHandler implements CommandHandler<
 
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
+
+    this.authorizer.authorize(bucketName, opts?.caller);
 
     bucket.configureWebsite(
       new SimS3BucketWebsite(cmd.input.WebsiteConfiguration),
