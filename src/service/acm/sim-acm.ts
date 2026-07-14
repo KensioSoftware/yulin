@@ -98,13 +98,15 @@ export class SimAcm {
    */
   async requestCertificate(
     cmd: SimRequestCertificateCommand,
+    opts?: SimAcmRequestOptions,
   ): Promise<SimRequestCertificateCommandOutput> {
     const handler = new RequestCertificateCommandHandler({
       accountRegionScope: this.accountRegionScope,
       certificates: this.certificates,
+      iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd);
+    return await handler.handle(cmd, opts);
   }
 
   /**
