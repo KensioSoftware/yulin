@@ -1,5 +1,8 @@
+import {
+  ListCertificatesCommand,
+  RequestCertificateCommand,
+} from "@aws-sdk/client-acm";
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
-import { CreateBucketCommand, ListBucketsCommand } from "@aws-sdk/client-s3";
 import {
   assertArrayLength,
   assertIdentical,
@@ -10,47 +13,56 @@ import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { makeSimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
-import { SimS3 } from "../../sim-s3.js";
+import { SimAcm } from "../../sim-acm.js";
 import { makeAwsRegionName } from "../../../aws/sim-aws-region.js";
 
-describe("S3 ListBucketsCommand IAM authorization", () => {
+describe("ACM ListCertificatesCommand IAM authorization", () => {
   it("allows the default Account root caller", async () => {
-    // Given a Bucket in an Account-scoped S3 service.
+    // Given a Certificate in an Account and Region-scoped ACM service.
     const accountId = makeSimAwsAccountId();
     const region = makeAwsRegionName();
     const simAws = new SimAws();
-    const simS3 = simAws.account(accountId).region(region).s3();
+    const simAcm = simAws.account(accountId).region(region).acm();
 
-    await simS3.createBucket(
-      new CreateBucketCommand({ Bucket: "root-listed-bucket" }),
+    await simAcm.requestCertificate(
+      new RequestCertificateCommand({
+        DomainName: "root-listed.example.com",
+      }),
     );
 
-    // When ListBuckets is called without an explicit caller.
-    const output = await simS3.listBuckets(new ListBucketsCommand());
+    // When ListCertificates is called without an explicit caller.
+    const output = await simAcm.listCertificates(new ListCertificatesCommand());
 
-    // Then IAM defaults to Account root and S3 returns the Account's Bucket.
-    assertArrayLength(output.Buckets, 1);
-    assertIdentical(output.Buckets[0].Name, "root-listed-bucket");
+    // Then IAM defaults to Account root and ACM returns the Certificate.
+    assertArrayLength(output.CertificateSummaryList, 1);
+    assertIdentical(
+      output.CertificateSummaryList[0].DomainName,
+      "root-listed.example.com",
+    );
   });
 
   it("allows a Role when its action, resource, and condition match", async () => {
-    // Given a Role allowed to list all Buckets when its principal ARN matches.
+    // Given a Role allowed to list Certificates when its principal ARN matches.
     const accountId = makeSimAwsAccountId();
     const region = makeAwsRegionName();
     const simAws = new SimAws();
     const simIam = simAws.account(accountId).iam();
-    const simS3 = simAws.account(accountId).region(region).s3();
+    const simAcm = simAws.account(accountId).region(region).acm();
 
-    await simS3.createBucket(
-      new CreateBucketCommand({ Bucket: "application-bucket" }),
+    await simAcm.requestCertificate(
+      new RequestCertificateCommand({
+        DomainName: "first.example.com",
+      }),
     );
-    await simS3.createBucket(
-      new CreateBucketCommand({ Bucket: "archive-bucket" }),
+    await simAcm.requestCertificate(
+      new RequestCertificateCommand({
+        DomainName: "second.example.com",
+      }),
     );
 
     const createRoleOutput = await simIam.createRole(
       new CreateRoleCommand({
-        RoleName: "BucketLister",
+        RoleName: "CertificateLister",
         AssumeRolePolicyDocument: JSON.stringify({
           Version: "2012-10-17",
           Statement: {
@@ -65,13 +77,13 @@ describe("S3 ListBucketsCommand IAM authorization", () => {
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
-        RoleName: "BucketLister",
-        PolicyName: "ConditionalBucketListing",
+        RoleName: "CertificateLister",
+        PolicyName: "ConditionalCertificateListing",
         PolicyDocument: JSON.stringify({
           Version: "2012-10-17",
           Statement: {
             Effect: "Allow",
-            Action: "s3:ListAllMyBuckets",
+            Action: "acm:ListCertificates",
             Resource: "*",
             Condition: {
               StringEquals: {
@@ -83,36 +95,57 @@ describe("S3 ListBucketsCommand IAM authorization", () => {
       }),
     );
 
-    // When the Role lists Buckets with an S3 prefix filter.
-    const output = await simS3.listBuckets(
-      new ListBucketsCommand({
-        Prefix: "application",
+    // When the Role requests two status-filtered pages of Certificates.
+    const firstPage = await simAcm.listCertificates(
+      new ListCertificatesCommand({
+        CertificateStatuses: ["PENDING_VALIDATION"],
+        MaxItems: 1,
+      }),
+      {
+        caller: { kind: "arn", arn: roleArn },
+      },
+    );
+    const secondPage = await simAcm.listCertificates(
+      new ListCertificatesCommand({
+        CertificateStatuses: ["PENDING_VALIDATION"],
+        MaxItems: 1,
+        NextToken: firstPage.NextToken,
       }),
       {
         caller: { kind: "arn", arn: roleArn },
       },
     );
 
-    // Then IAM allows the account-level action and S3 applies the filter.
-    assertArrayLength(output.Buckets, 1);
-    assertIdentical(output.Buckets[0].Name, "application-bucket");
+    // Then IAM allows both requests and ACM applies filtering and pagination.
+    assertArrayLength(firstPage.CertificateSummaryList, 1);
+    assertIdentical(
+      firstPage.CertificateSummaryList[0].DomainName,
+      "first.example.com",
+    );
+    assertArrayLength(secondPage.CertificateSummaryList, 1);
+    assertIdentical(
+      secondPage.CertificateSummaryList[0].DomainName,
+      "second.example.com",
+    );
   });
 
-  it("implicitly denies a bucket-scoped ListAllMyBuckets permission", async () => {
-    // Given a Role whose ListAllMyBuckets policy uses a Bucket ARN instead of "*".
+  it("implicitly denies a Certificate-scoped ListCertificates permission", async () => {
+    // Given a Role whose ListCertificates policy uses a Certificate ARN instead of "*".
     const accountId = makeSimAwsAccountId();
     const region = makeAwsRegionName();
     const simAws = new SimAws();
     const simIam = simAws.account(accountId).iam();
-    const simS3 = simAws.account(accountId).region(region).s3();
+    const simAcm = simAws.account(accountId).region(region).acm();
 
-    await simS3.createBucket(
-      new CreateBucketCommand({ Bucket: "bucket-scoped-listing" }),
+    await simAcm.requestCertificate(
+      new RequestCertificateCommand({
+        DomainName: "resource-scoped.example.com",
+      }),
     );
 
     const createRoleOutput = await simIam.createRole(
       new CreateRoleCommand({
-        RoleName: "BucketScopedLister",
+        RoleName: "CertificateScopedLister",
         AssumeRolePolicyDocument: JSON.stringify({
           Version: "2012-10-17",
           Statement: {
@@ -127,29 +160,29 @@ describe("S3 ListBucketsCommand IAM authorization", () => {
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
-        RoleName: "BucketScopedLister",
-        PolicyName: "BucketScopedListing",
+        RoleName: "CertificateScopedLister",
+        PolicyName: "CertificateScopedListing",
         PolicyDocument: JSON.stringify({
           Version: "2012-10-17",
           Statement: {
             Effect: "Allow",
-            Action: "s3:ListAllMyBuckets",
-            Resource: "arn:aws:s3:::bucket-scoped-listing",
+            Action: "acm:ListCertificates",
+            Resource: `arn:aws:acm:eu-central-1:${accountId}:certificate/00000001`,
           },
         }),
       }),
     );
 
-    // When the Role attempts the account-level ListBuckets operation.
+    // When the Role attempts the account and Region-level listing operation.
     const error = await assertThrowsErrorAsync(async () =>
-      simS3.listBuckets(new ListBucketsCommand(), {
+      simAcm.listCertificates(new ListCertificatesCommand(), {
         caller: { kind: "arn", arn: roleArn },
       }),
     );
 
-    // Then the Bucket ARN does not match the required "*" resource.
+    // Then the Certificate ARN does not match the required "*" resource.
     assertInstanceOf(error, SimIamAccessDenied);
-    assertIdentical(error.action, "s3:ListAllMyBuckets");
+    assertIdentical(error.action, "acm:ListCertificates");
     assertIdentical(error.resource, "*");
   });
 
@@ -159,15 +192,17 @@ describe("S3 ListBucketsCommand IAM authorization", () => {
     const region = makeAwsRegionName();
     const simAws = new SimAws();
     const simIam = simAws.account(accountId).iam();
-    const simS3 = simAws.account(accountId).region(region).s3();
+    const simAcm = simAws.account(accountId).region(region).acm();
 
-    await simS3.createBucket(
-      new CreateBucketCommand({ Bucket: "condition-denied-listing" }),
+    await simAcm.requestCertificate(
+      new RequestCertificateCommand({
+        DomainName: "condition-denied.example.com",
+      }),
     );
 
     const createRoleOutput = await simIam.createRole(
       new CreateRoleCommand({
-        RoleName: "ConditionMismatchLister",
+        RoleName: "ConditionMismatchCertificateLister",
         AssumeRolePolicyDocument: JSON.stringify({
           Version: "2012-10-17",
           Statement: {
@@ -182,13 +217,13 @@ describe("S3 ListBucketsCommand IAM authorization", () => {
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
-        RoleName: "ConditionMismatchLister",
+        RoleName: "ConditionMismatchCertificateLister",
         PolicyName: "MismatchedPrincipal",
         PolicyDocument: JSON.stringify({
           Version: "2012-10-17",
           Statement: {
             Effect: "Allow",
-            Action: "s3:ListAllMyBuckets",
+            Action: "acm:ListCertificates",
             Resource: "*",
             Condition: {
               StringEquals: {
@@ -200,9 +235,9 @@ describe("S3 ListBucketsCommand IAM authorization", () => {
       }),
     );
 
-    // When the Role attempts to list Buckets.
+    // When the Role attempts to list Certificates.
     const error = await assertThrowsErrorAsync(async () =>
-      simS3.listBuckets(new ListBucketsCommand(), {
+      simAcm.listCertificates(new ListCertificatesCommand(), {
         caller: { kind: "arn", arn: roleArn },
       }),
     );
@@ -210,24 +245,26 @@ describe("S3 ListBucketsCommand IAM authorization", () => {
     // Then the condition mismatch causes an implicit access denial.
     assertInstanceOf(error, SimIamAccessDenied);
     assertIdentical(error.caller.kind, "arn");
-    assertIdentical(error.action, "s3:ListAllMyBuckets");
+    assertIdentical(error.action, "acm:ListCertificates");
   });
 
   it("lets an explicit Deny override an Allow", async () => {
-    // Given a Role with both Allow and Deny statements for ListAllMyBuckets.
+    // Given a Role with both Allow and Deny statements for ListCertificates.
     const accountId = makeSimAwsAccountId();
     const region = makeAwsRegionName();
     const simAws = new SimAws();
     const simIam = simAws.account(accountId).iam();
-    const simS3 = simAws.account(accountId).region(region).s3();
+    const simAcm = simAws.account(accountId).region(region).acm();
 
-    await simS3.createBucket(
-      new CreateBucketCommand({ Bucket: "explicitly-denied-listing" }),
+    await simAcm.requestCertificate(
+      new RequestCertificateCommand({
+        DomainName: "explicitly-denied.example.com",
+      }),
     );
 
     const createRoleOutput = await simIam.createRole(
       new CreateRoleCommand({
-        RoleName: "DeniedBucketLister",
+        RoleName: "DeniedCertificateLister",
         AssumeRolePolicyDocument: JSON.stringify({
           Version: "2012-10-17",
           Statement: {
@@ -242,19 +279,19 @@ describe("S3 ListBucketsCommand IAM authorization", () => {
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
-        RoleName: "DeniedBucketLister",
-        PolicyName: "ConflictingBucketListing",
+        RoleName: "DeniedCertificateLister",
+        PolicyName: "ConflictingCertificateListing",
         PolicyDocument: JSON.stringify({
           Version: "2012-10-17",
           Statement: [
             {
               Effect: "Allow",
-              Action: "s3:ListAllMyBuckets",
+              Action: "acm:ListCertificates",
               Resource: "*",
             },
             {
               Effect: "Deny",
-              Action: "s3:ListAllMyBuckets",
+              Action: "acm:ListCertificates",
               Resource: "*",
             },
           ],
@@ -262,63 +299,70 @@ describe("S3 ListBucketsCommand IAM authorization", () => {
       }),
     );
 
-    // When the Role attempts to list the Account's Buckets.
+    // When the Role attempts to list the Account and Region's Certificates.
     const error = await assertThrowsErrorAsync(async () =>
-      simS3.listBuckets(new ListBucketsCommand(), {
+      simAcm.listCertificates(new ListCertificatesCommand(), {
         caller: { kind: "arn", arn: roleArn },
       }),
     );
 
-    // Then the explicit Deny wins and identifies the AWS IAM action and resource.
+    // Then the explicit Deny wins and reports the IAM action and resource.
     assertInstanceOf(error, SimIamAccessDenied);
     assertIdentical(
       error.message,
-      `User: ${roleArn} is not authorized to perform: s3:ListAllMyBuckets on resource: *`,
+      `User: ${roleArn} is not authorized to perform: acm:ListCertificates on resource: *`,
     );
   });
 
   it("does not apply the Account root fallback to an anonymous caller", async () => {
-    // Given an Account-scoped S3 service containing a Bucket.
+    // Given an Account and Region-scoped ACM service containing a Certificate.
     const accountId = makeSimAwsAccountId();
     const region = makeAwsRegionName();
     const simAws = new SimAws();
-    const simS3 = simAws.account(accountId).region(region).s3();
+    const simAcm = simAws.account(accountId).region(region).acm();
 
-    await simS3.createBucket(
-      new CreateBucketCommand({ Bucket: "anonymous-listing-bucket" }),
+    await simAcm.requestCertificate(
+      new RequestCertificateCommand({
+        DomainName: "anonymous-denied.example.com",
+      }),
     );
 
-    // When an explicitly anonymous caller attempts to list Buckets.
+    // When an explicitly anonymous caller attempts to list Certificates.
     const error = await assertThrowsErrorAsync(async () =>
-      simS3.listBuckets(new ListBucketsCommand(), {
+      simAcm.listCertificates(new ListCertificatesCommand(), {
         caller: { kind: "anonymous" },
       }),
     );
 
-    // Then the real Account IAM implementation preserves anonymity and denies it.
+    // Then IAM preserves anonymity and returns an access-denied response.
     assertInstanceOf(error, SimIamAccessDenied);
     assertIdentical(error.caller.kind, "anonymous");
     assertIdentical(error.$metadata.httpStatusCode, 403);
   });
 
-  it("uses allow-all authorization when SimS3 is instantiated directly", async () => {
-    // Given a directly constructed S3 service with no IAM implementation supplied.
-    const simS3 = new SimS3();
+  it("uses allow-all authorization when SimAcm is instantiated directly", async () => {
+    // Given a directly constructed ACM service with no IAM implementation supplied.
+    const simAcm = new SimAcm();
 
-    await simS3.createBucket(
-      new CreateBucketCommand({ Bucket: "standalone-listing-bucket" }),
+    await simAcm.requestCertificate(
+      new RequestCertificateCommand({
+        DomainName: "standalone.example.com",
+      }),
+    );
+
+    // When an anonymous caller lists Certificates through the standalone service.
+    const output = await simAcm.listCertificates(
+      new ListCertificatesCommand(),
       {
         caller: { kind: "anonymous" },
       },
     );
 
-    // When an anonymous caller lists Buckets through the standalone service.
-    const output = await simS3.listBuckets(new ListBucketsCommand(), {
-      caller: { kind: "anonymous" },
-    });
-
-    // Then the allow-all fallback permits the request and S3 returns its state.
-    assertArrayLength(output.Buckets, 1);
-    assertIdentical(output.Buckets[0].Name, "standalone-listing-bucket");
+    // Then the allow-all fallback permits the request and ACM returns its state.
+    assertArrayLength(output.CertificateSummaryList, 1);
+    assertIdentical(
+      output.CertificateSummaryList[0].DomainName,
+      "standalone.example.com",
+    );
   });
 });

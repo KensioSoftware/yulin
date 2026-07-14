@@ -22,9 +22,19 @@ import type {
 import { ListCertificatesCommandHandler } from "./command/list-certificates/list-certificates.handler.js";
 import { SimAcmCfnResourceFactory } from "./cfn/sim-cfn-acm-resource-factory.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
+import type { SimAwsCaller } from "../aws/caller/sim-aws-caller.js";
+import {
+  SimIamAllowAllAuth,
+  type SimIamInterServiceAuthZ,
+} from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+
+export interface SimAcmRequestOptions {
+  readonly caller?: SimAwsCaller;
+}
 
 interface SimAcmProps {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
+  readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
 }
 
@@ -35,6 +45,7 @@ export class SimAcm {
   public readonly certificates = new Map<SimArn, SimAcmCertificate>();
 
   private readonly accountRegionScope: SimAwsAccountRegionScope;
+  private readonly iam: SimIamInterServiceAuthZ;
   private readonly background: BackgroundScheduler;
   private readonly cfnFactory = new SimAcmCfnResourceFactory({
     acm: this,
@@ -43,10 +54,12 @@ export class SimAcm {
   constructor(props: SimAcmProps = {}) {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
+      iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
     } = props;
 
     this.accountRegionScope = accountRegionScope;
+    this.iam = iam;
     this.background = background;
   }
 
@@ -68,12 +81,14 @@ export class SimAcm {
    */
   async listCertificates(
     cmd: SimListCertificatesCommand,
+    opts?: SimAcmRequestOptions,
   ): Promise<SimListCertificatesCommandOutput> {
     const handler = new ListCertificatesCommandHandler({
       certificates: this.certificates,
+      iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd);
+    return await handler.handle(cmd, opts);
   }
 
   /**
