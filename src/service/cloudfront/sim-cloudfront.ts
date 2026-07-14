@@ -136,12 +136,15 @@ export class SimCloudFront {
    */
   async getDistribution(
     cmd: SimGetDistributionCommand,
+    opts?: SimCloudFrontRequestOptions,
   ): Promise<SimGetDistributionCommandOutput> {
     const handler = new GetDistributionCommandHandler({
+      accountId: this.accountRegionScope.accountId,
       distributions: this.distributions,
+      iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd);
+    return await handler.handle(cmd, opts);
   }
 
   /**

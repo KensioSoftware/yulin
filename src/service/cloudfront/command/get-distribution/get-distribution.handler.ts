@@ -13,13 +13,26 @@ import {
   BackgroundTasks,
 } from "../../../../util/background/background.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
+import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
+import {
+  SimIamAllowAllAuth,
+  type SimIamInterServiceAuthZ,
+} from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import { GetDistributionAuthorizer } from "./get-distribution-authorizer.js";
 
 interface GetDistributionCommandHandlerProps {
+  readonly accountId: SimAwsAccountId;
   readonly distributions: Map<
     SimCloudFrontDistributionId,
     SimCloudFrontDistribution
   >;
+  readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
+}
+
+interface GetDistributionCommandHandlerOptions {
+  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -35,11 +48,21 @@ export class GetDistributionCommandHandler implements CommandHandler<
     SimCloudFrontDistributionId,
     SimCloudFrontDistribution
   >;
+  private readonly authorizer: GetDistributionAuthorizer;
   private readonly background: BackgroundScheduler;
 
   constructor(props: GetDistributionCommandHandlerProps) {
-    const { distributions, background = new BackgroundTasks() } = props;
+    const {
+      accountId,
+      distributions,
+      iam = new SimIamAllowAllAuth(),
+      background = new BackgroundTasks(),
+    } = props;
     this.distributions = distributions;
+    this.authorizer = new GetDistributionAuthorizer({
+      accountId,
+      iam,
+    });
     this.background = background;
   }
 
@@ -48,12 +71,15 @@ export class GetDistributionCommandHandler implements CommandHandler<
    */
   async handle(
     cmd: SimGetDistributionCommand,
+    opts?: GetDistributionCommandHandlerOptions,
   ): Promise<SimGetDistributionCommandOutput> {
     assertDefined(cmd.input.Id, "GetDistributionCommand.input.Id");
     const distributionId = cmd.input.Id as SimCloudFrontDistributionId;
 
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
+
+    this.authorizer.authorize(distributionId, opts?.caller);
 
     const distribution = this.distributions.get(distributionId);
     if (distribution === undefined) {
