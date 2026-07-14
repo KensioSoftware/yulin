@@ -14,6 +14,12 @@ import {
   BackgroundTasks,
 } from "../../../../util/background/background.js";
 import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
+import {
+  SimIamAllowAllAuth,
+  type SimIamInterServiceAuthZ,
+} from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import { CreateFunctionAuthorizer } from "./create-function-authorizer.js";
 
 export type SimCloudFrontFunctionMap = Map<
   SimCloudFrontFunctionName,
@@ -23,7 +29,12 @@ export type SimCloudFrontFunctionMap = Map<
 interface CreateFunctionCommandHandlerProps {
   accountId: SimAwsAccountId;
   cloudFrontFunctions?: SimCloudFrontFunctionMap;
+  iam?: SimIamInterServiceAuthZ;
   background?: BackgroundScheduler;
+}
+
+interface CreateFunctionCommandHandlerOptions {
+  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -37,16 +48,22 @@ export class CreateFunctionCommandHandler implements CommandHandler<
 > {
   private readonly accountId: SimAwsAccountId;
   private readonly cloudFrontFunctions: SimCloudFrontFunctionMap;
+  private readonly authorizer: CreateFunctionAuthorizer;
   private readonly background: BackgroundScheduler;
 
   constructor(props: CreateFunctionCommandHandlerProps) {
     const {
       accountId,
       cloudFrontFunctions = new Map() as SimCloudFrontFunctionMap,
+      iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
     } = props;
     this.accountId = accountId;
     this.cloudFrontFunctions = cloudFrontFunctions;
+    this.authorizer = new CreateFunctionAuthorizer({
+      accountId,
+      iam,
+    });
     this.background = background;
   }
 
@@ -55,6 +72,7 @@ export class CreateFunctionCommandHandler implements CommandHandler<
    */
   async handle(
     cmd: SimCreateFunctionCommand,
+    opts?: CreateFunctionCommandHandlerOptions,
   ): Promise<SimCreateFunctionCommandOutput> {
     assertDefined(cmd.input.Name, "CreateFunctionCommand.input.Name");
     assertDefined(
@@ -64,6 +82,8 @@ export class CreateFunctionCommandHandler implements CommandHandler<
 
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
+
+    this.authorizer.authorize(cmd.input.Name, opts?.caller);
 
     const handlerFunction = new CffUint8ArrayFunctionCodeExtractor(
       cmd.input.FunctionCode,

@@ -149,13 +149,15 @@ export class SimCloudFront {
    */
   async createFunction(
     cmd: SimCreateFunctionCommand,
+    opts?: SimCloudFrontRequestOptions,
   ): Promise<SimCreateFunctionCommandOutput> {
     const handler = new CreateFunctionCommandHandler({
       accountId: this.accountRegionScope.accountId,
       cloudFrontFunctions: this.cloudFrontFunctions,
+      iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd);
+    return await handler.handle(cmd, opts);
   }
 
   /**
