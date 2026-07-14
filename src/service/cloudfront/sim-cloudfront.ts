@@ -36,11 +36,21 @@ import { assertDefined } from "../../util/type-guard/defined.js";
 import { SimCloudFrontCloudFormationResourceFactory } from "./cfn/sim-cfn-cloudfront-resource-factory.js";
 import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
+import type { SimAwsCaller } from "../aws/caller/sim-aws-caller.js";
+import {
+  SimIamAllowAllAuth,
+  type SimIamInterServiceAuthZ,
+} from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+
+export interface SimCloudFrontRequestOptions {
+  readonly caller?: SimAwsCaller;
+}
 
 interface SimCloudFrontProps {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
   readonly cloudFrontRegistry?: SimCloudFrontRegistry;
   readonly s3OriginResolver?: SimCloudFrontS3OriginResolver;
+  readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
 }
 
@@ -60,6 +70,7 @@ export class SimCloudFront {
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly cloudFrontRegistry: SimCloudFrontRegistry;
   private readonly s3OriginResolver: SimCloudFrontS3OriginResolver;
+  private readonly iam: SimIamInterServiceAuthZ;
   private readonly background: BackgroundScheduler;
   private readonly cfnFactory = new SimCloudFrontCloudFormationResourceFactory(
     this,
@@ -70,12 +81,14 @@ export class SimCloudFront {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       cloudFrontRegistry = new SimCloudFrontRegistry(),
       s3OriginResolver = emptyCloudFrontS3OriginResolver,
+      iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
     } = props;
 
     this.accountRegionScope = accountRegionScope;
     this.cloudFrontRegistry = cloudFrontRegistry;
     this.s3OriginResolver = s3OriginResolver;
+    this.iam = iam;
     this.background = background;
   }
 
@@ -105,15 +118,17 @@ export class SimCloudFront {
    */
   async createDistribution(
     cmd: SimCreateDistributionCommand,
+    opts?: SimCloudFrontRequestOptions,
   ): Promise<SimCreateDistributionCommandOutput> {
     const handler = new CreateDistributionCommandHandler({
       accountId: this.accountRegionScope.accountId,
       distributions: this.distributions,
       cloudFrontRegistry: this.cloudFrontRegistry,
       s3OriginResolver: this.s3OriginResolver,
+      iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd);
+    return await handler.handle(cmd, opts);
   }
 
   /**

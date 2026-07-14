@@ -70,6 +70,8 @@ export class SimAwsAccountServiceCache {
    * Create or get simulated CloudFront for an Account scope.
    */
   createCloudFront(scope: SimAwsAccountRegionContainer): SimCloudFront {
+    const iam = this.createIam(scope);
+
     return this.services.getOrCreate(
       accountServiceCacheKey("cloudFront", scope.accountRegionScope.accountId),
       () =>
@@ -77,6 +79,7 @@ export class SimAwsAccountServiceCache {
           accountRegionScope: scope.accountRegionScope,
           cloudFrontRegistry: this.cloudFrontRegistry,
           s3OriginResolver: makeSimCfS3OriginResolver(this.simAws, scope),
+          iam,
           background: this.background,
         }),
     );
