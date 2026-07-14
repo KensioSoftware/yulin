@@ -10,16 +10,24 @@ import type {
   SimRequestCertificateCommandOutput,
 } from "./request-certificate.cmd.js";
 import type { SimAcmCertificate } from "../../certificate/sim-acm-certificate.js";
-import {
-  SimAcmInvalidArgsException,
-  SimAcmTooManyTagsException,
-} from "../../error/sim-acm.error.js";
+import { RequestCertificateAuthorizer } from "./request-certificate-authorizer.js";
 import { RequestCertificateFactory } from "./request-cert-factory.js";
+import { RequestCertificateValidator } from "./request-certificate-validator.js";
+import {
+  SimIamAllowAllAuth,
+  type SimIamInterServiceAuthZ,
+} from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 
 interface RequestCertificateCommandHandlerProps {
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly certificates: Map<SimArn, SimAcmCertificate>;
+  readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
+}
+
+interface RequestCertificateCommandHandlerOptions {
+  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -32,17 +40,24 @@ export class RequestCertificateCommandHandler implements CommandHandler<
   SimRequestCertificateCommandOutput
 > {
   private readonly certificates: Map<SimArn, SimAcmCertificate>;
+  private readonly authorizer: RequestCertificateAuthorizer;
   private readonly background: BackgroundScheduler;
   private readonly certificateFactory: RequestCertificateFactory;
+  private readonly validator = new RequestCertificateValidator();
 
   constructor(props: RequestCertificateCommandHandlerProps) {
     const {
       accountRegionScope,
       certificates,
+      iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
     } = props;
 
     this.certificates = certificates;
+    this.authorizer = new RequestCertificateAuthorizer({
+      iam,
+      resource: `arn:aws:acm:${accountRegionScope.regionName}:${accountRegionScope.accountId}:certificate/*`,
+    });
     this.background = background;
     this.certificateFactory = new RequestCertificateFactory({
       accountRegionScope,
@@ -50,25 +65,23 @@ export class RequestCertificateCommandHandler implements CommandHandler<
   }
 
   /**
-   * Request a simulated ACM certificate.
+   * Validate, authorize, create, and schedule issuance of a certificate.
+   *
+   * Validation precedes authorization so malformed SDK requests retain ACM's
+   * client-error behavior. Authorization precedes factory use and Map mutation,
+   * preventing an unauthorized caller from allocating certificate state or
+   * scheduling a certificate issuance task.
    */
   async handle(
     cmd: SimRequestCertificateCommand,
+    opts?: RequestCertificateCommandHandlerOptions,
   ): Promise<SimRequestCertificateCommandOutput> {
-    if (cmd.input.DomainName === undefined || cmd.input.DomainName === "") {
-      throw new SimAcmInvalidArgsException(
-        "RequestCertificateCommand.input.DomainName required",
-      );
-    }
-
-    if ((cmd.input.Tags?.length ?? 0) > 50) {
-      throw new SimAcmTooManyTagsException(
-        "RequestCertificateCommand.input.Tags cannot contain more than 50 tags",
-      );
-    }
+    this.validator.validate(cmd);
 
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
+
+    this.authorizer.authorize(opts?.caller);
 
     const certificate = this.certificateFactory.makeCertificate(
       cmd,

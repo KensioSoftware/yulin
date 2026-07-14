@@ -93,8 +93,11 @@ export class SimAwsServiceFactory {
    * Create simulated ACM for an Account Region scope.
    */
   createAcm(scope: SimAwsAccountRegionContainer): SimAcm {
+    const iam = this.createIam(scope);
+
     return new SimAcm({
       accountRegionScope: scope.accountRegionScope,
+      iam,
       background: this.background,
     });
   }
