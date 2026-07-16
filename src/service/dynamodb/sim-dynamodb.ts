@@ -102,12 +102,15 @@ export class SimDynamoDb {
    */
   async describeTable(
     cmd: SimDescribeTableCommand,
+    opts?: SimDynamoDbRequestOptions,
   ): Promise<SimDescribeTableCommandOutput> {
     const handler = new DescribeTableCommandHandler({
+      accountRegionScope: this.accountRegionScope,
       tables: this.tables,
+      iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd);
+    return await handler.handle(cmd, opts);
   }
 
   /**

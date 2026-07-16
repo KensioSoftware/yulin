@@ -13,10 +13,24 @@ import {
   BackgroundTasks,
 } from "../../../../util/background/background.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
+import {
+  SimIamAllowAllAuth,
+  type SimIamInterServiceAuthZ,
+} from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import { DescribeTableAuthorizer } from "./describe-table-authorizer.js";
+import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
+import type { SimArn } from "../../../aws/arn.js";
 
 interface DescribeTableCommandHandlerProps {
+  readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>;
+  readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
+}
+
+interface DescribeTableCommandHandlerOptions {
+  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -28,12 +42,21 @@ export class DescribeTableCommandHandler implements CommandHandler<
   SimDescribeTableCommand,
   SimDescribeTableCommandOutput
 > {
+  private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>;
+  private readonly authorizer: DescribeTableAuthorizer;
   private readonly background: BackgroundScheduler;
 
   constructor(props: DescribeTableCommandHandlerProps) {
-    const { tables, background = new BackgroundTasks() } = props;
+    const {
+      accountRegionScope,
+      tables,
+      iam = new SimIamAllowAllAuth(),
+      background = new BackgroundTasks(),
+    } = props;
+    this.accountRegionScope = accountRegionScope;
     this.tables = tables;
+    this.authorizer = new DescribeTableAuthorizer({ iam });
     this.background = background;
   }
 
@@ -42,12 +65,17 @@ export class DescribeTableCommandHandler implements CommandHandler<
    */
   async handle(
     cmd: SimDescribeTableCommand,
+    opts?: DescribeTableCommandHandlerOptions,
   ): Promise<SimDescribeTableCommandOutput> {
     assertDefined(cmd.input.TableName, "DescribeTableCommand.input.TableName");
     const tableName = cmd.input.TableName as DynamoDbTableName;
 
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
+
+    const tableArn: SimArn = `arn:aws:dynamodb:${this.accountRegionScope.regionName}:${this.accountRegionScope.accountId}:table/${tableName}`;
+
+    this.authorizer.authorize(tableArn, opts?.caller);
 
     const table = this.tables.get(tableName);
     if (table === undefined) {
