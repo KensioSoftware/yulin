@@ -19,22 +19,15 @@ jobs:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v7
-        with:
-          persist-credentials: false
-
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 11.12.0
-
       - uses: actions/setup-node@v6.4.0
         with:
           node-version-file: .nvmrc
-          cache: pnpm
-
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.13.1
+          cache: true
       - run: pnpm install --frozen-lockfile
-
       - run: pnpm test:coverage
-
       - name: Read coverage
         id: coverage
         run: |

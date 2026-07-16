@@ -24,7 +24,7 @@ jobs:
           node-version-file: .nvmrc
       - uses: pnpm/action-setup@v6
         with:
-          version: 11.12.0
+          version: 11.13.1
           cache: true
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
@@ -40,7 +40,7 @@ jobs:
           node-version-file: .nvmrc
       - uses: pnpm/action-setup@v6
         with:
-          version: 11.12.0
+          version: 11.13.1
           cache: true
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:coverage
@@ -55,7 +55,7 @@ jobs:
           node-version-file: .nvmrc
       - uses: pnpm/action-setup@v6
         with:
-          version: 11.12.0
+          version: 11.13.1
           cache: true
       - run: pnpm install --frozen-lockfile
       - run: pnpm build:check
