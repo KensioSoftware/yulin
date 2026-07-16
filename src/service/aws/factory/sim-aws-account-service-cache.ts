@@ -108,10 +108,13 @@ export class SimAwsAccountServiceCache {
    * Create or get simulated Route53 for an Account scope.
    */
   createRoute53(scope: SimAwsAccountRegionContainer): SimRoute53 {
+    const iam = this.createIam(scope);
+
     return this.services.getOrCreate(
       accountServiceCacheKey("route53", scope.accountRegionScope.accountId),
       () =>
         new SimRoute53({
+          iam,
           background: this.background,
           route53Registry: this.route53Registry,
         }),

@@ -13,10 +13,21 @@ import type {
   SimGetHostedZoneCommand,
   SimGetHostedZoneCommandOutput,
 } from "./get-hosted-zone.cmd.js";
+import {
+  SimIamAllowAllAuth,
+  type SimIamInterServiceAuthZ,
+} from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import { GetHostedZoneAuthorizer } from "./get-hosted-zone-authorizer.js";
 
 interface GetHostedZoneCommandHandlerProps {
   readonly hostedZones: Map<SimRoute53HostedZoneId, SimRoute53HostedZone>;
+  readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
+}
+
+interface GetHostedZoneCommandHandlerOptions {
+  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -32,24 +43,39 @@ export class GetHostedZoneCommandHandler implements CommandHandler<
     SimRoute53HostedZoneId,
     SimRoute53HostedZone
   >;
+  private readonly authorizer: GetHostedZoneAuthorizer;
   private readonly background: BackgroundScheduler;
 
   constructor(props: GetHostedZoneCommandHandlerProps) {
-    const { hostedZones, background = new BackgroundTasks() } = props;
+    const {
+      hostedZones,
+      iam = new SimIamAllowAllAuth(),
+      background = new BackgroundTasks(),
+    } = props;
     this.hostedZones = hostedZones;
+    this.authorizer = new GetHostedZoneAuthorizer({ iam });
     this.background = background;
   }
 
   /**
    * Handle getting a Route53 Hosted Zone.
+   *
+   * The hosted zone ID is normalized before authorization because it is the
+   * resource identifier used in the IAM decision. Authorization happens before
+   * the hosted zone store is read so unauthorized callers cannot learn whether
+   * the requested ID exists.
    */
   async handle(
     cmd: SimGetHostedZoneCommand,
+    opts?: GetHostedZoneCommandHandlerOptions,
   ): Promise<SimGetHostedZoneCommandOutput> {
     const hostedZoneId = normalizeSimRoute53HostedZoneId(cmd.input.Id);
+    const hostedZoneArn = `arn:aws:route53:::hostedzone/${hostedZoneId}`;
 
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
+
+    this.authorizer.authorize(hostedZoneArn, opts?.caller);
 
     const hostedZone = this.hostedZones.get(hostedZoneId);
     if (hostedZone === undefined) {
