@@ -118,6 +118,7 @@ export class SimRoute53 {
     const handler = new ListHostedZonesByNameCommandHandler({
       hostedZones: this.hostedZones,
       iam: this.iam,
+      background: this.background,
     });
     return await handler.handle(cmd, opts);
   }

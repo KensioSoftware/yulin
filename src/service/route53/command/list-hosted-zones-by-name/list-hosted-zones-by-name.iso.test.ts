@@ -108,4 +108,38 @@ describe("Route53 ListHostedZonesByNameCommand", () => {
     assertIdentical(listHostedZonesOutput.DNSName, "bravo.example.com");
     assertFalse(listHostedZonesOutput.IsTruncated);
   });
+
+  it("reflects Hosted Zones created as background tasks complete via the shared SimAws background scheduler", async () => {
+    // Given a SimAws instance whose background scheduler is shared across services.
+    const simAws = new SimAws();
+    const simRoute53 = simAws.route53();
+
+    // When a Hosted Zone is created (which schedules a background synchronization task).
+    await simRoute53.createHostedZone(
+      new CreateHostedZoneCommand({
+        Name: "background-sync.example.com",
+        CallerReference: "background-sync-ref",
+      }),
+    );
+
+    // Then the Hosted Zone is already visible in the listing before background tasks complete.
+    const listBeforeComplete = await simRoute53.listHostedZonesByName(
+      new ListHostedZonesByNameCommand(),
+    );
+    assertArrayLength(listBeforeComplete.HostedZones, 1);
+
+    // When the shared background scheduler is drained via SimAws.
+    await simAws.backgroundTasksComplete();
+
+    // Then the listing still reflects the Hosted Zone, confirming the background
+    // instance used by listHostedZonesByName is the same one owned by SimAws.
+    const listAfterComplete = await simRoute53.listHostedZonesByName(
+      new ListHostedZonesByNameCommand(),
+    );
+    assertArrayLength(listAfterComplete.HostedZones, 1);
+    assertIdentical(
+      listAfterComplete.HostedZones[0].Name,
+      "background-sync.example.com.",
+    );
+  });
 });
