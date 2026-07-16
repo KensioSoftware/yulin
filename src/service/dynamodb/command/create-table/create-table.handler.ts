@@ -10,11 +10,22 @@ import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type { SimArn } from "../../../aws/arn.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import { SimDynamoDbResourceInUseException } from "../../error/dynamodb.error.js";
+import {
+  SimIamAllowAllAuth,
+  type SimIamInterServiceAuthZ,
+} from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import { CreateTableAuthorizer } from "./create-table-authorizer.js";
 
 interface CreateTableCommandHandlerProps {
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>;
+  readonly iam?: SimIamInterServiceAuthZ;
   readonly background: BackgroundScheduler;
+}
+
+interface CreateTableCommandHandlerOptions {
+  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -28,11 +39,15 @@ export class CreateTableCommandHandler implements CommandHandler<
 > {
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>;
+  private readonly authorizer: CreateTableAuthorizer;
   private readonly background: BackgroundScheduler;
 
   constructor(props: CreateTableCommandHandlerProps) {
     this.accountRegionScope = props.accountRegionScope;
     this.tables = props.tables;
+    this.authorizer = new CreateTableAuthorizer({
+      iam: props.iam ?? new SimIamAllowAllAuth(),
+    });
     this.background = props.background;
   }
 
@@ -41,6 +56,7 @@ export class CreateTableCommandHandler implements CommandHandler<
    */
   async handle(
     cmd: SimCreateTableCommand,
+    opts?: CreateTableCommandHandlerOptions,
   ): Promise<SimCreateTableCommandOutput> {
     assertDefined(
       cmd.input.TableName,
@@ -58,6 +74,9 @@ export class CreateTableCommandHandler implements CommandHandler<
     await this.background.sequence();
 
     const tableArn: SimArn = `arn:aws:dynamodb:${this.accountRegionScope.regionName}:${this.accountRegionScope.accountId}:table/${tableName}`;
+
+    this.authorizer.authorize(tableArn, opts?.caller);
+
     const table = new SimDynamoDbTable({
       createCommand: cmd,
       arn: tableArn,

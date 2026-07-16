@@ -11,10 +11,21 @@ import {
   type BackgroundScheduler,
   BackgroundTasks,
 } from "../../../../util/background/background.js";
+import {
+  SimIamAllowAllAuth,
+  type SimIamInterServiceAuthZ,
+} from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import { ListTablesAuthorizer } from "./list-tables-authorizer.js";
 
 interface ListTablesCommandHandlerProps {
   readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>;
+  readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
+}
+
+interface ListTablesCommandHandlerOptions {
+  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -27,20 +38,31 @@ export class ListTablesCommandHandler implements CommandHandler<
   SimListTablesCommandOutput
 > {
   private readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>;
+  private readonly authorizer: ListTablesAuthorizer;
   private readonly background: BackgroundScheduler;
 
   constructor(props: ListTablesCommandHandlerProps) {
-    const { tables, background = new BackgroundTasks() } = props;
+    const {
+      tables,
+      iam = new SimIamAllowAllAuth(),
+      background = new BackgroundTasks(),
+    } = props;
     this.tables = tables;
+    this.authorizer = new ListTablesAuthorizer({ iam });
     this.background = background;
   }
 
   /**
    * Simulate listing DynamoDB Tables.
    */
-  async handle(cmd: SimListTablesCommand): Promise<SimListTablesCommandOutput> {
+  async handle(
+    cmd: SimListTablesCommand,
+    opts?: ListTablesCommandHandlerOptions,
+  ): Promise<SimListTablesCommandOutput> {
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
+
+    this.authorizer.authorize(opts?.caller);
 
     const tables = this.tables.values().toArray();
     tables.sort((a, b) => a.tableName.localeCompare(b.tableName));

@@ -124,8 +124,11 @@ export class SimAwsServiceFactory {
    * Create simulated DynamoDB for an Account Region scope.
    */
   createDynamoDb(scope: SimAwsAccountRegionContainer): SimDynamoDb {
+    const iam = this.createIam(scope);
+
     return new SimDynamoDb({
       accountRegionScope: scope.accountRegionScope,
+      iam,
       background: this.background,
     });
   }
