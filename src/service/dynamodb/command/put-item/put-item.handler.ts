@@ -10,9 +10,23 @@ import type {
 import { DynamoDbItem } from "../../item/dynamodb-item.js";
 import { SimDynamoDbResourceNotFoundException } from "../../error/dynamodb.error.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
+import {
+  SimIamAllowAllAuth,
+  type SimIamInterServiceAuthZ,
+} from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import { PutItemAuthorizer } from "./put-item-authorizer.js";
+import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
+import type { SimArn } from "../../../aws/arn.js";
 
 interface PutItemCommandHandlerProps {
+  readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>;
+  readonly iam?: SimIamInterServiceAuthZ;
+}
+
+interface PutItemCommandHandlerOptions {
+  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -24,18 +38,31 @@ export class PutItemCommandHandler implements CommandHandler<
   SimPutItemCommand,
   SimPutItemCommandOutput
 > {
+  private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>;
+  private readonly authorizer: PutItemAuthorizer;
 
   constructor(props: PutItemCommandHandlerProps) {
+    this.accountRegionScope = props.accountRegionScope;
     this.tables = props.tables;
+    this.authorizer = new PutItemAuthorizer({
+      iam: props.iam ?? new SimIamAllowAllAuth(),
+    });
   }
 
   /**
    * Put an Item into a DynamoDB Table.
    */
-  async handle(cmd: SimPutItemCommand): Promise<SimPutItemCommandOutput> {
+  async handle(
+    cmd: SimPutItemCommand,
+    opts?: PutItemCommandHandlerOptions,
+  ): Promise<SimPutItemCommandOutput> {
     const tableName = cmd.input.TableName as DynamoDbTableName | undefined;
     assertDefined(tableName, "PutItemCommand.input.TableName required");
+
+    const tableArn: SimArn = `arn:aws:dynamodb:${this.accountRegionScope.regionName}:${this.accountRegionScope.accountId}:table/${tableName}`;
+
+    this.authorizer.authorize(tableArn, opts?.caller);
 
     const table = this.tables.get(tableName);
     if (table === undefined) {

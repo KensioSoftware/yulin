@@ -116,8 +116,15 @@ export class SimDynamoDb {
   /**
    * Handle a Put Item Command from the SDK.
    */
-  async putItem(cmd: SimPutItemCommand): Promise<SimPutItemCommandOutput> {
-    const handler = new PutItemCommandHandler({ tables: this.tables });
-    return await handler.handle(cmd);
+  async putItem(
+    cmd: SimPutItemCommand,
+    opts?: SimDynamoDbRequestOptions,
+  ): Promise<SimPutItemCommandOutput> {
+    const handler = new PutItemCommandHandler({
+      accountRegionScope: this.accountRegionScope,
+      tables: this.tables,
+      iam: this.iam,
+    });
+    return await handler.handle(cmd, opts);
   }
 }
