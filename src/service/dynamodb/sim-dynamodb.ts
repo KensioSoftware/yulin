@@ -87,12 +87,14 @@ export class SimDynamoDb {
    */
   async listTables(
     cmd: SimListTablesCommand,
+    opts?: SimDynamoDbRequestOptions,
   ): Promise<SimListTablesCommandOutput> {
     const handler = new ListTablesCommandHandler({
       tables: this.tables,
+      iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd);
+    return await handler.handle(cmd, opts);
   }
 
   /**
