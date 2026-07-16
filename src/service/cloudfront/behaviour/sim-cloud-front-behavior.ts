@@ -9,11 +9,11 @@ export interface SimCloudFrontBehavior {
   viewerProtocolPolicy?: "allow-all" | "redirect-to-https" | "https-only";
   originPath?: string;
   functionAssociations?:
+    | undefined
     | {
         viewerRequest?: SimArn;
         viewerResponse?: SimArn;
-      }
-    | undefined;
+      };
 }
 
 /**

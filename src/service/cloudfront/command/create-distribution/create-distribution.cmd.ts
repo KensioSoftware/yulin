@@ -19,6 +19,7 @@ export interface SimCreateDistributionCommandInput {
  */
 export interface SimCreateDistributionCommandOutput {
   readonly Distribution?:
+    | undefined
     | {
         readonly Id?: string | undefined;
         readonly ARN?: string | undefined;
@@ -28,8 +29,7 @@ export interface SimCreateDistributionCommandOutput {
         readonly DomainName?: string | undefined;
         readonly DistributionConfig?:
           SimCloudFrontDistributionConfig | undefined;
-      }
-    | undefined;
+      };
   readonly Location?: string | undefined;
   readonly $metadata: SimResponseMetadata;
 }
@@ -39,23 +39,23 @@ export interface SimCreateDistributionCommandOutput {
  */
 export interface SimCloudFrontDistributionConfig {
   readonly Aliases?:
+    | undefined
     | {
         readonly Items?: readonly string[] | undefined;
-      }
-    | undefined;
+      };
   readonly Origins?:
+    | undefined
     | {
         readonly Items?: readonly SimCloudFrontOriginConfig[] | undefined;
-      }
-    | undefined;
+      };
   readonly DefaultCacheBehavior?:
     SimCloudFrontDefaultCacheBehaviorConfig | undefined;
   readonly CacheBehaviors?:
+    | undefined
     | {
         readonly Items?:
           readonly SimCloudFrontCacheBehaviorConfig[] | undefined;
-      }
-    | undefined;
+      };
 }
 
 /**

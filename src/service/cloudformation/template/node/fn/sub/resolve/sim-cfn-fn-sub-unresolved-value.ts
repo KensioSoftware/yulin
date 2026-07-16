@@ -34,10 +34,12 @@ export class SimCfnFnSubUnresolvedValue {
       "Fn::Sub": [
         this.template,
         Object.fromEntries(
-          [...this.variables.keys()].map((name) => [
-            name,
-            this.requiredResolvedVariable(name, resolvedVariables),
-          ]),
+          this.variables
+            .keys()
+            .map((name) => [
+              name,
+              this.requiredResolvedVariable(name, resolvedVariables),
+            ]),
         ),
       ],
     };

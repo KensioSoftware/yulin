@@ -38,9 +38,6 @@ interface SimAwsServiceFactoryProps {
  * such as IAM, Route53, and CloudFront.
  */
 export class SimAwsServiceFactory {
-  private readonly simAws: SimAws;
-  private readonly background: BackgroundScheduler & BackgroundCompleter;
-
   /**
    * Shared simulated CloudFront registry.
    *
@@ -57,6 +54,9 @@ export class SimAwsServiceFactory {
    * instance so cross-account services can resolve Account-owned IAM state.
    */
   public readonly iamRegistry = new SimIamRegistry();
+
+  private readonly simAws: SimAws;
+  private readonly background: BackgroundScheduler & BackgroundCompleter;
 
   /**
    * Shared simulated Route53 registry.

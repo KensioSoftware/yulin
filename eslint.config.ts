@@ -192,6 +192,22 @@ export default defineConfig(
       "unicorn/prevent-abbreviations": "off",
       "unicorn/no-null": "off",
       "unicorn/prefer-https": "off",
+      "unicorn/prefer-uint8array-base64": "off",
+      "unicorn/consistent-class-member-order": [
+        "error",
+        {
+          order: [
+            "static-field",
+            "static-block",
+            "public-field",
+            "private-field",
+            "constructor",
+            "static-method",
+            "public-method",
+            "private-method",
+          ],
+        },
+      ],
     },
   },
   {

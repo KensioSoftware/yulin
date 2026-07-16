@@ -235,11 +235,12 @@ export class SimCfnResource<T extends object = object> {
    * remains a lifecycle record rather than an async workflow implementation.
    */
   create(context: SimCloudFormationResourceCreateContext): Promise<void> {
-    return new SimCfnResourceCreateOperation({
+    const createOperation = new SimCfnResourceCreateOperation({
       background: this.background,
       resource: this,
       cfnResourceFactory: this.cfnResourceFactory,
-    }).run(context);
+    });
+    return createOperation.run(context);
   }
 
   /**

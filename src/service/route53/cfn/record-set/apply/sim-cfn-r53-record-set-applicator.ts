@@ -38,10 +38,11 @@ export class SimCfnRoute53RecordSetApplicator {
       resource,
       properties,
     );
-    const recordSet = new SimCfnRoute53RecordSetBuilder(
+    const recordSetBuilder = new SimCfnRoute53RecordSetBuilder(
       resource,
       properties,
-    ).build();
+    );
+    const recordSet = recordSetBuilder.build();
 
     assertDefined(recordSet.Name, "Route53 record set name");
     assertDefined(recordSet.Type, "Route53 record set type");

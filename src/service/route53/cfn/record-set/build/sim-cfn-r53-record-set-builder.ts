@@ -25,14 +25,13 @@ export class SimCfnRoute53RecordSetBuilder {
     const name = this.name();
     const type = this.type();
 
+    const aliasTargetParser = new SimCfnRoute53AliasTargetParser(this.resource);
     return {
       Name: name,
       Type: type,
       TTL: this.ttl(),
       ResourceRecords: this.resourceRecords(),
-      AliasTarget: new SimCfnRoute53AliasTargetParser(this.resource).parse(
-        this.properties["AliasTarget"],
-      ),
+      AliasTarget: aliasTargetParser.parse(this.properties["AliasTarget"]),
     };
   }
 
@@ -81,7 +80,7 @@ export class SimCfnRoute53RecordSetBuilder {
 
     const parsedTtl = Number(ttl);
 
-    if (!Number.isInteger(parsedTtl) || parsedTtl < 0) {
+    if (!Number.isSafeInteger(parsedTtl) || parsedTtl < 0) {
       throw new TypeError(
         `Invalid AWS::Route53::RecordSet ${this.resource.logicalId}: TTL must be a non-negative integer`,
       );

@@ -5,7 +5,7 @@ import { assertIdentical } from "@kensio/smartass";
 
 describe("sim CloudFront distro config normalizer", () => {
   it("normalizes DefaultCacheBehavior FunctionAssociations from CFN array shape", () => {
-    const normalized = new SimCloudFrontDistributionConfigNormalizer({
+    const normalizer = new SimCloudFrontDistributionConfigNormalizer({
       DefaultCacheBehavior: {
         TargetOriginId: "SiteOrigin",
         FunctionAssociations: [
@@ -15,7 +15,8 @@ describe("sim CloudFront distro config normalizer", () => {
           },
         ],
       },
-    } as SimCloudFrontDistributionConfig).normalize();
+    } as SimCloudFrontDistributionConfig);
+    const normalized = normalizer.normalize();
 
     assertIdentical(
       normalized.DefaultCacheBehavior?.FunctionAssociations?.Items?.[0]

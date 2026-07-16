@@ -100,8 +100,6 @@ export class SimCfnAcmCertificatePropertyListReader {
     }
 
     const domainName = value["DomainName"];
-    const validationDomain = value["ValidationDomain"];
-
     if (domainName !== undefined && typeof domainName !== "string") {
       throw this.propertyError(
         `${propertyPath}.DomainName`,
@@ -109,6 +107,7 @@ export class SimCfnAcmCertificatePropertyListReader {
       );
     }
 
+    const validationDomain = value["ValidationDomain"];
     if (
       validationDomain !== undefined &&
       typeof validationDomain !== "string"
@@ -133,12 +132,11 @@ export class SimCfnAcmCertificatePropertyListReader {
     }
 
     const key = value["Key"];
-    const tagValue = value["Value"];
-
     if (key !== undefined && typeof key !== "string") {
       throw this.propertyError(`${propertyPath}.Key`, "must be a string");
     }
 
+    const tagValue = value["Value"];
     if (tagValue !== undefined && typeof tagValue !== "string") {
       throw this.propertyError(`${propertyPath}.Value`, "must be a string");
     }

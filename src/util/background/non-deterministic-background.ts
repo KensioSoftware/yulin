@@ -4,6 +4,8 @@ import type {
   BackgroundTask,
 } from "./background.js";
 
+/* eslint-disable unicorn/prefer-await  */
+
 /**
  * Non-deterministic async background tasks scheduler.
  *

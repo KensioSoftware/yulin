@@ -12,7 +12,8 @@ describe("sim CloudFront Function", () => {
     );
 
     assertInstanceOf(cffRes, Request);
-    assertIdentical(new URL(cffRes.url).pathname, "/foo/bar/object.json");
+    const url = new URL(cffRes.url);
+    assertIdentical(url.pathname, "/foo/bar/object.json");
   });
 
   it("applies default handler function for viewer-response", () => {
@@ -43,6 +44,7 @@ describe("sim CloudFront Function", () => {
     );
 
     assertInstanceOf(cffRes, Request);
-    assertIdentical(new URL(cffRes.url).pathname, "/foo/bar/foobar.html");
+    const url = new URL(cffRes.url);
+    assertIdentical(url.pathname, "/foo/bar/foobar.html");
   });
 });

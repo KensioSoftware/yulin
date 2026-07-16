@@ -112,12 +112,12 @@ export class SimRoute53HostedZone {
     this.synchronizationComplete =
       this.synchronizationComplete === undefined
         ? synchronizationComplete
-        : Promise.all([
-            this.synchronizationComplete,
-            synchronizationComplete,
-          ]).then(() => {
-            //
-          });
+        : (async (): Promise<void> => {
+            await Promise.all([
+              this.synchronizationComplete,
+              synchronizationComplete,
+            ]);
+          })();
   }
 
   /**

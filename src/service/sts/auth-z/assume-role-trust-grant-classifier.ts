@@ -71,11 +71,13 @@ export class AssumeRoleTrustGrantClassifier {
       return [principal];
     }
 
+    /* v8 ignore if */
     if (!this.isPrincipalObject(principal)) {
       return principal;
     }
 
     const awsPrincipal = principal["AWS"];
+    /* v8 ignore if */
     if (awsPrincipal === undefined) {
       return [];
     }

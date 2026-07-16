@@ -47,7 +47,7 @@ export class ListRolesCommandHandler implements CommandHandler<
     const startRoleName =
       cmd.input.Marker === undefined
         ? undefined
-        : ListRolesCommandHandler.parseMarker(cmd.input.Marker);
+        : this.parseMarker(cmd.input.Marker);
 
     const startIndex = this.getStartIndex(roles, startRoleName);
 
@@ -68,32 +68,29 @@ export class ListRolesCommandHandler implements CommandHandler<
       IsTruncated: isTruncated,
       Marker:
         isTruncated && lastRole !== undefined
-          ? ListRolesCommandHandler.makeMarker(lastRole.roleName)
+          ? this.makeMarker(lastRole.roleName)
           : undefined,
     };
   }
 
   private matchingRoles(cmd: SimListRolesCommand): SimIamRole[] {
-    const roles = [...this.roles.values()].toSorted((a, b) =>
-      a.arn.localeCompare(b.arn),
-    );
+    const roles = this.roles
+      .values()
+      .toArray()
+      .toSorted((a, b) => a.arn.localeCompare(b.arn));
 
     return roles.filter((role) => {
-      if (
+      return !(
         cmd.input.PathPrefix !== undefined &&
         !role.path.startsWith(cmd.input.PathPrefix)
-      ) {
-        return false;
-      }
-
-      return true;
+      );
     });
   }
 
   private getMaxItems(cmd: SimListRolesCommand): number {
     const maxItems = cmd.input.MaxItems ?? 100;
 
-    if (!Number.isInteger(maxItems) || maxItems < 1 || maxItems > 1000) {
+    if (!Number.isSafeInteger(maxItems) || maxItems < 1 || maxItems > 1000) {
       throw new RangeError(
         "ListRolesCommand.input.MaxItems must be an integer between 1 and 1000",
       );
@@ -123,11 +120,11 @@ export class ListRolesCommandHandler implements CommandHandler<
     return markerIndex + 1;
   }
 
-  private static makeMarker(roleName: SimIamRoleName): string {
+  private makeMarker(roleName: SimIamRoleName): string {
     return Buffer.from(roleName, "utf8").toString("base64url");
   }
 
-  private static parseMarker(marker: string): SimIamRoleName {
+  private parseMarker(marker: string): SimIamRoleName {
     return Buffer.from(marker, "base64url").toString("utf8") as SimIamRoleName;
   }
 }

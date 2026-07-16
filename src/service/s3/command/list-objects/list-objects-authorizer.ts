@@ -24,7 +24,7 @@ interface ListObjectsAuthorizationInput {
  * Prefix and maximum-result constraints are request attributes used by IAM
  * policies to limit which listings a principal may perform. They are supplied
  * as S3 condition keys so policy evaluation can distinguish, for example, a
- * permitted application prefix from a restricted private prefix.
+ * permitted app prefix from a restricted private prefix.
  */
 export class ListObjectsAuthorizer {
   private static readonly action = "s3:ListBucket";

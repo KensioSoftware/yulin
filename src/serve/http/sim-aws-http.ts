@@ -62,7 +62,8 @@ export class SimAwsHttp {
   }
 
   private hostnameFromRequest(request: Request): string | undefined {
-    const hostname = new URL(request.url).hostname.toLowerCase();
+    const url = new URL(request.url);
+    const hostname = url.hostname.toLowerCase();
 
     if (hostname.length === 0) {
       return undefined;

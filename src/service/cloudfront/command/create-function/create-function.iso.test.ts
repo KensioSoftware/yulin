@@ -39,7 +39,8 @@ describe("CloudFront CreateFunctionCommand", () => {
       new Request("http://foobar.cloudfront.net/foo/bar/object.json"),
     );
     assertInstanceOf(cffRes, Request);
-    assertIdentical(new URL(cffRes.url).pathname, "/changed/object.json");
+    const url = new URL(cffRes.url);
+    assertIdentical(url.pathname, "/changed/object.json");
   });
 
   it("creates viewer-request CloudFront Function from source code", async () => {
@@ -72,7 +73,8 @@ describe("CloudFront CreateFunctionCommand", () => {
       new Request("http://foobar.cloudfront.net/foo/bar/object.json"),
     );
     assertInstanceOf(cffRes, Request);
-    assertIdentical(new URL(cffRes.url).pathname, "/changed/object.json");
+    const url = new URL(cffRes.url);
+    assertIdentical(url.pathname, "/changed/object.json");
   });
 
   it("creates viewer-response CloudFront Function from handler function reference", async () => {

@@ -40,12 +40,13 @@ describe("Simulated AWS local URL", () => {
   });
 
   it("converts to a URL instance", () => {
-    const url = new SimAwsLocalUrl({
+    const simAwsLocalUrl = new SimAwsLocalUrl({
       input: new URL(
         "https://my-site.s3-website.eu-west-2.sim-aws.localhost/foo/",
       ),
       port: "12345",
-    }).toURL();
+    });
+    const url = simAwsLocalUrl.toURL();
 
     assertInstanceOf(url, URL);
     assertIdentical(

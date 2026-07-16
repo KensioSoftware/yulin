@@ -27,6 +27,7 @@ export class SimAwsLocalServer {
     const { simAws = new SimAws() } = props;
     this.simAwsHttp = new SimAwsHttp({ simAws });
     this.server = http.createServer((request, response) => {
+      // eslint-disable-next-line unicorn/prefer-await
       this.handleRequest(request, response).catch((error: unknown) => {
         this.handleRequestError(error, response);
       });
@@ -77,7 +78,8 @@ export class SimAwsLocalServer {
    * Adapt a simulated AWS URL for this local server instance.
    */
   localUrl(input: string | URL): URL {
-    return new SimAwsLocalUrl({ input, port: this.port }).toURL();
+    const simAwsLocalUrl = new SimAwsLocalUrl({ input, port: this.port });
+    return simAwsLocalUrl.toURL();
   }
 
   private async handleRequest(
@@ -95,9 +97,6 @@ export class SimAwsLocalServer {
     error: unknown,
     nodeResponse: ServerResponse,
   ): void {
-    const message =
-      error instanceof Error ? error.message : "HTTP request processing failed";
-
     /* v8 ignore if */
     if (nodeResponse.writableEnded) {
       return;
@@ -107,6 +106,9 @@ export class SimAwsLocalServer {
       nodeResponse.statusCode = 400;
       nodeResponse.setHeader("content-type", "text/plain; charset=utf-8");
     }
+
+    const message =
+      error instanceof Error ? error.message : "HTTP request processing failed";
 
     nodeResponse.end(message);
   }

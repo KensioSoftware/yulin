@@ -69,7 +69,7 @@ export class SimCfnStackOutputResolver {
   private resolveOutputTemplate(
     template: SimCfnTemplateValueRecord,
   ): SimCfnTemplateValueRecord {
-    return new SimCfnTemplateValueResolver({
+    const resolver = new SimCfnTemplateValueResolver({
       parameters: this.template.parameters,
       pseudoParameters: this.template.pseudoParameters(),
       resources: {
@@ -95,7 +95,8 @@ export class SimCfnStackOutputResolver {
           return resource.attributeValue(attributeName);
         },
       },
-    }).resolveRecord(template);
+    });
+    return resolver.resolveRecord(template);
   }
 
   private description(template: SimCfnTemplateValueRecord): string | undefined {

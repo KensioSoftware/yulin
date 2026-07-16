@@ -42,7 +42,7 @@ export interface SimIamAuthorizationInput {
   /**
    * Condition values known by the service handling the simulated request, such
    * as S3 object tags. Sim IAM automatically supplies global condition values
-   * that it can derive itself, such as aws:PrincipalArn.
+   * that it can derive itself, such as AWS:PrincipalArn.
    *
    * Context-key names are matched case-insensitively by the condition matcher,
    * while string values remain case-sensitive. IAM-derived values take
@@ -135,7 +135,7 @@ export class SimIamAuthZContextBuilder {
 
   /**
    * Combine service-provided condition values with global values that IAM can
-   * derive from the resolved caller. aws:PrincipalArn identifies the IAM
+   * derive from the resolved caller. AWS:PrincipalArn identifies the IAM
    * identity whose policies apply; for temporary Role credentials this is the
    * underlying Role ARN, rather than the STS assumed-role session ARN retained
    * as the effective caller for diagnostics.

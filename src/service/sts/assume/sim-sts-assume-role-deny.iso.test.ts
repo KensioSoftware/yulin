@@ -277,7 +277,8 @@ describe("STS AssumeRole denial", () => {
       kind: "arn" as const,
       arn: `arn:aws:iam::${accountId}:root`,
     };
-    const simIam = new SimAws({ defaultAccountId: accountId }).iam();
+    const simAws = new SimAws({ defaultAccountId: accountId });
+    const simIam = simAws.iam();
     const createRoleOutput = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "TargetRole",
@@ -296,7 +297,9 @@ describe("STS AssumeRole denial", () => {
     };
 
     const error = assertThrowsError(() => {
-      new AssumeRoleTrustPolicyAuthorizer().authorize({
+      const assumeRoleTrustPolicyAuthorizer =
+        new AssumeRoleTrustPolicyAuthorizer();
+      assumeRoleTrustPolicyAuthorizer.authorize({
         roleArn: targetRoleArn,
         // @ts-expect-error TS2322 -- testing invalid role
         role,

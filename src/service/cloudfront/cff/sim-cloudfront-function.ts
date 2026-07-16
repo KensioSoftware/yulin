@@ -37,9 +37,9 @@ export const defaultCffHandler: CloudFrontFunction.Handler = (
  */
 export class SimCloudFrontFunction {
   public readonly name: SimCloudFrontFunctionName;
-  #status: CloudFrontFunctionStatus;
   public readonly accountId: SimAwsAccountId;
 
+  #status: CloudFrontFunctionStatus;
   private readonly handlerFunction: CloudFrontFunction.Handler;
   private readonly eventAdapter: SimCffEventAdapter;
 

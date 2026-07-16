@@ -25,12 +25,15 @@ export class SimCfnStackDescriber {
       StackName: stack.stackName,
       StackStatus: stack.lifecycle.status,
       StackStatusReason: stack.lifecycle.error?.message,
-      Outputs: [...stack.outputs.values()].map((output) => ({
-        OutputKey: output.outputKey,
-        OutputValue: output.value,
-        Description: output.description,
-        ExportName: output.exportName,
-      })),
+      Outputs: stack.outputs
+        .values()
+        .map((output) => ({
+          OutputKey: output.outputKey,
+          OutputValue: output.value,
+          Description: output.description,
+          ExportName: output.exportName,
+        }))
+        .toArray(),
     };
   }
 }

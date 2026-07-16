@@ -87,7 +87,7 @@ export class SimS3GetObjectController {
 
     const headers = {
       "content-length": String(object.body.length),
-      ...(contentType === undefined ? {} : { "content-type": contentType }),
+      ...(contentType !== undefined && { "content-type": contentType }),
     };
 
     if (request.method === "HEAD") {

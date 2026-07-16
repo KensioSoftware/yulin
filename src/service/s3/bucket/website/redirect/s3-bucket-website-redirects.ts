@@ -110,6 +110,7 @@ export class S3BucketWebsiteRedirects {
     } else if (redirect.ReplaceKeyPrefixWith !== undefined) {
       url.pathname = `/${this.requestKey(req).replace(
         this.matchingKeyPrefix(req),
+        // eslint-disable-next-line unicorn/no-unsafe-string-replacement
         redirect.ReplaceKeyPrefixWith,
       )}`;
     }
@@ -117,13 +118,14 @@ export class S3BucketWebsiteRedirects {
     return new Response(undefined, {
       status: Number(redirect.HttpRedirectCode ?? "301"),
       headers: {
-        location: url.toString(),
+        location: url.href,
       },
     });
   }
 
   private requestKey(req: Request): string {
-    return new URL(req.url).pathname.replace(/^\/+/, "");
+    const url = new URL(req.url);
+    return url.pathname.replace(/^\/+/, "");
   }
 
   private matchingKeyPrefix(req: Request): string {

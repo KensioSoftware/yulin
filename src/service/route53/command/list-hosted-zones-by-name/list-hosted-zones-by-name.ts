@@ -36,7 +36,7 @@ export function getHostedZoneListPage(
     markerHostedZoneId: props.markerHostedZoneId,
   });
 
-  const matchingEntries = [...props.hostedZones.entries()]
+  const matchingEntries = [...props.hostedZones]
     .map(([hostedZoneId, hostedZone]) => ({
       hostedZoneId,
       hostedZone,

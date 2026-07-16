@@ -85,9 +85,10 @@ export class CreateFunctionCommandHandler implements CommandHandler<
 
     this.authorizer.authorize(cmd.input.Name, opts?.caller);
 
-    const handlerFunction = new CffUint8ArrayFunctionCodeExtractor(
+    const extractor = new CffUint8ArrayFunctionCodeExtractor(
       cmd.input.FunctionCode,
-    ).extractHandlerFunction();
+    );
+    const handlerFunction = extractor.extractHandlerFunction();
     const simCff = new SimCloudFrontFunction({
       name: cmd.input.Name,
       accountId: this.accountId,

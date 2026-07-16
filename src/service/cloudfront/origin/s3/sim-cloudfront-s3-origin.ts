@@ -63,7 +63,8 @@ export class SimCloudFrontS3Origin implements SimCloudFrontOrigin {
   }
 
   private objectKeyForRequest(request: SimCloudFrontOriginRequest): string {
-    const requestPath = new URL(request.req.url).pathname;
+    const url = new URL(request.req.url);
+    const requestPath = url.pathname;
 
     return this.normalizeObjectKey(`${this.originPath}/${requestPath}`);
   }
@@ -79,7 +80,7 @@ export class SimCloudFrontS3Origin implements SimCloudFrontOrigin {
 
     const headers = {
       "content-length": String(object.body.length),
-      ...(contentType === undefined ? {} : { "content-type": contentType }),
+      ...(contentType !== undefined && { "content-type": contentType }),
     };
 
     if (request.method === "HEAD") {

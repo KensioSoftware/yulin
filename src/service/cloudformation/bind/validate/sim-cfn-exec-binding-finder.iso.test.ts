@@ -67,7 +67,8 @@ function handler(event) {
     );
 
     assertInstanceOf(result, Request);
-    assertIdentical(new URL(result.url).pathname, "/bound-handler.html");
+    const url = new URL(result.url);
+    assertIdentical(url.pathname, "/bound-handler.html");
   });
 
   it("finds a logicalId binding from the final CDK path segment when deploying a template", async () => {
@@ -126,7 +127,8 @@ function handler(event) {
     );
 
     assertInstanceOf(result, Request);
-    assertIdentical(new URL(result.url).pathname, "/bound-handler.html");
+    const url = new URL(result.url);
+    assertIdentical(url.pathname, "/bound-handler.html");
   });
 
   it("uses the first supported string CDK path metadata key when finding a binding directly", () => {

@@ -95,6 +95,11 @@ interface SimIamProps {
  * service facade per Account.
  */
 export class SimIam implements SimIamInterServiceAuthZ {
+  /**
+   * Manage temporary sessions belonging to this simulated IAM Account.
+   */
+  public readonly sessionManager: SimIamSessionManager;
+
   private readonly policies = new Map<SimArn, SimIamManagedPolicy>();
   private readonly roles = new Map<SimIamRoleName, SimIamRole>();
   private readonly users = new Map<SimIamUsername, SimIamUser>();
@@ -103,11 +108,6 @@ export class SimIam implements SimIamInterServiceAuthZ {
   private readonly background: BackgroundScheduler;
   private readonly credentialRegistry: SimIamCredentialRegistry;
   private readonly userCredentialGenerator: SimIamUserCredentialGenerator;
-
-  /**
-   * Manage temporary sessions belonging to this simulated IAM Account.
-   */
-  public readonly sessionManager: SimIamSessionManager;
 
   constructor(props: SimIamProps = {}) {
     const {
@@ -149,7 +149,7 @@ export class SimIam implements SimIamInterServiceAuthZ {
    * suppresses that fallback and is evaluated without identity policies.
    */
   authorize(input: SimIamAuthorizationInput): SimIamPolicyDecision {
-    return new SimIamAuthorizer({
+    const simIamAuthorizer = new SimIamAuthorizer({
       policies: this.policies,
       roles: this.roles,
       users: this.users,
@@ -157,7 +157,8 @@ export class SimIam implements SimIamInterServiceAuthZ {
         this.accountRegionScope.accountId,
       ),
       credentialIdentityResolver: this,
-    }).authorize(input);
+    });
+    return simIamAuthorizer.authorize(input);
   }
 
   /**

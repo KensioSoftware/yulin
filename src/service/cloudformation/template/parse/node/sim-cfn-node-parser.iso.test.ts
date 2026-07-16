@@ -89,20 +89,16 @@ describe("SimCfnNodeParser", () => {
     });
 
     assertInstanceOf(node, SimCfnFnFindInMap);
+    const parameters = SimCfnParameters.fromValues({});
     assertIdentical(
       node.resolve(
-        new SimCfnResolveContext(
-          SimCfnParameters.fromValues({}),
-          undefined,
-          undefined,
-          {
-            RegionMap: {
-              "us-east-1": {
-                AMI: "ami-1234567890abcdef0",
-              },
+        new SimCfnResolveContext(parameters, undefined, undefined, {
+          RegionMap: {
+            "us-east-1": {
+              AMI: "ami-1234567890abcdef0",
             },
           },
-        ),
+        }),
       ),
       "ami-1234567890abcdef0",
     );

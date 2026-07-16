@@ -59,7 +59,7 @@ describe("IAM ListRolesCommand", () => {
 
     const listedRoleNames = listRolesOutput.Roles.map(
       (role) => role.RoleName,
-    ).toSorted();
+    ).toSorted((a, b) => a.localeCompare(b));
 
     assertIdentical(listedRoleNames[0], "ReadRole");
     assertIdentical(listedRoleNames[1], "WriteRole");
@@ -214,7 +214,7 @@ describe("IAM ListRolesCommand", () => {
     const allRoleNames = [
       ...firstPageRoleNames,
       ...secondPage.Roles.map((role) => role.RoleName),
-    ].toSorted();
+    ].toSorted((a, b) => a.localeCompare(b));
 
     assertIdentical(allRoleNames[0], "AlphaRole");
     assertIdentical(allRoleNames[1], "BetaRole");

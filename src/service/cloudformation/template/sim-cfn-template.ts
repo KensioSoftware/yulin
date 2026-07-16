@@ -70,7 +70,8 @@ export class SimCfnTemplate {
     this.stackName = stackName;
     this.accountRegionScope = accountRegionScope;
 
-    new SimCfnTemplateBodyValidator({ template, stackName }).validate();
+    const validator = new SimCfnTemplateBodyValidator({ template, stackName });
+    validator.validate();
 
     this.parameters = (
       parameters ?? new SimCfnParameters({ stackName })

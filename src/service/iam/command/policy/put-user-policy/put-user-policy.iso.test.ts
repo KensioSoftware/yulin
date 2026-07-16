@@ -118,7 +118,8 @@ describe("IAM PutUserPolicyCommand", () => {
   });
 
   it("throws when the IAM User does not exist", async () => {
-    const simIam = new SimAws().iam();
+    const simAws = new SimAws();
+    const simIam = simAws.iam();
 
     const error = await assertThrowsErrorAsync(async () =>
       simIam.putUserPolicy(
@@ -141,7 +142,8 @@ describe("IAM PutUserPolicyCommand", () => {
   });
 
   it("rejects a malformed inline policy document", async () => {
-    const simIam = new SimAws().iam();
+    const simAws = new SimAws();
+    const simIam = simAws.iam();
     await simIam.createUser(
       new CreateUserCommand({
         UserName: "ApplicationUser",

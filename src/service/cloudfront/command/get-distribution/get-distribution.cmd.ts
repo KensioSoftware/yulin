@@ -20,6 +20,7 @@ export interface SimGetDistributionCommandInput {
  */
 export interface SimGetDistributionCommandOutput {
   readonly Distribution?:
+    | undefined
     | {
         readonly Id?: string | undefined;
         readonly ARN?: string | undefined;
@@ -29,7 +30,6 @@ export interface SimGetDistributionCommandOutput {
         readonly DomainName?: string | undefined;
         readonly DistributionConfig?:
           SimCloudFrontDistributionConfig | undefined;
-      }
-    | undefined;
+      };
   readonly $metadata: SimResponseMetadata;
 }

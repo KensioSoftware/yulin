@@ -86,12 +86,12 @@ export class SimCfnFnSubVariableResolver {
         );
       }
 
-      return new SimCfnGetAtt(logicalId, attributeParts.join(".")).resolve(
-        context,
-      );
+      const cfnGetAtt = new SimCfnGetAtt(logicalId, attributeParts.join("."));
+      return cfnGetAtt.resolve(context);
     }
 
-    return new SimCfnRef(variableName).resolve(context);
+    const cfnRef = new SimCfnRef(variableName);
+    return cfnRef.resolve(context);
   }
 
   /**

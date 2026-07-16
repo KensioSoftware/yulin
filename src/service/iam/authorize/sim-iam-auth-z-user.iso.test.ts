@@ -89,7 +89,7 @@ describe("Sim IAM User authorization", () => {
       ],
     });
 
-    // Then IAM derives aws:PrincipalArn from the User caller.
+    // Then IAM derives AWS:PrincipalArn from the User caller.
     assertTrue(decision.isAllowed);
   });
 

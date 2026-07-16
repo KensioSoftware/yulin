@@ -48,17 +48,16 @@ export class PutRolePolicyCommandHandler implements CommandHandler<
     cmd: SimPutRolePolicyCommand,
   ): Promise<SimPutRolePolicyCommandOutput> {
     const roleName = cmd.input.RoleName as SimIamRoleName | undefined;
-    const policyName = cmd.input.PolicyName;
-    const policyDocument = cmd.input.PolicyDocument;
-
     if (roleName === undefined || roleName.length === 0) {
       throw new Error("RoleName is required");
     }
 
+    const policyName = cmd.input.PolicyName;
     if (policyName === undefined || policyName.length === 0) {
       throw new Error("PolicyName is required");
     }
 
+    const policyDocument = cmd.input.PolicyDocument;
     this.policyDocValidator.validateRequired(policyDocument);
 
     // Allow for potential non-deterministic sequencing of async events.

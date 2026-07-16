@@ -38,9 +38,10 @@ interface SimCloudFormationProps {
  * Simulated CloudFormation in one AWS Account and Region.
  */
 export class SimCloudFormation {
+  public readonly accountRegionScope: SimAwsAccountRegionScope;
+
   private readonly simAws: SimAws;
   private readonly background: BackgroundScheduler & BackgroundCompleter;
-  public readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly stacks = new Map<SimCloudFormationStackName, SimCfnStack>();
   private readonly templateDeployer: SimCloudFormationTemplateDeployer;
 
@@ -78,22 +79,6 @@ export class SimCloudFormation {
     cmd: SimCreateStackCommand,
   ): Promise<SimCreateStackCommandOutput> {
     return await this.createStackWithContext(cmd);
-  }
-
-  private async createStackWithContext(
-    cmd: SimCreateStackCommand,
-    cdkOutContext?: SimCdkOutContext,
-    bindings?: readonly SimCfnExecutableResourceBinding[],
-  ): Promise<SimCreateStackCommandOutput> {
-    const handler = new CreateStackCommandHandler({
-      simAws: this.simAws,
-      accountRegionScope: this.accountRegionScope,
-      stacks: this.stacks,
-      background: this.background,
-      cdkOutContext,
-      bindings,
-    });
-    return await handler.handle(cmd);
   }
 
   /**
@@ -139,5 +124,21 @@ export class SimCloudFormation {
     props: SimCloudFormationDeployTemplateFileProps | string,
   ): Promise<SimCfnStack> {
     return await this.templateDeployer.deployTemplateFile(props);
+  }
+
+  private async createStackWithContext(
+    cmd: SimCreateStackCommand,
+    cdkOutContext?: SimCdkOutContext,
+    bindings?: readonly SimCfnExecutableResourceBinding[],
+  ): Promise<SimCreateStackCommandOutput> {
+    const handler = new CreateStackCommandHandler({
+      simAws: this.simAws,
+      accountRegionScope: this.accountRegionScope,
+      stacks: this.stacks,
+      background: this.background,
+      cdkOutContext,
+      bindings,
+    });
+    return await handler.handle(cmd);
   }
 }

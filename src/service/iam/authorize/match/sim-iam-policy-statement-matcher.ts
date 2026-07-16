@@ -72,10 +72,11 @@ export class SimIamPolicyStatementMatcher {
     }
 
     if (statement.notActions !== undefined) {
-      return !statement.notActions.some((pattern) =>
-        simIamWildcardMatch(pattern, this.context.action, {
-          caseSensitive: false,
-        }),
+      return statement.notActions.every(
+        (pattern) =>
+          !simIamWildcardMatch(pattern, this.context.action, {
+            caseSensitive: false,
+          }),
       );
     }
 
@@ -105,10 +106,11 @@ export class SimIamPolicyStatementMatcher {
     }
 
     if (statement.notResources !== undefined) {
-      return !statement.notResources.some((pattern) =>
-        simIamWildcardMatch(pattern, this.context.resource, {
-          caseSensitive: true,
-        }),
+      return statement.notResources.every(
+        (pattern) =>
+          !simIamWildcardMatch(pattern, this.context.resource, {
+            caseSensitive: true,
+          }),
       );
     }
 

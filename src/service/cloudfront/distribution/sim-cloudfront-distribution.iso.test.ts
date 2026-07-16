@@ -124,14 +124,12 @@ describe("SimCloudFrontDistribution", () => {
     const distributionId = makeDistributionId();
 
     assertStringLength(distributionId, 14);
-    assertIdentical(distributionId[0], "E");
+    assertIdentical(distributionId.at(0), "E");
   });
 });
 
 function makeOrigin(): SimCloudFrontOrigin {
   return {
-    fetch() {
-      return Promise.resolve(new Response("ok"));
-    },
+    fetch: () => Promise.resolve(new Response("ok")),
   };
 }

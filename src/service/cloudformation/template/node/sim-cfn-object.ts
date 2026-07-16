@@ -23,6 +23,9 @@ export class SimCfnObject extends SimCfnNode {
    * Collect referenced names from every property value.
    */
   override referencedNames(): string[] {
-    return [...this.entries.values()].flatMap((node) => node.referencedNames());
+    return this.entries
+      .values()
+      .flatMap((node) => node.referencedNames())
+      .toArray();
   }
 }

@@ -9,7 +9,7 @@ interface ListBucketsAuthorizerProps {
 /**
  * Applies IAM authorization to an S3 ListBuckets request.
  *
- * AWS maps the ListBuckets API operation to the s3:ListAllMyBuckets IAM
+ * AWS maps the ListBuckets API operation to the S3:ListAllMyBuckets IAM
  * action. Despite the action name, this permission does not use individual
  * Bucket ARNs. AWS documents it as an account-level listing permission whose
  * resource is "*".

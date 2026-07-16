@@ -5,7 +5,7 @@ import { SimIam } from "../../../../../sim-iam.js";
 
 describe("sim IAM ForAnyValue:StringLike authorization", () => {
   it("allows a request when one context value matches an asterisk pattern", () => {
-    // Given a policy accepting application tag keys.
+    // Given a policy accepting app tag keys.
     const simIam = new SimIam();
     const policy = simIamAuthZResourcePolicySourceFactory.make({
       document: {
@@ -113,7 +113,7 @@ describe("sim IAM ForAnyValue:StringLike authorization", () => {
   });
 
   it("implicitly denies a request when no context value matches a policy pattern", () => {
-    // Given a policy accepting only application and team tag-key patterns.
+    // Given a policy accepting only app and team tag-key patterns.
     const simIam = new SimIam();
     const policy = simIamAuthZResourcePolicySourceFactory.make({
       document: {
@@ -185,7 +185,7 @@ describe("sim IAM ForAnyValue:StringLike authorization", () => {
   });
 
   it("implicitly denies a request with an empty context value set", () => {
-    // Given a policy accepting application tag keys.
+    // Given a policy accepting app tag keys.
     const simIam = new SimIam();
     const policy = simIamAuthZResourcePolicySourceFactory.make({
       document: {
@@ -254,7 +254,7 @@ describe("sim IAM ForAnyValue:StringLike authorization", () => {
   });
 
   it("matches a pattern against the principal ARN derived from the caller", () => {
-    // Given a policy accepting application roles from a particular account.
+    // Given a policy accepting app roles from a particular account.
     const simIam = new SimIam();
     const callerPrincipalArn =
       "arn:aws:iam::123456789012:role/application/TestRole";

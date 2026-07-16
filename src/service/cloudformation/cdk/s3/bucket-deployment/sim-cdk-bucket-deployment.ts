@@ -42,7 +42,6 @@ export class SimCdkBucketDeploymentResourceFactory implements SimCfnServiceResou
   ): void {
     const properties = context.resolvedProperties ?? resource.properties;
     const destinationBucketName = properties["DestinationBucketName"];
-    const sourceObjectKeys = properties["SourceObjectKeys"];
 
     /* v8 ignore if -- defensive catch */
     if (typeof destinationBucketName !== "string") {
@@ -51,6 +50,7 @@ export class SimCdkBucketDeploymentResourceFactory implements SimCfnServiceResou
       );
     }
 
+    const sourceObjectKeys = properties["SourceObjectKeys"];
     /* v8 ignore if -- defensive catch */
     if (!Array.isArray(sourceObjectKeys)) {
       throw new TypeError(

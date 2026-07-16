@@ -24,6 +24,7 @@ interface SimS3BucketProps {
  */
 export class SimS3Bucket {
   public readonly bucketName: SimS3BucketName;
+
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private storage: SimS3BucketStorage;
   private website: SimS3BucketWebsite;

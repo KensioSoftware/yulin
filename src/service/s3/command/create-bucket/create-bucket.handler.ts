@@ -95,11 +95,12 @@ export class CreateBucketCommandHandler implements CommandHandler<
       });
     }
 
-    new SimS3BucketNameAvailability({
+    const simS3BucketNameAvailability = new SimS3BucketNameAvailability({
       accountRegionScope: this.accountRegionScope,
       buckets: this.buckets,
       s3GlobalRegistry: this.s3GlobalRegistry,
-    }).ensureCanCreateBucketNamed(bucketName);
+    });
+    simS3BucketNameAvailability.ensureCanCreateBucketNamed(bucketName);
 
     const bucket = new SimS3Bucket({
       bucketName,

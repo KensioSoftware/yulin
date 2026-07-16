@@ -106,8 +106,7 @@ export class SimIamPolicyPrincipalMatcher {
       return false;
     }
 
-    const delegatedAccountId =
-      SimIamPolicyPrincipalMatcher.delegatedAccountId(pattern);
+    const delegatedAccountId = this.delegatedAccountId(pattern);
 
     if (delegatedAccountId !== undefined) {
       return caller.accountId === delegatedAccountId;
@@ -140,7 +139,7 @@ export class SimIamPolicyPrincipalMatcher {
    * IAM supports both a bare 12-digit account ID and the corresponding account
    * root ARN.
    */
-  private static delegatedAccountId(pattern: string): string | undefined {
+  private delegatedAccountId(pattern: string): string | undefined {
     if (/^\d{12}$/u.test(pattern)) {
       return pattern;
     }

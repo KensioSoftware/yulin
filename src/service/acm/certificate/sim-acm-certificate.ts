@@ -47,12 +47,13 @@ export class SimAcmCertificate {
   public readonly certificateArn: SimArn;
   public readonly domainName: string;
   public readonly subjectAlternativeNames: readonly string[];
-  #status: SimAcmCertificateStatus;
   public readonly validationMethod?: SimAcmValidationMethod | undefined;
   public readonly domainValidationOptions: readonly SimAcmDomainValidationOption[];
   public readonly createdAt: Date;
-  #issuedAt: Date | undefined;
   public readonly tags?: readonly SimAcmTag[] | undefined;
+
+  #issuedAt: Date | undefined;
+  #status: SimAcmCertificateStatus;
 
   constructor(props: SimAcmCertificateProps) {
     const {

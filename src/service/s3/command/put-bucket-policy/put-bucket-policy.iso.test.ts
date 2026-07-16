@@ -27,6 +27,8 @@ import { SimS3NoSuchBucket } from "../../error/sim-s3.error.js";
 import { simS3BodyToBuffer } from "../../storage/s3-body-buffer.js";
 
 describe("S3 PutBucketPolicyCommand", () => {
+  const simAws = new SimAws();
+
   it("configures a Bucket policy that grants an IAM User Object write access", async () => {
     // Given a Bucket and an IAM User with access key credentials but no identity policy.
     const accountId = makeSimAwsAccountId();
@@ -239,7 +241,7 @@ describe("S3 PutBucketPolicyCommand", () => {
 
   it("rejects missing required request inputs", async () => {
     // Given the top-level simulated S3 service.
-    const simS3 = new SimAws().s3();
+    const simS3 = simAws.s3();
 
     // When PutBucketPolicy is called without its required Bucket.
     const bucketError = await assertThrowsErrorAsync(async () =>
@@ -276,7 +278,7 @@ describe("S3 PutBucketPolicyCommand", () => {
 
   it("rejects a non-existent Bucket before configuring its policy", async () => {
     // Given the top-level simulated S3 service without the requested Bucket.
-    const simS3 = new SimAws().s3();
+    const simS3 = simAws.s3();
 
     // When PutBucketPolicy targets the missing Bucket.
     const error = await assertThrowsErrorAsync(async () =>
@@ -303,7 +305,6 @@ describe("S3 PutBucketPolicyCommand", () => {
 
   it("rejects a policy document with an invalid statement effect", async () => {
     // Given an existing Bucket and an invalid IAM policy document.
-    const simAws = new SimAws();
     const simS3 = simAws.s3();
 
     await simS3.createBucket(
