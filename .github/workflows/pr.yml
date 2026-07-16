@@ -19,13 +19,13 @@ jobs:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 11.12.0
       - uses: actions/setup-node@v6.4.0
         with:
           node-version-file: .nvmrc
-          cache: pnpm
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.12.0
+          cache: true
       - run: pnpm install --frozen-lockfile
       - run: pnpm lint
       - run: pnpm fta
@@ -35,13 +35,13 @@ jobs:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 11.12.0
       - uses: actions/setup-node@v6.4.0
         with:
           node-version-file: .nvmrc
-          cache: pnpm
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.12.0
+          cache: true
       - run: pnpm install --frozen-lockfile
       - run: pnpm test:coverage
 
@@ -50,12 +50,12 @@ jobs:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 11.12.0
       - uses: actions/setup-node@v6.4.0
         with:
           node-version-file: .nvmrc
-          cache: pnpm
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.12.0
+          cache: true
       - run: pnpm install --frozen-lockfile
       - run: pnpm build:check
