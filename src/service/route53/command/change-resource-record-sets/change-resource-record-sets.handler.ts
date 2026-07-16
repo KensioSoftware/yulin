@@ -15,10 +15,21 @@ import type {
 } from "./change-resource-record-sets.cmd.js";
 import { getChangeResourceRecordSetsHostedZone } from "./change-res-rec-sets-zone.js";
 import { scheduleChangeResourceRecordSets } from "./schedule/schedule-change-res-rec-sets.js";
+import {
+  SimIamAllowAllAuth,
+  type SimIamInterServiceAuthZ,
+} from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import { ChangeResourceRecordSetsAuthorizer } from "./change-resource-record-sets-authorizer.js";
 
 interface ChangeResourceRecordSetsCommandHandlerProps {
   readonly hostedZones: Map<SimRoute53HostedZoneId, SimRoute53HostedZone>;
+  readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
+}
+
+interface ChangeResourceRecordSetsCommandHandlerOptions {
+  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -34,23 +45,36 @@ export class ChangeResourceRecordSetsCommandHandler implements CommandHandler<
     SimRoute53HostedZoneId,
     SimRoute53HostedZone
   >;
+  private readonly authorizer: ChangeResourceRecordSetsAuthorizer;
   private readonly background: BackgroundScheduler;
 
   constructor(props: ChangeResourceRecordSetsCommandHandlerProps) {
-    const { hostedZones, background = new BackgroundTasks() } = props;
+    const {
+      hostedZones,
+      iam = new SimIamAllowAllAuth(),
+      background = new BackgroundTasks(),
+    } = props;
     this.hostedZones = hostedZones;
+    this.authorizer = new ChangeResourceRecordSetsAuthorizer({ iam });
     this.background = background;
   }
 
   /**
    * Handle changing Route53 records in a Hosted Zone.
+   *
+   * The hosted zone ID is normalized before authorization because it is the
+   * resource identifier used in the IAM decision. Authorization happens before
+   * the hosted zone store is read so unauthorized callers cannot learn whether
+   * the requested ID exists.
    */
   async handle(
     cmd: SimChangeResourceRecordSetsCommand,
+    opts?: ChangeResourceRecordSetsCommandHandlerOptions,
   ): Promise<SimChangeResourceRecordSetsCommandOutput> {
     const hostedZoneId = normalizeSimRoute53HostedZoneId(
       cmd.input.HostedZoneId,
     );
+    const hostedZoneArn = `arn:aws:route53:::hostedzone/${hostedZoneId}`;
 
     const changes = cmd.input.ChangeBatch?.Changes;
     assertDefined(
@@ -60,6 +84,8 @@ export class ChangeResourceRecordSetsCommandHandler implements CommandHandler<
 
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
+
+    this.authorizer.authorize(hostedZoneArn, opts?.caller);
 
     const hostedZone = getChangeResourceRecordSetsHostedZone(
       this.hostedZones,

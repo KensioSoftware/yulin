@@ -128,12 +128,14 @@ export class SimRoute53 {
    */
   async changeResourceRecordSets(
     cmd: SimChangeResourceRecordSetsCommand,
+    opts?: SimRoute53RequestOptions,
   ): Promise<SimChangeResourceRecordSetsCommandOutput> {
     const handler = new ChangeResourceRecordSetsCommandHandler({
       hostedZones: this.hostedZones,
+      iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd);
+    return await handler.handle(cmd, opts);
   }
 
   /**
