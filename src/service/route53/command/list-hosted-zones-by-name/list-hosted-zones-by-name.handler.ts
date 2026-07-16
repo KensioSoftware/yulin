@@ -10,10 +10,21 @@ import type {
   SimListHostedZonesByNameCommandOutput,
 } from "./list-hosted-zones-by-name.cmd.js";
 import { getHostedZoneListPage } from "./list-hosted-zones-by-name.js";
+import {
+  SimIamAllowAllAuth,
+  type SimIamInterServiceAuthZ,
+} from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import { ListHostedZonesByNameAuthorizer } from "./list-hosted-zones-by-name-authorizer.js";
 
 interface ListHostedZonesByNameCommandHandlerProps {
   readonly hostedZones: Map<SimRoute53HostedZoneId, SimRoute53HostedZone>;
+  readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
+}
+
+interface ListHostedZonesByNameCommandHandlerOptions {
+  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -29,22 +40,34 @@ export class ListHostedZonesByNameCommandHandler implements CommandHandler<
     SimRoute53HostedZoneId,
     SimRoute53HostedZone
   >;
+  private readonly authorizer: ListHostedZonesByNameAuthorizer;
   private readonly background: BackgroundScheduler;
 
   constructor(props: ListHostedZonesByNameCommandHandlerProps) {
-    const { hostedZones, background = new BackgroundTasks() } = props;
+    const {
+      hostedZones,
+      iam = new SimIamAllowAllAuth(),
+      background = new BackgroundTasks(),
+    } = props;
     this.hostedZones = hostedZones;
+    this.authorizer = new ListHostedZonesByNameAuthorizer({ iam });
     this.background = background;
   }
 
   /**
    * Handle listing Route53 Hosted Zones by name.
+   *
+   * Authorization applies to the complete operation. A denied caller receives
+   * AccessDenied rather than an empty or filtered listing.
    */
   async handle(
     cmd: SimListHostedZonesByNameCommand,
+    opts?: ListHostedZonesByNameCommandHandlerOptions,
   ): Promise<SimListHostedZonesByNameCommandOutput> {
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
+
+    this.authorizer.authorize(opts?.caller);
 
     const page = getHostedZoneListPage({
       hostedZones: this.hostedZones,
