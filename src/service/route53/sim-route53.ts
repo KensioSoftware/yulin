@@ -98,12 +98,14 @@ export class SimRoute53 {
    */
   async getHostedZone(
     cmd: SimGetHostedZoneCommand,
+    opts?: SimRoute53RequestOptions,
   ): Promise<SimGetHostedZoneCommandOutput> {
     const handler = new GetHostedZoneCommandHandler({
       hostedZones: this.hostedZones,
+      iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd);
+    return await handler.handle(cmd, opts);
   }
 
   /**
