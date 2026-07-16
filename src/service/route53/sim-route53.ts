@@ -29,8 +29,18 @@ import {
 import { SimRoute53CloudFormationResourceFactory } from "./cfn/sim-cfn-route53-resource-factory.js";
 import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import { SimRoute53Registry } from "./registry/sim-route53-registry.js";
+import type { SimAwsCaller } from "../aws/caller/sim-aws-caller.js";
+import {
+  SimIamAllowAllAuth,
+  type SimIamInterServiceAuthZ,
+} from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+
+export interface SimRoute53RequestOptions {
+  readonly caller?: SimAwsCaller;
+}
 
 interface SimRoute53Props {
+  readonly iam?: SimIamInterServiceAuthZ | undefined;
   readonly background?: BackgroundScheduler | undefined;
   readonly route53Registry?: SimRoute53Registry | undefined;
 }
@@ -43,6 +53,7 @@ export class SimRoute53 {
     SimRoute53HostedZoneId,
     SimRoute53HostedZone
   >();
+  private readonly iam: SimIamInterServiceAuthZ;
   private readonly background: BackgroundScheduler;
   private readonly route53Registry: SimRoute53Registry;
   private readonly cfnFactory = new SimRoute53CloudFormationResourceFactory({
@@ -53,10 +64,12 @@ export class SimRoute53 {
 
   constructor(props: SimRoute53Props = {}) {
     const {
+      iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
       route53Registry = new SimRoute53Registry(),
     } = props;
 
+    this.iam = iam;
     this.background = background;
     this.route53Registry = route53Registry;
     this.resolver = new SimRoute53Resolver({
@@ -69,13 +82,15 @@ export class SimRoute53 {
    */
   async createHostedZone(
     cmd: SimCreateHostedZoneCommand,
+    opts?: SimRoute53RequestOptions,
   ): Promise<SimCreateHostedZoneCommandOutput> {
     const handler = new CreateHostedZoneCommandHandler({
       hostedZones: this.hostedZones,
+      iam: this.iam,
       background: this.background,
       route53Registry: this.route53Registry,
     });
-    return await handler.handle(cmd);
+    return await handler.handle(cmd, opts);
   }
 
   /**
