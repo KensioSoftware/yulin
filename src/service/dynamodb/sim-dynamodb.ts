@@ -28,9 +28,19 @@ import type {
   SimDescribeTableCommandOutput,
 } from "./command/describe-table/describe-table.cmd.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
+import type { SimAwsCaller } from "../aws/caller/sim-aws-caller.js";
+import {
+  SimIamAllowAllAuth,
+  type SimIamInterServiceAuthZ,
+} from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+
+export interface SimDynamoDbRequestOptions {
+  readonly caller?: SimAwsCaller;
+}
 
 interface SimDynamoDbProps {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
+  readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
 }
 
@@ -41,15 +51,18 @@ export class SimDynamoDb {
   private readonly tables = new Map<DynamoDbTableName, SimDynamoDbTable>();
 
   private readonly accountRegionScope: SimAwsAccountRegionScope;
+  private readonly iam: SimIamInterServiceAuthZ;
   private readonly background: BackgroundScheduler;
 
   constructor(props: SimDynamoDbProps = {}) {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
+      iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
     } = props;
 
     this.accountRegionScope = accountRegionScope;
+    this.iam = iam;
     this.background = background;
   }
 
@@ -58,13 +71,15 @@ export class SimDynamoDb {
    */
   async createTable(
     cmd: SimCreateTableCommand,
+    opts?: SimDynamoDbRequestOptions,
   ): Promise<SimCreateTableCommandOutput> {
     const handler = new CreateTableCommandHandler({
       accountRegionScope: this.accountRegionScope,
       tables: this.tables,
+      iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd);
+    return await handler.handle(cmd, opts);
   }
 
   /**
