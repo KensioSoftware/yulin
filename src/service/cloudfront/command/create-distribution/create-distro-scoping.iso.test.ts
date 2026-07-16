@@ -57,7 +57,7 @@ describe("CloudFront CreateDistributionCommand scoping", () => {
     const distributionId = createDistributionOutput.Distribution.Id;
 
     assertStringLength(distributionId, 14);
-    assertIdentical(distributionId[0], "E");
+    assertIdentical(distributionId.at(0), "E");
     assertIdentical(
       createDistributionOutput.Distribution.ARN,
       `arn:aws:cloudfront::555555555555:distribution/${distributionId}`,

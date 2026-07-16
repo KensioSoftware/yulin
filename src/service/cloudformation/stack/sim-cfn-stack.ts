@@ -51,18 +51,18 @@ interface SimCloudFormationStackProps {
  * - SimCfnStackResourceCreator creates resources in dependency order.
  */
 export class SimCfnStack {
+  public readonly lifecycle: SimCfnStackDeploymentLifecycle;
+  public readonly stackName: SimCloudFormationStackName;
+  public readonly template: CfnTemplateBodyRecord;
+  public readonly resources: Map<string, SimCfnResource>;
+  public outputs = new Map<string, SimCfnStackOutput>();
+
   private readonly simAws: SimAws;
   private readonly cfnTemplate: SimCfnTemplate;
   private readonly cdkOutContext: SimCdkOutContext | undefined;
   private readonly bindings:
     readonly SimCfnExecutableResourceBinding[] | undefined;
   private readonly skippedResourceList: SimCfnResource[] = [];
-  public readonly lifecycle: SimCfnStackDeploymentLifecycle;
-
-  public readonly stackName: SimCloudFormationStackName;
-  public readonly template: CfnTemplateBodyRecord;
-  public readonly resources: Map<string, SimCfnResource>;
-  public outputs = new Map<string, SimCfnStackOutput>();
 
   constructor(props: SimCloudFormationStackProps) {
     const {
@@ -148,9 +148,10 @@ export class SimCfnStack {
   }
 
   private resolveOutputs(): void {
-    this.outputs = new SimCfnStackOutputResolver({
+    const outputResolver = new SimCfnStackOutputResolver({
       template: this.cfnTemplate,
       resources: this.resources,
-    }).resolve();
+    });
+    this.outputs = outputResolver.resolve();
   }
 }

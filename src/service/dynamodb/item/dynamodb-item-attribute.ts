@@ -52,7 +52,7 @@ export class DynamoDBItemAttribute {
     }
     if ("L" in value) {
       return new DynamoDBItemAttribute(
-        value.L.map((el) => DynamoDBItemAttribute.fromAttributeValue(el).value),
+        value.L.map((el) => this.fromAttributeValue(el).value),
       );
     }
     if ("M" in value) {
@@ -60,7 +60,7 @@ export class DynamoDBItemAttribute {
         Object.fromEntries(
           Object.entries(value.M).map(([key, val]) => [
             key,
-            DynamoDBItemAttribute.fromAttributeValue(val).value,
+            this.fromAttributeValue(val).value,
           ]),
         ),
       );
@@ -91,7 +91,10 @@ export class DynamoDBItemAttribute {
     }
     if (Array.isArray(value)) {
       return {
-        L: value.map((el) => new DynamoDBItemAttribute(el).toAttributeValue()),
+        L: value.map((el) => {
+          const itemAttribute = new DynamoDBItemAttribute(el);
+          return itemAttribute.toAttributeValue();
+        }),
       };
     }
     if (value instanceof Set) {
@@ -107,10 +110,10 @@ export class DynamoDBItemAttribute {
 
     return {
       M: Object.fromEntries(
-        Object.entries(value).map(([key, val]) => [
-          key,
-          new DynamoDBItemAttribute(val).toAttributeValue(),
-        ]),
+        Object.entries(value).map(([key, val]) => {
+          const itemAttribute = new DynamoDBItemAttribute(val);
+          return [key, itemAttribute.toAttributeValue()];
+        }),
       ),
     };
   }

@@ -17,7 +17,8 @@ export class SimCfnFnSubTemplate {
   variableNames(): string[] {
     return [
       ...new Set(
-        [...this.template.matchAll(SimCfnFnSubTemplate.variablePattern)]
+        this.template
+          .matchAll(SimCfnFnSubTemplate.variablePattern)
           .filter((match) => match[1] !== "!")
           .map((match) => match[2])
           .filter((name): name is string => name !== undefined),

@@ -99,8 +99,9 @@ interface SimAwsRegionProps {
  * full Account/Region scope.
  */
 export class SimAwsRegion {
-  private readonly simAws: Pick<SimAws, "accountRegionScope">;
   public readonly regionName: AwsRegionName;
+
+  private readonly simAws: Pick<SimAws, "accountRegionScope">;
 
   constructor(props: SimAwsRegionProps = {}) {
     const { simAws = new SimAws(), regionName = DEFAULT_SIM_AWS_REGION_NAME } =

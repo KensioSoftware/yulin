@@ -36,27 +36,39 @@ export function configureCffAssociations(
       "CloudFront Function association FunctionARN",
     );
 
-    switch (funcAssoc.EventType) {
-      case "viewer-request": {
-        associations.viewerRequest = funcAssoc.FunctionARN as SimArn;
-        break;
-      }
-      case "viewer-response": {
-        associations.viewerResponse = funcAssoc.FunctionARN as SimArn;
-        break;
-      }
-      case "origin-request": {
-        throw new Error(
-          "CloudFront Function association EventType origin-request not implemented",
-        );
-      }
-      case "origin-response": {
-        throw new Error(
-          "CloudFront Function association EventType origin-response not implemented",
-        );
-      }
-    }
+    applyFunctionAssociation(
+      associations,
+      funcAssoc.EventType,
+      funcAssoc.FunctionARN as SimArn,
+    );
   }
 
   return Object.keys(associations).length > 0 ? associations : undefined;
+}
+
+function applyFunctionAssociation(
+  associations: NonNullable<SimCloudFrontBehavior["functionAssociations"]>,
+  eventType: string,
+  functionArn: SimArn,
+): void {
+  switch (eventType) {
+    case "viewer-request": {
+      associations.viewerRequest = functionArn;
+      break;
+    }
+    case "viewer-response": {
+      associations.viewerResponse = functionArn;
+      break;
+    }
+    case "origin-request": {
+      throw new Error(
+        "CloudFront Function association EventType origin-request not implemented",
+      );
+    }
+    case "origin-response": {
+      throw new Error(
+        "CloudFront Function association EventType origin-response not implemented",
+      );
+    }
+  }
 }

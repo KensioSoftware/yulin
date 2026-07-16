@@ -51,11 +51,12 @@ export class SimCfnCffCreator {
     properties: SimCfnTemplateValueRecord,
     context?: SimCloudFormationResourceCreateContext,
   ): Promise<SimCloudFrontFunction> {
-    const createInput = new SimCfnCffCreateInputBuilder({
+    const inputBuilder = new SimCfnCffCreateInputBuilder({
       resource,
       properties,
       bindings: context?.bindings,
-    }).build();
+    });
+    const createInput = inputBuilder.build();
 
     const output = await this.cloudFront.createFunction({
       input: createInput,

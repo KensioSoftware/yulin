@@ -18,11 +18,11 @@ export interface SimCreateFunctionCommand {
 export interface SimCreateFunctionCommandInput {
   readonly Name?: string | undefined;
   FunctionConfig?:
+    | undefined
     | {
         Comment?: string | undefined;
         Runtime?: "cloudfront-js-1.0" | "cloudfront-js-2.0" | undefined;
-      }
-    | undefined;
+      };
   FunctionCode?: Uint8Array | undefined;
 }
 

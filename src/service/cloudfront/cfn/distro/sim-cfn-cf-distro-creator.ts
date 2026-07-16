@@ -41,10 +41,11 @@ export class SimCfnCfDistroCreator {
       `AWS::CloudFront::Distribution ${resource.logicalId} DistributionConfig`,
     );
 
-    const distributionConfig = new SimCfnCfDistroConfigValidator({
+    const validator = new SimCfnCfDistroConfigValidator({
       logicalId: resource.logicalId,
       distributionConfig: distributionConfigValue,
-    }).validate();
+    });
+    const distributionConfig = validator.validate();
 
     const output = await this.cloudFront.createDistribution({
       input: {

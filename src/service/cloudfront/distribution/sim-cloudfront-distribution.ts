@@ -27,15 +27,16 @@ interface SimCloudFrontDistributionProps {
  */
 export class SimCloudFrontDistribution {
   public readonly distributionId: SimCloudFrontDistributionId;
-  #status: SimCloudFrontDistributionStatus;
   public readonly accountId: SimAwsAccountId;
   public readonly distributionConfig:
     SimCloudFrontDistributionConfig | undefined;
-
-  private readonly alternateDomainNames = new Set<string>();
   public readonly behaviors: SimCloudFrontBehavior[] = [];
-  private readonly origins = new Map<string, SimCloudFrontOrigin>();
   public readonly lastModifiedTime: Date = new Date();
+
+  #status: SimCloudFrontDistributionStatus;
+  private readonly alternateDomainNames = new Set<string>();
+
+  private readonly origins = new Map<string, SimCloudFrontOrigin>();
 
   constructor(props: SimCloudFrontDistributionProps = {}) {
     const {

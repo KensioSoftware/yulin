@@ -7,8 +7,10 @@ import { describe, it } from "vitest";
 import { SimS3ServiceController } from "./sim-s3-controller.js";
 
 describe("Simulated S3 local HTTP controller", () => {
+  const simS3ServiceController = new SimS3ServiceController();
+
   it("responds HTTP 400 for missing S3 Bucket name", async () => {
-    const res = await new SimS3ServiceController().handleRequest(
+    const res = await simS3ServiceController.handleRequest(
       {
         service: "s3",
         resourceName: "",
@@ -24,7 +26,7 @@ describe("Simulated S3 local HTTP controller", () => {
   });
 
   it("responds HTTP 400 for missing S3 Bucket region", async () => {
-    const res = await new SimS3ServiceController().handleRequest(
+    const res = await simS3ServiceController.handleRequest(
       {
         service: "s3",
         resourceName: "foo-site",

@@ -24,12 +24,12 @@ interface SimAwsAccountRegionContainerProps {
  * This is the real Account/Region scope container for simulated services.
  */
 export class SimAwsAccountRegionContainer {
-  private readonly simAws: SimAws;
   public readonly account: SimAwsAccount;
   public readonly region: SimAwsRegion;
-  private readonly memo = new Memo<object>();
-
   public readonly accountRegionScope: SimAwsAccountRegionScope;
+
+  private readonly simAws: SimAws;
+  private readonly memo = new Memo<object>();
 
   constructor(props: SimAwsAccountRegionContainerProps = {}) {
     const { simAws = new SimAws(), account, region } = props;

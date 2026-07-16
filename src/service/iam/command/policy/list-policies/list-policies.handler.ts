@@ -49,7 +49,7 @@ export class ListPoliciesCommandHandler implements CommandHandler<
     const startArn =
       cmd.input.Marker === undefined
         ? undefined
-        : ListPoliciesCommandHandler.parseMarker(cmd.input.Marker);
+        : this.parseMarker(cmd.input.Marker);
 
     const startIndex =
       startArn === undefined
@@ -80,15 +80,16 @@ export class ListPoliciesCommandHandler implements CommandHandler<
       IsTruncated: isTruncated,
       Marker:
         isTruncated && lastPolicy !== undefined
-          ? ListPoliciesCommandHandler.makeMarker(lastPolicy.arn)
+          ? this.makeMarker(lastPolicy.arn)
           : undefined,
     };
   }
 
   private matchingPolicies(cmd: SimListPoliciesCommand): SimIamManagedPolicy[] {
-    const policies = [...this.policies.values()].toSorted((a, b) =>
-      a.arn.localeCompare(b.arn),
-    );
+    const policies = this.policies
+      .values()
+      .toArray()
+      .toSorted((a, b) => a.arn.localeCompare(b.arn));
 
     return policies.filter((policy) => {
       if (cmd.input.Scope === "AWS") {
@@ -106,22 +107,18 @@ export class ListPoliciesCommandHandler implements CommandHandler<
         return false;
       }
 
-      if (
+      return !(
         cmd.input.PolicyUsageFilter === "PermissionsBoundary" &&
         policy.permissionsBoundaryUsageCount === 0
-      ) {
-        return false;
-      }
-
-      return true;
+      );
     });
   }
 
-  private static makeMarker(policyArn: SimArn): string {
+  private makeMarker(policyArn: SimArn): string {
     return Buffer.from(policyArn, "utf8").toString("base64url");
   }
 
-  private static parseMarker(marker: string): SimArn {
+  private parseMarker(marker: string): SimArn {
     return Buffer.from(marker, "base64url").toString("utf8") as SimArn;
   }
 }

@@ -45,13 +45,11 @@ export class SimIamIdentityPolicyOwnerSourceBuilder {
   private inlinePolicySources(
     owner: SimIamIdentityPolicyOwner,
   ): readonly SimIamAuthZPolicySource[] {
-    return [...owner.inlinePolicies.entries()].map(
-      ([policyName, policyDocument]) => ({
-        sourceType: "identity-inline",
-        policyName,
-        document: jsonParse(policyDocument),
-      }),
-    );
+    return [...owner.inlinePolicies].map(([policyName, policyDocument]) => ({
+      sourceType: "identity-inline",
+      policyName,
+      document: jsonParse(policyDocument),
+    }));
   }
 
   /**

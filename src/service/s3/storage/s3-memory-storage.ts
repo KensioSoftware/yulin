@@ -18,7 +18,7 @@ export class MemoryS3BucketStorage implements SimS3BucketStorage {
    * List simulated Objects in in-memory storage.
    */
   listObjects(prefix?: string): Promise<SimS3Object[]> {
-    const objects = [...this.objects.entries()]
+    const objects = [...this.objects]
       .filter(([key]) => prefix === undefined || key.startsWith(prefix))
       .map(([, object]) => object);
 

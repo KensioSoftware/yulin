@@ -34,9 +34,8 @@ describe("SimCfnTemplateFileLoader", () => {
     );
 
     // When the template file is loaded from a string path.
-    const loadedTemplate = await new SimCfnTemplateFileLoader().load(
-      tempDir.join(templatePath),
-    );
+    const fileLoader = new SimCfnTemplateFileLoader();
+    const loadedTemplate = await fileLoader.load(tempDir.join(templatePath));
 
     // Then the template is parsed and the Stack name is derived from the file name.
     assertIdentical(loadedTemplate.stackName, "TestStack");
@@ -87,7 +86,8 @@ describe("SimCfnTemplateFileLoader", () => {
     );
 
     // When the template file is loaded with explicit props.
-    const loadedTemplate = await new SimCfnTemplateFileLoader().load({
+    const fileLoader = new SimCfnTemplateFileLoader();
+    const loadedTemplate = await fileLoader.load({
       templatePath: tempDir.join(templatePath),
       stackName: "ExplicitStack",
       parameters,
@@ -134,9 +134,8 @@ describe("SimCfnTemplateFileLoader", () => {
     );
 
     // When the template file is loaded.
-    const loadedTemplate = await new SimCfnTemplateFileLoader().load(
-      tempDir.join(templatePath),
-    );
+    const fileLoader = new SimCfnTemplateFileLoader();
+    const loadedTemplate = await fileLoader.load(tempDir.join(templatePath));
 
     // Then the sibling CDK assets manifest is included in the context.
     assertObjectMatches(loadedTemplate.cdkOutContext, {
@@ -174,9 +173,8 @@ describe("SimCfnTemplateFileLoader", () => {
     );
 
     // When the template file is loaded.
-    const loadedTemplate = await new SimCfnTemplateFileLoader().load(
-      tempDir.join(templatePath),
-    );
+    const fileLoader = new SimCfnTemplateFileLoader();
+    const loadedTemplate = await fileLoader.load(tempDir.join(templatePath));
 
     // Then no asset manifest is required, and the Stack name falls back to the file basename.
     assertIdentical(loadedTemplate.stackName, "template.json");
@@ -206,9 +204,8 @@ describe("SimCfnTemplateFileLoader", () => {
     );
 
     // When the template file is loaded.
-    const loadedTemplate = await new SimCfnTemplateFileLoader().load(
-      tempDir.join(templatePath),
-    );
+    const fileLoader = new SimCfnTemplateFileLoader();
+    const loadedTemplate = await fileLoader.load(tempDir.join(templatePath));
 
     // Then loading continues with an empty assets manifest context.
     assertObjectMatches(loadedTemplate.cdkOutContext, {

@@ -66,9 +66,10 @@ export class DescribeStacksCommandHandler implements CommandHandler<
     }
 
     return {
-      Stacks: [...this.stacks.values()].map((stack) =>
-        this.describer.describe(stack),
-      ),
+      Stacks: this.stacks
+        .values()
+        .map((stack) => this.describer.describe(stack))
+        .toArray(),
       $metadata: {},
     };
   }

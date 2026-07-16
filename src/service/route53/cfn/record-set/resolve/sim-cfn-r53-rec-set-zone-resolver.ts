@@ -58,9 +58,9 @@ export class SimCfnRoute53RecordSetHostedZoneResolver {
 
     const normalizedHostedZoneName = `${normaliseSimRoute53Name(hostedZoneName)}.`;
 
-    const hostedZone = [...this.route53.hostedZones.values()].find(
-      (candidate) => candidate.name === normalizedHostedZoneName,
-    );
+    const hostedZone = this.route53.hostedZones
+      .values()
+      .find((candidate) => candidate.name === normalizedHostedZoneName);
 
     assertDefined(
       hostedZone,

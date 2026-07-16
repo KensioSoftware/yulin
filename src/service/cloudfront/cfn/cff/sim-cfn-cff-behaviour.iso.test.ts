@@ -61,7 +61,8 @@ function handler(event) {
 
     // Then the FunctionCode from the template is executed through the sim CFF.
     assertInstanceOf(result, Request);
-    assertIdentical(new URL(result.url).pathname, "/foobar.html");
+    const url = new URL(result.url);
+    assertIdentical(url.pathname, "/foobar.html");
   });
 
   it("uses a logicalId binding instead of the template FunctionCode", async () => {
@@ -114,7 +115,8 @@ function handler(event) {
 
     // Then the bound handler is used instead of the template FunctionCode.
     assertInstanceOf(result, Request);
-    assertIdentical(new URL(result.url).pathname, "/from-binding.html");
+    const url = new URL(result.url);
+    assertIdentical(url.pathname, "/from-binding.html");
   });
 
   it("uses a functionName binding instead of the template FunctionCode", async () => {
@@ -165,9 +167,7 @@ function handler(event) {
 
     // Then the bound handler is used instead of the template FunctionCode.
     assertInstanceOf(result, Request);
-    assertIdentical(
-      new URL(result.url).pathname,
-      "/from-function-name-binding.html",
-    );
+    const url = new URL(result.url);
+    assertIdentical(url.pathname, "/from-function-name-binding.html");
   });
 });

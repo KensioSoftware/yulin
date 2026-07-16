@@ -13,10 +13,11 @@ import { SimCfnRoute53RecordSetBuilder } from "./sim-cfn-r53-record-set-builder.
 
 describe("SimCfnRoute53RecordSetBuilder", () => {
   function buildRecordSet(properties: SimCfnTemplateValueRecord) {
-    return new SimCfnRoute53RecordSetBuilder(
+    const recordSetBuilder = new SimCfnRoute53RecordSetBuilder(
       new SimCfnResource({ logicalId: "TestRecordSet" }),
       properties,
-    ).build();
+    );
+    return recordSetBuilder.build();
   }
 
   it("builds a Route53 ResourceRecordSet from CloudFormation properties", () => {

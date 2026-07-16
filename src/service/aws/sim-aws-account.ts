@@ -30,8 +30,9 @@ interface SimAwsAccountProps {
  * full Account/Region scope.
  */
 export class SimAwsAccount {
-  private readonly simAws: Pick<SimAws, "accountRegionScope">;
   public readonly accountId: SimAwsAccountId;
+
+  private readonly simAws: Pick<SimAws, "accountRegionScope">;
 
   constructor(props: SimAwsAccountProps = {}) {
     const { simAws = new SimAws(), accountId = DEFAULT_SIM_AWS_ACCOUNT_ID } =

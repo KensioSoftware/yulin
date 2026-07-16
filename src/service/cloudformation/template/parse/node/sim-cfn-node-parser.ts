@@ -88,5 +88,6 @@ export class SimCfnNodeParser {
  * Parse a raw CloudFormation template value into a concrete node tree.
  */
 export function parseSimCfnNode(value: SimCfnTemplateValue): SimCfnNode {
-  return new SimCfnNodeParser().parse(value);
+  const parser = new SimCfnNodeParser();
+  return parser.parse(value);
 }

@@ -71,7 +71,7 @@ export class ListBucketsPageBuilder {
    * same relative order for filtered and unfiltered requests.
    */
   private matchingBuckets(prefix?: string): SimS3Bucket[] {
-    const buckets = [...this.buckets.values()];
+    const buckets = this.buckets.values().toArray();
     buckets.sort((a, b) => a.bucketName.localeCompare(b.bucketName));
 
     return prefix === undefined
@@ -94,8 +94,7 @@ export class ListBucketsPageBuilder {
       return 0;
     }
 
-    const startBucketName =
-      ListBucketsPageBuilder.parseContinuationToken(continuationToken);
+    const startBucketName = this.parseContinuationToken(continuationToken);
 
     return Math.max(
       0,
@@ -118,21 +117,21 @@ export class ListBucketsPageBuilder {
     const hasMoreBuckets = startIndex + page.length < matchingBucketCount;
 
     return hasMoreBuckets && lastBucket !== undefined
-      ? ListBucketsPageBuilder.makeContinuationToken(lastBucket.bucketName)
+      ? this.makeContinuationToken(lastBucket.bucketName)
       : undefined;
   }
 
   /**
    * Encode a Bucket name as an opaque URL-safe continuation token.
    */
-  private static makeContinuationToken(bucketName: string): string {
+  private makeContinuationToken(bucketName: string): string {
     return Buffer.from(bucketName, "utf8").toString("base64url");
   }
 
   /**
    * Recover the Bucket name represented by a continuation token.
    */
-  private static parseContinuationToken(token: string): string {
+  private parseContinuationToken(token: string): string {
     return Buffer.from(token, "base64url").toString("utf8");
   }
 }

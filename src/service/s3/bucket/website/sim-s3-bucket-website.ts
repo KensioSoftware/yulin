@@ -84,7 +84,7 @@ export class SimS3BucketWebsite {
     return new Response(undefined, {
       status: 301,
       headers: {
-        location: url.toString(),
+        location: url.href,
       },
     });
   }

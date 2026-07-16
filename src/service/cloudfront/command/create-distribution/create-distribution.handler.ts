@@ -85,9 +85,10 @@ export class CreateDistributionCommandHandler implements CommandHandler<
       "CreateDistributionCommand.DistributionConfig",
     );
 
-    const distributionConfig = new SimCloudFrontDistributionConfigNormalizer(
+    const normalizer = new SimCloudFrontDistributionConfigNormalizer(
       distributionConfigInput,
-    ).normalize();
+    );
+    const distributionConfig = normalizer.normalize();
 
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();

@@ -33,9 +33,9 @@ export const simCfnCffResourceFactory = new MappedFactory<
           FunctionConfig: { Runtime: "cloudfront-js-2.0" },
           ...factoryProps.properties,
         },
-        ...(factoryProps.metadata === undefined
-          ? {}
-          : { Metadata: factoryProps.metadata }),
+        ...(factoryProps.metadata !== undefined && {
+          Metadata: factoryProps.metadata,
+        }),
       },
     }),
 );

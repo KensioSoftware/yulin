@@ -62,13 +62,13 @@ export class SimIamIdentityPolicyOwnerResolver {
    * Search account-scoped role state for the matching principal ARN.
    */
   private role(principalArn: string): SimIamRole | undefined {
-    return [...this.roles.values()].find((role) => role.arn === principalArn);
+    return this.roles.values().find((role) => role.arn === principalArn);
   }
 
   /**
    * Search account-scoped user state for the matching principal ARN.
    */
   private user(principalArn: string): SimIamUser | undefined {
-    return [...this.users.values()].find((user) => user.arn === principalArn);
+    return this.users.values().find((user) => user.arn === principalArn);
   }
 }

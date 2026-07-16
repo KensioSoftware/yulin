@@ -59,12 +59,14 @@ export class SimS3BucketNameAvailability {
 
   private ensureLocalBucketRegistered(bucketName: SimS3BucketName): void {
     /* v8 ignore if -- safety catch for situation that cannot happen in normal usage */
-    if (this.buckets.has(bucketName)) {
-      // Somehow the Bucket was absent from the global registry.
-      this.s3GlobalRegistry.registerBucket(bucketName, this.accountRegionScope);
-      throw new SimS3BucketAlreadyOwnedByYou(
-        `S3 Bucket ${bucketName} already exists in ${this.accountRegionScope.regionName} and is owned by ${this.accountRegionScope.accountId}`,
-      );
+    if (!this.buckets.has(bucketName)) {
+      return;
     }
+
+    // Somehow the Bucket was absent from the global registry.
+    this.s3GlobalRegistry.registerBucket(bucketName, this.accountRegionScope);
+    throw new SimS3BucketAlreadyOwnedByYou(
+      `S3 Bucket ${bucketName} already exists in ${this.accountRegionScope.regionName} and is owned by ${this.accountRegionScope.accountId}`,
+    );
   }
 }

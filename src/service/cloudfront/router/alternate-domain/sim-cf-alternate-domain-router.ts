@@ -42,9 +42,9 @@ export class SimCloudFrontAlternateDomainRouter {
   ): SimCloudFrontDistroRoute | undefined {
     // Tier 1: search the inline distributions map first.
     if (this.distributions !== undefined) {
-      const distribution = [...this.distributions.values()].find((distro) =>
-        distro.hasAlternateDomainName(alternateDomainName),
-      );
+      const distribution = this.distributions
+        .values()
+        .find((distro) => distro.hasAlternateDomainName(alternateDomainName));
 
       if (distribution !== undefined) {
         return {

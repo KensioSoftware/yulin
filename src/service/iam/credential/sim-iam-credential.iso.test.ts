@@ -164,6 +164,8 @@ describe("SimIamCredentialRegistry", () => {
   it("rejects temporary credentials without a session token", () => {
     // Given an access key backed by a temporary session.
     const registry = new SimIamCredentialRegistry();
+    const createDate = new Date("2026-01-01T00:00:00.000Z");
+    const expiration = new Date("2026-01-01T01:00:00.000Z");
     registry.registerAccessKey(
       new SimIamAccessKey({
         accessKeyId: "ASIATEMPORARY",
@@ -184,8 +186,8 @@ describe("SimIamCredentialRegistry", () => {
           role: {} as SimIamRole,
           sessionName: "test-session",
           sessionToken: "correct-token",
-          createDate: new Date("2026-01-01T00:00:00.000Z"),
-          expiration: new Date("2026-01-01T01:00:00.000Z"),
+          createDate,
+          expiration,
         }),
       }),
     );
@@ -234,6 +236,8 @@ describe("SimIamCredentialRegistry", () => {
   it("rejects a mismatched session token", () => {
     // Given an access key backed by a temporary session.
     const registry = new SimIamCredentialRegistry();
+    const createDate = new Date("2026-01-01T00:00:00.000Z");
+    const expiration = new Date("2026-01-01T01:00:00.000Z");
     registry.registerAccessKey(
       new SimIamAccessKey({
         accessKeyId: "ASIATEMPORARY",
@@ -254,8 +258,8 @@ describe("SimIamCredentialRegistry", () => {
           role: {} as SimIamRole,
           sessionName: "test-session",
           sessionToken: "correct-token",
-          createDate: new Date("2026-01-01T00:00:00.000Z"),
-          expiration: new Date("2026-01-01T01:00:00.000Z"),
+          createDate,
+          expiration,
         }),
       }),
     );
@@ -280,6 +284,8 @@ describe("SimIamCredentialRegistry", () => {
   it("rejects a session at its expiration time", () => {
     // Given temporary credentials whose session expires at a known instant.
     const registry = new SimIamCredentialRegistry();
+    const createDate = new Date("2026-01-01T00:00:00.000Z");
+    const expiration = new Date("2026-01-01T01:00:00.000Z");
     registry.registerAccessKey(
       new SimIamAccessKey({
         accessKeyId: "ASIATEMPORARY",
@@ -300,8 +306,8 @@ describe("SimIamCredentialRegistry", () => {
           role: {} as SimIamRole,
           sessionName: "test-session",
           sessionToken: "correct-token",
-          createDate: new Date("2026-01-01T00:00:00.000Z"),
-          expiration: new Date("2026-01-01T01:00:00.000Z"),
+          createDate,
+          expiration,
         }),
       }),
     );

@@ -43,27 +43,25 @@ export class SimCdkBucketDeploySource {
     );
 
     if (fileAsset?.source?.path === undefined) {
-      throw new Error(
-        new SimCdkBucketDeployErrorMessage({
-          resource,
-          sourceObjectKey,
-          cdkOutContext,
-          reason: "No matching CDK file asset with a source path was found.",
-        }).toString(),
-      );
+      const errorMessage = new SimCdkBucketDeployErrorMessage({
+        resource,
+        sourceObjectKey,
+        cdkOutContext,
+        reason: "No matching CDK file asset with a source path was found.",
+      });
+      throw new Error(errorMessage.toString());
     }
 
     if (fileAsset.source.packaging !== "zip") {
-      throw new Error(
-        new SimCdkBucketDeployErrorMessage({
-          resource,
-          sourceObjectKey,
-          cdkOutContext,
-          reason: `Expected CDK file asset packaging "zip", got ${String(
-            fileAsset.source.packaging,
-          )}.`,
-        }).toString(),
-      );
+      const errorMessage = new SimCdkBucketDeployErrorMessage({
+        resource,
+        sourceObjectKey,
+        cdkOutContext,
+        reason: `Expected CDK file asset packaging "zip", got ${String(
+          fileAsset.source.packaging,
+        )}.`,
+      });
+      throw new Error(errorMessage.toString());
     }
 
     const resolvedTemplateDirectoryPath = path.resolve(templateDirectoryPath);
@@ -78,14 +76,13 @@ export class SimCdkBucketDeploySource {
         `${resolvedTemplateDirectoryPath}${path.sep}`,
       )
     ) {
-      throw new Error(
-        new SimCdkBucketDeployErrorMessage({
-          resource,
-          sourceObjectKey,
-          cdkOutContext,
-          reason: `CDK file asset source path escapes the template directory: ${fileAsset.source.path}`,
-        }).toString(),
-      );
+      const errorMessage = new SimCdkBucketDeployErrorMessage({
+        resource,
+        sourceObjectKey,
+        cdkOutContext,
+        reason: `CDK file asset source path escapes the template directory: ${fileAsset.source.path}`,
+      });
+      throw new Error(errorMessage.toString());
     }
 
     return resolvedAssetPath;

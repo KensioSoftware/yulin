@@ -26,9 +26,10 @@ export function handler(event) {
     const source = cloudFrontFunctionSourceFromModule(
       tempDir.join("rewrite.cff.js"),
     );
-    const handlerFunction = new CffUint8ArrayFunctionCodeExtractor(
+    const extractor = new CffUint8ArrayFunctionCodeExtractor(
       Buffer.from(source),
-    ).extractHandlerFunction();
+    );
+    const handlerFunction = extractor.extractHandlerFunction();
 
     const simCff = new SimCloudFrontFunction({
       name: "rewrite-cff",
@@ -40,7 +41,8 @@ export function handler(event) {
     );
 
     assertInstanceOf(result, Request);
-    assertIdentical(new URL(result.url).pathname, "/rewritten.html");
+    const url = new URL(result.url);
+    assertIdentical(url.pathname, "/rewritten.html");
   });
 
   it("loads a viewer-response handler module into a sim CloudFront Function", async () => {
@@ -60,9 +62,10 @@ export function handler(event) {
     const source = cloudFrontFunctionSourceFromModule(
       tempDir.join("response.cff.js"),
     );
-    const handlerFunction = new CffUint8ArrayFunctionCodeExtractor(
+    const extractor = new CffUint8ArrayFunctionCodeExtractor(
       Buffer.from(source),
-    ).extractHandlerFunction();
+    );
+    const handlerFunction = extractor.extractHandlerFunction();
 
     const simCff = new SimCloudFrontFunction({
       name: "response-cff",
@@ -94,9 +97,10 @@ function handler(event) {
     const source = cloudFrontFunctionSourceFromModule(
       tempDir.join("plain-handler.cff.js"),
     );
-    const handlerFunction = new CffUint8ArrayFunctionCodeExtractor(
+    const extractor = new CffUint8ArrayFunctionCodeExtractor(
       Buffer.from(source),
-    ).extractHandlerFunction();
+    );
+    const handlerFunction = extractor.extractHandlerFunction();
 
     const simCff = new SimCloudFrontFunction({
       name: "plain-handler-cff",
@@ -108,7 +112,8 @@ function handler(event) {
     );
 
     assertInstanceOf(result, Request);
-    assertIdentical(new URL(result.url).pathname, "/plain-handler.html");
+    const url = new URL(result.url);
+    assertIdentical(url.pathname, "/plain-handler.html");
   });
 
   it("throws when the module does not contain a supported handler pattern", async () => {

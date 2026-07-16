@@ -14,11 +14,11 @@ export class IamRoleArnParser {
    */
   parse(roleArn: string): IamRoleArnParts {
     const prefix = "arn:aws:iam::";
-    const roleSeparator = ":role/";
-
     if (!roleArn.startsWith(prefix)) {
       throw new Error(`Invalid IAM Role ARN: ${roleArn}`);
     }
+
+    const roleSeparator = ":role/";
 
     const separatorIndex = roleArn.indexOf(roleSeparator, prefix.length);
 

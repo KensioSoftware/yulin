@@ -28,8 +28,10 @@ export class SimCloudFrontServiceController implements SimAwsServiceController {
   private readonly originFetcher: SimCloudFrontOriginFetcher;
 
   constructor(props: SimCloudFrontServiceControllerProps = {}) {
+    const dependenciesFactory =
+      new SimCloudFrontControllerDependenciesFactory();
     const { distroRouter, behaviourResolver, cffApplicator, originFetcher } =
-      new SimCloudFrontControllerDependenciesFactory().make(props);
+      dependenciesFactory.make(props);
 
     this.distroRouter = distroRouter;
     this.behaviourResolver = behaviourResolver;

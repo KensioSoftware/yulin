@@ -81,7 +81,11 @@ export class ListCertificatesPageBuilder {
   private maxItems(requestedMaxItems?: number): number {
     const maxItems = requestedMaxItems ?? defaultMaxItems;
 
-    if (!Number.isInteger(maxItems) || maxItems < 1 || maxItems > maxMaxItems) {
+    if (
+      !Number.isSafeInteger(maxItems) ||
+      maxItems < 1 ||
+      maxItems > maxMaxItems
+    ) {
       throw new SimAcmInvalidArgsException(
         "ListCertificatesCommand.input.MaxItems must be an integer between 1 and 1000",
       );
@@ -105,7 +109,7 @@ export class ListCertificatesPageBuilder {
     const startIndex = Number(nextToken);
 
     if (
-      !Number.isInteger(startIndex) ||
+      !Number.isSafeInteger(startIndex) ||
       startIndex < 0 ||
       String(startIndex) !== nextToken
     ) {
@@ -127,7 +131,7 @@ export class ListCertificatesPageBuilder {
   private matchingCertificates(
     statuses: SimListCertificatesCommandInput["CertificateStatuses"],
   ): SimAcmCertificate[] {
-    const certificates = [...this.certificates.values()];
+    const certificates = this.certificates.values().toArray();
 
     return statuses === undefined
       ? certificates

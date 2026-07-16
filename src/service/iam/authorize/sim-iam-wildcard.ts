@@ -31,8 +31,9 @@ function wildcardMatch(
    * other regex characters are escaped above.
    */
   // eslint-disable-next-line security/detect-non-literal-regexp
-  return new RegExp(
+  const regExp = new RegExp(
     `^${regexPattern}$`,
     options.caseSensitive ? "u" : "iu",
-  ).test(value);
+  );
+  return regExp.test(value);
 }

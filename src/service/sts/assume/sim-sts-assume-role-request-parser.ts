@@ -76,7 +76,7 @@ export class SimStsAssumeRoleRequestParser {
     const durationSeconds = value ?? defaultRoleSessionDurationSeconds;
 
     /* v8 ignore if */
-    if (!Number.isInteger(durationSeconds) || durationSeconds <= 0) {
+    if (!Number.isSafeInteger(durationSeconds) || durationSeconds <= 0) {
       throw new Error("DurationSeconds must be a positive integer");
     }
 

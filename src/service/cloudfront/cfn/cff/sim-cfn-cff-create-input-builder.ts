@@ -64,10 +64,11 @@ export class SimCfnCffCreateInputBuilder {
   build(): SimCfnCfFunctionCreateInput {
     const functionCodeValue = this.functionCode();
     const cffName = this.cffName();
-    const binding = new SimCfnCffBindingFinder({
+    const bindingFinder = new SimCfnCffBindingFinder({
       resource: this.resource,
       bindings: this.bindings,
-    }).findBinding(cffName);
+    });
+    const binding = bindingFinder.findBinding(cffName);
 
     return {
       Name: cffName,

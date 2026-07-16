@@ -47,9 +47,8 @@ export class SimIamAccessDenied extends SimIamError {
    * contract: message structure, HTTP metadata, and diagnostic properties.
    */
   constructor(input: SimIamAccessDeniedInput) {
-    const callerIdentifier = new SimIamCallerIdentifier().format(
-      input.principal,
-    );
+    const iamCallerIdentifier = new SimIamCallerIdentifier();
+    const callerIdentifier = iamCallerIdentifier.format(input.principal);
 
     super(
       `User: ${callerIdentifier} is not authorized to perform: ${input.action} on resource: ${input.resource}`,

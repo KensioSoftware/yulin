@@ -16,7 +16,8 @@ export class SimCloudFrontBehaviorResolver {
     req: Request,
     simDistribution: SimCloudFrontDistribution,
   ): SimCloudFrontBehavior {
-    const requestPath = new URL(req.url).pathname;
+    const url = new URL(req.url);
+    const requestPath = url.pathname;
 
     const explicitMatch = simDistribution.behaviors
       .filter((behaviour) => this.behaviourMatchesPath(behaviour, requestPath))
@@ -53,7 +54,8 @@ export class SimCloudFrontBehaviorResolver {
     const pathPattern = behaviour.pathPattern;
     assertDefined(pathPattern, "CloudFront Behavior path pattern");
 
-    return new SimCloudFrontPathPattern({ pathPattern }).matches(requestPath);
+    const cloudFrontPathPattern = new SimCloudFrontPathPattern({ pathPattern });
+    return cloudFrontPathPattern.matches(requestPath);
   }
 
   private isDefaultBehaviour(behaviour: SimCloudFrontBehavior): boolean {
@@ -66,6 +68,7 @@ export class SimCloudFrontBehaviorResolver {
       return 0;
     }
 
-    return new SimCloudFrontPathPattern({ pathPattern }).specificity();
+    const cloudFrontPathPattern = new SimCloudFrontPathPattern({ pathPattern });
+    return cloudFrontPathPattern.specificity();
   }
 }

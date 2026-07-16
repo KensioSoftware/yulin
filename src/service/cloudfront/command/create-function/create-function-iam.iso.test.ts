@@ -5,6 +5,7 @@ import {
   assertInstanceOf,
   assertNonNullable,
   assertThrowsErrorAsync,
+  assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { makeSimAwsAccountId } from "../../../aws/sim-aws-account.js";
@@ -201,10 +202,7 @@ describe("CloudFront CreateFunctionCommand IAM authorization", () => {
     assertInstanceOf(error, SimIamAccessDenied);
     assertIdentical(error.action, "cloudfront:CreateFunction");
     assertIdentical(error.resource, functionArn);
-    assertIdentical(
-      simCloudFront.getCloudFrontFunctionByName(functionName),
-      undefined,
-    );
+    assertUndefined(simCloudFront.getCloudFrontFunctionByName(functionName));
   });
 
   it("lets an explicit Deny override an Allow without registering the Function", async () => {
@@ -283,10 +281,7 @@ describe("CloudFront CreateFunctionCommand IAM authorization", () => {
       error.message,
       `User: ${roleArn} is not authorized to perform: cloudfront:CreateFunction on resource: ${functionArn}`,
     );
-    assertIdentical(
-      simCloudFront.getCloudFrontFunctionByName(functionName),
-      undefined,
-    );
+    assertUndefined(simCloudFront.getCloudFrontFunctionByName(functionName));
   });
 
   it("does not apply the Account root fallback to an anonymous caller", async () => {
@@ -322,10 +317,7 @@ describe("CloudFront CreateFunctionCommand IAM authorization", () => {
     assertInstanceOf(error, SimIamAccessDenied);
     assertIdentical(error.caller.kind, "anonymous");
     assertIdentical(error.$metadata.httpStatusCode, 403);
-    assertIdentical(
-      simCloudFront.getCloudFrontFunctionByName(functionName),
-      undefined,
-    );
+    assertUndefined(simCloudFront.getCloudFrontFunctionByName(functionName));
   });
 
   it("uses allow-all authorization when SimCloudFront is instantiated directly", async () => {

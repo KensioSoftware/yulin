@@ -26,7 +26,7 @@ export class SimCfnExecutableResourceBindingMatcher {
      * Convert the map values once so each matching branch can scan a stable
      * resource list without repeating `[...resources.values()]`.
      */
-    this.#resources = [...resources.values()];
+    this.#resources = resources.values().toArray();
   }
 
   /**

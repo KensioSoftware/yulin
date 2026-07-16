@@ -5,7 +5,8 @@ import { SimAwsLocalServer } from "./sim-aws-local-server.js";
 
 describe("SimAwsLocalServer", () => {
   it("responds HTTP 400 when request processing rejects", async () => {
-    const server = await new SimAwsLocalServer().listen(0);
+    const localServer = new SimAwsLocalServer();
+    const server = await localServer.listen(0);
 
     try {
       const responseText = await sendRawHttpRequest(
@@ -24,7 +25,8 @@ describe("SimAwsLocalServer", () => {
   });
 
   it("sets a plain text response for request processing errors", async () => {
-    const server = await new SimAwsLocalServer().listen(0);
+    const localServer1 = new SimAwsLocalServer();
+    const server = await localServer1.listen(0);
 
     try {
       const responseText = await sendRawHttpRequest(

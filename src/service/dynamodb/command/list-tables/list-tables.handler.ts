@@ -42,7 +42,7 @@ export class ListTablesCommandHandler implements CommandHandler<
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    const tables = [...this.tables.values()];
+    const tables = this.tables.values().toArray();
     tables.sort((a, b) => a.tableName.localeCompare(b.tableName));
 
     const exclusiveStartTableName = cmd.input.ExclusiveStartTableName;

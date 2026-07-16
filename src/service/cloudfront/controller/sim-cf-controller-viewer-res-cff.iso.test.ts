@@ -91,9 +91,10 @@ describe("Simulated CloudFront local HTTP controller CFF", () => {
     const distributionId = distributionOutput.Distribution?.Id;
     assertNonNullable(distributionId);
 
-    const res = await new SimCloudFrontServiceController({
+    const cfController = new SimCloudFrontServiceController({
       simAws,
-    }).handleRequest(
+    });
+    const res = await cfController.handleRequest(
       {
         service: "cloudFront",
         resourceName: "",

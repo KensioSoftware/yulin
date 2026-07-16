@@ -44,9 +44,9 @@ export class PutObjectBuilder {
   private toMetadata(cmd: SimPutObjectCommand): Record<string, string> {
     return {
       ...cmd.input.Metadata,
-      ...(cmd.input.ContentType === undefined
-        ? {}
-        : { "content-type": cmd.input.ContentType }),
+      ...(cmd.input.ContentType !== undefined && {
+        "content-type": cmd.input.ContentType,
+      }),
     };
   }
 

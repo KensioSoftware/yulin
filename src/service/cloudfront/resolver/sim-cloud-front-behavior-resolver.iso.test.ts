@@ -19,7 +19,8 @@ describe("sim CloudFront Behavior resolver", () => {
     });
     distribution.addBehavior(defaultBehavior);
 
-    const behavior = new SimCloudFrontBehaviorResolver().resolve(
+    const behaviorResolver = new SimCloudFrontBehaviorResolver();
+    const behavior = behaviorResolver.resolve(
       new Request("https://example.test/assets/app.css"),
       distribution,
     );
@@ -36,7 +37,8 @@ describe("sim CloudFront Behavior resolver", () => {
     });
     distribution.addBehavior(defaultBehavior);
 
-    const behavior = new SimCloudFrontBehaviorResolver().resolve(
+    const behaviorResolver = new SimCloudFrontBehaviorResolver();
+    const behavior = behaviorResolver.resolve(
       new Request("https://example.test/assets/app.css"),
       distribution,
     );
@@ -55,7 +57,8 @@ describe("sim CloudFront Behavior resolver", () => {
     distribution.addBehavior(defaultBehavior);
     distribution.addBehavior(explicitBehavior);
 
-    const behavior = new SimCloudFrontBehaviorResolver().resolve(
+    const behaviorResolver = new SimCloudFrontBehaviorResolver();
+    const behavior = behaviorResolver.resolve(
       new Request("https://example.test/assets/app.css"),
       distribution,
     );
@@ -76,7 +79,8 @@ describe("sim CloudFront Behavior resolver", () => {
     distribution.addBehavior(defaultBehavior);
     distribution.addBehavior(explicitBehavior);
 
-    const behavior = new SimCloudFrontBehaviorResolver().resolve(
+    const behaviorResolver = new SimCloudFrontBehaviorResolver();
+    const behavior = behaviorResolver.resolve(
       new Request("https://example.test/assets/app.css"),
       distribution,
     );
@@ -95,7 +99,8 @@ describe("sim CloudFront Behavior resolver", () => {
     distribution.addBehavior(defaultBehavior);
     distribution.addBehavior(explicitBehavior);
 
-    const behavior = new SimCloudFrontBehaviorResolver().resolve(
+    const behaviorResolver = new SimCloudFrontBehaviorResolver();
+    const behavior = behaviorResolver.resolve(
       new Request("https://example.test/assets/a.css"),
       distribution,
     );
@@ -116,7 +121,8 @@ describe("sim CloudFront Behavior resolver", () => {
     distribution.addBehavior(broadBehavior);
     distribution.addBehavior(specificBehavior);
 
-    const behavior = new SimCloudFrontBehaviorResolver().resolve(
+    const behaviorResolver = new SimCloudFrontBehaviorResolver();
+    const behavior = behaviorResolver.resolve(
       new Request("https://example.test/assets/app.css"),
       distribution,
     );
@@ -133,7 +139,8 @@ describe("sim CloudFront Behavior resolver", () => {
     );
 
     const error = assertThrowsError(() => {
-      new SimCloudFrontBehaviorResolver().resolve(
+      const behaviorResolver = new SimCloudFrontBehaviorResolver();
+      behaviorResolver.resolve(
         new Request("https://example.test/index.html"),
         distribution,
       );

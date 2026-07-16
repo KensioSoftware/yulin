@@ -53,9 +53,7 @@ export class SimCfnFnSub extends SimCfnNode {
     // before Resources have been created. Preserve the Fn::Sub expression so
     // the later Resource-creation resolution pass can substitute the final
     // string.
-    if (
-      [...resolvedVariables.values()].some((value) => typeof value !== "string")
-    ) {
+    if (resolvedVariables.values().some((value) => typeof value !== "string")) {
       return this.unresolvedValue.toTemplateValue(resolvedVariables);
     }
 
@@ -70,9 +68,7 @@ export class SimCfnFnSub extends SimCfnNode {
    */
   override referencedNames(): string[] {
     return [
-      ...[...this.variables.values()].flatMap((value) =>
-        value.referencedNames(),
-      ),
+      ...this.variables.values().flatMap((value) => value.referencedNames()),
       ...this.subTemplate
         .variableNames()
         .filter((variableName) => !this.variables.has(variableName))

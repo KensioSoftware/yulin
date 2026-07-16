@@ -61,7 +61,7 @@ describe("IAM ListPoliciesCommand", () => {
 
     const listedPolicyNames = listPoliciesOutput.Policies.map(
       (policy) => policy.PolicyName,
-    ).toSorted();
+    ).toSorted((a, b) => a.localeCompare(b));
 
     assertIdentical(listedPolicyNames[0], "ReadPolicy");
     assertIdentical(listedPolicyNames[1], "WritePolicy");
@@ -248,7 +248,7 @@ describe("IAM ListPoliciesCommand", () => {
     const allPolicyNames = [
       ...firstPagePolicyNames,
       ...secondPage.Policies.map((policy) => policy.PolicyName),
-    ].toSorted();
+    ].toSorted((a, b) => a.localeCompare(b));
 
     assertIdentical(allPolicyNames[0], "AlphaPolicy");
     assertIdentical(allPolicyNames[1], "BetaPolicy");

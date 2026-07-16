@@ -30,6 +30,51 @@ export class DynamoDbKeySchema {
     this.rangeKeyAttributeName = rangeKey?.AttributeName;
   }
 
+  /**
+   * Make a primary key string for an item based on this key schema.
+   */
+  makeItemKey(item: DynamoDbItem): string {
+    const partitionKeyAttr = item.attributes[this.hashKeyAttributeName];
+    assertDefined(
+      partitionKeyAttr,
+      `DynamoDB Item partition key ${this.hashKeyAttributeName} required`,
+    );
+    const partitionKey = partitionKeyAttr.value;
+    if (!this.canBeDynamoDbKey(partitionKey)) {
+      throw new TypeError(
+        `DynamoDB Item partition key ${this.hashKeyAttributeName} must be string or number`,
+      );
+    }
+
+    const keyParts: Record<string, DynamoDbKey> = {
+      [this.hashKeyAttributeName]: partitionKey,
+    };
+
+    if (this.rangeKeyAttributeName !== undefined) {
+      const sortKeyAttr = item.attributes[this.rangeKeyAttributeName];
+      if (sortKeyAttr === undefined) {
+        throw new TypeError(
+          `DynamoDB Item sort key ${this.rangeKeyAttributeName} is undefined`,
+        );
+      }
+      if (!this.canBeDynamoDbKey(sortKeyAttr.value)) {
+        throw new TypeError(
+          `DynamoDB Item sort key ${this.rangeKeyAttributeName} must be string or number`,
+        );
+      }
+      keyParts[this.rangeKeyAttributeName] = sortKeyAttr.value;
+    }
+
+    return jsonStringify(keyParts);
+  }
+
+  /**
+   * Check if a given value can be used as a DynamoDB partition key or sort key.
+   */
+  private canBeDynamoDbKey(value: DynamoDBAttrType): value is DynamoDbKey {
+    return typeof value === "string" || typeof value === "number";
+  }
+
   private requiredKeySchemaElement(
     createTableInput: SimCreateTableCommandInput,
     keyType: SimDynamoDbKeyType,
@@ -52,50 +97,5 @@ export class DynamoDbKeySchema {
         keySchemaElement.KeyType === keyType &&
         keySchemaElement.AttributeName !== undefined,
     );
-  }
-
-  /**
-   * Make a primary key string for an item based on this key schema.
-   */
-  makeItemKey(item: DynamoDbItem): string {
-    const partitionKeyAttr = item.attributes[this.hashKeyAttributeName];
-    assertDefined(
-      partitionKeyAttr,
-      `DynamoDB Item partition key ${this.hashKeyAttributeName} required`,
-    );
-    const partitionKey = partitionKeyAttr.value;
-    if (!DynamoDbKeySchema.canBeDynamoDbKey(partitionKey)) {
-      throw new TypeError(
-        `DynamoDB Item partition key ${this.hashKeyAttributeName} must be string or number`,
-      );
-    }
-
-    const keyParts: Record<string, DynamoDbKey> = {
-      [this.hashKeyAttributeName]: partitionKey,
-    };
-
-    if (this.rangeKeyAttributeName !== undefined) {
-      const sortKeyAttr = item.attributes[this.rangeKeyAttributeName];
-      if (sortKeyAttr === undefined) {
-        throw new TypeError(
-          `DynamoDB Item sort key ${this.rangeKeyAttributeName} is undefined`,
-        );
-      }
-      if (!DynamoDbKeySchema.canBeDynamoDbKey(sortKeyAttr.value)) {
-        throw new TypeError(
-          `DynamoDB Item sort key ${this.rangeKeyAttributeName} must be string or number`,
-        );
-      }
-      keyParts[this.rangeKeyAttributeName] = sortKeyAttr.value;
-    }
-
-    return jsonStringify(keyParts);
-  }
-
-  /**
-   * Check if a given value can be used as a DynamoDB partition key or sort key.
-   */
-  static canBeDynamoDbKey(value: DynamoDBAttrType): value is DynamoDbKey {
-    return typeof value === "string" || typeof value === "number";
   }
 }

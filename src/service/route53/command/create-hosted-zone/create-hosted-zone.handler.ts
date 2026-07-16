@@ -69,9 +69,9 @@ export class CreateHostedZoneCommandHandler implements CommandHandler<
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    const existingHostedZone = [...this.hostedZones.values()].find(
-      (hostedZone) => hostedZone.callerReference === callerReference,
-    );
+    const existingHostedZone = this.hostedZones
+      .values()
+      .find((hostedZone) => hostedZone.callerReference === callerReference);
     if (existingHostedZone !== undefined) {
       throw new SimRoute53HostedZoneAlreadyExists(
         `A sim Route53 Hosted Zone with caller reference ${callerReference} already exists`,

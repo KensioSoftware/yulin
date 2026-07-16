@@ -67,7 +67,8 @@ describe("sim CFF event structure adapter", () => {
 
       assertInstanceOf(result, Request);
       assertIdentical(result.method, "POST");
-      assertIdentical(new URL(result.url).pathname, "/new/path");
+      const url = new URL(result.url);
+      assertIdentical(url.pathname, "/new/path");
     });
 
     it("converts CFF Response to native Response", () => {
