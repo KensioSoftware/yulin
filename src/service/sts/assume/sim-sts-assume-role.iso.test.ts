@@ -199,7 +199,7 @@ describe("STS AssumeRole in the same sim Account", () => {
     assertNonNullable(credentials.SessionToken);
 
     // Then the Account's top-level IAM facade resolves the issued identity.
-    const identity = simIam.resolveCredentials({
+    const identity = simIam.credentials.resolveCredentials({
       accessKeyId: credentials.AccessKeyId,
       secretAccessKey: credentials.SecretAccessKey,
       sessionToken: credentials.SessionToken,

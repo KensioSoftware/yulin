@@ -46,7 +46,7 @@ describe("STS AssumeRole credentials and sessions", () => {
     assertNonNullable(credentials.AccessKeyId);
     assertNonNullable(credentials.SecretAccessKey);
     assertNonNullable(credentials.SessionToken);
-    const identity = simIam.resolveCredentials({
+    const identity = simIam.credentials.resolveCredentials({
       accessKeyId: credentials.AccessKeyId,
       secretAccessKey: credentials.SecretAccessKey,
       sessionToken: credentials.SessionToken,
@@ -101,7 +101,7 @@ describe("STS AssumeRole credentials and sessions", () => {
 
     // When IAM validates the access key with a different secret access key.
     const error = assertThrowsError(() =>
-      simIam.resolveCredentials({
+      simIam.credentials.resolveCredentials({
         accessKeyId,
         secretAccessKey: "different-secret-access-key",
         sessionToken: credentials.SessionToken,
@@ -148,7 +148,7 @@ describe("STS AssumeRole credentials and sessions", () => {
 
     // When IAM validates the temporary access key without its session token.
     const error = assertThrowsError(() =>
-      simIam.resolveCredentials({
+      simIam.credentials.resolveCredentials({
         accessKeyId,
         secretAccessKey,
       }),
@@ -197,7 +197,7 @@ describe("STS AssumeRole credentials and sessions", () => {
 
     // When IAM validates the credentials at their expiration time.
     const error = assertThrowsError(() =>
-      simIam.resolveCredentials(
+      simIam.credentials.resolveCredentials(
         {
           accessKeyId,
           secretAccessKey,

@@ -69,7 +69,7 @@ describe("STS AssumeRole for sim IAM Users", () => {
     assertNonNullable(credentials.SessionToken);
 
     // And IAM resolves those credentials to the assumed Role.
-    const identity = simIam.resolveCredentials({
+    const identity = simIam.credentials.resolveCredentials({
       accessKeyId: credentials.AccessKeyId,
       secretAccessKey: credentials.SecretAccessKey,
       sessionToken: credentials.SessionToken,
