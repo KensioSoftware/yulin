@@ -32,7 +32,7 @@ export class SimIamCredentialRegistry {
   /**
    * Authenticate credentials and resolve their simulated AWS identity.
    */
-  resolve(
+  resolveCredentials(
     credentials: SimAwsCredentials,
     now: Date = new Date(),
   ): SimIamCredentialIdentity {

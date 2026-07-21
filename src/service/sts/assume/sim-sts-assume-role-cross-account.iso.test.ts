@@ -175,11 +175,14 @@ describe("STS AssumeRole across sim Accounts", () => {
     assertNonNullable(credentials.SessionToken);
 
     // Then the target Account's IAM resolves the issued session identity.
-    const identity = simAws.account(targetAccountId).iam().resolveCredentials({
-      accessKeyId: credentials.AccessKeyId,
-      secretAccessKey: credentials.SecretAccessKey,
-      sessionToken: credentials.SessionToken,
-    });
+    const identity = simAws
+      .account(targetAccountId)
+      .iam()
+      .credentials.resolveCredentials({
+        accessKeyId: credentials.AccessKeyId,
+        secretAccessKey: credentials.SecretAccessKey,
+        sessionToken: credentials.SessionToken,
+      });
     assertObjectHasProperty(identity.principal, "arn");
     assertIdentical(
       identity.principal.arn,

@@ -33,7 +33,7 @@ describe("SimIamCredentialRegistry", () => {
     );
 
     // When matching credentials are resolved.
-    const identity = registry.resolve({
+    const identity = registry.resolveCredentials({
       accessKeyId: "AKIAEXAMPLE",
       secretAccessKey: "correct-secret",
     });
@@ -75,7 +75,7 @@ describe("SimIamCredentialRegistry", () => {
     );
 
     // When all temporary credential components match before expiration.
-    const identity = registry.resolve(
+    const identity = registry.resolveCredentials(
       {
         accessKeyId: "ASIATEMPORARY",
         secretAccessKey: "correct-secret",
@@ -94,7 +94,7 @@ describe("SimIamCredentialRegistry", () => {
 
     // When credentials using that ID are resolved.
     const error = assertThrowsError(() => {
-      registry.resolve({
+      registry.resolveCredentials({
         accessKeyId: "AKIAUNKNOWN",
         secretAccessKey: "secret",
       });
@@ -122,7 +122,7 @@ describe("SimIamCredentialRegistry", () => {
 
     // When credentials with a mismatched secret are resolved.
     const error = assertThrowsError(() => {
-      registry.resolve({
+      registry.resolveCredentials({
         accessKeyId: "AKIAINACTIVE",
         secretAccessKey: "wrong-secret",
       });
@@ -150,7 +150,7 @@ describe("SimIamCredentialRegistry", () => {
 
     // When credentials supply the wrong secret.
     const error = assertThrowsError(() => {
-      registry.resolve({
+      registry.resolveCredentials({
         accessKeyId: "AKIAEXAMPLE",
         secretAccessKey: "wrong-secret",
       });
@@ -194,7 +194,7 @@ describe("SimIamCredentialRegistry", () => {
 
     // When the session token is omitted.
     const error = assertThrowsError(() => {
-      registry.resolve({
+      registry.resolveCredentials({
         accessKeyId: "ASIATEMPORARY",
         secretAccessKey: "correct-secret",
       });
@@ -221,7 +221,7 @@ describe("SimIamCredentialRegistry", () => {
 
     // When credentials include an unexpected session token.
     const error = assertThrowsError(() => {
-      registry.resolve({
+      registry.resolveCredentials({
         accessKeyId: "AKIAEXAMPLE",
         secretAccessKey: "correct-secret",
         sessionToken: "unexpected-token",
@@ -266,7 +266,7 @@ describe("SimIamCredentialRegistry", () => {
 
     // When credentials supply a different session token.
     const error = assertThrowsError(() => {
-      registry.resolve(
+      registry.resolveCredentials(
         {
           accessKeyId: "ASIATEMPORARY",
           secretAccessKey: "correct-secret",
@@ -314,7 +314,7 @@ describe("SimIamCredentialRegistry", () => {
 
     // When the credentials are resolved exactly at expiration.
     const error = assertThrowsError(() => {
-      registry.resolve(
+      registry.resolveCredentials(
         {
           accessKeyId: "ASIATEMPORARY",
           secretAccessKey: "correct-secret",

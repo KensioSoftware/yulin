@@ -10,6 +10,10 @@ import { SimRoute53HostedZone } from "../../../route53/hosted-zone/sim-route53-h
 import { SimRoute53HostedZoneCfn } from "./route53/sim-route53-hosted-zone-cfn.js";
 import { SimAcmCertificateCfn } from "./acm/sim-acm-certificate-cfn.js";
 import { SimAcmCertificate } from "../../../acm/certificate/sim-acm-certificate.js";
+import { SimIamManagedPolicyCfn } from "./iam/sim-iam-managed-policy-cfn.js";
+import type { SimIamManagedPolicy } from "../../../iam/policy/sim-iam-policy.js";
+import { SimIamRoleCfn } from "./iam/sim-iam-role-cfn.js";
+import type { SimIamRole } from "../../../iam/role/sim-iam-role.js";
 
 export interface SimCfnResourceValueAdapter {
   refValue(): SimCfnTemplateValue;
@@ -66,6 +70,18 @@ export function simCfnResourceValueAdapter(
   ) {
     return new SimCloudFrontFunctionCfn({
       cloudFrontFunction: props.simResource,
+    });
+  }
+
+  if (props.type === "AWS::IAM::ManagedPolicy") {
+    return new SimIamManagedPolicyCfn({
+      policy: props.simResource as SimIamManagedPolicy,
+    });
+  }
+
+  if (props.type === "AWS::IAM::Role") {
+    return new SimIamRoleCfn({
+      role: props.simResource as SimIamRole,
     });
   }
 

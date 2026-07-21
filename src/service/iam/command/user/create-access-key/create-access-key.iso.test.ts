@@ -55,7 +55,7 @@ describe("IAM CreateAccessKeyCommand", () => {
         UserName: "AuthenticatedUser",
       }),
     );
-    const identity = simIam.resolveCredentials({
+    const identity = simIam.credentials.resolveCredentials({
       accessKeyId: output.AccessKey.AccessKeyId,
       secretAccessKey: output.AccessKey.SecretAccessKey,
     });
