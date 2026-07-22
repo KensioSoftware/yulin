@@ -19,7 +19,7 @@ jobs:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-node@v6.4.0
+      - uses: actions/setup-node@v7.0.0
         with:
           node-version-file: .nvmrc
       - uses: pnpm/action-setup@v6
@@ -47,7 +47,7 @@ jobs:
           echo "color=$COLOR" >> "$GITHUB_OUTPUT"
 
       - name: Update coverage badge
-        uses: schneegans/dynamic-badges-action@v1.8.0
+        uses: schneegans/dynamic-badges-action@v1.9.0
         with:
           auth: ${{ secrets.GIST_SECRET }}
           gistID: 60631670004a3f173e7b379bfb9d5072
