@@ -18,7 +18,10 @@ import {
   assertTrue,
 } from "@kensio/smartass";
 import { SimAws } from "../service/aws/sim-aws.js";
-import { SimSdkInvalidClientError } from "./error/sim-sdk.error.js";
+import {
+  SimSdkAlreadyInterceptedError,
+  SimSdkInvalidClientError,
+} from "./error/sim-sdk.error.js";
 import { SimSdk } from "./sim-sdk.js";
 
 describe("simulated AWS SDK", () => {
@@ -197,6 +200,32 @@ describe("simulated AWS SDK", () => {
     });
 
     assertStringIncludes(error.message, "DynamoDB");
+  });
+
+  it("rejects intercepting a client that is already intercepted", () => {
+    using simSdk = new SimSdk();
+    const client = new S3Client({ region: "us-east-1" });
+    simSdk.intercept(client);
+
+    const error = assertThrowsError(() => {
+      simSdk.intercept(client);
+    });
+
+    assertInstanceOf(error, SimSdkAlreadyInterceptedError);
+    assertStringIncludes(error.message, "S3Client");
+  });
+
+  it("rejects intercepting a client already intercepted by another SimSdk", () => {
+    using firstSimSdk = new SimSdk();
+    using secondSimSdk = new SimSdk();
+    const client = new S3Client({ region: "us-east-1" });
+    firstSimSdk.intercept(client);
+
+    const error = assertThrowsError(() => {
+      secondSimSdk.intercept(client);
+    });
+
+    assertInstanceOf(error, SimSdkAlreadyInterceptedError);
   });
 
   it("rejects intercepting a client class without a prototype", () => {

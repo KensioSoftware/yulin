@@ -62,6 +62,10 @@ export class SimSdk implements Disposable {
    * scope and caller are resolved per send, never per client: from the
    * ambient SimAws.runAs caller and the sending client's configured Region,
    * falling back to the SimAws defaults.
+   *
+   * A client can only have one interception at a time: intercepting an
+   * already-intercepted client throws SimSdkAlreadyInterceptedError until the
+   * existing interception is restored.
    */
   intercept(
     target: SimSdkInterceptTarget,

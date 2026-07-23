@@ -3,10 +3,15 @@ import {
   assertFalse,
   assertIdentical,
   assertInstanceOf,
+  assertStringIncludes,
+  assertThrowsError,
   assertThrowsErrorAsync,
   assertTrue,
 } from "@kensio/smartass";
-import { SimSdkCallbackNotSupportedError } from "./error/sim-sdk.error.js";
+import {
+  SimSdkAlreadyInterceptedError,
+  SimSdkCallbackNotSupportedError,
+} from "./error/sim-sdk.error.js";
 import { installSendPatch } from "./send-patch.js";
 
 interface SendCapable {
@@ -96,6 +101,40 @@ describe("SDK client send patch", () => {
     assertFalse(patch.isInstalled());
     patch.restore();
     assertIdentical(ownSendValue(client), laterSend);
+  });
+
+  it("rejects patching a send that is already patched", () => {
+    const client: SendCapable = new FakeClient();
+    installSendPatch(client, () => Promise.resolve("simulated"));
+
+    const error = assertThrowsError(() => {
+      installSendPatch(client, () => Promise.resolve("simulated again"));
+    });
+
+    assertInstanceOf(error, SimSdkAlreadyInterceptedError);
+    assertStringIncludes(error.message, "FakeClient");
+  });
+
+  it("names an unnameable patch target as target in the rejection", () => {
+    const bare = Object.create(null) as object;
+    installSendPatch(bare, () => Promise.resolve("simulated"));
+
+    const error = assertThrowsError(() => {
+      installSendPatch(bare, () => Promise.resolve("simulated again"));
+    });
+
+    assertStringIncludes(error.message, "SDK client target");
+  });
+
+  it("allows patching again after a restore", async () => {
+    const client: SendCapable = new FakeClient();
+    const first = installSendPatch(client, () => Promise.resolve("first"));
+    first.restore();
+
+    const second = installSendPatch(client, () => Promise.resolve("second"));
+
+    assertTrue(second.isInstalled());
+    assertIdentical(await client.send({}), "second");
   });
 
   it("rejects callback-style send calls", async () => {

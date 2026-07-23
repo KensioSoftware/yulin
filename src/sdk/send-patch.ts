@@ -1,4 +1,14 @@
-import { SimSdkCallbackNotSupportedError } from "./error/sim-sdk.error.js";
+import {
+  SimSdkAlreadyInterceptedError,
+  SimSdkCallbackNotSupportedError,
+} from "./error/sim-sdk.error.js";
+
+/**
+ * All send functions installed by simulated SDK interception, so a second
+ * interception of an already-intercepted target can be rejected, including
+ * across separate SimSdk instances.
+ */
+const installedSends = new WeakSet<object>();
 
 /**
  * Handler for SDK Commands sent through a patched client send method.
@@ -41,6 +51,13 @@ export function installSendPatch(
   handler: SimSdkSendHandler,
 ): SimSdkSendPatch {
   const previous = Object.getOwnPropertyDescriptor(target, "send");
+  const previousSend: unknown = previous?.value;
+  if (typeof previousSend === "function" && installedSends.has(previousSend)) {
+    throw new SimSdkAlreadyInterceptedError(
+      `SDK client ${patchTargetName(target)} is already intercepted; ` +
+        `restore the existing interception before intercepting it again`,
+    );
+  }
 
   const patched = async function (
     this: unknown,
@@ -58,6 +75,7 @@ export function installSendPatch(
     return await handler(command, this);
   };
 
+  installedSends.add(patched);
   Object.defineProperty(target, "send", {
     value: patched,
     writable: true,
@@ -80,4 +98,14 @@ export function installSendPatch(
       Object.defineProperty(target, "send", previous);
     },
   };
+}
+
+/**
+ * Name a patch target for diagnostics: the client's class name for instances
+ * and prototypes alike, when it has one.
+ */
+function patchTargetName(target: object): string {
+  const constructor = (target as { constructor?: { name?: string } })
+    .constructor;
+  return constructor?.name ?? "target";
 }

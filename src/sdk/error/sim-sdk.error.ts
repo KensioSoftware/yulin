@@ -33,6 +33,16 @@ export class SimSdkCommandNotInterceptedError extends SimSdkError {
 }
 
 /**
+ * The SDK client instance or client class is already intercepted.
+ *
+ * Multiple simultaneous interceptions of the same client could only ever be
+ * confusing, so the existing interception must be restored first.
+ */
+export class SimSdkAlreadyInterceptedError extends SimSdkError {
+  public override readonly name = "SimSdkAlreadyInterceptedError";
+}
+
+/**
  * The intercepted SDK client send was called with an unsupported callback
  * argument.
  */
