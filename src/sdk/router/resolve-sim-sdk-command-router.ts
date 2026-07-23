@@ -23,8 +23,29 @@ export function resolveSimSdkCommandRouter(
   const scoped = simAws.account(accountId).region(regionName);
 
   switch (serviceId) {
+    case "ACM": {
+      return scoped.acm().sdkCommandRouter();
+    }
+    case "CloudFormation": {
+      return scoped.cloudFormation().sdkCommandRouter();
+    }
+    case "CloudFront": {
+      return scoped.cloudFront().sdkCommandRouter();
+    }
+    case "DynamoDB": {
+      return scoped.dynamoDb().sdkCommandRouter();
+    }
+    case "IAM": {
+      return scoped.iam().sdkCommandRouter();
+    }
+    case "Route 53": {
+      return scoped.route53().sdkCommandRouter();
+    }
     case "S3": {
       return scoped.s3().sdkCommandRouter();
+    }
+    case "STS": {
+      return scoped.sts().sdkCommandRouter();
     }
     default: {
       throw new SimSdkUnknownServiceError(

@@ -33,6 +33,8 @@ import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { SimDynamoDatabaseSdkCommandRouter } from "./sdk/sim-dynamodb-sdk-command-router.js";
+import type { SimSdkCommandRouter } from "../../sdk/index.js";
 
 export interface SimDynamoDbRequestOptions {
   readonly caller?: SimAwsCaller;
@@ -56,6 +58,7 @@ export class SimDynamoDb {
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly iam: SimIamInterServiceAuthZ;
   private readonly background: BackgroundScheduler;
+  private readonly sdkRouter = new SimDynamoDatabaseSdkCommandRouter(this);
 
   constructor(properties: SimDynamoDatabaseProperties = {}) {
     const {
@@ -129,5 +132,12 @@ export class SimDynamoDb {
       iam: this.iam,
     });
     return await handler.handle(command, options);
+  }
+
+  /**
+   * Get this service's SDK Command router for SDK client interception.
+   */
+  sdkCommandRouter(): SimSdkCommandRouter {
+    return this.sdkRouter;
   }
 }

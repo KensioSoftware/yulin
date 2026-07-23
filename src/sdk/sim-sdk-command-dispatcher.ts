@@ -1,4 +1,5 @@
 import { SimAwsCallerResolver } from "../service/aws/caller/sim-aws-caller-resolver.js";
+import type { SimAwsPrincipal } from "../service/aws/caller/sim-aws-caller.js";
 import { simAwsRunAsContext } from "../service/aws/caller/sim-aws-run-as-context.js";
 import type { SimAws } from "../service/aws/sim-aws.js";
 import {
@@ -42,7 +43,8 @@ export class SimSdkCommandDispatcher {
     }
 
     const serviceId = simSdkClientServiceId(client);
-    const accountId = this.ambientAccountId() ?? this.simAws.defaultAccountId;
+    const caller = this.ambientCaller();
+    const accountId = callerAccountId(caller) ?? this.simAws.defaultAccountId;
     const regionName = await simSdkClientRegionName(
       client,
       this.simAws.defaultRegionName,
@@ -64,22 +66,30 @@ export class SimSdkCommandDispatcher {
       );
     }
 
-    return await route(command);
+    return await route(command, { caller });
   }
 
   /**
-   * Resolve the AWS Account of the ambient SimAws.runAs caller, if one is
-   * set for this dispatcher's SimAws instance and identifies an Account.
+   * Get the ambient SimAws.runAs caller for this dispatcher's SimAws
+   * instance, if one is set.
    *
    * Only this SimAws instance's own run-as caller applies: a run-as on a
    * different SimAws instance is a different simulated universe and never
    * affects Commands dispatched here.
    */
-  private ambientAccountId(): string | undefined {
-    const caller = simAwsRunAsContext.currentCaller(this.simAws);
-    if (caller === undefined) {
-      return undefined;
-    }
-    return new SimAwsCallerResolver().resolve(caller, caller).accountId;
+  private ambientCaller(): SimAwsPrincipal | undefined {
+    return simAwsRunAsContext.currentCaller(this.simAws);
   }
+}
+
+/**
+ * Resolve the AWS Account a caller belongs to, when it identifies one.
+ */
+function callerAccountId(
+  caller: SimAwsPrincipal | undefined,
+): string | undefined {
+  if (caller === undefined) {
+    return undefined;
+  }
+  return new SimAwsCallerResolver().resolve(caller, caller).accountId;
 }

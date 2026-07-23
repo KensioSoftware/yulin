@@ -62,12 +62,11 @@ import type {
   SimCreateUserCommand,
   SimCreateUserCommandOutput,
 } from "./command/user/create-user/create-user.cmd.js";
-import { CreateUserCommandHandler } from "./command/user/create-user/create-user.handler.js";
 import type {
   SimCreateAccessKeyCommand,
   SimCreateAccessKeyCommandOutput,
 } from "./command/user/create-access-key/create-access-key.cmd.js";
-import { CreateAccessKeyCommandHandler } from "./command/user/create-access-key/create-access-key.handler.js";
+import { SimIamUserCommandHandlers } from "./command/user/sim-iam-user-command-handlers.js";
 import type {
   SimPutUserPolicyCommand,
   SimPutUserPolicyCommandOutput,
@@ -76,6 +75,8 @@ import { PutUserPolicyCommandHandler } from "./command/policy/put-user-policy/pu
 import { SimIamCloudFormationResourceFactory } from "./cfn/sim-cfn-iam-resource-factory.js";
 import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import type { SimIamInterServiceAuthZ } from "./authorize/sim-iam-inter-service-auth-z.js";
+import { SimIamSdkCommandRouter } from "./sdk/sim-iam-sdk-command-router.js";
+import type { SimSdkCommandRouter } from "../../sdk/index.js";
 
 interface SimIamProperties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
@@ -107,9 +108,10 @@ export class SimIam implements SimIamInterServiceAuthZ {
 
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly background: BackgroundScheduler;
-  private readonly userCredentialGenerator: SimIamUserCredentialGenerator;
   private readonly cfnFactory: SimCfnServiceResourceFactory;
   private readonly roleCommands: SimIamRoleCommandHandlers;
+  private readonly userCommands: SimIamUserCommandHandlers;
+  private readonly sdkRouter = new SimIamSdkCommandRouter(this);
 
   constructor(properties: SimIamProperties = {}) {
     const {
@@ -123,7 +125,6 @@ export class SimIam implements SimIamInterServiceAuthZ {
     this.accountRegionScope = accountRegionScope;
     this.background = background;
     this.credentials = credentialRegistry;
-    this.userCredentialGenerator = userCredentialGenerator;
     this.sessionManager = new SimIamSessionManager({
       accountId: accountRegionScope.accountId,
       roles: this.roles,
@@ -134,6 +135,13 @@ export class SimIam implements SimIamInterServiceAuthZ {
     this.roleCommands = new SimIamRoleCommandHandlers({
       accountId: accountRegionScope.accountId,
       roles: this.roles,
+      background: this.background,
+    });
+    this.userCommands = new SimIamUserCommandHandlers({
+      accountId: accountRegionScope.accountId,
+      users: this.users,
+      credentialRegistry,
+      credentialGenerator: userCredentialGenerator,
       background: this.background,
     });
   }
@@ -261,13 +269,7 @@ export class SimIam implements SimIamInterServiceAuthZ {
   async createUser(
     command: SimCreateUserCommand,
   ): Promise<SimCreateUserCommandOutput> {
-    const handler = new CreateUserCommandHandler({
-      accountId: this.accountRegionScope.accountId,
-      users: this.users,
-      background: this.background,
-    });
-
-    return await handler.handle(command);
+    return await this.userCommands.createUser(command);
   }
 
   /**
@@ -276,14 +278,7 @@ export class SimIam implements SimIamInterServiceAuthZ {
   async createAccessKey(
     command: SimCreateAccessKeyCommand,
   ): Promise<SimCreateAccessKeyCommandOutput> {
-    const handler = new CreateAccessKeyCommandHandler({
-      users: this.users,
-      credentialRegistry: this.credentials,
-      credentialGenerator: this.userCredentialGenerator,
-      background: this.background,
-    });
-
-    return await handler.handle(command);
+    return await this.userCommands.createAccessKey(command);
   }
 
   /**
@@ -291,5 +286,12 @@ export class SimIam implements SimIamInterServiceAuthZ {
    */
   cfnResourceFactory(): SimCfnServiceResourceFactory {
     return this.cfnFactory;
+  }
+
+  /**
+   * Get this service's SDK Command router for SDK client interception.
+   */
+  sdkCommandRouter(): SimSdkCommandRouter {
+    return this.sdkRouter;
   }
 }
