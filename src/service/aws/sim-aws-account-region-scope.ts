@@ -9,6 +9,7 @@ import type { SimCloudFormation } from "../cloudformation/index.js";
 import type { SimRoute53 } from "../route53/index.js";
 import type { SimAcm } from "../acm/sim-acm.js";
 import type { SimIam } from "../iam/index.js";
+import type { SimLambda } from "../lambda/index.js";
 import type { SimSts } from "../sts/sim-sts.js";
 
 export type SimAccountRegionScopeKey = `${SimAwsAccountId}:${AwsRegionName}`;
@@ -90,6 +91,15 @@ export class SimAwsAccountRegionContainer {
   iam(): SimIam {
     return this.memo.getOrCreate("iam", () =>
       this.simAws.serviceFactory.createIam(this),
+    );
+  }
+
+  /**
+   * Get simulated Lambda for this account and region.
+   */
+  lambda(): SimLambda {
+    return this.memo.getOrCreate("lambda", () =>
+      this.simAws.serviceFactory.createLambda(this),
     );
   }
 
