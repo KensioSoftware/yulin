@@ -16,6 +16,7 @@ import { SimAcm } from "../../acm/sim-acm.js";
 import { SimRoute53Registry } from "../../route53/registry/sim-route53-registry.js";
 import type { SimIam } from "../../iam/index.js";
 import { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
+import { SimLambda } from "../../lambda/index.js";
 import { SimSts } from "../../sts/sim-sts.js";
 
 interface SimAwsServiceFactoryProperties {
@@ -139,6 +140,20 @@ export class SimAwsServiceFactory {
    */
   createIam(scope: SimAwsAccountRegionContainer): SimIam {
     return this.accountServices.createIam(scope);
+  }
+
+  /**
+   * Create simulated Lambda for an Account Region scope.
+   */
+  createLambda(scope: SimAwsAccountRegionContainer): SimLambda {
+    const iam = this.createIam(scope);
+
+    return new SimLambda({
+      accountRegionScope: scope.accountRegionScope,
+      iam,
+      background: this.background,
+      runAsOwner: this.simAws,
+    });
   }
 
   /**

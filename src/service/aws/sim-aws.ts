@@ -25,6 +25,7 @@ import { SimAwsScopeRegistry } from "./scope/sim-aws-scope-registry.js";
 import type { SimAcm } from "../acm/sim-acm.js";
 import type { SimIam } from "../iam/index.js";
 import type { SimIamRegistry } from "../iam/registry/sim-iam-registry.js";
+import type { SimLambda } from "../lambda/index.js";
 import type { SimSts } from "../sts/sim-sts.js";
 import type { SimAwsPrincipal } from "./caller/sim-aws-caller.js";
 import { simAwsRunAsContext } from "./caller/sim-aws-run-as-context.js";
@@ -134,6 +135,13 @@ export class SimAws {
    */
   iam(): SimIam {
     return this.accountRegionScope().iam();
+  }
+
+  /**
+   * Get simulated Lambda in the default Account Region scope.
+   */
+  lambda(): SimLambda {
+    return this.accountRegionScope().lambda();
   }
 
   /**

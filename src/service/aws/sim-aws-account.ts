@@ -10,6 +10,7 @@ import type { SimCloudFormation } from "../cloudformation/index.js";
 import type { SimAcm } from "../acm/sim-acm.js";
 import type { SimRoute53 } from "../route53/index.js";
 import type { SimIam } from "../iam/index.js";
+import type { SimLambda } from "../lambda/index.js";
 import type { SimAwsPrincipal } from "./caller/sim-aws-caller.js";
 import { makeSimAwsAccountRootPrincipal } from "./caller/sim-aws-account-root-principal.js";
 import type { SimSts } from "../sts/sim-sts.js";
@@ -89,6 +90,13 @@ export class SimAwsAccount {
    */
   iam(): SimIam {
     return this.region().iam();
+  }
+
+  /**
+   * Get simulated Lambda for this Account's default Region.
+   */
+  lambda(): SimLambda {
+    return this.region().lambda();
   }
 
   /**
