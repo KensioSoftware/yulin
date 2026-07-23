@@ -41,6 +41,8 @@ import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { SimCloudFrontSdkCommandRouter } from "./sdk/sim-cloudfront-sdk-command-router.js";
+import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
 
 export interface SimCloudFrontRequestOptions {
   readonly caller?: SimAwsCaller;
@@ -75,6 +77,7 @@ export class SimCloudFront {
   private readonly cfnFactory = new SimCloudFrontCloudFormationResourceFactory(
     this,
   );
+  private readonly sdkRouter = new SimCloudFrontSdkCommandRouter(this);
 
   constructor(properties: SimCloudFrontProperties = {}) {
     const {
@@ -197,5 +200,12 @@ export class SimCloudFront {
    */
   cfnResourceFactory(): SimCfnServiceResourceFactory {
     return this.cfnFactory;
+  }
+
+  /**
+   * Get this service's SDK Command router for SDK client interception.
+   */
+  sdkCommandRouter(): SimSdkCommandRouter {
+    return this.sdkRouter;
   }
 }

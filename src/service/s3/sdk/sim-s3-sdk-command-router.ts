@@ -1,8 +1,8 @@
 import type {
   SimSdkCommandRoute,
   SimSdkCommandRouter,
-} from "../../../sdk/router/sim-sdk-command-router.type.js";
-import { simSdkStreamBody } from "../../../sdk/stream/sim-sdk-stream-body.js";
+} from "../../../sdk/index.js";
+import { simSdkStreamBody } from "../../../sdk/index.js";
 import type { SimCreateBucketCommand } from "../command/create-bucket/create-bucket.cmd.js";
 import type {
   SimGetObjectCommand,

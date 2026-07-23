@@ -29,9 +29,57 @@ npm i -D @kensio/yulin
 
 ## Usage
 
+### Intercept AWS SDK clients
+
+If your code uses the AWS SDK, you can intercept AWS SDK clients and route their Commands to
+simulated AWS services. Your implementation code uses the SDK as normal and never needs to know that
+it's dealing with a simulator behind the scenes:
+
+```typescript
+import {
+  CreateBucketCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
+import { SimSdk } from "@kensio/yulin/sdk";
+
+const simSdk = new SimSdk();
+simSdk.intercept(S3Client); // Intercepts every instance of the client class.
+
+// The code under test uses the AWS SDK as normal.
+const s3Client = new S3Client({ region: "eu-west-2" });
+await s3Client.send(new CreateBucketCommand({ Bucket: "foo-bucket" }));
+await s3Client.send(
+  new PutObjectCommand({
+    Bucket: "foo-bucket",
+    Key: "foo.txt",
+    Body: "Hello, world!",
+  }),
+);
+
+const output = await s3Client.send(
+  new GetObjectCommand({ Bucket: "foo-bucket", Key: "foo.txt" }),
+);
+console.log(await output.Body?.transformToString()); // "Hello, world!"
+
+simSdk.restoreAll(); // Or `using simSdk = new SimSdk();` to restore on scope exit.
+```
+
+You can intercept a client class, as above, or a single client instance. The simulated Account and
+Region scope is resolved per send: the Region comes from the sending client's configuration, and
+the Account from the ambient `simAws.runAs(...)` caller when one is set, falling back to the
+simulation defaults.
+
+Each `SimSdk` owns its own isolated simulated AWS, available as `simSdk.simAws` when a test needs
+to seed or inspect simulated state directly. To share state with an existing simulation, wrap it
+with `new SimSdk({ simAws })`.
+
+See the [simulated AWS SDK docs](./docs/sdk "Simulated AWS SDK docs") for full usage.
+
 ### Direct interaction with simulated AWS
 
-Create and interact directly with a simulated AWS:
+You can also create and interact directly with a simulated AWS:
 
 ```typescript
 import { SimAws } from "@kensio/yulin";

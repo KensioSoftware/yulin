@@ -11,9 +11,9 @@ import {
 /**
  * Stores and authenticates simulated IAM access keys.
  *
- * The registry is deliberately agnostic about the principal type represented
- * by an access key. Temporary sessions and future IAM-user access keys share
- * the same lookup and authentication behavior.
+ * The registry is agnostic about the principal type represented by an access
+ * key. Temporary sessions and future IAM-user access keys share the same lookup
+ * and authentication behavior.
  */
 export class SimIamCredentialRegistry {
   private readonly accessKeys = new Map<string, SimIamAccessKey>();

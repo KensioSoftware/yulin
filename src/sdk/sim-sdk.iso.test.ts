@@ -7,7 +7,6 @@ import {
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
-import { DynamoDBClient, ListTablesCommand } from "@aws-sdk/client-dynamodb";
 import {
   assertFalse,
   assertIdentical,
@@ -23,6 +22,11 @@ import {
   SimSdkInvalidClientError,
 } from "./error/sim-sdk.error.js";
 import { SimSdk } from "./sim-sdk.js";
+
+interface SdkClientLike {
+  readonly config: { readonly serviceId: string; readonly region: string };
+  send(command: object): Promise<unknown>;
+}
 
 describe("simulated AWS SDK", () => {
   it("round-trips S3 Commands through an intercepted client alone", async () => {
@@ -242,14 +246,18 @@ describe("simulated AWS SDK", () => {
 
   it("rejects a client for a service without SDK interception support", async () => {
     using simSdk = new SimSdk();
-    const client = new DynamoDBClient({ region: "us-east-1" });
+    // A structurally valid SDK client for a service Yulin does not simulate.
+    const client: SdkClientLike = {
+      config: { serviceId: "SQS", region: "us-east-1" },
+      send: () => Promise.resolve("real send"),
+    };
     simSdk.intercept(client);
 
     const error = await assertThrowsErrorAsync(async () => {
-      await client.send(new ListTablesCommand({}));
+      await client.send({ input: {} });
     });
 
-    assertStringIncludes(error.message, "DynamoDB");
+    assertStringIncludes(error.message, "SQS");
   });
 
   it("rejects intercepting a client that is already intercepted", () => {

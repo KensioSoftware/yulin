@@ -12,6 +12,8 @@ import { SimIamRegistry } from "../iam/registry/sim-iam-registry.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import type { SimAwsPrincipal } from "../aws/caller/sim-aws-caller.js";
+import { SimStsSdkCommandRouter } from "./sdk/sim-sts-sdk-command-router.js";
+import type { SimSdkCommandRouter } from "../../sdk/index.js";
 
 interface SimStsProperties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
@@ -30,6 +32,7 @@ export class SimSts {
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly background: BackgroundScheduler;
   private readonly iamResolver: SimIamAccountResolver;
+  private readonly sdkRouter = new SimStsSdkCommandRouter(this);
 
   constructor(properties: SimStsProperties = {}) {
     this.accountRegionScope =
@@ -53,5 +56,12 @@ export class SimSts {
       background: this.background,
     });
     return await handler.handle(command, options);
+  }
+
+  /**
+   * Get this service's SDK Command router for SDK client interception.
+   */
+  sdkCommandRouter(): SimSdkCommandRouter {
+    return this.sdkRouter;
   }
 }

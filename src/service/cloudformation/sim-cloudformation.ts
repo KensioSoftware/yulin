@@ -27,6 +27,8 @@ import {
 import type { SimCloudFormationDeployTemplateFileProps as SimCloudFormationDeployTemplateFileProperties } from "./deploy/sim-cfn-template-file-loader.js";
 import type { SimCfnExecutableResourceBinding } from "./bind/sim-cfn-exec-binding.type.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
+import { SimCloudFormationSdkCommandRouter } from "./sdk/sim-cloudformation-sdk-command-router.js";
+import type { SimSdkCommandRouter } from "../../sdk/index.js";
 
 interface SimCloudFormationProperties {
   readonly simAws: SimAws;
@@ -44,6 +46,7 @@ export class SimCloudFormation {
   private readonly background: BackgroundScheduler & BackgroundCompleter;
   private readonly stacks = new Map<SimCloudFormationStackName, SimCfnStack>();
   private readonly templateDeployer: SimCloudFormationTemplateDeployer;
+  private readonly sdkRouter = new SimCloudFormationSdkCommandRouter(this);
 
   constructor(properties: SimCloudFormationProperties) {
     const {
@@ -124,6 +127,13 @@ export class SimCloudFormation {
     properties: SimCloudFormationDeployTemplateFileProperties | string,
   ): Promise<SimCfnStack> {
     return await this.templateDeployer.deployTemplateFile(properties);
+  }
+
+  /**
+   * Get this service's SDK Command router for SDK client interception.
+   */
+  sdkCommandRouter(): SimSdkCommandRouter {
+    return this.sdkRouter;
   }
 
   private async createStackWithContext(
