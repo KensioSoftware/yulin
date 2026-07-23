@@ -72,6 +72,10 @@
       "import": "./dist/service/route53/index.js",
       "types": "./dist/service/route53/index.d.ts"
     },
+    "./sdk": {
+      "import": "./dist/sdk/index.js",
+      "types": "./dist/sdk/index.d.ts"
+    },
     "./serve": {
       "import": "./dist/serve/index.js",
       "types": "./dist/serve/index.d.ts"

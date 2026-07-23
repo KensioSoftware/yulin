@@ -1,0 +1,95 @@
+import type {
+  SimSdkCommandRoute,
+  SimSdkCommandRouter,
+} from "../../../sdk/router/sim-sdk-command-router.type.js";
+import { simSdkStreamBody } from "../../../sdk/stream/sim-sdk-stream-body.js";
+import type { SimCreateBucketCommand } from "../command/create-bucket/create-bucket.cmd.js";
+import type {
+  SimGetObjectCommand,
+  SimGetObjectCommandOutput,
+} from "../command/get-object/get-object.cmd.js";
+import type { SimListBucketsCommand } from "../command/list-buckets/list-buckets.cmd.js";
+import type { SimListObjectsCommand } from "../command/list-objects/list-objects.cmd.js";
+import type { SimPutBucketPolicyCommand } from "../command/put-bucket-policy/put-bucket-policy.cmd.js";
+import type { SimPutBucketWebsiteCommand } from "../command/put-bucket-website/put-bucket-website.cmd.js";
+import type { SimPutObjectCommand } from "../command/put-object/put-object.cmd.js";
+import type { SimS3 } from "../sim-s3.js";
+
+/**
+ * Routes intercepted SDK Commands to one scoped simulated S3 instance.
+ */
+export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
+  private readonly routes: ReadonlyMap<string, SimSdkCommandRoute>;
+
+  constructor(simS3: SimS3) {
+    this.routes = new Map<string, SimSdkCommandRoute>([
+      [
+        "CreateBucketCommand",
+        async (command): Promise<unknown> =>
+          await simS3.createBucket(command as SimCreateBucketCommand),
+      ],
+      [
+        "GetObjectCommand",
+        async (command): Promise<unknown> =>
+          await getObjectWithSdkStreamBody(
+            simS3,
+            command as SimGetObjectCommand,
+          ),
+      ],
+      [
+        "ListBucketsCommand",
+        async (command): Promise<unknown> =>
+          await simS3.listBuckets(command as SimListBucketsCommand),
+      ],
+      [
+        "ListObjectsCommand",
+        async (command): Promise<unknown> =>
+          await simS3.listObjects(command as SimListObjectsCommand),
+      ],
+      [
+        "PutBucketPolicyCommand",
+        async (command): Promise<unknown> =>
+          await simS3.putBucketPolicy(command as SimPutBucketPolicyCommand),
+      ],
+      [
+        "PutBucketWebsiteCommand",
+        async (command): Promise<unknown> =>
+          await simS3.putBucketWebsite(command as SimPutBucketWebsiteCommand),
+      ],
+      [
+        "PutObjectCommand",
+        async (command): Promise<unknown> =>
+          await simS3.putObject(command as SimPutObjectCommand),
+      ],
+    ]);
+  }
+
+  /**
+   * The SDK Command names simulated S3 can handle.
+   */
+  supportedCommandNames(): readonly string[] {
+    return this.routes.keys().toArray();
+  }
+
+  /**
+   * Get the route for an SDK Command name, if simulated S3 supports it.
+   */
+  route(commandName: string): SimSdkCommandRoute | undefined {
+    return this.routes.get(commandName);
+  }
+}
+
+/**
+ * Get an Object and mix the SDK stream transform methods into its Body, so
+ * SDK callers can use e.g. Body.transformToString() as with real S3.
+ */
+async function getObjectWithSdkStreamBody(
+  simS3: SimS3,
+  command: SimGetObjectCommand,
+): Promise<SimGetObjectCommandOutput> {
+  const output = await simS3.getObject(command);
+  if (output.Body === undefined) {
+    return output;
+  }
+  return { ...output, Body: simSdkStreamBody(output.Body) };
+}

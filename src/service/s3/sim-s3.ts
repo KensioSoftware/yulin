@@ -50,6 +50,8 @@ import type {
   SimPutBucketPolicyCommandOutput,
 } from "./command/put-bucket-policy/put-bucket-policy.cmd.js";
 import { PutBucketPolicyCommandHandler } from "./command/put-bucket-policy/put-bucket-policy.handler.js";
+import { SimS3SdkCommandRouter } from "./sdk/sim-s3-sdk-command-router.js";
+import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
 
 export interface SimS3RequestOptions {
   readonly caller?: SimAwsCaller;
@@ -75,6 +77,7 @@ export class SimS3 {
   private readonly iam: SimIamInterServiceAuthZ;
   private readonly background: BackgroundScheduler;
   private readonly cfnFactory = new SimS3CloudFormationResourceFactory(this);
+  private readonly sdkRouter = new SimS3SdkCommandRouter(this);
 
   constructor(properties: SimS3Properties = {}) {
     const {
@@ -244,5 +247,12 @@ export class SimS3 {
    */
   cfnResourceFactory(): SimCfnServiceResourceFactory {
     return this.cfnFactory;
+  }
+
+  /**
+   * Get this service's SDK Command router for SDK client interception.
+   */
+  sdkCommandRouter(): SimSdkCommandRouter {
+    return this.sdkRouter;
   }
 }
