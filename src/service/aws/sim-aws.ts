@@ -26,6 +26,8 @@ import type { SimAcm } from "../acm/sim-acm.js";
 import type { SimIam } from "../iam/index.js";
 import type { SimIamRegistry } from "../iam/registry/sim-iam-registry.js";
 import type { SimSts } from "../sts/sim-sts.js";
+import type { SimAwsPrincipal } from "./caller/sim-aws-caller.js";
+import { simAwsRunAsContext } from "./caller/sim-aws-run-as-context.js";
 
 interface SimAwsProperties {
   readonly defaultAccountId?: SimAwsAccountId;
@@ -164,6 +166,17 @@ export class SimAws {
    */
   cloudFrontRegistry(): SimCloudFrontRegistry {
     return this.serviceFactory.cloudFrontRegistry;
+  }
+
+  /**
+   * Run a function with an ambient simulated caller for this SimAws instance.
+   *
+   * Simulated AWS operations during the run resolve this caller when no
+   * explicit caller is given, including SDK Commands routed by interception.
+   * Runs may be nested; the innermost caller wins.
+   */
+  async runAs<T>(caller: SimAwsPrincipal, run: () => Promise<T>): Promise<T> {
+    return await simAwsRunAsContext.run(this, caller, run);
   }
 
   /**
