@@ -4,12 +4,16 @@
     "noEmit": true,
     "paths": {
       "@kensio/yulin": ["../src/index.ts"],
+      "@kensio/yulin/cloudformation": [
+        "../src/service/cloudformation/index.ts"
+      ],
       "@kensio/yulin/cloudfront": ["../src/service/cloudfront/index.ts"],
       "@kensio/yulin/cloudfront/globals": [
         "../src/service/cloudfront/globals.ts"
       ],
       "@kensio/yulin/dynamodb": ["../src/service/dynamodb/index.ts"],
       "@kensio/yulin/eslint": ["../src/config/eslint/index.ts"],
+      "@kensio/yulin/iam": ["../src/service/iam/index.ts"],
       "@kensio/yulin/route53": ["../src/service/route53/index.ts"],
       "@kensio/yulin/s3": ["../src/service/s3/index.ts"],
       "@kensio/yulin/serve": ["../src/serve/index.ts"]
