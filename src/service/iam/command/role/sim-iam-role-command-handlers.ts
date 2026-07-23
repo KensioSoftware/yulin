@@ -1,4 +1,6 @@
 import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
+import type { SimIamActionAuthorizer } from "../../authorize/sim-iam-action-authorizer.js";
+import type { SimIamRequestOptions } from "../sim-iam-request-options.js";
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import type { SimIamRole, SimIamRoleName } from "../../role/sim-iam-role.js";
 import { CreateRoleCommandHandler } from "./create-role/create-role.handler.js";
@@ -31,6 +33,7 @@ interface SimIamRoleCommandHandlersProperties {
   readonly accountId: SimAwsAccountId;
   readonly roles: Map<SimIamRoleName, SimIamRole>;
   readonly background: BackgroundScheduler;
+  readonly authorizer: SimIamActionAuthorizer;
 }
 
 /**
@@ -46,13 +49,15 @@ export class SimIamRoleCommandHandlers {
   private readonly accountId: SimAwsAccountId;
   private readonly roles: Map<SimIamRoleName, SimIamRole>;
   private readonly background: BackgroundScheduler;
+  private readonly authorizer: SimIamActionAuthorizer;
 
   constructor(properties: SimIamRoleCommandHandlersProperties) {
-    const { accountId, roles, background } = properties;
+    const { accountId, roles, background, authorizer } = properties;
 
     this.accountId = accountId;
     this.roles = roles;
     this.background = background;
+    this.authorizer = authorizer;
   }
 
   /**
@@ -60,7 +65,13 @@ export class SimIamRoleCommandHandlers {
    */
   async createRole(
     command: SimCreateRoleCommand,
+    options?: SimIamRequestOptions,
   ): Promise<SimCreateRoleCommandOutput> {
+    this.authorizer.authorize(
+      "iam:CreateRole",
+      this.roleArn(command.input.RoleName),
+      options?.caller,
+    );
     const handler = new CreateRoleCommandHandler({
       accountId: this.accountId,
       roles: this.roles,
@@ -72,7 +83,15 @@ export class SimIamRoleCommandHandlers {
   /**
    * Handle a GetRole command from the SDK.
    */
-  async getRole(command: SimGetRoleCommand): Promise<SimGetRoleCommandOutput> {
+  async getRole(
+    command: SimGetRoleCommand,
+    options?: SimIamRequestOptions,
+  ): Promise<SimGetRoleCommandOutput> {
+    this.authorizer.authorize(
+      "iam:GetRole",
+      this.roleArn(command.input.RoleName),
+      options?.caller,
+    );
     const handler = new GetRoleCommandHandler({
       roles: this.roles,
       background: this.background,
@@ -85,7 +104,9 @@ export class SimIamRoleCommandHandlers {
    */
   async listRoles(
     command: SimListRolesCommand,
+    options?: SimIamRequestOptions,
   ): Promise<SimListRolesCommandOutput> {
+    this.authorizer.authorize("iam:ListRoles", "*", options?.caller);
     const handler = new ListRolesCommandHandler({
       roles: this.roles,
       background: this.background,
@@ -98,7 +119,13 @@ export class SimIamRoleCommandHandlers {
    */
   async putRolePolicy(
     command: SimPutRolePolicyCommand,
+    options?: SimIamRequestOptions,
   ): Promise<SimPutRolePolicyCommandOutput> {
+    this.authorizer.authorize(
+      "iam:PutRolePolicy",
+      this.roleArn(command.input.RoleName),
+      options?.caller,
+    );
     const handler = new PutRolePolicyCommandHandler({
       roles: this.roles,
       background: this.background,
@@ -111,11 +138,24 @@ export class SimIamRoleCommandHandlers {
    */
   async attachRolePolicy(
     command: SimAttachRolePolicyCommand,
+    options?: SimIamRequestOptions,
   ): Promise<SimAttachRolePolicyCommandOutput> {
+    this.authorizer.authorize(
+      "iam:AttachRolePolicy",
+      this.roleArn(command.input.RoleName),
+      options?.caller,
+    );
     const handler = new AttachRolePolicyCommandHandler({
       roles: this.roles,
       background: this.background,
     });
     return await handler.handle(command);
+  }
+
+  /**
+   * The Role ARN a command operates on, for authorization.
+   */
+  private roleArn(roleName: string | undefined): string {
+    return `arn:aws:iam::${this.accountId}:role/${roleName ?? "*"}`;
   }
 }

@@ -109,6 +109,7 @@ export class SimAwsServiceFactory {
     return new SimCloudFormation({
       simAws: this.simAws,
       accountRegionScope: scope.accountRegionScope,
+      iam: this.createIam(scope),
       background: this.background,
     });
   }

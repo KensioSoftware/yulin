@@ -1,4 +1,6 @@
 import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
+import type { SimIamActionAuthorizer } from "../../authorize/sim-iam-action-authorizer.js";
+import type { SimIamRequestOptions } from "../sim-iam-request-options.js";
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import type { SimIamCredentialRegistry } from "../../credential/sim-iam-credential-registry.js";
 import type { SimIamUserCredentialGenerator } from "../../credential/user/sim-iam-user-credential-generator.js";
@@ -20,6 +22,7 @@ interface SimIamUserCommandHandlersProperties {
   readonly credentialRegistry: SimIamCredentialRegistry;
   readonly credentialGenerator: SimIamUserCredentialGenerator;
   readonly background: BackgroundScheduler;
+  readonly authorizer: SimIamActionAuthorizer;
 }
 
 /**
@@ -35,6 +38,7 @@ export class SimIamUserCommandHandlers {
   private readonly credentialRegistry: SimIamCredentialRegistry;
   private readonly credentialGenerator: SimIamUserCredentialGenerator;
   private readonly background: BackgroundScheduler;
+  private readonly authorizer: SimIamActionAuthorizer;
 
   constructor(properties: SimIamUserCommandHandlersProperties) {
     const {
@@ -43,6 +47,7 @@ export class SimIamUserCommandHandlers {
       credentialRegistry,
       credentialGenerator,
       background,
+      authorizer,
     } = properties;
 
     this.accountId = accountId;
@@ -50,6 +55,7 @@ export class SimIamUserCommandHandlers {
     this.credentialRegistry = credentialRegistry;
     this.credentialGenerator = credentialGenerator;
     this.background = background;
+    this.authorizer = authorizer;
   }
 
   /**
@@ -57,7 +63,13 @@ export class SimIamUserCommandHandlers {
    */
   async createUser(
     command: SimCreateUserCommand,
+    options?: SimIamRequestOptions,
   ): Promise<SimCreateUserCommandOutput> {
+    this.authorizer.authorize(
+      "iam:CreateUser",
+      this.userArn(command.input.UserName),
+      options?.caller,
+    );
     const handler = new CreateUserCommandHandler({
       accountId: this.accountId,
       users: this.users,
@@ -71,7 +83,13 @@ export class SimIamUserCommandHandlers {
    */
   async createAccessKey(
     command: SimCreateAccessKeyCommand,
+    options?: SimIamRequestOptions,
   ): Promise<SimCreateAccessKeyCommandOutput> {
+    this.authorizer.authorize(
+      "iam:CreateAccessKey",
+      this.userArn(command.input.UserName),
+      options?.caller,
+    );
     const handler = new CreateAccessKeyCommandHandler({
       users: this.users,
       credentialRegistry: this.credentialRegistry,
@@ -79,5 +97,12 @@ export class SimIamUserCommandHandlers {
       background: this.background,
     });
     return await handler.handle(command);
+  }
+
+  /**
+   * The User ARN a command operates on, for authorization.
+   */
+  private userArn(username: string | undefined): string {
+    return `arn:aws:iam::${this.accountId}:user/${username ?? "*"}`;
   }
 }
