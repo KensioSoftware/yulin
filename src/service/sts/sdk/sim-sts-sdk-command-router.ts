@@ -1,6 +1,7 @@
-import type {
-  SimSdkCommandRoute,
-  SimSdkCommandRouter,
+import {
+  simSdkCallerOptions,
+  type SimSdkCommandRoute,
+  type SimSdkCommandRouter,
 } from "../../../sdk/index.js";
 import type { SimAssumeRoleCommand } from "../command/assume-role/assume-role.cmd.js";
 import type { SimSts } from "../sim-sts.js";
@@ -15,8 +16,11 @@ export class SimStsSdkCommandRouter implements SimSdkCommandRouter {
     this.routes = new Map<string, SimSdkCommandRoute>([
       [
         "AssumeRoleCommand",
-        async (command): Promise<unknown> =>
-          await simSts.assumeRole(command as SimAssumeRoleCommand),
+        async (command, context): Promise<unknown> =>
+          await simSts.assumeRole(
+            command as SimAssumeRoleCommand,
+            simSdkCallerOptions(context),
+          ),
       ],
     ]);
   }

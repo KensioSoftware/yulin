@@ -9,11 +9,13 @@ import {
 } from "@aws-sdk/client-dynamodb";
 import {
   assertIdentical,
+  assertInstanceOf,
   assertNonNullable,
   assertStringIncludes,
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import { SimSdk } from "../../../sdk/index.js";
+import { SimIamAccessDenied } from "../../iam/error/sim-iam.error.js";
 
 describe("simulated DynamoDB SDK Command routing", () => {
   it("round-trips Table Commands through an intercepted client", async () => {
@@ -70,6 +72,35 @@ describe("simulated DynamoDB SDK Command routing", () => {
     );
 
     assertNonNullable(putOut.$metadata);
+  });
+
+  it("does not give a denied run-as caller root privileges", async () => {
+    using simSdk = new SimSdk();
+    const accountId = simSdk.simAws.defaultAccountId;
+    const client = new DynamoDBClient({ region: "us-east-1" });
+    simSdk.intercept(client);
+
+    // The ambient caller has no IAM permissions, so intercepted Commands
+    // must be authorized as that caller and denied, rather than falling back
+    // to the Account root default.
+    const error = await assertThrowsErrorAsync(async () => {
+      await simSdk.simAws.runAs(
+        { kind: "arn", arn: `arn:aws:iam::${accountId}:role/NoPermsRole` },
+        async () => {
+          await client.send(
+            new CreateTableCommand({
+              TableName: "DeniedTable",
+              KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+            }),
+          );
+        },
+      );
+    });
+    assertInstanceOf(error, SimIamAccessDenied);
+
+    // And no Table was created with root privileges.
+    const listOut = await client.send(new ListTablesCommand({}));
+    assertIdentical(listOut.TableNames?.length, 0);
   });
 
   it("rejects a Command simulated DynamoDB does not support", async () => {

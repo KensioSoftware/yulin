@@ -78,15 +78,21 @@ The simulated Account and Region scope is resolved for each sent Command, never 
 2. The **Account** comes from the ambient `simAws.runAs(...)` caller when one is set, falling back
    to the simulation default Account.
 
+The resolved caller is passed through to the simulated service, so simulated
+[IAM](../services/iam/) authorization applies to it exactly as for direct sim service use: a
+caller without permission for a Command is denied, like real AWS. When no caller can be
+identified, Commands run as the simulation's default Account root.
+
 `runAs` runs a function with an ambient simulated caller, such as an IAM Role. Commands sent
-during the run are attributed to that caller's Account — with no changes to the client or the code
-under test:
+during the run are attributed to that caller — with no changes to the client or the code under
+test:
 
 ```typescript sim-sdk-run-as
 /**
  * Attributing intercepted SDK Commands to a caller with runAs.
  */
 
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
   CreateBucketCommand,
   ListBucketsCommand,
@@ -98,11 +104,38 @@ import { SimSdk } from "@kensio/yulin/sdk";
 const simAws = new SimAws();
 const simSdk = new SimSdk({ simAws });
 
-// Seed a Bucket in a specific simulated Account.
-await simAws
-  .account("222222222222")
+// Seed a Bucket, and a Role allowed to list Buckets, in a simulated Account.
+const account = simAws.account("222222222222");
+await account
   .s3()
   .createBucket(new CreateBucketCommand({ Bucket: "team-bucket" }));
+await account.iam().createRole(
+  new CreateRoleCommand({
+    RoleName: "TeamRole",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { AWS: "arn:aws:iam::222222222222:root" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+await account.iam().putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "TeamRole",
+    PolicyName: "list-buckets",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: "s3:ListAllMyBuckets",
+        Resource: "*",
+      },
+    }),
+  }),
+);
 
 const s3Client = new S3Client({ region: "us-east-1" });
 simSdk.intercept(s3Client);
@@ -110,7 +143,8 @@ simSdk.intercept(s3Client);
 await simAws.runAs(
   { kind: "arn", arn: "arn:aws:iam::222222222222:role/TeamRole" },
   async () => {
-    // Sent as the TeamRole caller, so resolved in Account 222222222222.
+    // Sent as the TeamRole caller: resolved in Account 222222222222 and
+    // authorized against the Role's simulated IAM permissions.
     const output = await s3Client.send(new ListBucketsCommand({}));
     console.log(output.Buckets); // [{ Name: "team-bucket" }]
   },

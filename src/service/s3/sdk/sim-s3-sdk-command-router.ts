@@ -1,8 +1,9 @@
 import type {
+  SimSdkCallerOptions,
   SimSdkCommandRoute,
   SimSdkCommandRouter,
 } from "../../../sdk/index.js";
-import { simSdkStreamBody } from "../../../sdk/index.js";
+import { simSdkCallerOptions, simSdkStreamBody } from "../../../sdk/index.js";
 import type { SimCreateBucketCommand } from "../command/create-bucket/create-bucket.cmd.js";
 import type {
   SimGetObjectCommand,
@@ -25,41 +26,60 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
     this.routes = new Map<string, SimSdkCommandRoute>([
       [
         "CreateBucketCommand",
-        async (command): Promise<unknown> =>
-          await simS3.createBucket(command as SimCreateBucketCommand),
+        async (command, context): Promise<unknown> =>
+          await simS3.createBucket(
+            command as SimCreateBucketCommand,
+            simSdkCallerOptions(context),
+          ),
       ],
       [
         "GetObjectCommand",
-        async (command): Promise<unknown> =>
+        async (command, context): Promise<unknown> =>
           await getObjectWithSdkStreamBody(
             simS3,
             command as SimGetObjectCommand,
+            simSdkCallerOptions(context),
           ),
       ],
       [
         "ListBucketsCommand",
-        async (command): Promise<unknown> =>
-          await simS3.listBuckets(command as SimListBucketsCommand),
+        async (command, context): Promise<unknown> =>
+          await simS3.listBuckets(
+            command as SimListBucketsCommand,
+            simSdkCallerOptions(context),
+          ),
       ],
       [
         "ListObjectsCommand",
-        async (command): Promise<unknown> =>
-          await simS3.listObjects(command as SimListObjectsCommand),
+        async (command, context): Promise<unknown> =>
+          await simS3.listObjects(
+            command as SimListObjectsCommand,
+            simSdkCallerOptions(context),
+          ),
       ],
       [
         "PutBucketPolicyCommand",
-        async (command): Promise<unknown> =>
-          await simS3.putBucketPolicy(command as SimPutBucketPolicyCommand),
+        async (command, context): Promise<unknown> =>
+          await simS3.putBucketPolicy(
+            command as SimPutBucketPolicyCommand,
+            simSdkCallerOptions(context),
+          ),
       ],
       [
         "PutBucketWebsiteCommand",
-        async (command): Promise<unknown> =>
-          await simS3.putBucketWebsite(command as SimPutBucketWebsiteCommand),
+        async (command, context): Promise<unknown> =>
+          await simS3.putBucketWebsite(
+            command as SimPutBucketWebsiteCommand,
+            simSdkCallerOptions(context),
+          ),
       ],
       [
         "PutObjectCommand",
-        async (command): Promise<unknown> =>
-          await simS3.putObject(command as SimPutObjectCommand),
+        async (command, context): Promise<unknown> =>
+          await simS3.putObject(
+            command as SimPutObjectCommand,
+            simSdkCallerOptions(context),
+          ),
       ],
     ]);
   }
@@ -86,8 +106,9 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
 async function getObjectWithSdkStreamBody(
   simS3: SimS3,
   command: SimGetObjectCommand,
+  options: SimSdkCallerOptions | undefined,
 ): Promise<SimGetObjectCommandOutput> {
-  const output = await simS3.getObject(command);
+  const output = await simS3.getObject(command, options);
   if (output.Body === undefined) {
     return output;
   }

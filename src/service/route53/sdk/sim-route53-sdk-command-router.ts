@@ -1,6 +1,7 @@
-import type {
-  SimSdkCommandRoute,
-  SimSdkCommandRouter,
+import {
+  simSdkCallerOptions,
+  type SimSdkCommandRoute,
+  type SimSdkCommandRouter,
 } from "../../../sdk/index.js";
 import type { SimChangeResourceRecordSetsCommand } from "../command/change-resource-record-sets/change-resource-record-sets.cmd.js";
 import type { SimCreateHostedZoneCommand } from "../command/create-hosted-zone/create-hosted-zone.cmd.js";
@@ -18,28 +19,34 @@ export class SimRoute53SdkCommandRouter implements SimSdkCommandRouter {
     this.routes = new Map<string, SimSdkCommandRoute>([
       [
         "ChangeResourceRecordSetsCommand",
-        async (command): Promise<unknown> =>
+        async (command, context): Promise<unknown> =>
           await simRoute53.changeResourceRecordSets(
             command as SimChangeResourceRecordSetsCommand,
+            simSdkCallerOptions(context),
           ),
       ],
       [
         "CreateHostedZoneCommand",
-        async (command): Promise<unknown> =>
+        async (command, context): Promise<unknown> =>
           await simRoute53.createHostedZone(
             command as SimCreateHostedZoneCommand,
+            simSdkCallerOptions(context),
           ),
       ],
       [
         "GetHostedZoneCommand",
-        async (command): Promise<unknown> =>
-          await simRoute53.getHostedZone(command as SimGetHostedZoneCommand),
+        async (command, context): Promise<unknown> =>
+          await simRoute53.getHostedZone(
+            command as SimGetHostedZoneCommand,
+            simSdkCallerOptions(context),
+          ),
       ],
       [
         "ListHostedZonesByNameCommand",
-        async (command): Promise<unknown> =>
+        async (command, context): Promise<unknown> =>
           await simRoute53.listHostedZonesByName(
             command as SimListHostedZonesByNameCommand,
+            simSdkCallerOptions(context),
           ),
       ],
     ]);

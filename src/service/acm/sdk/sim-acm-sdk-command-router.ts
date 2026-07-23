@@ -1,7 +1,8 @@
-import type {
-  SimSdkCommandRoute,
-  SimSdkCommandRouter,
-} from "../../../sdk/router/sim-sdk-command-router.type.js";
+import {
+  simSdkCallerOptions,
+  type SimSdkCommandRoute,
+  type SimSdkCommandRouter,
+} from "../../../sdk/index.js";
 import type { SimDescribeCertificateCommand } from "../command/describe-certificate/describe-certificate.cmd.js";
 import type { SimListCertificatesCommand } from "../command/list-certificates/list-certificates.cmd.js";
 import type { SimRequestCertificateCommand } from "../command/request-certificate/request-certificate.cmd.js";
@@ -17,21 +18,26 @@ export class SimAcmSdkCommandRouter implements SimSdkCommandRouter {
     this.routes = new Map<string, SimSdkCommandRoute>([
       [
         "DescribeCertificateCommand",
-        async (command): Promise<unknown> =>
+        async (command, context): Promise<unknown> =>
           await simAcm.describeCertificate(
             command as SimDescribeCertificateCommand,
+            simSdkCallerOptions(context),
           ),
       ],
       [
         "ListCertificatesCommand",
-        async (command): Promise<unknown> =>
-          await simAcm.listCertificates(command as SimListCertificatesCommand),
+        async (command, context): Promise<unknown> =>
+          await simAcm.listCertificates(
+            command as SimListCertificatesCommand,
+            simSdkCallerOptions(context),
+          ),
       ],
       [
         "RequestCertificateCommand",
-        async (command): Promise<unknown> =>
+        async (command, context): Promise<unknown> =>
           await simAcm.requestCertificate(
             command as SimRequestCertificateCommand,
+            simSdkCallerOptions(context),
           ),
       ],
     ]);

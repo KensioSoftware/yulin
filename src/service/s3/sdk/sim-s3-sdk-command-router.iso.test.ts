@@ -103,7 +103,7 @@ describe("simulated S3 SDK Command routing", () => {
 
     const route = router.route("GetObjectCommand");
     assertDefined(route, "GetObjectCommand route should exist");
-    const output = await route({ input: {} });
+    const output = await route({ input: {} }, {});
 
     assertIdentical((output as { Body?: unknown }).Body, undefined);
   });

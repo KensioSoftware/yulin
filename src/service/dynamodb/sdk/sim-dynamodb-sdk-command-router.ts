@@ -1,6 +1,7 @@
-import type {
-  SimSdkCommandRoute,
-  SimSdkCommandRouter,
+import {
+  simSdkCallerOptions,
+  type SimSdkCommandRoute,
+  type SimSdkCommandRouter,
 } from "../../../sdk/index.js";
 import type { SimCreateTableCommand } from "../command/create-table/create-table.cmd.js";
 import type { SimDescribeTableCommand } from "../command/describe-table/describe-table.cmd.js";
@@ -18,25 +19,35 @@ export class SimDynamoDatabaseSdkCommandRouter implements SimSdkCommandRouter {
     this.routes = new Map<string, SimSdkCommandRoute>([
       [
         "CreateTableCommand",
-        async (command): Promise<unknown> =>
-          await simDynamoDatabase.createTable(command as SimCreateTableCommand),
+        async (command, context): Promise<unknown> =>
+          await simDynamoDatabase.createTable(
+            command as SimCreateTableCommand,
+            simSdkCallerOptions(context),
+          ),
       ],
       [
         "DescribeTableCommand",
-        async (command): Promise<unknown> =>
+        async (command, context): Promise<unknown> =>
           await simDynamoDatabase.describeTable(
             command as SimDescribeTableCommand,
+            simSdkCallerOptions(context),
           ),
       ],
       [
         "ListTablesCommand",
-        async (command): Promise<unknown> =>
-          await simDynamoDatabase.listTables(command as SimListTablesCommand),
+        async (command, context): Promise<unknown> =>
+          await simDynamoDatabase.listTables(
+            command as SimListTablesCommand,
+            simSdkCallerOptions(context),
+          ),
       ],
       [
         "PutItemCommand",
-        async (command): Promise<unknown> =>
-          await simDynamoDatabase.putItem(command as SimPutItemCommand),
+        async (command, context): Promise<unknown> =>
+          await simDynamoDatabase.putItem(
+            command as SimPutItemCommand,
+            simSdkCallerOptions(context),
+          ),
       ],
     ]);
   }

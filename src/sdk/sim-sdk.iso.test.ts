@@ -7,6 +7,7 @@ import {
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
   assertFalse,
   assertIdentical,
@@ -26,6 +27,46 @@ import { SimSdk } from "./sim-sdk.js";
 interface SdkClientLike {
   readonly config: { readonly serviceId: string; readonly region: string };
   send(command: object): Promise<unknown>;
+}
+
+/**
+ * Create an IAM Role allowed to list Buckets in one simulated Account, so
+ * run-as callers in these tests hold real simulated IAM permissions.
+ */
+async function createBucketListerRole(
+  simAws: SimAws,
+  accountId: string,
+  roleName: string,
+): Promise<string> {
+  const simIam = simAws.account(accountId).iam();
+  await simIam.createRole(
+    new CreateRoleCommand({
+      RoleName: roleName,
+      AssumeRolePolicyDocument: JSON.stringify({
+        Version: "2012-10-17",
+        Statement: {
+          Effect: "Allow",
+          Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+          Action: "sts:AssumeRole",
+        },
+      }),
+    }),
+  );
+  await simIam.putRolePolicy(
+    new PutRolePolicyCommand({
+      RoleName: roleName,
+      PolicyName: "list-buckets",
+      PolicyDocument: JSON.stringify({
+        Version: "2012-10-17",
+        Statement: {
+          Effect: "Allow",
+          Action: "s3:ListAllMyBuckets",
+          Resource: "*",
+        },
+      }),
+    }),
+  );
+  return `arn:aws:iam::${accountId}:role/${roleName}`;
 }
 
 describe("simulated AWS SDK", () => {
@@ -85,6 +126,12 @@ describe("simulated AWS SDK", () => {
       new CreateBucketCommand({ Bucket: "bucket-c" }),
     );
 
+    const roleArn = await createBucketListerRole(
+      simAws,
+      "222222222222",
+      "test-role",
+    );
+
     const client = new S3Client({ region: "us-east-1" });
     simSdk.intercept(client);
 
@@ -94,13 +141,10 @@ describe("simulated AWS SDK", () => {
     const defaultScopeOutput = await client.send(new ListBucketsCommand({}));
     assertIdentical(defaultScopeOutput.Buckets?.length ?? 0, 0);
 
-    await simAws.runAs(
-      { kind: "arn", arn: "arn:aws:iam::222222222222:role/test-role" },
-      async () => {
-        const runAsOutput = await client.send(new ListBucketsCommand({}));
-        assertIdentical(runAsOutput.Buckets?.[0]?.Name, "bucket-c");
-      },
-    );
+    await simAws.runAs({ kind: "arn", arn: roleArn }, async () => {
+      const runAsOutput = await client.send(new ListBucketsCommand({}));
+      assertIdentical(runAsOutput.Buckets?.[0]?.Name, "bucket-c");
+    });
   });
 
   it("resolves each intercepted client's ambient caller from its own SimAws", async () => {
@@ -125,32 +169,35 @@ describe("simulated AWS SDK", () => {
       .s3()
       .createBucket(new CreateBucketCommand({ Bucket: "bucket-other" }));
 
+    const oneRoleArn = await createBucketListerRole(
+      simAws,
+      "222222222222",
+      "one-role",
+    );
+    const otherRoleArn = await createBucketListerRole(
+      otherSimAws,
+      "333333333333",
+      "other-role",
+    );
+
     const client = new S3Client({ region: "us-east-1" });
     simSdk.intercept(client);
     const otherClient = new S3Client({ region: "us-east-1" });
     otherSimSdk.intercept(otherClient);
 
-    await simAws.runAs(
-      { kind: "arn", arn: "arn:aws:iam::222222222222:role/one-role" },
-      async () => {
-        await otherSimAws.runAs(
-          { kind: "arn", arn: "arn:aws:iam::333333333333:role/other-role" },
-          async () => {
-            // client belongs to simAws, so it resolves simAws's own runAs
-            // caller, even inside otherSimAws's nested runAs.
-            const output = await client.send(new ListBucketsCommand({}));
-            assertIdentical(output.Buckets?.[0]?.Name, "bucket-one");
+    await simAws.runAs({ kind: "arn", arn: oneRoleArn }, async () => {
+      await otherSimAws.runAs({ kind: "arn", arn: otherRoleArn }, async () => {
+        // client belongs to simAws, so it resolves simAws's own runAs
+        // caller, even inside otherSimAws's nested runAs.
+        const output = await client.send(new ListBucketsCommand({}));
+        assertIdentical(output.Buckets?.[0]?.Name, "bucket-one");
 
-            // otherClient belongs to otherSimAws, so it resolves the nested
-            // runAs caller from otherSimAws.
-            const otherOutput = await otherClient.send(
-              new ListBucketsCommand({}),
-            );
-            assertIdentical(otherOutput.Buckets?.[0]?.Name, "bucket-other");
-          },
-        );
-      },
-    );
+        // otherClient belongs to otherSimAws, so it resolves the nested
+        // runAs caller from otherSimAws.
+        const otherOutput = await otherClient.send(new ListBucketsCommand({}));
+        assertIdentical(otherOutput.Buckets?.[0]?.Name, "bucket-other");
+      });
+    });
   });
 
   it("restores the real client send when the sim SDK is disposed", () => {

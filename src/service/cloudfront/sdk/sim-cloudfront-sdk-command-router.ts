@@ -1,6 +1,7 @@
-import type {
-  SimSdkCommandRoute,
-  SimSdkCommandRouter,
+import {
+  simSdkCallerOptions,
+  type SimSdkCommandRoute,
+  type SimSdkCommandRouter,
 } from "../../../sdk/index.js";
 import type { SimCreateDistributionCommand } from "../command/create-distribution/create-distribution.cmd.js";
 import type { SimCreateFunctionCommand } from "../command/create-function/create-function.cmd.js";
@@ -18,23 +19,26 @@ export class SimCloudFrontSdkCommandRouter implements SimSdkCommandRouter {
     this.routes = new Map<string, SimSdkCommandRoute>([
       [
         "CreateDistributionCommand",
-        async (command): Promise<unknown> =>
+        async (command, context): Promise<unknown> =>
           await simCloudFront.createDistribution(
             command as SimCreateDistributionCommand,
+            simSdkCallerOptions(context),
           ),
       ],
       [
         "CreateFunctionCommand",
-        async (command): Promise<unknown> =>
+        async (command, context): Promise<unknown> =>
           await simCloudFront.createFunction(
             command as SimCreateFunctionCommand,
+            simSdkCallerOptions(context),
           ),
       ],
       [
         "GetDistributionCommand",
-        async (command): Promise<unknown> =>
+        async (command, context): Promise<unknown> =>
           await simCloudFront.getDistribution(
             command as SimGetDistributionCommand,
+            simSdkCallerOptions(context),
           ),
       ],
     ]);
