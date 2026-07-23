@@ -6,6 +6,7 @@ import {
   assertIdentical,
   assertInstanceOf,
   assertThrowsError,
+  assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import { SimSdkStreamAlreadyConsumedError } from "../error/sim-sdk.error.js";
 import { simSdkStreamBody } from "./sim-sdk-stream-body.js";
@@ -54,6 +55,19 @@ describe("simulated SDK stream body", () => {
     await body.transformToString();
 
     const error = assertThrowsError(() => body.transformToWebStream());
+
+    assertInstanceOf(error, SimSdkStreamAlreadyConsumedError);
+  });
+
+  it("rejects a transform after the body was read directly", async () => {
+    const body = simSdkStreamBody(Readable.from("Hello, world!"));
+
+    const chunks = await Array.fromAsync(body);
+    assertIdentical(chunks.join(""), "Hello, world!");
+
+    const error = await assertThrowsErrorAsync(async () => {
+      await body.transformToString();
+    });
 
     assertInstanceOf(error, SimSdkStreamAlreadyConsumedError);
   });

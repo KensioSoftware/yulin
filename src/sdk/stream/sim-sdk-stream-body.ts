@@ -28,6 +28,21 @@ export type SimSdkStreamBody = Readable & SimSdkStreamBodyMethods;
  */
 export function simSdkStreamBody(body: Readable): SimSdkStreamBody {
   let consumed = false;
+
+  // Node funnels every real consumption path (pipe(), on("data", ...), and
+  // for-await iteration) through calls to the public read(). Overriding it
+  // here, rather than adding a "data"/"readable" listener, detects direct
+  // reads without switching the stream into flowing mode itself, which would
+  // start consuming it before any caller asked for that.
+  const originalRead = body.read.bind(body);
+  body.read = (size?: number): unknown => {
+    const chunk: unknown = originalRead(size);
+    if (chunk !== null) {
+      consumed = true;
+    }
+    return chunk;
+  };
+
   const consume = (): Readable => {
     if (consumed) {
       throw new SimSdkStreamAlreadyConsumedError(
