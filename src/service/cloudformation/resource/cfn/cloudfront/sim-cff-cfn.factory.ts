@@ -6,7 +6,7 @@ import type {
   SimCfnTemplateValueRecord,
 } from "../../../template/value/sim-cfn-template-value.js";
 
-interface SimCfnCffResourceFactoryProps {
+interface SimCfnCffResourceFactoryProperties {
   readonly logicalId: string;
   readonly properties: SimCfnTemplateValueRecord;
   readonly metadata?: SimCfnTemplateValue;
@@ -16,25 +16,25 @@ interface SimCfnCffResourceFactoryProps {
  * Generate fake AWS::CloudFront::Function SimCfnResource instances.
  */
 export const simCfnCffResourceFactory = new MappedFactory<
-  SimCfnCffResourceFactoryProps,
+  SimCfnCffResourceFactoryProperties,
   SimCfnResource
 >(
   () => ({
     logicalId: "RewriteFunction",
     properties: {},
   }),
-  (factoryProps) =>
+  (factoryProperties) =>
     simCfnResourceFactory.make({
-      logicalId: factoryProps.logicalId,
+      logicalId: factoryProperties.logicalId,
       template: {
         Type: "AWS::CloudFront::Function",
         Properties: {
           FunctionCode: "function handler(event) { return event.request; }",
           FunctionConfig: { Runtime: "cloudfront-js-2.0" },
-          ...factoryProps.properties,
+          ...factoryProperties.properties,
         },
-        ...(factoryProps.metadata !== undefined && {
-          Metadata: factoryProps.metadata,
+        ...(factoryProperties.metadata !== undefined && {
+          Metadata: factoryProperties.metadata,
         }),
       },
     }),

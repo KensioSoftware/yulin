@@ -1,11 +1,11 @@
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 
-interface SimCfnStackDeploymentSchedulerProps {
+interface SimCfnStackDeploymentSchedulerProperties {
   readonly background: BackgroundScheduler;
   readonly failureMessage: string;
 }
 
-interface ScheduleDeploymentProps {
+interface ScheduleDeploymentProperties {
   readonly deploy: () => Promise<void>;
   readonly onSuccess: () => void;
   readonly onFailure: (error: Error) => void;
@@ -27,8 +27,8 @@ export class SimCfnStackDeploymentScheduler {
   private readonly background: BackgroundScheduler;
   private readonly failureMessage: string;
 
-  constructor(props: SimCfnStackDeploymentSchedulerProps) {
-    const { background, failureMessage } = props;
+  constructor(properties: SimCfnStackDeploymentSchedulerProperties) {
+    const { background, failureMessage } = properties;
 
     this.background = background;
     this.failureMessage = failureMessage;
@@ -53,8 +53,8 @@ export class SimCfnStackDeploymentScheduler {
    * This scheduler only decides when that callback runs, then reports the
    * outcome via onSuccess or onFailure so the Stack can update its own status.
    */
-  schedule(props: ScheduleDeploymentProps): Promise<void> {
-    const { deploy, onSuccess, onFailure } = props;
+  schedule(properties: ScheduleDeploymentProperties): Promise<void> {
+    const { deploy, onSuccess, onFailure } = properties;
 
     return new Promise<void>((resolve) => {
       this.background.schedule(async () => {

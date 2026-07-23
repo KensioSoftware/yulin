@@ -24,7 +24,7 @@ describe("SimRoute53 hostname resolution", () => {
     return hostedZoneId;
   }
 
-  async function createAliasRecord(props: {
+  async function createAliasRecord(properties: {
     readonly simAws: SimAws;
     readonly simRoute53: SimRoute53;
     readonly hostedZoneId: SimRoute53HostedZoneId;
@@ -32,18 +32,18 @@ describe("SimRoute53 hostname resolution", () => {
     readonly type: "A" | "AAAA";
     readonly value: string;
   }): Promise<void> {
-    await props.simRoute53.changeResourceRecordSets({
+    await properties.simRoute53.changeResourceRecordSets({
       input: {
-        HostedZoneId: props.hostedZoneId,
+        HostedZoneId: properties.hostedZoneId,
         ChangeBatch: {
           Changes: [
             {
               Action: "CREATE",
               ResourceRecordSet: {
-                Name: props.name,
-                Type: props.type,
+                Name: properties.name,
+                Type: properties.type,
                 AliasTarget: {
-                  DNSName: props.value,
+                  DNSName: properties.value,
                   HostedZoneId: "Z2FDTNDATAQYW2",
                   EvaluateTargetHealth: false,
                 },
@@ -54,7 +54,7 @@ describe("SimRoute53 hostname resolution", () => {
       },
     });
 
-    await props.simAws.backgroundTasksComplete();
+    await properties.simAws.backgroundTasksComplete();
   }
 
   it("resolves an apex A alias to a CloudFront distribution hostname", async () => {

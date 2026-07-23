@@ -4,7 +4,7 @@ import type {
 } from "../../command/request-certificate/request-certificate.cmd.js";
 import { isRecord } from "../../../../util/type-guard/record.js";
 
-interface SimCfnAcmCertificatePropertyListReaderProps {
+interface SimCfnAcmCertificatePropertyListReaderProperties {
   readonly logicalId: string;
 }
 
@@ -25,8 +25,8 @@ interface SimCfnAcmCertificatePropertyListReaderProps {
 export class SimCfnAcmCertificatePropertyListReader {
   private readonly logicalId: string;
 
-  constructor(props: SimCfnAcmCertificatePropertyListReaderProps) {
-    this.logicalId = props.logicalId;
+  constructor(properties: SimCfnAcmCertificatePropertyListReaderProperties) {
+    this.logicalId = properties.logicalId;
   }
 
   /**

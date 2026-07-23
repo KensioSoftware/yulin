@@ -11,9 +11,9 @@ describe("DynamoDB PutItemCommand errors", () => {
   it("rejects when missing partition key", async () => {
     const simAws = new SimAws();
 
-    const simDynamoDb = simAws.dynamoDb();
+    const simDynamoDatabase = simAws.dynamoDb();
 
-    await simDynamoDb.createTable(
+    await simDynamoDatabase.createTable(
       new CreateTableCommand({
         TableName: "FooTable",
         KeySchema: [{ AttributeName: "userId", KeyType: "HASH" }],
@@ -21,7 +21,7 @@ describe("DynamoDB PutItemCommand errors", () => {
     );
 
     const error = await assertThrowsErrorAsync(async () => {
-      await simDynamoDb.putItem(
+      await simDynamoDatabase.putItem(
         new PutItemCommand({
           TableName: "FooTable",
           Item: {
@@ -42,9 +42,9 @@ describe("DynamoDB PutItemCommand errors", () => {
   it("rejects when missing sort key", async () => {
     const simAws = new SimAws();
 
-    const simDynamoDb = simAws.dynamoDb();
+    const simDynamoDatabase = simAws.dynamoDb();
 
-    await simDynamoDb.createTable(
+    await simDynamoDatabase.createTable(
       new CreateTableCommand({
         TableName: "FooTable",
         KeySchema: [
@@ -55,7 +55,7 @@ describe("DynamoDB PutItemCommand errors", () => {
     );
 
     const error = await assertThrowsErrorAsync(async () => {
-      await simDynamoDb.putItem(
+      await simDynamoDatabase.putItem(
         new PutItemCommand({
           TableName: "FooTable",
           Item: {
@@ -76,9 +76,9 @@ describe("DynamoDB PutItemCommand errors", () => {
   it("rejects on invalid partition key type", async () => {
     const simAws = new SimAws();
 
-    const simDynamoDb = simAws.dynamoDb();
+    const simDynamoDatabase = simAws.dynamoDb();
 
-    await simDynamoDb.createTable(
+    await simDynamoDatabase.createTable(
       new CreateTableCommand({
         TableName: "FooTable",
         KeySchema: [{ AttributeName: "userId", KeyType: "HASH" }],
@@ -86,7 +86,7 @@ describe("DynamoDB PutItemCommand errors", () => {
     );
 
     const error = await assertThrowsErrorAsync(async () => {
-      await simDynamoDb.putItem(
+      await simDynamoDatabase.putItem(
         new PutItemCommand({
           TableName: "FooTable",
           Item: {
@@ -106,9 +106,9 @@ describe("DynamoDB PutItemCommand errors", () => {
   it("rejects on invalid sort key type", async () => {
     const simAws = new SimAws();
 
-    const simDynamoDb = simAws.dynamoDb();
+    const simDynamoDatabase = simAws.dynamoDb();
 
-    await simDynamoDb.createTable(
+    await simDynamoDatabase.createTable(
       new CreateTableCommand({
         TableName: "FooTable",
         KeySchema: [
@@ -119,7 +119,7 @@ describe("DynamoDB PutItemCommand errors", () => {
     );
 
     const error = await assertThrowsErrorAsync(async () => {
-      await simDynamoDb.putItem(
+      await simDynamoDatabase.putItem(
         new PutItemCommand({
           TableName: "FooTable",
           Item: {
@@ -140,10 +140,10 @@ describe("DynamoDB PutItemCommand errors", () => {
   it("rejects undefined table name", async () => {
     const simAws = new SimAws();
 
-    const simDynamoDb = simAws.dynamoDb();
+    const simDynamoDatabase = simAws.dynamoDb();
 
     const error = await assertThrowsErrorAsync(async () => {
-      await simDynamoDb.putItem(
+      await simDynamoDatabase.putItem(
         new PutItemCommand({
           TableName: undefined,
           Item: {
@@ -163,10 +163,10 @@ describe("DynamoDB PutItemCommand errors", () => {
   it("rejects non-existent table", async () => {
     const simAws = new SimAws();
 
-    const simDynamoDb = simAws.dynamoDb();
+    const simDynamoDatabase = simAws.dynamoDb();
 
     const error = await assertThrowsErrorAsync(async () => {
-      await simDynamoDb.putItem(
+      await simDynamoDatabase.putItem(
         new PutItemCommand({
           TableName: "FooTable",
           Item: {
@@ -183,9 +183,9 @@ describe("DynamoDB PutItemCommand errors", () => {
   it("rejects missing item", async () => {
     const simAws = new SimAws();
 
-    const simDynamoDb = simAws.dynamoDb();
+    const simDynamoDatabase = simAws.dynamoDb();
 
-    await simDynamoDb.createTable(
+    await simDynamoDatabase.createTable(
       new CreateTableCommand({
         TableName: "FooTable",
         KeySchema: [{ AttributeName: "userId", KeyType: "HASH" }],
@@ -193,7 +193,7 @@ describe("DynamoDB PutItemCommand errors", () => {
     );
 
     const error = await assertThrowsErrorAsync(async () => {
-      await simDynamoDb.putItem(
+      await simDynamoDatabase.putItem(
         new PutItemCommand({
           TableName: "FooTable",
           Item: undefined,

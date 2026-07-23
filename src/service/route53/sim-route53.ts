@@ -39,7 +39,7 @@ export interface SimRoute53RequestOptions {
   readonly caller?: SimAwsCaller;
 }
 
-interface SimRoute53Props {
+interface SimRoute53Properties {
   readonly iam?: SimIamInterServiceAuthZ | undefined;
   readonly background?: BackgroundScheduler | undefined;
   readonly route53Registry?: SimRoute53Registry | undefined;
@@ -62,12 +62,12 @@ export class SimRoute53 {
 
   private readonly resolver: SimRoute53Resolver;
 
-  constructor(props: SimRoute53Props = {}) {
+  constructor(properties: SimRoute53Properties = {}) {
     const {
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
       route53Registry = new SimRoute53Registry(),
-    } = props;
+    } = properties;
 
     this.iam = iam;
     this.background = background;
@@ -81,8 +81,8 @@ export class SimRoute53 {
    * Create a new simulated Route53 Hosted Zone.
    */
   async createHostedZone(
-    cmd: SimCreateHostedZoneCommand,
-    opts?: SimRoute53RequestOptions,
+    command: SimCreateHostedZoneCommand,
+    options?: SimRoute53RequestOptions,
   ): Promise<SimCreateHostedZoneCommandOutput> {
     const handler = new CreateHostedZoneCommandHandler({
       hostedZones: this.hostedZones,
@@ -90,52 +90,52 @@ export class SimRoute53 {
       background: this.background,
       route53Registry: this.route53Registry,
     });
-    return await handler.handle(cmd, opts);
+    return await handler.handle(command, options);
   }
 
   /**
    * Handle a Get Hosted Zone command from the SDK.
    */
   async getHostedZone(
-    cmd: SimGetHostedZoneCommand,
-    opts?: SimRoute53RequestOptions,
+    command: SimGetHostedZoneCommand,
+    options?: SimRoute53RequestOptions,
   ): Promise<SimGetHostedZoneCommandOutput> {
     const handler = new GetHostedZoneCommandHandler({
       hostedZones: this.hostedZones,
       iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd, opts);
+    return await handler.handle(command, options);
   }
 
   /**
    * Handle a List Hosted Zones By Name command from the SDK.
    */
   async listHostedZonesByName(
-    cmd: SimListHostedZonesByNameCommand,
-    opts?: SimRoute53RequestOptions,
+    command: SimListHostedZonesByNameCommand,
+    options?: SimRoute53RequestOptions,
   ): Promise<SimListHostedZonesByNameCommandOutput> {
     const handler = new ListHostedZonesByNameCommandHandler({
       hostedZones: this.hostedZones,
       iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd, opts);
+    return await handler.handle(command, options);
   }
 
   /**
    * Handle a Change Resource Record Sets command from the SDK.
    */
   async changeResourceRecordSets(
-    cmd: SimChangeResourceRecordSetsCommand,
-    opts?: SimRoute53RequestOptions,
+    command: SimChangeResourceRecordSetsCommand,
+    options?: SimRoute53RequestOptions,
   ): Promise<SimChangeResourceRecordSetsCommandOutput> {
     const handler = new ChangeResourceRecordSetsCommandHandler({
       hostedZones: this.hostedZones,
       iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd, opts);
+    return await handler.handle(command, options);
   }
 
   /**

@@ -6,7 +6,7 @@ import type { SimIamSession } from "./session/sim-iam-session.js";
 
 export type SimIamAccessKeyStatus = "Active" | "Inactive";
 
-interface SimIamAccessKeyProps {
+interface SimIamAccessKeyProperties {
   readonly accessKeyId: string;
   readonly secretAccessKey: string;
   readonly principal: SimAwsPrincipal;
@@ -31,15 +31,15 @@ export class SimIamAccessKey {
   public readonly createDate: Date;
   public status: SimIamAccessKeyStatus;
 
-  constructor(props: SimIamAccessKeyProps) {
-    this.accessKeyId = props.accessKeyId;
-    this.secretAccessKey = props.secretAccessKey;
-    this.principal = props.principal;
+  constructor(properties: SimIamAccessKeyProperties) {
+    this.accessKeyId = properties.accessKeyId;
+    this.secretAccessKey = properties.secretAccessKey;
+    this.principal = properties.principal;
     this.identityPolicyPrincipal =
-      props.identityPolicyPrincipal ?? props.principal;
-    this.session = props.session;
-    this.createDate = new Date(props.createDate ?? Date.now());
-    this.status = props.status ?? "Active";
+      properties.identityPolicyPrincipal ?? properties.principal;
+    this.session = properties.session;
+    this.createDate = new Date(properties.createDate ?? Date.now());
+    this.status = properties.status ?? "Active";
   }
 
   /**

@@ -54,11 +54,11 @@ describe("Sim ACM CloudFormation Certificate", () => {
     });
 
     // Then the CloudFormation Outputs expose the simulated certificate values.
-    const certificateRef = stack.outputs.get("CertificateRef")?.value;
+    const certificateReference = stack.outputs.get("CertificateRef")?.value;
     const certificateArn = stack.outputs.get("CertificateArn")?.value;
 
-    assertStringStartsWith(certificateRef, "arn:aws:acm:");
-    assertIdentical(certificateArn, certificateRef);
+    assertStringStartsWith(certificateReference, "arn:aws:acm:");
+    assertIdentical(certificateArn, certificateReference);
     assertIdentical(
       stack.outputs.get("CertificateStatus")?.value,
       "PENDING_VALIDATION",

@@ -4,7 +4,7 @@ import { SimCfnList } from "../../node/sim-cfn-list.js";
 import { isRecord } from "../../../../../util/type-guard/record.js";
 import { SimCfnLiteral } from "../../node/sim-cfn-literal.js";
 import { SimCfnObject } from "../../node/sim-cfn-object.js";
-import { SimCfnRef } from "../../node/sim-cfn-ref.js";
+import { SimCfnRef as SimCfnReference } from "../../node/sim-cfn-ref.js";
 import { SimCfnFunctionParser } from "../fn/sim-cfn-function-parser.js";
 
 /**
@@ -42,14 +42,14 @@ export class SimCfnNodeParser {
       return new SimCfnLiteral(value);
     }
 
-    const ref = this.parseRef(value);
-    if (ref !== undefined) {
-      return ref;
+    const reference = this.parseRef(value);
+    if (reference !== undefined) {
+      return reference;
     }
 
-    const fn = this.functionParser.parse(value);
-    if (fn !== undefined) {
-      return fn;
+    const callable = this.functionParser.parse(value);
+    if (callable !== undefined) {
+      return callable;
     }
 
     return this.parseObject(value);
@@ -57,7 +57,7 @@ export class SimCfnNodeParser {
 
   private parseRef(
     value: Record<string, SimCfnTemplateValue>,
-  ): SimCfnRef | undefined {
+  ): SimCfnReference | undefined {
     if (Object.keys(value).length !== 1 || !("Ref" in value)) {
       return undefined;
     }
@@ -68,7 +68,7 @@ export class SimCfnNodeParser {
       throw new TypeError("Sim CloudFormation Ref value must be a string");
     }
 
-    return new SimCfnRef(name);
+    return new SimCfnReference(name);
   }
 
   private parseObject(

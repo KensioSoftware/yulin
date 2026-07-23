@@ -24,7 +24,7 @@ import type { JSONString } from "../../../../util/type-guard/json.js";
 import type { SimCdkOutContext } from "../../cdk/sim-cdk-out-context.js";
 import type { SimCfnExecutableResourceBinding } from "../../bind/sim-cfn-exec-binding.type.js";
 
-interface CreateStackCommandHandlerProps {
+interface CreateStackCommandHandlerProperties {
   readonly simAws: SimAws;
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly stacks: Map<SimCloudFormationStackName, SimCfnStack>;
@@ -50,7 +50,7 @@ export class CreateStackCommandHandler implements CommandHandler<
   private readonly bindings:
     readonly SimCfnExecutableResourceBinding[] | undefined;
 
-  constructor(props: CreateStackCommandHandlerProps) {
+  constructor(properties: CreateStackCommandHandlerProperties) {
     const {
       simAws,
       accountRegionScope,
@@ -58,7 +58,7 @@ export class CreateStackCommandHandler implements CommandHandler<
       background,
       cdkOutContext,
       bindings,
-    } = props;
+    } = properties;
 
     this.simAws = simAws;
     this.accountRegionScope = accountRegionScope;
@@ -72,18 +72,21 @@ export class CreateStackCommandHandler implements CommandHandler<
    * Create a simulated CloudFormation Stack.
    */
   async handle(
-    cmd: SimCreateStackCommand,
+    command: SimCreateStackCommand,
   ): Promise<SimCreateStackCommandOutput> {
-    assertDefined(cmd.input.StackName, "CreateStackCommand.input.StackName");
     assertDefined(
-      cmd.input.TemplateBody,
+      command.input.StackName,
+      "CreateStackCommand.input.StackName",
+    );
+    assertDefined(
+      command.input.TemplateBody,
       "CreateStackCommand.input.TemplateBody",
     );
 
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    const stackName = cmd.input.StackName as SimCloudFormationStackName;
+    const stackName = command.input.StackName as SimCloudFormationStackName;
     if (this.stacks.has(stackName)) {
       throw new SimCloudFormationAlreadyExistsException(
         `Stack [${stackName}] already exists`,
@@ -91,10 +94,10 @@ export class CreateStackCommandHandler implements CommandHandler<
     }
 
     const template = SimCfnTemplate.fromJson(
-      cmd.input.TemplateBody as JSONString<CfnTemplateBodyRecord>,
+      command.input.TemplateBody as JSONString<CfnTemplateBodyRecord>,
       {
         stackName,
-        parameters: SimCfnParameters.fromInput(cmd.input, {
+        parameters: SimCfnParameters.fromInput(command.input, {
           stackName,
         }),
         accountRegionScope: this.accountRegionScope,

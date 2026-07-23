@@ -39,14 +39,14 @@ export interface SimCfnOutputTemplateRecord {
   readonly template: SimCfnTemplateValueRecord;
 }
 
-interface SimCfnTemplateProps {
+interface SimCfnTemplateProperties {
   readonly template: CfnTemplateBodyRecord;
   readonly parameters?: SimCfnParameters | undefined;
   readonly stackName?: string | undefined;
   readonly accountRegionScope?: SimAwsAccountRegionScope | undefined;
 }
 
-interface SimCfnTemplateFromJsonProps {
+interface SimCfnTemplateFromJsonProperties {
   readonly stackName?: string | undefined;
   readonly parameters?: SimCfnParameters | undefined;
   readonly accountRegionScope?: SimAwsAccountRegionScope | undefined;
@@ -63,8 +63,8 @@ export class SimCfnTemplate {
   public readonly parameters: SimCfnParameters;
   private readonly accountRegionScope: SimAwsAccountRegionScope | undefined;
 
-  constructor(props: SimCfnTemplateProps) {
-    const { template, parameters, stackName, accountRegionScope } = props;
+  constructor(properties: SimCfnTemplateProperties) {
+    const { template, parameters, stackName, accountRegionScope } = properties;
 
     this.template = template;
     this.stackName = stackName;
@@ -83,7 +83,7 @@ export class SimCfnTemplate {
    */
   static fromJson(
     templateBody: JSONString<CfnTemplateBodyRecord>,
-    props: SimCfnTemplateFromJsonProps = {},
+    properties: SimCfnTemplateFromJsonProperties = {},
   ): SimCfnTemplate {
     let template: CfnTemplateBodyRecord;
 
@@ -91,7 +91,7 @@ export class SimCfnTemplate {
       template = jsonParse(templateBody);
     } catch (error) {
       throw new Error(
-        `Sim CloudFormation Stack ${props.stackName ?? "unknown"} TemplateBody must be valid JSON`,
+        `Sim CloudFormation Stack ${properties.stackName ?? "unknown"} TemplateBody must be valid JSON`,
         {
           cause: error,
         },
@@ -100,9 +100,9 @@ export class SimCfnTemplate {
 
     return new SimCfnTemplate({
       template,
-      parameters: props.parameters,
-      stackName: props.stackName,
-      accountRegionScope: props.accountRegionScope,
+      parameters: properties.parameters,
+      stackName: properties.stackName,
+      accountRegionScope: properties.accountRegionScope,
     });
   }
 

@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, it } from "vitest";
 import { SimAwsLocalServer } from "../../../../serve/index.js";
-import { TempDir } from "../../../../util/filesystem/temp-dir.js";
+import { TemporaryDirectory as TemporaryDirectory } from "../../../../util/filesystem/temporary-directory.js";
 import {
   CreateBucketCommand,
   PutBucketWebsiteCommand,
@@ -29,7 +29,7 @@ describe("Serve sim S3 Bucket on localhost with filesystem storage", () => {
   });
 
   it("reads files from filesystem and serves on localhost", async () => {
-    const testDir = new TempDir();
+    const testDir = new TemporaryDirectory();
     await testDir.writeFile("public/foobar.html", "<h1>Hello</h1>");
     await testDir.writeFile("public/index.html", "<h1>Filesystem index</h1>");
     await testDir.writeFile(
@@ -85,7 +85,7 @@ describe("Serve sim S3 Bucket on localhost with filesystem storage", () => {
   });
 
   it("redirects extensionless filesystem folder paths to a trailing slash when an index document exists", async () => {
-    const testDir = new TempDir();
+    const testDir = new TemporaryDirectory();
     await testDir.writeFile(
       ["public", "dengji", "a1", "index.html"],
       "<h1>A1 index</h1>",

@@ -12,15 +12,15 @@ import {
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import { SimAws } from "../../../aws/sim-aws.js";
-import { SimDynamoDbResourceInUseException } from "../../error/dynamodb.error.js";
+import { SimDynamoDbResourceInUseException as SimDynamoDatabaseResourceInUseException } from "../../error/dynamodb.error.js";
 
 describe("DynamoDB CreateTableCommand", () => {
   it("creates new DynamoDB Table", async () => {
     const simAws = new SimAws();
 
-    const simDynamoDb = simAws.account().dynamoDb();
+    const simDynamoDatabase = simAws.account().dynamoDb();
 
-    const createTableOutput = await simDynamoDb.createTable(
+    const createTableOutput = await simDynamoDatabase.createTable(
       new CreateTableCommand({
         TableName: "FoobarTable",
         KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
@@ -34,7 +34,7 @@ describe("DynamoDB CreateTableCommand", () => {
     );
     assertIdentical(createTableOutput.TableDescription.TableStatus, "CREATING");
 
-    const listTablesOutput = await simDynamoDb.listTables(
+    const listTablesOutput = await simDynamoDatabase.listTables(
       new ListTablesCommand(),
     );
 
@@ -47,10 +47,10 @@ describe("DynamoDB CreateTableCommand", () => {
   it("throws on undefined Table name", async () => {
     const simAws = new SimAws();
 
-    const simDynamoDb = simAws.region().dynamoDb();
+    const simDynamoDatabase = simAws.region().dynamoDb();
 
     const error = await assertThrowsErrorAsync(async () =>
-      simDynamoDb.createTable(
+      simDynamoDatabase.createTable(
         new CreateTableCommand({
           TableName: undefined,
           KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
@@ -68,13 +68,13 @@ describe("DynamoDB CreateTableCommand", () => {
   it("throws on missing key schema", async () => {
     const simAws = new SimAws();
 
-    const simDynamoDb = simAws
+    const simDynamoDatabase = simAws
       .account("666666666666")
       .region("eu-west-2")
       .dynamoDb();
 
     const error = await assertThrowsErrorAsync(async () =>
-      simDynamoDb.createTable(
+      simDynamoDatabase.createTable(
         new CreateTableCommand({ TableName: "FoobarTable" }),
       ),
     );
@@ -86,9 +86,9 @@ describe("DynamoDB CreateTableCommand", () => {
   it("throws on duplicate Table name", async () => {
     const simAws = new SimAws();
 
-    const simDynamoDb = simAws.dynamoDb();
+    const simDynamoDatabase = simAws.dynamoDb();
 
-    await simDynamoDb.createTable(
+    await simDynamoDatabase.createTable(
       new CreateTableCommand({
         TableName: "FoobarTable",
         KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
@@ -96,10 +96,10 @@ describe("DynamoDB CreateTableCommand", () => {
     );
 
     const error = await assertThrowsErrorAsync(async () =>
-      simDynamoDb.createTable(
+      simDynamoDatabase.createTable(
         new CreateTableCommand({ TableName: "FoobarTable" }),
       ),
     );
-    assertInstanceOf(error, SimDynamoDbResourceInUseException);
+    assertInstanceOf(error, SimDynamoDatabaseResourceInUseException);
   });
 });

@@ -5,7 +5,7 @@ import {
 import { normaliseSimRoute53Name } from "../../local-name/sim-route53-local-name.js";
 import type { HostedZoneListEntry } from "../list-hosted-zones-by-name/list-hosted-zones-by-name.js";
 
-interface HostedZoneListMarkerProps {
+interface HostedZoneListMarkerProperties {
   readonly markerNameInput?: string | undefined;
   readonly markerHostedZoneId?: string | undefined;
 }
@@ -19,11 +19,13 @@ interface HostedZoneListMarker {
  * Normalise ListHostedZonesByName marker inputs before pagination comparison.
  */
 export function normaliseHostedZoneListMarker(
-  props: HostedZoneListMarkerProps,
+  properties: HostedZoneListMarkerProperties,
 ): HostedZoneListMarker {
   return {
-    markerName: normaliseMarkerName(props.markerNameInput),
-    markerHostedZoneId: normaliseMarkerHostedZoneId(props.markerHostedZoneId),
+    markerName: normaliseMarkerName(properties.markerNameInput),
+    markerHostedZoneId: normaliseMarkerHostedZoneId(
+      properties.markerHostedZoneId,
+    ),
   };
 }
 

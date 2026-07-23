@@ -31,23 +31,25 @@ export class SimCloudFrontControllerDependenciesFactory {
    * Build controller dependencies from optional constructor props.
    */
   make(
-    props: SimCloudFrontServiceControllerProps = {},
+    properties: SimCloudFrontServiceControllerProps = {},
   ): SimCloudFrontControllerDependencies {
-    const simAws = props.simAws ?? new SimAws();
+    const simAws = properties.simAws ?? new SimAws();
     const cloudFrontRegistry =
-      props.cloudFrontRegistry ?? simAws.cloudFrontRegistry();
+      properties.cloudFrontRegistry ?? simAws.cloudFrontRegistry();
 
     return {
       distroRouter:
-        props.distroRouter ??
+        properties.distroRouter ??
         new DefaultSimCloudFrontDistroRouter({
           simAws,
           cloudFrontRegistry,
         }),
       behaviourResolver:
-        props.behaviourResolver ?? new DefaultSimCloudFrontBehaviorResolver(),
-      cffApplicator: props.cffApplicator ?? new SimCffApplicator(),
-      originFetcher: props.originFetcher ?? new SimCloudFrontOriginFetcher(),
+        properties.behaviourResolver ??
+        new DefaultSimCloudFrontBehaviorResolver(),
+      cffApplicator: properties.cffApplicator ?? new SimCffApplicator(),
+      originFetcher:
+        properties.originFetcher ?? new SimCloudFrontOriginFetcher(),
     };
   }
 }

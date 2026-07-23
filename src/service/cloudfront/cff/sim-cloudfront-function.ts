@@ -15,7 +15,7 @@ export type SimCloudFrontFunctionName = Brand<
 export type CloudFrontFunctionStatus =
   "UNPUBLISHED" | "UNASSOCIATED" | "ASSOCIATED";
 
-interface SimCloudFrontFunctionProps {
+interface SimCloudFrontFunctionProperties {
   name: SimCloudFrontFunctionName | string;
   status?: CloudFrontFunctionStatus;
   readonly accountId?: SimAwsAccountId;
@@ -43,14 +43,14 @@ export class SimCloudFrontFunction {
   private readonly handlerFunction: CloudFrontFunction.Handler;
   private readonly eventAdapter: SimCffEventAdapter;
 
-  constructor(props: SimCloudFrontFunctionProps) {
+  constructor(properties: SimCloudFrontFunctionProperties) {
     const {
       name,
       status = "UNPUBLISHED",
       accountId = makeSimAwsAccountId(),
       handlerFunction = defaultCffHandler,
       eventAdapter = new SimCffEventAdapter(),
-    } = props;
+    } = properties;
     this.name = name as SimCloudFrontFunctionName;
     this.#status = status;
     this.accountId = accountId;
@@ -83,21 +83,21 @@ export class SimCloudFrontFunction {
   /**
    * Run the viewer-request CFF handler on a native Request.
    */
-  handleViewerRequest(req: Request): Request | Response {
-    const cffEvent = this.eventAdapter.toViewerRequestEvent(req);
+  handleViewerRequest(request: Request): Request | Response {
+    const cffEvent = this.eventAdapter.toViewerRequestEvent(request);
 
     const handlerFunction = this
       .handlerFunction as CloudFrontFunction.ViewerRequestHandler;
     const cffResult = handlerFunction(cffEvent);
 
-    return this.eventAdapter.fromViewerRequestResult(cffResult, req);
+    return this.eventAdapter.fromViewerRequestResult(cffResult, request);
   }
 
   /**
    * Run the viewer-response CFF handler on a native Request and Response.
    */
-  handleViewerResponse(req: Request, res: Response): Response {
-    const cffEvent = this.eventAdapter.toViewerResponseEvent(req, res);
+  handleViewerResponse(request: Request, res: Response): Response {
+    const cffEvent = this.eventAdapter.toViewerResponseEvent(request, res);
 
     const handlerFunction = this
       .handlerFunction as CloudFrontFunction.ViewerResponseHandler;

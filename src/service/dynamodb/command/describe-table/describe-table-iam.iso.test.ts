@@ -13,7 +13,7 @@ import { SimAws } from "../../../aws/sim-aws.js";
 import { makeSimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import { makeAwsRegionName } from "../../../aws/sim-aws-region.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
-import { SimDynamoDb } from "../../sim-dynamodb.js";
+import { SimDynamoDb as SimDynamoDatabase } from "../../sim-dynamodb.js";
 
 describe("DynamoDB DescribeTableCommand IAM authorization", () => {
   it("allows the default Account root caller", async () => {
@@ -21,9 +21,12 @@ describe("DynamoDB DescribeTableCommand IAM authorization", () => {
     const accountId = makeSimAwsAccountId();
     const region = makeAwsRegionName();
     const simAws = new SimAws();
-    const simDynamoDb = simAws.account(accountId).region(region).dynamoDb();
+    const simDynamoDatabase = simAws
+      .account(accountId)
+      .region(region)
+      .dynamoDb();
 
-    await simDynamoDb.createTable(
+    await simDynamoDatabase.createTable(
       new CreateTableCommand({
         TableName: "RootTable",
         KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
@@ -33,7 +36,7 @@ describe("DynamoDB DescribeTableCommand IAM authorization", () => {
     );
 
     // When DescribeTable is called without an explicit caller.
-    const output = await simDynamoDb.describeTable(
+    const output = await simDynamoDatabase.describeTable(
       new DescribeTableCommand({ TableName: "RootTable" }),
     );
 
@@ -47,9 +50,12 @@ describe("DynamoDB DescribeTableCommand IAM authorization", () => {
     const region = makeAwsRegionName();
     const simAws = new SimAws();
     const simIam = simAws.account(accountId).iam();
-    const simDynamoDb = simAws.account(accountId).region(region).dynamoDb();
+    const simDynamoDatabase = simAws
+      .account(accountId)
+      .region(region)
+      .dynamoDb();
 
-    await simDynamoDb.createTable(
+    await simDynamoDatabase.createTable(
       new CreateTableCommand({
         TableName: "DescribedTable",
         KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
@@ -89,7 +95,7 @@ describe("DynamoDB DescribeTableCommand IAM authorization", () => {
     );
 
     // When the Role describes the table it has permission for.
-    const output = await simDynamoDb.describeTable(
+    const output = await simDynamoDatabase.describeTable(
       new DescribeTableCommand({ TableName: "DescribedTable" }),
       { caller: { kind: "arn", arn: roleArn } },
     );
@@ -104,9 +110,12 @@ describe("DynamoDB DescribeTableCommand IAM authorization", () => {
     const region = makeAwsRegionName();
     const simAws = new SimAws();
     const simIam = simAws.account(accountId).iam();
-    const simDynamoDb = simAws.account(accountId).region(region).dynamoDb();
+    const simDynamoDatabase = simAws
+      .account(accountId)
+      .region(region)
+      .dynamoDb();
 
-    await simDynamoDb.createTable(
+    await simDynamoDatabase.createTable(
       new CreateTableCommand({
         TableName: "ProtectedTable",
         KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
@@ -132,7 +141,7 @@ describe("DynamoDB DescribeTableCommand IAM authorization", () => {
 
     // When the Role attempts to describe the table.
     const error = await assertThrowsErrorAsync(async () =>
-      simDynamoDb.describeTable(
+      simDynamoDatabase.describeTable(
         new DescribeTableCommand({ TableName: "ProtectedTable" }),
         { caller: { kind: "arn", arn: roleArn } },
       ),
@@ -153,9 +162,12 @@ describe("DynamoDB DescribeTableCommand IAM authorization", () => {
     const region = makeAwsRegionName();
     const simAws = new SimAws();
     const simIam = simAws.account(accountId).iam();
-    const simDynamoDb = simAws.account(accountId).region(region).dynamoDb();
+    const simDynamoDatabase = simAws
+      .account(accountId)
+      .region(region)
+      .dynamoDb();
 
-    await simDynamoDb.createTable(
+    await simDynamoDatabase.createTable(
       new CreateTableCommand({
         TableName: "ExplicitlyDeniedTable",
         KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
@@ -203,7 +215,7 @@ describe("DynamoDB DescribeTableCommand IAM authorization", () => {
 
     // When the Role attempts to describe the table.
     const error = await assertThrowsErrorAsync(async () =>
-      simDynamoDb.describeTable(
+      simDynamoDatabase.describeTable(
         new DescribeTableCommand({ TableName: "ExplicitlyDeniedTable" }),
         { caller: { kind: "arn", arn: roleArn } },
       ),
@@ -222,9 +234,12 @@ describe("DynamoDB DescribeTableCommand IAM authorization", () => {
     const accountId = makeSimAwsAccountId();
     const region = makeAwsRegionName();
     const simAws = new SimAws();
-    const simDynamoDb = simAws.account(accountId).region(region).dynamoDb();
+    const simDynamoDatabase = simAws
+      .account(accountId)
+      .region(region)
+      .dynamoDb();
 
-    await simDynamoDb.createTable(
+    await simDynamoDatabase.createTable(
       new CreateTableCommand({
         TableName: "AnonymousTable",
         KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
@@ -235,7 +250,7 @@ describe("DynamoDB DescribeTableCommand IAM authorization", () => {
 
     // When an explicitly anonymous caller attempts to describe the table.
     const error = await assertThrowsErrorAsync(async () =>
-      simDynamoDb.describeTable(
+      simDynamoDatabase.describeTable(
         new DescribeTableCommand({ TableName: "AnonymousTable" }),
         { caller: { kind: "anonymous" } },
       ),
@@ -249,9 +264,9 @@ describe("DynamoDB DescribeTableCommand IAM authorization", () => {
 
   it("uses allow-all authorization when SimDynamoDb is instantiated directly", async () => {
     // Given a directly constructed DynamoDB service with no IAM implementation supplied.
-    const simDynamoDb = new SimDynamoDb();
+    const simDynamoDatabase = new SimDynamoDatabase();
 
-    await simDynamoDb.createTable(
+    await simDynamoDatabase.createTable(
       new CreateTableCommand({
         TableName: "StandaloneTable",
         KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
@@ -261,7 +276,7 @@ describe("DynamoDB DescribeTableCommand IAM authorization", () => {
     );
 
     // When an anonymous caller describes a table through the standalone service.
-    const output = await simDynamoDb.describeTable(
+    const output = await simDynamoDatabase.describeTable(
       new DescribeTableCommand({ TableName: "StandaloneTable" }),
       { caller: { kind: "anonymous" } },
     );

@@ -1,6 +1,6 @@
 import type {
-  DynamoDbTableName,
-  SimDynamoDbTable,
+  DynamoDbTableName as DynamoDatabaseTableName,
+  SimDynamoDbTable as SimDynamoDatabaseTable,
 } from "./table/sim-dynamodb-table.js";
 import { CreateTableCommandHandler } from "./command/create-table/create-table.handler.js";
 import {
@@ -38,7 +38,7 @@ export interface SimDynamoDbRequestOptions {
   readonly caller?: SimAwsCaller;
 }
 
-interface SimDynamoDbProps {
+interface SimDynamoDatabaseProperties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
@@ -48,18 +48,21 @@ interface SimDynamoDbProps {
  * Simulated DynamoDB. Handles SDK commands. Emulates AWS behaviour and state.
  */
 export class SimDynamoDb {
-  private readonly tables = new Map<DynamoDbTableName, SimDynamoDbTable>();
+  private readonly tables = new Map<
+    DynamoDatabaseTableName,
+    SimDynamoDatabaseTable
+  >();
 
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly iam: SimIamInterServiceAuthZ;
   private readonly background: BackgroundScheduler;
 
-  constructor(props: SimDynamoDbProps = {}) {
+  constructor(properties: SimDynamoDatabaseProperties = {}) {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
-    } = props;
+    } = properties;
 
     this.accountRegionScope = accountRegionScope;
     this.iam = iam;
@@ -70,8 +73,8 @@ export class SimDynamoDb {
    * Handle a Create Table Command from the SDK.
    */
   async createTable(
-    cmd: SimCreateTableCommand,
-    opts?: SimDynamoDbRequestOptions,
+    command: SimCreateTableCommand,
+    options?: SimDynamoDbRequestOptions,
   ): Promise<SimCreateTableCommandOutput> {
     const handler = new CreateTableCommandHandler({
       accountRegionScope: this.accountRegionScope,
@@ -79,30 +82,30 @@ export class SimDynamoDb {
       iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd, opts);
+    return await handler.handle(command, options);
   }
 
   /**
    * Handle a List Tables Command from the SDK.
    */
   async listTables(
-    cmd: SimListTablesCommand,
-    opts?: SimDynamoDbRequestOptions,
+    command: SimListTablesCommand,
+    options?: SimDynamoDbRequestOptions,
   ): Promise<SimListTablesCommandOutput> {
     const handler = new ListTablesCommandHandler({
       tables: this.tables,
       iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd, opts);
+    return await handler.handle(command, options);
   }
 
   /**
    * Handle a Describe Table Command from the SDK.
    */
   async describeTable(
-    cmd: SimDescribeTableCommand,
-    opts?: SimDynamoDbRequestOptions,
+    command: SimDescribeTableCommand,
+    options?: SimDynamoDbRequestOptions,
   ): Promise<SimDescribeTableCommandOutput> {
     const handler = new DescribeTableCommandHandler({
       accountRegionScope: this.accountRegionScope,
@@ -110,21 +113,21 @@ export class SimDynamoDb {
       iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd, opts);
+    return await handler.handle(command, options);
   }
 
   /**
    * Handle a Put Item Command from the SDK.
    */
   async putItem(
-    cmd: SimPutItemCommand,
-    opts?: SimDynamoDbRequestOptions,
+    command: SimPutItemCommand,
+    options?: SimDynamoDbRequestOptions,
   ): Promise<SimPutItemCommandOutput> {
     const handler = new PutItemCommandHandler({
       accountRegionScope: this.accountRegionScope,
       tables: this.tables,
       iam: this.iam,
     });
-    return await handler.handle(cmd, opts);
+    return await handler.handle(command, options);
   }
 }

@@ -2,7 +2,7 @@ import type { SimCfnTemplateValue } from "../../../template/value/sim-cfn-templa
 import type { SimCloudFrontFunction } from "../../../../cloudfront/cff/sim-cloudfront-function.js";
 import type { SimCfnResourceValueAdapter } from "../sim-cfn-resource-value-adapter.js";
 
-interface SimCloudFrontFunctionCfnProps {
+interface SimCloudFrontFunctionCfnProperties {
   readonly cloudFrontFunction: SimCloudFrontFunction;
 }
 
@@ -12,8 +12,8 @@ interface SimCloudFrontFunctionCfnProps {
 export class SimCloudFrontFunctionCfn implements SimCfnResourceValueAdapter {
   private readonly cloudFrontFunction;
 
-  constructor(props: SimCloudFrontFunctionCfnProps) {
-    this.cloudFrontFunction = props.cloudFrontFunction;
+  constructor(properties: SimCloudFrontFunctionCfnProperties) {
+    this.cloudFrontFunction = properties.cloudFrontFunction;
   }
 
   /**

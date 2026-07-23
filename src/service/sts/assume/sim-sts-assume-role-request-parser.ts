@@ -44,24 +44,24 @@ export class SimStsAssumeRoleRequestParser {
    * Parsing fails before any authorization or session state changes occur. This
    * keeps malformed requests from reaching policy evaluation or IAM registries.
    */
-  parse(cmd: SimAssumeRoleCommand): ParsedAssumeRoleRequest {
-    const roleArn = cmd.input.RoleArn;
+  parse(command: SimAssumeRoleCommand): ParsedAssumeRoleRequest {
+    const roleArn = command.input.RoleArn;
     assertDefined(roleArn, "STS AssumeRole RoleArn is required");
 
-    const roleSessionName = cmd.input.RoleSessionName;
+    const roleSessionName = command.input.RoleSessionName;
     assertDefined(
       roleSessionName,
       "STS AssumeRole RoleSessionName is required",
     );
 
-    const durationSeconds = this.durationSeconds(cmd.input.DurationSeconds);
+    const durationSeconds = this.durationSeconds(command.input.DurationSeconds);
 
     return {
       roleArn,
       roleArnParts: this.roleArnParser.parse(roleArn),
       roleSessionName,
       durationSeconds,
-      conditionContext: this.conditionContext(cmd.input.ExternalId),
+      conditionContext: this.conditionContext(command.input.ExternalId),
     };
   }
 

@@ -55,7 +55,7 @@ describe("CloudFormation Fn::Sub Resource referential", () => {
   it("resolves a Resource Ref inside Fn::Sub when creating another Resource", async () => {
     // Given a template where one S3 Bucket name is built from a Fn::Sub reference
     // to another S3 Bucket Resource.
-    const subRefTemplate = {
+    const subReferenceTemplate = {
       Resources: {
         SourceBucket: {
           Type: "AWS::S3::Bucket",
@@ -78,7 +78,7 @@ describe("CloudFormation Fn::Sub Resource referential", () => {
     const simAws = new SimAws();
     const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "test-stack",
-      template: subRefTemplate,
+      template: subReferenceTemplate,
     });
 
     // Then the Resource Ref is deferred during template parsing and resolved
@@ -105,7 +105,7 @@ describe("CloudFormation Fn::Sub Resource referential", () => {
   it("resolves a Resource Ref from an explicit Fn::Sub variable map", async () => {
     // Given a template where Fn::Sub's template variable is an alias, and the
     // explicit variable map contains the actual Resource Ref dependency.
-    const subRefTemplate = {
+    const subReferenceTemplate = {
       Resources: {
         SourceBucket: {
           Type: "AWS::S3::Bucket",
@@ -135,7 +135,7 @@ describe("CloudFormation Fn::Sub Resource referential", () => {
     const simAws = new SimAws();
     const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "test-stack",
-      template: subRefTemplate,
+      template: subReferenceTemplate,
     });
 
     // Then the explicit variable Ref is discovered as a dependency and resolves

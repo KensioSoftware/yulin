@@ -18,8 +18,8 @@ export class NonDeterministicBackgroundTasks
   private readonly pending = new Set<Promise<void>>();
   private readonly maxJitterMs: number;
 
-  constructor(props: { maxJitterMs?: number } = {}) {
-    const { maxJitterMs = 5 } = props;
+  constructor(properties: { maxJitterMs?: number } = {}) {
+    const { maxJitterMs = 5 } = properties;
     this.maxJitterMs = maxJitterMs;
   }
 

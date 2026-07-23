@@ -1,36 +1,36 @@
 import { execa } from "execa";
 import { repoPath } from "./path.js";
-import { TempDir } from "./temp-dir.js";
+import { TemporaryDirectory as TemporaryDirectory } from "./temporary-directory.js";
 
-interface TestCdkProjectProps {
-  projectDir?: TempDir;
+interface TestCdkProjectProperties {
+  projectDirectory?: TemporaryDirectory;
 }
 
 /**
  * Convenience wrapper for temporary CDK projects used in tests.
  */
 export class TestCdkProject {
-  readonly projectDir: TempDir;
+  readonly projectDirectory: TemporaryDirectory;
 
-  constructor(props: TestCdkProjectProps = {}) {
-    const { projectDir = new TempDir() } = props;
-    this.projectDir = projectDir;
+  constructor(properties: TestCdkProjectProperties = {}) {
+    const { projectDirectory = new TemporaryDirectory() } = properties;
+    this.projectDirectory = projectDirectory;
   }
 
   /**
    * Write the CDK app entrypoint file inside this temporary project.
    */
   async writeCdkAppFile(content: string): Promise<void> {
-    await this.projectDir.writeFile("cdkApp.mjs", content);
+    await this.projectDirectory.writeFile("cdkApp.mjs", content);
   }
 
   /**
    * Synth the CDK app, returning the absolute path to the output directory.
    */
   async synth(relativeOutputPath = "cdk.out"): Promise<string> {
-    await this.projectDir.resolvePath();
-    const cdkAppFile = this.projectDir.join("cdkApp.mjs");
-    const cdkOutDir = this.projectDir.join(relativeOutputPath);
+    await this.projectDirectory.resolvePath();
+    const cdkAppFile = this.projectDirectory.join("cdkApp.mjs");
+    const cdkOutDirectory = this.projectDirectory.join(relativeOutputPath);
     const appCommand = `node ${JSON.stringify(cdkAppFile)}`;
 
     await execa(cdkBinPath(), [
@@ -38,10 +38,10 @@ export class TestCdkProject {
       "--app",
       appCommand,
       "--output",
-      cdkOutDir,
+      cdkOutDirectory,
     ]);
 
-    return cdkOutDir;
+    return cdkOutDirectory;
   }
 }
 

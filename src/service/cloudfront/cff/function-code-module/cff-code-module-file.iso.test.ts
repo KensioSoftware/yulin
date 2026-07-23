@@ -5,15 +5,15 @@ import {
   assertThrowsError,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
-import { TempDir } from "../../../../util/filesystem/temp-dir.js";
+import { TemporaryDirectory as TemporaryDirectory } from "../../../../util/filesystem/temporary-directory.js";
 import { CffUint8ArrayFunctionCodeExtractor } from "../function-code-input/cff-function-code-input.js";
 import { SimCloudFrontFunction } from "../sim-cloudfront-function.js";
 import { cloudFrontFunctionSourceFromModule } from "./cff-code-module-file.js";
 
 describe("CloudFront Function source from module", () => {
   it("loads a viewer-request handler module into a sim CloudFront Function", async () => {
-    const tempDir = new TempDir();
-    await tempDir.writeFile(
+    const temporaryDirectory = new TemporaryDirectory();
+    await temporaryDirectory.writeFile(
       "rewrite.cff.js",
       `
 export function handler(event) {
@@ -24,7 +24,7 @@ export function handler(event) {
     );
 
     const source = cloudFrontFunctionSourceFromModule(
-      tempDir.join("rewrite.cff.js"),
+      temporaryDirectory.join("rewrite.cff.js"),
     );
     const extractor = new CffUint8ArrayFunctionCodeExtractor(
       Buffer.from(source),
@@ -46,8 +46,8 @@ export function handler(event) {
   });
 
   it("loads a viewer-response handler module into a sim CloudFront Function", async () => {
-    const tempDir = new TempDir();
-    await tempDir.writeFile(
+    const temporaryDirectory = new TemporaryDirectory();
+    await temporaryDirectory.writeFile(
       "response.cff.js",
       `
 export function handler(event) {
@@ -60,7 +60,7 @@ export function handler(event) {
     );
 
     const source = cloudFrontFunctionSourceFromModule(
-      tempDir.join("response.cff.js"),
+      temporaryDirectory.join("response.cff.js"),
     );
     const extractor = new CffUint8ArrayFunctionCodeExtractor(
       Buffer.from(source),
@@ -83,8 +83,8 @@ export function handler(event) {
   });
 
   it("loads a non-exported handler module into a sim CloudFront Function", async () => {
-    const tempDir = new TempDir();
-    await tempDir.writeFile(
+    const temporaryDirectory = new TemporaryDirectory();
+    await temporaryDirectory.writeFile(
       "plain-handler.cff.js",
       `
 function handler(event) {
@@ -95,7 +95,7 @@ function handler(event) {
     );
 
     const source = cloudFrontFunctionSourceFromModule(
-      tempDir.join("plain-handler.cff.js"),
+      temporaryDirectory.join("plain-handler.cff.js"),
     );
     const extractor = new CffUint8ArrayFunctionCodeExtractor(
       Buffer.from(source),
@@ -117,8 +117,8 @@ function handler(event) {
   });
 
   it("throws when the module does not contain a supported handler pattern", async () => {
-    const tempDir = new TempDir();
-    await tempDir.writeFile(
+    const temporaryDirectory = new TemporaryDirectory();
+    await temporaryDirectory.writeFile(
       "unsupported.cff.js",
       `
 export const handler = (event) => {
@@ -128,7 +128,9 @@ export const handler = (event) => {
     );
 
     const error = assertThrowsError(() =>
-      cloudFrontFunctionSourceFromModule(tempDir.join("unsupported.cff.js")),
+      cloudFrontFunctionSourceFromModule(
+        temporaryDirectory.join("unsupported.cff.js"),
+      ),
     );
 
     assertStringIncludes(

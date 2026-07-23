@@ -1,9 +1,9 @@
 import { SimCfnNode } from "../../sim-cfn-node.js";
 import type { SimCfnTemplateValue } from "../../../value/sim-cfn-template-value.js";
-import { SimCfnFnSubTemplate } from "./template/sim-cfn-fn-sub-template.js";
-import { SimCfnFnSubVariableResolver } from "./resolve/sim-cfn-fn-sub-variable-resolver.js";
+import { SimCfnFnSubTemplate as SimCfnFunctionSubTemplate } from "./template/sim-cfn-fn-sub-template.js";
+import { SimCfnFnSubVariableResolver as SimCfnFunctionSubVariableResolver } from "./resolve/sim-cfn-fn-sub-variable-resolver.js";
 import type { SimCfnResolveContext } from "../../../resolve/sim-cfn-resolve-context.js";
-import { SimCfnFnSubUnresolvedValue } from "./resolve/sim-cfn-fn-sub-unresolved-value.js";
+import { SimCfnFnSubUnresolvedValue as SimCfnFunctionSubUnresolvedValue } from "./resolve/sim-cfn-fn-sub-unresolved-value.js";
 
 /**
  * Simulated CloudFormation `Fn::Sub` intrinsic function.
@@ -19,9 +19,9 @@ import { SimCfnFnSubUnresolvedValue } from "./resolve/sim-cfn-fn-sub-unresolved-
  * }
  */
 export class SimCfnFnSub extends SimCfnNode {
-  private readonly subTemplate: SimCfnFnSubTemplate;
-  private readonly variableResolver: SimCfnFnSubVariableResolver;
-  private readonly unresolvedValue: SimCfnFnSubUnresolvedValue;
+  private readonly subTemplate: SimCfnFunctionSubTemplate;
+  private readonly variableResolver: SimCfnFunctionSubVariableResolver;
+  private readonly unresolvedValue: SimCfnFunctionSubUnresolvedValue;
 
   constructor(
     template: string,
@@ -29,9 +29,9 @@ export class SimCfnFnSub extends SimCfnNode {
   ) {
     super();
 
-    this.subTemplate = new SimCfnFnSubTemplate(template);
-    this.variableResolver = new SimCfnFnSubVariableResolver(variables);
-    this.unresolvedValue = new SimCfnFnSubUnresolvedValue({
+    this.subTemplate = new SimCfnFunctionSubTemplate(template);
+    this.variableResolver = new SimCfnFunctionSubVariableResolver(variables);
+    this.unresolvedValue = new SimCfnFunctionSubUnresolvedValue({
       template,
       variables,
     });

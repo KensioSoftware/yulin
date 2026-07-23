@@ -1,5 +1,5 @@
-import type { DynamoDbTableName } from "../../table/sim-dynamodb-table.js";
-import { SimDynamoDbTable } from "../../table/sim-dynamodb-table.js";
+import type { DynamoDbTableName as DynamoDatabaseTableName } from "../../table/sim-dynamodb-table.js";
+import { SimDynamoDbTable as SimDynamoDatabaseTable } from "../../table/sim-dynamodb-table.js";
 import type {
   SimCreateTableCommand,
   SimCreateTableCommandOutput,
@@ -9,7 +9,7 @@ import type { CommandHandler } from "../../../../command/command-handler.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type { SimArn } from "../../../aws/arn.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
-import { SimDynamoDbResourceInUseException } from "../../error/dynamodb.error.js";
+import { SimDynamoDbResourceInUseException as SimDynamoDatabaseResourceInUseException } from "../../error/dynamodb.error.js";
 import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
@@ -17,9 +17,9 @@ import {
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { CreateTableAuthorizer } from "./create-table-authorizer.js";
 
-interface CreateTableCommandHandlerProps {
+interface CreateTableCommandHandlerProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
-  readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>;
+  readonly tables: Map<DynamoDatabaseTableName, SimDynamoDatabaseTable>;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background: BackgroundScheduler;
 }
@@ -38,34 +38,34 @@ export class CreateTableCommandHandler implements CommandHandler<
   SimCreateTableCommandOutput
 > {
   private readonly accountRegionScope: SimAwsAccountRegionScope;
-  private readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>;
+  private readonly tables: Map<DynamoDatabaseTableName, SimDynamoDatabaseTable>;
   private readonly authorizer: CreateTableAuthorizer;
   private readonly background: BackgroundScheduler;
 
-  constructor(props: CreateTableCommandHandlerProps) {
-    this.accountRegionScope = props.accountRegionScope;
-    this.tables = props.tables;
+  constructor(properties: CreateTableCommandHandlerProperties) {
+    this.accountRegionScope = properties.accountRegionScope;
+    this.tables = properties.tables;
     this.authorizer = new CreateTableAuthorizer({
-      iam: props.iam ?? new SimIamAllowAllAuth(),
+      iam: properties.iam ?? new SimIamAllowAllAuth(),
     });
-    this.background = props.background;
+    this.background = properties.background;
   }
 
   /**
    * Handle creation of a new DynamoDB Table.
    */
   async handle(
-    cmd: SimCreateTableCommand,
-    opts?: CreateTableCommandHandlerOptions,
+    command: SimCreateTableCommand,
+    options?: CreateTableCommandHandlerOptions,
   ): Promise<SimCreateTableCommandOutput> {
     assertDefined(
-      cmd.input.TableName,
+      command.input.TableName,
       "CreateTableCommand.input.TableName required",
     );
 
-    const tableName = cmd.input.TableName as DynamoDbTableName;
+    const tableName = command.input.TableName as DynamoDatabaseTableName;
     if (this.tables.has(tableName)) {
-      throw new SimDynamoDbResourceInUseException(
+      throw new SimDynamoDatabaseResourceInUseException(
         `DynamoDB Table ${tableName} already exists`,
       );
     }
@@ -75,10 +75,10 @@ export class CreateTableCommandHandler implements CommandHandler<
 
     const tableArn: SimArn = `arn:aws:dynamodb:${this.accountRegionScope.regionName}:${this.accountRegionScope.accountId}:table/${tableName}`;
 
-    this.authorizer.authorize(tableArn, opts?.caller);
+    this.authorizer.authorize(tableArn, options?.caller);
 
-    const table = new SimDynamoDbTable({
-      createCommand: cmd,
+    const table = new SimDynamoDatabaseTable({
+      createCommand: command,
       arn: tableArn,
       background: this.background,
     });

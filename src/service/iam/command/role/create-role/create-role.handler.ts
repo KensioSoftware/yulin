@@ -15,7 +15,7 @@ import { normaliseRolePath } from "../../../role/sim-iam-role-path.js";
 import { makeSimRoleArn } from "../../../role/arn/sim-iam-role-arn.js";
 import { SimIamTrustPolicyDocumentValidator } from "../../../validate/trust/sim-iam-trust-policy-doc-validator.js";
 
-interface CreateRoleCommandHandlerProps {
+interface CreateRoleCommandHandlerProperties {
   readonly accountId: SimAwsAccountId;
   readonly roles: Map<SimIamRoleName, SimIamRole>;
   readonly background?: BackgroundScheduler;
@@ -40,8 +40,8 @@ export class CreateRoleCommandHandler implements CommandHandler<
   private readonly trustPolicyValidator: SimIamTrustPolicyDocumentValidator;
   private readonly background: BackgroundScheduler;
 
-  constructor(props: CreateRoleCommandHandlerProps) {
-    const { accountId, roles, background = new BackgroundTasks() } = props;
+  constructor(properties: CreateRoleCommandHandlerProperties) {
+    const { accountId, roles, background = new BackgroundTasks() } = properties;
 
     this.accountId = accountId;
     this.roles = roles;
@@ -52,18 +52,20 @@ export class CreateRoleCommandHandler implements CommandHandler<
   /**
    * Handle a CreateRoleCommand from the SDK.
    */
-  async handle(cmd: SimCreateRoleCommand): Promise<SimCreateRoleCommandOutput> {
-    const roleName = cmd.input.RoleName as SimIamRoleName | undefined;
+  async handle(
+    command: SimCreateRoleCommand,
+  ): Promise<SimCreateRoleCommandOutput> {
+    const roleName = command.input.RoleName as SimIamRoleName | undefined;
 
     if (roleName === undefined || roleName.length === 0) {
       throw new Error("RoleName is required");
     }
 
     this.trustPolicyValidator.validateRequired(
-      cmd.input.AssumeRolePolicyDocument,
+      command.input.AssumeRolePolicyDocument,
     );
 
-    const path = normaliseRolePath(cmd.input.Path);
+    const path = normaliseRolePath(command.input.Path);
     const arn = makeSimRoleArn({
       accountId: this.accountId,
       path,
@@ -84,7 +86,7 @@ export class CreateRoleCommandHandler implements CommandHandler<
       arn,
       path,
       roleName,
-      cmd,
+      cmd: command,
     });
 
     this.roles.set(roleName, role);

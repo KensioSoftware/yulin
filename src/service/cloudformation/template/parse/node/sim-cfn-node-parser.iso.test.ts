@@ -9,13 +9,13 @@ import {
 } from "@kensio/smartass";
 import { describe, it, vi } from "vitest";
 import { SimCfnParameters } from "../../../parameters/sim-cfn-parameters.js";
-import { SimCfnFnFindInMap } from "../../node/fn/find-in-map/sim-cfn-fn-find-in-map.js";
-import { SimCfnFnJoin } from "../../node/fn/join/sim-cfn-fn-join.js";
+import { SimCfnFnFindInMap as SimCfnFunctionFindInMap } from "../../node/fn/find-in-map/sim-cfn-fn-find-in-map.js";
+import { SimCfnFnJoin as SimCfnFunctionJoin } from "../../node/fn/join/sim-cfn-fn-join.js";
 import { SimCfnList } from "../../node/sim-cfn-list.js";
 import { SimCfnLiteral } from "../../node/sim-cfn-literal.js";
 import { SimCfnNode } from "../../node/sim-cfn-node.js";
 import { SimCfnObject } from "../../node/sim-cfn-object.js";
-import { SimCfnRef } from "../../node/sim-cfn-ref.js";
+import { SimCfnRef as SimCfnReference } from "../../node/sim-cfn-ref.js";
 import { parseSimCfnNode, SimCfnNodeParser } from "./sim-cfn-node-parser.js";
 import { SimAws } from "../../../../aws/sim-aws.js";
 import { SimCfnResolveContext } from "../../resolve/sim-cfn-resolve-context.js";
@@ -44,7 +44,7 @@ describe("SimCfnNodeParser", () => {
 
     const node = parser.parse({ Ref: "BucketName" });
 
-    assertInstanceOf(node, SimCfnRef);
+    assertInstanceOf(node, SimCfnReference);
     assertObjectMatches(node.resolve(emptyContext()), {
       Ref: "BucketName",
     });
@@ -77,7 +77,7 @@ describe("SimCfnNodeParser", () => {
       "Fn::Join": ["-", ["my", "test", "bucket"]],
     });
 
-    assertInstanceOf(node, SimCfnFnJoin);
+    assertInstanceOf(node, SimCfnFunctionJoin);
     assertIdentical(node.resolve(emptyContext()), "my-test-bucket");
   });
 
@@ -88,7 +88,7 @@ describe("SimCfnNodeParser", () => {
       "Fn::FindInMap": ["RegionMap", "us-east-1", "AMI"],
     });
 
-    assertInstanceOf(node, SimCfnFnFindInMap);
+    assertInstanceOf(node, SimCfnFunctionFindInMap);
     const parameters = SimCfnParameters.fromValues({});
     assertIdentical(
       node.resolve(

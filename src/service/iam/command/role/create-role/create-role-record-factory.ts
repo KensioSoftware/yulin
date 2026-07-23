@@ -10,7 +10,7 @@ import type { JSONString } from "../../../../../util/type-guard/json.js";
 import type { SimIamRole, SimIamRoleName } from "../../../role/sim-iam-role.js";
 import { makeSimIamRoleId } from "../../../role/sim-iam-role-id.js";
 
-interface MakeRoleProps {
+interface MakeRoleProperties {
   readonly accountId: SimAwsAccountId;
   readonly arn: SimArn;
   readonly path: string;
@@ -25,8 +25,8 @@ export class CreateRoleRecordFactory {
   /**
    * Make a sim IAM Role object from input properties.
    */
-  makeRole(props: MakeRoleProps): SimIamRole {
-    const { accountId, arn, path, roleName, cmd } = props;
+  makeRole(properties: MakeRoleProperties): SimIamRole {
+    const { accountId, arn, path, roleName, cmd } = properties;
     const createDate = new Date();
 
     return {

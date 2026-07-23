@@ -5,7 +5,7 @@ export class SimS3ObjectMetadata {
   constructor(public readonly values: Record<string, string> = {}) {}
 }
 
-interface SimS3ObjectProps {
+interface SimS3ObjectProperties {
   readonly key?: string;
   readonly body?: Buffer;
   readonly metadata?: SimS3ObjectMetadata;
@@ -19,12 +19,12 @@ export class SimS3Object {
   public readonly body: Buffer;
   public readonly metadata: SimS3ObjectMetadata;
 
-  constructor(props: SimS3ObjectProps = {}) {
+  constructor(properties: SimS3ObjectProperties = {}) {
     const {
       key = "object.json",
       body = Buffer.alloc(0),
       metadata = new SimS3ObjectMetadata(),
-    } = props;
+    } = properties;
 
     this.key = key;
     this.body = body;

@@ -8,7 +8,7 @@ import type {
 type DistributionConfigInput =
   string | number | boolean | SimCfnTemplateValueRecord | SimCfnTemplateValue[];
 
-interface SimCfnCloudFrontDistributionConfigValidatorProps {
+interface SimCfnCloudFrontDistributionConfigValidatorProperties {
   readonly logicalId: string;
   readonly distributionConfig: DistributionConfigInput;
 }
@@ -24,9 +24,11 @@ export class SimCfnCfDistroConfigValidator {
   private readonly logicalId: string;
   private readonly distributionConfig: DistributionConfigInput;
 
-  constructor(props: SimCfnCloudFrontDistributionConfigValidatorProps) {
-    this.logicalId = props.logicalId;
-    this.distributionConfig = props.distributionConfig;
+  constructor(
+    properties: SimCfnCloudFrontDistributionConfigValidatorProperties,
+  ) {
+    this.logicalId = properties.logicalId;
+    this.distributionConfig = properties.distributionConfig;
   }
 
   /**

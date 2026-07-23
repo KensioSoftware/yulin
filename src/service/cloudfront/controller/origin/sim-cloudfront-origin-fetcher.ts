@@ -9,7 +9,7 @@ export class SimCloudFrontOriginFetcher {
    * Fetch the request from the Origin targeted by the resolved Behavior.
    */
   async fetch(
-    req: Request,
+    request: Request,
     distro: SimCloudFrontDistribution,
     behaviour: SimCloudFrontBehavior,
   ): Promise<Response> {
@@ -24,7 +24,7 @@ export class SimCloudFrontOriginFetcher {
     }
 
     return await origin.fetch({
-      req,
+      req: request,
       distribution: distro,
       behavior: behaviour,
     });

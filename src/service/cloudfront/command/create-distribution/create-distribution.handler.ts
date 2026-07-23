@@ -23,7 +23,7 @@ import {
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { CreateDistributionAuthorizer } from "./create-distribution-authorizer.js";
 
-interface CreateDistributionCommandHandlerProps {
+interface CreateDistributionCommandHandlerProperties {
   readonly accountId: SimAwsAccountId;
   readonly distributions: Map<
     SimCloudFrontDistributionId,
@@ -58,28 +58,28 @@ export class CreateDistributionCommandHandler implements CommandHandler<
   private readonly authorizer: CreateDistributionAuthorizer;
   private readonly background: BackgroundScheduler;
 
-  constructor(props: CreateDistributionCommandHandlerProps) {
-    this.accountId = props.accountId;
-    this.distributions = props.distributions;
-    this.cloudFrontRegistry = props.cloudFrontRegistry;
+  constructor(properties: CreateDistributionCommandHandlerProperties) {
+    this.accountId = properties.accountId;
+    this.distributions = properties.distributions;
+    this.cloudFrontRegistry = properties.cloudFrontRegistry;
     this.distributionConfigurator = new SimCloudFrontDistributionConfigurator(
-      new SimCloudFrontOriginConfigurator(props.s3OriginResolver),
+      new SimCloudFrontOriginConfigurator(properties.s3OriginResolver),
       new SimCloudFrontBehaviorConfigurator(),
     );
     this.authorizer = new CreateDistributionAuthorizer({
-      iam: props.iam ?? new SimIamAllowAllAuth(),
+      iam: properties.iam ?? new SimIamAllowAllAuth(),
     });
-    this.background = props.background;
+    this.background = properties.background;
   }
 
   /**
    * Handle creation of a new CloudFront Distribution.
    */
   async handle(
-    cmd: SimCreateDistributionCommand,
-    opts?: CreateDistributionCommandHandlerOptions,
+    command: SimCreateDistributionCommand,
+    options?: CreateDistributionCommandHandlerOptions,
   ): Promise<SimCreateDistributionCommandOutput> {
-    const distributionConfigInput = cmd.input.DistributionConfig;
+    const distributionConfigInput = command.input.DistributionConfig;
     assertDefined(
       distributionConfigInput,
       "CreateDistributionCommand.DistributionConfig",
@@ -93,7 +93,7 @@ export class CreateDistributionCommandHandler implements CommandHandler<
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    this.authorizer.authorize(opts?.caller);
+    this.authorizer.authorize(options?.caller);
 
     const distributionId = this.cloudFrontRegistry.allocateDistributionId();
     const distribution = new SimCloudFrontDistribution({

@@ -17,7 +17,7 @@ import type { SimAwsAccountRegionContainer } from "./sim-aws-account-region-scop
 import type { SimS3 } from "../s3/sim-s3.js";
 import type { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
 import type { SimCloudFrontRegistry } from "../cloudfront/registry/sim-cloud-front-registry.js";
-import type { SimDynamoDb } from "../dynamodb/index.js";
+import type { SimDynamoDb as SimDynamoDatabase } from "../dynamodb/index.js";
 import type { SimCloudFormation } from "../cloudformation/index.js";
 import type { SimRoute53 } from "../route53/index.js";
 import { SimAwsServiceFactory } from "./factory/sim-aws-service-factory.js";
@@ -27,7 +27,7 @@ import type { SimIam } from "../iam/index.js";
 import type { SimIamRegistry } from "../iam/registry/sim-iam-registry.js";
 import type { SimSts } from "../sts/sim-sts.js";
 
-interface SimAwsProps {
+interface SimAwsProperties {
   readonly defaultAccountId?: SimAwsAccountId;
   readonly defaultRegionName?: AwsRegionName;
   readonly background?: BackgroundScheduler & BackgroundCompleter;
@@ -55,12 +55,12 @@ export class SimAws {
   private readonly background: BackgroundScheduler & BackgroundCompleter;
   private readonly scopes: SimAwsScopeRegistry;
 
-  constructor(props: SimAwsProps = {}) {
+  constructor(properties: SimAwsProperties = {}) {
     const {
       defaultAccountId = DEFAULT_SIM_AWS_ACCOUNT_ID,
       defaultRegionName = DEFAULT_SIM_AWS_REGION_NAME,
       background = new BackgroundTasks(),
-    } = props;
+    } = properties;
 
     this.defaultAccountId = defaultAccountId;
     this.defaultRegionName = defaultRegionName;
@@ -123,7 +123,7 @@ export class SimAws {
   /**
    * Get simulated DynamoDB in the default Account Region scope.
    */
-  dynamoDb(): SimDynamoDb {
+  dynamoDb(): SimDynamoDatabase {
     return this.accountRegionScope().dynamoDb();
   }
 

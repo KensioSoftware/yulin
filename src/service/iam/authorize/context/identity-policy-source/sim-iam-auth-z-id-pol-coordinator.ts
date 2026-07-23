@@ -6,7 +6,7 @@ import type { SimIamAuthZPolicySource } from "../sim-iam-auth-z-context.js";
 import { SimIamIdentityPolicyOwnerResolver } from "./sim-iam-id-pol-owner-resolver.js";
 import { SimIamIdentityPolicyOwnerSourceBuilder } from "./sim-iam-id-pol-owner-src-builder.js";
 
-interface SimIamAuthZIdentityPolicySourceBuilderProps {
+interface SimIamAuthZIdentityPolicySourceBuilderProperties {
   policies?: ReadonlyMap<SimArn, SimIamPolicy>;
   roles?: ReadonlyMap<SimIamRoleName, SimIamRole>;
   users?: ReadonlyMap<SimIamUsername, SimIamUser>;
@@ -29,12 +29,12 @@ export class SimIamAuthZIdentityPolicyCoordinator {
   private readonly ownerResolver: SimIamIdentityPolicyOwnerResolver;
   private readonly ownerSourceBuilder: SimIamIdentityPolicyOwnerSourceBuilder;
 
-  constructor(props: SimIamAuthZIdentityPolicySourceBuilderProps) {
+  constructor(properties: SimIamAuthZIdentityPolicySourceBuilderProperties) {
     const {
       policies = new Map(),
       roles = new Map(),
       users = new Map(),
-    } = props;
+    } = properties;
 
     this.ownerResolver = new SimIamIdentityPolicyOwnerResolver({
       roles,

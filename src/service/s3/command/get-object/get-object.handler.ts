@@ -21,7 +21,7 @@ import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { GetObjectAuthorizer } from "./get-object-authorizer.js";
 import { GetObjectLoader } from "./get-object-loader.js";
 
-interface GetObjectCommandHandlerProps {
+interface GetObjectCommandHandlerProperties {
   readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
@@ -45,12 +45,12 @@ export class GetObjectCommandHandler implements CommandHandler<
   private readonly loader = new GetObjectLoader();
   private readonly background: BackgroundScheduler;
 
-  constructor(props: GetObjectCommandHandlerProps) {
+  constructor(properties: GetObjectCommandHandlerProperties) {
     const {
       buckets,
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
-    } = props;
+    } = properties;
     this.buckets = buckets;
     this.authorizer = new GetObjectAuthorizer({ iam });
     this.background = background;
@@ -68,13 +68,13 @@ export class GetObjectCommandHandler implements CommandHandler<
    * - the loader performs storage access only after authorization succeeds.
    */
   async handle(
-    cmd: SimGetObjectCommand,
-    opts?: GetObjectCommandHandlerOptions,
+    command: SimGetObjectCommand,
+    options?: GetObjectCommandHandlerOptions,
   ): Promise<SimGetObjectCommandOutput> {
-    assertDefined(cmd.input.Bucket, "GetObjectCommand.input.Bucket");
-    assertDefined(cmd.input.Key, "GetObjectCommand.input.Key");
+    assertDefined(command.input.Bucket, "GetObjectCommand.input.Bucket");
+    assertDefined(command.input.Key, "GetObjectCommand.input.Key");
 
-    const bucketName = cmd.input.Bucket as SimS3BucketName;
+    const bucketName = command.input.Bucket as SimS3BucketName;
     const bucket = this.buckets.get(bucketName);
     if (bucket === undefined) {
       throw new SimS3NoSuchBucket(`No S3 Bucket named ${bucketName}`);
@@ -83,8 +83,8 @@ export class GetObjectCommandHandler implements CommandHandler<
     // Complete request sequencing before authorization and storage access.
     await this.background.sequence();
 
-    this.authorizer.authorize(bucket, cmd.input.Key, opts?.caller);
+    this.authorizer.authorize(bucket, command.input.Key, options?.caller);
 
-    return await this.loader.load(bucket, cmd.input.Key);
+    return await this.loader.load(bucket, command.input.Key);
   }
 }

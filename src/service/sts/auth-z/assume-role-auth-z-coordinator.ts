@@ -10,7 +10,7 @@ import type { IamRoleArnParts } from "../../iam/role/arn/sim-iam-role-arn-parser
 import { AssumeRoleSourcePrincipalAuthorizer } from "./assume-role-src-acc-auth-z.js";
 import { AssumeRoleTargetRoleAuthorizer } from "./assume-role-target-auth-z.js";
 
-interface AssumeRoleAuthorizationCoordinatorProps {
+interface AssumeRoleAuthorizationCoordinatorProperties {
   readonly sourceAccountId: SimAwsAccountId;
   readonly iamResolver: SimIamAccountResolver;
 }
@@ -44,14 +44,14 @@ export class AssumeRoleAuthorizationCoordinator {
   private readonly sourcePrincipalAuthorizer: AssumeRoleSourcePrincipalAuthorizer;
   private readonly targetRoleAuthorizer: AssumeRoleTargetRoleAuthorizer;
 
-  constructor(props: AssumeRoleAuthorizationCoordinatorProps) {
-    this.sourceAccountId = props.sourceAccountId;
+  constructor(properties: AssumeRoleAuthorizationCoordinatorProperties) {
+    this.sourceAccountId = properties.sourceAccountId;
     this.sourcePrincipalAuthorizer = new AssumeRoleSourcePrincipalAuthorizer({
-      sourceAccountId: props.sourceAccountId,
-      iamResolver: props.iamResolver,
+      sourceAccountId: properties.sourceAccountId,
+      iamResolver: properties.iamResolver,
     });
     this.targetRoleAuthorizer = new AssumeRoleTargetRoleAuthorizer({
-      iamResolver: props.iamResolver,
+      iamResolver: properties.iamResolver,
     });
   }
 

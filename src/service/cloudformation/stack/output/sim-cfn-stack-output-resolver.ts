@@ -7,7 +7,7 @@ import type {
 } from "../../template/value/sim-cfn-template-value.js";
 import type { SimCfnStackOutput } from "./sim-cfn-stack-output.js";
 
-interface SimCfnStackOutputResolverProps {
+interface SimCfnStackOutputResolverProperties {
   readonly template: SimCfnTemplate;
   readonly resources: ReadonlyMap<string, SimCfnResource>;
 }
@@ -23,9 +23,9 @@ export class SimCfnStackOutputResolver {
   private readonly template: SimCfnTemplate;
   private readonly resources: ReadonlyMap<string, SimCfnResource>;
 
-  constructor(props: SimCfnStackOutputResolverProps) {
-    this.template = props.template;
-    this.resources = props.resources;
+  constructor(properties: SimCfnStackOutputResolverProperties) {
+    this.template = properties.template;
+    this.resources = properties.resources;
   }
 
   /**

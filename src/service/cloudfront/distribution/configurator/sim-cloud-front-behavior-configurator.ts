@@ -20,7 +20,7 @@ export class SimCloudFrontBehaviorConfigurator {
     cacheBehavior: SimCloudFrontDefaultCacheBehaviorConfig | undefined,
   ): void {
     assertDefined(cacheBehavior, "CloudFront DefaultCacheBehavior");
-    distribution.addBehavior(buildBaseBehaviorProps(cacheBehavior));
+    distribution.addBehavior(buildBaseBehaviorProperties(cacheBehavior));
   }
 
   /**
@@ -36,7 +36,7 @@ export class SimCloudFrontBehaviorConfigurator {
     );
     distribution.addBehavior({
       pathPattern: cacheBehavior.PathPattern,
-      ...buildBaseBehaviorProps(cacheBehavior),
+      ...buildBaseBehaviorProperties(cacheBehavior),
     });
   }
 }
@@ -45,7 +45,7 @@ export class SimCloudFrontBehaviorConfigurator {
  * Build the shared Behavior properties common to both default and named Cache
  * Behaviors. Callers add their own fields (e.g. pathPattern) on top.
  */
-function buildBaseBehaviorProps(
+function buildBaseBehaviorProperties(
   cacheBehavior:
     SimCloudFrontDefaultCacheBehaviorConfig | SimCloudFrontCacheBehaviorConfig,
 ): SimCloudFrontBehavior {

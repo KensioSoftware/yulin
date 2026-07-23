@@ -2,7 +2,7 @@ import type { SimCfnTemplateValue } from "../../../template/value/sim-cfn-templa
 import type { SimS3Bucket } from "../../../../s3/bucket/sim-s3-bucket.js";
 import type { SimCfnResourceValueAdapter } from "../sim-cfn-resource-value-adapter.js";
 
-interface SimS3BucketCfnProps {
+interface SimS3BucketCfnProperties {
   readonly bucket: SimS3Bucket;
 }
 
@@ -16,8 +16,8 @@ interface SimS3BucketCfnProps {
 export class SimS3BucketCfn implements SimCfnResourceValueAdapter {
   private readonly bucket: SimS3Bucket;
 
-  constructor(props: SimS3BucketCfnProps) {
-    this.bucket = props.bucket;
+  constructor(properties: SimS3BucketCfnProperties) {
+    this.bucket = properties.bucket;
   }
 
   /**

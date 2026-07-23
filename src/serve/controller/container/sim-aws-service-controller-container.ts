@@ -3,7 +3,7 @@ import { SimAws } from "../../../service/aws/sim-aws.js";
 import { Memo } from "../../../util/memo/memo.js";
 import type { SimAwsServiceController } from "../sim-service-controller.js";
 
-interface SimAwsServiceControllerContainerProps {
+interface SimAwsServiceControllerContainerProperties {
   readonly simAws?: SimAws;
 }
 
@@ -17,8 +17,8 @@ export class SimAwsServiceControllerContainer {
   private readonly controllerFactory: SimAwsServiceControllerFactory;
   private readonly controllers = new Memo<SimAwsServiceController>();
 
-  constructor(props: SimAwsServiceControllerContainerProps = {}) {
-    const { simAws = new SimAws() } = props;
+  constructor(properties: SimAwsServiceControllerContainerProperties = {}) {
+    const { simAws = new SimAws() } = properties;
     this.controllerFactory = new SimAwsServiceControllerFactory(simAws);
   }
 

@@ -2,7 +2,7 @@ import type { SimRoute53HostedZone } from "../../../../route53/hosted-zone/sim-r
 import type { SimCfnTemplateValue } from "../../../template/value/sim-cfn-template-value.js";
 import type { SimCfnResourceValueAdapter } from "../sim-cfn-resource-value-adapter.js";
 
-interface SimRoute53HostedZoneCfnProps {
+interface SimRoute53HostedZoneCfnProperties {
   readonly hostedZone: SimRoute53HostedZone;
 }
 
@@ -12,8 +12,8 @@ interface SimRoute53HostedZoneCfnProps {
 export class SimRoute53HostedZoneCfn implements SimCfnResourceValueAdapter {
   private readonly hostedZone: SimRoute53HostedZone;
 
-  constructor(props: SimRoute53HostedZoneCfnProps) {
-    this.hostedZone = props.hostedZone;
+  constructor(properties: SimRoute53HostedZoneCfnProperties) {
+    this.hostedZone = properties.hostedZone;
   }
 
   /**

@@ -19,7 +19,7 @@ import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { ListBucketsAuthorizer } from "./list-buckets-authorizer.js";
 import { ListBucketsPageBuilder } from "./list-buckets-page-builder.js";
 
-interface ListBucketsCommandHandlerProps {
+interface ListBucketsCommandHandlerProperties {
   readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
@@ -42,12 +42,12 @@ export class ListBucketsCommandHandler implements CommandHandler<
   private readonly pageBuilder: ListBucketsPageBuilder;
   private readonly background: BackgroundScheduler;
 
-  constructor(props: ListBucketsCommandHandlerProps) {
+  constructor(properties: ListBucketsCommandHandlerProperties) {
     const {
       buckets,
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
-    } = props;
+    } = properties;
     this.authorizer = new ListBucketsAuthorizer({ iam });
     this.pageBuilder = new ListBucketsPageBuilder({ buckets });
     this.background = background;
@@ -64,16 +64,16 @@ export class ListBucketsCommandHandler implements CommandHandler<
    * focused on coordinating request-level concerns.
    */
   async handle(
-    cmd: SimListBucketsCommand,
-    opts?: ListBucketsCommandHandlerOptions,
+    command: SimListBucketsCommand,
+    options?: ListBucketsCommandHandlerOptions,
   ): Promise<SimListBucketsCommandOutput> {
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    this.authorizer.authorize(opts?.caller);
+    this.authorizer.authorize(options?.caller);
 
     return {
-      ...this.pageBuilder.build(cmd.input),
+      ...this.pageBuilder.build(command.input),
       $metadata: {},
     };
   }

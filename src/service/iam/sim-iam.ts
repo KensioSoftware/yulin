@@ -77,7 +77,7 @@ import { SimIamCloudFormationResourceFactory } from "./cfn/sim-cfn-iam-resource-
 import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import type { SimIamInterServiceAuthZ } from "./authorize/sim-iam-inter-service-auth-z.js";
 
-interface SimIamProps {
+interface SimIamProperties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
   readonly background?: BackgroundScheduler;
   readonly credentialRegistry?: SimIamCredentialRegistry;
@@ -111,14 +111,14 @@ export class SimIam implements SimIamInterServiceAuthZ {
   private readonly cfnFactory: SimCfnServiceResourceFactory;
   private readonly roleCommands: SimIamRoleCommandHandlers;
 
-  constructor(props: SimIamProps = {}) {
+  constructor(properties: SimIamProperties = {}) {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       background = new BackgroundTasks(),
       credentialRegistry = new SimIamCredentialRegistry(),
       sessionCredentialGenerator = new SimIamRandomSessionCredentialGenerator(),
       userCredentialGenerator = new SimIamRandomUserCredentialGenerator(),
-    } = props;
+    } = properties;
 
     this.accountRegionScope = accountRegionScope;
     this.background = background;
@@ -163,103 +163,103 @@ export class SimIam implements SimIamInterServiceAuthZ {
    * Handle a Create Policy Command from the SDK.
    */
   async createPolicy(
-    cmd: SimCreatePolicyCommand,
+    command: SimCreatePolicyCommand,
   ): Promise<SimCreatePolicyCommandOutput> {
     const handler = new CreatePolicyCommandHandler({
       accountId: this.accountRegionScope.accountId,
       policies: this.policies,
       background: this.background,
     });
-    return await handler.handle(cmd);
+    return await handler.handle(command);
   }
 
   /**
    * Handle a Get Policy Command from the SDK.
    */
   async getPolicy(
-    cmd: SimGetPolicyCommand,
+    command: SimGetPolicyCommand,
   ): Promise<SimGetPolicyCommandOutput> {
     const handler = new GetPolicyCommandHandler({
       policies: this.policies,
       background: this.background,
     });
-    return await handler.handle(cmd);
+    return await handler.handle(command);
   }
 
   /**
    * Handle a List Policies Command from the SDK.
    */
   async listPolicies(
-    cmd: SimListPoliciesCommand,
+    command: SimListPoliciesCommand,
   ): Promise<SimListPoliciesCommandOutput> {
     const handler = new ListPoliciesCommandHandler({
       policies: this.policies,
       background: this.background,
     });
-    return await handler.handle(cmd);
+    return await handler.handle(command);
   }
 
   /**
    * Handle a Put Role Policy Command from the SDK.
    */
   async putRolePolicy(
-    cmd: SimPutRolePolicyCommand,
+    command: SimPutRolePolicyCommand,
   ): Promise<SimPutRolePolicyCommandOutput> {
-    return await this.roleCommands.putRolePolicy(cmd);
+    return await this.roleCommands.putRolePolicy(command);
   }
 
   /**
    * Handle an IAM PutUserPolicy command.
    */
   async putUserPolicy(
-    cmd: SimPutUserPolicyCommand,
+    command: SimPutUserPolicyCommand,
   ): Promise<SimPutUserPolicyCommandOutput> {
     const handler = new PutUserPolicyCommandHandler({
       users: this.users,
       background: this.background,
     });
-    return await handler.handle(cmd);
+    return await handler.handle(command);
   }
 
   /**
    * Handle a Create Role Command from the SDK.
    */
   async createRole(
-    cmd: SimCreateRoleCommand,
+    command: SimCreateRoleCommand,
   ): Promise<SimCreateRoleCommandOutput> {
-    return await this.roleCommands.createRole(cmd);
+    return await this.roleCommands.createRole(command);
   }
 
   /**
    * Handle an Attach Role Policy Command from the SDK.
    */
   async attachRolePolicy(
-    cmd: SimAttachRolePolicyCommand,
+    command: SimAttachRolePolicyCommand,
   ): Promise<SimAttachRolePolicyCommandOutput> {
-    return await this.roleCommands.attachRolePolicy(cmd);
+    return await this.roleCommands.attachRolePolicy(command);
   }
 
   /**
    * Handle a Get Role Command from the SDK.
    */
-  async getRole(cmd: SimGetRoleCommand): Promise<SimGetRoleCommandOutput> {
-    return await this.roleCommands.getRole(cmd);
+  async getRole(command: SimGetRoleCommand): Promise<SimGetRoleCommandOutput> {
+    return await this.roleCommands.getRole(command);
   }
 
   /**
    * Handle a List Roles Command from the SDK.
    */
   async listRoles(
-    cmd: SimListRolesCommand,
+    command: SimListRolesCommand,
   ): Promise<SimListRolesCommandOutput> {
-    return await this.roleCommands.listRoles(cmd);
+    return await this.roleCommands.listRoles(command);
   }
 
   /**
    * Handle an IAM CreateUser command.
    */
   async createUser(
-    cmd: SimCreateUserCommand,
+    command: SimCreateUserCommand,
   ): Promise<SimCreateUserCommandOutput> {
     const handler = new CreateUserCommandHandler({
       accountId: this.accountRegionScope.accountId,
@@ -267,14 +267,14 @@ export class SimIam implements SimIamInterServiceAuthZ {
       background: this.background,
     });
 
-    return await handler.handle(cmd);
+    return await handler.handle(command);
   }
 
   /**
    * Handle an IAM CreateAccessKey command.
    */
   async createAccessKey(
-    cmd: SimCreateAccessKeyCommand,
+    command: SimCreateAccessKeyCommand,
   ): Promise<SimCreateAccessKeyCommandOutput> {
     const handler = new CreateAccessKeyCommandHandler({
       users: this.users,
@@ -283,7 +283,7 @@ export class SimIam implements SimIamInterServiceAuthZ {
       background: this.background,
     });
 
-    return await handler.handle(cmd);
+    return await handler.handle(command);
   }
 
   /**

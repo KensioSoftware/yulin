@@ -55,7 +55,7 @@ export interface SimS3RequestOptions {
   readonly caller?: SimAwsCaller;
 }
 
-interface SimS3Props {
+interface SimS3Properties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
   readonly s3GlobalRegistry?: SimS3GlobalRegistry;
   readonly iam?: SimIamInterServiceAuthZ;
@@ -76,13 +76,13 @@ export class SimS3 {
   private readonly background: BackgroundScheduler;
   private readonly cfnFactory = new SimS3CloudFormationResourceFactory(this);
 
-  constructor(props: SimS3Props = {}) {
+  constructor(properties: SimS3Properties = {}) {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       s3GlobalRegistry = new SimS3GlobalRegistry(),
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
-    } = props;
+    } = properties;
 
     this.accountRegionScope = accountRegionScope;
     this.s3GlobalRegistry = s3GlobalRegistry;
@@ -94,8 +94,8 @@ export class SimS3 {
    * Handle a Create Bucket Command from the SDK.
    */
   async createBucket(
-    cmd: SimCreateBucketCommand,
-    opts?: SimS3RequestOptions,
+    command: SimCreateBucketCommand,
+    options?: SimS3RequestOptions,
   ): Promise<SimCreateBucketCommandOutput> {
     const handler = new CreateBucketCommandHandler({
       accountRegionScope: this.accountRegionScope,
@@ -104,97 +104,97 @@ export class SimS3 {
       iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd, opts);
+    return await handler.handle(command, options);
   }
 
   /**
    * Handle a Put Bucket Policy Command from the SDK.
    */
   async putBucketPolicy(
-    cmd: SimPutBucketPolicyCommand,
-    opts?: SimS3RequestOptions,
+    command: SimPutBucketPolicyCommand,
+    options?: SimS3RequestOptions,
   ): Promise<SimPutBucketPolicyCommandOutput> {
     const handler = new PutBucketPolicyCommandHandler({
       buckets: this.buckets,
       iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd, opts);
+    return await handler.handle(command, options);
   }
 
   /**
    * Handle a Put Bucket Website Command from the SDK.
    */
   async putBucketWebsite(
-    cmd: SimPutBucketWebsiteCommand,
-    opts?: SimS3RequestOptions,
+    command: SimPutBucketWebsiteCommand,
+    options?: SimS3RequestOptions,
   ): Promise<SimPutBucketWebsiteCommandOutput> {
     const handler = new PutBucketWebsiteCommandHandler({
       buckets: this.buckets,
       iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd, opts);
+    return await handler.handle(command, options);
   }
 
   /**
    * Handle a List Buckets Command from the SDK.
    */
   async listBuckets(
-    cmd: SimListBucketsCommand,
-    opts?: SimS3RequestOptions,
+    command: SimListBucketsCommand,
+    options?: SimS3RequestOptions,
   ): Promise<SimListBucketsCommandOutput> {
     const handler = new ListBucketsCommandHandler({
       buckets: this.buckets,
       iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd, opts);
+    return await handler.handle(command, options);
   }
 
   /**
    * Handle a Put Object Command from the SDK.
    */
   async putObject(
-    cmd: SimPutObjectCommand,
-    opts?: SimS3RequestOptions,
+    command: SimPutObjectCommand,
+    options?: SimS3RequestOptions,
   ): Promise<SimPutObjectCommandOutput> {
     const handler = new PutObjectCommandHandler({
       buckets: this.buckets,
       iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd, opts);
+    return await handler.handle(command, options);
   }
 
   /**
    * Handle a Get Object Command from the SDK.
    */
   async getObject(
-    cmd: SimGetObjectCommand,
-    opts?: SimS3RequestOptions,
+    command: SimGetObjectCommand,
+    options?: SimS3RequestOptions,
   ): Promise<SimGetObjectCommandOutput> {
     const handler = new GetObjectCommandHandler({
       buckets: this.buckets,
       iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd, opts);
+    return await handler.handle(command, options);
   }
 
   /**
    * Handle a List Objects Command from the SDK.
    */
   async listObjects(
-    cmd: SimListObjectsCommand,
-    opts?: SimS3RequestOptions,
+    command: SimListObjectsCommand,
+    options?: SimS3RequestOptions,
   ): Promise<SimListObjectsCommandOutput> {
     const handler = new ListObjectsCommandHandler({
       buckets: this.buckets,
       iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd, opts);
+    return await handler.handle(command, options);
   }
 
   /**

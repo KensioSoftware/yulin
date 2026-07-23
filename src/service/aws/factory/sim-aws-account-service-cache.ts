@@ -14,7 +14,7 @@ import type { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
 import { Memo } from "../../../util/memo/memo.js";
 import { accountServiceCacheKey } from "./account-service-cache-key.js";
 
-interface SimAwsAccountServiceCacheProps {
+interface SimAwsAccountServiceCacheProperties {
   readonly simAws: SimAws;
   readonly background: BackgroundScheduler & BackgroundCompleter;
   readonly cloudFrontRegistry: SimCloudFrontRegistry;
@@ -58,12 +58,12 @@ export class SimAwsAccountServiceCache {
    */
   private readonly services = new Memo<SimCloudFront | SimIam | SimRoute53>();
 
-  constructor(props: SimAwsAccountServiceCacheProps) {
-    this.simAws = props.simAws;
-    this.background = props.background;
-    this.cloudFrontRegistry = props.cloudFrontRegistry;
-    this.iamRegistry = props.iamRegistry;
-    this.route53Registry = props.route53Registry;
+  constructor(properties: SimAwsAccountServiceCacheProperties) {
+    this.simAws = properties.simAws;
+    this.background = properties.background;
+    this.cloudFrontRegistry = properties.cloudFrontRegistry;
+    this.iamRegistry = properties.iamRegistry;
+    this.route53Registry = properties.route53Registry;
   }
 
   /**

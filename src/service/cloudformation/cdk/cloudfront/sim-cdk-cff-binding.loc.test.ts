@@ -13,7 +13,7 @@ import { SimCloudFrontDistribution } from "../../../cloudfront/distribution/sim-
 import type { CloudFrontFunction } from "../../../cloudfront/index.js";
 import { SimAwsLocalServer } from "../../../../serve/index.js";
 import { TestCdkProject } from "../../../../util/filesystem/test-cdk-project.js";
-import { TempDir } from "../../../../util/filesystem/temp-dir.js";
+import { TemporaryDirectory as TemporaryDirectory } from "../../../../util/filesystem/temporary-directory.js";
 
 /**
  * Slower local integration test. Calls the real CDK CLI to synth the output
@@ -36,8 +36,8 @@ describe("Sim CDK CloudFront Function binding local integration", () => {
   it("deploys a CloudFront Function association using a binding", async () => {
     // Given a real js2 syntax CloudFront Function handler file in the temp CDK
     // project.
-    const projectDir = new TempDir();
-    await projectDir.writeFile(
+    const projectDirectory = new TemporaryDirectory();
+    await projectDirectory.writeFile(
       "cff/rewrite-function.js",
       // (We allow `export` in CFF JS2 files, and in real projects strip it out
       // at CDK compile time.)
@@ -58,11 +58,11 @@ export function handler(event) {
 `,
     );
 
-    const handlerFile = projectDir.join("cff/rewrite-function.js");
+    const handlerFile = projectDirectory.join("cff/rewrite-function.js");
 
     // And a CDK stack with an S3 Bucket, CloudFront Function, and Distribution
     // associated with that Function.
-    const cdkProject = new TestCdkProject({ projectDir });
+    const cdkProject = new TestCdkProject({ projectDirectory });
 
     await cdkProject.writeCdkAppFile(`
 import * as cdk from "aws-cdk-lib";
@@ -123,12 +123,12 @@ app.synth();
     };
 
     // And the CDK app is synthesized to a CloudFormation template.
-    const cdkOutDir = await cdkProject.synth();
+    const cdkOutDirectory = await cdkProject.synth();
 
     // When the synthesized template is deployed through sim CloudFormation with a
     // binding for the CloudFront Function logical ID.
     const stack = await simAws.cloudFormation().deployTemplateFile({
-      templatePath: path.join(cdkOutDir, "TestStack.template.json"),
+      templatePath: path.join(cdkOutDirectory, "TestStack.template.json"),
       bindings: [
         {
           logicalId: "RewriteFunction",

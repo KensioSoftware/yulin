@@ -10,13 +10,15 @@ import { SimCfnExecutableResourceBindingMatcher } from "./sim-cfn-exec-binding-m
  * rules live in `SimCfnExecutableResourceBindingMatcher`, which keeps this file
  * small and focused on reporting actionable validation errors.
  */
-export function validateSimCfnExecutableResourceBindings(props: {
+export function validateSimCfnExecutableResourceBindings(properties: {
   readonly stackName: string;
   readonly resources: ReadonlyMap<string, SimCfnResource>;
   readonly bindings?: readonly SimCfnExecutableResourceBinding[] | undefined;
 }): void {
-  const bindings = props.bindings ?? [];
-  const matcher = new SimCfnExecutableResourceBindingMatcher(props.resources);
+  const bindings = properties.bindings ?? [];
+  const matcher = new SimCfnExecutableResourceBindingMatcher(
+    properties.resources,
+  );
 
   for (const binding of bindings) {
     if (matcher.matches(binding)) {
@@ -24,7 +26,7 @@ export function validateSimCfnExecutableResourceBindings(props: {
     }
 
     throw new Error(
-      `Invalid sim CloudFormation executable binding in Stack ${props.stackName}: ${describeBinding(binding)} does not resolve to a Resource in the Stack`,
+      `Invalid sim CloudFormation executable binding in Stack ${properties.stackName}: ${describeBinding(binding)} does not resolve to a Resource in the Stack`,
     );
   }
 }

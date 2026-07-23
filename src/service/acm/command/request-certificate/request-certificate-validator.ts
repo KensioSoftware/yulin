@@ -1,6 +1,6 @@
 import type { SimRequestCertificateCommand } from "./request-certificate.cmd.js";
 import {
-  SimAcmInvalidArgsException,
+  SimAcmInvalidArgsException as SimAcmInvalidArgumentsException,
   SimAcmTooManyTagsException,
 } from "../../error/sim-acm.error.js";
 
@@ -25,14 +25,17 @@ export class RequestCertificateValidator {
    * before certificate creation because the request limit applies to the whole
    * request, not to an already-created certificate.
    */
-  validate(cmd: SimRequestCertificateCommand): void {
-    if (cmd.input.DomainName === undefined || cmd.input.DomainName === "") {
-      throw new SimAcmInvalidArgsException(
+  validate(command: SimRequestCertificateCommand): void {
+    if (
+      command.input.DomainName === undefined ||
+      command.input.DomainName === ""
+    ) {
+      throw new SimAcmInvalidArgumentsException(
         "RequestCertificateCommand.input.DomainName required",
       );
     }
 
-    if ((cmd.input.Tags?.length ?? 0) > 50) {
+    if ((command.input.Tags?.length ?? 0) > 50) {
       throw new SimAcmTooManyTagsException(
         "RequestCertificateCommand.input.Tags cannot contain more than 50 tags",
       );

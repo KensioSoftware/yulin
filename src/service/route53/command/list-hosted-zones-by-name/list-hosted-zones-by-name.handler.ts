@@ -17,7 +17,7 @@ import {
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { ListHostedZonesByNameAuthorizer } from "./list-hosted-zones-by-name-authorizer.js";
 
-interface ListHostedZonesByNameCommandHandlerProps {
+interface ListHostedZonesByNameCommandHandlerProperties {
   readonly hostedZones: Map<SimRoute53HostedZoneId, SimRoute53HostedZone>;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
@@ -43,12 +43,12 @@ export class ListHostedZonesByNameCommandHandler implements CommandHandler<
   private readonly authorizer: ListHostedZonesByNameAuthorizer;
   private readonly background: BackgroundScheduler;
 
-  constructor(props: ListHostedZonesByNameCommandHandlerProps) {
+  constructor(properties: ListHostedZonesByNameCommandHandlerProperties) {
     const {
       hostedZones,
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
-    } = props;
+    } = properties;
     this.hostedZones = hostedZones;
     this.authorizer = new ListHostedZonesByNameAuthorizer({ iam });
     this.background = background;
@@ -61,25 +61,25 @@ export class ListHostedZonesByNameCommandHandler implements CommandHandler<
    * AccessDenied rather than an empty or filtered listing.
    */
   async handle(
-    cmd: SimListHostedZonesByNameCommand,
-    opts?: ListHostedZonesByNameCommandHandlerOptions,
+    command: SimListHostedZonesByNameCommand,
+    options?: ListHostedZonesByNameCommandHandlerOptions,
   ): Promise<SimListHostedZonesByNameCommandOutput> {
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    this.authorizer.authorize(opts?.caller);
+    this.authorizer.authorize(options?.caller);
 
     const page = getHostedZoneListPage({
       hostedZones: this.hostedZones,
-      maxItemsInput: cmd.input.MaxItems,
-      markerNameInput: cmd.input.DNSName,
-      markerHostedZoneId: cmd.input.HostedZoneId,
+      maxItemsInput: command.input.MaxItems,
+      markerNameInput: command.input.DNSName,
+      markerHostedZoneId: command.input.HostedZoneId,
     });
 
     return {
       HostedZones: page.hostedZones,
-      DNSName: cmd.input.DNSName,
-      HostedZoneId: cmd.input.HostedZoneId,
+      DNSName: command.input.DNSName,
+      HostedZoneId: command.input.HostedZoneId,
       IsTruncated: page.nextEntry !== undefined,
       NextDNSName: page.nextEntry?.hostedZone.name,
       NextHostedZoneId: page.nextEntry?.hostedZone.id,

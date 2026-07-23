@@ -4,11 +4,11 @@ import type {
   SimPutItemCommandOutput,
 } from "./put-item.cmd.js";
 import type {
-  DynamoDbTableName,
-  SimDynamoDbTable,
+  DynamoDbTableName as DynamoDatabaseTableName,
+  SimDynamoDbTable as SimDynamoDatabaseTable,
 } from "../../table/sim-dynamodb-table.js";
-import { DynamoDbItem } from "../../item/dynamodb-item.js";
-import { SimDynamoDbResourceNotFoundException } from "../../error/dynamodb.error.js";
+import { DynamoDbItem as DynamoDatabaseItem } from "../../item/dynamodb-item.js";
+import { SimDynamoDbResourceNotFoundException as SimDynamoDatabaseResourceNotFoundException } from "../../error/dynamodb.error.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import {
   SimIamAllowAllAuth,
@@ -19,9 +19,9 @@ import { PutItemAuthorizer } from "./put-item-authorizer.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimArn } from "../../../aws/arn.js";
 
-interface PutItemCommandHandlerProps {
+interface PutItemCommandHandlerProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
-  readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>;
+  readonly tables: Map<DynamoDatabaseTableName, SimDynamoDatabaseTable>;
   readonly iam?: SimIamInterServiceAuthZ;
 }
 
@@ -39,14 +39,14 @@ export class PutItemCommandHandler implements CommandHandler<
   SimPutItemCommandOutput
 > {
   private readonly accountRegionScope: SimAwsAccountRegionScope;
-  private readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>;
+  private readonly tables: Map<DynamoDatabaseTableName, SimDynamoDatabaseTable>;
   private readonly authorizer: PutItemAuthorizer;
 
-  constructor(props: PutItemCommandHandlerProps) {
-    this.accountRegionScope = props.accountRegionScope;
-    this.tables = props.tables;
+  constructor(properties: PutItemCommandHandlerProperties) {
+    this.accountRegionScope = properties.accountRegionScope;
+    this.tables = properties.tables;
     this.authorizer = new PutItemAuthorizer({
-      iam: props.iam ?? new SimIamAllowAllAuth(),
+      iam: properties.iam ?? new SimIamAllowAllAuth(),
     });
   }
 
@@ -54,26 +54,27 @@ export class PutItemCommandHandler implements CommandHandler<
    * Put an Item into a DynamoDB Table.
    */
   async handle(
-    cmd: SimPutItemCommand,
-    opts?: PutItemCommandHandlerOptions,
+    command: SimPutItemCommand,
+    options?: PutItemCommandHandlerOptions,
   ): Promise<SimPutItemCommandOutput> {
-    const tableName = cmd.input.TableName as DynamoDbTableName | undefined;
+    const tableName = command.input.TableName as
+      DynamoDatabaseTableName | undefined;
     assertDefined(tableName, "PutItemCommand.input.TableName required");
 
     const tableArn: SimArn = `arn:aws:dynamodb:${this.accountRegionScope.regionName}:${this.accountRegionScope.accountId}:table/${tableName}`;
 
-    this.authorizer.authorize(tableArn, opts?.caller);
+    this.authorizer.authorize(tableArn, options?.caller);
 
     const table = this.tables.get(tableName);
     if (table === undefined) {
-      throw new SimDynamoDbResourceNotFoundException(
+      throw new SimDynamoDatabaseResourceNotFoundException(
         `No DynamoDB Table named ${tableName}`,
       );
     }
 
-    assertDefined(cmd.input.Item, "PutItemCommand.input.Item required");
+    assertDefined(command.input.Item, "PutItemCommand.input.Item required");
 
-    const item = DynamoDbItem.fromAttributeValues(cmd.input.Item);
+    const item = DynamoDatabaseItem.fromAttributeValues(command.input.Item);
 
     await table.putItem(item);
 

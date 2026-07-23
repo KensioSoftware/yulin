@@ -1,10 +1,10 @@
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimCfnTemplateValue } from "../../template/value/sim-cfn-template-value.js";
-import { simAwsLocalConf } from "../../../../serve/http/local-server/sim-aws-local.conf.js";
+import { simAwsLocalConf as simAwsLocalConfig } from "../../../../serve/http/local-server/sim-aws-local.conf.js";
 import { DEFAULT_SIM_AWS_ACCOUNT_ID } from "../../../aws/sim-aws-account.js";
 import { DEFAULT_SIM_AWS_REGION_NAME } from "../../../aws/sim-aws-region.js";
 
-interface SimCfnPseudoParametersProps {
+interface SimCfnPseudoParametersProperties {
   readonly accountRegionScope?: SimAwsAccountRegionScope | undefined;
   readonly stackName?: string | undefined;
 }
@@ -16,9 +16,9 @@ export class SimCfnPseudoParameters {
   private readonly accountRegionScope: SimAwsAccountRegionScope | undefined;
   private readonly stackName: string | undefined;
 
-  constructor(props: SimCfnPseudoParametersProps) {
-    this.accountRegionScope = props.accountRegionScope;
-    this.stackName = props.stackName;
+  constructor(properties: SimCfnPseudoParametersProperties) {
+    this.accountRegionScope = properties.accountRegionScope;
+    this.stackName = properties.stackName;
   }
 
   /**
@@ -57,7 +57,7 @@ export class SimCfnPseudoParameters {
       }
 
       case "AWS::URLSuffix": {
-        return simAwsLocalConf.hostname;
+        return simAwsLocalConfig.hostname;
       }
 
       default: {

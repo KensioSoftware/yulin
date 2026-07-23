@@ -76,8 +76,8 @@ export class SimS3BucketWebsite {
   /**
    * Redirect this request to the same URL with a trailing slash on the path.
    */
-  trailingSlashRedirect(req: Request): Response {
-    const url = new URL(req.url);
+  trailingSlashRedirect(request: Request): Response {
+    const url = new URL(request.url);
 
     url.pathname = `${url.pathname}/`;
 
@@ -100,10 +100,10 @@ export class SimS3BucketWebsite {
    * Choose an appropriate response for a request response pair based on static
    * website configuration for this simulated S3 bucket.
    */
-  redirectForRequestResponse(req: Request, res: Response): Response {
+  redirectForRequestResponse(request: Request, response: Response): Response {
     return this.redirects.redirectForRequestResponse(
-      req,
-      res,
+      request,
+      response,
       this.websiteEnabled(),
     );
   }

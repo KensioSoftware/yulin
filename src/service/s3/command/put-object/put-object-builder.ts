@@ -24,12 +24,12 @@ export class PutObjectBuilder {
    * validation and authorization before invoking it so failed authorization
    * cannot trigger body processing or lead to storage mutation.
    */
-  build(cmd: SimPutObjectCommand): SimS3Object {
-    assertDefined(cmd.input.Key, "PutObjectCommand.input.Key");
+  build(command: SimPutObjectCommand): SimS3Object {
+    assertDefined(command.input.Key, "PutObjectCommand.input.Key");
     return new SimS3Object({
-      key: cmd.input.Key,
-      body: this.toBuffer(cmd.input.Body),
-      metadata: new SimS3ObjectMetadata(this.toMetadata(cmd)),
+      key: command.input.Key,
+      body: this.toBuffer(command.input.Body),
+      metadata: new SimS3ObjectMetadata(this.toMetadata(command)),
     });
   }
 
@@ -41,11 +41,11 @@ export class PutObjectBuilder {
    * path. Omitting ContentType leaves that key absent rather than assigning an
    * undefined value.
    */
-  private toMetadata(cmd: SimPutObjectCommand): Record<string, string> {
+  private toMetadata(command: SimPutObjectCommand): Record<string, string> {
     return {
-      ...cmd.input.Metadata,
-      ...(cmd.input.ContentType !== undefined && {
-        "content-type": cmd.input.ContentType,
+      ...command.input.Metadata,
+      ...(command.input.ContentType !== undefined && {
+        "content-type": command.input.ContentType,
       }),
     };
   }

@@ -30,7 +30,8 @@ const listOutput = await acm.listCertificates(
   }),
 );
 
-for (const summary of listOutput.CertificateSummaryList ?? []) {
+const certificateSummaries = listOutput.CertificateSummaryList ?? [];
+for (const summary of certificateSummaries) {
   console.log(summary.CertificateArn);
   console.log(summary.DomainName);
   console.log(summary.Status);

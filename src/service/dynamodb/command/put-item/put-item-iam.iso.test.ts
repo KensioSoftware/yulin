@@ -10,7 +10,7 @@ import { SimAws } from "../../../aws/sim-aws.js";
 import { makeSimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import { makeAwsRegionName } from "../../../aws/sim-aws-region.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
-import { SimDynamoDb } from "../../sim-dynamodb.js";
+import { SimDynamoDb as SimDynamoDatabase } from "../../sim-dynamodb.js";
 
 describe("DynamoDB PutItemCommand IAM authorization", () => {
   it("allows the default Account root caller", async () => {
@@ -18,9 +18,12 @@ describe("DynamoDB PutItemCommand IAM authorization", () => {
     const accountId = makeSimAwsAccountId();
     const region = makeAwsRegionName();
     const simAws = new SimAws();
-    const simDynamoDb = simAws.account(accountId).region(region).dynamoDb();
+    const simDynamoDatabase = simAws
+      .account(accountId)
+      .region(region)
+      .dynamoDb();
 
-    await simDynamoDb.createTable(
+    await simDynamoDatabase.createTable(
       new CreateTableCommand({
         TableName: "RootTable",
         KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
@@ -30,7 +33,7 @@ describe("DynamoDB PutItemCommand IAM authorization", () => {
     );
 
     // When PutItem is called without an explicit caller.
-    const output = await simDynamoDb.putItem(
+    const output = await simDynamoDatabase.putItem(
       new PutItemCommand({
         TableName: "RootTable",
         Item: { id: { S: "item-1" } },
@@ -47,9 +50,12 @@ describe("DynamoDB PutItemCommand IAM authorization", () => {
     const region = makeAwsRegionName();
     const simAws = new SimAws();
     const simIam = simAws.account(accountId).iam();
-    const simDynamoDb = simAws.account(accountId).region(region).dynamoDb();
+    const simDynamoDatabase = simAws
+      .account(accountId)
+      .region(region)
+      .dynamoDb();
 
-    await simDynamoDb.createTable(
+    await simDynamoDatabase.createTable(
       new CreateTableCommand({
         TableName: "AllowedTable",
         KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
@@ -89,7 +95,7 @@ describe("DynamoDB PutItemCommand IAM authorization", () => {
     );
 
     // When the Role puts an item into the table it has permission for.
-    const output = await simDynamoDb.putItem(
+    const output = await simDynamoDatabase.putItem(
       new PutItemCommand({
         TableName: "AllowedTable",
         Item: { id: { S: "item-1" } },
@@ -107,9 +113,12 @@ describe("DynamoDB PutItemCommand IAM authorization", () => {
     const region = makeAwsRegionName();
     const simAws = new SimAws();
     const simIam = simAws.account(accountId).iam();
-    const simDynamoDb = simAws.account(accountId).region(region).dynamoDb();
+    const simDynamoDatabase = simAws
+      .account(accountId)
+      .region(region)
+      .dynamoDb();
 
-    await simDynamoDb.createTable(
+    await simDynamoDatabase.createTable(
       new CreateTableCommand({
         TableName: "ProtectedTable",
         KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
@@ -135,7 +144,7 @@ describe("DynamoDB PutItemCommand IAM authorization", () => {
 
     // When the Role attempts to put an item.
     const error = await assertThrowsErrorAsync(async () =>
-      simDynamoDb.putItem(
+      simDynamoDatabase.putItem(
         new PutItemCommand({
           TableName: "ProtectedTable",
           Item: { id: { S: "item-1" } },
@@ -159,9 +168,12 @@ describe("DynamoDB PutItemCommand IAM authorization", () => {
     const region = makeAwsRegionName();
     const simAws = new SimAws();
     const simIam = simAws.account(accountId).iam();
-    const simDynamoDb = simAws.account(accountId).region(region).dynamoDb();
+    const simDynamoDatabase = simAws
+      .account(accountId)
+      .region(region)
+      .dynamoDb();
 
-    await simDynamoDb.createTable(
+    await simDynamoDatabase.createTable(
       new CreateTableCommand({
         TableName: "ExplicitlyDeniedTable",
         KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
@@ -209,7 +221,7 @@ describe("DynamoDB PutItemCommand IAM authorization", () => {
 
     // When the Role attempts to put an item.
     const error = await assertThrowsErrorAsync(async () =>
-      simDynamoDb.putItem(
+      simDynamoDatabase.putItem(
         new PutItemCommand({
           TableName: "ExplicitlyDeniedTable",
           Item: { id: { S: "item-1" } },
@@ -231,9 +243,12 @@ describe("DynamoDB PutItemCommand IAM authorization", () => {
     const accountId = makeSimAwsAccountId();
     const region = makeAwsRegionName();
     const simAws = new SimAws();
-    const simDynamoDb = simAws.account(accountId).region(region).dynamoDb();
+    const simDynamoDatabase = simAws
+      .account(accountId)
+      .region(region)
+      .dynamoDb();
 
-    await simDynamoDb.createTable(
+    await simDynamoDatabase.createTable(
       new CreateTableCommand({
         TableName: "AnonymousTable",
         KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
@@ -244,7 +259,7 @@ describe("DynamoDB PutItemCommand IAM authorization", () => {
 
     // When an explicitly anonymous caller attempts to put an item.
     const error = await assertThrowsErrorAsync(async () =>
-      simDynamoDb.putItem(
+      simDynamoDatabase.putItem(
         new PutItemCommand({
           TableName: "AnonymousTable",
           Item: { id: { S: "item-1" } },
@@ -261,9 +276,9 @@ describe("DynamoDB PutItemCommand IAM authorization", () => {
 
   it("uses allow-all authorization when SimDynamoDb is instantiated directly", async () => {
     // Given a directly constructed DynamoDB service with no IAM implementation supplied.
-    const simDynamoDb = new SimDynamoDb();
+    const simDynamoDatabase = new SimDynamoDatabase();
 
-    await simDynamoDb.createTable(
+    await simDynamoDatabase.createTable(
       new CreateTableCommand({
         TableName: "StandaloneTable",
         KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
@@ -273,7 +288,7 @@ describe("DynamoDB PutItemCommand IAM authorization", () => {
     );
 
     // When an anonymous caller puts an item through the standalone service.
-    const output = await simDynamoDb.putItem(
+    const output = await simDynamoDatabase.putItem(
       new PutItemCommand({
         TableName: "StandaloneTable",
         Item: { id: { S: "item-1" } },

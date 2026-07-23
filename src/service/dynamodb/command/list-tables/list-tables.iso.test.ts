@@ -10,22 +10,22 @@ describe("DynamoDB ListTablesCommand", () => {
   it("List all DynamoDB Tables", async () => {
     const simAws = new SimAws();
 
-    const simDynamoDb = simAws.dynamoDb();
+    const simDynamoDatabase = simAws.dynamoDb();
 
     await Promise.all([
-      simDynamoDb.createTable(
+      simDynamoDatabase.createTable(
         new CreateTableCommand({
           TableName: "TableA",
           KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
         }),
       ),
-      simDynamoDb.createTable(
+      simDynamoDatabase.createTable(
         new CreateTableCommand({
           TableName: "TableB",
           KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
         }),
       ),
-      simDynamoDb.createTable(
+      simDynamoDatabase.createTable(
         new CreateTableCommand({
           TableName: "TableC",
           KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
@@ -33,7 +33,7 @@ describe("DynamoDB ListTablesCommand", () => {
       ),
     ]);
 
-    const listTablesOutput = await simDynamoDb.listTables(
+    const listTablesOutput = await simDynamoDatabase.listTables(
       new ListTablesCommand(),
     );
 
@@ -49,22 +49,22 @@ describe("DynamoDB ListTablesCommand", () => {
   it("List DynamoDB Tables with limit", async () => {
     const simAws = new SimAws();
 
-    const simDynamoDb = simAws.dynamoDb();
+    const simDynamoDatabase = simAws.dynamoDb();
 
     await Promise.all([
-      simDynamoDb.createTable(
+      simDynamoDatabase.createTable(
         new CreateTableCommand({
           TableName: "TableA",
           KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
         }),
       ),
-      simDynamoDb.createTable(
+      simDynamoDatabase.createTable(
         new CreateTableCommand({
           TableName: "TableB",
           KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
         }),
       ),
-      simDynamoDb.createTable(
+      simDynamoDatabase.createTable(
         new CreateTableCommand({
           TableName: "TableC",
           KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
@@ -72,7 +72,7 @@ describe("DynamoDB ListTablesCommand", () => {
       ),
     ]);
 
-    const listTablesOutput = await simDynamoDb.listTables(
+    const listTablesOutput = await simDynamoDatabase.listTables(
       new ListTablesCommand({ Limit: 2 }),
     );
 
@@ -87,22 +87,22 @@ describe("DynamoDB ListTablesCommand", () => {
   it("List DynamoDB Tables with exclusive start and limit", async () => {
     const simAws = new SimAws();
 
-    const simDynamoDb = simAws.dynamoDb();
+    const simDynamoDatabase = simAws.dynamoDb();
 
     await Promise.all([
-      simDynamoDb.createTable(
+      simDynamoDatabase.createTable(
         new CreateTableCommand({
           TableName: "TableA",
           KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
         }),
       ),
-      simDynamoDb.createTable(
+      simDynamoDatabase.createTable(
         new CreateTableCommand({
           TableName: "TableB",
           KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
         }),
       ),
-      simDynamoDb.createTable(
+      simDynamoDatabase.createTable(
         new CreateTableCommand({
           TableName: "TableC",
           KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
@@ -110,7 +110,7 @@ describe("DynamoDB ListTablesCommand", () => {
       ),
     ]);
 
-    const listTablesOutput = await simDynamoDb.listTables(
+    const listTablesOutput = await simDynamoDatabase.listTables(
       new ListTablesCommand({ ExclusiveStartTableName: "TableB", Limit: 2 }),
     );
 

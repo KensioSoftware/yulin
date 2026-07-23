@@ -3,7 +3,7 @@ import type { SimAwsAccountRegionContainer } from "./sim-aws-account-region-scop
 import { faker } from "@faker-js/faker";
 import type { SimS3 } from "../s3/sim-s3.js";
 import type { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
-import type { SimDynamoDb } from "../dynamodb/index.js";
+import type { SimDynamoDb as SimDynamoDatabase } from "../dynamodb/index.js";
 import { SimAws } from "./sim-aws.js";
 import type { SimCloudFormation } from "../cloudformation/index.js";
 import type { SimAcm } from "../acm/sim-acm.js";
@@ -87,7 +87,7 @@ export type AwsRegionName = (typeof AWS_REGION_NAMES)[number];
 
 export const DEFAULT_SIM_AWS_REGION_NAME = "us-east-1" as const;
 
-interface SimAwsRegionProps {
+interface SimAwsRegionProperties {
   readonly simAws?: Pick<SimAws, "accountRegionScope">;
   readonly regionName?: AwsRegionName;
 }
@@ -103,9 +103,9 @@ export class SimAwsRegion {
 
   private readonly simAws: Pick<SimAws, "accountRegionScope">;
 
-  constructor(props: SimAwsRegionProps = {}) {
+  constructor(properties: SimAwsRegionProperties = {}) {
     const { simAws = new SimAws(), regionName = DEFAULT_SIM_AWS_REGION_NAME } =
-      props;
+      properties;
 
     this.simAws = simAws;
     this.regionName = regionName;
@@ -145,7 +145,7 @@ export class SimAwsRegion {
   /**
    * Get simulated DynamoDB for this Region's default Account.
    */
-  dynamoDb(): SimDynamoDb {
+  dynamoDb(): SimDynamoDatabase {
     return this.account().dynamoDb();
   }
 

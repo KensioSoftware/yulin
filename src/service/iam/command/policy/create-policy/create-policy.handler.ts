@@ -9,17 +9,12 @@ import {
   type BackgroundScheduler,
   BackgroundTasks,
 } from "../../../../../util/background/background.js";
-import type {
-  SimIamManagedPolicy,
-  SimIamPolicyName,
-} from "../../../policy/sim-iam-policy.js";
-import { makeSimPolicyArn } from "../../../policy/sim-iam-policy-arn.js";
-import { normalisePolicyPath } from "../../../policy/sim-iam-policy-path.js";
+import type { SimIamManagedPolicy } from "../../../policy/sim-iam-policy.js";
+import { CreatePolicyInputResolver } from "./create-policy-input-resolver.js";
 import { CreatePolicyRecordFactory } from "./create-policy-record-factory.js";
 import { SimIamEntityAlreadyExists } from "../../../error/sim-iam.error.js";
-import { SimIamPolicyDocumentValidator } from "../../../validate/sim-iam-policy-doc-validator.js";
 
-interface CreatePolicyCommandHandlerProps {
+interface CreatePolicyCommandHandlerProperties {
   readonly accountId: SimAwsAccountId;
   readonly policies: Map<SimArn, SimIamManagedPolicy>;
   readonly background?: BackgroundScheduler;
@@ -34,40 +29,29 @@ export class CreatePolicyCommandHandler implements CommandHandler<
   SimCreatePolicyCommand,
   SimCreatePolicyCommandOutput
 > {
-  private readonly accountId: SimAwsAccountId;
   private readonly policies: Map<SimArn, SimIamManagedPolicy>;
   private readonly background: BackgroundScheduler;
+  private readonly inputResolver: CreatePolicyInputResolver;
   private readonly policyFactory = new CreatePolicyRecordFactory();
-  private readonly policyDocValidator: SimIamPolicyDocumentValidator;
 
-  constructor(props: CreatePolicyCommandHandlerProps) {
-    const { accountId, policies, background = new BackgroundTasks() } = props;
-    this.accountId = accountId;
+  constructor(properties: CreatePolicyCommandHandlerProperties) {
+    const {
+      accountId,
+      policies,
+      background = new BackgroundTasks(),
+    } = properties;
     this.policies = policies;
     this.background = background;
-    this.policyDocValidator = new SimIamPolicyDocumentValidator();
+    this.inputResolver = new CreatePolicyInputResolver(accountId);
   }
 
   /**
    * Handle a CreatePolicyCommand from the SDK.
    */
   async handle(
-    cmd: SimCreatePolicyCommand,
+    command: SimCreatePolicyCommand,
   ): Promise<SimCreatePolicyCommandOutput> {
-    const policyName = cmd.input.PolicyName as SimIamPolicyName | undefined;
-
-    if (policyName === undefined || policyName.length === 0) {
-      throw new Error("PolicyName is required");
-    }
-
-    this.policyDocValidator.validateOptional(cmd.input.PolicyDocument);
-
-    const path = normalisePolicyPath(cmd.input.Path);
-    const arn = makeSimPolicyArn({
-      accountId: this.accountId,
-      path,
-      policyName,
-    });
+    const { policyName, path, arn } = this.inputResolver.resolve(command);
 
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
@@ -82,7 +66,7 @@ export class CreatePolicyCommandHandler implements CommandHandler<
       arn,
       path,
       policyName,
-      cmd,
+      cmd: command,
     });
 
     this.policies.set(arn, policy);

@@ -15,7 +15,7 @@ export function emptyCloudFrontS3OriginResolver(): undefined {
   return;
 }
 
-interface SimCloudFrontS3OriginProps {
+interface SimCloudFrontS3OriginProperties {
   readonly bucket: SimS3Bucket;
   readonly originPath?: string | undefined;
 }
@@ -29,9 +29,9 @@ export class SimCloudFrontS3Origin implements SimCloudFrontOrigin {
   private readonly bucket: SimS3Bucket;
   private readonly originPath: string;
 
-  constructor(props: SimCloudFrontS3OriginProps) {
-    this.bucket = props.bucket;
-    this.originPath = props.originPath ?? "";
+  constructor(properties: SimCloudFrontS3OriginProperties) {
+    this.bucket = properties.bucket;
+    this.originPath = properties.originPath ?? "";
   }
 
   /**

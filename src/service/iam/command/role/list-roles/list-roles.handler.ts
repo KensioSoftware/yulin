@@ -8,9 +8,9 @@ import type {
   SimListRolesCommandOutput,
 } from "./list-roles.cmd.js";
 import type { SimIamRole, SimIamRoleName } from "../../../role/sim-iam-role.js";
-import { SimIamInvalidMarkerException } from "../../../error/sim-iam.error.js";
+import { ListRolesPaginator } from "./list-roles-paginator.js";
 
-interface ListRolesCommandHandlerProps {
+interface ListRolesCommandHandlerProperties {
   readonly roles: Map<SimIamRoleName, SimIamRole>;
   readonly background?: BackgroundScheduler;
 }
@@ -26,9 +26,10 @@ export class ListRolesCommandHandler implements CommandHandler<
 > {
   private readonly roles: Map<SimIamRoleName, SimIamRole>;
   private readonly background: BackgroundScheduler;
+  private readonly paginator = new ListRolesPaginator();
 
-  constructor(props: ListRolesCommandHandlerProps) {
-    const { roles, background = new BackgroundTasks() } = props;
+  constructor(properties: ListRolesCommandHandlerProperties) {
+    const { roles, background = new BackgroundTasks() } = properties;
 
     this.roles = roles;
     this.background = background;
@@ -37,26 +38,21 @@ export class ListRolesCommandHandler implements CommandHandler<
   /**
    * Handle a ListRolesCommand from the SDK.
    */
-  async handle(cmd: SimListRolesCommand): Promise<SimListRolesCommandOutput> {
+  async handle(
+    command: SimListRolesCommand,
+  ): Promise<SimListRolesCommandOutput> {
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    const maxItems = this.getMaxItems(cmd);
-    const roles = this.matchingRoles(cmd);
-
-    const startRoleName =
-      cmd.input.Marker === undefined
-        ? undefined
-        : this.parseMarker(cmd.input.Marker);
-
-    const startIndex = this.getStartIndex(roles, startRoleName);
-
-    const page = roles.slice(startIndex, startIndex + maxItems);
-    const lastRole = page.at(-1);
-    const isTruncated = startIndex + page.length < roles.length;
+    const roles = this.matchingRoles(command);
+    const page = this.paginator.page(
+      roles,
+      command.input.MaxItems,
+      command.input.Marker,
+    );
 
     return {
-      Roles: page.map((role) => ({
+      Roles: page.roles.map((role) => ({
         Path: role.path,
         RoleName: role.roleName,
         RoleId: role.roleId,
@@ -65,15 +61,12 @@ export class ListRolesCommandHandler implements CommandHandler<
         AssumeRolePolicyDocument: role.assumeRolePolicyDocument,
         Description: role.description,
       })),
-      IsTruncated: isTruncated,
-      Marker:
-        isTruncated && lastRole !== undefined
-          ? this.makeMarker(lastRole.roleName)
-          : undefined,
+      IsTruncated: page.isTruncated,
+      Marker: page.marker,
     };
   }
 
-  private matchingRoles(cmd: SimListRolesCommand): SimIamRole[] {
+  private matchingRoles(command: SimListRolesCommand): SimIamRole[] {
     const roles = this.roles
       .values()
       .toArray()
@@ -81,50 +74,9 @@ export class ListRolesCommandHandler implements CommandHandler<
 
     return roles.filter((role) => {
       return !(
-        cmd.input.PathPrefix !== undefined &&
-        !role.path.startsWith(cmd.input.PathPrefix)
+        command.input.PathPrefix !== undefined &&
+        !role.path.startsWith(command.input.PathPrefix)
       );
     });
-  }
-
-  private getMaxItems(cmd: SimListRolesCommand): number {
-    const maxItems = cmd.input.MaxItems ?? 100;
-
-    if (!Number.isSafeInteger(maxItems) || maxItems < 1 || maxItems > 1000) {
-      throw new RangeError(
-        "ListRolesCommand.input.MaxItems must be an integer between 1 and 1000",
-      );
-    }
-
-    return maxItems;
-  }
-
-  private getStartIndex(
-    roles: readonly SimIamRole[],
-    startRoleName: SimIamRoleName | undefined,
-  ): number {
-    if (startRoleName === undefined) {
-      return 0;
-    }
-
-    const markerIndex = roles.findIndex(
-      (role) => role.roleName === startRoleName,
-    );
-
-    if (markerIndex === -1) {
-      throw new SimIamInvalidMarkerException(
-        "ListRolesCommand.input.Marker is invalid",
-      );
-    }
-
-    return markerIndex + 1;
-  }
-
-  private makeMarker(roleName: SimIamRoleName): string {
-    return Buffer.from(roleName, "utf8").toString("base64url");
-  }
-
-  private parseMarker(marker: string): SimIamRoleName {
-    return Buffer.from(marker, "base64url").toString("utf8") as SimIamRoleName;
   }
 }

@@ -13,7 +13,7 @@ import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-sco
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import type { SimAwsPrincipal } from "../aws/caller/sim-aws-caller.js";
 
-interface SimStsProps {
+interface SimStsProperties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
   readonly iamResolver?: SimIamAccountResolver;
   readonly background?: BackgroundScheduler;
@@ -31,19 +31,19 @@ export class SimSts {
   private readonly background: BackgroundScheduler;
   private readonly iamResolver: SimIamAccountResolver;
 
-  constructor(props: SimStsProps = {}) {
+  constructor(properties: SimStsProperties = {}) {
     this.accountRegionScope =
-      props.accountRegionScope ?? simAwsAccountRegionScopeFactory.make();
-    this.iamResolver = props.iamResolver ?? new SimIamRegistry();
-    this.background = props.background ?? new BackgroundTasks();
+      properties.accountRegionScope ?? simAwsAccountRegionScopeFactory.make();
+    this.iamResolver = properties.iamResolver ?? new SimIamRegistry();
+    this.background = properties.background ?? new BackgroundTasks();
   }
 
   /**
    * Handle an AssumeRoleCommand from the SDK.
    */
   async assumeRole(
-    cmd: SimAssumeRoleCommand,
-    opts?: {
+    command: SimAssumeRoleCommand,
+    options?: {
       caller?: SimAwsPrincipal;
     },
   ): Promise<SimAssumeRoleCommandOutput> {
@@ -52,6 +52,6 @@ export class SimSts {
       iamResolver: this.iamResolver,
       background: this.background,
     });
-    return await handler.handle(cmd, opts);
+    return await handler.handle(command, options);
   }
 }

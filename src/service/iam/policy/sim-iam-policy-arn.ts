@@ -6,12 +6,12 @@ import { faker } from "@faker-js/faker";
 /**
  * Make a sim IAM policy ARN.
  */
-export function makeSimPolicyArn(props: {
+export function makeSimPolicyArn(properties: {
   readonly accountId: SimAwsAccountId;
   readonly path: string;
   readonly policyName: SimIamPolicyName;
 }): SimArn {
-  return `arn:aws:iam::${props.accountId}:policy${props.path}${props.policyName}` as SimArn;
+  return `arn:aws:iam::${properties.accountId}:policy${properties.path}${properties.policyName}` as SimArn;
 }
 
 /**

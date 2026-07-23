@@ -12,7 +12,7 @@ import {
 } from "./sim-cfn-cff-function-config.js";
 import { SimCfnCffBindingFinder } from "../../../cloudformation/bind/validate/sim-cfn-exec-binding-finder.js";
 
-interface SimCfnCfFunctionCreateInputBuilderProps {
+interface SimCfnCfFunctionCreateInputBuilderProperties {
   readonly resource: SimCfnResource;
   readonly properties: SimCfnTemplateValueRecord;
   readonly bindings?: readonly SimCfnExecutableResourceBinding[] | undefined;
@@ -46,10 +46,10 @@ export class SimCfnCffCreateInputBuilder {
   private readonly bindings:
     readonly SimCfnExecutableResourceBinding[] | undefined;
 
-  constructor(props: SimCfnCfFunctionCreateInputBuilderProps) {
-    this.resource = props.resource;
-    this.properties = props.properties;
-    this.bindings = props.bindings;
+  constructor(properties: SimCfnCfFunctionCreateInputBuilderProperties) {
+    this.resource = properties.resource;
+    this.properties = properties.properties;
+    this.bindings = properties.bindings;
   }
 
   /**

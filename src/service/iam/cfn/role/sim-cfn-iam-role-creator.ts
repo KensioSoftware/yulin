@@ -4,11 +4,11 @@ import type { SimIam } from "../../sim-iam.js";
 import type { SimIamRole, SimIamRoleName } from "../../role/sim-iam-role.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import {
-  SimCfnIamRolePropsParser,
-  type SimCfnIamRoleProps,
+  SimCfnIamRolePropsParser as SimCfnIamRolePropertiesParser,
+  type SimCfnIamRoleProps as SimCfnIamRoleProperties,
 } from "./sim-cfn-iam-role-props-parser.js";
 
-interface SimCfnIamRoleCreatorProps {
+interface SimCfnIamRoleCreatorProperties {
   readonly iam: SimIam;
 }
 
@@ -17,10 +17,10 @@ interface SimCfnIamRoleCreatorProps {
  */
 export class SimCfnIamRoleCreator {
   private readonly iam: SimIam;
-  private readonly propsParser = new SimCfnIamRolePropsParser();
+  private readonly propsParser = new SimCfnIamRolePropertiesParser();
 
-  constructor(props: SimCfnIamRoleCreatorProps) {
-    this.iam = props.iam;
+  constructor(properties: SimCfnIamRoleCreatorProperties) {
+    this.iam = properties.iam;
   }
 
   /**
@@ -30,39 +30,39 @@ export class SimCfnIamRoleCreator {
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
   ): Promise<SimIamRole> {
-    const roleProps = this.propsParser.parse(resource, properties);
+    const roleProperties = this.propsParser.parse(resource, properties);
 
     await this.iam.createRole({
       input: {
-        RoleName: roleProps.roleName,
-        Path: roleProps.path,
-        Description: roleProps.description,
-        AssumeRolePolicyDocument: roleProps.assumeRolePolicyDocument,
+        RoleName: roleProperties.roleName,
+        Path: roleProperties.path,
+        Description: roleProperties.description,
+        AssumeRolePolicyDocument: roleProperties.assumeRolePolicyDocument,
       },
     });
 
     await Promise.all([
-      this.putInlinePolicies(roleProps),
-      this.attachManagedPolicies(roleProps),
+      this.putInlinePolicies(roleProperties),
+      this.attachManagedPolicies(roleProperties),
     ]);
 
-    const role = this.iam.roles.get(roleProps.roleName as SimIamRoleName);
+    const role = this.iam.roles.get(roleProperties.roleName as SimIamRoleName);
     assertDefined(
       role,
-      `Sim IAM Role ${roleProps.roleName} after CloudFormation creation`,
+      `Sim IAM Role ${roleProperties.roleName} after CloudFormation creation`,
     );
 
     return role;
   }
 
   private async putInlinePolicies(
-    roleProps: SimCfnIamRoleProps,
+    roleProperties: SimCfnIamRoleProperties,
   ): Promise<void> {
     await Promise.all(
-      roleProps.inlinePolicies.map(async (inlinePolicy) =>
+      roleProperties.inlinePolicies.map(async (inlinePolicy) =>
         this.iam.putRolePolicy({
           input: {
-            RoleName: roleProps.roleName,
+            RoleName: roleProperties.roleName,
             PolicyName: inlinePolicy.policyName,
             PolicyDocument: inlinePolicy.policyDocument,
           },
@@ -72,13 +72,13 @@ export class SimCfnIamRoleCreator {
   }
 
   private async attachManagedPolicies(
-    roleProps: SimCfnIamRoleProps,
+    roleProperties: SimCfnIamRoleProperties,
   ): Promise<void> {
     await Promise.all(
-      roleProps.managedPolicyArns.map(async (policyArn) =>
+      roleProperties.managedPolicyArns.map(async (policyArn) =>
         this.iam.attachRolePolicy({
           input: {
-            RoleName: roleProps.roleName,
+            RoleName: roleProperties.roleName,
             PolicyArn: policyArn,
           },
         }),

@@ -208,7 +208,8 @@ const listObjectsOutput = await simS3.listObjects(
   }),
 );
 
-for (const object of listObjectsOutput.Contents ?? []) {
+const objectContentItems = listObjectsOutput.Contents ?? [];
+for (const object of objectContentItems) {
   console.log(object.Key, object.Size);
 }
 ```

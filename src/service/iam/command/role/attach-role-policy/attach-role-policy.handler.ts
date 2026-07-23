@@ -11,7 +11,7 @@ import type {
   SimAttachRolePolicyCommandOutput,
 } from "./attach-role-policy.cmd.js";
 
-interface AttachRolePolicyCommandHandlerProps {
+interface AttachRolePolicyCommandHandlerProperties {
   readonly roles: Map<SimIamRoleName, SimIamRole>;
   readonly background?: BackgroundScheduler;
 }
@@ -37,8 +37,8 @@ export class AttachRolePolicyCommandHandler implements CommandHandler<
   private readonly roles: Map<SimIamRoleName, SimIamRole>;
   private readonly background: BackgroundScheduler;
 
-  constructor(props: AttachRolePolicyCommandHandlerProps) {
-    const { roles, background = new BackgroundTasks() } = props;
+  constructor(properties: AttachRolePolicyCommandHandlerProperties) {
+    const { roles, background = new BackgroundTasks() } = properties;
 
     this.roles = roles;
     this.background = background;
@@ -48,14 +48,14 @@ export class AttachRolePolicyCommandHandler implements CommandHandler<
    * Handle an AttachRolePolicyCommand from the SDK.
    */
   async handle(
-    cmd: SimAttachRolePolicyCommand,
+    command: SimAttachRolePolicyCommand,
   ): Promise<SimAttachRolePolicyCommandOutput> {
-    const roleName = cmd.input.RoleName as SimIamRoleName | undefined;
+    const roleName = command.input.RoleName as SimIamRoleName | undefined;
     if (roleName === undefined || roleName.length === 0) {
       throw new Error("RoleName is required");
     }
 
-    const policyArn = cmd.input.PolicyArn as SimArn | undefined;
+    const policyArn = command.input.PolicyArn as SimArn | undefined;
     if (policyArn === undefined || policyArn.length === 0) {
       throw new Error("PolicyArn is required");
     }

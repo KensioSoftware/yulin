@@ -8,10 +8,10 @@ describe("sim IAM NumericLessThanEquals authorization", () => {
     const operator = new SimIamNumericLessThanEquals();
 
     // When the request value equals that maximum.
-    const matches = operator.matches(2, 2);
+    const isMatches = operator.matches(2, 2);
 
     // Then NumericLessThanEquals accepts the boundary value.
-    assertTrue(matches);
+    assertTrue(isMatches);
   });
 
   it("matches numeric strings using numeric rather than lexical ordering", () => {
@@ -19,10 +19,10 @@ describe("sim IAM NumericLessThanEquals authorization", () => {
     const operator = new SimIamNumericLessThanEquals();
 
     // When a smaller request value is also represented as text.
-    const matches = operator.matches("2", "10");
+    const isMatches = operator.matches("2", "10");
 
     // Then the values are compared numerically.
-    assertTrue(matches);
+    assertTrue(isMatches);
   });
 
   it("rejects a request value greater than every policy limit", () => {
@@ -30,10 +30,10 @@ describe("sim IAM NumericLessThanEquals authorization", () => {
     const operator = new SimIamNumericLessThanEquals();
 
     // When the request value exceeds each limit.
-    const matches = operator.matches(11, ["2", "10"]);
+    const isMatches = operator.matches(11, ["2", "10"]);
 
     // Then no policy value satisfies the comparison.
-    assertFalse(matches);
+    assertFalse(isMatches);
   });
 
   it("rejects non-numeric values instead of coercing them", () => {
@@ -41,9 +41,9 @@ describe("sim IAM NumericLessThanEquals authorization", () => {
     const operator = new SimIamNumericLessThanEquals();
 
     // When the request contains an empty non-numeric value.
-    const matches = operator.matches("", 10);
+    const isMatches = operator.matches("", 10);
 
     // Then the malformed numeric value fails closed.
-    assertFalse(matches);
+    assertFalse(isMatches);
   });
 });

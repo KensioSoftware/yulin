@@ -6,7 +6,7 @@ import {
 } from "../sim-aws-account-region-scope.js";
 import type { SimAws } from "../sim-aws.js";
 
-interface SimAwsScopeRegistryProps {
+interface SimAwsScopeRegistryProperties {
   readonly simAws: SimAws;
 }
 
@@ -28,8 +28,8 @@ export class SimAwsScopeRegistry {
     SimAwsAccountRegionContainer
   >();
 
-  constructor(props: SimAwsScopeRegistryProps) {
-    this.simAws = props.simAws;
+  constructor(properties: SimAwsScopeRegistryProperties) {
+    this.simAws = properties.simAws;
   }
 
   /**

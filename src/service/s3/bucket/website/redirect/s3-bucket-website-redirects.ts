@@ -37,7 +37,7 @@ export class S3BucketWebsiteRedirects {
    * Website configuration.
    */
   redirectForRequestResponse(
-    req: Request,
+    request: Request,
     res: Response,
     websiteEnabled: boolean,
   ): Response {
@@ -49,18 +49,18 @@ export class S3BucketWebsiteRedirects {
       this.websiteConfiguration.RedirectAllRequestsTo;
 
     if (redirectAllRequestsTo !== undefined) {
-      return this.redirectResponse(req, {
+      return this.redirectResponse(request, {
         HostName: redirectAllRequestsTo.HostName,
         Protocol: redirectAllRequestsTo.Protocol,
       });
     }
 
     const routingRule = this.websiteConfiguration.RoutingRules?.find((rule) =>
-      this.routingRuleMatches(rule, req, res),
+      this.routingRuleMatches(rule, request, res),
     );
 
     if (routingRule?.Redirect !== undefined) {
-      return this.redirectResponse(req, routingRule.Redirect);
+      return this.redirectResponse(request, routingRule.Redirect);
     }
 
     return res;
@@ -68,7 +68,7 @@ export class S3BucketWebsiteRedirects {
 
   private routingRuleMatches(
     rule: SimS3WebsiteRoutingRule,
-    req: Request,
+    request: Request,
     res: Response,
   ): boolean {
     const condition = rule.Condition;
@@ -86,15 +86,15 @@ export class S3BucketWebsiteRedirects {
 
     return !(
       condition.KeyPrefixEquals !== undefined &&
-      !this.requestKey(req).startsWith(condition.KeyPrefixEquals)
+      !this.requestKey(request).startsWith(condition.KeyPrefixEquals)
     );
   }
 
   private redirectResponse(
-    req: Request,
+    request: Request,
     redirect: SimS3WebsiteRedirect,
   ): Response {
-    const url = new URL(req.url);
+    const url = new URL(request.url);
 
     if (redirect.Protocol !== undefined) {
       url.protocol = `${redirect.Protocol}:`;
@@ -108,8 +108,8 @@ export class S3BucketWebsiteRedirects {
     if (redirect.ReplaceKeyWith !== undefined) {
       url.pathname = `/${redirect.ReplaceKeyWith}`;
     } else if (redirect.ReplaceKeyPrefixWith !== undefined) {
-      url.pathname = `/${this.requestKey(req).replace(
-        this.matchingKeyPrefix(req),
+      url.pathname = `/${this.requestKey(request).replace(
+        this.matchingKeyPrefix(request),
         // eslint-disable-next-line unicorn/no-unsafe-string-replacement
         redirect.ReplaceKeyPrefixWith,
       )}`;
@@ -123,13 +123,13 @@ export class S3BucketWebsiteRedirects {
     });
   }
 
-  private requestKey(req: Request): string {
-    const url = new URL(req.url);
+  private requestKey(request: Request): string {
+    const url = new URL(request.url);
     return url.pathname.replace(/^\/+/, "");
   }
 
-  private matchingKeyPrefix(req: Request): string {
-    const requestKey = this.requestKey(req);
+  private matchingKeyPrefix(request: Request): string {
+    const requestKey = this.requestKey(request);
 
     return (
       this.websiteConfiguration.RoutingRules?.find((rule) => {

@@ -17,7 +17,7 @@ import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import type { SimAwsPrincipal } from "../../../aws/caller/sim-aws-caller.js";
 import { AssumeRoleAuthorizationCoordinator } from "../../auth-z/assume-role-auth-z-coordinator.js";
 
-interface AssumeRoleCommandHandlerProps {
+interface AssumeRoleCommandHandlerProperties {
   readonly sourceAccountId: SimAwsAccountId;
   readonly iamResolver: SimIamAccountResolver;
   readonly background?: BackgroundScheduler;
@@ -43,12 +43,12 @@ export class AssumeRoleCommandHandler implements CommandHandler<
   private readonly sessionCreator: SimStsAssumeRoleSessionCreator;
   private readonly sourceAccountId: SimAwsAccountId;
 
-  constructor(props: AssumeRoleCommandHandlerProps) {
+  constructor(properties: AssumeRoleCommandHandlerProperties) {
     const {
       sourceAccountId,
       iamResolver,
       background = new BackgroundTasks(),
-    } = props;
+    } = properties;
 
     this.sourceAccountId = sourceAccountId;
     this.background = background;
@@ -68,14 +68,14 @@ export class AssumeRoleCommandHandler implements CommandHandler<
    * coordinates authorization and temporary session creation.
    */
   async handle(
-    cmd: SimAssumeRoleCommand,
-    opts?: {
+    command: SimAssumeRoleCommand,
+    options?: {
       caller?: SimAwsPrincipal;
     },
   ): Promise<SimAssumeRoleCommandOutput> {
-    const request = this.requestParser.parse(cmd);
+    const request = this.requestParser.parse(command);
     const caller = this.callerResolver.resolve(
-      opts?.caller,
+      options?.caller,
       makeSimAwsAccountRootPrincipal(this.sourceAccountId),
     );
 

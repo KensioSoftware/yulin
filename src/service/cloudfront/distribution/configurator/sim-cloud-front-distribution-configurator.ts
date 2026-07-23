@@ -27,11 +27,13 @@ export class SimCloudFrontDistributionConfigurator {
     distribution: SimCloudFrontDistribution,
     distributionConfig: SimCloudFrontDistributionConfig,
   ): void {
-    for (const alias of distributionConfig.Aliases?.Items ?? []) {
+    const aliasItems = distributionConfig.Aliases?.Items ?? [];
+    for (const alias of aliasItems) {
       distribution.addAlternateDomainName(alias);
     }
 
-    for (const origin of distributionConfig.Origins?.Items ?? []) {
+    const originItems = distributionConfig.Origins?.Items ?? [];
+    for (const origin of originItems) {
       this.originConfigurator.configure(distribution, origin);
     }
 
@@ -40,8 +42,8 @@ export class SimCloudFrontDistributionConfigurator {
       distributionConfig.DefaultCacheBehavior,
     );
 
-    for (const cacheBehavior of distributionConfig.CacheBehaviors?.Items ??
-      []) {
+    const cacheBehaviorItems = distributionConfig.CacheBehaviors?.Items ?? [];
+    for (const cacheBehavior of cacheBehaviorItems) {
       this.behaviorConfigurator.configureCacheBehavior(
         distribution,
         cacheBehavior,

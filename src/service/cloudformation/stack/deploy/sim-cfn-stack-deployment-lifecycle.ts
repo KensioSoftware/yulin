@@ -5,7 +5,7 @@ import type {
 } from "../sim-cfn-stack.js";
 import { SimCfnStackDeploymentScheduler } from "./sim-cfn-stack-deployment-scheduler.js";
 
-interface SimCfnStackDeploymentProps {
+interface SimCfnStackDeploymentProperties {
   readonly background: BackgroundScheduler;
   readonly stackName: SimCloudFormationStackName;
 
@@ -44,10 +44,10 @@ export class SimCfnStackDeploymentLifecycle {
   private completePromise: Promise<void> | undefined;
   private deployError: Error | undefined;
 
-  constructor(props: SimCfnStackDeploymentProps) {
-    this.background = props.background;
-    this.stackName = props.stackName;
-    this.runDeployment = props.runDeployment;
+  constructor(properties: SimCfnStackDeploymentProperties) {
+    this.background = properties.background;
+    this.stackName = properties.stackName;
+    this.runDeployment = properties.runDeployment;
   }
 
   /**

@@ -1,6 +1,6 @@
 import {
   parseSimCfnResourceDependencies,
-  parseSimCfnResourceRefDependencies,
+  parseSimCfnResourceRefDependencies as parseSimCfnResourceReferenceDependencies,
 } from "../dependency/sim-cfn-resource-dependencies.js";
 import type { SimCfnTemplateValueRecord } from "../../template/value/sim-cfn-template-value.js";
 import { isCfnTemplateValueRecord } from "./sim-cfn-templ-val-record.js";
@@ -58,11 +58,11 @@ export class SimCfnResourceTemplateReader {
     const dependsOn = parseSimCfnResourceDependencies(
       this.template["DependsOn"],
     );
-    const refDependencies = parseSimCfnResourceRefDependencies(
+    const referenceDependencies = parseSimCfnResourceReferenceDependencies(
       this.template,
       resourceLogicalIds,
     );
 
-    return [...new Set([...dependsOn, ...refDependencies])];
+    return [...new Set([...dependsOn, ...referenceDependencies])];
   }
 }

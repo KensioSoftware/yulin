@@ -2,7 +2,7 @@ import type { SimCfnTemplateValue } from "../../../template/value/sim-cfn-templa
 import type { SimIamManagedPolicy } from "../../../../iam/policy/sim-iam-policy.js";
 import type { SimCfnResourceValueAdapter } from "../sim-cfn-resource-value-adapter.js";
 
-interface SimIamManagedPolicyCfnProps {
+interface SimIamManagedPolicyCfnProperties {
   readonly policy: SimIamManagedPolicy;
 }
 
@@ -15,8 +15,8 @@ interface SimIamManagedPolicyCfnProps {
 export class SimIamManagedPolicyCfn implements SimCfnResourceValueAdapter {
   private readonly policy: SimIamManagedPolicy;
 
-  constructor(props: SimIamManagedPolicyCfnProps) {
-    this.policy = props.policy;
+  constructor(properties: SimIamManagedPolicyCfnProperties) {
+    this.policy = properties.policy;
   }
 
   /**

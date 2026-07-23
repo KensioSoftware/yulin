@@ -9,7 +9,7 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
-import { SimAcmInvalidArgsException } from "../../error/sim-acm.error.js";
+import { SimAcmInvalidArgsException as SimAcmInvalidArgumentsException } from "../../error/sim-acm.error.js";
 import {
   ListCertificatesCommand,
   RequestCertificateCommand,
@@ -178,7 +178,7 @@ describe("ACM ListCertificatesCommand pagination and filters", () => {
     );
 
     // Then ACM rejects the request as invalid.
-    assertInstanceOf(error, SimAcmInvalidArgsException);
+    assertInstanceOf(error, SimAcmInvalidArgumentsException);
     assertIdentical(error.name, "InvalidArgsException");
     assertIdentical(error.$metadata.httpStatusCode, 400);
     assertStringIncludes(error.message, "MaxItems");
@@ -199,7 +199,7 @@ describe("ACM ListCertificatesCommand pagination and filters", () => {
     );
 
     // Then ACM rejects the request as invalid.
-    assertInstanceOf(error, SimAcmInvalidArgsException);
+    assertInstanceOf(error, SimAcmInvalidArgumentsException);
     assertIdentical(error.name, "InvalidArgsException");
     assertIdentical(error.$metadata.httpStatusCode, 400);
     assertStringIncludes(error.message, "MaxItems");
@@ -220,7 +220,7 @@ describe("ACM ListCertificatesCommand pagination and filters", () => {
     );
 
     // Then ACM rejects the request as invalid.
-    assertInstanceOf(error, SimAcmInvalidArgsException);
+    assertInstanceOf(error, SimAcmInvalidArgumentsException);
     assertIdentical(error.name, "InvalidArgsException");
     assertIdentical(error.$metadata.httpStatusCode, 400);
     assertStringIncludes(error.message, "MaxItems");
@@ -241,7 +241,7 @@ describe("ACM ListCertificatesCommand pagination and filters", () => {
     );
 
     // Then ACM rejects the request as invalid.
-    assertInstanceOf(error, SimAcmInvalidArgsException);
+    assertInstanceOf(error, SimAcmInvalidArgumentsException);
     assertIdentical(error.name, "InvalidArgsException");
     assertIdentical(error.$metadata.httpStatusCode, 400);
     assertStringIncludes(error.message, "NextToken");

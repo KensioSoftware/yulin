@@ -6,9 +6,9 @@ import type { SimCfnServiceResourceFactory } from "../../cloudformation/resource
 import { SimAcm } from "../sim-acm.js";
 import { assertDefined } from "../../../util/type-guard/defined.js";
 import type { SimAcmCertificate } from "../certificate/sim-acm-certificate.js";
-import { SimCfnAcmCertificateProperties } from "./property/sim-cfn-acm-cert-properties.js";
+import { SimCfnAcmCertificatePropertyReader } from "./property/sim-cfn-acm-cert-properties.js";
 
-interface SimAcmCfnResourceFactoryProps {
+interface SimAcmCfnResourceFactoryProperties {
   readonly acm?: SimAcm | undefined;
 }
 
@@ -18,8 +18,8 @@ interface SimAcmCfnResourceFactoryProps {
 export class SimAcmCfnResourceFactory implements SimCfnServiceResourceFactory {
   private readonly acm: SimAcm;
 
-  constructor(props: SimAcmCfnResourceFactoryProps = {}) {
-    const { acm = new SimAcm() } = props;
+  constructor(properties: SimAcmCfnResourceFactoryProperties = {}) {
+    const { acm = new SimAcm() } = properties;
 
     this.acm = acm;
   }
@@ -48,7 +48,7 @@ export class SimAcmCfnResourceFactory implements SimCfnServiceResourceFactory {
     resource: SimCfnResource,
     context: SimCloudFormationResourceCreateContext,
   ): Promise<SimAcmCertificate> {
-    const properties = new SimCfnAcmCertificateProperties({
+    const properties = new SimCfnAcmCertificatePropertyReader({
       logicalId: resource.logicalId,
       properties: context.resolvedProperties ?? resource.properties,
     });

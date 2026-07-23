@@ -17,7 +17,7 @@ import type {
 } from "./list-certificates.cmd.js";
 import { ListCertificatesPageBuilder } from "./list-certificates-page-builder.js";
 
-interface ListCertificatesCommandHandlerProps {
+interface ListCertificatesCommandHandlerProperties {
   readonly certificates: Map<SimArn, SimAcmCertificate>;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
@@ -40,12 +40,12 @@ export class ListCertificatesCommandHandler implements CommandHandler<
   private readonly pageBuilder: ListCertificatesPageBuilder;
   private readonly background: BackgroundScheduler;
 
-  constructor(props: ListCertificatesCommandHandlerProps) {
+  constructor(properties: ListCertificatesCommandHandlerProperties) {
     const {
       certificates,
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
-    } = props;
+    } = properties;
 
     this.authorizer = new ListCertificatesAuthorizer({ iam });
     this.pageBuilder = new ListCertificatesPageBuilder({ certificates });
@@ -66,16 +66,16 @@ export class ListCertificatesCommandHandler implements CommandHandler<
    * remains responsible for request-level coordination and response metadata.
    */
   async handle(
-    cmd: SimListCertificatesCommand,
-    opts?: ListCertificatesCommandHandlerOptions,
+    command: SimListCertificatesCommand,
+    options?: ListCertificatesCommandHandlerOptions,
   ): Promise<SimListCertificatesCommandOutput> {
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    this.authorizer.authorize(opts?.caller);
+    this.authorizer.authorize(options?.caller);
 
     return {
-      ...this.pageBuilder.build(cmd.input),
+      ...this.pageBuilder.build(command.input),
       $metadata: {},
     };
   }

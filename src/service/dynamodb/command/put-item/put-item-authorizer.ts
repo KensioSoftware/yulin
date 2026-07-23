@@ -2,7 +2,7 @@ import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 
-interface PutItemAuthorizerProps {
+interface PutItemAuthorizerProperties {
   readonly iam: SimIamInterServiceAuthZ;
 }
 
@@ -17,8 +17,8 @@ export class PutItemAuthorizer {
 
   private readonly iam: SimIamInterServiceAuthZ;
 
-  constructor(props: PutItemAuthorizerProps) {
-    this.iam = props.iam;
+  constructor(properties: PutItemAuthorizerProperties) {
+    this.iam = properties.iam;
   }
 
   /**

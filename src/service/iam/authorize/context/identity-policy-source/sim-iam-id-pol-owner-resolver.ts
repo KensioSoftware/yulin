@@ -9,7 +9,7 @@ import type { SimIamUser, SimIamUsername } from "../../../user/sim-iam-user.js";
  */
 export type SimIamIdentityPolicyOwner = SimIamRole | SimIamUser;
 
-interface SimIamIdentityPolicyOwnerResolverProps {
+interface SimIamIdentityPolicyOwnerResolverProperties {
   readonly roles: ReadonlyMap<SimIamRoleName, SimIamRole>;
   readonly users: ReadonlyMap<SimIamUsername, SimIamUser>;
 }
@@ -33,9 +33,9 @@ export class SimIamIdentityPolicyOwnerResolver {
   private readonly roles: ReadonlyMap<SimIamRoleName, SimIamRole>;
   private readonly users: ReadonlyMap<SimIamUsername, SimIamUser>;
 
-  constructor(props: SimIamIdentityPolicyOwnerResolverProps) {
-    this.roles = props.roles;
-    this.users = props.users;
+  constructor(properties: SimIamIdentityPolicyOwnerResolverProperties) {
+    this.roles = properties.roles;
+    this.users = properties.users;
   }
 
   /**

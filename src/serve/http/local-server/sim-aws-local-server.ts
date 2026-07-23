@@ -4,13 +4,13 @@ import http, {
   type ServerResponse,
 } from "node:http";
 import { SimAws } from "../../../service/aws/sim-aws.js";
-import { simAwsLocalConf } from "./sim-aws-local.conf.js";
+import { simAwsLocalConf as simAwsLocalConfig } from "./sim-aws-local.conf.js";
 import { SimAwsHttp } from "../sim-aws-http.js";
 import { SimAwsLocalUrl } from "../url/sim-aws-local-url.js";
 import { NodeFetchHttpAdapter } from "../node-fetch-http-adapter.js";
 import { waitNodeServerListen } from "./wait-node-server-listen.js";
 
-interface SimAwsLocalServerProps {
+interface SimAwsLocalServerProperties {
   readonly simAws?: SimAws;
 }
 
@@ -23,8 +23,8 @@ export class SimAwsLocalServer {
   private readonly nodeFetchHttpAdapter = new NodeFetchHttpAdapter();
   private readonly server: Server;
 
-  constructor(props: SimAwsLocalServerProps = {}) {
-    const { simAws = new SimAws() } = props;
+  constructor(properties: SimAwsLocalServerProperties = {}) {
+    const { simAws = new SimAws() } = properties;
     this.simAwsHttp = new SimAwsHttp({ simAws });
     this.server = http.createServer((request, response) => {
       // eslint-disable-next-line unicorn/prefer-await
@@ -37,7 +37,7 @@ export class SimAwsLocalServer {
   /**
    * Start serving simulated AWS services on localhost.
    */
-  async listen(port: number = simAwsLocalConf.defaultPort): Promise<this> {
+  async listen(port: number = simAwsLocalConfig.defaultPort): Promise<this> {
     this.server.listen(port, this.hostname);
     await waitNodeServerListen(this.server);
     return this;
@@ -47,7 +47,7 @@ export class SimAwsLocalServer {
    * Get the hostname on which this local server is listening.
    */
   get hostname(): string {
-    return simAwsLocalConf.hostname;
+    return simAwsLocalConfig.hostname;
   }
 
   /**
@@ -114,7 +114,7 @@ export class SimAwsLocalServer {
   }
 }
 
-interface ServeSimAwsProps {
+interface ServeSimAwsProperties {
   readonly simAws?: SimAws;
   readonly port?: number;
 }
@@ -123,9 +123,10 @@ interface ServeSimAwsProps {
  * Serve a simulated AWS environment on localhost.
  */
 export async function serveSimAws(
-  props: ServeSimAwsProps = {},
+  properties: ServeSimAwsProperties = {},
 ): Promise<SimAwsLocalServer> {
-  const { simAws = new SimAws(), port = simAwsLocalConf.defaultPort } = props;
+  const { simAws = new SimAws(), port = simAwsLocalConfig.defaultPort } =
+    properties;
   const server = new SimAwsLocalServer({ simAws });
   return server.listen(port);
 }

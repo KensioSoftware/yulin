@@ -25,7 +25,7 @@ export class SimCloudFrontDistroIdRouter {
     | ReadonlyMap<SimCloudFrontDistributionId, SimCloudFrontDistribution>
     | undefined;
 
-  constructor(props: {
+  constructor(properties: {
     readonly simAws: SimAws;
     readonly cloudFrontRegistry: SimCloudFrontRegistry;
     readonly distributions?: ReadonlyMap<
@@ -33,9 +33,9 @@ export class SimCloudFrontDistroIdRouter {
       SimCloudFrontDistribution
     >;
   }) {
-    this.simAws = props.simAws;
-    this.cloudFrontRegistry = props.cloudFrontRegistry;
-    this.distributions = props.distributions;
+    this.simAws = properties.simAws;
+    this.cloudFrontRegistry = properties.cloudFrontRegistry;
+    this.distributions = properties.distributions;
   }
 
   /**

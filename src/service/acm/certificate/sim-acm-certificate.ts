@@ -27,7 +27,7 @@ export interface SimAcmDomainValidationOption {
   readonly resourceRecord?: SimAcmValidationRecord | undefined;
 }
 
-interface SimAcmCertificateProps {
+interface SimAcmCertificateProperties {
   readonly certificateArn: SimArn;
   readonly domainName: string;
   readonly subjectAlternativeNames?: readonly string[] | undefined;
@@ -55,7 +55,7 @@ export class SimAcmCertificate {
   #issuedAt: Date | undefined;
   #status: SimAcmCertificateStatus;
 
-  constructor(props: SimAcmCertificateProps) {
+  constructor(properties: SimAcmCertificateProperties) {
     const {
       certificateArn,
       domainName,
@@ -66,7 +66,7 @@ export class SimAcmCertificate {
       createdAt = new Date(),
       issuedAt,
       tags,
-    } = props;
+    } = properties;
 
     this.certificateArn = certificateArn;
     this.domainName = domainName;

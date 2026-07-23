@@ -5,24 +5,24 @@ import { repoPath } from "./path.js";
 /**
  * Create a temporary directory and return its path.
  */
-export async function makeTempDir(): Promise<string> {
-  const tmpDirPath = repoPath(".tmp");
+export async function makeTemporaryDirectory(): Promise<string> {
+  const temporaryDirectoryPath = repoPath(".tmp");
 
   // eslint-disable-next-line security/detect-non-literal-fs-filename
-  await mkdir(tmpDirPath, { recursive: true });
+  await mkdir(temporaryDirectoryPath, { recursive: true });
 
-  return await mkdtemp(path.join(tmpDirPath, "yulin-test-"));
+  return await mkdtemp(path.join(temporaryDirectoryPath, "yulin-test-"));
 }
 
 /**
  * Convenience wrapper for working with a temporary test directory.
  */
-export class TempDir {
+export class TemporaryDirectory {
   private readonly dirPathPromise: Promise<string>;
   private dirPath: string | undefined;
 
   constructor() {
-    this.dirPathPromise = makeTempDir();
+    this.dirPathPromise = makeTemporaryDirectory();
   }
 
   /**

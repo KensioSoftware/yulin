@@ -4,14 +4,14 @@ import {
   assertThrowsError,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
-import { SimCfnFnSubTemplate } from "./sim-cfn-fn-sub-template.js";
+import { SimCfnFnSubTemplate as SimCfnFunctionSubTemplate } from "./sim-cfn-fn-sub-template.js";
 
 /* eslint-disable no-template-curly-in-string */
 
 describe("SimAws CloudFormation Fn::Sub template string", () => {
   it("returns no variable names for a template without substitutions", () => {
     // Given a template string with no Fn::Sub variables.
-    const template = new SimCfnFnSubTemplate("plain-bucket-name");
+    const template = new SimCfnFunctionSubTemplate("plain-bucket-name");
 
     // When the variable names are read.
     const variableNames = template.variableNames();
@@ -22,7 +22,7 @@ describe("SimAws CloudFormation Fn::Sub template string", () => {
 
   it("returns unique non-escaped variable names in first-seen order", () => {
     // Given a template string with repeated and escaped variables.
-    const template = new SimCfnFnSubTemplate(
+    const template = new SimCfnFunctionSubTemplate(
       "${Prefix}-${Name}-${Prefix}-${!Literal}",
     );
 
@@ -37,7 +37,9 @@ describe("SimAws CloudFormation Fn::Sub template string", () => {
 
   it("substitutes every matching variable occurrence", () => {
     // Given a template string with repeated variables.
-    const template = new SimCfnFnSubTemplate("${Prefix}-${Name}-${Prefix}");
+    const template = new SimCfnFunctionSubTemplate(
+      "${Prefix}-${Name}-${Prefix}",
+    );
 
     // When resolved values are substituted.
     const resolved = template.substitute(
@@ -53,7 +55,7 @@ describe("SimAws CloudFormation Fn::Sub template string", () => {
 
   it("keeps escaped variables literal during substitution", () => {
     // Given a template string with an escaped Fn::Sub variable.
-    const template = new SimCfnFnSubTemplate("literal-${!Name}-${Name}");
+    const template = new SimCfnFunctionSubTemplate("literal-${!Name}-${Name}");
 
     // When resolved values are substituted.
     const resolved = template.substitute(new Map([["Name", "bucket"]]));
@@ -64,7 +66,7 @@ describe("SimAws CloudFormation Fn::Sub template string", () => {
 
   it("returns logical names with attribute suffixes removed", () => {
     // Given a template string with Ref-style and GetAtt-style variables.
-    const template = new SimCfnFnSubTemplate(
+    const template = new SimCfnFunctionSubTemplate(
       "${Bucket}-${Distribution.DomainName}",
     );
 
@@ -79,7 +81,7 @@ describe("SimAws CloudFormation Fn::Sub template string", () => {
 
   it("throws when a substitution variable has no resolved value", () => {
     // Given a template string with a variable.
-    const template = new SimCfnFnSubTemplate("${Name}");
+    const template = new SimCfnFunctionSubTemplate("${Name}");
 
     // When substitution runs without that variable, then it throws.
     const error = assertThrowsError(() => {

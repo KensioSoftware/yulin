@@ -7,7 +7,7 @@ import {
 import { describe, it } from "vitest";
 import { SimAws } from "../../../../aws/sim-aws.js";
 import { jsonStringify } from "../../../../../util/type-guard/json.js";
-import { TempDir } from "../../../../../util/filesystem/temp-dir.js";
+import { TemporaryDirectory as TemporaryDirectory } from "../../../../../util/filesystem/temporary-directory.js";
 import { SimCdkBucketDeploymentResourceFactory } from "./sim-cdk-bucket-deployment.js";
 import type {
   SimCfnResource,
@@ -21,18 +21,18 @@ import type {
 describe("CDK BucketDeployment CloudFormation Custom Resource [iso]", () => {
   it("configures the destination S3 Bucket with filesystem storage from the CDK asset", async () => {
     // Given a synthesized CDK cloud assembly with a BucketDeployment asset.
-    const tempDir = new TempDir();
+    const temporaryDirectory = new TemporaryDirectory();
     const assetDirectoryName =
       "asset.31e8a41d3ff70be515d436d1393b5d444831b547d127baaaec63c5abe713679f";
     const templatePathParts = ["cdk.out", "FooStack.template.json"];
     const assetsPathParts = ["cdk.out", "FooStack.assets.json"];
 
-    await tempDir.writeFile(
+    await temporaryDirectory.writeFile(
       ["cdk.out", assetDirectoryName, "index.html"],
       "<h1>Hello</h1>",
     );
 
-    await tempDir.writeFile(
+    await temporaryDirectory.writeFile(
       templatePathParts,
       jsonStringify({
         Resources: {
@@ -55,7 +55,7 @@ describe("CDK BucketDeployment CloudFormation Custom Resource [iso]", () => {
       }),
     );
 
-    await tempDir.writeFile(
+    await temporaryDirectory.writeFile(
       assetsPathParts,
       jsonStringify({
         files: {
@@ -74,7 +74,7 @@ describe("CDK BucketDeployment CloudFormation Custom Resource [iso]", () => {
       }),
     );
 
-    const templatePath = tempDir.join(...templatePathParts);
+    const templatePath = temporaryDirectory.join(...templatePathParts);
 
     // When the synthesized template file is deployed through sim CFN.
     const simAws = new SimAws();
@@ -117,18 +117,18 @@ describe("CDK BucketDeployment CloudFormation Custom Resource [iso]", () => {
   it("fails deployment when the CDK BucketDeployment destination Bucket does not exist", async () => {
     // Given a synthesized CDK cloud assembly with a BucketDeployment that
     // targets a missing destination Bucket.
-    const tempDir = new TempDir();
+    const temporaryDirectory = new TemporaryDirectory();
     const assetDirectoryName =
       "asset.31e8a41d3ff70be515d436d1393b5d444831b547d127baaaec63c5abe713679f";
     const templatePathParts = ["cdk.out", "FooStack.template.json"];
     const assetsPathParts = ["cdk.out", "FooStack.assets.json"];
 
-    await tempDir.writeFile(
+    await temporaryDirectory.writeFile(
       ["cdk.out", assetDirectoryName, "index.html"],
       "<h1>Hello</h1>",
     );
 
-    await tempDir.writeFile(
+    await temporaryDirectory.writeFile(
       templatePathParts,
       jsonStringify({
         Resources: {
@@ -143,7 +143,7 @@ describe("CDK BucketDeployment CloudFormation Custom Resource [iso]", () => {
       }),
     );
 
-    await tempDir.writeFile(
+    await temporaryDirectory.writeFile(
       assetsPathParts,
       jsonStringify({
         files: {
@@ -162,7 +162,7 @@ describe("CDK BucketDeployment CloudFormation Custom Resource [iso]", () => {
       }),
     );
 
-    const templatePath = tempDir.join(...templatePathParts);
+    const templatePath = temporaryDirectory.join(...templatePathParts);
 
     // When the synthesized template file is deployed through top-level SimAws,
     // then the deployment rejects with the missing destination Bucket error.
@@ -181,11 +181,11 @@ describe("CDK BucketDeployment CloudFormation Custom Resource [iso]", () => {
   it("fails deployment with a helpful asset manifest diagnostic when a BucketDeployment references an asset but the assets manifest is missing", async () => {
     // Given a synthesized CDK template with a BucketDeployment asset reference
     // but no sibling CDK assets manifest file.
-    const tempDir = new TempDir();
+    const temporaryDirectory = new TemporaryDirectory();
     const templatePathParts = ["cdk.out", "FooStack.template.json"];
     const assetsPathParts = ["cdk.out", "FooStack.assets.json"];
 
-    await tempDir.writeFile(
+    await temporaryDirectory.writeFile(
       templatePathParts,
       jsonStringify({
         Resources: {
@@ -208,8 +208,8 @@ describe("CDK BucketDeployment CloudFormation Custom Resource [iso]", () => {
       }),
     );
 
-    const templatePath = tempDir.join(...templatePathParts);
-    const assetsPath = tempDir.join(...assetsPathParts);
+    const templatePath = temporaryDirectory.join(...templatePathParts);
+    const assetsPath = temporaryDirectory.join(...assetsPathParts);
 
     // When the synthesized template file is deployed through sim CFN.
     const simAws = new SimAws();

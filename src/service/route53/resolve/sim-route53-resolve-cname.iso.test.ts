@@ -25,24 +25,24 @@ describe("SimRoute53 hostname resolution", () => {
     return hostedZoneId;
   }
 
-  async function createCnameRecord(props: {
+  async function createCnameRecord(properties: {
     readonly simAws: SimAws;
     readonly simRoute53: SimRoute53;
     readonly hostedZoneId: SimRoute53HostedZoneId;
     readonly name: string;
     readonly value: string;
   }): Promise<void> {
-    await props.simRoute53.changeResourceRecordSets({
+    await properties.simRoute53.changeResourceRecordSets({
       input: {
-        HostedZoneId: props.hostedZoneId,
+        HostedZoneId: properties.hostedZoneId,
         ChangeBatch: {
           Changes: [
             {
               Action: "CREATE",
               ResourceRecordSet: {
-                Name: props.name,
+                Name: properties.name,
                 Type: "CNAME",
-                ResourceRecords: [{ Value: props.value }],
+                ResourceRecords: [{ Value: properties.value }],
               },
             },
           ],
@@ -50,7 +50,7 @@ describe("SimRoute53 hostname resolution", () => {
       },
     });
 
-    await props.simAws.backgroundTasksComplete();
+    await properties.simAws.backgroundTasksComplete();
   }
 
   it("returns undefined when the hostname is not a local Route53 name", () => {

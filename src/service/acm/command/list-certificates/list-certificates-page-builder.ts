@@ -1,13 +1,13 @@
 import type { SimArn } from "../../../aws/arn.js";
 import type { SimAcmCertificate } from "../../certificate/sim-acm-certificate.js";
-import { SimAcmInvalidArgsException } from "../../error/sim-acm.error.js";
+import { SimAcmInvalidArgsException as SimAcmInvalidArgumentsException } from "../../error/sim-acm.error.js";
 import type {
   SimAcmCertificateSummary,
   SimListCertificatesCommandInput,
   SimListCertificatesCommandOutput,
 } from "./list-certificates.cmd.js";
 
-interface ListCertificatesPageBuilderProps {
+interface ListCertificatesPageBuilderProperties {
   readonly certificates: ReadonlyMap<SimArn, SimAcmCertificate>;
 }
 
@@ -36,8 +36,8 @@ const maxMaxItems = 1000;
 export class ListCertificatesPageBuilder {
   private readonly certificates: ReadonlyMap<SimArn, SimAcmCertificate>;
 
-  constructor(props: ListCertificatesPageBuilderProps) {
-    this.certificates = props.certificates;
+  constructor(properties: ListCertificatesPageBuilderProperties) {
+    this.certificates = properties.certificates;
   }
 
   /**
@@ -86,7 +86,7 @@ export class ListCertificatesPageBuilder {
       maxItems < 1 ||
       maxItems > maxMaxItems
     ) {
-      throw new SimAcmInvalidArgsException(
+      throw new SimAcmInvalidArgumentsException(
         "ListCertificatesCommand.input.MaxItems must be an integer between 1 and 1000",
       );
     }
@@ -113,7 +113,7 @@ export class ListCertificatesPageBuilder {
       startIndex < 0 ||
       String(startIndex) !== nextToken
     ) {
-      throw new SimAcmInvalidArgsException(
+      throw new SimAcmInvalidArgumentsException(
         "ListCertificatesCommand.input.NextToken is invalid",
       );
     }

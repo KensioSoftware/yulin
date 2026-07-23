@@ -10,7 +10,7 @@ import { SimAws } from "../../../aws/sim-aws.js";
 import { makeSimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import { makeAwsRegionName } from "../../../aws/sim-aws-region.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
-import { SimDynamoDb } from "../../sim-dynamodb.js";
+import { SimDynamoDb as SimDynamoDatabase } from "../../sim-dynamodb.js";
 
 describe("DynamoDB CreateTableCommand IAM authorization", () => {
   it("allows the default Account root caller", async () => {
@@ -18,10 +18,13 @@ describe("DynamoDB CreateTableCommand IAM authorization", () => {
     const accountId = makeSimAwsAccountId();
     const region = makeAwsRegionName();
     const simAws = new SimAws();
-    const simDynamoDb = simAws.account(accountId).region(region).dynamoDb();
+    const simDynamoDatabase = simAws
+      .account(accountId)
+      .region(region)
+      .dynamoDb();
 
     // When CreateTable is called without an explicit caller.
-    const output = await simDynamoDb.createTable(
+    const output = await simDynamoDatabase.createTable(
       new CreateTableCommand({
         TableName: "RootTable",
         KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
@@ -40,7 +43,10 @@ describe("DynamoDB CreateTableCommand IAM authorization", () => {
     const region = makeAwsRegionName();
     const simAws = new SimAws();
     const simIam = simAws.account(accountId).iam();
-    const simDynamoDb = simAws.account(accountId).region(region).dynamoDb();
+    const simDynamoDatabase = simAws
+      .account(accountId)
+      .region(region)
+      .dynamoDb();
 
     const createRoleOutput = await simIam.createRole(
       new CreateRoleCommand({
@@ -73,7 +79,7 @@ describe("DynamoDB CreateTableCommand IAM authorization", () => {
     );
 
     // When the Role creates the table it has permission for.
-    const output = await simDynamoDb.createTable(
+    const output = await simDynamoDatabase.createTable(
       new CreateTableCommand({
         TableName: "AllowedTable",
         KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
@@ -93,7 +99,10 @@ describe("DynamoDB CreateTableCommand IAM authorization", () => {
     const region = makeAwsRegionName();
     const simAws = new SimAws();
     const simIam = simAws.account(accountId).iam();
-    const simDynamoDb = simAws.account(accountId).region(region).dynamoDb();
+    const simDynamoDatabase = simAws
+      .account(accountId)
+      .region(region)
+      .dynamoDb();
 
     const createRoleOutput = await simIam.createRole(
       new CreateRoleCommand({
@@ -112,7 +121,7 @@ describe("DynamoDB CreateTableCommand IAM authorization", () => {
 
     // When the Role attempts to create a table.
     const error = await assertThrowsErrorAsync(async () =>
-      simDynamoDb.createTable(
+      simDynamoDatabase.createTable(
         new CreateTableCommand({
           TableName: "DeniedTable",
           KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
@@ -134,7 +143,10 @@ describe("DynamoDB CreateTableCommand IAM authorization", () => {
     const region = makeAwsRegionName();
     const simAws = new SimAws();
     const simIam = simAws.account(accountId).iam();
-    const simDynamoDb = simAws.account(accountId).region(region).dynamoDb();
+    const simDynamoDatabase = simAws
+      .account(accountId)
+      .region(region)
+      .dynamoDb();
 
     const createRoleOutput = await simIam.createRole(
       new CreateRoleCommand({
@@ -175,7 +187,7 @@ describe("DynamoDB CreateTableCommand IAM authorization", () => {
 
     // When the Role attempts to create a table.
     const error = await assertThrowsErrorAsync(async () =>
-      simDynamoDb.createTable(
+      simDynamoDatabase.createTable(
         new CreateTableCommand({
           TableName: "ExplicitlyDeniedTable",
           KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
@@ -199,11 +211,14 @@ describe("DynamoDB CreateTableCommand IAM authorization", () => {
     const accountId = makeSimAwsAccountId();
     const region = makeAwsRegionName();
     const simAws = new SimAws();
-    const simDynamoDb = simAws.account(accountId).region(region).dynamoDb();
+    const simDynamoDatabase = simAws
+      .account(accountId)
+      .region(region)
+      .dynamoDb();
 
     // When an explicitly anonymous caller attempts to create a table.
     const error = await assertThrowsErrorAsync(async () =>
-      simDynamoDb.createTable(
+      simDynamoDatabase.createTable(
         new CreateTableCommand({
           TableName: "AnonymousTable",
           KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
@@ -222,10 +237,10 @@ describe("DynamoDB CreateTableCommand IAM authorization", () => {
 
   it("uses allow-all authorization when SimDynamoDb is instantiated directly", async () => {
     // Given a directly constructed DynamoDB service with no IAM implementation supplied.
-    const simDynamoDb = new SimDynamoDb();
+    const simDynamoDatabase = new SimDynamoDatabase();
 
     // When an anonymous caller creates a table through the standalone service.
-    const output = await simDynamoDb.createTable(
+    const output = await simDynamoDatabase.createTable(
       new CreateTableCommand({
         TableName: "StandaloneTable",
         KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],

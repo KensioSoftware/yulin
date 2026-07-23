@@ -7,13 +7,16 @@ import {
   assertThrowsError,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
-import { makeTempDir, TempDir } from "./temp-dir.js";
+import {
+  makeTemporaryDirectory as makeTemporaryDirectory,
+  TemporaryDirectory as TemporaryDirectory,
+} from "./temporary-directory.js";
 
 describe("Temp dir helper", () => {
   it("creates a temporary directory", async () => {
     // Given the temp dir helper.
     // When a temp directory is created.
-    const tempDirPath = await makeTempDir();
+    const tempDirPath = await makeTemporaryDirectory();
 
     // Then it exists on disk with the expected test prefix.
     assertDirectoryExists(tempDirPath);
@@ -22,11 +25,11 @@ describe("Temp dir helper", () => {
 
   it("throws when reading a TempDir path before it is resolved", () => {
     // Given a TempDir whose path has not been resolved yet.
-    const tempDir = new TempDir();
+    const temporaryDirectory = new TemporaryDirectory();
 
     // When the path is read before resolution.
     const error = assertThrowsError(() => {
-      tempDir.path();
+      temporaryDirectory.path();
     });
 
     // Then the helper explains how to resolve it first.
@@ -38,12 +41,12 @@ describe("Temp dir helper", () => {
 
   it("writes a file inside a TempDir", async () => {
     // Given a TempDir and a nested relative file path.
-    const tempDir = new TempDir();
+    const temporaryDirectory = new TemporaryDirectory();
 
     // When a file is written through the helper.
-    await tempDir.writeFile(["nested", "hello.txt"], "hello!");
+    await temporaryDirectory.writeFile(["nested", "hello.txt"], "hello!");
 
     // Then the helper creates parent directories and writes the file content.
-    assertFileEquals(tempDir.join("nested", "hello.txt"), "hello!");
+    assertFileEquals(temporaryDirectory.join("nested", "hello.txt"), "hello!");
   });
 });

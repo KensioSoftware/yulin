@@ -2,7 +2,7 @@ import type { SimCfnNode } from "../../../sim-cfn-node.js";
 import type { SimCfnTemplateValue } from "../../../../value/sim-cfn-template-value.js";
 import { assertDefined } from "../../../../../../../util/type-guard/defined.js";
 import { SimCfnGetAtt } from "../../get-att/sim-cfn-fn-get-att.js";
-import { SimCfnRef } from "../../../sim-cfn-ref.js";
+import { SimCfnRef as SimCfnReference } from "../../../sim-cfn-ref.js";
 import type { SimCfnResolveContext } from "../../../../resolve/sim-cfn-resolve-context.js";
 
 /**
@@ -90,8 +90,8 @@ export class SimCfnFnSubVariableResolver {
       return cfnGetAtt.resolve(context);
     }
 
-    const cfnRef = new SimCfnRef(variableName);
-    return cfnRef.resolve(context);
+    const cfnReference = new SimCfnReference(variableName);
+    return cfnReference.resolve(context);
   }
 
   /**

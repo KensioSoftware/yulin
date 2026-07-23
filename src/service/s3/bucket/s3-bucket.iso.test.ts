@@ -13,7 +13,7 @@ import { describe, it } from "vitest";
 import { SimS3Object } from "../object/s3-object.js";
 import { FilesystemS3BucketStorage } from "../storage/filesystem/s3-filesystem-storage.js";
 import { SimS3Bucket } from "./sim-s3-bucket.js";
-import { TempDir } from "../../../util/filesystem/temp-dir.js";
+import { TemporaryDirectory as TemporaryDirectory } from "../../../util/filesystem/temporary-directory.js";
 import { SimS3 } from "../sim-s3.js";
 import { Readable } from "node:stream";
 import { simS3BodyToBuffer } from "../storage/s3-body-buffer.js";
@@ -207,7 +207,7 @@ describe("Simulated S3 Bucket", () => {
     const simS3 = new SimS3();
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "foobar" }));
 
-    const testDir = new TempDir();
+    const testDir = new TemporaryDirectory();
     await testDir.resolvePath();
     simS3.mountBucketFilesystem("foobar", testDir.join("public"));
 
@@ -231,10 +231,10 @@ interface StorageFactory {
 }
 
 async function makeFilesystemStorage(): Promise<FilesystemS3BucketStorage> {
-  const tempDir = new TempDir();
-  await tempDir.resolvePath();
+  const temporaryDirectory = new TemporaryDirectory();
+  await temporaryDirectory.resolvePath();
 
   return new FilesystemS3BucketStorage({
-    directoryPath: tempDir.join("public"),
+    directoryPath: temporaryDirectory.join("public"),
   });
 }

@@ -11,7 +11,7 @@ import {
 import type { SimRequestCertificateCommand } from "./request-certificate.cmd.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 
-interface RequestCertificateFactoryProps {
+interface RequestCertificateFactoryProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
 }
 
@@ -26,8 +26,8 @@ interface RequestCertificateFactoryProps {
 export class RequestCertificateFactory {
   private readonly accountRegionScope: SimAwsAccountRegionScope;
 
-  constructor(props: RequestCertificateFactoryProps) {
-    this.accountRegionScope = props.accountRegionScope;
+  constructor(properties: RequestCertificateFactoryProperties) {
+    this.accountRegionScope = properties.accountRegionScope;
   }
 
   /**
@@ -39,24 +39,24 @@ export class RequestCertificateFactory {
    * ARNs that match the existing simulator behavior.
    */
   makeCertificate(
-    cmd: SimRequestCertificateCommand,
+    command: SimRequestCertificateCommand,
     certificateCount: number,
   ): SimAcmCertificate {
     const certificateArn = this.makeCertificateArn(certificateCount);
-    const validationMethod = cmd.input.ValidationMethod ?? "DNS";
+    const validationMethod = command.input.ValidationMethod ?? "DNS";
     const domainNames = [
-      cmd.input.DomainName,
-      ...(cmd.input.SubjectAlternativeNames ?? []),
+      command.input.DomainName,
+      ...(command.input.SubjectAlternativeNames ?? []),
     ];
     assertDefined(
-      cmd.input.DomainName,
+      command.input.DomainName,
       "SimRequestCertificateCommand.input.DomainName required",
     );
 
     return new SimAcmCertificate({
       certificateArn,
-      domainName: cmd.input.DomainName,
-      subjectAlternativeNames: cmd.input.SubjectAlternativeNames ?? [],
+      domainName: command.input.DomainName,
+      subjectAlternativeNames: command.input.SubjectAlternativeNames ?? [],
       status: "PENDING_VALIDATION",
       validationMethod,
       domainValidationOptions: domainNames.map((domainName) => {
@@ -67,7 +67,7 @@ export class RequestCertificateFactory {
         return this.makeDomainValidationOption(domainName, validationMethod);
       }),
       createdAt: new Date(),
-      tags: cmd.input.Tags?.map((tag): SimAcmTag => ({
+      tags: command.input.Tags?.map((tag): SimAcmTag => ({
         Key: tag.Key,
         Value: tag.Value,
       })),

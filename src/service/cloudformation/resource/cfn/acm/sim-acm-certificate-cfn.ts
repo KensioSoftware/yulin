@@ -2,7 +2,7 @@ import type { SimAcmCertificate } from "../../../../acm/certificate/sim-acm-cert
 import type { SimCfnTemplateValue } from "../../../template/value/sim-cfn-template-value.js";
 import type { SimCfnResourceValueAdapter } from "../sim-cfn-resource-value-adapter.js";
 
-interface SimAcmCertificateCfnProps {
+interface SimAcmCertificateCfnProperties {
   readonly certificate: SimAcmCertificate;
 }
 
@@ -12,8 +12,8 @@ interface SimAcmCertificateCfnProps {
 export class SimAcmCertificateCfn implements SimCfnResourceValueAdapter {
   private readonly certificate: SimAcmCertificate;
 
-  constructor(props: SimAcmCertificateCfnProps) {
-    this.certificate = props.certificate;
+  constructor(properties: SimAcmCertificateCfnProperties) {
+    this.certificate = properties.certificate;
   }
 
   /**

@@ -7,7 +7,7 @@ import type {
   SimS3BucketName,
 } from "../../bucket/sim-s3-bucket.js";
 
-interface ListBucketsPageBuilderProps {
+interface ListBucketsPageBuilderProperties {
   readonly buckets: ReadonlyMap<SimS3BucketName, SimS3Bucket>;
 }
 
@@ -30,8 +30,8 @@ type ListBucketsPage = Omit<SimListBucketsCommandOutput, "$metadata">;
 export class ListBucketsPageBuilder {
   private readonly buckets: ReadonlyMap<SimS3BucketName, SimS3Bucket>;
 
-  constructor(props: ListBucketsPageBuilderProps) {
-    this.buckets = props.buckets;
+  constructor(properties: ListBucketsPageBuilderProperties) {
+    this.buckets = properties.buckets;
   }
 
   /**

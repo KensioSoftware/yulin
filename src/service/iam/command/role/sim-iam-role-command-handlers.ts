@@ -27,7 +27,7 @@ import type {
   SimAttachRolePolicyCommandOutput,
 } from "./attach-role-policy/attach-role-policy.cmd.js";
 
-interface SimIamRoleCommandHandlersProps {
+interface SimIamRoleCommandHandlersProperties {
   readonly accountId: SimAwsAccountId;
   readonly roles: Map<SimIamRoleName, SimIamRole>;
   readonly background: BackgroundScheduler;
@@ -47,8 +47,8 @@ export class SimIamRoleCommandHandlers {
   private readonly roles: Map<SimIamRoleName, SimIamRole>;
   private readonly background: BackgroundScheduler;
 
-  constructor(props: SimIamRoleCommandHandlersProps) {
-    const { accountId, roles, background } = props;
+  constructor(properties: SimIamRoleCommandHandlersProperties) {
+    const { accountId, roles, background } = properties;
 
     this.accountId = accountId;
     this.roles = roles;
@@ -59,63 +59,63 @@ export class SimIamRoleCommandHandlers {
    * Handle a CreateRole command from the SDK.
    */
   async createRole(
-    cmd: SimCreateRoleCommand,
+    command: SimCreateRoleCommand,
   ): Promise<SimCreateRoleCommandOutput> {
     const handler = new CreateRoleCommandHandler({
       accountId: this.accountId,
       roles: this.roles,
       background: this.background,
     });
-    return await handler.handle(cmd);
+    return await handler.handle(command);
   }
 
   /**
    * Handle a GetRole command from the SDK.
    */
-  async getRole(cmd: SimGetRoleCommand): Promise<SimGetRoleCommandOutput> {
+  async getRole(command: SimGetRoleCommand): Promise<SimGetRoleCommandOutput> {
     const handler = new GetRoleCommandHandler({
       roles: this.roles,
       background: this.background,
     });
-    return await handler.handle(cmd);
+    return await handler.handle(command);
   }
 
   /**
    * Handle a ListRoles command from the SDK.
    */
   async listRoles(
-    cmd: SimListRolesCommand,
+    command: SimListRolesCommand,
   ): Promise<SimListRolesCommandOutput> {
     const handler = new ListRolesCommandHandler({
       roles: this.roles,
       background: this.background,
     });
-    return await handler.handle(cmd);
+    return await handler.handle(command);
   }
 
   /**
    * Handle a PutRolePolicy command from the SDK.
    */
   async putRolePolicy(
-    cmd: SimPutRolePolicyCommand,
+    command: SimPutRolePolicyCommand,
   ): Promise<SimPutRolePolicyCommandOutput> {
     const handler = new PutRolePolicyCommandHandler({
       roles: this.roles,
       background: this.background,
     });
-    return await handler.handle(cmd);
+    return await handler.handle(command);
   }
 
   /**
    * Handle an AttachRolePolicy command from the SDK.
    */
   async attachRolePolicy(
-    cmd: SimAttachRolePolicyCommand,
+    command: SimAttachRolePolicyCommand,
   ): Promise<SimAttachRolePolicyCommandOutput> {
     const handler = new AttachRolePolicyCommandHandler({
       roles: this.roles,
       background: this.background,
     });
-    return await handler.handle(cmd);
+    return await handler.handle(command);
   }
 }

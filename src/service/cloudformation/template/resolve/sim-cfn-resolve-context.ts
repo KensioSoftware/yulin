@@ -1,5 +1,5 @@
 import type { SimCfnParameters } from "../../parameters/sim-cfn-parameters.js";
-import type { SimCfnResourceRefResolver } from "./sim-cfn-resource-ref-resolver.js";
+import type { SimCfnResourceRefResolver as SimCfnResourceReferenceResolver } from "./sim-cfn-resource-ref-resolver.js";
 import type { SimCfnPseudoParameters } from "../../parameters/pseudo/sim-cfn-pseudo-parameters.js";
 import type { SimCfnMappings } from "../mapping/sim-cfn-mappings.js";
 
@@ -9,7 +9,7 @@ import type { SimCfnMappings } from "../mapping/sim-cfn-mappings.js";
 export class SimCfnResolveContext {
   constructor(
     readonly parameters: SimCfnParameters,
-    readonly resources?: SimCfnResourceRefResolver | undefined,
+    readonly resources?: SimCfnResourceReferenceResolver | undefined,
     readonly pseudoParameters?: SimCfnPseudoParameters | undefined,
     readonly mappings?: SimCfnMappings | undefined,
   ) {}

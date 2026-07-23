@@ -21,7 +21,7 @@ import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { PutObjectAuthorizer } from "./put-object-authorizer.js";
 import { PutObjectBuilder } from "./put-object-builder.js";
 
-interface PutObjectCommandHandlerProps {
+interface PutObjectCommandHandlerProperties {
   readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
@@ -45,12 +45,12 @@ export class PutObjectCommandHandler implements CommandHandler<
   private readonly objectBuilder = new PutObjectBuilder();
   private readonly background: BackgroundScheduler;
 
-  constructor(props: PutObjectCommandHandlerProps) {
+  constructor(properties: PutObjectCommandHandlerProperties) {
     const {
       buckets,
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
-    } = props;
+    } = properties;
     this.buckets = buckets;
     this.authorizer = new PutObjectAuthorizer({ iam });
     this.background = background;
@@ -69,13 +69,13 @@ export class PutObjectCommandHandler implements CommandHandler<
    * sequencing while body and metadata conversion stay isolated from it.
    */
   async handle(
-    cmd: SimPutObjectCommand,
-    opts?: PutObjectCommandHandlerOptions,
+    command: SimPutObjectCommand,
+    options?: PutObjectCommandHandlerOptions,
   ): Promise<SimPutObjectCommandOutput> {
-    assertDefined(cmd.input.Bucket, "PutObjectCommand.input.Bucket");
-    assertDefined(cmd.input.Key, "PutObjectCommand.input.Key");
+    assertDefined(command.input.Bucket, "PutObjectCommand.input.Bucket");
+    assertDefined(command.input.Key, "PutObjectCommand.input.Key");
 
-    const bucketName = cmd.input.Bucket as SimS3BucketName;
+    const bucketName = command.input.Bucket as SimS3BucketName;
     const bucket = this.buckets.get(bucketName);
     if (bucket === undefined) {
       throw new SimS3NoSuchBucket(`No S3 Bucket named ${bucketName}`);
@@ -84,9 +84,9 @@ export class PutObjectCommandHandler implements CommandHandler<
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    this.authorizer.authorize(bucket, cmd.input.Key, opts?.caller);
+    this.authorizer.authorize(bucket, command.input.Key, options?.caller);
 
-    const object = this.objectBuilder.build(cmd);
+    const object = this.objectBuilder.build(command);
     await bucket.putObject(object);
 
     return {

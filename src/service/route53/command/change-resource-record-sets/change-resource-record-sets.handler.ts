@@ -22,7 +22,7 @@ import {
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { ChangeResourceRecordSetsAuthorizer } from "./change-resource-record-sets-authorizer.js";
 
-interface ChangeResourceRecordSetsCommandHandlerProps {
+interface ChangeResourceRecordSetsCommandHandlerProperties {
   readonly hostedZones: Map<SimRoute53HostedZoneId, SimRoute53HostedZone>;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
@@ -48,12 +48,12 @@ export class ChangeResourceRecordSetsCommandHandler implements CommandHandler<
   private readonly authorizer: ChangeResourceRecordSetsAuthorizer;
   private readonly background: BackgroundScheduler;
 
-  constructor(props: ChangeResourceRecordSetsCommandHandlerProps) {
+  constructor(properties: ChangeResourceRecordSetsCommandHandlerProperties) {
     const {
       hostedZones,
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
-    } = props;
+    } = properties;
     this.hostedZones = hostedZones;
     this.authorizer = new ChangeResourceRecordSetsAuthorizer({ iam });
     this.background = background;
@@ -68,15 +68,15 @@ export class ChangeResourceRecordSetsCommandHandler implements CommandHandler<
    * the requested ID exists.
    */
   async handle(
-    cmd: SimChangeResourceRecordSetsCommand,
-    opts?: ChangeResourceRecordSetsCommandHandlerOptions,
+    command: SimChangeResourceRecordSetsCommand,
+    options?: ChangeResourceRecordSetsCommandHandlerOptions,
   ): Promise<SimChangeResourceRecordSetsCommandOutput> {
     const hostedZoneId = normalizeSimRoute53HostedZoneId(
-      cmd.input.HostedZoneId,
+      command.input.HostedZoneId,
     );
     const hostedZoneArn = `arn:aws:route53:::hostedzone/${hostedZoneId}`;
 
-    const changes = cmd.input.ChangeBatch?.Changes;
+    const changes = command.input.ChangeBatch?.Changes;
     assertDefined(
       changes,
       "ChangeResourceRecordSetsCommand.ChangeBatch.Changes",
@@ -85,7 +85,7 @@ export class ChangeResourceRecordSetsCommandHandler implements CommandHandler<
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    this.authorizer.authorize(hostedZoneArn, opts?.caller);
+    this.authorizer.authorize(hostedZoneArn, options?.caller);
 
     const hostedZone = getChangeResourceRecordSetsHostedZone(
       this.hostedZones,

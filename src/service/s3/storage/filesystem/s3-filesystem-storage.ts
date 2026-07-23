@@ -7,7 +7,7 @@ import { metadataForFilesystemS3ObjectKey } from "./s3-filesystem-object-metadat
 import { filesystemPathExists } from "./filesystem-path-exists.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 
-interface FilesystemS3BucketStorageProps {
+interface FilesystemS3BucketStorageProperties {
   readonly directoryPath: string;
   readonly allowedDirectoryNames?: readonly string[];
 }
@@ -24,12 +24,12 @@ export class FilesystemS3BucketStorage implements SimS3BucketStorage {
   private readonly directoryPath: string;
   private readonly safety: FilesystemS3StorageSafety;
 
-  constructor(props: FilesystemS3BucketStorageProps) {
+  constructor(properties: FilesystemS3BucketStorageProperties) {
     this.safety = new FilesystemS3StorageSafety({
-      allowedDirectoryNames: props.allowedDirectoryNames,
+      allowedDirectoryNames: properties.allowedDirectoryNames,
     });
-    this.safety.assertSafeDirectoryPath(props.directoryPath);
-    this.directoryPath = path.resolve(props.directoryPath);
+    this.safety.assertSafeDirectoryPath(properties.directoryPath);
+    this.directoryPath = path.resolve(properties.directoryPath);
   }
 
   /**

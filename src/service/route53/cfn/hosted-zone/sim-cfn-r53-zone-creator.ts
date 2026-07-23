@@ -5,7 +5,7 @@ import type { SimRoute53HostedZone } from "../../hosted-zone/sim-route53-hosted-
 import type { SimRoute53 } from "../../sim-route53.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 
-interface SimCfnRoute53HostedZoneCreatorProps {
+interface SimCfnRoute53HostedZoneCreatorProperties {
   readonly route53: SimRoute53;
 }
 
@@ -15,8 +15,8 @@ interface SimCfnRoute53HostedZoneCreatorProps {
 export class SimCfnRoute53HostedZoneCreator {
   private readonly route53: SimRoute53;
 
-  constructor(props: SimCfnRoute53HostedZoneCreatorProps) {
-    this.route53 = props.route53;
+  constructor(properties: SimCfnRoute53HostedZoneCreatorProperties) {
+    this.route53 = properties.route53;
   }
 
   /**

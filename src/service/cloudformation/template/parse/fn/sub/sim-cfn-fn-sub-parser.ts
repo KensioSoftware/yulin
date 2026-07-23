@@ -1,5 +1,5 @@
 import { isRecord } from "../../../../../../util/type-guard/record.js";
-import { SimCfnFnSub } from "../../../node/fn/sub/sim-cfn-fn-sub.js";
+import { SimCfnFnSub as SimCfnFunctionSub } from "../../../node/fn/sub/sim-cfn-fn-sub.js";
 import type { SimCfnTemplateValue } from "../../../value/sim-cfn-template-value.js";
 import type { SimCfnValueParser } from "../../value/sim-cfn-value-parser.type.js";
 
@@ -24,9 +24,9 @@ export class SimCfnFnSubParser {
   /**
    * Parse and validate the value inside a Fn::Sub expression.
    */
-  parse(value: SimCfnTemplateValue): SimCfnFnSub {
+  parse(value: SimCfnTemplateValue): SimCfnFunctionSub {
     if (typeof value === "string") {
-      return new SimCfnFnSub(value);
+      return new SimCfnFunctionSub(value);
     }
 
     if (!Array.isArray(value) || value.length !== 2) {
@@ -49,7 +49,7 @@ export class SimCfnFnSubParser {
       );
     }
 
-    return new SimCfnFnSub(
+    return new SimCfnFunctionSub(
       template,
       new Map(
         Object.entries(variables).map(([name, variableValue]) => [

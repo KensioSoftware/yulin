@@ -44,7 +44,7 @@ export class BackgroundTasks
     const promise = new Promise<void>((resolve) => {
       setTimeout(resolve, 0);
     })
-      // eslint-disable-next-line unicorn/no-unreadable-new-expression
+
       .then(task)
       .then(
         () => {

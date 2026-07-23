@@ -4,7 +4,7 @@ import { jsonParse } from "../../../../../util/type-guard/json.js";
 import type { SimIamAuthZPolicySource } from "../sim-iam-auth-z-context.js";
 import type { SimIamIdentityPolicyOwner } from "./sim-iam-id-pol-owner-resolver.js";
 
-interface SimIamIdentityPolicyOwnerSourceBuilderProps {
+interface SimIamIdentityPolicyOwnerSourceBuilderProperties {
   readonly policies: ReadonlyMap<SimArn, SimIamPolicy>;
 }
 
@@ -22,8 +22,8 @@ interface SimIamIdentityPolicyOwnerSourceBuilderProps {
 export class SimIamIdentityPolicyOwnerSourceBuilder {
   private readonly policies: ReadonlyMap<SimArn, SimIamPolicy>;
 
-  constructor(props: SimIamIdentityPolicyOwnerSourceBuilderProps) {
-    this.policies = props.policies;
+  constructor(properties: SimIamIdentityPolicyOwnerSourceBuilderProperties) {
+    this.policies = properties.policies;
   }
 
   /**
