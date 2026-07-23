@@ -7,11 +7,14 @@ import {
 } from "@aws-sdk/client-cloudformation";
 import {
   assertIdentical,
+  assertInstanceOf,
   assertNonNullable,
   assertStringIncludes,
   assertThrowsErrorAsync,
+  assertUndefined,
 } from "@kensio/smartass";
 import { SimSdk } from "../../../sdk/index.js";
+import { SimIamAccessDenied } from "../../iam/error/sim-iam.error.js";
 
 describe("simulated CloudFormation SDK Command routing", () => {
   it("deploys a Stack with resources through an intercepted client", async () => {
@@ -52,6 +55,32 @@ describe("simulated CloudFormation SDK Command routing", () => {
         .region("eu-west-2")
         .s3()
         .getSimBucketByName("cfn-intercepted-bucket"),
+    );
+  });
+
+  it("does not give a denied run-as caller root privileges", async () => {
+    using simSdk = new SimSdk();
+    const accountId = simSdk.simAws.defaultAccountId;
+    const client = new CloudFormationClient({ region: "us-east-1" });
+    simSdk.intercept(client);
+
+    const error = await assertThrowsErrorAsync(async () => {
+      await simSdk.simAws.runAs(
+        { kind: "arn", arn: `arn:aws:iam::${accountId}:role/NoPermsRole` },
+        async () => {
+          await client.send(
+            new CreateStackCommand({
+              StackName: "denied-stack",
+              TemplateBody: JSON.stringify({ Resources: {} }),
+            }),
+          );
+        },
+      );
+    });
+
+    assertInstanceOf(error, SimIamAccessDenied);
+    assertUndefined(
+      simSdk.simAws.cloudFormation().getStackByName("denied-stack"),
     );
   });
 

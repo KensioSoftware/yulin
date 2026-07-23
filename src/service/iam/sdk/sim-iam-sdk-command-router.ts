@@ -1,6 +1,7 @@
-import type {
-  SimSdkCommandRoute,
-  SimSdkCommandRouter,
+import {
+  simSdkCallerOptions,
+  type SimSdkCommandRoute,
+  type SimSdkCommandRouter,
 } from "../../../sdk/index.js";
 import type { SimCreatePolicyCommand } from "../command/policy/create-policy/create-policy.cmd.js";
 import type { SimGetPolicyCommand } from "../command/policy/get-policy/get-policy.cmd.js";
@@ -25,58 +26,91 @@ export class SimIamSdkCommandRouter implements SimSdkCommandRouter {
     this.routes = new Map<string, SimSdkCommandRoute>([
       [
         "AttachRolePolicyCommand",
-        async (command): Promise<unknown> =>
-          await simIam.attachRolePolicy(command as SimAttachRolePolicyCommand),
+        async (command, context): Promise<unknown> =>
+          await simIam.attachRolePolicy(
+            command as SimAttachRolePolicyCommand,
+            simSdkCallerOptions(context),
+          ),
       ],
       [
         "CreateAccessKeyCommand",
-        async (command): Promise<unknown> =>
-          await simIam.createAccessKey(command as SimCreateAccessKeyCommand),
+        async (command, context): Promise<unknown> =>
+          await simIam.createAccessKey(
+            command as SimCreateAccessKeyCommand,
+            simSdkCallerOptions(context),
+          ),
       ],
       [
         "CreatePolicyCommand",
-        async (command): Promise<unknown> =>
-          await simIam.createPolicy(command as SimCreatePolicyCommand),
+        async (command, context): Promise<unknown> =>
+          await simIam.createPolicy(
+            command as SimCreatePolicyCommand,
+            simSdkCallerOptions(context),
+          ),
       ],
       [
         "CreateRoleCommand",
-        async (command): Promise<unknown> =>
-          await simIam.createRole(command as SimCreateRoleCommand),
+        async (command, context): Promise<unknown> =>
+          await simIam.createRole(
+            command as SimCreateRoleCommand,
+            simSdkCallerOptions(context),
+          ),
       ],
       [
         "CreateUserCommand",
-        async (command): Promise<unknown> =>
-          await simIam.createUser(command as SimCreateUserCommand),
+        async (command, context): Promise<unknown> =>
+          await simIam.createUser(
+            command as SimCreateUserCommand,
+            simSdkCallerOptions(context),
+          ),
       ],
       [
         "GetPolicyCommand",
-        async (command): Promise<unknown> =>
-          await simIam.getPolicy(command as SimGetPolicyCommand),
+        async (command, context): Promise<unknown> =>
+          await simIam.getPolicy(
+            command as SimGetPolicyCommand,
+            simSdkCallerOptions(context),
+          ),
       ],
       [
         "GetRoleCommand",
-        async (command): Promise<unknown> =>
-          await simIam.getRole(command as SimGetRoleCommand),
+        async (command, context): Promise<unknown> =>
+          await simIam.getRole(
+            command as SimGetRoleCommand,
+            simSdkCallerOptions(context),
+          ),
       ],
       [
         "ListPoliciesCommand",
-        async (command): Promise<unknown> =>
-          await simIam.listPolicies(command as SimListPoliciesCommand),
+        async (command, context): Promise<unknown> =>
+          await simIam.listPolicies(
+            command as SimListPoliciesCommand,
+            simSdkCallerOptions(context),
+          ),
       ],
       [
         "ListRolesCommand",
-        async (command): Promise<unknown> =>
-          await simIam.listRoles(command as SimListRolesCommand),
+        async (command, context): Promise<unknown> =>
+          await simIam.listRoles(
+            command as SimListRolesCommand,
+            simSdkCallerOptions(context),
+          ),
       ],
       [
         "PutRolePolicyCommand",
-        async (command): Promise<unknown> =>
-          await simIam.putRolePolicy(command as SimPutRolePolicyCommand),
+        async (command, context): Promise<unknown> =>
+          await simIam.putRolePolicy(
+            command as SimPutRolePolicyCommand,
+            simSdkCallerOptions(context),
+          ),
       ],
       [
         "PutUserPolicyCommand",
-        async (command): Promise<unknown> =>
-          await simIam.putUserPolicy(command as SimPutUserPolicyCommand),
+        async (command, context): Promise<unknown> =>
+          await simIam.putUserPolicy(
+            command as SimPutUserPolicyCommand,
+            simSdkCallerOptions(context),
+          ),
       ],
     ]);
   }

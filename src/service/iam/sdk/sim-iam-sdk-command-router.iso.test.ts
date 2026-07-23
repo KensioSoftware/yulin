@@ -16,11 +16,13 @@ import {
 } from "@aws-sdk/client-iam";
 import {
   assertIdentical,
+  assertInstanceOf,
   assertNonNullable,
   assertStringIncludes,
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import { SimSdk } from "../../../sdk/index.js";
+import { SimIamAccessDenied } from "../error/sim-iam.error.js";
 
 const allowAllPolicyDocument = JSON.stringify({
   Version: "2012-10-17",
@@ -136,6 +138,26 @@ describe("simulated IAM SDK Command routing", () => {
       secretAccessKey: accessKeyCreation.AccessKey.SecretAccessKey ?? "",
     });
     assertIdentical(identity.principal.kind, "arn");
+  });
+
+  it("does not give a denied run-as caller root privileges", async () => {
+    using simSdk = new SimSdk();
+    const accountId = simSdk.simAws.defaultAccountId;
+    const client = new IAMClient({ region: "us-east-1" });
+    simSdk.intercept(client);
+
+    // The ambient caller has no IAM permissions, so intercepted IAM Commands
+    // must be authorized as that caller and denied, rather than falling back
+    // to the Account root default.
+    const error = await assertThrowsErrorAsync(async () => {
+      await simSdk.simAws.runAs(
+        { kind: "arn", arn: `arn:aws:iam::${accountId}:role/NoPermsRole` },
+        async () => {
+          await client.send(new CreateUserCommand({ UserName: "Denied" }));
+        },
+      );
+    });
+    assertInstanceOf(error, SimIamAccessDenied);
   });
 
   it("rejects a Command simulated IAM does not support", async () => {

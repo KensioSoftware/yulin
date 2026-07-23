@@ -1,6 +1,7 @@
-import type {
-  SimSdkCommandRoute,
-  SimSdkCommandRouter,
+import {
+  simSdkCallerOptions,
+  type SimSdkCommandRoute,
+  type SimSdkCommandRouter,
 } from "../../../sdk/index.js";
 import type { SimCreateStackCommand } from "../command/create-stack/create-stack.cmd.js";
 import type { SimDescribeStacksCommand } from "../command/describe-stacks/describe-stacks.cmd.js";
@@ -17,14 +18,18 @@ export class SimCloudFormationSdkCommandRouter implements SimSdkCommandRouter {
     this.routes = new Map<string, SimSdkCommandRoute>([
       [
         "CreateStackCommand",
-        async (command): Promise<unknown> =>
-          await simCloudFormation.createStack(command as SimCreateStackCommand),
+        async (command, context): Promise<unknown> =>
+          await simCloudFormation.createStack(
+            command as SimCreateStackCommand,
+            simSdkCallerOptions(context),
+          ),
       ],
       [
         "DescribeStacksCommand",
-        async (command): Promise<unknown> =>
+        async (command, context): Promise<unknown> =>
           await simCloudFormation.describeStacks(
             command as SimDescribeStacksCommand,
+            simSdkCallerOptions(context),
           ),
       ],
     ]);

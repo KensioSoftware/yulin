@@ -29,10 +29,24 @@ import type { SimCfnExecutableResourceBinding } from "./bind/sim-cfn-exec-bindin
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import { SimCloudFormationSdkCommandRouter } from "./sdk/sim-cloudformation-sdk-command-router.js";
 import type { SimSdkCommandRouter } from "../../sdk/index.js";
+import type { SimAwsCaller } from "../aws/caller/sim-aws-caller.js";
+import { SimIamActionAuthorizer } from "../iam/authorize/sim-iam-action-authorizer.js";
+import {
+  SimIamAllowAllAuth,
+  type SimIamInterServiceAuthZ,
+} from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+
+/**
+ * Options accepted by simulated CloudFormation command operations.
+ */
+export interface SimCloudFormationRequestOptions {
+  readonly caller?: SimAwsCaller;
+}
 
 interface SimCloudFormationProperties {
   readonly simAws: SimAws;
   readonly accountRegionScope?: SimAwsAccountRegionScope;
+  readonly iam?: SimIamInterServiceAuthZ;
   readonly background: BackgroundScheduler & BackgroundCompleter;
 }
 
@@ -47,17 +61,20 @@ export class SimCloudFormation {
   private readonly stacks = new Map<SimCloudFormationStackName, SimCfnStack>();
   private readonly templateDeployer: SimCloudFormationTemplateDeployer;
   private readonly sdkRouter = new SimCloudFormationSdkCommandRouter(this);
+  private readonly authorizer: SimIamActionAuthorizer;
 
   constructor(properties: SimCloudFormationProperties) {
     const {
       simAws,
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
+      iam = new SimIamAllowAllAuth(),
       background,
     } = properties;
 
     this.simAws = simAws;
     this.background = background;
     this.accountRegionScope = accountRegionScope;
+    this.authorizer = new SimIamActionAuthorizer({ iam });
     this.templateDeployer = new SimCloudFormationTemplateDeployer({
       simAws: this.simAws,
       accountRegionScope: this.accountRegionScope,
@@ -80,7 +97,13 @@ export class SimCloudFormation {
    */
   async createStack(
     command: SimCreateStackCommand,
+    options?: SimCloudFormationRequestOptions,
   ): Promise<SimCreateStackCommandOutput> {
+    this.authorizer.authorize(
+      "cloudformation:CreateStack",
+      this.stackArn(command.input.StackName),
+      options?.caller,
+    );
     return await this.createStackWithContext(command);
   }
 
@@ -89,7 +112,13 @@ export class SimCloudFormation {
    */
   async describeStacks(
     command: SimDescribeStacksCommand,
+    options?: SimCloudFormationRequestOptions,
   ): Promise<SimDescribeStacksCommandOutput> {
+    this.authorizer.authorize(
+      "cloudformation:DescribeStacks",
+      this.stackArn(command.input.StackName),
+      options?.caller,
+    );
     const handler = new DescribeStacksCommandHandler({
       stacks: this.stacks,
       background: this.background,
@@ -134,6 +163,14 @@ export class SimCloudFormation {
    */
   sdkCommandRouter(): SimSdkCommandRouter {
     return this.sdkRouter;
+  }
+
+  /**
+   * The Stack ARN a command operates on, for authorization.
+   */
+  private stackArn(stackName: string | undefined): string {
+    const { accountId, regionName } = this.accountRegionScope;
+    return `arn:aws:cloudformation:${regionName}:${accountId}:stack/${stackName ?? "*"}/*`;
   }
 
   private async createStackWithContext(
