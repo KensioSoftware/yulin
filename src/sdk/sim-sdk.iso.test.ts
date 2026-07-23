@@ -99,6 +99,56 @@ describe("simulated AWS SDK", () => {
     );
   });
 
+  it("resolves each intercepted client's ambient caller from its own SimAws", async () => {
+    // Two SimSdk/SimAws pairs are two isolated simulated universes, and
+    // runAs is per universe rather than a global identity switch: running as
+    // a caller on one SimAws never masks the ambient caller of another. So
+    // with two nested runAs on different SimAws instances, each intercepted
+    // client still resolves the caller of the SimAws it belongs to.
+    const simAws = new SimAws();
+    using simSdk = new SimSdk({ simAws });
+    const otherSimAws = new SimAws();
+    using otherSimSdk = new SimSdk({ simAws: otherSimAws });
+
+    await simAws
+      .account("222222222222")
+      .region("us-east-1")
+      .s3()
+      .createBucket(new CreateBucketCommand({ Bucket: "bucket-one" }));
+    await otherSimAws
+      .account("333333333333")
+      .region("us-east-1")
+      .s3()
+      .createBucket(new CreateBucketCommand({ Bucket: "bucket-other" }));
+
+    const client = new S3Client({ region: "us-east-1" });
+    simSdk.intercept(client);
+    const otherClient = new S3Client({ region: "us-east-1" });
+    otherSimSdk.intercept(otherClient);
+
+    await simAws.runAs(
+      { kind: "arn", arn: "arn:aws:iam::222222222222:role/one-role" },
+      async () => {
+        await otherSimAws.runAs(
+          { kind: "arn", arn: "arn:aws:iam::333333333333:role/other-role" },
+          async () => {
+            // client belongs to simAws, so it resolves simAws's own runAs
+            // caller, even inside otherSimAws's nested runAs.
+            const output = await client.send(new ListBucketsCommand({}));
+            assertIdentical(output.Buckets?.[0]?.Name, "bucket-one");
+
+            // otherClient belongs to otherSimAws, so it resolves the nested
+            // runAs caller from otherSimAws.
+            const otherOutput = await otherClient.send(
+              new ListBucketsCommand({}),
+            );
+            assertIdentical(otherOutput.Buckets?.[0]?.Name, "bucket-other");
+          },
+        );
+      },
+    );
+  });
+
   it("restores the real client send when the sim SDK is disposed", () => {
     const client = new S3Client({ region: "us-east-1" });
     assertFalse(Object.hasOwn(client, "send"));

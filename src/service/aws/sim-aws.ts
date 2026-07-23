@@ -171,9 +171,14 @@ export class SimAws {
   /**
    * Run a function with an ambient simulated caller for this SimAws instance.
    *
-   * Simulated AWS operations during the run resolve this caller when no
+   * The caller is the simulated principal, such as an IAM Role, that
+   * simulated AWS operations during the run are attributed to when no
    * explicit caller is given, including SDK Commands routed by interception.
-   * Runs may be nested; the innermost caller wins.
+   *
+   * The caller is scoped to this SimAws instance, not global: each SimAws is
+   * its own simulated universe, so running as a caller here never changes
+   * what a different SimAws instance observes. Runs on the same instance may
+   * be nested; the innermost caller wins.
    */
   async runAs<T>(caller: SimAwsPrincipal, run: () => Promise<T>): Promise<T> {
     return await simAwsRunAsContext.run(this, caller, run);

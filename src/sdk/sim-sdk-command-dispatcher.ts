@@ -70,6 +70,10 @@ export class SimSdkCommandDispatcher {
   /**
    * Resolve the AWS Account of the ambient SimAws.runAs caller, if one is
    * set for this dispatcher's SimAws instance and identifies an Account.
+   *
+   * Only this SimAws instance's own run-as caller applies: a run-as on a
+   * different SimAws instance is a different simulated universe and never
+   * affects Commands dispatched here.
    */
   private ambientAccountId(): string | undefined {
     const caller = simAwsRunAsContext.currentCaller(this.simAws);
