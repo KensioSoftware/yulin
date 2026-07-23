@@ -6,7 +6,7 @@ import type {
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import { SimCfnAcmCertificatePropertyListReader } from "./sim-cfn-acm-cert-prop-reader.js";
 
-interface SimCfnAcmCertificatePropertiesProps {
+interface SimCfnAcmCertificateProperties {
   readonly logicalId: string;
   readonly properties: SimCfnTemplateValueRecord;
 }
@@ -15,14 +15,14 @@ interface SimCfnAcmCertificatePropertiesProps {
  * Reads and validates CloudFormation AWS::ACM::Certificate properties for
  * sim ACM certificate creation.
  */
-export class SimCfnAcmCertificateProperties {
+export class SimCfnAcmCertificatePropertyReader {
   private readonly logicalId: string;
   private readonly properties: SimCfnTemplateValueRecord;
   private readonly listReader: SimCfnAcmCertificatePropertyListReader;
 
-  constructor(props: SimCfnAcmCertificatePropertiesProps) {
-    this.logicalId = props.logicalId;
-    this.properties = props.properties;
+  constructor(properties: SimCfnAcmCertificateProperties) {
+    this.logicalId = properties.logicalId;
+    this.properties = properties.properties;
     this.listReader = new SimCfnAcmCertificatePropertyListReader({
       logicalId: this.logicalId,
     });

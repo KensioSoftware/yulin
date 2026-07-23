@@ -21,7 +21,7 @@ import {
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { GetDistributionAuthorizer } from "./get-distribution-authorizer.js";
 
-interface GetDistributionCommandHandlerProps {
+interface GetDistributionCommandHandlerProperties {
   readonly accountId: SimAwsAccountId;
   readonly distributions: Map<
     SimCloudFrontDistributionId,
@@ -51,13 +51,13 @@ export class GetDistributionCommandHandler implements CommandHandler<
   private readonly authorizer: GetDistributionAuthorizer;
   private readonly background: BackgroundScheduler;
 
-  constructor(props: GetDistributionCommandHandlerProps) {
+  constructor(properties: GetDistributionCommandHandlerProperties) {
     const {
       accountId,
       distributions,
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
-    } = props;
+    } = properties;
     this.distributions = distributions;
     this.authorizer = new GetDistributionAuthorizer({
       accountId,
@@ -70,16 +70,16 @@ export class GetDistributionCommandHandler implements CommandHandler<
    * Handle getting a CloudFront Distribution.
    */
   async handle(
-    cmd: SimGetDistributionCommand,
-    opts?: GetDistributionCommandHandlerOptions,
+    command: SimGetDistributionCommand,
+    options?: GetDistributionCommandHandlerOptions,
   ): Promise<SimGetDistributionCommandOutput> {
-    assertDefined(cmd.input.Id, "GetDistributionCommand.input.Id");
-    const distributionId = cmd.input.Id as SimCloudFrontDistributionId;
+    assertDefined(command.input.Id, "GetDistributionCommand.input.Id");
+    const distributionId = command.input.Id as SimCloudFrontDistributionId;
 
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    this.authorizer.authorize(distributionId, opts?.caller);
+    this.authorizer.authorize(distributionId, options?.caller);
 
     const distribution = this.distributions.get(distributionId);
     if (distribution === undefined) {

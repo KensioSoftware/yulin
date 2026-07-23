@@ -11,7 +11,7 @@ import type {
 } from "./put-role-policy.cmd.js";
 import { SimIamPolicyDocumentValidator } from "../../../validate/sim-iam-policy-doc-validator.js";
 
-interface PutRolePolicyCommandHandlerProps {
+interface PutRolePolicyCommandHandlerProperties {
   readonly roles: Map<SimIamRoleName, SimIamRole>;
   readonly background?: BackgroundScheduler;
 }
@@ -33,8 +33,8 @@ export class PutRolePolicyCommandHandler implements CommandHandler<
   private readonly background: BackgroundScheduler;
   private readonly policyDocValidator: SimIamPolicyDocumentValidator;
 
-  constructor(props: PutRolePolicyCommandHandlerProps) {
-    const { roles, background = new BackgroundTasks() } = props;
+  constructor(properties: PutRolePolicyCommandHandlerProperties) {
+    const { roles, background = new BackgroundTasks() } = properties;
 
     this.roles = roles;
     this.background = background;
@@ -45,19 +45,19 @@ export class PutRolePolicyCommandHandler implements CommandHandler<
    * Handle a PutRolePolicyCommand from the SDK.
    */
   async handle(
-    cmd: SimPutRolePolicyCommand,
+    command: SimPutRolePolicyCommand,
   ): Promise<SimPutRolePolicyCommandOutput> {
-    const roleName = cmd.input.RoleName as SimIamRoleName | undefined;
+    const roleName = command.input.RoleName as SimIamRoleName | undefined;
     if (roleName === undefined || roleName.length === 0) {
       throw new Error("RoleName is required");
     }
 
-    const policyName = cmd.input.PolicyName;
+    const policyName = command.input.PolicyName;
     if (policyName === undefined || policyName.length === 0) {
       throw new Error("PolicyName is required");
     }
 
-    const policyDocument = cmd.input.PolicyDocument;
+    const policyDocument = command.input.PolicyDocument;
     this.policyDocValidator.validateRequired(policyDocument);
 
     // Allow for potential non-deterministic sequencing of async events.

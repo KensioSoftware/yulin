@@ -3,7 +3,7 @@ import type { SimCfnExecutableResourceBinding } from "../../bind/sim-cfn-exec-bi
 import type { SimCdkOutContext } from "../../cdk/sim-cdk-out-context.js";
 import type { SimCfnResource } from "../../resource/sim-cfn-resource.js";
 
-interface SimCfnStackResourceBatchCreatorProps {
+interface SimCfnStackResourceBatchCreatorProperties {
   readonly simAws: SimAws;
   readonly resources: ReadonlyMap<string, SimCfnResource>;
   readonly cdkOutContext?: SimCdkOutContext | undefined;
@@ -34,14 +34,14 @@ export class SimCfnStackResourceBatchCreator {
     readonly SimCfnExecutableResourceBinding[] | undefined;
   private readonly skippedResources: SimCfnResource[];
 
-  constructor(props: SimCfnStackResourceBatchCreatorProps) {
+  constructor(properties: SimCfnStackResourceBatchCreatorProperties) {
     const {
       simAws,
       resources,
       cdkOutContext,
       bindings,
       skippedResources = [],
-    } = props;
+    } = properties;
 
     this.simAws = simAws;
     this.resources = resources;

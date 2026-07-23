@@ -13,16 +13,16 @@ describe("background sequencing", () => {
   describe("NonDeterministicBackgroundTasks", () => {
     it("executes scheduled tasks", async () => {
       const tasks = new NonDeterministicBackgroundTasks({});
-      let executed = false;
+      let isExecuted = false;
 
       tasks.schedule(async () => {
         await Promise.resolve();
-        executed = true;
+        isExecuted = true;
       });
 
-      assertFalse(executed);
+      assertFalse(isExecuted);
       await tasks.complete();
-      assertTrue(executed);
+      assertTrue(isExecuted);
     });
 
     it("tracks pending task count", async () => {

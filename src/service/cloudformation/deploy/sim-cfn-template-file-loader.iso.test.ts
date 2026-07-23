@@ -5,18 +5,18 @@ import {
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
-import { TempDir } from "../../../util/filesystem/temp-dir.js";
+import { TemporaryDirectory as TemporaryDirectory } from "../../../util/filesystem/temporary-directory.js";
 import { jsonStringify } from "../../../util/type-guard/json.js";
 import { SimCfnTemplateFileLoader } from "./sim-cfn-template-file-loader.js";
 
 describe("SimCfnTemplateFileLoader", () => {
   it("loads a template file from a string path and derives the stack name", async () => {
     // Given a synthesized stack template and its sibling CDK assets manifest.
-    const tempDir = new TempDir();
+    const temporaryDirectory = new TemporaryDirectory();
     const templatePath = "TestStack.template.json";
     const assetsPath = "TestStack.assets.json";
 
-    await tempDir.writeFile(
+    await temporaryDirectory.writeFile(
       templatePath,
       jsonStringify({
         Resources: {
@@ -26,7 +26,7 @@ describe("SimCfnTemplateFileLoader", () => {
         },
       }),
     );
-    await tempDir.writeFile(
+    await temporaryDirectory.writeFile(
       assetsPath,
       jsonStringify({
         files: {},
@@ -35,7 +35,9 @@ describe("SimCfnTemplateFileLoader", () => {
 
     // When the template file is loaded from a string path.
     const fileLoader = new SimCfnTemplateFileLoader();
-    const loadedTemplate = await fileLoader.load(tempDir.join(templatePath));
+    const loadedTemplate = await fileLoader.load(
+      temporaryDirectory.join(templatePath),
+    );
 
     // Then the template is parsed and the Stack name is derived from the file name.
     assertIdentical(loadedTemplate.stackName, "TestStack");
@@ -51,14 +53,14 @@ describe("SimCfnTemplateFileLoader", () => {
 
   it("loads explicit deployment props with stack name and parameters", async () => {
     // Given a template file, sibling CDK assets manifest and explicit deploy props.
-    const tempDir = new TempDir();
+    const temporaryDirectory = new TemporaryDirectory();
     const templatePath = "DerivedStack.template.json";
     const assetsPath = "DerivedStack.assets.json";
     const parameters = {
       BucketName: "explicit-bucket",
     };
 
-    await tempDir.writeFile(
+    await temporaryDirectory.writeFile(
       templatePath,
       jsonStringify({
         Parameters: {
@@ -78,7 +80,7 @@ describe("SimCfnTemplateFileLoader", () => {
         },
       }),
     );
-    await tempDir.writeFile(
+    await temporaryDirectory.writeFile(
       assetsPath,
       jsonStringify({
         files: {},
@@ -88,7 +90,7 @@ describe("SimCfnTemplateFileLoader", () => {
     // When the template file is loaded with explicit props.
     const fileLoader = new SimCfnTemplateFileLoader();
     const loadedTemplate = await fileLoader.load({
-      templatePath: tempDir.join(templatePath),
+      templatePath: temporaryDirectory.join(templatePath),
       stackName: "ExplicitStack",
       parameters,
     });
@@ -104,17 +106,17 @@ describe("SimCfnTemplateFileLoader", () => {
 
   it("loads sibling CDK assets manifest context for a synthesized template", async () => {
     // Given a synthesized stack template and its sibling assets manifest.
-    const tempDir = new TempDir();
+    const temporaryDirectory = new TemporaryDirectory();
     const templatePath = "AssetStack.template.json";
     const assetsPath = "AssetStack.assets.json";
 
-    await tempDir.writeFile(
+    await temporaryDirectory.writeFile(
       templatePath,
       jsonStringify({
         Resources: {},
       }),
     );
-    await tempDir.writeFile(
+    await temporaryDirectory.writeFile(
       assetsPath,
       jsonStringify({
         files: {
@@ -135,13 +137,15 @@ describe("SimCfnTemplateFileLoader", () => {
 
     // When the template file is loaded.
     const fileLoader = new SimCfnTemplateFileLoader();
-    const loadedTemplate = await fileLoader.load(tempDir.join(templatePath));
+    const loadedTemplate = await fileLoader.load(
+      temporaryDirectory.join(templatePath),
+    );
 
     // Then the sibling CDK assets manifest is included in the context.
     assertObjectMatches(loadedTemplate.cdkOutContext, {
-      templatePath: path.resolve(tempDir.join(templatePath)),
-      templateDirectoryPath: tempDir.path(),
-      assetsManifestPath: tempDir.join(assetsPath),
+      templatePath: path.resolve(temporaryDirectory.join(templatePath)),
+      templateDirectoryPath: temporaryDirectory.path(),
+      assetsManifestPath: temporaryDirectory.join(assetsPath),
       assetsManifest: {
         files: {
           assetHash: {
@@ -162,10 +166,10 @@ describe("SimCfnTemplateFileLoader", () => {
 
   it("loads a non-CDK template filename without requiring an assets manifest", async () => {
     // Given a template file whose name does not follow the CDK template naming convention.
-    const tempDir = new TempDir();
+    const temporaryDirectory = new TemporaryDirectory();
     const templatePath = "template.json";
 
-    await tempDir.writeFile(
+    await temporaryDirectory.writeFile(
       templatePath,
       jsonStringify({
         Resources: {},
@@ -174,13 +178,15 @@ describe("SimCfnTemplateFileLoader", () => {
 
     // When the template file is loaded.
     const fileLoader = new SimCfnTemplateFileLoader();
-    const loadedTemplate = await fileLoader.load(tempDir.join(templatePath));
+    const loadedTemplate = await fileLoader.load(
+      temporaryDirectory.join(templatePath),
+    );
 
     // Then no asset manifest is required, and the Stack name falls back to the file basename.
     assertIdentical(loadedTemplate.stackName, "template.json");
     assertObjectMatches(loadedTemplate.cdkOutContext, {
-      templatePath: path.resolve(tempDir.join(templatePath)),
-      templateDirectoryPath: tempDir.path(),
+      templatePath: path.resolve(temporaryDirectory.join(templatePath)),
+      templateDirectoryPath: temporaryDirectory.path(),
     });
     assertUndefined(loadedTemplate.cdkOutContext.assetsManifestPath);
     assertUndefined(loadedTemplate.cdkOutContext.assetsManifest);
@@ -188,11 +194,11 @@ describe("SimCfnTemplateFileLoader", () => {
 
   it("loads a synthesized template with an empty assets manifest context when the sibling assets manifest is missing", async () => {
     // Given a synthesized stack template with no sibling CDK assets manifest.
-    const tempDir = new TempDir();
+    const temporaryDirectory = new TemporaryDirectory();
     const templatePath = "NoAssetsStack.template.json";
     const assetsPath = "NoAssetsStack.assets.json";
 
-    await tempDir.writeFile(
+    await temporaryDirectory.writeFile(
       templatePath,
       jsonStringify({
         Resources: {
@@ -205,13 +211,15 @@ describe("SimCfnTemplateFileLoader", () => {
 
     // When the template file is loaded.
     const fileLoader = new SimCfnTemplateFileLoader();
-    const loadedTemplate = await fileLoader.load(tempDir.join(templatePath));
+    const loadedTemplate = await fileLoader.load(
+      temporaryDirectory.join(templatePath),
+    );
 
     // Then loading continues with an empty assets manifest context.
     assertObjectMatches(loadedTemplate.cdkOutContext, {
-      templatePath: path.resolve(tempDir.join(templatePath)),
-      templateDirectoryPath: tempDir.path(),
-      assetsManifestPath: tempDir.join(assetsPath),
+      templatePath: path.resolve(temporaryDirectory.join(templatePath)),
+      templateDirectoryPath: temporaryDirectory.path(),
+      assetsManifestPath: temporaryDirectory.join(assetsPath),
       assetsManifest: {},
     });
   });

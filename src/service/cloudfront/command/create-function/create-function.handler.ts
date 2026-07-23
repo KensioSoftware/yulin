@@ -26,7 +26,7 @@ export type SimCloudFrontFunctionMap = Map<
   SimCloudFrontFunction
 >;
 
-interface CreateFunctionCommandHandlerProps {
+interface CreateFunctionCommandHandlerProperties {
   accountId: SimAwsAccountId;
   cloudFrontFunctions?: SimCloudFrontFunctionMap;
   iam?: SimIamInterServiceAuthZ;
@@ -51,13 +51,13 @@ export class CreateFunctionCommandHandler implements CommandHandler<
   private readonly authorizer: CreateFunctionAuthorizer;
   private readonly background: BackgroundScheduler;
 
-  constructor(props: CreateFunctionCommandHandlerProps) {
+  constructor(properties: CreateFunctionCommandHandlerProperties) {
     const {
       accountId,
       cloudFrontFunctions = new Map() as SimCloudFrontFunctionMap,
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
-    } = props;
+    } = properties;
     this.accountId = accountId;
     this.cloudFrontFunctions = cloudFrontFunctions;
     this.authorizer = new CreateFunctionAuthorizer({
@@ -71,26 +71,26 @@ export class CreateFunctionCommandHandler implements CommandHandler<
    * Create a sim CloudFront Function.
    */
   async handle(
-    cmd: SimCreateFunctionCommand,
-    opts?: CreateFunctionCommandHandlerOptions,
+    command: SimCreateFunctionCommand,
+    options?: CreateFunctionCommandHandlerOptions,
   ): Promise<SimCreateFunctionCommandOutput> {
-    assertDefined(cmd.input.Name, "CreateFunctionCommand.input.Name");
+    assertDefined(command.input.Name, "CreateFunctionCommand.input.Name");
     assertDefined(
-      cmd.input.FunctionCode,
+      command.input.FunctionCode,
       "CreateFunctionCommand.input.FunctionCode",
     );
 
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    this.authorizer.authorize(cmd.input.Name, opts?.caller);
+    this.authorizer.authorize(command.input.Name, options?.caller);
 
     const extractor = new CffUint8ArrayFunctionCodeExtractor(
-      cmd.input.FunctionCode,
+      command.input.FunctionCode,
     );
     const handlerFunction = extractor.extractHandlerFunction();
     const simCff = new SimCloudFrontFunction({
-      name: cmd.input.Name,
+      name: command.input.Name,
       accountId: this.accountId,
       handlerFunction,
     });

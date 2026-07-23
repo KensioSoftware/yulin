@@ -11,7 +11,7 @@ import type {
 } from "./get-role.cmd.js";
 import type { SimIamRole, SimIamRoleName } from "../../../role/sim-iam-role.js";
 
-interface GetRoleCommandHandlerProps {
+interface GetRoleCommandHandlerProperties {
   readonly roles: Map<SimIamRoleName, SimIamRole>;
   readonly background?: BackgroundScheduler;
 }
@@ -28,8 +28,8 @@ export class GetRoleCommandHandler implements CommandHandler<
   private readonly roles: Map<SimIamRoleName, SimIamRole>;
   private readonly background: BackgroundScheduler;
 
-  constructor(props: GetRoleCommandHandlerProps) {
-    const { roles, background = new BackgroundTasks() } = props;
+  constructor(properties: GetRoleCommandHandlerProperties) {
+    const { roles, background = new BackgroundTasks() } = properties;
 
     this.roles = roles;
     this.background = background;
@@ -38,8 +38,8 @@ export class GetRoleCommandHandler implements CommandHandler<
   /**
    * Handle a GetRoleCommand from the SDK.
    */
-  async handle(cmd: SimGetRoleCommand): Promise<SimGetRoleCommandOutput> {
-    const roleName = cmd.input.RoleName as SimIamRoleName | undefined;
+  async handle(command: SimGetRoleCommand): Promise<SimGetRoleCommandOutput> {
+    const roleName = command.input.RoleName as SimIamRoleName | undefined;
 
     if (roleName === undefined || roleName.length === 0) {
       throw new Error("RoleName is required");

@@ -20,7 +20,7 @@ import {
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 
-interface CreateBucketCommandHandlerProps {
+interface CreateBucketCommandHandlerProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly buckets: Map<string, SimS3Bucket>;
   readonly s3GlobalRegistry: SimS3GlobalRegistry;
@@ -47,14 +47,14 @@ export class CreateBucketCommandHandler implements CommandHandler<
   private readonly iam: SimIamInterServiceAuthZ;
   private readonly background: BackgroundScheduler;
 
-  constructor(props: CreateBucketCommandHandlerProps) {
+  constructor(properties: CreateBucketCommandHandlerProperties) {
     const {
       accountRegionScope,
       buckets,
       s3GlobalRegistry,
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
-    } = props;
+    } = properties;
     this.accountRegionScope = accountRegionScope;
     this.buckets = buckets;
     this.s3GlobalRegistry = s3GlobalRegistry;
@@ -66,25 +66,25 @@ export class CreateBucketCommandHandler implements CommandHandler<
    * Handle creation of a new S3 Bucket.
    */
   async handle(
-    cmd: SimCreateBucketCommand,
-    opts?: CreateBucketCommandHandlerOptions,
+    command: SimCreateBucketCommand,
+    options?: CreateBucketCommandHandlerOptions,
   ): Promise<SimCreateBucketCommandOutput> {
     assertDefined(
-      cmd.input.Bucket,
+      command.input.Bucket,
       "CreateBucketCommand.input.Bucket required",
     );
 
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    const bucketName = cmd.input.Bucket;
+    const bucketName = command.input.Bucket;
     validateS3BucketName(bucketName);
 
     const resource = `arn:aws:s3:::${bucketName}`;
     const decision = this.iam.authorize({
       action: "s3:CreateBucket",
       resource,
-      caller: opts?.caller,
+      caller: options?.caller,
     });
 
     if (decision.isDenied) {

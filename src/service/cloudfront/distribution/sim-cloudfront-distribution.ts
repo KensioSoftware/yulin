@@ -15,7 +15,7 @@ export type SimCloudFrontDistributionId = Brand<
 
 export type SimCloudFrontDistributionStatus = "Deploying" | "Deployed";
 
-interface SimCloudFrontDistributionProps {
+interface SimCloudFrontDistributionProperties {
   readonly distributionId?: SimCloudFrontDistributionId;
   readonly status?: SimCloudFrontDistributionStatus;
   readonly accountId?: SimAwsAccountId;
@@ -38,13 +38,13 @@ export class SimCloudFrontDistribution {
 
   private readonly origins = new Map<string, SimCloudFrontOrigin>();
 
-  constructor(props: SimCloudFrontDistributionProps = {}) {
+  constructor(properties: SimCloudFrontDistributionProperties = {}) {
     const {
       distributionId = makeDistributionId(),
       status = "Deployed",
       accountId = makeSimAwsAccountId(),
       distributionConfig,
-    } = props;
+    } = properties;
 
     this.distributionId = distributionId;
     this.#status = status;

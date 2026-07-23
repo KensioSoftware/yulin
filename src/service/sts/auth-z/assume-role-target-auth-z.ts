@@ -10,7 +10,7 @@ import {
   AssumeRoleTrustPolicyAuthorizer,
 } from "./assume-role-trust-policy-authorizer.js";
 
-interface AssumeRoleTargetRoleAuthorizerProps {
+interface AssumeRoleTargetRoleAuthorizerProperties {
   readonly iamResolver: SimIamAccountResolver;
 }
 
@@ -45,8 +45,8 @@ export class AssumeRoleTargetRoleAuthorizer {
   private readonly trustPolicyAuthorizer =
     new AssumeRoleTrustPolicyAuthorizer();
 
-  constructor(props: AssumeRoleTargetRoleAuthorizerProps) {
-    this.iamResolver = props.iamResolver;
+  constructor(properties: AssumeRoleTargetRoleAuthorizerProperties) {
+    this.iamResolver = properties.iamResolver;
   }
 
   /**

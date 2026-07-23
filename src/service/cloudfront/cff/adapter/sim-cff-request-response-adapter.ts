@@ -11,15 +11,15 @@ export class SimCffRequestResponseAdapter {
   /**
    * Convert a Node fetch Request to a CFF Request.
    */
-  toCffRequest(req: Request): CloudFrontFunction.Request {
-    const url = new URL(req.url);
+  toCffRequest(request: Request): CloudFrontFunction.Request {
+    const url = new URL(request.url);
 
     return {
-      method: req.method,
+      method: request.method,
       uri: url.pathname,
-      headers: this.metadataAdapter.toCffHeaders(req.headers),
+      headers: this.metadataAdapter.toCffHeaders(request.headers),
       querystring: this.metadataAdapter.toCffQueryString(url.searchParams),
-      cookies: this.metadataAdapter.toCffCookies(req.headers),
+      cookies: this.metadataAdapter.toCffCookies(request.headers),
     };
   }
 
@@ -38,24 +38,26 @@ export class SimCffRequestResponseAdapter {
    * Convert a CFF Request to a Node fetch Request.
    */
   fromCffRequest(
-    cffReq: CloudFrontFunction.Request,
-    originalReq: Request,
+    cffRequest: CloudFrontFunction.Request,
+    originalRequest: Request,
   ): Request {
-    const url = new URL(originalReq.url);
-    url.pathname = cffReq.uri;
-    url.search = this.metadataAdapter.fromCffQueryString(cffReq.querystring);
-    const allowsBody = !/^(get|head)$/i.test(cffReq.method);
+    const url = new URL(originalRequest.url);
+    url.pathname = cffRequest.uri;
+    url.search = this.metadataAdapter.fromCffQueryString(
+      cffRequest.querystring,
+    );
+    const isAllowsBody = !/^(get|head)$/i.test(cffRequest.method);
 
     return new Request(url, {
-      method: cffReq.method,
+      method: cffRequest.method,
       headers: this.metadataAdapter.fromCffHeaders(
-        cffReq.headers,
-        cffReq.cookies,
+        cffRequest.headers,
+        cffRequest.cookies,
       ),
-      body: allowsBody ? originalReq.clone().body : null,
+      body: isAllowsBody ? originalRequest.clone().body : null,
       duplex: "half",
-      redirect: originalReq.redirect,
-      signal: originalReq.signal,
+      redirect: originalRequest.redirect,
+      signal: originalRequest.signal,
     });
   }
 

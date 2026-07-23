@@ -32,7 +32,7 @@ export interface SimAcmRequestOptions {
   readonly caller?: SimAwsCaller;
 }
 
-interface SimAcmProps {
+interface SimAcmProperties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
@@ -51,12 +51,12 @@ export class SimAcm {
     acm: this,
   });
 
-  constructor(props: SimAcmProps = {}) {
+  constructor(properties: SimAcmProperties = {}) {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
-    } = props;
+    } = properties;
 
     this.accountRegionScope = accountRegionScope;
     this.iam = iam;
@@ -67,38 +67,38 @@ export class SimAcm {
    * Handle a Describe Certificate Command from the SDK.
    */
   async describeCertificate(
-    cmd: SimDescribeCertificateCommand,
-    opts?: SimAcmRequestOptions,
+    command: SimDescribeCertificateCommand,
+    options?: SimAcmRequestOptions,
   ): Promise<SimDescribeCertificateCommandOutput> {
     const handler = new DescribeCertificateCommandHandler({
       certificates: this.certificates,
       iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd, opts);
+    return await handler.handle(command, options);
   }
 
   /**
    * Handle a List Certificates Command from the SDK.
    */
   async listCertificates(
-    cmd: SimListCertificatesCommand,
-    opts?: SimAcmRequestOptions,
+    command: SimListCertificatesCommand,
+    options?: SimAcmRequestOptions,
   ): Promise<SimListCertificatesCommandOutput> {
     const handler = new ListCertificatesCommandHandler({
       certificates: this.certificates,
       iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd, opts);
+    return await handler.handle(command, options);
   }
 
   /**
    * Handle a Request Certificate Command from the SDK.
    */
   async requestCertificate(
-    cmd: SimRequestCertificateCommand,
-    opts?: SimAcmRequestOptions,
+    command: SimRequestCertificateCommand,
+    options?: SimAcmRequestOptions,
   ): Promise<SimRequestCertificateCommandOutput> {
     const handler = new RequestCertificateCommandHandler({
       accountRegionScope: this.accountRegionScope,
@@ -106,7 +106,7 @@ export class SimAcm {
       iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd, opts);
+    return await handler.handle(command, options);
   }
 
   /**

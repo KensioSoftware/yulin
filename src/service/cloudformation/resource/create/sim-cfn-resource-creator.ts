@@ -7,7 +7,7 @@ import { parseSimCloudFormationResourceType } from "../parser/sim-cfn-resource-p
 import { resolveSimCloudFormationServiceResourceFactory } from "../resolve/service/sim-cfn-service-resolver.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 
-interface SimCfnResourceCreatorProps<T extends object> {
+interface SimCfnResourceCreatorProperties<T extends object> {
   readonly resource: SimCfnResource<T>;
   readonly cfnResourceFactory?: SimCfnServiceResourceFactory | undefined;
 }
@@ -28,9 +28,9 @@ export class SimCfnResourceCreator<T extends object = object> {
   private readonly resource: SimCfnResource<T>;
   private readonly cfnResourceFactory: SimCfnServiceResourceFactory | undefined;
 
-  constructor(props: SimCfnResourceCreatorProps<T>) {
-    this.resource = props.resource;
-    this.cfnResourceFactory = props.cfnResourceFactory;
+  constructor(properties: SimCfnResourceCreatorProperties<T>) {
+    this.resource = properties.resource;
+    this.cfnResourceFactory = properties.cfnResourceFactory;
   }
 
   /**

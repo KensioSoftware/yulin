@@ -16,7 +16,7 @@ export interface SimS3RouteFailure {
 
 export type SimS3Route = SimS3GetObjectRoute | SimS3RouteFailure;
 
-interface SimS3RequestRouterProps {
+interface SimS3RequestRouterProperties {
   readonly simAws?: SimAws;
 }
 
@@ -26,8 +26,8 @@ interface SimS3RequestRouterProps {
 export class SimS3RequestRouter {
   private readonly simAws: SimAws;
 
-  constructor(props: SimS3RequestRouterProps = {}) {
-    const { simAws = new SimAws() } = props;
+  constructor(properties: SimS3RequestRouterProperties = {}) {
+    const { simAws = new SimAws() } = properties;
     this.simAws = simAws;
   }
 

@@ -42,12 +42,13 @@ export class SimCffRequestMetadataAdapter {
    * Convert Node URL search params to CFF QueryString.
    */
   toCffQueryString(
-    searchParams: URLSearchParams,
+    searchParameters: URLSearchParams,
   ): CloudFrontFunction.QueryString {
     const queryString = Object.create(null) as CloudFrontFunction.QueryString;
 
-    for (const key of new Set(searchParams.keys())) {
-      const values = searchParams.getAll(key).map((value) => ({ value }));
+    const searchParameterKeys = new Set(searchParameters.keys());
+    for (const key of searchParameterKeys) {
+      const values = searchParameters.getAll(key).map((value) => ({ value }));
 
       if (values[0] !== undefined) {
         // eslint-disable-next-line security/detect-object-injection
@@ -70,19 +71,19 @@ export class SimCffRequestMetadataAdapter {
    * Convert CFF QueryString to Node URL search params.
    */
   fromCffQueryString(querystring: CloudFrontFunction.QueryString): string {
-    const searchParams = new URLSearchParams();
+    const searchParameters = new URLSearchParams();
 
     for (const [key, valueOrMultiValue] of Object.entries(querystring)) {
       if ("multiValue" in valueOrMultiValue) {
         for (const { value } of valueOrMultiValue.multiValue) {
-          searchParams.append(key, value);
+          searchParameters.append(key, value);
         }
       } else {
-        searchParams.append(key, valueOrMultiValue.value);
+        searchParameters.append(key, valueOrMultiValue.value);
       }
     }
 
-    return searchParams.toString();
+    return searchParameters.toString();
   }
 
   /**

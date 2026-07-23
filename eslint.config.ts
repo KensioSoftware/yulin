@@ -189,10 +189,12 @@ export default defineConfig(
   {
     rules: {
       "unicorn/better-regex": "warn",
-      "unicorn/prevent-abbreviations": "off",
+      "unicorn/prevent-abbreviations": "warn",
+      "unicorn/no-non-function-verb-prefix": "warn",
       "unicorn/no-null": "off",
       "unicorn/prefer-https": "off",
       "unicorn/prefer-uint8array-base64": "off",
+      "unicorn/consistent-boolean-name": "off",
       "unicorn/consistent-class-member-order": [
         "error",
         {
@@ -206,6 +208,16 @@ export default defineConfig(
             "public-method",
             "private-method",
           ],
+        },
+      ],
+      "unicorn/name-replacements": [
+        "warn",
+        {
+          replacements: {
+            configuration: {
+              config: false,
+            },
+          },
         },
       ],
     },

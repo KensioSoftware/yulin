@@ -21,7 +21,7 @@ export interface SimCfnResourceValueAdapter {
   attributeValue(attributeName: string): SimCfnTemplateValue;
 }
 
-interface SimCfnResourceValueAdapterProps {
+interface SimCfnResourceValueAdapterProperties {
   readonly logicalId: string;
   readonly type: string | undefined;
   readonly simResource: object | undefined;
@@ -35,66 +35,66 @@ interface SimCfnResourceValueAdapterProps {
  * adapter owns CloudFormation-specific Ref and Fn::GetAtt behavior.
  */
 export function simCfnResourceValueAdapter(
-  props: SimCfnResourceValueAdapterProps,
+  properties: SimCfnResourceValueAdapterProperties,
 ): SimCfnResourceValueAdapter {
   if (
-    props.type === "AWS::CertificateManager::Certificate" &&
-    props.simResource instanceof SimAcmCertificate
+    properties.type === "AWS::CertificateManager::Certificate" &&
+    properties.simResource instanceof SimAcmCertificate
   ) {
     return new SimAcmCertificateCfn({
-      certificate: props.simResource,
+      certificate: properties.simResource,
     });
   }
 
   if (
-    props.type === "AWS::S3::Bucket" &&
-    props.simResource instanceof SimS3Bucket
+    properties.type === "AWS::S3::Bucket" &&
+    properties.simResource instanceof SimS3Bucket
   ) {
     return new SimS3BucketCfn({
-      bucket: props.simResource,
+      bucket: properties.simResource,
     });
   }
 
   if (
-    props.type === "AWS::CloudFront::Distribution" &&
-    props.simResource instanceof SimCloudFrontDistribution
+    properties.type === "AWS::CloudFront::Distribution" &&
+    properties.simResource instanceof SimCloudFrontDistribution
   ) {
     return new SimCloudFrontDistributionCfn({
-      distro: props.simResource,
+      distro: properties.simResource,
     });
   }
 
   if (
-    props.type === "AWS::CloudFront::Function" &&
-    props.simResource instanceof SimCloudFrontFunction
+    properties.type === "AWS::CloudFront::Function" &&
+    properties.simResource instanceof SimCloudFrontFunction
   ) {
     return new SimCloudFrontFunctionCfn({
-      cloudFrontFunction: props.simResource,
+      cloudFrontFunction: properties.simResource,
     });
   }
 
-  if (props.type === "AWS::IAM::ManagedPolicy") {
+  if (properties.type === "AWS::IAM::ManagedPolicy") {
     return new SimIamManagedPolicyCfn({
-      policy: props.simResource as SimIamManagedPolicy,
+      policy: properties.simResource as SimIamManagedPolicy,
     });
   }
 
-  if (props.type === "AWS::IAM::Role") {
+  if (properties.type === "AWS::IAM::Role") {
     return new SimIamRoleCfn({
-      role: props.simResource as SimIamRole,
+      role: properties.simResource as SimIamRole,
     });
   }
 
   if (
-    props.type === "AWS::Route53::HostedZone" &&
-    props.simResource instanceof SimRoute53HostedZone
+    properties.type === "AWS::Route53::HostedZone" &&
+    properties.simResource instanceof SimRoute53HostedZone
   ) {
     return new SimRoute53HostedZoneCfn({
-      hostedZone: props.simResource,
+      hostedZone: properties.simResource,
     });
   }
 
   return new SimCfnDefaultResourceValueAdapter({
-    logicalId: props.logicalId,
+    logicalId: properties.logicalId,
   });
 }

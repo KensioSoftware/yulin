@@ -20,7 +20,7 @@ import {
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { GetHostedZoneAuthorizer } from "./get-hosted-zone-authorizer.js";
 
-interface GetHostedZoneCommandHandlerProps {
+interface GetHostedZoneCommandHandlerProperties {
   readonly hostedZones: Map<SimRoute53HostedZoneId, SimRoute53HostedZone>;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
@@ -46,12 +46,12 @@ export class GetHostedZoneCommandHandler implements CommandHandler<
   private readonly authorizer: GetHostedZoneAuthorizer;
   private readonly background: BackgroundScheduler;
 
-  constructor(props: GetHostedZoneCommandHandlerProps) {
+  constructor(properties: GetHostedZoneCommandHandlerProperties) {
     const {
       hostedZones,
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
-    } = props;
+    } = properties;
     this.hostedZones = hostedZones;
     this.authorizer = new GetHostedZoneAuthorizer({ iam });
     this.background = background;
@@ -66,16 +66,16 @@ export class GetHostedZoneCommandHandler implements CommandHandler<
    * the requested ID exists.
    */
   async handle(
-    cmd: SimGetHostedZoneCommand,
-    opts?: GetHostedZoneCommandHandlerOptions,
+    command: SimGetHostedZoneCommand,
+    options?: GetHostedZoneCommandHandlerOptions,
   ): Promise<SimGetHostedZoneCommandOutput> {
-    const hostedZoneId = normalizeSimRoute53HostedZoneId(cmd.input.Id);
+    const hostedZoneId = normalizeSimRoute53HostedZoneId(command.input.Id);
     const hostedZoneArn = `arn:aws:route53:::hostedzone/${hostedZoneId}`;
 
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    this.authorizer.authorize(hostedZoneArn, opts?.caller);
+    this.authorizer.authorize(hostedZoneArn, options?.caller);
 
     const hostedZone = this.hostedZones.get(hostedZoneId);
     if (hostedZone === undefined) {

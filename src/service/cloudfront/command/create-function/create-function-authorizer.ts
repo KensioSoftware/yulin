@@ -4,7 +4,7 @@ import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-int
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import type { SimCloudFrontFunctionName } from "../../cff/sim-cloudfront-function.js";
 
-interface CreateFunctionAuthorizerProps {
+interface CreateFunctionAuthorizerProperties {
   readonly accountId: SimAwsAccountId;
   readonly iam: SimIamInterServiceAuthZ;
 }
@@ -21,9 +21,9 @@ export class CreateFunctionAuthorizer {
   private readonly accountId: SimAwsAccountId;
   private readonly iam: SimIamInterServiceAuthZ;
 
-  constructor(props: CreateFunctionAuthorizerProps) {
-    this.accountId = props.accountId;
-    this.iam = props.iam;
+  constructor(properties: CreateFunctionAuthorizerProperties) {
+    this.accountId = properties.accountId;
+    this.iam = properties.iam;
   }
 
   /**

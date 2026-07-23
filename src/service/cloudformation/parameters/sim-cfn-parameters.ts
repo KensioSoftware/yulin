@@ -1,7 +1,7 @@
 import { isRecord } from "../../../util/type-guard/record.js";
 import type {
   SimCfnParameterDefinition,
-  SimCfnParametersProps,
+  SimCfnParametersProps as SimCfnParametersProperties,
   SimCloudFormationParameterInput,
   SimCloudFormationParameterValue,
   SimCloudFormationParameterValues,
@@ -20,8 +20,8 @@ export class SimCfnParameters {
   private readonly values = new Map<string, SimCloudFormationParameterValue>();
   private readonly stackName: string | undefined;
 
-  constructor(props: SimCfnParametersProps = {}) {
-    const { definitions, values = {}, stackName } = props;
+  constructor(properties: SimCfnParametersProperties = {}) {
+    const { definitions, values = {}, stackName } = properties;
 
     this.stackName = stackName;
 
@@ -39,11 +39,15 @@ export class SimCfnParameters {
    */
   static fromInput(
     input: SimCloudFormationParameterInput,
-    props: Pick<SimCfnParametersProps, "definitions" | "stackName"> = {},
+    properties: Pick<
+      SimCfnParametersProperties,
+      "definitions" | "stackName"
+    > = {},
   ): SimCfnParameters {
     const values: SimCloudFormationParameterValues = {};
 
-    for (const parameter of input.Parameters ?? []) {
+    const inputParameters = input.Parameters ?? [];
+    for (const parameter of inputParameters) {
       if (
         parameter.ParameterKey === undefined ||
         parameter.ParameterValue === undefined
@@ -55,7 +59,7 @@ export class SimCfnParameters {
     }
 
     return new SimCfnParameters({
-      ...props,
+      ...properties,
       values,
     });
   }
@@ -69,10 +73,13 @@ export class SimCfnParameters {
    */
   static fromValues(
     values: SimCloudFormationParameterValues,
-    props: Pick<SimCfnParametersProps, "definitions" | "stackName"> = {},
+    properties: Pick<
+      SimCfnParametersProperties,
+      "definitions" | "stackName"
+    > = {},
   ): SimCfnParameters {
     return new SimCfnParameters({
-      ...props,
+      ...properties,
       values,
     });
   }

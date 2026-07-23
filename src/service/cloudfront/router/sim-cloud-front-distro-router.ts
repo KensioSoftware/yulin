@@ -16,7 +16,7 @@ export interface SimCloudFrontDistroRoute {
   readonly distribution: SimCloudFrontDistribution;
 }
 
-interface SimCloudFrontDistroRouterProps {
+interface SimCloudFrontDistroRouterProperties {
   readonly simAws?: SimAws;
   readonly cloudFrontRegistry?: SimCloudFrontRegistry;
   readonly distributions?: ReadonlyMap<
@@ -38,11 +38,11 @@ export class SimCloudFrontDistroRouter {
   private readonly alternateDomainRouter: SimCloudFrontAlternateDomainRouter;
   private readonly distroIdRouter: SimCloudFrontDistroIdRouter;
 
-  constructor(props: SimCloudFrontDistroRouterProps = {}) {
-    this.simAws = props.simAws ?? new SimAws();
+  constructor(properties: SimCloudFrontDistroRouterProperties = {}) {
+    this.simAws = properties.simAws ?? new SimAws();
     const cloudFrontRegistry =
-      props.cloudFrontRegistry ?? this.simAws.cloudFrontRegistry();
-    const distributions = props.distributions ?? new Map();
+      properties.cloudFrontRegistry ?? this.simAws.cloudFrontRegistry();
+    const distributions = properties.distributions ?? new Map();
 
     // Both sub-routers share the same SimAws, Registry and Distributions
     // snapshot so their lookups stay consistent within a single request.
@@ -78,9 +78,9 @@ export class SimCloudFrontDistroRouter {
    * `.sim-aws.localhost` suffix so both real and sim-local hostnames
    * are handled identically.
    */
-  routeForRequest(req: Request): SimCloudFrontDistroRoute | undefined {
-    const url = new URL(req.url);
-    const hostname = req.headers.get("host") ?? url.hostname;
+  routeForRequest(request: Request): SimCloudFrontDistroRoute | undefined {
+    const url = new URL(request.url);
+    const hostname = request.headers.get("host") ?? url.hostname;
     assertNotNull(hostname, "distroForRequest.req.headers.host");
     const simUrl = new SimAwsLocalUrl({ input: `http://${hostname}/` });
     const baseHostname = simUrl.withoutLocalhostSuffix().hostname;
@@ -96,7 +96,7 @@ export class SimCloudFrontDistroRouter {
   /**
    * Select the appropriate Distribution for a request.
    */
-  distroForRequest(req: Request): SimCloudFrontDistribution | undefined {
-    return this.routeForRequest(req)?.distribution;
+  distroForRequest(request: Request): SimCloudFrontDistribution | undefined {
+    return this.routeForRequest(request)?.distribution;
   }
 }

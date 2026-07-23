@@ -57,13 +57,15 @@ app.synth();
 `);
 
     // And the CDK app is synthesized to a CloudFormation template.
-    const cdkOutDir = await cdkProject.synth();
+    const cdkOutDirectory = await cdkProject.synth();
 
     // When the synthesized template is deployed through sim CloudFormation.
     const simAws = new SimAws();
     const stack = await simAws
       .cloudFormation()
-      .deployTemplateFile(path.join(cdkOutDir, "TestStack.template.json"));
+      .deployTemplateFile(
+        path.join(cdkOutDirectory, "TestStack.template.json"),
+      );
 
     // Then sim CloudFormation creates the simulated CloudFront Distribution.
     const distributionResource = stack.getResource("SiteDistribution");

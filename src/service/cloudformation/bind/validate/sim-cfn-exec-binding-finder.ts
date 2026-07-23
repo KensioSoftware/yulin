@@ -5,7 +5,7 @@ import type {
 import { cdkPathMetadataKeys } from "./sim-cfn-exec-binding-matcher.js";
 import type { SimCfnResource } from "../../resource/sim-cfn-resource.js";
 
-interface SimCfnCffBindingFinderProps {
+interface SimCfnCffBindingFinderProperties {
   readonly resource: SimCfnResource;
   readonly bindings?: readonly SimCfnExecutableResourceBinding[] | undefined;
 }
@@ -30,9 +30,9 @@ export class SimCfnCffBindingFinder {
   private readonly bindings:
     readonly SimCfnExecutableResourceBinding[] | undefined;
 
-  constructor(props: SimCfnCffBindingFinderProps) {
-    this.resource = props.resource;
-    this.bindings = props.bindings;
+  constructor(properties: SimCfnCffBindingFinderProperties) {
+    this.resource = properties.resource;
+    this.bindings = properties.bindings;
   }
 
   /**

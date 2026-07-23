@@ -22,7 +22,7 @@ import {
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { CreateHostedZoneAuthorizer } from "./create-hosted-zone-authorizer.js";
 
-interface CreateHostedZoneCommandHandlerProps {
+interface CreateHostedZoneCommandHandlerProperties {
   readonly hostedZones: Map<SimRoute53HostedZoneId, SimRoute53HostedZone>;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
@@ -50,13 +50,13 @@ export class CreateHostedZoneCommandHandler implements CommandHandler<
   private readonly background: BackgroundScheduler;
   private readonly route53Registry: SimRoute53Registry;
 
-  constructor(props: CreateHostedZoneCommandHandlerProps) {
+  constructor(properties: CreateHostedZoneCommandHandlerProperties) {
     const {
       hostedZones,
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
       route53Registry = new SimRoute53Registry(),
-    } = props;
+    } = properties;
     this.hostedZones = hostedZones;
     this.authorizer = new CreateHostedZoneAuthorizer({ iam });
     this.background = background;
@@ -70,13 +70,13 @@ export class CreateHostedZoneCommandHandler implements CommandHandler<
    * cannot allocate hosted zone state or schedule synchronization tasks.
    */
   async handle(
-    cmd: SimCreateHostedZoneCommand,
-    opts?: CreateHostedZoneCommandHandlerOptions,
+    command: SimCreateHostedZoneCommand,
+    options?: CreateHostedZoneCommandHandlerOptions,
   ): Promise<SimCreateHostedZoneCommandOutput> {
-    const nameInput = cmd.input.Name;
+    const nameInput = command.input.Name;
     assertDefined(nameInput, "CreateHostedZoneCommand.Name");
 
-    const callerReference = cmd.input.CallerReference;
+    const callerReference = command.input.CallerReference;
     assertDefined(callerReference, "CreateHostedZoneCommand.CallerReference");
 
     const hostedZoneId = makeSimRoute53HostedZoneId(
@@ -87,7 +87,7 @@ export class CreateHostedZoneCommandHandler implements CommandHandler<
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    this.authorizer.authorize(opts?.caller);
+    this.authorizer.authorize(options?.caller);
 
     const existingHostedZone = this.hostedZones
       .values()
@@ -102,7 +102,7 @@ export class CreateHostedZoneCommandHandler implements CommandHandler<
       id: hostedZoneId,
       name: nameInput,
       callerReference,
-      config: cmd.input.HostedZoneConfig,
+      config: command.input.HostedZoneConfig,
     });
 
     this.hostedZones.set(hostedZoneId, hostedZone);

@@ -13,7 +13,7 @@ import type {
 } from "./describe-stacks.cmd.js";
 import { SimCfnStackDescriber } from "./sim-cfn-stack-describer.js";
 
-interface DescribeStacksCommandHandlerProps {
+interface DescribeStacksCommandHandlerProperties {
   readonly stacks: Map<SimCloudFormationStackName, SimCfnStack>;
   readonly background?: BackgroundScheduler;
   readonly describer?: SimCfnStackDescriber;
@@ -32,12 +32,12 @@ export class DescribeStacksCommandHandler implements CommandHandler<
   private readonly background: BackgroundScheduler;
   private readonly describer: SimCfnStackDescriber;
 
-  constructor(props: DescribeStacksCommandHandlerProps) {
+  constructor(properties: DescribeStacksCommandHandlerProperties) {
     const {
       stacks,
       background = new BackgroundTasks(),
       describer = new SimCfnStackDescriber(),
-    } = props;
+    } = properties;
 
     this.stacks = stacks;
     this.background = background;
@@ -48,12 +48,12 @@ export class DescribeStacksCommandHandler implements CommandHandler<
    * Describe simulated CloudFormation Stacks.
    */
   async handle(
-    cmd: SimDescribeStacksCommand,
+    command: SimDescribeStacksCommand,
   ): Promise<SimDescribeStacksCommandOutput> {
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    const stackName = cmd.input.StackName as
+    const stackName = command.input.StackName as
       SimCloudFormationStackName | undefined;
 
     if (stackName !== undefined) {

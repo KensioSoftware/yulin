@@ -1,7 +1,7 @@
 import { homedir } from "node:os";
 import path from "node:path";
 
-interface FilesystemS3StorageSafetyProps {
+interface FilesystemS3StorageSafetyProperties {
   readonly allowedDirectoryNames?: readonly string[] | undefined;
 }
 
@@ -14,8 +14,8 @@ interface FilesystemS3StorageSafetyProps {
 export class FilesystemS3StorageSafety {
   private readonly allowedDirectoryNames: readonly string[];
 
-  constructor(props: FilesystemS3StorageSafetyProps = {}) {
-    const { allowedDirectoryNames = defaultAllowedDirectoryNames } = props;
+  constructor(properties: FilesystemS3StorageSafetyProperties = {}) {
+    const { allowedDirectoryNames = defaultAllowedDirectoryNames } = properties;
     this.allowedDirectoryNames = allowedDirectoryNames;
   }
 

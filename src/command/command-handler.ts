@@ -1,3 +1,3 @@
 export interface CommandHandler<TCommand, TOutput> {
-  handle(cmd: TCommand): Promise<TOutput>;
+  handle(command: TCommand): Promise<TOutput>;
 }

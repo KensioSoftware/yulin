@@ -5,7 +5,7 @@ import type {
 import type { SimS3 } from "../sim-s3.js";
 import type { SimCfnServiceResourceFactory } from "../../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import type { SimS3Bucket } from "../bucket/sim-s3-bucket.js";
-import type { SimS3WebsiteConfiguration } from "../command/put-bucket-website/put-bucket-website.cmd.js";
+import type { SimS3WebsiteConfiguration as SimS3WebsiteConfig } from "../command/put-bucket-website/put-bucket-website.cmd.js";
 import { validateS3BucketName } from "../bucket/validate/validate-s3-bucket-name.js";
 import { assertDefined } from "../../../util/type-guard/defined.js";
 
@@ -54,16 +54,16 @@ export class SimS3CloudFormationResourceFactory implements SimCfnServiceResource
       `sim S3 Bucket ${bucketName} after CloudFormation creation`,
     );
 
-    const websiteConfiguration = this.websiteConfigurationForResource(
+    const websiteConfig = this.websiteConfigurationForResource(
       resource,
       context,
     );
 
-    if (websiteConfiguration !== undefined) {
+    if (websiteConfig !== undefined) {
       await this.simS3.putBucketWebsite({
         input: {
           Bucket: bucketName,
-          WebsiteConfiguration: websiteConfiguration,
+          WebsiteConfiguration: websiteConfig,
         },
       });
     }
@@ -88,40 +88,40 @@ export class SimS3CloudFormationResourceFactory implements SimCfnServiceResource
   private websiteConfigurationForResource(
     resource: SimCfnResource,
     context: SimCloudFormationResourceCreateContext,
-  ): SimS3WebsiteConfiguration | undefined {
+  ): SimS3WebsiteConfig | undefined {
     const properties = context.resolvedProperties ?? resource.properties;
-    const websiteConfiguration = properties["WebsiteConfiguration"];
+    const websiteConfig = properties["WebsiteConfiguration"];
 
     if (
-      websiteConfiguration === undefined ||
-      websiteConfiguration === null ||
-      typeof websiteConfiguration !== "object" ||
-      Array.isArray(websiteConfiguration)
+      websiteConfig === undefined ||
+      websiteConfig === null ||
+      typeof websiteConfig !== "object" ||
+      Array.isArray(websiteConfig)
     ) {
       return undefined;
     }
 
     if (
-      "RoutingRules" in websiteConfiguration &&
-      !Array.isArray(websiteConfiguration["RoutingRules"])
+      "RoutingRules" in websiteConfig &&
+      !Array.isArray(websiteConfig["RoutingRules"])
     ) {
       return undefined;
     }
 
     return {
-      ...websiteConfiguration,
+      ...websiteConfig,
       IndexDocument:
-        typeof websiteConfiguration["IndexDocument"] === "string"
+        typeof websiteConfig["IndexDocument"] === "string"
           ? {
-              Suffix: websiteConfiguration["IndexDocument"],
+              Suffix: websiteConfig["IndexDocument"],
             }
-          : websiteConfiguration["IndexDocument"],
+          : websiteConfig["IndexDocument"],
       ErrorDocument:
-        typeof websiteConfiguration["ErrorDocument"] === "string"
+        typeof websiteConfig["ErrorDocument"] === "string"
           ? {
-              Key: websiteConfiguration["ErrorDocument"],
+              Key: websiteConfig["ErrorDocument"],
             }
-          : websiteConfiguration["ErrorDocument"],
-    } as SimS3WebsiteConfiguration;
+          : websiteConfig["ErrorDocument"],
+    } as SimS3WebsiteConfig;
   }
 }

@@ -11,7 +11,7 @@ import type {
   SimCreateAccessKeyCommandOutput,
 } from "./create-access-key.cmd.js";
 
-interface CreateAccessKeyCommandHandlerProps {
+interface CreateAccessKeyCommandHandlerProperties {
   readonly users: Map<SimIamUsername, SimIamUser>;
   readonly credentialRegistry: SimIamCredentialRegistry;
   readonly credentialGenerator: SimIamUserCredentialGenerator;
@@ -30,20 +30,20 @@ export class CreateAccessKeyCommandHandler implements CommandHandler<
   private readonly credentialGenerator: SimIamUserCredentialGenerator;
   private readonly background: BackgroundScheduler;
 
-  constructor(props: CreateAccessKeyCommandHandlerProps) {
-    this.users = props.users;
-    this.credentialRegistry = props.credentialRegistry;
-    this.credentialGenerator = props.credentialGenerator;
-    this.background = props.background ?? new BackgroundTasks();
+  constructor(properties: CreateAccessKeyCommandHandlerProperties) {
+    this.users = properties.users;
+    this.credentialRegistry = properties.credentialRegistry;
+    this.credentialGenerator = properties.credentialGenerator;
+    this.background = properties.background ?? new BackgroundTasks();
   }
 
   /**
    * Handle a Create Access Key command from the SDK.
    */
   async handle(
-    cmd: SimCreateAccessKeyCommand,
+    command: SimCreateAccessKeyCommand,
   ): Promise<SimCreateAccessKeyCommandOutput> {
-    const username = cmd.input.UserName as SimIamUsername | undefined;
+    const username = command.input.UserName as SimIamUsername | undefined;
 
     if (username === undefined || username.length === 0) {
       throw new Error("UserName is required");

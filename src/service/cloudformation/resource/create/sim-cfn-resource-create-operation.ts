@@ -6,7 +6,7 @@ import type {
 import type { SimCfnServiceResourceFactory } from "../factory/sim-cfn-resource-factory.type.js";
 import { SimCfnResourceCreator } from "./sim-cfn-resource-creator.js";
 
-interface SimCfnResourceCreateOperationProps<T extends object> {
+interface SimCfnResourceCreateOperationProperties<T extends object> {
   readonly background: BackgroundScheduler;
   readonly resource: SimCfnResource<T>;
   readonly cfnResourceFactory?: SimCfnServiceResourceFactory | undefined;
@@ -27,12 +27,12 @@ export class SimCfnResourceCreateOperation<T extends object = object> {
   private readonly resource: SimCfnResource<T>;
   private readonly creator: SimCfnResourceCreator<T>;
 
-  constructor(props: SimCfnResourceCreateOperationProps<T>) {
-    this.background = props.background;
-    this.resource = props.resource;
+  constructor(properties: SimCfnResourceCreateOperationProperties<T>) {
+    this.background = properties.background;
+    this.resource = properties.resource;
     this.creator = new SimCfnResourceCreator({
-      resource: props.resource,
-      cfnResourceFactory: props.cfnResourceFactory,
+      resource: properties.resource,
+      cfnResourceFactory: properties.cfnResourceFactory,
     });
   }
 

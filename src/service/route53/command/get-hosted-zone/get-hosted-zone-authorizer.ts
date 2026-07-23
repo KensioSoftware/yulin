@@ -2,7 +2,7 @@ import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 
-interface GetHostedZoneAuthorizerProps {
+interface GetHostedZoneAuthorizerProperties {
   readonly iam: SimIamInterServiceAuthZ;
 }
 
@@ -22,8 +22,8 @@ export class GetHostedZoneAuthorizer {
 
   private readonly iam: SimIamInterServiceAuthZ;
 
-  constructor(props: GetHostedZoneAuthorizerProps) {
-    this.iam = props.iam;
+  constructor(properties: GetHostedZoneAuthorizerProperties) {
+    this.iam = properties.iam;
   }
 
   /**

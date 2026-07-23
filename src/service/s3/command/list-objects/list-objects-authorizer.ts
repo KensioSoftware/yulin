@@ -3,7 +3,7 @@ import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-int
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import type { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
 
-interface ListObjectsAuthorizerProps {
+interface ListObjectsAuthorizerProperties {
   readonly iam: SimIamInterServiceAuthZ;
 }
 
@@ -31,8 +31,8 @@ export class ListObjectsAuthorizer {
 
   private readonly iam: SimIamInterServiceAuthZ;
 
-  constructor(props: ListObjectsAuthorizerProps) {
-    this.iam = props.iam;
+  constructor(properties: ListObjectsAuthorizerProperties) {
+    this.iam = properties.iam;
   }
 
   /**

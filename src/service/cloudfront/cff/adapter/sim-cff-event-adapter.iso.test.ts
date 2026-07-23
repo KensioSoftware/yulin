@@ -19,10 +19,10 @@ describe("sim CFF event structure adapter", () => {
 
   describe("toViewerRequestEvent", () => {
     it("converts a Request to ViewerRequestEvent", () => {
-      const req = new Request(
+      const request = new Request(
         "https://example.test/path/to/resource?foo=bar&baz=123",
       );
-      const event = adapter.toViewerRequestEvent(req);
+      const event = adapter.toViewerRequestEvent(request);
 
       assertIdentical(event.context.eventType, "viewer-request");
       assertObjectHasProperty(event.context, "requestId");
@@ -37,11 +37,11 @@ describe("sim CFF event structure adapter", () => {
 
   describe("toViewerResponseEvent", () => {
     it("converts a Request and Response to ViewerResponseEvent", () => {
-      const req = new Request("https://example.test/test");
+      const request = new Request("https://example.test/test");
       const res = new Response("OK", { status: 201, statusText: "Created" });
       res.headers.set("content-type", "text/plain");
 
-      const event = adapter.toViewerResponseEvent(req, res);
+      const event = adapter.toViewerResponseEvent(request, res);
 
       assertIdentical(event.context.eventType, "viewer-response");
       assertObjectHasProperty(event.context, "requestId");
@@ -57,13 +57,16 @@ describe("sim CFF event structure adapter", () => {
 
   describe("fromViewerRequestResult", () => {
     it("preserves Request when CFF returns a Request", () => {
-      const originalReq = new Request("https://example.test/old/path");
+      const originalRequest = new Request("https://example.test/old/path");
       const cffRequest = cloudFrontRequestFactory.make({
         method: "POST",
         uri: "/new/path",
       });
 
-      const result = adapter.fromViewerRequestResult(cffRequest, originalReq);
+      const result = adapter.fromViewerRequestResult(
+        cffRequest,
+        originalRequest,
+      );
 
       assertInstanceOf(result, Request);
       assertIdentical(result.method, "POST");
@@ -72,14 +75,17 @@ describe("sim CFF event structure adapter", () => {
     });
 
     it("converts CFF Response to native Response", () => {
-      const originalReq = new Request("https://example.test/test");
+      const originalRequest = new Request("https://example.test/test");
       const cffResponse = cloudFrontResponseFactory.make({
         statusCode: 403,
         statusDescription: "Forbidden",
         headers: { "x-custom-header": { value: "blocked" } },
       });
 
-      const result = adapter.fromViewerRequestResult(cffResponse, originalReq);
+      const result = adapter.fromViewerRequestResult(
+        cffResponse,
+        originalRequest,
+      );
 
       assertInstanceOf(result, Response);
       assertIdentical(result.status, 403);
@@ -109,10 +115,10 @@ describe("sim CFF event structure adapter", () => {
 
   describe("cookie handling", () => {
     it("serializes cookies from native headers to CFF format", () => {
-      const req = new Request("https://example.test/test");
-      req.headers.set("cookie", "session=abc123; user=john");
+      const request = new Request("https://example.test/test");
+      request.headers.set("cookie", "session=abc123; user=john");
 
-      const event = adapter.toViewerRequestEvent(req);
+      const event = adapter.toViewerRequestEvent(request);
       const cookies = event.request.cookies;
 
       assertIdentical(cookies["session"]?.value, "abc123");
@@ -138,11 +144,11 @@ describe("sim CFF event structure adapter", () => {
     });
 
     it("handles empty cookie names by skipping them", () => {
-      const req = new Request("https://example.test/test");
+      const request = new Request("https://example.test/test");
       // Cookie header with trailing semicolon creating empty name
-      req.headers.set("cookie", "session=abc123; =empty-name");
+      request.headers.set("cookie", "session=abc123; =empty-name");
 
-      const event = adapter.toViewerRequestEvent(req);
+      const event = adapter.toViewerRequestEvent(request);
       const cookies = event.request.cookies;
 
       // Empty cookie name should be skipped
@@ -154,11 +160,11 @@ describe("sim CFF event structure adapter", () => {
 
   describe("query string handling", () => {
     it("handles multi-value query parameters", () => {
-      const req = new Request(
+      const request = new Request(
         "https://example.test/test?tag=red&tag=blue&size=large",
       );
 
-      const event = adapter.toViewerRequestEvent(req);
+      const event = adapter.toViewerRequestEvent(request);
       const queryString = event.request.querystring;
 
       assertObjectMatches(queryString, {
@@ -171,18 +177,18 @@ describe("sim CFF event structure adapter", () => {
     });
 
     it("round-trips multi-value query parameters", () => {
-      const originalReq = new Request(
+      const originalRequest = new Request(
         "https://example.test/test?tag=a&tag=b&single=c",
       );
 
-      const event = adapter.toViewerRequestEvent(originalReq);
-      const restoredReq = adapter.fromViewerRequestResult(
+      const event = adapter.toViewerRequestEvent(originalRequest);
+      const restoredRequest = adapter.fromViewerRequestResult(
         event.request,
-        originalReq,
+        originalRequest,
       );
 
-      assertInstanceOf(restoredReq, Request);
-      const url = new URL(restoredReq.url);
+      assertInstanceOf(restoredRequest, Request);
+      const url = new URL(restoredRequest.url);
 
       assertArrayIncludesAll(url.searchParams.getAll("tag"), ["a", "b"]);
       assertIdentical(url.searchParams.get("single"), "c");
@@ -191,7 +197,7 @@ describe("sim CFF event structure adapter", () => {
 
   describe("base64 body encoding", () => {
     it("decodes base64-encoded response bodies", async () => {
-      const originalReq = new Request("https://example.test/test");
+      const originalRequest = new Request("https://example.test/test");
       const encodedBody = Buffer.from("Hello, world!").toString("base64");
       const cffResponse = cloudFrontResponseFactory.make({
         statusCode: 200,
@@ -199,20 +205,26 @@ describe("sim CFF event structure adapter", () => {
         bodyEncoding: "base64",
       });
 
-      const result = adapter.fromViewerRequestResult(cffResponse, originalReq);
+      const result = adapter.fromViewerRequestResult(
+        cffResponse,
+        originalRequest,
+      );
 
       assertInstanceOf(result, Response);
       assertIdentical(await result.text(), "Hello, world!");
     });
 
     it("returns plain string response bodies when no encoding is specified", async () => {
-      const originalReq = new Request("https://example.test/test");
+      const originalRequest = new Request("https://example.test/test");
       const cffResponse = cloudFrontResponseFactory.make({
         statusCode: 200,
         body: "Plain text response",
       });
 
-      const result = adapter.fromViewerRequestResult(cffResponse, originalReq);
+      const result = adapter.fromViewerRequestResult(
+        cffResponse,
+        originalRequest,
+      );
 
       assertInstanceOf(result, Response);
       assertIdentical(await result.text(), "Plain text response");
@@ -221,12 +233,12 @@ describe("sim CFF event structure adapter", () => {
 
   describe("request ID", () => {
     it("generates unique request IDs for each event", () => {
-      const req = new Request("https://example.test/test");
+      const request = new Request("https://example.test/test");
       const res = new Response("OK");
 
-      const requestEvent1 = adapter.toViewerRequestEvent(req);
-      const requestEvent2 = adapter.toViewerRequestEvent(req);
-      const responseEvent1 = adapter.toViewerResponseEvent(req, res);
+      const requestEvent1 = adapter.toViewerRequestEvent(request);
+      const requestEvent2 = adapter.toViewerRequestEvent(request);
+      const responseEvent1 = adapter.toViewerResponseEvent(request, res);
 
       assertTypeString(requestEvent1.context.requestId);
       assertTypeString(responseEvent1.context.requestId);

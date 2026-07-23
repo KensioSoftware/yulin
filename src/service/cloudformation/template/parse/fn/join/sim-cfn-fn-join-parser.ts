@@ -1,4 +1,4 @@
-import { SimCfnFnJoin } from "../../../node/fn/join/sim-cfn-fn-join.js";
+import { SimCfnFnJoin as SimCfnFunctionJoin } from "../../../node/fn/join/sim-cfn-fn-join.js";
 import type { SimCfnTemplateValue } from "../../../value/sim-cfn-template-value.js";
 import type { SimCfnValueParser } from "../../value/sim-cfn-value-parser.type.js";
 
@@ -22,7 +22,7 @@ export class SimCfnFnJoinParser {
   /**
    * Parse and validate the value inside a Fn::Join expression.
    */
-  parse(value: SimCfnTemplateValue): SimCfnFnJoin {
+  parse(value: SimCfnTemplateValue): SimCfnFunctionJoin {
     if (!Array.isArray(value) || value.length !== 2) {
       throw new Error(
         "Sim CloudFormation Fn::Join value must be [delimiter, values]",
@@ -43,7 +43,7 @@ export class SimCfnFnJoinParser {
       );
     }
 
-    return new SimCfnFnJoin(
+    return new SimCfnFunctionJoin(
       delimiter,
       values.map((item) => this.valueParser.parse(item)),
     );

@@ -11,28 +11,28 @@ import {
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import { SimAws } from "../../../aws/sim-aws.js";
-import { SimDynamoDbResourceNotFoundException } from "../../error/dynamodb.error.js";
+import { SimDynamoDbResourceNotFoundException as SimDynamoDatabaseResourceNotFoundException } from "../../error/dynamodb.error.js";
 
 describe("DynamoDB DescribeTableCommand", () => {
   it("describes DynamoDB Table", async () => {
     const simAws = new SimAws();
 
-    const simDynamoDb = simAws.dynamoDb();
+    const simDynamoDatabase = simAws.dynamoDb();
 
     await Promise.all([
-      simDynamoDb.createTable(
+      simDynamoDatabase.createTable(
         new CreateTableCommand({
           TableName: "TableA",
           KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
         }),
       ),
-      simDynamoDb.createTable(
+      simDynamoDatabase.createTable(
         new CreateTableCommand({
           TableName: "TableB",
           KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
         }),
       ),
-      simDynamoDb.createTable(
+      simDynamoDatabase.createTable(
         new CreateTableCommand({
           TableName: "TableC",
           KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
@@ -40,7 +40,7 @@ describe("DynamoDB DescribeTableCommand", () => {
       ),
     ]);
 
-    const describeTableOutput = await simDynamoDb.describeTable(
+    const describeTableOutput = await simDynamoDatabase.describeTable(
       new DescribeTableCommand({ TableName: "TableB" }),
     );
 
@@ -51,7 +51,7 @@ describe("DynamoDB DescribeTableCommand", () => {
 
     await simAws.backgroundTasksComplete();
 
-    const describeAgain = await simDynamoDb.describeTable(
+    const describeAgain = await simDynamoDatabase.describeTable(
       new DescribeTableCommand({ TableName: "TableB" }),
     );
     assertNonNullable(describeAgain.Table?.TableStatus);
@@ -61,10 +61,10 @@ describe("DynamoDB DescribeTableCommand", () => {
   it("throws on undefined Table name", async () => {
     const simAws = new SimAws();
 
-    const simDynamoDb = simAws.dynamoDb();
+    const simDynamoDatabase = simAws.dynamoDb();
 
     await assertThrowsErrorAsync(async () =>
-      simDynamoDb.describeTable(
+      simDynamoDatabase.describeTable(
         new DescribeTableCommand({ TableName: undefined }),
       ),
     );
@@ -73,13 +73,13 @@ describe("DynamoDB DescribeTableCommand", () => {
   it("throws on describing non-existent DynamoDB Table", async () => {
     const simAws = new SimAws();
 
-    const simDynamoDb = simAws.dynamoDb();
+    const simDynamoDatabase = simAws.dynamoDb();
 
     const error = await assertThrowsErrorAsync(async () =>
-      simDynamoDb.describeTable(
+      simDynamoDatabase.describeTable(
         new DescribeTableCommand({ TableName: "NonExistentTable" }),
       ),
     );
-    assertInstanceOf(error, SimDynamoDbResourceNotFoundException);
+    assertInstanceOf(error, SimDynamoDatabaseResourceNotFoundException);
   });
 });

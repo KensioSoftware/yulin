@@ -4,14 +4,14 @@ import type {
   SimCfnTemplateValue,
   SimCfnTemplateValueRecord,
 } from "./sim-cfn-template-value.js";
-import type { SimCfnResourceRefResolver } from "../resolve/sim-cfn-resource-ref-resolver.js";
+import type { SimCfnResourceRefResolver as SimCfnResourceReferenceResolver } from "../resolve/sim-cfn-resource-ref-resolver.js";
 import type { SimCfnPseudoParameters } from "../../parameters/pseudo/sim-cfn-pseudo-parameters.js";
 import { SimCfnResolveContext } from "../resolve/sim-cfn-resolve-context.js";
 import type { SimCfnMappings } from "../mapping/sim-cfn-mappings.js";
 
-interface SimCfnTemplateValueResolverProps {
+interface SimCfnTemplateValueResolverProperties {
   readonly parameters: SimCfnParameters;
-  readonly resources?: SimCfnResourceRefResolver | undefined;
+  readonly resources?: SimCfnResourceReferenceResolver | undefined;
   readonly pseudoParameters?: SimCfnPseudoParameters | undefined;
   readonly mappings?: SimCfnMappings | undefined;
 }
@@ -22,12 +22,12 @@ interface SimCfnTemplateValueResolverProps {
 export class SimCfnTemplateValueResolver {
   private readonly context: SimCfnResolveContext;
 
-  constructor(props: SimCfnTemplateValueResolverProps) {
+  constructor(properties: SimCfnTemplateValueResolverProperties) {
     this.context = new SimCfnResolveContext(
-      props.parameters,
-      props.resources,
-      props.pseudoParameters,
-      props.mappings,
+      properties.parameters,
+      properties.resources,
+      properties.pseudoParameters,
+      properties.mappings,
     );
   }
 

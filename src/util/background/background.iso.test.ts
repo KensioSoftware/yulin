@@ -12,16 +12,16 @@ describe("background sequencing", () => {
   describe("BackgroundTasks", () => {
     it("executes scheduled tasks", async () => {
       const tasks = new BackgroundTasks();
-      let executed = false;
+      let isExecuted = false;
 
       tasks.schedule(async () => {
         await Promise.resolve();
-        executed = true;
+        isExecuted = true;
       });
 
-      assertFalse(executed);
+      assertFalse(isExecuted);
       await tasks.complete();
-      assertTrue(executed);
+      assertTrue(isExecuted);
     });
 
     it("tracks pending task count", async () => {

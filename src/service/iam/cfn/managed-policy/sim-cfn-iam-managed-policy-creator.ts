@@ -4,7 +4,7 @@ import type { SimIam } from "../../sim-iam.js";
 import type { SimIamManagedPolicy } from "../../policy/sim-iam-policy.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 
-interface SimCfnIamManagedPolicyCreatorProps {
+interface SimCfnIamManagedPolicyCreatorProperties {
   readonly iam: SimIam;
 }
 
@@ -14,8 +14,8 @@ interface SimCfnIamManagedPolicyCreatorProps {
 export class SimCfnIamManagedPolicyCreator {
   private readonly iam: SimIam;
 
-  constructor(props: SimCfnIamManagedPolicyCreatorProps) {
-    this.iam = props.iam;
+  constructor(properties: SimCfnIamManagedPolicyCreatorProperties) {
+    this.iam = properties.iam;
   }
 
   /**

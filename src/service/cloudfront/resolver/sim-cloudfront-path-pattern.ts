@@ -1,4 +1,4 @@
-interface SimCloudFrontPathPatternProps {
+interface SimCloudFrontPathPatternProperties {
   readonly pathPattern: string;
 }
 
@@ -17,8 +17,8 @@ export class SimCloudFrontPathPattern {
   });
   private readonly pathPattern: string;
 
-  constructor(props: SimCloudFrontPathPatternProps) {
-    this.pathPattern = props.pathPattern;
+  constructor(properties: SimCloudFrontPathPatternProperties) {
+    this.pathPattern = properties.pathPattern;
   }
 
   /**

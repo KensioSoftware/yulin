@@ -26,20 +26,20 @@ export function configureCffAssociations(
 
   const associations: SimCloudFrontBehavior["functionAssociations"] = {};
 
-  for (const funcAssoc of cacheBehavior.FunctionAssociations.Items) {
+  for (const functionAssoc of cacheBehavior.FunctionAssociations.Items) {
     assertDefined(
-      funcAssoc.EventType,
+      functionAssoc.EventType,
       "CloudFront Function association EventType",
     );
     assertDefined(
-      funcAssoc.FunctionARN,
+      functionAssoc.FunctionARN,
       "CloudFront Function association FunctionARN",
     );
 
     applyFunctionAssociation(
       associations,
-      funcAssoc.EventType,
-      funcAssoc.FunctionARN as SimArn,
+      functionAssoc.EventType,
+      functionAssoc.FunctionARN as SimArn,
     );
   }
 

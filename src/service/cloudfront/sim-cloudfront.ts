@@ -46,7 +46,7 @@ export interface SimCloudFrontRequestOptions {
   readonly caller?: SimAwsCaller;
 }
 
-interface SimCloudFrontProps {
+interface SimCloudFrontProperties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
   readonly cloudFrontRegistry?: SimCloudFrontRegistry;
   readonly s3OriginResolver?: SimCloudFrontS3OriginResolver;
@@ -76,14 +76,14 @@ export class SimCloudFront {
     this,
   );
 
-  constructor(props: SimCloudFrontProps = {}) {
+  constructor(properties: SimCloudFrontProperties = {}) {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       cloudFrontRegistry = new SimCloudFrontRegistry(),
       s3OriginResolver = emptyCloudFrontS3OriginResolver,
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
-    } = props;
+    } = properties;
 
     this.accountRegionScope = accountRegionScope;
     this.cloudFrontRegistry = cloudFrontRegistry;
@@ -117,8 +117,8 @@ export class SimCloudFront {
    * Handle a Create Distribution Command from the SDK.
    */
   async createDistribution(
-    cmd: SimCreateDistributionCommand,
-    opts?: SimCloudFrontRequestOptions,
+    command: SimCreateDistributionCommand,
+    options?: SimCloudFrontRequestOptions,
   ): Promise<SimCreateDistributionCommandOutput> {
     const handler = new CreateDistributionCommandHandler({
       accountId: this.accountRegionScope.accountId,
@@ -128,15 +128,15 @@ export class SimCloudFront {
       iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd, opts);
+    return await handler.handle(command, options);
   }
 
   /**
    * Handle a Get Distribution Command from the SDK.
    */
   async getDistribution(
-    cmd: SimGetDistributionCommand,
-    opts?: SimCloudFrontRequestOptions,
+    command: SimGetDistributionCommand,
+    options?: SimCloudFrontRequestOptions,
   ): Promise<SimGetDistributionCommandOutput> {
     const handler = new GetDistributionCommandHandler({
       accountId: this.accountRegionScope.accountId,
@@ -144,15 +144,15 @@ export class SimCloudFront {
       iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd, opts);
+    return await handler.handle(command, options);
   }
 
   /**
    * Handle a Create Function Command from the SDK.
    */
   async createFunction(
-    cmd: SimCreateFunctionCommand,
-    opts?: SimCloudFrontRequestOptions,
+    command: SimCreateFunctionCommand,
+    options?: SimCloudFrontRequestOptions,
   ): Promise<SimCreateFunctionCommandOutput> {
     const handler = new CreateFunctionCommandHandler({
       accountId: this.accountRegionScope.accountId,
@@ -160,7 +160,7 @@ export class SimCloudFront {
       iam: this.iam,
       background: this.background,
     });
-    return await handler.handle(cmd, opts);
+    return await handler.handle(command, options);
   }
 
   /**

@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, it } from "vitest";
  */
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimAwsLocalServer } from "../../../../serve/index.js";
-import { TempDir } from "../../../../util/filesystem/temp-dir.js";
+import { TemporaryDirectory as TemporaryDirectory } from "../../../../util/filesystem/temporary-directory.js";
 import { TestCdkProject } from "../../../../util/filesystem/test-cdk-project.js";
 import path from "node:path";
 import {
@@ -32,12 +32,12 @@ describe("Sim CDK website deployment local integration", () => {
 
   it("deploys test demo project into sim AWS", async () => {
     // Given a small test demo project.
-    const projectDir = new TempDir();
-    await projectDir.writeFile("public/index.html", "<h1>Root</h1>");
-    await projectDir.writeFile("public/foo/index.html", "<h1>Foo</h1>");
+    const projectDirectory = new TemporaryDirectory();
+    await projectDirectory.writeFile("public/index.html", "<h1>Root</h1>");
+    await projectDirectory.writeFile("public/foo/index.html", "<h1>Foo</h1>");
 
     // Including a CFF.
-    await projectDir.writeFile(
+    await projectDirectory.writeFile(
       "cff/rewrite-function.js",
       `
 function handler(event) {
@@ -60,11 +60,11 @@ function handler(event) {
 `,
     );
 
-    const handlerFile = projectDir.join("cff/rewrite-function.js");
+    const handlerFile = projectDirectory.join("cff/rewrite-function.js");
 
     // And a CDK stack to deploy the test demo project.
-    const publicDir = projectDir.join("public");
-    const cdkProject = new TestCdkProject({ projectDir });
+    const publicDir = projectDirectory.join("public");
+    const cdkProject = new TestCdkProject({ projectDirectory });
     await cdkProject.writeCdkAppFile(
       `
 import * as cdk from "aws-cdk-lib/core";
@@ -177,12 +177,12 @@ app.synth();
     );
 
     // And we synth the CDK template.
-    const cdkOutDir = await cdkProject.synth();
+    const cdkOutDirectory = await cdkProject.synth();
 
     // When we deploy the template into sim CloudFormation.
     const simCfn = simAws.cloudFormation();
     const stack = await simCfn.deployTemplateFile(
-      path.join(cdkOutDir, "TestStack.template.json"),
+      path.join(cdkOutDirectory, "TestStack.template.json"),
     );
     await simAws.backgroundTasksComplete();
 

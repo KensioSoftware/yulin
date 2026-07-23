@@ -1,7 +1,7 @@
 import { isRecord } from "../../../util/type-guard/record.js";
 import type { CfnTemplateBodyRecord } from "./sim-cfn-template.js";
 
-interface SimCfnTemplateBodyValidatorProps {
+interface SimCfnTemplateBodyValidatorProperties {
   readonly template: CfnTemplateBodyRecord;
   readonly stackName?: string | undefined;
 }
@@ -16,9 +16,9 @@ export class SimCfnTemplateBodyValidator {
   private readonly template: CfnTemplateBodyRecord;
   private readonly stackName: string | undefined;
 
-  constructor(props: SimCfnTemplateBodyValidatorProps) {
-    this.template = props.template;
-    this.stackName = props.stackName;
+  constructor(properties: SimCfnTemplateBodyValidatorProperties) {
+    this.template = properties.template;
+    this.stackName = properties.stackName;
   }
 
   /**

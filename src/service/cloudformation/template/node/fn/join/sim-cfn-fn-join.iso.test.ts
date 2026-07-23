@@ -106,7 +106,7 @@ describe("CloudFormation Fn::Join Resource value", () => {
 
   it("joins literal values with a resolved Parameter Ref", async () => {
     // Given a template that combines Fn::Join with a Ref to a Parameter.
-    const joinRefTemplate = {
+    const joinReferenceTemplate = {
       Parameters: {
         Environment: {
           Type: "String",
@@ -128,7 +128,7 @@ describe("CloudFormation Fn::Join Resource value", () => {
     const simAws = new SimAws();
     await simAws.cloudFormation().deployTemplate({
       stackName: "test-stack",
-      template: joinRefTemplate,
+      template: joinReferenceTemplate,
       parameters: {
         Environment: "prod",
       },

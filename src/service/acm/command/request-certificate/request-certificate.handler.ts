@@ -19,7 +19,7 @@ import {
 } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 
-interface RequestCertificateCommandHandlerProps {
+interface RequestCertificateCommandHandlerProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly certificates: Map<SimArn, SimAcmCertificate>;
   readonly iam?: SimIamInterServiceAuthZ;
@@ -45,13 +45,13 @@ export class RequestCertificateCommandHandler implements CommandHandler<
   private readonly certificateFactory: RequestCertificateFactory;
   private readonly validator = new RequestCertificateValidator();
 
-  constructor(props: RequestCertificateCommandHandlerProps) {
+  constructor(properties: RequestCertificateCommandHandlerProperties) {
     const {
       accountRegionScope,
       certificates,
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
-    } = props;
+    } = properties;
 
     this.certificates = certificates;
     this.authorizer = new RequestCertificateAuthorizer({
@@ -73,18 +73,18 @@ export class RequestCertificateCommandHandler implements CommandHandler<
    * scheduling a certificate issuance task.
    */
   async handle(
-    cmd: SimRequestCertificateCommand,
-    opts?: RequestCertificateCommandHandlerOptions,
+    command: SimRequestCertificateCommand,
+    options?: RequestCertificateCommandHandlerOptions,
   ): Promise<SimRequestCertificateCommandOutput> {
-    this.validator.validate(cmd);
+    this.validator.validate(command);
 
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    this.authorizer.authorize(opts?.caller);
+    this.authorizer.authorize(options?.caller);
 
     const certificate = this.certificateFactory.makeCertificate(
-      cmd,
+      command,
       this.certificates.size,
     );
     const { certificateArn } = certificate;

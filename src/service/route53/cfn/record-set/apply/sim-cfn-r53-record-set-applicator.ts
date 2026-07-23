@@ -9,7 +9,7 @@ import { assertDefined } from "../../../../../util/type-guard/defined.js";
 import { SimCfnRoute53RecordSetBuilder } from "../build/sim-cfn-r53-record-set-builder.js";
 import { SimCfnRoute53RecordSetHostedZoneResolver } from "../resolve/sim-cfn-r53-rec-set-zone-resolver.js";
 
-interface SimCfnRoute53RecordSetApplicatorProps {
+interface SimCfnRoute53RecordSetApplicatorProperties {
   readonly route53: SimRoute53;
 }
 
@@ -20,8 +20,8 @@ export class SimCfnRoute53RecordSetApplicator {
   private readonly route53: SimRoute53;
   private readonly hostedZoneResolver: SimCfnRoute53RecordSetHostedZoneResolver;
 
-  constructor(props: SimCfnRoute53RecordSetApplicatorProps) {
-    this.route53 = props.route53;
+  constructor(properties: SimCfnRoute53RecordSetApplicatorProperties) {
+    this.route53 = properties.route53;
     this.hostedZoneResolver = new SimCfnRoute53RecordSetHostedZoneResolver({
       route53: this.route53,
     });

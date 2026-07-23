@@ -4,7 +4,7 @@ import { Memo } from "../../util/memo/memo.js";
 import { SimAws } from "./sim-aws.js";
 import type { SimS3 } from "../s3/sim-s3.js";
 import type { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
-import type { SimDynamoDb } from "../dynamodb/index.js";
+import type { SimDynamoDb as SimDynamoDatabase } from "../dynamodb/index.js";
 import type { SimCloudFormation } from "../cloudformation/index.js";
 import type { SimRoute53 } from "../route53/index.js";
 import type { SimAcm } from "../acm/sim-acm.js";
@@ -13,7 +13,7 @@ import type { SimSts } from "../sts/sim-sts.js";
 
 export type SimAccountRegionScopeKey = `${SimAwsAccountId}:${AwsRegionName}`;
 
-interface SimAwsAccountRegionContainerProps {
+interface SimAwsAccountRegionContainerProperties {
   readonly simAws?: SimAws;
   readonly account?: SimAwsAccount;
   readonly region?: SimAwsRegion;
@@ -31,8 +31,8 @@ export class SimAwsAccountRegionContainer {
   private readonly simAws: SimAws;
   private readonly memo = new Memo<object>();
 
-  constructor(props: SimAwsAccountRegionContainerProps = {}) {
-    const { simAws = new SimAws(), account, region } = props;
+  constructor(properties: SimAwsAccountRegionContainerProperties = {}) {
+    const { simAws = new SimAws(), account, region } = properties;
 
     this.simAws = simAws;
     this.account =
@@ -78,7 +78,7 @@ export class SimAwsAccountRegionContainer {
   /**
    * Get simulated DynamoDB for this account and region.
    */
-  dynamoDb(): SimDynamoDb {
+  dynamoDb(): SimDynamoDatabase {
     return this.memo.getOrCreate("dynamoDb", () =>
       this.simAws.serviceFactory.createDynamoDb(this),
     );

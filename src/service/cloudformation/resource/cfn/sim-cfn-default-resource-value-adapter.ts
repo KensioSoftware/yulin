@@ -1,7 +1,7 @@
 import type { SimCfnTemplateValue } from "../../template/value/sim-cfn-template-value.js";
 import type { SimCfnResourceValueAdapter } from "./sim-cfn-resource-value-adapter.js";
 
-interface SimCfnDefaultResourceValueAdapterProps {
+interface SimCfnDefaultResourceValueAdapterProperties {
   readonly logicalId: string;
 }
 
@@ -12,8 +12,8 @@ interface SimCfnDefaultResourceValueAdapterProps {
 export class SimCfnDefaultResourceValueAdapter implements SimCfnResourceValueAdapter {
   private readonly logicalId: string;
 
-  constructor(props: SimCfnDefaultResourceValueAdapterProps) {
-    this.logicalId = props.logicalId;
+  constructor(properties: SimCfnDefaultResourceValueAdapterProperties) {
+    this.logicalId = properties.logicalId;
   }
 
   /**

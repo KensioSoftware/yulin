@@ -4,21 +4,21 @@ import {
   type SimArn,
   type SimArnComponents,
 } from "../../aws/arn.js";
-import type { DynamoDbKeySchema } from "./dynamodb-key-schema.js";
-import type { DynamoDbItem } from "../item/dynamodb-item.js";
+import type { DynamoDbKeySchema as DynamoDatabaseKeySchema } from "./dynamodb-key-schema.js";
+import type { DynamoDbItem as DynamoDatabaseItem } from "../item/dynamodb-item.js";
 import {
   type BackgroundScheduler,
   BackgroundTasks,
 } from "../../../util/background/background.js";
 import type {
   SimCreateTableCommand,
-  SimDynamoDbTableStatus,
+  SimDynamoDbTableStatus as SimDynamoDatabaseTableStatus,
 } from "../command/create-table/create-table.cmd.js";
-import { DynamoDbTableCreateInput } from "./dynamodb-table-create-input.js";
+import { DynamoDbTableCreateInput as DynamoDatabaseTableCreateInput } from "./dynamodb-table-create-input.js";
 
 export type DynamoDbTableName = Brand<string, "DynamoDbTableName">;
 
-interface SimDynamoDbTableProps {
+interface SimDynamoDatabaseTableProperties {
   readonly createCommand: SimCreateTableCommand;
   readonly arn?: SimArn;
   readonly background?: BackgroundScheduler;
@@ -34,18 +34,18 @@ export class SimDynamoDbTable {
   public readonly arn: SimArn;
 
   private readonly background: BackgroundScheduler;
-  readonly #keySchema: DynamoDbKeySchema;
-  #status: SimDynamoDbTableStatus = "CREATING";
+  readonly #keySchema: DynamoDatabaseKeySchema;
+  #status: SimDynamoDatabaseTableStatus = "CREATING";
 
-  private readonly items = new Map<string, DynamoDbItem>();
+  private readonly items = new Map<string, DynamoDatabaseItem>();
 
-  constructor(props: SimDynamoDbTableProps) {
+  constructor(properties: SimDynamoDatabaseTableProperties) {
     const {
       createCommand,
       arn = makeSimDynamoDbTableArn(),
       background = new BackgroundTasks(),
-    } = props;
-    const createInput = new DynamoDbTableCreateInput(createCommand);
+    } = properties;
+    const createInput = new DynamoDatabaseTableCreateInput(createCommand);
 
     this.arn = arn;
     this.background = background;
@@ -66,14 +66,14 @@ export class SimDynamoDbTable {
   /**
    * Get the current table status.
    */
-  public get status(): SimDynamoDbTableStatus {
+  public get status(): SimDynamoDatabaseTableStatus {
     return this.#status;
   }
 
   /**
    * Put an item into the table.
    */
-  public putItem(item: DynamoDbItem): Promise<void> {
+  public putItem(item: DynamoDatabaseItem): Promise<void> {
     const keyString = this.#keySchema.makeItemKey(item);
     this.background.schedule(() => {
       this.items.set(keyString, item);

@@ -2,7 +2,7 @@ import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 
-interface RequestCertificateAuthorizerProps {
+interface RequestCertificateAuthorizerProperties {
   readonly iam: SimIamInterServiceAuthZ;
   readonly resource: string;
 }
@@ -20,9 +20,9 @@ export class RequestCertificateAuthorizer {
   private readonly iam: SimIamInterServiceAuthZ;
   private readonly resource: string;
 
-  constructor(props: RequestCertificateAuthorizerProps) {
-    this.iam = props.iam;
-    this.resource = props.resource;
+  constructor(properties: RequestCertificateAuthorizerProperties) {
+    this.iam = properties.iam;
+    this.resource = properties.resource;
   }
 
   /**

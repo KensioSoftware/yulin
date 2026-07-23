@@ -12,7 +12,7 @@ import type {
 } from "./put-user-policy.cmd.js";
 import { assertDefined } from "../../../../../util/type-guard/defined.js";
 
-interface PutUserPolicyCommandHandlerProps {
+interface PutUserPolicyCommandHandlerProperties {
   readonly users: Map<SimIamUsername, SimIamUser>;
   readonly background?: BackgroundScheduler;
 }
@@ -33,8 +33,8 @@ export class PutUserPolicyCommandHandler implements CommandHandler<
   private readonly background: BackgroundScheduler;
   private readonly policyDocValidator: SimIamPolicyDocumentValidator;
 
-  constructor(props: PutUserPolicyCommandHandlerProps) {
-    const { users, background = new BackgroundTasks() } = props;
+  constructor(properties: PutUserPolicyCommandHandlerProperties) {
+    const { users, background = new BackgroundTasks() } = properties;
 
     this.users = users;
     this.background = background;
@@ -45,13 +45,13 @@ export class PutUserPolicyCommandHandler implements CommandHandler<
    * Handle a PutUserPolicyCommand from the SDK.
    */
   async handle(
-    cmd: SimPutUserPolicyCommand,
+    command: SimPutUserPolicyCommand,
   ): Promise<SimPutUserPolicyCommandOutput> {
-    const username = cmd.input.UserName as SimIamUsername | undefined;
+    const username = command.input.UserName as SimIamUsername | undefined;
     assertDefined(username, "PutUserPolicyCommand.input.UserName");
-    const policyName = cmd.input.PolicyName;
+    const policyName = command.input.PolicyName;
     assertDefined(policyName, "PutUserPolicyCommand.input.PolicyName");
-    const policyDocument = cmd.input.PolicyDocument;
+    const policyDocument = command.input.PolicyDocument;
 
     this.policyDocValidator.validateRequired(policyDocument);
 

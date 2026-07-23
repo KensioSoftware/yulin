@@ -13,10 +13,10 @@ export class SimCloudFrontBehaviorResolver {
    * request.
    */
   resolve(
-    req: Request,
+    request: Request,
     simDistribution: SimCloudFrontDistribution,
   ): SimCloudFrontBehavior {
-    const url = new URL(req.url);
+    const url = new URL(request.url);
     const requestPath = url.pathname;
 
     const explicitMatch = simDistribution.behaviors

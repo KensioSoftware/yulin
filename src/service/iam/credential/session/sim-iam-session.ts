@@ -4,7 +4,7 @@ import type {
 } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimIamRole } from "../../role/sim-iam-role.js";
 
-interface SimIamSessionProps {
+interface SimIamSessionProperties {
   readonly principal: SimArnPrincipal;
   readonly sourcePrincipal: SimAwsPrincipal;
   readonly role: SimIamRole;
@@ -29,26 +29,26 @@ export class SimIamSession {
   public readonly createDate: Date;
   public readonly expiration: Date;
 
-  constructor(props: SimIamSessionProps) {
-    if (props.sessionName.length === 0) {
+  constructor(properties: SimIamSessionProperties) {
+    if (properties.sessionName.length === 0) {
       throw new Error("Sim IAM session name must not be empty");
     }
 
-    if (props.sessionToken.length === 0) {
+    if (properties.sessionToken.length === 0) {
       throw new Error("Sim IAM session token must not be empty");
     }
 
-    if (props.expiration.getTime() <= props.createDate.getTime()) {
+    if (properties.expiration.getTime() <= properties.createDate.getTime()) {
       throw new Error("Sim IAM session expiration must follow its creation");
     }
 
-    this.principal = props.principal;
-    this.sourcePrincipal = props.sourcePrincipal;
-    this.role = props.role;
-    this.sessionName = props.sessionName;
-    this.sessionToken = props.sessionToken;
-    this.createDate = new Date(props.createDate);
-    this.expiration = new Date(props.expiration);
+    this.principal = properties.principal;
+    this.sourcePrincipal = properties.sourcePrincipal;
+    this.role = properties.role;
+    this.sessionName = properties.sessionName;
+    this.sessionToken = properties.sessionToken;
+    this.createDate = new Date(properties.createDate);
+    this.expiration = new Date(properties.expiration);
   }
 
   /**

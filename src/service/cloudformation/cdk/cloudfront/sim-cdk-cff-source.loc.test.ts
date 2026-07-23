@@ -11,7 +11,7 @@ import { SimCloudFrontFunction } from "../../../cloudfront/cff/sim-cloudfront-fu
 import { SimCloudFrontDistribution } from "../../../cloudfront/distribution/sim-cloudfront-distribution.js";
 import { SimAwsLocalServer } from "../../../../serve/index.js";
 import { TestCdkProject } from "../../../../util/filesystem/test-cdk-project.js";
-import { TempDir } from "../../../../util/filesystem/temp-dir.js";
+import { TemporaryDirectory as TemporaryDirectory } from "../../../../util/filesystem/temporary-directory.js";
 
 /**
  * Slower local integration test. Calls the real CDK CLI to synth the output
@@ -34,8 +34,8 @@ describe("Sim CDK CloudFront Function embedded source local integration", () => 
   it("deploys a CloudFront Function association using embedded source code", async () => {
     // Given a real js2 syntax CloudFront Function handler file in the temp CDK
     // project.
-    const projectDir = new TempDir();
-    await projectDir.writeFile(
+    const projectDirectory = new TemporaryDirectory();
+    await projectDirectory.writeFile(
       "cff/rewrite-function.js",
       `
 function handler(event) {
@@ -54,11 +54,11 @@ function handler(event) {
 `,
     );
 
-    const handlerFile = projectDir.join("cff/rewrite-function.js");
+    const handlerFile = projectDirectory.join("cff/rewrite-function.js");
 
     // And a CDK stack with an S3 Bucket, CloudFront Function, and Distribution
     // associated with that Function.
-    const cdkProject = new TestCdkProject({ projectDir });
+    const cdkProject = new TestCdkProject({ projectDirectory });
 
     await cdkProject.writeCdkAppFile(`
 import * as cdk from "aws-cdk-lib";
@@ -113,13 +113,15 @@ app.synth();
 `);
 
     // And the CDK app is synthesized to a CloudFormation template.
-    const cdkOutDir = await cdkProject.synth();
+    const cdkOutDirectory = await cdkProject.synth();
 
     // When the synthesized template is deployed through sim CloudFormation without
     // any executable binding.
     const stack = await simAws
       .cloudFormation()
-      .deployTemplateFile(path.join(cdkOutDir, "TestStack.template.json"));
+      .deployTemplateFile(
+        path.join(cdkOutDirectory, "TestStack.template.json"),
+      );
 
     // Then sim CloudFormation creates both the Function and Distribution.
     const functionResource = stack.getResource("RewriteFunction");

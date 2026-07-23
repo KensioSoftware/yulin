@@ -11,7 +11,7 @@ export interface HostedZoneListEntry {
   readonly hostedZone: SimRoute53HostedZone;
 }
 
-interface HostedZoneListPageProps {
+interface HostedZoneListPageProperties {
   readonly hostedZones: Map<SimRoute53HostedZoneId, SimRoute53HostedZone>;
   readonly maxItemsInput?: number | undefined;
   readonly markerNameInput?: string | undefined;
@@ -28,15 +28,15 @@ interface HostedZoneListPage {
  * Builds a sorted ListHostedZonesByName response page.
  */
 export function getHostedZoneListPage(
-  props: HostedZoneListPageProps,
+  properties: HostedZoneListPageProperties,
 ): HostedZoneListPage {
-  const maxItems = props.maxItemsInput ?? 100;
+  const maxItems = properties.maxItemsInput ?? 100;
   const marker = normaliseHostedZoneListMarker({
-    markerNameInput: props.markerNameInput,
-    markerHostedZoneId: props.markerHostedZoneId,
+    markerNameInput: properties.markerNameInput,
+    markerHostedZoneId: properties.markerHostedZoneId,
   });
 
-  const matchingEntries = [...props.hostedZones]
+  const matchingEntries = [...properties.hostedZones]
     .map(([hostedZoneId, hostedZone]) => ({
       hostedZoneId,
       hostedZone,

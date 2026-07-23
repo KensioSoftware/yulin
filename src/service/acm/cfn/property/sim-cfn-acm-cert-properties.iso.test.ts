@@ -2,12 +2,12 @@ import { assertIdentical, assertThrowsError } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimCfnAcmCertificatePropertyListReader } from "./sim-cfn-acm-cert-prop-reader.js";
-import { SimCfnAcmCertificateProperties } from "./sim-cfn-acm-cert-properties.js";
+import { SimCfnAcmCertificatePropertyReader } from "./sim-cfn-acm-cert-properties.js";
 
 describe("SimCfnAcmCertificateProperties", () => {
   it("rejects a non-string DomainName", () => {
     // Given ACM certificate properties with an invalid DomainName shape.
-    const properties = new SimCfnAcmCertificateProperties({
+    const properties = new SimCfnAcmCertificatePropertyReader({
       logicalId: "InvalidCertificate",
       properties: {
         DomainName: 123,
@@ -27,7 +27,7 @@ describe("SimCfnAcmCertificateProperties", () => {
   it("rejects an unsupported ValidationMethod", () => {
     // Given ACM certificate properties with a ValidationMethod other than DNS or
     // EMAIL.
-    const properties = new SimCfnAcmCertificateProperties({
+    const properties = new SimCfnAcmCertificatePropertyReader({
       logicalId: "InvalidCertificate",
       properties: {
         ValidationMethod: "HTTP",

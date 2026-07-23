@@ -8,7 +8,7 @@ import type { SimAwsCredentials } from "../sim-aws-credentials.js";
 import { SimIamAccessKey } from "../sim-iam-access-key.js";
 import { SimIamAssumedRolePrincipalFactory } from "./sim-iam-assumed-role-principal-factory.js";
 
-interface SimIamSessionManagerProps {
+interface SimIamSessionManagerProperties {
   readonly accountId: SimAwsAccountId;
   readonly roles: ReadonlyMap<SimIamRoleName, SimIamRole>;
   readonly credentialRegistry: SimIamCredentialRegistry;
@@ -40,12 +40,12 @@ export class SimIamSessionManager {
   private readonly credentialGenerator: SimIamSessionCredentialGenerator;
   private readonly principalFactory: SimIamAssumedRolePrincipalFactory;
 
-  constructor(props: SimIamSessionManagerProps) {
-    this.roles = props.roles;
-    this.credentialRegistry = props.credentialRegistry;
-    this.credentialGenerator = props.credentialGenerator;
+  constructor(properties: SimIamSessionManagerProperties) {
+    this.roles = properties.roles;
+    this.credentialRegistry = properties.credentialRegistry;
+    this.credentialGenerator = properties.credentialGenerator;
     this.principalFactory = new SimIamAssumedRolePrincipalFactory(
-      props.accountId,
+      properties.accountId,
     );
   }
 

@@ -1,6 +1,6 @@
 import { describe, it } from "vitest";
 import { CreateTableCommand } from "@aws-sdk/client-dynamodb";
-import { SimDynamoDbTable } from "./sim-dynamodb-table.js";
+import { SimDynamoDbTable as SimDynamoDatabaseTable } from "./sim-dynamodb-table.js";
 import {
   assertIdentical,
   assertInstanceOf,
@@ -11,7 +11,7 @@ describe("SimDynamoDbTable", () => {
   it("throws when TableName is undefined", () => {
     const createCommand = new CreateTableCommand({ TableName: undefined });
 
-    assertThrowsError(() => new SimDynamoDbTable({ createCommand }));
+    assertThrowsError(() => new SimDynamoDatabaseTable({ createCommand }));
   });
 
   it("creates table with CREATING status", () => {
@@ -20,7 +20,7 @@ describe("SimDynamoDbTable", () => {
       KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
     });
 
-    const table = new SimDynamoDbTable({ createCommand });
+    const table = new SimDynamoDatabaseTable({ createCommand });
 
     assertIdentical(table.tableName, "test-table");
     assertIdentical(table.status, "CREATING");
@@ -33,7 +33,7 @@ describe("SimDynamoDbTable", () => {
       KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
     });
 
-    const table = new SimDynamoDbTable({ createCommand });
+    const table = new SimDynamoDatabaseTable({ createCommand });
     assertIdentical(table.status, "CREATING");
 
     await table.activate();

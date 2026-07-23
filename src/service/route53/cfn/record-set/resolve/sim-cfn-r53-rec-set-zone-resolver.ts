@@ -8,7 +8,7 @@ import { normaliseSimRoute53Name } from "../../../local-name/sim-route53-local-n
 import type { SimRoute53 } from "../../../sim-route53.js";
 import { assertDefined } from "../../../../../util/type-guard/defined.js";
 
-interface SimCfnRoute53RecordSetHostedZoneResolverProps {
+interface SimCfnRoute53RecordSetHostedZoneResolverProperties {
   readonly route53: SimRoute53;
 }
 
@@ -18,8 +18,8 @@ interface SimCfnRoute53RecordSetHostedZoneResolverProps {
 export class SimCfnRoute53RecordSetHostedZoneResolver {
   private readonly route53: SimRoute53;
 
-  constructor(props: SimCfnRoute53RecordSetHostedZoneResolverProps) {
-    this.route53 = props.route53;
+  constructor(properties: SimCfnRoute53RecordSetHostedZoneResolverProperties) {
+    this.route53 = properties.route53;
   }
 
   /**

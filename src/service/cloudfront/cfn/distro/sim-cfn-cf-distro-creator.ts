@@ -8,7 +8,7 @@ import type { SimCloudFrontDistribution } from "../../distribution/sim-cloudfron
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import { SimCfnCfDistroConfigValidator } from "./sim-cfn-cf-distro-config-validator.js";
 
-interface SimCfnCfDistroCreatorProps {
+interface SimCfnCfDistroCreatorProperties {
   readonly cloudFront: SimCloudFront;
 }
 
@@ -18,8 +18,8 @@ interface SimCfnCfDistroCreatorProps {
 export class SimCfnCfDistroCreator {
   private readonly cloudFront: SimCloudFront;
 
-  constructor(props: SimCfnCfDistroCreatorProps) {
-    this.cloudFront = props.cloudFront;
+  constructor(properties: SimCfnCfDistroCreatorProperties) {
+    this.cloudFront = properties.cloudFront;
   }
 
   /**

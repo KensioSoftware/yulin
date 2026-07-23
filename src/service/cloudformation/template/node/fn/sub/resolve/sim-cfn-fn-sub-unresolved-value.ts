@@ -2,7 +2,7 @@ import type { SimCfnNode } from "../../../sim-cfn-node.js";
 import type { SimCfnTemplateValue } from "../../../../value/sim-cfn-template-value.js";
 import { assertDefined } from "../../../../../../../util/type-guard/defined.js";
 
-interface SimCfnFnSubUnresolvedValueProps {
+interface SimCfnFunctionSubUnresolvedValueProperties {
   readonly template: string;
   readonly variables: ReadonlyMap<string, SimCfnNode>;
 }
@@ -14,9 +14,9 @@ export class SimCfnFnSubUnresolvedValue {
   private readonly template: string;
   private readonly variables: ReadonlyMap<string, SimCfnNode>;
 
-  constructor(props: SimCfnFnSubUnresolvedValueProps) {
-    this.template = props.template;
-    this.variables = props.variables;
+  constructor(properties: SimCfnFunctionSubUnresolvedValueProperties) {
+    this.template = properties.template;
+    this.variables = properties.variables;
   }
 
   /**

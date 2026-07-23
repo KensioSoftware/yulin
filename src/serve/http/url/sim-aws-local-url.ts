@@ -1,6 +1,6 @@
-import { simAwsLocalConf } from "../local-server/sim-aws-local.conf.js";
+import { simAwsLocalConf as simAwsLocalConfig } from "../local-server/sim-aws-local.conf.js";
 
-interface SimAwsLocalUrlProps {
+interface SimAwsLocalUrlProperties {
   readonly input: string | URL;
   readonly port?: string;
 }
@@ -9,16 +9,16 @@ interface SimAwsLocalUrlProps {
  * Local URL for a simulated AWS service.
  */
 export class SimAwsLocalUrl {
-  public static readonly localhostSuffix = `.${simAwsLocalConf.hostname}`;
+  public static readonly localhostSuffix = `.${simAwsLocalConfig.hostname}`;
 
   private readonly url: URL;
 
-  constructor(props: SimAwsLocalUrlProps) {
-    this.url = new URL(props.input);
+  constructor(properties: SimAwsLocalUrlProperties) {
+    this.url = new URL(properties.input);
     this.url.protocol = "http:";
     this.url.hostname = this.localHostname(this.url.hostname);
-    if (props.port !== undefined) {
-      this.url.port = props.port;
+    if (properties.port !== undefined) {
+      this.url.port = properties.port;
     }
   }
 

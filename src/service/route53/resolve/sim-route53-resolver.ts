@@ -10,7 +10,7 @@ import { SimRoute53ServiceTargetResolver } from "./sim-r53-service-target-resolv
 
 const maxCnameDepth = 8;
 
-interface SimRoute53ResolverProps {
+interface SimRoute53ResolverProperties {
   readonly hostedZones: ReadonlyMap<string, SimRoute53HostedZone>;
 }
 
@@ -22,8 +22,10 @@ export class SimRoute53Resolver {
   private readonly serviceTargetResolver =
     new SimRoute53ServiceTargetResolver();
 
-  constructor(props: SimRoute53ResolverProps) {
-    this.recordFinder = new SimRoute53HostedZoneRecordFinder(props.hostedZones);
+  constructor(properties: SimRoute53ResolverProperties) {
+    this.recordFinder = new SimRoute53HostedZoneRecordFinder(
+      properties.hostedZones,
+    );
   }
 
   /**

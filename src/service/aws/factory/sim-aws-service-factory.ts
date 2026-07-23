@@ -7,7 +7,7 @@ import type { SimAws } from "../sim-aws.js";
 import { SimCloudFormation } from "../../cloudformation/index.js";
 import { SimCloudFrontRegistry } from "../../cloudfront/registry/sim-cloud-front-registry.js";
 import type { SimCloudFront } from "../../cloudfront/sim-cloudfront.js";
-import { SimDynamoDb } from "../../dynamodb/index.js";
+import { SimDynamoDb as SimDynamoDatabase } from "../../dynamodb/index.js";
 import type { SimRoute53 } from "../../route53/index.js";
 import { SimS3 } from "../../s3/sim-s3.js";
 import { SimS3GlobalRegistry } from "../../s3/sim-s3-global-registry.js";
@@ -18,7 +18,7 @@ import type { SimIam } from "../../iam/index.js";
 import { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
 import { SimSts } from "../../sts/sim-sts.js";
 
-interface SimAwsServiceFactoryProps {
+interface SimAwsServiceFactoryProperties {
   readonly simAws: SimAws;
   readonly background: BackgroundScheduler & BackgroundCompleter;
 }
@@ -77,12 +77,12 @@ export class SimAwsServiceFactory {
 
   private readonly accountServices: SimAwsAccountServiceCache;
 
-  constructor(props: SimAwsServiceFactoryProps) {
-    this.simAws = props.simAws;
-    this.background = props.background;
+  constructor(properties: SimAwsServiceFactoryProperties) {
+    this.simAws = properties.simAws;
+    this.background = properties.background;
     this.accountServices = new SimAwsAccountServiceCache({
-      simAws: props.simAws,
-      background: props.background,
+      simAws: properties.simAws,
+      background: properties.background,
       cloudFrontRegistry: this.cloudFrontRegistry,
       route53Registry: this.route53Registry,
       iamRegistry: this.iamRegistry,
@@ -123,10 +123,10 @@ export class SimAwsServiceFactory {
   /**
    * Create simulated DynamoDB for an Account Region scope.
    */
-  createDynamoDb(scope: SimAwsAccountRegionContainer): SimDynamoDb {
+  createDynamoDb(scope: SimAwsAccountRegionContainer): SimDynamoDatabase {
     const iam = this.createIam(scope);
 
-    return new SimDynamoDb({
+    return new SimDynamoDatabase({
       accountRegionScope: scope.accountRegionScope,
       iam,
       background: this.background,

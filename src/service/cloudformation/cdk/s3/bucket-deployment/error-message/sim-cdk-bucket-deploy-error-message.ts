@@ -1,7 +1,7 @@
 import type { SimCfnResource } from "../../../../resource/sim-cfn-resource.js";
 import type { SimCdkOutContext } from "../../../sim-cdk-out-context.js";
 
-interface SimCdkBucketDeploymentAssetErrorMessageProps {
+interface SimCdkBucketDeploymentAssetErrorMessageProperties {
   readonly resource: SimCfnResource;
   readonly sourceObjectKey: string;
   readonly cdkOutContext: SimCdkOutContext | undefined;
@@ -17,11 +17,11 @@ export class SimCdkBucketDeployErrorMessage {
   private readonly cdkOutContext: SimCdkOutContext | undefined;
   private readonly reason: string;
 
-  constructor(props: SimCdkBucketDeploymentAssetErrorMessageProps) {
-    this.resource = props.resource;
-    this.sourceObjectKey = props.sourceObjectKey;
-    this.cdkOutContext = props.cdkOutContext;
-    this.reason = props.reason;
+  constructor(properties: SimCdkBucketDeploymentAssetErrorMessageProperties) {
+    this.resource = properties.resource;
+    this.sourceObjectKey = properties.sourceObjectKey;
+    this.cdkOutContext = properties.cdkOutContext;
+    this.reason = properties.reason;
   }
 
   /**

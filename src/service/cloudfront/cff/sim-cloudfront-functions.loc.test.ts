@@ -43,7 +43,7 @@ describe("Serve sim CloudFront Functions on localhost", () => {
       }
       return event.request;
     }
-    const createViewReqCffOut = await simCloudFront.createFunction(
+    const createViewRequestCffOut = await simCloudFront.createFunction(
       new CreateFunctionCommand({
         Name: "foo-viewer-request-cff",
         FunctionConfig: {
@@ -78,7 +78,8 @@ describe("Serve sim CloudFront Functions on localhost", () => {
               Items: [
                 {
                   EventType: "viewer-request",
-                  FunctionARN: createViewReqCffOut.FunctionMetadata.FunctionARN,
+                  FunctionARN:
+                    createViewRequestCffOut.FunctionMetadata.FunctionARN,
                 },
               ],
             },

@@ -4,11 +4,7 @@
 export async function simS3BodyToBuffer(
   body: AsyncIterable<Buffer>,
 ): Promise<Buffer> {
-  const chunks: Buffer[] = [];
-
-  for await (const chunk of body) {
-    chunks.push(chunk);
-  }
+  const chunks: Buffer[] = await Array.fromAsync(body);
 
   return Buffer.concat(chunks);
 }

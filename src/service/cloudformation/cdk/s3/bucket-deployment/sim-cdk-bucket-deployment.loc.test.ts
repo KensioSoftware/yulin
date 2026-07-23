@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, it } from "vitest";
 import { SimAws } from "../../../../aws/sim-aws.js";
 import { SimAwsLocalServer } from "../../../../../serve/index.js";
-import { TempDir } from "../../../../../util/filesystem/temp-dir.js";
+import { TemporaryDirectory as TemporaryDirectory } from "../../../../../util/filesystem/temporary-directory.js";
 import path from "node:path";
 import { assertIdentical, assertStringIncludes } from "@kensio/smartass";
 import { TestCdkProject } from "../../../../../util/filesystem/test-cdk-project.js";
@@ -25,13 +25,13 @@ describe("Sim CDK BucketDeployment local integration", () => {
 
   it("sets up sim S3 bucket deployment on local filesystem", async () => {
     // Given static website content in a local filesystem directory.
-    const projectDir = new TempDir();
-    await projectDir.writeFile("public/index.html", "<h1>Root</h1>");
-    await projectDir.writeFile("public/foo/index.html", "<h1>Foo</h1>");
+    const projectDirectory = new TemporaryDirectory();
+    await projectDirectory.writeFile("public/index.html", "<h1>Root</h1>");
+    await projectDirectory.writeFile("public/foo/index.html", "<h1>Foo</h1>");
 
     // And a CDK stack with a BucketDeployment resource.
-    const publicDir = projectDir.join("public");
-    const cdkProject = new TestCdkProject({ projectDir });
+    const publicDir = projectDirectory.join("public");
+    const cdkProject = new TestCdkProject({ projectDirectory });
     await cdkProject.writeCdkAppFile(
       `
 import * as cdk from "aws-cdk-lib";
@@ -58,12 +58,12 @@ app.synth();
     );
 
     // And we synth the CDK template.
-    const cdkOutDir = await cdkProject.synth();
+    const cdkOutDirectory = await cdkProject.synth();
 
     // When we deploy the template into sim CloudFormation.
     const simCfn = simAws.cloudFormation();
     const stack = await simCfn.deployTemplateFile(
-      path.join(cdkOutDir, "TestStack.template.json"),
+      path.join(cdkOutDirectory, "TestStack.template.json"),
     );
 
     const websiteUrlOut = stack.outputs.get("SiteBucketWebsiteUrl")?.value;

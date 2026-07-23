@@ -31,7 +31,7 @@ export interface SimCloudFormationDeployTemplateFileProps {
   readonly parameters?: Record<string, string> | undefined;
 }
 
-interface SimCloudFormationTemplateDeployerProps {
+interface SimCloudFormationTemplateDeployerProperties {
   readonly simAws: SimAws;
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly stacks: Map<SimCloudFormationStackName, SimCfnStack>;
@@ -55,11 +55,11 @@ export class SimCloudFormationTemplateDeployer {
   private readonly background: BackgroundScheduler & BackgroundCompleter;
   private readonly templateFileLoader = new SimCfnTemplateFileLoader();
 
-  constructor(props: SimCloudFormationTemplateDeployerProps) {
-    this.simAws = props.simAws;
-    this.accountRegionScope = props.accountRegionScope;
-    this.stacks = props.stacks;
-    this.background = props.background;
+  constructor(properties: SimCloudFormationTemplateDeployerProperties) {
+    this.simAws = properties.simAws;
+    this.accountRegionScope = properties.accountRegionScope;
+    this.stacks = properties.stacks;
+    this.background = properties.background;
   }
 
   /**
@@ -67,13 +67,13 @@ export class SimCloudFormationTemplateDeployer {
    * object.
    */
   async deployTemplate(
-    props: SimCloudFormationCreateStackProps,
+    properties: SimCloudFormationCreateStackProps,
   ): Promise<SimCfnStack> {
     return await this.deployTemplateWithContext({
-      stackName: props.stackName ?? makeSimCloudFormationStackName(),
-      template: props.template,
-      parameters: props.parameters,
-      bindings: props.bindings,
+      stackName: properties.stackName ?? makeSimCloudFormationStackName(),
+      template: properties.template,
+      parameters: properties.parameters,
+      bindings: properties.bindings,
     });
   }
 
@@ -82,14 +82,14 @@ export class SimCloudFormationTemplateDeployer {
    * template file.
    */
   async deployTemplateFile(
-    props: SimCloudFormationDeployTemplateFileProps | string,
+    properties: SimCloudFormationDeployTemplateFileProps | string,
   ): Promise<SimCfnStack> {
     return await this.deployTemplateWithContext(
-      await this.templateFileLoader.load(props),
+      await this.templateFileLoader.load(properties),
     );
   }
 
-  private async deployTemplateWithContext(props: {
+  private async deployTemplateWithContext(properties: {
     readonly stackName: SimCloudFormationStackName | string;
     readonly template: CfnTemplateBodyRecord;
     readonly parameters?: Record<string, string> | undefined;
@@ -99,9 +99,9 @@ export class SimCloudFormationTemplateDeployer {
     await this.createStackWithContext(
       {
         input: {
-          StackName: props.stackName,
-          TemplateBody: jsonStringify(props.template),
-          Parameters: Object.entries(props.parameters ?? {}).map(
+          StackName: properties.stackName,
+          TemplateBody: jsonStringify(properties.template),
+          Parameters: Object.entries(properties.parameters ?? {}).map(
             ([parameterKey, parameterValue]) => ({
               ParameterKey: parameterKey,
               ParameterValue: parameterValue,
@@ -109,14 +109,17 @@ export class SimCloudFormationTemplateDeployer {
           ),
         },
       },
-      props.cdkOutContext,
-      props.bindings,
+      properties.cdkOutContext,
+      properties.bindings,
     );
 
     const stack = this.stacks.get(
-      props.stackName as SimCloudFormationStackName,
+      properties.stackName as SimCloudFormationStackName,
     );
-    assertDefined(stack, `Sim CloudFormation Stack named ${props.stackName}`);
+    assertDefined(
+      stack,
+      `Sim CloudFormation Stack named ${properties.stackName}`,
+    );
 
     await stack.waitForDeployComplete();
 
@@ -124,7 +127,7 @@ export class SimCloudFormationTemplateDeployer {
   }
 
   private async createStackWithContext(
-    cmd: {
+    command: {
       readonly input: {
         readonly StackName: SimCloudFormationStackName | string;
         readonly TemplateBody: string;
@@ -146,7 +149,7 @@ export class SimCloudFormationTemplateDeployer {
       bindings,
     });
 
-    return await handler.handle(cmd);
+    return await handler.handle(command);
   }
 }
 

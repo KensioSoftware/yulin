@@ -1,10 +1,10 @@
 import type { SimCfnNode } from "../../node/sim-cfn-node.js";
 import type { SimCfnTemplateValue } from "../../value/sim-cfn-template-value.js";
-import { SimCfnFnGetAttParser } from "./get-att/sim-cfn-fn-get-att-parser.js";
-import { SimCfnFnJoinParser } from "./join/sim-cfn-fn-join-parser.js";
+import { SimCfnFnGetAttParser as SimCfnFunctionGetAttParser } from "./get-att/sim-cfn-fn-get-att-parser.js";
+import { SimCfnFnJoinParser as SimCfnFunctionJoinParser } from "./join/sim-cfn-fn-join-parser.js";
 import type { SimCfnValueParser } from "../value/sim-cfn-value-parser.type.js";
-import { SimCfnFnSubParser } from "./sub/sim-cfn-fn-sub-parser.js";
-import { SimCfnFnFindInMapParser } from "./find-in-map/sim-cfn-fn-find-in-map-parser.js";
+import { SimCfnFnSubParser as SimCfnFunctionSubParser } from "./sub/sim-cfn-fn-sub-parser.js";
+import { SimCfnFnFindInMapParser as SimCfnFunctionFindInMapParser } from "./find-in-map/sim-cfn-fn-find-in-map-parser.js";
 import { assertDefined } from "../../../../../util/type-guard/defined.js";
 
 /**
@@ -22,16 +22,16 @@ import { assertDefined } from "../../../../../util/type-guard/defined.js";
  * that need child values parsed recursively.
  */
 export class SimCfnFunctionParser {
-  private readonly fnGetAttParser: SimCfnFnGetAttParser;
-  private readonly fnFindInMapParser: SimCfnFnFindInMapParser;
-  private readonly fnJoinParser: SimCfnFnJoinParser;
-  private readonly fnSubParser: SimCfnFnSubParser;
+  private readonly fnGetAttParser: SimCfnFunctionGetAttParser;
+  private readonly fnFindInMapParser: SimCfnFunctionFindInMapParser;
+  private readonly fnJoinParser: SimCfnFunctionJoinParser;
+  private readonly fnSubParser: SimCfnFunctionSubParser;
 
   constructor(valueParser: SimCfnValueParser) {
-    this.fnGetAttParser = new SimCfnFnGetAttParser();
-    this.fnFindInMapParser = new SimCfnFnFindInMapParser(valueParser);
-    this.fnJoinParser = new SimCfnFnJoinParser(valueParser);
-    this.fnSubParser = new SimCfnFnSubParser(valueParser);
+    this.fnGetAttParser = new SimCfnFunctionGetAttParser();
+    this.fnFindInMapParser = new SimCfnFunctionFindInMapParser(valueParser);
+    this.fnJoinParser = new SimCfnFunctionJoinParser(valueParser);
+    this.fnSubParser = new SimCfnFunctionSubParser(valueParser);
   }
 
   /**

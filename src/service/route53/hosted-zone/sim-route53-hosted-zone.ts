@@ -9,7 +9,7 @@ import type { BackgroundScheduler } from "../../../util/background/background.js
 
 export type SimRoute53HostedZoneStatus = "PENDING" | "INSYNC";
 
-interface SimRoute53HostedZoneProps {
+interface SimRoute53HostedZoneProperties {
   readonly id: SimRoute53HostedZoneId | string;
   readonly name: string;
   // Route53 Hosted Zone caller reference is like an idempotency key.
@@ -33,13 +33,13 @@ export class SimRoute53HostedZone {
   #status: SimRoute53HostedZoneStatus = "PENDING";
   private synchronizationComplete: Promise<void> | undefined;
 
-  constructor(props: SimRoute53HostedZoneProps) {
-    assertIsSimRoute53HostedZoneId(props.id);
-    this.hostedZoneId = props.id;
-    this.hostedZoneName = `${normaliseSimRoute53Name(props.name)}.`;
-    this.hostedZoneCallerReference = props.callerReference;
+  constructor(properties: SimRoute53HostedZoneProperties) {
+    assertIsSimRoute53HostedZoneId(properties.id);
+    this.hostedZoneId = properties.id;
+    this.hostedZoneName = `${normaliseSimRoute53Name(properties.name)}.`;
+    this.hostedZoneCallerReference = properties.callerReference;
     this.hostedZoneConfig =
-      props.config === undefined ? undefined : { ...props.config };
+      properties.config === undefined ? undefined : { ...properties.config };
   }
 
   /**

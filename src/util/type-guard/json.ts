@@ -13,7 +13,7 @@ type Jsonify<T> = T extends { toJSON(): infer R }
   : T extends string | number | boolean | null
     ? T
     : // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      T extends undefined | ((...args: any[]) => any) | symbol
+      T extends undefined | ((...arguments_: any[]) => any) | symbol
       ? never // dropped in objects
       : T extends [unknown, ...unknown[]]
         ? { [K in keyof T]: Jsonify<T[K]> } // preserve tuples

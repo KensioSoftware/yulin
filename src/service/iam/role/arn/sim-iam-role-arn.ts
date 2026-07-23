@@ -2,7 +2,7 @@ import type { SimArn } from "../../../aws/arn.js";
 import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import type { SimIamRoleName } from "../sim-iam-role.js";
 
-interface MakeSimRoleArnProps {
+interface MakeSimRoleArnProperties {
   readonly accountId: SimAwsAccountId;
   readonly path: string;
   readonly roleName: SimIamRoleName;
@@ -11,8 +11,8 @@ interface MakeSimRoleArnProps {
 /**
  * Make an IAM Role ARN.
  */
-export function makeSimRoleArn(props: MakeSimRoleArnProps): SimArn {
-  const { accountId, path, roleName } = props;
+export function makeSimRoleArn(properties: MakeSimRoleArnProperties): SimArn {
+  const { accountId, path, roleName } = properties;
   const pathPart = path === "/" ? "" : path.slice(1);
 
   return `arn:aws:iam::${accountId}:role/${pathPart}${roleName}` as SimArn;

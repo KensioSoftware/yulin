@@ -1,7 +1,7 @@
 import { SimAwsServiceControllerContainer } from "../controller/container/sim-aws-service-controller-container.js";
 import { SimAws } from "../../service/aws/sim-aws.js";
 
-interface SimAwsHttpProps {
+interface SimAwsHttpProperties {
   readonly simAws?: SimAws;
 }
 
@@ -12,8 +12,8 @@ export class SimAwsHttp {
   private readonly simAws: SimAws;
   private readonly controllers: SimAwsServiceControllerContainer;
 
-  constructor(props: SimAwsHttpProps = {}) {
-    const { simAws = new SimAws() } = props;
+  constructor(properties: SimAwsHttpProperties = {}) {
+    const { simAws = new SimAws() } = properties;
     this.simAws = simAws;
     this.controllers = new SimAwsServiceControllerContainer({ simAws });
   }

@@ -4,7 +4,7 @@ import type { SimIamUser, SimIamUsername } from "../../../user/sim-iam-user.js";
 import { makeSimIamUserId } from "../../../user/sim-iam-user-id.js";
 import type { SimCreateUserCommandOutput } from "./create-user.cmd.js";
 
-interface MakeUserProps {
+interface MakeUserProperties {
   readonly accountId: SimAwsAccountId;
   readonly arn: SimArn;
   readonly path: string;
@@ -18,15 +18,15 @@ export class CreateUserRecordFactory {
   /**
    * Make a sim IAM User from input props.
    */
-  makeUser(props: MakeUserProps): SimIamUser {
+  makeUser(properties: MakeUserProperties): SimIamUser {
     return {
-      arn: props.arn,
-      accountId: props.accountId,
+      arn: properties.arn,
+      accountId: properties.accountId,
       principalType: "user",
-      name: props.userName,
+      name: properties.userName,
       userId: makeSimIamUserId(),
-      userName: props.userName,
-      path: props.path,
+      userName: properties.userName,
+      path: properties.path,
       createDate: new Date(),
       accessKeys: new Map(),
       inlinePolicies: new Map(),

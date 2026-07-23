@@ -7,7 +7,7 @@ import { SimRoute53 } from "../sim-route53.js";
 import { SimCfnRoute53HostedZoneCreator } from "./hosted-zone/sim-cfn-r53-zone-creator.js";
 import { SimCfnRoute53RecordSetApplicator } from "./record-set/apply/sim-cfn-r53-record-set-applicator.js";
 
-interface SimRoute53CloudFormationResourceFactoryProps {
+interface SimRoute53CloudFormationResourceFactoryProperties {
   readonly route53?: SimRoute53 | undefined;
 }
 
@@ -18,8 +18,10 @@ export class SimRoute53CloudFormationResourceFactory implements SimCfnServiceRes
   private readonly hostedZoneCreator: SimCfnRoute53HostedZoneCreator;
   private readonly recordSetCreator: SimCfnRoute53RecordSetApplicator;
 
-  constructor(props: SimRoute53CloudFormationResourceFactoryProps = {}) {
-    const { route53 = new SimRoute53() } = props;
+  constructor(
+    properties: SimRoute53CloudFormationResourceFactoryProperties = {},
+  ) {
+    const { route53 = new SimRoute53() } = properties;
 
     this.hostedZoneCreator = new SimCfnRoute53HostedZoneCreator({ route53 });
     this.recordSetCreator = new SimCfnRoute53RecordSetApplicator({ route53 });

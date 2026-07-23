@@ -34,6 +34,7 @@ const listOutput = await route53.listHostedZonesByName(
   }),
 );
 
-for (const hostedZone of listOutput.HostedZones ?? []) {
+const hostedZones = listOutput.HostedZones ?? [];
+for (const hostedZone of hostedZones) {
   console.log(hostedZone.Name, hostedZone.Id);
 }

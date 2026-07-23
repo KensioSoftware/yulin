@@ -11,7 +11,7 @@ import type {
   SimGetPolicyCommandOutput,
 } from "./get-policy.cmd.js";
 
-interface GetPolicyCommandHandlerProps {
+interface GetPolicyCommandHandlerProperties {
   readonly policies: Map<SimArn, SimIamManagedPolicy>;
   readonly background?: BackgroundScheduler;
 }
@@ -28,8 +28,8 @@ export class GetPolicyCommandHandler implements CommandHandler<
   private readonly policies: Map<SimArn, SimIamManagedPolicy>;
   private readonly background: BackgroundScheduler;
 
-  constructor(props: GetPolicyCommandHandlerProps) {
-    const { policies, background = new BackgroundTasks() } = props;
+  constructor(properties: GetPolicyCommandHandlerProperties) {
+    const { policies, background = new BackgroundTasks() } = properties;
 
     this.policies = policies;
     this.background = background;
@@ -38,8 +38,10 @@ export class GetPolicyCommandHandler implements CommandHandler<
   /**
    * Handle a GetPolicyCommand from the SDK.
    */
-  async handle(cmd: SimGetPolicyCommand): Promise<SimGetPolicyCommandOutput> {
-    const policyArn = cmd.input.PolicyArn as SimArn | undefined;
+  async handle(
+    command: SimGetPolicyCommand,
+  ): Promise<SimGetPolicyCommandOutput> {
+    const policyArn = command.input.PolicyArn as SimArn | undefined;
 
     if (policyArn === undefined || policyArn.length === 0) {
       throw new Error("PolicyArn is required");

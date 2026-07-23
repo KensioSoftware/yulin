@@ -4,7 +4,7 @@ import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-int
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import type { SimCloudFrontDistributionId } from "../../distribution/sim-cloudfront-distribution.js";
 
-interface GetDistributionAuthorizerProps {
+interface GetDistributionAuthorizerProperties {
   readonly accountId: SimAwsAccountId;
   readonly iam: SimIamInterServiceAuthZ;
 }
@@ -22,9 +22,9 @@ export class GetDistributionAuthorizer {
   private readonly accountId: SimAwsAccountId;
   private readonly iam: SimIamInterServiceAuthZ;
 
-  constructor(props: GetDistributionAuthorizerProps) {
-    this.accountId = props.accountId;
-    this.iam = props.iam;
+  constructor(properties: GetDistributionAuthorizerProperties) {
+    this.accountId = properties.accountId;
+    this.iam = properties.iam;
   }
 
   /**

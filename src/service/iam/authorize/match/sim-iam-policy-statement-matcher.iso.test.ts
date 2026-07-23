@@ -26,10 +26,10 @@ describe("SimIamPolicyStatementMatcher", () => {
     });
 
     // When the statement is matched against the caller.
-    const matches = matcher.matches(policy, statement);
+    const isMatches = matcher.matches(policy, statement);
 
     // Then the array Principal is accepted because at least one entry matches.
-    assertTrue(matches);
+    assertTrue(isMatches);
   });
 
   it("does not match an unsupported Principal object key", () => {
@@ -45,10 +45,10 @@ describe("SimIamPolicyStatementMatcher", () => {
     });
 
     // When the statement is matched against the caller.
-    const matches = matcher.matches(policy, statement);
+    const isMatches = matcher.matches(policy, statement);
 
     // Then the unsupported principal type is ignored and the statement does not match.
-    assertFalse(matches);
+    assertFalse(isMatches);
   });
 
   it("matches a resource policy Principal object array when any AWS entry matches the caller ARN", () => {
@@ -67,10 +67,10 @@ describe("SimIamPolicyStatementMatcher", () => {
     });
 
     // When the statement is matched against the caller.
-    const matches = matcher.matches(policy, statement);
+    const isMatches = matcher.matches(policy, statement);
 
     // Then the AWS Principal array is accepted because at least one entry matches.
-    assertTrue(matches);
+    assertTrue(isMatches);
   });
 
   it("does not match a concrete Principal when the request has no caller ARN", () => {
@@ -85,10 +85,10 @@ describe("SimIamPolicyStatementMatcher", () => {
     });
 
     // When the request has no caller ARN.
-    const matches = matcher.matches(policy, statement);
+    const isMatches = matcher.matches(policy, statement);
 
     // Then the concrete Principal cannot match.
-    assertFalse(matches);
+    assertFalse(isMatches);
   });
 
   it("does not match a resource policy statement without Principal or NotPrincipal", () => {
@@ -103,9 +103,9 @@ describe("SimIamPolicyStatementMatcher", () => {
     });
 
     // When the statement is matched against the caller.
-    const matches = matcher.matches(policy, statement);
+    const isMatches = matcher.matches(policy, statement);
 
     // Then the resource policy is rejected because resource policies must name or exclude a principal.
-    assertFalse(matches);
+    assertFalse(isMatches);
   });
 });

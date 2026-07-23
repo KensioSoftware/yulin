@@ -4,7 +4,7 @@ import type { SimAwsPrincipal } from "../../aws/caller/sim-aws-caller.js";
 import { makeSimAwsAccountRootPrincipal } from "../../aws/caller/sim-aws-account-root-principal.js";
 import { SimIamAccessDenied } from "../../iam/error/sim-iam.error.js";
 
-interface AssumeRoleSourceAccountAuthorizerProps {
+interface AssumeRoleSourceAccountAuthorizerProperties {
   readonly sourceAccountId: SimAwsAccountId;
   readonly iamResolver: SimIamAccountResolver;
 }
@@ -39,9 +39,9 @@ export class AssumeRoleSourcePrincipalAuthorizer {
   private readonly sourceAccountId: SimAwsAccountId;
   private readonly iamResolver: SimIamAccountResolver;
 
-  constructor(props: AssumeRoleSourceAccountAuthorizerProps) {
-    this.sourceAccountId = props.sourceAccountId;
-    this.iamResolver = props.iamResolver;
+  constructor(properties: AssumeRoleSourceAccountAuthorizerProperties) {
+    this.sourceAccountId = properties.sourceAccountId;
+    this.iamResolver = properties.iamResolver;
   }
 
   /**

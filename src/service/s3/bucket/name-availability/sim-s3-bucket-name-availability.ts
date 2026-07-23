@@ -6,7 +6,7 @@ import {
   SimS3BucketAlreadyOwnedByYou,
 } from "../../error/sim-s3.error.js";
 
-interface SimS3BucketNameAvailabilityProps {
+interface SimS3BucketNameAvailabilityProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly buckets: Map<string, SimS3Bucket>;
   readonly s3GlobalRegistry: SimS3GlobalRegistry;
@@ -20,8 +20,8 @@ export class SimS3BucketNameAvailability {
   private readonly buckets: Map<string, SimS3Bucket>;
   private readonly s3GlobalRegistry: SimS3GlobalRegistry;
 
-  constructor(props: SimS3BucketNameAvailabilityProps) {
-    const { accountRegionScope, buckets, s3GlobalRegistry } = props;
+  constructor(properties: SimS3BucketNameAvailabilityProperties) {
+    const { accountRegionScope, buckets, s3GlobalRegistry } = properties;
 
     this.accountRegionScope = accountRegionScope;
     this.buckets = buckets;

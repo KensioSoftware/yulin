@@ -19,7 +19,7 @@ export type SimIamInvalidCredentialsReason =
   | "session-token-mismatch"
   | "expired-session";
 
-interface SimIamInvalidCredentialsProps {
+interface SimIamInvalidCredentialsProperties {
   readonly accessKeyId: string;
   readonly reason: SimIamInvalidCredentialsReason;
   readonly accessKeyStatus?: SimIamAccessKeyStatus | undefined;
@@ -38,27 +38,31 @@ export class SimIamInvalidCredentials extends SimIamCredentialError {
   public readonly accessKeyStatus?: SimIamAccessKeyStatus | undefined;
   public readonly expiration?: Date | undefined;
 
-  constructor(props: SimIamInvalidCredentialsProps) {
-    super(SimIamInvalidCredentials.message(props));
+  constructor(properties: SimIamInvalidCredentialsProperties) {
+    super(SimIamInvalidCredentials.message(properties));
 
-    this.accessKeyId = props.accessKeyId;
-    this.reason = props.reason;
-    this.accessKeyStatus = props.accessKeyStatus;
+    this.accessKeyId = properties.accessKeyId;
+    this.reason = properties.reason;
+    this.accessKeyStatus = properties.accessKeyStatus;
     this.expiration =
-      props.expiration === undefined ? undefined : new Date(props.expiration);
+      properties.expiration === undefined
+        ? undefined
+        : new Date(properties.expiration);
   }
 
-  private static message(props: SimIamInvalidCredentialsProps): string {
-    const prefix = `Sim IAM could not authenticate access key ${props.accessKeyId}`;
+  private static message(
+    properties: SimIamInvalidCredentialsProperties,
+  ): string {
+    const prefix = `Sim IAM could not authenticate access key ${properties.accessKeyId}`;
 
-    switch (props.reason) {
+    switch (properties.reason) {
       case "unknown-access-key": {
         return `${prefix}: the access key is not registered`;
       }
 
       case "inactive-access-key": {
         return `${prefix}: the access key is ${
-          props.accessKeyStatus ?? "inactive"
+          properties.accessKeyStatus ?? "inactive"
         }`;
       }
 
@@ -80,9 +84,9 @@ export class SimIamInvalidCredentials extends SimIamCredentialError {
 
       case "expired-session": {
         return `${prefix}: the session expired${
-          props.expiration === undefined
+          properties.expiration === undefined
             ? ""
-            : ` at ${props.expiration.toISOString()}`
+            : ` at ${properties.expiration.toISOString()}`
         }`;
       }
     }

@@ -9,11 +9,11 @@ import {
 } from "@kensio/smartass";
 import { FilesystemS3BucketStorage } from "./s3-filesystem-storage.js";
 import { SimS3Object } from "../../object/s3-object.js";
-import { TempDir } from "../../../../util/filesystem/temp-dir.js";
+import { TemporaryDirectory as TemporaryDirectory } from "../../../../util/filesystem/temporary-directory.js";
 
 describe("Filesystem simulated S3 storage", () => {
   async function makeFilesystemStorage(): Promise<FilesystemS3BucketStorage> {
-    const testDir = new TempDir();
+    const testDir = new TemporaryDirectory();
     await testDir.resolvePath();
 
     return new FilesystemS3BucketStorage({
@@ -147,7 +147,7 @@ describe("Filesystem simulated S3 storage", () => {
   });
 
   it("ignores unsupported file extensions when listing Objects", async () => {
-    const testDir = new TempDir();
+    const testDir = new TemporaryDirectory();
     await testDir.writeFile(["public", "safe.txt"], "safe");
     await testDir.writeFile(["public", "unsafe.pem"], "unsafe");
 
@@ -161,7 +161,7 @@ describe("Filesystem simulated S3 storage", () => {
   });
 
   it("ignores symlinks when listing Objects", async () => {
-    const testDir = new TempDir();
+    const testDir = new TemporaryDirectory();
     await testDir.writeFile(["public", "safe.txt"], "safe");
     await testDir.writeFile("outside.txt", "outside");
 

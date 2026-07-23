@@ -11,7 +11,7 @@ import { simAwsAccountRegionScopeFactory } from "../../aws/sim-aws-account-regio
 
 export type SimS3BucketName = Brand<string, "SimS3BucketName">;
 
-interface SimS3BucketProps {
+interface SimS3BucketProperties {
   readonly bucketName: SimS3BucketName | string;
   readonly accountRegionScope?: SimAwsAccountRegionScope;
   readonly storage?: SimS3BucketStorage;
@@ -30,14 +30,14 @@ export class SimS3Bucket {
   private website: SimS3BucketWebsite;
   private policy: SimIamPolicyDocument | undefined;
 
-  constructor(props: SimS3BucketProps) {
+  constructor(properties: SimS3BucketProperties) {
     const {
       bucketName,
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       storage = new MemoryS3BucketStorage(),
       website = new SimS3BucketWebsite(),
       policy,
-    } = props;
+    } = properties;
 
     validateS3BucketName(bucketName);
 

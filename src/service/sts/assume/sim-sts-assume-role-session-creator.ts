@@ -4,7 +4,7 @@ import type { SimIamAccountResolver } from "../../iam/registry/sim-iam-account-r
 import type { IamRoleArnParts } from "../../iam/role/arn/sim-iam-role-arn-parser.js";
 import type { SimAssumeRoleCommandOutput } from "../command/assume-role/assume-role.cmd.js";
 
-interface AssumeRoleSessionCreatorProps {
+interface AssumeRoleSessionCreatorProperties {
   readonly iamResolver: SimIamAccountResolver;
 }
 
@@ -34,8 +34,8 @@ interface CreateAssumeRoleSessionInput {
 export class SimStsAssumeRoleSessionCreator {
   private readonly iamResolver: SimIamAccountResolver;
 
-  constructor(props: AssumeRoleSessionCreatorProps) {
-    this.iamResolver = props.iamResolver;
+  constructor(properties: AssumeRoleSessionCreatorProperties) {
+    this.iamResolver = properties.iamResolver;
   }
 
   /**

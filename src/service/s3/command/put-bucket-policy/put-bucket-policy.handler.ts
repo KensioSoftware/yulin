@@ -20,7 +20,7 @@ import type {
   SimPutBucketPolicyCommandOutput,
 } from "./put-bucket-policy.cmd.js";
 
-interface PutBucketPolicyCommandHandlerProps {
+interface PutBucketPolicyCommandHandlerProperties {
   readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
@@ -42,12 +42,12 @@ export class PutBucketPolicyCommandHandler implements CommandHandler<
   private readonly background: BackgroundScheduler;
   private readonly policyValidator: SimIamPolicyDocumentValidator;
 
-  constructor(props: PutBucketPolicyCommandHandlerProps) {
+  constructor(properties: PutBucketPolicyCommandHandlerProperties) {
     const {
       buckets,
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
-    } = props;
+    } = properties;
 
     this.buckets = buckets;
     this.authorizer = new PutBucketPolicyAuthorizer({ iam });
@@ -59,14 +59,14 @@ export class PutBucketPolicyCommandHandler implements CommandHandler<
    * Validate, authorize, and replace a Bucket's resource policy.
    */
   async handle(
-    cmd: SimPutBucketPolicyCommand,
-    opts?: PutBucketPolicyCommandHandlerOptions,
+    command: SimPutBucketPolicyCommand,
+    options?: PutBucketPolicyCommandHandlerOptions,
   ): Promise<SimPutBucketPolicyCommandOutput> {
-    assertDefined(cmd.input.Bucket, "PutBucketPolicyCommand.input.Bucket");
-    assertDefined(cmd.input.Policy, "PutBucketPolicyCommand.input.Policy");
-    this.policyValidator.validateRequired(cmd.input.Policy);
+    assertDefined(command.input.Bucket, "PutBucketPolicyCommand.input.Bucket");
+    assertDefined(command.input.Policy, "PutBucketPolicyCommand.input.Policy");
+    this.policyValidator.validateRequired(command.input.Policy);
 
-    const bucketName = cmd.input.Bucket as SimS3BucketName;
+    const bucketName = command.input.Bucket as SimS3BucketName;
     const bucket = this.buckets.get(bucketName);
     if (bucket === undefined) {
       throw new SimS3NoSuchBucket(`No S3 Bucket named ${bucketName}`);
@@ -74,9 +74,9 @@ export class PutBucketPolicyCommandHandler implements CommandHandler<
 
     await this.background.sequence();
 
-    this.authorizer.authorize(bucketName, opts?.caller);
+    this.authorizer.authorize(bucketName, options?.caller);
 
-    bucket.configurePolicy(jsonParse(cmd.input.Policy));
+    bucket.configurePolicy(jsonParse(command.input.Policy));
 
     return {
       $metadata: {},

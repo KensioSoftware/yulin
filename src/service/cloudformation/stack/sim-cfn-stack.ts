@@ -27,7 +27,7 @@ export type SimCloudFormationStackStatus =
   | "CREATE_COMPLETE"
   | "CREATE_FAILED";
 
-interface SimCloudFormationStackProps {
+interface SimCloudFormationStackProperties {
   readonly simAws: SimAws;
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly background: BackgroundScheduler;
@@ -64,7 +64,7 @@ export class SimCfnStack {
     readonly SimCfnExecutableResourceBinding[] | undefined;
   private readonly skippedResourceList: SimCfnResource[] = [];
 
-  constructor(props: SimCloudFormationStackProps) {
+  constructor(properties: SimCloudFormationStackProperties) {
     const {
       simAws,
       accountRegionScope,
@@ -73,7 +73,7 @@ export class SimCfnStack {
       template,
       cdkOutContext,
       bindings,
-    } = props;
+    } = properties;
 
     this.simAws = simAws;
     this.stackName = stackName;

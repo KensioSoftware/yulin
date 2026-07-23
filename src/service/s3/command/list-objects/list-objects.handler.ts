@@ -21,7 +21,7 @@ import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { ListObjectsAuthorizer } from "./list-objects-authorizer.js";
 import { ListObjectsPageBuilder } from "./list-objects-page-builder.js";
 
-interface ListObjectsCommandHandlerProps {
+interface ListObjectsCommandHandlerProperties {
   readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
@@ -45,12 +45,12 @@ export class ListObjectsCommandHandler implements CommandHandler<
   private readonly pageBuilder = new ListObjectsPageBuilder();
   private readonly background: BackgroundScheduler;
 
-  constructor(props: ListObjectsCommandHandlerProps) {
+  constructor(properties: ListObjectsCommandHandlerProperties) {
     const {
       buckets,
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
-    } = props;
+    } = properties;
 
     this.buckets = buckets;
     this.authorizer = new ListObjectsAuthorizer({ iam });
@@ -65,12 +65,12 @@ export class ListObjectsCommandHandler implements CommandHandler<
    * a denied caller cannot inspect Object keys or sizes.
    */
   async handle(
-    cmd: SimListObjectsCommand,
-    opts?: ListObjectsCommandHandlerOptions,
+    command: SimListObjectsCommand,
+    options?: ListObjectsCommandHandlerOptions,
   ): Promise<SimListObjectsCommandOutput> {
-    assertDefined(cmd.input.Bucket, "ListObjectsCommand.input.Bucket");
+    assertDefined(command.input.Bucket, "ListObjectsCommand.input.Bucket");
 
-    const bucketName = cmd.input.Bucket as SimS3BucketName;
+    const bucketName = command.input.Bucket as SimS3BucketName;
     const bucket = this.buckets.get(bucketName);
     if (bucket === undefined) {
       throw new SimS3NoSuchBucket(`No S3 Bucket named ${bucketName}`);
@@ -79,18 +79,18 @@ export class ListObjectsCommandHandler implements CommandHandler<
     // Complete request sequencing before authorization and storage access.
     await this.background.sequence();
 
-    const maxKeys = cmd.input.MaxKeys ?? 1000;
+    const maxKeys = command.input.MaxKeys ?? 1000;
     this.authorizer.authorize({
       bucket,
-      prefix: cmd.input.Prefix,
+      prefix: command.input.Prefix,
       maxKeys,
-      caller: opts?.caller,
+      caller: options?.caller,
     });
 
     return await this.pageBuilder.build({
       bucket,
-      prefix: cmd.input.Prefix,
-      marker: cmd.input.Marker,
+      prefix: command.input.Prefix,
+      marker: command.input.Marker,
       maxKeys,
     });
   }

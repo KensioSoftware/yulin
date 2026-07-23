@@ -13,7 +13,9 @@ export class SimCffEventAdapter {
   /**
    * Adapt a Request into a ViewerRequestEvent.
    */
-  toViewerRequestEvent(req: Request): CloudFrontFunction.ViewerRequestEvent {
+  toViewerRequestEvent(
+    request: Request,
+  ): CloudFrontFunction.ViewerRequestEvent {
     return {
       context: {
         eventType: "viewer-request",
@@ -22,7 +24,7 @@ export class SimCffEventAdapter {
       viewer: {
         ip: "127.0.0.1",
       },
-      request: this.requestResponseAdapter.toCffRequest(req),
+      request: this.requestResponseAdapter.toCffRequest(request),
     };
   }
 
@@ -30,7 +32,7 @@ export class SimCffEventAdapter {
    * Adapt a Request and Response into a ViewerResponseEvent.
    */
   toViewerResponseEvent(
-    req: Request,
+    request: Request,
     res: Response,
   ): CloudFrontFunction.ViewerResponseEvent {
     return {
@@ -41,7 +43,7 @@ export class SimCffEventAdapter {
       viewer: {
         ip: "127.0.0.1",
       },
-      request: this.requestResponseAdapter.toCffRequest(req),
+      request: this.requestResponseAdapter.toCffRequest(request),
       response: this.requestResponseAdapter.toCffResponse(res),
     };
   }
@@ -51,13 +53,13 @@ export class SimCffEventAdapter {
    */
   fromViewerRequestResult(
     result: CloudFrontFunction.Request | CloudFrontFunction.Response,
-    originalReq: Request,
+    originalRequest: Request,
   ): Request | Response {
     if (this.isCffResponse(result)) {
       return this.requestResponseAdapter.fromCffResponse(result);
     }
 
-    return this.requestResponseAdapter.fromCffRequest(result, originalReq);
+    return this.requestResponseAdapter.fromCffRequest(result, originalRequest);
   }
 
   /**

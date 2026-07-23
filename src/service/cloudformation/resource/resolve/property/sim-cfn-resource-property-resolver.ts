@@ -7,7 +7,7 @@ import type {
 import type { SimCloudFormationResourceCreateContext } from "../../sim-cfn-resource.js";
 import type { SimCfnPseudoParameters } from "../../../parameters/pseudo/sim-cfn-pseudo-parameters.js";
 
-interface SimCfnResourcePropertyResolverProps {
+interface SimCfnResourcePropertyResolverProperties {
   readonly parameters?: SimCfnParameters | undefined;
   readonly pseudoParameters?: SimCfnPseudoParameters | undefined;
 }
@@ -29,9 +29,9 @@ export class SimCfnResourcePropertyResolver {
   private readonly parameters: SimCfnParameters | undefined;
   private readonly pseudoParameters: SimCfnPseudoParameters | undefined;
 
-  constructor(props: SimCfnResourcePropertyResolverProps = {}) {
-    this.parameters = props.parameters;
-    this.pseudoParameters = props.pseudoParameters;
+  constructor(properties: SimCfnResourcePropertyResolverProperties = {}) {
+    this.parameters = properties.parameters;
+    this.pseudoParameters = properties.pseudoParameters;
   }
 
   /**

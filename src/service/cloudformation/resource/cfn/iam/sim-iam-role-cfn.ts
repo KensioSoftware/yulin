@@ -2,7 +2,7 @@ import type { SimCfnTemplateValue } from "../../../template/value/sim-cfn-templa
 import type { SimIamRole } from "../../../../iam/role/sim-iam-role.js";
 import type { SimCfnResourceValueAdapter } from "../sim-cfn-resource-value-adapter.js";
 
-interface SimIamRoleCfnProps {
+interface SimIamRoleCfnProperties {
   readonly role: SimIamRole;
 }
 
@@ -15,8 +15,8 @@ interface SimIamRoleCfnProps {
 export class SimIamRoleCfn implements SimCfnResourceValueAdapter {
   private readonly role: SimIamRole;
 
-  constructor(props: SimIamRoleCfnProps) {
-    this.role = props.role;
+  constructor(properties: SimIamRoleCfnProperties) {
+    this.role = properties.role;
   }
 
   /**

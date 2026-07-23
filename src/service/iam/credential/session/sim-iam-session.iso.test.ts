@@ -4,7 +4,7 @@ import { simIamRoleFactory } from "../../role/sim-iam-role.factory.js";
 import { SimIamSession } from "./sim-iam-session.js";
 
 describe("SimIamSession", () => {
-  const validProps = () => ({
+  const validProperties = () => ({
     principal: {
       kind: "arn" as const,
       arn: "arn:aws:sts::123456789012:assumed-role/ApplicationRole/test-session",
@@ -24,7 +24,7 @@ describe("SimIamSession", () => {
     const error = assertThrowsError(
       () =>
         new SimIamSession({
-          ...validProps(),
+          ...validProperties(),
           sessionName: "",
         }),
     );
@@ -36,7 +36,7 @@ describe("SimIamSession", () => {
     const error = assertThrowsError(
       () =>
         new SimIamSession({
-          ...validProps(),
+          ...validProperties(),
           sessionToken: "",
         }),
     );
@@ -57,7 +57,7 @@ describe("SimIamSession", () => {
     const error = assertThrowsError(
       () =>
         new SimIamSession({
-          ...validProps(),
+          ...validProperties(),
           expiration,
         }),
     );

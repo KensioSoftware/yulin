@@ -34,15 +34,18 @@ export class SimCfnTemplateFileLoader {
    * ready for the deployment workflow.
    */
   async load(
-    props: SimCloudFormationDeployTemplateFileProps | string,
+    properties: SimCloudFormationDeployTemplateFileProps | string,
   ): Promise<SimCfnLoadedTemplateFile> {
-    const templatePath = typeof props === "string" ? props : props.templatePath;
-    const parameters = typeof props === "string" ? undefined : props.parameters;
-    const bindings = typeof props === "string" ? undefined : props.bindings;
+    const templatePath =
+      typeof properties === "string" ? properties : properties.templatePath;
+    const parameters =
+      typeof properties === "string" ? undefined : properties.parameters;
+    const bindings =
+      typeof properties === "string" ? undefined : properties.bindings;
     const stackName =
-      typeof props === "string"
+      typeof properties === "string"
         ? stackNameFromTemplatePath(templatePath)
-        : (props.stackName ?? stackNameFromTemplatePath(templatePath));
+        : (properties.stackName ?? stackNameFromTemplatePath(templatePath));
 
     // eslint-disable-next-line security/detect-non-literal-fs-filename
     const templateBody = await readFile(templatePath, "utf8");

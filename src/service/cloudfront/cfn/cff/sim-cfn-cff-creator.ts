@@ -11,7 +11,7 @@ import type {
 } from "../../cff/sim-cloudfront-function.js";
 import { SimCfnCffCreateInputBuilder } from "./sim-cfn-cff-create-input-builder.js";
 
-interface SimCfnCfFunctionCreatorProps {
+interface SimCfnCfFunctionCreatorProperties {
   readonly cloudFront: SimCloudFront;
 }
 
@@ -33,8 +33,8 @@ interface SimCfnCfFunctionCreatorProps {
 export class SimCfnCffCreator {
   private readonly cloudFront;
 
-  constructor(props: SimCfnCfFunctionCreatorProps) {
-    this.cloudFront = props.cloudFront;
+  constructor(properties: SimCfnCfFunctionCreatorProperties) {
+    this.cloudFront = properties.cloudFront;
   }
 
   /**

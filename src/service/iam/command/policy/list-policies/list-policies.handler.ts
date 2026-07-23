@@ -10,7 +10,7 @@ import type {
   SimListPoliciesCommandOutput,
 } from "./list-policies.cmd.js";
 
-interface ListPoliciesCommandHandlerProps {
+interface ListPoliciesCommandHandlerProperties {
   readonly policies: Map<SimArn, SimIamManagedPolicy>;
   readonly background?: BackgroundScheduler;
 }
@@ -27,8 +27,8 @@ export class ListPoliciesCommandHandler implements CommandHandler<
   private readonly policies: Map<SimArn, SimIamManagedPolicy>;
   private readonly background: BackgroundScheduler;
 
-  constructor(props: ListPoliciesCommandHandlerProps) {
-    const { policies, background = new BackgroundTasks() } = props;
+  constructor(properties: ListPoliciesCommandHandlerProperties) {
+    const { policies, background = new BackgroundTasks() } = properties;
 
     this.policies = policies;
     this.background = background;
@@ -38,18 +38,18 @@ export class ListPoliciesCommandHandler implements CommandHandler<
    * Handle a ListPoliciesCommand from the SDK.
    */
   async handle(
-    cmd: SimListPoliciesCommand,
+    command: SimListPoliciesCommand,
   ): Promise<SimListPoliciesCommandOutput> {
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    const maxItems = cmd.input.MaxItems ?? 100;
-    const policies = this.matchingPolicies(cmd);
+    const maxItems = command.input.MaxItems ?? 100;
+    const policies = this.matchingPolicies(command);
 
     const startArn =
-      cmd.input.Marker === undefined
+      command.input.Marker === undefined
         ? undefined
-        : this.parseMarker(cmd.input.Marker);
+        : this.parseMarker(command.input.Marker);
 
     const startIndex =
       startArn === undefined
@@ -85,30 +85,32 @@ export class ListPoliciesCommandHandler implements CommandHandler<
     };
   }
 
-  private matchingPolicies(cmd: SimListPoliciesCommand): SimIamManagedPolicy[] {
+  private matchingPolicies(
+    command: SimListPoliciesCommand,
+  ): SimIamManagedPolicy[] {
     const policies = this.policies
       .values()
       .toArray()
       .toSorted((a, b) => a.arn.localeCompare(b.arn));
 
     return policies.filter((policy) => {
-      if (cmd.input.Scope === "AWS") {
+      if (command.input.Scope === "AWS") {
         return false;
       }
 
-      if (cmd.input.OnlyAttached === true && policy.attachmentCount === 0) {
+      if (command.input.OnlyAttached === true && policy.attachmentCount === 0) {
         return false;
       }
 
       if (
-        cmd.input.PathPrefix !== undefined &&
-        !policy.path.startsWith(cmd.input.PathPrefix)
+        command.input.PathPrefix !== undefined &&
+        !policy.path.startsWith(command.input.PathPrefix)
       ) {
         return false;
       }
 
       return !(
-        cmd.input.PolicyUsageFilter === "PermissionsBoundary" &&
+        command.input.PolicyUsageFilter === "PermissionsBoundary" &&
         policy.permissionsBoundaryUsageCount === 0
       );
     });

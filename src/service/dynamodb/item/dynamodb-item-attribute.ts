@@ -1,4 +1,4 @@
-import type { SimDynamoDbAttributeValue } from "../command/put-item/put-item.cmd.js";
+import type { SimDynamoDbAttributeValue as SimDynamoDatabaseAttributeValue } from "../command/put-item/put-item.cmd.js";
 import { jsonStringify } from "../../../util/type-guard/json.js";
 
 export type DynamoDBAttrType =
@@ -24,7 +24,7 @@ export class DynamoDBItemAttribute {
    * instance.
    */
   static fromAttributeValue(
-    value: SimDynamoDbAttributeValue,
+    value: SimDynamoDatabaseAttributeValue,
   ): DynamoDBItemAttribute {
     if ("BOOL" in value) {
       return new DynamoDBItemAttribute(value.BOOL);
@@ -52,15 +52,15 @@ export class DynamoDBItemAttribute {
     }
     if ("L" in value) {
       return new DynamoDBItemAttribute(
-        value.L.map((el) => this.fromAttributeValue(el).value),
+        value.L.map((element) => this.fromAttributeValue(element).value),
       );
     }
     if ("M" in value) {
       return new DynamoDBItemAttribute(
         Object.fromEntries(
-          Object.entries(value.M).map(([key, val]) => [
+          Object.entries(value.M).map(([key, value]) => [
             key,
-            this.fromAttributeValue(val).value,
+            this.fromAttributeValue(value).value,
           ]),
         ),
       );
@@ -71,7 +71,7 @@ export class DynamoDBItemAttribute {
   /**
    * Convert this DynamoDBItemAttribute to a DynamoDB AttributeValue structure.
    */
-  toAttributeValue(): SimDynamoDbAttributeValue {
+  toAttributeValue(): SimDynamoDatabaseAttributeValue {
     const value = this.value;
 
     if (value === null) {
@@ -91,8 +91,8 @@ export class DynamoDBItemAttribute {
     }
     if (Array.isArray(value)) {
       return {
-        L: value.map((el) => {
-          const itemAttribute = new DynamoDBItemAttribute(el);
+        L: value.map((element) => {
+          const itemAttribute = new DynamoDBItemAttribute(element);
           return itemAttribute.toAttributeValue();
         }),
       };
@@ -110,8 +110,8 @@ export class DynamoDBItemAttribute {
 
     return {
       M: Object.fromEntries(
-        Object.entries(value).map(([key, val]) => {
-          const itemAttribute = new DynamoDBItemAttribute(val);
+        Object.entries(value).map(([key, value]) => {
+          const itemAttribute = new DynamoDBItemAttribute(value);
           return [key, itemAttribute.toAttributeValue()];
         }),
       ),

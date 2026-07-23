@@ -146,12 +146,12 @@ describe("SimCfnResource", () => {
     // When explicit creation status helpers are used.
     resource.markCreateInProgress();
     const inProgressStatus = resource.status;
-    const inProgressDeployed = resource.deployed;
-    const inProgressCreateComplete = resource.createComplete;
+    const isInProgressDeployed = resource.deployed;
+    const isInProgressCreateComplete = resource.createComplete;
 
     resource.markCreateFailed(createError);
     const failedStatus = resource.status;
-    const failedCreateComplete = resource.createComplete;
+    const isFailedCreateComplete = resource.createComplete;
     const failedError = resource.error;
 
     resource.markCreateComplete(originalSimResource);
@@ -166,11 +166,11 @@ describe("SimCfnResource", () => {
     // Then each helper updates status, terminal flags, error and sim Resource
     // state consistently.
     assertIdentical(inProgressStatus, "CREATE_IN_PROGRESS");
-    assertFalse(inProgressDeployed);
-    assertFalse(inProgressCreateComplete);
+    assertFalse(isInProgressDeployed);
+    assertFalse(isInProgressCreateComplete);
 
     assertIdentical(failedStatus, "CREATE_FAILED");
-    assertTrue(failedCreateComplete);
+    assertTrue(isFailedCreateComplete);
     assertIdentical(failedError, createError);
 
     assertIdentical(completeWithOriginal, originalSimResource);

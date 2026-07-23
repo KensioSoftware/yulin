@@ -3,7 +3,7 @@ import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-regi
 import { SimCfnResource } from "../../resource/sim-cfn-resource.js";
 import type { SimCfnTemplate } from "../../template/sim-cfn-template.js";
 
-interface MakeSimCfnStackResourceMapProps {
+interface MakeSimCfnStackResourceMapProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly background: BackgroundScheduler;
   readonly template: SimCfnTemplate;
@@ -13,9 +13,9 @@ interface MakeSimCfnStackResourceMapProps {
  * Build simulated CloudFormation Stack resources from a template.
  */
 export function makeSimCfnStackResourceMap(
-  props: MakeSimCfnStackResourceMapProps,
+  properties: MakeSimCfnStackResourceMapProperties,
 ): Map<string, SimCfnResource> {
-  const { accountRegionScope, background, template } = props;
+  const { accountRegionScope, background, template } = properties;
   const resources = new Map<string, SimCfnResource>();
 
   const resourceTemplates = template.resourceTemplates();

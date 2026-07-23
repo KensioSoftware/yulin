@@ -21,14 +21,14 @@ import type {
 import { DescribeStacksCommandHandler } from "./command/describe-stacks/describe-stacks.handler.js";
 import type { SimCdkOutContext } from "./cdk/sim-cdk-out-context.js";
 import {
-  type SimCloudFormationCreateStackProps,
+  type SimCloudFormationCreateStackProps as SimCloudFormationCreateStackProperties,
   SimCloudFormationTemplateDeployer,
 } from "./deploy/sim-cfn-template-deployer.js";
-import type { SimCloudFormationDeployTemplateFileProps } from "./deploy/sim-cfn-template-file-loader.js";
+import type { SimCloudFormationDeployTemplateFileProps as SimCloudFormationDeployTemplateFileProperties } from "./deploy/sim-cfn-template-file-loader.js";
 import type { SimCfnExecutableResourceBinding } from "./bind/sim-cfn-exec-binding.type.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 
-interface SimCloudFormationProps {
+interface SimCloudFormationProperties {
   readonly simAws: SimAws;
   readonly accountRegionScope?: SimAwsAccountRegionScope;
   readonly background: BackgroundScheduler & BackgroundCompleter;
@@ -45,12 +45,12 @@ export class SimCloudFormation {
   private readonly stacks = new Map<SimCloudFormationStackName, SimCfnStack>();
   private readonly templateDeployer: SimCloudFormationTemplateDeployer;
 
-  constructor(props: SimCloudFormationProps) {
+  constructor(properties: SimCloudFormationProperties) {
     const {
       simAws,
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       background,
-    } = props;
+    } = properties;
 
     this.simAws = simAws;
     this.background = background;
@@ -76,22 +76,22 @@ export class SimCloudFormation {
    * Handle a Create Stack Command from the SDK.
    */
   async createStack(
-    cmd: SimCreateStackCommand,
+    command: SimCreateStackCommand,
   ): Promise<SimCreateStackCommandOutput> {
-    return await this.createStackWithContext(cmd);
+    return await this.createStackWithContext(command);
   }
 
   /**
    * Handle a Describe Stacks Command from the SDK.
    */
   async describeStacks(
-    cmd: SimDescribeStacksCommand,
+    command: SimDescribeStacksCommand,
   ): Promise<SimDescribeStacksCommandOutput> {
     const handler = new DescribeStacksCommandHandler({
       stacks: this.stacks,
       background: this.background,
     });
-    return await handler.handle(cmd);
+    return await handler.handle(command);
   }
 
   /**
@@ -111,9 +111,9 @@ export class SimCloudFormation {
    * Stack from a parsed template object.
    */
   async deployTemplate(
-    props: SimCloudFormationCreateStackProps,
+    properties: SimCloudFormationCreateStackProperties,
   ): Promise<SimCfnStack> {
-    return await this.templateDeployer.deployTemplate(props);
+    return await this.templateDeployer.deployTemplate(properties);
   }
 
   /**
@@ -121,13 +121,13 @@ export class SimCloudFormation {
    * Stack from a synthesized CDK template file.
    */
   async deployTemplateFile(
-    props: SimCloudFormationDeployTemplateFileProps | string,
+    properties: SimCloudFormationDeployTemplateFileProperties | string,
   ): Promise<SimCfnStack> {
-    return await this.templateDeployer.deployTemplateFile(props);
+    return await this.templateDeployer.deployTemplateFile(properties);
   }
 
   private async createStackWithContext(
-    cmd: SimCreateStackCommand,
+    command: SimCreateStackCommand,
     cdkOutContext?: SimCdkOutContext,
     bindings?: readonly SimCfnExecutableResourceBinding[],
   ): Promise<SimCreateStackCommandOutput> {
@@ -139,6 +139,6 @@ export class SimCloudFormation {
       cdkOutContext,
       bindings,
     });
-    return await handler.handle(cmd);
+    return await handler.handle(command);
   }
 }

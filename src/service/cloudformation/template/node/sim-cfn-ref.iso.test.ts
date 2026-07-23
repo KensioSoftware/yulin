@@ -12,7 +12,7 @@ import { SimS3Bucket } from "../../../s3/bucket/sim-s3-bucket.js";
 describe("CloudFormation Ref Resource value", () => {
   it("preserves an S3 Bucket Resource Ref in stored Resource properties", async () => {
     // Given a template where a WaitConditionHandle property Refs an S3 Bucket.
-    const refTemplate = {
+    const referenceTemplate = {
       Resources: {
         SourceBucket: {
           Type: "AWS::S3::Bucket",
@@ -35,7 +35,7 @@ describe("CloudFormation Ref Resource value", () => {
     const simAws = new SimAws();
     const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "test-stack",
-      template: refTemplate,
+      template: referenceTemplate,
     });
 
     // Then both Resources are created successfully.
@@ -68,7 +68,7 @@ describe("CloudFormation Ref Resource value", () => {
   it("resolves a Resource Ref inside Fn::Join when creating another Resource", async () => {
     // Given a template where one S3 Bucket name is built from a Ref to another
     // S3 Bucket Resource.
-    const refJoinTemplate = {
+    const referenceJoinTemplate = {
       Resources: {
         SourceBucket: {
           Type: "AWS::S3::Bucket",
@@ -91,7 +91,7 @@ describe("CloudFormation Ref Resource value", () => {
     const simAws = new SimAws();
     const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "test-stack",
-      template: refJoinTemplate,
+      template: referenceJoinTemplate,
     });
 
     // Then the Resource Ref resolves to the source Bucket name during creation of
@@ -122,7 +122,7 @@ describe("CloudFormation Ref Resource value", () => {
   it("resolves Parameter and Resource Refs together inside Fn::Join", async () => {
     // Given a template where a Bucket name combines an up-front Parameter Ref
     // with a Resource Ref that must be deferred until Resource creation.
-    const mixedRefJoinTemplate = {
+    const mixedReferenceJoinTemplate = {
       Parameters: {
         BucketPrefix: {
           Type: "String",
@@ -153,7 +153,7 @@ describe("CloudFormation Ref Resource value", () => {
     const simAws = new SimAws();
     const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "test-stack",
-      template: mixedRefJoinTemplate,
+      template: mixedReferenceJoinTemplate,
       parameters: {
         BucketPrefix: "prefix",
       },
@@ -186,7 +186,7 @@ describe("CloudFormation Ref Resource value", () => {
 
   it("resolves multiple Resource Refs inside the same Fn::Join", async () => {
     // Given a template where one Bucket name depends on multiple Resource Refs.
-    const multipleResourceRefJoinTemplate = {
+    const multipleResourceReferenceJoinTemplate = {
       Resources: {
         FirstBucket: {
           Type: "AWS::S3::Bucket",
@@ -218,7 +218,7 @@ describe("CloudFormation Ref Resource value", () => {
     const simAws = new SimAws();
     const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "test-stack",
-      template: multipleResourceRefJoinTemplate,
+      template: multipleResourceReferenceJoinTemplate,
     });
 
     // Then both Resource Refs resolve before the dependent Bucket is created.

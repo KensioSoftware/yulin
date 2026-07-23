@@ -4,8 +4,8 @@ import type {
   SimListTablesCommandOutput,
 } from "./list-tables.cmd.js";
 import type {
-  DynamoDbTableName,
-  SimDynamoDbTable,
+  DynamoDbTableName as DynamoDatabaseTableName,
+  SimDynamoDbTable as SimDynamoDatabaseTable,
 } from "../../table/sim-dynamodb-table.js";
 import {
   type BackgroundScheduler,
@@ -18,8 +18,8 @@ import {
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { ListTablesAuthorizer } from "./list-tables-authorizer.js";
 
-interface ListTablesCommandHandlerProps {
-  readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>;
+interface ListTablesCommandHandlerProperties {
+  readonly tables: Map<DynamoDatabaseTableName, SimDynamoDatabaseTable>;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
 }
@@ -37,16 +37,16 @@ export class ListTablesCommandHandler implements CommandHandler<
   SimListTablesCommand,
   SimListTablesCommandOutput
 > {
-  private readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>;
+  private readonly tables: Map<DynamoDatabaseTableName, SimDynamoDatabaseTable>;
   private readonly authorizer: ListTablesAuthorizer;
   private readonly background: BackgroundScheduler;
 
-  constructor(props: ListTablesCommandHandlerProps) {
+  constructor(properties: ListTablesCommandHandlerProperties) {
     const {
       tables,
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
-    } = props;
+    } = properties;
     this.tables = tables;
     this.authorizer = new ListTablesAuthorizer({ iam });
     this.background = background;
@@ -56,19 +56,19 @@ export class ListTablesCommandHandler implements CommandHandler<
    * Simulate listing DynamoDB Tables.
    */
   async handle(
-    cmd: SimListTablesCommand,
-    opts?: ListTablesCommandHandlerOptions,
+    command: SimListTablesCommand,
+    options?: ListTablesCommandHandlerOptions,
   ): Promise<SimListTablesCommandOutput> {
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    this.authorizer.authorize(opts?.caller);
+    this.authorizer.authorize(options?.caller);
 
     const tables = this.tables.values().toArray();
     tables.sort((a, b) => a.tableName.localeCompare(b.tableName));
 
-    const exclusiveStartTableName = cmd.input.ExclusiveStartTableName;
-    const limit = cmd.input.Limit ?? 100;
+    const exclusiveStartTableName = command.input.ExclusiveStartTableName;
+    const limit = command.input.Limit ?? 100;
 
     const startIndex =
       exclusiveStartTableName === undefined

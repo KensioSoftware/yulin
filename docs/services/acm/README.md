@@ -143,7 +143,8 @@ const certificate = describeOutput.Certificate;
 console.log(certificate?.DomainName);
 console.log(certificate?.Status);
 
-for (const validation of certificate?.DomainValidationOptions ?? []) {
+const domainValidationOptions = certificate?.DomainValidationOptions ?? [];
+for (const validation of domainValidationOptions) {
   console.log(validation.DomainName);
   console.log(validation.ValidationMethod);
   console.log(validation.ResourceRecord?.Name);
@@ -268,7 +269,8 @@ const listOutput = await acm.listCertificates(
   }),
 );
 
-for (const summary of listOutput.CertificateSummaryList ?? []) {
+const certificateSummaries = listOutput.CertificateSummaryList ?? [];
+for (const summary of certificateSummaries) {
   console.log(summary.CertificateArn);
   console.log(summary.DomainName);
   console.log(summary.Status);

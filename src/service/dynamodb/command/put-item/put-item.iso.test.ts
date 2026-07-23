@@ -147,16 +147,16 @@ describe("DynamoDB PutItemCommand", () => {
     "puts new $name Item attribute into DynamoDB Table, returns attributes",
     async ({ item, assertAttribute }) => {
       const simAws = new SimAws();
-      const simDynamoDb = simAws.dynamoDb();
+      const simDynamoDatabase = simAws.dynamoDb();
 
-      await simDynamoDb.createTable(
+      await simDynamoDatabase.createTable(
         new CreateTableCommand({
           TableName: "FooTable",
           KeySchema: [{ AttributeName: "userId", KeyType: "HASH" }],
         }),
       );
 
-      const putItemOutput = await simDynamoDb.putItem(
+      const putItemOutput = await simDynamoDatabase.putItem(
         new PutItemCommand({
           TableName: "FooTable",
           Item: {
@@ -181,9 +181,9 @@ describe("DynamoDB PutItemCommand", () => {
   it("puts new Item into DynamoDB Table with partition key + sort key", async () => {
     const simAws = new SimAws();
 
-    const simDynamoDb = simAws.dynamoDb();
+    const simDynamoDatabase = simAws.dynamoDb();
 
-    await simDynamoDb.createTable(
+    await simDynamoDatabase.createTable(
       new CreateTableCommand({
         TableName: "FooTable",
         KeySchema: [
@@ -193,7 +193,7 @@ describe("DynamoDB PutItemCommand", () => {
       }),
     );
 
-    const putItemOutput = await simDynamoDb.putItem(
+    const putItemOutput = await simDynamoDatabase.putItem(
       new PutItemCommand({
         TableName: "FooTable",
         Item: {

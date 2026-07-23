@@ -8,7 +8,7 @@ import {
 } from "@kensio/smartass";
 import { FilesystemS3BucketStorage } from "./s3-filesystem-storage.js";
 import { SimS3Object } from "../../object/s3-object.js";
-import { TempDir } from "../../../../util/filesystem/temp-dir.js";
+import { TemporaryDirectory as TemporaryDirectory } from "../../../../util/filesystem/temporary-directory.js";
 
 describe("Filesystem simulated S3 storage safety", () => {
   it("rejects relative storage directory path", () => {
@@ -39,7 +39,7 @@ describe("Filesystem simulated S3 storage safety", () => {
   });
 
   it("rejects storage directory path with parent directory segment", async () => {
-    const testDir = new TempDir();
+    const testDir = new TemporaryDirectory();
     await testDir.resolvePath();
 
     const error = assertThrowsError(
@@ -53,7 +53,7 @@ describe("Filesystem simulated S3 storage safety", () => {
   });
 
   it("rejects storage directory path with unsafe directory name", async () => {
-    const testDir = new TempDir();
+    const testDir = new TemporaryDirectory();
     await testDir.resolvePath();
     const directoryPath = testDir.join("private");
 
@@ -65,7 +65,7 @@ describe("Filesystem simulated S3 storage safety", () => {
   });
 
   it("rejects Object key with parent directory segment", async () => {
-    const testDir = new TempDir();
+    const testDir = new TemporaryDirectory();
     await testDir.resolvePath();
     const storage = new FilesystemS3BucketStorage({
       directoryPath: testDir.join("public"),
@@ -81,7 +81,7 @@ describe("Filesystem simulated S3 storage safety", () => {
   });
 
   it("rejects absolute Object key", async () => {
-    const testDir = new TempDir();
+    const testDir = new TemporaryDirectory();
     await testDir.resolvePath();
     const storage = new FilesystemS3BucketStorage({
       directoryPath: testDir.join("public"),
@@ -100,7 +100,7 @@ describe("Filesystem simulated S3 storage safety", () => {
   });
 
   it("rejects Object key with unsupported file extension", async () => {
-    const testDir = new TempDir();
+    const testDir = new TemporaryDirectory();
     await testDir.resolvePath();
     const storage = new FilesystemS3BucketStorage({
       directoryPath: testDir.join("public"),

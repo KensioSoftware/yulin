@@ -12,7 +12,7 @@ import type {
 } from "./create-user.cmd.js";
 import { CreateUserRecordFactory } from "./create-user-record-factory.js";
 
-interface CreateUserCommandHandlerProps {
+interface CreateUserCommandHandlerProperties {
   readonly accountId: SimAwsAccountId;
   readonly users: Map<SimIamUsername, SimIamUser>;
   readonly background?: BackgroundScheduler;
@@ -30,23 +30,25 @@ export class CreateUserCommandHandler implements CommandHandler<
   private readonly background: BackgroundScheduler;
   private readonly userFactory = new CreateUserRecordFactory();
 
-  constructor(props: CreateUserCommandHandlerProps) {
-    this.accountId = props.accountId;
-    this.users = props.users;
-    this.background = props.background ?? new BackgroundTasks();
+  constructor(properties: CreateUserCommandHandlerProperties) {
+    this.accountId = properties.accountId;
+    this.users = properties.users;
+    this.background = properties.background ?? new BackgroundTasks();
   }
 
   /**
    * Handle a Create User Command from the SDK.
    */
-  async handle(cmd: SimCreateUserCommand): Promise<SimCreateUserCommandOutput> {
-    const username = cmd.input.UserName as SimIamUsername | undefined;
+  async handle(
+    command: SimCreateUserCommand,
+  ): Promise<SimCreateUserCommandOutput> {
+    const username = command.input.UserName as SimIamUsername | undefined;
 
     if (username === undefined || username.length === 0) {
       throw new Error("UserName is required");
     }
 
-    const path = normaliseUserPath(cmd.input.Path);
+    const path = normaliseUserPath(command.input.Path);
     const arn = makeSimUserArn({
       accountId: this.accountId,
       path,

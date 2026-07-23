@@ -11,7 +11,7 @@ import type {
 } from "./create-policy.cmd.js";
 import type { JSONString } from "../../../../../util/type-guard/json.js";
 
-interface CreatePolicyRecordFactoryProps {
+interface CreatePolicyRecordFactoryProperties {
   readonly arn: SimArn;
   readonly path: string;
   readonly policyName: SimIamPolicyName;
@@ -34,8 +34,10 @@ export class CreatePolicyRecordFactory {
    * created IAM policy has not had a later update event. The default version
    * starts at v1, matching IAM's managed policy version model.
    */
-  makePolicy(props: CreatePolicyRecordFactoryProps): SimIamManagedPolicy {
-    const { arn, path, policyName, cmd } = props;
+  makePolicy(
+    properties: CreatePolicyRecordFactoryProperties,
+  ): SimIamManagedPolicy {
+    const { arn, path, policyName, cmd } = properties;
     const now = new Date();
 
     return {

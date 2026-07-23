@@ -31,7 +31,8 @@ const certificate = describeOutput.Certificate;
 console.log(certificate?.DomainName);
 console.log(certificate?.Status);
 
-for (const validation of certificate?.DomainValidationOptions ?? []) {
+const domainValidationOptions = certificate?.DomainValidationOptions ?? [];
+for (const validation of domainValidationOptions) {
   console.log(validation.DomainName);
   console.log(validation.ValidationMethod);
   console.log(validation.ResourceRecord?.Name);

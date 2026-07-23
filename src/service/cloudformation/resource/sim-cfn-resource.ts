@@ -77,7 +77,7 @@ export class SimCfnResource<T extends object = object> {
   private readonly cfnResourceFactory: SimCfnServiceResourceFactory | undefined;
   private readonly resourceLogicalIds: ReadonlySet<string>;
 
-  constructor(props: SimCloudFormationResourceProps = {}) {
+  constructor(properties: SimCloudFormationResourceProps = {}) {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       background = new BackgroundTasks(),
@@ -86,7 +86,7 @@ export class SimCfnResource<T extends object = object> {
       cfnResourceFactory,
       parameters,
       resourceLogicalIds = new Set(),
-    } = props;
+    } = properties;
 
     this.accountRegionScope = accountRegionScope;
     this.background = background;

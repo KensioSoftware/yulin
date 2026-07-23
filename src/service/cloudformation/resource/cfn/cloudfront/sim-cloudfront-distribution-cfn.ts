@@ -2,7 +2,7 @@ import type { SimCfnTemplateValue } from "../../../template/value/sim-cfn-templa
 import type { SimCloudFrontDistribution } from "../../../../cloudfront/distribution/sim-cloudfront-distribution.js";
 import type { SimCfnResourceValueAdapter } from "../sim-cfn-resource-value-adapter.js";
 
-interface SimCloudFrontDistributionCfnProps {
+interface SimCloudFrontDistributionCfnProperties {
   readonly distro: SimCloudFrontDistribution;
 }
 
@@ -12,8 +12,8 @@ interface SimCloudFrontDistributionCfnProps {
 export class SimCloudFrontDistributionCfn implements SimCfnResourceValueAdapter {
   private readonly distro: SimCloudFrontDistribution;
 
-  constructor(props: SimCloudFrontDistributionCfnProps) {
-    this.distro = props.distro;
+  constructor(properties: SimCloudFrontDistributionCfnProperties) {
+    this.distro = properties.distro;
   }
 
   /**

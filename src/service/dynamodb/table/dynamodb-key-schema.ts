@@ -1,19 +1,20 @@
 import { assertDefined } from "../../../util/type-guard/defined.js";
-import type { DynamoDBAttrType } from "../item/dynamodb-item-attribute.js";
-import type { DynamoDbItem } from "../item/dynamodb-item.js";
+import type { DynamoDBAttrType as DynamoDBAttributeType } from "../item/dynamodb-item-attribute.js";
+import type { DynamoDbItem as DynamoDatabaseItem } from "../item/dynamodb-item.js";
 import type {
   SimCreateTableCommandInput,
-  SimDynamoDbKeySchemaElement,
-  SimDynamoDbKeyType,
+  SimDynamoDbKeySchemaElement as SimDynamoDatabaseKeySchemaElement,
+  SimDynamoDbKeyType as SimDynamoDatabaseKeyType,
 } from "../command/create-table/create-table.cmd.js";
 import { jsonStringify } from "../../../util/type-guard/json.js";
 
-type DynamoDbKey = number | string;
+type DynamoDatabaseKey = number | string;
 
-type RequiredSimDynamoDbKeySchemaElement = SimDynamoDbKeySchemaElement & {
-  readonly AttributeName: string;
-  readonly KeyType: SimDynamoDbKeyType;
-};
+type RequiredSimDynamoDatabaseKeySchemaElement =
+  SimDynamoDatabaseKeySchemaElement & {
+    readonly AttributeName: string;
+    readonly KeyType: SimDynamoDatabaseKeyType;
+  };
 
 /**
  * Simulated DynamoDB table key schema.
@@ -33,36 +34,36 @@ export class DynamoDbKeySchema {
   /**
    * Make a primary key string for an item based on this key schema.
    */
-  makeItemKey(item: DynamoDbItem): string {
-    const partitionKeyAttr = item.attributes[this.hashKeyAttributeName];
+  makeItemKey(item: DynamoDatabaseItem): string {
+    const partitionKeyAttribute = item.attributes[this.hashKeyAttributeName];
     assertDefined(
-      partitionKeyAttr,
+      partitionKeyAttribute,
       `DynamoDB Item partition key ${this.hashKeyAttributeName} required`,
     );
-    const partitionKey = partitionKeyAttr.value;
+    const partitionKey = partitionKeyAttribute.value;
     if (!this.canBeDynamoDbKey(partitionKey)) {
       throw new TypeError(
         `DynamoDB Item partition key ${this.hashKeyAttributeName} must be string or number`,
       );
     }
 
-    const keyParts: Record<string, DynamoDbKey> = {
+    const keyParts: Record<string, DynamoDatabaseKey> = {
       [this.hashKeyAttributeName]: partitionKey,
     };
 
     if (this.rangeKeyAttributeName !== undefined) {
-      const sortKeyAttr = item.attributes[this.rangeKeyAttributeName];
-      if (sortKeyAttr === undefined) {
+      const sortKeyAttribute = item.attributes[this.rangeKeyAttributeName];
+      if (sortKeyAttribute === undefined) {
         throw new TypeError(
           `DynamoDB Item sort key ${this.rangeKeyAttributeName} is undefined`,
         );
       }
-      if (!this.canBeDynamoDbKey(sortKeyAttr.value)) {
+      if (!this.canBeDynamoDbKey(sortKeyAttribute.value)) {
         throw new TypeError(
           `DynamoDB Item sort key ${this.rangeKeyAttributeName} must be string or number`,
         );
       }
-      keyParts[this.rangeKeyAttributeName] = sortKeyAttr.value;
+      keyParts[this.rangeKeyAttributeName] = sortKeyAttribute.value;
     }
 
     return jsonStringify(keyParts);
@@ -71,14 +72,16 @@ export class DynamoDbKeySchema {
   /**
    * Check if a given value can be used as a DynamoDB partition key or sort key.
    */
-  private canBeDynamoDbKey(value: DynamoDBAttrType): value is DynamoDbKey {
+  private canBeDynamoDbKey(
+    value: DynamoDBAttributeType,
+  ): value is DynamoDatabaseKey {
     return typeof value === "string" || typeof value === "number";
   }
 
   private requiredKeySchemaElement(
     createTableInput: SimCreateTableCommandInput,
-    keyType: SimDynamoDbKeyType,
-  ): RequiredSimDynamoDbKeySchemaElement {
+    keyType: SimDynamoDatabaseKeyType,
+  ): RequiredSimDynamoDatabaseKeySchemaElement {
     const keySchemaElement = this.keySchemaElement(createTableInput, keyType);
 
     assertDefined(keySchemaElement, `DynamoDB Table ${keyType} key schema`);
@@ -88,12 +91,12 @@ export class DynamoDbKeySchema {
 
   private keySchemaElement(
     createTableInput: SimCreateTableCommandInput,
-    keyType: SimDynamoDbKeyType,
-  ): RequiredSimDynamoDbKeySchemaElement | undefined {
+    keyType: SimDynamoDatabaseKeyType,
+  ): RequiredSimDynamoDatabaseKeySchemaElement | undefined {
     return createTableInput.KeySchema?.find(
       (
         keySchemaElement,
-      ): keySchemaElement is RequiredSimDynamoDbKeySchemaElement =>
+      ): keySchemaElement is RequiredSimDynamoDatabaseKeySchemaElement =>
         keySchemaElement.KeyType === keyType &&
         keySchemaElement.AttributeName !== undefined,
     );

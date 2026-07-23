@@ -19,7 +19,7 @@ import type {
 } from "./describe-certificate.cmd.js";
 import { SimAcmCertificateDetailFactory } from "./sim-acm-cert-detail-factory.js";
 
-interface DescribeCertificateCommandHandlerProps {
+interface DescribeCertificateCommandHandlerProperties {
   readonly certificates: Map<SimArn, SimAcmCertificate>;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
@@ -44,12 +44,12 @@ export class DescribeCertificateCommandHandler implements CommandHandler<
   private readonly certificateDetailFactory =
     new SimAcmCertificateDetailFactory();
 
-  constructor(props: DescribeCertificateCommandHandlerProps) {
+  constructor(properties: DescribeCertificateCommandHandlerProperties) {
     const {
       certificates,
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
-    } = props;
+    } = properties;
 
     this.certificates = certificates;
     this.authorizer = new DescribeCertificateAuthorizer({ iam });
@@ -65,25 +65,25 @@ export class DescribeCertificateCommandHandler implements CommandHandler<
    * whether the requested ARN exists.
    */
   async handle(
-    cmd: SimDescribeCertificateCommand,
-    opts?: DescribeCertificateCommandHandlerOptions,
+    command: SimDescribeCertificateCommand,
+    options?: DescribeCertificateCommandHandlerOptions,
   ): Promise<SimDescribeCertificateCommandOutput> {
     assertDefined(
-      cmd.input.CertificateArn,
+      command.input.CertificateArn,
       "DescribeCertificateCommand.input.CertificateArn required",
     );
 
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    this.authorizer.authorize(cmd.input.CertificateArn, opts?.caller);
+    this.authorizer.authorize(command.input.CertificateArn, options?.caller);
 
     const certificate = this.certificates.get(
-      cmd.input.CertificateArn as SimArn,
+      command.input.CertificateArn as SimArn,
     );
     if (certificate === undefined) {
       throw new SimAcmResourceNotFoundException(
-        `No sim ACM Certificate with ARN ${cmd.input.CertificateArn}`,
+        `No sim ACM Certificate with ARN ${command.input.CertificateArn}`,
       );
     }
 

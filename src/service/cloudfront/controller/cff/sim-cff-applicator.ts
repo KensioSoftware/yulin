@@ -11,12 +11,12 @@ export class SimCffApplicator {
    */
   applyViewerRequest(
     cloudFront: SimCloudFront,
-    req: Request,
+    request: Request,
     behaviour: SimCloudFrontBehavior,
   ): Request | Response {
     const viewerRequestCffArn = behaviour.functionAssociations?.viewerRequest;
     if (viewerRequestCffArn === undefined) {
-      return req;
+      return request;
     }
 
     const viewerRequestCff =
@@ -26,7 +26,7 @@ export class SimCffApplicator {
       `CloudFront Function ${viewerRequestCffArn} for viewer-request`,
     );
 
-    return viewerRequestCff.handleViewerRequest(req);
+    return viewerRequestCff.handleViewerRequest(request);
   }
 
   /**
@@ -34,7 +34,7 @@ export class SimCffApplicator {
    */
   applyViewerResponse(
     cloudFront: SimCloudFront,
-    req: Request,
+    request: Request,
     res: Response,
     behaviour: SimCloudFrontBehavior,
   ): Response {
@@ -50,6 +50,6 @@ export class SimCffApplicator {
       `CloudFront Function ${viewerResponseCffArn} for viewer-response`,
     );
 
-    return viewerResponseCff.handleViewerResponse(req, res);
+    return viewerResponseCff.handleViewerResponse(request, res);
   }
 }
