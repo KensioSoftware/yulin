@@ -10,7 +10,7 @@ import {
   simCfnCffFunctionConfig,
   type SimCfnCffFunctionConfig,
 } from "./sim-cfn-cff-function-config.js";
-import { SimCfnCffBindingFinder } from "../../../cloudformation/bind/validate/sim-cfn-exec-binding-finder.js";
+import { findSimCfnCffBinding } from "./sim-cfn-cff-binding-lookup.js";
 
 interface SimCfnCfFunctionCreateInputBuilderProperties {
   readonly resource: SimCfnResource;
@@ -64,11 +64,11 @@ export class SimCfnCffCreateInputBuilder {
   build(): SimCfnCfFunctionCreateInput {
     const functionCodeValue = this.functionCode();
     const cffName = this.cffName();
-    const bindingFinder = new SimCfnCffBindingFinder({
+    const binding = findSimCfnCffBinding({
       resource: this.resource,
       bindings: this.bindings,
+      cffName,
     });
-    const binding = bindingFinder.findBinding(cffName);
 
     return {
       Name: cffName,

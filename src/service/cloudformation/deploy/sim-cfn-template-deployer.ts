@@ -6,7 +6,10 @@ import type { CfnTemplateBodyRecord } from "../template/sim-cfn-template.js";
 import { jsonStringify } from "../../../util/type-guard/json.js";
 import { assertDefined } from "../../../util/type-guard/defined.js";
 import type { SimCdkOutContext } from "../cdk/sim-cdk-out-context.js";
-import { SimCfnTemplateFileLoader } from "./sim-cfn-template-file-loader.js";
+import {
+  SimCfnTemplateFileLoader,
+  type SimCloudFormationDeployTemplateFileProps as SimCloudFormationDeployTemplateFileProperties,
+} from "./sim-cfn-template-file-loader.js";
 import type { SimCfnExecutableResourceBinding } from "../bind/sim-cfn-exec-binding.type.js";
 import type { SimAws } from "../../aws/sim-aws.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
@@ -25,11 +28,7 @@ export interface SimCloudFormationCreateStackProps {
   readonly bindings?: readonly SimCfnExecutableResourceBinding[] | undefined;
 }
 
-export interface SimCloudFormationDeployTemplateFileProps {
-  readonly templatePath: string;
-  readonly stackName?: SimCloudFormationStackName | string | undefined;
-  readonly parameters?: Record<string, string> | undefined;
-}
+export type { SimCloudFormationDeployTemplateFileProps } from "./sim-cfn-template-file-loader.js";
 
 interface SimCloudFormationTemplateDeployerProperties {
   readonly simAws: SimAws;
@@ -82,7 +81,7 @@ export class SimCloudFormationTemplateDeployer {
    * template file.
    */
   async deployTemplateFile(
-    properties: SimCloudFormationDeployTemplateFileProps | string,
+    properties: SimCloudFormationDeployTemplateFileProperties | string,
   ): Promise<SimCfnStack> {
     return await this.deployTemplateWithContext(
       await this.templateFileLoader.load(properties),

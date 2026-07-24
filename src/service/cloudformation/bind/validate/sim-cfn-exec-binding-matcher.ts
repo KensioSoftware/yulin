@@ -1,3 +1,4 @@
+import { simLambdaFunctionArn } from "../../../lambda/function/sim-lambda-function.js";
 import type { SimCfnResource } from "../../resource/sim-cfn-resource.js";
 import type { SimCfnExecutableResourceBinding } from "../sim-cfn-exec-binding.type.js";
 
@@ -35,9 +36,11 @@ export class SimCfnExecutableResourceBindingMatcher {
    * Each binding variant uses the most natural identifier available:
    *
    * - `logicalId` checks the synthesized logical ID and the CDK construct ID.
-   * - `functionName` checks the CloudFront Function Name property, falling
-   *   back to the logical ID because CloudFront Functions can omit Name.
-   * - `arn` reconstructs the simulator's CloudFront Function ARN format.
+   * - `functionName` checks the CloudFront Function Name or Lambda
+   *   FunctionName property, falling back to the logical ID because both can
+   *   omit an explicit name.
+   * - `arn` reconstructs the simulator's CloudFront Function or Lambda
+   *   function ARN format.
    * - `cdkPath` checks CDK metadata emitted into the synthesized template.
    */
   matches(binding: SimCfnExecutableResourceBinding): boolean {
@@ -50,13 +53,13 @@ export class SimCfnExecutableResourceBindingMatcher {
     if ("functionName" in binding) {
       return this.#resources.some(
         (resource) =>
-          this.#cloudFrontFunctionName(resource) === binding.functionName,
+          this.#executableFunctionName(resource) === binding.functionName,
       );
     }
 
     if ("arn" in binding) {
       return this.#resources.some(
-        (resource) => this.#cloudFrontFunctionArn(resource) === binding.arn,
+        (resource) => this.#executableFunctionArn(resource) === binding.arn,
       );
     }
 
@@ -86,36 +89,61 @@ export class SimCfnExecutableResourceBindingMatcher {
     );
   }
 
-  #cloudFrontFunctionName(resource: SimCfnResource): string | undefined {
-    if (resource.type !== "AWS::CloudFront::Function") {
+  /**
+   * The name an executable function Resource resolves to when created.
+   *
+   * CloudFront Function Name and Lambda FunctionName are optional in CDK
+   * output. When no explicit name is present, the simulator identifies the
+   * function using its logical ID, matching the fallback used when the sim
+   * resource is created.
+   */
+  #executableFunctionName(resource: SimCfnResource): string | undefined {
+    const name = this.#functionNameProperty(resource);
+
+    if (name === undefined) {
       return undefined;
     }
 
-    const name = resource.properties["Name"];
-
-    /*
-     * CloudFront Function Name is optional in CDK output. When no explicit name
-     * is present, the simulator identifies the function using its logical ID,
-     * matching the fallback used when the sim Function resource is created.
-     */
-    return typeof name === "string" && name.length > 0
-      ? name
-      : resource.logicalId;
+    return name.length > 0 ? name : resource.logicalId;
   }
 
-  #cloudFrontFunctionArn(resource: SimCfnResource): string | undefined {
-    const functionName = this.#cloudFrontFunctionName(resource);
+  #functionNameProperty(resource: SimCfnResource): string | undefined {
+    const propertyName = this.#namePropertyForType(resource.type);
+    if (propertyName === undefined) {
+      return undefined;
+    }
 
-    /* v8 ignore if */
+    // eslint-disable-next-line security/detect-object-injection -- fixed per-type property names.
+    const name = resource.properties[propertyName];
+    return typeof name === "string" ? name : "";
+  }
+
+  #namePropertyForType(resourceType: string | undefined): string | undefined {
+    if (resourceType === "AWS::CloudFront::Function") {
+      return "Name";
+    }
+    if (resourceType === "AWS::Lambda::Function") {
+      return "FunctionName";
+    }
+    return undefined;
+  }
+
+  #executableFunctionArn(resource: SimCfnResource): string | undefined {
+    const functionName = this.#executableFunctionName(resource);
+
     if (functionName === undefined) {
       return undefined;
     }
 
     /*
-     * CloudFront Function ARNs do not contain a region component. The account
-     * still comes from the resource scope so bindings can validate exact ARNs
-     * when CDK associations use ARN-based references.
+     * CloudFront Function ARNs do not contain a region component, while
+     * Lambda function ARNs do. The account comes from the resource scope so
+     * bindings can validate exact ARNs when associations use ARN-based
+     * references.
      */
+    if (resource.type === "AWS::Lambda::Function") {
+      return simLambdaFunctionArn(resource.accountRegionScope, functionName);
+    }
     return `arn:aws:cloudfront::${resource.accountRegionScope.accountId}:function/${functionName}`;
   }
 

@@ -1,4 +1,9 @@
 export { SimLambda } from "./sim-lambda.js";
+export {
+  SimLambdaNoVmSdkModuleProvider,
+  type SimLambdaVmSdkModuleProvider,
+} from "./function/code/vm/sdk/sim-lambda-vm-sdk-module-provider.js";
+export { SimSdkLambdaVmModuleProvider } from "./function/code/vm/sdk/sim-sdk-lambda-vm-module-provider.js";
 export { makeLambdaZipFileInput } from "./function/code/lambda-zip-file-input.js";
 export {
   makeLambdaCodeZip,

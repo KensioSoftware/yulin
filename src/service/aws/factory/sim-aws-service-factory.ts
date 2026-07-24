@@ -18,6 +18,7 @@ import type { SimIam } from "../../iam/index.js";
 import { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
 import { SimLambda } from "../../lambda/index.js";
 import { SimS3LambdaCodeStore } from "../../lambda/function/code/store/sim-s3-lambda-code-store.js";
+import { SimSdkLambdaVmModuleProvider } from "../../lambda/function/code/vm/sdk/sim-sdk-lambda-vm-module-provider.js";
 import { SimSts } from "../../sts/sim-sts.js";
 
 interface SimAwsServiceFactoryProperties {
@@ -147,7 +148,10 @@ export class SimAwsServiceFactory {
    * Create simulated Lambda for an Account Region scope.
    *
    * S3-located function code is fetched from the same Account/Region scope's
-   * simulated S3, as real Lambda requires same-region code buckets.
+   * simulated S3, as real Lambda requires same-region code buckets. Function
+   * code running in the vm runtime is provided host-installed AWS SDK
+   * packages intercepted into this SimAws, as the real Lambda runtime
+   * provides the SDK.
    */
   createLambda(scope: SimAwsAccountRegionContainer): SimLambda {
     const iam = this.createIam(scope);
@@ -158,6 +162,10 @@ export class SimAwsServiceFactory {
       background: this.background,
       runAsOwner: this.simAws,
       codeStore: new SimS3LambdaCodeStore({ s3: scope.s3() }),
+      vmSdkModuleProvider: new SimSdkLambdaVmModuleProvider({
+        simAws: this.simAws,
+        regionName: scope.accountRegionScope.regionName,
+      }),
     });
   }
 

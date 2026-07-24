@@ -1,8 +1,16 @@
 import type { CloudFrontFunction } from "../../cloudfront/index.js";
+import type { SimLambdaHandler } from "../../lambda/function/sim-lambda-handler.type.js";
 
-// Later this will be expanded for other executable resources such as Lambdas.
-// eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
-type SimCfnExecutableResource = CloudFrontFunction.Handler | Function;
+/**
+ * A real in-process handler function that can back an executable
+ * CloudFormation Resource: a CloudFront Function handler or a Lambda handler.
+ * The plain Function member keeps room for other executable resource kinds.
+ */
+export type SimCfnExecutableResource =
+  | CloudFrontFunction.Handler
+  | SimLambdaHandler
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
+  | Function;
 
 export type SimCfnExecutableResourceBinding<
   H extends SimCfnExecutableResource = SimCfnExecutableResource,
@@ -38,3 +46,6 @@ export type SimCfnExecutableResourceBinding<
 
 export type SimCfnCfBinding =
   SimCfnExecutableResourceBinding<CloudFrontFunction.Handler>;
+
+export type SimCfnLambdaBinding =
+  SimCfnExecutableResourceBinding<SimLambdaHandler>;

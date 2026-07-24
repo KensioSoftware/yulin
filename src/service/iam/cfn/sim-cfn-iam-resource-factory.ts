@@ -5,6 +5,7 @@ import type {
 import type { SimCfnServiceResourceFactory } from "../../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import type { SimIam } from "../sim-iam.js";
 import { SimCfnIamManagedPolicyCreator } from "./managed-policy/sim-cfn-iam-managed-policy-creator.js";
+import { SimCfnIamPolicyCreator } from "./policy/sim-cfn-iam-policy-creator.js";
 import { SimCfnIamRoleCreator } from "./role/sim-cfn-iam-role-creator.js";
 
 /**
@@ -12,10 +13,12 @@ import { SimCfnIamRoleCreator } from "./role/sim-cfn-iam-role-creator.js";
  */
 export class SimIamCloudFormationResourceFactory implements SimCfnServiceResourceFactory {
   private readonly managedPolicyCreator: SimCfnIamManagedPolicyCreator;
+  private readonly policyCreator: SimCfnIamPolicyCreator;
   private readonly roleCreator: SimCfnIamRoleCreator;
 
   constructor(iam: SimIam) {
     this.managedPolicyCreator = new SimCfnIamManagedPolicyCreator({ iam });
+    this.policyCreator = new SimCfnIamPolicyCreator({ iam });
     this.roleCreator = new SimCfnIamRoleCreator({ iam });
   }
 
@@ -33,6 +36,13 @@ export class SimIamCloudFormationResourceFactory implements SimCfnServiceResourc
           resource,
           context.resolvedProperties ?? resource.properties,
         );
+      }
+      case "Policy": {
+        await this.policyCreator.create(
+          resource,
+          context.resolvedProperties ?? resource.properties,
+        );
+        return;
       }
       case "Role": {
         return await this.roleCreator.create(

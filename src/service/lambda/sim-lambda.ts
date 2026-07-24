@@ -11,9 +11,16 @@ import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
+import { SimLambdaCloudFormationResourceFactory } from "./cfn/sim-cfn-lambda-resource-factory.js";
 import { CreateFunctionCommandHandler } from "./command/create-function/create-function.handler.js";
 import type { SimLambdaCodeStore } from "./function/code/store/sim-lambda-code-store.js";
-import type { SimLambdaFunctionMap } from "./function/sim-lambda-function.js";
+import type { SimLambdaVmSdkModuleProvider } from "./function/code/vm/sdk/sim-lambda-vm-sdk-module-provider.js";
+import type {
+  SimLambdaFunction,
+  SimLambdaFunctionMap,
+  SimLambdaFunctionName,
+} from "./function/sim-lambda-function.js";
 import type {
   SimCreateFunctionCommand,
   SimCreateFunctionCommandOutput,
@@ -40,6 +47,7 @@ interface SimLambdaProperties {
   readonly background?: BackgroundScheduler;
   readonly runAsOwner?: SimAwsRunAsOwner;
   readonly codeStore?: SimLambdaCodeStore;
+  readonly vmSdkModuleProvider?: SimLambdaVmSdkModuleProvider;
 }
 
 /**
@@ -53,6 +61,11 @@ export class SimLambda {
   private readonly background: BackgroundScheduler;
   private readonly runAsOwner: SimAwsRunAsOwner;
   private readonly codeStore: SimLambdaCodeStore | undefined;
+  private readonly vmSdkModuleProvider:
+    SimLambdaVmSdkModuleProvider | undefined;
+  private readonly cfnFactory = new SimLambdaCloudFormationResourceFactory(
+    this,
+  );
   private readonly sdkRouter = new SimLambdaSdkCommandRouter(this);
 
   constructor(properties: SimLambdaProperties = {}) {
@@ -61,12 +74,14 @@ export class SimLambda {
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
       codeStore,
+      vmSdkModuleProvider,
     } = properties;
 
     this.accountRegionScope = accountRegionScope;
     this.iam = iam;
     this.background = background;
     this.codeStore = codeStore;
+    this.vmSdkModuleProvider = vmSdkModuleProvider;
     // Ambient execution-role callers are tracked per owning SimAws instance.
     // A standalone SimLambda is its own little universe, so it owns its own
     // ambient callers.
@@ -87,6 +102,7 @@ export class SimLambda {
       iam: this.iam,
       background: this.background,
       codeStore: this.codeStore,
+      vmSdkModuleProvider: this.vmSdkModuleProvider,
     });
     return await handler.handle(command, options);
   }
@@ -121,6 +137,22 @@ export class SimLambda {
       background: this.background,
     });
     return await handler.handle(command, options);
+  }
+
+  /**
+   * Get a simulated Lambda function instance by name.
+   */
+  getSimFunctionByName(
+    functionName: SimLambdaFunctionName | string,
+  ): SimLambdaFunction | undefined {
+    return this.functions.get(functionName as SimLambdaFunctionName);
+  }
+
+  /**
+   * Get this service's CloudFormation Resource factory.
+   */
+  cfnResourceFactory(): SimCfnServiceResourceFactory {
+    return this.cfnFactory;
   }
 
   /**

@@ -14,6 +14,7 @@ import { SimLambdaResourceConflictException } from "../../error/sim-lambda.error
 import type { SimLambdaExecutableCode } from "../../function/code/sim-lambda-executable-code.js";
 import { SimLambdaCodeResolver } from "../../function/code/sim-lambda-code-resolver.js";
 import type { SimLambdaCodeStore } from "../../function/code/store/sim-lambda-code-store.js";
+import type { SimLambdaVmSdkModuleProvider } from "../../function/code/vm/sdk/sim-lambda-vm-sdk-module-provider.js";
 import {
   DEFAULT_SIM_LAMBDA_MEMORY_SIZE_MB,
   SimLambdaFunction,
@@ -38,6 +39,7 @@ interface CreateFunctionCommandHandlerProperties {
   iam?: SimIamInterServiceAuthZ;
   background?: BackgroundScheduler;
   codeStore?: SimLambdaCodeStore | undefined;
+  vmSdkModuleProvider?: SimLambdaVmSdkModuleProvider | undefined;
 }
 
 interface CreateFunctionCommandHandlerOptions {
@@ -68,13 +70,17 @@ export class CreateFunctionCommandHandler implements CommandHandler<
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
       codeStore,
+      vmSdkModuleProvider,
     } = properties;
     this.accountRegionScope = accountRegionScope;
     this.functions = functions;
     this.runAsOwner = runAsOwner;
     this.authorizer = new CreateFunctionAuthorizer({ iam });
     this.background = background;
-    this.codeResolver = new SimLambdaCodeResolver({ codeStore });
+    this.codeResolver = new SimLambdaCodeResolver({
+      codeStore,
+      vmSdkModuleProvider,
+    });
   }
 
   /**
