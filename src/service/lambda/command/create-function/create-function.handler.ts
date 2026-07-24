@@ -95,13 +95,15 @@ export class CreateFunctionCommandHandler implements CommandHandler<
     );
     this.authorizer.authorize(functionArn, options?.caller);
 
-    if (this.functions.has(input.name as SimLambdaFunctionName)) {
-      throw new SimLambdaResourceConflictException(
-        `Function already exist: ${functionArn}`,
-      );
-    }
+    this.requireAvailableFunctionName(input.name, functionArn);
 
     const code = await this.resolveCode(input, options?.caller);
+
+    // Re-check after resolving code: a concurrent create for the same name
+    // may have completed while awaiting an S3 code fetch, and must not be
+    // overwritten.
+    this.requireAvailableFunctionName(input.name, functionArn);
+
     const simFunction = new SimLambdaFunction({
       ...input,
       code,
@@ -118,6 +120,20 @@ export class CreateFunctionCommandHandler implements CommandHandler<
       $metadata: {},
       ...simFunction.configuration(),
     };
+  }
+
+  /**
+   * Ensure no sim Lambda function already has the given name.
+   */
+  private requireAvailableFunctionName(
+    name: string,
+    functionArn: string,
+  ): void {
+    if (this.functions.has(name as SimLambdaFunctionName)) {
+      throw new SimLambdaResourceConflictException(
+        `Function already exist: ${functionArn}`,
+      );
+    }
   }
 
   /**

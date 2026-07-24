@@ -18,6 +18,7 @@ export function writeLocalFileHeader(entry: ZipFileEntry): Buffer {
   const header = Buffer.alloc(30 + namePath.length);
   header.writeUInt32LE(0x04_03_4b_50, 0);
   header.writeUInt16LE(20, 4); // Version needed to extract.
+  header.writeUInt16LE(0x08_00, 6); // General purpose flag: UTF-8 file name.
   header.writeUInt16LE(entry.compressionMethod, 8);
   header.writeUInt32LE(crc32(entry.content), 14);
   header.writeUInt32LE(entry.compressed.length, 18);
@@ -39,6 +40,7 @@ export function writeCentralDirectoryEntry(
   record.writeUInt32LE(0x02_01_4b_50, 0);
   record.writeUInt16LE(20, 4); // Version made by.
   record.writeUInt16LE(20, 6); // Version needed to extract.
+  record.writeUInt16LE(0x08_00, 8); // General purpose flag: UTF-8 file name.
   record.writeUInt16LE(entry.compressionMethod, 10);
   record.writeUInt32LE(crc32(entry.content), 16);
   record.writeUInt32LE(entry.compressed.length, 20);

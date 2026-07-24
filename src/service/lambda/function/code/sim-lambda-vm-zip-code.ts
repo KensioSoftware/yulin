@@ -71,9 +71,7 @@ export class SimLambdaVmZipCode implements SimLambdaExecutableCode {
       parsedName.modulePath,
     );
 
-    const handler = (moduleExports as Record<string, unknown>)[
-      parsedName.exportName
-    ];
+    const handler = this.exportedHandler(moduleExports, parsedName.exportName);
     if (typeof handler !== "function") {
       throw new SimLambdaRuntimeError(
         "Runtime.HandlerNotFound",
@@ -81,6 +79,17 @@ export class SimLambdaVmZipCode implements SimLambdaExecutableCode {
       );
     }
     return handler as SimLambdaHandler;
+  }
+
+  /**
+   * Look up the handler export, tolerating a module that exported a nullish
+   * value so the lookup still reports Runtime.HandlerNotFound.
+   */
+  private exportedHandler(moduleExports: unknown, exportName: string): unknown {
+    if (moduleExports === null || moduleExports === undefined) {
+      return undefined;
+    }
+    return (moduleExports as Record<string, unknown>)[exportName];
   }
 
   private importHandlerModule(

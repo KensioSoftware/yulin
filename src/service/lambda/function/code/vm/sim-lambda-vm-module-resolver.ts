@@ -31,6 +31,7 @@ export class SimLambdaVmModuleResolver {
       basePath,
       `${basePath}.js`,
       `${basePath}.cjs`,
+      `${basePath}.json`,
       `${basePath}/index.js`,
     ];
     for (const candidate of candidates) {

@@ -3,6 +3,8 @@ import {
   GetFunctionCommand,
 } from "@aws-sdk/client-lambda";
 import {
+  assertArrayIncludes,
+  assertArrayLength,
   assertIdentical,
   assertInstanceOf,
   assertStringIncludes,
@@ -136,6 +138,7 @@ describe("Lambda CreateFunctionCommand", () => {
 
     assertInstanceOf(error, SimLambdaInvalidParameterValueException);
     assertStringIncludes(error.message, "Could not unzip uploaded file");
+    assertInstanceOf(error.cause, Error);
   });
 
   it("throws on duplicate function name", async () => {
@@ -163,6 +166,36 @@ describe("Lambda CreateFunctionCommand", () => {
     assertInstanceOf(error, SimLambdaResourceConflictException);
     assertStringIncludes(error.message, "Function already exist");
     assertIdentical(error.$metadata.httpStatusCode, 409);
+
+    await simAws.backgroundTasksComplete();
+  });
+
+  it("rejects one of two concurrent creates with the same name", async () => {
+    // Given two createFunction calls racing for the same function name; code
+    // resolution awaits, so both can pass the initial duplicate check.
+    const simAws = new SimAws();
+    const simLambda = simAws.lambda();
+    const racingCreate = async (): Promise<unknown> =>
+      await simLambda.createFunction(
+        new CreateFunctionCommand({
+          FunctionName: "raced",
+          Role: "arn:aws:iam::111111111111:role/SomeRole",
+          Code: {
+            ZipFile: makeLambdaZipFileInput(() => null),
+          },
+        }),
+      );
+
+    // When both creates run concurrently.
+    const results = await Promise.allSettled([racingCreate(), racingCreate()]);
+
+    // Then exactly one create wins and the other gets the conflict error,
+    // rather than silently overwriting the stored function.
+    const statuses = results.map((result) => result.status);
+    assertArrayIncludes(statuses, "fulfilled");
+    const rejections = results.filter((result) => result.status === "rejected");
+    assertArrayLength(rejections, 1);
+    assertInstanceOf(rejections[0].reason, SimLambdaResourceConflictException);
 
     await simAws.backgroundTasksComplete();
   });

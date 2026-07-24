@@ -81,6 +81,49 @@ describe("sim Lambda vm zip code runtime errors", () => {
     assertStringIncludes(error.message, "index.mjs is an ES module");
   });
 
+  it("reports a nullish module export as Runtime.HandlerNotFound", async () => {
+    // Given modules that export null and undefined instead of an object.
+    const sources = ["module.exports = null;", "module.exports = undefined;"];
+
+    const [nullExportError, undefinedExportError] = await Promise.all(
+      sources.map(async (source) =>
+        assertThrowsErrorAsync(async () => makeVmFunction(source).invoke({})),
+      ),
+    );
+
+    assertInstanceOf(nullExportError, SimLambdaRuntimeError);
+    assertIdentical(nullExportError.name, "Runtime.HandlerNotFound");
+    assertInstanceOf(undefinedExportError, SimLambdaRuntimeError);
+    assertIdentical(undefinedExportError.name, "Runtime.HandlerNotFound");
+  });
+
+  it("re-attempts a failed module require, as Node.js does", async () => {
+    // Given a module that fails at import time and code that catches the
+    // require error and retries.
+    const simFunction = makeVmFunction({
+      "index.js": `
+        const attempts = [];
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          try {
+            require("./broken.js");
+            attempts.push("loaded");
+          } catch (error) {
+            attempts.push(error.message);
+          }
+        }
+        exports.handler = async () => attempts.join(",");
+      `,
+      "broken.js": "throw new Error('broken module');",
+    });
+
+    // When the function is invoked.
+    const result = await simFunction.invoke({});
+
+    // Then the failed module was evicted and both requires re-threw, rather
+    // than the retry observing silently empty exports.
+    assertIdentical(result, "broken module,broken module");
+  });
+
   it("reports a missing export as Runtime.HandlerNotFound", async () => {
     const simFunction = makeVmFunction(
       "exports.somethingElse = async () => null;",
@@ -170,6 +213,25 @@ describe("sim Lambda vm zip code runtime errors", () => {
     assertInstanceOf(error, SimLambdaRuntimeError);
     assertIdentical(error.name, "Runtime.ImportModuleError");
     assertStringIncludes(error.message, "JSON");
+  });
+
+  it("reports an unparseable JSON module as an import error", async () => {
+    // Given code requiring a JSON module that cannot be parsed.
+    const simFunction = makeVmFunction({
+      "index.js": `
+        const config = require("./config.json");
+        exports.handler = async () => config;
+      `,
+      "config.json": "{not valid json",
+    });
+
+    const error = await assertThrowsErrorAsync(async () =>
+      simFunction.invoke({}),
+    );
+
+    assertInstanceOf(error, SimLambdaRuntimeError);
+    assertIdentical(error.name, "Runtime.ImportModuleError");
+    assertStringIncludes(error.message, "Cannot parse JSON module config.json");
   });
 
   it("keeps failing on repeated invocations after a failed cold start", async () => {

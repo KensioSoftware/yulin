@@ -117,6 +117,10 @@ module and export (`index.handler`, `src/app.handler`). ES module source is not 
 fails with a clear hint. The sandbox exposes common globals and an AWS-like `process.env` with the
 standard runtime variables.
 
+Note that the `vm` context is a namespacing convenience, not a security boundary: function code
+runs in-process with the same trust as the test suite itself, in keeping with the simulator's
+in-process, Docker-free design. Do not run untrusted code through the simulator.
+
 The zip support itself is a dependency-free reader/writer pair in `src/util/zip/`, so archives
 interoperate with real tooling in both directions.
 

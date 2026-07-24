@@ -12,8 +12,9 @@ export class SimLambdaError extends Error {
   constructor(
     message: string,
     public readonly $metadata: SimLambdaErrorMetadata = {},
+    options?: ErrorOptions,
   ) {
-    super(message);
+    super(message, options);
   }
 }
 
@@ -59,7 +60,7 @@ export class SimLambdaInvalidRequestContentException extends SimLambdaError {
 export class SimLambdaInvalidParameterValueException extends SimLambdaError {
   public override readonly name = "InvalidParameterValueException";
 
-  constructor(message: string) {
-    super(message, { httpStatusCode: 400 });
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, { httpStatusCode: 400 }, options);
   }
 }

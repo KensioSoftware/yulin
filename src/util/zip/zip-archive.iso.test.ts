@@ -61,6 +61,25 @@ describe("sim zip archive", () => {
     assertTrue(archive.file("blob.bin").equals(binary));
   });
 
+  it("round-trips non-ASCII file paths with the UTF-8 flag set", () => {
+    // Given an archive with a non-ASCII file path.
+    const bytes = Buffer.from(
+      new SimZipArchiveBuilder()
+        .addFile("目录/ファイル.js", "// code")
+        .toBytes(),
+    );
+
+    // Then the general purpose flags declare UTF-8 file names, in the local
+    // header at offset 6 and the central directory entry at offset 8.
+    assertIdentical(bytes.readUInt16LE(6), 0x08_00);
+    const centralOffset = bytes.readUInt32LE(bytes.length - 22 + 16);
+    assertIdentical(bytes.readUInt16LE(centralOffset + 8), 0x08_00);
+
+    // And the path round-trips through parsing.
+    const archive = SimZipArchive.fromBytes(bytes);
+    assertArrayEquals(archive.filePaths(), ["目录/ファイル.js"]);
+  });
+
   it("reports whether a file exists", () => {
     const bytes = new SimZipArchiveBuilder().addFile("here.txt", "").toBytes();
 

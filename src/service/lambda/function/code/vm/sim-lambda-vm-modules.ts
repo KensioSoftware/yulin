@@ -2,8 +2,9 @@ import { createRequire, isBuiltin } from "node:module";
 import path from "node:path";
 import vm from "node:vm";
 import type { SimZipArchive } from "../../../../../util/zip/zip-archive.js";
-import { SimLambdaRuntimeError } from "../../../error/sim-lambda-runtime.error.js";
+import { loadJsonModule } from "./sim-lambda-vm-json-module.js";
 import { SimLambdaVmModuleResolver } from "./sim-lambda-vm-module-resolver.js";
+import { userCodeSyntaxError } from "./sim-lambda-vm-syntax-error.js";
 
 /**
  * Sim Lambda module code runs synchronously at import time, so evaluation is
@@ -63,19 +64,34 @@ export class SimLambdaVmModules {
   }
 
   private loadModule(filePath: string): VmModule {
+    if (filePath.endsWith(".json")) {
+      const jsonModule: VmModule = {
+        exports: loadJsonModule(this.properties.archive, filePath),
+      };
+      this.modules.set(filePath, jsonModule);
+      return jsonModule;
+    }
+
     const module: VmModule = { exports: {} };
     // Register before evaluation so require cycles observe partial exports,
     // as in Node.js.
     this.modules.set(filePath, module);
 
-    const moduleDirectory = path.posix.dirname(filePath);
-    this.compileModule(filePath)(
-      module.exports,
-      (specifier: string) => this.requireModule(specifier, moduleDirectory),
-      module,
-      filePath,
-      moduleDirectory,
-    );
+    try {
+      const moduleDirectory = path.posix.dirname(filePath);
+      this.compileModule(filePath)(
+        module.exports,
+        (specifier: string) => this.requireModule(specifier, moduleDirectory),
+        module,
+        filePath,
+        moduleDirectory,
+      );
+    } catch (error) {
+      // Evict the failed module so a later require re-attempts evaluation
+      // instead of observing empty exports, as in Node.js.
+      this.modules.delete(filePath);
+      throw error;
+    }
     return module;
   }
 
@@ -89,33 +105,12 @@ export class SimLambdaVmModules {
     try {
       script = new vm.Script(wrapped, { filename: filePath });
     } catch (error) {
-      throw this.userCodeSyntaxError(filePath, error);
+      throw userCodeSyntaxError(filePath, error);
     }
 
     return script.runInContext(this.properties.context, {
       timeout: moduleEvaluationTimeoutMs,
       breakOnSigint: true,
     }) as CommonJsModuleFunction;
-  }
-
-  private userCodeSyntaxError(
-    filePath: string,
-    error: unknown,
-  ): SimLambdaRuntimeError {
-    let message = String(error);
-    if (error instanceof Error) {
-      message = error.message;
-    }
-
-    if (message.includes("import statement") || message.includes("'export'")) {
-      message +=
-        "; sim Lambda only supports CommonJS function code so far - " +
-        "use exports.handler = ... instead of ES module syntax";
-    }
-
-    return new SimLambdaRuntimeError(
-      "Runtime.UserCodeSyntaxError",
-      `Syntax error in ${filePath}: ${message}`,
-    );
   }
 }

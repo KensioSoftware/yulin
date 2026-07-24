@@ -189,6 +189,35 @@ describe("sim Lambda vm zip code", () => {
     assertIdentical(result, "main fallback");
   });
 
+  it("supports requiring JSON modules", async () => {
+    // Given code requiring a bundled JSON file, as Node.js CommonJS allows.
+    const simFunction = makeVmFunction({
+      "index.js": `
+        const config = require("./config.json");
+        exports.handler = async () => config.greeting;
+      `,
+      "config.json": '{"greeting":"hello from json"}',
+    });
+
+    const result = await simFunction.invoke({});
+
+    assertIdentical(result, "hello from json");
+  });
+
+  it("resolves an extensionless require to a JSON module", async () => {
+    const simFunction = makeVmFunction({
+      "index.js": `
+        const config = require("./config");
+        exports.handler = async () => config.greeting;
+      `,
+      "config.json": '{"greeting":"extensionless json"}',
+    });
+
+    const result = await simFunction.invoke({});
+
+    assertIdentical(result, "extensionless json");
+  });
+
   it("supports a nested handler module path", async () => {
     const simFunction = makeVmFunction(
       {

@@ -93,10 +93,11 @@ export class SimLambdaCodeResolver {
   private unzip(zipBytes: Uint8Array): SimZipArchive {
     try {
       return SimZipArchive.fromBytes(zipBytes);
-    } catch {
+    } catch (error) {
       throw new SimLambdaInvalidParameterValueException(
         "Could not unzip uploaded file. Please check your file, " +
           "then try to upload again.",
+        { cause: error },
       );
     }
   }
