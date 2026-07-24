@@ -289,6 +289,7 @@ export default defineConfig(
     files: ["scripts/**/*.mts"],
     rules: {
       "no-await-in-loop": "off",
+      "no-console": "off",
       "security/detect-non-literal-fs-filename": "off",
     },
   },

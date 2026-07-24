@@ -59,3 +59,20 @@ jobs:
           cache: true
       - run: pnpm install --frozen-lockfile
       - run: pnpm build:check
+
+  pack:
+    name: Pack
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7.0.0
+        with:
+          node-version-file: .nvmrc
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.17.0
+          cache: true
+      - run: pnpm install --frozen-lockfile
+      # Packs the tarball, installs it into a throwaway project and imports
+      # every export subpath, so an incomplete dist/ cannot be published.
+      - run: pnpm verify:pack

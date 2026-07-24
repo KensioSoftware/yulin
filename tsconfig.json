@@ -10,6 +10,7 @@
     "allowUnusedLabels": false,
     "exactOptionalPropertyTypes": true,
     "incremental": true,
+    "tsBuildInfoFile": "./tsconfig.tsbuildinfo",
     "noCheck": false,
     "noEmitOnError": true,
     "noFallthroughCasesInSwitch": true,
