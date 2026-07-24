@@ -2,6 +2,7 @@
   "extends": "../tsconfig.json",
   "compilerOptions": {
     "noEmit": true,
+    "tsBuildInfoFile": "../tsconfig.docs.tsbuildinfo",
     "paths": {
       "@kensio/yulin": ["../src/index.ts"],
       "@kensio/yulin/cloudformation": [

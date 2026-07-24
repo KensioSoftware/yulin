@@ -8,8 +8,11 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "clean": "rm -rf ./dist/ ./*.tsbuildinfo",
+    "build": "pnpm clean && tsc -p tsconfig.build.json",
     "build:check": "tsc -p tsconfig.json --noEmit",
+    "prepack": "pnpm build",
+    "verify:pack": "pnpm tsx scripts/mts/verify-pack.mts",
     "fmt": "eslint --fix . && prettier --write .",
     "lint": "eslint . && prettier --check .",
     "test": "vitest run",
