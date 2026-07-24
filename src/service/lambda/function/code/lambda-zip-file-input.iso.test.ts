@@ -1,43 +1,29 @@
-import {
-  assertIdentical,
-  assertInstanceOf,
-  assertThrowsError,
-} from "@kensio/smartass";
+import { assertIdentical, assertInstanceOf } from "@kensio/smartass";
 import { describe, it } from "vitest";
-import { SimLambdaUnsupportedCodeInput } from "../../error/sim-lambda.error.js";
 import { defaultLambdaHandler } from "../sim-lambda-handler.type.js";
 import {
-  LambdaZipFileExtractor,
   LambdaZipFileStowaway,
   makeLambdaZipFileInput,
 } from "./lambda-zip-file-input.js";
 
 describe("Lambda zip file code input", () => {
   it("stows away a handler function reference in a Uint8Array disguise", () => {
+    // Given a real handler function reference.
     const handlerFunction = (event: { name: string }): string =>
       `Hello ${event.name}`;
 
+    // When it is made into CreateFunction ZipFile input.
     const zipFileInput = makeLambdaZipFileInput(handlerFunction);
 
+    // Then the input passes as a Uint8Array carrying the function reference.
     assertInstanceOf(zipFileInput, Uint8Array);
-    const extractor = new LambdaZipFileExtractor(zipFileInput);
-    assertIdentical(extractor.extractHandlerFunction(), handlerFunction);
+    assertInstanceOf(zipFileInput, LambdaZipFileStowaway);
+    assertIdentical(zipFileInput.handlerFunction, handlerFunction);
   });
 
   it("defaults a fresh stowaway to the default echo handler", () => {
     const stowaway = new LambdaZipFileStowaway();
 
     assertIdentical(stowaway.handlerFunction, defaultLambdaHandler);
-  });
-
-  it("rejects real zip file bytes as unsupported code input", () => {
-    const extractor = new LambdaZipFileExtractor(
-      Buffer.from("PK real zip bytes"),
-    );
-
-    const error = assertThrowsError(() => extractor.extractHandlerFunction());
-
-    assertInstanceOf(error, SimLambdaUnsupportedCodeInput);
-    assertIdentical(error.$metadata.httpStatusCode, 400);
   });
 });

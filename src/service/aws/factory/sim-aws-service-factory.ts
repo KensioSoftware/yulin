@@ -17,6 +17,7 @@ import { SimRoute53Registry } from "../../route53/registry/sim-route53-registry.
 import type { SimIam } from "../../iam/index.js";
 import { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
 import { SimLambda } from "../../lambda/index.js";
+import { SimS3LambdaCodeStore } from "../../lambda/function/code/store/sim-s3-lambda-code-store.js";
 import { SimSts } from "../../sts/sim-sts.js";
 
 interface SimAwsServiceFactoryProperties {
@@ -144,6 +145,9 @@ export class SimAwsServiceFactory {
 
   /**
    * Create simulated Lambda for an Account Region scope.
+   *
+   * S3-located function code is fetched from the same Account/Region scope's
+   * simulated S3, as real Lambda requires same-region code buckets.
    */
   createLambda(scope: SimAwsAccountRegionContainer): SimLambda {
     const iam = this.createIam(scope);
@@ -153,6 +157,7 @@ export class SimAwsServiceFactory {
       iam,
       background: this.background,
       runAsOwner: this.simAws,
+      codeStore: new SimS3LambdaCodeStore({ s3: scope.s3() }),
     });
   }
 

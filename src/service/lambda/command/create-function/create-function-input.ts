@@ -1,6 +1,8 @@
 import { assertDefined } from "../../../../util/type-guard/defined.js";
-import { LambdaZipFileExtractor } from "../../function/code/lambda-zip-file-input.js";
-import type { SimLambdaHandler } from "../../function/sim-lambda-handler.type.js";
+import {
+  requireLambdaCodeSource,
+  type SimLambdaCodeSource,
+} from "../../function/code/lambda-code-source.js";
 import type { SimCreateFunctionCommand } from "./create-function.cmd.js";
 
 /**
@@ -9,7 +11,7 @@ import type { SimCreateFunctionCommand } from "./create-function.cmd.js";
 export interface CreateFunctionInput {
   name: string;
   roleArn: string;
-  handlerFunction: SimLambdaHandler;
+  codeSource: SimLambdaCodeSource;
   handlerName: string | undefined;
   runtimeName: string | undefined;
   description: string | undefined;
@@ -18,8 +20,8 @@ export interface CreateFunctionInput {
 }
 
 /**
- * Require the AWS-required CreateFunction input fields, and extract the
- * handler function reference from the function code input.
+ * Require the AWS-required CreateFunction input fields, and validate the
+ * function code input into a sim Lambda code source.
  */
 export function requireCreateFunctionInput(
   command: SimCreateFunctionCommand,
@@ -30,17 +32,11 @@ export function requireCreateFunctionInput(
     "CreateFunctionCommand.input.FunctionName required",
   );
   assertDefined(input.Role, "CreateFunctionCommand.input.Role required");
-  assertDefined(
-    input.Code?.ZipFile,
-    "CreateFunctionCommand.input.Code.ZipFile required",
-  );
-
-  const extractor = new LambdaZipFileExtractor(input.Code.ZipFile);
 
   return {
     name: input.FunctionName,
     roleArn: input.Role,
-    handlerFunction: extractor.extractHandlerFunction(),
+    codeSource: requireLambdaCodeSource(input.Code),
     handlerName: input.Handler,
     runtimeName: input.Runtime,
     description: input.Description,

@@ -64,27 +64,65 @@ starts in the `Pending` state and becomes `Active` asynchronously via the shared
 
 ### Function code input
 
-Real Lambda receives function code as a zipped bundle in `Code.ZipFile`. The simulator currently
-supports a real handler function reference instead, smuggled through the SDK-shaped input with the
-same `Uint8Array` "stowaway" trick used by simulated CloudFront Functions:
+Real Lambda receives zip-packaged function code in exactly two ways: zip archive bytes directly on
+the request (`Code.ZipFile`) or a zip object stored in S3 (`Code.S3Bucket`/`S3Key`). Every
+non-container deployment tool — vanilla CloudFormation, SAM, CDK, the console editor — reduces to
+one of those two API primitives. The simulator supports both, plus a sim-only convenience:
 
-```typescript
-new CreateFunctionCommand({
-  FunctionName: "greeter",
-  Role: "arn:aws:iam::111111111111:role/GreeterRole",
-  Code: {
-    ZipFile: makeLambdaZipFileInput(
-      async (event: { name: string }) => `Hello ${event.name}`,
-    ),
-  },
-});
-```
+1. **Handler function reference** — a real function smuggled through the SDK-shaped `Code.ZipFile`
+   input with the same `Uint8Array` "stowaway" trick used by simulated CloudFront Functions:
 
-`function/code/lambda-zip-file-input.ts` owns this: `makeLambdaZipFileInput(...)` wraps the handler
-in a `Uint8Array` subclass, and `LambdaZipFileExtractor` recovers it at creation time. The
-extractor is the seam where future code inputs belong — source code strings run in a `vm` context
-(as simulated CloudFront Functions already support), and eventually real zipped bundles produced by
-CloudFormation or CDK packaging. Real zip bytes currently fail with a clear sim-specific error.
+   ```typescript
+   new CreateFunctionCommand({
+     FunctionName: "greeter",
+     Role: "arn:aws:iam::111111111111:role/GreeterRole",
+     Code: {
+       ZipFile: makeLambdaZipFileInput(
+         async (event: { name: string }) => `Hello ${event.name}`,
+       ),
+     },
+   });
+   ```
+
+2. **Real zip archive bytes** on `Code.ZipFile`. `makeLambdaCodeZip(...)` builds real zip bytes
+   from a source string (becoming `index.js`, like CloudFormation inline `ZipFile` source) or from
+   a files map (like a bundled deployment package). Bytes that are not a zip archive fail with the
+   AWS-like `InvalidParameterValueException: Could not unzip uploaded file`.
+
+3. **A zip object in sim S3** via `Code.S3Bucket`/`S3Key`. The fetch goes through the sim S3
+   GetObject operation as the creating caller, so simulated IAM applies to the code object, and S3
+   lookup failures are wrapped AWS-style (`Error occurred while GetObject. S3 Error Code:
+NoSuchKey. ...`). `S3ObjectVersion` is accepted but ignored, as sim S3 has no object versioning
+   yet. A standalone `SimLambda` has no sim S3; `SimAws`-created Lambda wires the same-scope sim S3
+   automatically (real Lambda requires a same-region code bucket).
+
+`function/code/` owns this: `lambda-code-source.ts` validates the `Code` input into a discriminated
+source, `sim-lambda-code-resolver.ts` resolves it into executable code (fetching S3 code and
+checking zip validity at creation time, as real AWS does), and `store/` holds the sim S3-backed
+code store behind a narrow interface.
+
+### The vm runtime
+
+Zip-sourced code runs in a Node.js `vm` context (`function/code/vm/`), like simulated CloudFront
+Functions run their function code. `SimLambdaVmZipCode` mirrors real cold start semantics: the
+module is imported once, on first invocation, and module state stays warm across invocations.
+Import and handler problems surface as invocation errors with the real runtime errorTypes —
+`Runtime.ImportModuleError`, `Runtime.HandlerNotFound`, `Runtime.UserCodeSyntaxError`,
+`Runtime.MalformedHandlerName` — rather than failing creation.
+
+`SimLambdaVmModules` provides a CommonJS module system over the archive: relative requires between
+archived files, Node.js built-ins from the host (as the real runtime provides them), and a minimal
+`node_modules` lookup for dependencies bundled into the archive. The `Handler` string selects the
+module and export (`index.handler`, `src/app.handler`). ES module source is not supported yet and
+fails with a clear hint. The sandbox exposes common globals and an AWS-like `process.env` with the
+standard runtime variables.
+
+Note that the `vm` context is a namespacing convenience, not a security boundary: function code
+runs in-process with the same trust as the test suite itself, in keeping with the simulator's
+in-process, Docker-free design. Do not run untrusted code through the simulator.
+
+The zip support itself is a dependency-free reader/writer pair in `src/util/zip/`, so archives
+interoperate with real tooling in both directions.
 
 ### Handler typing and completion styles
 
@@ -128,8 +166,12 @@ allow-all fallback as other services for direct standalone construction.
 
 ## Not simulated yet
 
-- CloudFormation `AWS::Lambda::*` resource creation (no `cfn/` directory yet)
-- function code as source strings or real zipped bundles
-- versions, aliases and qualifiers
+- CloudFormation `AWS::Lambda::*` resource creation (no `cfn/` directory yet), including inline
+  template `ZipFile` source strings
+- ES module function code (`.mjs` / `export` syntax) in the vm runtime
+- container image functions (`Code.ImageUri`) — the simulator stays Docker-free
+- `UpdateFunctionCode`, versions, aliases and qualifiers
+- Lambda Layers
+- environment variable configuration (`Environment.Variables`)
 - timeouts interrupting handler execution
 - asynchronous invocation retries and failure destinations
