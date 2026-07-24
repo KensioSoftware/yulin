@@ -11,8 +11,8 @@ import {
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import {
+  SimLambdaInvalidParameterValueException,
   SimLambdaResourceConflictException,
-  SimLambdaUnsupportedCodeInput,
 } from "../../error/sim-lambda.error.js";
 import { makeLambdaZipFileInput } from "../../function/code/lambda-zip-file-input.js";
 
@@ -113,13 +113,14 @@ describe("Lambda CreateFunctionCommand", () => {
       ),
     );
 
+    assertInstanceOf(error, SimLambdaInvalidParameterValueException);
     assertStringIncludes(
       error.message,
-      "CreateFunctionCommand.input.Code.ZipFile required",
+      "requires either ZipFile bytes or an S3Bucket and S3Key",
     );
   });
 
-  it("rejects real zip file bytes as unsupported code input", async () => {
+  it("rejects bytes that are not a zip archive, like real AWS", async () => {
     const simAws = new SimAws();
 
     const error = await assertThrowsErrorAsync(async () =>
@@ -127,13 +128,14 @@ describe("Lambda CreateFunctionCommand", () => {
         new CreateFunctionCommand({
           FunctionName: "real-zip",
           Role: "arn:aws:iam::111111111111:role/SomeRole",
-          Code: { ZipFile: Buffer.from("PK real zip bytes") },
+          Handler: "index.handler",
+          Code: { ZipFile: Buffer.from("not really zip bytes") },
         }),
       ),
     );
 
-    assertInstanceOf(error, SimLambdaUnsupportedCodeInput);
-    assertStringIncludes(error.message, "makeLambdaZipFileInput");
+    assertInstanceOf(error, SimLambdaInvalidParameterValueException);
+    assertStringIncludes(error.message, "Could not unzip uploaded file");
   });
 
   it("throws on duplicate function name", async () => {

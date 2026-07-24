@@ -51,13 +51,13 @@ export class SimLambdaInvalidRequestContentException extends SimLambdaError {
 }
 
 /**
- * Sim-specific error for Lambda function code input the simulator cannot run.
+ * Simulated Lambda InvalidParameterValueException error.
  *
- * Real Lambda accepts zipped source bundles; the simulator currently only
- * supports handler function references stowed away by makeLambdaZipFileInput.
+ * Real Lambda reports function code problems this way, such as unreadable
+ * zip file bytes or S3 code locations that cannot be fetched.
  */
-export class SimLambdaUnsupportedCodeInput extends SimLambdaError {
-  public override readonly name = "SimLambdaUnsupportedCodeInput";
+export class SimLambdaInvalidParameterValueException extends SimLambdaError {
+  public override readonly name = "InvalidParameterValueException";
 
   constructor(message: string) {
     super(message, { httpStatusCode: 400 });
