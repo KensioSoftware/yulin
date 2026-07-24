@@ -113,6 +113,55 @@ describe("Lambda CloudFormation Function deployment", () => {
     await simAws.backgroundTasksComplete();
   });
 
+  it("resolves a Role name from Ref to the role's ARN", async () => {
+    // Given a template whose function references its Role with Ref, which
+    // resolves to the role name rather than the ARN Fn::GetAtt provides.
+    const simAws = new SimAws();
+
+    // When the template is deployed through sim CloudFormation.
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "ref-role-stack",
+      template: {
+        Resources: {
+          RefRole: {
+            Type: "AWS::IAM::Role",
+            Properties: {
+              RoleName: "RefRole",
+              AssumeRolePolicyDocument: assumeRolePolicyDocument,
+            },
+          },
+          RefRoleFunction: {
+            Type: "AWS::Lambda::Function",
+            Properties: {
+              FunctionName: "ref-role-function",
+              Role: {
+                Ref: "RefRole",
+              },
+              Code: {
+                ZipFile: "exports.handler = async () => 'ref role';",
+              },
+              Handler: "index.handler",
+            },
+          },
+        },
+      },
+    });
+
+    // Then the function's execution Role is the role's ARN, keeping
+    // execution-role attribution correct.
+    const roleResource = stack.getResource("RefRole");
+    assertNonNullable(roleResource);
+    const role = roleResource.simResource as SimIamRole;
+
+    const simFunction = simAws
+      .lambda()
+      .getSimFunctionByName("ref-role-function");
+    assertNonNullable(simFunction);
+    assertIdentical(simFunction.roleArn, role.arn);
+
+    await simAws.backgroundTasksComplete();
+  });
+
   it("uses the function name for Ref and exposes Arn via Fn::GetAtt", async () => {
     // Given a CloudFormation template with a function, a dependent resource,
     // and Outputs that exercise Ref and Fn::GetAtt resolution.

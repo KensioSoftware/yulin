@@ -12,6 +12,15 @@ import { describe, it } from "vitest";
 import { SimAws } from "../../../../../aws/sim-aws.js";
 import { SimSdkLambdaVmModuleProvider } from "./sim-sdk-lambda-vm-module-provider.js";
 
+/**
+ * Build the error shape Node.js module resolution throws for a missing
+ * package.
+ */
+function makeModuleNotFoundError(specifier: string): Error {
+  const error = new Error(`Cannot find module '${specifier}'`);
+  return Object.assign(error, { code: "MODULE_NOT_FOUND" });
+}
+
 describe("SimSdkLambdaVmModuleProvider", () => {
   it("provides an intercepted AWS SDK package module", () => {
     // Given a provider for a simulated AWS environment.
@@ -57,11 +66,11 @@ describe("SimSdkLambdaVmModuleProvider", () => {
   });
 
   it("reports an uninstalled AWS SDK package helpfully", () => {
-    // Given a provider whose host require cannot find the package.
+    // Given a provider whose host require cannot resolve the package.
     const provider = new SimSdkLambdaVmModuleProvider({
       simAws: new SimAws(),
       requireModule: () => {
-        throw new Error("Cannot find module");
+        throw makeModuleNotFoundError("@aws-sdk/client-unknown");
       },
     });
 
@@ -73,6 +82,25 @@ describe("SimSdkLambdaVmModuleProvider", () => {
 
     assertStringIncludes(error.message, "@aws-sdk/client-unknown");
     assertStringIncludes(error.message, "not installed");
+  });
+
+  it("propagates installed-package initialization failures unchanged", () => {
+    // Given a provider whose host require resolves the package but the
+    // package throws while initializing.
+    const provider = new SimSdkLambdaVmModuleProvider({
+      simAws: new SimAws(),
+      requireModule: () => {
+        throw new Error("boom during package initialization");
+      },
+    });
+
+    // When the package is requested, then the real initialization error is
+    // reported rather than a misleading not-installed message.
+    const error = assertThrowsError(() =>
+      provider.provideModule("@aws-sdk/client-s3"),
+    );
+
+    assertIdentical(error.message, "boom during package initialization");
   });
 
   it("rejects a host module that is not a module object", () => {

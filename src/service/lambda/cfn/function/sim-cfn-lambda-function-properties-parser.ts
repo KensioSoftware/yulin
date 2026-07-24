@@ -1,5 +1,7 @@
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
+import { makeSimRoleArn } from "../../../iam/role/arn/sim-iam-role-arn.js";
+import type { SimIamRoleName } from "../../../iam/role/sim-iam-role.js";
 import type {
   SimCreateFunctionCommandInput,
   SimLambdaFunctionCode,
@@ -59,11 +61,7 @@ export class SimCfnLambdaFunctionPropertiesParser {
   ): SimCfnLambdaFunctionProperties {
     return {
       functionName: this.functionName(resource, properties),
-      roleArn: this.propertyParser.requiredString(
-        resource,
-        properties["Role"],
-        "Role",
-      ),
+      roleArn: this.roleArn(resource, properties),
       code: this.codeParser.parse(resource, properties["Code"]),
       handlerName: this.propertyParser.optionalString(
         resource,
@@ -91,6 +89,35 @@ export class SimCfnLambdaFunctionPropertiesParser {
         "MemorySize",
       ),
     };
+  }
+
+  /**
+   * The execution Role, resolved to an ARN.
+   *
+   * A Ref to a same-stack AWS::IAM::Role resolves to the role name, so a
+   * plain name is mapped to the role's default-path ARN, equivalent to what
+   * Fn::GetAtt Role.Arn resolves to, keeping execution-role attribution
+   * correct. Direct ARN strings pass through unchanged.
+   */
+  private roleArn(
+    resource: SimCfnResource,
+    properties: SimCfnTemplateValueRecord,
+  ): string {
+    const role = this.propertyParser.requiredString(
+      resource,
+      properties["Role"],
+      "Role",
+    );
+
+    if (role.startsWith("arn:")) {
+      return role;
+    }
+
+    return makeSimRoleArn({
+      accountId: resource.accountRegionScope.accountId,
+      path: "/",
+      roleName: role as SimIamRoleName,
+    });
   }
 
   /**

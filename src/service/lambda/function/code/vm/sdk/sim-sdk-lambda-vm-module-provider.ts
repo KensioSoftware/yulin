@@ -71,12 +71,18 @@ export class SimSdkLambdaVmModuleProvider implements SimLambdaVmSdkModuleProvide
     let moduleExports: unknown;
     try {
       moduleExports = this.requireModule(specifier);
-    } catch {
+    } catch (error) {
+      // Only translate resolution failures: an installed package failing to
+      // initialize is a real error the function code should observe as-is.
+      if (!isModuleNotFoundError(error)) {
+        throw error;
+      }
       throw new Error(
         `Cannot provide ${specifier} to sim Lambda function code: the ` +
           "package is not installed. Install it in your project, as the " +
           "real Lambda runtime provides it, or bundle it into the function " +
           "code archive.",
+        { cause: error },
       );
     }
 
@@ -106,4 +112,16 @@ function requireHostModule(specifier: string): unknown {
        this package's own require context cannot see the SDK packages. */
     return createRequire(path.join(process.cwd(), "package.json"))(specifier);
   }
+}
+
+/**
+ * Whether an error is a Node.js module resolution failure, as opposed to an
+ * error thrown while a resolved module initializes.
+ */
+function isModuleNotFoundError(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    "code" in error &&
+    (error.code === "MODULE_NOT_FOUND" || error.code === "ERR_MODULE_NOT_FOUND")
+  );
 }

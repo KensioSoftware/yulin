@@ -1,3 +1,4 @@
+import { simLambdaFunctionArn } from "../../../lambda/function/sim-lambda-function.js";
 import type { SimCfnResource } from "../../resource/sim-cfn-resource.js";
 import type { SimCfnExecutableResourceBinding } from "../sim-cfn-exec-binding.type.js";
 
@@ -35,8 +36,9 @@ export class SimCfnExecutableResourceBindingMatcher {
    * Each binding variant uses the most natural identifier available:
    *
    * - `logicalId` checks the synthesized logical ID and the CDK construct ID.
-   * - `functionName` checks the CloudFront Function Name property, falling
-   *   back to the logical ID because CloudFront Functions can omit Name.
+   * - `functionName` checks the CloudFront Function Name or Lambda
+   *   FunctionName property, falling back to the logical ID because both can
+   *   omit an explicit name.
    * - `arn` reconstructs the simulator's CloudFront Function or Lambda
    *   function ARN format.
    * - `cdkPath` checks CDK metadata emitted into the synthesized template.
@@ -111,6 +113,7 @@ export class SimCfnExecutableResourceBindingMatcher {
       return undefined;
     }
 
+    // eslint-disable-next-line security/detect-object-injection -- fixed per-type property names.
     const name = resource.properties[propertyName];
     return typeof name === "string" ? name : "";
   }
@@ -138,11 +141,10 @@ export class SimCfnExecutableResourceBindingMatcher {
      * bindings can validate exact ARNs when associations use ARN-based
      * references.
      */
-    const { accountId, regionName } = resource.accountRegionScope;
     if (resource.type === "AWS::Lambda::Function") {
-      return `arn:aws:lambda:${regionName}:${accountId}:function:${functionName}`;
+      return simLambdaFunctionArn(resource.accountRegionScope, functionName);
     }
-    return `arn:aws:cloudfront::${accountId}:function/${functionName}`;
+    return `arn:aws:cloudfront::${resource.accountRegionScope.accountId}:function/${functionName}`;
   }
 
   #cdkPath(resource: SimCfnResource): string | undefined {
