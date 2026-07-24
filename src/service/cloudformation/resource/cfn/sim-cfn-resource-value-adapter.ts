@@ -14,6 +14,8 @@ import { SimIamManagedPolicyCfn } from "./iam/sim-iam-managed-policy-cfn.js";
 import type { SimIamManagedPolicy } from "../../../iam/policy/sim-iam-policy.js";
 import { SimIamRoleCfn } from "./iam/sim-iam-role-cfn.js";
 import type { SimIamRole } from "../../../iam/role/sim-iam-role.js";
+import { SimLambdaFunction } from "../../../lambda/function/sim-lambda-function.js";
+import { SimLambdaFunctionCfn } from "./lambda/sim-lambda-function-cfn.js";
 
 export interface SimCfnResourceValueAdapter {
   refValue(): SimCfnTemplateValue;
@@ -82,6 +84,15 @@ export function simCfnResourceValueAdapter(
   if (properties.type === "AWS::IAM::Role") {
     return new SimIamRoleCfn({
       role: properties.simResource as SimIamRole,
+    });
+  }
+
+  if (
+    properties.type === "AWS::Lambda::Function" &&
+    properties.simResource instanceof SimLambdaFunction
+  ) {
+    return new SimLambdaFunctionCfn({
+      lambdaFunction: properties.simResource,
     });
   }
 

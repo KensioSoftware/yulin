@@ -2,6 +2,7 @@ import { createRequire, isBuiltin } from "node:module";
 import path from "node:path";
 import vm from "node:vm";
 import type { SimZipArchive } from "../../../../../util/zip/zip-archive.js";
+import type { SimLambdaVmSdkModuleProvider } from "./sdk/sim-lambda-vm-sdk-module-provider.js";
 import { loadJsonModule } from "./sim-lambda-vm-json-module.js";
 import { SimLambdaVmModuleResolver } from "./sim-lambda-vm-module-resolver.js";
 import { userCodeSyntaxError } from "./sim-lambda-vm-syntax-error.js";
@@ -17,6 +18,7 @@ const hostRequire = createRequire(import.meta.url);
 interface SimLambdaVmModulesProperties {
   readonly archive: SimZipArchive;
   readonly context: vm.Context;
+  readonly sdkModuleProvider: SimLambdaVmSdkModuleProvider;
 }
 
 interface VmModule {
@@ -55,12 +57,34 @@ export class SimLambdaVmModules {
       return hostRequire(specifier);
     }
 
-    const filePath = this.resolver.resolveFilePath(specifier, fromDirectory);
+    let filePath: string;
+    try {
+      filePath = this.resolver.resolveFilePath(specifier, fromDirectory);
+    } catch (archiveError) {
+      return this.provideModule(specifier, archiveError);
+    }
+
     const loaded = this.modules.get(filePath);
     if (loaded !== undefined) {
       return loaded.exports;
     }
     return this.loadModule(filePath).exports;
+  }
+
+  /**
+   * Provide a runtime module the archive does not bundle, as the real Lambda
+   * runtime provides the AWS SDK.
+   *
+   * The archive always takes precedence: the provider is only consulted for
+   * specifiers the archive cannot resolve, and when it declines, the
+   * original archive resolution error is reported.
+   */
+  private provideModule(specifier: string, archiveError: unknown): unknown {
+    const provided = this.properties.sdkModuleProvider.provideModule(specifier);
+    if (provided === undefined) {
+      throw archiveError;
+    }
+    return provided;
   }
 
   private loadModule(filePath: string): VmModule {

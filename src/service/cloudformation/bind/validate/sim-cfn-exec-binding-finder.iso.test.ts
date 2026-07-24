@@ -9,7 +9,7 @@ import type { CloudFrontFunction } from "../../../cloudfront/index.js";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimCloudFrontFunction } from "../../../cloudfront/cff/sim-cloudfront-function.js";
 import { simCfnCffResourceFactory } from "../../resource/cfn/cloudfront/sim-cff-cfn.factory.js";
-import { SimCfnCffBindingFinder } from "./sim-cfn-exec-binding-finder.js";
+import { SimCfnExecBindingFinder } from "./sim-cfn-exec-binding-finder.js";
 
 describe("Sim CloudFormation executable binding finder", () => {
   it("finds a logicalId binding from CDK construct path metadata when deploying a template", async () => {
@@ -143,12 +143,15 @@ function handler(event) {
       logicalId: "RewriteFunction",
       handler: rewriteRequestToBoundHandler,
     };
-    const finder = new SimCfnCffBindingFinder({
+    const finder = new SimCfnExecBindingFinder({
       resource,
       bindings: [binding],
     });
 
-    assertIdentical(finder.findBinding("RewriteFunction48E73F66"), binding);
+    assertIdentical(
+      finder.findBinding({ functionName: "RewriteFunction48E73F66" }),
+      binding,
+    );
   });
 
   it("ignores invalid CDK path metadata when finding a binding directly", () => {
@@ -175,7 +178,7 @@ function handler(event) {
         logicalId: "RewriteFunction48E73F66",
         metadata: testCase.metadata,
       });
-      const finder = new SimCfnCffBindingFinder({
+      const finder = new SimCfnExecBindingFinder({
         resource,
         bindings: [
           {
@@ -185,7 +188,9 @@ function handler(event) {
         ],
       });
 
-      assertUndefined(finder.findBinding("RewriteFunction48E73F66"));
+      assertUndefined(
+        finder.findBinding({ functionName: "RewriteFunction48E73F66" }),
+      );
     }
   });
 });

@@ -31,6 +31,7 @@ Sim CloudFormation currently supports:
   - `AWS::CloudFormation::WaitConditionHandle`
   - `AWS::S3::Bucket`
   - `AWS::CloudFront::Distribution`
+  - `AWS::Lambda::Function`
   - CloudFront Functions used by CDK-generated templates
   - selected CDK custom resources such as CDK S3 BucketDeployment
 
@@ -672,6 +673,61 @@ The `bindings` array matches a template resource logical ID to a local handler f
 especially useful when CDK has embedded or transformed CloudFront Function source in synthesized
 output, but your test wants to provide an executable local function directly.
 
+## Lambda function bindings
+
+`AWS::Lambda::Function` resources support the same bindings, and this is the most convenient way
+to deploy Lambdas through sim CloudFormation: the deployed function is backed by your real
+in-process handler, so tests can close over test state and step through the handler in a debugger,
+while the stack still wires roles, grants, and references exactly as the template declares. A
+bound function may omit template `Code` and `Handler` entirely.
+
+```typescript sim-cloudformation-lambda-binding
+/**
+ * Binding a real in-process Lambda handler during template deployment.
+ */
+
+import { InvokeCommand } from "@aws-sdk/client-lambda";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+await simAws.cloudFormation().deployTemplate({
+  stackName: "greeter-stack",
+  template: {
+    Resources: {
+      GreeterFunction: {
+        Type: "AWS::Lambda::Function",
+        Properties: {
+          FunctionName: "greeter",
+          Role: "arn:aws:iam::111111111111:role/GreeterRole",
+        },
+      },
+    },
+  },
+  bindings: [
+    {
+      logicalId: "GreeterFunction",
+      handler: (event: { name: string }): string => `Hello ${event.name}`,
+    },
+  ],
+});
+
+const output = await simAws.lambda().invoke(
+  new InvokeCommand({
+    FunctionName: "greeter",
+    Payload: JSON.stringify({ name: "Yulin" }),
+  }),
+);
+
+console.log(new TextDecoder().decode(output.Payload));
+```
+
+Bindings can target the CloudFormation logical ID (or the CDK construct ID recovered from
+synthesized metadata), the function name, or the function ARN. Bound handlers still run with the
+function's execution Role as the ambient simulated caller, so downstream calls made through
+`SimSdk`-intercepted clients are authorized by simulated IAM as on real Lambda. Functions without
+a matching binding keep their template code, running in the simulated vm runtime.
+
 ## Serving deployed resources on localhost
 
 CloudFormation itself is not served as an HTTP API. Instead, you deploy infrastructure through Sim
@@ -897,6 +953,7 @@ Current supported resource areas include:
 - `AWS::CloudFormation::WaitConditionHandle`
 - `AWS::S3::Bucket`
 - `AWS::CloudFront::Distribution`
+- `AWS::Lambda::Function`
 - selected CloudFront Function resources emitted by CDK
 - selected CDK custom resources, including CDK S3 BucketDeployment
 

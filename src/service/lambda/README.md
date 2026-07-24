@@ -117,6 +117,23 @@ module and export (`index.handler`, `src/app.handler`). ES module source is not 
 fails with a clear hint. The sandbox exposes common globals and an AWS-like `process.env` with the
 standard runtime variables.
 
+### Runtime-provided AWS SDK
+
+Like the real Lambda Node.js runtime, the simulated runtime provides AWS SDK v3 packages without
+them being bundled in the code archive: `require("@aws-sdk/client-s3")` (and other `@aws-sdk/*`
+packages installed in the host project) resolves to the real host module with its client classes
+intercepted into the owning simulated AWS environment. Calls the function code makes are routed
+per send with the function's execution role as the caller, so simulated IAM authorizes them just
+like real Lambda execution roles. A client constructed without a region defaults to the function's
+Account/Region scope, as the real runtime's `AWS_REGION` provides; an explicit region wins.
+
+The archive always takes precedence: a package bundled under the archive's `node_modules/` is used
+as-is, uninstrumented. Interception is per client instance (`function/code/vm/sdk/`,
+`src/sdk/module/`), so the host package's classes are never patched globally. A standalone
+`SimLambda` constructed outside `SimAws` has no simulated environment to route to; SDK requires
+fail with `Runtime.ImportModuleError` and guidance to wire a `vmSdkModuleProvider` or bundle the
+package.
+
 Note that the `vm` context is a namespacing convenience, not a security boundary: function code
 runs in-process with the same trust as the test suite itself, in keeping with the simulator's
 in-process, Docker-free design. Do not run untrusted code through the simulator.
@@ -164,10 +181,54 @@ account-scoped simulated IAM implementation when constructed through `SimAws`
 (`lambda:CreateFunction`, `lambda:GetFunction`, `lambda:InvokeFunction`), with the same
 allow-all fallback as other services for direct standalone construction.
 
+## CloudFormation
+
+`cfn/` owns `AWS::Lambda::*` resource creation, following the shared per-service factory pattern
+(see `src/service/cloudformation/README.md`). `SimLambdaCloudFormationResourceFactory` is exposed
+via `SimLambda.cfnResourceFactory()` and resolved by the generic CloudFormation engine, so
+deploying a template containing `AWS::Lambda::Function` creates a real `SimLambdaFunction`,
+reachable afterwards through `simAws.lambda()` and invokable via the SDK `InvokeCommand`.
+
+Supported `AWS::Lambda::Function` properties: `FunctionName` (defaults to the logical ID), `Role`
+(typically a `Ref`/`Fn::GetAtt` to a same-stack `AWS::IAM::Role`), `Code`, `Handler`, `Runtime`,
+`Description`, `Timeout`, and `MemorySize`. Malformed property values fail AWS-style with a
+`TypeError` naming the property and logical ID.
+
+Template `Code` supports two source forms:
+
+- **Inline `ZipFile` source string** — packaged into a single-module `index.js` zip with
+  `makeLambdaCodeZip(...)`, mirroring how real CloudFormation packages inline source.
+- **`S3Bucket`/`S3Key`** — passed through to the CreateFunction handler, which fetches the code
+  zip from same-scope sim S3.
+
+The handler-reference stowaway trick stays SDK-only: template values are JSON, so a `Uint8Array`
+cannot appear in a template `Code.ZipFile`. Inline template code does not need it to reach AWS:
+the vm runtime provides `@aws-sdk/*` packages routed to the owning simulated environment (see
+"Runtime-provided AWS SDK" above), so a CDK `Code.fromInline` function can read sim S3 as its
+execution role.
+
+### Executable bindings
+
+Deploy-time `bindings` (shared with simulated CloudFront Functions — see
+`src/service/cloudformation/bind/`) let `deployTemplate`/`deployTemplateFile` back an
+`AWS::Lambda::Function` with a real in-process handler instead of template code. The
+`SimCfnLambdaFunctionCreator` swaps the bound handler in through the same stowaway code input the
+SDK path uses, so execution-role attribution and invocation behaviour are identical, tests can
+close over test state, and handlers can be stepped through in a debugger. Bindings target the
+logical ID (or CDK construct ID), the function name, or the function ARN; a bound function may
+omit template `Code` and `Handler`. Unbound functions keep their template code on the vm path.
+
+`Ref` on the function returns the function name and `Fn::GetAtt` exposes `Arn`, implemented by the
+`SimLambdaFunctionCfn` value adapter under
+`src/service/cloudformation/resource/cfn/lambda/`, keeping the function model free of
+CloudFormation concerns.
+
+Other `AWS::Lambda::*` resource types (`Version`, `Alias`, `Permission`, `EventSourceMapping`, ...)
+are not supported and are skipped by the CloudFormation engine with an "Unsupported" diagnostic.
+
 ## Not simulated yet
 
-- CloudFormation `AWS::Lambda::*` resource creation (no `cfn/` directory yet), including inline
-  template `ZipFile` source strings
+- `AWS::Lambda::*` CloudFormation resource types other than `AWS::Lambda::Function`
 - ES module function code (`.mjs` / `export` syntax) in the vm runtime
 - container image functions (`Code.ImageUri`) — the simulator stays Docker-free
 - `UpdateFunctionCode`, versions, aliases and qualifiers

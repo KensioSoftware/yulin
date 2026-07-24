@@ -1,51 +1,68 @@
 import type {
-  SimCfnCfBinding,
+  SimCfnExecutableResource,
   SimCfnExecutableResourceBinding,
 } from "../sim-cfn-exec-binding.type.js";
 import { cdkPathMetadataKeys } from "./sim-cfn-exec-binding-matcher.js";
 import type { SimCfnResource } from "../../resource/sim-cfn-resource.js";
 
-interface SimCfnCffBindingFinderProperties {
+interface SimCfnExecBindingFinderProperties {
   readonly resource: SimCfnResource;
   readonly bindings?: readonly SimCfnExecutableResourceBinding[] | undefined;
 }
 
 /**
- * Finds the executable binding that should replace CloudFormation FunctionCode.
+ * The resolved identifiers of the executable Resource a factory is creating,
+ * used to decide which binding targets it.
+ */
+export interface SimCfnExecBindingTargets {
+  readonly functionName: string;
+  readonly arn?: string | undefined;
+}
+
+/**
+ * Finds the executable binding that should replace CloudFormation function
+ * code.
  *
- * A CloudFront Function can be declared in a synthesized CloudFormation template,
- * while test code may provide an executable JavaScript handler through a binding.
- * This class keeps the matching rules in one place so the CreateFunction input
- * builder can stay focused on validating Resource properties and building the
- * command input.
+ * An executable resource such as a CloudFront Function or Lambda function can
+ * be declared in a synthesized CloudFormation template, while test code may
+ * provide a real in-process handler through a binding. This class keeps the
+ * matching rules in one place so resource factories can stay focused on
+ * validating Resource properties and building command input.
  *
  * Supported binding targets:
  *
  * - CloudFormation logical ID, for templates written directly or synthesized by CDK
  * - CDK construct ID, recovered from Resource Metadata path values
- * - resolved CloudFront Function name, for name-based bindings
+ * - resolved function name, for name-based bindings
+ * - resource ARN, when the creating factory supplies its ARN format
+ * - CDK construct path, matched against Resource Metadata
  */
-export class SimCfnCffBindingFinder {
+export class SimCfnExecBindingFinder<
+  H extends SimCfnExecutableResource = SimCfnExecutableResource,
+> {
   private readonly resource: SimCfnResource;
   private readonly bindings:
     readonly SimCfnExecutableResourceBinding[] | undefined;
 
-  constructor(properties: SimCfnCffBindingFinderProperties) {
+  constructor(properties: SimCfnExecBindingFinderProperties) {
     this.resource = properties.resource;
     this.bindings = properties.bindings;
   }
 
   /**
-   * Return the first binding that targets this CloudFront Function Resource.
+   * Return the first binding that targets this executable Resource.
    *
    * Logical ID matching is evaluated before function-name matching because the
-   * logical ID is stable even when the template omits the Function Name property
-   * and the simulator falls back to the Resource logical ID as the local name.
+   * logical ID is stable even when the template omits the function name
+   * property and the simulator falls back to the Resource logical ID as the
+   * local name.
    */
-  findBinding(functionName: string): SimCfnCfBinding | undefined {
+  findBinding(
+    targets: SimCfnExecBindingTargets,
+  ): SimCfnExecutableResourceBinding<H> | undefined {
     return this.bindings?.find((binding) =>
-      this.matchesBinding(binding, functionName),
-    ) as SimCfnCfBinding | undefined;
+      this.matchesBinding(binding, targets),
+    ) as SimCfnExecutableResourceBinding<H> | undefined;
   }
 
   /**
@@ -57,14 +74,22 @@ export class SimCfnCffBindingFinder {
    */
   private matchesBinding(
     binding: SimCfnExecutableResourceBinding,
-    functionName: string,
+    targets: SimCfnExecBindingTargets,
   ): boolean {
     if ("logicalId" in binding) {
       return this.resourceMatchesLogicalIdBinding(binding.logicalId);
     }
 
     if ("functionName" in binding) {
-      return binding.functionName === functionName;
+      return binding.functionName === targets.functionName;
+    }
+
+    if ("arn" in binding) {
+      return targets.arn !== undefined && binding.arn === targets.arn;
+    }
+
+    if ("cdkPath" in binding) {
+      return binding.cdkPath === this.cdkPath();
     }
 
     /* v8 ignore next */

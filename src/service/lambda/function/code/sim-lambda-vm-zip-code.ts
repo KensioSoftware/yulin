@@ -1,6 +1,10 @@
 import type { SimZipArchive } from "../../../../util/zip/zip-archive.js";
 import { SimLambdaRuntimeError } from "../../error/sim-lambda-runtime.error.js";
 import type { SimLambdaHandler } from "../sim-lambda-handler.type.js";
+import {
+  SimLambdaNoVmSdkModuleProvider,
+  type SimLambdaVmSdkModuleProvider,
+} from "./vm/sdk/sim-lambda-vm-sdk-module-provider.js";
 import type { SimLambdaExecutableCode } from "./sim-lambda-executable-code.js";
 import {
   makeSimLambdaVmContext,
@@ -12,6 +16,7 @@ interface SimLambdaVmZipCodeProperties {
   readonly archive: SimZipArchive;
   readonly handlerName: string;
   readonly environment: SimLambdaVmEnvironment;
+  readonly sdkModuleProvider?: SimLambdaVmSdkModuleProvider | undefined;
 }
 
 interface ParsedHandlerName {
@@ -59,12 +64,15 @@ export class SimLambdaVmZipCode implements SimLambdaExecutableCode {
   }
 
   private coldStart(): SimLambdaHandler {
-    const { archive, handlerName, environment } = this.properties;
+    const { archive, handlerName, environment, sdkModuleProvider } =
+      this.properties;
     const parsedName = parseLambdaHandlerName(handlerName);
 
     const modules = new SimLambdaVmModules({
       archive,
       context: makeSimLambdaVmContext(environment),
+      sdkModuleProvider:
+        sdkModuleProvider ?? new SimLambdaNoVmSdkModuleProvider(),
     });
     const moduleExports = this.importHandlerModule(
       modules,

@@ -27,6 +27,7 @@ Sim IAM currently supports:
 - CloudFormation resources:
   - `AWS::IAM::Role`
   - `AWS::IAM::ManagedPolicy`
+  - `AWS::IAM::Policy` (inline policies put onto referenced Roles)
 
 The simulator focuses on useful behavior for isolated tests and local development rather than full
 IAM feature parity. Unsupported IAM options may be ignored or may throw errors depending on whether
@@ -518,7 +519,11 @@ that never mention IAM keep working.
 
 ## CloudFormation Roles and Managed Policies
 
-Sim CloudFormation can create IAM resources from `AWS::IAM::Role` and `AWS::IAM::ManagedPolicy`.
+Sim CloudFormation can create IAM resources from `AWS::IAM::Role`, `AWS::IAM::ManagedPolicy`, and
+`AWS::IAM::Policy`. An `AWS::IAM::Policy` puts its document onto each Role named in `Roles` as an
+inline policy — the pattern CDK grants such as `bucket.grantRead(fn)` synthesize as a
+"DefaultPolicy" resource. IAM Users and Groups are not simulated as policy principals, so naming
+them fails creation rather than silently dropping the grant.
 
 ```typescript sim-iam-cloudformation
 /**
