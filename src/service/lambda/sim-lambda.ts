@@ -12,6 +12,7 @@ import {
   type SimIamInterServiceAuthZ,
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { CreateFunctionCommandHandler } from "./command/create-function/create-function.handler.js";
+import type { SimLambdaCodeStore } from "./function/code/store/sim-lambda-code-store.js";
 import type { SimLambdaFunctionMap } from "./function/sim-lambda-function.js";
 import type {
   SimCreateFunctionCommand,
@@ -38,6 +39,7 @@ interface SimLambdaProperties {
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
   readonly runAsOwner?: SimAwsRunAsOwner;
+  readonly codeStore?: SimLambdaCodeStore;
 }
 
 /**
@@ -50,6 +52,7 @@ export class SimLambda {
   private readonly iam: SimIamInterServiceAuthZ;
   private readonly background: BackgroundScheduler;
   private readonly runAsOwner: SimAwsRunAsOwner;
+  private readonly codeStore: SimLambdaCodeStore | undefined;
   private readonly sdkRouter = new SimLambdaSdkCommandRouter(this);
 
   constructor(properties: SimLambdaProperties = {}) {
@@ -57,11 +60,13 @@ export class SimLambda {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
+      codeStore,
     } = properties;
 
     this.accountRegionScope = accountRegionScope;
     this.iam = iam;
     this.background = background;
+    this.codeStore = codeStore;
     // Ambient execution-role callers are tracked per owning SimAws instance.
     // A standalone SimLambda is its own little universe, so it owns its own
     // ambient callers.
@@ -81,6 +86,7 @@ export class SimLambda {
       runAsOwner: this.runAsOwner,
       iam: this.iam,
       background: this.background,
+      codeStore: this.codeStore,
     });
     return await handler.handle(command, options);
   }

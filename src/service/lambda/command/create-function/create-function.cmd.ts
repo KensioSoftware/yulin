@@ -14,9 +14,16 @@ export interface SimCreateFunctionCommand {
 
 /**
  * Minimal structural sim Lambda function code input.
+ *
+ * Either ZipFile bytes or an S3 object location, as on real AWS.
+ * S3ObjectVersion is accepted but ignored, as sim S3 does not simulate
+ * object versioning yet.
  */
 export interface SimLambdaFunctionCode {
   ZipFile?: Uint8Array | undefined;
+  S3Bucket?: string | undefined;
+  S3Key?: string | undefined;
+  S3ObjectVersion?: string | undefined;
 }
 
 /**

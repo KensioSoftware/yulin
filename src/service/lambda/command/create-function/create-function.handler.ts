@@ -11,14 +11,21 @@ import {
   type SimIamInterServiceAuthZ,
 } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimLambdaResourceConflictException } from "../../error/sim-lambda.error.js";
+import type { SimLambdaExecutableCode } from "../../function/code/sim-lambda-executable-code.js";
+import { SimLambdaCodeResolver } from "../../function/code/sim-lambda-code-resolver.js";
+import type { SimLambdaCodeStore } from "../../function/code/store/sim-lambda-code-store.js";
 import {
+  DEFAULT_SIM_LAMBDA_MEMORY_SIZE_MB,
   SimLambdaFunction,
   type SimLambdaFunctionMap,
   type SimLambdaFunctionName,
   simLambdaFunctionArn,
 } from "../../function/sim-lambda-function.js";
 import { CreateFunctionAuthorizer } from "./create-function-authorizer.js";
-import { requireCreateFunctionInput } from "./create-function-input.js";
+import {
+  type CreateFunctionInput,
+  requireCreateFunctionInput,
+} from "./create-function-input.js";
 import type {
   SimCreateFunctionCommand,
   SimCreateFunctionCommandOutput,
@@ -30,6 +37,7 @@ interface CreateFunctionCommandHandlerProperties {
   runAsOwner: SimAwsRunAsOwner;
   iam?: SimIamInterServiceAuthZ;
   background?: BackgroundScheduler;
+  codeStore?: SimLambdaCodeStore | undefined;
 }
 
 interface CreateFunctionCommandHandlerOptions {
@@ -50,6 +58,7 @@ export class CreateFunctionCommandHandler implements CommandHandler<
   private readonly runAsOwner: SimAwsRunAsOwner;
   private readonly authorizer: CreateFunctionAuthorizer;
   private readonly background: BackgroundScheduler;
+  private readonly codeResolver: SimLambdaCodeResolver;
 
   constructor(properties: CreateFunctionCommandHandlerProperties) {
     const {
@@ -58,12 +67,14 @@ export class CreateFunctionCommandHandler implements CommandHandler<
       runAsOwner,
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
+      codeStore,
     } = properties;
     this.accountRegionScope = accountRegionScope;
     this.functions = functions;
     this.runAsOwner = runAsOwner;
     this.authorizer = new CreateFunctionAuthorizer({ iam });
     this.background = background;
+    this.codeResolver = new SimLambdaCodeResolver({ codeStore });
   }
 
   /**
@@ -84,14 +95,18 @@ export class CreateFunctionCommandHandler implements CommandHandler<
     );
     this.authorizer.authorize(functionArn, options?.caller);
 
-    if (this.functions.has(input.name as SimLambdaFunctionName)) {
-      throw new SimLambdaResourceConflictException(
-        `Function already exist: ${functionArn}`,
-      );
-    }
+    this.requireAvailableFunctionName(input.name, functionArn);
+
+    const code = await this.resolveCode(input, options?.caller);
+
+    // Re-check after resolving code: a concurrent create for the same name
+    // may have completed while awaiting an S3 code fetch, and must not be
+    // overwritten.
+    this.requireAvailableFunctionName(input.name, functionArn);
 
     const simFunction = new SimLambdaFunction({
       ...input,
+      code,
       accountRegionScope: this.accountRegionScope,
       runAsOwner: this.runAsOwner,
     });
@@ -105,5 +120,36 @@ export class CreateFunctionCommandHandler implements CommandHandler<
       $metadata: {},
       ...simFunction.configuration(),
     };
+  }
+
+  /**
+   * Ensure no sim Lambda function already has the given name.
+   */
+  private requireAvailableFunctionName(
+    name: string,
+    functionArn: string,
+  ): void {
+    if (this.functions.has(name as SimLambdaFunctionName)) {
+      throw new SimLambdaResourceConflictException(
+        `Function already exist: ${functionArn}`,
+      );
+    }
+  }
+
+  /**
+   * Resolve the validated code source into executable code, fetching
+   * S3-located code as the creating caller.
+   */
+  private async resolveCode(
+    input: CreateFunctionInput,
+    caller: SimAwsCaller | undefined,
+  ): Promise<SimLambdaExecutableCode> {
+    return await this.codeResolver.resolve(input.codeSource, {
+      handlerName: input.handlerName,
+      functionName: input.name,
+      regionName: this.accountRegionScope.regionName,
+      memorySizeMb: input.memorySizeMb ?? DEFAULT_SIM_LAMBDA_MEMORY_SIZE_MB,
+      caller,
+    });
   }
 }

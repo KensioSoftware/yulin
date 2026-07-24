@@ -3,6 +3,10 @@ import type { SimAwsRunAsOwner } from "../../aws/caller/sim-aws-run-as-context.j
 import { simAwsRunAsContext } from "../../aws/caller/sim-aws-run-as-context.js";
 import { simAwsAccountRegionScopeFactory } from "../../aws/sim-aws-account-region-scope.factory.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
+import {
+  type SimLambdaExecutableCode,
+  SimLambdaHandlerReferenceCode,
+} from "./code/sim-lambda-executable-code.js";
 import { SimLambdaHandlerRunner } from "./invoke/sim-lambda-handler-runner.js";
 import { SimLambdaInvokeContextBuilder } from "./invoke/sim-lambda-invoke-context-builder.js";
 import {
@@ -11,6 +15,9 @@ import {
 } from "./sim-lambda-handler.type.js";
 
 export type SimLambdaFunctionName = Brand<string, "SimLambdaFunctionName">;
+
+export const DEFAULT_SIM_LAMBDA_TIMEOUT_SECONDS = 3;
+export const DEFAULT_SIM_LAMBDA_MEMORY_SIZE_MB = 128;
 
 export type SimLambdaFunctionMap = Map<
   SimLambdaFunctionName,
@@ -58,6 +65,7 @@ interface SimLambdaFunctionProperties {
   roleArn: string;
   readonly accountRegionScope?: SimAwsAccountRegionScope;
   handlerFunction?: SimLambdaHandler;
+  code?: SimLambdaExecutableCode | undefined;
   state?: SimLambdaFunctionState;
   handlerName?: string | undefined;
   runtimeName?: string | undefined;
@@ -86,7 +94,7 @@ export class SimLambdaFunction {
   public readonly memorySizeMb: number;
 
   #state: SimLambdaFunctionState;
-  private readonly handlerFunction: SimLambdaHandler;
+  private readonly code: SimLambdaExecutableCode;
   private readonly runAsOwner: SimAwsRunAsOwner;
   private readonly runner = new SimLambdaHandlerRunner();
 
@@ -96,18 +104,19 @@ export class SimLambdaFunction {
       roleArn,
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       handlerFunction = defaultLambdaHandler,
+      code,
       state = "Pending",
       handlerName,
       runtimeName,
       description,
-      timeoutSeconds = 3,
-      memorySizeMb = 128,
+      timeoutSeconds = DEFAULT_SIM_LAMBDA_TIMEOUT_SECONDS,
+      memorySizeMb = DEFAULT_SIM_LAMBDA_MEMORY_SIZE_MB,
       runAsOwner = this,
     } = properties;
     this.name = name as SimLambdaFunctionName;
     this.roleArn = roleArn;
     this.accountRegionScope = accountRegionScope;
-    this.handlerFunction = handlerFunction;
+    this.code = code ?? new SimLambdaHandlerReferenceCode(handlerFunction);
     this.#state = state;
     this.handlerName = handlerName;
     this.runtimeName = runtimeName;
@@ -162,9 +171,11 @@ export class SimLambdaFunction {
    *
    * The handler runs with this function's execution Role as the ambient
    * simulated caller for the run-as owner, which is the owning SimAws
-   * instance when the function was created through one.
+   * instance when the function was created through one. Cold-start module
+   * imports also run as the execution Role, as on real Lambda.
    *
-   * Resolves with the handler result, or rejects with the handler error.
+   * Resolves with the handler result, or rejects with the handler or
+   * Runtime.* cold-start error.
    */
   async invoke(event: unknown): Promise<unknown> {
     const contextBuilder = new SimLambdaInvokeContextBuilder({
@@ -178,7 +189,11 @@ export class SimLambdaFunction {
       this.runAsOwner,
       { kind: "arn", arn: this.roleArn },
       async () =>
-        await this.runner.run(this.handlerFunction, event, contextBuilder),
+        await this.runner.run(
+          this.code.handlerFunction(),
+          event,
+          contextBuilder,
+        ),
     );
   }
 }

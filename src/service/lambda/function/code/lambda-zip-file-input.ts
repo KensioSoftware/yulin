@@ -1,4 +1,3 @@
-import { SimLambdaUnsupportedCodeInput } from "../../error/sim-lambda.error.js";
 import {
   defaultLambdaHandler,
   type SimLambdaHandler,
@@ -38,30 +37,5 @@ export class LambdaZipFileStowaway extends Uint8Array {
    */
   get handlerFunction(): SimLambdaHandler {
     return this.#handlerFunction;
-  }
-}
-
-/**
- * Extracts a handler function reference from Lambda function code input.
- *
- * This is the seam where other code inputs can be supported in future, such
- * as source code strings run in a vm context, or real zipped bundles produced
- * by CloudFormation or CDK packaging.
- */
-export class LambdaZipFileExtractor {
-  constructor(private readonly zipFileInput: Uint8Array) {}
-
-  /**
-   * Extract the handler function.
-   */
-  extractHandlerFunction(): SimLambdaHandler {
-    if (this.zipFileInput instanceof LambdaZipFileStowaway) {
-      return this.zipFileInput.handlerFunction;
-    }
-
-    throw new SimLambdaUnsupportedCodeInput(
-      "Sim Lambda only supports handler function references as function " +
-        "code; pass Code.ZipFile made with makeLambdaZipFileInput(handler)",
-    );
   }
 }

@@ -1,5 +1,9 @@
 export { SimLambda } from "./sim-lambda.js";
 export { makeLambdaZipFileInput } from "./function/code/lambda-zip-file-input.js";
+export {
+  makeLambdaCodeZip,
+  type LambdaCodeZipFiles,
+} from "./function/code/make-lambda-code-zip.js";
 export type {
   SimLambdaCallback,
   SimLambdaContext,
