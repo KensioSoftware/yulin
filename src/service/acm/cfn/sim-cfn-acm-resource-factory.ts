@@ -4,9 +4,7 @@ import type {
 } from "../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnServiceResourceFactory } from "../../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import { SimAcm } from "../sim-acm.js";
-import { assertDefined } from "../../../util/type-guard/defined.js";
-import type { SimAcmCertificate } from "../certificate/sim-acm-certificate.js";
-import { SimCfnAcmCertificatePropertyReader } from "./property/sim-cfn-acm-cert-properties.js";
+import { SimCfnAcmCertificateCreator } from "./certificate/sim-cfn-acm-cert-creator.js";
 
 interface SimAcmCfnResourceFactoryProperties {
   readonly acm?: SimAcm | undefined;
@@ -16,12 +14,12 @@ interface SimAcmCfnResourceFactoryProperties {
  * CloudFormation Resource factory for simulated ACM resources.
  */
 export class SimAcmCfnResourceFactory implements SimCfnServiceResourceFactory {
-  private readonly acm: SimAcm;
+  private readonly certificateCreator: SimCfnAcmCertificateCreator;
 
   constructor(properties: SimAcmCfnResourceFactoryProperties = {}) {
     const { acm = new SimAcm() } = properties;
 
-    this.acm = acm;
+    this.certificateCreator = new SimCfnAcmCertificateCreator({ acm });
   }
 
   /**
@@ -34,7 +32,7 @@ export class SimAcmCfnResourceFactory implements SimCfnServiceResourceFactory {
   ): Promise<object | undefined> {
     switch (resourceTypeName) {
       case "Certificate": {
-        return await this.createCertificate(resource, context);
+        return await this.certificateCreator.create(resource, context);
       }
       default: {
         throw new Error(
@@ -42,39 +40,5 @@ export class SimAcmCfnResourceFactory implements SimCfnServiceResourceFactory {
         );
       }
     }
-  }
-
-  private async createCertificate(
-    resource: SimCfnResource,
-    context: SimCloudFormationResourceCreateContext,
-  ): Promise<SimAcmCertificate> {
-    const properties = new SimCfnAcmCertificatePropertyReader({
-      logicalId: resource.logicalId,
-      properties: context.resolvedProperties ?? resource.properties,
-    });
-
-    const requestCertificateOutput = await this.acm.requestCertificate({
-      input: {
-        DomainName: properties.domainName(),
-        SubjectAlternativeNames: properties.subjectAlternativeNames(),
-        ValidationMethod: properties.validationMethod(),
-        DomainValidationOptions: properties.domainValidationOptions(),
-        Tags: properties.tags(),
-      },
-    });
-
-    const certificateArn = requestCertificateOutput.CertificateArn;
-    assertDefined(
-      certificateArn,
-      `sim ACM Certificate ARN after CloudFormation creation for ${resource.logicalId}`,
-    );
-
-    const certificate = this.acm.certificates.get(certificateArn);
-    assertDefined(
-      certificate,
-      `sim ACM Certificate ${certificateArn} after CloudFormation creation`,
-    );
-
-    return certificate;
   }
 }

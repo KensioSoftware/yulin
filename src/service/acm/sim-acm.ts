@@ -114,6 +114,19 @@ export class SimAcm {
   }
 
   /**
+   * Re-check a sim Certificate against DNS now, issuing it if it is validated.
+   *
+   * This publishes nothing. It is for callers that have already created the
+   * validation records themselves, such as CloudFormation.
+   * @internal
+   */
+  async settleCertificateValidation(
+    certificate: SimAcmCertificate,
+  ): Promise<void> {
+    await this.validation.settle(certificate);
+  }
+
+  /**
    * Handle a Describe Certificate Command from the SDK.
    */
   async describeCertificate(

@@ -12,7 +12,8 @@ certificates. It is an in-memory service for tests and local development, not a 
 - `certificate/` contains the simulated certificate model.
 - `command/` contains AWS SDK-style command handlers.
 - `validation/` contains domain validation against sim Route53.
-- `cfn/` contains CloudFormation support for `AWS::CertificateManager::Certificate`.
+- `cfn/` contains CloudFormation support for `AWS::CertificateManager::Certificate`, including
+  publishing validation records the template asks for.
 - `error/` contains ACM-specific AWS-like errors.
 
 `SimAcm` owns a map of certificates keyed by certificate ARN. When used through `SimAws`, ACM is
@@ -147,20 +148,47 @@ ACM CloudFormation support lives under `cfn/`.
 
 - `AWS::CertificateManager::Certificate`
 
-The factory reads resolved CloudFormation properties through the ACM certificate property helpers,
-then creates the certificate through the normal `requestCertificate()` command path. It does not
-construct certificates directly.
+The factory itself is a thin switch on resource type. `SimCfnAcmCertificateCreator` reads resolved
+CloudFormation properties through the ACM certificate property helpers, then creates the certificate
+through the normal `requestCertificate()` command path. It does not construct certificates directly.
 
 Supported certificate properties include:
 
 - `DomainName`
 - `SubjectAlternativeNames`
 - `ValidationMethod`
-- `DomainValidationOptions`
+- `DomainValidationOptions`, including `HostedZoneId`
 - `Tags`
 
-After the request command returns, the factory reads the created certificate from the service map
-and returns it as the CloudFormation-backed resource.
+`DomainValidationOptions` has its own property reader, `SimCfnAcmDomainValidationReader`, because it
+carries two unrelated things. `DomainName` and `ValidationDomain` are ACM API fields and go into the
+request-certificate command. `HostedZoneId` is CloudFormation-only, with no equivalent in the ACM
+API, and says where CloudFormation should publish the validation record.
+
+### CloudFormation-driven validation
+
+Creation is not finished when the request command returns. `SimCfnAcmCertificateValidation` then:
+
+1. publishes each domain's validation record into the Hosted Zone its `HostedZoneId` names, through
+   `SimCfnAcmValidationRecords`;
+2. settles the certificate through `SimAcm.settleCertificateValidation()`;
+3. fails the Resource if the certificate is still not issued.
+
+Records go through Route53's own `ChangeResourceRecordSets` command path rather than being written
+into the zone directly, so a validation record is an ordinary record in the hosted zone: listed by
+`ListResourceRecordSets` and answerable over DNS. Record mutations are scheduled, so each one waits
+on the zone's synchronization before the certificate is checked against DNS.
+
+A `HostedZoneId` naming a zone the simulator does not hold is skipped rather than failing. Zone IDs
+are matched leniently and deliberately not validated as simulator-shaped IDs, because a template
+commonly carries the ID of a real zone from a real account: that is an external zone rather than a
+broken template. The certificate then follows the usual rule and is issued with nothing
+authoritative for its domain.
+
+Waiting for issuance inside Resource creation is what makes dependent resources see an issued
+certificate, as they would in real CloudFormation. Failing rather than leaving the Resource pending
+is a deliberate difference: real CloudFormation sits in `CREATE_IN_PROGRESS` for hours before timing
+out, which is no use in a test.
 
 ## Background scheduling
 

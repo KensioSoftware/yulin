@@ -5,6 +5,7 @@ import type {
 } from "../../command/request-certificate/request-certificate.command.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import { SimCfnAcmCertificatePropertyListReader } from "./sim-cfn-acm-cert-property-reader.js";
+import { SimCfnAcmDomainValidationReader } from "./sim-cfn-acm-domain-validation-reader.js";
 
 interface SimCfnAcmCertificateProperties {
   readonly logicalId: string;
@@ -19,11 +20,15 @@ export class SimCfnAcmCertificatePropertyReader {
   private readonly logicalId: string;
   private readonly properties: SimCfnTemplateValueRecord;
   private readonly listReader: SimCfnAcmCertificatePropertyListReader;
+  private readonly domainValidationReader: SimCfnAcmDomainValidationReader;
 
   constructor(properties: SimCfnAcmCertificateProperties) {
     this.logicalId = properties.logicalId;
     this.properties = properties.properties;
     this.listReader = new SimCfnAcmCertificatePropertyListReader({
+      logicalId: this.logicalId,
+    });
+    this.domainValidationReader = new SimCfnAcmDomainValidationReader({
       logicalId: this.logicalId,
     });
   }
@@ -88,7 +93,20 @@ export class SimCfnAcmCertificatePropertyReader {
       return undefined;
     }
 
-    return this.listReader.domainValidationOptions(value);
+    return this.domainValidationReader.options(value);
+  }
+
+  /**
+   * Get the Hosted Zone each DomainValidationOptions entry names, by domain.
+   */
+  domainValidationHostedZoneIds(): ReadonlyMap<string, string> {
+    const value = this.properties["DomainValidationOptions"];
+
+    if (value === undefined) {
+      return new Map();
+    }
+
+    return this.domainValidationReader.hostedZoneIds(value);
   }
 
   /**

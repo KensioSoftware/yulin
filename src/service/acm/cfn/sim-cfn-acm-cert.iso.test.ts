@@ -59,10 +59,9 @@ describe("Sim ACM CloudFormation Certificate", () => {
 
     assertStringStartsWith(certificateReference, "arn:aws:acm:");
     assertIdentical(certificateArn, certificateReference);
-    assertIdentical(
-      stack.outputs.get("CertificateStatus")?.value,
-      "PENDING_VALIDATION",
-    );
+    // CloudFormation holds a Certificate Resource until it is issued, as real
+    // CloudFormation does, so the status is already ISSUED in stack outputs.
+    assertIdentical(stack.outputs.get("CertificateStatus")?.value, "ISSUED");
 
     // And the certificate can be found through the sim ACM list-certificates
     // command.
