@@ -4,6 +4,8 @@ import {
   BackgroundTasks,
 } from "../../../../util/background/background.js";
 import { findSimRoute53HostedZone } from "../../hosted-zone/find-sim-route53-hosted-zone.js";
+import { simRoute53HostedZoneArn } from "../../hosted-zone/sim-route53-hosted-zone-arn.js";
+import { simRoute53AbsoluteName } from "../../local-name/sim-route53-local-name.js";
 import type { SimRoute53HostedZone } from "../../hosted-zone/sim-route53-hosted-zone.js";
 import {
   normalizeSimRoute53HostedZoneId,
@@ -73,7 +75,7 @@ export class ListResourceRecordSetsCommandHandler implements CommandHandler<
     const hostedZoneId = normalizeSimRoute53HostedZoneId(
       command.input.HostedZoneId,
     );
-    const hostedZoneArn = `arn:aws:route53:::hostedzone/${hostedZoneId}`;
+    const hostedZoneArn = simRoute53HostedZoneArn(hostedZoneId);
 
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
@@ -105,5 +107,5 @@ function nextRecordName(name: string | undefined): string | undefined {
     return undefined;
   }
 
-  return `${name}.`;
+  return simRoute53AbsoluteName(name);
 }

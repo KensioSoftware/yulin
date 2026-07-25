@@ -5,6 +5,7 @@ import {
   BackgroundTasks,
 } from "../../../../util/background/background.js";
 import type { SimRoute53HostedZone } from "../../hosted-zone/sim-route53-hosted-zone.js";
+import { simRoute53HostedZoneArn } from "../../hosted-zone/sim-route53-hosted-zone-arn.js";
 import {
   normalizeSimRoute53HostedZoneId,
   type SimRoute53HostedZoneId,
@@ -74,7 +75,7 @@ export class ChangeResourceRecordSetsCommandHandler implements CommandHandler<
     const hostedZoneId = normalizeSimRoute53HostedZoneId(
       command.input.HostedZoneId,
     );
-    const hostedZoneArn = `arn:aws:route53:::hostedzone/${hostedZoneId}`;
+    const hostedZoneArn = simRoute53HostedZoneArn(hostedZoneId);
 
     const changes = command.input.ChangeBatch?.Changes;
     assertDefined(

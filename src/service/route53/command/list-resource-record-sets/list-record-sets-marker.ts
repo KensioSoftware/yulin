@@ -1,6 +1,9 @@
 import { normaliseSimRoute53Name } from "../../local-name/sim-route53-local-name.js";
 import type { SimRoute53Record } from "../../record/sim-route53-record.js";
-import { compareSimRoute53RecordNames } from "./list-record-sets-order.js";
+import {
+  compareOrdinal,
+  compareSimRoute53RecordNames,
+} from "./list-record-sets-order.js";
 
 interface RecordSetListMarkerProperties {
   readonly startRecordName?: string | undefined;
@@ -59,7 +62,9 @@ export function isRecordAtOrAfterMarker(
     return true;
   }
 
-  return record.type.localeCompare(marker.markerType) >= 0;
+  // Ordinal, matching how the sort orders record types, so the filter cannot
+  // disagree with the ordering the marker was produced from.
+  return compareOrdinal(record.type, marker.markerType) >= 0;
 }
 
 function normaliseMarkerName(name: string | undefined): string | undefined {

@@ -1,6 +1,27 @@
 import type { SimRoute53Record } from "../../record/sim-route53-record.js";
 
 /**
+ * Compare two strings by code unit rather than by locale.
+ *
+ * Record ordering has to be reproducible wherever the simulator runs, and it
+ * has to agree exactly with the order the pagination marker filter applies.
+ * `localeCompare` depends on the runtime's default locale and on how the
+ * collator weights characters that are legal in DNS labels, hyphens in
+ * particular, so ordinal comparison is used throughout record ordering.
+ */
+export function compareOrdinal(left: string, right: string): number {
+  if (left < right) {
+    return -1;
+  }
+
+  if (left > right) {
+    return 1;
+  }
+
+  return 0;
+}
+
+/**
  * Compare two normalised Route53 record names in DNS name order.
  *
  * Route53 orders record sets by DNS name, which compares labels from the right
@@ -20,7 +41,8 @@ export function compareSimRoute53RecordNames(
   for (let index = 0; index < labelCount; index += 1) {
     // A missing label sorts first, which puts shorter names before the longer
     // names that extend them.
-    const comparison = (leftLabels[index] ?? "").localeCompare(
+    const comparison = compareOrdinal(
+      leftLabels[index] ?? "",
       rightLabels[index] ?? "",
     );
 
@@ -48,5 +70,5 @@ export function compareSimRoute53Records(
     return nameComparison;
   }
 
-  return left.type.localeCompare(right.type);
+  return compareOrdinal(left.type, right.type);
 }

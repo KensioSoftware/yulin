@@ -1,3 +1,4 @@
+import { simRoute53AbsoluteName } from "../../local-name/sim-route53-local-name.js";
 import type { SimRoute53Record } from "../../record/sim-route53-record.js";
 import type { SimRoute53ResourceRecordSet } from "../change-resource-record-sets/change-resource-record-sets.cmd.js";
 
@@ -15,7 +16,7 @@ export function toSimRoute53ResourceRecordSet(
   }
 
   return {
-    Name: absoluteRecordName(record.name),
+    Name: simRoute53AbsoluteName(record.name),
     Type: record.type,
     TTL: record.ttl,
     ResourceRecords: record.values.map((value) => ({ Value: value })),
@@ -43,15 +44,11 @@ function toAliasResourceRecordSet(
   }
 
   return {
-    Name: absoluteRecordName(record.name),
+    Name: simRoute53AbsoluteName(record.name),
     Type: record.type,
     AliasTarget: {
-      DNSName: absoluteRecordName(aliasTargetName),
+      DNSName: simRoute53AbsoluteName(aliasTargetName),
       EvaluateTargetHealth: false,
     },
   };
-}
-
-function absoluteRecordName(name: string): string {
-  return `${name}.`;
 }

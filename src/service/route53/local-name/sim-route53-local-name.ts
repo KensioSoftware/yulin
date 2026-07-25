@@ -10,6 +10,17 @@ export function normaliseSimRoute53Name(name: string): string {
 }
 
 /**
+ * Render a Route53 name in absolute form, with the trailing dot AWS returns.
+ *
+ * This is the inverse of the trailing-dot stripping `normaliseSimRoute53Name`
+ * applies, and belongs at output boundaries where stored names become
+ * AWS-shaped command output.
+ */
+export function simRoute53AbsoluteName(name: string): string {
+  return `${name}.`;
+}
+
+/**
  * Convert a Yulin-local Route53 name to a logical DNS name.
  */
 export function simRoute53LogicalName(localName: string): string | undefined {
