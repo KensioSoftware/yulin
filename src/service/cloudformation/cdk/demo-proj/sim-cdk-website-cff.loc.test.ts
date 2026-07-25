@@ -105,6 +105,10 @@ const hostedZone = new route53.HostedZone(stack, "SiteHostedZone", {
 });
 const certificate = new acm.Certificate(stack, "Certificate", {
   domainName,
+  // The distribution serves www, so the certificate has to cover it too.
+  // CloudFront rejects a distribution whose alternate domain names its viewer
+  // certificate does not cover.
+  subjectAlternativeNames: ["www.example.test"],
   validation: acm.CertificateValidation.fromDns(hostedZone),
 });
 

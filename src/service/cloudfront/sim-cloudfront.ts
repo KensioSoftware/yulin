@@ -43,6 +43,7 @@ import {
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimCloudFrontSdkCommandRouter } from "./sdk/sim-cloudfront-sdk-command-router.js";
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
+import type { SimAcmRegistry } from "../acm/registry/sim-acm-registry.js";
 
 export interface SimCloudFrontRequestOptions {
   readonly caller?: SimAwsCaller;
@@ -53,6 +54,7 @@ interface SimCloudFrontProperties {
   readonly cloudFrontRegistry?: SimCloudFrontRegistry;
   readonly s3OriginResolver?: SimCloudFrontS3OriginResolver;
   readonly iam?: SimIamInterServiceAuthZ;
+  readonly acmRegistry?: SimAcmRegistry | undefined;
   readonly background?: BackgroundScheduler;
 }
 
@@ -73,6 +75,7 @@ export class SimCloudFront {
   private readonly cloudFrontRegistry: SimCloudFrontRegistry;
   private readonly s3OriginResolver: SimCloudFrontS3OriginResolver;
   private readonly iam: SimIamInterServiceAuthZ;
+  private readonly acmRegistry: SimAcmRegistry | undefined;
   private readonly background: BackgroundScheduler;
   private readonly cfnFactory = new SimCloudFrontCloudFormationResourceFactory(
     this,
@@ -85,6 +88,7 @@ export class SimCloudFront {
       cloudFrontRegistry = new SimCloudFrontRegistry(),
       s3OriginResolver = emptyCloudFrontS3OriginResolver,
       iam = new SimIamAllowAllAuth(),
+      acmRegistry,
       background = new BackgroundTasks(),
     } = properties;
 
@@ -92,6 +96,7 @@ export class SimCloudFront {
     this.cloudFrontRegistry = cloudFrontRegistry;
     this.s3OriginResolver = s3OriginResolver;
     this.iam = iam;
+    this.acmRegistry = acmRegistry;
     this.background = background;
   }
 
@@ -129,6 +134,7 @@ export class SimCloudFront {
       cloudFrontRegistry: this.cloudFrontRegistry,
       s3OriginResolver: this.s3OriginResolver,
       iam: this.iam,
+      acmRegistry: this.acmRegistry,
       background: this.background,
     });
     return await handler.handle(command, options);

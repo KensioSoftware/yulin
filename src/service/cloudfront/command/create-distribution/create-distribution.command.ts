@@ -38,6 +38,9 @@ export interface SimCreateDistributionCommandOutput {
  * Minimal structural sim CloudFront DistributionConfig.
  */
 export interface SimCloudFrontDistributionConfig {
+  readonly CallerReference?: string | undefined;
+  readonly Comment?: string | undefined;
+  readonly Enabled?: boolean | undefined;
   readonly Aliases?:
     | undefined
     | {
@@ -56,6 +59,25 @@ export interface SimCloudFrontDistributionConfig {
         readonly Items?:
           readonly SimCloudFrontCacheBehaviorConfig[] | undefined;
       };
+  readonly ViewerCertificate?: SimCloudFrontViewerCertificate | undefined;
+}
+
+/**
+ * Minimal structural sim CloudFront ViewerCertificate.
+ *
+ * The CloudFront API and CloudFormation capitalise the certificate fields
+ * differently: the API has `ACMCertificateArn` and `SSLSupportMethod`, while
+ * `AWS::CloudFront::Distribution` has `AcmCertificateArn` and
+ * `SslSupportMethod`. Both spellings are accepted so a template and an SDK
+ * call reach the simulator the same way.
+ */
+export interface SimCloudFrontViewerCertificate {
+  readonly CloudFrontDefaultCertificate?: boolean | undefined;
+  readonly ACMCertificateArn?: string | undefined;
+  readonly AcmCertificateArn?: string | undefined;
+  readonly SSLSupportMethod?: string | undefined;
+  readonly SslSupportMethod?: string | undefined;
+  readonly MinimumProtocolVersion?: string | undefined;
 }
 
 /**

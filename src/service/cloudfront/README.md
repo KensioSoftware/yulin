@@ -56,6 +56,30 @@ time, including:
 The `Distribution/configurator/` classes translate AWS-style `DistributionConfig` input into the
 internal Distribution model.
 
+### Viewer certificates
+
+`distribution/viewer-certificate/` holds the checks CloudFront applies to a Distribution's ACM
+certificate. They run before any Distribution state is allocated, because CloudFront rejects the
+whole request.
+
+`SimCloudFrontViewerCertificateValidator` rejects, all as `InvalidViewerCertificate`:
+
+- a certificate outside `us-east-1`, which is the gotcha worth simulating: nothing else in a stack
+  cares which Region the certificate is in, so the mistake only surfaces at deploy time;
+- an ARN that resolves to no certificate;
+- a certificate that is not `ISSUED`;
+- alternate domain names the certificate does not cover.
+
+`SimCloudFrontAliasCoverage` owns the last of those. A wildcard covers exactly one label, as in AWS:
+`*.a.test` covers `www.a.test` but neither `a.test` nor `deep.www.a.test`.
+
+The CloudFront API and CloudFormation capitalise this property differently, so both spellings are
+accepted: `ACMCertificateArn`/`SSLSupportMethod` from the API, and
+`AcmCertificateArn`/`SslSupportMethod` from `AWS::CloudFront::Distribution`.
+
+Certificates are resolved through `SimAcmRegistry`, so a standalone `SimCloudFront` with no
+registry checks nothing.
+
 ## Request routing and handling
 
 HTTP request behaviour is split across a few directories:
@@ -93,6 +117,8 @@ The key integration points are:
   information across the broader simulated AWS instance.
 - S3 Origin resolution, which lets CloudFront Distributions fetch from simulated S3 buckets and S3
   website Origins.
+- `SimAcmRegistry`, which resolves the ACM Certificate a Distribution's viewer certificate ARN
+  names, wherever in the simulated AWS instance it lives.
 
 A standalone `SimCloudFront` instance can be used directly, but full CloudFront routing is usually
 most useful through `SimAws`, where CloudFront, S3, and the shared registry are wired together.

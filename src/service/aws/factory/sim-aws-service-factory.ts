@@ -14,6 +14,7 @@ import { SimS3GlobalRegistry } from "../../s3/sim-s3-global-registry.js";
 import { SimAwsAccountServiceCache } from "./sim-aws-account-service-cache.js";
 import { SimAcm } from "../../acm/sim-acm.js";
 import { SimRoute53AcmDnsRecords } from "../../acm/validation/sim-route53-acm-dns-records.js";
+import { SimAcmRegistry } from "../../acm/registry/sim-acm-registry.js";
 import { SimRoute53Registry } from "../../route53/registry/sim-route53-registry.js";
 import type { SimIam } from "../../iam/index.js";
 import { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
@@ -63,6 +64,15 @@ export class SimAwsServiceFactory {
   private readonly background: BackgroundScheduler & BackgroundCompleter;
 
   /**
+   * Shared simulated ACM registry.
+   *
+   * This indexes the account/region-scoped ACM facades created for one SimAws
+   * instance, so services holding only a Certificate ARN, such as CloudFront,
+   * can resolve the Certificate it names.
+   */
+  private readonly acmRegistry = new SimAcmRegistry();
+
+  /**
    * Shared simulated Route53 registry.
    *
    * This owns hosted zone and DNS record state that is shared by the
@@ -87,6 +97,7 @@ export class SimAwsServiceFactory {
     this.accountServices = new SimAwsAccountServiceCache({
       simAws: properties.simAws,
       background: properties.background,
+      acmRegistry: this.acmRegistry,
       cloudFrontRegistry: this.cloudFrontRegistry,
       route53Registry: this.route53Registry,
       iamRegistry: this.iamRegistry,
@@ -99,7 +110,7 @@ export class SimAwsServiceFactory {
   createAcm(scope: SimAwsAccountRegionContainer): SimAcm {
     const iam = this.createIam(scope);
 
-    return new SimAcm({
+    const acm = new SimAcm({
       accountRegionScope: scope.accountRegionScope,
       iam,
       background: this.background,
@@ -109,6 +120,10 @@ export class SimAwsServiceFactory {
         route53Registry: this.route53Registry,
       }),
     });
+
+    this.acmRegistry.register(scope.accountRegionScope, acm);
+
+    return acm;
   }
 
   /**
