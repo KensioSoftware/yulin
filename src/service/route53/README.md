@@ -337,6 +337,26 @@ created record.
 CloudFormation-created records should follow the same validation, normalization, change scheduling,
 and status transitions as SDK-created records.
 
+## Hosted-zone summary serving
+
+`serve/` holds Route53's own localhost HTTP controller, which is unlike the S3 and CloudFront
+controllers in that it does not serve a simulated AWS resource. It serves Yulin's view of the
+simulated hosted zones so a developer running `serveSimAws` can inspect Route53 state in a browser.
+
+The hostname is `dns.sim-aws.localhost`, whose logical name is defined by `simRoute53DnsHostName`.
+`SimRoute53ServiceTargetResolver` recognises it ahead of the S3 and CloudFront hostnames, so it
+cannot be shadowed by hosted-zone records, in the same way the other built-in service hostnames
+cannot. That means the summary stays reachable whatever a test has created.
+
+The summary reads the hosted-zone model directly rather than issuing `ListResourceRecordSets`,
+because it is an environment-wide development view rather than an AWS API call: it is not scoped to
+one Account and it does not apply sim IAM authorization. Zones come from `SimRoute53Registry` via
+`SimRoute53.resolvableHostedZones()`, so zones created in any simulated Account appear.
+
+Rendering is split into `zone-summary/`, with the page structure in
+`sim-route53-zone-summary-page.ts` and escaping in `sim-route53-summary-html.ts`. Hosted-zone names
+and record values originate in user templates and test code, so everything rendered is escaped.
+
 ## Cross-service routing role
 
 Route53's main cross-service role is name indirection for the local serving path.

@@ -162,6 +162,20 @@ export class SimRoute53 {
   }
 
   /**
+   * Get every Hosted Zone resolvable in this simulated AWS environment.
+   *
+   * Route53 service instances are Account-scoped, but DNS-style resolution is
+   * global, so the localhost serving layer reads zones from the shared registry
+   * rather than from one Account's hosted-zone map.
+   */
+  resolvableHostedZones(): ReadonlyMap<
+    SimRoute53HostedZoneId,
+    SimRoute53HostedZone
+  > {
+    return this.route53Registry.hostedZones;
+  }
+
+  /**
    * Resolve a Yulin-local HTTP hostname to a simulated AWS service target.
    */
   resolveHttpHost(hostname: string): SimAwsServiceTarget | undefined {
