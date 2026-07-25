@@ -13,6 +13,7 @@ Sim ACM currently supports:
 - Describing certificates with `DescribeCertificateCommand`
 - Listing certificates with `ListCertificatesCommand`
 - DNS validation against records in sim Route53
+- CloudFormation-published validation records from `DomainValidationOptions[].HostedZoneId`
 - EMAIL validation method shapes (but validation always succeeds regardless)
 - Subject alternative names
 - Certificate tags, up to the ACM limit of 50 tags
@@ -645,8 +646,79 @@ Supported certificate properties include:
 - `DomainName`
 - `SubjectAlternativeNames`
 - `ValidationMethod`
-- `DomainValidationOptions`
+- `DomainValidationOptions`, including `HostedZoneId`
 - `Tags`
+
+### Validating a certificate from the template
+
+Give a `DomainValidationOptions` entry a `HostedZoneId` and sim CloudFormation publishes the
+validation record itself, the same way real CloudFormation does. This is what CDK emits for
+`CertificateValidation.fromDns(zone)`, so a CDK-synthesised template works without changes.
+
+A certificate Resource is not complete until the certificate is issued, again as in real
+CloudFormation, so anything depending on the certificate is created after it exists.
+
+```typescript sim-acm-cloudformation-dns-validation
+/**
+ * Validating an ACM certificate from a simulated CloudFormation template.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "acm-dns-validation-stack",
+  template: {
+    Resources: {
+      Zone: {
+        Type: "AWS::Route53::HostedZone",
+        Properties: {
+          Name: "example.test",
+        },
+      },
+      SiteCertificate: {
+        Type: "AWS::CertificateManager::Certificate",
+        Properties: {
+          DomainName: "api.example.test",
+          ValidationMethod: "DNS",
+          DomainValidationOptions: [
+            {
+              DomainName: "api.example.test",
+              HostedZoneId: { Ref: "Zone" },
+            },
+          ],
+        },
+      },
+    },
+    Outputs: {
+      CertificateStatus: {
+        Value: {
+          "Fn::GetAtt": ["SiteCertificate", "CertificateStatus"],
+        },
+      },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+
+// The hosted zone, the validation record and the issued certificate, from one
+// template deploy.
+console.log(stack.outputs.get("CertificateStatus")?.value); // ISSUED
+```
+
+`HostedZoneId` accepts a `Ref` to an `AWS::Route53::HostedZone` in the same template, as above, or
+the literal ID of a zone created outside the stack.
+
+A `HostedZoneId` naming a hosted zone the simulator does not hold is skipped rather than failing,
+since Route53 is often managed by another team or another tool. The certificate then follows the
+usual rule from [DNS validation against sim Route53](#dns-validation-against-sim-route53): with
+nothing authoritative for its domain, it is issued without validation.
+
+If a hosted zone does cover the domain but the validation record never appears, the stack fails
+rather than hanging. Real CloudFormation sits in `CREATE_IN_PROGRESS` for hours before timing out
+here, which is no use in a test, so the resource fails immediately naming the record it waited for.
 
 ## Limitations
 
@@ -657,7 +729,6 @@ Current documented limitations:
 - Imported certificates are not supported.
 - EMAIL validation always succeeds; only DNS validation is really checked.
 - DNS validation is checked against sim Route53 only, never against real DNS.
-- Validation does not time out: a certificate whose record never appears stays `PENDING_VALIDATION`.
-- CloudFormation templates cannot create their own validation records yet, so
-  `DomainValidationOptions[].HostedZoneId` is ignored.
+- Validation does not time out: a certificate requested through the SDK whose record never appears
+  stays `PENDING_VALIDATION`. A CloudFormation certificate fails its stack instead.
 - ACM is not served as an HTTP API by `serveSimAws`.

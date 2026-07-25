@@ -1,7 +1,4 @@
-import type {
-  SimRequestCertificateDomainValidationOption,
-  SimRequestCertificateTag,
-} from "../../command/request-certificate/request-certificate.command.js";
+import type { SimRequestCertificateTag } from "../../command/request-certificate/request-certificate.command.js";
 import { isRecord } from "../../../../util/type-guard/record.js";
 
 interface SimCfnAcmCertificatePropertyListReaderProperties {
@@ -21,6 +18,9 @@ interface SimCfnAcmCertificatePropertyListReaderProperties {
  * - each array item is validated with an index-aware error path;
  * - nested optional string fields are checked before being returned to the
  *   request-certificate command shape.
+ *
+ * DomainValidationOptions has its own reader, because it carries a
+ * CloudFormation-only Hosted Zone reference alongside its ACM fields.
  */
 export class SimCfnAcmCertificatePropertyListReader {
   private readonly logicalId: string;
@@ -52,21 +52,6 @@ export class SimCfnAcmCertificatePropertyListReader {
   }
 
   /**
-   * Read Certificate DomainValidationOptions.
-   *
-   * Each option is a small object with optional string fields. The simulator
-   * returns the command input shape because the ACM resource factory can pass it
-   * directly into the request-certificate flow.
-   */
-  domainValidationOptions(
-    value: unknown,
-  ): readonly SimRequestCertificateDomainValidationOption[] {
-    this.assertArray(value, "DomainValidationOptions");
-
-    return value.map((item, index) => this.domainValidationOption(item, index));
-  }
-
-  /**
    * Read Certificate Tags.
    *
    * Tags follow the AWS SDK command shape where Key and Value are optional
@@ -81,47 +66,11 @@ export class SimCfnAcmCertificatePropertyListReader {
 
   private assertArray(
     value: unknown,
-    propertyName:
-      "SubjectAlternativeNames" | "DomainValidationOptions" | "Tags",
+    propertyName: "SubjectAlternativeNames" | "Tags",
   ): asserts value is unknown[] {
     if (!Array.isArray(value)) {
       throw this.propertyError(propertyName, "must be an array");
     }
-  }
-
-  private domainValidationOption(
-    value: unknown,
-    index: number,
-  ): SimRequestCertificateDomainValidationOption {
-    const propertyPath = `DomainValidationOptions[${String(index)}]`;
-
-    if (!isRecord(value)) {
-      throw this.propertyError(propertyPath, "must be an object");
-    }
-
-    const domainName = value["DomainName"];
-    if (domainName !== undefined && typeof domainName !== "string") {
-      throw this.propertyError(
-        `${propertyPath}.DomainName`,
-        "must be a string",
-      );
-    }
-
-    const validationDomain = value["ValidationDomain"];
-    if (
-      validationDomain !== undefined &&
-      typeof validationDomain !== "string"
-    ) {
-      throw this.propertyError(
-        `${propertyPath}.ValidationDomain`,
-        "must be a string",
-      );
-    }
-
-    return {
-      DomainName: domainName,
-      ValidationDomain: validationDomain,
-    };
   }
 
   private tag(value: unknown, index: number): SimRequestCertificateTag {
