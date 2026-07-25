@@ -4,6 +4,7 @@ import {
   assertInstanceOf,
   assertNonNullable,
   assertStringIncludes,
+  assertThrowsError,
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import {
@@ -166,6 +167,17 @@ describe("Sim ACM DNS validation overrides", () => {
 
     // Then it reports the certificate as not found.
     assertInstanceOf(error, SimAcmResourceNotFoundException);
+  });
+
+  it("rejects requiring DNS validation with no sim Route53", () => {
+    // Given standalone ACM, with no simulated DNS anywhere.
+    const simAcm = new SimAcm();
+
+    // When DNS validation is required.
+    const error = assertThrowsError(() => simAcm.requireDnsValidation());
+
+    // Then it explains that nothing could ever satisfy it.
+    assertStringIncludes(error.message, "no sim Route53 to validate against");
   });
 
   it("throws completing DNS validation with no certificate ARN", async () => {

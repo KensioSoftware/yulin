@@ -325,8 +325,9 @@ console.log(issuedOutput.Certificate?.Status); // ISSUED
 ```
 
 Each domain on a certificate is validated separately, so a certificate with subject alternative
-names is issued only once every domain's record exists. Until then `DescribeCertificateCommand`
-reports `SUCCESS` for the domains already validated and `PENDING_VALIDATION` for the rest.
+names is issued only once every domain that needs DNS validation has its record. Domains no hosted
+zone covers need nothing published for them. Until then `DescribeCertificateCommand` reports
+`SUCCESS` for the domains already validated and `PENDING_VALIDATION` for the rest.
 
 Hosted zones are looked up across every simulated account, matching real ACM validating against
 public DNS. A certificate in one account can be validated by a hosted zone in another.
@@ -386,6 +387,8 @@ Two methods override the default for tests where the hosted zone heuristic guess
   without creating a hosted zone first.
 
 A standalone `new SimAcm()` has no sim Route53 at all, so it always issues certificates immediately.
+Calling `requireDnsValidation()` on one throws, because nothing could ever publish the record it
+would then wait for.
 
 ## Listing and filtering certificates
 

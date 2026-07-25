@@ -93,8 +93,8 @@ record into the hosted zone covering it, settles the certificate, and throws
 ## RequestCertificate
 
 `RequestCertificateCommandHandler` validates the required inputs, sequences background work, creates
-a certificate, stores it in the service certificate map, and schedules certificate issuance as a
-background task.
+a certificate, stores it in the service certificate map, and schedules domain validation as a
+background task. Validation is what issues the certificate, once every domain has succeeded.
 
 Current behaviour:
 

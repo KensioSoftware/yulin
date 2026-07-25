@@ -35,8 +35,18 @@ export class SimAcmCertificateValidation {
 
   /**
    * Always require a DNS validation record before issuing a Certificate.
+   *
+   * With no sim Route53 to validate against there is no way to satisfy this,
+   * so it is rejected rather than silently issuing certificates anyway.
    */
   alwaysRequireDnsValidation(): void {
+    if (this.dnsRecords === undefined) {
+      throw new Error(
+        "Sim ACM cannot require DNS validation with no sim Route53 to validate against. " +
+          "Use SimAws, so ACM can see Hosted Zones, rather than a standalone SimAcm.",
+      );
+    }
+
     this.mode = SimAcmDnsValidationMode.always();
   }
 
