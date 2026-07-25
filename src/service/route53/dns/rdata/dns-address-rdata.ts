@@ -1,6 +1,7 @@
 import { DnsMessageFormatError } from "../error/dns-message.error.js";
 
 const ipv4ByteCount = 4;
+const decimalPattern = /^\d+$/u;
 const ipv6GroupCount = 8;
 
 /**
@@ -89,14 +90,18 @@ function exactGroups(
 }
 
 function parseOctet(address: string, part: string): number {
+  // Matched against digits before conversion because Number() also accepts
+  // hexadecimal, exponent and signed forms, so "0x10" or "1e2" would otherwise
+  // encode as some other octet instead of being rejected.
+  if (!decimalPattern.test(part)) {
+    throw new DnsMessageFormatError(
+      `Cannot encode ${address} as an A record: ${part} is not an octet`,
+    );
+  }
+
   const octet = Number(part);
 
-  if (
-    !Number.isSafeInteger(octet) ||
-    octet < 0 ||
-    octet > 255 ||
-    part.length === 0
-  ) {
+  if (octet > 255) {
     throw new DnsMessageFormatError(
       `Cannot encode ${address} as an A record: ${part} is not an octet`,
     );

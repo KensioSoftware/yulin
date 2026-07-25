@@ -5,6 +5,7 @@ import { DnsMessageFormatError } from "../error/dns-message.error.js";
 const soaFieldCount = 7;
 const soaIntervalCount = 5;
 const maxUnsignedInt32 = 4_294_967_295;
+const decimalPattern = /^\d+$/u;
 
 /**
  * Encode an SOA record value as RDATA.
@@ -39,13 +40,18 @@ export function encodeDnsSoaRdata(value: string): Uint8Array {
 }
 
 function parseInterval(value: string, field: string): number {
+  // Matched against digits before conversion because Number() also accepts
+  // hexadecimal, exponent and signed forms, which would otherwise be encoded as
+  // some other interval rather than rejected.
+  if (!decimalPattern.test(field)) {
+    throw new DnsMessageFormatError(
+      `Cannot encode SOA value ${value}: ${field} is not a 32-bit interval`,
+    );
+  }
+
   const interval = Number(field);
 
-  if (
-    !Number.isSafeInteger(interval) ||
-    interval < 0 ||
-    interval > maxUnsignedInt32
-  ) {
+  if (interval > maxUnsignedInt32) {
     throw new DnsMessageFormatError(
       `Cannot encode SOA value ${value}: ${field} is not a 32-bit interval`,
     );

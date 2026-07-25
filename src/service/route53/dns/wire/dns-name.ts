@@ -18,11 +18,10 @@ const utf8Decoder = new TextDecoder();
  * bytes per answer.
  */
 export function encodeDnsName(name: string): Uint8Array {
-  const labels = name.split(".").filter((label) => label.length > 0);
   const bytes: number[] = [];
 
-  for (const label of labels) {
-    const labelBytes = encodeLabel(label);
+  for (const label of splitDnsLabels(name)) {
+    const labelBytes = encodeLabel(name, label);
     bytes.push(labelBytes.length, ...labelBytes);
   }
 
@@ -85,7 +84,31 @@ export function decodeDnsName(
   }
 }
 
-function encodeLabel(label: string): Uint8Array {
+/**
+ * Split a name into the labels to encode.
+ *
+ * A single trailing empty part is the root label of an absolute name such as
+ * `example.test.`, so it is dropped rather than encoded. Any other empty label
+ * means a malformed name like `a..b.test`, which is rejected in `encodeLabel`
+ * rather than silently collapsed: sim Route53 name normalisation only strips
+ * trailing dots, so an empty label here would encode to a different name than
+ * the one stored.
+ */
+function splitDnsLabels(name: string): readonly string[] {
+  const parts = name.split(".");
+
+  if (parts.at(-1) === "") {
+    return parts.slice(0, -1);
+  }
+
+  return parts;
+}
+
+function encodeLabel(name: string, label: string): Uint8Array {
+  if (label.length === 0) {
+    throw new DnsMessageFormatError(`DNS name ${name} contains an empty label`);
+  }
+
   const labelBytes = utf8Encoder.encode(label);
 
   if (labelBytes.length > maxLabelLength) {

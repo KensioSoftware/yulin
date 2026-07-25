@@ -80,6 +80,26 @@ describe("DNS name wire format", () => {
     assertStringIncludes(error.message, "over the 255 byte limit");
   });
 
+  it("rejects an empty label rather than silently collapsing it", () => {
+    // Given a name with a repeated dot, which sim Route53 name normalisation
+    // does not collapse.
+    // When it is encoded.
+    const error = assertThrowsError(() => encodeDnsName("a..b.test"));
+
+    // Then it is rejected instead of encoding as the different name a.b.test.
+    assertInstanceOf(error, DnsMessageFormatError);
+    assertStringIncludes(error.message, "contains an empty label");
+  });
+
+  it("encodes the root name as a bare root label", () => {
+    // Given the empty name, which is the DNS root.
+    // When it is encoded.
+    const encoded = encodeDnsName("");
+
+    // Then it is just the root label.
+    assertArrayEquals([...encoded], [0]);
+  });
+
   it("rejects a compression pointer rather than following it", () => {
     // Given a name that begins with a compression pointer.
     const pointer = Uint8Array.of(0xc0, 0x0c);

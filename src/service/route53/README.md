@@ -370,6 +370,12 @@ The scope is deliberately narrow, which is what keeps the codec small:
   `TXT`, `NS`, `SOA`. `dns-record-type.ts` maps those to and from wire type
   numbers, and returns `undefined` for any other query type so a caller answers
   with no records rather than guessing at an encoding it does not have.
+- **`ANY` (QTYPE 255) is a query type, not a record type**, so it deliberately
+  does not map to a stored record type. `dnsAnyQueryType` is exported for a
+  caller that wants to recognise it, but what to _answer_ for `ANY` is answer
+  semantics rather than wire format, and is not the codec's decision. Note that
+  RFC 8482 discourages returning every record at a name in response to `ANY`, so
+  "answer with all of them" is not an obvious default to build in.
 - **Names are always written uncompressed.** Compression is optional for a
   message author and every resolver must accept uncompressed names, so leaving
   it out removes the most error-prone part of the format. Compression pointers
