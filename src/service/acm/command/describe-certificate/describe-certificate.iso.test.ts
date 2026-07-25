@@ -185,7 +185,7 @@ describe("ACM DescribeCertificateCommand", () => {
     assertArrayLength(describeOutput.Certificate.DomainValidationOptions, 1);
     assertIdentical(
       describeOutput.Certificate.DomainValidationOptions[0].ValidationStatus,
-      "ISSUED",
+      "SUCCESS",
     );
   });
 

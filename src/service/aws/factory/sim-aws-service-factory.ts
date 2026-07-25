@@ -13,6 +13,7 @@ import { SimS3 } from "../../s3/sim-s3.js";
 import { SimS3GlobalRegistry } from "../../s3/sim-s3-global-registry.js";
 import { SimAwsAccountServiceCache } from "./sim-aws-account-service-cache.js";
 import { SimAcm } from "../../acm/sim-acm.js";
+import { SimRoute53AcmDnsRecords } from "../../acm/validation/sim-route53-acm-dns-records.js";
 import { SimRoute53Registry } from "../../route53/registry/sim-route53-registry.js";
 import type { SimIam } from "../../iam/index.js";
 import { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
@@ -102,6 +103,11 @@ export class SimAwsServiceFactory {
       accountRegionScope: scope.accountRegionScope,
       iam,
       background: this.background,
+      // Certificates validate against Hosted Zones from any simulated Account,
+      // as real ACM validates against public DNS.
+      dnsRecords: new SimRoute53AcmDnsRecords({
+        route53Registry: this.route53Registry,
+      }),
     });
   }
 

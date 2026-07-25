@@ -150,6 +150,13 @@ The record store supports three mutation modes:
 - `upsert()` creates or replaces a name/type record
 - `delete()` removes by name/type and is tolerant of missing records
 
+The store also notifies listeners registered through `onChange()` after every mutation.
+`SimRoute53Registry` subscribes each hosted zone as it is registered and re-broadcasts through its
+own `onRecordChange()`, so other simulated services can watch DNS across every account without
+holding a reference to individual zones. Sim ACM uses this to validate certificates when their
+validation record appears. Pushing changes this way rather than having watchers poll is what keeps
+background task draining terminating.
+
 Reads are `get()` for one name/type pair and `list()` for the whole zone. Both return copies, so
 callers cannot mutate hosted-zone state through a returned record. `list()` returns records in map
 insertion order rather than DNS order, because the store is a lookup structure; callers that need
@@ -281,6 +288,11 @@ then a lookup for `www.sub.example.test` prefers records from `sub.example.test`
 This is an important Route53-like behaviour. It lets tests model overlapping hosted zones without
 requiring a global DNS tree. The implementation remains simple because hosted zones are still just
 entries in a map; most-specific selection is applied only during record lookup.
+
+`findZone()` answers the related but distinct question of which hosted zone covers a name at all,
+regardless of the records it currently holds. That is what a caller needs to decide where a new
+record should be written, or to establish that nothing in the simulation could ever answer for a
+name. Sim ACM uses it for both.
 
 ## CloudFormation support
 

@@ -1,4 +1,8 @@
 import type { SimArn } from "../../aws/arn.js";
+import type {
+  SimAcmDomainValidation,
+  SimAcmValidationMethod,
+} from "./sim-acm-domain-validation.js";
 
 export type SimAcmCertificateStatus =
   | "EXPIRED"
@@ -8,23 +12,10 @@ export type SimAcmCertificateStatus =
   | "PENDING_VALIDATION"
   | "REVOKED"
   | "VALIDATION_TIMED_OUT";
-export type SimAcmValidationMethod = "DNS" | "EMAIL" | "HTTP";
 
 export interface SimAcmTag {
   readonly Key?: string | undefined;
   readonly Value?: string | undefined;
-}
-
-export interface SimAcmValidationRecord {
-  readonly name: string;
-  readonly type: "CNAME";
-  readonly value: string;
-}
-
-export interface SimAcmDomainValidationOption {
-  readonly domainName: string;
-  readonly validationMethod?: SimAcmValidationMethod | undefined;
-  readonly resourceRecord?: SimAcmValidationRecord | undefined;
 }
 
 interface SimAcmCertificateProperties {
@@ -34,7 +25,7 @@ interface SimAcmCertificateProperties {
   readonly status?: SimAcmCertificateStatus | undefined;
   readonly validationMethod?: SimAcmValidationMethod | undefined;
   readonly domainValidationOptions?:
-    readonly SimAcmDomainValidationOption[] | undefined;
+    readonly SimAcmDomainValidation[] | undefined;
   readonly createdAt?: Date | undefined;
   readonly issuedAt?: Date | undefined;
   readonly tags?: readonly SimAcmTag[] | undefined;
@@ -48,7 +39,7 @@ export class SimAcmCertificate {
   public readonly domainName: string;
   public readonly subjectAlternativeNames: readonly string[];
   public readonly validationMethod?: SimAcmValidationMethod | undefined;
-  public readonly domainValidationOptions: readonly SimAcmDomainValidationOption[];
+  public readonly domainValidationOptions: readonly SimAcmDomainValidation[];
   public readonly createdAt: Date;
   public readonly tags?: readonly SimAcmTag[] | undefined;
 
@@ -94,11 +85,33 @@ export class SimAcmCertificate {
   }
 
   /**
+   * Whether every domain name on this sim Certificate has been validated.
+   *
+   * ACM issues a certificate only once ownership of all of its domain names is
+   * proven, so this is the gate the validation flow waits on.
+   */
+  get isValidated(): boolean {
+    return this.domainValidationOptions.every(
+      (domainValidation) => domainValidation.hasSucceeded,
+    );
+  }
+
+  /**
    * Move the sim Certificate into ISSUED status.
+   *
+   * Issuing implies every domain name was validated, so any domain validation
+   * still pending is marked successful here. That keeps the per-domain
+   * statuses consistent with the certificate status for the paths that issue a
+   * certificate without waiting for DNS, such as EMAIL validation.
    */
   issue(): Promise<void> {
     this.#status = "ISSUED";
     this.#issuedAt = new Date();
+
+    for (const domainValidation of this.domainValidationOptions) {
+      domainValidation.succeed();
+    }
+
     return Promise.resolve();
   }
 }

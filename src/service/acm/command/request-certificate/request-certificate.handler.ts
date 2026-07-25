@@ -18,12 +18,14 @@ import {
   type SimIamInterServiceAuthZ,
 } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import { SimAcmCertificateValidation } from "../../validation/sim-acm-certificate-validation.js";
 
 interface RequestCertificateCommandHandlerProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly certificates: Map<SimArn, SimAcmCertificate>;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
+  readonly validation?: SimAcmCertificateValidation;
 }
 
 interface RequestCertificateCommandHandlerOptions {
@@ -43,6 +45,7 @@ export class RequestCertificateCommandHandler implements CommandHandler<
   private readonly authorizer: RequestCertificateAuthorizer;
   private readonly background: BackgroundScheduler;
   private readonly certificateFactory: RequestCertificateFactory;
+  private readonly validation: SimAcmCertificateValidation;
   private readonly validator = new RequestCertificateValidator();
 
   constructor(properties: RequestCertificateCommandHandlerProperties) {
@@ -51,9 +54,11 @@ export class RequestCertificateCommandHandler implements CommandHandler<
       certificates,
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
+      validation = new SimAcmCertificateValidation({ background }),
     } = properties;
 
     this.certificates = certificates;
+    this.validation = validation;
     this.authorizer = new RequestCertificateAuthorizer({
       iam,
       resource: `arn:aws:acm:${accountRegionScope.regionName}:${accountRegionScope.accountId}:certificate/*`,
@@ -91,8 +96,8 @@ export class RequestCertificateCommandHandler implements CommandHandler<
 
     this.certificates.set(certificateArn, certificate);
 
-    // Schedule background task to issue the sim Certificate.
-    this.background.schedule(() => certificate.issue());
+    // Issuance waits on domain validation, which happens in the background.
+    this.validation.begin(certificate);
 
     return {
       $metadata: {},

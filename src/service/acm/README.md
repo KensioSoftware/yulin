@@ -11,6 +11,7 @@ certificates. It is an in-memory service for tests and local development, not a 
 - `index.ts` exports the public ACM simulator API for `@kensio/yulin/acm`.
 - `certificate/` contains the simulated certificate model.
 - `command/` contains AWS SDK-style command handlers.
+- `validation/` contains domain validation against sim Route53.
 - `cfn/` contains CloudFormation support for `AWS::CertificateManager::Certificate`.
 - `error/` contains ACM-specific AWS-like errors.
 
@@ -49,14 +50,51 @@ AWS SDK classes from `src/`.
 Certificates start as `PENDING_VALIDATION` when requested. The `issue()` method changes status to
 `ISSUED` and records `issuedAt`.
 
+Domain validation options are `SimAcmDomainValidation` objects rather than plain data, because each
+domain on a certificate carries its own validation status. `isValidated` on the certificate is the
+gate issuance waits on, and `issue()` marks any still-pending domain successful so the per-domain
+statuses stay consistent with the certificate status.
+
 The model is small. Command handlers and output factories translate it into AWS-shaped responses
 where needed.
+
+## Domain validation
+
+Validation lives under `validation/`.
+
+`SimAcmCertificateValidation` owns issuance. `RequestCertificate` hands it each new certificate
+instead of scheduling `issue()` directly, and it evaluates the certificate as background work, then
+again whenever DNS records change, until every domain has succeeded.
+
+Whether a domain must be validated at all is decided per domain:
+
+- ACM with no `SimAcmDnsRecords` at all, which is a standalone `SimAcm`, validates nothing.
+- a domain not using `DNS` validation is not checked.
+- otherwise `SimAcmDnsValidationMode` decides. The default `auto` mode requires validation only
+  where a hosted zone covers the domain name, so certificates for domains the simulation is not
+  authoritative for are issued rather than left stuck. `always` and `never` are the overrides behind
+  `SimAcm.requireDnsValidation()` and `SimAcm.autoIssueCertificates()`.
+
+`SimAcmDnsRecords` is the port ACM depends on, and `SimRoute53AcmDnsRecords` implements it over the
+shared `SimRoute53Registry`. All DNS name handling stays in that adapter, because Route53 stores
+record names and values normalised and comparisons have to match. The registry spans simulated
+accounts, so a certificate in one account can validate against a hosted zone in another, as real ACM
+validates against public DNS.
+
+Re-evaluation is driven by record change notifications from Route53 rather than by polling. A
+polling loop that rescheduled itself would never let `BackgroundTasks.complete()` drain, since it
+drains until no tasks remain. Pushing instead means a certificate whose record never appears simply
+stays pending.
+
+`SimAcmDnsValidationCompleter` backs `SimAcm.completeDnsValidation()`: it publishes each validation
+record into the hosted zone covering it, settles the certificate, and throws
+`SimAcmDnsValidationFailed` naming the records that had nowhere to go.
 
 ## RequestCertificate
 
 `RequestCertificateCommandHandler` validates the required inputs, sequences background work, creates
-a certificate, stores it in the service certificate map, and schedules certificate issuance as a
-background task.
+a certificate, stores it in the service certificate map, and schedules domain validation as a
+background task. Validation is what issues the certificate, once every domain has succeeded.
 
 Current behaviour:
 
@@ -66,6 +104,9 @@ Current behaviour:
 - certificate ARNs are generated from the account, region, and a stable sequence number.
 - DNS validation records are deterministic CNAMEs derived from account, region, and domain.
 - the command returns the new `CertificateArn`.
+
+Issuance is not scheduled directly. The handler hands the certificate to `SimAcmCertificateValidation`,
+which issues it once every domain is validated. See the domain validation section below.
 
 `RequestCertificateFactory` owns the certificate-shaping rules: ARN generation, validation defaults,
 domain validation option creation, deterministic validation records, and tag copying.
@@ -129,7 +170,7 @@ Current uses:
 
 - commands sequence before reading or mutating certificate state.
 - requested certificates are inserted immediately.
-- issuance is scheduled as background work after creation.
+- domain validation is scheduled as background work after creation, and again on DNS record changes.
 
 Tests that need the final issued state should drain the simulator background tasks, for example
 through the broader `SimAws` background completion helper.
@@ -143,6 +184,8 @@ Current errors cover the behaviours implemented by the simulator:
 - invalid command arguments
 - too many tags
 - certificate not found
+- DNS validation that could not be completed, which is a simulator diagnostic rather than an AWS
+  error: real ACM leaves the certificate pending until it times out hours later.
 
 Validation that does not yet need an AWS-specific exception may use assertion-style errors. Add a
 specific ACM error class when caller-visible failure semantics matter.

@@ -40,6 +40,22 @@ export class SimAcmResourceNotFoundException extends SimAcmError {
 }
 
 /**
+ * Simulated ACM DNS validation failure.
+ *
+ * This is a simulator diagnostic rather than an AWS error: real ACM leaves a
+ * certificate pending until validation times out hours later, which is no use
+ * in a test. The message names the records that could not be published so the
+ * missing Hosted Zone is obvious.
+ */
+export class SimAcmDnsValidationFailed extends SimAcmError {
+  public override readonly name = "DnsValidationFailed";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
  * Simulated ACM TooManyTagsException error.
  */
 export class SimAcmTooManyTagsException extends SimAcmError {
