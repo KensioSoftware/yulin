@@ -1,5 +1,5 @@
 import { StaticFactory } from "@kensio/part-factory";
-import type { SimIamParsedPolicyStatement } from "./sim-iam-doc-parser.js";
+import type { SimIamParsedPolicyStatement } from "./sim-iam-document-parser.js";
 
 /**
  * Generates parsed IAM policy statements for tests.

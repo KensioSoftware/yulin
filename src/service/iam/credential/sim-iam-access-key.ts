@@ -12,7 +12,7 @@ interface SimIamAccessKeyProperties {
   readonly principal: SimAwsPrincipal;
   readonly identityPolicyPrincipal?: SimAwsPrincipal | undefined;
   readonly session?: SimIamSession | undefined;
-  readonly createDate?: Date | undefined;
+  readonly creationDate?: Date | undefined;
   readonly status?: SimIamAccessKeyStatus | undefined;
 }
 
@@ -28,7 +28,7 @@ export class SimIamAccessKey {
   public readonly principal: SimAwsPrincipal;
   public readonly identityPolicyPrincipal: SimAwsPrincipal;
   public readonly session?: SimIamSession | undefined;
-  public readonly createDate: Date;
+  public readonly creationDate: Date;
   public status: SimIamAccessKeyStatus;
 
   constructor(properties: SimIamAccessKeyProperties) {
@@ -38,7 +38,7 @@ export class SimIamAccessKey {
     this.identityPolicyPrincipal =
       properties.identityPolicyPrincipal ?? properties.principal;
     this.session = properties.session;
-    this.createDate = new Date(properties.createDate ?? Date.now());
+    this.creationDate = new Date(properties.creationDate ?? Date.now());
     this.status = properties.status ?? "Active";
   }
 

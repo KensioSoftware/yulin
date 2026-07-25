@@ -8,7 +8,7 @@ import { jsonParse } from "../../../../util/type-guard/json.js";
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamAllowAllAuth } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
-import { SimIamPolicyDocumentValidator } from "../../../iam/validate/sim-iam-policy-doc-validator.js";
+import { SimIamPolicyDocumentValidator } from "../../../iam/validate/sim-iam-policy-document-validator.js";
 import type {
   SimS3Bucket,
   SimS3BucketName,

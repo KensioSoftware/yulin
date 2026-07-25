@@ -24,7 +24,7 @@ describe("IAM PutRolePolicyCommand", () => {
     const accountId = makeSimAwsAccountId();
     const simIam = simAws.account(accountId).iam();
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ApplicationRole",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -63,7 +63,7 @@ describe("IAM PutRolePolicyCommand", () => {
     const decision = simIam.authorize({
       caller: {
         kind: "arn",
-        arn: createRoleOutput.Role.Arn,
+        arn: roleCreation.Role.Arn,
       },
       action: "s3:GetObject",
       resource: "arn:aws:s3:::example-bucket/object.txt",
@@ -90,7 +90,7 @@ describe("IAM PutRolePolicyCommand", () => {
     const accountId = makeSimAwsAccountId();
     const simIam = simAws.account(accountId).iam();
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ApplicationRole",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -141,7 +141,7 @@ describe("IAM PutRolePolicyCommand", () => {
     const decision = simIam.authorize({
       caller: {
         kind: "arn",
-        arn: createRoleOutput.Role.Arn,
+        arn: roleCreation.Role.Arn,
       },
       action: "s3:GetObject",
       resource: "arn:aws:s3:::example-bucket/object.txt",

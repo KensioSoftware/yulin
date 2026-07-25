@@ -37,19 +37,19 @@ describe("S3 PutObjectCommand", () => {
       }),
     );
 
-    const getObjectOutput = await simS3.getObject(
+    const objectOut = await simS3.getObject(
       new GetObjectCommand({
         Bucket: bucketName,
         Key: "foo.txt",
       }),
     );
 
-    assertInstanceOf(getObjectOutput.Body, Readable);
+    assertInstanceOf(objectOut.Body, Readable);
     assertBufferEqual(
-      await simS3BodyToBuffer(getObjectOutput.Body),
+      await simS3BodyToBuffer(objectOut.Body),
       Buffer.from("Hello, world!"),
     );
-    assertIdentical(getObjectOutput.Metadata?.["foo"], "bar");
+    assertIdentical(objectOut.Metadata?.["foo"], "bar");
   });
 
   it("puts an Object with Uint8Array body", async () => {
@@ -69,16 +69,16 @@ describe("S3 PutObjectCommand", () => {
       }),
     );
 
-    const getObjectOutput = await simS3.getObject(
+    const objectOut = await simS3.getObject(
       new GetObjectCommand({
         Bucket: bucketName,
         Key: "foo.bin",
       }),
     );
 
-    assertInstanceOf(getObjectOutput.Body, Readable);
+    assertInstanceOf(objectOut.Body, Readable);
     assertBufferEqual(
-      await simS3BodyToBuffer(getObjectOutput.Body),
+      await simS3BodyToBuffer(objectOut.Body),
       Buffer.from([1, 2, 3]),
     );
   });

@@ -5,7 +5,7 @@ import {
   type SimCfnIamRoleInlinePolicy,
 } from "./sim-cfn-iam-role-policies-parser.js";
 
-export interface SimCfnIamRoleProps {
+export interface SimCfnIamRoleProperties {
   readonly roleName: string;
   readonly path: string | undefined;
   readonly description: string | undefined;
@@ -21,7 +21,7 @@ export interface SimCfnIamRoleProps {
  * Keeping the property-shape validation here keeps the creator focused on
  * orchestrating IAM command calls.
  */
-export class SimCfnIamRolePropsParser {
+export class SimCfnIamRolePropertiesParser {
   private readonly policiesParser = new SimCfnIamRolePoliciesParser();
 
   /**
@@ -30,7 +30,7 @@ export class SimCfnIamRolePropsParser {
   parse(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
-  ): SimCfnIamRoleProps {
+  ): SimCfnIamRoleProperties {
     return {
       roleName:
         this.optionalString(resource, properties["RoleName"], "RoleName") ??

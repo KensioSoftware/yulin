@@ -27,7 +27,7 @@ export async function createTestZone(
   records: readonly TestRecord[],
   route53: SimRoute53 = simAws.route53(),
 ): Promise<void> {
-  const createOutput = await route53.createHostedZone({
+  const hostedZoneCreation = await route53.createHostedZone({
     input: {
       Name: zoneName,
       CallerReference: `${zoneName}-dns-test`,
@@ -37,7 +37,7 @@ export async function createTestZone(
   if (records.length > 0) {
     await route53.changeResourceRecordSets({
       input: {
-        HostedZoneId: createOutput.HostedZone?.Id,
+        HostedZoneId: hostedZoneCreation.HostedZone?.Id,
         ChangeBatch: {
           Changes: records.map((record) => ({
             Action: "CREATE" as const,

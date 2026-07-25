@@ -78,7 +78,7 @@ export class CreateTableCommandHandler implements CommandHandler<
     this.authorizer.authorize(tableArn, options?.caller);
 
     const table = new SimDynamoDatabaseTable({
-      createCommand: command,
+      tableCommand: command,
       arn: tableArn,
       background: this.background,
     });

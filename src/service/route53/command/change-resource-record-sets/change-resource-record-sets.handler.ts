@@ -14,8 +14,8 @@ import type {
   SimChangeResourceRecordSetsCommand,
   SimChangeResourceRecordSetsCommandOutput,
 } from "./change-resource-record-sets.command.js";
-import { getChangeResourceRecordSetsHostedZone } from "./change-res-rec-sets-zone.js";
-import { scheduleChangeResourceRecordSets } from "./schedule/schedule-change-res-rec-sets.js";
+import { getChangeResourceRecordSetsHostedZone } from "./change-resource-rec-sets-zone.js";
+import { scheduleChangeResourceRecordSets } from "./schedule/schedule-change-resource-rec-sets.js";
 import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,

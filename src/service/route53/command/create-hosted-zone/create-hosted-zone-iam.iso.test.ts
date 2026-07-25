@@ -41,7 +41,7 @@ describe("Route53 CreateHostedZoneCommand IAM authorization", () => {
     const simIam = simAws.account(accountId).iam();
     const simRoute53 = simAws.account(accountId).route53();
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ConditionalHostedZoneCreator",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -54,7 +54,7 @@ describe("Route53 CreateHostedZoneCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
@@ -99,7 +99,7 @@ describe("Route53 CreateHostedZoneCommand IAM authorization", () => {
     const simIam = simAws.account(accountId).iam();
     const simRoute53 = simAws.account(accountId).route53();
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ConditionMismatchHostedZoneCreator",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -112,7 +112,7 @@ describe("Route53 CreateHostedZoneCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
@@ -161,7 +161,7 @@ describe("Route53 CreateHostedZoneCommand IAM authorization", () => {
     const simIam = simAws.account(accountId).iam();
     const simRoute53 = simAws.account(accountId).route53();
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "DeniedHostedZoneCreator",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -174,7 +174,7 @@ describe("Route53 CreateHostedZoneCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
     const resource = "arn:aws:route53:::hostedzone/*";
 
     await simIam.putRolePolicy(

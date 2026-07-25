@@ -27,7 +27,7 @@ export class CreateUserRecordFactory {
       userId: makeSimIamUserId(),
       userName: properties.userName,
       path: properties.path,
-      createDate: new Date(),
+      creationDate: new Date(),
       accessKeys: new Map(),
       inlinePolicies: new Map(),
       attachedPolicyArns: new Set(),
@@ -44,7 +44,7 @@ export class CreateUserRecordFactory {
         UserName: user.userName,
         UserId: user.userId,
         Arn: user.arn,
-        CreateDate: user.createDate,
+        CreateDate: user.creationDate,
       },
     };
   }

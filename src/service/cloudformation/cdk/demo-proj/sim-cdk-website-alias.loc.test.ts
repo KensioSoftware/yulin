@@ -34,7 +34,7 @@ describe("Sim CDK website deployment local integration", () => {
     await projectDirectory.writeFile("public/index.html", "<h1>Root</h1>");
 
     // And a CDK stack to deploy the test demo project.
-    const publicDir = projectDirectory.join("public");
+    const publicDirectory = projectDirectory.join("public");
     const cdkProject = new TestCdkProject({ projectDirectory });
     await cdkProject.writeCdkAppFile(
       `
@@ -102,7 +102,7 @@ const distribution = new cloudfront.Distribution(stack, "Distribution", {
 });
 
 new s3Deployment.BucketDeployment(stack, "WebsiteDeployment", {
-  sources: [s3Deployment.Source.asset(${JSON.stringify(publicDir)})],
+  sources: [s3Deployment.Source.asset(${JSON.stringify(publicDirectory)})],
   destinationBucket: websiteBucket,
   distribution,
   distributionPaths: ["/*"],
@@ -156,8 +156,12 @@ app.synth();
     const localUrl = srv.localUrl(websiteUrl);
 
     // And we should be able to interact with the test demo project.
-    const rootRes = await fetch(new URL("/index.html", localUrl));
-    assertResponseStatus(rootRes, 200, await describeResponse(rootRes));
-    assertIdentical(await rootRes.text(), "<h1>Root</h1>");
+    const rootResponse = await fetch(new URL("/index.html", localUrl));
+    assertResponseStatus(
+      rootResponse,
+      200,
+      await describeResponse(rootResponse),
+    );
+    assertIdentical(await rootResponse.text(), "<h1>Root</h1>");
   });
 });

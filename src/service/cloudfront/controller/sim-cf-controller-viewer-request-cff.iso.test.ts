@@ -81,7 +81,7 @@ describe("Simulated CloudFront local HTTP controller CFF", () => {
     const cfController = new SimCloudFrontServiceController({
       simAws,
     });
-    const res = await cfController.handleRequest(
+    const response = await cfController.handleRequest(
       {
         service: "cloudFront",
         resourceName: "",
@@ -91,8 +91,8 @@ describe("Simulated CloudFront local HTTP controller CFF", () => {
       ),
     );
 
-    assertResponseStatus(res, 204);
-    assertIdentical(res.headers.get("x-cff-resolved"), "same-account");
+    assertResponseStatus(response, 204);
+    assertIdentical(response.headers.get("x-cff-resolved"), "same-account");
   });
 
   it("does not resolve a CFF from another Account", async () => {

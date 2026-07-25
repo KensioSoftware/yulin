@@ -1,6 +1,6 @@
 import dgram from "node:dgram";
 import { SimAws } from "../../service/aws/sim-aws.js";
-import { simAwsLocalConf as simAwsLocalConfig } from "../http/local-server/sim-aws-local.conf.js";
+import { simAwsLocalConfig } from "../http/local-server/sim-aws-local.config.js";
 import { SimAwsDns } from "./sim-aws-dns.js";
 
 interface SimAwsDnsServerProperties {

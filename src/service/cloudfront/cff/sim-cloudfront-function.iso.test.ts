@@ -7,24 +7,24 @@ describe("sim CloudFront Function", () => {
   it("applies default handler function for viewer-request", () => {
     const simCff = new SimCloudFrontFunction({ name: "foo-cff" });
 
-    const cffRes = simCff.handleViewerRequest(
+    const cffResponse = simCff.handleViewerRequest(
       new Request("http://foobar.cloudfront.net/foo/bar/object.json"),
     );
 
-    assertInstanceOf(cffRes, Request);
-    const url = new URL(cffRes.url);
+    assertInstanceOf(cffResponse, Request);
+    const url = new URL(cffResponse.url);
     assertIdentical(url.pathname, "/foo/bar/object.json");
   });
 
   it("applies default handler function for viewer-response", () => {
     const simCff = new SimCloudFrontFunction({ name: "foo-cff" });
 
-    const cffRes = simCff.handleViewerResponse(
+    const cffResponse = simCff.handleViewerResponse(
       new Request("http://foobar.cloudfront.net/foo/bar/object.json"),
       new Response(),
     );
 
-    assertInstanceOf(cffRes, Response);
+    assertInstanceOf(cffResponse, Response);
   });
 
   it("applies injected handler function", () => {
@@ -39,12 +39,12 @@ describe("sim CloudFront Function", () => {
       },
     });
 
-    const cffRes = simCff.handleViewerRequest(
+    const cffResponse = simCff.handleViewerRequest(
       new Request("http://foobar.cloudfront.net/foo/bar/object.json"),
     );
 
-    assertInstanceOf(cffRes, Request);
-    const url = new URL(cffRes.url);
+    assertInstanceOf(cffResponse, Request);
+    const url = new URL(cffResponse.url);
     assertIdentical(url.pathname, "/foo/bar/foobar.html");
   });
 });

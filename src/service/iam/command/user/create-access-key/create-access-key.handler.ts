@@ -83,7 +83,7 @@ export class CreateAccessKeyCommandHandler implements CommandHandler<
         AccessKeyId: accessKey.accessKeyId,
         Status: accessKey.status,
         SecretAccessKey: accessKey.secretAccessKey,
-        CreateDate: accessKey.createDate,
+        CreateDate: accessKey.creationDate,
       },
     };
   }

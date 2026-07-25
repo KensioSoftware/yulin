@@ -52,7 +52,7 @@ describe("sim CloudFront local server", () => {
     );
 
     const simCloudFront = simAws.cloudFront();
-    const createDistroOutput = await simCloudFront.createDistribution(
+    const distributionCreation = await simCloudFront.createDistribution(
       new CreateDistributionCommand({
         DistributionConfig: {
           CallerReference: "default-behavior",
@@ -96,25 +96,25 @@ describe("sim CloudFront local server", () => {
         },
       }),
     );
-    const distroId = createDistroOutput.Distribution?.Id;
+    const distroId = distributionCreation.Distribution?.Id;
     assertNonNullable(distroId);
 
-    const assetsRes = await fetch(
+    const assetsResponse = await fetch(
       `http://${distroId.toLowerCase()}.cloudfront.net.sim-aws.localhost:${srv.port}/assets/object.json`,
     );
-    assertIdentical(assetsRes.status, 200);
-    assertIdentical(await assetsRes.text(), '{"something":"A"}');
+    assertIdentical(assetsResponse.status, 200);
+    assertIdentical(await assetsResponse.text(), '{"something":"A"}');
 
-    const assetsFooRes = await fetch(
+    const assetsFooResponse = await fetch(
       `http://${distroId.toLowerCase()}.cloudfront.net.sim-aws.localhost:${srv.port}/assets/foo/object.json`,
     );
-    assertIdentical(assetsFooRes.status, 200);
-    assertIdentical(await assetsFooRes.text(), '{"something":"foo-B"}');
+    assertIdentical(assetsFooResponse.status, 200);
+    assertIdentical(await assetsFooResponse.text(), '{"something":"foo-B"}');
 
-    const missingRes = await fetch(
+    const missingResponse = await fetch(
       `http://${distroId.toLowerCase()}.cloudfront.net.sim-aws.localhost:${srv.port}/missing/object.json`,
     );
-    assertIdentical(missingRes.status, 404);
+    assertIdentical(missingResponse.status, 404);
   });
 
   it("can use S3 Origin in any Region", async () => {
@@ -132,7 +132,7 @@ describe("sim CloudFront local server", () => {
     );
 
     const simCloudFront = simAws.region(regionB).cloudFront();
-    const createDistroOutput = await simCloudFront.createDistribution(
+    const distributionCreation = await simCloudFront.createDistribution(
       new CreateDistributionCommand({
         DistributionConfig: {
           CallerReference: "default-behavior",
@@ -155,7 +155,7 @@ describe("sim CloudFront local server", () => {
         },
       }),
     );
-    const distroId = createDistroOutput.Distribution?.Id;
+    const distroId = distributionCreation.Distribution?.Id;
     assertNonNullable(distroId);
   });
 

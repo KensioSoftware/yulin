@@ -64,7 +64,7 @@ describe("DynamoDB DescribeTableCommand IAM authorization", () => {
       }),
     );
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "TableDescriber",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -77,7 +77,7 @@ describe("DynamoDB DescribeTableCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
@@ -124,7 +124,7 @@ describe("DynamoDB DescribeTableCommand IAM authorization", () => {
       }),
     );
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "NoPermissionsRole",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -137,7 +137,7 @@ describe("DynamoDB DescribeTableCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     // When the Role attempts to describe the table.
     const error = await assertThrowsErrorAsync(async () =>
@@ -176,7 +176,7 @@ describe("DynamoDB DescribeTableCommand IAM authorization", () => {
       }),
     );
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "DeniedTableDescriber",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -189,7 +189,7 @@ describe("DynamoDB DescribeTableCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({

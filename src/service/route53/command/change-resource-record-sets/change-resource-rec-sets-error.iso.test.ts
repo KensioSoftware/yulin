@@ -17,14 +17,14 @@ describe("Route53 ChangeResourceRecordSetsCommand errors", () => {
     const simAws = new SimAws();
     const simRoute53 = simAws.route53();
 
-    const createHostedZoneOutput = await simRoute53.createHostedZone(
+    const hostedZoneCreation = await simRoute53.createHostedZone(
       new CreateHostedZoneCommand({
         Name: "unsupported-type.example.com",
         CallerReference: "unsupported-type-test",
       }),
     );
 
-    const hostedZoneId = createHostedZoneOutput.HostedZone?.Id;
+    const hostedZoneId = hostedZoneCreation.HostedZone?.Id;
     assertNonNullable(hostedZoneId, "Created Hosted Zone ID");
 
     await simAws.backgroundTasksComplete();

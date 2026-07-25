@@ -32,13 +32,13 @@ async function createMarkersZone(
 ): Promise<string> {
   const route53 = simAws.route53();
 
-  const createOutput = await route53.createHostedZone(
+  const hostedZoneCreation = await route53.createHostedZone(
     new CreateHostedZoneCommand({
       Name: "markers.test",
       CallerReference: callerReference,
     }),
   );
-  const hostedZoneId = createOutput.HostedZone?.Id;
+  const hostedZoneId = hostedZoneCreation.HostedZone?.Id;
   assertNonNullable(hostedZoneId, "Hosted Zone ID");
 
   await route53.changeResourceRecordSets(

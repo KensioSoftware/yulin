@@ -51,7 +51,7 @@ import { SimAws } from "@kensio/yulin";
 const simAws = new SimAws();
 const route53 = simAws.route53();
 
-const createHostedZoneOutput = await route53.createHostedZone(
+const hostedZoneCreation = await route53.createHostedZone(
   new CreateHostedZoneCommand({
     Name: "example.test",
     CallerReference: "example-test-zone",
@@ -62,18 +62,18 @@ const createHostedZoneOutput = await route53.createHostedZone(
   }),
 );
 
-const hostedZoneId = createHostedZoneOutput.HostedZone!.Id!;
+const hostedZoneId = hostedZoneCreation.HostedZone!.Id!;
 
 await simAws.backgroundTasksComplete();
 
-const getHostedZoneOutput = await route53.getHostedZone(
+const hostedZoneOut = await route53.getHostedZone(
   new GetHostedZoneCommand({
     Id: hostedZoneId,
   }),
 );
 
-console.log(getHostedZoneOutput.HostedZone?.Name);
-console.log(getHostedZoneOutput.HostedZone?.ResourceRecordSetCount);
+console.log(hostedZoneOut.HostedZone?.Name);
+console.log(hostedZoneOut.HostedZone?.ResourceRecordSetCount);
 ```
 
 Hosted Zone names are normalised with a trailing dot in Route53-style outputs, so `example.test`
@@ -101,14 +101,14 @@ import { SimAws } from "@kensio/yulin";
 const simAws = new SimAws();
 const route53 = simAws.route53();
 
-const createHostedZoneOutput = await route53.createHostedZone(
+const hostedZoneCreation = await route53.createHostedZone(
   new CreateHostedZoneCommand({
     Name: "example.test",
     CallerReference: "record-zone",
   }),
 );
 
-const hostedZoneId = createHostedZoneOutput.HostedZone!.Id!;
+const hostedZoneId = hostedZoneCreation.HostedZone!.Id!;
 
 await simAws.backgroundTasksComplete();
 
@@ -158,14 +158,14 @@ import { SimAws } from "@kensio/yulin";
 const simAws = new SimAws();
 const route53 = simAws.route53();
 
-const createHostedZoneOutput = await route53.createHostedZone(
+const hostedZoneCreation = await route53.createHostedZone(
   new CreateHostedZoneCommand({
     Name: "example.test",
     CallerReference: "upsert-delete-zone",
   }),
 );
 
-const hostedZoneId = createHostedZoneOutput.HostedZone!.Id!;
+const hostedZoneId = hostedZoneCreation.HostedZone!.Id!;
 
 await simAws.backgroundTasksComplete();
 
@@ -232,14 +232,14 @@ import { SimAws } from "@kensio/yulin";
 const simAws = new SimAws();
 const route53 = simAws.route53();
 
-const createHostedZoneOutput = await route53.createHostedZone(
+const hostedZoneCreation = await route53.createHostedZone(
   new CreateHostedZoneCommand({
     Name: "example.test",
     CallerReference: "alias-zone",
   }),
 );
 
-const hostedZoneId = createHostedZoneOutput.HostedZone!.Id!;
+const hostedZoneId = hostedZoneCreation.HostedZone!.Id!;
 
 await simAws.backgroundTasksComplete();
 
@@ -341,14 +341,14 @@ import { SimAws } from "@kensio/yulin";
 const simAws = new SimAws();
 const route53 = simAws.route53();
 
-const createOutput = await route53.createHostedZone(
+const hostedZoneCreation = await route53.createHostedZone(
   new CreateHostedZoneCommand({
     Name: "example.test",
     CallerReference: "records-listing-zone",
   }),
 );
 
-const hostedZoneId = createOutput.HostedZone?.Id;
+const hostedZoneId = hostedZoneCreation.HostedZone?.Id;
 
 await route53.changeResourceRecordSets(
   new ChangeResourceRecordSetsCommand({
@@ -464,7 +464,7 @@ import { serveSimAws } from "@kensio/yulin/serve";
 const simAws = new SimAws();
 const route53 = simAws.route53();
 
-const createOutput = await route53.createHostedZone(
+const hostedZoneCreation = await route53.createHostedZone(
   new CreateHostedZoneCommand({
     Name: "example.test",
     CallerReference: "dns-zone",
@@ -473,7 +473,7 @@ const createOutput = await route53.createHostedZone(
 
 await route53.changeResourceRecordSets(
   new ChangeResourceRecordSetsCommand({
-    HostedZoneId: createOutput.HostedZone?.Id,
+    HostedZoneId: hostedZoneCreation.HostedZone?.Id,
     ChangeBatch: {
       Changes: [
         {
@@ -661,7 +661,7 @@ try {
     }),
   );
 
-  const createDistributionOutput = await cloudFront.createDistribution(
+  const distributionCreation = await cloudFront.createDistribution(
     new CreateDistributionCommand({
       DistributionConfig: {
         CallerReference: "route53-site-distribution",
@@ -687,17 +687,16 @@ try {
     }),
   );
 
-  const distributionHostname =
-    createDistributionOutput.Distribution!.DomainName!;
+  const distributionHostname = distributionCreation.Distribution!.DomainName!;
 
-  const createHostedZoneOutput = await route53.createHostedZone(
+  const hostedZoneCreation = await route53.createHostedZone(
     new CreateHostedZoneCommand({
       Name: "example.test",
       CallerReference: "route53-localhost-zone",
     }),
   );
 
-  const hostedZoneId = createHostedZoneOutput.HostedZone!.Id!;
+  const hostedZoneId = hostedZoneCreation.HostedZone!.Id!;
 
   await route53.changeResourceRecordSets(
     new ChangeResourceRecordSetsCommand({
@@ -953,14 +952,14 @@ import { SimRoute53 } from "@kensio/yulin/route53";
 
 const route53 = new SimRoute53();
 
-const createHostedZoneOutput = await route53.createHostedZone(
+const hostedZoneCreation = await route53.createHostedZone(
   new CreateHostedZoneCommand({
     Name: "standalone.example.test",
     CallerReference: "standalone-zone",
   }),
 );
 
-console.log(createHostedZoneOutput.HostedZone?.Id);
+console.log(hostedZoneCreation.HostedZone?.Id);
 ```
 
 A standalone `SimRoute53` instance has its own isolated state and is not connected to a wider

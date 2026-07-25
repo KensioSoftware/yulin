@@ -8,7 +8,7 @@ import { assertDefined } from "../../../util/type-guard/defined.js";
 import type { SimCdkOutContext } from "../cdk/sim-cdk-out-context.js";
 import {
   SimCfnTemplateFileLoader,
-  type SimCloudFormationDeployTemplateFileProps as SimCloudFormationDeployTemplateFileProperties,
+  type SimCloudFormationDeployTemplateFileProperties as SimCloudFormationDeployTemplateFileProperties,
 } from "./sim-cfn-template-file-loader.js";
 import type { SimCfnExecutableResourceBinding } from "../bind/sim-cfn-exec-binding.type.js";
 import type { SimAws } from "../../aws/sim-aws.js";
@@ -21,14 +21,14 @@ import type { SimCreateStackCommandOutput } from "../command/create-stack/create
 import { CreateStackCommandHandler } from "../command/create-stack/create-stack.handler.js";
 import { faker } from "@faker-js/faker";
 
-export interface SimCloudFormationCreateStackProps {
+export interface SimCloudFormationCreateStackProperties {
   readonly stackName?: SimCloudFormationStackName | string;
   readonly template: CfnTemplateBodyRecord;
   readonly parameters?: Record<string, string> | undefined;
   readonly bindings?: readonly SimCfnExecutableResourceBinding[] | undefined;
 }
 
-export type { SimCloudFormationDeployTemplateFileProps } from "./sim-cfn-template-file-loader.js";
+export type { SimCloudFormationDeployTemplateFileProperties } from "./sim-cfn-template-file-loader.js";
 
 interface SimCloudFormationTemplateDeployerProperties {
   readonly simAws: SimAws;
@@ -66,7 +66,7 @@ export class SimCloudFormationTemplateDeployer {
    * object.
    */
   async deployTemplate(
-    properties: SimCloudFormationCreateStackProps,
+    properties: SimCloudFormationCreateStackProperties,
   ): Promise<SimCfnStack> {
     return await this.deployTemplateWithContext({
       stackName: properties.stackName ?? makeSimCloudFormationStackName(),

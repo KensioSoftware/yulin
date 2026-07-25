@@ -12,14 +12,14 @@ describe("SimRoute53 hostname resolution", () => {
     simRoute53: SimRoute53,
     name: string,
   ): Promise<SimRoute53HostedZoneId> {
-    const createHostedZoneOutput = await simRoute53.createHostedZone({
+    const hostedZoneCreation = await simRoute53.createHostedZone({
       input: {
         Name: name,
         CallerReference: `${name}-test`,
       },
     });
 
-    const hostedZoneId = createHostedZoneOutput.HostedZone?.Id;
+    const hostedZoneId = hostedZoneCreation.HostedZone?.Id;
     assertIsSimRoute53HostedZoneId(hostedZoneId);
 
     return hostedZoneId;

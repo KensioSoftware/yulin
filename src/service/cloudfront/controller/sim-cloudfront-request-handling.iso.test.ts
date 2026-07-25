@@ -32,7 +32,7 @@ describe("Simulated CloudFront local HTTP controller request handling", () => {
     );
 
     const cloudFront = simAws.cloudFront();
-    const createDistributionOutput = await cloudFront.createDistribution(
+    const distributionCreation = await cloudFront.createDistribution(
       new CreateDistributionCommand({
         DistributionConfig: {
           CallerReference: "head-request-test",
@@ -66,13 +66,13 @@ describe("Simulated CloudFront local HTTP controller request handling", () => {
       }),
     );
 
-    const distributionId = createDistributionOutput.Distribution?.Id;
+    const distributionId = distributionCreation.Distribution?.Id;
     assertNonNullable(distributionId);
 
     const cfController = new SimCloudFrontServiceController({
       simAws,
     });
-    const res = await cfController.handleRequest(
+    const response = await cfController.handleRequest(
       {
         service: "cloudFront",
         resourceName: "",
@@ -83,9 +83,9 @@ describe("Simulated CloudFront local HTTP controller request handling", () => {
       ),
     );
 
-    assertResponseStatus(res, 200, await describeResponse(res));
-    assertIdentical(await res.text(), "");
-    assertIdentical(res.headers.get("content-type"), "application/json");
+    assertResponseStatus(response, 200, await describeResponse(response));
+    assertIdentical(await response.text(), "");
+    assertIdentical(response.headers.get("content-type"), "application/json");
   });
 
   it("returns HTTP 405 when the S3 Origin receives an unsupported request method", async () => {
@@ -99,7 +99,7 @@ describe("Simulated CloudFront local HTTP controller request handling", () => {
     );
 
     const cloudFront = simAws.cloudFront();
-    const createDistributionOutput = await cloudFront.createDistribution(
+    const distributionCreation = await cloudFront.createDistribution(
       new CreateDistributionCommand({
         DistributionConfig: {
           CallerReference: "unsupported-method-test",
@@ -131,13 +131,13 @@ describe("Simulated CloudFront local HTTP controller request handling", () => {
       }),
     );
 
-    const distributionId = createDistributionOutput.Distribution?.Id;
+    const distributionId = distributionCreation.Distribution?.Id;
     assertNonNullable(distributionId);
 
     const cfController = new SimCloudFrontServiceController({
       simAws,
     });
-    const res = await cfController.handleRequest(
+    const response = await cfController.handleRequest(
       {
         service: "cloudFront",
         resourceName: "",
@@ -148,13 +148,13 @@ describe("Simulated CloudFront local HTTP controller request handling", () => {
       ),
     );
 
-    assertResponseStatus(res, 405, await describeResponse(res));
-    assertIdentical(res.headers.get("allow"), "GET, HEAD");
+    assertResponseStatus(response, 405, await describeResponse(response));
+    assertIdentical(response.headers.get("allow"), "GET, HEAD");
     assertIdentical(
-      res.headers.get("content-type"),
+      response.headers.get("content-type"),
       "text/plain; charset=utf-8",
     );
-    assertIdentical(await res.text(), "Method POST not allowed");
+    assertIdentical(await response.text(), "Method POST not allowed");
   });
 
   it("returns the S3 Origin not found response when the selected Origin has no matching object", async () => {
@@ -175,7 +175,7 @@ describe("Simulated CloudFront local HTTP controller request handling", () => {
     );
 
     const cloudFront = simAws.cloudFront();
-    const createDistributionOutput = await cloudFront.createDistribution(
+    const distributionCreation = await cloudFront.createDistribution(
       new CreateDistributionCommand({
         DistributionConfig: {
           CallerReference: "not-found-test",
@@ -199,13 +199,13 @@ describe("Simulated CloudFront local HTTP controller request handling", () => {
       }),
     );
 
-    const distributionId = createDistributionOutput.Distribution?.Id;
+    const distributionId = distributionCreation.Distribution?.Id;
     assertNonNullable(distributionId);
 
     const cfController = new SimCloudFrontServiceController({
       simAws,
     });
-    const res = await cfController.handleRequest(
+    const response = await cfController.handleRequest(
       {
         service: "cloudFront",
         resourceName: "",
@@ -215,9 +215,9 @@ describe("Simulated CloudFront local HTTP controller request handling", () => {
       ),
     );
 
-    assertResponseStatus(res, 404, await describeResponse(res));
+    assertResponseStatus(response, 404, await describeResponse(response));
     assertStringIncludes(
-      await res.text(),
+      await response.text(),
       "Object missing.html not found in sim S3 Bucket not-found-bucket",
     );
   });
@@ -226,7 +226,7 @@ describe("Simulated CloudFront local HTTP controller request handling", () => {
     const simAws = new SimAws();
 
     const cloudFront = simAws.cloudFront();
-    const createDistributionOutput = await cloudFront.createDistribution(
+    const distributionCreation = await cloudFront.createDistribution(
       new CreateDistributionCommand({
         DistributionConfig: {
           CallerReference: "missing-origin-test",
@@ -244,13 +244,13 @@ describe("Simulated CloudFront local HTTP controller request handling", () => {
       }),
     );
 
-    const distributionId = createDistributionOutput.Distribution?.Id;
+    const distributionId = distributionCreation.Distribution?.Id;
     assertNonNullable(distributionId);
 
     const cfController = new SimCloudFrontServiceController({
       simAws,
     });
-    const res = await cfController.handleRequest(
+    const response = await cfController.handleRequest(
       {
         service: "cloudFront",
         resourceName: "",
@@ -265,9 +265,9 @@ describe("Simulated CloudFront local HTTP controller request handling", () => {
       ),
     );
 
-    assertResponseStatus(res, 501, await describeResponse(res));
+    assertResponseStatus(response, 501, await describeResponse(response));
     assertStringIncludes(
-      await res.text(),
+      await response.text(),
       "Sim CloudFront Distribution misconfigured for Origin missing-origin",
     );
   });

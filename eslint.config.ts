@@ -218,6 +218,15 @@ export default defineConfig(
             configuration: {
               config: false,
             },
+            // These read as abbreviations, but each is real AWS terminology
+            // that the simulator deliberately mirrors, so expanding them would
+            // move the names further from the thing they model:
+            // `Fn` is the CloudFormation intrinsic function prefix (`Fn::Join`,
+            // `Fn::Sub`, `Fn::GetAtt`), `Ref` is the `Ref` intrinsic, and `Db`
+            // matches the SDK's `DynamoDB`.
+            fn: false,
+            ref: false,
+            db: false,
           },
         },
       ],

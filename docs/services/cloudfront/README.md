@@ -50,7 +50,7 @@ await simS3.createBucket(
   }),
 );
 
-const createDistroOut = await simCloudFront.createDistribution(
+const distributionCreation = await simCloudFront.createDistribution(
   new CreateDistributionCommand({
     DistributionConfig: {
       CallerReference: "assets-cdn",
@@ -76,7 +76,7 @@ const createDistroOut = await simCloudFront.createDistribution(
   }),
 );
 
-console.log(createDistroOut.Distribution?.DomainName);
+console.log(distributionCreation.Distribution?.DomainName);
 ```
 
 ## Serve simulated CloudFront on localhost
@@ -115,7 +115,7 @@ try {
     }),
   );
 
-  const createDistributionOutput = await simCloudFront.createDistribution(
+  const distributionCreation = await simCloudFront.createDistribution(
     new CreateDistributionCommand({
       DistributionConfig: {
         CallerReference: "localhost-assets-cdn",
@@ -141,7 +141,7 @@ try {
     }),
   );
 
-  const distroHostname = createDistributionOutput.Distribution!.DomainName!;
+  const distroHostname = distributionCreation.Distribution!.DomainName!;
 
   const url = srv.localUrl(`http://${distroHostname}/hello.txt`);
   const response = await fetch(url);
@@ -211,7 +211,7 @@ try {
     return event.request;
   }
 
-  const createFunctionOutput = await simCloudFront.createFunction(
+  const functionCreation = await simCloudFront.createFunction(
     new CreateFunctionCommand({
       Name: "redirect-old-page",
       FunctionConfig: {
@@ -222,7 +222,7 @@ try {
     }),
   );
 
-  const createDistributionOutput = await simCloudFront.createDistribution(
+  const distributionCreation = await simCloudFront.createDistribution(
     new CreateDistributionCommand({
       DistributionConfig: {
         CallerReference: "function-cdn",
@@ -248,7 +248,7 @@ try {
             Items: [
               {
                 EventType: "viewer-request",
-                FunctionARN: createFunctionOutput.FunctionMetadata.FunctionARN,
+                FunctionARN: functionCreation.FunctionMetadata.FunctionARN,
               },
             ],
           },
@@ -257,7 +257,7 @@ try {
     }),
   );
 
-  const distroHostname = createDistributionOutput.Distribution!.DomainName!;
+  const distroHostname = distributionCreation.Distribution!.DomainName!;
 
   const url = srv.localUrl(`http://${distroHostname}/old-page.html`);
   const response = await fetch(url, { redirect: "manual" });

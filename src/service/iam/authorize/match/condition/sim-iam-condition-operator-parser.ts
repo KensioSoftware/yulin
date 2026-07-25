@@ -5,7 +5,7 @@ import { SimIamForAnyValueStringEquals } from "./string/any-value/sim-iam-for-an
 import { SimIamForAnyValueStringLike } from "./string/any-value/sim-iam-for-any-value-string-like.js";
 import { SimIamStringEquals } from "./string/equals/sim-iam-string-equals.js";
 import { SimIamStringLike } from "./string/like/sim-iam-string-like.js";
-import { SimIamNumericLessThanEquals } from "./numeric/less-than-equals/sim-iam-num-lte.js";
+import { SimIamNumericLessThanEquals } from "./numeric/less-than-equals/sim-iam-number-lte.js";
 
 type SimIamConditionOperatorFactory = () => SimIamConditionOperator;
 

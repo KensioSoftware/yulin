@@ -1,7 +1,7 @@
 import type { SimDynamoDbAttributeValue as SimDynamoDatabaseAttributeValue } from "../command/put-item/put-item.command.js";
 import { jsonStringify } from "../../../util/type-guard/json.js";
 
-export type DynamoDBAttrType =
+export type DynamoDBAttributeType =
   | boolean
   | null
   | number
@@ -10,14 +10,14 @@ export type DynamoDBAttrType =
   | Set<string>
   | Set<number>
   | Set<Uint8Array>
-  | DynamoDBAttrType[]
-  | { [key: string]: DynamoDBAttrType };
+  | DynamoDBAttributeType[]
+  | { [key: string]: DynamoDBAttributeType };
 
 /**
  * A single attribute of a DynamoDB Item.
  */
 export class DynamoDBItemAttribute {
-  constructor(readonly value: DynamoDBAttrType) {}
+  constructor(readonly value: DynamoDBAttributeType) {}
 
   /**
    * Convert a DynamoDB AttributeValue structure to a DynamoDBItemAttribute

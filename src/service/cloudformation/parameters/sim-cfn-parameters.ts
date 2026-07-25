@@ -1,7 +1,7 @@
 import { isRecord } from "../../../util/type-guard/record.js";
 import type {
   SimCfnParameterDefinition,
-  SimCfnParametersProps as SimCfnParametersProperties,
+  SimCfnParametersProperties as SimCfnParametersProperties,
   SimCloudFormationParameterInput,
   SimCloudFormationParameterValue,
   SimCloudFormationParameterValues,

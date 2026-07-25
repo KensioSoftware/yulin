@@ -136,7 +136,7 @@ describe("SimCfnResource", () => {
     const simAws = new SimAws();
     const originalSimResource = { bucketName: "original-bucket" };
     const replacementSimResource = { bucketName: "replacement-bucket" };
-    const createError = new Error("creation failed");
+    const creationError = new Error("creation failed");
     const resource = new SimCfnResource({
       accountRegionScope: simAws.accountRegionScope().accountRegionScope,
       logicalId: "TestResource",
@@ -149,7 +149,7 @@ describe("SimCfnResource", () => {
     const isInProgressDeployed = resource.deployed;
     const isInProgressCreateComplete = resource.createComplete;
 
-    resource.markCreateFailed(createError);
+    resource.markCreateFailed(creationError);
     const failedStatus = resource.status;
     const isFailedCreateComplete = resource.createComplete;
     const failedError = resource.error;
@@ -171,7 +171,7 @@ describe("SimCfnResource", () => {
 
     assertIdentical(failedStatus, "CREATE_FAILED");
     assertTrue(isFailedCreateComplete);
-    assertIdentical(failedError, createError);
+    assertIdentical(failedError, creationError);
 
     assertIdentical(completeWithOriginal, originalSimResource);
     assertUndefined(completeWithoutReplacement);
@@ -211,11 +211,11 @@ describe("SimCfnResource", () => {
     };
 
     // When the Resource is created.
-    const createPromise = resource.create(context);
+    const creationPromise = resource.create(context);
 
     assertIdentical(resource.status, "CREATE_IN_PROGRESS");
 
-    await createPromise;
+    await creationPromise;
 
     // Then the injected factory result is recorded and the Resource completes.
     assertIdentical(resource.status, "CREATE_COMPLETE");

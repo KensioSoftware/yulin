@@ -30,7 +30,7 @@ export class SimCfnIamManagedPolicyCreator {
     const description = this.description(resource, properties);
     const policyDocument = this.policyDocument(resource, properties);
 
-    const createOutput = await this.iam.createPolicy({
+    const policyCreation = await this.iam.createPolicy({
       input: {
         PolicyName: policyName,
         Path: path,
@@ -39,10 +39,10 @@ export class SimCfnIamManagedPolicyCreator {
       },
     });
 
-    const policy = this.iam.policies.get(createOutput.Policy.Arn);
+    const policy = this.iam.policies.get(policyCreation.Policy.Arn);
     assertDefined(
       policy,
-      `Sim IAM Managed Policy ${createOutput.Policy.Arn} after CloudFormation creation`,
+      `Sim IAM Managed Policy ${policyCreation.Policy.Arn} after CloudFormation creation`,
     );
 
     return policy;

@@ -8,9 +8,12 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 import {
+  assertArrayIncludes,
+  assertArrayLength,
   assertIdentical,
   assertStringIncludes,
-  assertTrue,
+  assertTypeObject,
+  assertUndefined,
 } from "@kensio/smartass";
 import { assertDefined } from "../../../util/type-guard/defined.js";
 import { SimSdk } from "../../../sdk/index.js";
@@ -82,7 +85,7 @@ describe("simulated S3 SDK Command routing", () => {
       }),
     );
 
-    assertIdentical(typeof output.$metadata, "object");
+    assertTypeObject(output.$metadata);
   });
 
   it("lists its supported SDK Command names", () => {
@@ -90,9 +93,9 @@ describe("simulated S3 SDK Command routing", () => {
 
     const supported = router.supportedCommandNames();
 
-    assertIdentical(supported.length, 7);
-    assertTrue(supported.includes("GetObjectCommand"));
-    assertIdentical(router.route("HeadObjectCommand"), undefined);
+    assertArrayLength(supported, 7);
+    assertArrayIncludes(supported, "GetObjectCommand");
+    assertUndefined(router.route("HeadObjectCommand"));
   });
 
   it("passes through a GetObject output without a Body", async () => {
@@ -105,6 +108,6 @@ describe("simulated S3 SDK Command routing", () => {
     assertDefined(route, "GetObjectCommand route should exist");
     const output = await route({ input: {} }, {});
 
-    assertIdentical((output as { Body?: unknown }).Body, undefined);
+    assertUndefined((output as { Body?: unknown }).Body);
   });
 });

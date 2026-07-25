@@ -21,7 +21,7 @@ describe("Simulated Route53 hosted zone summary over localhost", () => {
   beforeAll(async () => {
     const route53 = simAws.route53();
 
-    const createOutput = await route53.createHostedZone(
+    const hostedZoneCreation = await route53.createHostedZone(
       new CreateHostedZoneCommand({
         Name: "served.test",
         CallerReference: "served-summary-zone",
@@ -30,7 +30,7 @@ describe("Simulated Route53 hosted zone summary over localhost", () => {
 
     await route53.changeResourceRecordSets(
       new ChangeResourceRecordSetsCommand({
-        HostedZoneId: createOutput.HostedZone?.Id,
+        HostedZoneId: hostedZoneCreation.HostedZone?.Id,
         ChangeBatch: {
           Changes: [
             {

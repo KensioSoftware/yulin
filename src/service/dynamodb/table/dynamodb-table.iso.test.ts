@@ -9,18 +9,18 @@ import {
 
 describe("SimDynamoDbTable", () => {
   it("throws when TableName is undefined", () => {
-    const createCommand = new CreateTableCommand({ TableName: undefined });
+    const tableCommand = new CreateTableCommand({ TableName: undefined });
 
-    assertThrowsError(() => new SimDynamoDatabaseTable({ createCommand }));
+    assertThrowsError(() => new SimDynamoDatabaseTable({ tableCommand }));
   });
 
   it("creates table with CREATING status", () => {
-    const createCommand = new CreateTableCommand({
+    const tableCommand = new CreateTableCommand({
       TableName: "test-table",
       KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
     });
 
-    const table = new SimDynamoDatabaseTable({ createCommand });
+    const table = new SimDynamoDatabaseTable({ tableCommand });
 
     assertIdentical(table.tableName, "test-table");
     assertIdentical(table.status, "CREATING");
@@ -28,12 +28,12 @@ describe("SimDynamoDbTable", () => {
   });
 
   it("activates table", async () => {
-    const createCommand = new CreateTableCommand({
+    const tableCommand = new CreateTableCommand({
       TableName: "test-table",
       KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
     });
 
-    const table = new SimDynamoDatabaseTable({ createCommand });
+    const table = new SimDynamoDatabaseTable({ tableCommand });
     assertIdentical(table.status, "CREATING");
 
     await table.activate();

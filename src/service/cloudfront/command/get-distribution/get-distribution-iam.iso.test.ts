@@ -22,7 +22,7 @@ describe("CloudFront GetDistributionCommand IAM authorization", () => {
     const simAws = new SimAws();
     const simCloudFront = simAws.account(accountId).cloudFront();
 
-    const createOutput = await simCloudFront.createDistribution(
+    const distributionCreation = await simCloudFront.createDistribution(
       new CreateDistributionCommand({
         DistributionConfig: {
           CallerReference: "root-readable-distribution",
@@ -50,7 +50,7 @@ describe("CloudFront GetDistributionCommand IAM authorization", () => {
         },
       }),
     );
-    const createdDistribution = createOutput.Distribution;
+    const createdDistribution = distributionCreation.Distribution;
     assertNonNullable(createdDistribution);
     assertNonNullable(createdDistribution.Id);
 
@@ -72,7 +72,7 @@ describe("CloudFront GetDistributionCommand IAM authorization", () => {
     const simIam = simAws.account(accountId).iam();
     const simCloudFront = simAws.account(accountId).cloudFront();
 
-    const createOutput = await simCloudFront.createDistribution(
+    const distributionCreation = await simCloudFront.createDistribution(
       new CreateDistributionCommand({
         DistributionConfig: {
           CallerReference: "conditional-readable-distribution",
@@ -100,12 +100,12 @@ describe("CloudFront GetDistributionCommand IAM authorization", () => {
         },
       }),
     );
-    const createdDistribution = createOutput.Distribution;
+    const createdDistribution = distributionCreation.Distribution;
     assertNonNullable(createdDistribution);
     assertNonNullable(createdDistribution.Id);
     assertNonNullable(createdDistribution.ARN);
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ConditionalDistributionReader",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -120,7 +120,7 @@ describe("CloudFront GetDistributionCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
@@ -163,7 +163,7 @@ describe("CloudFront GetDistributionCommand IAM authorization", () => {
     const simIam = simAws.account(accountId).iam();
     const simCloudFront = simAws.account(accountId).cloudFront();
 
-    const createOutput = await simCloudFront.createDistribution(
+    const distributionCreation = await simCloudFront.createDistribution(
       new CreateDistributionCommand({
         DistributionConfig: {
           CallerReference: "condition-denied-distribution",
@@ -191,12 +191,12 @@ describe("CloudFront GetDistributionCommand IAM authorization", () => {
         },
       }),
     );
-    const createdDistribution = createOutput.Distribution;
+    const createdDistribution = distributionCreation.Distribution;
     assertNonNullable(createdDistribution);
     assertNonNullable(createdDistribution.Id);
     assertNonNullable(createdDistribution.ARN);
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ConditionMismatchDistributionReader",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -211,7 +211,7 @@ describe("CloudFront GetDistributionCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
@@ -283,7 +283,7 @@ describe("CloudFront GetDistributionCommand IAM authorization", () => {
     // Given standalone CloudFront with no supplied IAM implementation.
     const simCloudFront = new SimCloudFront();
 
-    const createOutput = await simCloudFront.createDistribution(
+    const distributionCreation = await simCloudFront.createDistribution(
       new CreateDistributionCommand({
         DistributionConfig: {
           CallerReference: "standalone-readable-distribution",
@@ -311,7 +311,7 @@ describe("CloudFront GetDistributionCommand IAM authorization", () => {
         },
       }),
     );
-    const createdDistribution = createOutput.Distribution;
+    const createdDistribution = distributionCreation.Distribution;
     assertNonNullable(createdDistribution);
     assertNonNullable(createdDistribution.Id);
 

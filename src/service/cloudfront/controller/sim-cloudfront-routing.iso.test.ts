@@ -14,7 +14,7 @@ import { SimCloudFrontServiceController } from "./sim-cloudfront-controller.js";
 describe("Simulated CloudFront local HTTP controller routing", () => {
   it("responds HTTP 404 when no Distribution matches the request host", async () => {
     const cfController = new SimCloudFrontServiceController();
-    const res = await cfController.handleRequest(
+    const response = await cfController.handleRequest(
       {
         service: "cloudFront",
         resourceName: "",
@@ -22,9 +22,9 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
       new Request("http://unknown.cloudfront.net.sim-aws.localhost/index.html"),
     );
 
-    assertResponseStatus(res, 404, await describeResponse(res));
+    assertResponseStatus(response, 404, await describeResponse(response));
     assertStringIncludes(
-      await res.text(),
+      await response.text(),
       "Suitable sim CloudFront Distribution not found",
     );
   });
@@ -45,7 +45,7 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
     );
 
     const cloudFront = simAws.cloudFront();
-    const createDistributionOutput = await cloudFront.createDistribution(
+    const distributionCreation = await cloudFront.createDistribution(
       new CreateDistributionCommand({
         DistributionConfig: {
           CallerReference: "distro-host",
@@ -69,13 +69,13 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
       }),
     );
 
-    const distributionId = createDistributionOutput.Distribution?.Id;
+    const distributionId = distributionCreation.Distribution?.Id;
     assertNonNullable(distributionId);
 
     const cfController = new SimCloudFrontServiceController({
       simAws,
     });
-    const res = await cfController.handleRequest(
+    const response = await cfController.handleRequest(
       {
         service: "cloudFront",
         resourceName: "",
@@ -90,9 +90,9 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
       ),
     );
 
-    assertResponseStatus(res, 200, await describeResponse(res));
-    assertIdentical(await res.text(), "<h1>From Distribution host</h1>");
-    assertIdentical(res.headers.get("content-type"), "text/html");
+    assertResponseStatus(response, 200, await describeResponse(response));
+    assertIdentical(await response.text(), "<h1>From Distribution host</h1>");
+    assertIdentical(response.headers.get("content-type"), "text/html");
   });
 
   it("uses the default Behavior when no explicit path pattern matches", async () => {
@@ -126,7 +126,7 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
     );
 
     const cloudFront = simAws.cloudFront();
-    const createDistributionOutput = await cloudFront.createDistribution(
+    const distributionCreation = await cloudFront.createDistribution(
       new CreateDistributionCommand({
         DistributionConfig: {
           CallerReference: "default-behavior",
@@ -165,13 +165,13 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
       }),
     );
 
-    const distributionId = createDistributionOutput.Distribution?.Id;
+    const distributionId = distributionCreation.Distribution?.Id;
     assertNonNullable(distributionId);
 
     const cfController = new SimCloudFrontServiceController({
       simAws,
     });
-    const res = await cfController.handleRequest(
+    const response = await cfController.handleRequest(
       {
         service: "cloudFront",
         resourceName: "",
@@ -181,8 +181,8 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
       ),
     );
 
-    assertResponseStatus(res, 200, await describeResponse(res));
-    assertIdentical(await res.text(), "<h1>Default origin page</h1>");
+    assertResponseStatus(response, 200, await describeResponse(response));
+    assertIdentical(await response.text(), "<h1>Default origin page</h1>");
   });
 
   it("uses the most specific matching Behavior for the request path", async () => {
@@ -228,7 +228,7 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
     );
 
     const cloudFront = simAws.cloudFront();
-    const createDistributionOutput = await cloudFront.createDistribution(
+    const distributionCreation = await cloudFront.createDistribution(
       new CreateDistributionCommand({
         DistributionConfig: {
           CallerReference: "specific-behavior",
@@ -278,13 +278,13 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
       }),
     );
 
-    const distributionId = createDistributionOutput.Distribution?.Id;
+    const distributionId = distributionCreation.Distribution?.Id;
     assertNonNullable(distributionId);
 
     const cfController = new SimCloudFrontServiceController({
       simAws,
     });
-    const res = await cfController.handleRequest(
+    const response = await cfController.handleRequest(
       {
         service: "cloudFront",
         resourceName: "",
@@ -294,7 +294,7 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
       ),
     );
 
-    assertResponseStatus(res, 200, await describeResponse(res));
-    assertIdentical(await res.text(), "image logo");
+    assertResponseStatus(response, 200, await describeResponse(response));
+    assertIdentical(await response.text(), "image logo");
   });
 });

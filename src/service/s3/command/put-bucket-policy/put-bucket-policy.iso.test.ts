@@ -105,7 +105,7 @@ describe("S3 PutBucketPolicyCommand", () => {
     await simS3.createBucket(
       new CreateBucketCommand({ Bucket: "conditional-policy-bucket" }),
     );
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ConditionalPolicyAdministrator",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -120,7 +120,7 @@ describe("S3 PutBucketPolicyCommand", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
@@ -196,7 +196,7 @@ describe("S3 PutBucketPolicyCommand", () => {
     await simS3.createBucket(
       new CreateBucketCommand({ Bucket: "protected-policy-bucket" }),
     );
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "UnprivilegedPolicyWriter",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -228,7 +228,7 @@ describe("S3 PutBucketPolicyCommand", () => {
           }),
         }),
         {
-          caller: { kind: "arn", arn: createRoleOutput.Role.Arn },
+          caller: { kind: "arn", arn: roleCreation.Role.Arn },
         },
       ),
     );

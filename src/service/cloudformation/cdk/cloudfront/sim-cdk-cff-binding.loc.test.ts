@@ -154,14 +154,14 @@ app.synth();
 
     // And requests through the Distribution execute the bound handler function.
     const distroSubdomain = distro.distributionId.toLowerCase();
-    const res = await fetch(
+    const response = await fetch(
       `http://${distroSubdomain}.cloudfront.net.sim-aws.localhost:${srv.port}/redirect-me.html`,
       { redirect: "manual" },
     );
 
-    assertIdentical(res.status, 302);
+    assertIdentical(response.status, 302);
     assertIdentical(
-      res.headers.get("location"),
+      response.headers.get("location"),
       "https://example.test/from-bound-handler.html",
     );
   });

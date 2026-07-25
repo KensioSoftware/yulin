@@ -24,7 +24,7 @@ describe("CloudFront GetDistributionCommand", () => {
 
     const simCloudFront = simAws.cloudFront();
 
-    const createDistroOutput = await simCloudFront.createDistribution(
+    const distributionCreation = await simCloudFront.createDistribution(
       new CreateDistributionCommand({
         DistributionConfig: {
           CallerReference: "test-ref-1",
@@ -53,13 +53,13 @@ describe("CloudFront GetDistributionCommand", () => {
       }),
     );
 
-    assertNonNullable(createDistroOutput.Distribution?.Id);
-    const distributionId = createDistroOutput.Distribution.Id;
+    assertNonNullable(distributionCreation.Distribution?.Id);
+    const distributionId = distributionCreation.Distribution.Id;
 
-    const getBeforeDeployment = await simCloudFront.getDistribution(
+    const beforeDeployment = await simCloudFront.getDistribution(
       new GetDistributionCommand({ Id: distributionId }),
     );
-    assertOneOf(getBeforeDeployment.Distribution?.Status, [
+    assertOneOf(beforeDeployment.Distribution?.Status, [
       "Deploying",
       "Deployed",
     ]);
@@ -68,19 +68,19 @@ describe("CloudFront GetDistributionCommand", () => {
     await simAws.backgroundTasksComplete();
 
     // Get the distribution again.
-    const getOutput = await simCloudFront.getDistribution(
+    const distributionOut = await simCloudFront.getDistribution(
       new GetDistributionCommand({ Id: distributionId }),
     );
 
-    assertNonNullable(getOutput.Distribution?.Id);
-    assertIdentical(getOutput.Distribution.Id, distributionId);
-    assertNonNullable(getOutput.Distribution.ARN);
-    assertNonNullable(getOutput.Distribution.Status);
-    assertIdentical(getOutput.Distribution.Status, "Deployed");
-    assertNonNullable(getOutput.Distribution.LastModifiedTime);
-    assertNonNullable(getOutput.Distribution.DomainName);
+    assertNonNullable(distributionOut.Distribution?.Id);
+    assertIdentical(distributionOut.Distribution.Id, distributionId);
+    assertNonNullable(distributionOut.Distribution.ARN);
+    assertNonNullable(distributionOut.Distribution.Status);
+    assertIdentical(distributionOut.Distribution.Status, "Deployed");
+    assertNonNullable(distributionOut.Distribution.LastModifiedTime);
+    assertNonNullable(distributionOut.Distribution.DomainName);
     assertIdentical(
-      getOutput.Distribution.DomainName,
+      distributionOut.Distribution.DomainName,
       `${distributionId.toLowerCase()}.cloudfront.net`,
     );
   });

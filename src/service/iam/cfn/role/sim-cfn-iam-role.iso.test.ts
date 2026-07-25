@@ -59,12 +59,12 @@ describe("IAM CloudFormation Role", () => {
     assertIdentical(simAws.iam().roles.get(role.roleName), role);
 
     // And the Role is retrievable through the IAM GetRole API.
-    const getRoleOutput = await simAws.iam().getRole({
+    const roleOut = await simAws.iam().getRole({
       input: { RoleName: "LambdaExecutionRole" },
     });
 
-    assertIdentical(getRoleOutput.Role.RoleName, "LambdaExecutionRole");
-    assertIdentical(getRoleOutput.Role.Arn, role.arn);
+    assertIdentical(roleOut.Role.RoleName, "LambdaExecutionRole");
+    assertIdentical(roleOut.Role.Arn, role.arn);
   });
 
   it("defaults RoleName to the logical ID and Path to the root", async () => {

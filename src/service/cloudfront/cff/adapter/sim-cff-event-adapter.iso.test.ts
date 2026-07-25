@@ -38,10 +38,13 @@ describe("sim CFF event structure adapter", () => {
   describe("toViewerResponseEvent", () => {
     it("converts a Request and Response to ViewerResponseEvent", () => {
       const request = new Request("https://example.test/test");
-      const res = new Response("OK", { status: 201, statusText: "Created" });
-      res.headers.set("content-type", "text/plain");
+      const response = new Response("OK", {
+        status: 201,
+        statusText: "Created",
+      });
+      response.headers.set("content-type", "text/plain");
 
-      const event = adapter.toViewerResponseEvent(request, res);
+      const event = adapter.toViewerResponseEvent(request, response);
 
       assertIdentical(event.context.eventType, "viewer-response");
       assertObjectHasProperty(event.context, "requestId");
@@ -234,11 +237,11 @@ describe("sim CFF event structure adapter", () => {
   describe("request ID", () => {
     it("generates unique request IDs for each event", () => {
       const request = new Request("https://example.test/test");
-      const res = new Response("OK");
+      const response = new Response("OK");
 
       const requestEvent1 = adapter.toViewerRequestEvent(request);
       const requestEvent2 = adapter.toViewerRequestEvent(request);
-      const responseEvent1 = adapter.toViewerResponseEvent(request, res);
+      const responseEvent1 = adapter.toViewerResponseEvent(request, response);
 
       assertTypeString(requestEvent1.context.requestId);
       assertTypeString(responseEvent1.context.requestId);

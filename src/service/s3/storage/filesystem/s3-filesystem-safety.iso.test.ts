@@ -39,13 +39,13 @@ describe("Filesystem simulated S3 storage safety", () => {
   });
 
   it("rejects storage directory path with parent directory segment", async () => {
-    const testDir = new TemporaryDirectory();
-    await testDir.resolvePath();
+    const testDirectory = new TemporaryDirectory();
+    await testDirectory.resolvePath();
 
     const error = assertThrowsError(
       () =>
         new FilesystemS3BucketStorage({
-          directoryPath: `${testDir.path()}/../public`,
+          directoryPath: `${testDirectory.path()}/../public`,
         }),
     );
 
@@ -53,9 +53,9 @@ describe("Filesystem simulated S3 storage safety", () => {
   });
 
   it("rejects storage directory path with unsafe directory name", async () => {
-    const testDir = new TemporaryDirectory();
-    await testDir.resolvePath();
-    const directoryPath = testDir.join("private");
+    const testDirectory = new TemporaryDirectory();
+    await testDirectory.resolvePath();
+    const directoryPath = testDirectory.join("private");
 
     const error = assertThrowsError(
       () => new FilesystemS3BucketStorage({ directoryPath }),
@@ -65,10 +65,10 @@ describe("Filesystem simulated S3 storage safety", () => {
   });
 
   it("rejects Object key with parent directory segment", async () => {
-    const testDir = new TemporaryDirectory();
-    await testDir.resolvePath();
+    const testDirectory = new TemporaryDirectory();
+    await testDirectory.resolvePath();
     const storage = new FilesystemS3BucketStorage({
-      directoryPath: testDir.join("public"),
+      directoryPath: testDirectory.join("public"),
     });
 
     const error = await assertThrowsErrorAsync(async () => {
@@ -81,16 +81,16 @@ describe("Filesystem simulated S3 storage safety", () => {
   });
 
   it("rejects absolute Object key", async () => {
-    const testDir = new TemporaryDirectory();
-    await testDir.resolvePath();
+    const testDirectory = new TemporaryDirectory();
+    await testDirectory.resolvePath();
     const storage = new FilesystemS3BucketStorage({
-      directoryPath: testDir.join("public"),
+      directoryPath: testDirectory.join("public"),
     });
 
     const error = await assertThrowsErrorAsync(async () => {
       await storage.putObject(
         new SimS3Object({
-          key: testDir.join("secret.txt"),
+          key: testDirectory.join("secret.txt"),
           body: Buffer.from("secret"),
         }),
       );
@@ -100,10 +100,10 @@ describe("Filesystem simulated S3 storage safety", () => {
   });
 
   it("rejects Object key with unsupported file extension", async () => {
-    const testDir = new TemporaryDirectory();
-    await testDir.resolvePath();
+    const testDirectory = new TemporaryDirectory();
+    await testDirectory.resolvePath();
     const storage = new FilesystemS3BucketStorage({
-      directoryPath: testDir.join("public"),
+      directoryPath: testDirectory.join("public"),
     });
 
     const error = await assertThrowsErrorAsync(async () => {

@@ -36,13 +36,13 @@ describe("Serve simulated S3 Bucket static website on localhost", () => {
       }),
     );
 
-    const res = await fetch(
+    const response = await fetch(
       `http://website-disabled-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/index.html`,
     );
 
-    assertIdentical(res.status, 403);
+    assertIdentical(response.status, 403);
     assertStringIncludes(
-      await res.text(),
+      await response.text(),
       "Static website hosting is not enabled",
     );
   });
@@ -72,16 +72,16 @@ describe("Serve simulated S3 Bucket static website on localhost", () => {
       }),
     );
 
-    const res = await fetch(
+    const response = await fetch(
       `http://root-index-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/`,
     );
 
-    assertIdentical(res.status, 200);
+    assertIdentical(response.status, 200);
     assertIdentical(
-      res.headers.get("content-type"),
+      response.headers.get("content-type"),
       "text/html; charset=utf-8",
     );
-    assertIdentical(await res.text(), "<h1>Root index</h1>");
+    assertIdentical(await response.text(), "<h1>Root index</h1>");
   });
 
   it("serves a configured folder index document", async () => {
@@ -109,12 +109,12 @@ describe("Serve simulated S3 Bucket static website on localhost", () => {
       }),
     );
 
-    const res = await fetch(
+    const response = await fetch(
       `http://folder-index-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/docs/`,
     );
 
-    assertIdentical(res.status, 200);
-    assertIdentical(await res.text(), "<h1>Docs index</h1>");
+    assertIdentical(response.status, 200);
+    assertIdentical(await response.text(), "<h1>Docs index</h1>");
   });
 
   it("serves the configured error document body with HTTP 404", async () => {
@@ -145,15 +145,15 @@ describe("Serve simulated S3 Bucket static website on localhost", () => {
       }),
     );
 
-    const res = await fetch(
+    const response = await fetch(
       `http://error-document-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/missing.html`,
     );
 
-    assertIdentical(res.status, 404);
+    assertIdentical(response.status, 404);
     assertIdentical(
-      res.headers.get("content-type"),
+      response.headers.get("content-type"),
       "text/html; charset=utf-8",
     );
-    assertIdentical(await res.text(), "<h1>Not found</h1>");
+    assertIdentical(await response.text(), "<h1>Not found</h1>");
   });
 });

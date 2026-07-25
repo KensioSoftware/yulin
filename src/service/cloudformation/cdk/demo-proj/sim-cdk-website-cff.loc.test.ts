@@ -63,7 +63,7 @@ function handler(event) {
     const handlerFile = projectDirectory.join("cff/rewrite-function.js");
 
     // And a CDK stack to deploy the test demo project.
-    const publicDir = projectDirectory.join("public");
+    const publicDirectory = projectDirectory.join("public");
     const cdkProject = new TestCdkProject({ projectDirectory });
     await cdkProject.writeCdkAppFile(
       `
@@ -149,7 +149,7 @@ new route53.CnameRecord(stack, "SiteCnameRecord", {
 });
 
 new s3deploy.BucketDeployment(stack, "DeploySite", {
-  sources: [s3deploy.Source.asset(${JSON.stringify(publicDir)})],
+  sources: [s3deploy.Source.asset(${JSON.stringify(publicDirectory)})],
   destinationBucket: siteBucket,
   distribution,
   distributionPaths: ["/*"],
@@ -204,24 +204,28 @@ app.synth();
     assertStringStartsWith(certArn, "arn:aws:acm:");
 
     // And we should be able to interact with the test demo project.
-    const distroRes = await fetch(
+    const distroResponse = await fetch(
       `http://${distroSubdomain}.sim-aws.localhost:${srv.port}/foo/`,
     );
-    assertResponseStatus(distroRes, 200, await describeResponse(distroRes));
-    const redirectedRes = await fetch(
+    assertResponseStatus(
+      distroResponse,
+      200,
+      await describeResponse(distroResponse),
+    );
+    const redirectedResponse = await fetch(
       `http://${siteHostname}.sim-aws.localhost:${srv.port}/redirect-me.html`,
       { redirect: "manual" },
     );
     assertResponseStatus(
-      redirectedRes,
+      redirectedResponse,
       302,
-      await describeResponse(redirectedRes),
+      await describeResponse(redirectedResponse),
     );
 
-    const fooRes = await fetch(
+    const fooResponse = await fetch(
       `http://${siteHostname}.sim-aws.localhost:${srv.port}/foo/`,
     );
-    assertResponseStatus(fooRes, 200, await describeResponse(fooRes));
-    assertIdentical(await fooRes.text(), "<h1>Foo</h1>");
+    assertResponseStatus(fooResponse, 200, await describeResponse(fooResponse));
+    assertIdentical(await fooResponse.text(), "<h1>Foo</h1>");
   });
 });

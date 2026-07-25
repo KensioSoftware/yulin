@@ -39,7 +39,7 @@ export interface SimCloudFormationParameterInput {
  * Definitions come from a template Parameters section, while values come from
  * command input or already-normalized test/setup data.
  */
-export interface SimCfnParametersProps {
+export interface SimCfnParametersProperties {
   readonly definitions?: Record<string, SimCfnParameterDefinition> | undefined;
   readonly values?: SimCloudFormationParameterValues | undefined;
   readonly stackName?: string | undefined;

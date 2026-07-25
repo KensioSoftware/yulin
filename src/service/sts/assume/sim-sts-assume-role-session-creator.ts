@@ -46,8 +46,8 @@ export class SimStsAssumeRoleSessionCreator {
    * source principal come from the original request context.
    */
   create(input: CreateAssumeRoleSessionInput): SimAssumeRoleCommandOutput {
-    const createDate = new Date();
-    const expiration = this.expiration(createDate, input.durationSeconds);
+    const creationDate = new Date();
+    const expiration = this.expiration(creationDate, input.durationSeconds);
     const targetIam = this.iamResolver.iamForAccount(
       input.roleArnParts.accountId,
     );
@@ -56,7 +56,7 @@ export class SimStsAssumeRoleSessionCreator {
       roleName: input.role.RoleName,
       sessionName: input.roleSessionName,
       sourcePrincipal: input.sourcePrincipal,
-      createDate,
+      creationDate,
       expiration,
     });
 
@@ -82,7 +82,7 @@ export class SimStsAssumeRoleSessionCreator {
    * uses milliseconds. Using the supplied creation timestamp as the base keeps
    * session metadata and returned credential metadata on the same timeline.
    */
-  private expiration(createDate: Date, durationSeconds: number): Date {
-    return new Date(createDate.getTime() + durationSeconds * 1000);
+  private expiration(creationDate: Date, durationSeconds: number): Date {
+    return new Date(creationDate.getTime() + durationSeconds * 1000);
   }
 }

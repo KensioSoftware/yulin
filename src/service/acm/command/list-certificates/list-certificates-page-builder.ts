@@ -1,6 +1,6 @@
 import type { SimArn } from "../../../aws/arn.js";
 import type { SimAcmCertificate } from "../../certificate/sim-acm-certificate.js";
-import { SimAcmInvalidArgsException as SimAcmInvalidArgumentsException } from "../../error/sim-acm.error.js";
+import { SimAcmInvalidArgumentsException } from "../../error/sim-acm.error.js";
 import type {
   SimAcmCertificateSummary,
   SimListCertificatesCommandInput,

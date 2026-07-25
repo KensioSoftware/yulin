@@ -4,7 +4,7 @@ import type {
   SimIamPolicyDocumentPrincipal,
   SimIamPolicyDocumentStatement,
 } from "../sim-iam-policy.js";
-import { simIamPolicyDocumentStatements } from "../sim-iam-pol-doc-statements.js";
+import { simIamPolicyDocumentStatements } from "../sim-iam-pol-document-statements.js";
 
 export interface SimIamParsedPolicyDocument {
   readonly statements: readonly SimIamParsedPolicyStatement[];

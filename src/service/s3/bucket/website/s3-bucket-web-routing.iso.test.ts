@@ -62,12 +62,12 @@ describe("S3 Bucket static website routing", () => {
     });
     const originalResponse = new Response("Missing", { status: 404 });
 
-    const res = website.redirectForRequestResponse(
+    const response = website.redirectForRequestResponse(
       new Request("http://foo-site.s3-website.localhost/images/missing.png"),
       originalResponse,
     );
 
-    assertIdentical(res, originalResponse);
+    assertIdentical(response, originalResponse);
   });
 
   it("uses the first matching routing rule", () => {
@@ -92,14 +92,14 @@ describe("S3 Bucket static website routing", () => {
       ],
     });
 
-    const res = website.redirectForRequestResponse(
+    const response = website.redirectForRequestResponse(
       new Request("http://foo-site.s3-website.localhost/missing.html"),
       new Response("Missing", { status: 404 }),
     );
 
-    assertResponseStatus(res, 301);
+    assertResponseStatus(response, 301);
     assertIdentical(
-      res.headers.get("location"),
+      response.headers.get("location"),
       "http://foo-site.s3-website.localhost/first.html",
     );
   });
@@ -119,14 +119,14 @@ describe("S3 Bucket static website routing", () => {
       ],
     });
 
-    const res = website.redirectForRequestResponse(
+    const response = website.redirectForRequestResponse(
       new Request("http://foo-site.s3-website.localhost/missing.html"),
       new Response("Missing", { status: 404 }),
     );
 
-    assertResponseStatus(res, 302);
+    assertResponseStatus(response, 302);
     assertIdentical(
-      res.headers.get("location"),
+      response.headers.get("location"),
       "http://foo-site.s3-website.localhost/temporary.html",
     );
   });
@@ -147,14 +147,14 @@ describe("S3 Bucket static website routing", () => {
       ],
     });
 
-    const res = website.redirectForRequestResponse(
+    const response = website.redirectForRequestResponse(
       new Request("http://foo-site.s3-website.localhost/external/page.html"),
       new Response("OK", { status: 200 }),
     );
 
-    assertResponseStatus(res, 301);
+    assertResponseStatus(response, 301);
     assertIdentical(
-      res.headers.get("location"),
+      response.headers.get("location"),
       "https://example.test/archive/page.html",
     );
   });

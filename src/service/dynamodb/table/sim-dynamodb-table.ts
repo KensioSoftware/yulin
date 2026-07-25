@@ -19,7 +19,7 @@ import { DynamoDbTableCreateInput as DynamoDatabaseTableCreateInput } from "./dy
 export type DynamoDbTableName = Brand<string, "DynamoDbTableName">;
 
 interface SimDynamoDatabaseTableProperties {
-  readonly createCommand: SimCreateTableCommand;
+  readonly tableCommand: SimCreateTableCommand;
   readonly arn?: SimArn;
   readonly background?: BackgroundScheduler;
 }
@@ -41,18 +41,18 @@ export class SimDynamoDbTable {
 
   constructor(properties: SimDynamoDatabaseTableProperties) {
     const {
-      createCommand,
+      tableCommand,
       arn = makeSimDynamoDbTableArn(),
       background = new BackgroundTasks(),
     } = properties;
-    const createInput = new DynamoDatabaseTableCreateInput(createCommand);
+    const tableInput = new DynamoDatabaseTableCreateInput(tableCommand);
 
     this.arn = arn;
     this.background = background;
 
-    this.tableName = createInput.tableName();
+    this.tableName = tableInput.tableName();
     this.creationDateTime = new Date();
-    this.#keySchema = createInput.keySchema();
+    this.#keySchema = tableInput.keySchema();
   }
 
   /**

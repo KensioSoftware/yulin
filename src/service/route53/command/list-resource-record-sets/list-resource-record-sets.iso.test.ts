@@ -24,13 +24,13 @@ describe("Route53 ListResourceRecordSetsCommand", () => {
     const simAws = new SimAws();
     const route53 = simAws.route53();
 
-    const createOutput = await route53.createHostedZone(
+    const hostedZoneCreation = await route53.createHostedZone(
       new CreateHostedZoneCommand({
         Name: "example.test",
         CallerReference: "dns-order-zone",
       }),
     );
-    const hostedZoneId = createOutput.HostedZone?.Id;
+    const hostedZoneId = hostedZoneCreation.HostedZone?.Id;
     assertNonNullable(hostedZoneId, "Hosted Zone ID");
 
     await route53.changeResourceRecordSets(
@@ -101,13 +101,13 @@ describe("Route53 ListResourceRecordSetsCommand", () => {
     const simAws = new SimAws();
     const route53 = simAws.route53();
 
-    const createOutput = await route53.createHostedZone(
+    const hostedZoneCreation = await route53.createHostedZone(
       new CreateHostedZoneCommand({
         Name: "values.test",
         CallerReference: "values-zone",
       }),
     );
-    const hostedZoneId = createOutput.HostedZone?.Id;
+    const hostedZoneId = hostedZoneCreation.HostedZone?.Id;
     assertNonNullable(hostedZoneId, "Hosted Zone ID");
 
     await route53.changeResourceRecordSets(
@@ -153,13 +153,13 @@ describe("Route53 ListResourceRecordSetsCommand", () => {
     const simAws = new SimAws();
     const route53 = simAws.route53();
 
-    const createOutput = await route53.createHostedZone(
+    const hostedZoneCreation = await route53.createHostedZone(
       new CreateHostedZoneCommand({
         Name: "alias.test",
         CallerReference: "alias-zone",
       }),
     );
-    const hostedZoneId = createOutput.HostedZone?.Id;
+    const hostedZoneId = hostedZoneCreation.HostedZone?.Id;
     assertNonNullable(hostedZoneId, "Hosted Zone ID");
 
     await route53.changeResourceRecordSets(
@@ -198,7 +198,7 @@ describe("Route53 ListResourceRecordSetsCommand", () => {
       recordSet.AliasTarget?.DNSName,
       "d111111abcdef8.cloudfront.net.",
     );
-    assertIdentical(recordSet.AliasTarget.EvaluateTargetHealth, false);
+    assertFalse(recordSet.AliasTarget.EvaluateTargetHealth);
     assertUndefined(recordSet.ResourceRecords);
   });
 
@@ -207,13 +207,13 @@ describe("Route53 ListResourceRecordSetsCommand", () => {
     const simAws = new SimAws();
     const route53 = simAws.route53();
 
-    const createOutput = await route53.createHostedZone(
+    const hostedZoneCreation = await route53.createHostedZone(
       new CreateHostedZoneCommand({
         Name: "empty.test",
         CallerReference: "empty-zone",
       }),
     );
-    const hostedZoneId = createOutput.HostedZone?.Id;
+    const hostedZoneId = hostedZoneCreation.HostedZone?.Id;
     assertNonNullable(hostedZoneId, "Hosted Zone ID");
     await simAws.backgroundTasksComplete();
 
@@ -232,13 +232,13 @@ describe("Route53 ListResourceRecordSetsCommand", () => {
     const simAws = new SimAws();
     const route53 = simAws.route53();
 
-    const createOutput = await route53.createHostedZone(
+    const hostedZoneCreation = await route53.createHostedZone(
       new CreateHostedZoneCommand({
         Name: "prefixed.test",
         CallerReference: "prefixed-zone",
       }),
     );
-    const hostedZoneId = createOutput.HostedZone?.Id;
+    const hostedZoneId = hostedZoneCreation.HostedZone?.Id;
     assertNonNullable(hostedZoneId, "Hosted Zone ID");
 
     await route53.changeResourceRecordSets(

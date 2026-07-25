@@ -16,7 +16,7 @@ describe("IAM GetPolicyCommand", () => {
 
     const simIam = simAws.iam();
 
-    const createPolicyOutput = await simIam.createPolicy(
+    const policyCreation = await simIam.createPolicy(
       new CreatePolicyCommand({
         PolicyName: "TestPolicy",
         Path: "/service-role/",
@@ -35,33 +35,30 @@ describe("IAM GetPolicyCommand", () => {
     );
 
     assertNonNullable(
-      createPolicyOutput.Policy.Arn,
+      policyCreation.Policy.Arn,
       "Policy ARN should be defined",
     );
 
-    const getPolicyOutput = await simIam.getPolicy(
+    const policyOut = await simIam.getPolicy(
       new GetPolicyCommand({
-        PolicyArn: createPolicyOutput.Policy.Arn,
+        PolicyArn: policyCreation.Policy.Arn,
       }),
     );
 
-    assertIdentical(getPolicyOutput.Policy.PolicyName, "TestPolicy");
-    assertIdentical(getPolicyOutput.Policy.Arn, createPolicyOutput.Policy.Arn);
-    assertIdentical(getPolicyOutput.Policy.Path, "/service-role/");
-    assertIdentical(getPolicyOutput.Policy.DefaultVersionId, "v1");
-    assertIdentical(getPolicyOutput.Policy.AttachmentCount, 0);
-    assertIdentical(getPolicyOutput.Policy.PermissionsBoundaryUsageCount, 0);
-    assertTrue(getPolicyOutput.Policy.IsAttachable);
+    assertIdentical(policyOut.Policy.PolicyName, "TestPolicy");
+    assertIdentical(policyOut.Policy.Arn, policyCreation.Policy.Arn);
+    assertIdentical(policyOut.Policy.Path, "/service-role/");
+    assertIdentical(policyOut.Policy.DefaultVersionId, "v1");
+    assertIdentical(policyOut.Policy.AttachmentCount, 0);
+    assertIdentical(policyOut.Policy.PermissionsBoundaryUsageCount, 0);
+    assertTrue(policyOut.Policy.IsAttachable);
     assertIdentical(
-      getPolicyOutput.Policy.Description,
+      policyOut.Policy.Description,
       "Policy used by GetPolicyCommand tests",
     );
-    assertIdentical(
-      getPolicyOutput.Policy.PolicyId,
-      createPolicyOutput.Policy.PolicyId,
-    );
-    assertNonNullable(getPolicyOutput.Policy.CreateDate);
-    assertNonNullable(getPolicyOutput.Policy.UpdateDate);
+    assertIdentical(policyOut.Policy.PolicyId, policyCreation.Policy.PolicyId);
+    assertNonNullable(policyOut.Policy.CreateDate);
+    assertNonNullable(policyOut.Policy.UpdateDate);
   });
 
   it("throws on undefined Policy ARN", async () => {

@@ -49,7 +49,7 @@ import { SimAws } from "@kensio/yulin";
 const simAws = new SimAws();
 const simIam = simAws.account("123456789012").iam();
 
-const createRoleOutput = await simIam.createRole(
+const roleCreation = await simIam.createRole(
   new CreateRoleCommand({
     RoleName: "ReportReaderRole",
     Description: "Allows reading report objects",
@@ -82,7 +82,7 @@ await simIam.putRolePolicy(
 const decision = simIam.authorize({
   action: "s3:GetObject",
   resource: "arn:aws:s3:::reports-bucket/2026/summary.csv",
-  caller: { kind: "arn", arn: createRoleOutput.Role.Arn },
+  caller: { kind: "arn", arn: roleCreation.Role.Arn },
 });
 
 console.log(decision.isAllowed);
@@ -183,7 +183,7 @@ import { SimAws } from "@kensio/yulin";
 const simAws = new SimAws();
 const simIam = simAws.account("123456789012").iam();
 
-const createPolicyOutput = await simIam.createPolicy(
+const policyCreation = await simIam.createPolicy(
   new CreatePolicyCommand({
     PolicyName: "ReadOnlyReports",
     Path: "/service-role/",
@@ -198,7 +198,7 @@ const createPolicyOutput = await simIam.createPolicy(
   }),
 );
 
-const createRoleOutput = await simIam.createRole(
+const roleCreation = await simIam.createRole(
   new CreateRoleCommand({
     RoleName: "ReportingRole",
     AssumeRolePolicyDocument: JSON.stringify({
@@ -215,17 +215,17 @@ const createRoleOutput = await simIam.createRole(
 await simIam.attachRolePolicy(
   new AttachRolePolicyCommand({
     RoleName: "ReportingRole",
-    PolicyArn: createPolicyOutput.Policy.Arn,
+    PolicyArn: policyCreation.Policy.Arn,
   }),
 );
 
 const decision = simIam.authorize({
   action: "s3:GetObject",
   resource: "arn:aws:s3:::reports-bucket/2026/summary.csv",
-  caller: { kind: "arn", arn: createRoleOutput.Role.Arn },
+  caller: { kind: "arn", arn: roleCreation.Role.Arn },
 });
 
-console.log(createPolicyOutput.Policy.Arn);
+console.log(policyCreation.Policy.Arn);
 console.log(decision.isAllowed);
 ```
 
@@ -257,7 +257,7 @@ import { SimAws } from "@kensio/yulin";
 const simAws = new SimAws();
 const simIam = simAws.account("123456789012").iam();
 
-const createRoleOutput = await simIam.createRole(
+const roleCreation = await simIam.createRole(
   new CreateRoleCommand({
     RoleName: "FinanceReaderRole",
     AssumeRolePolicyDocument: JSON.stringify({
@@ -294,7 +294,7 @@ await simIam.putRolePolicy(
 const decision = simIam.authorize({
   action: "s3:GetObject",
   resource: "arn:aws:s3:::reports-bucket/2026/summary.csv",
-  caller: { kind: "arn", arn: createRoleOutput.Role.Arn },
+  caller: { kind: "arn", arn: roleCreation.Role.Arn },
   conditionContext: {
     "s3:ExistingObjectTag/department": "finance",
   },
@@ -350,7 +350,7 @@ await simIam.putUserPolicy(
   }),
 );
 
-const createAccessKeyOutput = await simIam.createAccessKey(
+const accessKeyCreation = await simIam.createAccessKey(
   new CreateAccessKeyCommand({
     UserName: "ApplicationUser",
   }),
@@ -362,8 +362,8 @@ const decision = simIam.authorize({
   caller: {
     kind: "credentials",
     credentials: {
-      accessKeyId: createAccessKeyOutput.AccessKey.AccessKeyId,
-      secretAccessKey: createAccessKeyOutput.AccessKey.SecretAccessKey,
+      accessKeyId: accessKeyCreation.AccessKey.AccessKeyId,
+      secretAccessKey: accessKeyCreation.AccessKey.SecretAccessKey,
     },
   },
 });
@@ -477,7 +477,7 @@ const account = simAws.account("123456789012");
 const simIam = account.iam();
 const simRoute53 = account.route53();
 
-const createRoleOutput = await simIam.createRole(
+const roleCreation = await simIam.createRole(
   new CreateRoleCommand({
     RoleName: "UnprivilegedRole",
     AssumeRolePolicyDocument: JSON.stringify({
@@ -498,7 +498,7 @@ try {
       CallerReference: "denied-ref",
     }),
     {
-      caller: { kind: "arn", arn: createRoleOutput.Role.Arn },
+      caller: { kind: "arn", arn: roleCreation.Role.Arn },
     },
   );
 } catch (error) {
@@ -603,13 +603,13 @@ await stack.waitForDeployComplete();
 console.log(stack.outputs.get("RoleArn")?.value);
 console.log(stack.outputs.get("PolicyArn")?.value);
 
-const getRoleOutput = await simAws.iam().getRole(
+const roleOut = await simAws.iam().getRole(
   new GetRoleCommand({
     RoleName: "LambdaExecutionRole",
   }),
 );
 
-console.log(getRoleOutput.Role.Arn);
+console.log(roleOut.Role.Arn);
 ```
 
 For `AWS::IAM::Role`, `Ref` returns the Role name and `Fn::GetAtt` supports `Arn` and `RoleId`. For
@@ -664,7 +664,7 @@ import { SimIam } from "@kensio/yulin/iam";
 
 const simIam = new SimIam();
 
-const createRoleOutput = await simIam.createRole(
+const roleCreation = await simIam.createRole(
   new CreateRoleCommand({
     RoleName: "StandaloneRole",
     AssumeRolePolicyDocument: JSON.stringify({
@@ -678,7 +678,7 @@ const createRoleOutput = await simIam.createRole(
   }),
 );
 
-console.log(createRoleOutput.Role.Arn);
+console.log(roleCreation.Role.Arn);
 ```
 
 A standalone `SimIam` instance has its own isolated state, scoped to a generated Account ID, and is

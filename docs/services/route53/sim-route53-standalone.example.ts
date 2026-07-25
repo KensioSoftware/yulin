@@ -8,11 +8,11 @@ import { SimRoute53 } from "@kensio/yulin/route53";
 
 const route53 = new SimRoute53();
 
-const createHostedZoneOutput = await route53.createHostedZone(
+const hostedZoneCreation = await route53.createHostedZone(
   new CreateHostedZoneCommand({
     Name: "standalone.example.test",
     CallerReference: "standalone-zone",
   }),
 );
 
-console.log(createHostedZoneOutput.HostedZone?.Id);
+console.log(hostedZoneCreation.HostedZone?.Id);

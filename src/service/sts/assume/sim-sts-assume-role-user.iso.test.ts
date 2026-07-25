@@ -19,12 +19,12 @@ describe("STS AssumeRole for sim IAM Users", () => {
     const targetRoleArn = `arn:aws:iam::${accountId}:role/UserTargetRole`;
     const simAws = new SimAws({ defaultAccountId: accountId });
     const simIam = simAws.iam();
-    const createUserOutput = await simIam.createUser(
+    const userCreation = await simIam.createUser(
       new CreateUserCommand({
         UserName: "TrustedUser",
       }),
     );
-    const userArn = createUserOutput.User.Arn;
+    const userArn = userCreation.User.Arn;
     assertNonNullable(userArn);
     await simIam.createRole(
       new CreateRoleCommand({
@@ -88,13 +88,13 @@ describe("STS AssumeRole for sim IAM Users", () => {
     const targetRoleArn = `arn:aws:iam::${accountId}:role/ConditionalUserRole`;
     const simAws = new SimAws({ defaultAccountId: accountId });
     const simIam = simAws.iam();
-    const createUserOutput = await simIam.createUser(
+    const userCreation = await simIam.createUser(
       new CreateUserCommand({
         UserName: "ApplicationUser",
         Path: "/application/",
       }),
     );
-    const userArn = createUserOutput.User.Arn;
+    const userArn = userCreation.User.Arn;
     assertNonNullable(userArn);
     await simIam.createRole(
       new CreateRoleCommand({
@@ -142,12 +142,12 @@ describe("STS AssumeRole for sim IAM Users", () => {
     const targetRoleArn = `arn:aws:iam::${accountId}:role/RestrictedUserRole`;
     const simAws = new SimAws({ defaultAccountId: accountId });
     const simIam = simAws.iam();
-    const createUserOutput = await simIam.createUser(
+    const userCreation = await simIam.createUser(
       new CreateUserCommand({
         UserName: "UntrustedUser",
       }),
     );
-    const userArn = createUserOutput.User.Arn;
+    const userArn = userCreation.User.Arn;
     assertNonNullable(userArn);
     await simIam.createRole(
       new CreateRoleCommand({

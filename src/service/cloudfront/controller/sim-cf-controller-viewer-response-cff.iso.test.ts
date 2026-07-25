@@ -94,7 +94,7 @@ describe("Simulated CloudFront local HTTP controller CFF", () => {
     const cfController = new SimCloudFrontServiceController({
       simAws,
     });
-    const res = await cfController.handleRequest(
+    const response = await cfController.handleRequest(
       {
         service: "cloudFront",
         resourceName: "",
@@ -104,17 +104,17 @@ describe("Simulated CloudFront local HTTP controller CFF", () => {
       ),
     );
 
-    assertResponseStatus(res, 200);
-    assertIdentical(await res.text(), body);
-    assertIdentical(res.headers.get("x-frame-options"), "DENY");
+    assertResponseStatus(response, 200);
+    assertIdentical(await response.text(), body);
+    assertIdentical(response.headers.get("x-frame-options"), "DENY");
 
-    const contentLength = res.headers.get("content-length");
-    if (contentLength !== null) {
-      assertIdentical(Number(contentLength), Buffer.byteLength(body));
-    }
-
-    assertFalse(
-      res.headers.has("content-length") && res.headers.has("transfer-encoding"),
+    // The Origin sets content-length from the S3 Object body, so a
+    // viewer-response CFF that only touches headers must leave it matching the
+    // body it did not change, with no conflicting transfer-encoding.
+    assertIdentical(
+      response.headers.get("content-length"),
+      String(Buffer.byteLength(body)),
     );
+    assertFalse(response.headers.has("transfer-encoding"));
   });
 });

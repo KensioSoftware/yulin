@@ -16,7 +16,7 @@ describe("IAM GetRoleCommand", () => {
 
     const simIam = simAws.account("123456789012").iam();
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "TestRole",
         Path: "/service-role/",
@@ -36,37 +36,34 @@ describe("IAM GetRoleCommand", () => {
       }),
     );
 
-    assertNonNullable(createRoleOutput.Role.RoleName);
+    assertNonNullable(roleCreation.Role.RoleName);
 
     // When we request the Role by name.
-    const getRoleOutput = await simIam.getRole(
+    const roleOut = await simIam.getRole(
       new GetRoleCommand({
-        RoleName: createRoleOutput.Role.RoleName,
+        RoleName: roleCreation.Role.RoleName,
       }),
     );
 
     // Then the stored Role metadata is returned.
-    assertIdentical(getRoleOutput.Role.RoleName, "TestRole");
-    assertIdentical(getRoleOutput.Role.Path, "/service-role/");
+    assertIdentical(roleOut.Role.RoleName, "TestRole");
+    assertIdentical(roleOut.Role.Path, "/service-role/");
     assertIdentical(
-      getRoleOutput.Role.Arn,
+      roleOut.Role.Arn,
       "arn:aws:iam::123456789012:role/service-role/TestRole",
     );
     assertIdentical(
-      getRoleOutput.Role.Description,
+      roleOut.Role.Description,
       "Role used by GetRoleCommand tests",
     );
-    assertIdentical(getRoleOutput.Role.RoleId, createRoleOutput.Role.RoleId);
-    assertIdentical(getRoleOutput.Role.Arn, createRoleOutput.Role.Arn);
+    assertIdentical(roleOut.Role.RoleId, roleCreation.Role.RoleId);
+    assertIdentical(roleOut.Role.Arn, roleCreation.Role.Arn);
     assertIdentical(
-      getRoleOutput.Role.AssumeRolePolicyDocument,
-      createRoleOutput.Role.AssumeRolePolicyDocument,
+      roleOut.Role.AssumeRolePolicyDocument,
+      roleCreation.Role.AssumeRolePolicyDocument,
     );
-    assertInstanceOf(getRoleOutput.Role.CreateDate, Date);
-    assertIdentical(
-      getRoleOutput.Role.CreateDate,
-      createRoleOutput.Role.CreateDate,
-    );
+    assertInstanceOf(roleOut.Role.CreateDate, Date);
+    assertIdentical(roleOut.Role.CreateDate, roleCreation.Role.CreateDate);
   });
 
   it("throws on undefined RoleName", async () => {

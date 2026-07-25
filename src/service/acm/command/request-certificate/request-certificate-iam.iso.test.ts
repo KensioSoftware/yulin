@@ -50,7 +50,7 @@ describe("ACM RequestCertificateCommand IAM authorization", () => {
     const simIam = simAws.account(accountId).iam();
     const simAcm = simAws.account(accountId).region(region).acm();
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ConditionalCertificateRequester",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -63,7 +63,7 @@ describe("ACM RequestCertificateCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
@@ -114,7 +114,7 @@ describe("ACM RequestCertificateCommand IAM authorization", () => {
     const simIam = simAws.account(accountId).iam();
     const simAcm = simAws.account(accountId).region(region).acm();
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ConditionMismatchCertificateRequester",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -127,7 +127,7 @@ describe("ACM RequestCertificateCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
@@ -180,7 +180,7 @@ describe("ACM RequestCertificateCommand IAM authorization", () => {
     const simIam = simAws.account(accountId).iam();
     const simAcm = simAws.account(accountId).region(region).acm();
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "DeniedCertificateRequester",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -193,7 +193,7 @@ describe("ACM RequestCertificateCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
     const resource = `arn:aws:acm:${region}:${accountId}:certificate/*`;
 
     await simIam.putRolePolicy(

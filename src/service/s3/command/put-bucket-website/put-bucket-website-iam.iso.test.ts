@@ -57,7 +57,7 @@ describe("S3 PutBucketWebsiteCommand IAM authorization", () => {
       new CreateBucketCommand({ Bucket: "conditional-website-bucket" }),
     );
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "WebsiteConfigurator",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -70,7 +70,7 @@ describe("S3 PutBucketWebsiteCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
@@ -127,7 +127,7 @@ describe("S3 PutBucketWebsiteCommand IAM authorization", () => {
       new CreateBucketCommand({ Bucket: "condition-denied-website" }),
     );
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ConditionMismatchConfigurator",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -140,7 +140,7 @@ describe("S3 PutBucketWebsiteCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
@@ -210,7 +210,7 @@ describe("S3 PutBucketWebsiteCommand IAM authorization", () => {
       }),
     );
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "RestrictedWebsiteConfigurator",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -223,7 +223,7 @@ describe("S3 PutBucketWebsiteCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({

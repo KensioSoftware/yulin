@@ -42,8 +42,8 @@ export function compareSimRoute53RecordNames(
     // A missing label sorts first, which puts shorter names before the longer
     // names that extend them.
     const comparison = compareOrdinal(
-      leftLabels[index] ?? "",
-      rightLabels[index] ?? "",
+      leftLabels.at(index) ?? "",
+      rightLabels.at(index) ?? "",
     );
 
     if (comparison !== 0) {

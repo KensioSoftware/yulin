@@ -2,7 +2,7 @@ import type {
   SimIamAuthZContext,
   SimIamAuthZPolicySource,
 } from "../context/sim-iam-auth-z-context.js";
-import type { SimIamParsedPolicyStatement } from "../../policy/parse/sim-iam-doc-parser.js";
+import type { SimIamParsedPolicyStatement } from "../../policy/parse/sim-iam-document-parser.js";
 import { simIamWildcardMatch } from "../sim-iam-wildcard.js";
 import { SimIamPolicyConditionMatcher } from "./condition/sim-iam-policy-condition-matcher.js";
 import { SimIamPolicyPrincipalMatcher } from "./sim-iam-policy-principal-matcher.js";

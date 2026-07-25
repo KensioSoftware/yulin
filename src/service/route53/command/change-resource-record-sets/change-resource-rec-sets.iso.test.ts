@@ -27,14 +27,14 @@ describe("Route53 ChangeResourceRecordSetsCommand", () => {
     const simAws = new SimAws();
     const simRoute53 = simAws.route53();
 
-    const createHostedZoneOutput = await simRoute53.createHostedZone(
+    const hostedZoneCreation = await simRoute53.createHostedZone(
       new CreateHostedZoneCommand({
         Name: name,
         CallerReference: `${name}-test`,
       }),
     );
 
-    const hostedZoneId = createHostedZoneOutput.HostedZone?.Id;
+    const hostedZoneId = hostedZoneCreation.HostedZone?.Id;
     assertIsSimRoute53HostedZoneId(hostedZoneId);
 
     await simAws.backgroundTasksComplete();
@@ -141,12 +141,12 @@ describe("Route53 ChangeResourceRecordSetsCommand", () => {
       },
     );
 
-    const getHostedZoneOutput = await simRoute53.getHostedZone(
+    const hostedZoneOut = await simRoute53.getHostedZone(
       new GetHostedZoneCommand({
         Id: hostedZoneId,
       }),
     );
-    assertIdentical(getHostedZoneOutput.HostedZone?.ResourceRecordSetCount, 2);
+    assertIdentical(hostedZoneOut.HostedZone?.ResourceRecordSetCount, 2);
   });
 
   it("upserts an existing record by replacing its values and TTL", async () => {

@@ -1,5 +1,5 @@
 import type { SimIamPolicyDocumentPrincipal } from "../../policy/sim-iam-policy.js";
-import type { SimIamParsedPolicyStatement } from "../../policy/parse/sim-iam-doc-parser.js";
+import type { SimIamParsedPolicyStatement } from "../../policy/parse/sim-iam-document-parser.js";
 import type {
   SimIamAuthZContext,
   SimIamAuthZPolicySource,

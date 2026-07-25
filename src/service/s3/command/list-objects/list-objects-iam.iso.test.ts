@@ -89,7 +89,7 @@ describe("S3 ListObjectsCommand IAM authorization", () => {
       ),
     ]);
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ConditionalObjectLister",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -104,7 +104,7 @@ describe("S3 ListObjectsCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
@@ -167,7 +167,7 @@ describe("S3 ListObjectsCommand IAM authorization", () => {
       }),
     );
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ReportsObjectLister",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -182,7 +182,7 @@ describe("S3 ListObjectsCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
@@ -234,7 +234,7 @@ describe("S3 ListObjectsCommand IAM authorization", () => {
       new CreateBucketCommand({ Bucket: "bucket-resource-required" }),
     );
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ObjectScopedLister",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -249,7 +249,7 @@ describe("S3 ListObjectsCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
@@ -295,7 +295,7 @@ describe("S3 ListObjectsCommand IAM authorization", () => {
       new CreateBucketCommand({ Bucket: "protected-listing-bucket" }),
     );
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "RestrictedBucketLister",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -310,7 +310,7 @@ describe("S3 ListObjectsCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({

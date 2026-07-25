@@ -43,7 +43,7 @@ describe("Serve sim CloudFront Functions on localhost", () => {
       }
       return event.request;
     }
-    const createViewRequestCffOut = await simCloudFront.createFunction(
+    const viewerRequestCffCreation = await simCloudFront.createFunction(
       new CreateFunctionCommand({
         Name: "foo-viewer-request-cff",
         FunctionConfig: {
@@ -54,7 +54,7 @@ describe("Serve sim CloudFront Functions on localhost", () => {
       }),
     );
 
-    const createDistroOutput = await simCloudFront.createDistribution(
+    const distributionCreation = await simCloudFront.createDistribution(
       new CreateDistributionCommand({
         DistributionConfig: {
           CallerReference: "default-behavior",
@@ -79,7 +79,7 @@ describe("Serve sim CloudFront Functions on localhost", () => {
                 {
                   EventType: "viewer-request",
                   FunctionARN:
-                    createViewRequestCffOut.FunctionMetadata.FunctionARN,
+                    viewerRequestCffCreation.FunctionMetadata.FunctionARN,
                 },
               ],
             },
@@ -87,20 +87,20 @@ describe("Serve sim CloudFront Functions on localhost", () => {
         },
       }),
     );
-    const distroId = createDistroOutput.Distribution?.Id;
+    const distroId = distributionCreation.Distribution?.Id;
     assertNonNullable(distroId);
 
-    const notFoundRes = await fetch(
+    const notFoundResponse = await fetch(
       `http://${distroId.toLowerCase()}.cloudfront.net.sim-aws.localhost:${srv.port}/missing.html`,
     );
-    assertIdentical(notFoundRes.status, 404);
-    const redirectedRes = await fetch(
+    assertIdentical(notFoundResponse.status, 404);
+    const redirectedResponse = await fetch(
       `http://${distroId.toLowerCase()}.cloudfront.net.sim-aws.localhost:${srv.port}/foobar/redirectme.html`,
       { redirect: "manual" },
     );
-    assertIdentical(redirectedRes.status, 302);
+    assertIdentical(redirectedResponse.status, 302);
     assertIdentical(
-      redirectedRes.headers.get("location"),
+      redirectedResponse.headers.get("location"),
       "https://yulin.test/redirected.html",
     );
   });
@@ -119,7 +119,7 @@ describe("Serve sim CloudFront Functions on localhost", () => {
       event.response.headers["x-changed-by"] = { value: "foobar handler" };
       return event.response;
     }
-    const createViewResCffOut = await simCloudFront.createFunction(
+    const viewerResponseCffCreation = await simCloudFront.createFunction(
       new CreateFunctionCommand({
         Name: "foo-viewer-response-cff",
         FunctionConfig: {
@@ -130,7 +130,7 @@ describe("Serve sim CloudFront Functions on localhost", () => {
       }),
     );
 
-    const createDistroOutput = await simCloudFront.createDistribution(
+    const distributionCreation = await simCloudFront.createDistribution(
       new CreateDistributionCommand({
         DistributionConfig: {
           CallerReference: "default-behavior",
@@ -154,7 +154,8 @@ describe("Serve sim CloudFront Functions on localhost", () => {
               Items: [
                 {
                   EventType: "viewer-response",
-                  FunctionARN: createViewResCffOut.FunctionMetadata.FunctionARN,
+                  FunctionARN:
+                    viewerResponseCffCreation.FunctionMetadata.FunctionARN,
                 },
               ],
             },
@@ -162,15 +163,15 @@ describe("Serve sim CloudFront Functions on localhost", () => {
         },
       }),
     );
-    const distroId = createDistroOutput.Distribution?.Id;
+    const distroId = distributionCreation.Distribution?.Id;
     assertNonNullable(distroId);
 
-    const redirectedRes = await fetch(
+    const redirectedResponse = await fetch(
       `http://${distroId.toLowerCase()}.cloudfront.net.sim-aws.localhost:${srv.port}/foobar/something.html`,
     );
-    assertIdentical(redirectedRes.status, 404);
+    assertIdentical(redirectedResponse.status, 404);
     assertIdentical(
-      redirectedRes.headers.get("x-changed-by"),
+      redirectedResponse.headers.get("x-changed-by"),
       "foobar handler",
     );
   });

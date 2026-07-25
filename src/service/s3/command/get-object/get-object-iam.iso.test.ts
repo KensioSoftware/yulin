@@ -74,7 +74,7 @@ describe("S3 GetObjectCommand IAM authorization", () => {
       }),
     );
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ConditionalObjectReader",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -89,7 +89,7 @@ describe("S3 GetObjectCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
@@ -148,7 +148,7 @@ describe("S3 GetObjectCommand IAM authorization", () => {
       }),
     );
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ConditionMismatchObjectReader",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -163,7 +163,7 @@ describe("S3 GetObjectCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
@@ -232,7 +232,7 @@ describe("S3 GetObjectCommand IAM authorization", () => {
       }),
     );
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "RestrictedObjectReader",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -247,7 +247,7 @@ describe("S3 GetObjectCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({

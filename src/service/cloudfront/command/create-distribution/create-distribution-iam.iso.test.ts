@@ -24,7 +24,7 @@ describe("CloudFront CreateDistributionCommand IAM authorization", () => {
     const simCloudFront = simAws.account(accountId).cloudFront();
 
     // When a Distribution is created without an explicit caller.
-    const createOutput = await simCloudFront.createDistribution(
+    const distributionCreation = await simCloudFront.createDistribution(
       new CreateDistributionCommand({
         DistributionConfig: {
           CallerReference: "root-created-distribution",
@@ -52,16 +52,19 @@ describe("CloudFront CreateDistributionCommand IAM authorization", () => {
         },
       }),
     );
-    assertNonNullable(createOutput.Distribution?.Id);
+    assertNonNullable(distributionCreation.Distribution?.Id);
 
-    const getOutput = await simCloudFront.getDistribution(
+    const distributionOut = await simCloudFront.getDistribution(
       new GetDistributionCommand({
-        Id: createOutput.Distribution.Id,
+        Id: distributionCreation.Distribution.Id,
       }),
     );
 
     // Then IAM defaults to Account root and CloudFront registers the Distribution.
-    assertIdentical(getOutput.Distribution?.Id, createOutput.Distribution.Id);
+    assertIdentical(
+      distributionOut.Distribution?.Id,
+      distributionCreation.Distribution.Id,
+    );
   });
 
   it("allows a Role when its action, wildcard resource, and principal condition match", async () => {
@@ -71,7 +74,7 @@ describe("CloudFront CreateDistributionCommand IAM authorization", () => {
     const simIam = simAws.account(accountId).iam();
     const simCloudFront = simAws.account(accountId).cloudFront();
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ConditionalDistributionCreator",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -86,7 +89,7 @@ describe("CloudFront CreateDistributionCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
@@ -153,7 +156,7 @@ describe("CloudFront CreateDistributionCommand IAM authorization", () => {
     const simIam = simAws.account(accountId).iam();
     const simCloudFront = simAws.account(accountId).cloudFront();
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ConditionMismatchDistributionCreator",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -168,7 +171,7 @@ describe("CloudFront CreateDistributionCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({

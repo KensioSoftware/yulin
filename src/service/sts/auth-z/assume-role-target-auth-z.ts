@@ -65,12 +65,12 @@ export class AssumeRoleTargetRoleAuthorizer {
       input.target,
     );
     const targetIam = this.iamResolver.iamForAccount(roleArnParts.accountId);
-    const getRoleOutput = await targetIam.getRole({
+    const roleOut = await targetIam.getRole({
       input: {
         RoleName: roleArnParts.roleName,
       },
     });
-    const role = getRoleOutput.Role;
+    const role = roleOut.Role;
 
     const trust = this.trustPolicyAuthorizer.authorize({
       roleArn: input.roleArn,

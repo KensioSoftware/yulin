@@ -9,7 +9,7 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
-import { SimAcmInvalidArgsException as SimAcmInvalidArgumentsException } from "../../error/sim-acm.error.js";
+import { SimAcmInvalidArgumentsException } from "../../error/sim-acm.error.js";
 import {
   ListCertificatesCommand,
   RequestCertificateCommand,

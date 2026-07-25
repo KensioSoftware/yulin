@@ -10,7 +10,7 @@ describe("Simulated S3 local HTTP controller", () => {
   const simS3ServiceController = new SimS3ServiceController();
 
   it("responds HTTP 400 for missing S3 Bucket name", async () => {
-    const res = await simS3ServiceController.handleRequest(
+    const response = await simS3ServiceController.handleRequest(
       {
         service: "s3",
         resourceName: "",
@@ -21,12 +21,12 @@ describe("Simulated S3 local HTTP controller", () => {
       }),
     );
 
-    assertResponseStatus(res, 400, await describeResponse(res));
-    assertStringIncludes(await res.text(), "Missing S3 Bucket name");
+    assertResponseStatus(response, 400, await describeResponse(response));
+    assertStringIncludes(await response.text(), "Missing S3 Bucket name");
   });
 
   it("responds HTTP 400 for missing S3 Bucket region", async () => {
-    const res = await simS3ServiceController.handleRequest(
+    const response = await simS3ServiceController.handleRequest(
       {
         service: "s3",
         resourceName: "foo-site",
@@ -36,7 +36,7 @@ describe("Simulated S3 local HTTP controller", () => {
       }),
     );
 
-    assertResponseStatus(res, 400, await describeResponse(res));
-    assertStringIncludes(await res.text(), "Missing S3 Bucket region");
+    assertResponseStatus(response, 400, await describeResponse(response));
+    assertStringIncludes(await response.text(), "Missing S3 Bucket region");
   });
 });

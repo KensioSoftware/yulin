@@ -38,11 +38,11 @@ export class S3BucketWebsiteRedirects {
    */
   redirectForRequestResponse(
     request: Request,
-    res: Response,
+    response: Response,
     websiteEnabled: boolean,
   ): Response {
     if (!websiteEnabled) {
-      return res;
+      return response;
     }
 
     const redirectAllRequestsTo =
@@ -56,20 +56,20 @@ export class S3BucketWebsiteRedirects {
     }
 
     const routingRule = this.websiteConfiguration.RoutingRules?.find((rule) =>
-      this.routingRuleMatches(rule, request, res),
+      this.routingRuleMatches(rule, request, response),
     );
 
     if (routingRule?.Redirect !== undefined) {
       return this.redirectResponse(request, routingRule.Redirect);
     }
 
-    return res;
+    return response;
   }
 
   private routingRuleMatches(
     rule: SimS3WebsiteRoutingRule,
     request: Request,
-    res: Response,
+    response: Response,
   ): boolean {
     const condition = rule.Condition;
 
@@ -79,7 +79,7 @@ export class S3BucketWebsiteRedirects {
 
     if (
       condition.HttpErrorCodeReturnedEquals !== undefined &&
-      condition.HttpErrorCodeReturnedEquals !== String(res.status)
+      condition.HttpErrorCodeReturnedEquals !== String(response.status)
     ) {
       return false;
     }

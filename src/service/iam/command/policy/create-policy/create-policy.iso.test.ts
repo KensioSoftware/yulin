@@ -17,7 +17,7 @@ describe("IAM CreatePolicyCommand", () => {
 
     const simIam = simAws.account("123456789012").iam();
 
-    const createPolicyOutput = await simIam.createPolicy(
+    const policyCreation = await simIam.createPolicy(
       new CreatePolicyCommand({
         PolicyName: "TestPolicy",
         Path: "/service-role/",
@@ -35,26 +35,26 @@ describe("IAM CreatePolicyCommand", () => {
       }),
     );
 
-    assertIdentical(createPolicyOutput.Policy.PolicyName, "TestPolicy");
-    assertIdentical(createPolicyOutput.Policy.Path, "/service-role/");
-    assertIdentical(createPolicyOutput.Policy.DefaultVersionId, "v1");
-    assertIdentical(createPolicyOutput.Policy.AttachmentCount, 0);
-    assertIdentical(createPolicyOutput.Policy.PermissionsBoundaryUsageCount, 0);
-    assertTrue(createPolicyOutput.Policy.IsAttachable);
+    assertIdentical(policyCreation.Policy.PolicyName, "TestPolicy");
+    assertIdentical(policyCreation.Policy.Path, "/service-role/");
+    assertIdentical(policyCreation.Policy.DefaultVersionId, "v1");
+    assertIdentical(policyCreation.Policy.AttachmentCount, 0);
+    assertIdentical(policyCreation.Policy.PermissionsBoundaryUsageCount, 0);
+    assertTrue(policyCreation.Policy.IsAttachable);
     assertIdentical(
-      createPolicyOutput.Policy.Description,
+      policyCreation.Policy.Description,
       "Policy used by CreatePolicyCommand tests",
     );
-    assertNonNullable(createPolicyOutput.Policy.PolicyId);
+    assertNonNullable(policyCreation.Policy.PolicyId);
     assertIdentical(
-      createPolicyOutput.Policy.Arn,
+      policyCreation.Policy.Arn,
       "arn:aws:iam::123456789012:policy/service-role/TestPolicy",
     );
-    assertInstanceOf(createPolicyOutput.Policy.CreateDate, Date);
-    assertInstanceOf(createPolicyOutput.Policy.UpdateDate, Date);
+    assertInstanceOf(policyCreation.Policy.CreateDate, Date);
+    assertInstanceOf(policyCreation.Policy.UpdateDate, Date);
     assertIdentical(
-      createPolicyOutput.Policy.UpdateDate,
-      createPolicyOutput.Policy.CreateDate,
+      policyCreation.Policy.UpdateDate,
+      policyCreation.Policy.CreateDate,
     );
   });
 
@@ -63,26 +63,26 @@ describe("IAM CreatePolicyCommand", () => {
 
     const simIam = simAws.account("123456789012").iam();
 
-    const createPolicyOutput = await simIam.createPolicy(
+    const policyCreation = await simIam.createPolicy(
       new CreatePolicyCommand({
         PolicyName: "DefaultedPolicy",
         PolicyDocument: undefined,
       }),
     );
 
-    assertIdentical(createPolicyOutput.Policy.PolicyName, "DefaultedPolicy");
-    assertIdentical(createPolicyOutput.Policy.Path, "/");
+    assertIdentical(policyCreation.Policy.PolicyName, "DefaultedPolicy");
+    assertIdentical(policyCreation.Policy.Path, "/");
     assertIdentical(
-      createPolicyOutput.Policy.Arn,
+      policyCreation.Policy.Arn,
       "arn:aws:iam::123456789012:policy/DefaultedPolicy",
     );
-    assertUndefined(createPolicyOutput.Policy.Description);
-    assertIdentical(createPolicyOutput.Policy.DefaultVersionId, "v1");
-    assertIdentical(createPolicyOutput.Policy.AttachmentCount, 0);
-    assertIdentical(createPolicyOutput.Policy.PermissionsBoundaryUsageCount, 0);
-    assertTrue(createPolicyOutput.Policy.IsAttachable);
-    assertInstanceOf(createPolicyOutput.Policy.CreateDate, Date);
-    assertInstanceOf(createPolicyOutput.Policy.UpdateDate, Date);
+    assertUndefined(policyCreation.Policy.Description);
+    assertIdentical(policyCreation.Policy.DefaultVersionId, "v1");
+    assertIdentical(policyCreation.Policy.AttachmentCount, 0);
+    assertIdentical(policyCreation.Policy.PermissionsBoundaryUsageCount, 0);
+    assertTrue(policyCreation.Policy.IsAttachable);
+    assertInstanceOf(policyCreation.Policy.CreateDate, Date);
+    assertInstanceOf(policyCreation.Policy.UpdateDate, Date);
   });
 
   it("normalises IAM Policy paths", async () => {
@@ -137,7 +137,7 @@ describe("IAM CreatePolicyCommand", () => {
 
     const simIam = simAws.iam();
 
-    const createPolicyOutput = await simIam.createPolicy(
+    const policyCreation = await simIam.createPolicy(
       new CreatePolicyCommand({
         PolicyName: "AccountScopedPolicy",
         Path: "/application/",
@@ -146,7 +146,7 @@ describe("IAM CreatePolicyCommand", () => {
     );
 
     assertIdentical(
-      createPolicyOutput.Policy.Arn,
+      policyCreation.Policy.Arn,
       `arn:aws:iam::${accountId}:policy/application/AccountScopedPolicy`,
     );
   });

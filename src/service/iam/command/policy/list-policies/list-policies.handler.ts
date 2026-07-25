@@ -74,7 +74,7 @@ export class ListPoliciesCommandHandler implements CommandHandler<
         PermissionsBoundaryUsageCount: policy.permissionsBoundaryUsageCount,
         IsAttachable: policy.isAttachable,
         Description: policy.description,
-        CreateDate: policy.createDate,
+        CreateDate: policy.creationDate,
         UpdateDate: policy.updateDate,
       })),
       IsTruncated: isTruncated,

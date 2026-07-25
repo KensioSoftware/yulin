@@ -156,7 +156,7 @@ describe("S3 CloudFormation Bucket WebsiteConfiguration", () => {
 
     assertNonNullable(bucket);
 
-    const res = bucket
+    const response = bucket
       .getWebsite()
       .redirectForRequestResponse(
         new Request(
@@ -165,9 +165,9 @@ describe("S3 CloudFormation Bucket WebsiteConfiguration", () => {
         new Response("Missing", { status: 404 }),
       );
 
-    assertResponseStatus(res, 301, await describeResponse(res));
+    assertResponseStatus(response, 301, await describeResponse(response));
     assertIdentical(
-      res.headers.get("location"),
+      response.headers.get("location"),
       "http://routing-rules-website-config-bucket.s3-website.localhost/not-found.html",
     );
   });

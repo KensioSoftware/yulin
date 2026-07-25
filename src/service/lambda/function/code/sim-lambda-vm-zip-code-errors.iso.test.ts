@@ -138,6 +138,25 @@ describe("sim Lambda vm zip code runtime errors", () => {
     assertStringIncludes(error.message, "index.handler is undefined");
   });
 
+  it("reports an inherited property as Runtime.HandlerNotFound", async () => {
+    // Given a module that does not export the named handler, where that name
+    // happens to exist on Object.prototype.
+    const simFunction = makeVmFunction(
+      "exports.somethingElse = async () => null;",
+      "index.constructor",
+    );
+
+    // When the function is invoked.
+    const error = await assertThrowsErrorAsync(async () =>
+      simFunction.invoke({}),
+    );
+
+    // Then the prototype member is not mistaken for an exported handler.
+    assertInstanceOf(error, SimLambdaRuntimeError);
+    assertIdentical(error.name, "Runtime.HandlerNotFound");
+    assertStringIncludes(error.message, "index.constructor is undefined");
+  });
+
   it("reports invalid source as Runtime.UserCodeSyntaxError", async () => {
     const simFunction = makeVmFunction("exports.handler = async ((( => null;");
 

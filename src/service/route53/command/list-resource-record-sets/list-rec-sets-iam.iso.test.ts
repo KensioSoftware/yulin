@@ -25,7 +25,7 @@ async function createRoleWithPolicy(
 ): Promise<string> {
   const simIam = simAws.account(accountId).iam();
 
-  const createRoleOutput = await simIam.createRole(
+  const roleCreation = await simIam.createRole(
     new CreateRoleCommand({
       RoleName: roleName,
       AssumeRolePolicyDocument: JSON.stringify({
@@ -38,7 +38,7 @@ async function createRoleWithPolicy(
       }),
     }),
   );
-  const roleArn = createRoleOutput.Role.Arn;
+  const roleArn = roleCreation.Role.Arn;
   const policyDocumentJson = JSON.stringify(policyDocument(roleArn));
 
   await simIam.putRolePolicy(
@@ -59,13 +59,13 @@ describe("Route53 ListResourceRecordSetsCommand IAM authorization", () => {
     const simAws = new SimAws();
     const route53 = simAws.account(accountId).route53();
 
-    const createOutput = await route53.createHostedZone(
+    const hostedZoneCreation = await route53.createHostedZone(
       new CreateHostedZoneCommand({
         Name: "root-records.test",
         CallerReference: "root-records-ref",
       }),
     );
-    const hostedZoneId = createOutput.HostedZone?.Id;
+    const hostedZoneId = hostedZoneCreation.HostedZone?.Id;
     assertNonNullable(hostedZoneId, "Hosted Zone ID");
 
     // When record sets are listed without an explicit caller.
@@ -83,13 +83,13 @@ describe("Route53 ListResourceRecordSetsCommand IAM authorization", () => {
     const simAws = new SimAws();
     const route53 = simAws.account(accountId).route53();
 
-    const createOutput = await route53.createHostedZone(
+    const hostedZoneCreation = await route53.createHostedZone(
       new CreateHostedZoneCommand({
         Name: "role-records.test",
         CallerReference: "role-records-ref",
       }),
     );
-    const hostedZoneId = createOutput.HostedZone?.Id;
+    const hostedZoneId = hostedZoneCreation.HostedZone?.Id;
     assertNonNullable(hostedZoneId, "Hosted Zone ID");
 
     const roleArn = await createRoleWithPolicy(
@@ -122,13 +122,13 @@ describe("Route53 ListResourceRecordSetsCommand IAM authorization", () => {
     const simAws = new SimAws();
     const route53 = simAws.account(accountId).route53();
 
-    const createOutput = await route53.createHostedZone(
+    const hostedZoneCreation = await route53.createHostedZone(
       new CreateHostedZoneCommand({
         Name: "other-zone-records.test",
         CallerReference: "other-zone-records-ref",
       }),
     );
-    const hostedZoneId = createOutput.HostedZone?.Id;
+    const hostedZoneId = hostedZoneCreation.HostedZone?.Id;
     assertNonNullable(hostedZoneId, "Hosted Zone ID");
     const otherHostedZoneId = makeSimRoute53HostedZoneId();
 
@@ -190,13 +190,13 @@ describe("Route53 ListResourceRecordSetsCommand IAM authorization", () => {
     // Given standalone Route53 with no supplied IAM implementation.
     const simRoute53 = new SimRoute53();
 
-    const createOutput = await simRoute53.createHostedZone(
+    const hostedZoneCreation = await simRoute53.createHostedZone(
       new CreateHostedZoneCommand({
         Name: "standalone-records.test",
         CallerReference: "standalone-records-ref",
       }),
     );
-    const hostedZoneId = createOutput.HostedZone?.Id;
+    const hostedZoneId = hostedZoneCreation.HostedZone?.Id;
     assertNonNullable(hostedZoneId, "Hosted Zone ID");
 
     // When an anonymous caller lists record sets through the standalone service.

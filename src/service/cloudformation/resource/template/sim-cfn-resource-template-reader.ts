@@ -3,7 +3,7 @@ import {
   parseSimCfnResourceRefDependencies as parseSimCfnResourceReferenceDependencies,
 } from "../dependency/sim-cfn-resource-dependencies.js";
 import type { SimCfnTemplateValueRecord } from "../../template/value/sim-cfn-template-value.js";
-import { isCfnTemplateValueRecord } from "./sim-cfn-templ-val-record.js";
+import { isCfnTemplateValueRecord } from "./sim-cfn-templ-value-record.js";
 
 /**
  * Reads CloudFormation Resource-level fields from one Resource template object.

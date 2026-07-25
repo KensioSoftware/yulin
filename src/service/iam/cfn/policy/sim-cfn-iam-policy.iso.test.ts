@@ -1,4 +1,8 @@
-import { assertIdentical, assertNonNullable } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertNonNullable,
+  assertUndefined,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
@@ -73,7 +77,7 @@ describe("IAM CloudFormation Policy", () => {
     // And the Policy Resource completes without a standalone sim resource.
     const policyResource = stack.getResource("ReaderDefaultPolicy");
     assertNonNullable(policyResource);
-    assertIdentical(policyResource.simResource, undefined);
+    assertUndefined(policyResource.simResource);
   });
 
   it("puts the inline policy onto multiple referenced Roles", async () => {

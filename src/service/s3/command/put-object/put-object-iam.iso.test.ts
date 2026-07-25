@@ -64,7 +64,7 @@ describe("S3 PutObjectCommand IAM authorization", () => {
       new CreateBucketCommand({ Bucket: "conditional-object-bucket" }),
     );
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ConditionalObjectWriter",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -77,7 +77,7 @@ describe("S3 PutObjectCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
@@ -141,7 +141,7 @@ describe("S3 PutObjectCommand IAM authorization", () => {
       new CreateBucketCommand({ Bucket: "condition-denied-objects" }),
     );
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ConditionMismatchObjectWriter",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -154,7 +154,7 @@ describe("S3 PutObjectCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
@@ -218,7 +218,7 @@ describe("S3 PutObjectCommand IAM authorization", () => {
       }),
     );
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "RestrictedObjectWriter",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -231,7 +231,7 @@ describe("S3 PutObjectCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({

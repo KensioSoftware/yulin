@@ -9,7 +9,7 @@ import {
 } from "../cdk/sim-cdk-out-context.js";
 import type { SimCfnExecutableResourceBinding } from "../bind/sim-cfn-exec-binding.type.js";
 
-export interface SimCloudFormationDeployTemplateFileProps {
+export interface SimCloudFormationDeployTemplateFileProperties {
   readonly templatePath: string;
   readonly stackName?: SimCloudFormationStackName | string | undefined;
   readonly parameters?: Record<string, string> | undefined;
@@ -34,7 +34,7 @@ export class SimCfnTemplateFileLoader {
    * ready for the deployment workflow.
    */
   async load(
-    properties: SimCloudFormationDeployTemplateFileProps | string,
+    properties: SimCloudFormationDeployTemplateFileProperties | string,
   ): Promise<SimCfnLoadedTemplateFile> {
     const templatePath =
       typeof properties === "string" ? properties : properties.templatePath;

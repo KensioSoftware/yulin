@@ -45,79 +45,70 @@ describe("CloudFront CreateDistributionCommand scoping", () => {
       },
     };
 
-    const createDistributionOutput = await simCloudFront.createDistribution(
+    const distributionCreation = await simCloudFront.createDistribution(
       new CreateDistributionCommand({
         DistributionConfig: distributionConfig,
       }),
     );
 
-    assertNonNullable(createDistributionOutput.Distribution);
-    assertNonNullable(createDistributionOutput.Distribution.Id);
+    assertNonNullable(distributionCreation.Distribution);
+    assertNonNullable(distributionCreation.Distribution.Id);
 
-    const distributionId = createDistributionOutput.Distribution.Id;
+    const distributionId = distributionCreation.Distribution.Id;
 
     assertStringLength(distributionId, 14);
     assertIdentical(distributionId.at(0), "E");
     assertIdentical(
-      createDistributionOutput.Distribution.ARN,
+      distributionCreation.Distribution.ARN,
       `arn:aws:cloudfront::555555555555:distribution/${distributionId}`,
     );
-    assertOneOf(createDistributionOutput.Distribution.Status, [
+    assertOneOf(distributionCreation.Distribution.Status, [
       "Deploying",
       "Deployed",
     ]);
-    assertInstanceOf(
-      createDistributionOutput.Distribution.LastModifiedTime,
-      Date,
-    );
+    assertInstanceOf(distributionCreation.Distribution.LastModifiedTime, Date);
     assertIdentical(
-      createDistributionOutput.Distribution.InProgressInvalidationBatches,
+      distributionCreation.Distribution.InProgressInvalidationBatches,
       0,
     );
     assertIdentical(
-      createDistributionOutput.Distribution.DomainName,
+      distributionCreation.Distribution.DomainName,
       `${distributionId.toLowerCase()}.cloudfront.net`,
     );
-    assertObjectMatches(
-      createDistributionOutput.Distribution.DistributionConfig,
-      {
-        CallerReference: distributionConfig.CallerReference,
-        Comment: distributionConfig.Comment,
-        Enabled: distributionConfig.Enabled,
-        Origins: distributionConfig.Origins,
-        DefaultCacheBehavior: distributionConfig.DefaultCacheBehavior,
-      },
-    );
+    assertObjectMatches(distributionCreation.Distribution.DistributionConfig, {
+      CallerReference: distributionConfig.CallerReference,
+      Comment: distributionConfig.Comment,
+      Enabled: distributionConfig.Enabled,
+      Origins: distributionConfig.Origins,
+      DefaultCacheBehavior: distributionConfig.DefaultCacheBehavior,
+    });
     assertIdentical(
-      createDistributionOutput.Location,
+      distributionCreation.Location,
       `https://cloudfront.amazonaws.com/2020-05-31/distribution/${distributionId}`,
     );
 
     await simAws.backgroundTasksComplete();
 
-    const getDistributionOutput = await simCloudFront.getDistribution(
+    const distributionOut = await simCloudFront.getDistribution(
       new GetDistributionCommand({ Id: distributionId }),
     );
-    assertNonNullable(getDistributionOutput.Distribution);
-    assertIdentical(getDistributionOutput.Distribution.Id, distributionId);
+    assertNonNullable(distributionOut.Distribution);
+    assertIdentical(distributionOut.Distribution.Id, distributionId);
     assertIdentical(
-      getDistributionOutput.Distribution.ARN,
+      distributionOut.Distribution.ARN,
       `arn:aws:cloudfront::555555555555:distribution/${distributionId}`,
     );
-    assertOneOf(getDistributionOutput.Distribution.Status, [
-      "Deploying",
-      "Deployed",
-    ]);
-    assertInstanceOf(getDistributionOutput.Distribution.LastModifiedTime, Date);
+    assertOneOf(distributionOut.Distribution.Status, ["Deploying", "Deployed"]);
+    assertInstanceOf(distributionOut.Distribution.LastModifiedTime, Date);
     assertIdentical(
-      getDistributionOutput.Distribution.InProgressInvalidationBatches,
+      distributionOut.Distribution.InProgressInvalidationBatches,
       0,
     );
     assertIdentical(
-      getDistributionOutput.Distribution.DomainName,
+      distributionOut.Distribution.DomainName,
       `${distributionId.toLowerCase()}.cloudfront.net`,
     );
-    assertObjectMatches(getDistributionOutput.Distribution.DistributionConfig, {
+    assertObjectMatches(distributionOut.Distribution.DistributionConfig, {
       CallerReference: distributionConfig.CallerReference,
       Comment: distributionConfig.Comment,
       Enabled: distributionConfig.Enabled,
@@ -149,7 +140,7 @@ describe("CloudFront CreateDistributionCommand scoping", () => {
       .region("ap-east-1")
       .cloudFront();
 
-    const createDistributionOutput = await simCloudFront.createDistribution(
+    const distributionCreation = await simCloudFront.createDistribution(
       new CreateDistributionCommand({
         DistributionConfig: {
           CallerReference: "account-specific-distribution",
@@ -178,10 +169,10 @@ describe("CloudFront CreateDistributionCommand scoping", () => {
       }),
     );
 
-    assertNonNullable(createDistributionOutput.Distribution);
-    assertNonNullable(createDistributionOutput.Distribution.ARN);
+    assertNonNullable(distributionCreation.Distribution);
+    assertNonNullable(distributionCreation.Distribution.ARN);
     assertStringIncludes(
-      createDistributionOutput.Distribution.ARN,
+      distributionCreation.Distribution.ARN,
       "arn:aws:cloudfront::666666666666:distribution/",
     );
   });

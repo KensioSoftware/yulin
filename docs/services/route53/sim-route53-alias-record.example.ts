@@ -12,14 +12,14 @@ import { SimAws } from "@kensio/yulin";
 const simAws = new SimAws();
 const route53 = simAws.route53();
 
-const createHostedZoneOutput = await route53.createHostedZone(
+const hostedZoneCreation = await route53.createHostedZone(
   new CreateHostedZoneCommand({
     Name: "example.test",
     CallerReference: "alias-zone",
   }),
 );
 
-const hostedZoneId = createHostedZoneOutput.HostedZone!.Id!;
+const hostedZoneId = hostedZoneCreation.HostedZone!.Id!;
 
 await simAws.backgroundTasksComplete();
 

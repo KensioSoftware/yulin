@@ -26,16 +26,17 @@ describe("CFF function code input conversion", () => {
     const functionCodeInput = makeCffFunctionCodeInput(handlerFunction);
     assertInstanceOf(functionCodeInput, Uint8Array);
 
-    const createFunctionCommand: SimCreateFunctionCommand =
-      new CreateFunctionCommand({
+    const functionCommand: SimCreateFunctionCommand = new CreateFunctionCommand(
+      {
         Name: "foobar-cloudfront-function",
         FunctionCode: functionCodeInput,
         FunctionConfig: {
           Comment: "test function code input typing",
           Runtime: "cloudfront-js-2.0",
         },
-      });
-    assertInstanceOf(createFunctionCommand, CreateFunctionCommand);
+      },
+    );
+    assertInstanceOf(functionCommand, CreateFunctionCommand);
   });
 
   it("extracts handler function reference back out", () => {
@@ -47,8 +48,8 @@ describe("CFF function code input conversion", () => {
     assertInstanceOf(handler, Function);
 
     const cffEvent = cloudFrontViewerRequestEventFactory.make();
-    const handlerRes = handler(cffEvent);
-    assertIdentical(handlerRes, cffEvent.request);
+    const handlerResponse = handler(cffEvent);
+    assertIdentical(handlerResponse, cffEvent.request);
   });
 
   it("creates handler function from Uint8Array source code", () => {
@@ -64,8 +65,8 @@ describe("CFF function code input conversion", () => {
     assertTypeFunction(handler);
 
     const cffEvent = cloudFrontViewerRequestEventFactory.make();
-    const handlerRes = handler(cffEvent);
-    assertIdentical(handlerRes, cffEvent.request);
+    const handlerResponse = handler(cffEvent);
+    assertIdentical(handlerResponse, cffEvent.request);
   });
 
   it("throws on non-function handler in source code", () => {

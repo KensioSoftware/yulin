@@ -48,7 +48,7 @@ describe("S3 ListBucketsCommand IAM authorization", () => {
       new CreateBucketCommand({ Bucket: "archive-bucket" }),
     );
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "BucketLister",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -61,7 +61,7 @@ describe("S3 ListBucketsCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
@@ -110,7 +110,7 @@ describe("S3 ListBucketsCommand IAM authorization", () => {
       new CreateBucketCommand({ Bucket: "bucket-scoped-listing" }),
     );
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "BucketScopedLister",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -123,7 +123,7 @@ describe("S3 ListBucketsCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
@@ -165,7 +165,7 @@ describe("S3 ListBucketsCommand IAM authorization", () => {
       new CreateBucketCommand({ Bucket: "condition-denied-listing" }),
     );
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ConditionMismatchLister",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -178,7 +178,7 @@ describe("S3 ListBucketsCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
@@ -225,7 +225,7 @@ describe("S3 ListBucketsCommand IAM authorization", () => {
       new CreateBucketCommand({ Bucket: "explicitly-denied-listing" }),
     );
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "DeniedBucketLister",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -238,7 +238,7 @@ describe("S3 ListBucketsCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({

@@ -7,7 +7,7 @@ import { SimCloudFrontBehaviorResolver as DefaultSimCloudFrontBehaviorResolver }
 import { SimCffApplicator } from "../cff/sim-cff-applicator.js";
 import { SimCloudFrontOriginFetcher } from "../origin/sim-cloudfront-origin-fetcher.js";
 
-export interface SimCloudFrontServiceControllerProps {
+export interface SimCloudFrontServiceControllerProperties {
   readonly simAws?: SimAws;
   readonly cloudFrontRegistry?: SimCloudFrontRegistry;
   readonly distroRouter?: SimCloudFrontDistroRouter;
@@ -31,7 +31,7 @@ export class SimCloudFrontControllerDependenciesFactory {
    * Build controller dependencies from optional constructor props.
    */
   make(
-    properties: SimCloudFrontServiceControllerProps = {},
+    properties: SimCloudFrontServiceControllerProperties = {},
   ): SimCloudFrontControllerDependencies {
     const simAws = properties.simAws ?? new SimAws();
     const cloudFrontRegistry =

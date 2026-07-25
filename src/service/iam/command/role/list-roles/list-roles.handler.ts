@@ -57,7 +57,7 @@ export class ListRolesCommandHandler implements CommandHandler<
         RoleName: role.roleName,
         RoleId: role.roleId,
         Arn: role.arn,
-        CreateDate: role.createDate,
+        CreateDate: role.creationDate,
         AssumeRolePolicyDocument: role.assumeRolePolicyDocument,
         Description: role.description,
       })),

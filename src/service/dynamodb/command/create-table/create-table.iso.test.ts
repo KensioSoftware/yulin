@@ -20,19 +20,16 @@ describe("DynamoDB CreateTableCommand", () => {
 
     const simDynamoDatabase = simAws.account().dynamoDb();
 
-    const createTableOutput = await simDynamoDatabase.createTable(
+    const tableCreation = await simDynamoDatabase.createTable(
       new CreateTableCommand({
         TableName: "FoobarTable",
         KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
       }),
     );
 
-    assertNonNullable(createTableOutput.TableDescription);
-    assertIdentical(
-      createTableOutput.TableDescription.TableName,
-      "FoobarTable",
-    );
-    assertIdentical(createTableOutput.TableDescription.TableStatus, "CREATING");
+    assertNonNullable(tableCreation.TableDescription);
+    assertIdentical(tableCreation.TableDescription.TableName, "FoobarTable");
+    assertIdentical(tableCreation.TableDescription.TableStatus, "CREATING");
 
     const listTablesOutput = await simDynamoDatabase.listTables(
       new ListTablesCommand(),

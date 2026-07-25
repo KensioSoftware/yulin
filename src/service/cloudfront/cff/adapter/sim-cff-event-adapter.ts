@@ -33,7 +33,7 @@ export class SimCffEventAdapter {
    */
   toViewerResponseEvent(
     request: Request,
-    res: Response,
+    response: Response,
   ): CloudFrontFunction.ViewerResponseEvent {
     return {
       context: {
@@ -44,7 +44,7 @@ export class SimCffEventAdapter {
         ip: "127.0.0.1",
       },
       request: this.requestResponseAdapter.toCffRequest(request),
-      response: this.requestResponseAdapter.toCffResponse(res),
+      response: this.requestResponseAdapter.toCffResponse(response),
     };
   }
 

@@ -4,7 +4,7 @@ import type {
   SimRequestCertificateTag,
 } from "../../command/request-certificate/request-certificate.command.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
-import { SimCfnAcmCertificatePropertyListReader } from "./sim-cfn-acm-cert-prop-reader.js";
+import { SimCfnAcmCertificatePropertyListReader } from "./sim-cfn-acm-cert-property-reader.js";
 
 interface SimCfnAcmCertificateProperties {
   readonly logicalId: string;

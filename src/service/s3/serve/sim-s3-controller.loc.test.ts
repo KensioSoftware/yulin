@@ -51,17 +51,17 @@ describe("Simulated S3 local HTTP controller", () => {
       }),
     );
 
-    const res = await fetch(
+    const response = await fetch(
       `http://foo-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/index.html`,
     );
 
-    assertIdentical(res.status, 200);
+    assertIdentical(response.status, 200);
     assertIdentical(
-      res.headers.get("content-type"),
+      response.headers.get("content-type"),
       "text/html; charset=utf-8",
     );
     assertBufferEqual(
-      Buffer.from(await res.arrayBuffer()),
+      Buffer.from(await response.arrayBuffer()),
       Buffer.from("<h1>Hello, world!</h1>"),
     );
   });
@@ -91,18 +91,18 @@ describe("Simulated S3 local HTTP controller", () => {
       }),
     );
 
-    const res = await fetch(
+    const response = await fetch(
       `http://head-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/index.html`,
       { method: "HEAD" },
     );
 
-    assertIdentical(res.status, 200);
+    assertIdentical(response.status, 200);
     assertIdentical(
-      res.headers.get("content-type"),
+      response.headers.get("content-type"),
       "text/html; charset=utf-8",
     );
-    assertIdentical(res.headers.get("content-length"), "22");
-    assertIdentical(await res.text(), "");
+    assertIdentical(response.headers.get("content-length"), "22");
+    assertIdentical(await response.text(), "");
   });
 
   it("decodes URL-encoded Object keys from the request path", async () => {
@@ -132,12 +132,12 @@ describe("Simulated S3 local HTTP controller", () => {
       }),
     );
 
-    const res = await fetch(
+    const response = await fetch(
       `http://encoded-path-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/folder/hello%20world.txt`,
     );
 
-    assertIdentical(res.status, 200);
-    assertIdentical(await res.text(), "Hello from an encoded path");
+    assertIdentical(response.status, 200);
+    assertIdentical(await response.text(), "Hello from an encoded path");
   });
 
   it("redirects folder requests without a trailing slash when an index document exists", async () => {
@@ -167,14 +167,14 @@ describe("Simulated S3 local HTTP controller", () => {
       }),
     );
 
-    const res = await fetch(
+    const response = await fetch(
       `http://folder-index-redirect-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/docs`,
       { redirect: "manual" },
     );
 
-    assertIdentical(res.status, 301);
+    assertIdentical(response.status, 301);
     assertIdentical(
-      res.headers.get("location"),
+      response.headers.get("location"),
       `http://folder-index-redirect-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/docs/`,
     );
   });
@@ -206,17 +206,20 @@ describe("Simulated S3 local HTTP controller", () => {
       }),
     );
 
-    const res = await fetch(
+    const response = await fetch(
       `http://folder-index-follow-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/docs`,
     );
 
-    assertIdentical(res.status, 200);
-    assertStringEndsWith(res.url, "/docs/");
+    assertIdentical(response.status, 200);
+    assertStringEndsWith(response.url, "/docs/");
     assertIdentical(
-      res.headers.get("content-type"),
+      response.headers.get("content-type"),
       "text/html; charset=utf-8",
     );
-    assertIdentical(await res.text(), "<h1>Docs index after redirect</h1>");
+    assertIdentical(
+      await response.text(),
+      "<h1>Docs index after redirect</h1>",
+    );
   });
 
   it("does not serve S3 Bucket root requests when static website hosting is not enabled", async () => {
@@ -224,13 +227,13 @@ describe("Simulated S3 local HTTP controller", () => {
 
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "index-site" }));
 
-    const res = await fetch(
+    const response = await fetch(
       `http://index-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/`,
     );
 
-    assertIdentical(res.status, 403);
-    const resBody = await res.text();
-    assertStringIncludes(resBody, "Static website hosting is not enabled");
+    assertIdentical(response.status, 403);
+    const responseBody = await response.text();
+    assertStringIncludes(responseBody, "Static website hosting is not enabled");
   });
 
   it("responds HTTP 404 for missing S3 Objects when static website hosting is enabled", async () => {
@@ -250,13 +253,13 @@ describe("Simulated S3 local HTTP controller", () => {
       }),
     );
 
-    const res = await fetch(
+    const response = await fetch(
       `http://missing-object-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/missing.txt`,
     );
 
-    assertIdentical(res.status, 404);
-    const resBody = await res.text();
-    assertStringIncludes(resBody, "Object missing.txt not found");
+    assertIdentical(response.status, 404);
+    const responseBody = await response.text();
+    assertStringIncludes(responseBody, "Object missing.txt not found");
   });
 
   it("responds HTTP 404 when the hostname region differs from the Bucket region", async () => {
@@ -273,26 +276,26 @@ describe("Simulated S3 local HTTP controller", () => {
       }),
     );
 
-    const res = await fetch(
+    const response = await fetch(
       `http://wrong-region-site.s3-website.us-east-1.sim-aws.localhost:${srv.port}/index.html`,
     );
 
-    assertIdentical(res.status, 404);
-    const resBody = await res.text();
+    assertIdentical(response.status, 404);
+    const responseBody = await response.text();
     assertStringIncludes(
-      resBody,
+      responseBody,
       "S3 bucket named wrong-region-site is in region eu-west-2, not requested us-east-1",
     );
   });
 
   it("responds HTTP 405 for unsupported methods", async () => {
-    const res = await fetch(
+    const response = await fetch(
       `http://method-not-allowed-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/index.html`,
       { method: "POST" },
     );
 
-    assertIdentical(res.status, 405);
-    const resBody = await res.text();
-    assertStringIncludes(resBody, "Method not allowed");
+    assertIdentical(response.status, 405);
+    const responseBody = await response.text();
+    assertStringIncludes(responseBody, "Method not allowed");
   });
 });

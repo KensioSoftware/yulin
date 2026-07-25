@@ -22,21 +22,21 @@ describe("Route53 GetHostedZoneCommand IAM authorization", () => {
     const simAws = new SimAws();
     const simRoute53 = simAws.account(accountId).route53();
 
-    const createOutput = await simRoute53.createHostedZone(
+    const hostedZoneCreation = await simRoute53.createHostedZone(
       new CreateHostedZoneCommand({
         Name: "root-read.example.com",
         CallerReference: "root-read-ref",
       }),
     );
-    assertNonNullable(createOutput.HostedZone?.Id);
+    assertNonNullable(hostedZoneCreation.HostedZone?.Id);
 
     // When GetHostedZone is called without an explicit caller.
     const output = await simRoute53.getHostedZone(
-      new GetHostedZoneCommand({ Id: createOutput.HostedZone.Id }),
+      new GetHostedZoneCommand({ Id: hostedZoneCreation.HostedZone.Id }),
     );
 
     // Then IAM defaults to Account root and Route53 returns the Hosted Zone details.
-    assertIdentical(output.HostedZone?.Id, createOutput.HostedZone.Id);
+    assertIdentical(output.HostedZone?.Id, hostedZoneCreation.HostedZone.Id);
     assertIdentical(output.HostedZone.Name, "root-read.example.com.");
   });
 
@@ -64,7 +64,7 @@ describe("Route53 GetHostedZoneCommand IAM authorization", () => {
 
     const allowedArn = `arn:aws:route53:::hostedzone/${allowedOutput.HostedZone.Id}`;
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "SingleHostedZoneReader",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -77,7 +77,7 @@ describe("Route53 GetHostedZoneCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
@@ -133,7 +133,7 @@ describe("Route53 GetHostedZoneCommand IAM authorization", () => {
     );
     assertNonNullable(deniedOutput.HostedZone?.Id);
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "DifferentHostedZoneReader",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -146,7 +146,7 @@ describe("Route53 GetHostedZoneCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     const allowedArn = `arn:aws:route53:::hostedzone/${allowedOutput.HostedZone.Id}`;
     await simIam.putRolePolicy(
@@ -202,7 +202,7 @@ describe("Route53 GetHostedZoneCommand IAM authorization", () => {
     );
     assertNonNullable(allowedOutput.HostedZone?.Id);
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "RestrictedHostedZoneReader",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -215,7 +215,7 @@ describe("Route53 GetHostedZoneCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     const deniedArn = `arn:aws:route53:::hostedzone/${deniedOutput.HostedZone.Id}`;
     await simIam.putRolePolicy(
@@ -285,17 +285,17 @@ describe("Route53 GetHostedZoneCommand IAM authorization", () => {
     // Given standalone Route53 with no supplied IAM implementation.
     const simRoute53 = new SimRoute53();
 
-    const createOutput = await simRoute53.createHostedZone(
+    const hostedZoneCreation = await simRoute53.createHostedZone(
       new CreateHostedZoneCommand({
         Name: "standalone.example.com",
         CallerReference: "standalone-ref",
       }),
     );
-    assertNonNullable(createOutput.HostedZone?.Id);
+    assertNonNullable(hostedZoneCreation.HostedZone?.Id);
 
     // When an anonymous caller gets the Hosted Zone through standalone SimRoute53.
     const output = await simRoute53.getHostedZone(
-      new GetHostedZoneCommand({ Id: createOutput.HostedZone.Id }),
+      new GetHostedZoneCommand({ Id: hostedZoneCreation.HostedZone.Id }),
       { caller: { kind: "anonymous" } },
     );
 

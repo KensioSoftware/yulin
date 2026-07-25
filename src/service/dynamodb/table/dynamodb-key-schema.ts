@@ -1,5 +1,5 @@
 import { assertDefined } from "../../../util/type-guard/defined.js";
-import type { DynamoDBAttrType as DynamoDBAttributeType } from "../item/dynamodb-item-attribute.js";
+import type { DynamoDBAttributeType } from "../item/dynamodb-item-attribute.js";
 import type { DynamoDbItem as DynamoDatabaseItem } from "../item/dynamodb-item.js";
 import type {
   SimCreateTableCommandInput,
@@ -23,11 +23,11 @@ export class DynamoDbKeySchema {
   private readonly hashKeyAttributeName: string;
   private readonly rangeKeyAttributeName: string | undefined;
 
-  constructor(createTableInput: SimCreateTableCommandInput) {
-    const hashKey = this.requiredKeySchemaElement(createTableInput, "HASH");
+  constructor(tableInput: SimCreateTableCommandInput) {
+    const hashKey = this.requiredKeySchemaElement(tableInput, "HASH");
     this.hashKeyAttributeName = hashKey.AttributeName;
 
-    const rangeKey = this.keySchemaElement(createTableInput, "RANGE");
+    const rangeKey = this.keySchemaElement(tableInput, "RANGE");
     this.rangeKeyAttributeName = rangeKey?.AttributeName;
   }
 
@@ -79,10 +79,10 @@ export class DynamoDbKeySchema {
   }
 
   private requiredKeySchemaElement(
-    createTableInput: SimCreateTableCommandInput,
+    tableInput: SimCreateTableCommandInput,
     keyType: SimDynamoDatabaseKeyType,
   ): RequiredSimDynamoDatabaseKeySchemaElement {
-    const keySchemaElement = this.keySchemaElement(createTableInput, keyType);
+    const keySchemaElement = this.keySchemaElement(tableInput, keyType);
 
     assertDefined(keySchemaElement, `DynamoDB Table ${keyType} key schema`);
 
@@ -90,10 +90,10 @@ export class DynamoDbKeySchema {
   }
 
   private keySchemaElement(
-    createTableInput: SimCreateTableCommandInput,
+    tableInput: SimCreateTableCommandInput,
     keyType: SimDynamoDatabaseKeyType,
   ): RequiredSimDynamoDatabaseKeySchemaElement | undefined {
-    return createTableInput.KeySchema?.find(
+    return tableInput.KeySchema?.find(
       (
         keySchemaElement,
       ): keySchemaElement is RequiredSimDynamoDatabaseKeySchemaElement =>

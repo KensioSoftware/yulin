@@ -5,7 +5,7 @@ import {
 } from "../../../../../util/background/background.js";
 import { SimIamNoSuchEntity } from "../../../error/sim-iam.error.js";
 import type { SimIamUser, SimIamUsername } from "../../../user/sim-iam-user.js";
-import { SimIamPolicyDocumentValidator } from "../../../validate/sim-iam-policy-doc-validator.js";
+import { SimIamPolicyDocumentValidator } from "../../../validate/sim-iam-policy-document-validator.js";
 import type {
   SimPutUserPolicyCommand,
   SimPutUserPolicyCommandOutput,

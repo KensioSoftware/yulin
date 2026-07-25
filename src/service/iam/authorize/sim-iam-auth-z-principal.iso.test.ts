@@ -17,7 +17,7 @@ describe("sim IAM authorization principal", () => {
 
     const simIam = simAws.account(accountId).iam();
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "CallerContextRole",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -35,7 +35,7 @@ describe("sim IAM authorization principal", () => {
       resource: "arn:aws:s3:::example-bucket/example-key.txt",
       caller: {
         kind: "arn",
-        arn: createRoleOutput.Role.Arn,
+        arn: roleCreation.Role.Arn,
       },
       resourcePolicies: [
         {
@@ -45,7 +45,7 @@ describe("sim IAM authorization principal", () => {
               {
                 Effect: "Allow",
                 Principal: {
-                  AWS: createRoleOutput.Role.Arn,
+                  AWS: roleCreation.Role.Arn,
                 },
                 Action: "s3:GetObject",
                 Resource: "arn:aws:s3:::example-bucket/*",
@@ -73,7 +73,7 @@ describe("sim IAM authorization principal", () => {
 
     const simIam = simAws.account(accountId).iam();
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "CallerContextIdentityRole",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -108,7 +108,7 @@ describe("sim IAM authorization principal", () => {
       resource: "arn:aws:s3:::example-bucket/example-key.txt",
       caller: {
         kind: "arn",
-        arn: createRoleOutput.Role.Arn,
+        arn: roleCreation.Role.Arn,
       },
     });
 

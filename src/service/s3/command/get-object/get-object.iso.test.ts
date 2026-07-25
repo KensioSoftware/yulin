@@ -34,19 +34,19 @@ describe("S3 GetObjectCommand", () => {
       }),
     );
 
-    const getObjectOutput = await simS3.getObject(
+    const objectOut = await simS3.getObject(
       new GetObjectCommand({
         Bucket: "bucket-a",
         Key: "foo.txt",
       }),
     );
 
-    assertInstanceOf(getObjectOutput.Body, Readable);
+    assertInstanceOf(objectOut.Body, Readable);
     assertBufferEqual(
-      await simS3BodyToBuffer(getObjectOutput.Body),
+      await simS3BodyToBuffer(objectOut.Body),
       Buffer.from("Hello, world!"),
     );
-    assertIdentical(getObjectOutput.Metadata?.["foo"], "bar");
+    assertIdentical(objectOut.Metadata?.["foo"], "bar");
   });
 
   it("rejects undefined bucket name", async () => {

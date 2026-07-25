@@ -41,7 +41,7 @@ describe("S3 CreateBucketCommand IAM authorization", () => {
     const simIam = simAws.account(accountId).iam();
     const simS3 = simAws.account(accountId).region(region).s3();
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "BucketCreator",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -54,7 +54,7 @@ describe("S3 CreateBucketCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
@@ -100,7 +100,7 @@ describe("S3 CreateBucketCommand IAM authorization", () => {
     const simIam = simAws.account(accountId).iam();
     const simS3 = simAws.account(accountId).region(region).s3();
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ConditionMismatchCreator",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -113,7 +113,7 @@ describe("S3 CreateBucketCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
@@ -160,7 +160,7 @@ describe("S3 CreateBucketCommand IAM authorization", () => {
     const simIam = simAws.account(accountId).iam();
     const simS3 = simAws.account(accountId).region(region).s3();
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "RestrictedBucketCreator",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -173,7 +173,7 @@ describe("S3 CreateBucketCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
