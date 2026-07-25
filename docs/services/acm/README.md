@@ -12,12 +12,14 @@ Sim ACM currently supports:
 - Requesting certificates with `RequestCertificateCommand`
 - Describing certificates with `DescribeCertificateCommand`
 - Listing certificates with `ListCertificatesCommand`
-- DNS and EMAIL validation method shapes (but validation always succeeds regardless)
+- DNS validation against records in sim Route53
+- EMAIL validation method shapes (but validation always succeeds regardless)
 - Subject alternative names
 - Certificate tags, up to the ACM limit of 50 tags
 - Deterministic simulated certificate ARNs scoped to account and region
 - Deterministic DNS validation CNAME records
 - Background certificate issuance from `PENDING_VALIDATION` to `ISSUED`
+- Per-domain validation status for multi-domain certificates
 - CloudFormation resource:
   - `AWS::CertificateManager::Certificate`
 - CloudFormation `Ref` and `Fn::GetAtt` values for ACM certificates
@@ -199,6 +201,9 @@ to move them to `ISSUED`.
 
 If your test needs the issued state, wait for simulator background tasks to complete.
 
+Where a sim Route53 hosted zone covers the certificate domain, issuance waits for DNS validation
+first. See [DNS validation against sim Route53](#dns-validation-against-sim-route53) below.
+
 ```typescript sim-acm-background-issuance
 /**
  * Waiting for a simulated ACM certificate to be issued.
@@ -231,6 +236,156 @@ const describeOutput = await acm.describeCertificate(
 console.log(describeOutput.Certificate?.Status);
 console.log(describeOutput.Certificate?.IssuedAt);
 ```
+
+## DNS validation against sim Route53
+
+Real ACM issues a DNS validated certificate only once the CNAME it asks for is resolvable. Sim ACM
+does the same, but only where the simulation could actually answer for the domain: if a sim Route53
+hosted zone covers the certificate domain, the certificate waits for its validation record. With no
+covering hosted zone there is nothing to validate against, so the certificate is issued as soon as
+background tasks drain.
+
+That keeps certificates realistic when you are simulating Route53, without getting in the way when
+your DNS lives outside the simulation. Templates commonly reference hosted zones managed by another
+team or another tool, and those certificates keep working here.
+
+```typescript sim-acm-dns-validation
+/**
+ * Validating a simulated ACM certificate against a simulated Route53 record.
+ */
+
+import {
+  DescribeCertificateCommand,
+  RequestCertificateCommand,
+} from "@aws-sdk/client-acm";
+import {
+  ChangeResourceRecordSetsCommand,
+  CreateHostedZoneCommand,
+} from "@aws-sdk/client-route-53";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const zoneOutput = await simAws.route53().createHostedZone(
+  new CreateHostedZoneCommand({
+    Name: "example.test",
+    CallerReference: "acm-dns-validation",
+  }),
+);
+
+const requestOutput = await simAws.acm().requestCertificate(
+  new RequestCertificateCommand({
+    DomainName: "api.example.test",
+  }),
+);
+
+await simAws.backgroundTasksComplete();
+
+// A hosted zone covers the domain, so the certificate waits for its record.
+const pendingOutput = await simAws.acm().describeCertificate(
+  new DescribeCertificateCommand({
+    CertificateArn: requestOutput.CertificateArn,
+  }),
+);
+
+console.log(pendingOutput.Certificate?.Status); // PENDING_VALIDATION
+
+const validationRecord =
+  pendingOutput.Certificate?.DomainValidationOptions?.[0]?.ResourceRecord;
+
+await simAws.route53().changeResourceRecordSets(
+  new ChangeResourceRecordSetsCommand({
+    HostedZoneId: zoneOutput.HostedZone?.Id,
+    ChangeBatch: {
+      Changes: [
+        {
+          Action: "CREATE",
+          ResourceRecordSet: {
+            Name: validationRecord?.Name,
+            Type: "CNAME",
+            TTL: 300,
+            ResourceRecords: [{ Value: validationRecord?.Value ?? "" }],
+          },
+        },
+      ],
+    },
+  }),
+);
+
+await simAws.backgroundTasksComplete();
+
+const issuedOutput = await simAws.acm().describeCertificate(
+  new DescribeCertificateCommand({
+    CertificateArn: requestOutput.CertificateArn,
+  }),
+);
+
+console.log(issuedOutput.Certificate?.Status); // ISSUED
+```
+
+Each domain on a certificate is validated separately, so a certificate with subject alternative
+names is issued only once every domain's record exists. Until then `DescribeCertificateCommand`
+reports `SUCCESS` for the domains already validated and `PENDING_VALIDATION` for the rest.
+
+Hosted zones are looked up across every simulated account, matching real ACM validating against
+public DNS. A certificate in one account can be validated by a hosted zone in another.
+
+### Skipping the validation record
+
+If you want a realistic hosted zone but not the certificate ceremony, `completeDnsValidation()`
+publishes the validation records for a pending certificate. The certificate is issued by the time it
+resolves.
+
+```typescript sim-acm-complete-dns-validation
+/**
+ * Completing simulated ACM DNS validation in one call.
+ */
+
+import {
+  DescribeCertificateCommand,
+  RequestCertificateCommand,
+} from "@aws-sdk/client-acm";
+import { CreateHostedZoneCommand } from "@aws-sdk/client-route-53";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+await simAws.route53().createHostedZone(
+  new CreateHostedZoneCommand({
+    Name: "example.test",
+    CallerReference: "acm-shortcut",
+  }),
+);
+
+const requestOutput = await simAws.acm().requestCertificate(
+  new RequestCertificateCommand({
+    DomainName: "api.example.test",
+  }),
+);
+
+await simAws.acm().completeDnsValidation(requestOutput.CertificateArn);
+
+const describeOutput = await simAws.acm().describeCertificate(
+  new DescribeCertificateCommand({
+    CertificateArn: requestOutput.CertificateArn,
+  }),
+);
+
+console.log(describeOutput.Certificate?.Status); // ISSUED
+```
+
+### Overriding when validation is required
+
+Two methods override the default for tests where the hosted zone heuristic guesses wrong:
+
+- `simAws.acm().autoIssueCertificates()` never requires validation, for a test that has a hosted zone
+  for unrelated reasons and does not care about certificates.
+- `simAws.acm().requireDnsValidation()` always requires it, so the validation path can be exercised
+  without creating a hosted zone first.
+
+A standalone `new SimAcm()` has no sim Route53 at all, so it always issues certificates immediately.
 
 ## Listing and filtering certificates
 
@@ -497,6 +652,9 @@ Current documented limitations:
 - Certificate deletion is not supported.
 - Certificate renewal is not supported.
 - Imported certificates are not supported.
-- Real validation checks are not performed.
-- DNS validation records are generated for test use; they are not resolvable through real DNS.
+- EMAIL validation always succeeds; only DNS validation is really checked.
+- DNS validation is checked against sim Route53 only, never against real DNS.
+- Validation does not time out: a certificate whose record never appears stays `PENDING_VALIDATION`.
+- CloudFormation templates cannot create their own validation records yet, so
+  `DomainValidationOptions[].HostedZoneId` is ignored.
 - ACM is not served as an HTTP API by `serveSimAws`.

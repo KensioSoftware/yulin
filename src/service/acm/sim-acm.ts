@@ -29,6 +29,9 @@ import {
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimAcmSdkCommandRouter } from "./sdk/sim-acm-sdk-command-router.js";
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
+import { SimAcmCertificateValidation } from "./validation/sim-acm-certificate-validation.js";
+import { SimAcmDnsValidationCompleter } from "./validation/sim-acm-dns-validation-completer.js";
+import type { SimAcmDnsRecords } from "./validation/sim-acm-dns-records.js";
 
 export interface SimAcmRequestOptions {
   readonly caller?: SimAwsCaller;
@@ -38,6 +41,7 @@ interface SimAcmProperties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
+  readonly dnsRecords?: SimAcmDnsRecords;
 }
 
 /**
@@ -49,6 +53,8 @@ export class SimAcm {
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly iam: SimIamInterServiceAuthZ;
   private readonly background: BackgroundScheduler;
+  private readonly validation: SimAcmCertificateValidation;
+  private readonly dnsValidationCompleter: SimAcmDnsValidationCompleter;
   private readonly cfnFactory = new SimAcmCfnResourceFactory({
     acm: this,
   });
@@ -59,11 +65,52 @@ export class SimAcm {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
+      dnsRecords,
     } = properties;
 
     this.accountRegionScope = accountRegionScope;
     this.iam = iam;
     this.background = background;
+    this.validation = new SimAcmCertificateValidation({
+      background,
+      dnsRecords,
+    });
+    this.dnsValidationCompleter = new SimAcmDnsValidationCompleter({
+      certificates: this.certificates,
+      validation: this.validation,
+      dnsRecords,
+    });
+  }
+
+  /**
+   * Always require a DNS validation record before issuing a Certificate, even
+   * where no sim Route53 Hosted Zone covers the domain name.
+   */
+  requireDnsValidation(): this {
+    this.validation.alwaysRequireDnsValidation();
+    return this;
+  }
+
+  /**
+   * Never require a DNS validation record: issue every Certificate as soon as
+   * it is requested, whatever sim Route53 holds.
+   */
+  autoIssueCertificates(): this {
+    this.validation.neverRequireDnsValidation();
+    return this;
+  }
+
+  /**
+   * Create the DNS validation records a pending sim Certificate is waiting on.
+   *
+   * This is a simulator convenience for tests that want a realistic issuance
+   * flow without publishing each validation CNAME by hand. The Certificate is
+   * issued by the time this resolves.
+   */
+  async completeDnsValidation(
+    certificateArn: string | undefined,
+  ): Promise<void> {
+    await this.dnsValidationCompleter.complete(certificateArn);
   }
 
   /**
@@ -108,6 +155,7 @@ export class SimAcm {
       certificates: this.certificates,
       iam: this.iam,
       background: this.background,
+      validation: this.validation,
     });
     return await handler.handle(command, options);
   }

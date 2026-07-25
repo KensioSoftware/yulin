@@ -1,9 +1,10 @@
 import type { SimArn } from "../../../aws/arn.js";
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
+import type { SimAcmCertificateStatus } from "../../certificate/sim-acm-certificate.js";
 import type {
-  SimAcmCertificateStatus,
+  SimAcmDomainValidationStatus,
   SimAcmValidationMethod,
-} from "../../certificate/sim-acm-certificate.js";
+} from "../../certificate/sim-acm-domain-validation.js";
 
 /**
  * Minimal structural sim ACM DescribeCertificate command.
@@ -53,7 +54,7 @@ export interface SimAcmCertificateDetail {
 export interface SimAcmCertificateDomainValidation {
   readonly DomainName?: string | undefined;
   readonly ValidationMethod?: SimAcmValidationMethod | undefined;
-  readonly ValidationStatus?: SimAcmCertificateStatus | undefined;
+  readonly ValidationStatus?: SimAcmDomainValidationStatus | undefined;
   readonly ResourceRecord?: SimAcmCertificateResourceRecord | undefined;
 }
 

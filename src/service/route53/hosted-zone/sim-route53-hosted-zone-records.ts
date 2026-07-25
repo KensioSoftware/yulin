@@ -4,12 +4,15 @@ import type {
   SimRoute53RecordType,
 } from "../record/sim-route53-record.js";
 
+export type SimRoute53RecordChangeListener = () => void;
+
 /**
  * Stores and normalises records for a simulated Route53 Hosted Zone.
  * @internal
  */
 export class SimRoute53HostedZoneRecords {
   private readonly records = new Map<string, SimRoute53Record>();
+  private readonly changeListeners = new Set<SimRoute53RecordChangeListener>();
 
   /**
    * Current number of records in the hosted zone.
@@ -35,6 +38,7 @@ export class SimRoute53HostedZoneRecords {
     }
 
     this.records.set(key, normalisedRecord);
+    this.notifyChange();
   }
 
   /**
@@ -48,6 +52,7 @@ export class SimRoute53HostedZoneRecords {
       recordKey(normalisedRecord.name, normalisedRecord.type),
       normalisedRecord,
     );
+    this.notifyChange();
   }
 
   /**
@@ -56,6 +61,18 @@ export class SimRoute53HostedZoneRecords {
    */
   delete(name: string, type: SimRoute53RecordType): void {
     this.records.delete(recordKey(normaliseSimRoute53Name(name), type));
+    this.notifyChange();
+  }
+
+  /**
+   * Register a listener called whenever a record in this hosted zone changes.
+   *
+   * Other simulated services observe DNS this way rather than polling for it,
+   * which keeps background task draining deterministic.
+   * @internal
+   */
+  onChange(listener: SimRoute53RecordChangeListener): void {
+    this.changeListeners.add(listener);
   }
 
   /**
@@ -87,6 +104,12 @@ export class SimRoute53HostedZoneRecords {
       .values()
       .map((record) => copyRecord(record))
       .toArray();
+  }
+
+  private notifyChange(): void {
+    for (const listener of this.changeListeners) {
+      listener();
+    }
   }
 }
 

@@ -166,7 +166,7 @@ describe("Sim ACM CloudFormation Certificate", () => {
     const primaryValidation = certificate.DomainValidationOptions[0];
     assertIdentical(primaryValidation.DomainName, "example.test");
     assertIdentical(primaryValidation.ValidationMethod, "DNS");
-    assertIdentical(primaryValidation.ValidationStatus, "ISSUED");
+    assertIdentical(primaryValidation.ValidationStatus, "SUCCESS");
     assertStringStartsWith(
       primaryValidation.ResourceRecord?.Name,
       "_yulin-acm-",

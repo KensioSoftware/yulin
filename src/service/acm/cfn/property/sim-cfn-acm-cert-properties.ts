@@ -1,4 +1,4 @@
-import type { SimAcmValidationMethod } from "../../certificate/sim-acm-certificate.js";
+import type { SimAcmValidationMethod } from "../../certificate/sim-acm-domain-validation.js";
 import type {
   SimRequestCertificateDomainValidationOption,
   SimRequestCertificateTag,

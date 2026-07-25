@@ -34,7 +34,7 @@ export class SimAcmCertificateDetailFactory {
         (option) => ({
           DomainName: option.domainName,
           ValidationMethod: option.validationMethod,
-          ValidationStatus: certificate.status,
+          ValidationStatus: option.status,
           ResourceRecord:
             option.resourceRecord === undefined
               ? undefined

@@ -3,11 +3,13 @@ import type { SimArn } from "../../../aws/arn.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import {
   SimAcmCertificate,
-  type SimAcmDomainValidationOption,
   type SimAcmTag,
+} from "../../certificate/sim-acm-certificate.js";
+import {
+  SimAcmDomainValidation,
   type SimAcmValidationMethod,
   type SimAcmValidationRecord,
-} from "../../certificate/sim-acm-certificate.js";
+} from "../../certificate/sim-acm-domain-validation.js";
 import type { SimRequestCertificateCommand } from "./request-certificate.command.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 
@@ -97,15 +99,26 @@ export class RequestCertificateFactory {
   private makeDomainValidationOption(
     domainName: string,
     validationMethod: SimAcmValidationMethod,
-  ): SimAcmDomainValidationOption {
-    return {
+  ): SimAcmDomainValidation {
+    return new SimAcmDomainValidation({
       domainName,
       validationMethod,
-      resourceRecord:
-        validationMethod === "DNS"
-          ? this.makeValidationRecord(domainName)
-          : undefined,
-    };
+      resourceRecord: this.makeResourceRecord(domainName, validationMethod),
+    });
+  }
+
+  /**
+   * Build the record ACM asks for, where the validation method has one.
+   */
+  private makeResourceRecord(
+    domainName: string,
+    validationMethod: SimAcmValidationMethod,
+  ): SimAcmValidationRecord | undefined {
+    if (validationMethod !== "DNS") {
+      return undefined;
+    }
+
+    return this.makeValidationRecord(domainName);
   }
 
   /**
