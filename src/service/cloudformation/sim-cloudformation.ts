@@ -13,11 +13,11 @@ import { CreateStackCommandHandler } from "./command/create-stack/create-stack.h
 import type {
   SimCreateStackCommand,
   SimCreateStackCommandOutput,
-} from "./command/create-stack/create-stack.cmd.js";
+} from "./command/create-stack/create-stack.command.js";
 import type {
   SimDescribeStacksCommand,
   SimDescribeStacksCommandOutput,
-} from "./command/describe-stacks/describe-stacks.cmd.js";
+} from "./command/describe-stacks/describe-stacks.command.js";
 import { DescribeStacksCommandHandler } from "./command/describe-stacks/describe-stacks.handler.js";
 import type { SimCdkOutContext } from "./cdk/sim-cdk-out-context.js";
 import {

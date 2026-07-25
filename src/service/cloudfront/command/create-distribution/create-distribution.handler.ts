@@ -2,7 +2,7 @@ import type { CommandHandler } from "../../../../command/command-handler.js";
 import type {
   SimCreateDistributionCommand,
   SimCreateDistributionCommandOutput,
-} from "./create-distribution.cmd.js";
+} from "./create-distribution.command.js";
 import type { SimCloudFrontRegistry } from "../../registry/sim-cloud-front-registry.js";
 import {
   SimCloudFrontDistribution,

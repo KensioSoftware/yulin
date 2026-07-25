@@ -14,7 +14,7 @@ import { ListCertificatesAuthorizer } from "./list-certificates-authorizer.js";
 import type {
   SimListCertificatesCommand,
   SimListCertificatesCommandOutput,
-} from "./list-certificates.cmd.js";
+} from "./list-certificates.command.js";
 import { ListCertificatesPageBuilder } from "./list-certificates-page-builder.js";
 
 interface ListCertificatesCommandHandlerProperties {

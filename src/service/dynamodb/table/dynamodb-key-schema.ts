@@ -5,7 +5,7 @@ import type {
   SimCreateTableCommandInput,
   SimDynamoDbKeySchemaElement as SimDynamoDatabaseKeySchemaElement,
   SimDynamoDbKeyType as SimDynamoDatabaseKeyType,
-} from "../command/create-table/create-table.cmd.js";
+} from "../command/create-table/create-table.command.js";
 import { jsonStringify } from "../../../util/type-guard/json.js";
 
 type DynamoDatabaseKey = number | string;

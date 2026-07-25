@@ -8,7 +8,7 @@ import type { SimRoute53HostedZoneId } from "../create-hosted-zone/sim-route53-z
 import type {
   SimListHostedZonesByNameCommand,
   SimListHostedZonesByNameCommandOutput,
-} from "./list-hosted-zones-by-name.cmd.js";
+} from "./list-hosted-zones-by-name.command.js";
 import { getHostedZoneListPage } from "./list-hosted-zones-by-name.js";
 import {
   SimIamAllowAllAuth,

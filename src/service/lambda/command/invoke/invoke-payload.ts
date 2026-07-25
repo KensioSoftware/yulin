@@ -2,7 +2,7 @@ import {
   SimLambdaError,
   SimLambdaInvalidRequestContentException,
 } from "../../error/sim-lambda.error.js";
-import type { SimInvokePayload } from "./invoke.cmd.js";
+import type { SimInvokePayload } from "./invoke.command.js";
 
 function payloadText(payload: SimInvokePayload): string {
   if (typeof payload === "string") {

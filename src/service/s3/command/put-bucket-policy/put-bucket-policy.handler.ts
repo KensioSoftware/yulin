@@ -18,7 +18,7 @@ import { PutBucketPolicyAuthorizer } from "./put-bucket-policy-authorizer.js";
 import type {
   SimPutBucketPolicyCommand,
   SimPutBucketPolicyCommandOutput,
-} from "./put-bucket-policy.cmd.js";
+} from "./put-bucket-policy.command.js";
 
 interface PutBucketPolicyCommandHandlerProperties {
   readonly buckets: Map<SimS3BucketName, SimS3Bucket>;

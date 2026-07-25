@@ -1,4 +1,4 @@
-import type { SimDynamoDbAttributeValue as SimDynamoDatabaseAttributeValue } from "../command/put-item/put-item.cmd.js";
+import type { SimDynamoDbAttributeValue as SimDynamoDatabaseAttributeValue } from "../command/put-item/put-item.command.js";
 import { jsonStringify } from "../../../util/type-guard/json.js";
 
 export type DynamoDBAttrType =

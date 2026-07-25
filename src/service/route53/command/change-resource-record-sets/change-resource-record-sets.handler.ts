@@ -13,7 +13,7 @@ import {
 import type {
   SimChangeResourceRecordSetsCommand,
   SimChangeResourceRecordSetsCommandOutput,
-} from "./change-resource-record-sets.cmd.js";
+} from "./change-resource-record-sets.command.js";
 import { getChangeResourceRecordSetsHostedZone } from "./change-res-rec-sets-zone.js";
 import { scheduleChangeResourceRecordSets } from "./schedule/schedule-change-res-rec-sets.js";
 import {

@@ -1,5 +1,5 @@
 import type { SimAcmCertificate } from "../../certificate/sim-acm-certificate.js";
-import type { SimAcmCertificateDetail } from "./describe-certificate.cmd.js";
+import type { SimAcmCertificateDetail } from "./describe-certificate.command.js";
 
 /**
  * Builds ACM DescribeCertificate certificate detail payloads.

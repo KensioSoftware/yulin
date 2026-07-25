@@ -16,7 +16,7 @@ import { DescribeCertificateAuthorizer } from "./describe-certificate-authorizer
 import type {
   SimDescribeCertificateCommand,
   SimDescribeCertificateCommandOutput,
-} from "./describe-certificate.cmd.js";
+} from "./describe-certificate.command.js";
 import { SimAcmCertificateDetailFactory } from "./sim-acm-cert-detail-factory.js";
 
 interface DescribeCertificateCommandHandlerProperties {

@@ -2,7 +2,7 @@ import type {
   SimS3WebsiteConfiguration,
   SimS3WebsiteRedirect,
   SimS3WebsiteRoutingRule,
-} from "../../../command/put-bucket-website/put-bucket-website.cmd.js";
+} from "../../../command/put-bucket-website/put-bucket-website.command.js";
 
 /**
  * Redirect handling for simulated S3 Bucket static website configuration.

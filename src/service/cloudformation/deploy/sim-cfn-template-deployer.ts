@@ -17,7 +17,7 @@ import type {
   BackgroundCompleter,
   BackgroundScheduler,
 } from "../../../util/background/background.js";
-import type { SimCreateStackCommandOutput } from "../command/create-stack/create-stack.cmd.js";
+import type { SimCreateStackCommandOutput } from "../command/create-stack/create-stack.command.js";
 import { CreateStackCommandHandler } from "../command/create-stack/create-stack.handler.js";
 import { faker } from "@faker-js/faker";
 

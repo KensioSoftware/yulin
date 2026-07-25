@@ -4,7 +4,7 @@ import type { SimRoute53Record } from "../../record/sim-route53-record.js";
 import type {
   SimRoute53Change,
   SimRoute53ResourceRecordSet,
-} from "./change-resource-record-sets.cmd.js";
+} from "./change-resource-record-sets.command.js";
 import { isSimRoute53RecordType } from "../../record/sim-route53-record-type.js";
 
 /**

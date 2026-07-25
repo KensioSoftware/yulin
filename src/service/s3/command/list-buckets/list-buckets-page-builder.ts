@@ -1,7 +1,7 @@
 import type {
   SimListBucketsCommandInput,
   SimListBucketsCommandOutput,
-} from "./list-buckets.cmd.js";
+} from "./list-buckets.command.js";
 import type {
   SimS3Bucket,
   SimS3BucketName,

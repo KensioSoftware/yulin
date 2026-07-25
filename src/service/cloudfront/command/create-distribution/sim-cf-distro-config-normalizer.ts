@@ -4,7 +4,7 @@ import type {
   SimCloudFrontDistributionConfig,
   SimCloudFrontFunctionAssociation,
   SimCloudFrontOriginConfig,
-} from "./create-distribution.cmd.js";
+} from "./create-distribution.command.js";
 import { isRecord } from "../../../../util/type-guard/record.js";
 
 interface SimCloudFrontConfigList<T> {

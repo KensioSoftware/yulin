@@ -4,16 +4,16 @@ import type {
   SimSdkCommandRouter,
 } from "../../../sdk/index.js";
 import { simSdkCallerOptions, simSdkStreamBody } from "../../../sdk/index.js";
-import type { SimCreateBucketCommand } from "../command/create-bucket/create-bucket.cmd.js";
+import type { SimCreateBucketCommand } from "../command/create-bucket/create-bucket.command.js";
 import type {
   SimGetObjectCommand,
   SimGetObjectCommandOutput,
-} from "../command/get-object/get-object.cmd.js";
-import type { SimListBucketsCommand } from "../command/list-buckets/list-buckets.cmd.js";
-import type { SimListObjectsCommand } from "../command/list-objects/list-objects.cmd.js";
-import type { SimPutBucketPolicyCommand } from "../command/put-bucket-policy/put-bucket-policy.cmd.js";
-import type { SimPutBucketWebsiteCommand } from "../command/put-bucket-website/put-bucket-website.cmd.js";
-import type { SimPutObjectCommand } from "../command/put-object/put-object.cmd.js";
+} from "../command/get-object/get-object.command.js";
+import type { SimListBucketsCommand } from "../command/list-buckets/list-buckets.command.js";
+import type { SimListObjectsCommand } from "../command/list-objects/list-objects.command.js";
+import type { SimPutBucketPolicyCommand } from "../command/put-bucket-policy/put-bucket-policy.command.js";
+import type { SimPutBucketWebsiteCommand } from "../command/put-bucket-website/put-bucket-website.command.js";
+import type { SimPutObjectCommand } from "../command/put-object/put-object.command.js";
 import type { SimS3 } from "../sim-s3.js";
 
 /**

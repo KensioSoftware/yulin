@@ -1,7 +1,7 @@
 import type {
   SimGetDistributionCommand,
   SimGetDistributionCommandOutput,
-} from "./get-distribution.cmd.js";
+} from "./get-distribution.command.js";
 import type { CommandHandler } from "../../../../command/command-handler.js";
 import type {
   SimCloudFrontDistribution,

@@ -13,7 +13,7 @@ import {
   makeSimRoute53HostedZoneId,
   type SimRoute53HostedZoneId,
 } from "../create-hosted-zone/sim-route53-zone-id.js";
-import type { SimRoute53Change } from "./change-resource-record-sets.cmd.js";
+import type { SimRoute53Change } from "./change-resource-record-sets.command.js";
 import type { SimRoute53 } from "../../sim-route53.js";
 
 describe("ChangeResourceRecordSetsCommand validation", () => {

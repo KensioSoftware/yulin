@@ -1,7 +1,7 @@
 import type {
   SimDescribeTableCommand,
   SimDescribeTableCommandOutput,
-} from "./describe-table.cmd.js";
+} from "./describe-table.command.js";
 import type { CommandHandler } from "../../../../command/command-handler.js";
 import type {
   DynamoDbTableName as DynamoDatabaseTableName,

@@ -2,7 +2,7 @@ import type { SimAwsPrincipal } from "../../aws/caller/sim-aws-caller.js";
 import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
 import type { SimIamAccountResolver } from "../../iam/registry/sim-iam-account-resolver.js";
 import type { IamRoleArnParts } from "../../iam/role/arn/sim-iam-role-arn-parser.js";
-import type { SimGetRoleCommandOutput } from "../../iam/command/role/get-role/get-role.cmd.js";
+import type { SimGetRoleCommandOutput } from "../../iam/command/role/get-role/get-role.command.js";
 import type { SimIamConditionValue } from "../../iam/policy/sim-iam-policy.js";
 import { AssumeRoleTargetResolver } from "./resolve/assume-role-target-resolver.js";
 import {

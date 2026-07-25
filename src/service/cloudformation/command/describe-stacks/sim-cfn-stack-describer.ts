@@ -1,5 +1,5 @@
 import type { SimCfnStack } from "../../stack/sim-cfn-stack.js";
-import type { SimCloudFormationStackDescription } from "./describe-stacks.cmd.js";
+import type { SimCloudFormationStackDescription } from "./describe-stacks.command.js";
 
 /**
  * Converts an internal simulated CloudFormation Stack into the public

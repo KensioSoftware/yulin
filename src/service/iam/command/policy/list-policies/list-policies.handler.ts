@@ -8,7 +8,7 @@ import type { SimIamManagedPolicy } from "../../../policy/sim-iam-policy.js";
 import type {
   SimListPoliciesCommand,
   SimListPoliciesCommandOutput,
-} from "./list-policies.cmd.js";
+} from "./list-policies.command.js";
 
 interface ListPoliciesCommandHandlerProperties {
   readonly policies: Map<SimArn, SimIamManagedPolicy>;

@@ -8,7 +8,7 @@ import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-sco
 import type {
   SimCreateDistributionCommand,
   SimCreateDistributionCommandOutput,
-} from "./command/create-distribution/create-distribution.cmd.js";
+} from "./command/create-distribution/create-distribution.command.js";
 import {
   emptyCloudFrontS3OriginResolver,
   type SimCloudFrontS3OriginResolver,
@@ -20,12 +20,12 @@ import {
 import type {
   SimGetDistributionCommand,
   SimGetDistributionCommandOutput,
-} from "./command/get-distribution/get-distribution.cmd.js";
+} from "./command/get-distribution/get-distribution.command.js";
 import { GetDistributionCommandHandler } from "./command/get-distribution/get-distribution.handler.js";
 import type {
   SimCreateFunctionCommand,
   SimCreateFunctionCommandOutput,
-} from "./command/create-function/create-function.cmd.js";
+} from "./command/create-function/create-function.command.js";
 import { CreateFunctionCommandHandler } from "./command/create-function/create-function.handler.js";
 import type {
   SimCloudFrontFunction,

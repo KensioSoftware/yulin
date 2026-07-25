@@ -1,6 +1,6 @@
 import type { SimArn } from "../../../../aws/arn.js";
 import type { SimAwsAccountId } from "../../../../aws/sim-aws-account.js";
-import type { SimCreatePolicyCommand } from "./create-policy.cmd.js";
+import type { SimCreatePolicyCommand } from "./create-policy.command.js";
 import type { SimIamPolicyName } from "../../../policy/sim-iam-policy.js";
 import { makeSimPolicyArn } from "../../../policy/sim-iam-policy-arn.js";
 import { normalisePolicyPath } from "../../../policy/sim-iam-policy-path.js";

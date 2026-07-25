@@ -4,7 +4,7 @@ import {
   IamRoleArnParser,
   type IamRoleArnParts,
 } from "../../iam/role/arn/sim-iam-role-arn-parser.js";
-import type { SimAssumeRoleCommand } from "../command/assume-role/assume-role.cmd.js";
+import type { SimAssumeRoleCommand } from "../command/assume-role/assume-role.command.js";
 
 const defaultRoleSessionDurationSeconds = 3600;
 

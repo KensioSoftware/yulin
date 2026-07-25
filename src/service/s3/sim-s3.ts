@@ -12,27 +12,27 @@ import { FilesystemS3BucketStorage } from "./storage/filesystem/s3-filesystem-st
 import type {
   SimPutObjectCommand,
   SimPutObjectCommandOutput,
-} from "./command/put-object/put-object.cmd.js";
+} from "./command/put-object/put-object.command.js";
 import type {
   SimPutBucketWebsiteCommand,
   SimPutBucketWebsiteCommandOutput,
-} from "./command/put-bucket-website/put-bucket-website.cmd.js";
+} from "./command/put-bucket-website/put-bucket-website.command.js";
 import type {
   SimListObjectsCommand,
   SimListObjectsCommandOutput,
-} from "./command/list-objects/list-objects.cmd.js";
+} from "./command/list-objects/list-objects.command.js";
 import type {
   SimListBucketsCommand,
   SimListBucketsCommandOutput,
-} from "./command/list-buckets/list-buckets.cmd.js";
+} from "./command/list-buckets/list-buckets.command.js";
 import type {
   SimGetObjectCommand,
   SimGetObjectCommandOutput,
-} from "./command/get-object/get-object.cmd.js";
+} from "./command/get-object/get-object.command.js";
 import type {
   SimCreateBucketCommand,
   SimCreateBucketCommandOutput,
-} from "./command/create-bucket/create-bucket.cmd.js";
+} from "./command/create-bucket/create-bucket.command.js";
 import {
   type BackgroundScheduler,
   BackgroundTasks,
@@ -48,7 +48,7 @@ import {
 import type {
   SimPutBucketPolicyCommand,
   SimPutBucketPolicyCommandOutput,
-} from "./command/put-bucket-policy/put-bucket-policy.cmd.js";
+} from "./command/put-bucket-policy/put-bucket-policy.command.js";
 import { PutBucketPolicyCommandHandler } from "./command/put-bucket-policy/put-bucket-policy.handler.js";
 import { SimS3SdkCommandRouter } from "./sdk/sim-s3-sdk-command-router.js";
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";

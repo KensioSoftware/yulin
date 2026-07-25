@@ -1,6 +1,6 @@
 import { simRoute53AbsoluteName } from "../../local-name/sim-route53-local-name.js";
 import type { SimRoute53Record } from "../../record/sim-route53-record.js";
-import type { SimRoute53ResourceRecordSet } from "../change-resource-record-sets/change-resource-record-sets.cmd.js";
+import type { SimRoute53ResourceRecordSet } from "../change-resource-record-sets/change-resource-record-sets.command.js";
 
 /**
  * Convert a stored Route53 record into an AWS-shaped ResourceRecordSet.

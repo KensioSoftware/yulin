@@ -18,7 +18,10 @@ import {
 } from "../../function/sim-lambda-function.js";
 import { InvokeAuthorizer } from "./invoke-authorizer.js";
 import { SimLambdaInvocationDispatcher } from "./invoke-dispatcher.js";
-import type { SimInvokeCommand, SimInvokeCommandOutput } from "./invoke.cmd.js";
+import type {
+  SimInvokeCommand,
+  SimInvokeCommandOutput,
+} from "./invoke.command.js";
 
 interface InvokeCommandHandlerProperties {
   accountRegionScope: SimAwsAccountRegionScope;

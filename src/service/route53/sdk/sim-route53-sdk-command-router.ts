@@ -3,11 +3,11 @@ import {
   type SimSdkCommandRoute,
   type SimSdkCommandRouter,
 } from "../../../sdk/index.js";
-import type { SimChangeResourceRecordSetsCommand } from "../command/change-resource-record-sets/change-resource-record-sets.cmd.js";
-import type { SimCreateHostedZoneCommand } from "../command/create-hosted-zone/create-hosted-zone.cmd.js";
-import type { SimGetHostedZoneCommand } from "../command/get-hosted-zone/get-hosted-zone.cmd.js";
-import type { SimListHostedZonesByNameCommand } from "../command/list-hosted-zones-by-name/list-hosted-zones-by-name.cmd.js";
-import type { SimListResourceRecordSetsCommand } from "../command/list-resource-record-sets/list-resource-record-sets.cmd.js";
+import type { SimChangeResourceRecordSetsCommand } from "../command/change-resource-record-sets/change-resource-record-sets.command.js";
+import type { SimCreateHostedZoneCommand } from "../command/create-hosted-zone/create-hosted-zone.command.js";
+import type { SimGetHostedZoneCommand } from "../command/get-hosted-zone/get-hosted-zone.command.js";
+import type { SimListHostedZonesByNameCommand } from "../command/list-hosted-zones-by-name/list-hosted-zones-by-name.command.js";
+import type { SimListResourceRecordSetsCommand } from "../command/list-resource-record-sets/list-resource-record-sets.command.js";
 import type { SimRoute53 } from "../sim-route53.js";
 
 /**

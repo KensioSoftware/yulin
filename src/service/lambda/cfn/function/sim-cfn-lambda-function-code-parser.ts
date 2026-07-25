@@ -1,6 +1,6 @@
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValue } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
-import type { SimLambdaFunctionCode } from "../../command/create-function/create-function.cmd.js";
+import type { SimLambdaFunctionCode } from "../../command/create-function/create-function.command.js";
 import { makeLambdaCodeZip } from "../../function/code/make-lambda-code-zip.js";
 import { SimCfnLambdaPropertyParser } from "./sim-cfn-lambda-property-parser.js";
 

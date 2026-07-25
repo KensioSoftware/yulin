@@ -1,7 +1,7 @@
 import type { JSONString } from "../../../util/type-guard/json.js";
 import { jsonParse } from "../../../util/type-guard/json.js";
 import type { SimAwsPrincipal } from "../../aws/caller/sim-aws-caller.js";
-import type { SimGetRoleCommandOutput } from "../../iam/command/role/get-role/get-role.cmd.js";
+import type { SimGetRoleCommandOutput } from "../../iam/command/role/get-role/get-role.command.js";
 import { SimIamAccessDenied } from "../../iam/error/sim-iam.error.js";
 import type {
   SimIamConditionValue,

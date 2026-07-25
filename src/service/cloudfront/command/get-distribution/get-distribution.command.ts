@@ -1,4 +1,4 @@
-import type { SimCloudFrontDistributionConfig } from "../create-distribution/create-distribution.cmd.js";
+import type { SimCloudFrontDistributionConfig } from "../create-distribution/create-distribution.command.js";
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
 
 /**

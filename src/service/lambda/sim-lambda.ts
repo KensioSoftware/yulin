@@ -24,17 +24,17 @@ import type {
 import type {
   SimCreateFunctionCommand,
   SimCreateFunctionCommandOutput,
-} from "./command/create-function/create-function.cmd.js";
+} from "./command/create-function/create-function.command.js";
 import { GetFunctionCommandHandler } from "./command/get-function/get-function.handler.js";
 import type {
   SimGetFunctionCommand,
   SimGetFunctionCommandOutput,
-} from "./command/get-function/get-function.cmd.js";
+} from "./command/get-function/get-function.command.js";
 import { InvokeCommandHandler } from "./command/invoke/invoke.handler.js";
 import type {
   SimInvokeCommand,
   SimInvokeCommandOutput,
-} from "./command/invoke/invoke.cmd.js";
+} from "./command/invoke/invoke.command.js";
 import { SimLambdaSdkCommandRouter } from "./sdk/sim-lambda-sdk-command-router.js";
 
 export interface SimLambdaRequestOptions {

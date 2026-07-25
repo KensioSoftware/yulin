@@ -3,7 +3,7 @@ import {
   requireLambdaCodeSource,
   type SimLambdaCodeSource,
 } from "../../function/code/lambda-code-source.js";
-import type { SimCreateFunctionCommand } from "./create-function.cmd.js";
+import type { SimCreateFunctionCommand } from "./create-function.command.js";
 
 /**
  * Validated CreateFunction input, in sim Lambda function model terms.

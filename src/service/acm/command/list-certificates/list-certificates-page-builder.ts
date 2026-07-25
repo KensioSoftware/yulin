@@ -5,7 +5,7 @@ import type {
   SimAcmCertificateSummary,
   SimListCertificatesCommandInput,
   SimListCertificatesCommandOutput,
-} from "./list-certificates.cmd.js";
+} from "./list-certificates.command.js";
 
 interface ListCertificatesPageBuilderProperties {
   readonly certificates: ReadonlyMap<SimArn, SimAcmCertificate>;

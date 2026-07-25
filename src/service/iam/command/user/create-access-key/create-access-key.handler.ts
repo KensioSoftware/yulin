@@ -9,7 +9,7 @@ import type { SimIamUser, SimIamUsername } from "../../../user/sim-iam-user.js";
 import type {
   SimCreateAccessKeyCommand,
   SimCreateAccessKeyCommandOutput,
-} from "./create-access-key.cmd.js";
+} from "./create-access-key.command.js";
 
 interface CreateAccessKeyCommandHandlerProperties {
   readonly users: Map<SimIamUsername, SimIamUser>;

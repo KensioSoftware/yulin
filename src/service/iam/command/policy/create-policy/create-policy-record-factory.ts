@@ -8,7 +8,7 @@ import { makeSimPolicyId } from "../../../policy/sim-iam-policy-arn.js";
 import type {
   SimCreatePolicyCommand,
   SimCreatePolicyCommandOutput,
-} from "./create-policy.cmd.js";
+} from "./create-policy.command.js";
 import type { JSONString } from "../../../../../util/type-guard/json.js";
 
 interface CreatePolicyRecordFactoryProperties {

@@ -6,7 +6,7 @@ import type { SimIamAccountResolver } from "../iam/registry/sim-iam-account-reso
 import type {
   SimAssumeRoleCommand,
   SimAssumeRoleCommandOutput,
-} from "./command/assume-role/assume-role.cmd.js";
+} from "./command/assume-role/assume-role.command.js";
 import { AssumeRoleCommandHandler } from "./command/assume-role/assume-role.handler.js";
 import { SimIamRegistry } from "../iam/registry/sim-iam-registry.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";

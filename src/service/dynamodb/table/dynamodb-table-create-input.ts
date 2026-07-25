@@ -1,5 +1,5 @@
 import { assertDefined } from "../../../util/type-guard/defined.js";
-import type { SimCreateTableCommand } from "../command/create-table/create-table.cmd.js";
+import type { SimCreateTableCommand } from "../command/create-table/create-table.command.js";
 import { DynamoDbKeySchema as DynamoDatabaseKeySchema } from "./dynamodb-key-schema.js";
 import type { DynamoDbTableName as DynamoDatabaseTableName } from "./sim-dynamodb-table.js";
 

@@ -3,7 +3,7 @@ import { SimDynamoDbTable as SimDynamoDatabaseTable } from "../../table/sim-dyna
 import type {
   SimCreateTableCommand,
   SimCreateTableCommandOutput,
-} from "./create-table.cmd.js";
+} from "./create-table.command.js";
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import type { CommandHandler } from "../../../../command/command-handler.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";

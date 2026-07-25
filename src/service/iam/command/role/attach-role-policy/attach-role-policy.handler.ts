@@ -9,7 +9,7 @@ import type { SimIamRole, SimIamRoleName } from "../../../role/sim-iam-role.js";
 import type {
   SimAttachRolePolicyCommand,
   SimAttachRolePolicyCommandOutput,
-} from "./attach-role-policy.cmd.js";
+} from "./attach-role-policy.command.js";
 
 interface AttachRolePolicyCommandHandlerProperties {
   readonly roles: Map<SimIamRoleName, SimIamRole>;

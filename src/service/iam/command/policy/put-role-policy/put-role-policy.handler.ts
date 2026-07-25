@@ -8,7 +8,7 @@ import type { SimIamRole, SimIamRoleName } from "../../../role/sim-iam-role.js";
 import type {
   SimPutRolePolicyCommand,
   SimPutRolePolicyCommandOutput,
-} from "./put-role-policy.cmd.js";
+} from "./put-role-policy.command.js";
 import { SimIamPolicyDocumentValidator } from "../../../validate/sim-iam-policy-doc-validator.js";
 
 interface PutRolePolicyCommandHandlerProperties {

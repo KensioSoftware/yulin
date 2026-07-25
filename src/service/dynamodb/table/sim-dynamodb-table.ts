@@ -13,7 +13,7 @@ import {
 import type {
   SimCreateTableCommand,
   SimDynamoDbTableStatus as SimDynamoDatabaseTableStatus,
-} from "../command/create-table/create-table.cmd.js";
+} from "../command/create-table/create-table.command.js";
 import { DynamoDbTableCreateInput as DynamoDatabaseTableCreateInput } from "./dynamodb-table-create-input.js";
 
 export type DynamoDbTableName = Brand<string, "DynamoDbTableName">;

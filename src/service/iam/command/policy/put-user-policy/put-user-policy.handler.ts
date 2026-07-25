@@ -9,7 +9,7 @@ import { SimIamPolicyDocumentValidator } from "../../../validate/sim-iam-policy-
 import type {
   SimPutUserPolicyCommand,
   SimPutUserPolicyCommandOutput,
-} from "./put-user-policy.cmd.js";
+} from "./put-user-policy.command.js";
 import { assertDefined } from "../../../../../util/type-guard/defined.js";
 
 interface PutUserPolicyCommandHandlerProperties {

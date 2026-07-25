@@ -8,7 +8,7 @@ import type { CommandHandler } from "../../../../command/command-handler.js";
 import type {
   SimRequestCertificateCommand,
   SimRequestCertificateCommandOutput,
-} from "./request-certificate.cmd.js";
+} from "./request-certificate.command.js";
 import type { SimAcmCertificate } from "../../certificate/sim-acm-certificate.js";
 import { RequestCertificateAuthorizer } from "./request-certificate-authorizer.js";
 import { RequestCertificateFactory } from "./request-cert-factory.js";

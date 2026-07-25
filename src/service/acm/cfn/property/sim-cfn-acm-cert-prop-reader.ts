@@ -1,7 +1,7 @@
 import type {
   SimRequestCertificateDomainValidationOption,
   SimRequestCertificateTag,
-} from "../../command/request-certificate/request-certificate.cmd.js";
+} from "../../command/request-certificate/request-certificate.command.js";
 import { isRecord } from "../../../../util/type-guard/record.js";
 
 interface SimCfnAcmCertificatePropertyListReaderProperties {

@@ -2,7 +2,7 @@ import type { SimArn } from "../../../../aws/arn.js";
 import type { SimAwsAccountId } from "../../../../aws/sim-aws-account.js";
 import type { SimIamUser, SimIamUsername } from "../../../user/sim-iam-user.js";
 import { makeSimIamUserId } from "../../../user/sim-iam-user-id.js";
-import type { SimCreateUserCommandOutput } from "./create-user.cmd.js";
+import type { SimCreateUserCommandOutput } from "./create-user.command.js";
 
 interface MakeUserProperties {
   readonly accountId: SimAwsAccountId;

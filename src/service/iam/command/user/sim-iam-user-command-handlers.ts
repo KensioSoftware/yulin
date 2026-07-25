@@ -9,12 +9,12 @@ import { CreateAccessKeyCommandHandler } from "./create-access-key/create-access
 import type {
   SimCreateAccessKeyCommand,
   SimCreateAccessKeyCommandOutput,
-} from "./create-access-key/create-access-key.cmd.js";
+} from "./create-access-key/create-access-key.command.js";
 import { CreateUserCommandHandler } from "./create-user/create-user.handler.js";
 import type {
   SimCreateUserCommand,
   SimCreateUserCommandOutput,
-} from "./create-user/create-user.cmd.js";
+} from "./create-user/create-user.command.js";
 
 interface SimIamUserCommandHandlersProperties {
   readonly accountId: SimAwsAccountId;

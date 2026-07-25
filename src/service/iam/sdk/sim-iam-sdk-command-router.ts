@@ -3,17 +3,17 @@ import {
   type SimSdkCommandRoute,
   type SimSdkCommandRouter,
 } from "../../../sdk/index.js";
-import type { SimCreatePolicyCommand } from "../command/policy/create-policy/create-policy.cmd.js";
-import type { SimGetPolicyCommand } from "../command/policy/get-policy/get-policy.cmd.js";
-import type { SimListPoliciesCommand } from "../command/policy/list-policies/list-policies.cmd.js";
-import type { SimPutRolePolicyCommand } from "../command/policy/put-role-policy/put-role-policy.cmd.js";
-import type { SimPutUserPolicyCommand } from "../command/policy/put-user-policy/put-user-policy.cmd.js";
-import type { SimAttachRolePolicyCommand } from "../command/role/attach-role-policy/attach-role-policy.cmd.js";
-import type { SimCreateRoleCommand } from "../command/role/create-role/create-role.cmd.js";
-import type { SimGetRoleCommand } from "../command/role/get-role/get-role.cmd.js";
-import type { SimListRolesCommand } from "../command/role/list-roles/list-roles.cmd.js";
-import type { SimCreateAccessKeyCommand } from "../command/user/create-access-key/create-access-key.cmd.js";
-import type { SimCreateUserCommand } from "../command/user/create-user/create-user.cmd.js";
+import type { SimCreatePolicyCommand } from "../command/policy/create-policy/create-policy.command.js";
+import type { SimGetPolicyCommand } from "../command/policy/get-policy/get-policy.command.js";
+import type { SimListPoliciesCommand } from "../command/policy/list-policies/list-policies.command.js";
+import type { SimPutRolePolicyCommand } from "../command/policy/put-role-policy/put-role-policy.command.js";
+import type { SimPutUserPolicyCommand } from "../command/policy/put-user-policy/put-user-policy.command.js";
+import type { SimAttachRolePolicyCommand } from "../command/role/attach-role-policy/attach-role-policy.command.js";
+import type { SimCreateRoleCommand } from "../command/role/create-role/create-role.command.js";
+import type { SimGetRoleCommand } from "../command/role/get-role/get-role.command.js";
+import type { SimListRolesCommand } from "../command/role/list-roles/list-roles.command.js";
+import type { SimCreateAccessKeyCommand } from "../command/user/create-access-key/create-access-key.command.js";
+import type { SimCreateUserCommand } from "../command/user/create-user/create-user.command.js";
 import type { SimIam } from "../sim-iam.js";
 
 /**

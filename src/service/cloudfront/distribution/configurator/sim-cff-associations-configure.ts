@@ -3,7 +3,7 @@ import type { SimArn } from "../../../aws/arn.js";
 import type {
   SimCloudFrontCacheBehaviorConfig,
   SimCloudFrontDefaultCacheBehaviorConfig,
-} from "../../command/create-distribution/create-distribution.cmd.js";
+} from "../../command/create-distribution/create-distribution.command.js";
 import type { SimCloudFrontBehavior } from "../../behaviour/sim-cloud-front-behavior.js";
 
 /**

@@ -2,7 +2,7 @@ import type { SimResponseMetadata } from "../../../aws/metadata/response-metadat
 import type {
   SimRoute53DelegationSet,
   SimRoute53HostedZoneOutput,
-} from "../create-hosted-zone/create-hosted-zone.cmd.js";
+} from "../create-hosted-zone/create-hosted-zone.command.js";
 
 /**
  * Minimal structural sim Route53 GetHostedZone command.

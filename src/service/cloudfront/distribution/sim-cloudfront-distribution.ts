@@ -6,7 +6,7 @@ import {
   makeSimAwsAccountId,
   type SimAwsAccountId,
 } from "../../aws/sim-aws-account.js";
-import type { SimCloudFrontDistributionConfig } from "../command/create-distribution/create-distribution.cmd.js";
+import type { SimCloudFrontDistributionConfig } from "../command/create-distribution/create-distribution.command.js";
 
 export type SimCloudFrontDistributionId = Brand<
   string,

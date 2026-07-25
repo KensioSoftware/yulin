@@ -2,7 +2,7 @@ import type { CommandHandler } from "../../../../command/command-handler.js";
 import type {
   SimListTablesCommand,
   SimListTablesCommandOutput,
-} from "./list-tables.cmd.js";
+} from "./list-tables.command.js";
 import type {
   DynamoDbTableName as DynamoDatabaseTableName,
   SimDynamoDbTable as SimDynamoDatabaseTable,

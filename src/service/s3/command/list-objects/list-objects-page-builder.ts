@@ -1,5 +1,5 @@
 import type { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
-import type { SimListObjectsCommandOutput } from "./list-objects.cmd.js";
+import type { SimListObjectsCommandOutput } from "./list-objects.command.js";
 
 interface ListObjectsPageInput {
   readonly bucket: SimS3Bucket;

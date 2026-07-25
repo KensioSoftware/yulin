@@ -11,7 +11,7 @@ import {
   assertTypeFunction,
 } from "@kensio/smartass";
 import { CreateFunctionCommand } from "@aws-sdk/client-cloudfront";
-import type { SimCreateFunctionCommand } from "../../command/create-function/create-function.cmd.js";
+import type { SimCreateFunctionCommand } from "../../command/create-function/create-function.command.js";
 import { cloudFrontViewerRequestEventFactory } from "../../factory/cloudfront-functions.factory.js";
 import type { CloudFrontFunction } from "../../typings/cloudfront-functions.namespace.js";
 

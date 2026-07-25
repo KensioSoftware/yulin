@@ -14,7 +14,7 @@ import {
 import type {
   SimListResourceRecordSetsCommand,
   SimListResourceRecordSetsCommandOutput,
-} from "./list-resource-record-sets.cmd.js";
+} from "./list-resource-record-sets.command.js";
 import { getRecordSetListPage } from "./list-resource-record-sets.js";
 import {
   SimIamAllowAllAuth,

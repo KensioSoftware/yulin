@@ -1,6 +1,6 @@
 import { describe, it } from "vitest";
 import { SimCloudFrontDistributionConfigNormalizer } from "./sim-cf-distro-config-normalizer.js";
-import type { SimCloudFrontDistributionConfig } from "./create-distribution.cmd.js";
+import type { SimCloudFrontDistributionConfig } from "./create-distribution.command.js";
 import { assertIdentical } from "@kensio/smartass";
 
 describe("sim CloudFront distro config normalizer", () => {

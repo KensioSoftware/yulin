@@ -1,7 +1,7 @@
 import type { SimCfnExecutableResourceBinding } from "../../../cloudformation/bind/sim-cfn-exec-binding.type.js";
 import { SimCfnExecBindingFinder } from "../../../cloudformation/bind/validate/sim-cfn-exec-binding-finder.js";
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
-import type { SimLambdaFunctionCode } from "../../command/create-function/create-function.cmd.js";
+import type { SimLambdaFunctionCode } from "../../command/create-function/create-function.command.js";
 import { makeLambdaZipFileInput } from "../../function/code/lambda-zip-file-input.js";
 import { simLambdaFunctionArn } from "../../function/sim-lambda-function.js";
 import type { SimLambdaHandler } from "../../function/sim-lambda-handler.type.js";

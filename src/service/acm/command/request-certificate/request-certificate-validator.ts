@@ -1,4 +1,4 @@
-import type { SimRequestCertificateCommand } from "./request-certificate.cmd.js";
+import type { SimRequestCertificateCommand } from "./request-certificate.command.js";
 import {
   SimAcmInvalidArgsException as SimAcmInvalidArgumentsException,
   SimAcmTooManyTagsException,

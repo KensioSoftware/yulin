@@ -9,22 +9,22 @@ import { CreatePolicyCommandHandler } from "./create-policy/create-policy.handle
 import type {
   SimCreatePolicyCommand,
   SimCreatePolicyCommandOutput,
-} from "./create-policy/create-policy.cmd.js";
+} from "./create-policy/create-policy.command.js";
 import { GetPolicyCommandHandler } from "./get-policy/get-policy.handler.js";
 import type {
   SimGetPolicyCommand,
   SimGetPolicyCommandOutput,
-} from "./get-policy/get-policy.cmd.js";
+} from "./get-policy/get-policy.command.js";
 import { ListPoliciesCommandHandler } from "./list-policies/list-policies.handler.js";
 import type {
   SimListPoliciesCommand,
   SimListPoliciesCommandOutput,
-} from "./list-policies/list-policies.cmd.js";
+} from "./list-policies/list-policies.command.js";
 import { PutUserPolicyCommandHandler } from "./put-user-policy/put-user-policy.handler.js";
 import type {
   SimPutUserPolicyCommand,
   SimPutUserPolicyCommandOutput,
-} from "./put-user-policy/put-user-policy.cmd.js";
+} from "./put-user-policy/put-user-policy.command.js";
 
 interface SimIamPolicyCommandHandlersProperties {
   readonly accountId: SimAwsAccountId;

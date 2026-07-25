@@ -1,5 +1,5 @@
 import { normaliseSimRoute53Name } from "../local-name/sim-route53-local-name.js";
-import type { SimRoute53HostedZoneConfig } from "../command/create-hosted-zone/create-hosted-zone.cmd.js";
+import type { SimRoute53HostedZoneConfig } from "../command/create-hosted-zone/create-hosted-zone.command.js";
 import { SimRoute53HostedZoneRecords } from "./sim-route53-hosted-zone-records.js";
 import {
   assertIsSimRoute53HostedZoneId,

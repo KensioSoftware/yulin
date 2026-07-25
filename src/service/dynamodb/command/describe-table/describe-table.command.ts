@@ -1,4 +1,4 @@
-import type { SimDynamoDbTableDescription as SimDynamoDatabaseTableDescription } from "../create-table/create-table.cmd.js";
+import type { SimDynamoDbTableDescription as SimDynamoDatabaseTableDescription } from "../create-table/create-table.command.js";
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
 
 /**

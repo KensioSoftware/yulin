@@ -3,7 +3,7 @@ import type { SimAwsAccountId } from "../../../../aws/sim-aws-account.js";
 import type {
   SimCreateRoleCommand,
   SimCreateRoleCommandOutput,
-} from "./create-role.cmd.js";
+} from "./create-role.command.js";
 
 import type { SimIamPolicyDocument } from "../../../policy/sim-iam-policy.js";
 import type { JSONString } from "../../../../../util/type-guard/json.js";

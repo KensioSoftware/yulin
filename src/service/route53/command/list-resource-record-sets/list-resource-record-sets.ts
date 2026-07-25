@@ -1,6 +1,6 @@
 import type { SimRoute53HostedZone } from "../../hosted-zone/sim-route53-hosted-zone.js";
 import type { SimRoute53Record } from "../../record/sim-route53-record.js";
-import type { SimRoute53ResourceRecordSet } from "../change-resource-record-sets/change-resource-record-sets.cmd.js";
+import type { SimRoute53ResourceRecordSet } from "../change-resource-record-sets/change-resource-record-sets.command.js";
 import {
   isRecordAtOrAfterMarker,
   normaliseRecordSetListMarker,
