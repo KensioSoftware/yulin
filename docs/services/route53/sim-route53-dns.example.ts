@@ -13,7 +13,7 @@ import { serveSimAws } from "@kensio/yulin/serve";
 const simAws = new SimAws();
 const route53 = simAws.route53();
 
-const createOutput = await route53.createHostedZone(
+const hostedZoneCreation = await route53.createHostedZone(
   new CreateHostedZoneCommand({
     Name: "example.test",
     CallerReference: "dns-zone",
@@ -22,7 +22,7 @@ const createOutput = await route53.createHostedZone(
 
 await route53.changeResourceRecordSets(
   new ChangeResourceRecordSetsCommand({
-    HostedZoneId: createOutput.HostedZone?.Id,
+    HostedZoneId: hostedZoneCreation.HostedZone?.Id,
     ChangeBatch: {
       Changes: [
         {

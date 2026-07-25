@@ -13,7 +13,7 @@ import { SimRoute53NoSuchHostedZone } from "../../error/sim-route53.error.js";
 import type {
   SimGetHostedZoneCommand,
   SimGetHostedZoneCommandOutput,
-} from "./get-hosted-zone.cmd.js";
+} from "./get-hosted-zone.command.js";
 import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,

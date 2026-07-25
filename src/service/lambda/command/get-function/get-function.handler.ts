@@ -20,7 +20,7 @@ import { GetFunctionAuthorizer } from "./get-function-authorizer.js";
 import type {
   SimGetFunctionCommand,
   SimGetFunctionCommandOutput,
-} from "./get-function.cmd.js";
+} from "./get-function.command.js";
 
 interface GetFunctionCommandHandlerProperties {
   accountRegionScope: SimAwsAccountRegionScope;

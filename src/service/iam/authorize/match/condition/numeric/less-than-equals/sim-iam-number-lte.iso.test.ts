@@ -1,6 +1,6 @@
 import { assertFalse, assertTrue } from "@kensio/smartass";
 import { describe, it } from "vitest";
-import { SimIamNumericLessThanEquals } from "./sim-iam-num-lte.js";
+import { SimIamNumericLessThanEquals } from "./sim-iam-number-lte.js";
 
 describe("sim IAM NumericLessThanEquals authorization", () => {
   it("matches a numeric request value equal to the policy limit", () => {

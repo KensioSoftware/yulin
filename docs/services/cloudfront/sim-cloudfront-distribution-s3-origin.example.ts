@@ -17,7 +17,7 @@ await simS3.createBucket(
   }),
 );
 
-const createDistroOut = await simCloudFront.createDistribution(
+const distributionCreation = await simCloudFront.createDistribution(
   new CreateDistributionCommand({
     DistributionConfig: {
       CallerReference: "assets-cdn",
@@ -43,4 +43,4 @@ const createDistroOut = await simCloudFront.createDistribution(
   }),
 );
 
-console.log(createDistroOut.Distribution?.DomainName);
+console.log(distributionCreation.Distribution?.DomainName);

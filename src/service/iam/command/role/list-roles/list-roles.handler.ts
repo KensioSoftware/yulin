@@ -6,7 +6,7 @@ import {
 import type {
   SimListRolesCommand,
   SimListRolesCommandOutput,
-} from "./list-roles.cmd.js";
+} from "./list-roles.command.js";
 import type { SimIamRole, SimIamRoleName } from "../../../role/sim-iam-role.js";
 import { ListRolesPaginator } from "./list-roles-paginator.js";
 
@@ -57,7 +57,7 @@ export class ListRolesCommandHandler implements CommandHandler<
         RoleName: role.roleName,
         RoleId: role.roleId,
         Arn: role.arn,
-        CreateDate: role.createDate,
+        CreateDate: role.creationDate,
         AssumeRolePolicyDocument: role.assumeRolePolicyDocument,
         Description: role.description,
       })),

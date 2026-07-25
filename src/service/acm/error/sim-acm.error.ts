@@ -20,7 +20,7 @@ export class SimAcmError extends Error {
 /**
  * Simulated ACM InvalidArgsException error.
  */
-export class SimAcmInvalidArgsException extends SimAcmError {
+export class SimAcmInvalidArgumentsException extends SimAcmError {
   public override readonly name = "InvalidArgsException";
 
   constructor(message: string) {

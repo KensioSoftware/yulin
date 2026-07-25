@@ -3,7 +3,7 @@ import type {
   SimIamAuthZContext,
   SimIamAuthZPolicySource,
 } from "./context/sim-iam-auth-z-context.js";
-import { SimIamPolicyDocumentParser } from "../policy/parse/sim-iam-doc-parser.js";
+import { SimIamPolicyDocumentParser } from "../policy/parse/sim-iam-document-parser.js";
 import { SimIamPolicyStatementMatcher } from "./match/sim-iam-policy-statement-matcher.js";
 import type { SimAwsResolvedCaller } from "../../aws/caller/sim-aws-caller-resolver.js";
 

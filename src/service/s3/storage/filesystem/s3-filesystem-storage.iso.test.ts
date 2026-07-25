@@ -13,11 +13,11 @@ import { TemporaryDirectory as TemporaryDirectory } from "../../../../util/files
 
 describe("Filesystem simulated S3 storage", () => {
   async function makeFilesystemStorage(): Promise<FilesystemS3BucketStorage> {
-    const testDir = new TemporaryDirectory();
-    await testDir.resolvePath();
+    const testDirectory = new TemporaryDirectory();
+    await testDirectory.resolvePath();
 
     return new FilesystemS3BucketStorage({
-      directoryPath: testDir.join("public"),
+      directoryPath: testDirectory.join("public"),
     });
   }
 
@@ -147,12 +147,12 @@ describe("Filesystem simulated S3 storage", () => {
   });
 
   it("ignores unsupported file extensions when listing Objects", async () => {
-    const testDir = new TemporaryDirectory();
-    await testDir.writeFile(["public", "safe.txt"], "safe");
-    await testDir.writeFile(["public", "unsafe.pem"], "unsafe");
+    const testDirectory = new TemporaryDirectory();
+    await testDirectory.writeFile(["public", "safe.txt"], "safe");
+    await testDirectory.writeFile(["public", "unsafe.pem"], "unsafe");
 
     const storage = new FilesystemS3BucketStorage({
-      directoryPath: testDir.join("public"),
+      directoryPath: testDirectory.join("public"),
     });
     const objects = await storage.listObjects();
 
@@ -161,18 +161,18 @@ describe("Filesystem simulated S3 storage", () => {
   });
 
   it("ignores symlinks when listing Objects", async () => {
-    const testDir = new TemporaryDirectory();
-    await testDir.writeFile(["public", "safe.txt"], "safe");
-    await testDir.writeFile("outside.txt", "outside");
+    const testDirectory = new TemporaryDirectory();
+    await testDirectory.writeFile(["public", "safe.txt"], "safe");
+    await testDirectory.writeFile("outside.txt", "outside");
 
     // eslint-disable-next-line security/detect-non-literal-fs-filename
     await symlink(
-      testDir.join("outside.txt"),
-      testDir.join("public", "linked.txt"),
+      testDirectory.join("outside.txt"),
+      testDirectory.join("public", "linked.txt"),
     );
 
     const storage = new FilesystemS3BucketStorage({
-      directoryPath: testDir.join("public"),
+      directoryPath: testDirectory.join("public"),
     });
     const objects = await storage.listObjects();
 

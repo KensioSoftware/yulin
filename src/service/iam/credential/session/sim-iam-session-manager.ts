@@ -19,7 +19,7 @@ export interface SimIamCreateRoleSessionInput {
   readonly roleName: SimIamRoleName;
   readonly sessionName: string;
   readonly sourcePrincipal: SimArnPrincipal;
-  readonly createDate: Date;
+  readonly creationDate: Date;
   readonly expiration: Date;
 }
 
@@ -64,7 +64,7 @@ export class SimIamSessionManager {
       role,
       sessionName: input.sessionName,
       sessionToken: credentials.sessionToken,
-      createDate: input.createDate,
+      creationDate: input.creationDate,
       expiration: input.expiration,
     });
 
@@ -78,7 +78,7 @@ export class SimIamSessionManager {
           arn: role.arn,
         },
         session,
-        createDate: input.createDate,
+        creationDate: input.creationDate,
       }),
     );
 

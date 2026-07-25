@@ -53,7 +53,7 @@ describe("Route53 ListHostedZonesByNameCommand IAM authorization", () => {
       }),
     );
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "HostedZoneLister",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -66,7 +66,7 @@ describe("Route53 ListHostedZonesByNameCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
@@ -113,7 +113,7 @@ describe("Route53 ListHostedZonesByNameCommand IAM authorization", () => {
       }),
     );
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ConditionMismatchHostedZoneLister",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -126,7 +126,7 @@ describe("Route53 ListHostedZonesByNameCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
@@ -175,7 +175,7 @@ describe("Route53 ListHostedZonesByNameCommand IAM authorization", () => {
       }),
     );
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "DeniedHostedZoneLister",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -188,7 +188,7 @@ describe("Route53 ListHostedZonesByNameCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({

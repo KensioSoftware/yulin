@@ -13,7 +13,7 @@ import {
   makeSimRoute53HostedZoneId,
   type SimRoute53HostedZoneId,
 } from "../create-hosted-zone/sim-route53-zone-id.js";
-import type { SimRoute53Change } from "./change-resource-record-sets.cmd.js";
+import type { SimRoute53Change } from "./change-resource-record-sets.command.js";
 import type { SimRoute53 } from "../../sim-route53.js";
 
 describe("ChangeResourceRecordSetsCommand validation", () => {
@@ -25,14 +25,14 @@ describe("ChangeResourceRecordSetsCommand validation", () => {
     const simAws = new SimAws();
     const simRoute53 = simAws.route53();
 
-    const createHostedZoneOutput = await simRoute53.createHostedZone({
+    const hostedZoneCreation = await simRoute53.createHostedZone({
       input: {
         Name: name,
         CallerReference: `${name}-test`,
       },
     });
 
-    const hostedZoneId = createHostedZoneOutput.HostedZone?.Id;
+    const hostedZoneId = hostedZoneCreation.HostedZone?.Id;
     assertIsSimRoute53HostedZoneId(hostedZoneId);
 
     await simAws.backgroundTasksComplete();

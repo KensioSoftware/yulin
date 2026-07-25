@@ -15,7 +15,7 @@ describe("CloudFront CreateFunctionCommand", () => {
     const simCloudFront = simAws.cloudFront();
 
     const cffName = "viewer-request-cff" as SimCloudFrontFunctionName;
-    const createFunctionOutput = await simCloudFront.createFunction(
+    const functionCreation = await simCloudFront.createFunction(
       new CreateFunctionCommand({
         Name: cffName,
         FunctionConfig: {
@@ -25,7 +25,7 @@ describe("CloudFront CreateFunctionCommand", () => {
         FunctionCode: makeCffFunctionCodeInput(viewerRequestHandlerFunction),
       }),
     );
-    assertIdentical(createFunctionOutput.FunctionSummary.Status, "UNPUBLISHED");
+    assertIdentical(functionCreation.FunctionSummary.Status, "UNPUBLISHED");
 
     const simCloudFrontFunction =
       simCloudFront.getCloudFrontFunctionByName(cffName);
@@ -35,11 +35,11 @@ describe("CloudFront CreateFunctionCommand", () => {
     await simAws.backgroundTasksComplete();
     assertIdentical(simCloudFrontFunction.status, "UNASSOCIATED");
 
-    const cffRes = simCloudFrontFunction.handleViewerRequest(
+    const cffResponse = simCloudFrontFunction.handleViewerRequest(
       new Request("http://foobar.cloudfront.net/foo/bar/object.json"),
     );
-    assertInstanceOf(cffRes, Request);
-    const url = new URL(cffRes.url);
+    assertInstanceOf(cffResponse, Request);
+    const url = new URL(cffResponse.url);
     assertIdentical(url.pathname, "/changed/object.json");
   });
 
@@ -69,11 +69,11 @@ describe("CloudFront CreateFunctionCommand", () => {
     const simCloudFrontFunction =
       simCloudFront.getCloudFrontFunctionByName(cffName);
     assertInstanceOf(simCloudFrontFunction, SimCloudFrontFunction);
-    const cffRes = simCloudFrontFunction.handleViewerRequest(
+    const cffResponse = simCloudFrontFunction.handleViewerRequest(
       new Request("http://foobar.cloudfront.net/foo/bar/object.json"),
     );
-    assertInstanceOf(cffRes, Request);
-    const url = new URL(cffRes.url);
+    assertInstanceOf(cffResponse, Request);
+    const url = new URL(cffResponse.url);
     assertIdentical(url.pathname, "/changed/object.json");
   });
 
@@ -82,7 +82,7 @@ describe("CloudFront CreateFunctionCommand", () => {
     const simCloudFront = simAws.cloudFront();
 
     const cffName = "viewer-response-cff" as SimCloudFrontFunctionName;
-    const createFunctionOutput = await simCloudFront.createFunction(
+    const functionCreation = await simCloudFront.createFunction(
       new CreateFunctionCommand({
         Name: cffName,
         FunctionConfig: {
@@ -92,7 +92,7 @@ describe("CloudFront CreateFunctionCommand", () => {
         FunctionCode: makeCffFunctionCodeInput(viewerResponseHandlerFunction),
       }),
     );
-    assertIdentical(createFunctionOutput.FunctionSummary.Status, "UNPUBLISHED");
+    assertIdentical(functionCreation.FunctionSummary.Status, "UNPUBLISHED");
 
     const simCloudFrontFunction =
       simCloudFront.getCloudFrontFunctionByName(cffName);
@@ -102,12 +102,12 @@ describe("CloudFront CreateFunctionCommand", () => {
     await simAws.backgroundTasksComplete();
     assertIdentical(simCloudFrontFunction.status, "UNASSOCIATED");
 
-    const cffRes = simCloudFrontFunction.handleViewerResponse(
+    const cffResponse = simCloudFrontFunction.handleViewerResponse(
       new Request("http://foobar.cloudfront.net/foo/bar/object.json"),
       new Response("OK", { status: 200 }),
     );
-    assertInstanceOf(cffRes, Response);
-    assertIdentical(cffRes.headers.get("x-changed-by"), "foobar handler");
+    assertInstanceOf(cffResponse, Response);
+    assertIdentical(cffResponse.headers.get("x-changed-by"), "foobar handler");
   });
 
   it("creates viewer-response CloudFront Function from source code", async () => {
@@ -136,12 +136,12 @@ describe("CloudFront CreateFunctionCommand", () => {
     const simCloudFrontFunction =
       simCloudFront.getCloudFrontFunctionByName(cffName);
     assertInstanceOf(simCloudFrontFunction, SimCloudFrontFunction);
-    const cffRes = simCloudFrontFunction.handleViewerResponse(
+    const cffResponse = simCloudFrontFunction.handleViewerResponse(
       new Request("http://foobar.cloudfront.net/foo/bar/object.json"),
       new Response("OK", { status: 200 }),
     );
-    assertInstanceOf(cffRes, Response);
-    assertIdentical(cffRes.headers.get("x-changed-by"), "foobar handler");
+    assertInstanceOf(cffResponse, Response);
+    assertIdentical(cffResponse.headers.get("x-changed-by"), "foobar handler");
   });
 });
 

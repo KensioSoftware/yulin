@@ -1,6 +1,6 @@
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimCfnTemplateValue } from "../../template/value/sim-cfn-template-value.js";
-import { simAwsLocalConf as simAwsLocalConfig } from "../../../../serve/http/local-server/sim-aws-local.conf.js";
+import { simAwsLocalConfig } from "../../../../serve/http/local-server/sim-aws-local.config.js";
 import { DEFAULT_SIM_AWS_ACCOUNT_ID } from "../../../aws/sim-aws-account.js";
 import { DEFAULT_SIM_AWS_REGION_NAME } from "../../../aws/sim-aws-region.js";
 

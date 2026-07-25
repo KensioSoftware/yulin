@@ -1,5 +1,5 @@
 import { DynamoDBItemAttribute } from "./dynamodb-item-attribute.js";
-import type { SimDynamoDbAttributeValue as SimDynamoDatabaseAttributeValue } from "../command/put-item/put-item.cmd.js";
+import type { SimDynamoDbAttributeValue as SimDynamoDatabaseAttributeValue } from "../command/put-item/put-item.command.js";
 
 /**
  * A single Item in a DynamoDB Table.

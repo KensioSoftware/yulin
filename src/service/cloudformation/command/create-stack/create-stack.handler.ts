@@ -14,7 +14,7 @@ import { SimCloudFormationAlreadyExistsException } from "../../error/sim-cloudfr
 import type {
   SimCreateStackCommand,
   SimCreateStackCommandOutput,
-} from "./create-stack.cmd.js";
+} from "./create-stack.command.js";
 import {
   type CfnTemplateBodyRecord,
   SimCfnTemplate,

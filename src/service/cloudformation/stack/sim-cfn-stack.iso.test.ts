@@ -16,7 +16,7 @@ describe("SimCfnStack", () => {
     const simAws = new SimAws();
 
     const cloudFormation = simAws.cloudFormation();
-    const createStackOutput = await cloudFormation.createStack(
+    const stackCreation = await cloudFormation.createStack(
       new CreateStackCommand({
         StackName: "TestStack",
         TemplateBody: jsonStringify({ Resources: {} }),
@@ -24,7 +24,7 @@ describe("SimCfnStack", () => {
     );
     const stack = cloudFormation.getStackByName("TestStack");
 
-    assertIdentical(createStackOutput.StackId, "TestStack");
+    assertIdentical(stackCreation.StackId, "TestStack");
     assertIdentical(stack?.lifecycle.status, "CREATE_IN_PROGRESS");
 
     await simAws.backgroundTasksComplete();

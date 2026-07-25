@@ -1,6 +1,6 @@
 import type { SimCfnResource } from "../../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../../cloudformation/template/value/sim-cfn-template-value.js";
-import type { SimRoute53AliasTarget } from "../../../command/change-resource-record-sets/change-resource-record-sets.cmd.js";
+import type { SimRoute53AliasTarget } from "../../../command/change-resource-record-sets/change-resource-record-sets.command.js";
 
 /**
  * Parses AWS::Route53::RecordSet AliasTarget properties into sim Route53 shape.

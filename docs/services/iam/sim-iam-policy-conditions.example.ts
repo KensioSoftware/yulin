@@ -8,7 +8,7 @@ import { SimAws } from "@kensio/yulin";
 const simAws = new SimAws();
 const simIam = simAws.account("123456789012").iam();
 
-const createRoleOutput = await simIam.createRole(
+const roleCreation = await simIam.createRole(
   new CreateRoleCommand({
     RoleName: "FinanceReaderRole",
     AssumeRolePolicyDocument: JSON.stringify({
@@ -45,7 +45,7 @@ await simIam.putRolePolicy(
 const decision = simIam.authorize({
   action: "s3:GetObject",
   resource: "arn:aws:s3:::reports-bucket/2026/summary.csv",
-  caller: { kind: "arn", arn: createRoleOutput.Role.Arn },
+  caller: { kind: "arn", arn: roleCreation.Role.Arn },
   conditionContext: {
     "s3:ExistingObjectTag/department": "finance",
   },

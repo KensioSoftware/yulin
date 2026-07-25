@@ -23,7 +23,7 @@ describe("Route53 GetHostedZoneCommand", () => {
     const simAws = new SimAws();
     const simRoute53 = simAws.route53();
 
-    const createHostedZoneOutput = await simRoute53.createHostedZone(
+    const hostedZoneCreation = await simRoute53.createHostedZone(
       new CreateHostedZoneCommand({
         Name: "example.com",
         CallerReference: "test-caller-reference",
@@ -34,18 +34,18 @@ describe("Route53 GetHostedZoneCommand", () => {
       }),
     );
 
-    const hostedZoneId = createHostedZoneOutput.HostedZone?.Id;
+    const hostedZoneId = hostedZoneCreation.HostedZone?.Id;
     assertNonNullable(hostedZoneId, "Created Hosted Zone ID");
 
     // When the Hosted Zone is requested by ID through SimRoute53.
-    const getHostedZoneOutput = await simRoute53.getHostedZone(
+    const hostedZoneOut = await simRoute53.getHostedZone(
       new GetHostedZoneCommand({
         Id: hostedZoneId,
       }),
     );
 
     // Then the Hosted Zone details match the created Hosted Zone.
-    assertObjectMatches(getHostedZoneOutput.HostedZone, {
+    assertObjectMatches(hostedZoneOut.HostedZone, {
       Id: hostedZoneId,
       Name: "example.com.",
       CallerReference: "test-caller-reference",
@@ -56,9 +56,9 @@ describe("Route53 GetHostedZoneCommand", () => {
       ResourceRecordSetCount: 0,
     });
 
-    assertNonNullable(getHostedZoneOutput.DelegationSet);
-    assertArrayLength(getHostedZoneOutput.DelegationSet.NameServers, 4);
-    assertObjectMatches(getHostedZoneOutput.$metadata, {});
+    assertNonNullable(hostedZoneOut.DelegationSet);
+    assertArrayLength(hostedZoneOut.DelegationSet.NameServers, 4);
+    assertObjectMatches(hostedZoneOut.$metadata, {});
   });
 
   it("gets an existing Hosted Zone with its current ResourceRecordSetCount", async () => {
@@ -66,14 +66,14 @@ describe("Route53 GetHostedZoneCommand", () => {
     const simAws = new SimAws();
     const simRoute53 = simAws.route53();
 
-    const createHostedZoneOutput = await simRoute53.createHostedZone(
+    const hostedZoneCreation = await simRoute53.createHostedZone(
       new CreateHostedZoneCommand({
         Name: "example.org",
         CallerReference: "record-count-test",
       }),
     );
 
-    const hostedZoneId = createHostedZoneOutput.HostedZone?.Id;
+    const hostedZoneId = hostedZoneCreation.HostedZone?.Id;
     assertNonNullable(hostedZoneId, "Created Hosted Zone ID");
 
     await simRoute53.changeResourceRecordSets(
@@ -98,14 +98,14 @@ describe("Route53 GetHostedZoneCommand", () => {
     await simAws.backgroundTasksComplete();
 
     // When the Hosted Zone is requested after the record change.
-    const getHostedZoneOutput = await simRoute53.getHostedZone(
+    const hostedZoneOut = await simRoute53.getHostedZone(
       new GetHostedZoneCommand({
         Id: hostedZoneId,
       }),
     );
 
     // Then the Hosted Zone reports the current record count.
-    assertIdentical(getHostedZoneOutput.HostedZone?.ResourceRecordSetCount, 1);
+    assertIdentical(hostedZoneOut.HostedZone?.ResourceRecordSetCount, 1);
   });
 
   it("throws when the Hosted Zone does not exist", async () => {

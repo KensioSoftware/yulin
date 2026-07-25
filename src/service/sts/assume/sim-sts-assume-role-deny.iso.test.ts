@@ -279,7 +279,7 @@ describe("STS AssumeRole denial", () => {
     };
     const simAws = new SimAws({ defaultAccountId: accountId });
     const simIam = simAws.iam();
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "TargetRole",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -292,7 +292,7 @@ describe("STS AssumeRole denial", () => {
       }),
     );
     const role = {
-      ...createRoleOutput.Role,
+      ...roleCreation.Role,
       AssumeRolePolicyDocument: undefined,
     };
 

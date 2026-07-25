@@ -2,7 +2,7 @@ import type { CommandHandler } from "../../../../command/command-handler.js";
 import type {
   SimCreateBucketCommand,
   SimCreateBucketCommandOutput,
-} from "./create-bucket.cmd.js";
+} from "./create-bucket.command.js";
 import { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type { SimS3GlobalRegistry } from "../../sim-s3-global-registry.js";

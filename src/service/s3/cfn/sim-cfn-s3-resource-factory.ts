@@ -5,7 +5,7 @@ import type {
 import type { SimS3 } from "../sim-s3.js";
 import type { SimCfnServiceResourceFactory } from "../../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import type { SimS3Bucket } from "../bucket/sim-s3-bucket.js";
-import type { SimS3WebsiteConfiguration as SimS3WebsiteConfig } from "../command/put-bucket-website/put-bucket-website.cmd.js";
+import type { SimS3WebsiteConfiguration as SimS3WebsiteConfig } from "../command/put-bucket-website/put-bucket-website.command.js";
 import { validateS3BucketName } from "../bucket/validate/validate-s3-bucket-name.js";
 import { assertDefined } from "../../../util/type-guard/defined.js";
 

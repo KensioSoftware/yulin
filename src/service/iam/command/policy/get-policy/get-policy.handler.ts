@@ -9,7 +9,7 @@ import { SimIamNoSuchEntity } from "../../../error/sim-iam.error.js";
 import type {
   SimGetPolicyCommand,
   SimGetPolicyCommandOutput,
-} from "./get-policy.cmd.js";
+} from "./get-policy.command.js";
 
 interface GetPolicyCommandHandlerProperties {
   readonly policies: Map<SimArn, SimIamManagedPolicy>;
@@ -67,7 +67,7 @@ export class GetPolicyCommandHandler implements CommandHandler<
         PermissionsBoundaryUsageCount: policy.permissionsBoundaryUsageCount,
         IsAttachable: policy.isAttachable,
         Description: policy.description,
-        CreateDate: policy.createDate,
+        CreateDate: policy.creationDate,
         UpdateDate: policy.updateDate,
       },
     };

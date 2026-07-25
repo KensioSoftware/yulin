@@ -1,4 +1,4 @@
-import type { SimS3WebsiteConfiguration } from "../../command/put-bucket-website/put-bucket-website.cmd.js";
+import type { SimS3WebsiteConfiguration } from "../../command/put-bucket-website/put-bucket-website.command.js";
 import { S3BucketWebsiteRedirects } from "./redirect/s3-bucket-website-redirects.js";
 
 /**

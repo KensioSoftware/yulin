@@ -9,7 +9,7 @@ import { normaliseUserPath } from "../../../user/sim-iam-user-path.js";
 import type {
   SimCreateUserCommand,
   SimCreateUserCommandOutput,
-} from "./create-user.cmd.js";
+} from "./create-user.command.js";
 import { CreateUserRecordFactory } from "./create-user-record-factory.js";
 
 interface CreateUserCommandHandlerProperties {

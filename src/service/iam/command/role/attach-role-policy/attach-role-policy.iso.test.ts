@@ -27,7 +27,7 @@ describe("IAM AttachRolePolicyCommand", () => {
     const accountId = makeSimAwsAccountId();
     const simIam = simAws.account(accountId).iam();
 
-    const createPolicyOutput = await simIam.createPolicy(
+    const policyCreation = await simIam.createPolicy(
       new CreatePolicyCommand({
         PolicyName: "ReadReports",
         PolicyDocument: JSON.stringify({
@@ -43,7 +43,7 @@ describe("IAM AttachRolePolicyCommand", () => {
       }),
     );
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ReportsReader",
         AssumeRolePolicyDocument: trustPolicy(accountId),
@@ -52,7 +52,7 @@ describe("IAM AttachRolePolicyCommand", () => {
 
     // And the Role has no access before attachment.
     const beforeDecision = simIam.authorize({
-      caller: { kind: "arn", arn: createRoleOutput.Role.Arn },
+      caller: { kind: "arn", arn: roleCreation.Role.Arn },
       action: "s3:GetObject",
       resource: "arn:aws:s3:::reports-bucket/daily.json",
     });
@@ -63,13 +63,13 @@ describe("IAM AttachRolePolicyCommand", () => {
     await simIam.attachRolePolicy(
       new AttachRolePolicyCommand({
         RoleName: "ReportsReader",
-        PolicyArn: createPolicyOutput.Policy.Arn,
+        PolicyArn: policyCreation.Policy.Arn,
       }),
     );
 
     // Then the attached managed policy grants the Role access.
     const afterDecision = simIam.authorize({
-      caller: { kind: "arn", arn: createRoleOutput.Role.Arn },
+      caller: { kind: "arn", arn: roleCreation.Role.Arn },
       action: "s3:GetObject",
       resource: "arn:aws:s3:::reports-bucket/daily.json",
     });
@@ -85,7 +85,7 @@ describe("IAM AttachRolePolicyCommand", () => {
     const accountId = makeSimAwsAccountId();
     const simIam = simAws.account(accountId).iam();
 
-    const createPolicyOutput = await simIam.createPolicy(
+    const policyCreation = await simIam.createPolicy(
       new CreatePolicyCommand({
         PolicyName: "ScopedRead",
         PolicyDocument: JSON.stringify({
@@ -101,7 +101,7 @@ describe("IAM AttachRolePolicyCommand", () => {
       }),
     );
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ScopedReader",
         AssumeRolePolicyDocument: trustPolicy(accountId),
@@ -111,13 +111,13 @@ describe("IAM AttachRolePolicyCommand", () => {
     await simIam.attachRolePolicy(
       new AttachRolePolicyCommand({
         RoleName: "ScopedReader",
-        PolicyArn: createPolicyOutput.Policy.Arn,
+        PolicyArn: policyCreation.Policy.Arn,
       }),
     );
 
     // When the Role accesses a resource inside the policy scope.
     const allowedDecision = simIam.authorize({
-      caller: { kind: "arn", arn: createRoleOutput.Role.Arn },
+      caller: { kind: "arn", arn: roleCreation.Role.Arn },
       action: "s3:GetObject",
       resource: "arn:aws:s3:::allowed-bucket/object.txt",
     });
@@ -127,7 +127,7 @@ describe("IAM AttachRolePolicyCommand", () => {
 
     // But a resource outside the policy scope is not allowed.
     const deniedDecision = simIam.authorize({
-      caller: { kind: "arn", arn: createRoleOutput.Role.Arn },
+      caller: { kind: "arn", arn: roleCreation.Role.Arn },
       action: "s3:GetObject",
       resource: "arn:aws:s3:::other-bucket/object.txt",
     });
@@ -141,7 +141,7 @@ describe("IAM AttachRolePolicyCommand", () => {
     const accountId = makeSimAwsAccountId();
     const simIam = simAws.account(accountId).iam();
 
-    const createPolicyOutput = await simIam.createPolicy(
+    const policyCreation = await simIam.createPolicy(
       new CreatePolicyCommand({
         PolicyName: "ReadReports",
         PolicyDocument: JSON.stringify({
@@ -157,7 +157,7 @@ describe("IAM AttachRolePolicyCommand", () => {
       }),
     );
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ReportsReader",
         AssumeRolePolicyDocument: trustPolicy(accountId),
@@ -167,7 +167,7 @@ describe("IAM AttachRolePolicyCommand", () => {
     await simIam.attachRolePolicy(
       new AttachRolePolicyCommand({
         RoleName: "ReportsReader",
-        PolicyArn: createPolicyOutput.Policy.Arn,
+        PolicyArn: policyCreation.Policy.Arn,
       }),
     );
 
@@ -175,13 +175,13 @@ describe("IAM AttachRolePolicyCommand", () => {
     await simIam.attachRolePolicy(
       new AttachRolePolicyCommand({
         RoleName: "ReportsReader",
-        PolicyArn: createPolicyOutput.Policy.Arn,
+        PolicyArn: policyCreation.Policy.Arn,
       }),
     );
 
     // Then the Role still has access exactly once.
     const decision = simIam.authorize({
-      caller: { kind: "arn", arn: createRoleOutput.Role.Arn },
+      caller: { kind: "arn", arn: roleCreation.Role.Arn },
       action: "s3:GetObject",
       resource: "arn:aws:s3:::reports-bucket/daily.json",
     });
@@ -196,7 +196,7 @@ describe("IAM AttachRolePolicyCommand", () => {
     const accountId = makeSimAwsAccountId();
     const simIam = simAws.account(accountId).iam();
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "AwsManagedReader",
         AssumeRolePolicyDocument: trustPolicy(accountId),
@@ -213,7 +213,7 @@ describe("IAM AttachRolePolicyCommand", () => {
 
     // Then the attachment succeeds but contributes no authorization statements.
     const decision = simIam.authorize({
-      caller: { kind: "arn", arn: createRoleOutput.Role.Arn },
+      caller: { kind: "arn", arn: roleCreation.Role.Arn },
       action: "s3:GetObject",
       resource: "arn:aws:s3:::any-bucket/object.txt",
     });

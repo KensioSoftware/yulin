@@ -23,7 +23,7 @@ describe("CloudFormation CreateStackCommand", () => {
     const cloudFormation = simAws.cloudFormation();
 
     // When CreateStackCommand is handled with a StackName and TemplateBody.
-    const createStackOutput = await cloudFormation.createStack(
+    const stackCreation = await cloudFormation.createStack(
       new CreateStackCommand({
         StackName: "test-stack",
         TemplateBody: jsonStringify({ Resources: {} }),
@@ -31,7 +31,7 @@ describe("CloudFormation CreateStackCommand", () => {
     );
 
     // Then the Stack is registered and starts deploying in the background.
-    assertIdentical(createStackOutput.StackId, "test-stack");
+    assertIdentical(stackCreation.StackId, "test-stack");
 
     const describeStacksOut = await cloudFormation.describeStacks(
       new DescribeStacksCommand({

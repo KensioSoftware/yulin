@@ -58,7 +58,7 @@ export class SimCloudFrontRequestPipeline {
     }
     requestReference = cffResult;
 
-    const res = await this.originFetcher.fetch(
+    const response = await this.originFetcher.fetch(
       requestReference,
       distro,
       behaviour,
@@ -70,7 +70,7 @@ export class SimCloudFrontRequestPipeline {
     return this.cffApplicator.applyViewerResponse(
       cloudFront,
       requestReference,
-      res,
+      response,
       behaviour,
     );
   }

@@ -8,8 +8,8 @@ import type { SimIamRole, SimIamRoleName } from "../../../role/sim-iam-role.js";
 import type {
   SimPutRolePolicyCommand,
   SimPutRolePolicyCommandOutput,
-} from "./put-role-policy.cmd.js";
-import { SimIamPolicyDocumentValidator } from "../../../validate/sim-iam-policy-doc-validator.js";
+} from "./put-role-policy.command.js";
+import { SimIamPolicyDocumentValidator } from "../../../validate/sim-iam-policy-document-validator.js";
 
 interface PutRolePolicyCommandHandlerProperties {
   readonly roles: Map<SimIamRoleName, SimIamRole>;

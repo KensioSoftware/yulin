@@ -8,7 +8,10 @@ import {
   parseInvokeEvent,
   resultPayload,
 } from "./invoke-payload.js";
-import type { SimInvokeCommand, SimInvokeCommandOutput } from "./invoke.cmd.js";
+import type {
+  SimInvokeCommand,
+  SimInvokeCommandOutput,
+} from "./invoke.command.js";
 
 interface SimLambdaInvocationDispatcherProperties {
   background?: BackgroundScheduler;

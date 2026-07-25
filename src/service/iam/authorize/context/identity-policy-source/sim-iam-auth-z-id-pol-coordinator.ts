@@ -4,7 +4,7 @@ import type { SimIamRole, SimIamRoleName } from "../../../role/sim-iam-role.js";
 import type { SimIamUser, SimIamUsername } from "../../../user/sim-iam-user.js";
 import type { SimIamAuthZPolicySource } from "../sim-iam-auth-z-context.js";
 import { SimIamIdentityPolicyOwnerResolver } from "./sim-iam-id-pol-owner-resolver.js";
-import { SimIamIdentityPolicyOwnerSourceBuilder } from "./sim-iam-id-pol-owner-src-builder.js";
+import { SimIamIdentityPolicyOwnerSourceBuilder } from "./sim-iam-id-pol-owner-source-builder.js";
 
 interface SimIamAuthZIdentityPolicySourceBuilderProperties {
   policies?: ReadonlyMap<SimArn, SimIamPolicy>;

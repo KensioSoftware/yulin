@@ -44,7 +44,7 @@ describe("Simulated AWS DNS", () => {
     // Given a served environment holding an A record.
     const simAws = new SimAws();
     const route53 = simAws.route53();
-    const createOutput = await route53.createHostedZone(
+    const hostedZoneCreation = await route53.createHostedZone(
       new CreateHostedZoneCommand({
         Name: "example.test",
         CallerReference: "dns-protocol-zone",
@@ -52,7 +52,7 @@ describe("Simulated AWS DNS", () => {
     );
     await route53.changeResourceRecordSets(
       new ChangeResourceRecordSetsCommand({
-        HostedZoneId: createOutput.HostedZone?.Id,
+        HostedZoneId: hostedZoneCreation.HostedZone?.Id,
         ChangeBatch: {
           Changes: [
             {
@@ -112,7 +112,7 @@ describe("Simulated AWS DNS", () => {
     // record changes do not validate address syntax, so this is reachable.
     const simAws = new SimAws();
     const route53 = simAws.route53();
-    const createOutput = await route53.createHostedZone(
+    const hostedZoneCreation = await route53.createHostedZone(
       new CreateHostedZoneCommand({
         Name: "example.test",
         CallerReference: "unencodable-zone",
@@ -120,7 +120,7 @@ describe("Simulated AWS DNS", () => {
     );
     await route53.changeResourceRecordSets(
       new ChangeResourceRecordSetsCommand({
-        HostedZoneId: createOutput.HostedZone?.Id,
+        HostedZoneId: hostedZoneCreation.HostedZone?.Id,
         ChangeBatch: {
           Changes: [
             {

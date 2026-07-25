@@ -11,7 +11,7 @@ const account = simAws.account("123456789012");
 const simIam = account.iam();
 const simRoute53 = account.route53();
 
-const createRoleOutput = await simIam.createRole(
+const roleCreation = await simIam.createRole(
   new CreateRoleCommand({
     RoleName: "UnprivilegedRole",
     AssumeRolePolicyDocument: JSON.stringify({
@@ -32,7 +32,7 @@ try {
       CallerReference: "denied-ref",
     }),
     {
-      caller: { kind: "arn", arn: createRoleOutput.Role.Arn },
+      caller: { kind: "arn", arn: roleCreation.Role.Arn },
     },
   );
 } catch (error) {

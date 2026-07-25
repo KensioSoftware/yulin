@@ -13,18 +13,18 @@ import { CreateStackCommandHandler } from "./command/create-stack/create-stack.h
 import type {
   SimCreateStackCommand,
   SimCreateStackCommandOutput,
-} from "./command/create-stack/create-stack.cmd.js";
+} from "./command/create-stack/create-stack.command.js";
 import type {
   SimDescribeStacksCommand,
   SimDescribeStacksCommandOutput,
-} from "./command/describe-stacks/describe-stacks.cmd.js";
+} from "./command/describe-stacks/describe-stacks.command.js";
 import { DescribeStacksCommandHandler } from "./command/describe-stacks/describe-stacks.handler.js";
 import type { SimCdkOutContext } from "./cdk/sim-cdk-out-context.js";
 import {
-  type SimCloudFormationCreateStackProps as SimCloudFormationCreateStackProperties,
+  type SimCloudFormationCreateStackProperties as SimCloudFormationCreateStackProperties,
   SimCloudFormationTemplateDeployer,
 } from "./deploy/sim-cfn-template-deployer.js";
-import type { SimCloudFormationDeployTemplateFileProps as SimCloudFormationDeployTemplateFileProperties } from "./deploy/sim-cfn-template-file-loader.js";
+import type { SimCloudFormationDeployTemplateFileProperties as SimCloudFormationDeployTemplateFileProperties } from "./deploy/sim-cfn-template-file-loader.js";
 import type { SimCfnExecutableResourceBinding } from "./bind/sim-cfn-exec-binding.type.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import { SimCloudFormationSdkCommandRouter } from "./sdk/sim-cloudformation-sdk-command-router.js";

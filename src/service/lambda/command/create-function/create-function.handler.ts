@@ -30,7 +30,7 @@ import {
 import type {
   SimCreateFunctionCommand,
   SimCreateFunctionCommandOutput,
-} from "./create-function.cmd.js";
+} from "./create-function.command.js";
 
 interface CreateFunctionCommandHandlerProperties {
   accountRegionScope: SimAwsAccountRegionScope;

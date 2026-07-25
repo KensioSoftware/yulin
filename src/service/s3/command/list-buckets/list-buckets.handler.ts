@@ -2,7 +2,7 @@ import type { CommandHandler } from "../../../../command/command-handler.js";
 import type {
   SimListBucketsCommand,
   SimListBucketsCommandOutput,
-} from "./list-buckets.cmd.js";
+} from "./list-buckets.command.js";
 import type {
   SimS3Bucket,
   SimS3BucketName,

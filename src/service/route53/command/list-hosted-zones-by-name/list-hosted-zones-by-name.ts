@@ -1,4 +1,4 @@
-import type { SimRoute53HostedZoneOutput } from "../create-hosted-zone/create-hosted-zone.cmd.js";
+import type { SimRoute53HostedZoneOutput } from "../create-hosted-zone/create-hosted-zone.command.js";
 import type { SimRoute53HostedZoneId } from "../create-hosted-zone/sim-route53-zone-id.js";
 import type { SimRoute53HostedZone } from "../../hosted-zone/sim-route53-hosted-zone.js";
 import {

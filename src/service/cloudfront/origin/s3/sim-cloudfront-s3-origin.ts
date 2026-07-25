@@ -1,6 +1,6 @@
 import type { SimS3Bucket } from "../../../s3/bucket/sim-s3-bucket.js";
 import type { SimS3Object } from "../../../s3/object/s3-object.js";
-import type { SimCloudFrontOriginRequest } from "../sim-cloudfront-req-res.js";
+import type { SimCloudFrontOriginRequest } from "../sim-cloudfront-request-response.js";
 import type { SimCloudFrontOrigin } from "../sim-cloudfront-origin.js";
 
 export type SimCloudFrontS3OriginResolver = (

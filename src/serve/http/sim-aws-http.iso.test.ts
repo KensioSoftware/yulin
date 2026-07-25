@@ -17,14 +17,14 @@ describe("Simulated AWS HTTP", () => {
   it("responds HTTP 501 for unknown host", async () => {
     const simAwsHttp = new SimAwsHttp();
 
-    const res = await simAwsHttp.fetch(
+    const response = await simAwsHttp.fetch(
       new URL("http://foobar.sim-aws.localhost/"),
     );
 
-    assertResponseStatus(res, 501, await describeResponse(res));
-    const resBody = await res.text();
+    assertResponseStatus(response, 501, await describeResponse(response));
+    const responseBody = await response.text();
     assertStringIncludes(
-      resBody,
+      responseBody,
       "Unknown simulated AWS host foobar.sim-aws.localhost",
     );
   });
@@ -32,12 +32,12 @@ describe("Simulated AWS HTTP", () => {
   it("responds HTTP 400 when the request URL has no hostname", async () => {
     const simAwsHttp = new SimAwsHttp();
 
-    const res = await simAwsHttp.handleRequest(
+    const response = await simAwsHttp.handleRequest(
       new Request("data:text/plain,hello"),
     );
 
-    assertResponseStatus(res, 400, await describeResponse(res));
-    assertIdentical(await res.text(), "Missing Host header\n");
+    assertResponseStatus(response, 400, await describeResponse(response));
+    assertIdentical(await response.text(), "Missing Host header\n");
   });
 
   it("routes S3 website request to simulated S3 controller", async () => {
@@ -45,20 +45,20 @@ describe("Simulated AWS HTTP", () => {
 
     const simAwsHttp = new SimAwsHttp({ simAws });
 
-    const res = await simAwsHttp.fetch(
+    const response = await simAwsHttp.fetch(
       new Request(
         "http://my-site.s3-website.eu-west-2.sim-aws.localhost/foobar-object.html",
       ),
     );
 
-    assertResponseStatus(res, 404);
-    const resBody = await res.text();
-    assertStringIncludes(resBody, "S3 bucket named my-site not found");
+    assertResponseStatus(response, 404);
+    const responseBody = await response.text();
+    assertStringIncludes(responseBody, "S3 bucket named my-site not found");
   });
 
   it("routes custom domains to CloudFront through simulated Route53", async () => {
     const simAws = new SimAws();
-    const createHostedZoneOutput = await simAws.route53().createHostedZone({
+    const hostedZoneCreation = await simAws.route53().createHostedZone({
       input: {
         Name: "foo.com",
         CallerReference: "foo-com-test",
@@ -67,7 +67,7 @@ describe("Simulated AWS HTTP", () => {
 
     await simAws.route53().changeResourceRecordSets({
       input: {
-        HostedZoneId: createHostedZoneOutput.HostedZone?.Id,
+        HostedZoneId: hostedZoneCreation.HostedZone?.Id,
         ChangeBatch: {
           Changes: [
             {
@@ -86,14 +86,14 @@ describe("Simulated AWS HTTP", () => {
 
     const simAwsHttp = new SimAwsHttp({ simAws });
 
-    const res = await simAwsHttp.fetch(
+    const response = await simAwsHttp.fetch(
       new Request("http://www.foo.com.sim-aws.localhost/"),
     );
 
-    assertResponseStatus(res, 404);
-    const resBody = await res.text();
+    assertResponseStatus(response, 404);
+    const responseBody = await response.text();
     assertStringIncludes(
-      resBody,
+      responseBody,
       "Suitable sim CloudFront Distribution not found",
     );
   });
@@ -124,16 +124,16 @@ describe("Simulated AWS HTTP", () => {
       }),
     );
 
-    const res = await simAwsHttp.fetch(
+    const response = await simAwsHttp.fetch(
       "http://foo-site.s3-website.eu-west-2.sim-aws.localhost/index.html",
     );
 
-    assertResponseStatus(res, 200);
+    assertResponseStatus(response, 200);
     assertIdentical(
-      res.headers.get("content-type"),
+      response.headers.get("content-type"),
       "text/html; charset=utf-8",
     );
-    assertIdentical(await res.text(), "<h1>Hello, world!</h1>");
+    assertIdentical(await response.text(), "<h1>Hello, world!</h1>");
   });
 
   it("serves HEAD requests without a response body when static website hosting is configured", async () => {
@@ -162,16 +162,16 @@ describe("Simulated AWS HTTP", () => {
       }),
     );
 
-    const res = await simAwsHttp.fetch(
+    const response = await simAwsHttp.fetch(
       "http://head-site.s3-website.eu-west-2.sim-aws.localhost/index.html",
       { method: "HEAD" },
     );
 
-    assertResponseStatus(res, 200);
+    assertResponseStatus(response, 200);
     assertIdentical(
-      res.headers.get("content-type"),
+      response.headers.get("content-type"),
       "text/html; charset=utf-8",
     );
-    assertIdentical(await res.text(), "");
+    assertIdentical(await response.text(), "");
   });
 });

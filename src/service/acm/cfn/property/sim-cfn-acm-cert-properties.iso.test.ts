@@ -1,7 +1,7 @@
 import { assertIdentical, assertThrowsError } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
-import { SimCfnAcmCertificatePropertyListReader } from "./sim-cfn-acm-cert-prop-reader.js";
+import { SimCfnAcmCertificatePropertyListReader } from "./sim-cfn-acm-cert-property-reader.js";
 import { SimCfnAcmCertificatePropertyReader } from "./sim-cfn-acm-cert-properties.js";
 
 describe("SimCfnAcmCertificateProperties", () => {

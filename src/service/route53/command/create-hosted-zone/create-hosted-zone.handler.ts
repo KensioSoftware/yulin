@@ -3,7 +3,7 @@ import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type {
   SimCreateHostedZoneCommand,
   SimCreateHostedZoneCommandOutput,
-} from "./create-hosted-zone.cmd.js";
+} from "./create-hosted-zone.command.js";
 import {
   type BackgroundScheduler,
   BackgroundTasks,

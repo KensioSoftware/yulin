@@ -57,7 +57,7 @@ export class SimCfnRoute53HostedZoneCreator {
             ),
           };
 
-    const createOutput = await this.route53.createHostedZone({
+    const hostedZoneCreation = await this.route53.createHostedZone({
       input: {
         Name: name,
         CallerReference: resource.logicalId,
@@ -65,7 +65,7 @@ export class SimCfnRoute53HostedZoneCreator {
       },
     });
 
-    const hostedZoneId = createOutput.HostedZone?.Id;
+    const hostedZoneId = hostedZoneCreation.HostedZone?.Id;
     assertIsSimRoute53HostedZoneId(hostedZoneId);
 
     const hostedZone = this.route53.hostedZones.get(hostedZoneId);

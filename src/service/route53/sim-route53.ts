@@ -4,28 +4,28 @@ import { CreateHostedZoneCommandHandler } from "./command/create-hosted-zone/cre
 import type {
   SimCreateHostedZoneCommand,
   SimCreateHostedZoneCommandOutput,
-} from "./command/create-hosted-zone/create-hosted-zone.cmd.js";
+} from "./command/create-hosted-zone/create-hosted-zone.command.js";
 import type { SimRoute53HostedZone } from "./hosted-zone/sim-route53-hosted-zone.js";
 import type { SimRoute53HostedZoneId } from "./command/create-hosted-zone/sim-route53-zone-id.js";
 import type {
   SimGetHostedZoneCommand,
   SimGetHostedZoneCommandOutput,
-} from "./command/get-hosted-zone/get-hosted-zone.cmd.js";
+} from "./command/get-hosted-zone/get-hosted-zone.command.js";
 import { GetHostedZoneCommandHandler } from "./command/get-hosted-zone/get-hosted-zone.handler.js";
 import type {
   SimListHostedZonesByNameCommand,
   SimListHostedZonesByNameCommandOutput,
-} from "./command/list-hosted-zones-by-name/list-hosted-zones-by-name.cmd.js";
+} from "./command/list-hosted-zones-by-name/list-hosted-zones-by-name.command.js";
 import { ListHostedZonesByNameCommandHandler } from "./command/list-hosted-zones-by-name/list-hosted-zones-by-name.handler.js";
 import type {
   SimListResourceRecordSetsCommand,
   SimListResourceRecordSetsCommandOutput,
-} from "./command/list-resource-record-sets/list-resource-record-sets.cmd.js";
+} from "./command/list-resource-record-sets/list-resource-record-sets.command.js";
 import { ListResourceRecordSetsCommandHandler } from "./command/list-resource-record-sets/list-resource-record-sets.handler.js";
 import type {
   SimChangeResourceRecordSetsCommand,
   SimChangeResourceRecordSetsCommandOutput,
-} from "./command/change-resource-record-sets/change-resource-record-sets.cmd.js";
+} from "./command/change-resource-record-sets/change-resource-record-sets.command.js";
 import { ChangeResourceRecordSetsCommandHandler } from "./command/change-resource-record-sets/change-resource-record-sets.handler.js";
 import {
   type BackgroundScheduler,

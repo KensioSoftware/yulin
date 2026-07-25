@@ -3,8 +3,8 @@ import {
   type SimSdkCommandRoute,
   type SimSdkCommandRouter,
 } from "../../../sdk/index.js";
-import type { SimCreateStackCommand } from "../command/create-stack/create-stack.cmd.js";
-import type { SimDescribeStacksCommand } from "../command/describe-stacks/describe-stacks.cmd.js";
+import type { SimCreateStackCommand } from "../command/create-stack/create-stack.command.js";
+import type { SimDescribeStacksCommand } from "../command/describe-stacks/describe-stacks.command.js";
 import type { SimCloudFormation } from "../sim-cloudformation.js";
 
 /**

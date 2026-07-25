@@ -1,7 +1,7 @@
 import { Readable } from "node:stream";
 import type { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
 import { SimS3NoSuchKey } from "../../error/sim-s3.error.js";
-import type { SimGetObjectCommandOutput } from "./get-object.cmd.js";
+import type { SimGetObjectCommandOutput } from "./get-object.command.js";
 
 /**
  * Loads an authorized S3 Object and converts it to a GetObject response.

@@ -1,5 +1,5 @@
 import { assertDefined } from "../../../util/type-guard/defined.js";
-import type { SimCreateTableCommand } from "../command/create-table/create-table.cmd.js";
+import type { SimCreateTableCommand } from "../command/create-table/create-table.command.js";
 import { DynamoDbKeySchema as DynamoDatabaseKeySchema } from "./dynamodb-key-schema.js";
 import type { DynamoDbTableName as DynamoDatabaseTableName } from "./sim-dynamodb-table.js";
 
@@ -7,7 +7,7 @@ import type { DynamoDbTableName as DynamoDatabaseTableName } from "./sim-dynamod
  * Extract and validate DynamoDB table creation input.
  */
 export class DynamoDbTableCreateInput {
-  constructor(private readonly createCommand: SimCreateTableCommand) {
+  constructor(private readonly tableCommand: SimCreateTableCommand) {
     //
   }
 
@@ -16,11 +16,11 @@ export class DynamoDbTableCreateInput {
    */
   tableName(): DynamoDatabaseTableName {
     assertDefined(
-      this.createCommand.input.TableName,
-      "createCommand.input.TableName",
+      this.tableCommand.input.TableName,
+      "tableCommand.input.TableName",
     );
 
-    return this.createCommand.input.TableName as DynamoDatabaseTableName;
+    return this.tableCommand.input.TableName as DynamoDatabaseTableName;
   }
 
   /**
@@ -28,12 +28,12 @@ export class DynamoDbTableCreateInput {
    */
   keySchema(): DynamoDatabaseKeySchema {
     if (
-      this.createCommand.input.KeySchema === undefined ||
-      this.createCommand.input.KeySchema.length === 0
+      this.tableCommand.input.KeySchema === undefined ||
+      this.tableCommand.input.KeySchema.length === 0
     ) {
       throw new Error("Table KeySchema is not defined");
     }
 
-    return new DynamoDatabaseKeySchema(this.createCommand.input);
+    return new DynamoDatabaseKeySchema(this.tableCommand.input);
   }
 }

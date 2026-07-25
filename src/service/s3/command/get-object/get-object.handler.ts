@@ -2,7 +2,7 @@ import type { CommandHandler } from "../../../../command/command-handler.js";
 import type {
   SimGetObjectCommand,
   SimGetObjectCommandOutput,
-} from "./get-object.cmd.js";
+} from "./get-object.command.js";
 import type {
   SimS3Bucket,
   SimS3BucketName,

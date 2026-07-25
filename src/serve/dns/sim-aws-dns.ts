@@ -7,7 +7,7 @@ import {
 import { dnsRcodes } from "../../service/route53/dns/dns-rcode.js";
 import { encodeDnsResponse } from "../../service/route53/dns/dns-response.js";
 import { dnsStandardQueryOpcode } from "../../service/route53/dns/wire/dns-header-flags.js";
-import { simAwsLocalConf as simAwsLocalConfig } from "../http/local-server/sim-aws-local.conf.js";
+import { simAwsLocalConfig } from "../http/local-server/sim-aws-local.config.js";
 
 interface SimAwsDnsProperties {
   readonly simAws?: SimAws;

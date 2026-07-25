@@ -5,7 +5,7 @@ import type {
   SimIamPolicyDocument,
   SimIamPolicyDocumentPrincipal,
 } from "../../policy/sim-iam-policy.js";
-import { simIamPolicyDocumentStatements } from "../../policy/sim-iam-pol-doc-statements.js";
+import { simIamPolicyDocumentStatements } from "../../policy/sim-iam-pol-document-statements.js";
 
 /**
  * Validates an IAM Role trust policy.

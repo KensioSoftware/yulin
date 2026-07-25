@@ -108,7 +108,7 @@ describe("IAM CloudFormation ManagedPolicy driven authorization", () => {
 
     const policy = policyResource.simResource as SimIamManagedPolicy;
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ReportsReader",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -121,7 +121,7 @@ describe("IAM CloudFormation ManagedPolicy driven authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.attachRolePolicy(
       new AttachRolePolicyCommand({
@@ -230,7 +230,7 @@ describe("IAM CloudFormation ManagedPolicy driven authorization", () => {
 
     const policy = policyResource.simResource as SimIamManagedPolicy;
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ZoneWriter",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -243,7 +243,7 @@ describe("IAM CloudFormation ManagedPolicy driven authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.attachRolePolicy(
       new AttachRolePolicyCommand({

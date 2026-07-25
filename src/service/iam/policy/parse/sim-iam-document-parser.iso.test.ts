@@ -1,7 +1,7 @@
 import { assertArrayLength, assertIdentical } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import type { SimIamPolicyDocument } from "../sim-iam-policy.js";
-import { SimIamPolicyDocumentParser } from "./sim-iam-doc-parser.js";
+import { SimIamPolicyDocumentParser } from "./sim-iam-document-parser.js";
 
 describe("SimIamPolicyDocumentParser", () => {
   it("parses a policy document with a single statement object", () => {

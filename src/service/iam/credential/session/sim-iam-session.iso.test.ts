@@ -16,7 +16,7 @@ describe("SimIamSession", () => {
     role: simIamRoleFactory.make(),
     sessionName: "test-session",
     sessionToken: "test-session-token",
-    createDate: new Date("2026-01-01T00:00:00.000Z"),
+    creationDate: new Date("2026-01-01T00:00:00.000Z"),
     expiration: new Date("2026-01-01T01:00:00.000Z"),
   });
 

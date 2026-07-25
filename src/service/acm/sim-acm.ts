@@ -7,18 +7,18 @@ import type { SimArn } from "../aws/arn.js";
 import type {
   SimRequestCertificateCommand,
   SimRequestCertificateCommandOutput,
-} from "./command/request-certificate/request-certificate.cmd.js";
+} from "./command/request-certificate/request-certificate.command.js";
 import { RequestCertificateCommandHandler } from "./command/request-certificate/request-certificate.handler.js";
 import type { SimAcmCertificate } from "./certificate/sim-acm-certificate.js";
 import type {
   SimDescribeCertificateCommand,
   SimDescribeCertificateCommandOutput,
-} from "./command/describe-certificate/describe-certificate.cmd.js";
+} from "./command/describe-certificate/describe-certificate.command.js";
 import { DescribeCertificateCommandHandler } from "./command/describe-certificate/describe-certificate.handler.js";
 import type {
   SimListCertificatesCommand,
   SimListCertificatesCommandOutput,
-} from "./command/list-certificates/list-certificates.cmd.js";
+} from "./command/list-certificates/list-certificates.command.js";
 import { ListCertificatesCommandHandler } from "./command/list-certificates/list-certificates.handler.js";
 import { SimAcmCfnResourceFactory } from "./cfn/sim-cfn-acm-resource-factory.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";

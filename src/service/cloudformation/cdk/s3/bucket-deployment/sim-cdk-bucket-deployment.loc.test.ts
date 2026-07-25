@@ -30,7 +30,7 @@ describe("Sim CDK BucketDeployment local integration", () => {
     await projectDirectory.writeFile("public/foo/index.html", "<h1>Foo</h1>");
 
     // And a CDK stack with a BucketDeployment resource.
-    const publicDir = projectDirectory.join("public");
+    const publicDirectory = projectDirectory.join("public");
     const cdkProject = new TestCdkProject({ projectDirectory });
     await cdkProject.writeCdkAppFile(
       `
@@ -46,7 +46,7 @@ const bucket = new s3.Bucket(stack, "SiteBucket", {
   websiteIndexDocument: "index.html",
 });
 new s3deploy.BucketDeployment(stack, "DeploySite", {
-  sources: [s3deploy.Source.asset(${JSON.stringify(publicDir)})],
+  sources: [s3deploy.Source.asset(${JSON.stringify(publicDirectory)})],
   destinationBucket: bucket,
   prune: true,
 });
@@ -74,14 +74,14 @@ app.synth();
     const websiteRoot = srv.localUrl(websiteUrlOut).toString().trimEnd();
 
     // Then we should be able to fetch the objects from the local sim server.
-    const rootRes = await fetch(websiteRoot);
-    assertIdentical(rootRes.status, 200);
-    assertStringIncludes(rootRes.headers.get("content-type"), "text/html");
-    assertStringIncludes(await rootRes.text(), "<h1>Root</h1>");
+    const rootResponse = await fetch(websiteRoot);
+    assertIdentical(rootResponse.status, 200);
+    assertStringIncludes(rootResponse.headers.get("content-type"), "text/html");
+    assertStringIncludes(await rootResponse.text(), "<h1>Root</h1>");
 
-    const fooRes = await fetch(`${websiteRoot}foo/`);
-    assertIdentical(fooRes.status, 200);
-    assertStringIncludes(fooRes.headers.get("content-type"), "text/html");
-    assertStringIncludes(await fooRes.text(), "<h1>Foo</h1>");
+    const fooResponse = await fetch(`${websiteRoot}foo/`);
+    assertIdentical(fooResponse.status, 200);
+    assertStringIncludes(fooResponse.headers.get("content-type"), "text/html");
+    assertStringIncludes(await fooResponse.text(), "<h1>Foo</h1>");
   });
 });

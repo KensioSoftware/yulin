@@ -7,27 +7,27 @@ import { CreateRoleCommandHandler } from "./create-role/create-role.handler.js";
 import type {
   SimCreateRoleCommand,
   SimCreateRoleCommandOutput,
-} from "./create-role/create-role.cmd.js";
+} from "./create-role/create-role.command.js";
 import { GetRoleCommandHandler } from "./get-role/get-role.handler.js";
 import type {
   SimGetRoleCommand,
   SimGetRoleCommandOutput,
-} from "./get-role/get-role.cmd.js";
+} from "./get-role/get-role.command.js";
 import { ListRolesCommandHandler } from "./list-roles/list-roles.handler.js";
 import type {
   SimListRolesCommand,
   SimListRolesCommandOutput,
-} from "./list-roles/list-roles.cmd.js";
+} from "./list-roles/list-roles.command.js";
 import { PutRolePolicyCommandHandler } from "../policy/put-role-policy/put-role-policy.handler.js";
 import type {
   SimPutRolePolicyCommand,
   SimPutRolePolicyCommandOutput,
-} from "../policy/put-role-policy/put-role-policy.cmd.js";
+} from "../policy/put-role-policy/put-role-policy.command.js";
 import { AttachRolePolicyCommandHandler } from "./attach-role-policy/attach-role-policy.handler.js";
 import type {
   SimAttachRolePolicyCommand,
   SimAttachRolePolicyCommandOutput,
-} from "./attach-role-policy/attach-role-policy.cmd.js";
+} from "./attach-role-policy/attach-role-policy.command.js";
 
 interface SimIamRoleCommandHandlersProperties {
   readonly accountId: SimAwsAccountId;

@@ -5,7 +5,7 @@ import type { SimIamRoleName } from "../../../iam/role/sim-iam-role.js";
 import type {
   SimCreateFunctionCommandInput,
   SimLambdaFunctionCode,
-} from "../../command/create-function/create-function.cmd.js";
+} from "../../command/create-function/create-function.command.js";
 import { SimCfnLambdaFunctionCodeParser } from "./sim-cfn-lambda-function-code-parser.js";
 import { SimCfnLambdaPropertyParser } from "./sim-cfn-lambda-property-parser.js";
 

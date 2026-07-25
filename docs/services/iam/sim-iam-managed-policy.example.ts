@@ -12,7 +12,7 @@ import { SimAws } from "@kensio/yulin";
 const simAws = new SimAws();
 const simIam = simAws.account("123456789012").iam();
 
-const createPolicyOutput = await simIam.createPolicy(
+const policyCreation = await simIam.createPolicy(
   new CreatePolicyCommand({
     PolicyName: "ReadOnlyReports",
     Path: "/service-role/",
@@ -27,7 +27,7 @@ const createPolicyOutput = await simIam.createPolicy(
   }),
 );
 
-const createRoleOutput = await simIam.createRole(
+const roleCreation = await simIam.createRole(
   new CreateRoleCommand({
     RoleName: "ReportingRole",
     AssumeRolePolicyDocument: JSON.stringify({
@@ -44,15 +44,15 @@ const createRoleOutput = await simIam.createRole(
 await simIam.attachRolePolicy(
   new AttachRolePolicyCommand({
     RoleName: "ReportingRole",
-    PolicyArn: createPolicyOutput.Policy.Arn,
+    PolicyArn: policyCreation.Policy.Arn,
   }),
 );
 
 const decision = simIam.authorize({
   action: "s3:GetObject",
   resource: "arn:aws:s3:::reports-bucket/2026/summary.csv",
-  caller: { kind: "arn", arn: createRoleOutput.Role.Arn },
+  caller: { kind: "arn", arn: roleCreation.Role.Arn },
 });
 
-console.log(createPolicyOutput.Policy.Arn);
+console.log(policyCreation.Policy.Arn);
 console.log(decision.isAllowed);

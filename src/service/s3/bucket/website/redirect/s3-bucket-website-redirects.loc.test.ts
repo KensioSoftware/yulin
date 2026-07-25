@@ -46,14 +46,14 @@ describe("Serve simulated S3 Bucket static website on localhost", () => {
       }),
     );
 
-    const res = await fetch(
+    const response = await fetch(
       `http://folder-index-redirect-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/docs`,
       { redirect: "manual" },
     );
 
-    assertIdentical(res.status, 301);
+    assertIdentical(response.status, 301);
     assertIdentical(
-      res.headers.get("location"),
+      response.headers.get("location"),
       `http://folder-index-redirect-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/docs/`,
     );
   });
@@ -86,14 +86,14 @@ describe("Serve simulated S3 Bucket static website on localhost", () => {
       }),
     );
 
-    const res = await fetch(
+    const response = await fetch(
       `http://missing-redirect-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/missing.html`,
       { redirect: "manual" },
     );
 
-    assertIdentical(res.status, 302);
+    assertIdentical(response.status, 302);
     assertIdentical(
-      res.headers.get("location"),
+      response.headers.get("location"),
       `http://missing-redirect-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/not-found.html`,
     );
   });
@@ -133,14 +133,14 @@ describe("Serve simulated S3 Bucket static website on localhost", () => {
       }),
     );
 
-    const res = await fetch(
+    const response = await fetch(
       `http://index-before-rule-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/docs/`,
       { redirect: "manual" },
     );
 
-    assertIdentical(res.status, 200);
-    assertIdentical(res.headers.get("location"), null);
-    assertIdentical(await res.text(), "<h1>Docs index</h1>");
+    assertIdentical(response.status, 200);
+    assertIdentical(response.headers.get("location"), null);
+    assertIdentical(await response.text(), "<h1>Docs index</h1>");
   });
 
   it("redirects all requests when RedirectAllRequestsTo is configured", async () => {
@@ -161,14 +161,14 @@ describe("Serve simulated S3 Bucket static website on localhost", () => {
       }),
     );
 
-    const res = await fetch(
+    const response = await fetch(
       `http://redirect-all-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/docs/page.html`,
       { redirect: "manual" },
     );
 
-    assertIdentical(res.status, 301);
+    assertIdentical(response.status, 301);
     assertIdentical(
-      res.headers.get("location"),
+      response.headers.get("location"),
       "https://example.test/docs/page.html",
     );
   });

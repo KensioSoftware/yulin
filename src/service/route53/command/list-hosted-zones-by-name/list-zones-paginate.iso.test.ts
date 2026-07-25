@@ -84,14 +84,14 @@ describe("Route53 ListHostedZonesByNameCommand", () => {
     assertNonNullable(firstHostedZoneId, "First Hosted Zone ID");
     assertNonNullable(secondHostedZoneId, "Second Hosted Zone ID");
 
-    const markerHostedZoneId =
-      firstHostedZoneId.localeCompare(secondHostedZoneId) < 0
-        ? firstHostedZoneId
-        : secondHostedZoneId;
-    const nextHostedZoneId =
-      markerHostedZoneId === firstHostedZoneId
-        ? secondHostedZoneId
-        : firstHostedZoneId;
+    // Hosted Zone IDs are generated, so sort the pair the same way the command
+    // orders duplicate names to know which one a marker starts from.
+    const [markerHostedZoneId, nextHostedZoneId] = [
+      firstHostedZoneId,
+      secondHostedZoneId,
+    ].toSorted((left, right) => left.localeCompare(right));
+    assertNonNullable(markerHostedZoneId, "Marker Hosted Zone ID");
+    assertNonNullable(nextHostedZoneId, "Next Hosted Zone ID");
 
     // When Hosted Zones are listed from a duplicate-name HostedZoneId marker.
     const listHostedZonesOutput = await simRoute53.listHostedZonesByName(

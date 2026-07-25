@@ -10,12 +10,12 @@ describe("Sim IAM User authorization", () => {
     const accountId = makeSimAwsAccountId();
     const simAws = new SimAws();
     const simIam = simAws.account(accountId).iam();
-    const createUserOutput = await simIam.createUser(
+    const userCreation = await simIam.createUser(
       new CreateUserCommand({
         UserName: "ResourcePolicyUser",
       }),
     );
-    const userArn = createUserOutput.User.Arn;
+    const userArn = userCreation.User.Arn;
     assertNonNullable(userArn);
 
     // When the User requests the resource allowed by the policy.
@@ -52,13 +52,13 @@ describe("Sim IAM User authorization", () => {
     const accountId = makeSimAwsAccountId();
     const simAws = new SimAws();
     const simIam = simAws.account(accountId).iam();
-    const createUserOutput = await simIam.createUser(
+    const userCreation = await simIam.createUser(
       new CreateUserCommand({
         UserName: "ConditionalUser",
         Path: "/application/",
       }),
     );
-    const userArn = createUserOutput.User.Arn;
+    const userArn = userCreation.User.Arn;
     assertNonNullable(userArn);
 
     // When the User requests the resource without supplying condition context.
@@ -98,12 +98,12 @@ describe("Sim IAM User authorization", () => {
     const accountId = makeSimAwsAccountId();
     const simAws = new SimAws();
     const simIam = simAws.account(accountId).iam();
-    const createUserOutput = await simIam.createUser(
+    const userCreation = await simIam.createUser(
       new CreateUserCommand({
         UserName: "DifferentConditionalUser",
       }),
     );
-    const userArn = createUserOutput.User.Arn;
+    const userArn = userCreation.User.Arn;
     assertNonNullable(userArn);
 
     // When the User requests the otherwise allowed resource.

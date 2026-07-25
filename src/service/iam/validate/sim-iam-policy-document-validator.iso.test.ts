@@ -6,7 +6,7 @@ import {
 import { describe, it } from "vitest";
 import { SimIamMalformedPolicyDocument } from "../error/sim-iam.error.js";
 import type { SimIamPolicyDocument } from "../policy/sim-iam-policy.js";
-import { SimIamPolicyDocumentValidator } from "./sim-iam-policy-doc-validator.js";
+import { SimIamPolicyDocumentValidator } from "./sim-iam-policy-document-validator.js";
 
 describe("SimIamPolicyDocumentValidator", () => {
   it("accepts a valid single-statement Allow policy document", () => {

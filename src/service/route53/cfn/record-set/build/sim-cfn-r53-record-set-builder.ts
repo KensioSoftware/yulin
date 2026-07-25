@@ -3,7 +3,7 @@ import type { SimCfnTemplateValueRecord } from "../../../../cloudformation/templ
 import type {
   SimRoute53ResourceRecord,
   SimRoute53ResourceRecordSet,
-} from "../../../command/change-resource-record-sets/change-resource-record-sets.cmd.js";
+} from "../../../command/change-resource-record-sets/change-resource-record-sets.command.js";
 import type { SimRoute53RecordType } from "../../../record/sim-route53-record.js";
 import { SimCfnRoute53AliasTargetParser } from "../parse/sim-cfn-r53-alias-target-parser.js";
 import { isSimRoute53RecordType } from "../../../record/sim-route53-record-type.js";

@@ -7,7 +7,7 @@ import { describe, it } from "vitest";
 
 import { SimIamMalformedPolicyDocument } from "../../error/sim-iam.error.js";
 import type { SimIamPolicyDocument } from "../../policy/sim-iam-policy.js";
-import { SimIamTrustPolicyDocumentValidator } from "./sim-iam-trust-policy-doc-validator.js";
+import { SimIamTrustPolicyDocumentValidator } from "./sim-iam-trust-policy-document-validator.js";
 
 describe("SimIamTrustPolicyDocumentValidator", () => {
   const validator: SimIamTrustPolicyDocumentValidator =

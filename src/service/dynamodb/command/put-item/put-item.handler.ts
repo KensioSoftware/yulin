@@ -2,7 +2,7 @@ import type { CommandHandler } from "../../../../command/command-handler.js";
 import type {
   SimPutItemCommand,
   SimPutItemCommandOutput,
-} from "./put-item.cmd.js";
+} from "./put-item.command.js";
 import type {
   DynamoDbTableName as DynamoDatabaseTableName,
   SimDynamoDbTable as SimDynamoDatabaseTable,

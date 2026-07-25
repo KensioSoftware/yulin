@@ -1,5 +1,5 @@
 import { SimS3Object, SimS3ObjectMetadata } from "../../object/s3-object.js";
-import type { SimPutObjectCommand } from "./put-object.cmd.js";
+import type { SimPutObjectCommand } from "./put-object.command.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 
 /**

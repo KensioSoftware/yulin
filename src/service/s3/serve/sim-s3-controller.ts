@@ -3,8 +3,8 @@ import type {
   SimAwsServiceController,
   SimAwsServiceTarget,
 } from "../../../serve/controller/sim-service-controller.js";
-import { SimS3RequestRouter } from "./sim-s3-req-router.js";
-import { SimS3GetObjectController } from "./sim-s3-get-obj-controller.js";
+import { SimS3RequestRouter } from "./sim-s3-request-router.js";
+import { SimS3GetObjectController } from "./sim-s3-get-object-controller.js";
 
 interface SimS3ServiceControllerProperties {
   readonly simAws?: SimAws;
@@ -15,12 +15,12 @@ interface SimS3ServiceControllerProperties {
  */
 export class SimS3ServiceController implements SimAwsServiceController {
   private readonly s3Router: SimS3RequestRouter;
-  private readonly getObjectController: SimS3GetObjectController;
+  private readonly s3GetObjectController: SimS3GetObjectController;
 
   constructor(properties: SimS3ServiceControllerProperties = {}) {
     const { simAws = new SimAws() } = properties;
     this.s3Router = new SimS3RequestRouter({ simAws });
-    this.getObjectController = new SimS3GetObjectController();
+    this.s3GetObjectController = new SimS3GetObjectController();
   }
 
   /**
@@ -41,7 +41,7 @@ export class SimS3ServiceController implements SimAwsServiceController {
       });
     }
 
-    return this.getObjectController.handleRequest(
+    return this.s3GetObjectController.handleRequest(
       route.bucket,
       route.objectKey,
       request,

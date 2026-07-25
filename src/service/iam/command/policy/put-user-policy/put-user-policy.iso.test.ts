@@ -24,7 +24,7 @@ describe("IAM PutUserPolicyCommand", () => {
     const accountId = makeSimAwsAccountId();
     const simAws = new SimAws();
     const simIam = simAws.account(accountId).iam();
-    const createUserOutput = await simIam.createUser(
+    const userCreation = await simIam.createUser(
       new CreateUserCommand({
         UserName: "ApplicationUser",
       }),
@@ -49,7 +49,7 @@ describe("IAM PutUserPolicyCommand", () => {
     const decision = simIam.authorize({
       caller: {
         kind: "arn",
-        arn: createUserOutput.User.Arn,
+        arn: userCreation.User.Arn,
       },
       action: "s3:GetObject",
       resource: "arn:aws:s3:::example-bucket/object.txt",
@@ -69,7 +69,7 @@ describe("IAM PutUserPolicyCommand", () => {
     const accountId = makeSimAwsAccountId();
     const simAws = new SimAws();
     const simIam = simAws.account(accountId).iam();
-    const createUserOutput = await simIam.createUser(
+    const userCreation = await simIam.createUser(
       new CreateUserCommand({
         UserName: "ApplicationUser",
       }),
@@ -107,7 +107,7 @@ describe("IAM PutUserPolicyCommand", () => {
     const decision = simIam.authorize({
       caller: {
         kind: "arn",
-        arn: createUserOutput.User.Arn,
+        arn: userCreation.User.Arn,
       },
       action: "s3:GetObject",
       resource: "arn:aws:s3:::example-bucket/object.txt",

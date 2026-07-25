@@ -4,9 +4,9 @@ import type { SimIam } from "../../sim-iam.js";
 import type { SimIamRole, SimIamRoleName } from "../../role/sim-iam-role.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import {
-  SimCfnIamRolePropsParser as SimCfnIamRolePropertiesParser,
-  type SimCfnIamRoleProps as SimCfnIamRoleProperties,
-} from "./sim-cfn-iam-role-props-parser.js";
+  SimCfnIamRolePropertiesParser as SimCfnIamRolePropertiesParser,
+  type SimCfnIamRoleProperties as SimCfnIamRoleProperties,
+} from "./sim-cfn-iam-role-properties-parser.js";
 
 interface SimCfnIamRoleCreatorProperties {
   readonly iam: SimIam;

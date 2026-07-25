@@ -34,7 +34,7 @@ await simIam.putUserPolicy(
   }),
 );
 
-const createAccessKeyOutput = await simIam.createAccessKey(
+const accessKeyCreation = await simIam.createAccessKey(
   new CreateAccessKeyCommand({
     UserName: "ApplicationUser",
   }),
@@ -46,8 +46,8 @@ const decision = simIam.authorize({
   caller: {
     kind: "credentials",
     credentials: {
-      accessKeyId: createAccessKeyOutput.AccessKey.AccessKeyId,
-      secretAccessKey: createAccessKeyOutput.AccessKey.SecretAccessKey,
+      accessKeyId: accessKeyCreation.AccessKey.AccessKeyId,
+      secretAccessKey: accessKeyCreation.AccessKey.SecretAccessKey,
     },
   },
 });

@@ -26,11 +26,11 @@ export class SimCffRequestResponseAdapter {
   /**
    * Convert a Node fetch Response to a CFF Response.
    */
-  toCffResponse(res: Response): CloudFrontFunction.Response {
+  toCffResponse(response: Response): CloudFrontFunction.Response {
     return {
-      statusCode: res.status,
-      statusDescription: res.statusText,
-      headers: this.metadataAdapter.toCffHeaders(res.headers),
+      statusCode: response.status,
+      statusDescription: response.statusText,
+      headers: this.metadataAdapter.toCffHeaders(response.headers),
     };
   }
 
@@ -64,11 +64,11 @@ export class SimCffRequestResponseAdapter {
   /**
    * Convert a CFF Response to a Node fetch Response.
    */
-  fromCffResponse(cffRes: CloudFrontFunction.Response): Response {
-    return new Response(this.cffResponseBody(cffRes), {
-      status: cffRes.statusCode,
-      statusText: cffRes.statusDescription ?? "",
-      headers: this.metadataAdapter.fromCffHeaders(cffRes.headers, {}),
+  fromCffResponse(cffResponse: CloudFrontFunction.Response): Response {
+    return new Response(this.cffResponseBody(cffResponse), {
+      status: cffResponse.statusCode,
+      statusText: cffResponse.statusDescription ?? "",
+      headers: this.metadataAdapter.fromCffHeaders(cffResponse.headers, {}),
     });
   }
 
@@ -83,27 +83,27 @@ export class SimCffRequestResponseAdapter {
    * content-length.
    */
   fromCffViewerResponse(
-    cffRes: CloudFrontFunction.Response,
+    cffResponse: CloudFrontFunction.Response,
     originalResponse: Response,
   ): Response {
     return new Response(originalResponse.body, {
-      status: cffRes.statusCode,
-      statusText: cffRes.statusDescription ?? "",
-      headers: this.metadataAdapter.fromCffHeaders(cffRes.headers, {}),
+      status: cffResponse.statusCode,
+      statusText: cffResponse.statusDescription ?? "",
+      headers: this.metadataAdapter.fromCffHeaders(cffResponse.headers, {}),
     });
   }
 
   private cffResponseBody(
-    cffRes: CloudFrontFunction.Response,
+    cffResponse: CloudFrontFunction.Response,
   ): Buffer | string | null {
-    if (cffRes.body === undefined) {
+    if (cffResponse.body === undefined) {
       return null;
     }
 
-    if (cffRes.bodyEncoding === "base64") {
-      return Buffer.from(cffRes.body, "base64");
+    if (cffResponse.bodyEncoding === "base64") {
+      return Buffer.from(cffResponse.body, "base64");
     }
 
-    return cffRes.body;
+    return cffResponse.body;
   }
 }

@@ -1,7 +1,7 @@
 /**
  * Default configuration for serving simulated AWS on localhost.
  */
-export const simAwsLocalConf = {
+export const simAwsLocalConfig = {
   hostname: "sim-aws.localhost",
   defaultPort: 0,
   // The address the local servers bind, and the address DNS answers with for

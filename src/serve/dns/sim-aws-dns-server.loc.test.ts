@@ -12,11 +12,13 @@ import {
 } from "@aws-sdk/client-s3";
 import {
   assertArrayEquals,
+  assertFalse,
   assertIdentical,
   assertInstanceOf,
   assertStringIncludes,
   assertThrowsError,
   assertThrowsErrorAsync,
+  assertTrue,
 } from "@kensio/smartass";
 import { afterAll, beforeAll, describe, it } from "vitest";
 import { SimAws } from "../../service/aws/sim-aws.js";
@@ -79,7 +81,7 @@ describe("Simulated AWS DNS server", () => {
 
     // A Route53 name pointing at it, plus a name of a type it does not hold.
     const route53 = simAws.route53();
-    const createOutput = await route53.createHostedZone(
+    const hostedZoneCreation = await route53.createHostedZone(
       new CreateHostedZoneCommand({
         Name: "example.test",
         CallerReference: "dns-server-zone",
@@ -87,7 +89,7 @@ describe("Simulated AWS DNS server", () => {
     );
     await route53.changeResourceRecordSets(
       new ChangeResourceRecordSetsCommand({
-        HostedZoneId: createOutput.HostedZone?.Id,
+        HostedZoneId: hostedZoneCreation.HostedZone?.Id,
         ChangeBatch: {
           Changes: [
             {
@@ -196,7 +198,7 @@ describe("Simulated AWS DNS server", () => {
 
     // Then nothing is thrown, so teardown does not have to track whether the
     // server got as far as listening.
-    assertIdentical(true, true);
+    assertTrue(true);
   });
 
   it("falls back to another port when the preferred one is taken on UDP", async () => {
@@ -214,7 +216,7 @@ describe("Simulated AWS DNS server", () => {
 
     try {
       // Then it serves on a different port rather than failing to serve at all.
-      assertIdentical(dnsServer.port === String(occupiedPort), false);
+      assertFalse(dnsServer.port === String(occupiedPort));
 
       const fallbackResolver = new Resolver({ timeout: 1000, tries: 1 });
       fallbackResolver.setServers([`127.0.0.1:${dnsServer.port}`]);

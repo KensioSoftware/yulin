@@ -5,7 +5,7 @@ import type {
 import { SimCloudFrontRequestPipeline } from "./sim-cloudfront-request-pipeline.js";
 import {
   SimCloudFrontControllerDependenciesFactory,
-  type SimCloudFrontServiceControllerProps as SimCloudFrontServiceControllerProperties,
+  type SimCloudFrontServiceControllerProperties as SimCloudFrontServiceControllerProperties,
 } from "./dependency/sim-cf-controller-dependency.js";
 
 /**

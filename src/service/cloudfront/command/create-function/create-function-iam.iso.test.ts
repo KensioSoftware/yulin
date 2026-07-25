@@ -62,7 +62,7 @@ describe("CloudFront CreateFunctionCommand IAM authorization", () => {
     const simCloudFront = simAws.account(accountId).cloudFront();
     const functionName = "conditional-function" as SimCloudFrontFunctionName;
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ConditionalFunctionCreator",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -77,7 +77,7 @@ describe("CloudFront CreateFunctionCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
     const functionArn = `arn:aws:cloudfront::${accountId}:function/${functionName}`;
 
     await simIam.putRolePolicy(
@@ -140,7 +140,7 @@ describe("CloudFront CreateFunctionCommand IAM authorization", () => {
       "condition-denied-function" as SimCloudFrontFunctionName;
     const functionArn = `arn:aws:cloudfront::${accountId}:function/${functionName}`;
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ConditionMismatchFunctionCreator",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -155,7 +155,7 @@ describe("CloudFront CreateFunctionCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
@@ -215,7 +215,7 @@ describe("CloudFront CreateFunctionCommand IAM authorization", () => {
       "explicitly-denied-function" as SimCloudFrontFunctionName;
     const functionArn = `arn:aws:cloudfront::${accountId}:function/${functionName}`;
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "DeniedFunctionCreator",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -230,7 +230,7 @@ describe("CloudFront CreateFunctionCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({

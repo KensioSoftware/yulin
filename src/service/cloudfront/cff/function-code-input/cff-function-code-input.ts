@@ -1,6 +1,6 @@
 import type { CloudFrontFunction } from "../../typings/cloudfront-functions.namespace.js";
 import { defaultCffHandler } from "../sim-cloudfront-function.js";
-import type { SimCreateFunctionCommand } from "../../command/create-function/create-function.cmd.js";
+import type { SimCreateFunctionCommand } from "../../command/create-function/create-function.command.js";
 import vm from "node:vm";
 
 type FunctionCodeInput = SimCreateFunctionCommand["input"]["FunctionCode"];

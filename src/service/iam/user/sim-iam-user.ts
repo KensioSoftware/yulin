@@ -16,7 +16,7 @@ export interface SimIamUser extends SimIamPrincipal {
   readonly userId: SimIamUserId;
   readonly userName: SimIamUsername;
   readonly path: string;
-  readonly createDate: Date;
+  readonly creationDate: Date;
 
   /**
    * Long-lived access keys owned by this user.

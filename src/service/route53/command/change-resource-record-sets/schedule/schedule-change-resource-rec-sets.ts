@@ -1,6 +1,6 @@
 import type { BackgroundScheduler } from "../../../../../util/background/background.js";
 import type { SimRoute53HostedZone } from "../../../hosted-zone/sim-route53-hosted-zone.js";
-import type { SimRoute53Change } from "../change-resource-record-sets.cmd.js";
+import type { SimRoute53Change } from "../change-resource-record-sets.command.js";
 import {
   applyChangeResourceRecordSet,
   validateChangeResourceRecordSet,

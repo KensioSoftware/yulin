@@ -35,7 +35,7 @@ try {
     }),
   );
 
-  const createDistributionOutput = await cloudFront.createDistribution(
+  const distributionCreation = await cloudFront.createDistribution(
     new CreateDistributionCommand({
       DistributionConfig: {
         CallerReference: "route53-site-distribution",
@@ -61,17 +61,16 @@ try {
     }),
   );
 
-  const distributionHostname =
-    createDistributionOutput.Distribution!.DomainName!;
+  const distributionHostname = distributionCreation.Distribution!.DomainName!;
 
-  const createHostedZoneOutput = await route53.createHostedZone(
+  const hostedZoneCreation = await route53.createHostedZone(
     new CreateHostedZoneCommand({
       Name: "example.test",
       CallerReference: "route53-localhost-zone",
     }),
   );
 
-  const hostedZoneId = createHostedZoneOutput.HostedZone!.Id!;
+  const hostedZoneId = hostedZoneCreation.HostedZone!.Id!;
 
   await route53.changeResourceRecordSets(
     new ChangeResourceRecordSetsCommand({

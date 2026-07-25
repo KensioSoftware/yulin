@@ -8,7 +8,7 @@ import {
   type SimAcmValidationMethod,
   type SimAcmValidationRecord,
 } from "../../certificate/sim-acm-certificate.js";
-import type { SimRequestCertificateCommand } from "./request-certificate.cmd.js";
+import type { SimRequestCertificateCommand } from "./request-certificate.command.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 
 interface RequestCertificateFactoryProperties {

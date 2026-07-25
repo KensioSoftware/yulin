@@ -64,7 +64,7 @@ describe("DynamoDB PutItemCommand IAM authorization", () => {
       }),
     );
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ItemWriter",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -77,7 +77,7 @@ describe("DynamoDB PutItemCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
@@ -127,7 +127,7 @@ describe("DynamoDB PutItemCommand IAM authorization", () => {
       }),
     );
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "NoPermissionsRole",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -140,7 +140,7 @@ describe("DynamoDB PutItemCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     // When the Role attempts to put an item.
     const error = await assertThrowsErrorAsync(async () =>
@@ -182,7 +182,7 @@ describe("DynamoDB PutItemCommand IAM authorization", () => {
       }),
     );
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "DeniedItemWriter",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -195,7 +195,7 @@ describe("DynamoDB PutItemCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({

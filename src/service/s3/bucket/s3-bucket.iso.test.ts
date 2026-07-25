@@ -207,19 +207,19 @@ describe("Simulated S3 Bucket", () => {
     const simS3 = new SimS3();
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "foobar" }));
 
-    const testDir = new TemporaryDirectory();
-    await testDir.resolvePath();
-    simS3.mountBucketFilesystem("foobar", testDir.join("public"));
+    const testDirectory = new TemporaryDirectory();
+    await testDirectory.resolvePath();
+    simS3.mountBucketFilesystem("foobar", testDirectory.join("public"));
 
-    await testDir.writeFile(["public", "hello.txt"], "hello!");
+    await testDirectory.writeFile(["public", "hello.txt"], "hello!");
 
-    const getObject = await simS3.getObject(
+    const objectOut = await simS3.getObject(
       new GetObjectCommand({ Bucket: "foobar", Key: "hello.txt" }),
     );
 
-    assertInstanceOf(getObject.Body, Readable);
+    assertInstanceOf(objectOut.Body, Readable);
     assertBufferEqual(
-      await simS3BodyToBuffer(getObject.Body),
+      await simS3BodyToBuffer(objectOut.Body),
       Buffer.from("hello!"),
     );
   });

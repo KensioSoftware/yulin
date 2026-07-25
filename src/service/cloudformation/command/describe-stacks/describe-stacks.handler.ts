@@ -10,7 +10,7 @@ import type {
 import type {
   SimDescribeStacksCommand,
   SimDescribeStacksCommandOutput,
-} from "./describe-stacks.cmd.js";
+} from "./describe-stacks.command.js";
 import { SimCfnStackDescriber } from "./sim-cfn-stack-describer.js";
 
 interface DescribeStacksCommandHandlerProperties {

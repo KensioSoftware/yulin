@@ -19,7 +19,7 @@
     "test:coverage": "rm -rf './.tmp/' && vitest run --coverage",
     "test:iso": "vitest run --project isolatedTests",
     "test:local": "rm -rf './.tmp/' && vitest run --project localTests",
-    "examples:extract": "pnpm tsx scripts/mts/extract-docs-examples.mts",
+    "examples:extract": "pnpm tsx scripts/mts/extract-documentation-examples.mts",
     "examples:tsc": "tsc -p docs/tsconfig.json",
     "examples:lint": "eslint \"docs/**/*.example.ts\"",
     "examples:check": "pnpm examples:extract && pnpm examples:tsc && pnpm examples:lint",

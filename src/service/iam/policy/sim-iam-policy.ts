@@ -56,7 +56,7 @@ export interface SimIamManagedPolicy {
   readonly permissionsBoundaryUsageCount: number;
   readonly isAttachable: boolean;
   readonly description?: string | undefined;
-  readonly createDate: Date;
+  readonly creationDate: Date;
   readonly updateDate: Date;
   readonly policyDocument?: JSONString<SimIamPolicyDocument> | undefined;
 }

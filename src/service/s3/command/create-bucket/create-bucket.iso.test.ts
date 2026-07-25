@@ -19,12 +19,12 @@ describe("S3 CreateBucketCommand", () => {
 
     const simS3 = simAws.account("555555555555").s3();
 
-    const createBucketOutput = await simS3.createBucket(
+    const bucketCreation = await simS3.createBucket(
       new CreateBucketCommand({ Bucket: "foobar-bucket" }),
     );
 
-    assertIdentical(createBucketOutput.BucketArn, "arn:aws:s3:::foobar-bucket");
-    assertIdentical(createBucketOutput.Location, "/foobar-bucket");
+    assertIdentical(bucketCreation.BucketArn, "arn:aws:s3:::foobar-bucket");
+    assertIdentical(bucketCreation.Location, "/foobar-bucket");
 
     const listBucketsOutput = await simS3.listBuckets(new ListBucketsCommand());
 

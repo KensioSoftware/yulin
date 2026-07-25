@@ -19,7 +19,7 @@ describe("IAM CreateRoleCommand", () => {
     const simIam = simAws.account(accountId).iam();
 
     // When an IAM Role is created.
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "TestRole",
         Path: "/service-role/",
@@ -35,19 +35,19 @@ describe("IAM CreateRoleCommand", () => {
     );
 
     // Then the Role metadata is returned.
-    assertIdentical(createRoleOutput.Role.RoleName, "TestRole");
-    assertIdentical(createRoleOutput.Role.Path, "/service-role/");
+    assertIdentical(roleCreation.Role.RoleName, "TestRole");
+    assertIdentical(roleCreation.Role.Path, "/service-role/");
     assertIdentical(
-      createRoleOutput.Role.Description,
+      roleCreation.Role.Description,
       "Role used by CreateRoleCommand tests",
     );
     assertIdentical(
-      createRoleOutput.Role.Arn,
+      roleCreation.Role.Arn,
       `arn:aws:iam::${accountId}:role/service-role/TestRole`,
     );
-    assertStringLength(createRoleOutput.Role.RoleId, 21);
-    assertNonNullable(createRoleOutput.Role.AssumeRolePolicyDocument);
-    assertInstanceOf(createRoleOutput.Role.CreateDate, Date);
+    assertStringLength(roleCreation.Role.RoleId, 21);
+    assertNonNullable(roleCreation.Role.AssumeRolePolicyDocument);
+    assertInstanceOf(roleCreation.Role.CreateDate, Date);
   });
 
   it("defaults optional values when creating an IAM Role", async () => {
@@ -57,7 +57,7 @@ describe("IAM CreateRoleCommand", () => {
     const simIam = simAws.account(accountId).iam();
 
     // When an IAM Role is created with optional fields omitted.
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "DefaultedRole",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -71,16 +71,16 @@ describe("IAM CreateRoleCommand", () => {
     );
 
     // Then default Role values are returned.
-    assertIdentical(createRoleOutput.Role.RoleName, "DefaultedRole");
-    assertIdentical(createRoleOutput.Role.Path, "/");
+    assertIdentical(roleCreation.Role.RoleName, "DefaultedRole");
+    assertIdentical(roleCreation.Role.Path, "/");
     assertIdentical(
-      createRoleOutput.Role.Arn,
+      roleCreation.Role.Arn,
       `arn:aws:iam::${accountId}:role/DefaultedRole`,
     );
-    assertStringLength(createRoleOutput.Role.RoleId, 21);
-    assertUndefined(createRoleOutput.Role.Description);
-    assertNonNullable(createRoleOutput.Role.AssumeRolePolicyDocument);
-    assertInstanceOf(createRoleOutput.Role.CreateDate, Date);
+    assertStringLength(roleCreation.Role.RoleId, 21);
+    assertUndefined(roleCreation.Role.Description);
+    assertNonNullable(roleCreation.Role.AssumeRolePolicyDocument);
+    assertInstanceOf(roleCreation.Role.CreateDate, Date);
   });
 
   it("normalises IAM Role paths", async () => {
@@ -158,7 +158,7 @@ describe("IAM CreateRoleCommand", () => {
     const simIam = simAws.iam();
 
     // When a Role is created through the default account service.
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "AccountScopedRole",
         Path: "/application/",
@@ -174,7 +174,7 @@ describe("IAM CreateRoleCommand", () => {
 
     // Then the Role ARN includes the custom default account ID.
     assertIdentical(
-      createRoleOutput.Role.Arn,
+      roleCreation.Role.Arn,
       `arn:aws:iam::${accountId}:role/application/AccountScopedRole`,
     );
   });

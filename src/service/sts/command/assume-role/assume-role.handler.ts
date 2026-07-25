@@ -3,7 +3,7 @@ import type { SimIamAccountResolver } from "../../../iam/registry/sim-iam-accoun
 import type {
   SimAssumeRoleCommand,
   SimAssumeRoleCommandOutput,
-} from "./assume-role.cmd.js";
+} from "./assume-role.command.js";
 import {
   type BackgroundScheduler,
   BackgroundTasks,

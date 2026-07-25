@@ -29,7 +29,7 @@ describe("CloudFront CreateDistributionCommand origin", () => {
       }),
     );
 
-    const createDistributionOutput = await simCloudFront.createDistribution(
+    const distributionCreation = await simCloudFront.createDistribution(
       new CreateDistributionCommand({
         DistributionConfig: {
           CallerReference: "configured-distribution",
@@ -92,14 +92,12 @@ describe("CloudFront CreateDistributionCommand origin", () => {
       }),
     );
 
-    assertNonNullable(createDistributionOutput.Distribution);
-    assertNonNullable(createDistributionOutput.Distribution.Id);
+    assertNonNullable(distributionCreation.Distribution);
+    assertNonNullable(distributionCreation.Distribution.Id);
 
     const distribution = simCloudFront
       .getDistributions()
-      .get(
-        createDistributionOutput.Distribution.Id as SimCloudFrontDistributionId,
-      );
+      .get(distributionCreation.Distribution.Id as SimCloudFrontDistributionId);
 
     assertNonNullable(distribution);
 

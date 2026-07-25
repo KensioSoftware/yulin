@@ -71,7 +71,7 @@ describe("ACM DescribeCertificateCommand IAM authorization", () => {
       }),
     );
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "SingleCertificateReader",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -84,7 +84,7 @@ describe("ACM DescribeCertificateCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
@@ -145,7 +145,7 @@ describe("ACM DescribeCertificateCommand IAM authorization", () => {
     );
     assertNonNullable(deniedCertificate.CertificateArn);
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "DifferentCertificateReader",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -158,7 +158,7 @@ describe("ACM DescribeCertificateCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
@@ -207,7 +207,7 @@ describe("ACM DescribeCertificateCommand IAM authorization", () => {
     );
     assertNonNullable(certificate.CertificateArn);
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "ConditionMismatchCertificateReader",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -220,7 +220,7 @@ describe("ACM DescribeCertificateCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({
@@ -282,7 +282,7 @@ describe("ACM DescribeCertificateCommand IAM authorization", () => {
     );
     assertNonNullable(allowedCertificate.CertificateArn);
 
-    const createRoleOutput = await simIam.createRole(
+    const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "RestrictedCertificateReader",
         AssumeRolePolicyDocument: JSON.stringify({
@@ -295,7 +295,7 @@ describe("ACM DescribeCertificateCommand IAM authorization", () => {
         }),
       }),
     );
-    const roleArn = createRoleOutput.Role.Arn;
+    const roleArn = roleCreation.Role.Arn;
 
     await simIam.putRolePolicy(
       new PutRolePolicyCommand({

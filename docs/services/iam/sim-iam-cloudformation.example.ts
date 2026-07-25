@@ -74,10 +74,10 @@ await stack.waitForDeployComplete();
 console.log(stack.outputs.get("RoleArn")?.value);
 console.log(stack.outputs.get("PolicyArn")?.value);
 
-const getRoleOutput = await simAws.iam().getRole(
+const roleOut = await simAws.iam().getRole(
   new GetRoleCommand({
     RoleName: "LambdaExecutionRole",
   }),
 );
 
-console.log(getRoleOutput.Role.Arn);
+console.log(roleOut.Role.Arn);

@@ -16,11 +16,14 @@ describe("Temp dir helper", () => {
   it("creates a temporary directory", async () => {
     // Given the temp dir helper.
     // When a temp directory is created.
-    const tempDirPath = await makeTemporaryDirectory();
+    const temporaryDirectoryPath = await makeTemporaryDirectory();
 
     // Then it exists on disk with the expected test prefix.
-    assertDirectoryExists(tempDirPath);
-    assertStringStartsWith(path.basename(tempDirPath), "yulin-test-");
+    assertDirectoryExists(temporaryDirectoryPath);
+    assertStringStartsWith(
+      path.basename(temporaryDirectoryPath),
+      "yulin-test-",
+    );
   });
 
   it("throws when reading a TempDir path before it is resolved", () => {

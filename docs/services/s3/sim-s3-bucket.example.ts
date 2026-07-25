@@ -30,12 +30,12 @@ await simS3.putObject(
   }),
 );
 
-const getObjOut = await simS3.getObject(
+const objectOut = await simS3.getObject(
   new GetObjectCommand({
     Bucket: "foo-bucket",
     Key: "hello.txt",
   }),
 );
 
-console.log(getObjOut.Body);
-console.log(getObjOut.Metadata?.["source"]);
+console.log(objectOut.Body);
+console.log(objectOut.Metadata?.["source"]);

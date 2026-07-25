@@ -12,7 +12,7 @@ import { SimAws } from "@kensio/yulin";
 const simAws = new SimAws();
 const route53 = simAws.route53();
 
-const createHostedZoneOutput = await route53.createHostedZone(
+const hostedZoneCreation = await route53.createHostedZone(
   new CreateHostedZoneCommand({
     Name: "example.test",
     CallerReference: "example-test-zone",
@@ -23,15 +23,15 @@ const createHostedZoneOutput = await route53.createHostedZone(
   }),
 );
 
-const hostedZoneId = createHostedZoneOutput.HostedZone!.Id!;
+const hostedZoneId = hostedZoneCreation.HostedZone!.Id!;
 
 await simAws.backgroundTasksComplete();
 
-const getHostedZoneOutput = await route53.getHostedZone(
+const hostedZoneOut = await route53.getHostedZone(
   new GetHostedZoneCommand({
     Id: hostedZoneId,
   }),
 );
 
-console.log(getHostedZoneOutput.HostedZone?.Name);
-console.log(getHostedZoneOutput.HostedZone?.ResourceRecordSetCount);
+console.log(hostedZoneOut.HostedZone?.Name);
+console.log(hostedZoneOut.HostedZone?.ResourceRecordSetCount);

@@ -4,16 +4,16 @@ import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-s
 import type {
   SimCreatePolicyCommand,
   SimCreatePolicyCommandOutput,
-} from "./command/policy/create-policy/create-policy.cmd.js";
+} from "./command/policy/create-policy/create-policy.command.js";
 import type { SimIamManagedPolicy } from "./policy/sim-iam-policy.js";
 import type {
   SimGetPolicyCommand,
   SimGetPolicyCommandOutput,
-} from "./command/policy/get-policy/get-policy.cmd.js";
+} from "./command/policy/get-policy/get-policy.command.js";
 import type {
   SimListPoliciesCommand,
   SimListPoliciesCommandOutput,
-} from "./command/policy/list-policies/list-policies.cmd.js";
+} from "./command/policy/list-policies/list-policies.command.js";
 import {
   type BackgroundScheduler,
   BackgroundTasks,
@@ -21,27 +21,27 @@ import {
 import type {
   SimCreateRoleCommand,
   SimCreateRoleCommandOutput,
-} from "./command/role/create-role/create-role.cmd.js";
+} from "./command/role/create-role/create-role.command.js";
 import type {
   SimGetRoleCommand,
   SimGetRoleCommandOutput,
-} from "./command/role/get-role/get-role.cmd.js";
+} from "./command/role/get-role/get-role.command.js";
 import type { SimIamRole, SimIamRoleName } from "./role/sim-iam-role.js";
 import type {
   SimListRolesCommand,
   SimListRolesCommandOutput,
-} from "./command/role/list-roles/list-roles.cmd.js";
+} from "./command/role/list-roles/list-roles.command.js";
 import { SimIamRoleCommandHandlers } from "./command/role/sim-iam-role-command-handlers.js";
 import type { SimIamAuthorizationInput } from "./authorize/context/sim-iam-auth-z-context-builder.js";
 import type { SimIamPolicyDecision } from "./authorize/sim-iam-decision.js";
 import type {
   SimPutRolePolicyCommand,
   SimPutRolePolicyCommandOutput,
-} from "./command/policy/put-role-policy/put-role-policy.cmd.js";
+} from "./command/policy/put-role-policy/put-role-policy.command.js";
 import type {
   SimAttachRolePolicyCommand,
   SimAttachRolePolicyCommandOutput,
-} from "./command/role/attach-role-policy/attach-role-policy.cmd.js";
+} from "./command/role/attach-role-policy/attach-role-policy.command.js";
 import { SimIamCredentialRegistry } from "./credential/sim-iam-credential-registry.js";
 import {
   SimIamRandomSessionCredentialGenerator,
@@ -56,11 +56,11 @@ import type { SimIamUser, SimIamUsername } from "./user/sim-iam-user.js";
 import type {
   SimCreateUserCommand,
   SimCreateUserCommandOutput,
-} from "./command/user/create-user/create-user.cmd.js";
+} from "./command/user/create-user/create-user.command.js";
 import type {
   SimCreateAccessKeyCommand,
   SimCreateAccessKeyCommandOutput,
-} from "./command/user/create-access-key/create-access-key.cmd.js";
+} from "./command/user/create-access-key/create-access-key.command.js";
 import { SimIamUserCommandHandlers } from "./command/user/sim-iam-user-command-handlers.js";
 import { SimIamPolicyCommandHandlers } from "./command/policy/sim-iam-policy-command-handlers.js";
 import { SimIamActionAuthorizer } from "./authorize/sim-iam-action-authorizer.js";
@@ -69,7 +69,7 @@ import type { SimIamRequestOptions } from "./command/sim-iam-request-options.js"
 import type {
   SimPutUserPolicyCommand,
   SimPutUserPolicyCommandOutput,
-} from "./command/policy/put-user-policy/put-user-policy.cmd.js";
+} from "./command/policy/put-user-policy/put-user-policy.command.js";
 import { SimIamCloudFormationResourceFactory } from "./cfn/sim-cfn-iam-resource-factory.js";
 import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import type { SimIamInterServiceAuthZ } from "./authorize/sim-iam-inter-service-auth-z.js";

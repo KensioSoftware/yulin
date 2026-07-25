@@ -17,7 +17,7 @@ describe("IAM CreateUserCommand", () => {
     const simIam = simAws.account(accountId).iam();
 
     // When an IAM User is created.
-    const createUserOutput = await simIam.createUser(
+    const userCreation = await simIam.createUser(
       new CreateUserCommand({
         UserName: "TestUser",
         Path: "/application/",
@@ -25,14 +25,14 @@ describe("IAM CreateUserCommand", () => {
     );
 
     // Then the important User metadata is returned.
-    assertIdentical(createUserOutput.User.UserName, "TestUser");
-    assertIdentical(createUserOutput.User.Path, "/application/");
+    assertIdentical(userCreation.User.UserName, "TestUser");
+    assertIdentical(userCreation.User.Path, "/application/");
     assertIdentical(
-      createUserOutput.User.Arn,
+      userCreation.User.Arn,
       `arn:aws:iam::${accountId}:user/application/TestUser`,
     );
-    assertStringLength(createUserOutput.User.UserId, 20);
-    assertInstanceOf(createUserOutput.User.CreateDate, Date);
+    assertStringLength(userCreation.User.UserId, 20);
+    assertInstanceOf(userCreation.User.CreateDate, Date);
   });
 
   it("defaults the IAM User path", async () => {
@@ -42,16 +42,16 @@ describe("IAM CreateUserCommand", () => {
     const simIam = simAws.account(accountId).iam();
 
     // When an IAM User is created without a path.
-    const createUserOutput = await simIam.createUser(
+    const userCreation = await simIam.createUser(
       new CreateUserCommand({
         UserName: "DefaultPathUser",
       }),
     );
 
     // Then the root path is used in the returned User.
-    assertIdentical(createUserOutput.User.Path, "/");
+    assertIdentical(userCreation.User.Path, "/");
     assertIdentical(
-      createUserOutput.User.Arn,
+      userCreation.User.Arn,
       `arn:aws:iam::${accountId}:user/DefaultPathUser`,
     );
   });
@@ -109,7 +109,7 @@ describe("IAM CreateUserCommand", () => {
     const simIam = simAws.iam();
 
     // When a User is created through the default account service.
-    const createUserOutput = await simIam.createUser(
+    const userCreation = await simIam.createUser(
       new CreateUserCommand({
         UserName: "AccountScopedUser",
         Path: "/application/",
@@ -118,7 +118,7 @@ describe("IAM CreateUserCommand", () => {
 
     // Then the User ARN includes the custom default account ID.
     assertIdentical(
-      createUserOutput.User.Arn,
+      userCreation.User.Arn,
       `arn:aws:iam::${accountId}:user/application/AccountScopedUser`,
     );
   });

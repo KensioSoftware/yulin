@@ -1,6 +1,6 @@
 import { jsonParse, type JSONString } from "../../../util/type-guard/json.js";
 import { SimIamMalformedPolicyDocument } from "../error/sim-iam.error.js";
-import { simIamPolicyDocumentStatements } from "../policy/sim-iam-pol-doc-statements.js";
+import { simIamPolicyDocumentStatements } from "../policy/sim-iam-pol-document-statements.js";
 import type { SimIamPolicyDocument } from "../policy/sim-iam-policy.js";
 
 /**

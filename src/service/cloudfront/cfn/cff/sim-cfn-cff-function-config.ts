@@ -1,5 +1,5 @@
 import type { SimCfnTemplateValue } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
-import { isCfnTemplateValueRecord } from "../../../cloudformation/resource/template/sim-cfn-templ-val-record.js";
+import { isCfnTemplateValueRecord } from "../../../cloudformation/resource/template/sim-cfn-templ-value-record.js";
 
 export type SimCfnCffRuntime = "cloudfront-js-1.0" | "cloudfront-js-2.0";
 

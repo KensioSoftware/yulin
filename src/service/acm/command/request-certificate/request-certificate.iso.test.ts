@@ -9,7 +9,7 @@ import {
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import {
-  SimAcmInvalidArgsException as SimAcmInvalidArgumentsException,
+  SimAcmInvalidArgumentsException,
   SimAcmTooManyTagsException,
 } from "../../error/sim-acm.error.js";
 import {

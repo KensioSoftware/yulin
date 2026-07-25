@@ -3,7 +3,7 @@ import type { SimAwsAccountId } from "../../../../aws/sim-aws-account.js";
 import type {
   SimCreateRoleCommand,
   SimCreateRoleCommandOutput,
-} from "./create-role.cmd.js";
+} from "./create-role.command.js";
 
 import type { SimIamPolicyDocument } from "../../../policy/sim-iam-policy.js";
 import type { JSONString } from "../../../../../util/type-guard/json.js";
@@ -27,7 +27,7 @@ export class CreateRoleRecordFactory {
    */
   makeRole(properties: MakeRoleProperties): SimIamRole {
     const { accountId, arn, path, roleName, cmd } = properties;
-    const createDate = new Date();
+    const creationDate = new Date();
 
     return {
       arn,
@@ -40,7 +40,7 @@ export class CreateRoleRecordFactory {
       assumeRolePolicyDocument: cmd.input.AssumeRolePolicyDocument as
         JSONString<SimIamPolicyDocument> | undefined,
       description: cmd.input.Description,
-      createDate,
+      creationDate,
       inlinePolicies: new Map(),
       attachedPolicyArns: new Set(),
     };
@@ -56,7 +56,7 @@ export class CreateRoleRecordFactory {
         RoleName: role.roleName,
         RoleId: role.roleId,
         Arn: role.arn,
-        CreateDate: role.createDate,
+        CreateDate: role.creationDate,
         AssumeRolePolicyDocument: role.assumeRolePolicyDocument,
         Description: role.description,
       },

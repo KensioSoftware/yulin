@@ -8,7 +8,7 @@ import { SimIamNoSuchEntity } from "../../../error/sim-iam.error.js";
 import type {
   SimGetRoleCommand,
   SimGetRoleCommandOutput,
-} from "./get-role.cmd.js";
+} from "./get-role.command.js";
 import type { SimIamRole, SimIamRoleName } from "../../../role/sim-iam-role.js";
 
 interface GetRoleCommandHandlerProperties {
@@ -60,7 +60,7 @@ export class GetRoleCommandHandler implements CommandHandler<
         RoleName: role.roleName,
         RoleId: role.roleId,
         Arn: role.arn,
-        CreateDate: role.createDate,
+        CreateDate: role.creationDate,
         AssumeRolePolicyDocument: role.assumeRolePolicyDocument,
         Description: role.description,
       },

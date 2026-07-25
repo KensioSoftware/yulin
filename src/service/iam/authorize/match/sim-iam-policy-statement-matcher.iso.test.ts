@@ -6,7 +6,7 @@ import {
   simIamAuthZResourcePolicySourceFactory,
 } from "../context/sim-iam-auth-z-context.factory.js";
 import { SimIamPolicyStatementMatcher } from "./sim-iam-policy-statement-matcher.js";
-import { simIamParsedPolicyStatementFactory } from "../../policy/parse/sim-iam-doc-parser.factory.js";
+import { simIamParsedPolicyStatementFactory } from "../../policy/parse/sim-iam-document-parser.factory.js";
 
 describe("SimIamPolicyStatementMatcher", () => {
   it("matches a resource policy Principal array when any entry matches the caller ARN", () => {

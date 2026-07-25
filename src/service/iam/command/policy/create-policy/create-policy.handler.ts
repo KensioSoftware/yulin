@@ -4,7 +4,7 @@ import type { SimAwsAccountId } from "../../../../aws/sim-aws-account.js";
 import type {
   SimCreatePolicyCommand,
   SimCreatePolicyCommandOutput,
-} from "./create-policy.cmd.js";
+} from "./create-policy.command.js";
 import {
   type BackgroundScheduler,
   BackgroundTasks,

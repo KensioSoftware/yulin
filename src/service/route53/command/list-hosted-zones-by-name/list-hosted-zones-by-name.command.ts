@@ -1,5 +1,5 @@
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
-import type { SimRoute53HostedZoneOutput } from "../create-hosted-zone/create-hosted-zone.cmd.js";
+import type { SimRoute53HostedZoneOutput } from "../create-hosted-zone/create-hosted-zone.command.js";
 
 /**
  * Minimal structural sim Route53 ListHostedZonesByName command.

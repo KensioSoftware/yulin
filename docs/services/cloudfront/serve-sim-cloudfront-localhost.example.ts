@@ -29,7 +29,7 @@ try {
     }),
   );
 
-  const createDistributionOutput = await simCloudFront.createDistribution(
+  const distributionCreation = await simCloudFront.createDistribution(
     new CreateDistributionCommand({
       DistributionConfig: {
         CallerReference: "localhost-assets-cdn",
@@ -55,7 +55,7 @@ try {
     }),
   );
 
-  const distroHostname = createDistributionOutput.Distribution!.DomainName!;
+  const distroHostname = distributionCreation.Distribution!.DomainName!;
 
   const url = srv.localUrl(`http://${distroHostname}/hello.txt`);
   const response = await fetch(url);

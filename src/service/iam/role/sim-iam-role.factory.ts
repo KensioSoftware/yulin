@@ -24,7 +24,7 @@ export const simIamRoleFactory = new DynamicFactory<SimIamRole>(() => {
     roleId: makeSimIamRoleId(),
     roleName,
     path,
-    createDate: new Date(),
+    creationDate: new Date(),
     inlinePolicies: new Map(),
     attachedPolicyArns: new Set(),
   };

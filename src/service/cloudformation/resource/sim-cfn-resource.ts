@@ -22,7 +22,7 @@ import type { SimCdkOutContext } from "../cdk/sim-cdk-out-context.js";
 import type { SimCfnExecutableResourceBinding } from "../bind/sim-cfn-exec-binding.type.js";
 import { simAwsAccountRegionScopeFactory } from "../../aws/sim-aws-account-region-scope.factory.js";
 
-export interface SimCloudFormationResourceProps {
+export interface SimCloudFormationResourceProperties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
   readonly background?: BackgroundScheduler;
   readonly logicalId?: string;
@@ -77,7 +77,7 @@ export class SimCfnResource<T extends object = object> {
   private readonly cfnResourceFactory: SimCfnServiceResourceFactory | undefined;
   private readonly resourceLogicalIds: ReadonlySet<string>;
 
-  constructor(properties: SimCloudFormationResourceProps = {}) {
+  constructor(properties: SimCloudFormationResourceProperties = {}) {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       background = new BackgroundTasks(),
@@ -235,12 +235,12 @@ export class SimCfnResource<T extends object = object> {
    * remains a lifecycle record rather than an async workflow implementation.
    */
   create(context: SimCloudFormationResourceCreateContext): Promise<void> {
-    const createOperation = new SimCfnResourceCreateOperation({
+    const creationOperation = new SimCfnResourceCreateOperation({
       background: this.background,
       resource: this,
       cfnResourceFactory: this.cfnResourceFactory,
     });
-    return createOperation.run(context);
+    return creationOperation.run(context);
   }
 
   /**

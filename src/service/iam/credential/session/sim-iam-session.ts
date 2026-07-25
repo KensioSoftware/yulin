@@ -10,7 +10,7 @@ interface SimIamSessionProperties {
   readonly role: SimIamRole;
   readonly sessionName: string;
   readonly sessionToken: string;
-  readonly createDate: Date;
+  readonly creationDate: Date;
   readonly expiration: Date;
 }
 
@@ -26,7 +26,7 @@ export class SimIamSession {
   public readonly role: SimIamRole;
   public readonly sessionName: string;
   public readonly sessionToken: string;
-  public readonly createDate: Date;
+  public readonly creationDate: Date;
   public readonly expiration: Date;
 
   constructor(properties: SimIamSessionProperties) {
@@ -38,7 +38,7 @@ export class SimIamSession {
       throw new Error("Sim IAM session token must not be empty");
     }
 
-    if (properties.expiration.getTime() <= properties.createDate.getTime()) {
+    if (properties.expiration.getTime() <= properties.creationDate.getTime()) {
       throw new Error("Sim IAM session expiration must follow its creation");
     }
 
@@ -47,7 +47,7 @@ export class SimIamSession {
     this.role = properties.role;
     this.sessionName = properties.sessionName;
     this.sessionToken = properties.sessionToken;
-    this.createDate = new Date(properties.createDate);
+    this.creationDate = new Date(properties.creationDate);
     this.expiration = new Date(properties.expiration);
   }
 

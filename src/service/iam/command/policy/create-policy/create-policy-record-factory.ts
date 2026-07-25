@@ -8,7 +8,7 @@ import { makeSimPolicyId } from "../../../policy/sim-iam-policy-arn.js";
 import type {
   SimCreatePolicyCommand,
   SimCreatePolicyCommandOutput,
-} from "./create-policy.cmd.js";
+} from "./create-policy.command.js";
 import type { JSONString } from "../../../../../util/type-guard/json.js";
 
 interface CreatePolicyRecordFactoryProperties {
@@ -50,7 +50,7 @@ export class CreatePolicyRecordFactory {
       permissionsBoundaryUsageCount: 0,
       isAttachable: true,
       description: cmd.input.Description,
-      createDate: now,
+      creationDate: now,
       updateDate: now,
       policyDocument: cmd.input.PolicyDocument as
         JSONString<SimIamPolicyDocument> | undefined,
@@ -77,7 +77,7 @@ export class CreatePolicyRecordFactory {
         PermissionsBoundaryUsageCount: policy.permissionsBoundaryUsageCount,
         IsAttachable: policy.isAttachable,
         Description: policy.description,
-        CreateDate: policy.createDate,
+        CreateDate: policy.creationDate,
         UpdateDate: policy.updateDate,
       },
     };

@@ -1,6 +1,6 @@
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
 import type { SimRoute53Record } from "../../record/sim-route53-record.js";
-import type { SimRoute53ResourceRecordSet } from "../change-resource-record-sets/change-resource-record-sets.cmd.js";
+import type { SimRoute53ResourceRecordSet } from "../change-resource-record-sets/change-resource-record-sets.command.js";
 
 type SimRoute53RecordType = SimRoute53Record["type"];
 

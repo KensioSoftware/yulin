@@ -3,9 +3,9 @@ import {
   type SimSdkCommandRoute,
   type SimSdkCommandRouter,
 } from "../../../sdk/index.js";
-import type { SimDescribeCertificateCommand } from "../command/describe-certificate/describe-certificate.cmd.js";
-import type { SimListCertificatesCommand } from "../command/list-certificates/list-certificates.cmd.js";
-import type { SimRequestCertificateCommand } from "../command/request-certificate/request-certificate.cmd.js";
+import type { SimDescribeCertificateCommand } from "../command/describe-certificate/describe-certificate.command.js";
+import type { SimListCertificatesCommand } from "../command/list-certificates/list-certificates.command.js";
+import type { SimRequestCertificateCommand } from "../command/request-certificate/request-certificate.command.js";
 import type { SimAcm } from "../sim-acm.js";
 
 /**

@@ -7,7 +7,7 @@ import { SimIam } from "@kensio/yulin/iam";
 
 const simIam = new SimIam();
 
-const createRoleOutput = await simIam.createRole(
+const roleCreation = await simIam.createRole(
   new CreateRoleCommand({
     RoleName: "StandaloneRole",
     AssumeRolePolicyDocument: JSON.stringify({
@@ -21,4 +21,4 @@ const createRoleOutput = await simIam.createRole(
   }),
 );
 
-console.log(createRoleOutput.Role.Arn);
+console.log(roleCreation.Role.Arn);

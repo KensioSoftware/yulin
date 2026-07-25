@@ -29,10 +29,13 @@ describe("Serve sim S3 Bucket on localhost with filesystem storage", () => {
   });
 
   it("reads files from filesystem and serves on localhost", async () => {
-    const testDir = new TemporaryDirectory();
-    await testDir.writeFile("public/foobar.html", "<h1>Hello</h1>");
-    await testDir.writeFile("public/index.html", "<h1>Filesystem index</h1>");
-    await testDir.writeFile(
+    const testDirectory = new TemporaryDirectory();
+    await testDirectory.writeFile("public/foobar.html", "<h1>Hello</h1>");
+    await testDirectory.writeFile(
+      "public/index.html",
+      "<h1>Filesystem index</h1>",
+    );
+    await testDirectory.writeFile(
       "public/error.html",
       "<h1>Not found on filesystem</h1>",
     );
@@ -55,38 +58,38 @@ describe("Serve sim S3 Bucket on localhost with filesystem storage", () => {
     assertNonNullable(simBucket);
     simBucket.configureSimStorage(
       new FilesystemS3BucketStorage({
-        directoryPath: testDir.join("public"),
+        directoryPath: testDirectory.join("public"),
       }),
     );
 
-    const okRes = await fetch(
+    const okResponse = await fetch(
       `http://foo-site.s3-website.${region}.sim-aws.localhost:${srv.port}/foobar.html`,
     );
-    assertIdentical(okRes.status, 200);
-    assertIdentical(okRes.headers.get("content-type"), "text/html");
-    assertIdentical(await okRes.text(), "<h1>Hello</h1>");
+    assertIdentical(okResponse.status, 200);
+    assertIdentical(okResponse.headers.get("content-type"), "text/html");
+    assertIdentical(await okResponse.text(), "<h1>Hello</h1>");
 
-    const indexRes = await fetch(
+    const indexResponse = await fetch(
       `http://foo-site.s3-website.${region}.sim-aws.localhost:${srv.port}/`,
     );
-    assertIdentical(indexRes.status, 200);
-    assertIdentical(indexRes.headers.get("content-type"), "text/html");
-    assertIdentical(await indexRes.text(), "<h1>Filesystem index</h1>");
+    assertIdentical(indexResponse.status, 200);
+    assertIdentical(indexResponse.headers.get("content-type"), "text/html");
+    assertIdentical(await indexResponse.text(), "<h1>Filesystem index</h1>");
 
-    const notFoundRes = await fetch(
+    const notFoundResponse = await fetch(
       `http://foo-site.s3-website.${region}.sim-aws.localhost:${srv.port}/does-not-exist.json`,
     );
-    assertIdentical(notFoundRes.status, 404);
-    assertIdentical(notFoundRes.headers.get("content-type"), "text/html");
+    assertIdentical(notFoundResponse.status, 404);
+    assertIdentical(notFoundResponse.headers.get("content-type"), "text/html");
     assertIdentical(
-      await notFoundRes.text(),
+      await notFoundResponse.text(),
       "<h1>Not found on filesystem</h1>",
     );
   });
 
   it("redirects extensionless filesystem folder paths to a trailing slash when an index document exists", async () => {
-    const testDir = new TemporaryDirectory();
-    await testDir.writeFile(
+    const testDirectory = new TemporaryDirectory();
+    await testDirectory.writeFile(
       ["public", "dengji", "a1", "index.html"],
       "<h1>A1 index</h1>",
     );
@@ -108,27 +111,29 @@ describe("Serve sim S3 Bucket on localhost with filesystem storage", () => {
     const simBucket = simS3.getSimBucketByName(bucketName);
     assertNonNullable(simBucket);
     simBucket.configureSimStorage(
-      new FilesystemS3BucketStorage({ directoryPath: testDir.join("public") }),
+      new FilesystemS3BucketStorage({
+        directoryPath: testDirectory.join("public"),
+      }),
     );
 
-    const redirectRes = await fetch(
+    const redirectResponse = await fetch(
       `http://folder-index-filesystem-site.s3-website.${region}.sim-aws.localhost:${srv.port}/dengji/a1`,
       { redirect: "manual" },
     );
 
-    assertIdentical(redirectRes.status, 301);
+    assertIdentical(redirectResponse.status, 301);
     assertIdentical(
-      redirectRes.headers.get("location"),
+      redirectResponse.headers.get("location"),
       `http://folder-index-filesystem-site.s3-website.${region}.sim-aws.localhost:${srv.port}/dengji/a1/`,
     );
 
-    const indexRes = await fetch(
+    const indexResponse = await fetch(
       `http://folder-index-filesystem-site.s3-website.${region}.sim-aws.localhost:${srv.port}/dengji/a1`,
     );
 
-    assertIdentical(indexRes.status, 200);
-    assertStringEndsWith(indexRes.url, "/dengji/a1/");
-    assertIdentical(indexRes.headers.get("content-type"), "text/html");
-    assertIdentical(await indexRes.text(), "<h1>A1 index</h1>");
+    assertIdentical(indexResponse.status, 200);
+    assertStringEndsWith(indexResponse.url, "/dengji/a1/");
+    assertIdentical(indexResponse.headers.get("content-type"), "text/html");
+    assertIdentical(await indexResponse.text(), "<h1>A1 index</h1>");
   });
 });

@@ -24,7 +24,7 @@ export const simIamPolicyFactory = new DynamicFactory<SimIamPolicy>(() => {
     attachmentCount: 0,
     permissionsBoundaryUsageCount: 0,
     isAttachable: true,
-    createDate: now,
+    creationDate: now,
     updateDate: now,
   };
 });

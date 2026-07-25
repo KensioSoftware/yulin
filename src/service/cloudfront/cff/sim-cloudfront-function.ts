@@ -96,13 +96,13 @@ export class SimCloudFrontFunction {
   /**
    * Run the viewer-response CFF handler on a native Request and Response.
    */
-  handleViewerResponse(request: Request, res: Response): Response {
-    const cffEvent = this.eventAdapter.toViewerResponseEvent(request, res);
+  handleViewerResponse(request: Request, response: Response): Response {
+    const cffEvent = this.eventAdapter.toViewerResponseEvent(request, response);
 
     const handlerFunction = this
       .handlerFunction as CloudFrontFunction.ViewerResponseHandler;
     const cffResult = handlerFunction(cffEvent);
 
-    return this.eventAdapter.fromViewerResponseResult(cffResult, res);
+    return this.eventAdapter.fromViewerResponseResult(cffResult, response);
   }
 }

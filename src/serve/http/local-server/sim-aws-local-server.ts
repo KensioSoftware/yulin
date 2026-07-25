@@ -1,6 +1,6 @@
 import http, { type Server } from "node:http";
 import { SimAws } from "../../../service/aws/sim-aws.js";
-import { simAwsLocalConf as simAwsLocalConfig } from "./sim-aws-local.conf.js";
+import { simAwsLocalConfig } from "./sim-aws-local.config.js";
 import { SimAwsHttp } from "../sim-aws-http.js";
 import { SimAwsLocalUrl } from "../url/sim-aws-local-url.js";
 import { waitNodeServerListen } from "./wait-node-server-listen.js";

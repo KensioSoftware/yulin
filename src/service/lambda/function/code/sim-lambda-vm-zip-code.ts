@@ -92,12 +92,20 @@ export class SimLambdaVmZipCode implements SimLambdaExecutableCode {
   /**
    * Look up the handler export, tolerating a module that exported a nullish
    * value so the lookup still reports Runtime.HandlerNotFound.
+   *
+   * Only own exports count. Walking the prototype chain would let a handler
+   * name like `index.constructor` resolve to an `Object.prototype` member and
+   * be invoked as the handler, where real Lambda reports HandlerNotFound.
    */
   private exportedHandler(moduleExports: unknown, exportName: string): unknown {
     if (moduleExports === null || moduleExports === undefined) {
       return undefined;
     }
-    return (moduleExports as Record<string, unknown>)[exportName];
+    const exportedValues = moduleExports as Record<string, unknown>;
+    if (!Object.hasOwn(exportedValues, exportName)) {
+      return undefined;
+    }
+    return Reflect.get(exportedValues, exportName);
   }
 
   private importHandlerModule(

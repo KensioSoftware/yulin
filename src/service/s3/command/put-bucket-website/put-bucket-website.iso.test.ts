@@ -128,17 +128,17 @@ describe("S3 PutBucketWebsiteCommand", () => {
 
     const bucket = simS3.getSimBucketByName("rules-site");
     assertNonNullable(bucket);
-    const res = bucket
+    const response = bucket
       .getWebsite()
       .redirectForRequestResponse(
         new Request("http://rules-site.s3-website.localhost/missing.html"),
         new Response("Missing", { status: 404 }),
       );
 
-    assertNonNullable(res);
-    assertResponseStatus(res, 301, await describeResponse(res));
+    assertNonNullable(response);
+    assertResponseStatus(response, 301, await describeResponse(response));
     assertIdentical(
-      res.headers.get("location"),
+      response.headers.get("location"),
       "http://rules-site.s3-website.localhost/not-found.html",
     );
   });

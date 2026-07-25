@@ -23,7 +23,7 @@ export interface SimIamRole extends SimIamPrincipal {
     JSONString<SimIamPolicyDocument> | undefined;
 
   readonly description?: string | undefined;
-  readonly createDate: Date;
+  readonly creationDate: Date;
 
   /**
    * Inline identity-based permissions policies stored directly on this role.

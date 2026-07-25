@@ -3,9 +3,9 @@ import {
   type SimSdkCommandRoute,
   type SimSdkCommandRouter,
 } from "../../../sdk/index.js";
-import type { SimCreateFunctionCommand } from "../command/create-function/create-function.cmd.js";
-import type { SimGetFunctionCommand } from "../command/get-function/get-function.cmd.js";
-import type { SimInvokeCommand } from "../command/invoke/invoke.cmd.js";
+import type { SimCreateFunctionCommand } from "../command/create-function/create-function.command.js";
+import type { SimGetFunctionCommand } from "../command/get-function/get-function.command.js";
+import type { SimInvokeCommand } from "../command/invoke/invoke.command.js";
 import type { SimLambda } from "../sim-lambda.js";
 
 /**

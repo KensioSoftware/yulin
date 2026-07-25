@@ -1,5 +1,5 @@
 import { DynamicFactory } from "@kensio/part-factory";
-import type { SimCloudFrontDistributionConfig } from "../command/create-distribution/create-distribution.cmd.js";
+import type { SimCloudFrontDistributionConfig } from "../command/create-distribution/create-distribution.command.js";
 import type { SimCfnTemplateValue } from "../../cloudformation/template/value/sim-cfn-template-value.js";
 
 /**

@@ -4,7 +4,7 @@ import { readdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const projectRoot = path.resolve(import.meta.dirname, "../..");
-const docsDir = path.join(projectRoot, "docs");
+const documentationDirectory = path.join(projectRoot, "docs");
 
 interface ExtractedExample {
   readonly label: string;
@@ -12,7 +12,7 @@ interface ExtractedExample {
 }
 
 async function main(): Promise<void> {
-  const readmePaths = await findReadmes(docsDir);
+  const readmePaths = await findReadmes(documentationDirectory);
 
   for (const readmePath of readmePaths) {
     const markdown = await readFile(readmePath, "utf8");
@@ -22,23 +22,23 @@ async function main(): Promise<void> {
       continue;
     }
 
-    const readmeDir = path.dirname(readmePath);
+    const readmeDirectory = path.dirname(readmePath);
 
     for (const example of examples) {
       const fileName = `${example.label}.example.ts`;
-      const outputPath = path.join(readmeDir, fileName);
+      const outputPath = path.join(readmeDirectory, fileName);
 
       await writeFile(outputPath, `${example.code.trimEnd()}\n`, "utf8");
     }
   }
 }
 
-async function findReadmes(dir: string): Promise<readonly string[]> {
-  const entries = await readdir(dir, { withFileTypes: true });
+async function findReadmes(directory: string): Promise<readonly string[]> {
+  const entries = await readdir(directory, { withFileTypes: true });
   const readmePaths: string[] = [];
 
   for (const entry of entries) {
-    const entryPath = path.join(dir, entry.name);
+    const entryPath = path.join(directory, entry.name);
 
     if (entry.isDirectory()) {
       readmePaths.push(...(await findReadmes(entryPath)));

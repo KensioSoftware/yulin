@@ -35,12 +35,12 @@ export class SimCffApplicator {
   applyViewerResponse(
     cloudFront: SimCloudFront,
     request: Request,
-    res: Response,
+    response: Response,
     behaviour: SimCloudFrontBehavior,
   ): Response {
     const viewerResponseCffArn = behaviour.functionAssociations?.viewerResponse;
     if (viewerResponseCffArn === undefined) {
-      return res;
+      return response;
     }
 
     const viewerResponseCff =
@@ -50,6 +50,6 @@ export class SimCffApplicator {
       `CloudFront Function ${viewerResponseCffArn} for viewer-response`,
     );
 
-    return viewerResponseCff.handleViewerResponse(request, res);
+    return viewerResponseCff.handleViewerResponse(request, response);
   }
 }

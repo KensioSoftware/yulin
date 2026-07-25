@@ -1,4 +1,4 @@
-import type { SimCloudFrontDistributionConfig } from "../../command/create-distribution/create-distribution.cmd.js";
+import type { SimCloudFrontDistributionConfig } from "../../command/create-distribution/create-distribution.command.js";
 import type { SimCloudFrontDistribution } from "../sim-cloudfront-distribution.js";
 import type { SimCloudFrontOriginConfigurator } from "./sim-cloud-front-origin-configurator.js";
 import type { SimCloudFrontBehaviorConfigurator } from "./sim-cloud-front-behavior-configurator.js";

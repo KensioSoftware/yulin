@@ -11,7 +11,7 @@ describe("CloudFormation Fn::GetAtt Resource value", () => {
   it("resolves a Resource GetAtt inside Fn::Join when creating another Resource", async () => {
     // Given a template where one Bucket name is built from a GetAtt to another
     // S3 Bucket Resource.
-    const getAttJoinTemplate = {
+    const attJoinTemplate = {
       Resources: {
         SourceBucket: {
           Type: "AWS::S3::Bucket",
@@ -37,7 +37,7 @@ describe("CloudFormation Fn::GetAtt Resource value", () => {
     const simAws = new SimAws();
     const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "test-stack",
-      template: getAttJoinTemplate,
+      template: attJoinTemplate,
     });
 
     // Then the GetAtt resolves during creation of the derived Bucket.

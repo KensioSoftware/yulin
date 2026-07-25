@@ -56,10 +56,10 @@ export class SimCfnCffCreator {
       properties,
       bindings: context?.bindings,
     });
-    const createInput = inputBuilder.build();
+    const functionInput = inputBuilder.build();
 
     const output = await this.cloudFront.createFunction({
-      input: createInput,
+      input: functionInput,
     });
 
     const createdFunctionName = output.FunctionSummary

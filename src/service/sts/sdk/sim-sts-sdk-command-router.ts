@@ -3,7 +3,7 @@ import {
   type SimSdkCommandRoute,
   type SimSdkCommandRouter,
 } from "../../../sdk/index.js";
-import type { SimAssumeRoleCommand } from "../command/assume-role/assume-role.cmd.js";
+import type { SimAssumeRoleCommand } from "../command/assume-role/assume-role.command.js";
 import type { SimSts } from "../sim-sts.js";
 
 /**

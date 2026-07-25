@@ -14,19 +14,19 @@ import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-sco
 import type {
   SimCreateTableCommand,
   SimCreateTableCommandOutput,
-} from "./command/create-table/create-table.cmd.js";
+} from "./command/create-table/create-table.command.js";
 import type {
   SimPutItemCommand,
   SimPutItemCommandOutput,
-} from "./command/put-item/put-item.cmd.js";
+} from "./command/put-item/put-item.command.js";
 import type {
   SimListTablesCommand,
   SimListTablesCommandOutput,
-} from "./command/list-tables/list-tables.cmd.js";
+} from "./command/list-tables/list-tables.command.js";
 import type {
   SimDescribeTableCommand,
   SimDescribeTableCommandOutput,
-} from "./command/describe-table/describe-table.cmd.js";
+} from "./command/describe-table/describe-table.command.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import type { SimAwsCaller } from "../aws/caller/sim-aws-caller.js";
 import {

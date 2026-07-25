@@ -2,7 +2,7 @@ import type {
   SimCloudFrontCacheBehaviorConfig,
   SimCloudFrontDefaultCacheBehaviorConfig,
   SimCloudFrontMethodList,
-} from "../../command/create-distribution/create-distribution.cmd.js";
+} from "../../command/create-distribution/create-distribution.command.js";
 import type { SimCloudFrontBehavior } from "../../behaviour/sim-cloud-front-behavior.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type { SimCloudFrontDistribution } from "../sim-cloudfront-distribution.js";
