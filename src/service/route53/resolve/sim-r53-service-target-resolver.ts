@@ -1,6 +1,7 @@
 import type { SimAwsServiceTarget } from "../../../serve/controller/sim-service-controller.js";
 import type { AwsRegionName } from "../../aws/sim-aws-region.js";
 import { simRoute53LogicalName } from "../local-name/sim-route53-local-name.js";
+import { simRoute53DnsHostName } from "../serve/sim-route53-dns-host.js";
 
 const s3WebsiteServiceLabel = "s3-website";
 const cloudFrontServiceLabel = "cloudfront";
@@ -34,9 +35,30 @@ export class SimRoute53ServiceTargetResolver {
     }
 
     return (
+      this.route53DnsServiceTarget(logicalName) ??
       this.s3WebsiteServiceTarget(logicalName) ??
       this.cloudFrontServiceTarget(logicalName)
     );
+  }
+
+  /**
+   * Resolve Yulin's own Route53 introspection hostname.
+   *
+   * This is checked first so the hosted-zone summary stays reachable whatever
+   * records a test has created, in the same way the built-in service hostnames
+   * below cannot be shadowed by hosted-zone records.
+   */
+  private route53DnsServiceTarget(
+    logicalName: string,
+  ): SimAwsServiceTarget | undefined {
+    if (logicalName !== simRoute53DnsHostName) {
+      return undefined;
+    }
+
+    return {
+      service: "route53",
+      resourceName: simRoute53DnsHostName,
+    };
   }
 
   /**

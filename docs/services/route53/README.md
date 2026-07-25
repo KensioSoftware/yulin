@@ -21,6 +21,7 @@ Sim Route53 currently supports:
 - Local HTTP hostname routing through `CNAME` records that point to simulated service hostnames
 - Alias records, with `AliasTarget.DNSName` stored as the record value
 - Local hostname resolution through `*.sim-aws.localhost`
+- A browser-viewable hosted zone and record summary at `dns.sim-aws.localhost`
 - CloudFormation resources:
   - `AWS::Route53::HostedZone`
   - `AWS::Route53::RecordSet`
@@ -396,6 +397,50 @@ and `WWW.EXAMPLE.TEST.` select the same starting point.
 Alias records are returned with an `AliasTarget` rather than `ResourceRecords`. The simulator stores
 an alias target as a record value plus an alias flag, so `AliasTarget.DNSName` is returned but
 `AliasTarget.HostedZoneId` is not — it is not part of the stored record.
+
+## Inspecting hosted zones in a browser
+
+A served simulated AWS environment reports its Route53 state at `dns.sim-aws.localhost`, so you can
+see which hosted zones and records exist without writing code to read them back.
+
+```typescript sim-route53-zone-summary
+/**
+ * Inspecting simulated Route53 hosted zones in a browser.
+ */
+
+import { CreateHostedZoneCommand } from "@aws-sdk/client-route-53";
+
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+
+await simAws.route53().createHostedZone(
+  new CreateHostedZoneCommand({
+    Name: "example.test",
+    CallerReference: "browsable-zone",
+  }),
+);
+
+await simAws.backgroundTasksComplete();
+
+const srv = await serveSimAws({ simAws });
+
+// Open this in a browser to see every hosted zone and record.
+console.log(`http://dns.sim-aws.localhost:${srv.port}/`);
+```
+
+The page lists each hosted zone with its ID, synchronization status and record count, then a table
+of that zone's records in Route53 DNS name order. Alias records show their target marked `(alias)`
+with an em dash in place of a TTL, because Route53 answers an alias using the TTL of whatever it
+points at.
+
+Hosted zones from every simulated Account appear, not just the default one, because Route53 name
+resolution is environment-wide even though the Route53 service object is Account-scoped.
+
+`dns.sim-aws.localhost` is where the summary is served, not a name it answers for. It is a built-in
+Yulin hostname, so it stays reachable whatever records your test creates, and it is unrelated to any
+hosted zone you might name `dns`.
 
 ## Local hostname resolution
 
