@@ -189,9 +189,6 @@ export default defineConfig(
   unicorn.configs.recommended,
   {
     rules: {
-      "unicorn/better-regex": "warn",
-      "unicorn/prevent-abbreviations": "warn",
-      "unicorn/no-non-function-verb-prefix": "warn",
       "unicorn/no-null": "off",
       "unicorn/prefer-https": "off",
       "unicorn/prefer-uint8array-base64": "off",
@@ -212,7 +209,7 @@ export default defineConfig(
         },
       ],
       "unicorn/name-replacements": [
-        "warn",
+        "error",
         {
           replacements: {
             configuration: {
