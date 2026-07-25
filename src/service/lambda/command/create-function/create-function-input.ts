@@ -3,6 +3,7 @@ import {
   requireLambdaCodeSource,
   type SimLambdaCodeSource,
 } from "../../function/code/lambda-code-source.js";
+import { requireLambdaEnvironmentVariables } from "./create-function-environment.js";
 import type { SimCreateFunctionCommand } from "./create-function.command.js";
 
 /**
@@ -17,6 +18,7 @@ export interface CreateFunctionInput {
   description: string | undefined;
   timeoutSeconds: number | undefined;
   memorySizeMb: number | undefined;
+  environmentVariables: ReadonlyMap<string, string>;
 }
 
 /**
@@ -42,5 +44,6 @@ export function requireCreateFunctionInput(
     description: input.Description,
     timeoutSeconds: input.Timeout,
     memorySizeMb: input.MemorySize,
+    environmentVariables: requireLambdaEnvironmentVariables(input.Environment),
   };
 }

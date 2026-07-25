@@ -39,11 +39,7 @@ export class SimLambdaVmZipCodeFactory {
     return new SimLambdaVmZipCode({
       archive: this.unzip(zipBytes),
       handlerName: context.handlerName,
-      environment: {
-        functionName: context.functionName,
-        regionName: context.regionName,
-        memorySizeMb: context.memorySizeMb,
-      },
+      environment: context.environment,
       sdkModuleProvider: this.vmSdkModuleProvider,
     });
   }

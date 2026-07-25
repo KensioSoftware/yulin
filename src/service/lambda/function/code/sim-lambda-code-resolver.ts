@@ -1,4 +1,5 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimLambdaEnvironment } from "../environment/sim-lambda-environment.js";
 import type { SimLambdaCodeSource } from "./lambda-code-source.js";
 import {
   type SimLambdaExecutableCode,
@@ -18,14 +19,12 @@ interface SimLambdaCodeResolverProperties {
 
 /**
  * The function details a code source is resolved for: the handler identifier
- * selecting the module and export, the AWS-like execution environment for vm
- * code, and the creating caller for S3 code fetch authorization.
+ * selecting the module and export, the execution environment for vm code, and
+ * the creating caller for S3 code fetch authorization.
  */
 export interface SimLambdaCodeResolveContext {
   readonly handlerName: string | undefined;
-  readonly functionName: string;
-  readonly regionName: string;
-  readonly memorySizeMb: number;
+  readonly environment: SimLambdaEnvironment;
   readonly caller?: SimAwsCaller | undefined;
 }
 

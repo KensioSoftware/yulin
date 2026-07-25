@@ -26,6 +26,8 @@ Sim Lambda currently supports:
 - A Node.js `vm` runtime for zip-packaged code: warm module state across invocations, relative
   requires between archived files, Node.js built-in modules, and AWS-like runtime environment
   variables
+- Per-function environment variables with `Environment.Variables`, isolated from the host process
+  and from other functions
 - Runtime-provided `@aws-sdk/*` packages inside function code, routed into the owning simulated
   AWS environment
 - Execution roles: handlers run as their execution `Role`, evaluated against simulated IAM
@@ -427,6 +429,100 @@ console.log(dryRunOutput.StatusCode);
 `Event` invocation handler errors are dropped, as sim Lambda does not simulate asynchronous
 retries or failure destinations yet.
 
+## Environment variables
+
+A function can declare its own environment variables with `Environment.Variables`, as on real
+Lambda. While the function runs, its code reads those variables from `process.env`, alongside the
+AWS-provided runtime variables (`AWS_REGION`, `AWS_LAMBDA_FUNCTION_NAME`, and the rest).
+
+```typescript sim-lambda-environment-variables
+/**
+ * Giving a simulated Lambda function its own environment variables, read by
+ * a real in-process handler function.
+ */
+
+import { CreateFunctionCommand, InvokeCommand } from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+const lambda = simAws.lambda();
+
+await lambda.createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "greeter",
+    Role: "arn:aws:iam::111111111111:role/GreeterRole",
+    Environment: {
+      Variables: { GREETING: "Hello", TABLE_NAME: "widgets" },
+    },
+    Code: {
+      ZipFile: makeLambdaZipFileInput((event: { name: string }) => ({
+        // Read inside the handler, so this sees the function's own
+        // variables rather than the ones the test process happens to have.
+        message: `${process.env["GREETING"] ?? "Hi"} ${event.name}`,
+        tableName: process.env["TABLE_NAME"],
+        region: process.env["AWS_REGION"],
+      })),
+    },
+  }),
+);
+
+const invokeOutput = await lambda.invoke(
+  new InvokeCommand({
+    FunctionName: "greeter",
+    Payload: JSON.stringify({ name: "Yulin" }),
+  }),
+);
+
+if (invokeOutput.Payload === undefined) throw new Error("No invoke Payload");
+// {"message":"Hello Yulin","tableName":"widgets","region":"eu-west-2"}
+console.log(Buffer.from(invokeOutput.Payload).toString());
+```
+
+Each function gets only the variables it declares. Variables that happen to be set in the process
+running your tests are not visible to it, so a function cannot accidentally pass because your
+shell or CI environment had the right variable set. Two functions declaring the same variable name
+with different values each see their own, including when their invocations overlap.
+
+The same applies to zip-packaged code in the vm runtime and to functions deployed from an
+`AWS::Lambda::Function` template with an `Environment` property, including ones backed by an
+[executable binding](#executable-bindings).
+
+As on real AWS, the environment variable names Lambda reserves for the runtime (`AWS_REGION`,
+`AWS_LAMBDA_FUNCTION_NAME`, `LAMBDA_TASK_ROOT` and so on) cannot be declared, and are rejected with
+`InvalidParameterValueException`.
+
+### Read environment variables inside the handler
+
+There is one thing to know about functions backed by a real in-process handler function. Because
+that handler is an ordinary function in your test process rather than code loaded into a sandbox,
+it only gets the function's own `process.env` while it is actually running.
+
+That means a variable read at module scope is read too early:
+
+```typescript
+// Evaluated when your test file imports this module, before any invocation,
+// so it sees the test process's environment, not the function's.
+const TABLE_NAME = process.env.TABLE_NAME;
+
+export const handler = async () => {
+  // Read during the invocation, so this sees the function's own value.
+  return { tableName: process.env.TABLE_NAME };
+};
+```
+
+Moving the read inside the handler is the fix, and is worth doing anyway for testability. Zip
+code in the vm runtime is unaffected, because it is imported at cold start, during an invocation.
+
+In practice this often does not come up: test suites commonly export the same variables they
+configure their functions with, and then a module-scope read gets the right value regardless. Sim
+Lambda warns on the console when that is not the case, in the two situations where the difference
+actually changes what your code sees:
+
+- a declared variable whose name the host process also sets, with a different value
+- two simulated functions declaring the same variable name with different values
+
 ## CloudFormation functions
 
 Sim CloudFormation can create Lambda functions from `AWS::Lambda::Function`, typically alongside a
@@ -606,7 +702,9 @@ Current documented limitations:
   syntax) is not supported yet.
 - Container image functions (`Code.ImageUri`) are not supported — the simulator stays Docker-free.
 - Lambda Layers are not simulated.
-- Environment variable configuration (`Environment.Variables`) is not applied.
+- Environment variables declared with `Environment.Variables` reach a real in-process handler
+  function only while it runs, so a variable read at module scope sees the host process value
+  instead. See [Environment variables](#environment-variables).
 - `Timeout` is recorded but does not interrupt handler execution.
 - `Event` invocations do not simulate retries or failure destinations; handler errors are dropped.
 - `Code.S3ObjectVersion` is accepted but ignored, as sim S3 has no object versioning yet.

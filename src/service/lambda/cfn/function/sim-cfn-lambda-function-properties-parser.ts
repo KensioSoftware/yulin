@@ -5,7 +5,9 @@ import type { SimIamRoleName } from "../../../iam/role/sim-iam-role.js";
 import type {
   SimCreateFunctionCommandInput,
   SimLambdaFunctionCode,
+  SimLambdaFunctionEnvironment,
 } from "../../command/create-function/create-function.command.js";
+import { SimCfnLambdaEnvironmentParser } from "./sim-cfn-lambda-environment-parser.js";
 import { SimCfnLambdaFunctionCodeParser } from "./sim-cfn-lambda-function-code-parser.js";
 import { SimCfnLambdaPropertyParser } from "./sim-cfn-lambda-property-parser.js";
 
@@ -18,6 +20,7 @@ export interface SimCfnLambdaFunctionProperties {
   readonly description: string | undefined;
   readonly timeoutSeconds: number | undefined;
   readonly memorySizeMb: number | undefined;
+  readonly environment: SimLambdaFunctionEnvironment | undefined;
 }
 
 /**
@@ -38,6 +41,7 @@ export function simCfnLambdaCreateFunctionInput(
     Description: functionProperties.description,
     Timeout: functionProperties.timeoutSeconds,
     MemorySize: functionProperties.memorySizeMb,
+    Environment: functionProperties.environment,
   };
 }
 
@@ -51,6 +55,7 @@ export function simCfnLambdaCreateFunctionInput(
 export class SimCfnLambdaFunctionPropertiesParser {
   private readonly propertyParser = new SimCfnLambdaPropertyParser();
   private readonly codeParser = new SimCfnLambdaFunctionCodeParser();
+  private readonly environmentParser = new SimCfnLambdaEnvironmentParser();
 
   /**
    * Parse the resolved CloudFormation properties for an AWS::Lambda::Function.
@@ -87,6 +92,10 @@ export class SimCfnLambdaFunctionPropertiesParser {
         resource,
         properties["MemorySize"],
         "MemorySize",
+      ),
+      environment: this.environmentParser.parse(
+        resource,
+        properties["Environment"],
       ),
     };
   }

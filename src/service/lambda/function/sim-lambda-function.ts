@@ -7,6 +7,7 @@ import {
   type SimLambdaExecutableCode,
   SimLambdaHandlerReferenceCode,
 } from "./code/sim-lambda-executable-code.js";
+import { SimLambdaEnvironment } from "./environment/sim-lambda-environment.js";
 import { SimLambdaHandlerRunner } from "./invoke/sim-lambda-handler-runner.js";
 import { SimLambdaInvokeContextBuilder } from "./invoke/sim-lambda-invoke-context-builder.js";
 import {
@@ -58,6 +59,7 @@ export interface SimLambdaFunctionConfiguration {
   Handler?: string | undefined;
   Runtime?: string | undefined;
   Description?: string | undefined;
+  Environment?: { Variables: Record<string, string> } | undefined;
 }
 
 interface SimLambdaFunctionProperties {
@@ -72,6 +74,7 @@ interface SimLambdaFunctionProperties {
   description?: string | undefined;
   timeoutSeconds?: number | undefined;
   memorySizeMb?: number | undefined;
+  environment?: SimLambdaEnvironment | undefined;
   runAsOwner?: SimAwsRunAsOwner;
 }
 
@@ -92,6 +95,7 @@ export class SimLambdaFunction {
   public readonly description: string | undefined;
   public readonly timeoutSeconds: number;
   public readonly memorySizeMb: number;
+  public readonly environment: SimLambdaEnvironment;
 
   #state: SimLambdaFunctionState;
   private readonly code: SimLambdaExecutableCode;
@@ -111,6 +115,7 @@ export class SimLambdaFunction {
       description,
       timeoutSeconds = DEFAULT_SIM_LAMBDA_TIMEOUT_SECONDS,
       memorySizeMb = DEFAULT_SIM_LAMBDA_MEMORY_SIZE_MB,
+      environment,
       runAsOwner = this,
     } = properties;
     this.name = name as SimLambdaFunctionName;
@@ -123,6 +128,13 @@ export class SimLambdaFunction {
     this.description = description;
     this.timeoutSeconds = timeoutSeconds;
     this.memorySizeMb = memorySizeMb;
+    this.environment =
+      environment ??
+      new SimLambdaEnvironment({
+        functionName: name,
+        regionName: accountRegionScope.regionName,
+        memorySizeMb,
+      });
     this.runAsOwner = runAsOwner;
   }
 
@@ -163,6 +175,7 @@ export class SimLambdaFunction {
       Handler: this.handlerName,
       Runtime: this.runtimeName,
       Description: this.description,
+      Environment: this.environment.configuration(),
     };
   }
 
@@ -171,8 +184,9 @@ export class SimLambdaFunction {
    *
    * The handler runs with this function's execution Role as the ambient
    * simulated caller for the run-as owner, which is the owning SimAws
-   * instance when the function was created through one. Cold-start module
-   * imports also run as the execution Role, as on real Lambda.
+   * instance when the function was created through one, and with this
+   * function's own environment variables. Cold-start module imports also run
+   * as the execution Role and with the same environment, as on real Lambda.
    *
    * Resolves with the handler result, or rejects with the handler or
    * Runtime.* cold-start error.
@@ -189,10 +203,13 @@ export class SimLambdaFunction {
       this.runAsOwner,
       { kind: "arn", arn: this.roleArn },
       async () =>
-        await this.runner.run(
-          this.code.handlerFunction(),
-          event,
-          contextBuilder,
+        await this.environment.runWith(
+          async () =>
+            await this.runner.run(
+              this.code.handlerFunction(),
+              event,
+              contextBuilder,
+            ),
         ),
     );
   }

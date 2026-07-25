@@ -16,6 +16,7 @@ import { SimLambdaCloudFormationResourceFactory } from "./cfn/sim-cfn-lambda-res
 import { CreateFunctionCommandHandler } from "./command/create-function/create-function.handler.js";
 import type { SimLambdaCodeStore } from "./function/code/store/sim-lambda-code-store.js";
 import type { SimLambdaVmSdkModuleProvider } from "./function/code/vm/sdk/sim-lambda-vm-sdk-module-provider.js";
+import { SimLambdaEnvironmentConflicts } from "./function/environment/sim-lambda-environment-conflicts.js";
 import type {
   SimLambdaFunction,
   SimLambdaFunctionMap,
@@ -63,6 +64,12 @@ export class SimLambda {
   private readonly codeStore: SimLambdaCodeStore | undefined;
   private readonly vmSdkModuleProvider:
     SimLambdaVmSdkModuleProvider | undefined;
+  /**
+   * Shared across function creations so a conflicting environment variable is
+   * only reported once for this simulated Lambda.
+   */
+  private readonly environmentConflicts = new SimLambdaEnvironmentConflicts();
+
   private readonly cfnFactory = new SimLambdaCloudFormationResourceFactory(
     this,
   );
@@ -103,6 +110,7 @@ export class SimLambda {
       background: this.background,
       codeStore: this.codeStore,
       vmSdkModuleProvider: this.vmSdkModuleProvider,
+      environmentConflicts: this.environmentConflicts,
     });
     return await handler.handle(command, options);
   }

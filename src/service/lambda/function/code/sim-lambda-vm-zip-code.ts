@@ -5,17 +5,15 @@ import {
   SimLambdaNoVmSdkModuleProvider,
   type SimLambdaVmSdkModuleProvider,
 } from "./vm/sdk/sim-lambda-vm-sdk-module-provider.js";
+import type { SimLambdaEnvironment } from "../environment/sim-lambda-environment.js";
 import type { SimLambdaExecutableCode } from "./sim-lambda-executable-code.js";
-import {
-  makeSimLambdaVmContext,
-  type SimLambdaVmEnvironment,
-} from "./vm/sim-lambda-vm-context.js";
+import { makeSimLambdaVmContext } from "./vm/sim-lambda-vm-context.js";
 import { SimLambdaVmModules } from "./vm/sim-lambda-vm-modules.js";
 
 interface SimLambdaVmZipCodeProperties {
   readonly archive: SimZipArchive;
   readonly handlerName: string;
-  readonly environment: SimLambdaVmEnvironment;
+  readonly environment: SimLambdaEnvironment;
   readonly sdkModuleProvider?: SimLambdaVmSdkModuleProvider | undefined;
 }
 

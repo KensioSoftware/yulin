@@ -114,8 +114,9 @@ Import and handler problems surface as invocation errors with the real runtime e
 archived files, Node.js built-ins from the host (as the real runtime provides them), and a minimal
 `node_modules` lookup for dependencies bundled into the archive. The `Handler` string selects the
 module and export (`index.handler`, `src/app.handler`). ES module source is not supported yet and
-fails with a clear hint. The sandbox exposes common globals and an AWS-like `process.env` with the
-standard runtime variables.
+fails with a clear hint. The sandbox exposes common globals and an AWS-like `process.env` holding
+the standard runtime variables and any declared for the function (see "Environment variables"
+below).
 
 ### Runtime-provided AWS SDK
 
@@ -161,6 +162,34 @@ callback, or using the legacy context `done`/`fail`/`succeed` methods.
   `BackgroundScheduler`; handler errors are dropped (failure destinations are not simulated yet).
 - `DryRun`: returns `204` without invoking the handler.
 
+### Environment variables
+
+`function/environment/` owns what a function runs with. `SimLambdaEnvironment` merges the
+AWS-provided runtime variables with the ones declared through `Environment.Variables`, and is built
+at creation time because vm zip code takes it into its sandbox. The reserved names real Lambda
+refuses to let function configuration override are rejected at CreateFunction
+(`command/create-function/create-function-environment.ts`), so the two sets can never collide.
+
+Zip code needs nothing special: the vm context already owns its `process` object. A function backed
+by a real in-process handler is the harder case, because that handler is a closure over its own
+module scope and reads the host `process.env` like any other code in the test run.
+`sim-lambda-process-env.ts` bridges that with `AsyncLocalStorage`: `process.env` is a plain
+configurable data property on `process`, so it is redefined once as a getter that resolves to the
+current invocation's variables while one is set, and to the untouched host environment object
+otherwise. The store follows the invocation across `await` points and keeps concurrent invocations
+apart, which swapping and restoring `process.env` around the handler call could not.
+
+This is the only place the simulator patches a process global, so it is deliberately narrow. The
+patch is only installed when a function actually declares variables, it is inert whenever no
+invocation is running, and it is never removed, since removing it would be unsafe while another
+invocation is in flight and buys nothing.
+
+The limitation it cannot reach is a read that already happened: a handler module doing
+`const TABLE = process.env.TABLE_NAME` at module scope is evaluated when the test file imports it,
+before any invocation. `SimLambdaEnvironmentConflicts` warns about that in the two cases where it
+changes what the code sees, and stays quiet otherwise (see the usage docs section on reading
+environment variables inside the handler).
+
 ### Execution role
 
 Creating a function requires an execution `Role` ARN, as on real AWS. While a handler runs,
@@ -191,8 +220,9 @@ reachable afterwards through `simAws.lambda()` and invokable via the SDK `Invoke
 
 Supported `AWS::Lambda::Function` properties: `FunctionName` (defaults to the logical ID), `Role`
 (typically a `Ref`/`Fn::GetAtt` to a same-stack `AWS::IAM::Role`), `Code`, `Handler`, `Runtime`,
-`Description`, `Timeout`, and `MemorySize`. Malformed property values fail AWS-style with a
-`TypeError` naming the property and logical ID.
+`Description`, `Timeout`, `MemorySize`, and `Environment`. Malformed property values fail AWS-style
+with a `TypeError` naming the property and logical ID, down to the individual variable for
+`Environment.Variables`.
 
 Template `Code` supports two source forms:
 
@@ -233,6 +263,7 @@ are not supported and are skipped by the CloudFormation engine with an "Unsuppor
 - container image functions (`Code.ImageUri`) — the simulator stays Docker-free
 - `UpdateFunctionCode`, versions, aliases and qualifiers
 - Lambda Layers
-- environment variable configuration (`Environment.Variables`)
+- environment variables reaching a real in-process handler's module scope (see "Environment
+  variables" above)
 - timeouts interrupting handler execution
 - asynchronous invocation retries and failure destinations
