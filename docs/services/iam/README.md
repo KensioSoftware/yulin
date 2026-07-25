@@ -459,8 +459,9 @@ expired sessions are rejected.
 
 Simulated services use sim IAM to authorize their own actions when used through `SimAws`. Route53
 commands such as `CreateHostedZoneCommand`, `GetHostedZoneCommand`,
-`ChangeResourceRecordSetsCommand`, and `ListHostedZonesByNameCommand` accept an optional caller,
-letting tests exercise real allow/deny behaviour across services.
+`ChangeResourceRecordSetsCommand`, `ListHostedZonesByNameCommand`, and
+`ListResourceRecordSetsCommand` accept an optional caller, letting tests exercise real allow/deny
+behaviour across services.
 
 ```typescript sim-iam-route53-authorization
 /**

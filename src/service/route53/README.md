@@ -57,6 +57,7 @@ Supported command areas currently include:
 - `get-hosted-zone/`
 - `list-hosted-zones-by-name/`
 - `change-resource-record-sets/`
+- `list-resource-record-sets/`
 
 The command handlers follow the same broad pattern used by other sim services:
 
@@ -149,6 +150,11 @@ The record store supports three mutation modes:
 - `upsert()` creates or replaces a name/type record
 - `delete()` removes by name/type and is tolerant of missing records
 
+Reads are `get()` for one name/type pair and `list()` for the whole zone. Both return copies, so
+callers cannot mutate hosted-zone state through a returned record. `list()` returns records in map
+insertion order rather than DNS order, because the store is a lookup structure; callers that need
+Route53 ordering sort the result themselves.
+
 The simulator does not currently model routing policies, weighted records, health checks,
 multi-value answer records, DNSSEC, or alias-specific evaluation beyond converting alias targets
 into record values for supported routing scenarios.
@@ -179,6 +185,27 @@ records and CloudFormation alias-style records through the same simple record ab
 The actual mutation is scheduled through the hosted zone's synchronization mechanism. Tests or
 CloudFormation resource creation paths that need the record to exist immediately after a scheduled
 change should wait for hosted-zone synchronization or drain the broader simulator background tasks.
+
+## ListResourceRecordSets behaviour
+
+`ListResourceRecordSetsCommandHandler` returns one Hosted Zone's records in Route53 DNS name order.
+
+DNS name order compares names from the rightmost label inwards, which puts the zone apex first and
+groups names under a shared parent together. `compareSimRoute53RecordNames` implements that
+comparison; `compareSimRoute53Records` adds the record type as a tiebreak so records sharing a name
+still have a total ordering for pagination.
+
+Pagination mirrors `ListHostedZonesByName` but markers are a name and a record type rather than a
+name and a hosted-zone ID. `StartRecordName` is normalised the same way stored record names are, so
+absolute and relative forms select the same page.
+
+Records are converted to AWS-shaped `ResourceRecordSet` output in `record-set-output.ts`. Stored
+names gain their trailing dot back at this boundary. Alias records are returned with an
+`AliasTarget` rather than `ResourceRecords`, but the alias hosted-zone ID is not stored on the
+record, so `AliasTarget.HostedZoneId` is omitted rather than invented.
+
+Authorization uses the hosted-zone ARN, matching `ChangeResourceRecordSets`, and runs before the
+hosted-zone lookup so an unauthorized caller cannot learn whether a zone ID exists.
 
 ## Hosted-zone lookup and listing
 
@@ -399,6 +426,12 @@ Useful areas:
   - CREATE/UPSERT/DELETE behaviour
   - alias target conversion
   - scheduled synchronization
+
+- `command/list-resource-record-sets/*.iso.test.ts`
+  - DNS name ordering
+  - alias and standard record output shapes
+  - name/type pagination markers
+  - hosted-zone ARN authorization
 
 - `hosted-zone/*.ts` and related tests
   - record storage invariants

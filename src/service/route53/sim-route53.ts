@@ -18,6 +18,11 @@ import type {
 } from "./command/list-hosted-zones-by-name/list-hosted-zones-by-name.cmd.js";
 import { ListHostedZonesByNameCommandHandler } from "./command/list-hosted-zones-by-name/list-hosted-zones-by-name.handler.js";
 import type {
+  SimListResourceRecordSetsCommand,
+  SimListResourceRecordSetsCommandOutput,
+} from "./command/list-resource-record-sets/list-resource-record-sets.cmd.js";
+import { ListResourceRecordSetsCommandHandler } from "./command/list-resource-record-sets/list-resource-record-sets.handler.js";
+import type {
   SimChangeResourceRecordSetsCommand,
   SimChangeResourceRecordSetsCommandOutput,
 } from "./command/change-resource-record-sets/change-resource-record-sets.cmd.js";
@@ -119,6 +124,21 @@ export class SimRoute53 {
     options?: SimRoute53RequestOptions,
   ): Promise<SimListHostedZonesByNameCommandOutput> {
     const handler = new ListHostedZonesByNameCommandHandler({
+      hostedZones: this.hostedZones,
+      iam: this.iam,
+      background: this.background,
+    });
+    return await handler.handle(command, options);
+  }
+
+  /**
+   * Handle a List Resource Record Sets command from the SDK.
+   */
+  async listResourceRecordSets(
+    command: SimListResourceRecordSetsCommand,
+    options?: SimRoute53RequestOptions,
+  ): Promise<SimListResourceRecordSetsCommandOutput> {
+    const handler = new ListResourceRecordSetsCommandHandler({
       hostedZones: this.hostedZones,
       iam: this.iam,
       background: this.background,
