@@ -260,6 +260,35 @@ describe("Simulated Route53 DNS negative answers", () => {
     assertArrayLength(answer.answers, 0);
   });
 
+  it("takes the negative answer SOA from the zone the chase ended in", async () => {
+    // Given an alias crossing from one hosted zone into another, landing on a
+    // name the second zone does not hold. An alias rather than a CNAME, because
+    // a CNAME is itself an answer and so never reaches the negative path.
+    const simAws = new SimAws();
+    await createTestZone(simAws, "example.test", [
+      {
+        name: "cdn.example.test",
+        type: "A",
+        values: ["gone.other.test"],
+        alias: true,
+      },
+    ]);
+    await createTestZone(simAws, "other.test", [
+      { name: "kept.other.test", type: "A", values: ["192.0.2.50"] },
+    ]);
+
+    // When the alias name is queried for A.
+    const answer = testAnswerer(simAws).answer(
+      testQuestion("cdn.example.test", "A"),
+    );
+
+    // Then the SOA comes from the zone authoritative for where the chase ended,
+    // which is what a resolver caches the negative answer against.
+    assertArrayLength(answer.authority, 1);
+    assertIdentical(answer.authority[0].name, "other.test");
+    assertIdentical(answer.rcode, dnsRcodes.nameError);
+  });
+
   it("uses a stored SOA record when the zone holds one", async () => {
     // Given a zone with its own SOA record at the apex.
     const simAws = new SimAws();

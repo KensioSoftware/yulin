@@ -38,9 +38,15 @@ export class SimAwsLocalServer {
    * environment is inspectable with a DNS client without anything extra to
    * discover. It binds the same port number on UDP that HTTP took on TCP, which
    * is normally free because the two protocols have separate port namespaces.
+   *
+   * HTTP binds the loopback address rather than the hostname. `sim-aws.localhost`
+   * resolves to both `::1` and `127.0.0.1`, and binding the name takes whichever
+   * the resolver returns first, which is commonly `::1`. DNS answers with the
+   * IPv4 loopback address, so binding it explicitly is what makes the address in
+   * a DNS answer one that actually serves HTTP.
    */
   async listen(port: number = simAwsLocalConfig.defaultPort): Promise<this> {
-    this.server.listen(port, this.hostname);
+    this.server.listen(port, simAwsLocalConfig.loopbackAddress);
     await waitNodeServerListen(this.server);
     await this.dnsServer.listen(Number(this.port));
     return this;

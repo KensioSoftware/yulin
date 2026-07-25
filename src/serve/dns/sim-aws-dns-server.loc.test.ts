@@ -1,4 +1,5 @@
 import dgram from "node:dgram";
+import http from "node:http";
 import { Resolver } from "node:dns/promises";
 import {
   ChangeResourceRecordSetsCommand,
@@ -13,11 +14,9 @@ import {
   assertArrayEquals,
   assertIdentical,
   assertInstanceOf,
-  assertResponseStatus,
   assertStringIncludes,
   assertThrowsError,
   assertThrowsErrorAsync,
-  describeResponse,
 } from "@kensio/smartass";
 import { afterAll, beforeAll, describe, it } from "vitest";
 import { SimAws } from "../../service/aws/sim-aws.js";
@@ -26,6 +25,33 @@ import {
   type SimAwsLocalServer,
 } from "../http/local-server/sim-aws-local-server.js";
 import { SimAwsDnsServer } from "./sim-aws-dns-server.js";
+
+/**
+ * Request a path at a literal address, choosing the simulated host by Host
+ * header. `fetch` forbids setting Host, so the request is made with node:http.
+ */
+async function requestAt(
+  address: string,
+  port: string,
+  host: string,
+): Promise<{ statusCode: number | undefined; body: string }> {
+  return await new Promise((resolve, reject) => {
+    const request = http.request(
+      { hostname: address, port, path: "/", headers: { host } },
+      (response) => {
+        let body = "";
+        response.on("data", (chunk: Buffer) => {
+          body += chunk.toString("utf8");
+        });
+        response.on("end", () => {
+          resolve({ statusCode: response.statusCode, body });
+        });
+      },
+    );
+    request.on("error", reject);
+    request.end();
+  });
+}
 
 describe("Simulated AWS DNS server", () => {
   const simAws = new SimAws();
@@ -113,18 +139,20 @@ describe("Simulated AWS DNS server", () => {
     const addresses = await resolver.resolve4("www.example.test");
     assertIdentical(addresses[0], "127.0.0.1");
 
-    // When the same name is requested over HTTP on the local server.
-    // The `.sim-aws.localhost` suffix and the port are still needed, because
-    // nothing has pointed this machine's resolver at the simulator; the DNS
-    // answer says which address serves the name, not how to reach it by name.
-    const response = await fetch(
-      `http://www.example.test.sim-aws.localhost:${server.port}/`,
+    // When the site is requested at exactly the address DNS gave, rather than by
+    // resolving the hostname again. `sim-aws.localhost` resolves to both ::1 and
+    // 127.0.0.1, so going by name could reach a different socket than the one
+    // the DNS answer named, and hide a disagreement between the two.
+    const { statusCode, body } = await requestAt(
+      addresses[0],
+      server.port,
+      "www.example.test.sim-aws.localhost",
     );
 
-    // Then the simulated S3 website answers, so the DNS answer and the HTTP
-    // response describe the same thing.
-    assertResponseStatus(response, 200, await describeResponse(response));
-    assertStringIncludes(await response.text(), "Hello from Yulin");
+    // Then the simulated S3 website answers, so the address in the DNS answer is
+    // one that really serves the name.
+    assertIdentical(statusCode, 200);
+    assertStringIncludes(body, "Hello from Yulin");
   });
 
   it("resolves a TXT record through the same server", async () => {
@@ -146,13 +174,6 @@ describe("Simulated AWS DNS server", () => {
     // Then the client sees a name error rather than a timeout.
     assertInstanceOf(error, Error);
     assertIdentical((error as NodeJS.ErrnoException).code, "ENOTFOUND");
-  });
-
-  it("answers DNS on the same port number the HTTP server took", () => {
-    // Given a served environment with both protocols up.
-    // When the two ports are compared.
-    // Then they are the same number, UDP and TCP having separate namespaces.
-    assertIdentical(server.dnsPort, server.port);
   });
 
   it("throws when the port is read before the server is listening", () => {

@@ -70,7 +70,7 @@ export class SimRoute53DnsAnswerer {
     // than as an error, which is what a resolver expects for a type a zone
     // simply does not hold.
     if (recordType === undefined) {
-      return this.negative(hostedZone, dnsRcodes.noError, []);
+      return this.negative(hostedZone, dnsRcodes.noError);
     }
 
     const chased = this.chase.chase(question.name, recordType);
@@ -87,42 +87,47 @@ export class SimRoute53DnsAnswerer {
       return { rcode: dnsRcodes.noError, answers, authority: [] };
     }
 
-    return this.negative(hostedZone, this.negativeRcode(chased.finalName), []);
-  }
+    // A CNAME can lead into another hosted zone, and the SOA a resolver caches
+    // the negative answer against has to come from whichever zone is
+    // authoritative for the name the chase ended at.
+    const finalZone = this.zoneFinder.find(chased.finalName);
 
-  /**
-   * A name the zone holds under some other record type is a no-data answer; a
-   * name it does not hold at all does not exist.
-   */
-  private negativeRcode(name: string): DnsRcode {
-    const hostedZone = this.zoneFinder.find(name);
-
-    if (hostedZone === undefined) {
-      return dnsRcodes.nameError;
+    if (finalZone === undefined) {
+      return this.negative(hostedZone, dnsRcodes.nameError);
     }
 
-    const nameExists = hostedZone.records
-      .list()
-      .some((record) => record.name === name);
-
-    if (nameExists) {
-      return dnsRcodes.noError;
-    }
-
-    return dnsRcodes.nameError;
+    return this.negative(finalZone, negativeRcode(finalZone, chased.finalName));
   }
 
   private negative(
     hostedZone: SimRoute53HostedZone,
     rcode: DnsRcode,
-    answers: readonly DnsResourceRecord[],
   ): SimRoute53DnsAnswer {
     return {
       rcode,
-      answers,
+      answers: [],
       authority: [simRoute53DnsSoaRecord(hostedZone)],
     };
   }
+}
+
+/**
+ * A name the zone holds under some other record type is a no-data answer; a
+ * name it does not hold at all does not exist.
+ */
+function negativeRcode(
+  hostedZone: SimRoute53HostedZone,
+  name: string,
+): DnsRcode {
+  const nameExists = hostedZone.records
+    .list()
+    .some((record) => record.name === name);
+
+  if (nameExists) {
+    return dnsRcodes.noError;
+  }
+
+  return dnsRcodes.nameError;
 }
 
 function refused(): SimRoute53DnsAnswer {

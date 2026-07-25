@@ -1,6 +1,9 @@
 import { SimAws } from "../../service/aws/sim-aws.js";
 import { SimRoute53DnsAnswerer } from "../../service/route53/dns/answer/sim-route53-dns-answerer.js";
-import { decodeDnsQuery } from "../../service/route53/dns/dns-query.js";
+import {
+  decodeDnsQuery,
+  type DnsQuery,
+} from "../../service/route53/dns/dns-query.js";
 import { dnsRcodes } from "../../service/route53/dns/dns-rcode.js";
 import { encodeDnsResponse } from "../../service/route53/dns/dns-response.js";
 import { dnsStandardQueryOpcode } from "../../service/route53/dns/wire/dns-header-flags.js";
@@ -34,21 +37,31 @@ export class SimAwsDns {
   /**
    * Answer a DNS query datagram.
    *
-   * This never throws. A server on a socket has to answer whatever arrives, so
-   * a datagram that cannot be read becomes a format error and an unexpected
-   * failure becomes a server failure, rather than either taking the server down.
+   * This never throws: a server on a socket has to answer whatever arrives.
+   *
+   * The two failure modes are kept apart because they mean different things to a
+   * resolver. A datagram that cannot be decoded is the sender's problem and gets
+   * a format error. A datagram that decoded fine but could not be answered — an
+   * unencodable stored record value, say — is the server's problem and gets a
+   * server failure, so a resolver does not conclude it sent something malformed.
    */
   handleQuery(message: Uint8Array): Uint8Array {
+    let query;
+
     try {
-      return this.answerQuery(message);
+      query = decodeDnsQuery(message);
     } catch {
       return this.errorResponse(message, dnsRcodes.formatError);
     }
+
+    try {
+      return this.answerQuery(query);
+    } catch {
+      return this.errorResponse(message, dnsRcodes.serverFailure);
+    }
   }
 
-  private answerQuery(message: Uint8Array): Uint8Array {
-    const query = decodeDnsQuery(message);
-
+  private answerQuery(query: DnsQuery): Uint8Array {
     if (query.opcode !== dnsStandardQueryOpcode) {
       return encodeDnsResponse({
         id: query.id,

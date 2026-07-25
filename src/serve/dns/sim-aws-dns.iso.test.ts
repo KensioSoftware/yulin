@@ -107,6 +107,48 @@ describe("Simulated AWS DNS", () => {
     assertIdentical(view.getUint16(2) & 0x0f, dnsRcodes.formatError);
   });
 
+  it("reports a query it decoded but could not answer as a server failure", async () => {
+    // Given an A record stored with a value that is not an address. Route53
+    // record changes do not validate address syntax, so this is reachable.
+    const simAws = new SimAws();
+    const route53 = simAws.route53();
+    const createOutput = await route53.createHostedZone(
+      new CreateHostedZoneCommand({
+        Name: "example.test",
+        CallerReference: "unencodable-zone",
+      }),
+    );
+    await route53.changeResourceRecordSets(
+      new ChangeResourceRecordSetsCommand({
+        HostedZoneId: createOutput.HostedZone?.Id,
+        ChangeBatch: {
+          Changes: [
+            {
+              Action: "CREATE",
+              ResourceRecordSet: {
+                Name: "api.example.test",
+                Type: "A",
+                TTL: 60,
+                ResourceRecords: [{ Value: "not-an-address" }],
+              },
+            },
+          ],
+        },
+      }),
+    );
+    await simAws.backgroundTasksComplete();
+
+    // When it is queried.
+    const response = new SimAwsDns({ simAws }).handleQuery(
+      buildQuery("api.example.test"),
+    );
+
+    // Then the failure is reported as the server's, not as a malformed query,
+    // so the resolver does not conclude it sent something wrong.
+    const view = responseView(response);
+    assertIdentical(view.getUint16(2) & 0x0f, dnsRcodes.serverFailure);
+  });
+
   it("reports an opcode other than a standard query as not implemented", () => {
     // Given an inverse query, which the simulator does not answer.
     const inverseQuery = buildQuery("api.example.test", 1);

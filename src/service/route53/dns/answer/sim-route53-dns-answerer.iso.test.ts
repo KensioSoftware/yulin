@@ -147,6 +147,33 @@ describe("Simulated Route53 DNS answers", () => {
     assertArrayEquals([...answer.answers[0].rdata], [127, 0, 0, 1]);
   });
 
+  it("answers an alias to another record under the alias owner's name", async () => {
+    // Given an alias pointing at another record in the same zone, which Route53
+    // supports alongside aliases to AWS resources.
+    const simAws = new SimAws();
+    await createTestZone(simAws, "example.test", [
+      {
+        name: "cdn.example.test",
+        type: "A",
+        values: ["origin.example.test"],
+        alias: true,
+      },
+      { name: "origin.example.test", type: "A", values: ["192.0.2.40"] },
+    ]);
+
+    // When the alias name is queried.
+    const answer = testAnswerer(simAws).answer(
+      testQuestion("cdn.example.test", "A"),
+    );
+
+    // Then the target's address is answered under the queried name. Answering it
+    // under the target name would leave a resolver with a record it did not ask
+    // for and no CNAME explaining the change of name.
+    assertArrayLength(answer.answers, 1);
+    assertIdentical(answer.answers[0].name, "cdn.example.test");
+    assertArrayEquals([...answer.answers[0].rdata], [192, 0, 2, 40]);
+  });
+
   it("answers from the most specific hosted zone holding the name", async () => {
     // Given overlapping zones that both contain the queried name.
     const simAws = new SimAws();

@@ -76,8 +76,25 @@ export class SimAwsDnsServer {
   private createSocket(): dgram.Socket {
     const socket = dgram.createSocket("udp4");
 
+    // A socket with no error listener throws on an 'error' event, which would
+    // take the process down. Nothing useful can be done about a datagram that
+    // failed to send to a client that may no longer be there, so the error is
+    // absorbed and the server keeps answering.
+    socket.on("error", () => {
+      // Nothing to do but keep serving.
+    });
+
     socket.on("message", (message, remote) => {
-      socket.send(this.dns.handleQuery(message), remote.port, remote.address);
+      // The send callback keeps a failure here from reaching the socket's error
+      // event as an unhandled one.
+      socket.send(
+        this.dns.handleQuery(message),
+        remote.port,
+        remote.address,
+        () => {
+          // Delivery failure is the client's problem, not the server's.
+        },
+      );
     });
 
     return socket;

@@ -53,9 +53,16 @@ export class SimRoute53DnsRecordChase {
       }
       visitedNames.add(currentName);
 
-      const step = this.followName(currentName, recordType, records);
+      const step = this.followName(currentName, recordType);
 
       if (step === undefined) {
+        return { records, finalName: currentName, answerName };
+      }
+
+      if (step.record !== undefined) {
+        // Answered under the name the query reached through visible records, so
+        // a record found behind an alias still carries the alias owner's name.
+        records.push({ ...step.record, name: answerName });
         return { records, finalName: currentName, answerName };
       }
 
@@ -63,6 +70,7 @@ export class SimRoute53DnsRecordChase {
         answerName = step.nextName;
       }
 
+      records.push(...step.emit);
       currentName = step.nextName;
     }
 
@@ -76,7 +84,6 @@ export class SimRoute53DnsRecordChase {
   private followName(
     name: string,
     recordType: SimRoute53RecordType,
-    records: SimRoute53Record[],
   ): ChaseStep | undefined {
     const hostedZone = this.zoneFinder.find(name);
 
@@ -90,11 +97,10 @@ export class SimRoute53DnsRecordChase {
       // An alias record holds a hostname rather than data of its own type, so
       // it is followed rather than answered, and stays out of the answer.
       if (exactRecord.alias === true) {
-        return followedTo(exactRecord.values.at(0), false);
+        return followedTo(exactRecord.values.at(0), false, []);
       }
 
-      records.push(exactRecord);
-      return undefined;
+      return { record: exactRecord, nextName: name, visible: false, emit: [] };
     }
 
     // A CNAME query wants the CNAME itself, so there is nothing to follow.
@@ -108,24 +114,28 @@ export class SimRoute53DnsRecordChase {
       return undefined;
     }
 
-    records.push(cname);
-    return followedTo(cname.values.at(0), true);
+    return followedTo(cname.values.at(0), true, [cname]);
   }
 }
 
 interface ChaseStep {
+  /** Set when the chase found the record it was looking for. */
+  readonly record?: SimRoute53Record | undefined;
   readonly nextName: string;
   /** Whether the followed record appears in the answer, as a CNAME does. */
   readonly visible: boolean;
+  /** Records the followed step contributes to the answer. */
+  readonly emit: readonly SimRoute53Record[];
 }
 
 function followedTo(
   nextName: string | undefined,
   visible: boolean,
+  emit: readonly SimRoute53Record[],
 ): ChaseStep | undefined {
   if (nextName === undefined) {
     return undefined;
   }
 
-  return { nextName, visible };
+  return { nextName, visible, emit };
 }
