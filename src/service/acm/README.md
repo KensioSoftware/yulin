@@ -12,6 +12,7 @@ certificates. It is an in-memory service for tests and local development, not a 
 - `certificate/` contains the simulated certificate model.
 - `command/` contains AWS SDK-style command handlers.
 - `validation/` contains domain validation against sim Route53.
+- `registry/` contains the simulation-wide index of ACM facades by account and Region.
 - `cfn/` contains CloudFormation support for `AWS::CertificateManager::Certificate`, including
   publishing validation records the template asks for.
 - `error/` contains ACM-specific AWS-like errors.
@@ -189,6 +190,17 @@ Waiting for issuance inside Resource creation is what makes dependent resources 
 certificate, as they would in real CloudFormation. Failing rather than leaving the Resource pending
 is a deliberate difference: real CloudFormation sits in `CREATE_IN_PROGRESS` for hours before timing
 out, which is no use in a test.
+
+## Certificate lookup from other services
+
+`SimAcmRegistry` indexes the ACM facades of one SimAws instance by account and Region. Other
+services hold only a certificate ARN, so this is how they get from that ARN back to the certificate:
+it parses the ARN with `parseSimArn`, finds the ACM for that account and Region, and reads the
+certificate from its map. CloudFront uses it to check a Distribution's viewer certificate.
+
+Every way an ARN can fail to name a certificate here returns undefined rather than throwing, because
+the caller reports the failure in its own terms. CloudFront, for instance, reports all of them as
+`InvalidViewerCertificate`, exactly as real CloudFront does.
 
 ## Background scheduling
 

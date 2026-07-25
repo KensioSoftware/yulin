@@ -18,6 +18,21 @@ export class SimCloudFrontError extends Error {
 }
 
 /**
+ * Simulated CloudFront InvalidViewerCertificate error.
+ *
+ * This is what real CloudFront returns for every way a viewer certificate can
+ * be unusable, including the common case of an ACM certificate outside
+ * us-east-1.
+ */
+export class SimCloudFrontInvalidViewerCertificate extends SimCloudFrontError {
+  public override readonly name = "InvalidViewerCertificate";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
  * Simulated CloudFront ResourceNotFoundException error.
  */
 export class SimCloudFrontResourceNotFoundException extends SimCloudFrontError {

@@ -4,6 +4,7 @@ import type {
 } from "../../../util/background/background.js";
 import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-scope.js";
 import type { SimAws } from "../sim-aws.js";
+import type { SimAcmRegistry } from "../../acm/registry/sim-acm-registry.js";
 import type { SimCloudFrontRegistry } from "../../cloudfront/registry/sim-cloud-front-registry.js";
 import { makeSimCfS3OriginResolver } from "../../cloudfront/origin/s3/sim-cf-s3-origin-resolver-factory.js";
 import { SimCloudFront } from "../../cloudfront/sim-cloudfront.js";
@@ -17,6 +18,7 @@ import { accountServiceCacheKey } from "./account-service-cache-key.js";
 interface SimAwsAccountServiceCacheProperties {
   readonly simAws: SimAws;
   readonly background: BackgroundScheduler & BackgroundCompleter;
+  readonly acmRegistry: SimAcmRegistry;
   readonly cloudFrontRegistry: SimCloudFrontRegistry;
   readonly route53Registry: SimRoute53Registry;
   readonly iamRegistry: SimIamRegistry;
@@ -45,6 +47,7 @@ interface SimAwsAccountServiceCacheProperties {
 export class SimAwsAccountServiceCache {
   private readonly simAws: SimAws;
   private readonly background: BackgroundScheduler & BackgroundCompleter;
+  private readonly acmRegistry: SimAcmRegistry;
   private readonly cloudFrontRegistry: SimCloudFrontRegistry;
   private readonly iamRegistry: SimIamRegistry;
   private readonly route53Registry: SimRoute53Registry;
@@ -61,6 +64,7 @@ export class SimAwsAccountServiceCache {
   constructor(properties: SimAwsAccountServiceCacheProperties) {
     this.simAws = properties.simAws;
     this.background = properties.background;
+    this.acmRegistry = properties.acmRegistry;
     this.cloudFrontRegistry = properties.cloudFrontRegistry;
     this.iamRegistry = properties.iamRegistry;
     this.route53Registry = properties.route53Registry;
@@ -80,6 +84,7 @@ export class SimAwsAccountServiceCache {
           cloudFrontRegistry: this.cloudFrontRegistry,
           s3OriginResolver: makeSimCfS3OriginResolver(this.simAws, scope),
           iam,
+          acmRegistry: this.acmRegistry,
           background: this.background,
         }),
     );

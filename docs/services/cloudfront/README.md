@@ -19,6 +19,7 @@ Sim CloudFront currently supports:
 - CloudFront Distribution hostnames such as `distro123.cloudfront.net`
 - Default cache Behavior and path-based cache Behaviors
 - `viewer-request` and `viewer-response` CloudFront Functions
+- Viewer certificates from sim ACM, including CloudFront's `us-east-1` requirement
 - Serving simulated CloudFront traffic on localhost with `serveSimAws`
 
 The simulator focuses on useful behavior for isolated tests and local dev rather than full
@@ -155,6 +156,79 @@ try {
 
 The Distribution domain is adapted through `server.localUrl(...)` so that the request is sent to the
 local Yulin server while preserving the simulated CloudFront hostname.
+
+## Viewer certificates
+
+A Distribution with alternate domain names needs an ACM certificate, and CloudFront is fussy about
+which one it will take. Sim CloudFront applies the same rules, so a Distribution that real
+CloudFront would reject at deploy time is rejected here first, with
+`InvalidViewerCertificate`:
+
+- the certificate must be in `us-east-1`, wherever the rest of your infrastructure lives;
+- the certificate must exist and be `ISSUED`;
+- every alternate domain name must be covered by the certificate's domain name or one of its
+  subject alternative names, with a wildcard covering exactly one label.
+
+The `us-east-1` rule is the one worth knowing about. It catches people out because nothing else in a
+stack cares, so a Distribution in `eu-west-2` with a certificate alongside it looks perfectly
+reasonable until CloudFront refuses it.
+
+```typescript sim-cloudfront-viewer-certificate
+/**
+ * Catching an ACM certificate CloudFront will not accept.
+ */
+
+import { RequestCertificateCommand } from "@aws-sdk/client-acm";
+import { CreateDistributionCommand } from "@aws-sdk/client-cloudfront";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+// A certificate alongside the rest of the stack, rather than in us-east-1.
+const requestOutput = await simAws
+  .region("eu-west-2")
+  .acm()
+  .requestCertificate(
+    new RequestCertificateCommand({ DomainName: "example.test" }),
+  );
+
+await simAws.backgroundTasksComplete();
+
+try {
+  await simAws.cloudFront().createDistribution(
+    new CreateDistributionCommand({
+      DistributionConfig: {
+        CallerReference: "site-distribution",
+        Comment: "Site distribution",
+        Enabled: true,
+        Aliases: { Quantity: 1, Items: ["example.test"] },
+        Origins: { Quantity: 0, Items: [] },
+        DefaultCacheBehavior: {
+          TargetOriginId: "origin",
+          ViewerProtocolPolicy: "redirect-to-https",
+        },
+        ViewerCertificate: {
+          ACMCertificateArn: requestOutput.CertificateArn,
+          SSLSupportMethod: "sni-only",
+        },
+      },
+    }),
+  );
+} catch (error) {
+  // InvalidViewerCertificate: ... is in eu-west-2, but CloudFront only accepts
+  // ACM Certificates in us-east-1
+  console.log((error as Error).message);
+}
+```
+
+The CloudFront API and CloudFormation capitalise this field differently, and sim CloudFront accepts
+both. SDK calls use `ACMCertificateArn` and `SSLSupportMethod`, as above.
+`AWS::CloudFront::Distribution` uses `AcmCertificateArn` and `SslSupportMethod`, so a template or
+CDK app works without changes.
+
+A Distribution using `CloudFrontDefaultCertificate` needs no ACM certificate and is not checked. A
+standalone `new SimCloudFront()` has no sim ACM to check against, so it does not check either.
 
 ## Simulated CloudFront Functions
 

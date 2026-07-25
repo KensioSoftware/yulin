@@ -22,6 +22,8 @@ import {
 } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { CreateDistributionAuthorizer } from "./create-distribution-authorizer.js";
+import type { SimAcmRegistry } from "../../../acm/registry/sim-acm-registry.js";
+import { SimCloudFrontViewerCertificateValidator } from "../../distribution/viewer-certificate/sim-cf-viewer-certificate-validator.js";
 
 interface CreateDistributionCommandHandlerProperties {
   readonly accountId: SimAwsAccountId;
@@ -32,6 +34,7 @@ interface CreateDistributionCommandHandlerProperties {
   readonly cloudFrontRegistry: SimCloudFrontRegistry;
   readonly s3OriginResolver: SimCloudFrontS3OriginResolver;
   readonly iam?: SimIamInterServiceAuthZ;
+  readonly acmRegistry?: SimAcmRegistry | undefined;
   readonly background: BackgroundScheduler;
 }
 
@@ -56,6 +59,7 @@ export class CreateDistributionCommandHandler implements CommandHandler<
   private readonly cloudFrontRegistry: SimCloudFrontRegistry;
   private readonly distributionConfigurator: SimCloudFrontDistributionConfigurator;
   private readonly authorizer: CreateDistributionAuthorizer;
+  private readonly viewerCertificateValidator: SimCloudFrontViewerCertificateValidator;
   private readonly background: BackgroundScheduler;
 
   constructor(properties: CreateDistributionCommandHandlerProperties) {
@@ -69,6 +73,10 @@ export class CreateDistributionCommandHandler implements CommandHandler<
     this.authorizer = new CreateDistributionAuthorizer({
       iam: properties.iam ?? new SimIamAllowAllAuth(),
     });
+    this.viewerCertificateValidator =
+      new SimCloudFrontViewerCertificateValidator({
+        acmRegistry: properties.acmRegistry,
+      });
     this.background = properties.background;
   }
 
@@ -94,6 +102,10 @@ export class CreateDistributionCommandHandler implements CommandHandler<
     await this.background.sequence();
 
     this.authorizer.authorize(options?.caller);
+
+    // Reject an unusable viewer certificate before any Distribution state is
+    // allocated, as CloudFront rejects the whole request.
+    this.viewerCertificateValidator.validate(distributionConfig);
 
     const distributionId = this.cloudFrontRegistry.allocateDistributionId();
     const distribution = new SimCloudFrontDistribution({
