@@ -1,14 +1,11 @@
-import http, {
-  type IncomingMessage,
-  type Server,
-  type ServerResponse,
-} from "node:http";
+import http, { type Server } from "node:http";
 import { SimAws } from "../../../service/aws/sim-aws.js";
 import { simAwsLocalConf as simAwsLocalConfig } from "./sim-aws-local.conf.js";
 import { SimAwsHttp } from "../sim-aws-http.js";
 import { SimAwsLocalUrl } from "../url/sim-aws-local-url.js";
-import { NodeFetchHttpAdapter } from "../node-fetch-http-adapter.js";
 import { waitNodeServerListen } from "./wait-node-server-listen.js";
+import { SimAwsLocalRequestHandler } from "./sim-aws-local-request-handler.js";
+import { SimAwsDnsServer } from "../../dns/sim-aws-dns-server.js";
 
 interface SimAwsLocalServerProperties {
   readonly simAws?: SimAws;
@@ -19,27 +16,33 @@ interface SimAwsLocalServerProperties {
  * Useful for local integration testing and local development.
  */
 export class SimAwsLocalServer {
-  private readonly simAwsHttp: SimAwsHttp;
-  private readonly nodeFetchHttpAdapter = new NodeFetchHttpAdapter();
+  private readonly requestHandler: SimAwsLocalRequestHandler;
   private readonly server: Server;
+  private readonly dnsServer: SimAwsDnsServer;
 
   constructor(properties: SimAwsLocalServerProperties = {}) {
     const { simAws = new SimAws() } = properties;
-    this.simAwsHttp = new SimAwsHttp({ simAws });
+    this.requestHandler = new SimAwsLocalRequestHandler(
+      new SimAwsHttp({ simAws }),
+    );
+    this.dnsServer = new SimAwsDnsServer({ simAws });
     this.server = http.createServer((request, response) => {
-      // eslint-disable-next-line unicorn/prefer-await
-      this.handleRequest(request, response).catch((error: unknown) => {
-        this.handleRequestError(error, response);
-      });
+      this.requestHandler.handle(request, response);
     });
   }
 
   /**
    * Start serving simulated AWS services on localhost.
+   *
+   * DNS comes up alongside HTTP rather than being opted into, so a served
+   * environment is inspectable with a DNS client without anything extra to
+   * discover. It binds the same port number on UDP that HTTP took on TCP, which
+   * is normally free because the two protocols have separate port namespaces.
    */
   async listen(port: number = simAwsLocalConfig.defaultPort): Promise<this> {
     this.server.listen(port, this.hostname);
     await waitNodeServerListen(this.server);
+    await this.dnsServer.listen(Number(this.port));
     return this;
   }
 
@@ -68,10 +71,22 @@ export class SimAwsLocalServer {
   }
 
   /**
+   * Get the UDP port on which DNS queries are answered.
+   *
+   * Usually the same number as `port`, but not guaranteed: if that number was
+   * already taken on UDP, DNS bound an ephemeral port instead. Read it rather
+   * than assuming the numbers match.
+   */
+  get dnsPort(): string {
+    return this.dnsServer.port;
+  }
+
+  /**
    * Stop serving simulated AWS services.
    */
   close(): void {
     this.server.close();
+    this.dnsServer.close();
   }
 
   /**
@@ -80,37 +95,6 @@ export class SimAwsLocalServer {
   localUrl(input: string | URL): URL {
     const simAwsLocalUrl = new SimAwsLocalUrl({ input, port: this.port });
     return simAwsLocalUrl.toURL();
-  }
-
-  private async handleRequest(
-    nodeRequest: IncomingMessage,
-    nodeResponse: ServerResponse,
-  ): Promise<void> {
-    const request =
-      this.nodeFetchHttpAdapter.nodeRequestToFetchRequest(nodeRequest);
-    const response = await this.simAwsHttp.handleRequest(request);
-
-    await this.nodeFetchHttpAdapter.sendFetchResponse(nodeResponse, response);
-  }
-
-  private handleRequestError(
-    error: unknown,
-    nodeResponse: ServerResponse,
-  ): void {
-    /* v8 ignore if */
-    if (nodeResponse.writableEnded) {
-      return;
-    }
-
-    if (!nodeResponse.headersSent) {
-      nodeResponse.statusCode = 400;
-      nodeResponse.setHeader("content-type", "text/plain; charset=utf-8");
-    }
-
-    const message =
-      error instanceof Error ? error.message : "HTTP request processing failed";
-
-    nodeResponse.end(message);
   }
 }
 

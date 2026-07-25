@@ -364,13 +364,13 @@ from a real resolver and encode a response it will accept. It has no sockets and
 no knowledge of hosted zones, so it is exercised entirely by unit tests plus one
 localhost test against a real client.
 
-The scope is deliberately narrow, which is what keeps the codec small:
+The scope is narrow, which is what keeps the codec small:
 
 - Only the record types sim Route53 stores are encodable: `A`, `AAAA`, `CNAME`,
   `TXT`, `NS`, `SOA`. `dns-record-type.ts` maps those to and from wire type
   numbers, and returns `undefined` for any other query type so a caller answers
   with no records rather than guessing at an encoding it does not have.
-- **`ANY` (QTYPE 255) is a query type, not a record type**, so it deliberately
+- **`ANY` (QTYPE 255) is a query type, not a record type**, so it
   does not map to a stored record type. `dnsAnyQueryType` is exported for a
   caller that wants to recognise it, but what to _answer_ for `ANY` is answer
   semantics rather than wire format, and is not the codec's decision. Note that
@@ -399,6 +399,52 @@ front of the codec and queries it with Node's own `node:dns` resolver, which is
 c-ares. That proves the encoding against an independent implementation rather
 than against the codec's own decoder. Node's resolver is used rather than `dig`
 because it needs no external package and works the same on a laptop and in CI.
+
+## DNS answer semantics
+
+`dns/answer/` turns a decoded question into the records, response code and authority section that
+answer it. It is separate from `SimRoute53Resolver`, which resolves an HTTP hostname to
+a service target: an HTTP request only needs to know which simulated service handles a host, while a
+DNS answer needs record types, CNAME chains, and the difference between a name that does not exist
+and a name holding no record of the queried type.
+
+The pieces are small and each does one thing:
+
+- `sim-route53-dns-zone-finder.ts` picks the most specific hosted zone containing a name, the same
+  longest-suffix rule the HTTP record finder uses.
+- `sim-route53-dns-record-chase.ts` walks CNAME and alias records looking for the queried type,
+  bounded by both a visited-name set and a maximum depth.
+- `sim-route53-dns-service-target.ts` synthesises an address record for a name owned by a simulated
+  service. Those hostnames are recognised by shape rather than stored, so nothing holds an address
+  for them; answering with the address the local server listens on is what makes a DNS lookup and an
+  HTTP request for the same name describe the same thing.
+- `sim-route53-dns-soa.ts` supplies the SOA a negative answer carries, using the zone's own record
+  when it has one and synthesising a Route53-shaped default when it does not.
+- `sim-route53-dns-answerer.ts` composes those and decides the response code.
+
+Two distinctions carry most of the behaviour. A name the zone holds under another type is `NOERROR`
+with no answers; a name it does not hold is `NXDOMAIN`. A name held by no zone at all is `REFUSED`,
+because the simulator is authoritative only for its own zones and cannot say a name exists nowhere.
+
+**Aliases are followed, not answered.** An alias record stores a hostname rather than data of its own
+type, so encoding one as an address would fail. The chase follows it without adding it to the answer
+and records that the answer name should stay put, so the synthesised address appears under the name
+holding the alias. That matches Route53, where an alias is transparent.
+
+## DNS serving
+
+The socket lives in `src/serve/dns/`, mirroring how HTTP splits `SimAwsHttp` from
+`SimAwsLocalServer`. `SimAwsDns` turns a query datagram into a response datagram and holds no socket,
+so it is testable without networking; `SimAwsDnsServer` owns the UDP socket.
+
+`SimAwsDns.handleQuery` never throws. A server on a socket has to answer whatever arrives, so a
+datagram that cannot be read becomes a format error rather than taking the server down, and the query
+ID is echoed even then so the resolver can match the response.
+
+`serveSimAws` brings DNS up alongside HTTP rather than making it opt-in, binding the same port number
+on UDP that HTTP took on TCP. That is usually free, the two protocols having separate port
+namespaces, but it is not guaranteed: on collision the server binds an ephemeral port and reports it
+through `dnsPort`.
 
 ## Cross-service routing role
 
