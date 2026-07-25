@@ -357,6 +357,43 @@ Rendering is split into `zone-summary/`, with the page structure in
 `sim-route53-zone-summary-page.ts` and escaping in `sim-route53-summary-html.ts`. Hosted-zone names
 and record values originate in user templates and test code, so everything rendered is escaped.
 
+## DNS wire format
+
+`dns/` holds the DNS message codec: enough of the wire format to decode a query
+from a real resolver and encode a response it will accept. It has no sockets and
+no knowledge of hosted zones, so it is exercised entirely by unit tests plus one
+localhost test against a real client.
+
+The scope is deliberately narrow, which is what keeps the codec small:
+
+- Only the record types sim Route53 stores are encodable: `A`, `AAAA`, `CNAME`,
+  `TXT`, `NS`, `SOA`. `dns-record-type.ts` maps those to and from wire type
+  numbers, and returns `undefined` for any other query type so a caller answers
+  with no records rather than guessing at an encoding it does not have.
+- **Names are always written uncompressed.** Compression is optional for a
+  message author and every resolver must accept uncompressed names, so leaving
+  it out removes the most error-prone part of the format. Compression pointers
+  found while decoding are rejected rather than followed: the only names decoded
+  are question names, which have nothing before them to point back at.
+- **EDNS0 is ignored.** Anything after the question is skipped, and no OPT record
+  is ever returned. That is how a server without EDNS support behaves, and
+  resolvers fall back cleanly.
+- Exactly one question per query is required. Multiple questions are legal in the
+  format but unused in practice, so the count is checked rather than partially
+  handled.
+
+`wire/` holds the primitives — names, header, question, resource records — and
+`rdata/` holds one encoder per RDATA shape. `dns-query.ts` and `dns-response.ts`
+compose those into whole datagrams. Malformed input throws `DnsMessageFormatError`
+rather than returning a sentinel, because a bad datagram is an expected condition
+for a server on a socket and the server needs to answer it with a format error.
+
+`dns-codec.loc.test.ts` is the test that matters most: it stands a UDP socket in
+front of the codec and queries it with Node's own `node:dns` resolver, which is
+c-ares. That proves the encoding against an independent implementation rather
+than against the codec's own decoder. Node's resolver is used rather than `dig`
+because it needs no external package and works the same on a laptop and in CI.
+
 ## Cross-service routing role
 
 Route53's main cross-service role is name indirection for the local serving path.
