@@ -33,6 +33,7 @@ export default defineConfig(
       "test/.coverage/",
       "node_modules/",
       "**/*.config.ts",
+      ".claude/",
     ],
   },
 

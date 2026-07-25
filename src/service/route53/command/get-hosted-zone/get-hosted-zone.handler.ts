@@ -3,6 +3,7 @@ import {
   type BackgroundScheduler,
   BackgroundTasks,
 } from "../../../../util/background/background.js";
+import { simRoute53HostedZoneArn } from "../../hosted-zone/sim-route53-hosted-zone-arn.js";
 import {
   normalizeSimRoute53HostedZoneId,
   type SimRoute53HostedZoneId,
@@ -70,7 +71,7 @@ export class GetHostedZoneCommandHandler implements CommandHandler<
     options?: GetHostedZoneCommandHandlerOptions,
   ): Promise<SimGetHostedZoneCommandOutput> {
     const hostedZoneId = normalizeSimRoute53HostedZoneId(command.input.Id);
-    const hostedZoneArn = `arn:aws:route53:::hostedzone/${hostedZoneId}`;
+    const hostedZoneArn = simRoute53HostedZoneArn(hostedZoneId);
 
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();

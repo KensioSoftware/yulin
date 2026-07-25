@@ -5,6 +5,7 @@ import {
   DeleteHostedZoneCommand,
   GetHostedZoneCommand,
   ListHostedZonesByNameCommand,
+  ListResourceRecordSetsCommand,
   Route53Client,
 } from "@aws-sdk/client-route-53";
 import {
@@ -82,6 +83,52 @@ describe("simulated Route53 SDK Command routing", () => {
       .route53()
       .hostedZones.get(zoneCreation.HostedZone.Id);
     assertIdentical(hostedZone?.status, "INSYNC");
+  });
+
+  it("routes ListResourceRecordSetsCommand through an intercepted client", async () => {
+    using simSdk = new SimSdk();
+    const client = new Route53Client({ region: "us-east-1" });
+    simSdk.intercept(client);
+
+    const zoneCreation = await client.send(
+      new CreateHostedZoneCommand({
+        Name: "listed.example.com",
+        CallerReference: "sdk-intercept-ref-3",
+      }),
+    );
+    assertNonNullable(zoneCreation.HostedZone?.Id);
+
+    await client.send(
+      new ChangeResourceRecordSetsCommand({
+        HostedZoneId: zoneCreation.HostedZone.Id,
+        ChangeBatch: {
+          Changes: [
+            {
+              Action: "UPSERT",
+              ResourceRecordSet: {
+                Name: "www.listed.example.com",
+                Type: "A",
+                TTL: 300,
+                ResourceRecords: [{ Value: "192.0.2.20" }],
+              },
+            },
+          ],
+        },
+      }),
+    );
+    await simSdk.simAws.backgroundTasksComplete();
+
+    const listOutput = await client.send(
+      new ListResourceRecordSetsCommand({
+        HostedZoneId: zoneCreation.HostedZone.Id,
+      }),
+    );
+
+    assertIdentical(
+      listOutput.ResourceRecordSets?.[0]?.Name,
+      "www.listed.example.com.",
+    );
+    assertIdentical(listOutput.ResourceRecordSets[0].Type, "A");
   });
 
   it("rejects a Command simulated Route53 does not support", async () => {

@@ -15,6 +15,7 @@ Sim Route53 currently supports:
 - Getting Hosted Zones with `GetHostedZoneCommand`
 - Listing Hosted Zones by name with `ListHostedZonesByNameCommand`
 - Changing record sets with `ChangeResourceRecordSetsCommand`
+- Listing record sets in a Hosted Zone with `ListResourceRecordSetsCommand`
 - `CREATE`, `UPSERT`, and `DELETE` record changes
 - Stored record types: `A`, `AAAA`, `CNAME`, `TXT`, `NS`, and `SOA`
 - Local HTTP hostname routing through `CNAME` records that point to simulated service hostnames
@@ -316,6 +317,85 @@ for (const hostedZone of hostedZones) {
 
 The simulator supports duplicate Hosted Zone names when they have different caller references or
 CloudFormation logical IDs.
+
+## Listing records in a Hosted Zone
+
+Use `ListResourceRecordSetsCommand` to read back the records a Hosted Zone holds, whether they were
+created through the SDK or by sim CloudFormation.
+
+```typescript sim-route53-list-resource-record-sets
+/**
+ * Listing the records in a simulated Route53 Hosted Zone.
+ */
+
+import {
+  ChangeResourceRecordSetsCommand,
+  CreateHostedZoneCommand,
+  ListResourceRecordSetsCommand,
+} from "@aws-sdk/client-route-53";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const route53 = simAws.route53();
+
+const createOutput = await route53.createHostedZone(
+  new CreateHostedZoneCommand({
+    Name: "example.test",
+    CallerReference: "records-listing-zone",
+  }),
+);
+
+const hostedZoneId = createOutput.HostedZone?.Id;
+
+await route53.changeResourceRecordSets(
+  new ChangeResourceRecordSetsCommand({
+    HostedZoneId: hostedZoneId,
+    ChangeBatch: {
+      Changes: [
+        {
+          Action: "CREATE",
+          ResourceRecordSet: {
+            Name: "www.example.test",
+            Type: "CNAME",
+            TTL: 300,
+            ResourceRecords: [{ Value: "my-site.s3-website.eu-west-2" }],
+          },
+        },
+      ],
+    },
+  }),
+);
+
+await simAws.backgroundTasksComplete();
+
+const listOutput = await route53.listResourceRecordSets(
+  new ListResourceRecordSetsCommand({
+    HostedZoneId: hostedZoneId,
+  }),
+);
+
+const recordSets = listOutput.ResourceRecordSets ?? [];
+for (const recordSet of recordSets) {
+  console.log(recordSet.Name, recordSet.Type, recordSet.ResourceRecords);
+}
+```
+
+Records are returned in Route53 DNS name order, which compares names from the rightmost label
+inwards. The zone apex comes first, then names are grouped by shared parent, so `example.test.`
+sorts before `api.example.test.`, which sorts before `b.api.example.test.` and then
+`www.example.test.`. Where one name holds several record types, the record type breaks the tie.
+
+Record names are returned with a trailing dot, as Route53 returns them.
+
+Paginate with `MaxItems`. When the listing is truncated, `IsTruncated` is `true` and
+`NextRecordName` and `NextRecordType` identify the first record of the next page, which you pass
+back as `StartRecordName` and `StartRecordType`. Marker names are normalised, so `www.example.test`
+and `WWW.EXAMPLE.TEST.` select the same starting point.
+
+Alias records are returned with an `AliasTarget` rather than `ResourceRecords`. The simulator stores
+an alias target as a record value plus an alias flag, so `AliasTarget.DNSName` is returned but
+`AliasTarget.HostedZoneId` is not — it is not part of the stored record.
 
 ## Local hostname resolution
 

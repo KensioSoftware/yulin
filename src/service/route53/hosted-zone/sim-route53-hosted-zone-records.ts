@@ -71,11 +71,33 @@ export class SimRoute53HostedZoneRecords {
       return undefined;
     }
 
-    return {
-      ...record,
-      values: [...record.values],
-    };
+    return copyRecord(record);
   }
+
+  /**
+   * List every record in the hosted zone.
+   *
+   * Records are returned in insertion order. Callers that need Route53-style
+   * ordering sort the result themselves, because the store is a lookup
+   * structure rather than an ordered collection.
+   * @internal
+   */
+  list(): readonly SimRoute53Record[] {
+    return this.records
+      .values()
+      .map((record) => copyRecord(record))
+      .toArray();
+  }
+}
+
+/**
+ * Copy a stored record so callers cannot mutate hosted-zone state.
+ */
+function copyRecord(record: SimRoute53Record): SimRoute53Record {
+  return {
+    ...record,
+    values: [...record.values],
+  };
 }
 
 function normaliseRecord(record: SimRoute53Record): SimRoute53Record {
