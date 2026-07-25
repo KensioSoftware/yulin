@@ -22,6 +22,7 @@ Sim Route53 currently supports:
 - Alias records, with `AliasTarget.DNSName` stored as the record value
 - Local hostname resolution through `*.sim-aws.localhost`
 - A browser-viewable hosted zone and record summary at `dns.sim-aws.localhost`
+- Real DNS answers over UDP, so records can be queried with `dig` or any DNS client
 - CloudFormation resources:
   - `AWS::Route53::HostedZone`
   - `AWS::Route53::RecordSet`
@@ -441,6 +442,169 @@ resolution is environment-wide even though the Route53 service object is Account
 `dns.sim-aws.localhost` is where the summary is served, not a name it answers for. It is a built-in
 Yulin hostname, so it stays reachable whatever records your test creates, and it is unrelated to any
 hosted zone you might name `dns`.
+
+## Querying simulated records with dig
+
+A served simulated environment answers real DNS queries over UDP, on the same port number the HTTP
+server took on TCP. UDP and TCP port namespaces are separate, so one number covers both.
+
+```typescript sim-route53-dns
+/**
+ * Querying simulated Route53 records with a DNS client.
+ */
+
+import {
+  ChangeResourceRecordSetsCommand,
+  CreateHostedZoneCommand,
+} from "@aws-sdk/client-route-53";
+
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const route53 = simAws.route53();
+
+const createOutput = await route53.createHostedZone(
+  new CreateHostedZoneCommand({
+    Name: "example.test",
+    CallerReference: "dns-zone",
+  }),
+);
+
+await route53.changeResourceRecordSets(
+  new ChangeResourceRecordSetsCommand({
+    HostedZoneId: createOutput.HostedZone?.Id,
+    ChangeBatch: {
+      Changes: [
+        {
+          Action: "CREATE",
+          ResourceRecordSet: {
+            Name: "www.example.test",
+            Type: "CNAME",
+            TTL: 300,
+            ResourceRecords: [{ Value: "my-site.s3-website.eu-west-2" }],
+          },
+        },
+      ],
+    },
+  }),
+);
+
+await simAws.backgroundTasksComplete();
+
+const srv = await serveSimAws({ simAws });
+
+console.log(`dig @127.0.0.1 -p ${srv.dnsPort} www.example.test`);
+```
+
+Running that `dig` command against the served simulator:
+
+```text
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 17691
+;; flags: qr aa rd; QUERY: 1, ANSWER: 2, AUTHORITY: 0, ADDITIONAL: 0
+
+www.example.test.             300  IN  CNAME  my-site.s3-website.eu-west-2.
+my-site.s3-website.eu-west-2.  60  IN  A      127.0.0.1
+```
+
+The CNAME is followed and an address record is synthesised for the simulated S3 website, pointing at
+the address the local HTTP server listens on. A name that resolves to a simulated service therefore
+answers with somewhere you can actually make a request.
+
+Any DNS client works. Node's own resolver needs no extra dependency, which makes it convenient in
+tests:
+
+```typescript sim-route53-dns-resolver
+/**
+ * Resolving a simulated Route53 record with Node's DNS resolver.
+ */
+
+import { Resolver } from "node:dns/promises";
+
+import {
+  ChangeResourceRecordSetsCommand,
+  CreateHostedZoneCommand,
+} from "@aws-sdk/client-route-53";
+
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const route53 = simAws.route53();
+
+const zone = await route53.createHostedZone(
+  new CreateHostedZoneCommand({
+    Name: "example.test",
+    CallerReference: "resolver-zone",
+  }),
+);
+
+await route53.changeResourceRecordSets(
+  new ChangeResourceRecordSetsCommand({
+    HostedZoneId: zone.HostedZone?.Id,
+    ChangeBatch: {
+      Changes: [
+        {
+          Action: "CREATE",
+          ResourceRecordSet: {
+            Name: "api.example.test",
+            Type: "A",
+            TTL: 60,
+            ResourceRecords: [{ Value: "192.0.2.10" }],
+          },
+        },
+      ],
+    },
+  }),
+);
+
+await simAws.backgroundTasksComplete();
+
+const srv = await serveSimAws({ simAws });
+
+try {
+  const resolver = new Resolver({ timeout: 1000, tries: 1 });
+  resolver.setServers([`127.0.0.1:${srv.dnsPort}`]);
+
+  const addresses = await resolver.resolve4("api.example.test");
+
+  console.log(addresses); // [ '192.0.2.10' ]
+} finally {
+  srv.close();
+}
+```
+
+A short timeout with a single try keeps a test failing quickly rather than
+hanging, should the record not be there.
+
+### Ports
+
+DNS binds the same port number as HTTP, but that is a convenience rather than a guarantee: if the
+number is already held on UDP by something else, DNS binds an ephemeral port instead. Read
+`srv.dnsPort` rather than assuming it matches `srv.port`.
+
+Nothing binds port 53, which would need root. To resolve simulated names system-wide without naming a
+port, point your resolver at the simulator yourself — on macOS, a file such as `/etc/resolver/test`
+containing `nameserver 127.0.0.1` and `port <dnsPort>` makes the whole `.test` TLD resolve through it.
+That is a change to your machine, so Yulin does not make it for you.
+
+### What is answered
+
+- The record types sim Route53 stores: `A`, `AAAA`, `CNAME`, `TXT`, `NS` and `SOA`.
+- CNAME chains are followed, so an `A` query on a name holding a CNAME returns the CNAME and the
+  address it leads to together. Chains are bounded, and a cycle stops immediately.
+- Alias records are resolved to the address of whatever they point at, answered under the name that
+  holds the alias, which is how Route53 answers an alias. The alias record itself never appears.
+- A name in a zone holding no record of the queried type gives `NOERROR` with no answers, and a name
+  the zone does not hold gives `NXDOMAIN`. Both carry the zone `SOA` in the authority section, so a
+  resolver knows how long it may cache the negative answer. If the zone holds no `SOA` of its own,
+  one is synthesised.
+- A name held by no hosted zone is `REFUSED` rather than `NXDOMAIN`: the simulator answers only for
+  the zones it holds, and cannot claim a name exists nowhere.
+- Zones from every simulated Account are answered, because DNS resolution is environment-wide.
+
+Not modelled: EDNS0, the `ANY` query type, DNS over TCP, more than one question per query, recursion,
+and DNSSEC. Answers are always authoritative.
 
 ## Local hostname resolution
 
