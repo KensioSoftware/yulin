@@ -1,10 +1,12 @@
 import {
+  assertFalse,
   assertIdentical,
   assertInstanceOf,
   assertObjectMatches,
   assertStringStartsWith,
   assertUndefined,
 } from "@kensio/smartass";
+import { SimFixedClock } from "../../../../util/clock/sim-clock.js";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import type { SimRoute53 } from "../../sim-route53.js";
@@ -296,5 +298,55 @@ describe("Route53 ChangeResourceRecordSetsCommand", () => {
     assertObjectMatches(hostedZone?.records.get("app.alias.example.com", "A"), {
       values: ["dualstack.example-load-balancer.amazonaws.com"],
     });
+  });
+
+  it("gives each change its own id even on a stopped clock", async () => {
+    // Given a Hosted Zone in a simulation whose clock never moves
+    const simAws = new SimAws({
+      clock: new SimFixedClock(new Date("2026-07-26T09:30:00.000Z")),
+    });
+    const simRoute53 = simAws.route53();
+    const creation = await simRoute53.createHostedZone(
+      new CreateHostedZoneCommand({
+        Name: "stopped.example.com",
+        CallerReference: "stopped-clock-test",
+      }),
+    );
+    const hostedZoneId = creation.HostedZone?.Id;
+    assertIsSimRoute53HostedZoneId(hostedZoneId);
+    await simAws.backgroundTasksComplete();
+
+    // When two changes are submitted at the same simulated instant
+    const change = async (value: string): Promise<string | undefined> => {
+      const output = await simRoute53.changeResourceRecordSets(
+        new ChangeResourceRecordSetsCommand({
+          HostedZoneId: hostedZoneId,
+          ChangeBatch: {
+            Changes: [
+              {
+                Action: "UPSERT",
+                ResourceRecordSet: {
+                  Name: "www.stopped.example.com",
+                  Type: "A",
+                  TTL: 300,
+                  ResourceRecords: [{ Value: value }],
+                },
+              },
+            ],
+          },
+        }),
+      );
+      await simAws.backgroundTasksComplete();
+
+      return output.ChangeInfo?.Id;
+    };
+    const firstId = await change("192.0.2.1");
+    const secondId = await change("192.0.2.2");
+
+    // Then each change is still identifiable, as change ids do not come from
+    // the clock
+    assertStringStartsWith(firstId, `/change/${hostedZoneId}-`);
+    assertStringStartsWith(secondId, `/change/${hostedZoneId}-`);
+    assertFalse(firstId === secondId);
   });
 });

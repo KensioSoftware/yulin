@@ -68,6 +68,7 @@ export class CreateUserCommandHandler implements CommandHandler<
       arn,
       path,
       userName: username,
+      creationDate: this.background.now(),
     });
 
     this.users.set(username, user);

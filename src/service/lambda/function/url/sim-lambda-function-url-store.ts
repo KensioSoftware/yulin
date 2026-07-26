@@ -1,14 +1,15 @@
-import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import {
   SimLambdaResourceConflictException,
   SimLambdaResourceNotFoundException,
 } from "../../error/sim-lambda.error.js";
-import type { SimLambdaUrlRegistry } from "../../registry/sim-lambda-url-registry.js";
 import type {
   SimLambdaFunction,
   SimLambdaFunctionName,
 } from "../sim-lambda-function.js";
-import { SimLambdaFunctionUrlFactory } from "./sim-lambda-function-url-factory.js";
+import {
+  SimLambdaFunctionUrlFactory,
+  type SimLambdaFunctionUrlFactoryProperties,
+} from "./sim-lambda-function-url-factory.js";
 import type {
   SimLambdaFunctionUrl,
   SimLambdaFunctionUrlAuthType,
@@ -16,12 +17,6 @@ import type {
   SimLambdaFunctionUrlInvokeMode,
   SimLambdaFunctionUrlMap,
 } from "./sim-lambda-function-url.js";
-
-interface SimLambdaFunctionUrlStoreProperties {
-  readonly accountRegionScope: SimAwsAccountRegionScope;
-  readonly urlRegistry: SimLambdaUrlRegistry;
-}
-
 interface CreateSimLambdaFunctionUrlProperties {
   readonly simFunction: SimLambdaFunction;
   readonly authType?: SimLambdaFunctionUrlAuthType | undefined;
@@ -38,7 +33,9 @@ export class SimLambdaFunctionUrlStore {
   private readonly functionUrls: SimLambdaFunctionUrlMap = new Map();
   private readonly factory: SimLambdaFunctionUrlFactory;
 
-  constructor(properties: SimLambdaFunctionUrlStoreProperties) {
+  // The store's construction inputs are exactly the factory's: it holds URL
+  // state and forwards the wiring straight through.
+  constructor(properties: SimLambdaFunctionUrlFactoryProperties) {
     this.factory = new SimLambdaFunctionUrlFactory(properties);
   }
 

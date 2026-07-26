@@ -68,6 +68,7 @@ export class CreateAccessKeyCommandHandler implements CommandHandler<
       secretAccessKey: credentials.secretAccessKey,
       principal,
       identityPolicyPrincipal: principal,
+      creationDate: this.background.now(),
     });
 
     /*

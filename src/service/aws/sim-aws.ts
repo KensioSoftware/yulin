@@ -30,11 +30,18 @@ import type { SimLambda } from "../lambda/index.js";
 import type { SimSts } from "../sts/sim-sts.js";
 import type { SimAwsPrincipal } from "./caller/sim-aws-caller.js";
 import { simAwsRunAsContext } from "./caller/sim-aws-run-as-context.js";
+import type { SimClock } from "../../util/clock/sim-clock.js";
 
 interface SimAwsProperties {
   readonly defaultAccountId?: SimAwsAccountId;
   readonly defaultRegionName?: AwsRegionName;
   readonly background?: BackgroundScheduler & BackgroundCompleter;
+  /**
+   * Clock supplying this simulation's timestamps, defaulting to the real system
+   * clock. Ignored when an already-built background scheduler is supplied, as
+   * that scheduler carries its own clock.
+   */
+  readonly clock?: SimClock;
 }
 
 /**
@@ -63,8 +70,12 @@ export class SimAws {
     const {
       defaultAccountId = DEFAULT_SIM_AWS_ACCOUNT_ID,
       defaultRegionName = DEFAULT_SIM_AWS_REGION_NAME,
-      background = new BackgroundTasks(),
+      clock,
     } = properties;
+
+    const background =
+      properties.background ??
+      new BackgroundTasks(clock === undefined ? {} : { clock });
 
     this.defaultAccountId = defaultAccountId;
     this.defaultRegionName = defaultRegionName;
@@ -75,6 +86,16 @@ export class SimAws {
     });
     this.iamRegistry = this.serviceFactory.iamRegistry;
     this.scopes = new SimAwsScopeRegistry({ simAws: this });
+  }
+
+  /**
+   * Get the current time in this simulated AWS environment.
+   *
+   * Every simulated timestamp comes from here, so this is what a simulation
+   * means by "now", which is not necessarily what the host clock means by it.
+   */
+  now(): Date {
+    return this.background.now();
   }
 
   /**

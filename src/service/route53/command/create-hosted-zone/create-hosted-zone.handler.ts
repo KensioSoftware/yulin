@@ -82,7 +82,7 @@ export class CreateHostedZoneCommandHandler implements CommandHandler<
     const hostedZoneId = makeSimRoute53HostedZoneId(
       new Set(this.hostedZones.keys()),
     );
-    const submittedAt = new Date();
+    const submittedAt = this.background.now();
 
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();

@@ -1,8 +1,18 @@
 /* eslint-disable unicorn/prefer-await  */
 
+import { type SimClock, SimRealClock } from "../clock/sim-clock.js";
+
 export type BackgroundTask = () => Promise<void>;
 
-export interface BackgroundScheduler {
+/**
+ * Scheduler for a simulator's asynchronous work, and the source of its time.
+ *
+ * Timekeeping and scheduling stay separate responsibilities: a scheduler holds
+ * a SimClock and delegates to it, rather than implementing time itself. They
+ * are combined in one interface because they travel together, so anything
+ * already given a scheduler can read simulated time without extra wiring.
+ */
+export interface BackgroundScheduler extends SimClock {
   /**
    * Wait at a simulator sequencing point.
    *
@@ -13,6 +23,10 @@ export interface BackgroundScheduler {
   sequence(): Promise<void>;
 
   schedule(task: BackgroundTask): void;
+}
+
+interface BackgroundTasksProperties {
+  readonly clock?: SimClock;
 }
 
 export interface BackgroundCompleter {
@@ -29,6 +43,18 @@ export class BackgroundTasks
   implements BackgroundScheduler, BackgroundCompleter
 {
   private readonly pending = new Set<Promise<void>>();
+  private readonly clock: SimClock;
+
+  constructor(properties: BackgroundTasksProperties = {}) {
+    this.clock = properties.clock ?? new SimRealClock();
+  }
+
+  /**
+   * Get the current time in this simulation.
+   */
+  now(): Date {
+    return this.clock.now();
+  }
 
   /**
    * Wait at a deterministic sequencing point.

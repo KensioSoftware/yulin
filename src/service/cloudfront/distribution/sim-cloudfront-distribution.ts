@@ -7,6 +7,7 @@ import {
   type SimAwsAccountId,
 } from "../../aws/sim-aws-account.js";
 import type { SimCloudFrontDistributionConfig } from "../command/create-distribution/create-distribution.command.js";
+import { type SimClock, SimRealClock } from "../../../util/clock/sim-clock.js";
 
 export type SimCloudFrontDistributionId = Brand<
   string,
@@ -20,6 +21,11 @@ interface SimCloudFrontDistributionProperties {
   readonly status?: SimCloudFrontDistributionStatus;
   readonly accountId?: SimAwsAccountId;
   readonly distributionConfig?: SimCloudFrontDistributionConfig;
+  /**
+   * Clock stamping this Distribution's last modified time. A Distribution built
+   * standalone, outside a SimAws instance, falls back to the real clock.
+   */
+  readonly clock?: SimClock;
 }
 
 /**
@@ -31,7 +37,7 @@ export class SimCloudFrontDistribution {
   public readonly distributionConfig:
     SimCloudFrontDistributionConfig | undefined;
   public readonly behaviors: SimCloudFrontBehavior[] = [];
-  public readonly lastModifiedTime: Date = new Date();
+  public readonly lastModifiedTime: Date;
 
   #status: SimCloudFrontDistributionStatus;
   private readonly alternateDomainNames = new Set<string>();
@@ -44,8 +50,10 @@ export class SimCloudFrontDistribution {
       status = "Deployed",
       accountId = makeSimAwsAccountId(),
       distributionConfig,
+      clock = new SimRealClock(),
     } = properties;
 
+    this.lastModifiedTime = clock.now();
     this.distributionId = distributionId;
     this.#status = status;
     this.accountId = accountId;

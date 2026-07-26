@@ -7,6 +7,15 @@ import {
   SimIamDuplicateAccessKey,
   SimIamInvalidCredentials,
 } from "./error/sim-iam-credential.error.js";
+import { type SimClock, SimRealClock } from "../../../util/clock/sim-clock.js";
+
+interface SimIamCredentialRegistryProperties {
+  /**
+   * Clock deciding whether a temporary session has expired. Session expiry is
+   * simulated state, so it is judged in simulated time rather than host time.
+   */
+  readonly clock?: SimClock;
+}
 
 /**
  * Stores and authenticates simulated IAM access keys.
@@ -17,6 +26,11 @@ import {
  */
 export class SimIamCredentialRegistry {
   private readonly accessKeys = new Map<string, SimIamAccessKey>();
+  private readonly clock: SimClock;
+
+  constructor(properties: SimIamCredentialRegistryProperties = {}) {
+    this.clock = properties.clock ?? new SimRealClock();
+  }
 
   /**
    * Register a new simulated access key.
@@ -34,7 +48,7 @@ export class SimIamCredentialRegistry {
    */
   resolveCredentials(
     credentials: SimAwsCredentials,
-    now: Date = new Date(),
+    now: Date = this.clock.now(),
   ): SimIamCredentialIdentity {
     const accessKey = this.accessKeys.get(credentials.accessKeyId);
 

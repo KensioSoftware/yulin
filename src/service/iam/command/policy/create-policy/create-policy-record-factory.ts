@@ -16,6 +16,7 @@ interface CreatePolicyRecordFactoryProperties {
   readonly path: string;
   readonly policyName: SimIamPolicyName;
   readonly cmd: SimCreatePolicyCommand;
+  readonly now: Date;
 }
 
 /**
@@ -37,8 +38,7 @@ export class CreatePolicyRecordFactory {
   makePolicy(
     properties: CreatePolicyRecordFactoryProperties,
   ): SimIamManagedPolicy {
-    const { arn, path, policyName, cmd } = properties;
-    const now = new Date();
+    const { arn, path, policyName, cmd, now } = properties;
 
     return {
       arn,

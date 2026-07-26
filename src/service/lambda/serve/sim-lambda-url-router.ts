@@ -25,7 +25,15 @@ interface SimLambdaUrlRouterProperties {
  * names owns the Function URL and the function.
  */
 export class SimLambdaUrlRouter {
-  private readonly simAws: SimAws;
+  /**
+   * The simulation this router routes within.
+   *
+   * Exposed so collaborators that need the same simulation, such as the clock
+   * stamping invocation events, take it from here rather than being given a
+   * second SimAws that could be a different one.
+   */
+  public readonly simAws: SimAws;
+
   private readonly urlRegistry: SimLambdaUrlRegistry;
 
   constructor(properties: SimLambdaUrlRouterProperties = {}) {

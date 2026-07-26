@@ -87,6 +87,7 @@ export class CreateRoleCommandHandler implements CommandHandler<
       path,
       roleName,
       cmd: command,
+      creationDate: this.background.now(),
     });
 
     this.roles.set(roleName, role);

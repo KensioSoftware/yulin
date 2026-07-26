@@ -1,6 +1,8 @@
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { assertIdentical } from "@kensio/smartass";
+import { CreateUserCommand } from "@aws-sdk/client-iam";
 import { SimAws } from "./sim-aws.js";
+import { SimFixedClock } from "../../util/clock/sim-clock.js";
 
 describe("SimAws", () => {
   it("returns same Account for same Account ID", () => {
@@ -67,5 +69,53 @@ describe("SimAws", () => {
     assertIdentical(simAws.dynamoDb(), simAws.region().dynamoDb());
     assertIdentical(simAws.dynamoDb(), simAws.account().region().dynamoDb());
     assertIdentical(simAws.dynamoDb(), simAws.region().account().dynamoDb());
+  });
+
+  describe("simulated time", () => {
+    const instant = new Date("2026-07-26T09:30:00.000Z");
+
+    it("reports the real time by default", () => {
+      // Given a simulation with no clock of its own
+      const simAws = new SimAws();
+
+      // When its time is read
+      const now = simAws.now();
+
+      // Then it is the real system time
+      expect(Math.abs(now.getTime() - Date.now())).toBeLessThan(1000);
+    });
+
+    it("reports the time of an injected clock", () => {
+      // Given a simulation whose clock is stopped at a known instant
+      const simAws = new SimAws({ clock: new SimFixedClock(instant) });
+
+      // When its time is read
+      // Then it is that instant, not the host clock's
+      expect(simAws.now()).toStrictEqual(instant);
+    });
+
+    it("stamps a created resource with simulated time", async () => {
+      // Given a simulation whose clock is stopped at a known instant
+      const simAws = new SimAws({ clock: new SimFixedClock(instant) });
+
+      // When a resource that records a creation time is created
+      const output = await simAws
+        .iam()
+        .createUser(new CreateUserCommand({ UserName: "Clockwatcher" }));
+
+      // Then the resource is stamped with simulated time
+      expect(output.User.CreateDate).toStrictEqual(instant);
+    });
+
+    it("keeps one simulation's time out of another's", () => {
+      // Given two simulations, only one of which has a stopped clock
+      const stopped = new SimAws({ clock: new SimFixedClock(instant) });
+      const running = new SimAws();
+
+      // When both report their time
+      // Then each keeps its own: stopping one clock leaves the other running
+      expect(stopped.now()).toStrictEqual(instant);
+      expect(Math.abs(running.now().getTime() - Date.now())).toBeLessThan(1000);
+    });
   });
 });

@@ -3,6 +3,7 @@ import type {
   SimAcmDomainValidation,
   SimAcmValidationMethod,
 } from "./sim-acm-domain-validation.js";
+import { type SimClock, SimRealClock } from "../../../util/clock/sim-clock.js";
 
 export type SimAcmCertificateStatus =
   | "EXPIRED"
@@ -29,6 +30,11 @@ interface SimAcmCertificateProperties {
   readonly createdAt?: Date | undefined;
   readonly issuedAt?: Date | undefined;
   readonly tags?: readonly SimAcmTag[] | undefined;
+  /**
+   * Clock stamping this Certificate's created and issued times. A Certificate
+   * built standalone, outside a SimAws instance, falls back to the real clock.
+   */
+  readonly clock?: SimClock | undefined;
 }
 
 /**
@@ -45,6 +51,7 @@ export class SimAcmCertificate {
 
   #issuedAt: Date | undefined;
   #status: SimAcmCertificateStatus;
+  private readonly clock: SimClock;
 
   constructor(properties: SimAcmCertificateProperties) {
     const {
@@ -54,10 +61,13 @@ export class SimAcmCertificate {
       status = "PENDING_VALIDATION",
       validationMethod,
       domainValidationOptions = [],
-      createdAt = new Date(),
+      clock = new SimRealClock(),
+      createdAt = clock.now(),
       issuedAt,
       tags,
     } = properties;
+
+    this.clock = clock;
 
     this.certificateArn = certificateArn;
     this.domainName = domainName;
@@ -106,7 +116,7 @@ export class SimAcmCertificate {
    */
   issue(): Promise<void> {
     this.#status = "ISSUED";
-    this.#issuedAt = new Date();
+    this.#issuedAt = this.clock.now();
 
     for (const domainValidation of this.domainValidationOptions) {
       domainValidation.succeed();

@@ -6,10 +6,15 @@ import {
   type SimLambdaFunctionUrlAuthType,
   type SimLambdaFunctionUrlInvokeMode,
 } from "./sim-lambda-function-url.js";
+import {
+  type SimClock,
+  SimRealClock,
+} from "../../../../util/clock/sim-clock.js";
 
-interface SimLambdaFunctionUrlFactoryProperties {
+export interface SimLambdaFunctionUrlFactoryProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly urlRegistry: SimLambdaUrlRegistry;
+  readonly clock?: SimClock | undefined;
 }
 
 interface MakeSimLambdaFunctionUrlProperties {
@@ -27,10 +32,12 @@ interface MakeSimLambdaFunctionUrlProperties {
 export class SimLambdaFunctionUrlFactory {
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly urlRegistry: SimLambdaUrlRegistry;
+  private readonly clock: SimClock;
 
   constructor(properties: SimLambdaFunctionUrlFactoryProperties) {
     this.accountRegionScope = properties.accountRegionScope;
     this.urlRegistry = properties.urlRegistry;
+    this.clock = properties.clock ?? new SimRealClock();
   }
 
   /**
@@ -52,6 +59,7 @@ export class SimLambdaFunctionUrlFactory {
       accountRegionScope: this.accountRegionScope,
       authType,
       invokeMode,
+      clock: this.clock,
     });
   }
 

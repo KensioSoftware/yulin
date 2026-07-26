@@ -51,7 +51,7 @@ export class SimDynamoDbTable {
     this.background = background;
 
     this.tableName = tableInput.tableName();
-    this.creationDateTime = new Date();
+    this.creationDateTime = background.now();
     this.#keySchema = tableInput.keySchema();
   }
 

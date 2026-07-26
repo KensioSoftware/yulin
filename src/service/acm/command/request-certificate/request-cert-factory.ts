@@ -12,9 +12,14 @@ import {
 } from "../../certificate/sim-acm-domain-validation.js";
 import type { SimRequestCertificateCommand } from "./request-certificate.command.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
+import {
+  type SimClock,
+  SimRealClock,
+} from "../../../../util/clock/sim-clock.js";
 
 interface RequestCertificateFactoryProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
+  readonly clock?: SimClock;
 }
 
 /**
@@ -27,9 +32,11 @@ interface RequestCertificateFactoryProperties {
  */
 export class RequestCertificateFactory {
   private readonly accountRegionScope: SimAwsAccountRegionScope;
+  private readonly clock: SimClock;
 
   constructor(properties: RequestCertificateFactoryProperties) {
     this.accountRegionScope = properties.accountRegionScope;
+    this.clock = properties.clock ?? new SimRealClock();
   }
 
   /**
@@ -68,7 +75,7 @@ export class RequestCertificateFactory {
         );
         return this.makeDomainValidationOption(domainName, validationMethod);
       }),
-      createdAt: new Date(),
+      clock: this.clock,
       tags: command.input.Tags?.map((tag): SimAcmTag => ({
         Key: tag.Key,
         Value: tag.Value,

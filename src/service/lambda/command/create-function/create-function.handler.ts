@@ -130,6 +130,7 @@ export class CreateFunctionCommandHandler implements CommandHandler<
       environment,
       accountRegionScope: this.accountRegionScope,
       runAsOwner: this.runAsOwner,
+      clock: this.background,
     });
 
     this.functions.set(simFunction.name, simFunction);

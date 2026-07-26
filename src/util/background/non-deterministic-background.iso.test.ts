@@ -8,6 +8,7 @@ import {
   assertTrue,
 } from "@kensio/smartass";
 import { NonDeterministicBackgroundTasks } from "./non-deterministic-background.js";
+import { SimFixedClock } from "../clock/sim-clock.js";
 
 describe("background sequencing", () => {
   describe("NonDeterministicBackgroundTasks", () => {
@@ -99,6 +100,27 @@ describe("background sequencing", () => {
       });
 
       await assertThrowsErrorAsync(async () => tasks.complete());
+    });
+
+    it("reports the time of the clock it was given", () => {
+      // Given a non-deterministic scheduler holding a stopped clock
+      const instant = new Date("2026-07-26T09:30:00.000Z");
+      const tasks = new NonDeterministicBackgroundTasks({
+        clock: new SimFixedClock(instant),
+      });
+
+      // When the scheduler is asked for the time
+      // Then out-of-order sequencing does not make time non-deterministic too
+      assertIdentical(tasks.now().toISOString(), instant.toISOString());
+    });
+
+    it("reports the real time when given no clock", () => {
+      // Given a non-deterministic scheduler with no clock of its own
+      const tasks = new NonDeterministicBackgroundTasks({});
+
+      // When the scheduler is asked for the time
+      // Then it reports the real system time
+      assertTrue(Math.abs(tasks.now().getTime() - Date.now()) < 1000);
     });
   });
 });

@@ -23,6 +23,7 @@ describe("SimIamCredentialRegistry", () => {
     const registry = new SimIamCredentialRegistry();
     registry.registerAccessKey(
       new SimIamAccessKey({
+        creationDate: new Date(),
         accessKeyId: "AKIAEXAMPLE",
         secretAccessKey: "correct-secret",
         principal: {
@@ -67,6 +68,7 @@ describe("SimIamCredentialRegistry", () => {
     });
     registry.registerAccessKey(
       new SimIamAccessKey({
+        creationDate: new Date(),
         accessKeyId: "ASIATEMPORARY",
         secretAccessKey: "correct-secret",
         principal: session.principal,
@@ -110,6 +112,7 @@ describe("SimIamCredentialRegistry", () => {
     const registry = new SimIamCredentialRegistry();
     registry.registerAccessKey(
       new SimIamAccessKey({
+        creationDate: new Date(),
         accessKeyId: "AKIAINACTIVE",
         secretAccessKey: "correct-secret",
         principal: {
@@ -139,6 +142,7 @@ describe("SimIamCredentialRegistry", () => {
     const registry = new SimIamCredentialRegistry();
     registry.registerAccessKey(
       new SimIamAccessKey({
+        creationDate: new Date(),
         accessKeyId: "AKIAEXAMPLE",
         secretAccessKey: "correct-secret",
         principal: {
@@ -168,6 +172,7 @@ describe("SimIamCredentialRegistry", () => {
     const expiration = new Date("2026-01-01T01:00:00.000Z");
     registry.registerAccessKey(
       new SimIamAccessKey({
+        creationDate: new Date(),
         accessKeyId: "ASIATEMPORARY",
         secretAccessKey: "correct-secret",
         principal: {
@@ -210,6 +215,7 @@ describe("SimIamCredentialRegistry", () => {
     const registry = new SimIamCredentialRegistry();
     registry.registerAccessKey(
       new SimIamAccessKey({
+        creationDate: new Date(),
         accessKeyId: "AKIAEXAMPLE",
         secretAccessKey: "correct-secret",
         principal: {
@@ -240,6 +246,7 @@ describe("SimIamCredentialRegistry", () => {
     const expiration = new Date("2026-01-01T01:00:00.000Z");
     registry.registerAccessKey(
       new SimIamAccessKey({
+        creationDate: new Date(),
         accessKeyId: "ASIATEMPORARY",
         secretAccessKey: "correct-secret",
         principal: {
@@ -288,6 +295,7 @@ describe("SimIamCredentialRegistry", () => {
     const expiration = new Date("2026-01-01T01:00:00.000Z");
     registry.registerAccessKey(
       new SimIamAccessKey({
+        creationDate: new Date(),
         accessKeyId: "ASIATEMPORARY",
         secretAccessKey: "correct-secret",
         principal: {
@@ -338,6 +346,7 @@ describe("SimIamCredentialRegistry", () => {
     const registry = new SimIamCredentialRegistry();
     registry.registerAccessKey(
       new SimIamAccessKey({
+        creationDate: new Date(),
         accessKeyId: "AKIADUPLICATE",
         secretAccessKey: "first-secret",
         principal: {
@@ -351,6 +360,7 @@ describe("SimIamCredentialRegistry", () => {
     const error = assertThrowsError(() => {
       registry.registerAccessKey(
         new SimIamAccessKey({
+          creationDate: new Date(),
           accessKeyId: "AKIADUPLICATE",
           secretAccessKey: "second-secret",
           principal: {

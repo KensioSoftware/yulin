@@ -12,6 +12,7 @@ import {
 } from "@kensio/smartass";
 import { SimAwsHttp } from "./sim-aws-http.js";
 import { SimAws } from "../../service/aws/sim-aws.js";
+import { SimFixedClock } from "../../util/clock/sim-clock.js";
 
 describe("Simulated AWS HTTP", () => {
   it("responds HTTP 501 for unknown host", async () => {
@@ -173,5 +174,37 @@ describe("Simulated AWS HTTP", () => {
       "text/html; charset=utf-8",
     );
     assertIdentical(await response.text(), "");
+  });
+
+  describe("Date response header", () => {
+    const instant = new Date("2026-07-26T09:30:00.000Z");
+
+    it("stamps a served response with simulated time", async () => {
+      // Given a simulation whose clock is stopped at a known instant
+      const simAws = new SimAws({ clock: new SimFixedClock(instant) });
+      const simAwsHttp = new SimAwsHttp({ simAws });
+
+      // When any request is served
+      const response = await simAwsHttp.fetch(
+        "http://nothing-here.s3-website.eu-west-2.sim-aws.localhost/",
+      );
+
+      // Then the response reports simulated time, which is how an outside
+      // client discovers it without knowing about the simulator
+      assertIdentical(response.headers.get("date"), instant.toUTCString());
+    });
+
+    it("stamps a response that did not reach a service", async () => {
+      // Given a simulation whose clock is stopped at a known instant
+      const simAws = new SimAws({ clock: new SimFixedClock(instant) });
+      const simAwsHttp = new SimAwsHttp({ simAws });
+
+      // When a request names a host no simulated service answers for
+      const response = await simAwsHttp.fetch("http://unknown.example.com/");
+
+      // Then it is still stamped, as every real AWS response is
+      assertResponseStatus(response, 501);
+      assertIdentical(response.headers.get("date"), instant.toUTCString());
+    });
   });
 });

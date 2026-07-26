@@ -128,6 +128,7 @@ export class SimLambda {
     this.functionUrls = new SimLambdaFunctionUrlStore({
       accountRegionScope,
       urlRegistry,
+      clock: background,
     });
     this.functionUrlCommands = new SimLambdaFunctionUrlCommands({
       functionUrls: this.functionUrls,
