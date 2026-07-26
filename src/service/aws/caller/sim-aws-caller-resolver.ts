@@ -32,7 +32,8 @@ export interface SimAwsResolvedCaller {
  *
  * An omitted caller resolves to the supplied operation default. Explicit
  * anonymity is preserved. Credential callers are authenticated before a
- * resolved caller is returned.
+ * resolved caller is returned, and a caller already resolved elsewhere is
+ * taken as it stands.
  */
 export class SimAwsCallerResolver {
   private readonly credentialIdentityResolver?:
@@ -49,6 +50,10 @@ export class SimAwsCallerResolver {
     caller: SimAwsCaller | undefined,
     defaultPrincipal: SimAwsPrincipal,
   ): SimAwsResolvedCaller {
+    if (caller?.kind === "resolved") {
+      return this.normalized(caller.principal, caller.identityPolicyPrincipal);
+    }
+
     if (caller?.kind === "credentials") {
       if (this.credentialIdentityResolver === undefined) {
         throw new Error(

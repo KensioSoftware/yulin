@@ -18,8 +18,9 @@ export type SimLambdaFunctionUrlId = Brand<string, "SimLambdaFunctionUrlId">;
 /**
  * Function URL authentication types.
  *
- * NONE makes the URL publicly invokable. AWS_IAM requires SigV4-signed
- * requests, which the simulator stores and reports but does not authenticate.
+ * NONE makes the URL publicly invokable. AWS_IAM admits only a caller allowed
+ * `lambda:InvokeFunctionUrl` on the function, resolved from a SigV4 signature
+ * or from a named principal at the HTTP boundary.
  */
 export type SimLambdaFunctionUrlAuthType = "NONE" | "AWS_IAM";
 

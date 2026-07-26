@@ -246,14 +246,24 @@ as strings and everything else as base64, in both directions, decided by content
 controls the response, including `cookies` becoming `set-cookie` headers; any other return value
 becomes a 200 JSON response, as on AWS.
 
-A Function URL request is not attributed to a simulated principal: a `NONE` auth URL is invokable
-by anyone on AWS, so the controller invokes the function directly rather than through the Invoke
-command's IAM path. The function still runs as its execution Role.
+A `NONE` auth URL is invokable by anyone on AWS, so its requests are not attributed to a simulated
+principal and the controller invokes the function directly rather than through the Invoke command's
+IAM path.
 
-`AWS_IAM` URLs are stored and reported, but SigV4 signatures are not verified, so a served request
-to one is refused with 403 `{"Message":"Forbidden"}` rather than admitted unauthenticated. The
-endpoint's own error responses (403, 404 for an unknown or deleted URL, 502 for a handler error)
-are AWS-shaped JSON documents, though the exact wording is an approximation.
+An `AWS_IAM` URL goes through `serve/auth/`, which evaluates `lambda:InvokeFunctionUrl` on the
+function ARN against the caller the HTTP boundary resolved (`SimAwsServiceRequest.caller`, see
+`src/service/iam/request/`). That is a different IAM action from the `lambda:InvokeFunction` the
+Invoke command uses, as it is on AWS. The caller is passed to IAM as a `resolved` caller so an
+assumed-role session is judged against the Role behind it; a request that carried no identity is
+anonymous, owns no policies, and is denied by the same evaluation.
+
+Only an authorized `AWS_IAM` invocation is given a caller to describe in its event, which is what
+puts `requestContext.authorizer.iam` there and leaves it out for `NONE`
+(`serve/event/sim-lambda-url-iam-authorizer.ts`). Either way the function runs as its execution
+Role: who invoked it and what it runs as are separate questions.
+
+The endpoint's own error responses (403 for a denied caller, 404 for an unknown or deleted URL, 502
+for a handler error) are AWS-shaped JSON documents, though the exact wording is an approximation.
 
 ### CloudFormation
 
@@ -322,7 +332,8 @@ are not supported and are skipped by the CloudFormation engine with an "Unsuppor
 
 - `AWS::Lambda::*` CloudFormation resource types other than `AWS::Lambda::Function` and
   `AWS::Lambda::Url`
-- Function URL SigV4 verification, so `AWS_IAM` URLs refuse every served request
+- cross-account Function URL invocation, which needs a Lambda resource-based policy; `AWS_IAM`
+  URLs evaluate identity policies in the function's own Account only
 - Function URL `Cors` configuration and OPTIONS preflight handling
 - `InvokeMode: RESPONSE_STREAM`, which is accepted and reported but always served buffered
 - ES module function code (`.mjs` / `export` syntax) in the vm runtime

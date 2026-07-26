@@ -1,4 +1,7 @@
-import type { SimAwsPrincipal } from "../../aws/caller/sim-aws-caller.js";
+import type {
+  SimAwsCaller,
+  SimAwsPrincipal,
+} from "../../aws/caller/sim-aws-caller.js";
 import { simAwsCallerHeaderValue } from "./sim-aws-caller-header.js";
 
 /**
@@ -55,5 +58,20 @@ export class SimAwsRequestCaller {
    */
   toHeaderValue(): string {
     return simAwsCallerHeaderValue(this.principal);
+  }
+
+  /**
+   * This caller in the form simulated services pass to IAM authorization.
+   *
+   * The identity-policy principal travels with it, so an assumed-role session
+   * is authorized against the Role behind it rather than against a session ARN
+   * that owns no policies.
+   */
+  toCaller(): SimAwsCaller {
+    return {
+      kind: "resolved",
+      principal: this.principal,
+      identityPolicyPrincipal: this.identityPolicyPrincipal,
+    };
   }
 }

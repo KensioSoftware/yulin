@@ -22,6 +22,9 @@ Sim Lambda currently supports:
 - Function URLs, created with `CreateFunctionUrlConfigCommand` and served over real HTTP on
   localhost with `serveSimAws`, so application code can call a simulated function the way it calls
   a deployed one
+- `AuthType: "AWS_IAM"` Function URLs, authorizing `lambda:InvokeFunctionUrl` against the caller
+  resolved from the request and reporting it to the handler as
+  `requestContext.authorizer.iam`
 - Function code from three sources:
   - an in-process handler function passed via `makeLambdaZipFileInput(...)`
   - zip archive bytes on `Code.ZipFile` (build them with `makeLambdaCodeZip(...)`)
@@ -554,11 +557,115 @@ changes the `AuthType` or `InvokeMode` while keeping the same endpoint, and
 `404`. `ListFunctionUrlConfigsCommand` lists what a function has, which is either nothing or one
 configuration, since a function has at most one Function URL.
 
-A URL created with `AuthType: "AWS_IAM"` is stored and reported, but nothing yet evaluates
-`lambda:InvokeFunctionUrl` against the caller of a request, so serving one refuses every request
-with `403`. Use `AuthType: "NONE"` for URLs a test needs to call. The caller of a served request is
-resolved either way — see
-[callers of HTTP requests](../iam/#callers-of-http-requests) in the IAM docs.
+### IAM-authenticated Function URLs
+
+A URL created with `AuthType: "AWS_IAM"` invokes the function only for a caller allowed
+`lambda:InvokeFunctionUrl` on the function ARN, and answers `403` otherwise. That is a different
+action from `lambda:InvokeFunction`, which the Invoke API uses: real AWS separates the two so a
+policy can grant the HTTP endpoint without granting the SDK operation, and a policy naming only one
+of them does not grant the other here either.
+
+The caller comes from the request itself — a SigV4 signature, or an `x-sim-aws-caller` header
+naming a principal directly. A request that offers neither is anonymous, owns no policies, and is
+refused. See [callers of HTTP requests](../iam/#callers-of-http-requests) in the IAM docs for how
+that resolution works and how to sign a served request.
+
+An `AWS_IAM` invocation carries its caller into the event as
+`requestContext.authorizer.iam`, which is the part a handler reads. It is absent for a `NONE`
+invocation, as it is on real AWS, and `requestContext.accountId` is the caller's Account rather
+than `anonymous`.
+
+```typescript sim-lambda-function-url-iam-auth
+/**
+ * Invoking a simulated Lambda Function URL that requires IAM authentication.
+ */
+
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import {
+  CreateFunctionCommand,
+  CreateFunctionUrlConfigCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import {
+  type SimLambdaFunctionUrlEvent,
+  makeLambdaZipFileInput,
+} from "@kensio/yulin/lambda";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const roleArn = "arn:aws:iam::888888888888:role/Reporter";
+
+const created = await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "reporter",
+    Role: "arn:aws:iam::888888888888:role/ReporterExecutionRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput((event: SimLambdaFunctionUrlEvent) => ({
+        statusCode: 200,
+        body: `called by ${event.requestContext.authorizer?.iam.userArn ?? "nobody"}`,
+      })),
+    },
+  }),
+);
+
+const urlConfig = await simAws.lambda().createFunctionUrlConfig(
+  new CreateFunctionUrlConfigCommand({
+    FunctionName: "reporter",
+    AuthType: "AWS_IAM",
+  }),
+);
+
+// The Role that is allowed to call the endpoint.
+await simAws.iam().createRole(
+  new CreateRoleCommand({
+    RoleName: "Reporter",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { AWS: "arn:aws:iam::888888888888:root" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+
+await simAws.iam().putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "Reporter",
+    PolicyName: "InvokeReporterUrl",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: "lambda:InvokeFunctionUrl",
+        Resource: created.FunctionArn,
+      },
+    }),
+  }),
+);
+
+const srv = await serveSimAws({ simAws });
+
+try {
+  const url = srv.localUrl(urlConfig.FunctionUrl);
+
+  // Unauthenticated, so anonymous, so refused.
+  const refused = await fetch(url);
+  console.log(refused.status); // 403
+
+  // Named as the Role that is allowed to invoke.
+  const allowed = await fetch(url, {
+    headers: { "x-sim-aws-caller": roleArn },
+  });
+
+  console.log(allowed.status); // 200
+  console.log(await allowed.text()); // called by arn:aws:iam::888888888888:role/Reporter
+} finally {
+  srv.close();
+}
+```
 
 ## Environment variables
 
@@ -916,9 +1023,12 @@ Current documented limitations:
 
 - Only `CreateFunctionCommand`, `GetFunctionCommand`, `InvokeCommand`, and the Function URL config
   commands are supported — no `UpdateFunctionCode`, `DeleteFunction`, or function listing yet.
-- Function URLs with `AuthType: "AWS_IAM"` are stored and reported, and the caller of a served
-  request is resolved, but `lambda:InvokeFunctionUrl` is not evaluated against it, so serving one
-  refuses every request with `403`.
+- `AuthType: "AWS_IAM"` Function URLs evaluate `lambda:InvokeFunctionUrl` against identity policies
+  in the function's own Account. Cross-account invocation needs a Lambda resource-based policy,
+  which is not simulated yet.
+- `requestContext.authorizer.iam` reports `accessKey` as empty, and `callerId` and `userId` as the
+  caller ARN rather than the opaque unique id real AWS uses. `cognitoIdentity` and `principalOrgId`
+  are always null.
 - The Function URL `Cors` configuration is not simulated, including OPTIONS preflight handling.
 - `InvokeMode: "RESPONSE_STREAM"` is accepted and reported, but responses are always served
   buffered.
