@@ -18,6 +18,9 @@ import { SimAcmRegistry } from "../../acm/registry/sim-acm-registry.js";
 import { SimRoute53Registry } from "../../route53/registry/sim-route53-registry.js";
 import type { SimIam } from "../../iam/index.js";
 import { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
+import { SimIamAccessKeyRegistry } from "../../iam/registry/sim-iam-access-key-registry.js";
+import { SimIamGlobalCredentialResolver } from "../../iam/registry/sim-iam-global-credential-resolver.js";
+import { SimIamSigV4Verifier } from "../../iam/sigv4/sim-iam-sigv4-verifier.js";
 import { SimLambda } from "../../lambda/index.js";
 import { SimLambdaUrlRegistry } from "../../lambda/registry/sim-lambda-url-registry.js";
 import { SimS3LambdaCodeStore } from "../../lambda/function/code/store/sim-s3-lambda-code-store.js";
@@ -60,6 +63,26 @@ export class SimAwsServiceFactory {
    * instance so cross-account services can resolve Account-owned IAM state.
    */
   public readonly iamRegistry = new SimIamRegistry();
+
+  /**
+   * Shared index of which Account owns each simulated access key.
+   *
+   * A SigV4 signed request names an access key but not an Account, so this is
+   * what lets a signature be traced back to the IAM that issued it.
+   * @internal
+   */
+  public readonly accessKeyRegistry = new SimIamAccessKeyRegistry();
+
+  /**
+   * Verifies SigV4 signatures made with any access key in this simulation.
+   * @internal
+   */
+  public readonly signedRequests = new SimIamSigV4Verifier({
+    credentials: new SimIamGlobalCredentialResolver({
+      accessKeys: this.accessKeyRegistry,
+      iam: this.iamRegistry,
+    }),
+  });
 
   /**
    * Shared simulated Lambda Function URL registry.
@@ -112,6 +135,7 @@ export class SimAwsServiceFactory {
       cloudFrontRegistry: this.cloudFrontRegistry,
       route53Registry: this.route53Registry,
       iamRegistry: this.iamRegistry,
+      accessKeyRegistry: this.accessKeyRegistry,
     });
   }
 

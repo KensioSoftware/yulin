@@ -3,11 +3,13 @@ import type {
   SimIamCredentialIdentity,
 } from "./sim-aws-credentials.js";
 import type { SimIamAccessKey } from "./sim-iam-access-key.js";
+import { SimIamAccessKeyChecks } from "./sim-iam-access-key-checks.js";
 import {
   SimIamDuplicateAccessKey,
   SimIamInvalidCredentials,
 } from "./error/sim-iam-credential.error.js";
 import { type SimClock, SimRealClock } from "../../../util/clock/sim-clock.js";
+import type { SimIamAccessKeyIndex } from "./sim-iam-signing-credential.js";
 
 interface SimIamCredentialRegistryProperties {
   /**
@@ -15,6 +17,11 @@ interface SimIamCredentialRegistryProperties {
    * simulated state, so it is judged in simulated time rather than host time.
    */
   readonly clock?: SimClock;
+  /**
+   * Simulation-wide index told about every key registered here, so a signed
+   * request naming only an access key id can be traced back to this Account.
+   */
+  readonly accessKeyIndex?: SimIamAccessKeyIndex | undefined;
 }
 
 /**
@@ -27,9 +34,12 @@ interface SimIamCredentialRegistryProperties {
 export class SimIamCredentialRegistry {
   private readonly accessKeys = new Map<string, SimIamAccessKey>();
   private readonly clock: SimClock;
+  private readonly accessKeyIndex?: SimIamAccessKeyIndex | undefined;
+  private readonly checks = new SimIamAccessKeyChecks();
 
   constructor(properties: SimIamCredentialRegistryProperties = {}) {
     this.clock = properties.clock ?? new SimRealClock();
+    this.accessKeyIndex = properties.accessKeyIndex;
   }
 
   /**
@@ -41,6 +51,7 @@ export class SimIamCredentialRegistry {
     }
 
     this.accessKeys.set(accessKey.accessKeyId, accessKey);
+    this.accessKeyIndex?.registerAccessKey(accessKey.accessKeyId);
   }
 
   /**
@@ -50,22 +61,7 @@ export class SimIamCredentialRegistry {
     credentials: SimAwsCredentials,
     now: Date = this.clock.now(),
   ): SimIamCredentialIdentity {
-    const accessKey = this.accessKeys.get(credentials.accessKeyId);
-
-    if (accessKey === undefined) {
-      throw new SimIamInvalidCredentials({
-        accessKeyId: credentials.accessKeyId,
-        reason: "unknown-access-key",
-      });
-    }
-
-    if (accessKey.status !== "Active") {
-      throw new SimIamInvalidCredentials({
-        accessKeyId: credentials.accessKeyId,
-        reason: "inactive-access-key",
-        accessKeyStatus: accessKey.status,
-      });
-    }
+    const accessKey = this.activeAccessKey(credentials.accessKeyId);
 
     if (!accessKey.matchesSecretAccessKey(credentials.secretAccessKey)) {
       throw new SimIamInvalidCredentials({
@@ -74,44 +70,35 @@ export class SimIamCredentialRegistry {
       });
     }
 
-    if (
-      accessKey.session !== undefined &&
-      credentials.sessionToken === undefined
-    ) {
-      throw new SimIamInvalidCredentials({
-        accessKeyId: credentials.accessKeyId,
-        reason: "session-token-missing",
-      });
-    }
-
-    if (
-      accessKey.session === undefined &&
-      credentials.sessionToken !== undefined
-    ) {
-      throw new SimIamInvalidCredentials({
-        accessKeyId: credentials.accessKeyId,
-        reason: "session-token-unexpected",
-      });
-    }
-
-    if (
-      accessKey.session !== undefined &&
-      !accessKey.matchesSessionToken(credentials.sessionToken)
-    ) {
-      throw new SimIamInvalidCredentials({
-        accessKeyId: credentials.accessKeyId,
-        reason: "session-token-mismatch",
-      });
-    }
-
-    if (accessKey.session?.isExpired(now) === true) {
-      throw new SimIamInvalidCredentials({
-        accessKeyId: credentials.accessKeyId,
-        reason: "expired-session",
-        expiration: accessKey.session.expiration,
-      });
-    }
+    this.checks.checkSessionToken(accessKey, credentials.sessionToken);
+    this.checks.checkNotExpired(accessKey, now);
 
     return accessKey.identity();
+  }
+
+  /**
+   * Authenticate an access key without a secret to compare.
+   *
+   * A signed request proves possession of the secret by its signature rather
+   * than by presenting it, so everything except the secret is checked here and
+   * the signature settles the rest.
+   */
+  authenticateAccessKey(
+    accessKeyId: string,
+    sessionToken: string | undefined,
+    now: Date = this.clock.now(),
+  ): SimIamAccessKey {
+    const accessKey = this.activeAccessKey(accessKeyId);
+
+    this.checks.checkSessionToken(accessKey, sessionToken);
+    this.checks.checkNotExpired(accessKey, now);
+
+    return accessKey;
+  }
+
+  private activeAccessKey(accessKeyId: string): SimIamAccessKey {
+    return this.checks.activeAccessKey(this.accessKeys.get(accessKeyId), {
+      accessKeyId,
+    });
   }
 }

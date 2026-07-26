@@ -31,6 +31,8 @@ import type { SimSts } from "../sts/sim-sts.js";
 import type { SimAwsPrincipal } from "./caller/sim-aws-caller.js";
 import { simAwsRunAsContext } from "./caller/sim-aws-run-as-context.js";
 import type { SimClock } from "../../util/clock/sim-clock.js";
+import type { SimIamCredentialIdentity } from "../iam/credential/sim-aws-credentials.js";
+import { simIamSigV4SignedRequest } from "../iam/sigv4/sim-iam-sigv4-signed-request.js";
 
 interface SimAwsProperties {
   readonly defaultAccountId?: SimAwsAccountId;
@@ -96,6 +98,28 @@ export class SimAws {
    */
   now(): Date {
     return this.background.now();
+  }
+
+  /**
+   * Verify the SigV4 signature on an HTTP request and resolve who signed it.
+   *
+   * This answers the question an HTTP request cannot otherwise answer: which
+   * simulated principal made it. The resulting identity is what IAM
+   * authorization already knows how to work with.
+   *
+   * Verification spans every Account, because a signature names an access key
+   * and not an Account. The body is passed separately, since a request body can
+   * only be read once and whoever serves the request needs the same bytes.
+   *
+   * Throws a SimIamSigV4Error carrying the AWS error code real AWS would use.
+   */
+  verifySignedRequest(
+    request: Request,
+    body?: Uint8Array,
+  ): SimIamCredentialIdentity {
+    return this.serviceFactory.signedRequests.verify(
+      simIamSigV4SignedRequest(request, body),
+    );
   }
 
   /**

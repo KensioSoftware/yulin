@@ -12,6 +12,11 @@ import { SimRoute53 } from "../../route53/index.js";
 import type { SimRoute53Registry } from "../../route53/registry/sim-route53-registry.js";
 import { SimIam } from "../../iam/index.js";
 import type { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
+import {
+  SimIamAccountAccessKeyIndex,
+  type SimIamAccessKeyRegistry,
+} from "../../iam/registry/sim-iam-access-key-registry.js";
+import { SimIamCredentialRegistry } from "../../iam/credential/sim-iam-credential-registry.js";
 import { Memo } from "../../../util/memo/memo.js";
 import { accountServiceCacheKey } from "./account-service-cache-key.js";
 
@@ -22,6 +27,7 @@ interface SimAwsAccountServiceCacheProperties {
   readonly cloudFrontRegistry: SimCloudFrontRegistry;
   readonly route53Registry: SimRoute53Registry;
   readonly iamRegistry: SimIamRegistry;
+  readonly accessKeyRegistry: SimIamAccessKeyRegistry;
 }
 
 /**
@@ -50,6 +56,7 @@ export class SimAwsAccountServiceCache {
   private readonly acmRegistry: SimAcmRegistry;
   private readonly cloudFrontRegistry: SimCloudFrontRegistry;
   private readonly iamRegistry: SimIamRegistry;
+  private readonly accessKeyRegistry: SimIamAccessKeyRegistry;
   private readonly route53Registry: SimRoute53Registry;
 
   /**
@@ -67,6 +74,7 @@ export class SimAwsAccountServiceCache {
     this.acmRegistry = properties.acmRegistry;
     this.cloudFrontRegistry = properties.cloudFrontRegistry;
     this.iamRegistry = properties.iamRegistry;
+    this.accessKeyRegistry = properties.accessKeyRegistry;
     this.route53Registry = properties.route53Registry;
   }
 
@@ -100,6 +108,15 @@ export class SimAwsAccountServiceCache {
         const iam = new SimIam({
           accountRegionScope: scope.accountRegionScope,
           background: this.background,
+          // Access keys are indexed simulation-wide as they are issued, so a
+          // signed request naming only a key id can be traced to this Account.
+          credentialRegistry: new SimIamCredentialRegistry({
+            clock: this.background,
+            accessKeyIndex: new SimIamAccountAccessKeyIndex(
+              this.accessKeyRegistry,
+              scope.accountRegionScope.accountId,
+            ),
+          }),
         });
 
         this.iamRegistry.register(scope.accountRegionScope.accountId, iam);
