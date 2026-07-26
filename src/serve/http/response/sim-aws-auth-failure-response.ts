@@ -2,6 +2,7 @@ import {
   SimAwsInvalidCallerHeader,
   type SimAwsRequestAuthFailure,
 } from "../../../service/iam/request/error/sim-aws-request-auth.error.js";
+import { SimIamIncompleteSignature } from "../../../service/iam/sigv4/error/sim-iam-sigv4.error.js";
 import { SimAwsResponseHints } from "./sim-aws-response-hints.js";
 
 /**
@@ -26,14 +27,27 @@ export class SimAwsAuthFailureResponse {
   }
 
   private rejectedResponse(failure: SimAwsRequestAuthFailure): Response {
-    // A malformed simulator control header is a mistake in driving Yulin
-    // rather than a failed AWS authentication, so it is a bad request. Every
-    // SigV4 rejection is a 403, as it is on real AWS.
-    if (failure instanceof SimAwsInvalidCallerHeader) {
+    if (this.isBadRequest(failure)) {
       return this.jsonResponse(400, "Bad Request", failure.code);
     }
 
     return this.jsonResponse(403, "Forbidden", failure.code);
+  }
+
+  /**
+   * Whether the request was malformed rather than unauthenticated.
+   *
+   * A caller header the simulator cannot read is a mistake in driving Yulin
+   * rather than a failed AWS authentication. A signature too incomplete to
+   * parse is the one SigV4 rejection real AWS also answers with a 400, because
+   * nothing was presented that could have been authenticated; every other SigV4
+   * rejection is a 403.
+   */
+  private isBadRequest(failure: SimAwsRequestAuthFailure): boolean {
+    return (
+      failure instanceof SimAwsInvalidCallerHeader ||
+      failure instanceof SimIamIncompleteSignature
+    );
   }
 
   private jsonResponse(

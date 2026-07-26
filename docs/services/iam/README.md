@@ -560,19 +560,21 @@ that check the only symptom would be a signature mismatch with nothing to act on
 ### What the simulator reports back
 
 Every served response carries the simulator's own account of the request in headers, leaving the
-response body the shape the real service returns:
+response body the shape the real service returns. Which headers appear depends on whether the
+request was accepted:
 
-| Header                   | Meaning                                                                                  |
-| ------------------------ | ---------------------------------------------------------------------------------------- |
-| `x-sim-aws-caller`       | The principal the request was attributed to, in the same form the request header accepts |
-| `x-sim-aws-auth`         | How that was decided: `caller-header`, `sigv4`, `none`, or `rejected`                    |
-| `x-sim-aws-error`        | On a refusal, the AWS error code, such as `SignatureDoesNotMatch`                        |
-| `x-sim-aws-error-detail` | On a refusal, what the simulator can say about why                                       |
+| Header                   | On an accepted request                                                                   | On a refused request                                |
+| ------------------------ | ---------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| `x-sim-aws-caller`       | The principal the request was attributed to, in the same form the request header accepts | Absent — there is no principal to report            |
+| `x-sim-aws-auth`         | How that was decided: `caller-header`, `sigv4`, or `none`                                | `rejected`                                          |
+| `x-sim-aws-error`        | Absent                                                                                   | The AWS error code, such as `SignatureDoesNotMatch` |
+| `x-sim-aws-error-detail` | Absent                                                                                   | What the simulator can say about why                |
 
 A refused request is answered as real AWS answers it: `403` with `{"Message":"Forbidden"}` for a
-rejected signature, and `400` for an `x-sim-aws-caller` value that names no principal form. Real
-AWS has nowhere in that body to explain itself and neither does this, which is why the detail goes
-in `x-sim-aws-error-detail` where it changes nothing for a client parsing the response.
+rejected signature, and `400` for a signature too incomplete to parse or an `x-sim-aws-caller`
+value that names no principal form. Real AWS has nowhere in that body to explain itself and neither
+does this, which is why the detail goes in `x-sim-aws-error-detail` where it changes nothing for a
+client parsing the response.
 
 ## Authorizing other simulated services
 

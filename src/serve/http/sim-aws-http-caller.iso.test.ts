@@ -179,6 +179,25 @@ describe("The caller of a served simulated AWS request", () => {
     );
   });
 
+  it("refuses a signature too incomplete to parse as a bad request", async () => {
+    // Given a request whose Authorization header states the algorithm but not
+    // the parts a signature is made of
+    const simAws = new SimAws();
+    const url = await serveHeaderEcho(simAws);
+
+    // When it is served
+    const response = await new SimAwsHttp({ simAws }).fetch(url, {
+      headers: { authorization: "AWS4-HMAC-SHA256 SignedHeaders=host" },
+    });
+
+    // Then it is a 400, as real AWS answers IncompleteSignature: nothing was
+    // presented that could have been authenticated in the first place
+    expect(response.status).toBe(400);
+    expect(response.headers.get(simAwsErrorHeaderName)).toBe(
+      "IncompleteSignature",
+    );
+  });
+
   it("refuses a caller header it cannot read as a principal", async () => {
     // Given a Function URL served on localhost
     const simAws = new SimAws();
