@@ -11,12 +11,14 @@ const cdkBootstrapAssetsBucketPattern =
 /**
  * Skips functions whose code lives in a missing CDK bootstrap assets bucket.
  *
- * CDK-synthesized templates include helper functions, such as the CDK
- * BucketDeployment provider, whose code zip lives in the CDK bootstrap assets
- * bucket. That bucket does not exist in sim AWS, and sim CloudFormation
- * simulates the CDK custom resources directly instead of running their
- * provider functions. The "Unsupported sim ... CloudFormation" wording marks
- * the Resource as skipped rather than failing the stack.
+ * Deploying from a synthesized template file publishes the cloud assembly's
+ * assets into that bucket in sim S3 first, so asset-bundled function code is
+ * normally found there. This skip covers what is left: a CDK-shaped template
+ * deployed without its cloud assembly, such as a template object passed
+ * inline, where there is no asset to publish and nothing to fetch.
+ *
+ * The "Unsupported sim ... CloudFormation" wording marks the Resource as
+ * skipped rather than failing the stack.
  */
 export class SimCfnLambdaCdkAssetsSkip {
   /**
@@ -36,7 +38,10 @@ export class SimCfnLambdaCdkAssetsSkip {
 
     return new Error(
       `Unsupported sim Lambda CloudFormation Resource ${resource.logicalId}: ` +
-        `function code from missing CDK bootstrap assets bucket ${bucketName}`,
+        `function code from missing CDK bootstrap assets bucket ${bucketName}. ` +
+        `Deploy from a synthesized CDK template file so its cloud assembly ` +
+        `assets can be published, or bind a real in-process handler to this ` +
+        `function.`,
     );
   }
 

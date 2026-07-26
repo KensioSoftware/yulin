@@ -11,6 +11,7 @@ import { SimCfnStackResourceCreator } from "./deploy/sim-cfn-stack-resource-crea
 import { makeSimCfnStackResourceMap } from "./resource-map/sim-cfn-stack-resource-map.js";
 import { SimCfnStackDeploymentLifecycle } from "./deploy/sim-cfn-stack-deployment-lifecycle.js";
 import type { SimCdkOutContext } from "../cdk/sim-cdk-out-context.js";
+import { SimCdkAssetsPublisher } from "../cdk/assets/sim-cdk-assets-publisher.js";
 import type { SimCfnExecutableResourceBinding } from "../bind/sim-cfn-exec-binding.type.js";
 import type { SimCfnStackOutput } from "./output/sim-cfn-stack-output.js";
 import { SimCfnStackOutputResolver } from "./output/sim-cfn-stack-output-resolver.js";
@@ -58,6 +59,7 @@ export class SimCfnStack {
   public outputs = new Map<string, SimCfnStackOutput>();
 
   private readonly simAws: SimAws;
+  private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly cfnTemplate: SimCfnTemplate;
   private readonly cdkOutContext: SimCdkOutContext | undefined;
   private readonly bindings:
@@ -76,6 +78,7 @@ export class SimCfnStack {
     } = properties;
 
     this.simAws = simAws;
+    this.accountRegionScope = accountRegionScope;
     this.stackName = stackName;
     this.cfnTemplate = template;
     this.cdkOutContext = cdkOutContext;
@@ -132,8 +135,19 @@ export class SimCfnStack {
   /**
    * Delegate resource dependency ordering and creation to the resource
    * creator.
+   *
+   * CDK cloud assembly assets are published into sim S3 first, as a real
+   * `cdk deploy` publishes them before CloudFormation processes the template
+   * that references them.
    */
   private async createResources(): Promise<void> {
+    await new SimCdkAssetsPublisher({
+      simAws: this.simAws,
+      accountRegionScope: this.accountRegionScope,
+      stackName: this.stackName,
+      cdkOutContext: this.cdkOutContext,
+    }).publish();
+
     const resourceCreator = new SimCfnStackResourceCreator({
       simAws: this.simAws,
       resources: this.resources,

@@ -13,6 +13,7 @@ export interface SimCdkAssetsManifest {
       readonly destinations?: Record<
         string,
         {
+          readonly bucketName?: string | undefined;
           readonly objectKey?: string | undefined;
         }
       >;
