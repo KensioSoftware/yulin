@@ -182,13 +182,23 @@ describe("Simulated Lambda function resource policies", () => {
       new GetPolicyCommand({ FunctionName: "greeter" }),
     );
 
-    // When another is granted
+    // When another is granted, and then revoked again
     await grant("Second");
     const second = await lambda.getPolicy(
       new GetPolicyCommand({ FunctionName: "greeter" }),
     );
+    await lambda.removePermission(
+      new RemovePermissionCommand({
+        FunctionName: "greeter",
+        StatementId: "Second",
+      }),
+    );
+    const third = await lambda.getPolicy(
+      new GetPolicyCommand({ FunctionName: "greeter" }),
+    );
 
-    // Then the revision moves, as it does on AWS
+    // Then the revision moves each time, as it does on AWS
     expect(second.RevisionId).not.toBe(first.RevisionId);
+    expect(third.RevisionId).not.toBe(second.RevisionId);
   });
 });

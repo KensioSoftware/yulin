@@ -271,10 +271,13 @@ Invoke command uses, as it is on AWS. The caller is passed to IAM as a `resolved
 assumed-role session is judged against the Role behind it; a request that carried no identity is
 anonymous, owns no policies, and is denied by the same evaluation.
 
-Both sides of Lambda authorization are supplied: the caller's identity policies, which IAM finds
-itself, and the function's own resource policy, passed in by
-`command/authorize/sim-lambda-resource-policies.ts`. The URL's auth type travels with it as the
-`lambda:FunctionUrlAuthType` condition value, which is what a Function URL grant conditions on.
+Authorization is evaluated by the IAM of the Account that owns the function, against two policy
+sources: identity policies, which that IAM finds itself and which therefore only exist for a caller
+in the same Account, and the function's own resource policy, passed in by
+`command/authorize/sim-lambda-resource-policies.ts`. A caller from another Account has no identity
+policies here — its own Account's are not consulted — so a resource policy is the only thing that
+can allow it. The URL's auth type travels with the request as the `lambda:FunctionUrlAuthType`
+condition value, which is what a Function URL grant conditions on.
 
 Only an authorized `AWS_IAM` invocation is given a caller to describe in its event, which is what
 puts `requestContext.authorizer.iam` there and leaves it out for `NONE`
