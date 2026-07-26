@@ -828,3 +828,5 @@ full IAM feature set. Notable gaps:
 - The resolved caller is evaluated by Lambda Function URLs with `AuthType: "AWS_IAM"`, but not yet
   by the other services that serve HTTP: served S3 objects and CloudFront responses perform no
   authorization
+- A cross-account call is allowed by the target's resource policy alone. Real AWS also requires the
+  caller's own Account to allow the action, and that second side is not evaluated

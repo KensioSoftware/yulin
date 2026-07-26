@@ -82,11 +82,15 @@ export class InvokeCommandHandler implements CommandHandler<
       this.accountRegionScope,
       command.input.FunctionName,
     );
-    this.authorizer.authorize(functionArn, options?.caller);
-
     const simFunction = this.functions.get(
       command.input.FunctionName as SimLambdaFunctionName,
     );
+
+    // Looked up before authorizing, because the function's own resource policy
+    // is part of what decides the answer, but still reported as missing only
+    // after authorization, as AWS orders the two.
+    this.authorizer.authorize(functionArn, options?.caller, simFunction);
+
     if (simFunction === undefined) {
       throw new SimLambdaResourceNotFoundException(
         `Function not found: ${functionArn}`,

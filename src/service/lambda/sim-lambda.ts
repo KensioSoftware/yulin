@@ -13,50 +13,41 @@ import {
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
 import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import { SimLambdaCloudFormationResourceFactory } from "./cfn/sim-cfn-lambda-resource-factory.js";
-import { CreateFunctionCommandHandler } from "./command/create-function/create-function.handler.js";
 import type { SimLambdaCodeStore } from "./function/code/store/sim-lambda-code-store.js";
 import type { SimLambdaVmSdkModuleProvider } from "./function/code/vm/sdk/sim-lambda-vm-sdk-module-provider.js";
 import { SimLambdaEnvironmentConflicts } from "./function/environment/sim-lambda-environment-conflicts.js";
+import { SimLambdaFunctionCommands } from "./command/function/sim-lambda-function-commands.js";
 import type {
   SimLambdaFunction,
   SimLambdaFunctionMap,
   SimLambdaFunctionName,
 } from "./function/sim-lambda-function.js";
+import { SimLambdaFunctionUrlCommands } from "./command/function-url/sim-lambda-function-url-commands.js";
+import { SimLambdaPermissionCommands } from "./command/permission/sim-lambda-permission-commands.js";
 import type {
+  SimAddPermissionCommand,
+  SimAddPermissionCommandOutput,
   SimCreateFunctionCommand,
   SimCreateFunctionCommandOutput,
-} from "./command/create-function/create-function.command.js";
-import { GetFunctionCommandHandler } from "./command/get-function/get-function.handler.js";
-import type {
-  SimGetFunctionCommand,
-  SimGetFunctionCommandOutput,
-} from "./command/get-function/get-function.command.js";
-import { InvokeCommandHandler } from "./command/invoke/invoke.handler.js";
-import type {
-  SimInvokeCommand,
-  SimInvokeCommandOutput,
-} from "./command/invoke/invoke.command.js";
-import type {
   SimCreateFunctionUrlConfigCommand,
   SimCreateFunctionUrlConfigCommandOutput,
-} from "./command/create-function-url-config/create-function-url-config.command.js";
-import type {
-  SimGetFunctionUrlConfigCommand,
-  SimGetFunctionUrlConfigCommandOutput,
-} from "./command/get-function-url-config/get-function-url-config.command.js";
-import type {
-  SimUpdateFunctionUrlConfigCommand,
-  SimUpdateFunctionUrlConfigCommandOutput,
-} from "./command/update-function-url-config/update-function-url-config.command.js";
-import type {
   SimDeleteFunctionUrlConfigCommand,
   SimDeleteFunctionUrlConfigCommandOutput,
-} from "./command/delete-function-url-config/delete-function-url-config.command.js";
-import type {
+  SimGetFunctionCommand,
+  SimGetFunctionCommandOutput,
+  SimGetFunctionUrlConfigCommand,
+  SimGetFunctionUrlConfigCommandOutput,
+  SimGetPolicyCommand,
+  SimGetPolicyCommandOutput,
+  SimInvokeCommand,
+  SimInvokeCommandOutput,
   SimListFunctionUrlConfigsCommand,
   SimListFunctionUrlConfigsCommandOutput,
-} from "./command/list-function-url-configs/list-function-url-configs.command.js";
-import { SimLambdaFunctionUrlCommands } from "./command/function-url/sim-lambda-function-url-commands.js";
+  SimRemovePermissionCommand,
+  SimRemovePermissionCommandOutput,
+  SimUpdateFunctionUrlConfigCommand,
+  SimUpdateFunctionUrlConfigCommandOutput,
+} from "./command/sim-lambda-command.types.js";
 import { SimLambdaFunctionLookup } from "./function/url/sim-lambda-function-lookup.js";
 import { SimLambdaFunctionUrlStore } from "./function/url/sim-lambda-function-url-store.js";
 import type {
@@ -87,15 +78,10 @@ export class SimLambda {
   private readonly functions: SimLambdaFunctionMap = new Map();
   private readonly functionUrls: SimLambdaFunctionUrlStore;
   private readonly functionLookup: SimLambdaFunctionLookup;
+  private readonly functionCommands: SimLambdaFunctionCommands;
   private readonly functionUrlCommands: SimLambdaFunctionUrlCommands;
+  private readonly permissionCommands: SimLambdaPermissionCommands;
 
-  private readonly accountRegionScope: SimAwsAccountRegionScope;
-  private readonly iam: SimIamInterServiceAuthZ;
-  private readonly background: BackgroundScheduler;
-  private readonly runAsOwner: SimAwsRunAsOwner;
-  private readonly codeStore: SimLambdaCodeStore | undefined;
-  private readonly vmSdkModuleProvider:
-    SimLambdaVmSdkModuleProvider | undefined;
   /**
    * Shared across function creations so a conflicting environment variable is
    * only reported once for this simulated Lambda.
@@ -120,7 +106,6 @@ export class SimLambda {
       urlRegistry = new SimLambdaUrlRegistry(),
     } = properties;
 
-    this.accountRegionScope = accountRegionScope;
     this.functionLookup = new SimLambdaFunctionLookup({
       accountRegionScope,
       functions: this.functions,
@@ -136,14 +121,24 @@ export class SimLambda {
       iam,
       background,
     });
-    this.iam = iam;
-    this.background = background;
-    this.codeStore = codeStore;
-    this.vmSdkModuleProvider = vmSdkModuleProvider;
-    // Ambient execution-role callers are tracked per owning SimAws instance.
-    // A standalone SimLambda is its own little universe, so it owns its own
-    // ambient callers.
-    this.runAsOwner = properties.runAsOwner ?? this;
+    this.permissionCommands = new SimLambdaPermissionCommands({
+      functions: this.functionLookup,
+      iam,
+      background,
+    });
+    this.functionCommands = new SimLambdaFunctionCommands({
+      accountRegionScope,
+      functions: this.functions,
+      iam,
+      background,
+      // Ambient execution-role callers are tracked per owning SimAws instance.
+      // A standalone SimLambda is its own little universe, so it owns its own
+      // ambient callers.
+      runAsOwner: properties.runAsOwner ?? this,
+      environmentConflicts: this.environmentConflicts,
+      codeStore,
+      vmSdkModuleProvider,
+    });
   }
 
   /**
@@ -153,17 +148,7 @@ export class SimLambda {
     command: SimCreateFunctionCommand,
     options?: SimLambdaRequestOptions,
   ): Promise<SimCreateFunctionCommandOutput> {
-    const handler = new CreateFunctionCommandHandler({
-      accountRegionScope: this.accountRegionScope,
-      functions: this.functions,
-      runAsOwner: this.runAsOwner,
-      iam: this.iam,
-      background: this.background,
-      codeStore: this.codeStore,
-      vmSdkModuleProvider: this.vmSdkModuleProvider,
-      environmentConflicts: this.environmentConflicts,
-    });
-    return await handler.handle(command, options);
+    return await this.functionCommands.create(command, options);
   }
 
   /**
@@ -173,13 +158,7 @@ export class SimLambda {
     command: SimGetFunctionCommand,
     options?: SimLambdaRequestOptions,
   ): Promise<SimGetFunctionCommandOutput> {
-    const handler = new GetFunctionCommandHandler({
-      accountRegionScope: this.accountRegionScope,
-      functions: this.functions,
-      iam: this.iam,
-      background: this.background,
-    });
-    return await handler.handle(command, options);
+    return await this.functionCommands.get(command, options);
   }
 
   /**
@@ -189,13 +168,7 @@ export class SimLambda {
     command: SimInvokeCommand,
     options?: SimLambdaRequestOptions,
   ): Promise<SimInvokeCommandOutput> {
-    const handler = new InvokeCommandHandler({
-      accountRegionScope: this.accountRegionScope,
-      functions: this.functions,
-      iam: this.iam,
-      background: this.background,
-    });
-    return await handler.handle(command, options);
+    return await this.functionCommands.invoke(command, options);
   }
 
   /**
@@ -246,6 +219,36 @@ export class SimLambda {
     options?: SimLambdaRequestOptions,
   ): Promise<SimListFunctionUrlConfigsCommandOutput> {
     return await this.functionUrlCommands.list(command, options);
+  }
+
+  /**
+   * Handle an Add Permission Command from the SDK.
+   */
+  async addPermission(
+    command: SimAddPermissionCommand,
+    options?: SimLambdaRequestOptions,
+  ): Promise<SimAddPermissionCommandOutput> {
+    return await this.permissionCommands.add(command, options);
+  }
+
+  /**
+   * Handle a Remove Permission Command from the SDK.
+   */
+  async removePermission(
+    command: SimRemovePermissionCommand,
+    options?: SimLambdaRequestOptions,
+  ): Promise<SimRemovePermissionCommandOutput> {
+    return await this.permissionCommands.remove(command, options);
+  }
+
+  /**
+   * Handle a Get Policy Command from the SDK.
+   */
+  async getPolicy(
+    command: SimGetPolicyCommand,
+    options?: SimLambdaRequestOptions,
+  ): Promise<SimGetPolicyCommandOutput> {
+    return await this.permissionCommands.getPolicy(command, options);
   }
 
   /**

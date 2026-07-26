@@ -1,7 +1,7 @@
 import { assertIdentical } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
-import { simCfnLambdaUrlFunctionName } from "./sim-cfn-lambda-url-target.js";
+import { simCfnLambdaTargetFunctionName } from "./sim-cfn-lambda-target-function.js";
 
 describe("AWS::Lambda::Url target function name", () => {
   it("takes the function name out of a function ARN", () => {
@@ -10,7 +10,7 @@ describe("AWS::Lambda::Url target function name", () => {
       "arn:aws:lambda:eu-west-2:111111111111:function:greeter";
 
     // When the target function name is read.
-    const functionName = simCfnLambdaUrlFunctionName(targetFunctionArn);
+    const functionName = simCfnLambdaTargetFunctionName(targetFunctionArn);
 
     // Then it is the function the ARN names.
     assertIdentical(functionName, "greeter");
@@ -22,7 +22,7 @@ describe("AWS::Lambda::Url target function name", () => {
       "arn:aws:lambda:eu-west-2:111111111111:function:greeter:live";
 
     // When the target function name is read.
-    const functionName = simCfnLambdaUrlFunctionName(targetFunctionArn);
+    const functionName = simCfnLambdaTargetFunctionName(targetFunctionArn);
 
     // Then the qualifier is dropped, as qualified URLs are not simulated.
     assertIdentical(functionName, "greeter");
@@ -33,7 +33,7 @@ describe("AWS::Lambda::Url target function name", () => {
     const targetFunctionArn = "greeter";
 
     // When the target function name is read.
-    const functionName = simCfnLambdaUrlFunctionName(targetFunctionArn);
+    const functionName = simCfnLambdaTargetFunctionName(targetFunctionArn);
 
     // Then it is used as it is.
     assertIdentical(functionName, "greeter");

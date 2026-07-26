@@ -25,6 +25,8 @@ Sim Lambda currently supports:
 - `AuthType: "AWS_IAM"` Function URLs, authorizing `lambda:InvokeFunctionUrl` against the caller
   resolved from the request and reporting it to the handler as
   `requestContext.authorizer.iam`
+- Function resource-based policies with `AddPermissionCommand`, `RemovePermissionCommand` and
+  `GetPolicyCommand`, evaluated alongside identity policies, including cross-account invocation
 - Function code from three sources:
   - an in-process handler function passed via `makeLambdaZipFileInput(...)`
   - zip archive bytes on `Code.ZipFile` (build them with `makeLambdaCodeZip(...)`)
@@ -41,8 +43,8 @@ Sim Lambda currently supports:
   `lambda:GetFunction`, `lambda:InvokeFunction`, and the Function URL config actions)
 - AWS-like validation and errors, such as `ResourceConflictException` for duplicate function names
   and `Could not unzip uploaded file` for invalid zip bytes
-- CloudFormation resources `AWS::Lambda::Function` and `AWS::Lambda::Url`, with `Ref`/`Fn::GetAtt`
-  support and deploy-time executable bindings
+- CloudFormation resources `AWS::Lambda::Function`, `AWS::Lambda::Url` and
+  `AWS::Lambda::Permission`, with `Ref`/`Fn::GetAtt` support and deploy-time executable bindings
 
 Real `LambdaClient` instances can also be routed into sim Lambda with
 [SDK interception](../../sdk/ "Simulated AWS SDK interception docs").
@@ -667,6 +669,100 @@ try {
 }
 ```
 
+## Resource-based policies
+
+A function's resource-based policy is the other half of Lambda authorization. An identity policy
+says what a principal may do; a resource policy says who may act on the function. Either one is
+enough to allow a call within the same Account, and a resource policy is the _only_ thing that can
+allow a principal from another Account, because that principal's own policies live somewhere the
+function's Account never sees.
+
+`AddPermissionCommand` grants a statement, `RemovePermissionCommand` revokes it by `StatementId`,
+and `GetPolicyCommand` returns the assembled document. `AddPermission` is a shorthand for writing a
+statement — Lambda expands the parts into one — so the statement it returns is the clearest account
+of what a grant actually means:
+
+```typescript sim-lambda-add-permission
+/**
+ * Granting another Account permission to invoke a simulated Lambda function.
+ */
+
+import {
+  AddPermissionCommand,
+  CreateFunctionCommand,
+  GetPolicyCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+
+await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "greeter",
+    Role: "arn:aws:iam::888888888888:role/GreeterRole",
+    Code: { ZipFile: makeLambdaZipFileInput(() => "hello") },
+  }),
+);
+
+const added = await simAws.lambda().addPermission(
+  new AddPermissionCommand({
+    FunctionName: "greeter",
+    StatementId: "AllowOtherAccount",
+    Action: "lambda:InvokeFunctionUrl",
+    Principal: "222222222222",
+    FunctionUrlAuthType: "AWS_IAM",
+  }),
+);
+
+// The statement the shorthand expanded into.
+console.log(added.Statement);
+
+const policy = await simAws
+  .lambda()
+  .getPolicy(new GetPolicyCommand({ FunctionName: "greeter" }));
+
+console.log(policy.Policy);
+```
+
+`Principal` takes the same shorthand real Lambda does, and is expanded the same way: a 12-digit
+Account id becomes `{"AWS": "arn:aws:iam::<id>:root"}`, an ARN becomes `{"AWS": "<arn>"}`, anything
+else is read as a service principal, and `*` stays `*`.
+
+`FunctionUrlAuthType` becomes a `lambda:FunctionUrlAuthType` condition, which is evaluated when a
+Function URL is invoked. That is what a Function URL grant conditions on in practice: a permission
+granted for `AWS_IAM` does not also open a URL later switched to `NONE`.
+
+A function that has been granted nothing has no policy at all, which `GetPolicy` reports as a
+`ResourceNotFoundException` rather than as an empty document. Granting a `StatementId` that is
+already in use is a `ResourceConflictException`, and removing one that was never granted is a
+`ResourceNotFoundException`, as on AWS.
+
+### Permissions in templates
+
+`AWS::Lambda::Permission` creates the same permission from a CloudFormation template, which matters
+because CDK emits one for every `grantInvoke` and `grantInvokeUrl` to a principal outside the
+stack's own Account. The Resource has no `StatementId` property: CloudFormation names the statement
+after the logical ID, and so does this.
+
+```json
+{
+  "AllowOtherAccount": {
+    "Type": "AWS::Lambda::Permission",
+    "Properties": {
+      "FunctionName": { "Ref": "GreeterFunction" },
+      "Action": "lambda:InvokeFunctionUrl",
+      "Principal": "222222222222",
+      "FunctionUrlAuthType": "AWS_IAM"
+    }
+  }
+}
+```
+
+`FunctionName` accepts either a `Ref` to the function, giving its name, or an `Fn::GetAtt` on it,
+giving the ARN. A synthesized CDK app deploys either way with no special casing.
+
 ## Environment variables
 
 A function can declare its own environment variables with `Environment.Variables`, as on real
@@ -1023,9 +1119,15 @@ Current documented limitations:
 
 - Only `CreateFunctionCommand`, `GetFunctionCommand`, `InvokeCommand`, and the Function URL config
   commands are supported — no `UpdateFunctionCode`, `DeleteFunction`, or function listing yet.
-- `AuthType: "AWS_IAM"` Function URLs evaluate `lambda:InvokeFunctionUrl` against identity policies
-  in the function's own Account. Cross-account invocation needs a Lambda resource-based policy,
-  which is not simulated yet.
+- A cross-account call is allowed by the function's resource policy alone. Real AWS also requires
+  the caller's own Account to allow the action, and the simulator does not evaluate that second
+  side, so a cross-account grant is more permissive here than on AWS.
+- Only the `lambda:FunctionUrlAuthType` condition key is given a value at request time.
+  `SourceArn`, `SourceAccount`, `PrincipalOrgID` and `InvokedViaFunctionUrl` are written into the
+  statement so `GetPolicy` reports the grant that was made, but nothing supplies a value for them,
+  so a statement carrying one never matches.
+- `Qualifier`, `RevisionId` and `EventSourceToken` on the permission commands are not simulated,
+  as versions and aliases are not.
 - `requestContext.authorizer.iam` reports `accessKey` as empty, and `callerId` and `userId` as the
   caller ARN rather than the opaque unique id real AWS uses. `cognitoIdentity` and `principalOrgId`
   are always null.
@@ -1045,9 +1147,9 @@ Current documented limitations:
 - `Timeout` is recorded but does not interrupt handler execution.
 - `Event` invocations do not simulate retries or failure destinations; handler errors are dropped.
 - `Code.S3ObjectVersion` is accepted but ignored, as sim S3 has no object versioning yet.
-- CloudFormation resource types other than `AWS::Lambda::Function` and `AWS::Lambda::Url`
-  (`Version`, `Alias`, `Permission`, `EventSourceMapping`, ...) are skipped with an "Unsupported"
-  diagnostic.
+- CloudFormation resource types other than `AWS::Lambda::Function`, `AWS::Lambda::Url` and
+  `AWS::Lambda::Permission` (`Version`, `Alias`, `EventSourceMapping`, ...) are skipped with an
+  "Unsupported" diagnostic.
 - The `vm` context is a namespacing convenience, not a security boundary: function code runs
   in-process with the same trust as the test suite itself. Do not run untrusted code through the
   simulator.

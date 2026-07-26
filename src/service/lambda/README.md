@@ -52,6 +52,12 @@ Current command areas include:
 - `create-function-url-config/`, `get-function-url-config/`,
   `update-function-url-config/`, `delete-function-url-config/`,
   `list-function-url-configs/`
+- `add-permission/`, `remove-permission/`, `get-policy/`
+
+Commands sharing a set of collaborators are grouped behind one class per area — `command/function/`,
+`command/function-url/`, `command/permission/` — so the `SimLambda` facade stays a delegation
+rather than repeating the same wiring block per command. `command/sim-lambda-command.types.ts`
+gathers the command types for the same reason.
 
 The main `SimLambda` class delegates command execution to handlers rather than keeping command
 handling logic inline.
@@ -59,6 +65,14 @@ handling logic inline.
 ## Function model
 
 Function state lives under `function/`.
+
+`function/policy/` holds the function's resource-based policy: a map of `SimLambdaPermission`
+statements keyed by `StatementId`, which is how `AddPermission` and `RemovePermission` address
+them. `AddPermission` is a shorthand for writing a policy statement, so the permission holds the
+parts it was given and expands them into a statement on demand, rather than storing a statement
+nothing can address. The policy belongs to the function because it survives exactly as long as the
+function does, and because it is the only thing that can allow a principal from another Account,
+whose own policies this Account never sees.
 
 `SimLambdaFunction` is the stored simulated resource: name, execution role ARN, scope, AWS-like
 configuration metadata, and the real handler function reference that backs it. A new function
@@ -256,6 +270,14 @@ function ARN against the caller the HTTP boundary resolved (`SimAwsServiceReques
 Invoke command uses, as it is on AWS. The caller is passed to IAM as a `resolved` caller so an
 assumed-role session is judged against the Role behind it; a request that carried no identity is
 anonymous, owns no policies, and is denied by the same evaluation.
+
+Authorization is evaluated by the IAM of the Account that owns the function, against two policy
+sources: identity policies, which that IAM finds itself and which therefore only exist for a caller
+in the same Account, and the function's own resource policy, passed in by
+`command/authorize/sim-lambda-resource-policies.ts`. A caller from another Account has no identity
+policies here — its own Account's are not consulted — so a resource policy is the only thing that
+can allow it. The URL's auth type travels with the request as the `lambda:FunctionUrlAuthType`
+condition value, which is what a Function URL grant conditions on.
 
 Only an authorized `AWS_IAM` invocation is given a caller to describe in its event, which is what
 puts `requestContext.authorizer.iam` there and leaves it out for `NONE`

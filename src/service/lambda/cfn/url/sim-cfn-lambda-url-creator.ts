@@ -8,7 +8,7 @@ import type {
 } from "../../function/url/sim-lambda-function-url.js";
 import type { SimLambda } from "../../sim-lambda.js";
 import { SimCfnLambdaPropertyParser } from "../function/sim-cfn-lambda-property-parser.js";
-import { simCfnLambdaUrlFunctionName } from "./sim-cfn-lambda-url-target.js";
+import { simCfnLambdaTargetFunctionName } from "../function/sim-cfn-lambda-target-function.js";
 
 interface SimCfnLambdaUrlCreatorProperties {
   readonly lambda: SimLambda;
@@ -41,7 +41,7 @@ export class SimCfnLambdaUrlCreator {
       properties["TargetFunctionArn"],
       "TargetFunctionArn",
     );
-    const functionName = simCfnLambdaUrlFunctionName(targetFunctionArn);
+    const functionName = simCfnLambdaTargetFunctionName(targetFunctionArn);
 
     await this.lambda.createFunctionUrlConfig({
       input: {

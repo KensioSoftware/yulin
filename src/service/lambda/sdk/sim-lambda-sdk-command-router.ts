@@ -3,13 +3,16 @@ import {
   type SimSdkCommandRoute,
   type SimSdkCommandRouter,
 } from "../../../sdk/index.js";
+import type { SimAddPermissionCommand } from "../command/add-permission/add-permission.command.js";
 import type { SimCreateFunctionCommand } from "../command/create-function/create-function.command.js";
 import type { SimCreateFunctionUrlConfigCommand } from "../command/create-function-url-config/create-function-url-config.command.js";
 import type { SimDeleteFunctionUrlConfigCommand } from "../command/delete-function-url-config/delete-function-url-config.command.js";
 import type { SimGetFunctionCommand } from "../command/get-function/get-function.command.js";
 import type { SimGetFunctionUrlConfigCommand } from "../command/get-function-url-config/get-function-url-config.command.js";
+import type { SimGetPolicyCommand } from "../command/get-policy/get-policy.command.js";
 import type { SimInvokeCommand } from "../command/invoke/invoke.command.js";
 import type { SimListFunctionUrlConfigsCommand } from "../command/list-function-url-configs/list-function-url-configs.command.js";
+import type { SimRemovePermissionCommand } from "../command/remove-permission/remove-permission.command.js";
 import type { SimUpdateFunctionUrlConfigCommand } from "../command/update-function-url-config/update-function-url-config.command.js";
 import type { SimLambda } from "../sim-lambda.js";
 
@@ -74,6 +77,30 @@ export class SimLambdaSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simLambda.deleteFunctionUrlConfig(
             command as SimDeleteFunctionUrlConfigCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "AddPermissionCommand",
+        async (command, context): Promise<unknown> =>
+          await simLambda.addPermission(
+            command as SimAddPermissionCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "RemovePermissionCommand",
+        async (command, context): Promise<unknown> =>
+          await simLambda.removePermission(
+            command as SimRemovePermissionCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "GetPolicyCommand",
+        async (command, context): Promise<unknown> =>
+          await simLambda.getPolicy(
+            command as SimGetPolicyCommand,
             simSdkCallerOptions(context),
           ),
       ],

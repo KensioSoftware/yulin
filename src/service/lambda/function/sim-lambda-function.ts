@@ -8,6 +8,7 @@ import {
   SimLambdaHandlerReferenceCode,
 } from "./code/sim-lambda-executable-code.js";
 import { SimLambdaEnvironment } from "./environment/sim-lambda-environment.js";
+import { SimLambdaFunctionPolicy } from "./policy/sim-lambda-function-policy.js";
 import { SimLambdaHandlerRunner } from "./invoke/sim-lambda-handler-runner.js";
 import { SimLambdaInvokeContextBuilder } from "./invoke/sim-lambda-invoke-context-builder.js";
 import { type SimClock, SimRealClock } from "../../../util/clock/sim-clock.js";
@@ -103,6 +104,15 @@ export class SimLambdaFunction {
   public readonly timeoutSeconds: number;
   public readonly memorySizeMb: number;
   public readonly environment: SimLambdaEnvironment;
+  /**
+   * This function's resource-based policy, which says who may act on it.
+   *
+   * It lives on the function because that is what it belongs to: it survives
+   * as long as the function does, and it is the only thing that can allow a
+   * principal from another Account, whose own policies this Account never
+   * sees.
+   */
+  public readonly resourcePolicy = new SimLambdaFunctionPolicy();
 
   #state: SimLambdaFunctionState;
   private readonly code: SimLambdaExecutableCode;

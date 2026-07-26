@@ -57,6 +57,25 @@ export class SimCfnLambdaPropertyParser {
   }
 
   /**
+   * Parse a property value that must be a boolean when present.
+   */
+  optionalBoolean(
+    resource: SimCfnResource,
+    value: SimCfnTemplateValue | undefined,
+    label: string,
+  ): boolean | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    if (typeof value !== "boolean") {
+      throw this.invalidPropertyError(resource, label, "a boolean");
+    }
+
+    return value;
+  }
+
+  /**
    * Parse a property value that must be a record of strings when present.
    *
    * CloudFormation has no typed map, so every value has to be checked: a
