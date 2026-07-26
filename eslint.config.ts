@@ -288,6 +288,9 @@ export default defineConfig(
     rules: {
       "no-console": "off",
       "@typescript-eslint/no-non-null-assertion": "off",
+      // Examples model real AWS-shaped data, such as UPPER_SNAKE_CASE Lambda
+      // environment variable names, rather than code identifier names.
+      "@typescript-eslint/naming-convention": "off",
     },
   },
 

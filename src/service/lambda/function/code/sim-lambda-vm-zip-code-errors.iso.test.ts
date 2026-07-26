@@ -10,6 +10,7 @@ import { SimZipArchive } from "../../../../util/zip/zip-archive.js";
 import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import type { AwsRegionName } from "../../../aws/sim-aws-region.js";
 import { SimLambdaRuntimeError } from "../../error/sim-lambda-runtime.error.js";
+import { SimLambdaEnvironment } from "../environment/sim-lambda-environment.js";
 import { SimLambdaFunction } from "../sim-lambda-function.js";
 import {
   type LambdaCodeZipFiles,
@@ -37,11 +38,11 @@ function makeVmFunction(
     code: new SimLambdaVmZipCode({
       archive,
       handlerName,
-      environment: {
+      environment: new SimLambdaEnvironment({
         functionName: "vm-error-test",
         regionName: "eu-west-2",
         memorySizeMb: 128,
-      },
+      }),
     }),
   });
 }

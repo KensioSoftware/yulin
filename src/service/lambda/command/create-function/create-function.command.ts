@@ -27,6 +27,13 @@ export interface SimLambdaFunctionCode {
 }
 
 /**
+ * Minimal structural sim Lambda function environment configuration.
+ */
+export interface SimLambdaFunctionEnvironment {
+  Variables?: Record<string, string> | undefined;
+}
+
+/**
  * Minimal structural sim Lambda CreateFunction input.
  */
 export interface SimCreateFunctionCommandInput {
@@ -38,6 +45,7 @@ export interface SimCreateFunctionCommandInput {
   readonly Description?: string | undefined;
   readonly Timeout?: number | undefined;
   readonly MemorySize?: number | undefined;
+  readonly Environment?: SimLambdaFunctionEnvironment | undefined;
 }
 
 /**

@@ -1,46 +1,27 @@
 import vm from "node:vm";
-
-/**
- * The AWS-like execution environment details exposed to sim Lambda function
- * code running in a vm context.
- */
-export interface SimLambdaVmEnvironment {
-  readonly functionName: string;
-  readonly regionName: string;
-  readonly memorySizeMb: number;
-}
-
-/**
- * Build the AWS-like standard runtime environment variables.
- */
-function runtimeEnvironmentVariables(
-  environment: SimLambdaVmEnvironment,
-): Record<string, string> {
-  return Object.fromEntries([
-    ["AWS_REGION", environment.regionName],
-    ["AWS_DEFAULT_REGION", environment.regionName],
-    ["AWS_LAMBDA_FUNCTION_NAME", environment.functionName],
-    ["AWS_LAMBDA_FUNCTION_MEMORY_SIZE", String(environment.memorySizeMb)],
-    ["AWS_LAMBDA_FUNCTION_VERSION", "$LATEST"],
-  ]);
-}
+import type { SimLambdaEnvironment } from "../../environment/sim-lambda-environment.js";
 
 /**
  * Create the sandbox vm context that sim Lambda function code runs in.
  *
  * The context provides the common globals a Node.js Lambda runtime offers,
- * including an AWS-like process.env with the standard runtime variables.
- * Everything else must be part of the deployed function code archive, as on
- * real Lambda.
+ * including an AWS-like process.env holding the standard runtime variables
+ * and any variables declared for the function. Everything else must be part
+ * of the deployed function code archive, as on real Lambda.
+ *
+ * Zip code needs nothing like the process.env handling the in-process handler
+ * path does: this sandbox already owns its process object, so the host
+ * environment is invisible here whether or not the function declares
+ * variables of its own.
  */
 export function makeSimLambdaVmContext(
-  environment: SimLambdaVmEnvironment,
+  environment: SimLambdaEnvironment,
 ): vm.Context {
   return vm.createContext({
     console,
     Buffer,
     process: {
-      env: runtimeEnvironmentVariables(environment),
+      env: environment.variables(),
     },
     setTimeout,
     clearTimeout,

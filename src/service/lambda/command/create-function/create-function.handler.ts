@@ -15,6 +15,8 @@ import type { SimLambdaExecutableCode } from "../../function/code/sim-lambda-exe
 import { SimLambdaCodeResolver } from "../../function/code/sim-lambda-code-resolver.js";
 import type { SimLambdaCodeStore } from "../../function/code/store/sim-lambda-code-store.js";
 import type { SimLambdaVmSdkModuleProvider } from "../../function/code/vm/sdk/sim-lambda-vm-sdk-module-provider.js";
+import { SimLambdaEnvironmentConflicts } from "../../function/environment/sim-lambda-environment-conflicts.js";
+import { SimLambdaEnvironment } from "../../function/environment/sim-lambda-environment.js";
 import {
   DEFAULT_SIM_LAMBDA_MEMORY_SIZE_MB,
   SimLambdaFunction,
@@ -40,6 +42,7 @@ interface CreateFunctionCommandHandlerProperties {
   background?: BackgroundScheduler;
   codeStore?: SimLambdaCodeStore | undefined;
   vmSdkModuleProvider?: SimLambdaVmSdkModuleProvider | undefined;
+  environmentConflicts?: SimLambdaEnvironmentConflicts;
 }
 
 interface CreateFunctionCommandHandlerOptions {
@@ -61,6 +64,7 @@ export class CreateFunctionCommandHandler implements CommandHandler<
   private readonly authorizer: CreateFunctionAuthorizer;
   private readonly background: BackgroundScheduler;
   private readonly codeResolver: SimLambdaCodeResolver;
+  private readonly environmentConflicts: SimLambdaEnvironmentConflicts;
 
   constructor(properties: CreateFunctionCommandHandlerProperties) {
     const {
@@ -71,6 +75,7 @@ export class CreateFunctionCommandHandler implements CommandHandler<
       background = new BackgroundTasks(),
       codeStore,
       vmSdkModuleProvider,
+      environmentConflicts = new SimLambdaEnvironmentConflicts(),
     } = properties;
     this.accountRegionScope = accountRegionScope;
     this.functions = functions;
@@ -81,6 +86,7 @@ export class CreateFunctionCommandHandler implements CommandHandler<
       codeStore,
       vmSdkModuleProvider,
     });
+    this.environmentConflicts = environmentConflicts;
   }
 
   /**
@@ -103,16 +109,25 @@ export class CreateFunctionCommandHandler implements CommandHandler<
 
     this.requireAvailableFunctionName(input.name, functionArn);
 
-    const code = await this.resolveCode(input, options?.caller);
+    const environment = this.makeEnvironment(input);
+    const code = await this.resolveCode(input, environment, options?.caller);
 
     // Re-check after resolving code: a concurrent create for the same name
     // may have completed while awaiting an S3 code fetch, and must not be
     // overwritten.
     this.requireAvailableFunctionName(input.name, functionArn);
 
+    // Compared against the functions that already exist, so this has to
+    // happen before the new one joins them.
+    this.environmentConflicts.check(
+      environment,
+      this.functions.values().map((existing) => existing.environment),
+    );
+
     const simFunction = new SimLambdaFunction({
       ...input,
       code,
+      environment,
       accountRegionScope: this.accountRegionScope,
       runAsOwner: this.runAsOwner,
     });
@@ -143,18 +158,32 @@ export class CreateFunctionCommandHandler implements CommandHandler<
   }
 
   /**
+   * Build the environment the new function will run with.
+   *
+   * Built before the function itself, because vm zip code takes the
+   * environment at creation to put in its sandbox.
+   */
+  private makeEnvironment(input: CreateFunctionInput): SimLambdaEnvironment {
+    return new SimLambdaEnvironment({
+      functionName: input.name,
+      regionName: this.accountRegionScope.regionName,
+      memorySizeMb: input.memorySizeMb ?? DEFAULT_SIM_LAMBDA_MEMORY_SIZE_MB,
+      declaredVariables: input.environmentVariables,
+    });
+  }
+
+  /**
    * Resolve the validated code source into executable code, fetching
    * S3-located code as the creating caller.
    */
   private async resolveCode(
     input: CreateFunctionInput,
+    environment: SimLambdaEnvironment,
     caller: SimAwsCaller | undefined,
   ): Promise<SimLambdaExecutableCode> {
     return await this.codeResolver.resolve(input.codeSource, {
       handlerName: input.handlerName,
-      functionName: input.name,
-      regionName: this.accountRegionScope.regionName,
-      memorySizeMb: input.memorySizeMb ?? DEFAULT_SIM_LAMBDA_MEMORY_SIZE_MB,
+      environment,
       caller,
     });
   }

@@ -1,3 +1,4 @@
+import { isRecord } from "../../../../util/type-guard/record.js";
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValue } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 
@@ -53,6 +54,36 @@ export class SimCfnLambdaPropertyParser {
     }
 
     return value;
+  }
+
+  /**
+   * Parse a property value that must be a record of strings when present.
+   *
+   * CloudFormation has no typed map, so every value has to be checked: a
+   * template that puts a number or a nested object where a string belongs
+   * should fail here rather than reach the function as a non-string.
+   */
+  optionalStringRecord(
+    resource: SimCfnResource,
+    value: SimCfnTemplateValue | undefined,
+    label: string,
+  ): Record<string, string> | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    if (!isRecord(value)) {
+      throw this.invalidPropertyError(resource, label, "an object");
+    }
+
+    const entries: [string, string][] = Object.entries(value).map(
+      ([key, entryValue]) => [
+        key,
+        this.requiredString(resource, entryValue, `${label}.${key}`),
+      ],
+    );
+
+    return Object.fromEntries(entries);
   }
 
   /**
