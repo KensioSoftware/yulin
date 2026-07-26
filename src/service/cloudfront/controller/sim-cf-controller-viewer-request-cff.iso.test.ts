@@ -12,6 +12,7 @@ import {
 import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
 import { SimCloudFrontServiceController } from "./sim-cloudfront-controller.js";
+import { SimAwsServiceRequest } from "../../../serve/controller/sim-service-controller.js";
 import { makeCffFunctionCodeInput } from "../cff/function-code-input/cff-function-code-input.js";
 import { makeAwsRegionName } from "../../aws/sim-aws-region.js";
 import type { CloudFrontFunction } from "../typings/cloudfront-functions.namespace.js";
@@ -82,13 +83,15 @@ describe("Simulated CloudFront local HTTP controller CFF", () => {
       simAws,
     });
     const response = await cfController.handleRequest(
-      {
-        service: "cloudFront",
-        resourceName: "",
-      },
-      new Request(
-        `http://${distributionId}.cloudfront.net.sim-aws.localhost/index.html`,
-      ),
+      new SimAwsServiceRequest({
+        target: {
+          service: "cloudFront",
+          resourceName: "",
+        },
+        request: new Request(
+          `http://${distributionId}.cloudfront.net.sim-aws.localhost/index.html`,
+        ),
+      }),
     );
 
     assertResponseStatus(response, 204);
@@ -181,13 +184,15 @@ describe("Simulated CloudFront local HTTP controller CFF", () => {
         simAws,
       });
       await cfController.handleRequest(
-        {
-          service: "cloudFront",
-          resourceName: "",
-        },
-        new Request(
-          `http://${distributionId}.cloudfront.net.sim-aws.localhost/index.html`,
-        ),
+        new SimAwsServiceRequest({
+          target: {
+            service: "cloudFront",
+            resourceName: "",
+          },
+          request: new Request(
+            `http://${distributionId}.cloudfront.net.sim-aws.localhost/index.html`,
+          ),
+        }),
       );
     });
 

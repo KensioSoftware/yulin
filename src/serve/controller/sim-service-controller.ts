@@ -1,11 +1,46 @@
 import type { AwsRegionName } from "../../service/aws/sim-aws-region.js";
 import type { SimAws } from "../../service/aws/sim-aws.js";
+import { SimAwsRequestCaller } from "../../service/iam/request/sim-aws-request-caller.js";
 
 export interface SimAwsServiceTarget {
   readonly service: "s3" | "cloudFront" | "lambda" | "route53";
   readonly resourceName: string;
   // regionName is used for validation, not look-up
   readonly regionName?: AwsRegionName;
+}
+
+interface SimAwsServiceRequestProperties {
+  readonly target: SimAwsServiceTarget;
+  readonly request: Request;
+  readonly caller?: SimAwsRequestCaller | undefined;
+  readonly body?: Uint8Array | undefined;
+}
+
+/**
+ * One HTTP request, routed to a simulated service and attributed to a
+ * principal.
+ *
+ * Controllers are handed this rather than a bare request because everything
+ * they need has already been settled once at the boundary: which resource the
+ * hostname names, who is asking, and the request body, buffered so that both
+ * signature verification and the controller can read the same bytes.
+ *
+ * The request carries no simulator control headers, so a Lambda handler
+ * echoing `event.headers` sees the request as its client sent it.
+ */
+export class SimAwsServiceRequest {
+  public readonly target: SimAwsServiceTarget;
+  public readonly request: Request;
+  public readonly caller: SimAwsRequestCaller;
+  public readonly body?: Uint8Array | undefined;
+
+  constructor(properties: SimAwsServiceRequestProperties) {
+    this.target = properties.target;
+    this.request = properties.request;
+    // An unattributed request is anonymous, never the Account root.
+    this.caller = properties.caller ?? SimAwsRequestCaller.anonymous();
+    this.body = properties.body;
+  }
 }
 
 /**
@@ -22,8 +57,5 @@ export interface SimAwsServiceController {
   /**
    * Handle an HTTP request routed to this simulated AWS service.
    */
-  handleRequest(
-    target: SimAwsServiceTarget,
-    request: Request,
-  ): Promise<Response>;
+  handleRequest(serviceRequest: SimAwsServiceRequest): Promise<Response>;
 }

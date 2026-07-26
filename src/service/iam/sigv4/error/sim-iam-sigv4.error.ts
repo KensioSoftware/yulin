@@ -54,6 +54,23 @@ export class SimIamExpiredToken extends SimIamSigV4Error {
 }
 
 /**
+ * Raised when a signature was made for a different service or Region than the
+ * endpoint it arrived at.
+ *
+ * The scope is an input to the signing key, so this would otherwise surface as
+ * a bare signature mismatch with nothing to act on. Checking it first turns the
+ * least diagnosable SigV4 failure into the most obvious one, which matters
+ * because rewritten local hostnames make it an easy mistake to make. The AWS
+ * error code stays the one real AWS answers with, so client handling is
+ * unchanged; the detail is what the simulator adds.
+ */
+export class SimIamCredentialScopeMismatch extends SimIamSigV4Error {
+  constructor(message: string) {
+    super("SignatureDoesNotMatch", message);
+  }
+}
+
+/**
  * Raised when the request does not reproduce the signature it carries.
  *
  * The message says which part of the canonical request the simulator built, so

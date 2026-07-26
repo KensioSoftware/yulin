@@ -22,6 +22,8 @@ Sim IAM currently supports:
 - Allow/deny authorization decisions with `authorize(...)`, evaluating identity policies,
   service-supplied resource policies, and policy conditions with explicit-deny precedence
 - IAM authorization at simulated service boundaries, such as Route53 actions
+- Resolving the caller of an HTTP request into simulated AWS, from an `x-sim-aws-caller` header or
+  a verified SigV4 signature, defaulting to anonymous
 - Temporary Role sessions through simulated STS `AssumeRoleCommand`, evaluated against Role trust
   policies
 - CloudFormation resources:
@@ -455,6 +457,125 @@ the derived `aws:PrincipalArn` come from the underlying Role. A caller that the 
 not allow is denied the assume request, session credentials require their session token, and
 expired sessions are rejected.
 
+## Callers of HTTP requests
+
+An in-process SDK call can be told who its caller is. A request arriving over HTTP — through
+`serveSimAws`, or through `SimAwsHttp.fetch(...)` in the same process — carries no such thing, so
+sim IAM works the caller out from the request itself, in a fixed order:
+
+1. An `x-sim-aws-caller` header naming the principal directly.
+2. An `Authorization: AWS4-HMAC-SHA256` header, verified as a SigV4 signature.
+3. Neither, giving **anonymous**.
+
+The last step matters. Sim IAM treats an omitted in-process caller as the Account root with
+unrestricted access, which is a convenience inside a test. Over HTTP the same default would make
+every unauthenticated request an administrator, so a served request that says nothing about who
+sent it is anonymous instead, and never the Account root.
+
+### Naming the caller directly
+
+`x-sim-aws-caller` names the principal outright. It is the path for local development and for
+tooling that will not sign requests: a curl one-liner can be a Role without holding any credentials.
+
+```bash
+curl -H 'x-sim-aws-caller: arn:aws:iam::111111111111:role/Reporter' \
+  http://abc123.lambda-url.us-east-1.sim-aws.localhost:4566/
+```
+
+The value is one of three forms:
+
+| Value            | Principal                                                    |
+| ---------------- | ------------------------------------------------------------ |
+| An ARN           | That IAM User, Role, or assumed-role session                 |
+| `service:<name>` | An AWS service principal, such as `service:s3.amazonaws.com` |
+| `anonymous`      | Explicitly anonymous                                         |
+
+The header is always enabled and not configurable, it takes precedence over a valid signature, and
+it does not check that the ARN exists — naming a principal is not claiming it was created, exactly
+as `runAs` behaves. It is stripped before the request reaches the simulated service, so a Lambda
+handler echoing `event.headers` never sees simulator control metadata.
+
+```typescript sim-iam-served-request-caller
+/**
+ * Naming the caller of an HTTP request into simulated AWS.
+ */
+
+import {
+  CreateFunctionCommand,
+  CreateFunctionUrlConfigCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+
+await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "reporter",
+    Role: "arn:aws:iam::111111111111:role/ReporterRole",
+    Code: { ZipFile: makeLambdaZipFileInput(() => ({ ok: true })) },
+  }),
+);
+
+const urlConfig = await simAws.lambda().createFunctionUrlConfig(
+  new CreateFunctionUrlConfigCommand({
+    FunctionName: "reporter",
+    AuthType: "NONE",
+  }),
+);
+
+const srv = await serveSimAws({ simAws });
+
+try {
+  const response = await fetch(srv.localUrl(urlConfig.FunctionUrl), {
+    headers: { "x-sim-aws-caller": "arn:aws:iam::111111111111:role/Reporter" },
+  });
+
+  // arn:aws:iam::111111111111:role/Reporter
+  console.log(response.headers.get("x-sim-aws-caller"));
+  // caller-header
+  console.log(response.headers.get("x-sim-aws-auth"));
+} finally {
+  srv.close();
+}
+```
+
+### Signed requests
+
+A request signed with credentials from `CreateAccessKeyCommand` or from an STS `AssumeRoleCommand`
+session is verified as a SigV4 signature and resolves to the signing principal, with the same
+identity `resolveCredentials` returns in process.
+
+Sign the URL you actually call. Serving rewrites AWS endpoint hostnames to local ones — a Function
+URL is served at `<url-id>.lambda-url.<region>.sim-aws.localhost:<port>` — and the `host` header is
+part of what a signature covers, so a signature made against the real AWS hostname will not verify
+against the local one.
+
+A signature whose credential scope names a different service or Region than the endpoint it reached
+is refused before anything else is checked, and says so. The scope feeds the signing key, so without
+that check the only symptom would be a signature mismatch with nothing to act on.
+
+### What the simulator reports back
+
+Every served response carries the simulator's own account of the request in headers, leaving the
+response body the shape the real service returns. Which headers appear depends on whether the
+request was accepted:
+
+| Header                   | On an accepted request                                                                   | On a refused request                                |
+| ------------------------ | ---------------------------------------------------------------------------------------- | --------------------------------------------------- |
+| `x-sim-aws-caller`       | The principal the request was attributed to, in the same form the request header accepts | Absent — there is no principal to report            |
+| `x-sim-aws-auth`         | How that was decided: `caller-header`, `sigv4`, or `none`                                | `rejected`                                          |
+| `x-sim-aws-error`        | Absent                                                                                   | The AWS error code, such as `SignatureDoesNotMatch` |
+| `x-sim-aws-error-detail` | Absent                                                                                   | What the simulator can say about why                |
+
+A refused request is answered as real AWS answers it: `403` with `{"Message":"Forbidden"}` for a
+rejected signature, and `400` for a signature too incomplete to parse or an `x-sim-aws-caller`
+value that names no principal form. Real AWS has nowhere in that body to explain itself and neither
+does this, which is why the detail goes in `x-sim-aws-error-detail` where it changes nothing for a
+client parsing the response.
+
 ## Authorizing other simulated services
 
 Simulated services use sim IAM to authorize their own actions when used through `SimAws`. Route53
@@ -696,3 +817,12 @@ full IAM feature set. Notable gaps:
 - Deleting and detaching resources (Roles, Users, Policies, access keys) is not yet supported
 - Only the condition operators listed above are supported; a statement using an unsupported
   operator fails closed and does not match, rather than silently allowing
+- Signature age is deliberately not enforced: `X-Amz-Date` must be present, well formed, and agree
+  with the credential scope date, but is never compared to a clock, so a client stamping real time
+  is not locked out of a simulation keeping a different one. Session expiry _is_ enforced, against
+  simulated time
+- Presigned query-string authentication (`X-Amz-Algorithm` in the query), S3 `aws-chunked`
+  streaming signatures, and SigV4A are not verified
+- The resolved caller of a served request is reported back but is not yet evaluated by the services
+  that serve it: served S3 objects perform no authorization, and Lambda Function URLs with
+  `AuthType: "AWS_IAM"` still refuse every request

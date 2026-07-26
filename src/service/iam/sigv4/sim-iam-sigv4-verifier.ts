@@ -1,16 +1,12 @@
 import type { SimIamCredentialIdentity } from "../credential/sim-aws-credentials.js";
 import type { SimIamSigningCredentialResolver } from "../credential/sim-iam-signing-credential.js";
-import { SimIamSigV4CanonicalRequest } from "./canonical/sim-iam-sigv4-canonical-request.js";
-import { SimIamSignatureDoesNotMatch } from "./error/sim-iam-sigv4.error.js";
 import { SimIamSigV4Authorization } from "./sim-iam-sigv4-authorization.js";
-import { simIamSigV4CredentialFailure } from "./sim-iam-sigv4-credential-failure.js";
-import { simIamSigV4SignaturesMatch } from "./sim-iam-sigv4-signature-match.js";
+import { simIamSigV4CheckExpectedScope } from "./sim-iam-sigv4-expected-scope.js";
+import { simIamSigV4CheckSignature } from "./sim-iam-sigv4-signature-check.js";
 import { simIamSigV4RequestDate } from "./sim-iam-sigv4-request-date.js";
 import type { SimIamSigV4SignedRequest } from "./sim-iam-sigv4-signed-request.js";
-import {
-  simIamSigV4Signature,
-  simIamSigV4StringToSign,
-} from "./sim-iam-sigv4-signing-key.js";
+import { simIamSigV4SigningCredential } from "./sim-iam-sigv4-signing-credentials.js";
+import type { SimIamSigV4VerifyOptions } from "./sim-iam-sigv4-verify-options.js";
 
 interface SimIamSigV4VerifierProperties {
   readonly credentials: SimIamSigningCredentialResolver;
@@ -43,49 +39,33 @@ export class SimIamSigV4Verifier {
    */
   verify(
     signedRequest: SimIamSigV4SignedRequest,
-    now?: Date,
+    options: SimIamSigV4VerifyOptions = {},
   ): SimIamCredentialIdentity {
     const authorization = SimIamSigV4Authorization.parse(
       signedRequest.headers.get("authorization"),
     );
+
+    // Checked before anything else can fail on it, so a signature made for the
+    // wrong endpoint says so rather than looking like a bad secret.
+    simIamSigV4CheckExpectedScope(options.expectedScope, authorization.scope);
+
     const amzDate = simIamSigV4RequestDate(
       signedRequest.headers,
       authorization.scope,
     );
-
-    const { signingKey, identity } = simIamSigV4CredentialFailure(
-      authorization.accessKeyId,
-      () =>
-        this.credentials.signingCredentialFor({
-          accessKeyId: authorization.accessKeyId,
-          sessionToken:
-            signedRequest.headers.get("x-amz-security-token") ?? undefined,
-          scope: authorization.scope,
-          now,
-        }),
-    );
-
-    const canonicalRequest = new SimIamSigV4CanonicalRequest(
+    const { signingKey, identity } = simIamSigV4SigningCredential(
+      this.credentials,
       signedRequest,
-      authorization.signedHeaderNames,
-    ).toString();
-
-    const expected = simIamSigV4Signature(
-      signingKey,
-      simIamSigV4StringToSign({
-        amzDate,
-        scope: authorization.scope,
-        canonicalRequest,
-      }),
+      authorization,
+      options.now,
     );
 
-    if (!simIamSigV4SignaturesMatch(expected, authorization.signature)) {
-      throw new SimIamSignatureDoesNotMatch(
-        `Request signature does not match the signature the simulator ` +
-          `calculated for access key ${authorization.accessKeyId}`,
-        canonicalRequest,
-      );
-    }
+    simIamSigV4CheckSignature({
+      signedRequest,
+      authorization,
+      signingKey,
+      amzDate,
+    });
 
     return identity;
   }

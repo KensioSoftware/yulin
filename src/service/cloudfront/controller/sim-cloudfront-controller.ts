@@ -1,6 +1,6 @@
 import type {
   SimAwsServiceController,
-  SimAwsServiceTarget,
+  SimAwsServiceRequest,
 } from "../../../serve/controller/sim-service-controller.js";
 import { SimCloudFrontRequestPipeline } from "./sim-cloudfront-request-pipeline.js";
 import {
@@ -30,14 +30,11 @@ export class SimCloudFrontServiceController implements SimAwsServiceController {
   /**
    * Handle one incoming request for the simulated CloudFront service.
    *
-   * The `_target` is part of the shared service-controller interface, but
-   * CloudFront routing is host-based, so the request itself contains the
-   * information needed to find the Distribution.
+   * The service request carries the resolved target and caller, but CloudFront
+   * routing is host-based and a Distribution has no IAM authorization of its
+   * own, so only the request itself is needed to find and serve it.
    */
-  async handleRequest(
-    _target: SimAwsServiceTarget,
-    request: Request,
-  ): Promise<Response> {
-    return this.pipeline.handle(request);
+  async handleRequest(serviceRequest: SimAwsServiceRequest): Promise<Response> {
+    return this.pipeline.handle(serviceRequest.request);
   }
 }

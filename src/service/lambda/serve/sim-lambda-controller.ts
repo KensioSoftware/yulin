@@ -1,6 +1,6 @@
 import type {
   SimAwsServiceController,
-  SimAwsServiceTarget,
+  SimAwsServiceRequest,
 } from "../../../serve/controller/sim-service-controller.js";
 import { SimAws } from "../../aws/sim-aws.js";
 import { SimLambdaUrlEventBuilder } from "./event/sim-lambda-url-event-builder.js";
@@ -43,24 +43,23 @@ export class SimLambdaServiceController implements SimAwsServiceController {
   /**
    * Handle an HTTP request routed to a simulated Lambda Function URL.
    */
-  async handleRequest(
-    target: SimAwsServiceTarget,
-    request: Request,
-  ): Promise<Response> {
-    const route = this.router.route(target);
+  async handleRequest(serviceRequest: SimAwsServiceRequest): Promise<Response> {
+    const route = this.router.route(serviceRequest.target);
 
     if (route === undefined) {
       return this.errorResponse.notFound();
     }
 
-    // SigV4 signatures are not verified, so an IAM-authenticated URL has no
-    // way to admit a request. Refusing is the safe direction: it matches what
-    // an unsigned request to a real AWS_IAM Function URL gets.
+    // The request now arrives with a resolved principal, but nothing yet
+    // evaluates lambda:InvokeFunctionUrl against it, so an IAM-authenticated
+    // URL still has no way to admit a request. Refusing is the safe direction:
+    // it matches what an unauthorized request to a real AWS_IAM Function URL
+    // gets.
     if (route.functionUrl.authType === "AWS_IAM") {
       return this.errorResponse.forbidden();
     }
 
-    return await this.invoke(route, request);
+    return await this.invoke(route, serviceRequest.request);
   }
 
   private async invoke(

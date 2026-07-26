@@ -1,5 +1,10 @@
 import { SimAwsServiceControllerContainer } from "../controller/container/sim-aws-service-controller-container.js";
 import { SimAws } from "../../service/aws/sim-aws.js";
+import type { SimAwsServiceTarget } from "../controller/sim-service-controller.js";
+import { isSimAwsRequestAuthFailure } from "../../service/iam/request/error/sim-aws-request-auth.error.js";
+import { SimAwsRequestAuthenticator } from "./request/sim-aws-request-authenticator.js";
+import { SimAwsAuthFailureResponse } from "./response/sim-aws-auth-failure-response.js";
+import { SimAwsResponseHints } from "./response/sim-aws-response-hints.js";
 
 interface SimAwsHttpProperties {
   readonly simAws?: SimAws;
@@ -11,11 +16,15 @@ interface SimAwsHttpProperties {
 export class SimAwsHttp {
   private readonly simAws: SimAws;
   private readonly controllers: SimAwsServiceControllerContainer;
+  private readonly authenticator: SimAwsRequestAuthenticator;
+  private readonly authFailureResponse = new SimAwsAuthFailureResponse();
+  private readonly hints = new SimAwsResponseHints();
 
   constructor(properties: SimAwsHttpProperties = {}) {
     const { simAws = new SimAws() } = properties;
     this.simAws = simAws;
     this.controllers = new SimAwsServiceControllerContainer({ simAws });
+    this.authenticator = new SimAwsRequestAuthenticator({ simAws });
   }
 
   /**
@@ -61,9 +70,12 @@ export class SimAwsHttp {
         });
       }
 
-      const controller = this.controllers.controllerForService(target.service);
-      return await controller.handleRequest(target, request);
+      return await this.serveTarget(target, request);
     } catch (error) {
+      if (isSimAwsRequestAuthFailure(error)) {
+        return this.authFailureResponse.build(error);
+      }
+
       /* v8 ignore next */
       return new Response(
         error instanceof Error
@@ -72,6 +84,29 @@ export class SimAwsHttp {
         { status: 500 },
       );
     }
+  }
+
+  /**
+   * Authenticate a request and hand it to the service it is routed to.
+   *
+   * Every served request passes through the same authentication boundary,
+   * whichever service answers it, and every response says who the simulator
+   * decided the caller was.
+   */
+  private async serveTarget(
+    target: SimAwsServiceTarget,
+    request: Request,
+  ): Promise<Response> {
+    const serviceRequest = await this.authenticator.authenticate(
+      target,
+      request,
+    );
+    const controller = this.controllers.controllerForService(target.service);
+
+    return this.hints.stampCaller(
+      await controller.handleRequest(serviceRequest),
+      serviceRequest.caller,
+    );
   }
 
   private hostnameFromRequest(request: Request): string | undefined {
