@@ -1,13 +1,9 @@
-import { randomUUID } from "node:crypto";
-
 import type { SimLambdaFunctionUrl } from "../../function/url/sim-lambda-function-url.js";
 import { SimLambdaUrlBodyEncoding } from "./sim-lambda-url-body-encoding.js";
-import type {
-  SimLambdaFunctionUrlEvent,
-  SimLambdaFunctionUrlRequestContext,
-} from "./sim-lambda-url-event.type.js";
-import { simLambdaUrlEventTime } from "./sim-lambda-url-event-time.js";
+import type { SimLambdaFunctionUrlEvent } from "./sim-lambda-url-event.type.js";
 import { SimLambdaUrlRequestParts } from "./sim-lambda-url-request-parts.js";
+import { SimLambdaUrlRequestContextBuilder } from "./sim-lambda-url-request-context.js";
+import type { SimAwsRequestCaller } from "../../../iam/request/sim-aws-request-caller.js";
 import {
   type SimClock,
   SimRealClock,
@@ -28,23 +24,30 @@ interface SimLambdaUrlEventBuilderProperties {
  * Real Function URLs only speak payload format 2.0, so there is no version to
  * choose. Request headers are passed through as received, including the local
  * Host, while the requestContext describes the AWS-shaped endpoint the URL
- * identifies.
+ * identifies and the caller, if any, that it authenticated.
  */
 export class SimLambdaUrlEventBuilder {
   private readonly bodyEncoding = new SimLambdaUrlBodyEncoding();
   private readonly requestParts = new SimLambdaUrlRequestParts();
-  private readonly clock: SimClock;
+  private readonly requestContext: SimLambdaUrlRequestContextBuilder;
 
   constructor(properties: SimLambdaUrlEventBuilderProperties = {}) {
-    this.clock = properties.clock ?? new SimRealClock();
+    this.requestContext = new SimLambdaUrlRequestContextBuilder(
+      properties.clock ?? new SimRealClock(),
+    );
   }
 
   /**
    * Build the invocation event for one Function URL request.
+   *
+   * A caller is supplied only when the Function URL authenticated one, which
+   * is what makes the authorizer block present for an `AWS_IAM` invocation and
+   * absent for a `NONE` one.
    */
   async build(
     request: Request,
     functionUrl: SimLambdaFunctionUrl,
+    authenticatedCaller?: SimAwsRequestCaller,
   ): Promise<SimLambdaFunctionUrlEvent> {
     const url = new URL(request.url);
     const bytes = new Uint8Array(await request.arrayBuffer());
@@ -57,7 +60,12 @@ export class SimLambdaUrlEventBuilder {
       rawPath: url.pathname,
       rawQueryString: url.search.replace(/^\?/, ""),
       headers: this.requestParts.headers(request),
-      requestContext: this.requestContext(request, url, functionUrl),
+      requestContext: this.requestContext.build({
+        request,
+        url,
+        functionUrl,
+        authenticatedCaller,
+      }),
       isBase64Encoded: hasBody && !this.bodyEncoding.isText(contentType),
     };
 
@@ -76,34 +84,5 @@ export class SimLambdaUrlEventBuilder {
     }
 
     return event;
-  }
-
-  private requestContext(
-    request: Request,
-    url: URL,
-    functionUrl: SimLambdaFunctionUrl,
-  ): SimLambdaFunctionUrlRequestContext {
-    const now = this.clock.now();
-
-    return {
-      // Function URLs report the caller as anonymous when the request was not
-      // authenticated, which is every request the simulator serves.
-      accountId: "anonymous",
-      apiId: functionUrl.urlId,
-      domainName: functionUrl.hostname,
-      domainPrefix: functionUrl.urlId,
-      http: {
-        method: request.method,
-        path: url.pathname,
-        protocol: "HTTP/1.1",
-        sourceIp: "127.0.0.1",
-        userAgent: request.headers.get("user-agent") ?? "",
-      },
-      requestId: randomUUID(),
-      routeKey: "$default",
-      stage: "$default",
-      time: simLambdaUrlEventTime(now),
-      timeEpoch: now.getTime(),
-    };
   }
 }

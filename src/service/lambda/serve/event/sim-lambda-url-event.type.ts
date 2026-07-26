@@ -25,6 +25,7 @@ export interface SimLambdaFunctionUrlEvent {
 export interface SimLambdaFunctionUrlRequestContext {
   accountId: string;
   apiId: string;
+  authorizer?: SimLambdaFunctionUrlAuthorizerContext;
   domainName: string;
   domainPrefix: string;
   http: SimLambdaFunctionUrlHttpContext;
@@ -33,6 +34,41 @@ export interface SimLambdaFunctionUrlRequestContext {
   stage: "$default";
   time: string;
   timeEpoch: number;
+}
+
+/**
+ * The requestContext.authorizer block, present only on an invocation a
+ * Function URL authenticated.
+ *
+ * A `NONE` Function URL is invokable by anyone and has no caller to describe,
+ * so real Lambda leaves this out entirely rather than filling it with blanks.
+ */
+export interface SimLambdaFunctionUrlAuthorizerContext {
+  iam: SimLambdaFunctionUrlIamAuthorizer;
+}
+
+/**
+ * The IAM caller of an `AWS_IAM` Function URL invocation.
+ *
+ * `userArn` and `accountId` describe the principal the request was attributed
+ * to, which is what makes a handler able to behave differently for different
+ * callers.
+ *
+ * `callerId` and `userId` carry the caller ARN rather than the opaque unique
+ * id (`AIDA...`, `AROA...:session`) real AWS puts there: the simulator has no
+ * unique-id namespace at the request boundary, and an ARN is what a test would
+ * assert on anyway. `accessKey` is empty, as the simulator does not carry the
+ * signing access key id past authentication. `cognitoIdentity` and
+ * `principalOrgId` are always null, as neither is simulated.
+ */
+export interface SimLambdaFunctionUrlIamAuthorizer {
+  accessKey: string;
+  accountId: string;
+  callerId: string;
+  cognitoIdentity: null;
+  principalOrgId: null;
+  userArn: string;
+  userId: string;
 }
 
 /**

@@ -10,6 +10,8 @@ import {
   type SimLambdaFunctionUrlRoute,
   SimLambdaUrlRouter,
 } from "./sim-lambda-url-router.js";
+import { SimLambdaUrlAuthorizer } from "./auth/sim-lambda-url-authorizer.js";
+import type { SimAwsRequestCaller } from "../../iam/request/sim-aws-request-caller.js";
 
 interface SimLambdaServiceControllerProperties {
   readonly simAws?: SimAws;
@@ -19,10 +21,14 @@ interface SimLambdaServiceControllerProperties {
 /**
  * Localhost HTTP controller for simulated Lambda Function URLs.
  *
- * A Function URL is invoked without an SDK caller: on real AWS a NONE auth
- * URL is invokable by anyone, so the request is not attributed to a simulated
- * principal. The function itself still runs as its execution Role, as it does
- * for any other invocation.
+ * A NONE auth URL is invokable by anyone on real AWS, so the request is not
+ * attributed to a simulated principal. An AWS_IAM URL is invokable only by a
+ * caller allowed `lambda:InvokeFunctionUrl` on the function, evaluated against
+ * the principal resolved at the HTTP boundary.
+ *
+ * Either way the function itself runs as its execution Role, as it does for
+ * any other invocation. Who invoked it and what it runs as are separate
+ * questions on real Lambda, and stay separate here.
  */
 export class SimLambdaServiceController implements SimAwsServiceController {
   private readonly router: SimLambdaUrlRouter;
@@ -50,24 +56,51 @@ export class SimLambdaServiceController implements SimAwsServiceController {
       return this.errorResponse.notFound();
     }
 
-    // The request now arrives with a resolved principal, but nothing yet
-    // evaluates lambda:InvokeFunctionUrl against it, so an IAM-authenticated
-    // URL still has no way to admit a request. Refusing is the safe direction:
-    // it matches what an unauthorized request to a real AWS_IAM Function URL
-    // gets.
-    if (route.functionUrl.authType === "AWS_IAM") {
+    if (route.functionUrl.authType === "NONE") {
+      // A NONE URL is invokable by anyone on real AWS, so the request is not
+      // attributed to a principal and the event describes no caller.
+      return await this.invoke(route, serviceRequest.request);
+    }
+
+    return await this.invokeAuthenticated(route, serviceRequest);
+  }
+
+  /**
+   * Invoke through an `AWS_IAM` Function URL, if the caller may.
+   *
+   * The caller was resolved at the HTTP boundary, from a signature or from a
+   * named principal, and is anonymous when the request offered neither.
+   * Anonymous owns no policies, so an unsigned request is refused by the same
+   * evaluation that admits a permitted one, rather than by a special case.
+   */
+  private async invokeAuthenticated(
+    route: SimLambdaFunctionUrlRoute,
+    serviceRequest: SimAwsServiceRequest,
+  ): Promise<Response> {
+    const { caller } = serviceRequest;
+    const decision = new SimLambdaUrlAuthorizer({ iam: route.iam }).authorize(
+      route.functionUrl.functionArn,
+      caller.toCaller(),
+    );
+
+    if (decision.isDenied) {
       return this.errorResponse.forbidden();
     }
 
-    return await this.invoke(route, serviceRequest.request);
+    return await this.invoke(route, serviceRequest.request, caller);
   }
 
   private async invoke(
     route: SimLambdaFunctionUrlRoute,
     request: Request,
+    authenticatedCaller?: SimAwsRequestCaller,
   ): Promise<Response> {
     try {
-      const event = await this.eventBuilder.build(request, route.functionUrl);
+      const event = await this.eventBuilder.build(
+        request,
+        route.functionUrl,
+        authenticatedCaller,
+      );
 
       return this.responseBuilder.build(await route.simFunction.invoke(event));
     } catch {

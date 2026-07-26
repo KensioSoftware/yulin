@@ -6,10 +6,16 @@ import type {
   SimLambdaFunctionUrlId,
 } from "../function/url/sim-lambda-function-url.js";
 import type { SimLambdaUrlRegistry } from "../registry/sim-lambda-url-registry.js";
+import type { SimIamInterServiceAuthZ } from "../../iam/authorize/sim-iam-inter-service-auth-z.js";
 
 export interface SimLambdaFunctionUrlRoute {
   readonly functionUrl: SimLambdaFunctionUrl;
   readonly simFunction: SimLambdaFunction;
+  /**
+   * IAM of the Account that owns the function, which is what an `AWS_IAM`
+   * Function URL evaluates its invoke permission against.
+   */
+  readonly iam: SimIamInterServiceAuthZ;
 }
 
 interface SimLambdaUrlRouterProperties {
@@ -53,9 +59,8 @@ export class SimLambdaUrlRouter {
       return undefined;
     }
 
-    const lambda = this.simAws
-      .accountRegionScope(accountId, target.regionName)
-      .lambda();
+    const scope = this.simAws.accountRegionScope(accountId, target.regionName);
+    const lambda = scope.lambda();
     const functionUrl = lambda.getSimFunctionUrlById(urlId);
 
     if (functionUrl === undefined) {
@@ -69,6 +74,6 @@ export class SimLambdaUrlRouter {
       return undefined;
     }
 
-    return { functionUrl, simFunction };
+    return { functionUrl, simFunction, iam: scope.iam() };
   }
 }

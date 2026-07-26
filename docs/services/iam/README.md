@@ -546,7 +546,9 @@ try {
 
 A request signed with credentials from `CreateAccessKeyCommand` or from an STS `AssumeRoleCommand`
 session is verified as a SigV4 signature and resolves to the signing principal, with the same
-identity `resolveCredentials` returns in process.
+identity `resolveCredentials` returns in process. For an assumed-role session that means the
+request is attributed to the session while its permissions come from the Role behind it, so a
+policy on the Role applies to a request the session signed.
 
 Sign the URL you actually call. Serving rewrites AWS endpoint hostnames to local ones — a Function
 URL is served at `<url-id>.lambda-url.<region>.sim-aws.localhost:<port>` — and the `host` header is
@@ -823,6 +825,6 @@ full IAM feature set. Notable gaps:
   simulated time
 - Presigned query-string authentication (`X-Amz-Algorithm` in the query), S3 `aws-chunked`
   streaming signatures, and SigV4A are not verified
-- The resolved caller of a served request is reported back but is not yet evaluated by the services
-  that serve it: served S3 objects perform no authorization, and Lambda Function URLs with
-  `AuthType: "AWS_IAM"` still refuse every request
+- The resolved caller is evaluated by Lambda Function URLs with `AuthType: "AWS_IAM"`, but not yet
+  by the other services that serve HTTP: served S3 objects and CloudFront responses perform no
+  authorization
