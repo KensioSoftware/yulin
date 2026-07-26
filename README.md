@@ -187,6 +187,8 @@ import { AssumeRoleCommand } from "@aws-sdk/client-sts";
 
 const simAws = new SimAws();
 
+// Assumes a ReportingRole this Account is already allowed to assume; the
+// simulated time docs below show the same example with its IAM setup.
 const { Credentials } = await simAws.sts().assumeRole(
   new AssumeRoleCommand({
     RoleArn: `arn:aws:iam::${simAws.defaultAccountId}:role/ReportingRole`,

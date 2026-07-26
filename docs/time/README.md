@@ -53,12 +53,16 @@ await simAws.clock().advanceBy({ hours: 2, minutes: 30 });
 
 console.log(simAws.now()); // 2026-07-26T11:30:00.000Z
 
-// Time passes by itself again from here, still two and a half hours ahead.
+// Still two and a half hours ahead of the clock it was given. That clock is a
+// fixed one, so simulated time stays at 11:30 rather than running on.
 simAws.clock().resume();
 ```
 
 Simulated time is layered over whatever clock is supplied, so a simulation started at a fixed
-instant is still free to move from there.
+instant is still free to move from there. It also stays measured against that clock: resuming a
+simulation built on a `SimFixedClock` puts it back in running mode, but its time only moves when
+the clock underneath does, which a fixed clock never does. Leave the default real clock in place
+for a simulation whose time should pass by itself.
 
 ## Frozen and running
 
@@ -67,14 +71,14 @@ There are two modes, and they answer different questions:
 - **Frozen** — simulated time only moves when something moves it. A frozen clock reports the same
   instant however long the host takes, so a slow test cannot drift past the state it set up. This
   is what a deterministic assertion wants.
-- **Running** — simulated time passes by itself, offset from the clock underneath. This is what
-  "jump forward an hour and carry on" wants.
+- **Running** — simulated time tracks the clock underneath, offset from it. On the default real
+  clock that means time passes by itself, which is what "jump forward an hour and carry on" wants.
 
 Moving time deliberately freezes it: `setTo(...)` and `advanceBy(...)` both leave the clock
 stopped where they put it. Having asked for a specific instant, a test should get to assert on that
 instant rather than on that instant plus however long the assertion took. `resume()` is the way
-back to time passing by itself, and it carries on from where the clock stopped rather than snapping
-back to real time.
+back to running, and it carries on from where the clock stopped rather than snapping back to the
+clock underneath.
 
 `simAws.clock().isFrozen` reports which mode the clock is in.
 
@@ -143,6 +147,10 @@ try {
   console.log((error as Error).message);
 }
 ```
+
+If work triggered by advancing fails, the failure is thrown from `advanceBy(...)` rather than lost
+in the background, and the clock is left at the point it failed rather than at the instant asked
+for. Anything still queued stays queued.
 
 Nothing in the simulator schedules work on the clock yet, so today advancing mostly changes what
 timestamps and expiry checks see. The mechanism is there for scheduled behaviour to hook into as

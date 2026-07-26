@@ -19,5 +19,6 @@ await simAws.clock().advanceBy({ hours: 2, minutes: 30 });
 
 console.log(simAws.now()); // 2026-07-26T11:30:00.000Z
 
-// Time passes by itself again from here, still two and a half hours ahead.
+// Still two and a half hours ahead of the clock it was given. That clock is a
+// fixed one, so simulated time stays at 11:30 rather than running on.
 simAws.clock().resume();

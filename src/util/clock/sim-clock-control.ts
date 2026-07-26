@@ -82,6 +82,11 @@ export class SimClockControl implements SimClock {
    *
    * Setting time backwards runs nothing: it simply moves the clock, and work
    * already scheduled waits for time to reach it again.
+   *
+   * Work that fails throws from here, leaving the clock at the failed task's
+   * due time rather than at the instant asked for. Simulated time got that far
+   * and then something broke, and saying so is more use than claiming the whole
+   * interval elapsed. Whatever was still queued stays queued.
    */
   async setTo(instant: Date): Promise<void> {
     if (instant.getTime() >= this.now().getTime()) {
@@ -112,6 +117,11 @@ export class SimClockControl implements SimClock {
    * final one, so a task that stamps a timestamp records when it happened. Work
    * a task schedules for itself settles before the next due task is taken,
    * which keeps cascading work in order too.
+   *
+   * The loop runs as long as work keeps falling due inside the interval, as
+   * draining does generally: a task that endlessly reschedules itself inside
+   * the interval is asking for endless work, and cutting it off part way would
+   * report a settled simulation that is nothing of the kind.
    */
   private async runDueTasksUpTo(instant: Date): Promise<void> {
     let due = this.background.takeNextDueBy(instant);

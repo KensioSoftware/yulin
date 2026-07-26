@@ -187,6 +187,35 @@ describe("SimClockControl", () => {
     expect(control.now()).toStrictEqual(new Date("2027-01-01T00:00:00.000Z"));
   });
 
+  it("surfaces a due task that fails, stopping the clock where it failed", async () => {
+    // Given due work that throws, followed by more work later in the interval
+    const { control, background } = simulatedTime();
+    background.scheduleAt(new Date("2026-07-26T09:10:00.000Z"), async () => {
+      await Promise.resolve();
+
+      throw new Error("Scheduled work failed");
+    });
+    let laterRan = false;
+    background.scheduleAt(new Date("2026-07-26T09:15:00.000Z"), async () => {
+      laterRan = true;
+
+      await Promise.resolve();
+    });
+
+    // When time is advanced past both
+    const advance = control.advanceBy({ minutes: 20 });
+
+    // Then the failure surfaces to whoever advanced, rather than being lost in
+    // the background
+    await expect(advance).rejects.toThrow("Scheduled work failed");
+
+    // And simulated time stopped where it broke, with the work that never got
+    // its turn still queued rather than discarded
+    expect(control.now()).toStrictEqual(new Date("2026-07-26T09:10:00.000Z"));
+    expect(laterRan).toBe(false);
+    expect(background.dueTaskCount).toBe(1);
+  });
+
   it("runs nothing when simulated time is set backwards", async () => {
     // Given overdue work, with the clock already past it
     const { control, background } = simulatedTime();
