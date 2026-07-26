@@ -554,9 +554,11 @@ changes the `AuthType` or `InvokeMode` while keeping the same endpoint, and
 `404`. `ListFunctionUrlConfigsCommand` lists what a function has, which is either nothing or one
 configuration, since a function has at most one Function URL.
 
-A URL created with `AuthType: "AWS_IAM"` is stored and reported, but the simulator does not verify
-SigV4 signatures, so serving one refuses every request with `403`. Use `AuthType: "NONE"` for URLs
-a test needs to call.
+A URL created with `AuthType: "AWS_IAM"` is stored and reported, but nothing yet evaluates
+`lambda:InvokeFunctionUrl` against the caller of a request, so serving one refuses every request
+with `403`. Use `AuthType: "NONE"` for URLs a test needs to call. The caller of a served request is
+resolved either way — see
+[callers of HTTP requests](../iam/#callers-of-http-requests) in the IAM docs.
 
 ## Environment variables
 
@@ -914,8 +916,9 @@ Current documented limitations:
 
 - Only `CreateFunctionCommand`, `GetFunctionCommand`, `InvokeCommand`, and the Function URL config
   commands are supported — no `UpdateFunctionCode`, `DeleteFunction`, or function listing yet.
-- Function URLs with `AuthType: "AWS_IAM"` are stored and reported, but SigV4 signatures are not
-  verified, so serving one refuses every request with `403`.
+- Function URLs with `AuthType: "AWS_IAM"` are stored and reported, and the caller of a served
+  request is resolved, but `lambda:InvokeFunctionUrl` is not evaluated against it, so serving one
+  refuses every request with `403`.
 - The Function URL `Cors` configuration is not simulated, including OPTIONS preflight handling.
 - `InvokeMode: "RESPONSE_STREAM"` is accepted and reported, but responses are always served
   buffered.

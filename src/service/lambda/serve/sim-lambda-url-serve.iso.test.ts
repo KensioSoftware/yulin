@@ -13,6 +13,7 @@ import {
 import { describe, it } from "vitest";
 
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
+import { SimAwsServiceRequest } from "../../../serve/controller/sim-service-controller.js";
 import { SimAwsLocalUrl } from "../../../serve/http/url/sim-aws-local-url.js";
 import { SimAws } from "../../aws/sim-aws.js";
 import { makeLambdaZipFileInput } from "../function/code/lambda-zip-file-input.js";
@@ -322,12 +323,14 @@ describe("Serving a sim Lambda Function URL", () => {
     // When the Function URL is invoked through it
     const url = new URL(localUrl(functionUrl));
     const response = await controller.handleRequest(
-      {
-        service: "lambda",
-        resourceName: url.hostname.split(".", 1)[0] ?? "",
-        regionName: simAws.defaultRegionName,
-      },
-      new Request(url),
+      new SimAwsServiceRequest({
+        target: {
+          service: "lambda",
+          resourceName: url.hostname.split(".", 1)[0] ?? "",
+          regionName: simAws.defaultRegionName,
+        },
+        request: new Request(url),
+      }),
     );
 
     // Then the event carries the router's simulated time, not the real time

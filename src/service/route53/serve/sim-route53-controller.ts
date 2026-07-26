@@ -1,7 +1,7 @@
 import { SimAws } from "../../aws/sim-aws.js";
 import type {
   SimAwsServiceController,
-  SimAwsServiceTarget,
+  SimAwsServiceRequest,
 } from "../../../serve/controller/sim-service-controller.js";
 import { SimRoute53ZoneSummaryPage } from "./zone-summary/sim-route53-zone-summary-page.js";
 
@@ -27,11 +27,8 @@ export class SimRoute53ServiceController implements SimAwsServiceController {
   /**
    * Handle an HTTP request routed to the simulated Route53 summary host.
    */
-  handleRequest(
-    _target: SimAwsServiceTarget,
-    request: Request,
-  ): Promise<Response> {
-    const { pathname } = new URL(request.url);
+  handleRequest(serviceRequest: SimAwsServiceRequest): Promise<Response> {
+    const { pathname } = new URL(serviceRequest.request.url);
 
     if (pathname !== "/") {
       return Promise.resolve(

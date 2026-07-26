@@ -10,16 +10,21 @@ import { CreateDistributionCommand } from "@aws-sdk/client-cloudfront";
 import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
 import { SimCloudFrontServiceController } from "./sim-cloudfront-controller.js";
+import { SimAwsServiceRequest } from "../../../serve/controller/sim-service-controller.js";
 
 describe("Simulated CloudFront local HTTP controller routing", () => {
   it("responds HTTP 404 when no Distribution matches the request host", async () => {
     const cfController = new SimCloudFrontServiceController();
     const response = await cfController.handleRequest(
-      {
-        service: "cloudFront",
-        resourceName: "",
-      },
-      new Request("http://unknown.cloudfront.net.sim-aws.localhost/index.html"),
+      new SimAwsServiceRequest({
+        target: {
+          service: "cloudFront",
+          resourceName: "",
+        },
+        request: new Request(
+          "http://unknown.cloudfront.net.sim-aws.localhost/index.html",
+        ),
+      }),
     );
 
     assertResponseStatus(response, 404, await describeResponse(response));
@@ -76,18 +81,20 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
       simAws,
     });
     const response = await cfController.handleRequest(
-      {
-        service: "cloudFront",
-        resourceName: "",
-      },
-      new Request(
-        `http://${distributionId}.cloudfront.net.sim-aws.localhost/index.html`,
-        {
-          headers: {
-            host: `${distributionId}.cloudfront.net.sim-aws.localhost`,
-          },
+      new SimAwsServiceRequest({
+        target: {
+          service: "cloudFront",
+          resourceName: "",
         },
-      ),
+        request: new Request(
+          `http://${distributionId}.cloudfront.net.sim-aws.localhost/index.html`,
+          {
+            headers: {
+              host: `${distributionId}.cloudfront.net.sim-aws.localhost`,
+            },
+          },
+        ),
+      }),
     );
 
     assertResponseStatus(response, 200, await describeResponse(response));
@@ -172,13 +179,15 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
       simAws,
     });
     const response = await cfController.handleRequest(
-      {
-        service: "cloudFront",
-        resourceName: "",
-      },
-      new Request(
-        `http://${distributionId}.cloudfront.net.sim-aws.localhost/page.html`,
-      ),
+      new SimAwsServiceRequest({
+        target: {
+          service: "cloudFront",
+          resourceName: "",
+        },
+        request: new Request(
+          `http://${distributionId}.cloudfront.net.sim-aws.localhost/page.html`,
+        ),
+      }),
     );
 
     assertResponseStatus(response, 200, await describeResponse(response));
@@ -285,13 +294,15 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
       simAws,
     });
     const response = await cfController.handleRequest(
-      {
-        service: "cloudFront",
-        resourceName: "",
-      },
-      new Request(
-        `http://${distributionId}.cloudfront.net.sim-aws.localhost/assets/images/logo.png`,
-      ),
+      new SimAwsServiceRequest({
+        target: {
+          service: "cloudFront",
+          resourceName: "",
+        },
+        request: new Request(
+          `http://${distributionId}.cloudfront.net.sim-aws.localhost/assets/images/logo.png`,
+        ),
+      }),
     );
 
     assertResponseStatus(response, 200, await describeResponse(response));

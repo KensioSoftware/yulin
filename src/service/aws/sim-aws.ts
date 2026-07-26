@@ -33,6 +33,23 @@ import { simAwsRunAsContext } from "./caller/sim-aws-run-as-context.js";
 import type { SimClock } from "../../util/clock/sim-clock.js";
 import type { SimIamCredentialIdentity } from "../iam/credential/sim-aws-credentials.js";
 import { simIamSigV4SignedRequest } from "../iam/sigv4/sim-iam-sigv4-signed-request.js";
+import type { SimIamSigV4ExpectedScope } from "../iam/sigv4/sim-iam-sigv4-expected-scope.js";
+import type { SimAwsRequestCaller } from "../iam/request/sim-aws-request-caller.js";
+
+/**
+ * Everything caller resolution needs besides the request itself.
+ */
+export interface SimAwsRequestCallerOptions {
+  /**
+   * The request body, already buffered by whoever received the request.
+   */
+  readonly body?: Uint8Array | undefined;
+  /**
+   * The service and Region a signature should have been scoped to, when the
+   * receiving endpoint is known.
+   */
+  readonly expectedScope?: SimIamSigV4ExpectedScope | undefined;
+}
 
 interface SimAwsProperties {
   readonly defaultAccountId?: SimAwsAccountId;
@@ -119,6 +136,28 @@ export class SimAws {
   ): SimIamCredentialIdentity {
     return this.serviceFactory.signedRequests.verify(
       simIamSigV4SignedRequest(request, body),
+    );
+  }
+
+  /**
+   * Work out which simulated principal an HTTP request is made by.
+   *
+   * This is the request authentication boundary every served request passes
+   * through, exposed so it can be used directly. An `x-sim-aws-caller` header
+   * names a principal outright, an AWS4-HMAC-SHA256 signature is verified, and
+   * a request offering neither is anonymous rather than the Account root.
+   *
+   * The body is passed separately for the same reason it is on
+   * `verifySignedRequest`: a request body can only be read once, and whoever
+   * serves the request needs the same bytes.
+   */
+  resolveRequestCaller(
+    request: Request,
+    options: SimAwsRequestCallerOptions = {},
+  ): SimAwsRequestCaller {
+    return this.serviceFactory.requestCallers.resolve(
+      simIamSigV4SignedRequest(request, options.body),
+      options.expectedScope,
     );
   }
 

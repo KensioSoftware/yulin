@@ -21,6 +21,7 @@ import { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
 import { SimIamAccessKeyRegistry } from "../../iam/registry/sim-iam-access-key-registry.js";
 import { SimIamGlobalCredentialResolver } from "../../iam/registry/sim-iam-global-credential-resolver.js";
 import { SimIamSigV4Verifier } from "../../iam/sigv4/sim-iam-sigv4-verifier.js";
+import { SimAwsRequestCallerResolver } from "../../iam/request/sim-aws-request-caller-resolver.js";
 import { SimLambda } from "../../lambda/index.js";
 import { SimLambdaUrlRegistry } from "../../lambda/registry/sim-lambda-url-registry.js";
 import { SimS3LambdaCodeStore } from "../../lambda/function/code/store/sim-s3-lambda-code-store.js";
@@ -82,6 +83,18 @@ export class SimAwsServiceFactory {
       accessKeys: this.accessKeyRegistry,
       iam: this.iamRegistry,
     }),
+  });
+
+  /**
+   * Resolves the principal behind an HTTP request into this simulation.
+   *
+   * This is the single request authentication boundary: everything arriving
+   * over HTTP, including the in-process `SimAwsHttp.fetch()` path, gets its
+   * caller from here.
+   * @internal
+   */
+  public readonly requestCallers = new SimAwsRequestCallerResolver({
+    signedRequests: this.signedRequests,
   });
 
   /**
