@@ -88,13 +88,26 @@ export class SimCdkAssetsPublisher {
   /**
    * Create the staging Bucket if this is the first asset published into it,
    * standing in for the CDK bootstrap stack that provisions it for real.
+   *
+   * Stacks deployed concurrently share one staging Bucket, and creating it is
+   * not atomic: sim S3 reaches a sequencing point before registering the
+   * Bucket, so both can pass the check above and the loser is refused. A
+   * Bucket that exists by the time the failure lands is the outcome this
+   * wanted, whoever created it. Anything else, such as the name already being
+   * taken in another scope, is a real failure and is reported.
    */
   private async ensureBucket(s3: SimS3, bucketName: string): Promise<void> {
     if (s3.getSimBucketByName(bucketName) !== undefined) {
       return;
     }
 
-    await s3.createBucket({ input: { Bucket: bucketName } });
+    try {
+      await s3.createBucket({ input: { Bucket: bucketName } });
+    } catch (error) {
+      if (s3.getSimBucketByName(bucketName) === undefined) {
+        throw error;
+      }
+    }
   }
 
   private stagingS3(): SimS3 {

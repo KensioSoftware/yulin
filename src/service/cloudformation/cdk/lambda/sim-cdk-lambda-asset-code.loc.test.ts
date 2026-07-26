@@ -8,6 +8,7 @@ import {
   assertUndefined,
 } from "@kensio/smartass";
 import path from "node:path";
+import { buffer } from "node:stream/consumers";
 import { describe, it } from "vitest";
 
 /**
@@ -266,11 +267,18 @@ app.synth();
     assertIdentical(invokeOutput.StatusCode, 200);
     assertUndefined(invokeOutput.FunctionError);
 
-    // And the bucket deployment itself still works, as it is simulated
-    // directly rather than by running the skipped provider.
+    // And the bucket deployment itself still delivered its objects, as it is
+    // simulated directly rather than by running the skipped provider.
     const bucketName = stack.outputs.get("DataBucketName")?.value;
     assertTypeString(bucketName);
     assertNonNullable(simAws.s3().getSimBucketByName(bucketName));
+
+    const deployedObject = await simAws
+      .s3()
+      .getObject({ input: { Bucket: bucketName, Key: "greeting.txt" } });
+    assertNonNullable(deployedObject.Body);
+    const deployedBytes = await buffer(deployedObject.Body);
+    assertIdentical(deployedBytes.toString(), "Hello from sim S3");
 
     await simAws.backgroundTasksComplete();
   });

@@ -4,9 +4,11 @@ import {
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
+  assertStringIncludes,
+  assertThrowsErrorAsync,
   assertUndefined,
 } from "@kensio/smartass";
-import { describe, it } from "vitest";
+import { describe, it, vi } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimZipArchive } from "../../../../util/zip/zip-archive.js";
@@ -259,5 +261,79 @@ describe("SimCdkAssetsPublisher", () => {
     // Then nothing was published, and the Stack deployment is left to report
     // the missing code through the ordinary sim S3 lookup.
     assertUndefined(simAws.s3().getSimBucketByName("b"));
+  });
+
+  it("publishes into a staging Bucket another Stack created concurrently", async () => {
+    // Given a staging Bucket that appears between the publisher checking for
+    // it and its own CreateBucket landing, as it can when two Stacks sharing
+    // one staging Bucket deploy concurrently.
+    const simAws = new SimAws();
+    const cdkOutDirectory = new TemporaryDirectory();
+    await cdkOutDirectory.writeFile("asset.txt", "content");
+
+    const s3 = simAws.s3();
+    await s3.createBucket({ input: { Bucket: "shared-staging-bucket" } });
+
+    const findBucket = s3.getSimBucketByName.bind(s3);
+    let checkedBeforeCreate = false;
+    vi.spyOn(s3, "getSimBucketByName").mockImplementation((bucketName) => {
+      if (checkedBeforeCreate) {
+        return findBucket(bucketName);
+      }
+      checkedBeforeCreate = true;
+
+      return undefined;
+    });
+
+    // When the assets are published.
+    await publish(simAws, cdkOutDirectory.path(), {
+      files: {
+        abc: {
+          source: { path: "asset.txt", packaging: "file" },
+          destinations: {
+            one: { bucketName: "shared-staging-bucket", objectKey: "abc.txt" },
+          },
+        },
+      },
+    });
+
+    // Then losing the race to create the Bucket is not a failure, and the
+    // asset is published into the Bucket that won.
+    const objectBytes = await publishedObjectBytes(
+      simAws,
+      "shared-staging-bucket",
+      "abc.txt",
+    );
+    assertIdentical(Buffer.from(objectBytes).toString(), "content");
+  });
+
+  it("reports a staging Bucket name already taken in another scope", async () => {
+    // Given the staging Bucket name already in use in another Region, which
+    // sim S3 refuses because Bucket names are globally unique.
+    const simAws = new SimAws();
+    const cdkOutDirectory = new TemporaryDirectory();
+    await cdkOutDirectory.writeFile("asset.txt", "content");
+
+    await simAws
+      .accountRegionScope(undefined, "eu-west-2")
+      .s3()
+      .createBucket({ input: { Bucket: "taken-staging-bucket" } });
+
+    // When publishing tries to create it in the deploying scope.
+    const error = await assertThrowsErrorAsync(async () => {
+      await publish(simAws, cdkOutDirectory.path(), {
+        files: {
+          abc: {
+            source: { path: "asset.txt", packaging: "file" },
+            destinations: {
+              one: { bucketName: "taken-staging-bucket", objectKey: "abc.txt" },
+            },
+          },
+        },
+      });
+    });
+
+    // Then the failure is reported rather than mistaken for a lost race.
+    assertStringIncludes(error.message, "taken-staging-bucket");
   });
 });

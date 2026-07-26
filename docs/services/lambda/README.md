@@ -965,12 +965,16 @@ Code in a missing bucket fails the deploy AWS-style with a `NoSuchBucket` diagno
 
 ### CDK asset code
 
-`lambda.Code.fromAsset(...)` and the constructs built on it stage function code as a directory in
-the CDK cloud assembly, and synthesize a `Code.S3Bucket`/`S3Key` pointing at the CDK bootstrap
-staging bucket. Deploying a synthesized template file with `deployTemplateFile` publishes the cloud
-assembly's assets into that bucket in sim S3 before creating any resource, mirroring the way a real
+`lambda.Code.fromAsset(...)` and the constructs built on it stage function code in the CDK cloud
+assembly, and synthesize a `Code.S3Bucket`/`S3Key` pointing at the CDK bootstrap staging bucket.
+Deploying a synthesized template file with `deployTemplateFile` publishes the cloud assembly's
+assets into that bucket in sim S3 before creating any resource, mirroring the way a real
 `cdk deploy` runs `cdk-assets` before CloudFormation. Asset-bundled functions then resolve their
 code through the ordinary sim S3 fetch and run their real handler modules.
+
+Both shapes of staged asset are published. A handler directory is zipped on the way into sim S3,
+as `cdk-assets` zips it on the way to a real bucket. An asset that is already an archive, such as
+`Code.fromAsset("handler.zip")` or a bundler's archived output, is published as it stands.
 
 Asset code runs under the same rules as any other sim Lambda code: modules are evaluated as
 CommonJS in a vm, so everything the handler imports has to be in the asset, and only Node.js
