@@ -4,8 +4,13 @@ import {
   type SimSdkCommandRouter,
 } from "../../../sdk/index.js";
 import type { SimCreateFunctionCommand } from "../command/create-function/create-function.command.js";
+import type { SimCreateFunctionUrlConfigCommand } from "../command/create-function-url-config/create-function-url-config.command.js";
+import type { SimDeleteFunctionUrlConfigCommand } from "../command/delete-function-url-config/delete-function-url-config.command.js";
 import type { SimGetFunctionCommand } from "../command/get-function/get-function.command.js";
+import type { SimGetFunctionUrlConfigCommand } from "../command/get-function-url-config/get-function-url-config.command.js";
 import type { SimInvokeCommand } from "../command/invoke/invoke.command.js";
+import type { SimListFunctionUrlConfigsCommand } from "../command/list-function-url-configs/list-function-url-configs.command.js";
+import type { SimUpdateFunctionUrlConfigCommand } from "../command/update-function-url-config/update-function-url-config.command.js";
 import type { SimLambda } from "../sim-lambda.js";
 
 /**
@@ -37,6 +42,46 @@ export class SimLambdaSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simLambda.invoke(
             command as SimInvokeCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "CreateFunctionUrlConfigCommand",
+        async (command, context): Promise<unknown> =>
+          await simLambda.createFunctionUrlConfig(
+            command as SimCreateFunctionUrlConfigCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "GetFunctionUrlConfigCommand",
+        async (command, context): Promise<unknown> =>
+          await simLambda.getFunctionUrlConfig(
+            command as SimGetFunctionUrlConfigCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "UpdateFunctionUrlConfigCommand",
+        async (command, context): Promise<unknown> =>
+          await simLambda.updateFunctionUrlConfig(
+            command as SimUpdateFunctionUrlConfigCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteFunctionUrlConfigCommand",
+        async (command, context): Promise<unknown> =>
+          await simLambda.deleteFunctionUrlConfig(
+            command as SimDeleteFunctionUrlConfigCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListFunctionUrlConfigsCommand",
+        async (command, context): Promise<unknown> =>
+          await simLambda.listFunctionUrlConfigs(
+            command as SimListFunctionUrlConfigsCommand,
             simSdkCallerOptions(context),
           ),
       ],

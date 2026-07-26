@@ -49,6 +49,9 @@ Current command areas include:
 - `create-function/`
 - `get-function/`
 - `invoke/`
+- `create-function-url-config/`, `get-function-url-config/`,
+  `update-function-url-config/`, `delete-function-url-config/`,
+  `list-function-url-configs/`
 
 The main `SimLambda` class delegates command execution to handlers rather than keeping command
 handling logic inline.
@@ -206,12 +209,68 @@ execution roles.
 A standalone `SimLambda` (constructed directly rather than through `SimAws`) is its own run-as
 owner, keeping its ambient callers isolated.
 
+## Function URLs
+
+`function/url/` owns Function URLs: `SimLambdaFunctionUrl` is the stored resource and
+`SimLambdaFunctionUrlStore` holds one per function for an Account/Region scope. Creating one
+allocates a URL id and builds the AWS-shaped endpoint from it:
+
+```text
+https://<url-id>.lambda-url.<region>.on.aws/
+```
+
+The URL id is the routing key, so it is allocated from `SimLambdaUrlRegistry` (`registry/`), which
+maps ids to the Accounts that own them across one `SimAws` instance. A served request carries its
+region in the hostname but not its Account, and Lambda state is per Account/Region, so without that
+registry a Function URL host could not be resolved to a function. `SimCloudFrontRegistry` has the
+same shape for a different reason: CloudFront is not region-scoped, whereas this registry exists
+purely for the hostname-to-Account hop.
+
+### Serving
+
+`serve/` is the localhost HTTP side, reached through `serveSimAws` like the S3 and CloudFront
+controllers. Routing goes through simulated Route53: `<url-id>.lambda-url.<region>` is a terminal
+service target, with `SimAwsLocalUrl` dropping the real `.on.aws` tail exactly as it drops
+`.amazonaws.com` from S3 endpoints, giving:
+
+```text
+http://<url-id>.lambda-url.<region>.sim-aws.localhost:<port>/
+```
+
+`SimLambdaUrlRouter` turns that target back into a Function URL and function, then
+`SimLambdaServiceController` converts the request into a payload format 2.0 event
+(`serve/event/`) and the handler result back into a response (`serve/response/`). Payload format
+2.0 is the only format real Function URLs use, so there is no version to choose. Text bodies cross
+as strings and everything else as base64, in both directions, decided by content type in
+`SimLambdaUrlBodyEncoding`. A handler returning a structured result (one carrying `statusCode`)
+controls the response, including `cookies` becoming `set-cookie` headers; any other return value
+becomes a 200 JSON response, as on AWS.
+
+A Function URL request is not attributed to a simulated principal: a `NONE` auth URL is invokable
+by anyone on AWS, so the controller invokes the function directly rather than through the Invoke
+command's IAM path. The function still runs as its execution Role.
+
+`AWS_IAM` URLs are stored and reported, but SigV4 signatures are not verified, so a served request
+to one is refused with 403 `{"Message":"Forbidden"}` rather than admitted unauthenticated. The
+endpoint's own error responses (403, 404 for an unknown or deleted URL, 502 for a handler error)
+are AWS-shaped JSON documents, though the exact wording is an approximation.
+
+### CloudFormation
+
+`cfn/url/` creates `AWS::Lambda::Url`, which is what CDK's `Function.addFunctionUrl()` emits.
+`TargetFunctionArn` accepts both an `Fn::GetAtt` ARN and a `Ref` function name, dropping any
+version or alias qualifier. `Fn::GetAtt` exposes `FunctionUrl` and `FunctionArn`, and `Ref`
+returns the endpoint URL, implemented by the `SimLambdaFunctionUrlCfn` value adapter alongside the
+function's own adapter.
+
 ## IAM authorization
 
 Command handlers authorize with per-command authorizers against the function ARN, using the
 account-scoped simulated IAM implementation when constructed through `SimAws`
-(`lambda:CreateFunction`, `lambda:GetFunction`, `lambda:InvokeFunction`), with the same
-allow-all fallback as other services for direct standalone construction.
+(`lambda:CreateFunction`, `lambda:GetFunction`, `lambda:InvokeFunction`, and the
+`lambda:*FunctionUrlConfig*` actions), with the same allow-all fallback as other services for
+direct standalone construction. The Function URL commands share one `FunctionUrlAuthorizer` taking
+the action as a constructor value, since only the action name varies between them.
 
 ## CloudFormation
 
@@ -261,7 +320,11 @@ are not supported and are skipped by the CloudFormation engine with an "Unsuppor
 
 ## Not simulated yet
 
-- `AWS::Lambda::*` CloudFormation resource types other than `AWS::Lambda::Function`
+- `AWS::Lambda::*` CloudFormation resource types other than `AWS::Lambda::Function` and
+  `AWS::Lambda::Url`
+- Function URL SigV4 verification, so `AWS_IAM` URLs refuse every served request
+- Function URL `Cors` configuration and OPTIONS preflight handling
+- `InvokeMode: RESPONSE_STREAM`, which is accepted and reported but always served buffered
 - ES module function code (`.mjs` / `export` syntax) in the vm runtime
 - container image functions (`Code.ImageUri`) — the simulator stays Docker-free
 - `UpdateFunctionCode`, versions, aliases and qualifiers

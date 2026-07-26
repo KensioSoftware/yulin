@@ -50,15 +50,28 @@ export class SimAwsLocalUrl {
       return hostname;
     }
 
-    const s3AwsHostname =
-      /^(?<prefix>.+\.(?:s3|s3-website)\.[^.]+)\.amazonaws\.com$/.exec(
-        hostname,
-      );
+    const awsHostnamePrefix = this.awsHostnamePrefix(hostname);
 
-    if (s3AwsHostname?.groups?.["prefix"] !== undefined) {
-      return `${s3AwsHostname.groups["prefix"]}${SimAwsLocalUrl.localhostSuffix}`;
+    if (awsHostnamePrefix !== undefined) {
+      return `${awsHostnamePrefix}${SimAwsLocalUrl.localhostSuffix}`;
     }
 
     return `${hostname}${SimAwsLocalUrl.localhostSuffix}`;
+  }
+
+  /**
+   * Get the part of a real AWS service hostname that identifies the resource,
+   * dropping the AWS domain the local suffix replaces.
+   *
+   * Returns undefined for hostnames that are not AWS service endpoints, such
+   * as a CloudFront alternate domain name, which are used as they are.
+   */
+  private awsHostnamePrefix(hostname: string): string | undefined {
+    const awsHostname =
+      /^(?<prefix>.+\.(?:s3|s3-website)\.[^.]+)\.amazonaws\.com$/.exec(
+        hostname,
+      ) ?? /^(?<prefix>.+\.lambda-url\.[^.]+)\.on\.aws$/.exec(hostname);
+
+    return awsHostname?.groups?.["prefix"];
   }
 }

@@ -19,6 +19,7 @@ import { SimRoute53Registry } from "../../route53/registry/sim-route53-registry.
 import type { SimIam } from "../../iam/index.js";
 import { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
 import { SimLambda } from "../../lambda/index.js";
+import { SimLambdaUrlRegistry } from "../../lambda/registry/sim-lambda-url-registry.js";
 import { SimS3LambdaCodeStore } from "../../lambda/function/code/store/sim-s3-lambda-code-store.js";
 import { SimSdkLambdaVmModuleProvider } from "../../lambda/function/code/vm/sdk/sim-sdk-lambda-vm-module-provider.js";
 import { SimSts } from "../../sts/sim-sts.js";
@@ -59,6 +60,16 @@ export class SimAwsServiceFactory {
    * instance so cross-account services can resolve Account-owned IAM state.
    */
   public readonly iamRegistry = new SimIamRegistry();
+
+  /**
+   * Shared simulated Lambda Function URL registry.
+   *
+   * This maps Function URL ids to the Accounts that own them, so the
+   * localhost serving layer can route a Function URL request to the right
+   * Account/Region scope from the request hostname alone.
+   * @internal
+   */
+  public readonly lambdaUrlRegistry = new SimLambdaUrlRegistry();
 
   private readonly simAws: SimAws;
   private readonly background: BackgroundScheduler & BackgroundCompleter;
@@ -182,6 +193,7 @@ export class SimAwsServiceFactory {
       iam,
       background: this.background,
       runAsOwner: this.simAws,
+      urlRegistry: this.lambdaUrlRegistry,
       codeStore: new SimS3LambdaCodeStore({ s3: scope.s3() }),
       vmSdkModuleProvider: new SimSdkLambdaVmModuleProvider({
         simAws: this.simAws,
