@@ -3,10 +3,9 @@ import {
   type SimAwsAccount,
   type SimAwsAccountId,
 } from "./sim-aws-account.js";
-import {
-  type BackgroundCompleter,
-  type BackgroundScheduler,
-  BackgroundTasks,
+import type {
+  BackgroundCompleter,
+  BackgroundScheduler,
 } from "../../util/background/background.js";
 import {
   type AwsRegionName,
@@ -30,38 +29,15 @@ import type { SimLambda } from "../lambda/index.js";
 import type { SimSts } from "../sts/sim-sts.js";
 import type { SimAwsPrincipal } from "./caller/sim-aws-caller.js";
 import { simAwsRunAsContext } from "./caller/sim-aws-run-as-context.js";
-import type { SimClock } from "../../util/clock/sim-clock.js";
+import type { SimClockControl } from "../../util/clock/sim-clock-control.js";
+import { SimAwsTimekeeping } from "./sim-aws-timekeeping.js";
+import type {
+  SimAwsProperties,
+  SimAwsRequestCallerOptions,
+} from "./sim-aws-properties.js";
 import type { SimIamCredentialIdentity } from "../iam/credential/sim-aws-credentials.js";
 import { simIamSigV4SignedRequest } from "../iam/sigv4/sim-iam-sigv4-signed-request.js";
-import type { SimIamSigV4ExpectedScope } from "../iam/sigv4/sim-iam-sigv4-expected-scope.js";
 import type { SimAwsRequestCaller } from "../iam/request/sim-aws-request-caller.js";
-
-/**
- * Everything caller resolution needs besides the request itself.
- */
-export interface SimAwsRequestCallerOptions {
-  /**
-   * The request body, already buffered by whoever received the request.
-   */
-  readonly body?: Uint8Array | undefined;
-  /**
-   * The service and Region a signature should have been scoped to, when the
-   * receiving endpoint is known.
-   */
-  readonly expectedScope?: SimIamSigV4ExpectedScope | undefined;
-}
-
-interface SimAwsProperties {
-  readonly defaultAccountId?: SimAwsAccountId;
-  readonly defaultRegionName?: AwsRegionName;
-  readonly background?: BackgroundScheduler & BackgroundCompleter;
-  /**
-   * Clock supplying this simulation's timestamps, defaulting to the real system
-   * clock. Ignored when an already-built background scheduler is supplied, as
-   * that scheduler carries its own clock.
-   */
-  readonly clock?: SimClock;
-}
 
 /**
  * Top-level container for simulated AWS.
@@ -84,20 +60,25 @@ export class SimAws {
 
   private readonly background: BackgroundScheduler & BackgroundCompleter;
   private readonly scopes: SimAwsScopeRegistry;
+  private readonly timekeeping: SimAwsTimekeeping;
 
   constructor(properties: SimAwsProperties = {}) {
     const {
       defaultAccountId = DEFAULT_SIM_AWS_ACCOUNT_ID,
       defaultRegionName = DEFAULT_SIM_AWS_REGION_NAME,
       clock,
+      background: suppliedBackground,
     } = properties;
 
-    const background =
-      properties.background ??
-      new BackgroundTasks(clock === undefined ? {} : { clock });
+    const timekeeping = new SimAwsTimekeeping({
+      clock,
+      background: suppliedBackground,
+    });
+    const background = timekeeping.background;
 
     this.defaultAccountId = defaultAccountId;
     this.defaultRegionName = defaultRegionName;
+    this.timekeeping = timekeeping;
     this.background = background;
     this.serviceFactory = new SimAwsServiceFactory({
       simAws: this,
@@ -115,6 +96,27 @@ export class SimAws {
    */
   now(): Date {
     return this.background.now();
+  }
+
+  /**
+   * Control this simulated AWS environment's clock.
+   *
+   * Time can be frozen, set to an instant, or advanced by a duration, so
+   * behaviour that only happens once time passes — a temporary session
+   * expiring, for one — can be tested without waiting for it and without
+   * replacing the clock for the whole process:
+   *
+   * ```typescript
+   * await simAws.clock().advanceBy({ minutes: 20 });
+   * ```
+   *
+   * Advancing runs whatever falls due during the interval and returns once the
+   * simulation has settled, so the next line can assert. The clock belongs to
+   * this instance alone: moving it never disturbs another SimAws, or the real
+   * clock.
+   */
+  clock(): SimClockControl {
+    return this.timekeeping.clockControl();
   }
 
   /**

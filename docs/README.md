@@ -15,3 +15,8 @@ into tests, local development scripts, or small experiments.
 - [Route53](./services/route53/ "Simulated Route53 usage docs")
 - [S3](./services/s3/ "Simulated S3 usage docs")
 - [STS](./services/sts/ "Simulated STS usage docs")
+
+## Feature documentation
+
+- [AWS SDK interception](./sdk/ "Simulated AWS SDK usage docs")
+- [Simulated time](./time/ "Simulated time usage docs")

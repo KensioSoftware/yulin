@@ -27,6 +27,11 @@ npm i -D @kensio/yulin
 - [S3](./docs/services/s3 "Simulated S3 docs")
 - [STS](./docs/services/sts "Simulated STS docs")
 
+## Feature specific docs
+
+- [AWS SDK interception](./docs/sdk "Simulated AWS SDK docs")
+- [Simulated time](./docs/time "Simulated time docs")
+
 ## Usage
 
 ### Intercept AWS SDK clients
@@ -169,6 +174,38 @@ console.log(bucketWebsiteUrl.toString());
 // Fetch /foo/index.html from the simulated S3 bucket website via port on localhost.
 const res = await fetch(new URL("/foo/", bucketWebsiteUrl));
 ```
+
+### Control simulated time
+
+Each simulated AWS has its own clock, which you can freeze, set, or advance. This lets a test
+exercise behaviour that only happens once time passes, without waiting for it and without replacing
+the clock for the whole process:
+
+```typescript
+import { SimAws } from "@kensio/yulin";
+import { AssumeRoleCommand } from "@aws-sdk/client-sts";
+
+const simAws = new SimAws();
+
+// Assumes a ReportingRole this Account is already allowed to assume; the
+// simulated time docs below show the same example with its IAM setup.
+const { Credentials } = await simAws.sts().assumeRole(
+  new AssumeRoleCommand({
+    RoleArn: `arn:aws:iam::${simAws.defaultAccountId}:role/ReportingRole`,
+    RoleSessionName: "reporting-session",
+    DurationSeconds: 900,
+  }),
+);
+
+await simAws.clock().advanceBy({ minutes: 20 });
+
+// Those session credentials have now expired.
+```
+
+Advancing runs whatever falls due during the interval and returns once the simulation has settled,
+so the next line can assert. Time belongs to the `SimAws` instance, so moving it never disturbs
+another simulation, or the real clock. See the
+[simulated time docs](./docs/time "Simulated time docs") for full usage.
 
 ## What is yulin?
 

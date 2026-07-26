@@ -206,5 +206,22 @@ describe("Simulated AWS HTTP", () => {
       assertResponseStatus(response, 501);
       assertIdentical(response.headers.get("date"), instant.toUTCString());
     });
+
+    it("reports manipulated time to an outside client", async () => {
+      // Given a simulation whose clock has been advanced by a day
+      const simAws = new SimAws({ clock: new SimFixedClock(instant) });
+      const simAwsHttp = new SimAwsHttp({ simAws });
+      await simAws.clock().advanceBy({ days: 1 });
+
+      // When any request is served
+      const response = await simAwsHttp.fetch("http://unknown.example.com/");
+
+      // Then the response reports the advanced time, so a client talking to
+      // the simulation over HTTP sees the same "now" it does
+      assertIdentical(
+        response.headers.get("date"),
+        new Date("2026-07-27T09:30:00.000Z").toUTCString(),
+      );
+    });
   });
 });

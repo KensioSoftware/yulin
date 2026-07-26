@@ -1,6 +1,10 @@
 /* eslint-disable unicorn/prefer-await  */
 
 import { type SimClock, SimRealClock } from "../clock/sim-clock.js";
+import {
+  type BackgroundDueTask,
+  BackgroundDueTasks,
+} from "./background-due-tasks.js";
 
 export type BackgroundTask = () => Promise<void>;
 
@@ -23,6 +27,14 @@ export interface BackgroundScheduler extends SimClock {
   sequence(): Promise<void>;
 
   schedule(task: BackgroundTask): void;
+
+  /**
+   * Schedule a task to happen once simulated time reaches an instant.
+   *
+   * Nothing dispatches it until the clock gets there, so scheduled work
+   * happens on the simulation's timeline rather than the host's.
+   */
+  scheduleAt(dueTime: Date, task: BackgroundTask): void;
 }
 
 interface BackgroundTasksProperties {
@@ -34,15 +46,35 @@ export interface BackgroundCompleter {
 }
 
 /**
+ * Source of background work waiting on the clock.
+ *
+ * Whatever controls simulated time pulls due work from here as it moves the
+ * clock, which is what makes advancing time dispatch what falls due during the
+ * interval rather than everything at once at the end.
+ */
+export interface BackgroundDueTaskSource {
+  /**
+   * Take the next task due at or before an instant, earliest first.
+   */
+  takeNextDueBy(instant: Date): BackgroundDueTask | undefined;
+
+  /**
+   * See how many tasks are waiting for simulated time to reach them.
+   */
+  readonly dueTaskCount: number;
+}
+
+/**
  * Deterministic async background tasks scheduler.
  *
  * Tasks still run asynchronously, outside the current call stack, but dispatch in
  * the order they were scheduled.
  */
 export class BackgroundTasks
-  implements BackgroundScheduler, BackgroundCompleter
+  implements BackgroundScheduler, BackgroundCompleter, BackgroundDueTaskSource
 {
   private readonly pending = new Set<Promise<void>>();
+  private readonly dueTasks = new BackgroundDueTasks();
   private readonly clock: SimClock;
 
   constructor(properties: BackgroundTasksProperties = {}) {
@@ -90,8 +122,26 @@ export class BackgroundTasks
   }
 
   /**
+   * Schedule a task to happen once simulated time reaches an instant.
+   */
+  scheduleAt(dueTime: Date, task: BackgroundTask): void {
+    this.dueTasks.add(dueTime, task);
+  }
+
+  /**
+   * Take the next task due at or before an instant, earliest first.
+   */
+  takeNextDueBy(instant: Date): BackgroundDueTask | undefined {
+    return this.dueTasks.takeNextDueBy(instant);
+  }
+
+  /**
    * Wait until all tasks currently scheduled have finished.
    * If tasks schedule more tasks, this will continue draining until idle.
+   *
+   * Work waiting on the clock is not waited for: it is not outstanding, it is
+   * scheduled for a simulated instant that has not arrived. Only moving the
+   * clock releases it.
    */
   public async complete(): Promise<void> {
     while (this.pending.size > 0) {
@@ -105,5 +155,12 @@ export class BackgroundTasks
    */
   public get pendingTaskCount(): number {
     return this.pending.size;
+  }
+
+  /**
+   * See how many tasks are waiting for simulated time to reach them.
+   */
+  public get dueTaskCount(): number {
+    return this.dueTasks.size;
   }
 }
