@@ -6,3 +6,11 @@ export {
   SimFixedClock,
   SimRealClock,
 } from "./util/clock/sim-clock.js";
+export { SimControllableClock } from "./util/clock/sim-controllable-clock.js";
+export { SimClockControl } from "./util/clock/sim-clock-control.js";
+export {
+  SimDuration,
+  type SimDurationInput,
+  SimInvalidDuration,
+} from "./util/clock/sim-duration.js";
+export { SimAwsTimeNotControllable } from "./service/aws/sim-aws-timekeeping.js";
