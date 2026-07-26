@@ -158,6 +158,12 @@ describe("Serving a sim Lambda Function URL", () => {
       event.requestContext.domainPrefix,
     );
     assertIdentical(event.requestContext.accountId, "anonymous");
+    assertTrue(
+      /^\d{2}\/[A-Z][a-z]{2}\/\d{4}:\d{2}:\d{2}:\d{2} \+0000$/.test(
+        event.requestContext.time,
+      ),
+      `Unexpected request context time ${event.requestContext.time}`,
+    );
   });
 
   it("passes a text request body through as a string", async () => {

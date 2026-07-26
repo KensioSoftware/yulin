@@ -62,13 +62,15 @@ export class SimLambdaServiceController implements SimAwsServiceController {
     route: SimLambdaFunctionUrlRoute,
     request: Request,
   ): Promise<Response> {
-    const event = await this.eventBuilder.build(request, route.functionUrl);
-
     try {
+      const event = await this.eventBuilder.build(request, route.functionUrl);
+
       return this.responseBuilder.build(await route.simFunction.invoke(event));
     } catch {
       // Real Function URLs report an unhandled function error as a bad
       // gateway, with the error itself only visible in the function's logs.
+      // Reading the request body can fail the same way, so building the event
+      // is inside this too.
       return this.errorResponse.internalServerError();
     }
   }

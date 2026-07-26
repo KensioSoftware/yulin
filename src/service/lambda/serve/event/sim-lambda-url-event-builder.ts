@@ -6,6 +6,7 @@ import type {
   SimLambdaFunctionUrlEvent,
   SimLambdaFunctionUrlRequestContext,
 } from "./sim-lambda-url-event.type.js";
+import { simLambdaUrlEventTime } from "./sim-lambda-url-event-time.js";
 import { SimLambdaUrlRequestParts } from "./sim-lambda-url-request-parts.js";
 
 /**
@@ -84,7 +85,7 @@ export class SimLambdaUrlEventBuilder {
       requestId: randomUUID(),
       routeKey: "$default",
       stage: "$default",
-      time: now.toISOString(),
+      time: simLambdaUrlEventTime(now),
       timeEpoch: now.getTime(),
     };
   }

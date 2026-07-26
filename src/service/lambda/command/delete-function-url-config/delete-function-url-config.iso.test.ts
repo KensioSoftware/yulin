@@ -7,6 +7,7 @@ import {
 import {
   assertIdentical,
   assertInstanceOf,
+  assertNonNullable,
   assertStringIncludes,
   assertThrowsErrorAsync,
   assertUndefined,
@@ -17,7 +18,6 @@ import { SimAws } from "../../../aws/sim-aws.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import { SimLambdaResourceNotFoundException } from "../../error/sim-lambda.error.js";
 import { makeLambdaZipFileInput } from "../../function/code/lambda-zip-file-input.js";
-import type { SimLambdaFunctionUrlId } from "../../function/url/sim-lambda-function-url.js";
 import { SimLambda } from "../../sim-lambda.js";
 
 async function createGreeterWithUrl(simLambda: SimLambda): Promise<void> {
@@ -62,7 +62,7 @@ describe("Lambda DeleteFunctionUrlConfigCommand", () => {
     const simLambda = new SimLambda();
     await createGreeterWithUrl(simLambda);
     const functionUrl = simLambda.getSimFunctionUrl("greeter");
-    const urlId = functionUrl?.urlId ?? ("" as SimLambdaFunctionUrlId);
+    assertNonNullable(functionUrl);
 
     // When the Function URL is deleted.
     await simLambda.deleteFunctionUrlConfig(
@@ -70,7 +70,7 @@ describe("Lambda DeleteFunctionUrlConfigCommand", () => {
     );
 
     // Then its id no longer finds anything to serve.
-    assertUndefined(simLambda.getSimFunctionUrlById(urlId));
+    assertUndefined(simLambda.getSimFunctionUrlById(functionUrl.urlId));
   });
 
   it("allows a new Function URL after deleting the old one", async () => {
