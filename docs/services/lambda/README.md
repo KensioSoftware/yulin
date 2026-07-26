@@ -19,6 +19,9 @@ Sim Lambda currently supports:
 - Fetching function configuration with `GetFunctionCommand`
 - Invoking functions with `InvokeCommand`, including the `RequestResponse`, `Event`, and `DryRun`
   invocation types
+- Function URLs, created with `CreateFunctionUrlConfigCommand` and served over real HTTP on
+  localhost with `serveSimAws`, so application code can call a simulated function the way it calls
+  a deployed one
 - Function code from three sources:
   - an in-process handler function passed via `makeLambdaZipFileInput(...)`
   - zip archive bytes on `Code.ZipFile` (build them with `makeLambdaCodeZip(...)`)
@@ -32,11 +35,11 @@ Sim Lambda currently supports:
   AWS environment
 - Execution roles: handlers run as their execution `Role`, evaluated against simulated IAM
 - IAM authorization of the Lambda commands themselves (`lambda:CreateFunction`,
-  `lambda:GetFunction`, `lambda:InvokeFunction`)
+  `lambda:GetFunction`, `lambda:InvokeFunction`, and the Function URL config actions)
 - AWS-like validation and errors, such as `ResourceConflictException` for duplicate function names
   and `Could not unzip uploaded file` for invalid zip bytes
-- CloudFormation resource `AWS::Lambda::Function`, with `Ref`/`Fn::GetAtt` support and deploy-time
-  executable bindings
+- CloudFormation resources `AWS::Lambda::Function` and `AWS::Lambda::Url`, with `Ref`/`Fn::GetAtt`
+  support and deploy-time executable bindings
 
 Real `LambdaClient` instances can also be routed into sim Lambda with
 [SDK interception](../../sdk/ "Simulated AWS SDK interception docs").
@@ -429,6 +432,132 @@ console.log(dryRunOutput.StatusCode);
 `Event` invocation handler errors are dropped, as sim Lambda does not simulate asynchronous
 retries or failure destinations yet.
 
+## Function URLs
+
+A Function URL is an HTTP endpoint for one function. Creating one with
+`CreateFunctionUrlConfigCommand` returns an AWS-shaped endpoint:
+
+```text
+https://<url-id>.lambda-url.<region>.on.aws/
+```
+
+Serving that URL with `serveSimAws` is the point of the feature: application code, a frontend dev
+server, or curl can make real HTTP requests to a simulated Lambda function, alongside the other
+simulated services on the same local server. Pass the Function URL through `srv.localUrl(...)`,
+which keeps the endpoint's hostname but sends the request to the local server, in the same way it
+adapts simulated S3 website and CloudFront URLs.
+
+```typescript sim-lambda-function-url
+/**
+ * Serving a simulated Lambda Function URL on localhost.
+ */
+
+import {
+  CreateFunctionCommand,
+  CreateFunctionUrlConfigCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import {
+  type SimLambdaFunctionUrlEvent,
+  makeLambdaZipFileInput,
+} from "@kensio/yulin/lambda";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const lambda = simAws.lambda();
+
+await lambda.createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "greeter",
+    Role: "arn:aws:iam::111111111111:role/GreeterRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput((event: SimLambdaFunctionUrlEvent) => ({
+        statusCode: 200,
+        headers: { "content-type": "text/plain" },
+        body: `Hello ${event.queryStringParameters?.["name"] ?? "world"}`,
+      })),
+    },
+  }),
+);
+
+const urlConfig = await lambda.createFunctionUrlConfig(
+  new CreateFunctionUrlConfigCommand({
+    FunctionName: "greeter",
+    AuthType: "NONE",
+  }),
+);
+
+// https://<url-id>.lambda-url.us-east-1.on.aws/
+console.log(urlConfig.FunctionUrl);
+
+const srv = await serveSimAws({ simAws });
+
+try {
+  const response = await fetch(
+    srv.localUrl(`${urlConfig.FunctionUrl}greet?name=Yulin`),
+  );
+
+  console.log(response.status);
+  console.log(await response.text());
+} finally {
+  srv.close();
+}
+```
+
+On localhost the endpoint hostname becomes
+`<url-id>.lambda-url.<region>.sim-aws.localhost:<port>`, dropping the `.on.aws` tail the way
+simulated S3 endpoints drop `.amazonaws.com`. Requests are routed by that hostname, so a Function
+URL created in a non-default account or region reaches the right function without any extra
+configuration.
+
+### The invocation event and the response
+
+The handler receives the API Gateway HTTP API payload format 2.0 event that real Function URLs
+send, which is the only format they use:
+
+```json
+{
+  "version": "2.0",
+  "routeKey": "$default",
+  "rawPath": "/greet",
+  "rawQueryString": "name=Yulin",
+  "headers": { "host": "...", "user-agent": "..." },
+  "queryStringParameters": { "name": "Yulin" },
+  "cookies": ["session=abc"],
+  "requestContext": {
+    "http": { "method": "GET", "path": "/greet", "sourceIp": "127.0.0.1" }
+  },
+  "isBase64Encoded": false
+}
+```
+
+Cookies arrive in their own `cookies` field rather than in `headers`, and a request body arrives on
+`body` as text or, for binary content types, as base64 with `isBase64Encoded` set.
+
+A handler can answer in either of the two shapes real Lambda accepts:
+
+- a structured response, recognised by its `statusCode`, whose `headers`, `body`, `cookies` (sent
+  as `set-cookie` headers) and `isBase64Encoded` control the HTTP response
+- any other value, which becomes a `200` JSON response, as in
+  `return { greeting: "hello" }`
+
+If the handler throws, the endpoint answers `502` with an AWS-like error document rather than the
+handler's error, which stays visible to the test as the thrown error would be through
+`InvokeCommand`.
+
+### Managing a Function URL
+
+`GetFunctionUrlConfigCommand` reads the configuration back, `UpdateFunctionUrlConfigCommand`
+changes the `AuthType` or `InvokeMode` while keeping the same endpoint, and
+`DeleteFunctionUrlConfigCommand` removes it, after which the hostname stops resolving and returns
+`404`. `ListFunctionUrlConfigsCommand` lists what a function has, which is either nothing or one
+configuration, since a function has at most one Function URL.
+
+A URL created with `AuthType: "AWS_IAM"` is stored and reported, but the simulator does not verify
+SigV4 signatures, so serving one refuses every request with `403`. Use `AuthType: "NONE"` for URLs
+a test needs to call.
+
 ## Environment variables
 
 A function can declare its own environment variables with `Environment.Variables`, as on real
@@ -632,6 +761,90 @@ A function whose `Code` points at a missing CDK bootstrap assets bucket
 templates deploy without their asset staging. Code in any other missing bucket fails the deploy
 AWS-style with a `NoSuchBucket` diagnostic.
 
+## Function URLs in templates
+
+`AWS::Lambda::Url` creates a Function URL for a deployed function, which is what CDK's
+`Function.addFunctionUrl(...)` emits. `TargetFunctionArn` accepts either an `Fn::GetAtt` ARN or a
+`Ref` to the function, and `Fn::GetAtt` on the URL exposes `FunctionUrl` and `FunctionArn`.
+
+```typescript sim-lambda-cloudformation-function-url
+/**
+ * Deploying a simulated Lambda Function URL from a CloudFormation template.
+ */
+
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "greeter-stack",
+  template: {
+    Resources: {
+      GreeterRole: {
+        Type: "AWS::IAM::Role",
+        Properties: {
+          RoleName: "GreeterRole",
+          AssumeRolePolicyDocument: {
+            Version: "2012-10-17",
+            Statement: [
+              {
+                Effect: "Allow",
+                Principal: { Service: "lambda.amazonaws.com" },
+                Action: "sts:AssumeRole",
+              },
+            ],
+          },
+        },
+      },
+      GreeterFunction: {
+        Type: "AWS::Lambda::Function",
+        Properties: {
+          FunctionName: "greeter",
+          Role: { "Fn::GetAtt": ["GreeterRole", "Arn"] },
+          Handler: "index.handler",
+          Runtime: "nodejs22.x",
+          Code: {
+            ZipFile:
+              "exports.handler = async (event) => " +
+              "({ statusCode: 200, body: 'Hello ' + event.rawPath });",
+          },
+        },
+      },
+      GreeterUrl: {
+        Type: "AWS::Lambda::Url",
+        Properties: {
+          TargetFunctionArn: { "Fn::GetAtt": ["GreeterFunction", "Arn"] },
+          AuthType: "NONE",
+        },
+      },
+    },
+    Outputs: {
+      GreeterFunctionUrl: {
+        Value: { "Fn::GetAtt": ["GreeterUrl", "FunctionUrl"] },
+      },
+    },
+  },
+});
+await stack.waitForDeployComplete();
+
+const functionUrl = stack.outputs.get("GreeterFunctionUrl")?.value as string;
+const srv = await serveSimAws({ simAws });
+
+try {
+  const response = await fetch(srv.localUrl(`${functionUrl}hello`));
+
+  console.log(await response.text());
+} finally {
+  srv.close();
+}
+```
+
+CDK templates work the same way: synth the app, deploy the template file, and read
+`functionUrl.url` from the stack outputs. Note that CDK pairs a public Function URL with an
+`AWS::Lambda::Permission`, which is not simulated and is skipped with a diagnostic rather than
+failing the deployment.
+
 ## Executable bindings
 
 Deploy-time `bindings` let a template function be backed by a real in-process handler instead of
@@ -699,8 +912,15 @@ deploy with the unmatched target named for diagnosis.
 
 Current documented limitations:
 
-- Only `CreateFunctionCommand`, `GetFunctionCommand`, and `InvokeCommand` are supported —
-  no `UpdateFunctionCode`, `DeleteFunction`, or function listing yet.
+- Only `CreateFunctionCommand`, `GetFunctionCommand`, `InvokeCommand`, and the Function URL config
+  commands are supported — no `UpdateFunctionCode`, `DeleteFunction`, or function listing yet.
+- Function URLs with `AuthType: "AWS_IAM"` are stored and reported, but SigV4 signatures are not
+  verified, so serving one refuses every request with `403`.
+- The Function URL `Cors` configuration is not simulated, including OPTIONS preflight handling.
+- `InvokeMode: "RESPONSE_STREAM"` is accepted and reported, but responses are always served
+  buffered.
+- A function has at most one Function URL, and qualified (version or alias) Function URLs are not
+  simulated.
 - Function versions, aliases, and qualifiers are not simulated (`Version` is always `$LATEST`).
 - The vm runtime supports CommonJS function code only; ES module source (`.mjs` / `export`
   syntax) is not supported yet.
@@ -712,9 +932,12 @@ Current documented limitations:
 - `Timeout` is recorded but does not interrupt handler execution.
 - `Event` invocations do not simulate retries or failure destinations; handler errors are dropped.
 - `Code.S3ObjectVersion` is accepted but ignored, as sim S3 has no object versioning yet.
-- CloudFormation resource types other than `AWS::Lambda::Function` (`Version`, `Alias`,
-  `Permission`, `EventSourceMapping`, ...) are skipped with an "Unsupported" diagnostic.
+- CloudFormation resource types other than `AWS::Lambda::Function` and `AWS::Lambda::Url`
+  (`Version`, `Alias`, `Permission`, `EventSourceMapping`, ...) are skipped with an "Unsupported"
+  diagnostic.
 - The `vm` context is a namespacing convenience, not a security boundary: function code runs
   in-process with the same trust as the test suite itself. Do not run untrusted code through the
   simulator.
-- Lambda is not served as an HTTP API by `serveSimAws`.
+- Only Function URLs are served over HTTP by `serveSimAws`; the Lambda control-plane API itself is
+  not served, so SDK commands go through `SimAws` or [SDK interception](../../sdk/) rather than
+  over the local server.

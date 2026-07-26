@@ -17,6 +17,7 @@ import type { SimAwsAccountRegionContainer } from "./sim-aws-account-region-scop
 import type { SimS3 } from "../s3/sim-s3.js";
 import type { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
 import type { SimCloudFrontRegistry } from "../cloudfront/registry/sim-cloud-front-registry.js";
+import type { SimLambdaUrlRegistry } from "../lambda/registry/sim-lambda-url-registry.js";
 import type { SimDynamoDb as SimDynamoDatabase } from "../dynamodb/index.js";
 import type { SimCloudFormation } from "../cloudformation/index.js";
 import type { SimRoute53 } from "../route53/index.js";
@@ -174,6 +175,18 @@ export class SimAws {
    */
   cloudFrontRegistry(): SimCloudFrontRegistry {
     return this.serviceFactory.cloudFrontRegistry;
+  }
+
+  /**
+   * Get the shared simulated Lambda Function URL registry.
+   *
+   * This is intended for Lambda controller wiring, so serving a Function URL
+   * request resolves the owning Account from the same registry the Function
+   * URL commands register ids in.
+   * @internal
+   */
+  lambdaUrlRegistry(): SimLambdaUrlRegistry {
+    return this.serviceFactory.lambdaUrlRegistry;
   }
 
   /**

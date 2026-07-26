@@ -6,6 +6,7 @@ import {
   assertThrowsError,
 } from "@kensio/smartass";
 import { SimAws } from "../../../service/aws/sim-aws.js";
+import { SimLambdaServiceController } from "../../../service/lambda/serve/sim-lambda-controller.js";
 import { SimS3ServiceController } from "../../../service/s3/serve/sim-s3-controller.js";
 import { SimAwsServiceControllerContainer } from "./sim-aws-service-controller-container.js";
 
@@ -18,6 +19,16 @@ describe("SimAwsServiceControllerContainer", () => {
     const controller = container.controllerForService("s3");
 
     assertInstanceOf(controller, SimS3ServiceController);
+  });
+
+  it("returns Lambda service controller", () => {
+    const simAws = new SimAws();
+
+    const container = new SimAwsServiceControllerContainer({ simAws });
+
+    const controller = container.controllerForService("lambda");
+
+    assertInstanceOf(controller, SimLambdaServiceController);
   });
 
   it("returns same controller for same service", () => {

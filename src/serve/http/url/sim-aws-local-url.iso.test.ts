@@ -27,6 +27,20 @@ describe("Simulated AWS local URL", () => {
     );
   });
 
+  it("replaces an AWS Lambda Function URL suffix with the local hostname suffix", () => {
+    const url = new SimAwsLocalUrl({
+      input:
+        "https://2sn5f1tes4o11qsj5ue6cb5ndltmgute.lambda-url.eu-west-2.on.aws/hello",
+      port: "12345",
+    });
+
+    assertIdentical(
+      url.toString(),
+      "http://2sn5f1tes4o11qsj5ue6cb5ndltmgute.lambda-url.eu-west-2" +
+        ".sim-aws.localhost:12345/hello",
+    );
+  });
+
   it("adds the local hostname suffix to other hostnames", () => {
     const url = new SimAwsLocalUrl({
       input: "https://www.example.test/foo/",

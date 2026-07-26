@@ -14,3 +14,7 @@ export type {
   SimLambdaContext,
   SimLambdaHandler,
 } from "./function/sim-lambda-handler.type.js";
+export type {
+  SimLambdaFunctionUrlEvent,
+  SimLambdaFunctionUrlResult,
+} from "./serve/event/sim-lambda-url-event.type.js";

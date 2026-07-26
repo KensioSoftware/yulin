@@ -3,8 +3,8 @@ import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-re
 import type { SimCfnTemplateValue } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 
 /**
- * Validates individual AWS::Lambda::Function CloudFormation property values,
- * failing with a diagnostic naming the property and the logical ID.
+ * Validates individual AWS::Lambda::* CloudFormation property values, failing
+ * with a diagnostic naming the Resource type, the property and the logical ID.
  */
 export class SimCfnLambdaPropertyParser {
   /**
@@ -95,7 +95,8 @@ export class SimCfnLambdaPropertyParser {
     expected: string,
   ): TypeError {
     return new TypeError(
-      `Invalid AWS::Lambda::Function ${resource.logicalId}: ${label} must be ${expected}`,
+      `Invalid ${resource.type ?? "AWS::Lambda::Function"} ` +
+        `${resource.logicalId}: ${label} must be ${expected}`,
     );
   }
 }

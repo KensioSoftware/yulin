@@ -1,5 +1,6 @@
 import type { SimAwsServiceTarget } from "../../../serve/controller/sim-service-controller.js";
 import type { AwsRegionName } from "../../aws/sim-aws-region.js";
+import { lambdaFunctionUrlHostLabel } from "../../lambda/function/url/sim-lambda-function-url-host.js";
 import { simRoute53LogicalName } from "../local-name/sim-route53-local-name.js";
 import { simRoute53DnsHostName } from "../serve/sim-route53-dns-host.js";
 
@@ -37,7 +38,8 @@ export class SimRoute53ServiceTargetResolver {
     return (
       this.route53DnsServiceTarget(logicalName) ??
       this.s3WebsiteServiceTarget(logicalName) ??
-      this.cloudFrontServiceTarget(logicalName)
+      this.cloudFrontServiceTarget(logicalName) ??
+      this.lambdaFunctionUrlServiceTarget(logicalName)
     );
   }
 
@@ -134,6 +136,44 @@ export class SimRoute53ServiceTargetResolver {
     return {
       service: "cloudFront",
       resourceName: distroId,
+    };
+  }
+
+  /**
+   * Resolve Lambda Function URL hostnames.
+   *
+   * Simulated Function URL hostnames use:
+   *
+   *   <url-id>.lambda-url.<region>
+   *
+   * The real AWS endpoint ends `.on.aws`, which the local URL rewriting drops
+   * in the same way it drops `.amazonaws.com` from S3 endpoints. The URL id is
+   * one DNS label, so the label count here is exact.
+   */
+  private lambdaFunctionUrlServiceTarget(
+    logicalName: string,
+  ): SimAwsServiceTarget | undefined {
+    const labels = logicalName.split(".");
+
+    if (labels.length !== 3) {
+      return undefined;
+    }
+
+    const [urlId, service, regionName] = labels;
+
+    if (service !== lambdaFunctionUrlHostLabel || regionName === undefined) {
+      return undefined;
+    }
+
+    /* v8 ignore if -- defensive check */
+    if (urlId === undefined || urlId.length === 0) {
+      return undefined;
+    }
+
+    return {
+      service: "lambda",
+      resourceName: urlId,
+      regionName: regionName as AwsRegionName,
     };
   }
 }
