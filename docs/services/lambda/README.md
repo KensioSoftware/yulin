@@ -961,10 +961,34 @@ Supported function properties:
 - `Timeout`
 - `MemorySize`
 
-A function whose `Code` points at a missing CDK bootstrap assets bucket
-(`cdk-*-assets-*`) is skipped with a diagnostic rather than failing the stack, so CDK-synthesized
-templates deploy without their asset staging. Code in any other missing bucket fails the deploy
-AWS-style with a `NoSuchBucket` diagnostic.
+Code in a missing bucket fails the deploy AWS-style with a `NoSuchBucket` diagnostic.
+
+### CDK asset code
+
+`lambda.Code.fromAsset(...)` and the constructs built on it stage function code in the CDK cloud
+assembly, and synthesize a `Code.S3Bucket`/`S3Key` pointing at the CDK bootstrap staging bucket.
+Deploying a synthesized template file with `deployTemplateFile` publishes the cloud assembly's
+assets into that bucket in sim S3 before creating any resource, mirroring the way a real
+`cdk deploy` runs `cdk-assets` before CloudFormation. Asset-bundled functions then resolve their
+code through the ordinary sim S3 fetch and run their real handler modules.
+
+Both shapes of staged asset are published. A handler directory is zipped on the way into sim S3,
+as `cdk-assets` zips it on the way to a real bucket. An asset that is already an archive, such as
+`Code.fromAsset("handler.zip")` or a bundler's archived output, is published as it stands.
+
+Asset code runs under the same rules as any other sim Lambda code: modules are evaluated as
+CommonJS in a vm, so everything the handler imports has to be in the asset, and only Node.js
+runtimes are simulated.
+
+Two cases are skipped with a diagnostic rather than failing the stack:
+
+- A function declaring a non-Node.js `Runtime`, such as the Python provider function CDK
+  synthesizes for `BucketDeployment`. Sim CloudFormation simulates that custom resource directly,
+  so its provider never needs to run. Bind a real in-process handler to simulate a function whose
+  runtime Yulin cannot run.
+- A CDK-shaped template deployed without its cloud assembly, such as a template object passed
+  inline to `deployTemplate`, where there is no asset to publish and the staging bucket does not
+  exist.
 
 ## Function URLs in templates
 

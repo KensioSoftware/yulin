@@ -14,6 +14,15 @@ interface SimCfnLambdaCodeInputProperties {
 }
 
 /**
+ * The code a Resource's function will be created with, and whether an
+ * executable binding supplied it.
+ */
+export interface SimCfnLambdaCodeInput {
+  readonly code: SimLambdaFunctionCode | undefined;
+  readonly bound: boolean;
+}
+
+/**
  * The CreateFunction code input for an AWS::Lambda::Function Resource: an
  * executable binding's real handler when one targets the Resource, otherwise
  * the template code.
@@ -26,7 +35,7 @@ interface SimCfnLambdaCodeInputProperties {
  */
 export function simCfnLambdaCodeInput(
   properties: SimCfnLambdaCodeInputProperties,
-): SimLambdaFunctionCode | undefined {
+): SimCfnLambdaCodeInput {
   const { resource, functionProperties, bindings } = properties;
 
   const bindingFinder = new SimCfnExecBindingFinder<SimLambdaHandler>({
@@ -42,8 +51,11 @@ export function simCfnLambdaCodeInput(
   });
 
   if (binding === undefined) {
-    return functionProperties.code;
+    return { code: functionProperties.code, bound: false };
   }
 
-  return { ZipFile: makeLambdaZipFileInput(binding.handler) };
+  return {
+    code: { ZipFile: makeLambdaZipFileInput(binding.handler) },
+    bound: true,
+  };
 }

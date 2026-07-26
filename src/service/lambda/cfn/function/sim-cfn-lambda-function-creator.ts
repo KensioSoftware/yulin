@@ -6,6 +6,7 @@ import type { SimLambdaFunction } from "../../function/sim-lambda-function.js";
 import type { SimLambda } from "../../sim-lambda.js";
 import { SimCfnLambdaCdkAssetsSkip } from "./sim-cfn-lambda-cdk-assets-skip.js";
 import { simCfnLambdaCodeInput } from "./sim-cfn-lambda-code-input.js";
+import { SimCfnLambdaRuntimeSkip } from "./sim-cfn-lambda-runtime-skip.js";
 import {
   simCfnLambdaCreateFunctionInput,
   SimCfnLambdaFunctionPropertiesParser,
@@ -23,6 +24,7 @@ export class SimCfnLambdaFunctionCreator {
   private readonly propertiesParser =
     new SimCfnLambdaFunctionPropertiesParser();
   private readonly cdkAssetsSkip = new SimCfnLambdaCdkAssetsSkip();
+  private readonly runtimeSkip = new SimCfnLambdaRuntimeSkip();
 
   constructor(properties: SimCfnLambdaFunctionCreatorProperties) {
     this.lambda = properties.lambda;
@@ -45,11 +47,20 @@ export class SimCfnLambdaFunctionCreator {
       resource,
       properties,
     );
-    const code = simCfnLambdaCodeInput({
+    const { code, bound } = simCfnLambdaCodeInput({
       resource,
       functionProperties,
       bindings,
     });
+
+    const runtimeSkipError = this.runtimeSkip.findSkipError(
+      resource,
+      functionProperties,
+      bound,
+    );
+    if (runtimeSkipError !== undefined) {
+      throw runtimeSkipError;
+    }
 
     try {
       await this.lambda.createFunction({
