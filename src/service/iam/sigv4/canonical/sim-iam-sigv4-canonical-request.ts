@@ -38,7 +38,7 @@ export class SimIamSigV4CanonicalRequest {
     return [
       method.toUpperCase(),
       simIamSigV4CanonicalPath(url.pathname),
-      simIamSigV4CanonicalQuery(url.searchParams),
+      simIamSigV4CanonicalQuery(url.search),
       `${this.canonicalHeaders.toString()}\n`,
       this.canonicalHeaders.signedHeaderList(),
       simIamSigV4PayloadHash(headers, body),

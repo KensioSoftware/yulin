@@ -1,6 +1,11 @@
 import { timingSafeEqual } from "node:crypto";
 
-const hexSignaturePattern = /^[\da-f]+$/i;
+/**
+ * A SigV4 signature is a SHA-256 digest, so it is always exactly 64 hex
+ * characters. Requiring that here means nothing shorter, longer or oddly sized
+ * reaches the decoder, rather than relying on how it handles such input.
+ */
+const hexSignaturePattern = /^[\da-f]{64}$/i;
 
 /**
  * Compare a calculated signature with the one a request presented.

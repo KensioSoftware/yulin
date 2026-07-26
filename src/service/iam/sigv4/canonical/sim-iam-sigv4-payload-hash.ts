@@ -23,9 +23,11 @@ const emptyBodyHash =
  * without that, a signature would cover only the client's assertion about the
  * body, and the body could be replaced freely.
  *
- * Values that are not a digest, such as `UNSIGNED-PAYLOAD` and the streaming
- * markers, are declarations that the body is deliberately not covered. They are
- * used as they are, which is what they mean.
+ * `UNSIGNED-PAYLOAD` is the one declaration that deliberately leaves the body
+ * uncovered, and is honoured. Any other non-digest value, including the
+ * streaming markers that chunked uploads use, is refused rather than passed
+ * through: accepting one would mean serving a request whose body nothing had
+ * checked, which is worse than saying the simulator does not support it.
  */
 export function simIamSigV4PayloadHash(
   headers: Headers,
@@ -37,8 +39,16 @@ export function simIamSigV4PayloadHash(
     return hashOfBody(body);
   }
 
-  if (!sha256DigestPattern.test(declared)) {
+  if (declared === simIamSigV4UnsignedPayload) {
     return declared;
+  }
+
+  if (!sha256DigestPattern.test(declared)) {
+    throw new SimIamSignatureDoesNotMatch(
+      `Signed ${sha256HeaderName} header declares ${declared}, which is ` +
+        `neither a SHA-256 digest nor ${simIamSigV4UnsignedPayload}. ` +
+        `Chunked and streaming payload signing is not simulated.`,
+    );
   }
 
   const received = hashOfBody(body);

@@ -6,6 +6,7 @@ import { SimIamSigV4CanonicalHeaders } from "./sim-iam-sigv4-canonical-headers.j
 import { simIamSigV4CanonicalPath } from "./sim-iam-sigv4-canonical-path.js";
 import { simIamSigV4CanonicalQuery } from "./sim-iam-sigv4-canonical-query.js";
 import { simIamSigV4PayloadHash } from "./sim-iam-sigv4-payload-hash.js";
+import { SimIamSignatureDoesNotMatch } from "../error/sim-iam-sigv4.error.js";
 
 describe("SigV4 URI escaping", () => {
   it("encodes everything outside the unreserved set", () => {
@@ -62,26 +63,48 @@ describe("SigV4 canonical path", () => {
 describe("SigV4 canonical query", () => {
   it("orders by encoded key, then by value", () => {
     // Given keys that whole-pair sorting would order wrongly, and a repeat
-    const query = new URLSearchParams("b=2&a-z=1&a=9&a=1");
-
     // When the query is canonicalized
     // Then keys lead the ordering and repeated values follow their own
-    expect(simIamSigV4CanonicalQuery(query)).toBe("a=1&a=9&a-z=1&b=2");
+    expect(simIamSigV4CanonicalQuery("?b=2&a-z=1&a=9&a=1")).toBe(
+      "a=1&a=9&a-z=1&b=2",
+    );
   });
 
   it("encodes keys and values, and keeps empty values", () => {
-    const query = new URLSearchParams("a b=c d&empty=");
+    expect(simIamSigV4CanonicalQuery("?a%20b=c%20d&empty=&flag")).toBe(
+      "a%20b=c%20d&empty=&flag=",
+    );
+  });
 
-    expect(simIamSigV4CanonicalQuery(query)).toBe("a%20b=c%20d&empty=");
+  it("treats a literal plus as a plus rather than a space", () => {
+    // Given a query carrying an unencoded plus, which form decoding would read
+    // as a space
+    // When the query is canonicalized
+    // Then it is encoded as the character the client signed
+    expect(simIamSigV4CanonicalQuery("?a=b+c")).toBe("a=b%2Bc");
+    expect(simIamSigV4CanonicalQuery("?a=b%2Bc")).toBe("a=b%2Bc");
+  });
+
+  it("canonicalizes a part that is not validly encoded as it arrived", () => {
+    // Given a percent escape that cannot be decoded
+    // When the query is canonicalized
+    // Then the characters actually sent are what gets signed
+    expect(simIamSigV4CanonicalQuery("?a=100%25")).toBe("a=100%25");
+    expect(simIamSigV4CanonicalQuery("?a=100%zz")).toBe("a=100%25zz");
+  });
+
+  it("returns nothing for a request with no query", () => {
+    expect(simIamSigV4CanonicalQuery("")).toBe("");
   });
 
   it("leaves out the signature parameter", () => {
     // Given a presigned-style query carrying its own signature
-    const query = new URLSearchParams("a=1&X-Amz-Signature=deadbeef");
-
     // When the query is canonicalized
-    // Then the signature is not part of what it signs
-    expect(simIamSigV4CanonicalQuery(query)).toBe("a=1");
+    // Then the signature is not part of what it signs, which is also what the
+    // AWS signer does for a header-signed request
+    expect(simIamSigV4CanonicalQuery("?a=1&X-Amz-Signature=deadbeef")).toBe(
+      "a=1",
+    );
   });
 });
 
@@ -134,6 +157,27 @@ describe("SigV4 payload hash", () => {
   it("hashes an absent body as the empty digest", () => {
     expect(simIamSigV4PayloadHash(new Headers(), undefined)).toBe(
       "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    );
+  });
+
+  it("refuses a declaration it cannot check the body against", () => {
+    // Given a chunked upload's streaming marker, which is not simulated
+    const headers = new Headers({
+      "x-amz-content-sha256": "STREAMING-AWS4-HMAC-SHA256-PAYLOAD",
+    });
+
+    // When the hash is worked out
+    // Then it is refused, rather than serving a body nothing has checked
+    expect(() =>
+      simIamSigV4PayloadHash(headers, new TextEncoder().encode("chunk")),
+    ).toThrow(/not simulated/);
+  });
+
+  it("refuses a declaration that is neither digest nor marker", () => {
+    const headers = new Headers({ "x-amz-content-sha256": "nonsense" });
+
+    expect(() => simIamSigV4PayloadHash(headers, undefined)).toThrow(
+      SimIamSignatureDoesNotMatch,
     );
   });
 
