@@ -1,8 +1,9 @@
+import { GetPolicyCommand } from "@aws-sdk/client-lambda";
 import {
+  assertFalse,
   assertIdentical,
   assertNonNullable,
   assertStringIncludes,
-  assertTrue,
   assertTypeString,
 } from "@kensio/smartass";
 import path from "node:path";
@@ -103,7 +104,7 @@ app.synth();
     await simAws.backgroundTasksComplete();
   });
 
-  it("skips the AWS::Lambda::Permission CDK adds for a public URL", async () => {
+  it("creates the AWS::Lambda::Permission CDK adds for a public URL", async () => {
     // Given a CDK stack with a public Function URL, which CDK pairs with an
     // AWS::Lambda::Permission granting lambda:InvokeFunctionUrl to everyone.
     const simAws = new SimAws();
@@ -143,18 +144,21 @@ app.synth();
       );
     await simAws.backgroundTasksComplete();
 
-    // Then the unsupported permission Resource is skipped with a diagnostic
-    // rather than failing the deployment, and the Function URL still works.
+    // Then the permission Resource is deployed rather than skipped.
     const permissionResource = stack.resources
       .values()
       .find((resource) => resource.type === "AWS::Lambda::Permission");
     assertNonNullable(permissionResource);
-    assertTrue(permissionResource.skipped);
-    assertStringIncludes(
-      permissionResource.skippedReason ?? "",
-      "Unsupported sim Lambda CloudFormation Resource Permission",
-    );
+    assertFalse(permissionResource.skipped);
     assertNonNullable(simAws.lambda().getSimFunctionUrl("cdk-greeter"));
+
+    // And it lands on the function's resource policy as the grant CDK meant.
+    const policy = await simAws
+      .lambda()
+      .getPolicy(new GetPolicyCommand({ FunctionName: "cdk-greeter" }));
+    assertStringIncludes(policy.Policy, "lambda:InvokeFunctionUrl");
+    assertStringIncludes(policy.Policy, '"Principal":"*"');
+    assertStringIncludes(policy.Policy, '"lambda:FunctionUrlAuthType":"NONE"');
 
     await simAws.backgroundTasksComplete();
   });

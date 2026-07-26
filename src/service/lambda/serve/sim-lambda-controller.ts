@@ -78,10 +78,11 @@ export class SimLambdaServiceController implements SimAwsServiceController {
     serviceRequest: SimAwsServiceRequest,
   ): Promise<Response> {
     const { caller } = serviceRequest;
-    const decision = new SimLambdaUrlAuthorizer({ iam: route.iam }).authorize(
-      route.functionUrl.functionArn,
-      caller.toCaller(),
-    );
+    const decision = new SimLambdaUrlAuthorizer({ iam: route.iam }).authorize({
+      simFunction: route.simFunction,
+      functionUrl: route.functionUrl,
+      caller: caller.toCaller(),
+    });
 
     if (decision.isDenied) {
       return this.errorResponse.forbidden();
