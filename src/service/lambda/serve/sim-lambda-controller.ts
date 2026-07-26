@@ -33,7 +33,11 @@ export class SimLambdaServiceController implements SimAwsServiceController {
   constructor(properties: SimLambdaServiceControllerProperties = {}) {
     const { simAws = new SimAws() } = properties;
     this.router = properties.router ?? new SimLambdaUrlRouter({ simAws });
-    this.eventBuilder = new SimLambdaUrlEventBuilder({ clock: simAws });
+    // Taken from the router rather than from properties, so a supplied router
+    // and the event timestamps always belong to the same simulation.
+    this.eventBuilder = new SimLambdaUrlEventBuilder({
+      clock: this.router.simAws,
+    });
   }
 
   /**

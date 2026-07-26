@@ -22,6 +22,7 @@ import {
 } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { ChangeResourceRecordSetsAuthorizer } from "./change-resource-record-sets-authorizer.js";
+import { makeSimRoute53ChangeId } from "./sim-route53-change-id.js";
 
 interface ChangeResourceRecordSetsCommandHandlerProperties {
   readonly hostedZones: Map<SimRoute53HostedZoneId, SimRoute53HostedZone>;
@@ -103,7 +104,7 @@ export class ChangeResourceRecordSetsCommandHandler implements CommandHandler<
 
     return {
       ChangeInfo: {
-        Id: `/change/${hostedZoneId}-${String(submittedAt.getTime())}`,
+        Id: `/change/${hostedZoneId}-${makeSimRoute53ChangeId()}`,
         Status: hostedZone.status,
         SubmittedAt: submittedAt,
       },

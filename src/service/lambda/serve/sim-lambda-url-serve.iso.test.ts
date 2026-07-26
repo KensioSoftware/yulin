@@ -18,6 +18,9 @@ import { SimAws } from "../../aws/sim-aws.js";
 import { makeLambdaZipFileInput } from "../function/code/lambda-zip-file-input.js";
 import type { SimLambdaHandler } from "../function/sim-lambda-handler.type.js";
 import type { SimLambdaFunctionUrlEvent } from "./event/sim-lambda-url-event.type.js";
+import { SimFixedClock } from "../../../util/clock/sim-clock.js";
+import { SimLambdaServiceController } from "./sim-lambda-controller.js";
+import { SimLambdaUrlRouter } from "./sim-lambda-url-router.js";
 
 /**
  * Create a function backed by a real in-process handler and give it a public
@@ -301,5 +304,33 @@ describe("Serving a sim Lambda Function URL", () => {
     // Then each reaches its own account's function.
     assertIdentical(await firstResponse.text(), '"first account"');
     assertIdentical(await secondResponse.text(), '"second account"');
+  });
+
+  it("stamps the event from the clock of the router's simulation", async () => {
+    // Given a controller built from a router alone, with no separate SimAws,
+    // where that router's simulation has a stopped clock
+    const instant = new Date("2026-07-26T09:30:00.000Z");
+    const simAws = new SimAws({ clock: new SimFixedClock(instant) });
+    const functionUrl = await serveFunction(
+      simAws,
+      (event: SimLambdaFunctionUrlEvent) => event.requestContext.timeEpoch,
+    );
+    const controller = new SimLambdaServiceController({
+      router: new SimLambdaUrlRouter({ simAws }),
+    });
+
+    // When the Function URL is invoked through it
+    const url = new URL(localUrl(functionUrl));
+    const response = await controller.handleRequest(
+      {
+        service: "lambda",
+        resourceName: url.hostname.split(".", 1)[0] ?? "",
+        regionName: simAws.defaultRegionName,
+      },
+      new Request(url),
+    );
+
+    // Then the event carries the router's simulated time, not the real time
+    assertIdentical(await response.text(), String(instant.getTime()));
   });
 });
