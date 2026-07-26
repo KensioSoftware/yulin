@@ -70,10 +70,38 @@ class SimLambdaProcessEnvironment {
       get: (): NodeJS.ProcessEnv =>
         this.storage.getStore() ?? this.hostEnvironment,
       set: (replacement: NodeJS.ProcessEnv): void => {
-        this.hostEnvironment = replacement;
+        this.replaceVariables(replacement);
       },
     });
     this.installed = true;
+  }
+
+  /**
+   * Apply an assignment to process.env as a whole.
+   *
+   * Inside an invocation this has to stay invocation-local, like a write to a
+   * single variable does, or function code could wipe out the host
+   * environment for the rest of the test run. The store's object identity is
+   * fixed for the run, so the assignment is copied into it rather than
+   * swapping the reference. Outside an invocation it replaces the host
+   * environment, as an assignment to process.env normally would.
+   */
+  private replaceVariables(replacement: NodeJS.ProcessEnv): void {
+    const store = this.storage.getStore();
+    if (store === undefined) {
+      this.hostEnvironment = replacement;
+      return;
+    }
+
+    for (const name of Object.keys(store)) {
+      Reflect.deleteProperty(store, name);
+    }
+    for (const [name, value] of Object.entries(replacement)) {
+      if (value !== undefined) {
+        // eslint-disable-next-line security/detect-object-injection
+        store[name] = value;
+      }
+    }
   }
 }
 

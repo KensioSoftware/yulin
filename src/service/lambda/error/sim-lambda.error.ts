@@ -52,6 +52,22 @@ export class SimLambdaInvalidRequestContentException extends SimLambdaError {
 }
 
 /**
+ * Simulated Lambda ValidationException error.
+ *
+ * Real Lambda reports input that fails an API-level constraint this way, such
+ * as an environment variable name that does not match the required pattern.
+ * These constraints are checked before service-level rules like reserved
+ * environment variable names, so a name breaking both is reported here.
+ */
+export class SimLambdaValidationException extends SimLambdaError {
+  public override readonly name = "ValidationException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
  * Simulated Lambda InvalidParameterValueException error.
  *
  * Real Lambda reports function code problems this way, such as unreadable

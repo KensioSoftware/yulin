@@ -114,6 +114,34 @@ describe("sim Lambda process env", () => {
     }
   });
 
+  it("keeps a whole-object assignment inside the run", async () => {
+    // Given a variable set on the host process.
+    process.env["YULIN_HOST_SURVIVES"] = "host value";
+
+    try {
+      // When a run replaces process.env wholesale, as function code may.
+      const insideRun = await simLambdaProcessEnvironment.run(
+        { TABLE_NAME: "widgets" },
+        () => {
+          process.env = { REPLACED: "replaced" };
+          return Promise.resolve({
+            replaced: process.env["REPLACED"],
+            tableName: process.env["TABLE_NAME"],
+          });
+        },
+      );
+
+      // Then the run saw its own replacement, and the host environment came
+      // through the invocation untouched.
+      assertIdentical(insideRun.replaced, "replaced");
+      assertUndefined(insideRun.tableName);
+      assertIdentical(process.env["YULIN_HOST_SURVIVES"], "host value");
+      assertUndefined(process.env["REPLACED"]);
+    } finally {
+      delete process.env["YULIN_HOST_SURVIVES"];
+    }
+  });
+
   it("keeps process.env assignable", async () => {
     // Given the patch is installed.
     await simLambdaProcessEnvironment.run({}, () => Promise.resolve());

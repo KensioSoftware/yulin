@@ -489,9 +489,13 @@ The same applies to zip-packaged code in the vm runtime and to functions deploye
 `AWS::Lambda::Function` template with an `Environment` property, including ones backed by an
 [executable binding](#executable-bindings).
 
-As on real AWS, the environment variable names Lambda reserves for the runtime (`AWS_REGION`,
-`AWS_LAMBDA_FUNCTION_NAME`, `LAMBDA_TASK_ROOT` and so on) cannot be declared, and are rejected with
-`InvalidParameterValueException`.
+Variable names are validated as on real AWS. A name must match the Lambda name pattern
+`[a-zA-Z]([a-zA-Z0-9_])+` — starting with a letter, at least two characters, and otherwise letters,
+digits and underscores — or it is rejected with `ValidationException`. The names Lambda reserves
+for the runtime (`AWS_REGION`, `AWS_LAMBDA_FUNCTION_NAME`, `LAMBDA_TASK_ROOT` and so on) cannot be
+declared, and are rejected with `InvalidParameterValueException`. As on AWS, the pattern is checked
+first, so a reserved name that also breaks it, such as `_HANDLER`, is reported as the constraint
+violation.
 
 ### Read environment variables inside the handler
 

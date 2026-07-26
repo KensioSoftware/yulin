@@ -166,14 +166,17 @@ callback, or using the legacy context `done`/`fail`/`succeed` methods.
 
 `function/environment/` owns what a function runs with. `SimLambdaEnvironment` merges the
 AWS-provided runtime variables with the ones declared through `Environment.Variables`, and is built
-at creation time because vm zip code takes it into its sandbox. The reserved names real Lambda
-refuses to let function configuration override are rejected at CreateFunction
-(`command/create-function/create-function-environment.ts`), so the two sets can never collide.
+at creation time because vm zip code takes it into its sandbox. Name validation lives at
+CreateFunction (`command/create-function/create-function-environment.ts`) and follows AWS's two
+stages in order: the API name-pattern constraint (`ValidationException`), then the reserved names
+real Lambda refuses to let function configuration override
+(`InvalidParameterValueException`). Rejecting the reserved names means the AWS-provided runtime
+variables and the declared ones can never collide, so neither set needs to win over the other.
 
 Zip code needs nothing special: the vm context already owns its `process` object. A function backed
 by a real in-process handler is the harder case, because that handler is a closure over its own
 module scope and reads the host `process.env` like any other code in the test run.
-`sim-lambda-process-env.ts` bridges that with `AsyncLocalStorage`: `process.env` is a plain
+`sim-lambda-process-environment.ts` bridges that with `AsyncLocalStorage`: `process.env` is a plain
 configurable data property on `process`, so it is redefined once as a getter that resolves to the
 current invocation's variables while one is set, and to the untouched host environment object
 otherwise. The store follows the invocation across `await` points and keeps concurrent invocations
