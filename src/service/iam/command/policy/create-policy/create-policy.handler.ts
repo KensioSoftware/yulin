@@ -67,6 +67,7 @@ export class CreatePolicyCommandHandler implements CommandHandler<
       path,
       policyName,
       cmd: command,
+      now: this.background.now(),
     });
 
     this.policies.set(arn, policy);

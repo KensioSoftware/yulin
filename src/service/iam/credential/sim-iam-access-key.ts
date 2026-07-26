@@ -12,7 +12,12 @@ interface SimIamAccessKeyProperties {
   readonly principal: SimAwsPrincipal;
   readonly identityPolicyPrincipal?: SimAwsPrincipal | undefined;
   readonly session?: SimIamSession | undefined;
-  readonly creationDate?: Date | undefined;
+  /**
+   * When this access key was created, in simulated time. Required so that no
+   * part of IAM invents a timestamp of its own: the caller already knows what
+   * "now" means in its simulation.
+   */
+  readonly creationDate: Date;
   readonly status?: SimIamAccessKeyStatus | undefined;
 }
 
@@ -38,7 +43,7 @@ export class SimIamAccessKey {
     this.identityPolicyPrincipal =
       properties.identityPolicyPrincipal ?? properties.principal;
     this.session = properties.session;
-    this.creationDate = new Date(properties.creationDate ?? Date.now());
+    this.creationDate = new Date(properties.creationDate);
     this.status = properties.status ?? "Active";
   }
 

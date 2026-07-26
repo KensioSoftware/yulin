@@ -3,6 +3,7 @@ import type {
   BackgroundScheduler,
   BackgroundTask,
 } from "./background.js";
+import { type SimClock, SimRealClock } from "../clock/sim-clock.js";
 
 /* eslint-disable unicorn/prefer-await  */
 
@@ -17,10 +18,19 @@ export class NonDeterministicBackgroundTasks
 {
   private readonly pending = new Set<Promise<void>>();
   private readonly maxJitterMs: number;
+  private readonly clock: SimClock;
 
-  constructor(properties: { maxJitterMs?: number } = {}) {
-    const { maxJitterMs = 5 } = properties;
+  constructor(properties: { maxJitterMs?: number; clock?: SimClock } = {}) {
+    const { maxJitterMs = 5, clock = new SimRealClock() } = properties;
     this.maxJitterMs = maxJitterMs;
+    this.clock = clock;
+  }
+
+  /**
+   * Get the current time in this simulation.
+   */
+  now(): Date {
+    return this.clock.now();
   }
 
   /**

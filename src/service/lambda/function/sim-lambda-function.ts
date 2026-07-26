@@ -10,6 +10,7 @@ import {
 import { SimLambdaEnvironment } from "./environment/sim-lambda-environment.js";
 import { SimLambdaHandlerRunner } from "./invoke/sim-lambda-handler-runner.js";
 import { SimLambdaInvokeContextBuilder } from "./invoke/sim-lambda-invoke-context-builder.js";
+import { type SimClock, SimRealClock } from "../../../util/clock/sim-clock.js";
 import {
   defaultLambdaHandler,
   type SimLambdaHandler,
@@ -76,6 +77,12 @@ interface SimLambdaFunctionProperties {
   memorySizeMb?: number | undefined;
   environment?: SimLambdaEnvironment | undefined;
   runAsOwner?: SimAwsRunAsOwner;
+  /**
+   * Clock this function's invocations measure their remaining time against. A
+   * function built standalone, outside a SimAws instance, falls back to the
+   * real clock.
+   */
+  clock?: SimClock | undefined;
 }
 
 /**
@@ -101,6 +108,7 @@ export class SimLambdaFunction {
   private readonly code: SimLambdaExecutableCode;
   private readonly runAsOwner: SimAwsRunAsOwner;
   private readonly runner = new SimLambdaHandlerRunner();
+  private readonly clock: SimClock;
 
   constructor(properties: SimLambdaFunctionProperties) {
     const {
@@ -117,7 +125,9 @@ export class SimLambdaFunction {
       memorySizeMb = DEFAULT_SIM_LAMBDA_MEMORY_SIZE_MB,
       environment,
       runAsOwner = this,
+      clock = new SimRealClock(),
     } = properties;
+    this.clock = clock;
     this.name = name as SimLambdaFunctionName;
     this.roleArn = roleArn;
     this.accountRegionScope = accountRegionScope;
@@ -197,6 +207,7 @@ export class SimLambdaFunction {
       invokedFunctionArn: this.arn,
       timeoutSeconds: this.timeoutSeconds,
       memorySizeMb: this.memorySizeMb,
+      clock: this.clock,
     });
 
     return await simAwsRunAsContext.run(

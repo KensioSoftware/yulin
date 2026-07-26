@@ -93,7 +93,7 @@ export class ChangeResourceRecordSetsCommandHandler implements CommandHandler<
       hostedZoneId,
     );
 
-    const submittedAt = new Date();
+    const submittedAt = this.background.now();
 
     await scheduleChangeResourceRecordSets(
       this.background,

@@ -4,6 +4,10 @@ import type { Brand } from "../../../../util/brand.type.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimLambdaFunctionName } from "../sim-lambda-function.js";
 import { simLambdaFunctionUrlHost } from "./sim-lambda-function-url-host.js";
+import {
+  type SimClock,
+  SimRealClock,
+} from "../../../../util/clock/sim-clock.js";
 
 /**
  * The id AWS allocates for one Function URL, which is the leading DNS label of
@@ -39,6 +43,12 @@ interface SimLambdaFunctionUrlProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly authType?: SimLambdaFunctionUrlAuthType | undefined;
   readonly invokeMode?: SimLambdaFunctionUrlInvokeMode | undefined;
+  /**
+   * Clock stamping this Function URL's creation and last modified times. A
+   * Function URL built standalone, outside a SimAws instance, falls back to the
+   * real clock.
+   */
+  readonly clock?: SimClock | undefined;
 }
 
 /**
@@ -72,6 +82,7 @@ export class SimLambdaFunctionUrl {
   #authType: SimLambdaFunctionUrlAuthType;
   #invokeMode: SimLambdaFunctionUrlInvokeMode;
   #lastModifiedTime: string;
+  private readonly clock: SimClock;
 
   constructor(properties: SimLambdaFunctionUrlProperties) {
     const {
@@ -81,7 +92,10 @@ export class SimLambdaFunctionUrl {
       accountRegionScope,
       authType = "NONE",
       invokeMode = "BUFFERED",
+      clock = new SimRealClock(),
     } = properties;
+
+    this.clock = clock;
 
     this.urlId = urlId;
     this.functionName = functionName;
@@ -89,7 +103,7 @@ export class SimLambdaFunctionUrl {
     this.accountRegionScope = accountRegionScope;
     this.#authType = authType;
     this.#invokeMode = invokeMode;
-    this.creationTime = new Date().toISOString();
+    this.creationTime = clock.now().toISOString();
     this.#lastModifiedTime = this.creationTime;
   }
 
@@ -136,7 +150,7 @@ export class SimLambdaFunctionUrl {
   }): void {
     this.#authType = properties.authType ?? this.#authType;
     this.#invokeMode = properties.invokeMode ?? this.#invokeMode;
-    this.#lastModifiedTime = new Date().toISOString();
+    this.#lastModifiedTime = this.clock.now().toISOString();
   }
 
   /**

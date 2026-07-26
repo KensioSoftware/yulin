@@ -1,5 +1,6 @@
 import { describe, it } from "vitest";
 import { BackgroundTasks } from "./background.js";
+import { SimFixedClock } from "../clock/sim-clock.js";
 import {
   assertArrayLength,
   assertFalse,
@@ -72,6 +73,25 @@ describe("background sequencing", () => {
       });
 
       await assertThrowsErrorAsync(async () => tasks.complete());
+    });
+
+    it("reports the time of the clock it was given", () => {
+      // Given a scheduler holding a clock stopped at a known instant
+      const instant = new Date("2026-07-26T09:30:00.000Z");
+      const tasks = new BackgroundTasks({ clock: new SimFixedClock(instant) });
+
+      // When the scheduler is asked for the time
+      // Then it delegates to that clock rather than reading the host clock
+      assertIdentical(tasks.now().toISOString(), instant.toISOString());
+    });
+
+    it("reports the real time when given no clock", () => {
+      // Given a scheduler with no clock of its own
+      const tasks = new BackgroundTasks();
+
+      // When the scheduler is asked for the time
+      // Then it reports the real system time
+      assertTrue(Math.abs(tasks.now().getTime() - Date.now()) < 1000);
     });
   });
 });

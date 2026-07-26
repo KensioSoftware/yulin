@@ -9,6 +9,7 @@ interface MakeUserProperties {
   readonly arn: SimArn;
   readonly path: string;
   readonly userName: SimIamUsername;
+  readonly creationDate: Date;
 }
 
 /**
@@ -27,7 +28,7 @@ export class CreateUserRecordFactory {
       userId: makeSimIamUserId(),
       userName: properties.userName,
       path: properties.path,
-      creationDate: new Date(),
+      creationDate: properties.creationDate,
       accessKeys: new Map(),
       inlinePolicies: new Map(),
       attachedPolicyArns: new Set(),

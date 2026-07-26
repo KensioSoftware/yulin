@@ -3,12 +3,22 @@ import type {
   SimLambdaCallback,
   SimLambdaContext,
 } from "../sim-lambda-handler.type.js";
+import {
+  type SimClock,
+  SimRealClock,
+} from "../../../../util/clock/sim-clock.js";
 
 interface SimLambdaInvokeContextBuilderProperties {
   readonly functionName: string;
   readonly invokedFunctionArn: string;
   readonly timeoutSeconds: number;
   readonly memorySizeMb: number;
+  /**
+   * Clock measuring how much of the invocation timeout is left. Reading the
+   * remaining time from the simulation's clock means a stopped clock leaves a
+   * handler with a constant budget, rather than one that drains in real time.
+   */
+  readonly clock?: SimClock | undefined;
 }
 
 /**
@@ -26,9 +36,14 @@ export class SimLambdaInvokeContextBuilder {
    * Build the context for one invocation.
    */
   build(callback: SimLambdaCallback): SimLambdaContext {
-    const { functionName, invokedFunctionArn, timeoutSeconds, memorySizeMb } =
-      this.properties;
-    const startedAtMs = Date.now();
+    const {
+      functionName,
+      invokedFunctionArn,
+      timeoutSeconds,
+      memorySizeMb,
+      clock = new SimRealClock(),
+    } = this.properties;
+    const startedAtMs = clock.now().getTime();
     const awsRequestId = randomUUID();
 
     return {
@@ -41,7 +56,10 @@ export class SimLambdaInvokeContextBuilder {
       logGroupName: `/aws/lambda/${functionName}`,
       logStreamName: `[$LATEST]${awsRequestId}`,
       getRemainingTimeInMillis: (): number =>
-        Math.max(0, timeoutSeconds * 1000 - (Date.now() - startedAtMs)),
+        Math.max(
+          0,
+          timeoutSeconds * 1000 - (clock.now().getTime() - startedAtMs),
+        ),
       done: (error?: Error, result?: unknown): void => {
         callback(error ?? null, result);
       },

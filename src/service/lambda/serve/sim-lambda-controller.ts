@@ -26,13 +26,14 @@ interface SimLambdaServiceControllerProperties {
  */
 export class SimLambdaServiceController implements SimAwsServiceController {
   private readonly router: SimLambdaUrlRouter;
-  private readonly eventBuilder = new SimLambdaUrlEventBuilder();
+  private readonly eventBuilder: SimLambdaUrlEventBuilder;
   private readonly responseBuilder = new SimLambdaUrlResponseBuilder();
   private readonly errorResponse = new SimLambdaUrlErrorResponse();
 
   constructor(properties: SimLambdaServiceControllerProperties = {}) {
     const { simAws = new SimAws() } = properties;
     this.router = properties.router ?? new SimLambdaUrlRouter({ simAws });
+    this.eventBuilder = new SimLambdaUrlEventBuilder({ clock: simAws });
   }
 
   /**

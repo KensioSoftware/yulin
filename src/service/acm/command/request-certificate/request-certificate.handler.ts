@@ -66,6 +66,7 @@ export class RequestCertificateCommandHandler implements CommandHandler<
     this.background = background;
     this.certificateFactory = new RequestCertificateFactory({
       accountRegionScope,
+      clock: background,
     });
   }
 

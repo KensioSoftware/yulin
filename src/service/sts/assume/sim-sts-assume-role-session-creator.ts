@@ -3,9 +3,15 @@ import type { SimGetRoleCommandOutput } from "../../iam/command/role/get-role/ge
 import type { SimIamAccountResolver } from "../../iam/registry/sim-iam-account-resolver.js";
 import type { IamRoleArnParts } from "../../iam/role/arn/sim-iam-role-arn-parser.js";
 import type { SimAssumeRoleCommandOutput } from "../command/assume-role/assume-role.command.js";
+import { type SimClock, SimRealClock } from "../../../util/clock/sim-clock.js";
 
 interface AssumeRoleSessionCreatorProperties {
   readonly iamResolver: SimIamAccountResolver;
+  /**
+   * Clock stamping the session's creation and expiration. Both belong to the
+   * simulation, so an advanced clock expires a session as it would in AWS.
+   */
+  readonly clock?: SimClock;
 }
 
 interface CreateAssumeRoleSessionInput {
@@ -33,9 +39,11 @@ interface CreateAssumeRoleSessionInput {
  */
 export class SimStsAssumeRoleSessionCreator {
   private readonly iamResolver: SimIamAccountResolver;
+  private readonly clock: SimClock;
 
   constructor(properties: AssumeRoleSessionCreatorProperties) {
     this.iamResolver = properties.iamResolver;
+    this.clock = properties.clock ?? new SimRealClock();
   }
 
   /**
@@ -46,7 +54,7 @@ export class SimStsAssumeRoleSessionCreator {
    * source principal come from the original request context.
    */
   create(input: CreateAssumeRoleSessionInput): SimAssumeRoleCommandOutput {
-    const creationDate = new Date();
+    const creationDate = this.clock.now();
     const expiration = this.expiration(creationDate, input.durationSeconds);
     const targetIam = this.iamResolver.iamForAccount(
       input.roleArnParts.accountId,

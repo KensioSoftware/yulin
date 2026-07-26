@@ -113,6 +113,7 @@ export class CreateDistributionCommandHandler implements CommandHandler<
       distributionConfig,
       status: "Deploying",
       accountId: this.accountId,
+      clock: this.background,
     });
 
     this.distributionConfigurator.configure(distribution, distributionConfig);

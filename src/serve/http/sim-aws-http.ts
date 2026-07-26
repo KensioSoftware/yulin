@@ -30,8 +30,21 @@ export class SimAwsHttp {
 
   /**
    * Handle a simulated AWS HTTP request.
+   *
+   * Every response is stamped with simulated time, as real AWS stamps every API
+   * response with server time. That is the one mechanism an outside client has
+   * for discovering what this simulation thinks the time is, without needing to
+   * know it is talking to a simulator at all.
    */
   async handleRequest(request: Request): Promise<Response> {
+    const response = await this.routeRequest(request);
+
+    response.headers.set("date", this.simAws.now().toUTCString());
+
+    return response;
+  }
+
+  private async routeRequest(request: Request): Promise<Response> {
     try {
       const hostname = this.hostnameFromRequest(request);
       if (hostname === undefined) {

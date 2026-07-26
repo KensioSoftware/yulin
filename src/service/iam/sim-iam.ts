@@ -116,10 +116,15 @@ export class SimIam implements SimIamInterServiceAuthZ {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       background = new BackgroundTasks(),
-      credentialRegistry = new SimIamCredentialRegistry(),
       sessionCredentialGenerator = new SimIamRandomSessionCredentialGenerator(),
       userCredentialGenerator = new SimIamRandomUserCredentialGenerator(),
     } = properties;
+
+    // The scheduler is this simulation's clock, so session expiry is judged in
+    // the same time as every other simulated timestamp.
+    const credentialRegistry =
+      properties.credentialRegistry ??
+      new SimIamCredentialRegistry({ clock: background });
 
     this.background = background;
     this.credentials = credentialRegistry;

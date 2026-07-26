@@ -58,6 +58,7 @@ export class AssumeRoleCommandHandler implements CommandHandler<
     });
     this.sessionCreator = new SimStsAssumeRoleSessionCreator({
       iamResolver,
+      clock: background,
     });
   }
 

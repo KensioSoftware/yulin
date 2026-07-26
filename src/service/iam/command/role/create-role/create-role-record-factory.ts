@@ -16,6 +16,7 @@ interface MakeRoleProperties {
   readonly path: string;
   readonly roleName: SimIamRoleName;
   readonly cmd: SimCreateRoleCommand;
+  readonly creationDate: Date;
 }
 
 /**
@@ -26,8 +27,7 @@ export class CreateRoleRecordFactory {
    * Make a sim IAM Role object from input properties.
    */
   makeRole(properties: MakeRoleProperties): SimIamRole {
-    const { accountId, arn, path, roleName, cmd } = properties;
-    const creationDate = new Date();
+    const { accountId, arn, path, roleName, cmd, creationDate } = properties;
 
     return {
       arn,

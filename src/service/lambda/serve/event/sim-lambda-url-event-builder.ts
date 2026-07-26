@@ -8,6 +8,18 @@ import type {
 } from "./sim-lambda-url-event.type.js";
 import { simLambdaUrlEventTime } from "./sim-lambda-url-event-time.js";
 import { SimLambdaUrlRequestParts } from "./sim-lambda-url-request-parts.js";
+import {
+  type SimClock,
+  SimRealClock,
+} from "../../../../util/clock/sim-clock.js";
+
+interface SimLambdaUrlEventBuilderProperties {
+  /**
+   * Clock stamping the event's requestContext time, so a handler sees the same
+   * "now" as the rest of the simulation.
+   */
+  readonly clock?: SimClock;
+}
 
 /**
  * Builds the payload format 2.0 event a Function URL invocation passes to the
@@ -21,6 +33,11 @@ import { SimLambdaUrlRequestParts } from "./sim-lambda-url-request-parts.js";
 export class SimLambdaUrlEventBuilder {
   private readonly bodyEncoding = new SimLambdaUrlBodyEncoding();
   private readonly requestParts = new SimLambdaUrlRequestParts();
+  private readonly clock: SimClock;
+
+  constructor(properties: SimLambdaUrlEventBuilderProperties = {}) {
+    this.clock = properties.clock ?? new SimRealClock();
+  }
 
   /**
    * Build the invocation event for one Function URL request.
@@ -66,7 +83,7 @@ export class SimLambdaUrlEventBuilder {
     url: URL,
     functionUrl: SimLambdaFunctionUrl,
   ): SimLambdaFunctionUrlRequestContext {
-    const now = new Date();
+    const now = this.clock.now();
 
     return {
       // Function URLs report the caller as anonymous when the request was not
