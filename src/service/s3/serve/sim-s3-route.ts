@@ -2,11 +2,17 @@ import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-
 import type { SimS3Bucket } from "../bucket/sim-s3-bucket.js";
 
 /**
- * A request the static website endpoint should answer.
+ * A request the static website endpoint should answer, as the caller the
+ * authentication boundary resolved.
+ *
+ * The Bucket's scope is carried because serving goes through that scope's
+ * GetObject command, so the website endpoint authorizes exactly as the REST
+ * endpoint does.
  */
 export interface SimS3WebsiteRoute {
   readonly action: "website";
   readonly bucket: SimS3Bucket;
+  readonly bucketScope: SimAwsAccountRegionScope;
   readonly objectKey: string;
 }
 

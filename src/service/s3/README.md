@@ -157,9 +157,18 @@ is a normalized form of what was applied rather than the original text.
 
 ## Block Public Access
 
-`bucket/public-access/` holds the Block Public Access model. Every Bucket has a
-`SimS3PublicAccessBlock` with all four settings enabled, matching real S3's default for new Buckets,
-and a setting left unspecified is taken as enabled rather than disabled.
+`bucket/public-access/` holds the Block Public Access model. There are two distinct states and
+`SimS3PublicAccessBlock` has a named constructor for each. `blockingAll()` is what a Bucket nobody
+has configured gets, matching real S3's default for new Buckets. `fromConfiguration(...)` is what a
+`PutPublicAccessBlock` call or a `PublicAccessBlockConfiguration` property produces, and it takes
+the configuration literally: a setting left out of it is off, because the configuration replaces the
+previous one wholesale rather than merging into it.
+
+That second rule is load-bearing. CDK's `BlockPublicAccess.BLOCK_ACLS` sets only `blockPublicAcls`
+and `ignorePublicAcls`, leaving `BlockPublicPolicy` out of the synthesized template entirely, and
+pairing it with `publicReadAccess` is the standard way to build a public website Bucket. Treating
+the omitted setting as enabled refuses that template, which real AWS deploys without complaint; the
+CDK BucketDeployment local test exercises exactly this.
 
 Only `BlockPublicPolicy` currently has an effect. `SimS3PublicPolicyGuard` applies it in the
 `PutBucketPolicy` handler, after authorization, because the setting refuses a policy the caller is

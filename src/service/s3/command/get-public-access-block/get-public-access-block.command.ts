@@ -1,5 +1,5 @@
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
-import type { SimS3PublicAccessBlockConfiguration } from "../../bucket/public-access/sim-s3-public-access-block.js";
+import type { SimS3PublicAccessBlockSettings } from "../../bucket/public-access/sim-s3-public-access-block.js";
 
 /**
  * Minimal structural sim S3 GetPublicAccessBlock command.
@@ -19,6 +19,6 @@ export interface SimGetPublicAccessBlockCommandInput {
  * Minimal structural sim S3 GetPublicAccessBlock output.
  */
 export interface SimGetPublicAccessBlockCommandOutput {
-  readonly PublicAccessBlockConfiguration: Required<SimS3PublicAccessBlockConfiguration>;
+  readonly PublicAccessBlockConfiguration: SimS3PublicAccessBlockSettings;
   readonly $metadata: SimResponseMetadata;
 }

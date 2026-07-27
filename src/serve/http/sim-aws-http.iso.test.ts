@@ -4,6 +4,7 @@ import {
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
 import { describe, it } from "vitest";
+import { grantPublicWebsiteRead } from "../../service/s3/bucket/website/sim-s3-public-website.fixture.js";
 import {
   assertIdentical,
   assertStringIncludes,
@@ -116,6 +117,7 @@ describe("Simulated AWS HTTP", () => {
         },
       }),
     );
+    await grantPublicWebsiteRead(simS3, "foo-site");
     await simS3.putObject(
       new PutObjectCommand({
         Bucket: "foo-site",
@@ -154,6 +156,7 @@ describe("Simulated AWS HTTP", () => {
         },
       }),
     );
+    await grantPublicWebsiteRead(simS3, "head-site");
     await simS3.putObject(
       new PutObjectCommand({
         Bucket: "head-site",

@@ -16,8 +16,9 @@ interface SimS3ServiceControllerProperties {
  *
  * S3 answers on two endpoints that behave differently, so a request is routed
  * by the hostname it arrived on before anything else: the website endpoint
- * serves a static site to anyone, and the REST endpoint serves the API to
- * whoever the request is authenticated as.
+ * serves a static site, and the REST endpoint serves the API. Both serve as
+ * whoever the request is authenticated as, so a website Bucket needs a Bucket
+ * policy making it readable before it serves anything.
  */
 export class SimS3ServiceController implements SimAwsServiceController {
   private readonly s3Router: SimS3RequestRouter;
@@ -27,7 +28,7 @@ export class SimS3ServiceController implements SimAwsServiceController {
   constructor(properties: SimS3ServiceControllerProperties = {}) {
     const { simAws = new SimAws() } = properties;
     this.s3Router = new SimS3RequestRouter({ simAws });
-    this.s3GetObjectController = new SimS3GetObjectController();
+    this.s3GetObjectController = new SimS3GetObjectController({ simAws });
     this.s3RestController = new SimS3RestController({ simAws });
   }
 
@@ -52,9 +53,8 @@ export class SimS3ServiceController implements SimAwsServiceController {
     }
 
     return await this.s3GetObjectController.handleRequest(
-      route.bucket,
-      route.objectKey,
-      request,
+      route,
+      serviceRequest,
     );
   }
 }

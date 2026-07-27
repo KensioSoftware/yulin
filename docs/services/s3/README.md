@@ -347,6 +347,11 @@ await simS3.putPublicAccessBlock(
 );
 ```
 
+The configuration you supply replaces the previous one wholesale, so a setting you leave out of it
+is off rather than kept. That matches CDK: `BlockPublicAccess.BLOCK_ACLS` names only the two ACL
+settings, and pairing it with `publicReadAccess: true` is the usual way to build a public website
+Bucket.
+
 `GetPublicAccessBlockCommand` reads the settings back and `DeletePublicAccessBlockCommand` removes
 them, which returns the Bucket to fully blocked rather than leaving it open. In a CloudFormation
 template the settings are the `PublicAccessBlockConfiguration` property of `AWS::S3::Bucket`, and a
@@ -386,6 +391,12 @@ them disabled in favour of policies.
 ## Static website hosting
 
 Configure Bucket website hosting with `PutBucketWebsiteCommand`.
+
+Website hosting settles which Object answers a request, not who may read it. The website endpoint
+serves only what the Bucket policy has made readable, as real S3 does, so a site with no Bucket
+policy answers `403` to every request. See [Block Public Access](#block-public-access) for the two
+commands a public site needs; the localhost serving example below shows them in place. The examples
+in this section configure hosting without serving it, so they leave that out.
 
 ```typescript sim-s3-static-website-hosting
 /**
@@ -461,8 +472,10 @@ to access the simulated services via your browser or commandline with curl.
 
 import {
   CreateBucketCommand,
+  PutBucketPolicyCommand,
   PutBucketWebsiteCommand,
   PutObjectCommand,
+  PutPublicAccessBlockCommand,
 } from "@aws-sdk/client-s3";
 import { SimAws } from "@kensio/yulin";
 import { serveSimAws } from "@kensio/yulin/serve";
@@ -496,6 +509,32 @@ try {
           Suffix: "index.html",
         },
       },
+    }),
+  );
+
+  // A website endpoint serves only what the Bucket policy makes readable, and
+  // a public policy needs the Block Public Access opt-out first.
+  await simS3.putPublicAccessBlock(
+    new PutPublicAccessBlockCommand({
+      Bucket: "foo-site",
+      PublicAccessBlockConfiguration: {
+        BlockPublicAcls: true,
+        IgnorePublicAcls: true,
+      },
+    }),
+  );
+  await simS3.putBucketPolicy(
+    new PutBucketPolicyCommand({
+      Bucket: "foo-site",
+      Policy: JSON.stringify({
+        Version: "2012-10-17",
+        Statement: {
+          Effect: "Allow",
+          Principal: "*",
+          Action: "s3:GetObject",
+          Resource: "arn:aws:s3:::foo-site/*",
+        },
+      }),
     }),
   );
 

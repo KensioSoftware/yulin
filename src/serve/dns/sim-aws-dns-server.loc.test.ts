@@ -21,6 +21,7 @@ import {
   assertTrue,
 } from "@kensio/smartass";
 import { afterAll, beforeAll, describe, it } from "vitest";
+import { grantPublicWebsiteRead } from "../../service/s3/bucket/website/sim-s3-public-website.fixture.js";
 import { SimAws } from "../../service/aws/sim-aws.js";
 import {
   serveSimAws,
@@ -70,6 +71,7 @@ describe("Simulated AWS DNS server", () => {
         WebsiteConfiguration: { IndexDocument: { Suffix: "index.html" } },
       }),
     );
+    await grantPublicWebsiteRead(simS3, "my-site");
     await simS3.putObject(
       new PutObjectCommand({
         Bucket: "my-site",

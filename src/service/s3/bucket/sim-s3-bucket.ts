@@ -40,7 +40,7 @@ export class SimS3Bucket {
       storage = new MemoryS3BucketStorage(),
       website = new SimS3BucketWebsite(),
       policy,
-      publicAccessBlock = new SimS3PublicAccessBlock(),
+      publicAccessBlock = SimS3PublicAccessBlock.blockingAll(),
     } = properties;
 
     validateS3BucketName(bucketName);
@@ -140,7 +140,7 @@ export class SimS3Bucket {
    * new Bucket starts in, rather than leaving it unprotected.
    */
   deletePublicAccessBlock(): void {
-    this.publicAccessBlock = new SimS3PublicAccessBlock();
+    this.publicAccessBlock = SimS3PublicAccessBlock.blockingAll();
   }
 
   /**
