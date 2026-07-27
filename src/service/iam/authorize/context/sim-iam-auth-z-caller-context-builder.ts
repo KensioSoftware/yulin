@@ -9,7 +9,7 @@ import type {
 } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimIamAuthZPolicySource } from "./sim-iam-auth-z-context.js";
 
-interface SimIamAuthZCallerContext {
+export interface SimIamAuthZCallerContext {
   readonly caller: SimAwsResolvedCaller;
   readonly rootPolicySources: readonly SimIamAuthZPolicySource[];
 }

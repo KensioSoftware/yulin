@@ -6,6 +6,7 @@ import type {
 import { SimIamPolicyDocumentParser } from "../policy/parse/sim-iam-document-parser.js";
 import { SimIamPolicyStatementMatcher } from "./match/sim-iam-policy-statement-matcher.js";
 import type { SimAwsResolvedCaller } from "../../aws/caller/sim-aws-caller-resolver.js";
+import { SimIamAllowStatements } from "./allow/sim-iam-allow-statements.js";
 
 export const SimIamPolicyDecisionValue = {
   ExplicitDeny: "ExplicitDeny",
@@ -24,10 +25,11 @@ export type SimIamPolicyDecisionValue =
  * evaluate permissions boundaries, evaluate SCPs, or enforce service command
  * access.
  *
- * The simulator currently models the common IAM authorization union:
+ * The simulator currently models the common IAM authorization rules:
  *
  * - an explicit Deny in any evaluated policy wins;
- * - an Allow in an identity policy or resource policy allows the request;
+ * - the Allows found must satisfy the request's allow requirement, which is
+ *   either side within one Account and both sides across Accounts;
  * - otherwise the request is implicitly denied.
  *
  * Resource policies are expected to be supplied by the service that owns the
@@ -39,9 +41,7 @@ export class SimIamPolicyDecision {
   private readonly statementMatcher: SimIamPolicyStatementMatcher;
   private readonly explicitDenyStatementRecords: SimIamPolicyDocumentStatement[] =
     [];
-  private readonly allowStatementRecords: SimIamPolicyDocumentStatement[] = [];
-  private readonly trustAllowStatementRecords: SimIamPolicyDocumentStatement[] =
-    [];
+  private readonly allows = new SimIamAllowStatements();
 
   constructor(
     request: SimIamAuthZContext,
@@ -72,7 +72,7 @@ export class SimIamPolicyDecision {
       return SimIamPolicyDecisionValue.ExplicitDeny;
     }
 
-    if (this.allowStatementRecords.length > 0) {
+    if (this.request.allowRequirement.isSatisfiedBy(this.allows.sides)) {
       return SimIamPolicyDecisionValue.Allow;
     }
 
@@ -113,7 +113,7 @@ export class SimIamPolicyDecision {
    * An identity-policy Allow cannot substitute for the target role's trust.
    */
   get isAllowedByTrustPolicy(): boolean {
-    return this.trustAllowStatementRecords.length > 0;
+    return this.allows.trust.length > 0;
   }
 
   /**
@@ -124,17 +124,35 @@ export class SimIamPolicyDecision {
   }
 
   /**
-   * Matching Allow statements.
+   * Matching Allow statements, from both policy sides.
+   *
+   * A statement appearing here did match the request. It does not follow that
+   * the request was allowed: a cross-Account request needs a matching Allow
+   * from each side.
    */
   get allowStatements(): readonly SimIamPolicyDocumentStatement[] {
-    return this.allowStatementRecords;
+    return this.allows.all;
+  }
+
+  /**
+   * Matching Allow statements from identity-based policies.
+   */
+  get identityAllowStatements(): readonly SimIamPolicyDocumentStatement[] {
+    return this.allows.identity;
+  }
+
+  /**
+   * Matching Allow statements from resource-based policies.
+   */
+  get resourceAllowStatements(): readonly SimIamPolicyDocumentStatement[] {
+    return this.allows.resource;
   }
 
   /**
    * Matching Allow statements originating from trust policies.
    */
   get trustAllowStatements(): readonly SimIamPolicyDocumentStatement[] {
-    return this.trustAllowStatementRecords;
+    return this.allows.trust;
   }
 
   private evaluate(): void {
@@ -159,11 +177,7 @@ export class SimIamPolicyDecision {
         continue;
       }
 
-      this.allowStatementRecords.push(statement.source);
-
-      if (policy.sourceType === "trust") {
-        this.trustAllowStatementRecords.push(statement.source);
-      }
+      this.allows.record(policy, statement.source);
     }
   }
 }

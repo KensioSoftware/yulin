@@ -43,12 +43,19 @@ export class SimIamRegistry implements SimIamAccountResolver {
    * rely on receiving a usable account-scoped service.
    */
   iamForAccount(accountId: SimAwsAccountId): SimIam {
-    const iam = this.iamByAccountId.get(accountId);
+    const iam = this.findIamForAccount(accountId);
 
     if (iam === undefined) {
       throw new Error(`Sim IAM is not registered for Account ${accountId}`);
     }
 
     return iam;
+  }
+
+  /**
+   * Find the registered IAM facade belonging to an Account, if there is one.
+   */
+  findIamForAccount(accountId: SimAwsAccountId): SimIam | undefined {
+    return this.iamByAccountId.get(accountId);
   }
 }

@@ -71,8 +71,8 @@ statements keyed by `StatementId`, which is how `AddPermission` and `RemovePermi
 them. `AddPermission` is a shorthand for writing a policy statement, so the permission holds the
 parts it was given and expands them into a statement on demand, rather than storing a statement
 nothing can address. The policy belongs to the function because it survives exactly as long as the
-function does, and because it is the only thing that can allow a principal from another Account,
-whose own policies this Account never sees.
+function does, and because it is this Account's half of admitting a principal from another Account:
+the other half is that Account's own identity policy, which IAM asks it for.
 
 `SimLambdaFunction` is the stored simulated resource: name, execution role ARN, scope, AWS-like
 configuration metadata, and the real handler function reference that backs it. A new function
@@ -272,11 +272,11 @@ assumed-role session is judged against the Role behind it; a request that carrie
 anonymous, owns no policies, and is denied by the same evaluation.
 
 Authorization is evaluated by the IAM of the Account that owns the function, against two policy
-sources: identity policies, which that IAM finds itself and which therefore only exist for a caller
-in the same Account, and the function's own resource policy, passed in by
-`command/authorize/sim-lambda-resource-policies.ts`. A caller from another Account has no identity
-policies here — its own Account's are not consulted — so a resource policy is the only thing that
-can allow it. The URL's auth type travels with the request as the `lambda:FunctionUrlAuthType`
+sources: identity policies belonging to the caller, and the function's own resource policy, passed
+in by `command/authorize/sim-lambda-resource-policies.ts`. For a caller from another Account, IAM
+resolves that Account through the simulation's IAM registry and reads its identity policies from
+there, then requires an allow from both sides — a resource policy on its own is not enough, exactly
+as on AWS. The URL's auth type travels with the request as the `lambda:FunctionUrlAuthType`
 condition value, which is what a Function URL grant conditions on.
 
 Only an authorized `AWS_IAM` invocation is given a caller to describe in its event, which is what
@@ -354,8 +354,6 @@ are not supported and are skipped by the CloudFormation engine with an "Unsuppor
 
 - `AWS::Lambda::*` CloudFormation resource types other than `AWS::Lambda::Function` and
   `AWS::Lambda::Url`
-- cross-account Function URL invocation, which needs a Lambda resource-based policy; `AWS_IAM`
-  URLs evaluate identity policies in the function's own Account only
 - Function URL `Cors` configuration and OPTIONS preflight handling
 - `InvokeMode: RESPONSE_STREAM`, which is accepted and reported but always served buffered
 - ES module function code (`.mjs` / `export` syntax) in the vm runtime
