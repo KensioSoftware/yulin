@@ -24,6 +24,10 @@ import type { SimS3 } from "../sim-s3.js";
  * this wrong in the simulator is the expensive direction: a site that works in
  * a test and 403s on deploy is the single most common S3 static website
  * mistake, and one the simulator could not reproduce before.
+ *
+ * The last case here covers a deliberate divergence rather than S3 behaviour:
+ * a real website endpoint authenticates nothing, so identity policies cannot
+ * reach it there.
  */
 describe("Simulated S3 static website authorization", () => {
   const siteUrl = (bucketName: string, path = "/index.html"): string =>
@@ -226,7 +230,8 @@ describe("Simulated S3 static website authorization", () => {
     const anonymousResponse = await simAwsHttp.fetch(siteUrl("private-site"));
 
     // Then the website endpoint serves the Role what its identity policy
-    // grants, and still refuses everyone else.
+    // grants, and still refuses everyone else. Real S3 would refuse both,
+    // because its website endpoint never authenticates a request.
     assertResponseStatus(namedResponse, 200);
     assertIdentical(await namedResponse.text(), "<h1>Hello</h1>");
     assertResponseStatus(anonymousResponse, 403);

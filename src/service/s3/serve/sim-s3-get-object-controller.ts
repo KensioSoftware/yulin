@@ -16,8 +16,14 @@ interface SimS3GetObjectControllerProperties {
  *
  * Real S3 serves a website endpoint only what the Bucket policy makes readable,
  * answering 403 for an Object that is not publicly readable. Objects are
- * therefore read through the ordinary GetObject command as the requesting
- * principal, so a Bucket with no policy serves nothing.
+ * therefore read through the ordinary GetObject command, so a Bucket with no
+ * policy serves nothing to the browser that asks for a page.
+ *
+ * The reading is done as whoever the boundary resolved rather than always as
+ * anonymous, which is a deliberate divergence: a real website endpoint
+ * authenticates nothing, so an identity policy could never reach it there. It
+ * keeps the simulator's served services consistent with each other, at the cost
+ * of being looser than S3 for a request that names a principal.
  */
 export class SimS3GetObjectController {
   private readonly simAws: SimAws;

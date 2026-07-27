@@ -384,6 +384,11 @@ stricter than real S3. A `NotPrincipal` statement, a statement with no `Principa
 Account-level and organisation-level Block Public Access, access points, and `GetBucketPolicyStatus`
 are not simulated.
 
+The static website endpoint authorizes a request that names a principal as that principal, where a
+real S3 website endpoint supports only publicly readable content and authenticates nothing. The
+simulator is looser here, so a website reachable in a test as a named principal can be unreachable
+in the same way against real S3.
+
 Bucket ACLs and Object ownership settings are not modelled and are not planned. Object Ownership
 defaults to Bucket owner enforced on new Buckets, which disables ACLs, and AWS recommends keeping
 them disabled in favour of policies.
@@ -392,11 +397,20 @@ them disabled in favour of policies.
 
 Configure Bucket website hosting with `PutBucketWebsiteCommand`.
 
-Website hosting settles which Object answers a request, not who may read it. The website endpoint
-serves only what the Bucket policy has made readable, as real S3 does, so a site with no Bucket
-policy answers `403` to every request. See [Block Public Access](#block-public-access) for the two
-commands a public site needs; the localhost serving example below shows them in place. The examples
-in this section configure hosting without serving it, so they leave that out.
+Website hosting settles which Object answers a request, not who may read it. A browser asking for a
+page is anonymous, and anonymous holds nothing unless a Bucket policy grants it, so a site with no
+Bucket policy answers `403` to every ordinary visitor. That is what real S3 does, and it is the
+mistake this most often catches: a site that works because nothing was checking. See
+[Block Public Access](#block-public-access) for the two commands a public site needs; the localhost
+serving example below shows them in place. The examples in this section configure hosting without
+serving it, so they leave that out.
+
+A request that does name a principal, through a signature or the `x-sim-aws-caller` header, is
+authorized as that principal, so an identity policy granting `s3:GetObject` reaches the website
+endpoint too. Real S3 has no such thing: its website endpoint supports only publicly readable
+content and never authenticates a request. This is a deliberate simulator affordance, in keeping
+with the other simulated services that serve HTTP, and it means a website test driven as a named
+principal proves less than one driven as a browser would be.
 
 ```typescript sim-s3-static-website-hosting
 /**
