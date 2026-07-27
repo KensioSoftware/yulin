@@ -31,12 +31,12 @@ import type { SimAwsPrincipal } from "./caller/sim-aws-caller.js";
 import { simAwsRunAsContext } from "./caller/sim-aws-run-as-context.js";
 import type { SimClockControl } from "../../util/clock/sim-clock-control.js";
 import { SimAwsTimekeeping } from "./sim-aws-timekeeping.js";
+import { SimAwsRequestAuthentication } from "./sim-aws-request-authentication.js";
 import type {
   SimAwsProperties,
   SimAwsRequestCallerOptions,
 } from "./sim-aws-properties.js";
 import type { SimIamCredentialIdentity } from "../iam/credential/sim-aws-credentials.js";
-import { simIamSigV4SignedRequest } from "../iam/sigv4/sim-iam-sigv4-signed-request.js";
 import type { SimAwsRequestCaller } from "../iam/request/sim-aws-request-caller.js";
 
 /**
@@ -61,6 +61,7 @@ export class SimAws {
   private readonly background: BackgroundScheduler & BackgroundCompleter;
   private readonly scopes: SimAwsScopeRegistry;
   private readonly timekeeping: SimAwsTimekeeping;
+  private readonly requestAuthentication: SimAwsRequestAuthentication;
 
   constructor(properties: SimAwsProperties = {}) {
     const {
@@ -86,6 +87,10 @@ export class SimAws {
     });
     this.iamRegistry = this.serviceFactory.iamRegistry;
     this.scopes = new SimAwsScopeRegistry({ simAws: this });
+    this.requestAuthentication = new SimAwsRequestAuthentication({
+      serviceFactory: this.serviceFactory,
+      clock: background,
+    });
   }
 
   /**
@@ -136,9 +141,7 @@ export class SimAws {
     request: Request,
     body?: Uint8Array,
   ): SimIamCredentialIdentity {
-    return this.serviceFactory.signedRequests.verify(
-      simIamSigV4SignedRequest(request, body),
-    );
+    return this.requestAuthentication.verifySignature(request, body);
   }
 
   /**
@@ -150,17 +153,13 @@ export class SimAws {
    * a request offering neither is anonymous rather than the Account root.
    *
    * The body is passed separately for the same reason it is on
-   * `verifySignedRequest`: a request body can only be read once, and whoever
-   * serves the request needs the same bytes.
+   * `verifySignedRequest`: a request body can only be read once.
    */
   resolveRequestCaller(
     request: Request,
     options: SimAwsRequestCallerOptions = {},
   ): SimAwsRequestCaller {
-    return this.serviceFactory.requestCallers.resolve(
-      simIamSigV4SignedRequest(request, options.body),
-      options.expectedScope,
-    );
+    return this.requestAuthentication.resolveCaller(request, options);
   }
 
   /**

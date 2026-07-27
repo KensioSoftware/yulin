@@ -2,11 +2,23 @@ import type { AwsRegionName } from "../../service/aws/sim-aws-region.js";
 import type { SimAws } from "../../service/aws/sim-aws.js";
 import { SimAwsRequestCaller } from "../../service/iam/request/sim-aws-request-caller.js";
 
+/**
+ * Which of a service's endpoints a hostname named.
+ *
+ * Only S3 has more than one, and the difference is not cosmetic: the website
+ * endpoint serves public static sites and never authenticates, while the REST
+ * endpoint is the API the SDK and presigned URLs talk to. The hostname is the
+ * only thing that says which, so it is settled where hostnames are understood
+ * rather than guessed at again downstream.
+ */
+export type SimAwsServiceEndpoint = "rest" | "website";
+
 export interface SimAwsServiceTarget {
   readonly service: "s3" | "cloudFront" | "lambda" | "route53";
   readonly resourceName: string;
   // regionName is used for validation, not look-up
   readonly regionName?: AwsRegionName;
+  readonly endpoint?: SimAwsServiceEndpoint;
 }
 
 interface SimAwsServiceRequestProperties {

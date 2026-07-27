@@ -1,5 +1,6 @@
 import { SimIamIncompleteSignature } from "./error/sim-iam-sigv4.error.js";
 import { SimIamSigV4CredentialScope } from "./sim-iam-sigv4-credential-scope.js";
+import type { SimIamSigV4SignatureStatement } from "./sim-iam-sigv4-signature-statement.js";
 
 export const simIamSigV4Algorithm = "AWS4-HMAC-SHA256";
 
@@ -17,7 +18,7 @@ interface SimIamSigV4AuthorizationProperties {
  * canonicalize exactly the headers the signer chose, not whichever headers the
  * request happens to carry now.
  */
-export class SimIamSigV4Authorization {
+export class SimIamSigV4Authorization implements SimIamSigV4SignatureStatement {
   public readonly accessKeyId: string;
   public readonly scope: SimIamSigV4CredentialScope;
   public readonly signedHeaderNames: readonly string[];

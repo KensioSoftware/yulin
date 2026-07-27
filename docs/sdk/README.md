@@ -185,7 +185,9 @@ misbehaviour. Clients for AWS services Yulin doesn't simulate at all are rejecte
 ## Limitations
 
 - Only `client.send(command)` is intercepted. SDK utilities that bypass `send`, such as
-  `getSignedUrl`, are not simulated. Paginators and waiters go through `send`, so they work.
+  `getSignedUrl`, see nothing of interception. Paginators and waiters go through `send`, so they
+  work. Presigning needs no interception: point the client at the simulated endpoint instead, as
+  [the sim S3 presigned URL docs](../services/s3/README.md#presigned-urls) show.
 - Simulated errors carry SDK-shaped `name` and `$metadata`, but are not instances of the real SDK
   exception classes: match errors with `error.name`, not `instanceof`.
 - The callback form of `send(command, callback)` is not supported; use the promise form.

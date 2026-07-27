@@ -1,20 +1,16 @@
 import { SimAws } from "../../aws/sim-aws.js";
-import type { SimS3Bucket, SimS3BucketName } from "../bucket/sim-s3-bucket.js";
+import type { SimS3BucketName } from "../bucket/sim-s3-bucket.js";
 import type { SimAwsServiceTarget } from "../../../serve/controller/sim-service-controller.js";
-
-export interface SimS3GetObjectRoute {
-  readonly action: "getObject";
-  readonly bucket: SimS3Bucket;
-  readonly objectKey: string;
-}
-
-export interface SimS3RouteFailure {
-  readonly action: "failure";
-  readonly statusCode: number;
-  readonly message: string;
-}
-
-export type SimS3Route = SimS3GetObjectRoute | SimS3RouteFailure;
+import {
+  type SimS3Route,
+  simS3RouteFailure as failure,
+} from "./sim-s3-route.js";
+import {
+  SimS3BucketLocator,
+  SimS3BucketNotFound,
+} from "./sim-s3-bucket-locator.js";
+import { SimS3ObjectAddress } from "./sim-s3-object-address.js";
+import { simS3RestRefusal } from "./sim-s3-rest-refusal.js";
 
 interface SimS3RequestRouterProperties {
   readonly simAws?: SimAws;
@@ -22,83 +18,107 @@ interface SimS3RequestRouterProperties {
 
 /**
  * Resolves HTTP requests into simulated S3 actions.
+ *
+ * Which endpoint the request arrived at decides what it can be: the website
+ * endpoint serves static sites and reads nothing but GET and HEAD, while the
+ * REST endpoint is the API, and only it accepts an upload or authenticates a
+ * caller. Real S3 draws the same line, and a test that could reach the API
+ * through a website hostname would prove something about a deployment that
+ * cannot happen.
  */
 export class SimS3RequestRouter {
-  private readonly simAws: SimAws;
+  private readonly buckets: SimS3BucketLocator;
 
   constructor(properties: SimS3RequestRouterProperties = {}) {
     const { simAws = new SimAws() } = properties;
-    this.simAws = simAws;
+    this.buckets = new SimS3BucketLocator({ simAws });
   }
 
   /**
    * Route an incoming service target and HTTP request to a simulated S3 action.
    */
   route(target: SimAwsServiceTarget, request: Request): SimS3Route {
+    const regionName = target.regionName;
+
+    if (regionName === undefined) {
+      return failure(400, "Missing S3 Bucket region\n");
+    }
+
+    if (target.endpoint === "rest") {
+      return this.restRoute(target, request, regionName);
+    }
+
+    return this.websiteRoute(target, request, regionName);
+  }
+
+  private websiteRoute(
+    target: SimAwsServiceTarget,
+    request: Request,
+    regionName: string,
+  ): SimS3Route {
     if (request.method !== "GET" && request.method !== "HEAD") {
-      return {
-        action: "failure",
-        statusCode: 405,
-        message: "Method not allowed\n",
-      };
+      return failure(405, "Method not allowed\n");
     }
 
     if (target.resourceName.length === 0) {
-      return {
-        action: "failure",
-        statusCode: 400,
-        message: "Missing S3 Bucket name\n",
-      };
+      return failure(400, "Missing S3 Bucket name\n");
     }
 
-    if (target.regionName === undefined) {
-      return {
-        action: "failure",
-        statusCode: 400,
-        message: "Missing S3 Bucket region\n",
-      };
+    const found = this.buckets.locate(
+      target.resourceName as SimS3BucketName,
+      regionName,
+    );
+
+    if (found instanceof SimS3BucketNotFound) {
+      return failure(found.statusCode, found.message);
     }
 
     const url = new URL(request.url);
-    const objectKey = decodeURIComponent(url.pathname.replace(/^\/+/u, ""));
 
-    const bucketName = target.resourceName as SimS3BucketName;
-    const bucketScope = this.simAws.s3().findBucketScope(bucketName);
+    return {
+      action: "website",
+      bucket: found.bucket,
+      objectKey: decodeURIComponent(url.pathname.replace(/^\/+/u, "")),
+    };
+  }
 
-    if (bucketScope === undefined) {
-      return {
-        action: "failure",
-        statusCode: 404,
-        message: `S3 bucket named ${bucketName} not found`,
-      };
+  /**
+   * Route a request that arrived at the REST API endpoint.
+   *
+   * Only the Object operations simulated S3 has are accepted. Anything else is
+   * refused as unsupported rather than answered with something plausible, so a
+   * gap in the simulation shows up in the test that found it.
+   */
+  private restRoute(
+    target: SimAwsServiceTarget,
+    request: Request,
+    regionName: string,
+  ): SimS3Route {
+    const address = SimS3ObjectAddress.fromRestRequest(
+      target,
+      new URL(request.url),
+    );
+    if (address === undefined) {
+      return failure(400, "Missing S3 Bucket name\n");
     }
 
-    if (bucketScope.regionName !== target.regionName) {
-      return {
-        action: "failure",
-        statusCode: 404,
-        message: `S3 bucket named ${bucketName} is in region ${bucketScope.regionName}, not requested ${target.regionName}`,
-      };
+    const refusal = simS3RestRefusal(request.method, address);
+
+    if (refusal !== undefined) {
+      return refusal;
     }
 
-    const bucket = this.simAws
-      .accountRegionScope(bucketScope.accountId, bucketScope.regionName)
-      .s3()
-      .getSimBucketByName(bucketName);
+    const found = this.buckets.locate(address.bucketName, regionName);
 
-    /* v8 ignore if -- does not happen in practice */
-    if (bucket === undefined) {
-      return {
-        action: "failure",
-        statusCode: 404,
-        message: `S3 bucket named ${bucketName} not found`,
-      };
+    if (found instanceof SimS3BucketNotFound) {
+      return failure(found.statusCode, found.message);
     }
 
     return {
-      action: "getObject",
-      bucket,
-      objectKey,
+      action: "restObject",
+      bucket: found.bucket,
+      bucketScope: found.bucketScope,
+      objectKey: address.objectKey,
     };
   }
 }

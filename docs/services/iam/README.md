@@ -564,6 +564,18 @@ A signature whose credential scope names a different service or Region than the 
 is refused before anything else is checked, and says so. The scope feeds the signing key, so without
 that check the only symptom would be a signature mismatch with nothing to act on.
 
+### Presigned URLs
+
+A URL carrying its signature in query parameters is verified the same way: `X-Amz-Algorithm` in the
+query is what marks it, and the access key, credential scope, signed headers and signature are read
+from there instead of from an `Authorization` header. A presigned URL also states its own lifetime
+in `X-Amz-Expires`, and that _is_ enforced, against simulated time, so a frozen clock keeps a URL
+usable and advancing past the window refuses it with `AccessDenied` and `Request has expired`.
+
+URLs built by the real presigner, `getSignedUrl` from `@aws-sdk/s3-request-presigner`, verify here
+without anything simulator-specific. See
+[the sim S3 docs](../s3/README.md#presigned-urls) for the whole path from presigning to fetching.
+
 ### What the simulator reports back
 
 Every served response carries the simulator's own account of the request in headers, leaving the
@@ -930,11 +942,11 @@ full IAM feature set. Notable gaps:
   with the credential scope date, but is never compared to a clock, so a client stamping real time
   is not locked out of a simulation keeping a different one. Session expiry _is_ enforced, against
   simulated time
-- Presigned query-string authentication (`X-Amz-Algorithm` in the query), S3 `aws-chunked`
-  streaming signatures, and SigV4A are not verified
-- The resolved caller is evaluated by Lambda Function URLs with `AuthType: "AWS_IAM"`, but not yet
-  by the other services that serve HTTP: served S3 objects and CloudFront responses perform no
-  authorization
+- S3 `aws-chunked` streaming signatures and SigV4A are not verified. Presigned query-string
+  authentication is verified, for the `AWS4-HMAC-SHA256` algorithm only
+- The resolved caller is evaluated by Lambda Function URLs with `AuthType: "AWS_IAM"` and by the S3
+  REST endpoint, but not yet by the other services that serve HTTP: website-endpoint S3 responses
+  and CloudFront responses perform no authorization
 - The identity side of a cross-Account request comes from the caller's Account in the same `SimAws`
   instance. A caller whose Account is not part of the simulation is denied rather than assumed to be
   permitted

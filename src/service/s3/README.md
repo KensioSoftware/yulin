@@ -20,7 +20,8 @@ familiar AWS SDK command shapes, CloudFormation resources, and local HTTP reques
 - `object/` contains the simulated S3 Object model.
 - `storage/` contains pluggable Bucket storage implementations.
 - `command/` contains AWS SDK-style command handlers.
-- `serve/` contains localhost HTTP routing and object serving for S3 static website endpoints.
+- `serve/` contains localhost HTTP routing and object serving, for both the static website endpoint
+  and the REST API endpoint that presigned URLs address.
 - `cfn/` contains CloudFormation resource support for `AWS::S3::Bucket`.
 - `error/` contains AWS-like S3 error classes.
 
@@ -274,33 +275,46 @@ routing rule logic.
 
 ## Localhost HTTP serving
 
-The S3 HTTP implementation under `serve/` is focused on static website object access.
+The S3 HTTP implementation under `serve/` answers on the two endpoints real S3 has, and the
+hostname is what decides which. `SimRoute53ServiceTargetResolver` sets `endpoint` on the service
+target to `website` or `rest`, and everything downstream follows that rather than guessing again.
 
 The main classes are:
 
 - `SimS3ServiceController`
-- `SimS3RequestRouter`
-- `SimS3GetObjectController`
+- `SimS3RequestRouter`, with `SimS3ObjectAddress`, `SimS3BucketLocator` and `simS3RestRefusal`
+- `SimS3GetObjectController` for the website endpoint
+- `SimS3RestController` for the REST endpoint
 
 `SimS3ServiceController` coordinates request handling:
 
 1. route the request to a Bucket and object key
 2. return a plain-text failure response if routing fails
-3. delegate successful routes to `SimS3GetObjectController`
+3. delegate a website route to `SimS3GetObjectController`, and a REST route to `SimS3RestController`
 
-`SimS3RequestRouter` accepts only `GET` and `HEAD`. It validates that the service target contains:
+`SimS3RequestRouter` validates that the service target names a region, then routes by endpoint. The
+website endpoint accepts only `GET` and `HEAD` and takes the Bucket from the target's
+`resourceName`. The REST endpoint accepts `GET`, `HEAD` and `PUT`, and `SimS3ObjectAddress` reads
+the Bucket and key from either addressing style: virtual-hosted, where the hostname names the
+Bucket, or path style, where the first path segment does. `SimS3BucketLocator` then:
 
-- a Bucket name as `resourceName`
-- a region name as `regionName`
+1. looks up the Bucket scope through `simAws.s3().findBucketScope(bucketName)`
+2. rejects missing buckets
+3. rejects requests for the wrong Bucket region
+4. returns the Bucket and the account/region scope that owns it
 
-It then:
+`SimS3RestController` serves the API rather than a website:
 
-1. decodes the request path into an S3 object key
-2. looks up the Bucket scope through `simAws.s3().findBucketScope(bucketName)`
-3. rejects missing buckets
-4. rejects requests for the wrong Bucket region
-5. retrieves the owning account/region `SimS3` service
-6. returns the Bucket and object key for object serving
+- it calls `SimS3.getObject(...)` and `SimS3.putObject(...)` with the caller the authentication
+  boundary resolved, so an HTTP request is authorized by the same IAM code path an in-process SDK
+  call goes through, and a presigned URL grants no more than its signer holds
+- it checks any `x-amz-checksum-*` an upload states before storing anything, through
+  `SimS3UploadChecksum`
+- failures become the XML error document real S3 answers with, through `SimS3RestErrorResponse`,
+  which re-raises anything that is not a simulated S3 or IAM failure
+
+Signature verification itself is not here: it happens once at the serving boundary in
+`SimAwsRequestAuthenticator`, which is why this controller only has to ask who the caller is.
 
 `SimS3GetObjectController` serves static website responses:
 

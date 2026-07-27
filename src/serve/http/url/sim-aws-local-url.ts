@@ -67,10 +67,14 @@ export class SimAwsLocalUrl {
    * as a CloudFront alternate domain name, which are used as they are.
    */
   private awsHostnamePrefix(hostname: string): string | undefined {
+    // The path-style S3 endpoint names no Bucket in its hostname, so it is
+    // matched separately rather than by making the Bucket label optional.
     const awsHostname =
       /^(?<prefix>.+\.(?:s3|s3-website)\.[^.]+)\.amazonaws\.com$/.exec(
         hostname,
-      ) ?? /^(?<prefix>.+\.lambda-url\.[^.]+)\.on\.aws$/.exec(hostname);
+      ) ??
+      /^(?<prefix>s3\.[^.]+)\.amazonaws\.com$/.exec(hostname) ??
+      /^(?<prefix>.+\.lambda-url\.[^.]+)\.on\.aws$/.exec(hostname);
 
     return awsHostname?.groups?.["prefix"];
   }
