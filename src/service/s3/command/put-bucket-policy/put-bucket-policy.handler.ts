@@ -13,7 +13,8 @@ import type {
   SimS3Bucket,
   SimS3BucketName,
 } from "../../bucket/sim-s3-bucket.js";
-import { SimS3NoSuchBucket } from "../../error/sim-s3.error.js";
+import { SimS3PublicPolicyGuard } from "../../bucket/public-access/sim-s3-public-policy-guard.js";
+import { requireSimS3Bucket } from "../require-sim-s3-bucket.js";
 import { PutBucketPolicyAuthorizer } from "./put-bucket-policy-authorizer.js";
 import type {
   SimPutBucketPolicyCommand,
@@ -41,6 +42,7 @@ export class PutBucketPolicyCommandHandler implements CommandHandler<
   private readonly authorizer: PutBucketPolicyAuthorizer;
   private readonly background: BackgroundScheduler;
   private readonly policyValidator: SimIamPolicyDocumentValidator;
+  private readonly publicPolicyGuard = new SimS3PublicPolicyGuard();
 
   constructor(properties: PutBucketPolicyCommandHandlerProperties) {
     const {
@@ -67,16 +69,17 @@ export class PutBucketPolicyCommandHandler implements CommandHandler<
     this.policyValidator.validateRequired(command.input.Policy);
 
     const bucketName = command.input.Bucket as SimS3BucketName;
-    const bucket = this.buckets.get(bucketName);
-    if (bucket === undefined) {
-      throw new SimS3NoSuchBucket(`No S3 Bucket named ${bucketName}`);
-    }
+    const bucket = requireSimS3Bucket(this.buckets, bucketName);
 
     await this.background.sequence();
 
     this.authorizer.authorize(bucketName, options?.caller);
 
-    bucket.configurePolicy(jsonParse(command.input.Policy));
+    const document = jsonParse(command.input.Policy);
+
+    this.publicPolicyGuard.guard(bucket, document);
+
+    bucket.configurePolicy(document);
 
     return {
       $metadata: {},

@@ -2,6 +2,7 @@ import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-re
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimS3 } from "../../sim-s3.js";
 import type { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
+import type { SimS3PublicAccessBlockConfiguration } from "../../bucket/public-access/sim-s3-public-access-block.js";
 import type { SimS3WebsiteConfiguration as SimS3WebsiteConfig } from "../../command/put-bucket-website/put-bucket-website.command.js";
 import { validateS3BucketName } from "../../bucket/validate/validate-s3-bucket-name.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
@@ -53,7 +54,40 @@ export class SimCfnS3BucketCreator {
       });
     }
 
+    const publicAccessConfig =
+      this.publicAccessConfigurationForResource(properties);
+
+    if (publicAccessConfig !== undefined) {
+      await this.simS3.putPublicAccessBlock({
+        input: {
+          Bucket: bucketName,
+          PublicAccessBlockConfiguration: publicAccessConfig,
+        },
+      });
+    }
+
     return bucket;
+  }
+
+  /**
+   * Read PublicAccessBlockConfiguration, which a template uses to open a
+   * Bucket up from the all-blocked state a new Bucket starts in.
+   */
+  private publicAccessConfigurationForResource(
+    properties: SimCfnTemplateValueRecord,
+  ): SimS3PublicAccessBlockConfiguration | undefined {
+    const publicAccessConfig = properties["PublicAccessBlockConfiguration"];
+
+    if (
+      publicAccessConfig === undefined ||
+      publicAccessConfig === null ||
+      typeof publicAccessConfig !== "object" ||
+      Array.isArray(publicAccessConfig)
+    ) {
+      return undefined;
+    }
+
+    return publicAccessConfig;
   }
 
   private bucketNameForResource(

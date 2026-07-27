@@ -32,7 +32,10 @@ describe("S3 CloudFormation BucketPolicy Resource", () => {
       Resources: {
         ReportsBucket: {
           Type: "AWS::S3::Bucket",
-          Properties: { BucketName: "reports" },
+          Properties: {
+            BucketName: "reports",
+            PublicAccessBlockConfiguration: { BlockPublicPolicy: false },
+          },
         },
         ReportsBucketPolicy: {
           Type: "AWS::S3::BucketPolicy",
@@ -79,7 +82,12 @@ describe("S3 CloudFormation BucketPolicy Resource", () => {
         Resources: {
           ReportsBucket: {
             Type: "AWS::S3::Bucket",
-            Properties: { BucketName: "reports" },
+            Properties: {
+              BucketName: "reports",
+              // A public Bucket policy needs Block Public Access turned off,
+              // exactly as a real deployment does.
+              PublicAccessBlockConfiguration: { BlockPublicPolicy: false },
+            },
           },
           ReportsBucketPolicy: {
             Type: "AWS::S3::BucketPolicy",
@@ -145,7 +153,12 @@ describe("S3 CloudFormation BucketPolicy Resource", () => {
         Resources: {
           ReportsBucket: {
             Type: "AWS::S3::Bucket",
-            Properties: { BucketName: "reports" },
+            Properties: {
+              BucketName: "reports",
+              // A public Bucket policy needs Block Public Access turned off,
+              // exactly as a real deployment does.
+              PublicAccessBlockConfiguration: { BlockPublicPolicy: false },
+            },
           },
           ReportsBucketPolicy: {
             Type: "AWS::S3::BucketPolicy",

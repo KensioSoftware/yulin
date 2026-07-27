@@ -45,6 +45,21 @@ import type {
   SimPutBucketWebsiteCommandOutput,
 } from "./put-bucket-website/put-bucket-website.command.js";
 import { PutObjectCommandHandler } from "./put-object/put-object.handler.js";
+import { PutPublicAccessBlockCommandHandler } from "./put-public-access-block/put-public-access-block.handler.js";
+import type {
+  SimPutPublicAccessBlockCommand,
+  SimPutPublicAccessBlockCommandOutput,
+} from "./put-public-access-block/put-public-access-block.command.js";
+import { GetPublicAccessBlockCommandHandler } from "./get-public-access-block/get-public-access-block.handler.js";
+import type {
+  SimGetPublicAccessBlockCommand,
+  SimGetPublicAccessBlockCommandOutput,
+} from "./get-public-access-block/get-public-access-block.command.js";
+import { DeletePublicAccessBlockCommandHandler } from "./delete-public-access-block/delete-public-access-block.handler.js";
+import type {
+  SimDeletePublicAccessBlockCommand,
+  SimDeletePublicAccessBlockCommandOutput,
+} from "./delete-public-access-block/delete-public-access-block.command.js";
 import type {
   SimPutObjectCommand,
   SimPutObjectCommandOutput,
@@ -123,6 +138,42 @@ export class SimS3CommandHandlers {
     options?: SimS3RequestOptions,
   ): Promise<SimDeleteBucketPolicyCommandOutput> {
     return await new DeleteBucketPolicyCommandHandler(
+      this.bucketState(),
+    ).handle(command, options);
+  }
+
+  /**
+   * Replace a Bucket's Block Public Access settings.
+   */
+  async putPublicAccessBlock(
+    command: SimPutPublicAccessBlockCommand,
+    options?: SimS3RequestOptions,
+  ): Promise<SimPutPublicAccessBlockCommandOutput> {
+    return await new PutPublicAccessBlockCommandHandler(
+      this.bucketState(),
+    ).handle(command, options);
+  }
+
+  /**
+   * Read a Bucket's Block Public Access settings.
+   */
+  async getPublicAccessBlock(
+    command: SimGetPublicAccessBlockCommand,
+    options?: SimS3RequestOptions,
+  ): Promise<SimGetPublicAccessBlockCommandOutput> {
+    return await new GetPublicAccessBlockCommandHandler(
+      this.bucketState(),
+    ).handle(command, options);
+  }
+
+  /**
+   * Remove a Bucket's Block Public Access settings.
+   */
+  async deletePublicAccessBlock(
+    command: SimDeletePublicAccessBlockCommand,
+    options?: SimS3RequestOptions,
+  ): Promise<SimDeletePublicAccessBlockCommandOutput> {
+    return await new DeletePublicAccessBlockCommandHandler(
       this.bucketState(),
     ).handle(command, options);
   }

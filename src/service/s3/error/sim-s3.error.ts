@@ -54,6 +54,20 @@ export class SimS3NoSuchBucketPolicy extends SimS3Error {
 }
 
 /**
+ * Simulated S3 AccessDenied error.
+ *
+ * This is S3 itself refusing a request, as Block Public Access does, rather
+ * than sim IAM denying it after evaluating policies.
+ */
+export class SimS3AccessDenied extends SimS3Error {
+  public override readonly name = "AccessDenied";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 403 });
+  }
+}
+
+/**
  * Simulated S3 BucketAlreadyExists error.
  */
 export class SimS3BucketAlreadyExists extends SimS3Error {

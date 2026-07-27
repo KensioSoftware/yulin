@@ -3,6 +3,7 @@ import type { SimS3BucketStorage } from "../storage/s3-bucket-storage.js";
 import type { SimS3Object } from "../object/s3-object.js";
 import { MemoryS3BucketStorage } from "../storage/s3-memory-storage.js";
 import { SimS3BucketWebsite } from "./website/sim-s3-bucket-website.js";
+import { SimS3PublicAccessBlock } from "./public-access/sim-s3-public-access-block.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimIamPolicyDocument } from "../../iam/policy/sim-iam-policy.js";
 import { simS3BucketWebsiteUrl } from "./website/sim-s3-bucket-website-url.js";
@@ -17,6 +18,7 @@ interface SimS3BucketProperties {
   readonly storage?: SimS3BucketStorage;
   readonly website?: SimS3BucketWebsite;
   readonly policy?: SimIamPolicyDocument | undefined;
+  readonly publicAccessBlock?: SimS3PublicAccessBlock;
 }
 
 /**
@@ -29,6 +31,7 @@ export class SimS3Bucket {
   private storage: SimS3BucketStorage;
   private website: SimS3BucketWebsite;
   private policy: SimIamPolicyDocument | undefined;
+  private publicAccessBlock: SimS3PublicAccessBlock;
 
   constructor(properties: SimS3BucketProperties) {
     const {
@@ -37,6 +40,7 @@ export class SimS3Bucket {
       storage = new MemoryS3BucketStorage(),
       website = new SimS3BucketWebsite(),
       policy,
+      publicAccessBlock = new SimS3PublicAccessBlock(),
     } = properties;
 
     validateS3BucketName(bucketName);
@@ -46,6 +50,7 @@ export class SimS3Bucket {
     this.storage = storage;
     this.website = website;
     this.policy = policy;
+    this.publicAccessBlock = publicAccessBlock;
   }
 
   /**
@@ -112,6 +117,30 @@ export class SimS3Bucket {
    */
   deletePolicy(): void {
     this.policy = undefined;
+  }
+
+  /**
+   * Replace this Bucket's Block Public Access settings.
+   */
+  configurePublicAccessBlock(publicAccessBlock: SimS3PublicAccessBlock): void {
+    this.publicAccessBlock = publicAccessBlock;
+  }
+
+  /**
+   * Get this Bucket's Block Public Access settings.
+   */
+  getPublicAccessBlock(): SimS3PublicAccessBlock {
+    return this.publicAccessBlock;
+  }
+
+  /**
+   * Remove this Bucket's Block Public Access settings.
+   *
+   * Removing the configuration returns the Bucket to the all-enabled state a
+   * new Bucket starts in, rather than leaving it unprotected.
+   */
+  deletePublicAccessBlock(): void {
+    this.publicAccessBlock = new SimS3PublicAccessBlock();
   }
 
   /**

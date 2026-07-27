@@ -18,6 +18,8 @@ Sim S3 currently supports:
 - Bucket policies with `PutBucketPolicyCommand`, `GetBucketPolicyCommand` and
   `DeleteBucketPolicyCommand`, evaluated by sim IAM alongside identity policies
 - Creating Buckets and Bucket policies from `AWS::S3::Bucket` and `AWS::S3::BucketPolicy`
+- Block Public Access, on by default as in real S3, refusing a public Bucket policy unless the
+  Bucket opts out with `PutPublicAccessBlockCommand` or `PublicAccessBlockConfiguration`
 - Serving static website requests on localhost with `serveSimAws`
 - Serving Object `GET`, `HEAD` and `PUT` over the S3 REST endpoint, authorized by sim IAM
 - Presigned URLs built by the real `@aws-sdk/s3-request-presigner`, with expiry in simulated time
@@ -327,12 +329,55 @@ console.log(policyOut.Policy);
 is how real S3 distinguishes that from a Bucket that does not exist. `DeleteBucketPolicyCommand`
 succeeds either way, matching S3's idempotent behaviour.
 
+A Bucket policy granting `Principal: "*"` is refused by default. See
+[Block Public Access](#block-public-access) below.
+
+## Block Public Access
+
+Real S3 turns on all four Block Public Access settings for every new Bucket, and `BlockPublicPolicy`
+makes `PutBucketPolicy` reject a policy that allows public access. Sim S3 does the same, so a Bucket
+starts closed and a public Bucket policy is refused with `AccessDenied` until the Bucket opts out:
+
+```typescript
+await simS3.putPublicAccessBlock(
+  new PutPublicAccessBlockCommand({
+    Bucket: "site",
+    PublicAccessBlockConfiguration: { BlockPublicPolicy: false },
+  }),
+);
+```
+
+`GetPublicAccessBlockCommand` reads the settings back and `DeletePublicAccessBlockCommand` removes
+them, which returns the Bucket to fully blocked rather than leaving it open. In a CloudFormation
+template the settings are the `PublicAccessBlockConfiguration` property of `AWS::S3::Bucket`, and a
+Stack whose `AWS::S3::BucketPolicy` is public without that opt-out fails to deploy, exactly as the
+real deployment would.
+
+The settings govern what may be written rather than what is already stored, so turning
+`BlockPublicPolicy` back on afterwards leaves an existing public policy in place.
+
+### What counts as public
+
+A statement is public when it allows a wildcard `Principal` without pinning the caller down. A
+`Condition` fixing `aws:SourceAccount`, `aws:SourceArn`, `aws:PrincipalOrgID`, `aws:SourceVpc`,
+`aws:SourceVpce`, `aws:SourceOwner`, `aws:userid`, `s3:DataAccessPointArn` or
+`s3:DataAccessPointAccount` to a value with no wildcard in it makes the statement non-public, as it
+does in real S3. A `Service` principal is never a wildcard, and a `Deny` statement is never public.
+
 ### Limitations
 
-Sim S3 does not model S3 Block Public Access. Real S3 enables all four settings by default on new
-Buckets, and `BlockPublicPolicy` causes `PutBucketPolicy` to reject a policy that allows public
-access. The simulator accepts such a policy, so a Bucket policy granting `Principal: "*"` can work
-here and be refused by real S3 unless the Bucket sets `PublicAccessBlockConfiguration` accordingly.
+Only `BlockPublicPolicy` changes behaviour. The other three settings are stored and reported but do
+nothing: `BlockPublicAcls` and `IgnorePublicAcls` govern ACLs, which are not modelled, and
+`RestrictPublicBuckets` changes how an existing public policy is evaluated for cross-account callers
+rather than rejecting a write, which is not yet simulated.
+
+Anything the simulator cannot classify confidently counts as public and is refused, so it can be
+stricter than real S3. A `NotPrincipal` statement, a statement with no `Principal`, and a
+`Condition` on `aws:SourceIp` all count as public here. Real S3 accepts a sufficiently narrow
+`aws:SourceIp` CIDR range as non-public; the simulator does not judge range breadth.
+
+Account-level and organisation-level Block Public Access, access points, and `GetBucketPolicyStatus`
+are not simulated.
 
 Bucket ACLs and Object ownership settings are not modelled and are not planned. Object Ownership
 defaults to Bucket owner enforced on new Buckets, which disables ACLs, and AWS recommends keeping

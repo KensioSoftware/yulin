@@ -16,6 +16,9 @@ import type { SimGetBucketPolicyCommand } from "../command/get-bucket-policy/get
 import type { SimPutBucketPolicyCommand } from "../command/put-bucket-policy/put-bucket-policy.command.js";
 import type { SimPutBucketWebsiteCommand } from "../command/put-bucket-website/put-bucket-website.command.js";
 import type { SimPutObjectCommand } from "../command/put-object/put-object.command.js";
+import type { SimPutPublicAccessBlockCommand } from "../command/put-public-access-block/put-public-access-block.command.js";
+import type { SimGetPublicAccessBlockCommand } from "../command/get-public-access-block/get-public-access-block.command.js";
+import type { SimDeletePublicAccessBlockCommand } from "../command/delete-public-access-block/delete-public-access-block.command.js";
 import type { SimS3 } from "../sim-s3.js";
 
 /**
@@ -88,6 +91,30 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simS3.putBucketWebsite(
             command as SimPutBucketWebsiteCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "PutPublicAccessBlockCommand",
+        async (command, context): Promise<unknown> =>
+          await simS3.putPublicAccessBlock(
+            command as SimPutPublicAccessBlockCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "GetPublicAccessBlockCommand",
+        async (command, context): Promise<unknown> =>
+          await simS3.getPublicAccessBlock(
+            command as SimGetPublicAccessBlockCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeletePublicAccessBlockCommand",
+        async (command, context): Promise<unknown> =>
+          await simS3.deletePublicAccessBlock(
+            command as SimDeletePublicAccessBlockCommand,
             simSdkCallerOptions(context),
           ),
       ],

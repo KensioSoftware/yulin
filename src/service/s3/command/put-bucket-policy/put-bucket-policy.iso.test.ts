@@ -9,6 +9,7 @@ import {
   GetObjectCommand,
   PutBucketPolicyCommand,
   PutObjectCommand,
+  PutPublicAccessBlockCommand,
 } from "@aws-sdk/client-s3";
 import {
   assertBufferEqual,
@@ -139,6 +140,14 @@ describe("S3 PutBucketPolicyCommand", () => {
             },
           },
         }),
+      }),
+    );
+
+    // A public grant needs Block Public Access turned off first.
+    await simS3.putPublicAccessBlock(
+      new PutPublicAccessBlockCommand({
+        Bucket: "conditional-policy-bucket",
+        PublicAccessBlockConfiguration: { BlockPublicPolicy: false },
       }),
     );
 
