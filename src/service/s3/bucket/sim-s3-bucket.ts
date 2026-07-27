@@ -105,6 +105,16 @@ export class SimS3Bucket {
   }
 
   /**
+   * Remove the Bucket resource policy.
+   *
+   * Real S3 DeleteBucketPolicy is idempotent, so this reports nothing about
+   * whether there was a policy to remove.
+   */
+  deletePolicy(): void {
+    this.policy = undefined;
+  }
+
+  /**
    * Get the simulated AWS account Region scope for this Bucket.
    */
   getAccountRegionScope(): SimAwsAccountRegionScope {

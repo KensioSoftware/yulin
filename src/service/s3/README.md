@@ -68,9 +68,18 @@ Supported command areas currently include:
 - `create-Bucket/`
 - `list-buckets/`
 - `put-bucket-website/`
+- `put-bucket-policy/`
+- `get-bucket-policy/`
+- `delete-bucket-policy/`
 - `put-object/`
 - `get-object/`
 - `list-objects/`
+
+`SimS3CommandHandlers` in `command/` owns the wiring: every handler is built from the same Bucket
+map, IAM and background scheduler, so that construction lives in one place rather than being
+repeated once per command on the service facade. `requireSimS3Bucket` is the shared Bucket lookup
+that raises `SimS3NoSuchBucket`, which is what real S3 answers before considering anything else
+about a Bucket-scoped request.
 
 It's important that implementation code under `src/` does not depend on real AWS SDK package
 classes. Command types are local structural types with shapes compatible with the AWS SDK. Tests may
@@ -132,6 +141,13 @@ Its public methods are small:
 - `configureWebsite(website)`
 - `getWebsite()`
 - `getWebsiteUrl()`
+- `configurePolicy(policy)`
+- `getPolicy()`
+- `deletePolicy()`
+
+The Bucket resource policy is stored parsed rather than as a JSON string, because that is the shape
+sim IAM evaluates. `GetBucketPolicy` serializes it back on the way out, so the string a caller reads
+is a normalized form of what was applied rather than the original text.
 
 By keeping storage behind `SimS3BucketStorage`, the Bucket model stays independent of whether
 objects live in memory or on the local filesystem.
@@ -349,9 +365,20 @@ S3 CloudFormation support lives under `cfn/`.
 
 `SimS3CloudFormationResourceFactory` currently supports:
 
-- `AWS::S3::Bucket`
+- `AWS::S3::Bucket`, through `SimCfnS3BucketCreator`
+- `AWS::S3::BucketPolicy`, through `SimCfnS3BucketPolicyCreator`
 
-Resource creation flow:
+The factory itself only dispatches on the resource type name; each creator owns one resource type,
+as the Lambda factory does.
+
+Bucket policy creation reads the `Bucket` and `PolicyDocument` properties from the resolved
+properties, then calls the normal `putBucketPolicy` command path, so a policy declared in a template
+is validated and enforced exactly as one applied through the SDK. The simulated Bucket is returned
+as the Resource's simulated object, because a Bucket policy has no existence of its own in S3.
+A `Bucket` naming a Bucket that does not exist fails the Stack with `SimS3NoSuchBucket` rather than
+being skipped.
+
+Bucket resource creation flow:
 
 1. determine the Bucket name
 
@@ -380,6 +407,7 @@ Handlers throw AWS-like errors for supported failure cases, including:
 
 - no such Bucket
 - no such key
+- no such Bucket policy
 - Bucket already exists
 - Bucket already owned by you
 

@@ -40,6 +40,20 @@ export class SimS3NoSuchKey extends SimS3Error {
 }
 
 /**
+ * Simulated S3 NoSuchBucketPolicy error.
+ *
+ * Real S3 distinguishes a Bucket that does not exist from a Bucket that exists
+ * without a policy, so GetBucketPolicy answers this rather than an empty policy.
+ */
+export class SimS3NoSuchBucketPolicy extends SimS3Error {
+  public override readonly name = "NoSuchBucketPolicy";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 404 });
+  }
+}
+
+/**
  * Simulated S3 BucketAlreadyExists error.
  */
 export class SimS3BucketAlreadyExists extends SimS3Error {
