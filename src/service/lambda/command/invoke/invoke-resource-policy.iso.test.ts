@@ -3,9 +3,9 @@ import {
   CreateFunctionCommand,
   InvokeCommand,
 } from "@aws-sdk/client-lambda";
-import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import { describe, expect, it } from "vitest";
 
+import { createSimIamRoleWithPolicy } from "../../../../../test/iam/create-role-with-policy.js";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import { makeLambdaZipFileInput } from "../../function/code/lambda-zip-file-input.js";
@@ -47,36 +47,13 @@ async function grantInvoke(simAws: SimAws, principal: string): Promise<void> {
  * The calling Role, in its own Account, allowed to invoke by that Account.
  */
 async function allowedCallerRole(simAws: SimAws): Promise<void> {
-  const iam = simAws.account(callerAccountId).iam();
-
-  await iam.createRole(
-    new CreateRoleCommand({
-      RoleName: "Caller",
-      AssumeRolePolicyDocument: JSON.stringify({
-        Version: "2012-10-17",
-        Statement: {
-          Effect: "Allow",
-          Principal: { AWS: `arn:aws:iam::${callerAccountId}:root` },
-          Action: "sts:AssumeRole",
-        },
-      }),
-    }),
-  );
-
-  await iam.putRolePolicy(
-    new PutRolePolicyCommand({
-      RoleName: "Caller",
-      PolicyName: "Invoke",
-      PolicyDocument: JSON.stringify({
-        Version: "2012-10-17",
-        Statement: {
-          Effect: "Allow",
-          Action: "lambda:InvokeFunction",
-          Resource: "*",
-        },
-      }),
-    }),
-  );
+  await createSimIamRoleWithPolicy({
+    simAws,
+    accountId: callerAccountId,
+    roleName: "Caller",
+    policyName: "Invoke",
+    action: "lambda:InvokeFunction",
+  });
 }
 
 describe("Invoking a function through its resource policy", () => {

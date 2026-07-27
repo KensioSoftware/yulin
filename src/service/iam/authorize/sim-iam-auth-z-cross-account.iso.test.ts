@@ -1,4 +1,4 @@
-import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import { CreateRoleCommand } from "@aws-sdk/client-iam";
 import {
   assertArrayLength,
   assertFalse,
@@ -7,6 +7,7 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
+import { createSimIamRoleWithPolicy } from "../../../../test/iam/create-role-with-policy.js";
 import { SimAws } from "../../aws/sim-aws.js";
 import type { SimIamPolicyDocument } from "../policy/sim-iam-policy.js";
 import { SimIamPolicyDecisionValue } from "./sim-iam-decision.js";
@@ -41,36 +42,15 @@ async function callerRole(
   simAws: SimAws,
   effect: "Allow" | "Deny",
 ): Promise<void> {
-  const iam = simAws.account(callerAccountId).iam();
-
-  await iam.createRole(
-    new CreateRoleCommand({
-      RoleName: "Caller",
-      AssumeRolePolicyDocument: JSON.stringify({
-        Version: "2012-10-17",
-        Statement: {
-          Effect: "Allow",
-          Principal: { AWS: `arn:aws:iam::${callerAccountId}:root` },
-          Action: "sts:AssumeRole",
-        },
-      }),
-    }),
-  );
-
-  await iam.putRolePolicy(
-    new PutRolePolicyCommand({
-      RoleName: "Caller",
-      PolicyName: "ReadReports",
-      PolicyDocument: JSON.stringify({
-        Version: "2012-10-17",
-        Statement: {
-          Effect: effect,
-          Action: "s3:GetObject",
-          Resource: objectArn,
-        },
-      }),
-    }),
-  );
+  await createSimIamRoleWithPolicy({
+    simAws,
+    accountId: callerAccountId,
+    roleName: "Caller",
+    policyName: "ReadReports",
+    action: "s3:GetObject",
+    resource: objectArn,
+    effect,
+  });
 }
 
 /**

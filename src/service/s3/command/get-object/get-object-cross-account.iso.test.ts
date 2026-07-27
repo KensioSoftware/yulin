@@ -1,4 +1,3 @@
-import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
   CreateBucketCommand,
   GetObjectCommand,
@@ -13,6 +12,7 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
+import { createSimIamRoleWithPolicy } from "../../../../../test/iam/create-role-with-policy.js";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import type { SimS3 } from "../../sim-s3.js";
@@ -61,36 +61,14 @@ async function grantingBucket(simAws: SimAws): Promise<SimS3> {
  * The reading Role in its own Account, allowed to read the Object there.
  */
 async function allowedReaderRole(simAws: SimAws): Promise<void> {
-  const iam = simAws.account(callerAccountId).iam();
-
-  await iam.createRole(
-    new CreateRoleCommand({
-      RoleName: "Reader",
-      AssumeRolePolicyDocument: JSON.stringify({
-        Version: "2012-10-17",
-        Statement: {
-          Effect: "Allow",
-          Principal: { AWS: `arn:aws:iam::${callerAccountId}:root` },
-          Action: "sts:AssumeRole",
-        },
-      }),
-    }),
-  );
-
-  await iam.putRolePolicy(
-    new PutRolePolicyCommand({
-      RoleName: "Reader",
-      PolicyName: "ReadSharedReports",
-      PolicyDocument: JSON.stringify({
-        Version: "2012-10-17",
-        Statement: {
-          Effect: "Allow",
-          Action: "s3:GetObject",
-          Resource: "arn:aws:s3:::shared-reports/*",
-        },
-      }),
-    }),
-  );
+  await createSimIamRoleWithPolicy({
+    simAws,
+    accountId: callerAccountId,
+    roleName: "Reader",
+    policyName: "ReadSharedReports",
+    action: "s3:GetObject",
+    resource: "arn:aws:s3:::shared-reports/*",
+  });
 }
 
 describe("S3 GetObjectCommand cross-Account Bucket policy", () => {

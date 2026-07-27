@@ -1,7 +1,8 @@
-import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import { assertIdentical, assertTypeString } from "@kensio/smartass";
 import path from "node:path";
 import { describe, it } from "vitest";
+
+import { createSimIamRoleWithPolicy } from "../../../../../test/iam/create-role-with-policy.js";
 
 /**
  * Slower local integration test. Calls the real CDK CLI to synth the output
@@ -29,36 +30,13 @@ const otherAccountId = "222222222222";
  * that Account's own identity policy.
  */
 async function grantOtherAccountRole(simAws: SimAws): Promise<void> {
-  const iam = simAws.account(otherAccountId).iam();
-
-  await iam.createRole(
-    new CreateRoleCommand({
-      RoleName: "Anything",
-      AssumeRolePolicyDocument: JSON.stringify({
-        Version: "2012-10-17",
-        Statement: {
-          Effect: "Allow",
-          Principal: { AWS: `arn:aws:iam::${otherAccountId}:root` },
-          Action: "sts:AssumeRole",
-        },
-      }),
-    }),
-  );
-
-  await iam.putRolePolicy(
-    new PutRolePolicyCommand({
-      RoleName: "Anything",
-      PolicyName: "InvokeUrl",
-      PolicyDocument: JSON.stringify({
-        Version: "2012-10-17",
-        Statement: {
-          Effect: "Allow",
-          Action: "lambda:InvokeFunctionUrl",
-          Resource: "*",
-        },
-      }),
-    }),
-  );
+  await createSimIamRoleWithPolicy({
+    simAws,
+    accountId: otherAccountId,
+    roleName: "Anything",
+    policyName: "InvokeUrl",
+    action: "lambda:InvokeFunctionUrl",
+  });
 }
 
 describe("Sim CDK Lambda grantInvokeUrl local integration", () => {

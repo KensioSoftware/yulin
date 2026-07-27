@@ -6,13 +6,12 @@ import {
 } from "@aws-sdk/client-lambda";
 import {
   CreateAccessKeyCommand,
-  CreateRoleCommand,
   CreateUserCommand,
-  PutRolePolicyCommand,
   PutUserPolicyCommand,
 } from "@aws-sdk/client-iam";
 import { describe, expect, it } from "vitest";
 
+import { createSimIamRoleWithPolicy } from "../../../../test/iam/create-role-with-policy.js";
 import { signAwsRequest } from "../../../../test/sigv4/sign-aws-request.js";
 import type { SignAwsRequestCredentials } from "../../../../test/sigv4/sign-aws-request.js";
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
@@ -99,29 +98,13 @@ async function grantInvokeUrl(
  * alongside the resource policy on the function.
  */
 async function allowedCallerRole(simAws: SimAws): Promise<void> {
-  const iam = simAws.account(callerAccountId).iam();
-
-  await iam.createRole(
-    new CreateRoleCommand({
-      RoleName: "Caller",
-      AssumeRolePolicyDocument: JSON.stringify({
-        Version: "2012-10-17",
-        Statement: {
-          Effect: "Allow",
-          Principal: { AWS: `arn:aws:iam::${callerAccountId}:root` },
-          Action: "sts:AssumeRole",
-        },
-      }),
-    }),
-  );
-
-  await iam.putRolePolicy(
-    new PutRolePolicyCommand({
-      RoleName: "Caller",
-      PolicyName: "InvokeUrl",
-      PolicyDocument: invokeUrlPolicyDocument,
-    }),
-  );
+  await createSimIamRoleWithPolicy({
+    simAws,
+    accountId: callerAccountId,
+    roleName: "Caller",
+    policyName: "InvokeUrl",
+    action: "lambda:InvokeFunctionUrl",
+  });
 }
 
 /**

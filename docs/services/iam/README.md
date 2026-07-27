@@ -874,9 +874,11 @@ The caller's Account is resolved from the principal ARN, so it has to be an Acco
 `SimAws` instance for its policies to count. An Account the simulation was never told about grants
 nothing, which is also what a principal ARN that was never given any permissions means on AWS.
 
-A standalone `SimIam` has no simulation around it and so no other Account to ask: a caller from
-outside its own Account is always denied. Its Account ID is available as `simIam.accountId`, which
-is what a test naming its own principals should build their ARNs from.
+A standalone `SimIam` has no simulation around it and so no other Account to ask: a principal whose
+ARN belongs to another Account is always denied, however permissive the resource policy. Anonymous
+and service-principal callers are not affected — they have no Account either way, so a resource
+policy still allows them. The Account ID is available as `simIam.accountId`, which is what a test
+naming its own principals should build their ARNs from.
 
 ## Standalone SimIam
 

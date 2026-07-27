@@ -1,8 +1,8 @@
-import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import { GetPolicyCommand } from "@aws-sdk/client-lambda";
 import { assertTypeString } from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
+import { createSimIamRoleWithPolicy } from "../../../../../test/iam/create-role-with-policy.js";
 import { SimAwsHttp } from "../../../../serve/http/sim-aws-http.js";
 import { SimAwsLocalUrl } from "../../../../serve/http/url/sim-aws-local-url.js";
 import { SimAws } from "../../../aws/sim-aws.js";
@@ -25,36 +25,13 @@ const callerRoleArn = `arn:aws:iam::${callerAccountId}:role/Caller`;
  * with this side in place too.
  */
 async function allowedCallerRole(simAws: SimAws): Promise<void> {
-  const iam = simAws.account(callerAccountId).iam();
-
-  await iam.createRole(
-    new CreateRoleCommand({
-      RoleName: "Caller",
-      AssumeRolePolicyDocument: JSON.stringify({
-        Version: "2012-10-17",
-        Statement: {
-          Effect: "Allow",
-          Principal: { AWS: `arn:aws:iam::${callerAccountId}:root` },
-          Action: "sts:AssumeRole",
-        },
-      }),
-    }),
-  );
-
-  await iam.putRolePolicy(
-    new PutRolePolicyCommand({
-      RoleName: "Caller",
-      PolicyName: "InvokeUrl",
-      PolicyDocument: JSON.stringify({
-        Version: "2012-10-17",
-        Statement: {
-          Effect: "Allow",
-          Action: "lambda:InvokeFunctionUrl",
-          Resource: "*",
-        },
-      }),
-    }),
-  );
+  await createSimIamRoleWithPolicy({
+    simAws,
+    accountId: callerAccountId,
+    roleName: "Caller",
+    policyName: "InvokeUrl",
+    action: "lambda:InvokeFunctionUrl",
+  });
 }
 
 function greeterTemplate(
