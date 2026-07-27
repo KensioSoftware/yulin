@@ -19,13 +19,24 @@ const instant = new Date("2026-01-01T00:00:00.000Z");
 const hostDate = Date;
 
 /**
+ * Resolve after a real pause, so an invocation can be suspended part way
+ * through while another one runs.
+ */
+async function tick(milliseconds: number): Promise<void> {
+  await new Promise((resolve) => {
+    setTimeout(resolve, milliseconds);
+  });
+}
+
+/**
  * A simulation stopped at a known instant, with a function backed by a real
  * in-process handler.
  */
 async function makeSimulation(
   handlerFunction: SimLambdaHandler,
+  stoppedAt: Date = instant,
 ): Promise<SimAws> {
-  const simAws = new SimAws({ clock: new SimFixedClock(instant) });
+  const simAws = new SimAws({ clock: new SimFixedClock(stoppedAt) });
 
   await simAws.lambda().createFunction(
     new CreateFunctionCommand({
@@ -91,26 +102,30 @@ describe("sim Lambda in-process handler clock", () => {
     assertIdentical(after, "2026-01-01T01:30:00.000Z");
   });
 
-  it("keeps each simulation's time to itself", async () => {
-    // Given two simulations with clocks stopped at different instants.
-    const first = await makeSimulation(() => new Date().toISOString());
-    const second = new SimAws({
-      clock: new SimFixedClock(new Date("2030-06-01T12:00:00.000Z")),
+  it("keeps each simulation's time to itself while they interleave", async () => {
+    // Given two simulations with clocks stopped at different instants, each
+    // with a handler that reads the time on the far side of an await.
+    const laterInstant = new Date("2030-06-01T12:00:00.000Z");
+    const first = await makeSimulation(async () => {
+      await tick(5);
+      return new Date().toISOString();
     });
-    await second.lambda().createFunction(
-      new CreateFunctionCommand({
-        FunctionName: "stamper",
-        Role: "arn:aws:iam::111111111111:role/StamperRole",
-        Code: {
-          ZipFile: makeLambdaZipFileInput(() => new Date().toISOString()),
-        },
-      }),
-    );
+    const second = await makeSimulation(async () => {
+      await tick(1);
+      return new Date().toISOString();
+    }, laterInstant);
 
-    // When a function in each is invoked.
-    // Then each handler saw the time of the simulation it belongs to.
-    assertIdentical(await invokeStamper(first), "2026-01-01T00:00:00.000Z");
-    assertIdentical(await invokeStamper(second), "2030-06-01T12:00:00.000Z");
+    // When both are invoked at once, so each is suspended at its await while
+    // the other runs.
+    const [firstStamp, secondStamp] = await Promise.all([
+      invokeStamper(first),
+      invokeStamper(second),
+    ]);
+
+    // Then neither picked up the other's time: each read the clock of the
+    // simulation its function belongs to.
+    assertIdentical(firstStamp, "2026-01-01T00:00:00.000Z");
+    assertIdentical(secondStamp, "2030-06-01T12:00:00.000Z");
   });
 
   it("leaves the host clock alone outside an invocation", async () => {
