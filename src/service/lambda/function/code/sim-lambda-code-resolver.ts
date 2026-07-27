@@ -1,3 +1,4 @@
+import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimLambdaEnvironment } from "../environment/sim-lambda-environment.js";
 import type { SimLambdaCodeSource } from "./lambda-code-source.js";
@@ -15,6 +16,11 @@ import type { SimLambdaVmSdkModuleProvider } from "./vm/sdk/sim-lambda-vm-sdk-mo
 interface SimLambdaCodeResolverProperties {
   readonly codeStore?: SimLambdaCodeStore | undefined;
   readonly vmSdkModuleProvider?: SimLambdaVmSdkModuleProvider | undefined;
+  /**
+   * Clock vm zip code reports as the current time. A handler reference needs
+   * none: it runs in the host scope, where the invocation bridges the clock.
+   */
+  readonly clock?: SimClock | undefined;
 }
 
 /**
@@ -44,6 +50,7 @@ export class SimLambdaCodeResolver {
     this.codeStore = properties.codeStore ?? new SimLambdaNoCodeStore();
     this.vmZipCodeFactory = new SimLambdaVmZipCodeFactory({
       vmSdkModuleProvider: properties.vmSdkModuleProvider,
+      clock: properties.clock,
     });
   }
 

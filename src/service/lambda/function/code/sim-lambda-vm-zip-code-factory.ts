@@ -1,3 +1,4 @@
+import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import { SimZipArchive } from "../../../../util/zip/zip-archive.js";
 import { SimLambdaInvalidParameterValueException } from "../../error/sim-lambda.error.js";
@@ -7,6 +8,7 @@ import type { SimLambdaVmSdkModuleProvider } from "./vm/sdk/sim-lambda-vm-sdk-mo
 
 interface SimLambdaVmZipCodeFactoryProperties {
   readonly vmSdkModuleProvider?: SimLambdaVmSdkModuleProvider | undefined;
+  readonly clock?: SimClock | undefined;
 }
 
 /**
@@ -19,9 +21,11 @@ interface SimLambdaVmZipCodeFactoryProperties {
 export class SimLambdaVmZipCodeFactory {
   private readonly vmSdkModuleProvider:
     SimLambdaVmSdkModuleProvider | undefined;
+  private readonly clock: SimClock | undefined;
 
   constructor(properties: SimLambdaVmZipCodeFactoryProperties) {
     this.vmSdkModuleProvider = properties.vmSdkModuleProvider;
+    this.clock = properties.clock;
   }
 
   /**
@@ -41,6 +45,7 @@ export class SimLambdaVmZipCodeFactory {
       handlerName: context.handlerName,
       environment: context.environment,
       sdkModuleProvider: this.vmSdkModuleProvider,
+      clock: this.clock,
     });
   }
 

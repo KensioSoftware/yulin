@@ -1,3 +1,4 @@
+import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import type { SimZipArchive } from "../../../../util/zip/zip-archive.js";
 import { SimLambdaRuntimeError } from "../../error/sim-lambda-runtime.error.js";
 import type { SimLambdaHandler } from "../sim-lambda-handler.type.js";
@@ -15,6 +16,11 @@ interface SimLambdaVmZipCodeProperties {
   readonly handlerName: string;
   readonly environment: SimLambdaEnvironment;
   readonly sdkModuleProvider?: SimLambdaVmSdkModuleProvider | undefined;
+  /**
+   * Clock the sandbox's Date reports, so function code asking JavaScript for
+   * the time gets the simulation's time.
+   */
+  readonly clock?: SimClock | undefined;
 }
 
 interface ParsedHandlerName {
@@ -49,6 +55,12 @@ export function parseLambdaHandlerName(handlerName: string): ParsedHandlerName {
  * invocations like a warm execution environment.
  */
 export class SimLambdaVmZipCode implements SimLambdaExecutableCode {
+  /**
+   * The sandbox owns its own globals, so the handler needs nothing bridged
+   * from the host process to run with the simulation's environment and time.
+   */
+  readonly runsInHostScope = false;
+
   #handler: SimLambdaHandler | undefined;
 
   constructor(private readonly properties: SimLambdaVmZipCodeProperties) {}
@@ -62,13 +74,13 @@ export class SimLambdaVmZipCode implements SimLambdaExecutableCode {
   }
 
   private coldStart(): SimLambdaHandler {
-    const { archive, handlerName, environment, sdkModuleProvider } =
+    const { archive, handlerName, environment, sdkModuleProvider, clock } =
       this.properties;
     const parsedName = parseLambdaHandlerName(handlerName);
 
     const modules = new SimLambdaVmModules({
       archive,
-      context: makeSimLambdaVmContext(environment),
+      context: makeSimLambdaVmContext(environment, clock),
       sdkModuleProvider:
         sdkModuleProvider ?? new SimLambdaNoVmSdkModuleProvider(),
     });

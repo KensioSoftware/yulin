@@ -156,6 +156,93 @@ Nothing in the simulator schedules work on the clock yet, so today advancing mos
 timestamps and expiry checks see. The mechanism is there for scheduled behaviour to hook into as
 it arrives.
 
+## Time inside a simulated Lambda handler
+
+A simulated Lambda function runs on its simulation's clock, and that reaches the JavaScript clock
+the function code itself reads. `Date.now()` and `new Date()` inside a handler report simulated
+time, so code stamping an expiry or building a date-partitioned key can be tested against a clock
+the test controls:
+
+```typescript sim-clock-lambda-handler
+/**
+ * A simulated Lambda handler reading the simulation's clock.
+ */
+
+import { CreateFunctionCommand, InvokeCommand } from "@aws-sdk/client-lambda";
+
+import { SimAws, SimFixedClock } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws({
+  clock: new SimFixedClock(new Date("2026-07-26T09:00:00.000Z")),
+});
+const lambda = simAws.lambda();
+
+await lambda.createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "stamper",
+    Role: "arn:aws:iam::111111111111:role/StamperRole",
+    Code: {
+      // The handler asks JavaScript for the time, not the simulator.
+      ZipFile: makeLambdaZipFileInput(() => ({ at: new Date().toISOString() })),
+    },
+  }),
+);
+
+const first = await lambda.invoke(
+  new InvokeCommand({ FunctionName: "stamper" }),
+);
+console.log(Buffer.from(first.Payload!).toString()); // {"at":"2026-07-26T09:00:00.000Z"}
+
+await simAws.clock().advanceBy({ hours: 2 });
+
+const second = await lambda.invoke(
+  new InvokeCommand({ FunctionName: "stamper" }),
+);
+console.log(Buffer.from(second.Payload!).toString()); // {"at":"2026-07-26T11:00:00.000Z"}
+```
+
+How that is arranged depends on where the function code runs, which is worth knowing because one
+of the two touches a process global:
+
+- **Zip code** runs in a vm sandbox owning its own globals, so it is handed a `Date` bound to the
+  simulation's clock. Nothing outside the sandbox is affected.
+- **A real in-process handler function** is a closure over the module scope it was written in, and
+  reads the global `Date` like everything else in the test run. So the global is substituted for
+  one reporting the invocation's clock while an invocation is running, and the host clock
+  otherwise, tracked with `AsyncLocalStorage` so concurrent invocations of different simulations
+  stay apart. It is installed on the first in-process invocation and never removed, but with no
+  invocation running it behaves exactly as the host's own `Date` does.
+
+Only the current time comes from the clock. `new Date("2020-03-12")`, `Date.parse(...)`,
+`Date.UTC(...)` and `instanceof Date` all behave as they always did.
+
+One thing to watch: under a frozen clock `Date.now()` returns the same number for the whole
+invocation, so handler code that waits for it to change never finishes. `resume()` before invoking
+if the code under test polls the clock.
+
+### Where real AWS gets the time
+
+Real Lambda has no current-time API. The context object carries no timestamp, only
+`getRemainingTimeInMillis()`, and no environment variable holds one, so handler code reading
+`new Date()` is reading the machine clock. What AWS does provide is the time on the event:
+
+| Event source              | Field                                             |
+| ------------------------- | ------------------------------------------------- |
+| EventBridge               | `time`                                            |
+| Function URL, API Gateway | `requestContext.timeEpoch`, `requestContext.time` |
+| S3 notification           | `Records[].eventTime`                             |
+| SNS                       | `Records[].Sns.Timestamp`                         |
+| SQS                       | `Records[].attributes.SentTimestamp`              |
+
+For a scheduled invocation AWS's advice is to use the event's `time` rather than the system clock,
+because a retry or a delayed delivery runs later than the time the work was for. Simulated Lambda
+follows the same rule where it builds events: a Function URL request carries simulated time in
+`requestContext.time` and `requestContext.timeEpoch`.
+
+Handler code that takes a clock as a dependency stays the most testable option, on real AWS and
+here, and needs none of the machinery above.
+
 ## Time over HTTP
 
 A simulation served over HTTP, through `serveSimAws` or `SimAwsHttp.fetch(...)`, stamps every
@@ -178,7 +265,12 @@ runs on a clock a test can control: `await simSdk.simAws.clock().advanceBy({ hou
 - A `SimAws` constructed with a `background` scheduler of its own cannot control time, because that
   scheduler brings its own clock. `simAws.clock()` throws a diagnostic error rather than silently
   controlling nothing.
-- Simulated time does not affect JavaScript's own clock: `Date.now()` and `new Date()` inside code
-  under test — including inside a simulated Lambda handler — still report real time.
+- Simulated time reaches JavaScript's own clock inside a simulated Lambda invocation, and nowhere
+  else. `Date.now()` and `new Date()` in code under test that is not running as a simulated Lambda
+  function still report real time.
+- Timers are not simulated. `setTimeout` inside a handler is a host timer, so a sleeping handler
+  waits in real time and advancing the clock does not release it.
+- A time already read cannot be reached. A handler module doing `const startedAt = Date.now()` at
+  module scope read it when the test file imported the module, long before any invocation.
 - Advancing time does not re-evaluate simulated state that was already computed, such as an ACM
   certificate that has finished validating. It changes what is read from the clock next.

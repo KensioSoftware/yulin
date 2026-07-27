@@ -210,6 +210,32 @@ before any invocation. `SimLambdaEnvironmentConflicts` warns about that in the t
 changes what the code sees, and stays quiet otherwise (see the usage docs section on reading
 environment variables inside the handler).
 
+### The clock function code reads
+
+A function is given its simulation's clock, and the code it runs reads that clock rather than the
+host's when it asks JavaScript for the time. `makeSimClockDate` (`src/util/clock/`) builds the
+substitute: a `Proxy` over the host `Date` whose no-argument construction and `now()` read a
+`SimClock`, and which passes everything else through. A Proxy rather than a subclass because
+`Date.prototype` and `instanceof` have to keep meaning what they meant; a second Date identity
+would quietly stop dates built elsewhere being recognised as dates.
+
+Where it is installed follows the same split as environment variables, for the same reason.
+Sandboxed zip code is simply handed the substitute as the sandbox's `Date`
+(`makeSimLambdaVmContext`), touching nothing outside. A real in-process handler is a closure over
+its own module scope, so `sim-lambda-process-clock.ts` substitutes the global `Date` and resolves
+it through an `AsyncLocalStorage` store holding the invocation's clock, reporting the host time
+whenever no invocation is running.
+
+Two details in there are load-bearing. The store is read outside itself
+(`AsyncLocalStorage.exit`) when consulting the invocation's clock, because a simulation's clock is
+usually built on `new Date()` and would otherwise re-enter the substitute forever. And the patch is
+installed lazily, on the first invocation of an in-process handler, so a test run using only zip
+code never has its `Date` replaced at all: `Date` is a much busier global than `process.env`, so
+`SimLambdaExecutableCode.runsInHostScope` decides which invocations need it.
+
+`getRemainingTimeInMillis()` reads the same clock (`sim-lambda-invoke-context-builder.ts`), so a
+stopped clock leaves a handler with a constant budget.
+
 ### Execution role
 
 Creating a function requires an execution `Role` ARN, as on real AWS. While a handler runs,
@@ -361,6 +387,7 @@ are not supported and are skipped by the CloudFormation engine with an "Unsuppor
 - `UpdateFunctionCode`, versions, aliases and qualifiers
 - Lambda Layers
 - environment variables reaching a real in-process handler's module scope (see "Environment
-  variables" above)
+  variables" above), and the same limitation for a time read there
+- timers: `setTimeout` inside a handler is a host timer, not one the simulation's clock releases
 - timeouts interrupting handler execution
 - asynchronous invocation retries and failure destinations
