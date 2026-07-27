@@ -15,6 +15,9 @@ Sim S3 currently supports:
 - Getting Objects with `GetObjectCommand`
 - Listing Objects with `ListObjectsCommand`
 - Configuring static website hosting with `PutBucketWebsiteCommand`
+- Bucket policies with `PutBucketPolicyCommand`, `GetBucketPolicyCommand` and
+  `DeleteBucketPolicyCommand`, evaluated by sim IAM alongside identity policies
+- Creating Buckets and Bucket policies from `AWS::S3::Bucket` and `AWS::S3::BucketPolicy`
 - Serving static website requests on localhost with `serveSimAws`
 - Serving Object `GET`, `HEAD` and `PUT` over the S3 REST endpoint, authorized by sim IAM
 - Presigned URLs built by the real `@aws-sdk/s3-request-presigner`, with expiry in simulated time
@@ -217,6 +220,123 @@ for (const object of objectContentItems) {
 ```
 
 Object listings are sorted by key.
+
+## Bucket policies
+
+A Bucket policy is a resource policy stored on the Bucket. Sim IAM evaluates it alongside the
+caller's identity policies whenever an Object command is authorized, so a policy can grant access to
+a principal that holds no identity policy at all, including an anonymous caller.
+
+Apply one with `PutBucketPolicyCommand`, read it back with `GetBucketPolicyCommand`, and remove it
+with `DeleteBucketPolicyCommand`. Each is authorized in its own right, against `s3:PutBucketPolicy`,
+`s3:GetBucketPolicy` and `s3:DeleteBucketPolicy`.
+
+In a CloudFormation template, a Bucket policy is a separate `AWS::S3::BucketPolicy` resource rather
+than a property of `AWS::S3::Bucket`. This is what CDK synthesizes for `bucket.grantRead(...)`,
+`grantPut(...)` and `addToResourcePolicy(...)`, so a template reaches it whether or not the app
+mentions a Bucket policy itself. Sim CloudFormation attaches it through the same `PutBucketPolicy`
+path an SDK call takes, so the document is validated and enforced identically either way.
+
+```typescript sim-s3-bucket-policy
+/**
+ * Granting access to a simulated S3 Bucket with a Bucket policy.
+ */
+
+import { CreateRoleCommand } from "@aws-sdk/client-iam";
+import {
+  GetBucketPolicyCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const simIam = simAws.iam();
+const simS3 = simAws.s3();
+
+// The principal the Bucket policy will name. It gets no identity policy, so
+// the Bucket policy is the whole of its access.
+const roleOut = await simIam.createRole(
+  new CreateRoleCommand({
+    RoleName: "ReportReader",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { Service: "lambda.amazonaws.com" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+
+await simAws.cloudFormation().deployTemplate({
+  stackName: "reports-stack",
+  template: {
+    Resources: {
+      ReportsBucket: {
+        Type: "AWS::S3::Bucket",
+        Properties: { BucketName: "reports" },
+      },
+      ReportsBucketPolicy: {
+        Type: "AWS::S3::BucketPolicy",
+        Properties: {
+          Bucket: { Ref: "ReportsBucket" },
+          PolicyDocument: {
+            Version: "2012-10-17",
+            Statement: [
+              {
+                Effect: "Allow",
+                Principal: { AWS: roleOut.Role.Arn },
+                Action: "s3:GetObject",
+                Resource: "arn:aws:s3:::reports/*",
+              },
+            ],
+          },
+        },
+      },
+    },
+  },
+});
+
+await simS3.putObject(
+  new PutObjectCommand({
+    Bucket: "reports",
+    Key: "q3/report.txt",
+    Body: "quarterly numbers",
+  }),
+);
+
+// The deployed policy authorizes the read.
+const objectOut = await simS3.getObject(
+  new GetObjectCommand({ Bucket: "reports", Key: "q3/report.txt" }),
+  { caller: { kind: "arn", arn: roleOut.Role.Arn } },
+);
+
+console.log(objectOut.Metadata);
+
+// The same document comes back out as a JSON string.
+const policyOut = await simS3.getBucketPolicy(
+  new GetBucketPolicyCommand({ Bucket: "reports" }),
+);
+
+console.log(policyOut.Policy);
+```
+
+`GetBucketPolicyCommand` throws `NoSuchBucketPolicy` when the Bucket exists but has no policy, which
+is how real S3 distinguishes that from a Bucket that does not exist. `DeleteBucketPolicyCommand`
+succeeds either way, matching S3's idempotent behaviour.
+
+### Limitations
+
+Sim S3 does not model S3 Block Public Access. Real S3 enables all four settings by default on new
+Buckets, and `BlockPublicPolicy` causes `PutBucketPolicy` to reject a policy that allows public
+access. The simulator accepts such a policy, so a Bucket policy granting `Principal: "*"` can work
+here and be refused by real S3 unless the Bucket sets `PublicAccessBlockConfiguration` accordingly.
+
+Bucket ACLs and Object ownership settings are not modelled and are not planned. Object Ownership
+defaults to Bucket owner enforced on new Buckets, which disables ACLs, and AWS recommends keeping
+them disabled in favour of policies.
 
 ## Static website hosting
 
