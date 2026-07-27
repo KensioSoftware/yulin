@@ -11,6 +11,7 @@ import { SimLambdaEnvironment } from "./environment/sim-lambda-environment.js";
 import { SimLambdaFunctionPolicy } from "./policy/sim-lambda-function-policy.js";
 import { SimLambdaHandlerRunner } from "./invoke/sim-lambda-handler-runner.js";
 import { SimLambdaInvokeContextBuilder } from "./invoke/sim-lambda-invoke-context-builder.js";
+import { simLambdaProcessClock } from "./invoke/sim-lambda-process-clock.js";
 import { type SimClock, SimRealClock } from "../../../util/clock/sim-clock.js";
 import {
   defaultLambdaHandler,
@@ -226,12 +227,30 @@ export class SimLambdaFunction {
       async () =>
         await this.environment.runWith(
           async () =>
-            await this.runner.run(
-              this.code.handlerFunction(),
-              event,
-              contextBuilder,
+            await this.runWithSimulatedTime(
+              async () =>
+                await this.runner.run(
+                  this.code.handlerFunction(),
+                  event,
+                  contextBuilder,
+                ),
             ),
         ),
     );
+  }
+
+  /**
+   * Run an invocation with this simulation's time as the current time.
+   *
+   * Only code running in the host scope needs this. Zip code reads the Date
+   * its own vm sandbox was given, so a function backed by one leaves the
+   * global Date alone entirely.
+   */
+  private async runWithSimulatedTime<T>(run: () => Promise<T>): Promise<T> {
+    if (!this.code.runsInHostScope) {
+      return await run();
+    }
+
+    return await simLambdaProcessClock.run(this.clock, run);
   }
 }

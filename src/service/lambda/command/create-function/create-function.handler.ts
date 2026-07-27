@@ -85,6 +85,9 @@ export class CreateFunctionCommandHandler implements CommandHandler<
     this.codeResolver = new SimLambdaCodeResolver({
       codeStore,
       vmSdkModuleProvider,
+      // The background scheduler is this simulation's clock, and the same one
+      // the created function is given.
+      clock: background,
     });
     this.environmentConflicts = environmentConflicts;
   }

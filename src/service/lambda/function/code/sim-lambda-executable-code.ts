@@ -8,6 +8,17 @@ import type { SimLambdaHandler } from "../sim-lambda-handler.type.js";
  * at invocation time rather than at function creation.
  */
 export interface SimLambdaExecutableCode {
+  /**
+   * Whether this code runs in the host process's own global scope rather than
+   * in a sandbox of its own.
+   *
+   * Code in the host scope reads the host globals, so an invocation has to
+   * bridge process.env and Date to give it the function's environment and the
+   * simulation's time. Sandboxed code already has both and needs neither
+   * global touched.
+   */
+  readonly runsInHostScope: boolean;
+
   handlerFunction(): SimLambdaHandler;
 }
 
@@ -15,6 +26,12 @@ export interface SimLambdaExecutableCode {
  * Executable code backed directly by a real handler function reference.
  */
 export class SimLambdaHandlerReferenceCode implements SimLambdaExecutableCode {
+  /**
+   * A referenced handler is a closure over the module scope it was written
+   * in, which is the host process's.
+   */
+  readonly runsInHostScope = true;
+
   constructor(private readonly handler: SimLambdaHandler) {}
 
   /**

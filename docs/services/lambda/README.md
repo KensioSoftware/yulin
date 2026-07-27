@@ -863,6 +863,20 @@ actually changes what your code sees:
 - a declared variable whose name the host process also sets, with a different value
 - two simulated functions declaring the same variable name with different values
 
+## The time inside a handler
+
+A function runs on its simulation's clock, and so does the function code: `Date.now()` and
+`new Date()` inside a handler report simulated time rather than the host's. Freezing the clock
+gives an invocation a constant `Date.now()`, and advancing it changes what the next invocation
+reads. `context.getRemainingTimeInMillis()` counts down against the same clock, so a frozen clock
+leaves a handler with a constant budget rather than one draining in real time.
+
+Zip code gets this from its own vm sandbox. A real in-process handler gets it from a substituted
+global `Date` that reports the invocation's clock while an invocation is running and the host clock
+otherwise, so a time read at module scope is read too early, exactly as it is for environment
+variables. See [simulated time](../../time/README.md) for the whole picture, including where real
+AWS puts the time on the event.
+
 ## CloudFormation functions
 
 Sim CloudFormation can create Lambda functions from `AWS::Lambda::Function`, typically alongside a
@@ -1171,6 +1185,10 @@ Current documented limitations:
   function only while it runs, so a variable read at module scope sees the host process value
   instead. See [Environment variables](#environment-variables).
 - `Timeout` is recorded but does not interrupt handler execution.
+- Timers inside a handler are host timers: `setTimeout` waits in real time, and advancing the
+  simulation's clock does not release a sleeping handler.
+- A time read at module scope, like an environment variable read there, is read before any
+  invocation and sees the host clock. See [The time inside a handler](#the-time-inside-a-handler).
 - `Event` invocations do not simulate retries or failure destinations; handler errors are dropped.
 - `Code.S3ObjectVersion` is accepted but ignored, as sim S3 has no object versioning yet.
 - CloudFormation resource types other than `AWS::Lambda::Function`, `AWS::Lambda::Url` and
