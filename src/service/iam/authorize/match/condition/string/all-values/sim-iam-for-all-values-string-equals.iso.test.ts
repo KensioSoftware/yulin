@@ -184,8 +184,7 @@ describe("sim IAM ForAllValues:StringEquals authorization", () => {
   it("matches the principal ARN derived from the caller", () => {
     // Given a policy accepting the caller ARN as one of its principal values.
     const simIam = new SimIam();
-    const callerPrincipalArn =
-      "arn:aws:iam::123456789012:role/application/TestRole";
+    const callerPrincipalArn = `arn:aws:iam::${simIam.accountId}:role/application/TestRole`;
     const policy = simIamAuthZResourcePolicySourceFactory.make({
       document: {
         Statement: {
@@ -196,7 +195,7 @@ describe("sim IAM ForAllValues:StringEquals authorization", () => {
           Condition: {
             "ForAllValues:StringEquals": {
               "aws:PrincipalArn": [
-                "arn:aws:iam::123456789012:role/OtherRole",
+                `arn:aws:iam::${simIam.accountId}:role/OtherRole`,
                 callerPrincipalArn,
               ],
             },

@@ -99,15 +99,20 @@ denied for every action.
 ## Authorization decisions
 
 `authorize(...)` returns a decision object rather than throwing, so tests can assert on exactly why
-a request was allowed or denied. The decision models the common IAM evaluation union:
+a request was allowed or denied. The decision models the common IAM evaluation rules:
 
 - A matching explicit `Deny` statement in any evaluated policy wins
-- Otherwise a matching `Allow` in an identity policy or resource policy allows the request
+- Otherwise, within one Account, a matching `Allow` in an identity policy or resource policy allows
+  the request
+- Across Accounts, a matching `Allow` is needed from each side — see
+  [Cross-Account requests](#cross-account-requests)
 - Otherwise the request is implicitly denied
 
 The decision exposes `value` (`"Allow"`, `"ExplicitDeny"`, or `"ImplicitDeny"`), the convenience
 flags `isAllowed`, `isDenied`, `isExplicitDeny`, and `isImplicitDeny`, the matching
-`allowStatements` and `explicitDenyStatements`, and the resolved `caller` for diagnostics.
+`allowStatements` and `explicitDenyStatements`, and the resolved `caller` for diagnostics. The
+matching Allows are also available per side as `identityAllowStatements` and
+`resourceAllowStatements`, which is what a cross-Account denial is best read from.
 
 If the caller is omitted, authorization defaults to the root principal of the Account owning the
 sim IAM instance, which is allowed within its own Account. An explicit `{ kind: "anonymous" }`
@@ -770,8 +775,110 @@ console.log(secondUserOutput.User.Arn);
 ```
 
 Principals from one Account get no implicit access to another Account's resources: authorizing a
-caller from a different simulated Account results in an implicit deny unless a supplied resource
-policy allows it.
+caller from a different simulated Account results in an implicit deny unless both Accounts allow the
+request.
+
+## Cross-Account requests
+
+A request whose caller belongs to a different Account from the resource is decided in both
+Accounts, as it is on AWS:
+
+- The resource's Account must allow it through a resource policy, such as an S3 Bucket policy or a
+  Lambda permission
+- The caller's Account must allow it through an identity policy on that principal
+
+Either one on its own is denied. A resource policy naming another Account's principal delegates to
+that Account rather than granting on its behalf, and an Account cannot grant its own principals
+access to somebody else's resource. An explicit `Deny` on either side denies. Callers with no
+identity side — a service principal, or an anonymous request — are unaffected, and are still allowed
+by a resource policy alone.
+
+```typescript sim-iam-cross-account
+/**
+ * A cross-Account request needs an allow from both Accounts.
+ */
+
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const partnerRoleArn = "arn:aws:iam::222222222222:role/Reader";
+
+// The Bucket's Account grants the partner Account's Role.
+const bucketPolicy = {
+  document: {
+    Version: "2012-10-17",
+    Statement: {
+      Effect: "Allow",
+      Principal: { AWS: partnerRoleArn },
+      Action: "s3:GetObject",
+      Resource: "arn:aws:s3:::reports-bucket/*",
+    },
+  },
+} as const;
+
+const request = {
+  action: "s3:GetObject",
+  resource: "arn:aws:s3:::reports-bucket/summary.csv",
+  caller: { kind: "arn", arn: partnerRoleArn },
+  resourcePolicies: [bucketPolicy],
+} as const;
+
+const beforeIdentityPolicy = simAws
+  .account("111111111111")
+  .iam()
+  .authorize(request);
+
+// false: the partner Account has not allowed its Role to read anything.
+console.log(beforeIdentityPolicy.isAllowed);
+console.log(beforeIdentityPolicy.resourceAllowStatements.length); // 1
+console.log(beforeIdentityPolicy.identityAllowStatements.length); // 0
+
+// The partner Account allows its own Role.
+const partnerIam = simAws.account("222222222222").iam();
+
+await partnerIam.createRole(
+  new CreateRoleCommand({
+    RoleName: "Reader",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { AWS: "arn:aws:iam::222222222222:root" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+
+await partnerIam.putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "Reader",
+    PolicyName: "ReadReports",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: "s3:GetObject",
+        Resource: "arn:aws:s3:::reports-bucket/*",
+      },
+    }),
+  }),
+);
+
+// true: both Accounts now allow the request.
+console.log(simAws.account("111111111111").iam().authorize(request).isAllowed);
+```
+
+The caller's Account is resolved from the principal ARN, so it has to be an Account of the same
+`SimAws` instance for its policies to count. An Account the simulation was never told about grants
+nothing, which is also what a principal ARN that was never given any permissions means on AWS.
+
+A standalone `SimIam` has no simulation around it and so no other Account to ask: a principal whose
+ARN belongs to another Account is always denied, however permissive the resource policy. Anonymous
+and service-principal callers are not affected — they have no Account either way, so a resource
+policy still allows them. The Account ID is available as `simIam.accountId`, which is what a test
+naming its own principals should build their ARNs from.
 
 ## Standalone SimIam
 
@@ -828,5 +935,6 @@ full IAM feature set. Notable gaps:
 - The resolved caller is evaluated by Lambda Function URLs with `AuthType: "AWS_IAM"`, but not yet
   by the other services that serve HTTP: served S3 objects and CloudFront responses perform no
   authorization
-- A cross-account call is allowed by the target's resource policy alone. Real AWS also requires the
-  caller's own Account to allow the action, and that second side is not evaluated
+- The identity side of a cross-Account request comes from the caller's Account in the same `SimAws`
+  instance. A caller whose Account is not part of the simulation is denied rather than assumed to be
+  permitted

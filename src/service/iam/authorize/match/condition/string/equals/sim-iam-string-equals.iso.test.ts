@@ -116,7 +116,7 @@ describe("sim IAM StringEquals authorization", () => {
   it("allows a specified principal when its context value matches", () => {
     // Given a resource policy for a specific principal with a StringEquals condition.
     const simIam = new SimIam();
-    const callerPrincipalArn = "arn:aws:iam::123456789012:role/TestRole";
+    const callerPrincipalArn = `arn:aws:iam::${simIam.accountId}:role/TestRole`;
     const policy = simIamAuthZResourcePolicySourceFactory.make({
       document: {
         Statement: {
@@ -151,7 +151,7 @@ describe("sim IAM StringEquals authorization", () => {
   it("supplies the principal ARN condition value from the caller", () => {
     // Given a policy conditioned on an IAM-known property of the principal.
     const simIam = new SimIam();
-    const callerPrincipalArn = "arn:aws:iam::123456789012:role/TestRole";
+    const callerPrincipalArn = `arn:aws:iam::${simIam.accountId}:role/TestRole`;
     const policy = simIamAuthZResourcePolicySourceFactory.make({
       document: {
         Statement: {
