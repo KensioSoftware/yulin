@@ -87,7 +87,12 @@ describe("S3 CloudFormation BucketPolicy Resource", () => {
               Bucket: { Ref: "ReportsBucket" },
               PolicyDocument: {
                 Version: "2012-10-17",
-                Statement: [publicReadStatement],
+                Statement: [
+                  {
+                    ...publicReadStatement,
+                    Resource: "arn:aws:s3:::reports/public/*",
+                  },
+                ],
               },
             },
           },
@@ -99,34 +104,32 @@ describe("S3 CloudFormation BucketPolicy Resource", () => {
     await simS3.putObject(
       new PutObjectCommand({
         Bucket: "reports",
-        Key: "q3.txt",
+        Key: "public/q3.txt",
         Body: "quarterly numbers",
+      }),
+    );
+    await simS3.putObject(
+      new PutObjectCommand({
+        Bucket: "reports",
+        Key: "private/q3.txt",
+        Body: "not for publication",
       }),
     );
 
     // When an anonymous caller reads an Object the policy covers.
     const output = await simS3.getObject(
-      new GetObjectCommand({ Bucket: "reports", Key: "q3.txt" }),
+      new GetObjectCommand({ Bucket: "reports", Key: "public/q3.txt" }),
       { caller: { kind: "anonymous" } },
     );
 
     // Then the deployed policy authorizes it, as an SDK-applied policy would.
     assertNonNullable(output.Body);
 
-    // And an Object outside the policy's Resource remains denied.
-    await simS3.putObject(
-      new PutObjectCommand({
-        Bucket: "reports",
-        Key: "q3.txt",
-        Body: "quarterly numbers",
-      }),
-    );
+    // And the same caller is denied an Object outside the policy's Resource.
     const error = await assertThrowsErrorAsync(async () =>
       simS3.getObject(
-        new GetObjectCommand({ Bucket: "reports", Key: "q3.txt" }),
-        {
-          caller: { kind: "arn", arn: "arn:aws:iam::222222222222:role/Other" },
-        },
+        new GetObjectCommand({ Bucket: "reports", Key: "private/q3.txt" }),
+        { caller: { kind: "anonymous" } },
       ),
     );
     assertInstanceOf(error, SimIamAccessDenied);

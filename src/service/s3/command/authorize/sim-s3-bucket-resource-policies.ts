@@ -1,4 +1,5 @@
 import type { SimIamResourcePolicyInput } from "../../../iam/authorize/context/sim-iam-auth-z-context-builder.js";
+import { simS3BucketArn } from "../../bucket/sim-s3-bucket-arn.js";
 import type { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
 
 /**
@@ -21,7 +22,7 @@ export function simS3BucketResourcePolicies(
     {
       document: policy,
       policyName: "BucketPolicy",
-      resourceArn: `arn:aws:s3:::${bucket.bucketName}`,
+      resourceArn: simS3BucketArn(bucket.bucketName),
     },
   ];
 }

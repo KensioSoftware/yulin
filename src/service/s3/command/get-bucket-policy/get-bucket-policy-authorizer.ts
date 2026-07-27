@@ -1,6 +1,7 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
+import { simS3BucketArn } from "../../bucket/sim-s3-bucket-arn.js";
 import type { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
 import { simS3BucketResourcePolicies } from "../authorize/sim-s3-bucket-resource-policies.js";
 
@@ -24,7 +25,7 @@ export class GetBucketPolicyAuthorizer {
    * Ensure the caller may read the Bucket policy.
    */
   authorize(bucket: SimS3Bucket, caller?: SimAwsCaller): void {
-    const resource = `arn:aws:s3:::${bucket.bucketName}`;
+    const resource = simS3BucketArn(bucket.bucketName);
     const decision = this.iam.authorize({
       action: GetBucketPolicyAuthorizer.action,
       resource,

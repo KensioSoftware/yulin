@@ -82,7 +82,7 @@ export class SimCfnS3BucketPolicyCreator {
       typeof policyDocument !== "object" ||
       Array.isArray(policyDocument)
     ) {
-      throw new Error(
+      throw new TypeError(
         `AWS::S3::BucketPolicy ${resource.logicalId} requires a PolicyDocument object`,
       );
     }
