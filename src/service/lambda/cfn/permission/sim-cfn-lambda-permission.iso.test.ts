@@ -2,6 +2,7 @@ import { GetPolicyCommand } from "@aws-sdk/client-lambda";
 import { assertTypeString } from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
+import { createSimIamRoleWithPolicy } from "../../../../../test/iam/create-role-with-policy.js";
 import { SimAwsHttp } from "../../../../serve/http/sim-aws-http.js";
 import { SimAwsLocalUrl } from "../../../../serve/http/url/sim-aws-local-url.js";
 import { SimAws } from "../../../aws/sim-aws.js";
@@ -13,7 +14,25 @@ import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import { SimLambdaPermission } from "../../function/policy/sim-lambda-permission.js";
 import { SimCfnLambdaPermissionCreator } from "./sim-cfn-lambda-permission-creator.js";
 
-const callerRoleArn = "arn:aws:iam::222222222222:role/Caller";
+const callerAccountId = "222222222222";
+const callerRoleArn = `arn:aws:iam::${callerAccountId}:role/Caller`;
+
+/**
+ * The calling Role in its own Account, allowed to invoke Function URLs there.
+ *
+ * A cross-Account call needs an allow from the caller's Account as well as the
+ * grant on the function, so a template grant can only be shown to take effect
+ * with this side in place too.
+ */
+async function allowedCallerRole(simAws: SimAws): Promise<void> {
+  await createSimIamRoleWithPolicy({
+    simAws,
+    accountId: callerAccountId,
+    roleName: "Caller",
+    policyName: "InvokeUrl",
+    action: "lambda:InvokeFunctionUrl",
+  });
+}
 
 function greeterTemplate(
   permissionProperties: SimCfnTemplateValueRecord,
@@ -93,7 +112,8 @@ describe("Lambda CloudFormation Permission deployment", () => {
   });
 
   it("takes effect for a request to the deployed Function URL", async () => {
-    // Given the same template deployed, with the URL requiring IAM auth
+    // Given the same template deployed, with the URL requiring IAM auth, and
+    // the granted Role allowed to invoke Function URLs by its own Account
     const simAws = new SimAws();
     const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "greeter-stack",
@@ -105,6 +125,7 @@ describe("Lambda CloudFormation Permission deployment", () => {
       }),
     });
     await stack.waitForDeployComplete();
+    await allowedCallerRole(simAws);
     const functionUrl = stack.outputs.get("FunctionUrl")?.value;
     assertTypeString(functionUrl);
     const url = new SimAwsLocalUrl({ input: functionUrl }).toString();

@@ -2,6 +2,8 @@ import { assertIdentical, assertTypeString } from "@kensio/smartass";
 import path from "node:path";
 import { describe, it } from "vitest";
 
+import { createSimIamRoleWithPolicy } from "../../../../../test/iam/create-role-with-policy.js";
+
 /**
  * Slower local integration test. Calls the real CDK CLI to synth the output
  * template file, then serves the IAM-authenticated Function URL the app
@@ -22,6 +24,20 @@ import { TestCdkProject } from "../../../../util/filesystem/test-cdk-project.js"
 const accountId = "888888888888";
 
 const otherAccountId = "222222222222";
+
+/**
+ * The calling Role in the other Account, allowed to invoke Function URLs by
+ * that Account's own identity policy.
+ */
+async function grantOtherAccountRole(simAws: SimAws): Promise<void> {
+  await createSimIamRoleWithPolicy({
+    simAws,
+    accountId: otherAccountId,
+    roleName: "Anything",
+    policyName: "InvokeUrl",
+    action: "lambda:InvokeFunctionUrl",
+  });
+}
 
 describe("Sim CDK Lambda grantInvokeUrl local integration", () => {
   it("deploys grantInvokeUrl grants that admit the granted principals", async () => {
@@ -85,6 +101,11 @@ app.synth();
     const functionUrl = stack.outputs.get("ReporterFunctionUrl")?.value;
     assertTypeString(functionUrl);
 
+    // And the other Account allows its own Role to invoke Function URLs. That
+    // is the side a CDK app in this Account cannot write, and a cross-account
+    // call needs an allow from each Account.
+    await grantOtherAccountRole(simAws);
+
     const srv = await serveSimAws({ simAws });
     const invokeAs = async (arn: string): Promise<Response> =>
       await fetch(srv.localUrl(functionUrl), {
@@ -100,8 +121,7 @@ app.synth();
       assertIdentical(await grantedRole.text(), "reported");
 
       // And so does a principal in the Account granted by the deployed
-      // AWS::Lambda::Permission, which is the only way a cross-account call
-      // can be allowed at all.
+      // AWS::Lambda::Permission, now that its own Account allows it too.
       const grantedAccount = await invokeAs(
         `arn:aws:iam::${otherAccountId}:role/Anything`,
       );

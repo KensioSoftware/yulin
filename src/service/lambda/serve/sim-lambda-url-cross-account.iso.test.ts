@@ -11,6 +11,7 @@ import {
 } from "@aws-sdk/client-iam";
 import { describe, expect, it } from "vitest";
 
+import { createSimIamRoleWithPolicy } from "../../../../test/iam/create-role-with-policy.js";
 import { signAwsRequest } from "../../../../test/sigv4/sign-aws-request.js";
 import type { SignAwsRequestCredentials } from "../../../../test/sigv4/sign-aws-request.js";
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
@@ -22,6 +23,15 @@ import { makeLambdaZipFileInput } from "../function/code/lambda-zip-file-input.j
 const ownerAccountId = "111111111111";
 const callerAccountId = "222222222222";
 const callerRoleArn = `arn:aws:iam::${callerAccountId}:role/Caller`;
+
+const invokeUrlPolicyDocument = JSON.stringify({
+  Version: "2012-10-17",
+  Statement: {
+    Effect: "Allow",
+    Action: "lambda:InvokeFunctionUrl",
+    Resource: "*",
+  },
+});
 
 interface CrossAccountFunction {
   readonly simAws: SimAws;
@@ -81,6 +91,23 @@ async function grantInvokeUrl(
 }
 
 /**
+ * The calling Role in its own Account, allowed to invoke Function URLs by that
+ * Account's own identity policy.
+ *
+ * This is the caller's half of a cross-Account request, which AWS requires
+ * alongside the resource policy on the function.
+ */
+async function allowedCallerRole(simAws: SimAws): Promise<void> {
+  await createSimIamRoleWithPolicy({
+    simAws,
+    accountId: callerAccountId,
+    roleName: "Caller",
+    policyName: "InvokeUrl",
+    action: "lambda:InvokeFunctionUrl",
+  });
+}
+
+/**
  * A signing User in the caller's own Account, allowed to invoke the URL by
  * that Account's own identity policy.
  */
@@ -94,14 +121,7 @@ async function callerAccountUser(
     new PutUserPolicyCommand({
       UserName: "Caller",
       PolicyName: "InvokeUrl",
-      PolicyDocument: JSON.stringify({
-        Version: "2012-10-17",
-        Statement: {
-          Effect: "Allow",
-          Action: "lambda:InvokeFunctionUrl",
-          Resource: "*",
-        },
-      }),
+      PolicyDocument: invokeUrlPolicyDocument,
     }),
   );
 
@@ -125,13 +145,29 @@ describe("Cross-account invocation of an AWS_IAM Function URL", () => {
       headers: { [simAwsCallerHeaderName]: callerRoleArn },
     });
 
-    // Then it is refused: the owning Account has no policies for a principal
-    // it did not create, so nothing can allow the call
+    // Then it is refused: neither Account allows the call
     expect(response.status).toBe(403);
   });
 
-  it("invokes for a principal from another Account that was granted the URL", async () => {
-    // Given the other Account's Role granted permission on the function
+  it("invokes for a principal both Accounts allow", async () => {
+    // Given the other Account's Role granted permission on the function, and
+    // allowed to invoke Function URLs by its own Account
+    const { simAws, url } = await serveOwnedFunction();
+    await grantInvokeUrl(simAws);
+    await allowedCallerRole(simAws);
+
+    // When that Role calls the URL
+    const response = await new SimAwsHttp({ simAws }).fetch(url, {
+      headers: { [simAwsCallerHeaderName]: callerRoleArn },
+    });
+
+    // Then it is admitted, which is the only way a cross-account call can be
+    // allowed: an allow from each side
+    expect(response.status).toBe(200);
+  });
+
+  it("refuses a principal its own Account does not allow", async () => {
+    // Given only the function's own grant to the other Account's Role
     const { simAws, url } = await serveOwnedFunction();
     await grantInvokeUrl(simAws);
 
@@ -140,15 +176,33 @@ describe("Cross-account invocation of an AWS_IAM Function URL", () => {
       headers: { [simAwsCallerHeaderName]: callerRoleArn },
     });
 
-    // Then the resource policy is what admits it, which is the only way a
-    // cross-account call can be allowed at all
-    expect(response.status).toBe(200);
+    // Then it is refused: a resource policy delegates to the caller's Account
+    // rather than granting on its behalf, and nothing there allows the action
+    expect(response.status).toBe(403);
+  });
+
+  it("refuses a principal the function's Account did not grant", async () => {
+    // Given a Role its own Account allows to invoke any Function URL, with no
+    // grant on the function
+    const { simAws, url } = await serveOwnedFunction();
+    await allowedCallerRole(simAws);
+
+    // When that Role calls the URL
+    const response = await new SimAwsHttp({ simAws }).fetch(url, {
+      headers: { [simAwsCallerHeaderName]: callerRoleArn },
+    });
+
+    // Then it is refused: an Account cannot grant itself access to another
+    // Account's function
+    expect(response.status).toBe(403);
   });
 
   it("refuses again once the permission is removed", async () => {
-    // Given a granted permission that is then revoked
+    // Given a granted permission that is then revoked, with the caller's own
+    // Account still allowing the action
     const { simAws, url } = await serveOwnedFunction();
     await grantInvokeUrl(simAws);
+    await allowedCallerRole(simAws);
     await simAws
       .account(ownerAccountId)
       .lambda()
@@ -169,7 +223,8 @@ describe("Cross-account invocation of an AWS_IAM Function URL", () => {
   });
 
   it("admits a signed cross-account request", async () => {
-    // Given a User in the other Account holding an access key, granted the URL
+    // Given a User in the other Account holding an access key, allowed to
+    // invoke by its own Account and granted the URL by the function's
     const { simAws, url } = await serveOwnedFunction();
     const credentials = await callerAccountUser(simAws);
     await simAws
@@ -191,13 +246,15 @@ describe("Cross-account invocation of an AWS_IAM Function URL", () => {
       signed.request,
     );
 
-    // Then the signature identifies them and the resource policy admits them
+    // Then the signature identifies them and both Accounts admit them
     expect(response.status).toBe(200);
   });
 
   it("does not let an Invoke grant open the Function URL", async () => {
-    // Given the other Account's Role granted only the Invoke API action
+    // Given the other Account's Role granted only the Invoke API action, while
+    // its own Account allows it to invoke Function URLs
     const { simAws, url } = await serveOwnedFunction();
+    await allowedCallerRole(simAws);
     await simAws
       .account(ownerAccountId)
       .lambda()
@@ -224,6 +281,7 @@ describe("Cross-account invocation of an AWS_IAM Function URL", () => {
     // Given a grant conditioned on the URL being public, not IAM-authenticated
     const { simAws, url } = await serveOwnedFunction();
     await grantInvokeUrl(simAws, "NONE");
+    await allowedCallerRole(simAws);
 
     // When the Role calls the AWS_IAM URL
     const response = await new SimAwsHttp({ simAws }).fetch(url, {
@@ -239,6 +297,7 @@ describe("Cross-account invocation of an AWS_IAM Function URL", () => {
     // Given the same grant, conditioned on the auth type the URL actually has
     const { simAws, url } = await serveOwnedFunction();
     await grantInvokeUrl(simAws, "AWS_IAM");
+    await allowedCallerRole(simAws);
 
     // When the Role calls the URL
     const response = await new SimAwsHttp({ simAws }).fetch(url, {

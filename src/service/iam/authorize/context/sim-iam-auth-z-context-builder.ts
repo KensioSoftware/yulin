@@ -1,8 +1,12 @@
 import type { SimArn } from "../../../aws/arn.js";
+import { makeSimAwsAccountRootPrincipal } from "../../../aws/caller/sim-aws-account-root-principal.js";
 import type {
   SimAwsCaller,
   SimAwsPrincipal,
 } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
+import { SimIamCallerAccountResolver } from "../caller-account/sim-iam-caller-account-resolver.js";
+import type { SimIamAccountResolver } from "../../registry/sim-iam-account-resolver.js";
 import type {
   SimIamConditionValue,
   SimIamPolicy,
@@ -15,7 +19,10 @@ import type {
   SimIamAuthZPolicySourceType,
 } from "./sim-iam-auth-z-context.js";
 import { SimIamAuthZIdentityPolicyCoordinator } from "./identity-policy-source/sim-iam-auth-z-id-pol-coordinator.js";
-import { SimIamAuthZCallerContextBuilder } from "./sim-iam-auth-z-caller-context-builder.js";
+import {
+  SimIamAuthZCallerContextBuilder,
+  type SimIamAuthZCallerContext,
+} from "./sim-iam-auth-z-caller-context-builder.js";
 import type {
   SimAwsCredentialIdentityResolver,
   SimAwsResolvedCaller,
@@ -69,6 +76,24 @@ export interface SimIamAuthorizationInput {
   readonly resourcePolicies?: readonly SimIamResourcePolicyInput[] | undefined;
 }
 
+interface SimIamAuthZContextBuilderProperties {
+  /**
+   * The Account whose IAM is evaluating the request.
+   */
+  readonly accountId: SimAwsAccountId;
+
+  readonly policies: ReadonlyMap<SimArn, SimIamPolicy>;
+  readonly roles: ReadonlyMap<SimIamRoleName, SimIamRole>;
+  readonly users: ReadonlyMap<SimIamUsername, SimIamUser>;
+  readonly credentialIdentityResolver: SimAwsCredentialIdentityResolver;
+
+  /**
+   * Resolves other Accounts' IAM in the same simulation, for the identity side
+   * of a cross-Account request.
+   */
+  readonly iamResolver?: SimIamAccountResolver | undefined;
+}
+
 /**
  * Builds the authorization context consumed by SimIamAuthorizer.
  *
@@ -80,6 +105,11 @@ export interface SimIamAuthorizationInput {
  * SimIamAuthZIdentityPolicySourceBuilder. That helper owns the details of
  * finding a principal role, reading inline policies from the role, resolving
  * attached managed policy ARNs, and parsing stored policy documents.
+ *
+ * Whose identity policies are in scope depends on which Account owns the
+ * caller, which SimIamCallerAccountResolver decides. A caller from another
+ * Account brings that Account's identity policies with it, along with the rule
+ * that both sides must then allow the request.
  *
  * Resource policies are supplied by the service that owns the target resource.
  * They are passed through the authorization input rather than loaded from the
@@ -93,22 +123,21 @@ export interface SimIamAuthorizationInput {
 export class SimIamAuthZContextBuilder {
   private readonly callerContextBuilder: SimIamAuthZCallerContextBuilder;
   private readonly identityPolicyCoordinator: SimIamAuthZIdentityPolicyCoordinator;
+  private readonly callerAccountResolver: SimIamCallerAccountResolver;
 
-  constructor(
-    policies: ReadonlyMap<SimArn, SimIamPolicy>,
-    roles: ReadonlyMap<SimIamRoleName, SimIamRole>,
-    users: ReadonlyMap<SimIamUsername, SimIamUser>,
-    defaultCallerPrincipal: SimAwsPrincipal,
-    credentialIdentityResolver: SimAwsCredentialIdentityResolver,
-  ) {
+  constructor(properties: SimIamAuthZContextBuilderProperties) {
     this.callerContextBuilder = new SimIamAuthZCallerContextBuilder(
-      defaultCallerPrincipal,
-      credentialIdentityResolver,
+      makeSimAwsAccountRootPrincipal(properties.accountId),
+      properties.credentialIdentityResolver,
     );
     this.identityPolicyCoordinator = new SimIamAuthZIdentityPolicyCoordinator({
-      policies,
-      roles,
-      users,
+      policies: properties.policies,
+      roles: properties.roles,
+      users: properties.users,
+    });
+    this.callerAccountResolver = new SimIamCallerAccountResolver({
+      accountId: properties.accountId,
+      iamResolver: properties.iamResolver,
     });
   }
 
@@ -117,20 +146,52 @@ export class SimIamAuthZContextBuilder {
    */
   build(input: SimIamAuthorizationInput): SimIamAuthZContext {
     const callerContext = this.callerContextBuilder.build(input.caller);
+    const callerAccount = this.callerAccountResolver.resolve(
+      callerContext.caller,
+    );
 
     return {
       identityPolicies: [
-        ...this.identityPolicyCoordinator.build(
-          callerContext.caller.identityPolicyArn,
-        ),
-        ...callerContext.rootPolicySources,
+        ...this.ownIdentityPolicySources(callerContext),
+        ...callerAccount.identityPolicies,
       ],
       resourcePolicies: this.resourcePolicySources(input),
+      allowRequirement: callerAccount.allowRequirement,
       action: input.action,
       resource: input.resource,
       conditionContext: this.conditionContext(input, callerContext.caller),
       caller: callerContext.caller,
     };
+  }
+
+  /**
+   * Identity policy sources this Account applies to one of its own principals.
+   *
+   * This is the identity side of a request within one Account, and is also what
+   * another Account's IAM asks for when it is deciding a cross-Account request
+   * against a principal belonging to this one.
+   */
+  identityPolicySourcesFor(
+    principal: SimAwsPrincipal,
+  ): readonly SimIamAuthZPolicySource[] {
+    return this.ownIdentityPolicySources(
+      this.callerContextBuilder.build(principal),
+    );
+  }
+
+  /**
+   * Combine stored identity policies with any implied by the caller itself,
+   * such as the unrestricted access held by this Account's root principal.
+   */
+  private ownIdentityPolicySources(
+    callerContext: SimIamAuthZCallerContext,
+  ): readonly SimIamAuthZPolicySource[] {
+    return [
+      ...this.identityPolicyCoordinator.build(
+        callerContext.caller.identityPolicyArn,
+      ),
+      ...callerContext.rootPolicySources,
+    ];
   }
 
   /**

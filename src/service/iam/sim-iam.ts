@@ -1,6 +1,5 @@
 import type { SimArn } from "../aws/arn.js";
-import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
-import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
+import type { SimAwsAccountId } from "../aws/sim-aws-account.js";
 import type {
   SimCreatePolicyCommand,
   SimCreatePolicyCommandOutput,
@@ -14,10 +13,6 @@ import type {
   SimListPoliciesCommand,
   SimListPoliciesCommandOutput,
 } from "./command/policy/list-policies/list-policies.command.js";
-import {
-  type BackgroundScheduler,
-  BackgroundTasks,
-} from "../../util/background/background.js";
 import type {
   SimCreateRoleCommand,
   SimCreateRoleCommandOutput,
@@ -31,7 +26,6 @@ import type {
   SimListRolesCommand,
   SimListRolesCommandOutput,
 } from "./command/role/list-roles/list-roles.command.js";
-import { SimIamRoleCommandHandlers } from "./command/role/sim-iam-role-command-handlers.js";
 import type { SimIamAuthorizationInput } from "./authorize/context/sim-iam-auth-z-context-builder.js";
 import type { SimIamPolicyDecision } from "./authorize/sim-iam-decision.js";
 import type {
@@ -42,17 +36,6 @@ import type {
   SimAttachRolePolicyCommand,
   SimAttachRolePolicyCommandOutput,
 } from "./command/role/attach-role-policy/attach-role-policy.command.js";
-import { SimIamCredentialRegistry } from "./credential/sim-iam-credential-registry.js";
-import {
-  SimIamRandomSessionCredentialGenerator,
-  type SimIamSessionCredentialGenerator,
-} from "./credential/session/sim-iam-session-cred-gen.js";
-import { SimIamSessionManager } from "./credential/session/sim-iam-session-manager.js";
-import {
-  SimIamRandomUserCredentialGenerator,
-  type SimIamUserCredentialGenerator,
-} from "./credential/user/sim-iam-user-credential-generator.js";
-import type { SimIamUser, SimIamUsername } from "./user/sim-iam-user.js";
 import type {
   SimCreateUserCommand,
   SimCreateUserCommandOutput,
@@ -61,10 +44,6 @@ import type {
   SimCreateAccessKeyCommand,
   SimCreateAccessKeyCommandOutput,
 } from "./command/user/create-access-key/create-access-key.command.js";
-import { SimIamUserCommandHandlers } from "./command/user/sim-iam-user-command-handlers.js";
-import { SimIamPolicyCommandHandlers } from "./command/policy/sim-iam-policy-command-handlers.js";
-import { SimIamActionAuthorizer } from "./authorize/sim-iam-action-authorizer.js";
-import { SimIamAccountAuthZ } from "./authorize/sim-iam-account-auth-z.js";
 import type { SimIamRequestOptions } from "./command/sim-iam-request-options.js";
 import type {
   SimPutUserPolicyCommand,
@@ -73,16 +52,19 @@ import type {
 import { SimIamCloudFormationResourceFactory } from "./cfn/sim-cfn-iam-resource-factory.js";
 import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import type { SimIamInterServiceAuthZ } from "./authorize/sim-iam-inter-service-auth-z.js";
+import type { SimIamAccountIdentityPolicies } from "./authorize/identity/sim-iam-account-identity-policies.js";
+import type { SimIamAuthZPolicySource } from "./authorize/context/sim-iam-auth-z-context.js";
+import type { SimAwsPrincipal } from "../aws/caller/sim-aws-caller.js";
 import { SimIamSdkCommandRouter } from "./sdk/sim-iam-sdk-command-router.js";
 import type { SimSdkCommandRouter } from "../../sdk/index.js";
-
-interface SimIamProperties {
-  readonly accountRegionScope?: SimAwsAccountRegionScope;
-  readonly background?: BackgroundScheduler;
-  readonly credentialRegistry?: SimIamCredentialRegistry;
-  readonly sessionCredentialGenerator?: SimIamSessionCredentialGenerator;
-  readonly userCredentialGenerator?: SimIamUserCredentialGenerator;
-}
+import type { SimIamCredentialRegistry } from "./credential/sim-iam-credential-registry.js";
+import type { SimIamSessionManager } from "./credential/session/sim-iam-session-manager.js";
+import type { SimIamAccountAuthZ } from "./authorize/sim-iam-account-auth-z.js";
+import type { SimIamCommandHandlers } from "./command/sim-iam-command-handlers.js";
+import {
+  SimIamAccountParts,
+  type SimIamProperties,
+} from "./sim-iam-account-parts.js";
 
 /**
  * Simulated IAM service facade. Handles SDK commands. Emulates AWS behaviour
@@ -92,7 +74,17 @@ interface SimIamProperties {
  * scope for consistency with the other service factories, but memoises one
  * service facade per Account.
  */
-export class SimIam implements SimIamInterServiceAuthZ {
+export class SimIam
+  implements SimIamInterServiceAuthZ, SimIamAccountIdentityPolicies
+{
+  /**
+   * The simulated AWS Account this IAM belongs to.
+   *
+   * A standalone SimIam generates one, so this is how a test naming its own
+   * principals finds out which Account they should belong to.
+   */
+  public readonly accountId: SimAwsAccountId;
+
   /**
    * Manage temporary sessions belonging to this simulated IAM Account.
    */
@@ -100,70 +92,25 @@ export class SimIam implements SimIamInterServiceAuthZ {
 
   public readonly credentials: SimIamCredentialRegistry;
 
-  public readonly policies = new Map<SimArn, SimIamManagedPolicy>();
-  public readonly roles = new Map<SimIamRoleName, SimIamRole>();
-  private readonly users = new Map<SimIamUsername, SimIamUser>();
+  public readonly policies: Map<SimArn, SimIamManagedPolicy>;
+  public readonly roles: Map<SimIamRoleName, SimIamRole>;
 
-  private readonly background: BackgroundScheduler;
   private readonly cfnFactory: SimCfnServiceResourceFactory;
-  private readonly roleCommands: SimIamRoleCommandHandlers;
-  private readonly userCommands: SimIamUserCommandHandlers;
-  private readonly policyCommands: SimIamPolicyCommandHandlers;
+  private readonly commands: SimIamCommandHandlers;
   private readonly accountAuthZ: SimIamAccountAuthZ;
   private readonly sdkRouter = new SimIamSdkCommandRouter(this);
 
   constructor(properties: SimIamProperties = {}) {
-    const {
-      accountRegionScope = simAwsAccountRegionScopeFactory.make(),
-      background = new BackgroundTasks(),
-      sessionCredentialGenerator = new SimIamRandomSessionCredentialGenerator(),
-      userCredentialGenerator = new SimIamRandomUserCredentialGenerator(),
-    } = properties;
+    const parts = new SimIamAccountParts(properties);
 
-    // The scheduler is this simulation's clock, so session expiry is judged in
-    // the same time as every other simulated timestamp.
-    const credentialRegistry =
-      properties.credentialRegistry ??
-      new SimIamCredentialRegistry({ clock: background });
-
-    this.background = background;
-    this.credentials = credentialRegistry;
-    this.sessionManager = new SimIamSessionManager({
-      accountId: accountRegionScope.accountId,
-      roles: this.roles,
-      credentialRegistry,
-      credentialGenerator: sessionCredentialGenerator,
-    });
+    this.accountId = parts.accountId;
+    this.policies = parts.policies;
+    this.roles = parts.roles;
+    this.credentials = parts.credentials;
+    this.sessionManager = parts.sessionManager;
+    this.accountAuthZ = parts.accountAuthZ;
+    this.commands = parts.commandHandlers(this);
     this.cfnFactory = new SimIamCloudFormationResourceFactory(this);
-    this.accountAuthZ = new SimIamAccountAuthZ({
-      accountId: accountRegionScope.accountId,
-      policies: this.policies,
-      roles: this.roles,
-      users: this.users,
-      credentialIdentityResolver: credentialRegistry,
-    });
-    const authorizer = new SimIamActionAuthorizer({ iam: this });
-    this.roleCommands = new SimIamRoleCommandHandlers({
-      accountId: accountRegionScope.accountId,
-      roles: this.roles,
-      background: this.background,
-      authorizer,
-    });
-    this.userCommands = new SimIamUserCommandHandlers({
-      accountId: accountRegionScope.accountId,
-      users: this.users,
-      credentialRegistry,
-      credentialGenerator: userCredentialGenerator,
-      background: this.background,
-      authorizer,
-    });
-    this.policyCommands = new SimIamPolicyCommandHandlers({
-      accountId: accountRegionScope.accountId,
-      policies: this.policies,
-      users: this.users,
-      background: this.background,
-      authorizer,
-    });
   }
 
   /**
@@ -175,13 +122,28 @@ export class SimIam implements SimIamInterServiceAuthZ {
   }
 
   /**
+   * Identity-based policies this Account applies to one of its own principals.
+   *
+   * This is how another Account's IAM asks this Account what it grants a
+   * principal of its own, which is the caller's side of a cross-Account
+   * request. Real AWS requires that side to allow the action as well as the
+   * resource's own resource-based policy.
+   * @internal
+   */
+  identityPolicySourcesFor(
+    principal: SimAwsPrincipal,
+  ): readonly SimIamAuthZPolicySource[] {
+    return this.accountAuthZ.identityPolicySourcesFor(principal);
+  }
+
+  /**
    * Handle a Create Policy Command from the SDK.
    */
   async createPolicy(
     command: SimCreatePolicyCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimCreatePolicyCommandOutput> {
-    return await this.policyCommands.createPolicy(command, options);
+    return await this.commands.policies.createPolicy(command, options);
   }
 
   /**
@@ -191,7 +153,7 @@ export class SimIam implements SimIamInterServiceAuthZ {
     command: SimGetPolicyCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimGetPolicyCommandOutput> {
-    return await this.policyCommands.getPolicy(command, options);
+    return await this.commands.policies.getPolicy(command, options);
   }
 
   /**
@@ -201,7 +163,7 @@ export class SimIam implements SimIamInterServiceAuthZ {
     command: SimListPoliciesCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimListPoliciesCommandOutput> {
-    return await this.policyCommands.listPolicies(command, options);
+    return await this.commands.policies.listPolicies(command, options);
   }
 
   /**
@@ -211,7 +173,7 @@ export class SimIam implements SimIamInterServiceAuthZ {
     command: SimPutRolePolicyCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimPutRolePolicyCommandOutput> {
-    return await this.roleCommands.putRolePolicy(command, options);
+    return await this.commands.roles.putRolePolicy(command, options);
   }
 
   /**
@@ -221,7 +183,7 @@ export class SimIam implements SimIamInterServiceAuthZ {
     command: SimPutUserPolicyCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimPutUserPolicyCommandOutput> {
-    return await this.policyCommands.putUserPolicy(command, options);
+    return await this.commands.policies.putUserPolicy(command, options);
   }
 
   /**
@@ -231,7 +193,7 @@ export class SimIam implements SimIamInterServiceAuthZ {
     command: SimCreateRoleCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimCreateRoleCommandOutput> {
-    return await this.roleCommands.createRole(command, options);
+    return await this.commands.roles.createRole(command, options);
   }
 
   /**
@@ -241,7 +203,7 @@ export class SimIam implements SimIamInterServiceAuthZ {
     command: SimAttachRolePolicyCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimAttachRolePolicyCommandOutput> {
-    return await this.roleCommands.attachRolePolicy(command, options);
+    return await this.commands.roles.attachRolePolicy(command, options);
   }
 
   /**
@@ -251,7 +213,7 @@ export class SimIam implements SimIamInterServiceAuthZ {
     command: SimGetRoleCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimGetRoleCommandOutput> {
-    return await this.roleCommands.getRole(command, options);
+    return await this.commands.roles.getRole(command, options);
   }
 
   /**
@@ -261,7 +223,7 @@ export class SimIam implements SimIamInterServiceAuthZ {
     command: SimListRolesCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimListRolesCommandOutput> {
-    return await this.roleCommands.listRoles(command, options);
+    return await this.commands.roles.listRoles(command, options);
   }
 
   /**
@@ -271,7 +233,7 @@ export class SimIam implements SimIamInterServiceAuthZ {
     command: SimCreateUserCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimCreateUserCommandOutput> {
-    return await this.userCommands.createUser(command, options);
+    return await this.commands.users.createUser(command, options);
   }
 
   /**
@@ -281,7 +243,7 @@ export class SimIam implements SimIamInterServiceAuthZ {
     command: SimCreateAccessKeyCommand,
     options?: SimIamRequestOptions,
   ): Promise<SimCreateAccessKeyCommandOutput> {
-    return await this.userCommands.createAccessKey(command, options);
+    return await this.commands.users.createAccessKey(command, options);
   }
 
   /**

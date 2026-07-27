@@ -108,6 +108,9 @@ export class SimAwsAccountServiceCache {
         const iam = new SimIam({
           accountRegionScope: scope.accountRegionScope,
           background: this.background,
+          // A cross-Account request is decided in both Accounts, so this IAM
+          // needs to be able to reach the IAM of the caller's own Account.
+          iamResolver: this.iamRegistry,
           // Access keys are indexed simulation-wide as they are issued, so a
           // signed request naming only a key id can be traced to this Account.
           credentialRegistry: new SimIamCredentialRegistry({

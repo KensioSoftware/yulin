@@ -26,7 +26,8 @@ Sim Lambda currently supports:
   resolved from the request and reporting it to the handler as
   `requestContext.authorizer.iam`
 - Function resource-based policies with `AddPermissionCommand`, `RemovePermissionCommand` and
-  `GetPolicyCommand`, evaluated alongside identity policies, including cross-account invocation
+  `GetPolicyCommand`, evaluated alongside identity policies, including cross-account invocation,
+  which also needs the caller's own Account to allow the action
 - Function code from three sources:
   - an in-process handler function passed via `makeLambdaZipFileInput(...)`
   - zip archive bytes on `Code.ZipFile` (build them with `makeLambdaCodeZip(...)`)
@@ -673,9 +674,10 @@ try {
 
 A function's resource-based policy is the other half of Lambda authorization. An identity policy
 says what a principal may do; a resource policy says who may act on the function. Either one is
-enough to allow a call within the same Account, and a resource policy is the _only_ thing that can
-allow a principal from another Account, because that principal's own policies live somewhere the
-function's Account never sees.
+enough to allow a call within the same Account. A principal from another Account needs both: the
+grant on the function, and an identity policy in its own Account allowing the action, which is how
+AWS decides a cross-Account request. See
+[Cross-Account requests](../iam/README.md#cross-account-requests).
 
 `AddPermissionCommand` grants a statement, `RemovePermissionCommand` revokes it by `StatementId`,
 and `GetPolicyCommand` returns the assembled document. `AddPermission` is a shorthand for writing a
@@ -1143,9 +1145,9 @@ Current documented limitations:
 
 - Only `CreateFunctionCommand`, `GetFunctionCommand`, `InvokeCommand`, and the Function URL config
   commands are supported — no `UpdateFunctionCode`, `DeleteFunction`, or function listing yet.
-- A cross-account call is allowed by the function's resource policy alone. Real AWS also requires
-  the caller's own Account to allow the action, and the simulator does not evaluate that second
-  side, so a cross-account grant is more permissive here than on AWS.
+- A cross-account grant is only half of what admits a call: the caller's own Account has to allow
+  the action too, and its IAM has to be part of the same `SimAws` instance for its policies to be
+  found. A caller from an Account the simulation knows nothing about is denied.
 - Only the `lambda:FunctionUrlAuthType` condition key is given a value at request time.
   `SourceArn`, `SourceAccount`, `PrincipalOrgID` and `InvokedViaFunctionUrl` are written into the
   statement so `GetPolicy` reports the grant that was made, but nothing supplies a value for them,

@@ -4,6 +4,7 @@ import type {
   SimIamPolicyDocument,
 } from "../../policy/sim-iam-policy.js";
 import type { SimAwsResolvedCaller } from "../../../aws/caller/sim-aws-caller-resolver.js";
+import type { SimIamAllowRequirement } from "../allow/sim-iam-allow-requirement.js";
 
 export type SimIamAuthZPolicySourceType =
   | "identity-inline"
@@ -48,6 +49,15 @@ export interface SimIamAuthZContext {
    * Resource policies are not gathered from IAM's managed policy store.
    */
   readonly resourcePolicies: readonly SimIamAuthZPolicySource[];
+
+  /**
+   * How an Allow from each policy side combines into the final decision.
+   *
+   * Within one Account either side is enough. A cross-Account request needs
+   * both, because each Account only speaks for its own principals and
+   * resources.
+   */
+  readonly allowRequirement: SimIamAllowRequirement;
 
   readonly action: string;
   readonly resource: string;
