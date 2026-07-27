@@ -9,6 +9,7 @@ import type { SimCloudFormation } from "../cloudformation/index.js";
 import type { SimRoute53 } from "../route53/index.js";
 import type { SimAcm } from "../acm/sim-acm.js";
 import type { SimIam } from "../iam/index.js";
+import type { SimKms } from "../kms/index.js";
 import type { SimLambda } from "../lambda/index.js";
 import type { SimSts } from "../sts/sim-sts.js";
 
@@ -91,6 +92,15 @@ export class SimAwsAccountRegionContainer {
   iam(): SimIam {
     return this.memo.getOrCreate("iam", () =>
       this.simAws.serviceFactory.createIam(this),
+    );
+  }
+
+  /**
+   * Get simulated KMS for this account and region.
+   */
+  kms(): SimKms {
+    return this.memo.getOrCreate("kms", () =>
+      this.simAws.serviceFactory.createKms(this),
     );
   }
 

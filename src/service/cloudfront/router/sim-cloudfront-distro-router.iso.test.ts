@@ -155,7 +155,7 @@ describe("Sim CloudFront Distribution Router", () => {
 
       const router = new SimCloudFrontDistroRouter({
         simAws,
-        cloudFrontRegistry: simAws.cloudFrontRegistry(),
+        cloudFrontRegistry: simAws.serviceFactory.cloudFrontRegistry,
       });
 
       const request = new Request(
@@ -240,7 +240,7 @@ describe("Sim CloudFront Distribution Router", () => {
 
       const router = new SimCloudFrontDistroRouter({
         simAws,
-        cloudFrontRegistry: simAws.cloudFrontRegistry(),
+        cloudFrontRegistry: simAws.serviceFactory.cloudFrontRegistry,
       });
 
       const request = new Request("http://cdn.example.test/foo/bar.json");

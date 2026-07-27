@@ -6,6 +6,7 @@ import type {
 } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import { SimIamCallerAccountResolver } from "../caller-account/sim-iam-caller-account-resolver.js";
+import { SimIamAuthZAllowRequirement } from "./sim-iam-auth-z-allow-requirement.js";
 import type { SimIamAccountResolver } from "../../registry/sim-iam-account-resolver.js";
 import type {
   SimIamConditionValue,
@@ -74,6 +75,16 @@ export interface SimIamAuthorizationInput {
    * service-level resource policy.
    */
   readonly resourcePolicies?: readonly SimIamResourcePolicyInput[] | undefined;
+
+  /**
+   * Whether the resource's own policy must allow the request.
+   *
+   * Off by default, which is the ordinary AWS rule: a resource with no policy
+   * leaves the decision to the caller's identity policies. A service sets it
+   * for a resource whose policy is mandatory and is the root of trust for
+   * reaching it, which in AWS means a KMS key policy.
+   */
+  readonly requiresResourcePolicyAllow?: boolean | undefined;
 }
 
 interface SimIamAuthZContextBuilderProperties {
@@ -124,6 +135,7 @@ export class SimIamAuthZContextBuilder {
   private readonly callerContextBuilder: SimIamAuthZCallerContextBuilder;
   private readonly identityPolicyCoordinator: SimIamAuthZIdentityPolicyCoordinator;
   private readonly callerAccountResolver: SimIamCallerAccountResolver;
+  private readonly allowRequirement = new SimIamAuthZAllowRequirement();
 
   constructor(properties: SimIamAuthZContextBuilderProperties) {
     this.callerContextBuilder = new SimIamAuthZCallerContextBuilder(
@@ -156,7 +168,10 @@ export class SimIamAuthZContextBuilder {
         ...callerAccount.identityPolicies,
       ],
       resourcePolicies: this.resourcePolicySources(input),
-      allowRequirement: callerAccount.allowRequirement,
+      allowRequirement: this.allowRequirement.resolve(
+        callerAccount,
+        input.requiresResourcePolicyAllow,
+      ),
       action: input.action,
       resource: input.resource,
       conditionContext: this.conditionContext(input, callerContext.caller),

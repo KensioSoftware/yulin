@@ -22,6 +22,7 @@ import { SimIamAccessKeyRegistry } from "../../iam/registry/sim-iam-access-key-r
 import { SimIamGlobalCredentialResolver } from "../../iam/registry/sim-iam-global-credential-resolver.js";
 import { SimIamSigV4Verifier } from "../../iam/sigv4/sim-iam-sigv4-verifier.js";
 import { SimAwsRequestCallerResolver } from "../../iam/request/sim-aws-request-caller-resolver.js";
+import { SimKms } from "../../kms/index.js";
 import { SimLambda } from "../../lambda/index.js";
 import { SimLambdaUrlRegistry } from "../../lambda/registry/sim-lambda-url-registry.js";
 import { SimS3LambdaCodeStore } from "../../lambda/function/code/store/sim-s3-lambda-code-store.js";
@@ -211,6 +212,20 @@ export class SimAwsServiceFactory {
    */
   createIam(scope: SimAwsAccountRegionContainer): SimIam {
     return this.accountServices.createIam(scope);
+  }
+
+  /**
+   * Create simulated KMS for an Account Region scope.
+   *
+   * KMS keys are Region-scoped on real AWS: a key ARN names its Region, and a
+   * ciphertext produced in one Region cannot be decrypted in another.
+   */
+  createKms(scope: SimAwsAccountRegionContainer): SimKms {
+    return new SimKms({
+      accountRegionScope: scope.accountRegionScope,
+      iam: this.createIam(scope),
+      background: this.background,
+    });
   }
 
   /**

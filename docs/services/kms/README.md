@@ -1,0 +1,337 @@
+# Simulated KMS
+
+Yulin includes a simulated AWS Key Management Service (KMS) for tests and local development.
+
+Encryption here is real encryption. Each simulated key holds real AES-256 key material and the operations run through Node.js's own `crypto`, so a ciphertext genuinely cannot be read without its key, and a decryption with the wrong encryption context genuinely fails. That is fast enough to be unremarkable in a test suite, and it means a passing test says something about how the code will behave against real KMS.
+
+KMS-specific types are imported from the `@kensio/yulin/kms` subpath.
+
+## Available functionality
+
+Sim KMS currently supports:
+
+- Creating symmetric encryption keys with `CreateKeyCommand`, with the default key policy or one of your own
+- Describing and listing keys with `DescribeKeyCommand` and `ListKeysCommand`
+- Reading and replacing a key policy with `GetKeyPolicyCommand` and `PutKeyPolicyCommand`
+- Encrypting and decrypting with `EncryptCommand` and `DecryptCommand`, including encryption context
+- Envelope encryption with `GenerateDataKeyCommand`, by `KeySpec` or `NumberOfBytes`
+- Aliases with `CreateAliasCommand` and `ListAliasesCommand`, including AWS managed key aliases such as `alias/aws/s3`
+- Key lifecycle with `EnableKeyCommand`, `DisableKeyCommand`, `ScheduleKeyDeletionCommand` and `CancelKeyDeletionCommand`
+- Key policy evaluation by simulated IAM, including the rule that an identity policy cannot reach a key its policy does not admit
+- Key ARNs, key IDs, alias names and alias ARNs as interchangeable ways to name a key
+- Calls made from inside a simulated Lambda handler, authorized as the function's execution role
+
+The simulator focuses on useful behaviour for isolated tests and local development rather than full KMS feature parity.
+
+## Encrypting and decrypting
+
+Create a key and use it. `Decrypt` needs no `KeyId` for a symmetric key, because the ciphertext already names the key that produced it.
+
+```typescript sim-kms-encrypt-decrypt
+/**
+ * Encrypting and decrypting with a simulated KMS key.
+ */
+
+import {
+  CreateKeyCommand,
+  DecryptCommand,
+  EncryptCommand,
+} from "@aws-sdk/client-kms";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const kms = simAws.kms();
+
+const created = await kms.createKey(
+  new CreateKeyCommand({ Description: "Application key" }),
+);
+
+const encrypted = await kms.encrypt(
+  new EncryptCommand({
+    KeyId: created.KeyMetadata?.Arn,
+    Plaintext: Buffer.from("hunter2", "utf8"),
+  }),
+);
+
+const decrypted = await kms.decrypt(
+  new DecryptCommand({ CiphertextBlob: encrypted.CiphertextBlob }),
+);
+
+console.log(Buffer.from(decrypted.Plaintext ?? []).toString("utf8")); // "hunter2"
+```
+
+The ciphertext blob is opaque: it is not the plaintext, and nothing outside the simulator should try to read it. It is also not portable to real AWS, or between two `SimAws` instances.
+
+## Encryption context
+
+An encryption context is non-secret key/value data bound to a ciphertext. Supplying a different one on decryption fails, which is what makes it useful for tying a ciphertext to the thing it belongs to.
+
+```typescript sim-kms-encryption-context
+/**
+ * Binding an encryption context to a simulated KMS ciphertext.
+ */
+
+import {
+  CreateKeyCommand,
+  DecryptCommand,
+  EncryptCommand,
+} from "@aws-sdk/client-kms";
+
+import { SimAws } from "@kensio/yulin";
+import { SimKmsInvalidCiphertextException } from "@kensio/yulin/kms";
+
+const simAws = new SimAws();
+const kms = simAws.kms();
+
+const created = await kms.createKey(new CreateKeyCommand({}));
+
+const encrypted = await kms.encrypt(
+  new EncryptCommand({
+    KeyId: created.KeyMetadata?.Arn,
+    Plaintext: Buffer.from("hunter2", "utf8"),
+    EncryptionContext: { tenant: "acme" },
+  }),
+);
+
+try {
+  await kms.decrypt(
+    new DecryptCommand({
+      CiphertextBlob: encrypted.CiphertextBlob,
+      EncryptionContext: { tenant: "other" },
+    }),
+  );
+} catch (error) {
+  // The wrong context fails the cipher's own authentication, exactly as it
+  // does on real KMS.
+  console.log(error instanceof SimKmsInvalidCiphertextException); // true
+}
+```
+
+The context is an unordered map, so the same pairs written in a different order still decrypt.
+
+## Envelope encryption
+
+`Encrypt` takes at most 4096 bytes, which is the limit that makes envelope encryption necessary. `GenerateDataKey` returns a data key twice: once in the clear, to encrypt your data with, and once encrypted under the KMS key, to store alongside it.
+
+```typescript sim-kms-generate-data-key
+/**
+ * Envelope encryption with a simulated KMS data key.
+ */
+
+import {
+  CreateKeyCommand,
+  DecryptCommand,
+  GenerateDataKeyCommand,
+} from "@aws-sdk/client-kms";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const kms = simAws.kms();
+
+const created = await kms.createKey(new CreateKeyCommand({}));
+
+const dataKey = await kms.generateDataKey(
+  new GenerateDataKeyCommand({
+    KeyId: created.KeyMetadata?.Arn,
+    KeySpec: "AES_256",
+  }),
+);
+
+console.log(dataKey.Plaintext?.length); // 32
+
+// Store dataKey.CiphertextBlob with the data; discard the plaintext copy.
+const recovered = await kms.decrypt(
+  new DecryptCommand({ CiphertextBlob: dataKey.CiphertextBlob }),
+);
+
+console.log(recovered.Plaintext?.length); // 32
+```
+
+## Key policies and IAM
+
+This is the part of KMS most worth testing, and the part most often got wrong on real AWS.
+
+Every KMS key has a policy, and it cannot be removed. An IAM policy granting `kms:Decrypt` reaches nothing unless the key's own policy admits the caller. How it admits them decides what else is needed:
+
+- A statement naming the caller grants access outright, so a role with no permissions of its own can still use the key.
+- A statement naming the account root, which is what the default key policy contains, only delegates to that account's IAM. The caller still needs an identity policy allowing the action.
+
+```typescript sim-kms-key-policy
+/**
+ * A simulated KMS key policy deciding who can use the key.
+ */
+
+import { CreateRoleCommand } from "@aws-sdk/client-iam";
+import { CreateKeyCommand, EncryptCommand } from "@aws-sdk/client-kms";
+
+import { SimAws } from "@kensio/yulin";
+import { SimIamAccessDenied } from "@kensio/yulin/iam";
+
+const simAws = new SimAws();
+const accountId = simAws.defaultAccountId;
+
+const role = await simAws.iam().createRole(
+  new CreateRoleCommand({
+    RoleName: "Encrypter",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+
+// A key policy naming the Role directly, with no delegation to the Account.
+const created = await simAws.kms().createKey(
+  new CreateKeyCommand({
+    Policy: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Allow",
+          Principal: { AWS: role.Role.Arn },
+          Action: "kms:Encrypt",
+          Resource: "*",
+        },
+      ],
+    }),
+  }),
+);
+
+// The Role can encrypt, with no identity policy of its own.
+await simAws.kms().encrypt(
+  new EncryptCommand({
+    KeyId: created.KeyMetadata?.Arn,
+    Plaintext: Buffer.from("hunter2", "utf8"),
+  }),
+  { caller: { kind: "arn", arn: role.Role.Arn } },
+);
+
+// The Account root cannot, because this key policy does not admit it.
+try {
+  await simAws.kms().encrypt(
+    new EncryptCommand({
+      KeyId: created.KeyMetadata?.Arn,
+      Plaintext: Buffer.from("hunter2", "utf8"),
+    }),
+  );
+} catch (error) {
+  console.log(error instanceof SimIamAccessDenied); // true
+}
+```
+
+Replacing a key policy with `PutKeyPolicyCommand` can lock an account out of its own key. That is real KMS behaviour, and it is worth being able to reproduce in a test rather than in a deployment.
+
+## Naming a key
+
+Every operation takes its target as a `KeyId`, and any of the four forms real KMS accepts will do: a key ID, a key ARN, an alias name such as `alias/app-key`, or an alias ARN.
+
+Aliases beginning `alias/aws/` are reserved for AWS managed keys. `CreateAlias` refuses to create one, but referencing one brings the key into existence, the way an AWS managed key appears on real AWS when a service first needs it.
+
+```typescript sim-kms-aliases
+/**
+ * Naming a simulated KMS key by alias.
+ */
+
+import {
+  CreateAliasCommand,
+  CreateKeyCommand,
+  DescribeKeyCommand,
+  EncryptCommand,
+} from "@aws-sdk/client-kms";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const kms = simAws.kms();
+
+const created = await kms.createKey(new CreateKeyCommand({}));
+await kms.createAlias(
+  new CreateAliasCommand({
+    AliasName: "alias/app-key",
+    TargetKeyId: created.KeyMetadata?.KeyId,
+  }),
+);
+
+// The alias reaches the same key as its ID or ARN would.
+await kms.encrypt(
+  new EncryptCommand({
+    KeyId: "alias/app-key",
+    Plaintext: Buffer.from("hunter2", "utf8"),
+  }),
+);
+
+// An AWS managed key appears the first time its alias is referenced.
+const managed = await kms.describeKey(
+  new DescribeKeyCommand({ KeyId: "alias/aws/s3" }),
+);
+
+console.log(managed.KeyMetadata?.KeyManager); // "AWS"
+```
+
+## Key state and deletion
+
+A key can be disabled, which leaves it present but unusable, and re-enabled later. Deletion is never immediate: `ScheduleKeyDeletion` sets a recovery window of 7 to 30 days, defaulting to 30, during which the key refuses to be used but can still be recovered with `CancelKeyDeletion`. Cancelling leaves the key disabled rather than enabled, so re-enabling it is a separate deliberate step.
+
+A disabled key fails cryptographic operations with `DisabledException`; a key pending deletion fails with `KMSInvalidStateException`. The difference is worth keeping, because one says to enable the key and the other says the key is on its way out.
+
+## Scoping
+
+KMS keys belong to an account and a region, as they do on real AWS. A key created in one region cannot be found or used from another, and a ciphertext produced under it cannot be decrypted elsewhere.
+
+```typescript sim-kms-scoping
+/**
+ * Simulated KMS keys are scoped to an account and region.
+ */
+
+import { CreateKeyCommand, DescribeKeyCommand } from "@aws-sdk/client-kms";
+
+import { SimAws } from "@kensio/yulin";
+import { SimKmsNotFoundException } from "@kensio/yulin/kms";
+
+const simAws = new SimAws();
+
+const created = await simAws
+  .account("222222222222")
+  .region("eu-west-2")
+  .kms()
+  .createKey(new CreateKeyCommand({}));
+
+try {
+  await simAws
+    .account("222222222222")
+    .region("us-east-1")
+    .kms()
+    .describeKey(new DescribeKeyCommand({ KeyId: created.KeyMetadata?.Arn }));
+} catch (error) {
+  console.log(error instanceof SimKmsNotFoundException); // true
+}
+```
+
+## Inside a simulated Lambda handler
+
+Function code requiring `@aws-sdk/client-kms` is routed into the same simulated AWS environment, with the function's execution role as the caller. A handler that decrypts a value therefore has to be allowed to, by both the key policy and the role's identity policy, the same as on real AWS. See [simulated Lambda](../lambda/) for how function code and execution roles work.
+
+## Limitations
+
+Current documented limitations:
+
+- Only symmetric encryption keys (`SYMMETRIC_DEFAULT`, `ENCRYPT_DECRYPT`) are simulated. Asymmetric keys, HMAC keys, `Sign`, `Verify` and `ReEncrypt` are not.
+- Imported key material and custom key stores are not simulated; `Origin` other than `AWS_KMS` is refused.
+- Grants (`CreateGrant` and friends) are not simulated.
+- Automatic key rotation is not simulated.
+- Multi-Region keys are not simulated.
+- `AWS::KMS::Key` and `AWS::KMS::Alias` CloudFormation resources are not supported yet.
+- A key pending deletion stays in that state indefinitely. Advancing the simulated clock past the recovery window does not delete it, so the key ID stays taken.
+- Aliases cannot be updated or deleted; `UpdateAlias` and `DeleteAlias` are not supported.
+- Tags, `ListResourceTags` and the `aws:ResourceTag` condition key are not simulated.
+- `kms:ViaService`, `kms:EncryptionContext:*` and other KMS-specific condition keys are not derived, so a policy relying on them will not match. Ordinary condition operators on values sim IAM does supply work as usual.
+- AWS managed keys created on demand get the same default key policy as a customer key, rather than the via-service-scoped policy real AWS gives them.
+- Key material lives in process memory for the lifetime of the `SimAws` instance. That is fine for a simulator, but it is not a security boundary: anything sharing the process can reach it.
+- No other simulated service encrypts anything with KMS yet. Sim S3, sim DynamoDB and sim Lambda environment variables do not use simulated keys, and do not check `kms:Decrypt`.
+- KMS is not served as an HTTP API by `serveSimAws`.

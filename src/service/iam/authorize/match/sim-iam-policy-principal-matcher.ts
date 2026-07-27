@@ -5,6 +5,7 @@ import type {
   SimIamAuthZPolicySource,
 } from "../context/sim-iam-auth-z-context.js";
 import { simIamWildcardMatch } from "../sim-iam-wildcard.js";
+import { SimIamPrincipalMatch } from "./sim-iam-principal-match.js";
 
 /**
  * Matches the principal portion of an IAM policy statement.
@@ -36,11 +37,11 @@ export class SimIamPolicyPrincipalMatcher {
   matches(
     policy: SimIamAuthZPolicySource,
     statement: SimIamParsedPolicyStatement,
-  ): boolean {
+  ): SimIamPrincipalMatch {
     if (policy.sourceType !== "resource" && policy.sourceType !== "trust") {
-      return (
+      return SimIamPrincipalMatch.direct().when(
         statement.principal === undefined &&
-        statement.notPrincipal === undefined
+          statement.notPrincipal === undefined,
       );
     }
 
@@ -49,10 +50,14 @@ export class SimIamPolicyPrincipalMatcher {
     }
 
     if (statement.notPrincipal !== undefined) {
-      return !this.valueMatches(statement.notPrincipal);
+      // Excluding the caller says nothing about the Account delegating, so a
+      // NotPrincipal that leaves the caller in is a direct grant.
+      return SimIamPrincipalMatch.direct().when(
+        !this.valueMatches(statement.notPrincipal).matched,
+      );
     }
 
-    return false;
+    return SimIamPrincipalMatch.none();
   }
 
   /**
@@ -62,31 +67,47 @@ export class SimIamPolicyPrincipalMatcher {
    * to their principal category so AWS values match caller ARNs and account
    * delegation, while Service values match service principals.
    */
-  private valueMatches(principal: SimIamPolicyDocumentPrincipal): boolean {
+  private valueMatches(
+    principal: SimIamPolicyDocumentPrincipal,
+  ): SimIamPrincipalMatch {
     if (typeof principal === "string") {
       return this.awsPatternMatches(principal);
     }
 
     if (Array.isArray(principal)) {
-      return principal.some((value: string): boolean =>
+      return this.firstMatch(principal, (value: string) =>
         this.awsPatternMatches(value),
       );
     }
 
-    return Object.entries(principal).some(([principalType, values]) => {
+    return this.firstMatch(Object.entries(principal), ([type, values]) => {
       const patterns = typeof values === "string" ? [values] : values;
 
-      if (principalType === "AWS") {
-        return patterns.some((pattern) => this.awsPatternMatches(pattern));
+      if (type === "AWS") {
+        return this.firstMatch(patterns, (pattern) =>
+          this.awsPatternMatches(pattern),
+        );
       }
 
       /* v8 ignore if -- service principals not yet fully supported */
-      if (principalType === "Service") {
-        return patterns.some((pattern) => this.servicePatternMatches(pattern));
+      if (type === "Service") {
+        return this.firstMatch(patterns, (pattern) =>
+          this.servicePatternMatches(pattern),
+        );
       }
 
-      return false;
+      return SimIamPrincipalMatch.none();
     });
+  }
+
+  /**
+   * The winning match among alternatives, since Principal lists are an OR.
+   */
+  private firstMatch<T>(
+    values: readonly T[],
+    match: (value: T) => SimIamPrincipalMatch,
+  ): SimIamPrincipalMatch {
+    return SimIamPrincipalMatch.first(values.map((value) => match(value)));
   }
 
   /**
@@ -96,40 +117,44 @@ export class SimIamPolicyPrincipalMatcher {
    * forms require an ARN-based caller. Account delegation forms compare against
    * the account ID derived by the caller resolver.
    */
-  private awsPatternMatches(pattern: string): boolean {
+  private awsPatternMatches(pattern: string): SimIamPrincipalMatch {
     if (pattern === "*") {
-      return true;
+      return SimIamPrincipalMatch.direct();
     }
 
     const caller = this.context.caller;
     if (caller.arn === undefined) {
-      return false;
+      return SimIamPrincipalMatch.none();
     }
 
     const delegatedAccountId = this.delegatedAccountId(pattern);
 
     if (delegatedAccountId !== undefined) {
-      return caller.accountId === delegatedAccountId;
+      return SimIamPrincipalMatch.accountDelegation().when(
+        caller.accountId === delegatedAccountId,
+      );
     }
 
-    return simIamWildcardMatch(pattern, caller.arn, {
-      caseSensitive: true,
-    });
+    return SimIamPrincipalMatch.direct().when(
+      simIamWildcardMatch(pattern, caller.arn, {
+        caseSensitive: true,
+      }),
+    );
   }
 
   /**
    * Compare a service principal pattern with the resolved caller.
    */
-  private servicePatternMatches(pattern: string): boolean {
+  private servicePatternMatches(pattern: string): SimIamPrincipalMatch {
     /* v8 ignore next -- service principals not yet fully supported */
     const service = this.context.caller.service;
 
     /* v8 ignore next -- service principals not yet fully supported */
-    return (
+    return SimIamPrincipalMatch.direct().when(
       service !== undefined &&
-      simIamWildcardMatch(pattern, service, {
-        caseSensitive: true,
-      })
+        simIamWildcardMatch(pattern, service, {
+          caseSensitive: true,
+        }),
     );
   }
 

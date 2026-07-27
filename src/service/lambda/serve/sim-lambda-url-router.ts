@@ -45,7 +45,7 @@ export class SimLambdaUrlRouter {
   constructor(properties: SimLambdaUrlRouterProperties = {}) {
     this.simAws = properties.simAws ?? new SimAws();
     this.urlRegistry =
-      properties.urlRegistry ?? this.simAws.lambdaUrlRegistry();
+      properties.urlRegistry ?? this.simAws.serviceFactory.lambdaUrlRegistry;
   }
 
   /**

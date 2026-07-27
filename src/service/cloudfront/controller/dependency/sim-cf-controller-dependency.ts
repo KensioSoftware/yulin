@@ -35,7 +35,7 @@ export class SimCloudFrontControllerDependenciesFactory {
   ): SimCloudFrontControllerDependencies {
     const simAws = properties.simAws ?? new SimAws();
     const cloudFrontRegistry =
-      properties.cloudFrontRegistry ?? simAws.cloudFrontRegistry();
+      properties.cloudFrontRegistry ?? simAws.serviceFactory.cloudFrontRegistry;
 
     return {
       distroRouter:

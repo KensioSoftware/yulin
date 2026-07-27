@@ -38,6 +38,9 @@ export function resolveSimSdkCommandRouter(
     case "IAM": {
       return scoped.iam().sdkCommandRouter();
     }
+    case "KMS": {
+      return scoped.kms().sdkCommandRouter();
+    }
     case "Lambda": {
       return scoped.lambda().sdkCommandRouter();
     }
