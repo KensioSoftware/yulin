@@ -2,7 +2,7 @@ import type { SimIamSigV4SignedRequest } from "../sim-iam-sigv4-signed-request.j
 import { SimIamSigV4CanonicalHeaders } from "./sim-iam-sigv4-canonical-headers.js";
 import { simIamSigV4CanonicalPath } from "./sim-iam-sigv4-canonical-path.js";
 import { simIamSigV4CanonicalQuery } from "./sim-iam-sigv4-canonical-query.js";
-import { simIamSigV4PayloadHash } from "./sim-iam-sigv4-payload-hash.js";
+import { SimIamSigV4PayloadDeclaration } from "./sim-iam-sigv4-payload-hash.js";
 
 /**
  * The canonical form of a signed request: the exact bytes a signature is made
@@ -16,12 +16,17 @@ import { simIamSigV4PayloadHash } from "./sim-iam-sigv4-payload-hash.js";
 export class SimIamSigV4CanonicalRequest {
   private readonly canonicalHeaders: SimIamSigV4CanonicalHeaders;
   private readonly signedRequest: SimIamSigV4SignedRequest;
+  private readonly payload: SimIamSigV4PayloadDeclaration;
 
   constructor(
     signedRequest: SimIamSigV4SignedRequest,
     signedHeaderNames: readonly string[],
+    payload: SimIamSigV4PayloadDeclaration = SimIamSigV4PayloadDeclaration.fromHeaders(
+      signedRequest.headers,
+    ),
   ) {
     this.signedRequest = signedRequest;
+    this.payload = payload;
     this.canonicalHeaders = new SimIamSigV4CanonicalHeaders(
       signedRequest.headers,
       signedHeaderNames,
@@ -33,7 +38,7 @@ export class SimIamSigV4CanonicalRequest {
    * The canonical request string, ready to be hashed into a string to sign.
    */
   toString(): string {
-    const { method, url, headers, body } = this.signedRequest;
+    const { method, url, body } = this.signedRequest;
 
     return [
       method.toUpperCase(),
@@ -41,7 +46,7 @@ export class SimIamSigV4CanonicalRequest {
       simIamSigV4CanonicalQuery(url.search),
       `${this.canonicalHeaders.toString()}\n`,
       this.canonicalHeaders.signedHeaderList(),
-      simIamSigV4PayloadHash(headers, body),
+      this.payload.hashFor(body),
     ].join("\n");
   }
 }

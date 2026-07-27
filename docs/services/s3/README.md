@@ -16,6 +16,8 @@ Sim S3 currently supports:
 - Listing Objects with `ListObjectsCommand`
 - Configuring static website hosting with `PutBucketWebsiteCommand`
 - Serving static website requests on localhost with `serveSimAws`
+- Serving Object `GET`, `HEAD` and `PUT` over the S3 REST endpoint, authorized by sim IAM
+- Presigned URLs built by the real `@aws-sdk/s3-request-presigner`, with expiry in simulated time
 - Bucket website index documents, error documents, trailing-slash redirects, redirect-all
   configuration, and routing-rule redirects
 - Bucket-global uniqueness within a `SimAws` instance across simulated Accounts and Regions
@@ -348,6 +350,159 @@ try {
 The `getBucketWebsiteUrl(...)` method returns the simulated S3 website URL for the Bucket. The
 `localUrl(...)` method on the localhost server adapts that URL so the request is sent to the local
 server while preserving the simulated S3 website hostname.
+
+## Presigned URLs
+
+Sim S3 serves a REST API endpoint alongside the website endpoint, and it accepts presigned URLs
+built by the real AWS presigner, `getSignedUrl` from `@aws-sdk/s3-request-presigner`. Nothing about
+the signing is simulated: an `S3Client` is pointed at the simulated endpoint and signs as it would
+against real S3, and sim IAM verifies the signature it produced.
+
+Presigning is entirely client-side, so this works whether or not the URL is ever fetched over a real
+socket. Install the presigner alongside the SDK:
+
+```bash
+npm install --save-dev @aws-sdk/s3-request-presigner
+```
+
+`simS3.getServiceUrl()` gives the endpoint to configure the client with. Sim S3 also has
+`getBucketUrl(...)` for the virtual-hosted endpoint of one Bucket, though a client adds the Bucket
+to the service endpoint for itself.
+
+```typescript sim-s3-presigned-url
+/**
+ * Downloading a simulated S3 Object through a presigned URL.
+ */
+
+import {
+  CreateAccessKeyCommand,
+  CreateUserCommand,
+  PutUserPolicyCommand,
+} from "@aws-sdk/client-iam";
+import {
+  CreateBucketCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const srv = await serveSimAws({ simAws });
+
+try {
+  const simS3 = simAws.region("eu-west-2").s3();
+  const simIam = simAws.iam();
+
+  await simS3.createBucket(new CreateBucketCommand({ Bucket: "reports" }));
+  await simS3.putObject(
+    new PutObjectCommand({
+      Bucket: "reports",
+      Key: "q3/report.txt",
+      Body: "quarterly numbers",
+      ContentType: "text/plain",
+    }),
+  );
+
+  // Whoever presigns the URL needs permission for what it will be used for.
+  await simIam.createUser(new CreateUserCommand({ UserName: "Publisher" }));
+  await simIam.putUserPolicy(
+    new PutUserPolicyCommand({
+      UserName: "Publisher",
+      PolicyName: "ReadReports",
+      PolicyDocument: JSON.stringify({
+        Version: "2012-10-17",
+        Statement: {
+          Effect: "Allow",
+          Action: "s3:GetObject",
+          Resource: "arn:aws:s3:::reports/*",
+        },
+      }),
+    }),
+  );
+  const accessKey = await simIam.createAccessKey(
+    new CreateAccessKeyCommand({ UserName: "Publisher" }),
+  );
+
+  // The endpoint includes the port the local server took, because a presigned
+  // URL signs its own host and cannot be redirected elsewhere afterwards.
+  const s3Client = new S3Client({
+    region: "eu-west-2",
+    endpoint: srv.localUrl(simS3.getServiceUrl()).toString(),
+    credentials: {
+      accessKeyId: accessKey.AccessKey.AccessKeyId,
+      secretAccessKey: accessKey.AccessKey.SecretAccessKey,
+    },
+  });
+
+  const url = await getSignedUrl(
+    s3Client,
+    new GetObjectCommand({ Bucket: "reports", Key: "q3/report.txt" }),
+    { expiresIn: 900 },
+  );
+
+  const response = await fetch(url);
+
+  console.log(response.status);
+  console.log(await response.text());
+} finally {
+  srv.close();
+}
+```
+
+A presigned URL grants exactly what the principal who signed it holds. Sim IAM resolves that
+principal from the signature and authorizes `s3:GetObject` as them, so a user without permission
+cannot presign around it. Temporary credentials from an STS `AssumeRoleCommand` work the same way,
+carrying their session token in the URL.
+
+A request to the REST endpoint that neither presents a signature nor names a principal in the
+`x-sim-aws-caller` header is anonymous, and anonymous holds nothing unless a Bucket policy says
+otherwise. That header is always enabled and wins over a signature, so a request driven by hand can
+be any principal without signing anything, exactly as it can against the other simulated services
+that serve HTTP. See
+[the sim IAM docs](../iam/README.md#what-the-simulator-reports-back) for the whole boundary.
+
+### Expiry in simulated time
+
+`X-Amz-Expires` is judged against Yulin's simulated clock. A frozen clock keeps a URL usable however
+long a test spends, and advancing past the window expires it with the `AccessDenied` and
+`Request has expired` real S3 answers with:
+
+```typescript
+simAws.clock().freeze();
+const url = await getSignedUrl(s3Client, command, { expiresIn: 900 });
+
+await simAws.clock().advanceBy({ minutes: 20 });
+const response = await fetch(url); // 403
+```
+
+### Uploads and checksums
+
+Presigned `PutObjectCommand` URLs work in the same way, and bring one trap worth knowing about. The
+AWS SDK computes a checksum when it presigns, which is before there is a body to hash, and hoists it
+into the signed URL. Uploading anything else through that URL then fails against real S3, and fails
+here too, with `XAmzContentChecksumMismatch`. Build the client with
+`requestChecksumCalculation: "WHEN_REQUIRED"` to presign upload URLs that accept a body:
+
+```typescript
+const s3Client = new S3Client({
+  region: "eu-west-2",
+  endpoint: srv.localUrl(simS3.getServiceUrl()).toString(),
+  requestChecksumCalculation: "WHEN_REQUIRED",
+  credentials,
+});
+```
+
+### Limitations
+
+- `GET`, `HEAD` and `PUT` of an Object are served over the REST endpoint. Bucket operations, `DELETE`
+  and multipart uploads are not, and are refused with `501` rather than answered.
+- `createPresignedPost` and SigV4A presigning are not simulated.
+- Checksums are verified for CRC32, SHA1 and SHA256. An upload stating a CRC32C or CRC64NVME checksum
+  is refused rather than stored unchecked.
+- Responses carry no `ETag`, because sim S3 does not model Object entity tags.
 
 ## Error documents
 

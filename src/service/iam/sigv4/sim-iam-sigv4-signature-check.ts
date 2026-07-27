@@ -1,7 +1,8 @@
 import { SimIamSigV4CanonicalRequest } from "./canonical/sim-iam-sigv4-canonical-request.js";
+import type { SimIamSigV4PayloadDeclaration } from "./canonical/sim-iam-sigv4-payload-hash.js";
 import { SimIamSignatureDoesNotMatch } from "./error/sim-iam-sigv4.error.js";
-import type { SimIamSigV4Authorization } from "./sim-iam-sigv4-authorization.js";
 import { simIamSigV4SignaturesMatch } from "./sim-iam-sigv4-signature-match.js";
+import type { SimIamSigV4SignatureStatement } from "./sim-iam-sigv4-signature-statement.js";
 import type { SimIamSigV4SignedRequest } from "./sim-iam-sigv4-signed-request.js";
 import {
   simIamSigV4Signature,
@@ -10,9 +11,15 @@ import {
 
 interface SimIamSigV4SignatureCheckInput {
   readonly signedRequest: SimIamSigV4SignedRequest;
-  readonly authorization: SimIamSigV4Authorization;
+  readonly statement: SimIamSigV4SignatureStatement;
   readonly signingKey: Buffer;
   readonly amzDate: string;
+  /**
+   * How the request declared its payload hash. Omitted for a header-signed
+   * request, which declares it in a header the canonical request can read for
+   * itself.
+   */
+  readonly payload?: SimIamSigV4PayloadDeclaration | undefined;
 }
 
 /**
@@ -25,26 +32,27 @@ interface SimIamSigV4SignatureCheckInput {
 export function simIamSigV4CheckSignature(
   input: SimIamSigV4SignatureCheckInput,
 ): void {
-  const { signedRequest, authorization, signingKey, amzDate } = input;
+  const { signedRequest, statement, signingKey, amzDate, payload } = input;
 
   const canonicalRequest = new SimIamSigV4CanonicalRequest(
     signedRequest,
-    authorization.signedHeaderNames,
+    statement.signedHeaderNames,
+    payload,
   ).toString();
 
   const expected = simIamSigV4Signature(
     signingKey,
     simIamSigV4StringToSign({
       amzDate,
-      scope: authorization.scope,
+      scope: statement.scope,
       canonicalRequest,
     }),
   );
 
-  if (!simIamSigV4SignaturesMatch(expected, authorization.signature)) {
+  if (!simIamSigV4SignaturesMatch(expected, statement.signature)) {
     throw new SimIamSignatureDoesNotMatch(
       `Request signature does not match the signature the simulator ` +
-        `calculated for access key ${authorization.accessKeyId}`,
+        `calculated for access key ${statement.accessKeyId}`,
       canonicalRequest,
     );
   }

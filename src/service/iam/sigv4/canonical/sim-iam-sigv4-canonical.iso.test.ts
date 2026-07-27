@@ -5,7 +5,7 @@ import { compareSigV4ByteOrder } from "./sigv4-byte-order.js";
 import { SimIamSigV4CanonicalHeaders } from "./sim-iam-sigv4-canonical-headers.js";
 import { simIamSigV4CanonicalPath } from "./sim-iam-sigv4-canonical-path.js";
 import { simIamSigV4CanonicalQuery } from "./sim-iam-sigv4-canonical-query.js";
-import { simIamSigV4PayloadHash } from "./sim-iam-sigv4-payload-hash.js";
+import { SimIamSigV4PayloadDeclaration } from "./sim-iam-sigv4-payload-hash.js";
 import { SimIamSignatureDoesNotMatch } from "../error/sim-iam-sigv4.error.js";
 
 describe("SigV4 URI escaping", () => {
@@ -155,9 +155,11 @@ describe("SigV4 canonical headers", () => {
 
 describe("SigV4 payload hash", () => {
   it("hashes an absent body as the empty digest", () => {
-    expect(simIamSigV4PayloadHash(new Headers(), undefined)).toBe(
-      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-    );
+    expect(
+      SimIamSigV4PayloadDeclaration.fromHeaders(new Headers()).hashFor(
+        undefined,
+      ),
+    ).toBe("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
   });
 
   it("refuses a declaration it cannot check the body against", () => {
@@ -169,16 +171,18 @@ describe("SigV4 payload hash", () => {
     // When the hash is worked out
     // Then it is refused, rather than serving a body nothing has checked
     expect(() =>
-      simIamSigV4PayloadHash(headers, new TextEncoder().encode("chunk")),
+      SimIamSigV4PayloadDeclaration.fromHeaders(headers).hashFor(
+        new TextEncoder().encode("chunk"),
+      ),
     ).toThrow(/not simulated/);
   });
 
   it("refuses a declaration that is neither digest nor marker", () => {
     const headers = new Headers({ "x-amz-content-sha256": "nonsense" });
 
-    expect(() => simIamSigV4PayloadHash(headers, undefined)).toThrow(
-      SimIamSignatureDoesNotMatch,
-    );
+    expect(() =>
+      SimIamSigV4PayloadDeclaration.fromHeaders(headers).hashFor(undefined),
+    ).toThrow(SimIamSignatureDoesNotMatch);
   });
 
   it("accepts a marker that says the body is not covered", () => {
@@ -190,7 +194,9 @@ describe("SigV4 payload hash", () => {
     // When the hash is worked out for a body that does not match anything
     // Then the marker is used as it is, which is what it means
     expect(
-      simIamSigV4PayloadHash(headers, new TextEncoder().encode("anything")),
+      SimIamSigV4PayloadDeclaration.fromHeaders(headers).hashFor(
+        new TextEncoder().encode("anything"),
+      ),
     ).toBe("UNSIGNED-PAYLOAD");
   });
 });

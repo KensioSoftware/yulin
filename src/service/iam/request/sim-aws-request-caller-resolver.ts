@@ -1,3 +1,4 @@
+import { SimIamSigV4PresignedQuery } from "../sigv4/presign/sim-iam-sigv4-presigned-query.js";
 import { simIamSigV4Algorithm } from "../sigv4/sim-iam-sigv4-authorization.js";
 import type { SimIamSigV4ExpectedScope } from "../sigv4/sim-iam-sigv4-expected-scope.js";
 import type { SimIamSigV4SignedRequest } from "../sigv4/sim-iam-sigv4-signed-request.js";
@@ -10,6 +11,21 @@ import { SimAwsRequestCaller } from "./sim-aws-request-caller.js";
 
 interface SimAwsRequestCallerResolverProperties {
   readonly signedRequests: SimIamSigV4Verifier;
+}
+
+/**
+ * What resolving a caller needs beyond the request itself.
+ */
+export interface SimAwsCallerResolveOptions {
+  /**
+   * The service and Region the signature should have been scoped to.
+   */
+  readonly expectedScope?: SimIamSigV4ExpectedScope | undefined;
+  /**
+   * Simulated time, which credential expiry and a presigned URL's own expiry
+   * are both judged against.
+   */
+  readonly now?: Date | undefined;
 }
 
 /**
@@ -46,7 +62,7 @@ export class SimAwsRequestCallerResolver {
    */
   resolve(
     request: SimIamSigV4SignedRequest,
-    expectedScope?: SimIamSigV4ExpectedScope,
+    options: SimAwsCallerResolveOptions = {},
   ): SimAwsRequestCaller {
     const named = request.headers.get(simAwsCallerHeaderName);
 
@@ -61,29 +77,34 @@ export class SimAwsRequestCallerResolver {
       return SimAwsRequestCaller.anonymous();
     }
 
-    return this.signedCaller(request, expectedScope);
+    return this.signedCaller(request, options);
   }
 
   /**
    * Whether the request offers a SigV4 signature to verify.
    *
-   * Only an AWS4-HMAC-SHA256 header counts. An Authorization header of any
-   * other scheme belongs to the application: a bearer token sent to a Function
-   * URL with NONE auth is the handler's business, and treating it as a broken
-   * signature would refuse a request real AWS delivers.
+   * Two things count: an AWS4-HMAC-SHA256 Authorization header, and the
+   * `X-Amz-Algorithm` parameter a presigned URL states its signature with. An
+   * Authorization header of any other scheme belongs to the application: a
+   * bearer token sent to a Function URL with NONE auth is the handler's
+   * business, and treating it as a broken signature would refuse a request real
+   * AWS delivers.
    */
   private carriesSignature(request: SimIamSigV4SignedRequest): boolean {
     return (
       request.headers.get("authorization")?.startsWith(simIamSigV4Algorithm) ===
-      true
+        true || SimIamSigV4PresignedQuery.carriedBy(request.url)
     );
   }
 
   private signedCaller(
     request: SimIamSigV4SignedRequest,
-    expectedScope: SimIamSigV4ExpectedScope | undefined,
+    options: SimAwsCallerResolveOptions,
   ): SimAwsRequestCaller {
-    const identity = this.signedRequests.verify(request, { expectedScope });
+    const identity = this.signedRequests.verify(request, {
+      expectedScope: options.expectedScope,
+      now: options.now,
+    });
 
     return new SimAwsRequestCaller({
       principal: identity.principal,

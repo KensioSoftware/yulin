@@ -5,6 +5,10 @@ import { PutObjectCommandHandler } from "./command/put-object/put-object.handler
 import { GetObjectCommandHandler } from "./command/get-object/get-object.handler.js";
 import { ListObjectsCommandHandler } from "./command/list-objects/list-objects.handler.js";
 import { SimS3GlobalRegistry } from "./sim-s3-global-registry.js";
+import {
+  simS3BucketUrl,
+  simS3ServiceUrl,
+} from "./bucket/sim-s3-endpoint-url.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { PutBucketWebsiteCommandHandler } from "./command/put-bucket-website/put-bucket-website.handler.js";
 import { assertDefined } from "../../util/type-guard/defined.js";
@@ -207,6 +211,30 @@ export class SimS3 {
     bucketName: SimS3BucketName | string,
   ): SimS3Bucket | undefined {
     return this.buckets.get(bucketName as SimS3BucketName);
+  }
+
+  /**
+   * Get the simulated S3 REST API endpoint URL for this Region.
+   *
+   * This is the endpoint an AWS SDK S3 client is configured with, so that the
+   * client, and the presigner built on it, address simulated S3 the same way
+   * they address the real thing.
+   */
+  getServiceUrl(): URL {
+    return simS3ServiceUrl(this.accountRegionScope.regionName);
+  }
+
+  /**
+   * Get the simulated S3 REST API endpoint URL for one Bucket.
+   */
+  getBucketUrl(bucketName: SimS3BucketName | string): URL {
+    const bucket = this.getSimBucketByName(bucketName);
+    assertDefined(bucket, `Sim S3 Bucket named ${bucketName}`);
+
+    return simS3BucketUrl(
+      bucket.bucketName,
+      this.accountRegionScope.regionName,
+    );
   }
 
   /**

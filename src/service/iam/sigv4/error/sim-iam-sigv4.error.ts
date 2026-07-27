@@ -5,6 +5,7 @@
  * treat a simulated one exactly as it treats the real thing.
  */
 export type SimIamSigV4ErrorCode =
+  | "AccessDenied"
   | "ExpiredToken"
   | "IncompleteSignature"
   | "InvalidClientTokenId"
@@ -50,6 +51,21 @@ export class SimIamInvalidClientTokenId extends SimIamSigV4Error {
 export class SimIamExpiredToken extends SimIamSigV4Error {
   constructor(message: string) {
     super("ExpiredToken", message);
+  }
+}
+
+/**
+ * Raised when a presigned URL is used after the window it was signed for.
+ *
+ * The window is judged in simulated time, so a test that freezes the clock
+ * keeps a URL usable however long it spends, and one that advances the clock
+ * past `X-Amz-Expires` sees exactly what a real expired link does. The AWS
+ * error code is the one real S3 answers an expired presigned URL with, which
+ * is `AccessDenied` rather than anything naming expiry.
+ */
+export class SimIamPresignedRequestExpired extends SimIamSigV4Error {
+  constructor(message: string) {
+    super("AccessDenied", message);
   }
 }
 
