@@ -6,10 +6,12 @@ import { SimAwsRequestCaller } from "../../service/iam/request/sim-aws-request-c
  * Which of a service's endpoints a hostname named.
  *
  * Only S3 has more than one, and the difference is not cosmetic: the website
- * endpoint serves public static sites and never authenticates, while the REST
- * endpoint is the API the SDK and presigned URLs talk to. The hostname is the
- * only thing that says which, so it is settled where hostnames are understood
- * rather than guessed at again downstream.
+ * endpoint serves a static site to whoever the Bucket policy has made it
+ * readable by, while the REST endpoint is the API the SDK and presigned URLs
+ * talk to. Both authorize, and a website visitor presenting nothing is simply
+ * anonymous. The hostname is the only thing that says which endpoint was
+ * addressed, so it is settled where hostnames are understood rather than
+ * guessed at again downstream.
  */
 export type SimAwsServiceEndpoint = "rest" | "website";
 

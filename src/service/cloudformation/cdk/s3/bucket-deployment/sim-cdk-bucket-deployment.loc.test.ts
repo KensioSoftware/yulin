@@ -44,6 +44,10 @@ const stack = new cdk.Stack(app, "TestStack", {
 const bucket = new s3.Bucket(stack, "SiteBucket", {
   bucketName: "foo-bucket",
   websiteIndexDocument: "index.html",
+  // A website Bucket must be publicly readable, which needs the Block Public
+  // Access opt-out. CDK synthesizes an AWS::S3::BucketPolicy for this.
+  publicReadAccess: true,
+  blockPublicAccess: s3.BlockPublicAccess.BLOCK_ACLS,
 });
 new s3deploy.BucketDeployment(stack, "DeploySite", {
   sources: [s3deploy.Source.asset(${JSON.stringify(publicDirectory)})],

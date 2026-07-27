@@ -5,6 +5,7 @@ import {
 } from "@aws-sdk/client-s3";
 import { assertIdentical } from "@kensio/smartass";
 import { afterAll, beforeAll, describe, it } from "vitest";
+import { grantPublicWebsiteRead } from "../sim-s3-public-website.fixture.js";
 import { SimAwsLocalServer } from "../../../../../serve/index.js";
 import { SimAws } from "../../../../aws/sim-aws.js";
 
@@ -45,6 +46,7 @@ describe("Serve simulated S3 Bucket static website on localhost", () => {
         },
       }),
     );
+    await grantPublicWebsiteRead(simS3, "folder-index-redirect-site");
 
     const response = await fetch(
       `http://folder-index-redirect-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/docs`,
@@ -85,6 +87,7 @@ describe("Serve simulated S3 Bucket static website on localhost", () => {
         },
       }),
     );
+    await grantPublicWebsiteRead(simS3, "missing-redirect-site");
 
     const response = await fetch(
       `http://missing-redirect-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/missing.html`,
@@ -132,6 +135,7 @@ describe("Serve simulated S3 Bucket static website on localhost", () => {
         },
       }),
     );
+    await grantPublicWebsiteRead(simS3, "index-before-rule-site");
 
     const response = await fetch(
       `http://index-before-rule-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/docs/`,
@@ -160,6 +164,7 @@ describe("Serve simulated S3 Bucket static website on localhost", () => {
         },
       }),
     );
+    await grantPublicWebsiteRead(simS3, "redirect-all-site");
 
     const response = await fetch(
       `http://redirect-all-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/docs/page.html`,

@@ -12,46 +12,76 @@ export interface SimS3PublicAccessBlockConfiguration {
 }
 
 /**
+ * A Block Public Access configuration with every setting settled.
+ *
+ * The AWS-facing shape leaves all four optional, so this is what the simulator
+ * holds once the omissions have been resolved.
+ */
+export interface SimS3PublicAccessBlockSettings {
+  readonly BlockPublicAcls: boolean;
+  readonly IgnorePublicAcls: boolean;
+  readonly BlockPublicPolicy: boolean;
+  readonly RestrictPublicBuckets: boolean;
+}
+
+/**
  * The S3 Block Public Access settings of one simulated Bucket.
  *
- * Real S3 enables all four settings on every new Bucket, so that is what a
- * Bucket gets unless something turns one off.
+ * There are two distinct states here and they are not the same. A Bucket nobody
+ * has configured blocks everything, which is what real S3 does for every new
+ * Bucket. A Bucket someone has configured has exactly what they asked for: the
+ * configuration replaces the previous one wholesale, so a setting left out of
+ * it is off rather than inherited.
  *
- * A setting the caller leaves unspecified is taken as enabled. Real S3 replaces
- * the whole configuration on PutPublicAccessBlock, and its documentation does
- * not state what an omitted element means, so the simulator takes the
- * restrictive reading: being stricter than AWS surfaces as a puzzling test
- * failure, while being looser surfaces as a production incident.
+ * That second rule matters more than it looks. CDK's `BlockPublicAccess.
+ * BLOCK_ACLS` sets only `blockPublicAcls` and `ignorePublicAcls`, leaving
+ * `BlockPublicPolicy` out of the synthesized template, and pairing it with
+ * `publicReadAccess` is the standard way to build a public website Bucket.
+ * Treating the omitted setting as enabled would refuse that template, which
+ * real AWS deploys without complaint.
  */
 export class SimS3PublicAccessBlock {
-  private readonly blockPublicAcls: boolean;
-  private readonly ignorePublicAcls: boolean;
-  private readonly blockPublicPolicy: boolean;
-  private readonly restrictPublicBuckets: boolean;
+  private constructor(
+    private readonly settings: SimS3PublicAccessBlockSettings,
+  ) {}
 
-  constructor(configuration: SimS3PublicAccessBlockConfiguration = {}) {
-    this.blockPublicAcls = configuration.BlockPublicAcls ?? true;
-    this.ignorePublicAcls = configuration.IgnorePublicAcls ?? true;
-    this.blockPublicPolicy = configuration.BlockPublicPolicy ?? true;
-    this.restrictPublicBuckets = configuration.RestrictPublicBuckets ?? true;
+  /**
+   * The all-blocked state a Bucket has until something configures it.
+   */
+  static blockingAll(): SimS3PublicAccessBlock {
+    return new SimS3PublicAccessBlock({
+      BlockPublicAcls: true,
+      IgnorePublicAcls: true,
+      BlockPublicPolicy: true,
+      RestrictPublicBuckets: true,
+    });
+  }
+
+  /**
+   * A configuration exactly as supplied, with anything omitted turned off.
+   */
+  static fromConfiguration(
+    configuration: SimS3PublicAccessBlockConfiguration,
+  ): SimS3PublicAccessBlock {
+    return new SimS3PublicAccessBlock({
+      BlockPublicAcls: configuration.BlockPublicAcls ?? false,
+      IgnorePublicAcls: configuration.IgnorePublicAcls ?? false,
+      BlockPublicPolicy: configuration.BlockPublicPolicy ?? false,
+      RestrictPublicBuckets: configuration.RestrictPublicBuckets ?? false,
+    });
   }
 
   /**
    * Whether this Bucket refuses a Bucket policy that allows public access.
    */
   blocksPublicPolicy(): boolean {
-    return this.blockPublicPolicy;
+    return this.settings.BlockPublicPolicy;
   }
 
   /**
    * The configuration as an AWS-shaped record, for GetPublicAccessBlock.
    */
-  toConfiguration(): Required<SimS3PublicAccessBlockConfiguration> {
-    return {
-      BlockPublicAcls: this.blockPublicAcls,
-      IgnorePublicAcls: this.ignorePublicAcls,
-      BlockPublicPolicy: this.blockPublicPolicy,
-      RestrictPublicBuckets: this.restrictPublicBuckets,
-    };
+  toConfiguration(): SimS3PublicAccessBlockSettings {
+    return { ...this.settings };
   }
 }

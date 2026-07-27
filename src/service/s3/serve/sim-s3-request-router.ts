@@ -89,6 +89,7 @@ export class SimS3RequestRouter {
     return {
       action: "website",
       bucket: found.bucket,
+      bucketScope: found.bucketScope,
       objectKey: segments.join("/"),
     };
   }

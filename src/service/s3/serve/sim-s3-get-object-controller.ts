@@ -1,30 +1,51 @@
+import type { SimAwsServiceRequest } from "../../../serve/controller/sim-service-controller.js";
+import type { SimAws } from "../../aws/sim-aws.js";
+import { SimIamAccessDenied } from "../../iam/error/sim-iam.error.js";
 import type { SimS3Bucket } from "../bucket/sim-s3-bucket.js";
-import type { SimS3Object } from "../object/s3-object.js";
+import type { SimS3WebsiteRoute } from "./sim-s3-route.js";
+import { SimS3WebsiteObjectLoader } from "./website/sim-s3-website-object-loader.js";
+import type { SimS3WebsiteObject } from "./website/sim-s3-website-object.js";
+import { SimS3WebsiteResponses } from "./website/sim-s3-website-responses.js";
+
+interface SimS3GetObjectControllerProperties {
+  readonly simAws: SimAws;
+}
 
 /**
- * Serves a simulated S3 Object over HTTP.
+ * Serves a simulated S3 Object over the static website endpoint.
+ *
+ * Real S3 serves a website endpoint only what the Bucket policy makes readable,
+ * answering 403 for an Object that is not publicly readable. Objects are
+ * therefore read through the ordinary GetObject command, so a Bucket with no
+ * policy serves nothing to the browser that asks for a page.
+ *
+ * The reading is done as whoever the boundary resolved rather than always as
+ * anonymous, which is a deliberate divergence: a real website endpoint
+ * authenticates nothing, so an identity policy could never reach it there. It
+ * keeps the simulator's served services consistent with each other, at the cost
+ * of being looser than S3 for a request that names a principal.
  */
 export class SimS3GetObjectController {
+  private readonly simAws: SimAws;
+  private readonly responses = new SimS3WebsiteResponses();
+
+  constructor(properties: SimS3GetObjectControllerProperties) {
+    this.simAws = properties.simAws;
+  }
+
   /**
-   * Handle a GET request for an S3 Object via simulated S3.
+   * Handle a GET or HEAD request for an S3 Object via the website endpoint.
    */
   async handleRequest(
-    bucket: SimS3Bucket,
-    objectKey: string,
-    request: Request,
+    route: SimS3WebsiteRoute,
+    serviceRequest: SimAwsServiceRequest,
   ): Promise<Response> {
+    const { bucket } = route;
     const website = bucket.getWebsite();
+    const { request } = serviceRequest;
 
     if (!website.websiteEnabled()) {
-      return new Response(
-        `Static website hosting is not enabled for bucket ${bucket.bucketName}\n`,
-        {
-          status: 403,
-          headers: {
-            "content-type": "text/plain; charset=utf-8",
-          },
-        },
-      );
+      return this.responses.websiteNotEnabled(bucket.bucketName);
     }
 
     if (website.redirectsAllRequests()) {
@@ -34,84 +55,116 @@ export class SimS3GetObjectController {
       );
     }
 
-    const response = await this.websiteResponse(bucket, objectKey, request);
+    const loader = SimS3WebsiteObjectLoader.forRoute(
+      this.simAws,
+      route,
+      serviceRequest,
+    );
 
-    return website.redirectForRequestResponse(request, response);
+    return website.redirectForRequestResponse(
+      request,
+      await this.websiteResponse(route, request, loader),
+    );
   }
 
   private async websiteResponse(
-    bucket: SimS3Bucket,
-    objectKey: string,
+    route: SimS3WebsiteRoute,
     request: Request,
+    loader: SimS3WebsiteObjectLoader,
   ): Promise<Response> {
-    const website = bucket.getWebsite();
-    const websiteObjectKey = website.objectKeyForRequest(objectKey);
-    const object = await bucket.getObject(websiteObjectKey);
+    const { bucket, objectKey } = route;
+    const websiteObjectKey = bucket.getWebsite().objectKeyForRequest(objectKey);
+    const object = await this.loadRequested(loader, websiteObjectKey);
 
-    if (object !== undefined) {
-      return this.foundObjectResponse(object, request);
+    if (object instanceof SimIamAccessDenied) {
+      return await this.deniedResponse(bucket, request, loader);
     }
 
+    if (object !== undefined) {
+      return this.responses.foundObject(object, request);
+    }
+
+    return await this.missingResponse(route, request, loader, websiteObjectKey);
+  }
+
+  /**
+   * Answer a request for an Object the Bucket does not hold, which is either a
+   * folder needing a trailing slash, the error document, or a plain 404.
+   */
+  private async missingResponse(
+    route: SimS3WebsiteRoute,
+    request: Request,
+    loader: SimS3WebsiteObjectLoader,
+    websiteObjectKey: string,
+  ): Promise<Response> {
+    const { bucket, objectKey } = route;
+    const website = bucket.getWebsite();
     const folderIndexDocumentKey =
       website.folderIndexDocumentKeyForRequest(objectKey);
 
-    if (folderIndexDocumentKey !== undefined) {
-      const folderIndexDocumentObject = await bucket.getObject(
-        folderIndexDocumentKey,
-      );
-
-      if (folderIndexDocumentObject !== undefined) {
-        return website.trailingSlashRedirect(request);
-      }
+    if (
+      folderIndexDocumentKey !== undefined &&
+      (await loader.loadIfPermitted(folderIndexDocumentKey)) !== undefined
+    ) {
+      return website.trailingSlashRedirect(request);
     }
 
-    const errorDocumentKey = website.errorDocumentKey();
+    const errorDocumentObject = await this.errorDocument(bucket, loader);
 
-    if (errorDocumentKey !== undefined) {
-      const errorDocumentObject = await bucket.getObject(errorDocumentKey);
-
-      if (errorDocumentObject !== undefined) {
-        return this.foundObjectResponse(errorDocumentObject, request, 404);
-      }
+    if (errorDocumentObject !== undefined) {
+      return this.responses.foundObject(errorDocumentObject, request, 404);
     }
 
-    return this.notFoundResponse(bucket, websiteObjectKey);
+    return this.responses.notFound(bucket.bucketName, websiteObjectKey);
   }
 
-  private foundObjectResponse(
-    object: SimS3Object,
+  /**
+   * Load the Object the visitor asked for, reporting a denial as a value so
+   * the caller can answer 403 rather than falling through to the 404 path.
+   */
+  private async loadRequested(
+    loader: SimS3WebsiteObjectLoader,
+    objectKey: string,
+  ): Promise<SimS3WebsiteObject | SimIamAccessDenied | undefined> {
+    try {
+      return await loader.load(objectKey);
+    } catch (error) {
+      if (error instanceof SimIamAccessDenied) {
+        return error;
+      }
+
+      throw error;
+    }
+  }
+
+  /**
+   * Real S3 serves the custom error document for the whole 4XX class, so a
+   * denied request gets it too, provided the visitor may read it.
+   */
+  private async deniedResponse(
+    bucket: SimS3Bucket,
     request: Request,
-    status = 200,
-  ): Response {
-    const contentType = object.metadata.values["content-type"];
+    loader: SimS3WebsiteObjectLoader,
+  ): Promise<Response> {
+    const errorDocumentObject = await this.errorDocument(bucket, loader);
 
-    const headers = {
-      "content-length": String(object.body.length),
-      ...(contentType !== undefined && { "content-type": contentType }),
-    };
-
-    if (request.method === "HEAD") {
-      return new Response(undefined, {
-        status,
-        headers,
-      });
+    if (errorDocumentObject !== undefined) {
+      return this.responses.foundObject(errorDocumentObject, request, 403);
     }
 
-    return new Response(object.body, {
-      status,
-      headers,
-    });
+    return this.responses.accessDenied(bucket.bucketName);
   }
 
-  private notFoundResponse(bucket: SimS3Bucket, objectKey: string): Response {
-    return new Response(
-      `Object ${objectKey} not found in bucket ${bucket.bucketName}`,
-      {
-        status: 404,
-        headers: {
-          "content-type": "text/plain; charset=utf-8",
-        },
-      },
-    );
+  private async errorDocument(
+    bucket: SimS3Bucket,
+    loader: SimS3WebsiteObjectLoader,
+  ): Promise<SimS3WebsiteObject | undefined> {
+    const errorDocumentKey = bucket.getWebsite().errorDocumentKey();
+
+    if (errorDocumentKey === undefined) {
+      return undefined;
+    }
+
+    return await loader.loadIfPermitted(errorDocumentKey);
   }
 }

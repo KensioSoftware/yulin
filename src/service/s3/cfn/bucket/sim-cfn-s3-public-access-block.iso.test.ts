@@ -40,8 +40,8 @@ describe("S3 CloudFormation PublicAccessBlockConfiguration", () => {
       },
     });
 
-    // Then the Bucket carries those settings, with the unspecified ones at
-    // their blocked default.
+    // Then the Bucket carries exactly those settings, with the ones the
+    // template left out turned off.
     const output = await simAws
       .s3()
       .getPublicAccessBlock(
@@ -49,8 +49,8 @@ describe("S3 CloudFormation PublicAccessBlockConfiguration", () => {
       );
 
     assertObjectEquals(output.PublicAccessBlockConfiguration, {
-      BlockPublicAcls: true,
-      IgnorePublicAcls: true,
+      BlockPublicAcls: false,
+      IgnorePublicAcls: false,
       BlockPublicPolicy: false,
       RestrictPublicBuckets: false,
     });

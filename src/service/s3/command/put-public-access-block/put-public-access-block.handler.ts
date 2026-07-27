@@ -56,8 +56,8 @@ export class PutPublicAccessBlockCommandHandler implements CommandHandler<
    * Authorize and replace a Bucket's Block Public Access settings.
    *
    * The supplied configuration replaces the previous one wholesale, so a
-   * setting it leaves out returns to its enabled default rather than keeping
-   * whatever the Bucket had before.
+   * setting it leaves out is turned off rather than kept from whatever the
+   * Bucket had before.
    */
   async handle(
     command: SimPutPublicAccessBlockCommand,
@@ -80,7 +80,9 @@ export class PutPublicAccessBlockCommandHandler implements CommandHandler<
     this.authorizer.authorizeWrite(bucket, options?.caller);
 
     bucket.configurePublicAccessBlock(
-      new SimS3PublicAccessBlock(command.input.PublicAccessBlockConfiguration),
+      SimS3PublicAccessBlock.fromConfiguration(
+        command.input.PublicAccessBlockConfiguration,
+      ),
     );
 
     return {

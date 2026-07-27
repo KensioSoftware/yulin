@@ -20,6 +20,29 @@ try {
             WebsiteConfiguration: {
               IndexDocument: "index.html",
             },
+            // A website Bucket needs a public Bucket policy, which Block
+            // Public Access refuses until the Bucket opts out.
+            PublicAccessBlockConfiguration: {
+              BlockPublicAcls: true,
+              IgnorePublicAcls: true,
+            },
+          },
+        },
+        SiteBucketPolicy: {
+          Type: "AWS::S3::BucketPolicy",
+          Properties: {
+            Bucket: { Ref: "SiteBucket" },
+            PolicyDocument: {
+              Version: "2012-10-17",
+              Statement: [
+                {
+                  Effect: "Allow",
+                  Principal: "*",
+                  Action: "s3:GetObject",
+                  Resource: "arn:aws:s3:::local-site-bucket/*",
+                },
+              ],
+            },
           },
         },
       },

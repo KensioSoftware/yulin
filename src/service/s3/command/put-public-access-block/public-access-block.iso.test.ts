@@ -43,28 +43,35 @@ describe("S3 Block Public Access commands", () => {
     assertObjectEquals(output.PublicAccessBlockConfiguration, allBlocked);
   });
 
-  it("replaces the whole configuration, defaulting omitted settings to blocked", async () => {
-    // Given a Bucket at the default settings.
+  it("replaces the whole configuration, turning omitted settings off", async () => {
+    // Given a Bucket at the all-blocked default.
     const simS3 = simAws.s3();
 
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "partial" }));
 
-    // When only one setting is specified.
+    // When a configuration naming only the two ACL settings is applied, as
+    // CDK's BlockPublicAccess.BLOCK_ACLS preset synthesizes.
     await simS3.putPublicAccessBlock(
       new PutPublicAccessBlockCommand({
         Bucket: "partial",
-        PublicAccessBlockConfiguration: { BlockPublicPolicy: false },
+        PublicAccessBlockConfiguration: {
+          BlockPublicAcls: true,
+          IgnorePublicAcls: true,
+        },
       }),
     );
 
-    // Then the others take their blocked default rather than being left as-is.
+    // Then the settings it left out are off, because the configuration
+    // replaces the previous one rather than merging into it.
     const output = await simS3.getPublicAccessBlock(
       new GetPublicAccessBlockCommand({ Bucket: "partial" }),
     );
 
     assertObjectEquals(output.PublicAccessBlockConfiguration, {
-      ...allBlocked,
+      BlockPublicAcls: true,
+      IgnorePublicAcls: true,
       BlockPublicPolicy: false,
+      RestrictPublicBuckets: false,
     });
   });
 
