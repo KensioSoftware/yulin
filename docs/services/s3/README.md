@@ -454,9 +454,15 @@ try {
 
 A presigned URL grants exactly what the principal who signed it holds. Sim IAM resolves that
 principal from the signature and authorizes `s3:GetObject` as them, so a user without permission
-cannot presign around it, and an unsigned request to the REST endpoint is anonymous and refused.
-Temporary credentials from an STS `AssumeRoleCommand` work the same way, carrying their session
-token in the URL.
+cannot presign around it. Temporary credentials from an STS `AssumeRoleCommand` work the same way,
+carrying their session token in the URL.
+
+A request to the REST endpoint that neither presents a signature nor names a principal in the
+`x-sim-aws-caller` header is anonymous, and anonymous holds nothing unless a Bucket policy says
+otherwise. That header is always enabled and wins over a signature, so a request driven by hand can
+be any principal without signing anything, exactly as it can against the other simulated services
+that serve HTTP. See
+[the sim IAM docs](../iam/README.md#what-the-simulator-reports-back) for the whole boundary.
 
 ### Expiry in simulated time
 

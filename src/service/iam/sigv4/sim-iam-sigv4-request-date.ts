@@ -68,6 +68,11 @@ export function simIamSigV4CheckedAmzDate(
  *
  * The stamp is ISO 8601 basic form, which `Date` does not parse, so the
  * separators of the extended form are put back before it is read.
+ *
+ * The result is checked to name the day and time it was built from. Digits
+ * alone do not make a date: `Date` reads 24:60:00 as no instant at all, and
+ * quietly rolls February 30th forward into March, which would give a presigned
+ * URL a window nothing signed. Both are refused rather than honoured.
  */
 export function simIamSigV4SignedAt(amzDate: string): Date {
   const parts = amzDatePattern.exec(amzDate)?.groups;
@@ -89,6 +94,17 @@ export function simIamSigV4SignedAt(amzDate: string): Date {
   const clockTime = [time.slice(0, 2), time.slice(2, 4), time.slice(4, 6)].join(
     ":",
   );
+  const signedAt = new Date(`${date}T${clockTime}Z`);
 
-  return new Date(`${date}T${clockTime}Z`);
+  if (
+    Number.isNaN(signedAt.getTime()) ||
+    signedAt.toISOString() !== `${date}T${clockTime}.000Z`
+  ) {
+    throw new SimIamIncompleteSignature(
+      `X-Amz-Date ${amzDate} is not a real instant: there is no ` +
+        `${clockTime} on ${date}`,
+    );
+  }
+
+  return signedAt;
 }

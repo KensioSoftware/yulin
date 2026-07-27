@@ -51,6 +51,23 @@ describe("Refusing a malformed presigned URL", () => {
     ).toThrow(/not on the day its credential scope names/);
   });
 
+  it("refuses a stamp whose digits name no real instant", () => {
+    // Given stamps that are well formed digits and not times: a clock reading
+    // that does not exist, and a day February never has
+    for (const amzDate of ["20260727T246000Z", "20260230T120000Z"]) {
+      const dateStamp = amzDate.slice(0, 8);
+
+      expect(() =>
+        SimIamSigV4PresignedQuery.parse(
+          presignedTestUrl({
+            "X-Amz-Date": amzDate,
+            "X-Amz-Credential": `${exampleAccessKeyId}/${dateStamp}/eu-west-2/s3/aws4_request`,
+          }),
+        ),
+      ).toThrow(SimIamIncompleteSignature);
+    }
+  });
+
   it("refuses a lifetime AWS would not have signed", () => {
     // Given lifetimes outside the one second to seven days AWS allows
     for (const expires of ["0", "604801", "nine hundred", "-1"]) {

@@ -3,13 +3,18 @@ import type { SimS3BucketName } from "../bucket/sim-s3-bucket.js";
 import type { SimAwsServiceTarget } from "../../../serve/controller/sim-service-controller.js";
 import {
   type SimS3Route,
+  type SimS3RouteFailure,
   simS3RouteFailure as failure,
 } from "./sim-s3-route.js";
 import {
   SimS3BucketLocator,
   SimS3BucketNotFound,
 } from "./sim-s3-bucket-locator.js";
-import { SimS3ObjectAddress } from "./sim-s3-object-address.js";
+import {
+  SimS3ObjectAddress,
+  simS3PathSegments,
+  SimS3UndecodableUri,
+} from "./sim-s3-object-address.js";
 import { simS3RestRefusal } from "./sim-s3-rest-refusal.js";
 
 interface SimS3RequestRouterProperties {
@@ -64,6 +69,14 @@ export class SimS3RequestRouter {
       return failure(400, "Missing S3 Bucket name\n");
     }
 
+    // Read before the Bucket is looked up, as the REST endpoint reads its
+    // address: a path that is not a path names nothing in any Bucket.
+    const segments = simS3PathSegments(new URL(request.url).pathname);
+
+    if (segments instanceof SimS3UndecodableUri) {
+      return undecodableFailure(segments);
+    }
+
     const found = this.buckets.locate(
       target.resourceName as SimS3BucketName,
       regionName,
@@ -73,12 +86,10 @@ export class SimS3RequestRouter {
       return failure(found.statusCode, found.message);
     }
 
-    const url = new URL(request.url);
-
     return {
       action: "website",
       bucket: found.bucket,
-      objectKey: decodeURIComponent(url.pathname.replace(/^\/+/u, "")),
+      objectKey: segments.join("/"),
     };
   }
 
@@ -98,6 +109,10 @@ export class SimS3RequestRouter {
       target,
       new URL(request.url),
     );
+    if (address instanceof SimS3UndecodableUri) {
+      return undecodableFailure(address);
+    }
+
     if (address === undefined) {
       return failure(400, "Missing S3 Bucket name\n");
     }
@@ -121,4 +136,17 @@ export class SimS3RequestRouter {
       objectKey: address.objectKey,
     };
   }
+}
+
+/**
+ * Refuse a path the simulator cannot read as an Object key.
+ */
+function undecodableFailure(
+  undecodable: SimS3UndecodableUri,
+): SimS3RouteFailure {
+  return failure(
+    400,
+    `Could not parse the request path ${undecodable.pathname} as an S3 ` +
+      `Object key: it is not valid percent-encoding.\n`,
+  );
 }

@@ -142,9 +142,10 @@ describe("Presigned simulated S3 URLs", () => {
       { expiresIn: 1 },
     );
 
-    // When it is fetched after the test has spent longer than that
+    // When it is fetched after more than a second of real time has passed, so
+    // a window judged against the real clock would have closed
     await new Promise((resolve) => {
-      setTimeout(resolve, 5);
+      setTimeout(resolve, 1100);
     });
     const response = await http.fetch(url);
 

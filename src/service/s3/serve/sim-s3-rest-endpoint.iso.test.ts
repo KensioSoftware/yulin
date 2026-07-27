@@ -132,6 +132,20 @@ describe("The simulated S3 REST endpoint", () => {
     expect(await response.text()).toMatch(/absent not found/);
   });
 
+  it("refuses a path it cannot read as an Object key", async () => {
+    // Given a path that is not valid percent-encoding
+    const { http } = await presignSimulation();
+
+    // When it reaches the REST endpoint
+    const response = await http.fetch(
+      `http://${presignBucketName}.s3.eu-west-2.sim-aws.localhost/%zz`,
+    );
+
+    // Then it is the caller's mistake, not the simulator's
+    assertIdentical(response.status, 400);
+    expect(await response.text()).toMatch(/not valid percent-encoding/);
+  });
+
   it("refuses a path style request naming no Bucket at all", async () => {
     // Given a request to the Region endpoint itself
     const { http } = await presignSimulation();
