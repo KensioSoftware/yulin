@@ -31,7 +31,5 @@ export function parseSimCfnResourceRefDependencies(
 ): string[] {
   const referencedNames = parseSimCfnNode(template).referencedNames();
 
-  return [...new Set(referencedNames)].filter((name) =>
-    resourceLogicalIds.has(name),
-  );
+  return [...new Set(referencedNames).intersection(resourceLogicalIds)];
 }
