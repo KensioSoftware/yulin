@@ -2,19 +2,24 @@ import { describe, it } from "vitest";
 import {
   CreateBucketCommand,
   DeleteBucketPolicyCommand,
+  DeletePublicAccessBlockCommand,
   GetBucketPolicyCommand,
+  GetPublicAccessBlockCommand,
   ListObjectsCommand,
   PutBucketPolicyCommand,
   PutBucketWebsiteCommand,
   PutObjectCommand,
+  PutPublicAccessBlockCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
 import {
   assertArrayIncludes,
   assertArrayLength,
+  assertFalse,
   assertIdentical,
   assertObjectEquals,
   assertStringIncludes,
+  assertTrue,
   assertTypeObject,
   assertUndefined,
 } from "@kensio/smartass";
@@ -79,7 +84,7 @@ describe("simulated S3 SDK Command routing", () => {
           Statement: [
             {
               Effect: "Allow",
-              Principal: "*",
+              Principal: { AWS: "arn:aws:iam::222222222222:role/Reader" },
               Action: "s3:GetObject",
               Resource: "arn:aws:s3:::bucket-policy/*",
             },
@@ -101,7 +106,7 @@ describe("simulated S3 SDK Command routing", () => {
       Statement: [
         {
           Effect: "Allow",
-          Principal: "*",
+          Principal: { AWS: "arn:aws:iam::222222222222:role/Reader" },
           Action: "s3:GetObject",
           Resource: "arn:aws:s3:::bucket-policy-lifecycle/*",
         },
@@ -132,15 +137,45 @@ describe("simulated S3 SDK Command routing", () => {
     assertTypeObject(deletionOut.$metadata);
   });
 
+  it("routes the Block Public Access Commands through an intercepted client", async () => {
+    using simSdk = new SimSdk();
+    const client = new S3Client({ region: "us-east-1" });
+    simSdk.intercept(client);
+
+    await client.send(new CreateBucketCommand({ Bucket: "bucket-bpa" }));
+
+    await client.send(
+      new PutPublicAccessBlockCommand({
+        Bucket: "bucket-bpa",
+        PublicAccessBlockConfiguration: { BlockPublicPolicy: false },
+      }),
+    );
+
+    const readOut = await client.send(
+      new GetPublicAccessBlockCommand({ Bucket: "bucket-bpa" }),
+    );
+    assertFalse(readOut.PublicAccessBlockConfiguration?.BlockPublicPolicy);
+
+    // Removing the configuration restores the blocked default.
+    await client.send(
+      new DeletePublicAccessBlockCommand({ Bucket: "bucket-bpa" }),
+    );
+    const restoredOut = await client.send(
+      new GetPublicAccessBlockCommand({ Bucket: "bucket-bpa" }),
+    );
+    assertTrue(restoredOut.PublicAccessBlockConfiguration?.BlockPublicPolicy);
+  });
+
   it("lists its supported SDK Command names", () => {
     const router = new SimS3SdkCommandRouter({} as SimS3);
 
     const supported = router.supportedCommandNames();
 
-    assertArrayLength(supported, 9);
+    assertArrayLength(supported, 12);
     assertArrayIncludes(supported, "GetObjectCommand");
     assertArrayIncludes(supported, "GetBucketPolicyCommand");
     assertArrayIncludes(supported, "DeleteBucketPolicyCommand");
+    assertArrayIncludes(supported, "PutPublicAccessBlockCommand");
     assertUndefined(router.route("HeadObjectCommand"));
   });
 

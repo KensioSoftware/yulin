@@ -6,6 +6,7 @@ import {
   GetObjectCommand,
   PutBucketPolicyCommand,
   PutObjectCommand,
+  PutPublicAccessBlockCommand,
 } from "@aws-sdk/client-s3";
 import {
   assertIdentical,
@@ -37,6 +38,13 @@ describe("S3 DeleteBucketPolicyCommand", () => {
         Bucket: "revocable-policy-bucket",
         Key: "public/notice.txt",
         Body: "published",
+      }),
+    );
+    // A public grant needs Block Public Access turned off first.
+    await simS3.putPublicAccessBlock(
+      new PutPublicAccessBlockCommand({
+        Bucket: "revocable-policy-bucket",
+        PublicAccessBlockConfiguration: { BlockPublicPolicy: false },
       }),
     );
     await simS3.putBucketPolicy(

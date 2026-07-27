@@ -130,7 +130,9 @@ describe("S3 GetBucketPolicyCommand", () => {
           Version: "2012-10-17",
           Statement: {
             Effect: "Allow",
-            Principal: "*",
+            Principal: {
+              AWS: "arn:aws:iam::222222222222:role/ReportReader",
+            },
             Action: "s3:GetObject",
             Resource: "arn:aws:s3:::guarded-policy-bucket/*",
           },

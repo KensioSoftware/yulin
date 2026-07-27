@@ -71,6 +71,9 @@ Supported command areas currently include:
 - `put-bucket-policy/`
 - `get-bucket-policy/`
 - `delete-bucket-policy/`
+- `put-public-access-block/`
+- `get-public-access-block/`
+- `delete-public-access-block/`
 - `put-object/`
 - `get-object/`
 - `list-objects/`
@@ -144,10 +147,35 @@ Its public methods are small:
 - `configurePolicy(policy)`
 - `getPolicy()`
 - `deletePolicy()`
+- `configurePublicAccessBlock(publicAccessBlock)`
+- `getPublicAccessBlock()`
+- `deletePublicAccessBlock()`
 
 The Bucket resource policy is stored parsed rather than as a JSON string, because that is the shape
 sim IAM evaluates. `GetBucketPolicy` serializes it back on the way out, so the string a caller reads
 is a normalized form of what was applied rather than the original text.
+
+## Block Public Access
+
+`bucket/public-access/` holds the Block Public Access model. Every Bucket has a
+`SimS3PublicAccessBlock` with all four settings enabled, matching real S3's default for new Buckets,
+and a setting left unspecified is taken as enabled rather than disabled.
+
+Only `BlockPublicPolicy` currently has an effect. `SimS3PublicPolicyGuard` applies it in the
+`PutBucketPolicy` handler, after authorization, because the setting refuses a policy the caller is
+otherwise entitled to apply. It throws `SimS3AccessDenied`, which is S3 itself refusing the request
+rather than sim IAM denying it, so it is deliberately not `SimIamAccessDenied`.
+
+Deciding whether a document is public is split up so each piece stays small:
+
+- `SimS3PublicPolicy` walks the statements and decides the document
+- `simS3PrincipalIsWildcard` decides whether a statement's `Principal` names everyone
+- `simS3ConditionPinsPrincipal` decides whether a `Condition` ties a wildcard `Principal` to fixed
+  values, which is what makes an otherwise public statement non-public in real S3
+
+The determination fails closed throughout: a statement the simulator cannot classify counts as
+public, so the policy is refused rather than quietly stored. `aws:SourceIp` is deliberately excluded
+from the pinning condition keys because real S3 judges CIDR breadth and the simulator does not.
 
 By keeping storage behind `SimS3BucketStorage`, the Bucket model stays independent of whether
 objects live in memory or on the local filesystem.
@@ -408,6 +436,7 @@ Handlers throw AWS-like errors for supported failure cases, including:
 - no such Bucket
 - no such key
 - no such Bucket policy
+- access denied, for S3's own refusals such as Block Public Access
 - Bucket already exists
 - Bucket already owned by you
 

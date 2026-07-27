@@ -1,37 +1,39 @@
 import type { SimS3Bucket, SimS3BucketName } from "./bucket/sim-s3-bucket.js";
 import { SimS3CommandHandlers } from "./command/sim-s3-command-handlers.js";
+import type {
+  SimCreateBucketCommand,
+  SimCreateBucketCommandOutput,
+  SimDeleteBucketPolicyCommand,
+  SimDeleteBucketPolicyCommandOutput,
+  SimDeletePublicAccessBlockCommand,
+  SimDeletePublicAccessBlockCommandOutput,
+  SimGetBucketPolicyCommand,
+  SimGetBucketPolicyCommandOutput,
+  SimGetObjectCommand,
+  SimGetObjectCommandOutput,
+  SimGetPublicAccessBlockCommand,
+  SimGetPublicAccessBlockCommandOutput,
+  SimListBucketsCommand,
+  SimListBucketsCommandOutput,
+  SimListObjectsCommand,
+  SimListObjectsCommandOutput,
+  SimPutBucketPolicyCommand,
+  SimPutBucketPolicyCommandOutput,
+  SimPutBucketWebsiteCommand,
+  SimPutBucketWebsiteCommandOutput,
+  SimPutObjectCommand,
+  SimPutObjectCommandOutput,
+  SimPutPublicAccessBlockCommand,
+  SimPutPublicAccessBlockCommandOutput,
+} from "./command/sim-s3-command.types.js";
 import { SimS3GlobalRegistry } from "./sim-s3-global-registry.js";
+import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
+import { assertDefined } from "../../util/type-guard/defined.js";
+import { FilesystemS3BucketStorage } from "./storage/filesystem/s3-filesystem-storage.js";
 import {
   simS3BucketUrl,
   simS3ServiceUrl,
 } from "./bucket/sim-s3-endpoint-url.js";
-import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
-import { assertDefined } from "../../util/type-guard/defined.js";
-import { FilesystemS3BucketStorage } from "./storage/filesystem/s3-filesystem-storage.js";
-import type {
-  SimPutObjectCommand,
-  SimPutObjectCommandOutput,
-} from "./command/put-object/put-object.command.js";
-import type {
-  SimPutBucketWebsiteCommand,
-  SimPutBucketWebsiteCommandOutput,
-} from "./command/put-bucket-website/put-bucket-website.command.js";
-import type {
-  SimListObjectsCommand,
-  SimListObjectsCommandOutput,
-} from "./command/list-objects/list-objects.command.js";
-import type {
-  SimListBucketsCommand,
-  SimListBucketsCommandOutput,
-} from "./command/list-buckets/list-buckets.command.js";
-import type {
-  SimGetObjectCommand,
-  SimGetObjectCommandOutput,
-} from "./command/get-object/get-object.command.js";
-import type {
-  SimCreateBucketCommand,
-  SimCreateBucketCommandOutput,
-} from "./command/create-bucket/create-bucket.command.js";
 import {
   type BackgroundScheduler,
   BackgroundTasks,
@@ -44,18 +46,6 @@ import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
-import type {
-  SimPutBucketPolicyCommand,
-  SimPutBucketPolicyCommandOutput,
-} from "./command/put-bucket-policy/put-bucket-policy.command.js";
-import type {
-  SimGetBucketPolicyCommand,
-  SimGetBucketPolicyCommandOutput,
-} from "./command/get-bucket-policy/get-bucket-policy.command.js";
-import type {
-  SimDeleteBucketPolicyCommand,
-  SimDeleteBucketPolicyCommandOutput,
-} from "./command/delete-bucket-policy/delete-bucket-policy.command.js";
 import { SimS3SdkCommandRouter } from "./sdk/sim-s3-sdk-command-router.js";
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
 
@@ -141,6 +131,36 @@ export class SimS3 {
     options?: SimS3RequestOptions,
   ): Promise<SimDeleteBucketPolicyCommandOutput> {
     return await this.commands.deleteBucketPolicy(command, options);
+  }
+
+  /**
+   * Handle a Put Public Access Block Command from the SDK.
+   */
+  async putPublicAccessBlock(
+    command: SimPutPublicAccessBlockCommand,
+    options?: SimS3RequestOptions,
+  ): Promise<SimPutPublicAccessBlockCommandOutput> {
+    return await this.commands.putPublicAccessBlock(command, options);
+  }
+
+  /**
+   * Handle a Get Public Access Block Command from the SDK.
+   */
+  async getPublicAccessBlock(
+    command: SimGetPublicAccessBlockCommand,
+    options?: SimS3RequestOptions,
+  ): Promise<SimGetPublicAccessBlockCommandOutput> {
+    return await this.commands.getPublicAccessBlock(command, options);
+  }
+
+  /**
+   * Handle a Delete Public Access Block Command from the SDK.
+   */
+  async deletePublicAccessBlock(
+    command: SimDeletePublicAccessBlockCommand,
+    options?: SimS3RequestOptions,
+  ): Promise<SimDeletePublicAccessBlockCommandOutput> {
+    return await this.commands.deletePublicAccessBlock(command, options);
   }
 
   /**
