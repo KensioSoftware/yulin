@@ -211,19 +211,30 @@ describe("KMS aliases", () => {
     // Given a key with one alias.
     const simAws = new SimAws();
     const created = await simAws.kms().createKey(new CreateKeyCommand({}));
+    assertNonNullable(created.KeyMetadata);
+
     await simAws.kms().createAlias(
       new CreateAliasCommand({
         AliasName: "alias/app-key",
-        TargetKeyId: created.KeyMetadata?.KeyId,
+        TargetKeyId: created.KeyMetadata.KeyId,
       }),
     );
 
     // When aliases are listed with no key.
     const listed = await simAws.kms().listAliases(new ListAliasesCommand({}));
 
-    // Then the alias is reported with its ARN and target.
+    // Then the alias is reported with its ARN and target. The alias ARN names
+    // the Account and Region, the same as a key ARN does.
     assertArrayLength(listed.Aliases ?? [], 1);
-    assertIdentical(listed.Aliases?.[0]?.AliasName, "alias/app-key");
+
+    const alias = listed.Aliases?.[0];
+    assertNonNullable(alias);
+    assertIdentical(alias.AliasName, "alias/app-key");
+    assertIdentical(
+      alias.AliasArn,
+      `arn:aws:kms:${simAws.defaultRegionName}:${simAws.defaultAccountId}:alias/app-key`,
+    );
+    assertIdentical(alias.TargetKeyId, created.KeyMetadata.KeyId);
   });
 });
 
