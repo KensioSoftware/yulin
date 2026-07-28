@@ -176,9 +176,12 @@ All simulated services support SDK interception: ACM, CloudFormation, CloudFront
 Lambda, Route53, S3, Secrets Manager and STS. Each service's own docs under
 [docs/services](../services/) list the Commands it simulates.
 
-Sending a Command the simulated service doesn't support throws an error naming the Command and
-listing the supported ones, so gaps show up in test output rather than as silent misbehaviour.
-Clients for AWS services Yulin doesn't simulate at all are rejected the same way.
+Both kinds of gap are refused on send rather than misbehaving silently, with a different error each:
+
+- A Command the simulated service doesn't support throws `SimSdkUnsupportedCommandError`, naming the
+  Command and listing the Commands that service does support.
+- A client for an AWS service Yulin doesn't simulate at all throws `SimSdkUnknownServiceError`,
+  naming the service. There is no Command list to report, since no simulated service was resolved.
 
 ## Limitations
 

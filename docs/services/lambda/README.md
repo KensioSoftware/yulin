@@ -1143,7 +1143,8 @@ deploy with the unmatched target named for diagnosis.
 
 Current documented limitations:
 
-- Only `CreateFunctionCommand`, `GetFunctionCommand`, `InvokeCommand`, and the Function URL config
+- Only `CreateFunctionCommand`, `GetFunctionCommand`, `InvokeCommand`, the permission commands
+  (`AddPermissionCommand`, `RemovePermissionCommand`, `GetPolicyCommand`) and the Function URL config
   commands are supported. There is no `UpdateFunctionCode`, `DeleteFunction`, or function listing
   yet.
 - A cross-account grant is only half of what admits a call: the caller's own Account has to allow
