@@ -28,6 +28,7 @@ npm i -D @kensio/yulin
 - [Route53](./docs/services/route53 "Simulated Route53 docs")
 - [S3](./docs/services/s3 "Simulated S3 docs")
 - [Secrets Manager](./docs/services/secretsmanager "Simulated Secrets Manager docs")
+- [SSM Parameter Store](./docs/services/ssm "Simulated SSM Parameter Store docs")
 - [STS](./docs/services/sts "Simulated STS docs")
 
 ## Feature specific docs

@@ -26,6 +26,7 @@ import { SimLambdaUrlRegistry } from "../../lambda/registry/sim-lambda-url-regis
 import { SimS3LambdaCodeStore } from "../../lambda/function/code/store/sim-s3-lambda-code-store.js";
 import { SimSdkLambdaVmModuleProvider } from "../../lambda/function/code/vm/sdk/sim-sdk-lambda-vm-module-provider.js";
 import { SimSecretsManager } from "../../secretsmanager/index.js";
+import { SimSsm } from "../../ssm/index.js";
 import { SimSts } from "../../sts/sim-sts.js";
 
 interface SimAwsServiceFactoryProperties {
@@ -261,6 +262,20 @@ export class SimAwsServiceFactory {
    */
   createSecretsManager(scope: SimAwsAccountRegionContainer): SimSecretsManager {
     return new SimSecretsManager({
+      accountRegionScope: scope.accountRegionScope,
+      iam: this.createIam(scope),
+      background: this.background,
+    });
+  }
+
+  /**
+   * Create simulated SSM for an Account Region scope.
+   *
+   * Parameters are Region-scoped on real AWS: a parameter name is unique
+   * within one Account and Region, and its ARN names the Region.
+   */
+  createSsm(scope: SimAwsAccountRegionContainer): SimSsm {
+    return new SimSsm({
       accountRegionScope: scope.accountRegionScope,
       iam: this.createIam(scope),
       background: this.background,
