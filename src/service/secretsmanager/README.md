@@ -115,7 +115,9 @@ way it does on real AWS.
 ## Divergences worth knowing
 
 - `KmsKeyId` is stored and reported but nothing is encrypted with it, and no `kms:Decrypt` check
-  happens. This is looser than real AWS and stands until simulated KMS is wired into this service.
+  happens. This is looser than real AWS. Sim SSM shows the shape the wiring would take for
+  `SecureString` parameters, but a secret has versions, staging labels and rotation to carry through
+  it, so it stands as its own change rather than a follow-on.
 - Names ending in a hyphen and six characters are refused, which is stricter than real AWS.
 - `ListSecrets` refuses `Filters` and `SortOrder` rather than ignoring them.
 - A version that has lost every staging label is kept rather than removed, so it stays readable by

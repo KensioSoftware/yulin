@@ -16,6 +16,12 @@ export interface SimSsmParameterVersionDetails {
   readonly description?: string | undefined;
   readonly dataType?: string | undefined;
   readonly lastModifiedUser?: string | undefined;
+
+  /**
+   * The ARN of the KMS key a SecureString value was encrypted under, and
+   * undefined for the types that are stored in the clear.
+   */
+  readonly keyId?: string | undefined;
 }
 
 interface SimSsmParameterVersionProperties extends SimSsmParameterVersionDetails {
@@ -37,6 +43,7 @@ export class SimSsmParameterVersion {
   public readonly lastModifiedDate: Date;
   public readonly lastModifiedUser: string | undefined;
   public readonly description: string | undefined;
+  public readonly keyId: string | undefined;
   public readonly dataType: string;
 
   constructor(properties: SimSsmParameterVersionProperties) {
@@ -45,6 +52,7 @@ export class SimSsmParameterVersion {
     this.lastModifiedDate = properties.lastModifiedDate;
     this.lastModifiedUser = properties.lastModifiedUser;
     this.description = properties.description;
+    this.keyId = properties.keyId;
     this.dataType = properties.dataType ?? ssmTextDataType;
   }
 }

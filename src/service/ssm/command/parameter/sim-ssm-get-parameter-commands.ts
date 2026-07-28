@@ -1,5 +1,6 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { SimSsmValidationException } from "../../error/sim-ssm.error.js";
+import type { SimSsmParameterEncryption } from "../../parameter/sim-ssm-parameter-encryption.js";
 import type { SimSsmParameterStore } from "../../parameter/sim-ssm-parameter-store.js";
 import type { SimSsmAuthorizer } from "../authorize/sim-ssm-authorizer.js";
 import type {
@@ -9,13 +10,12 @@ import type {
   SimGetParametersCommandOutput,
 } from "./query.command.js";
 import { requireParameterNames } from "./sim-ssm-parameter-names.js";
-import {
-  type SimSsmFoundParameter,
-  SimSsmParameterReader,
-} from "./sim-ssm-parameter-reader.js";
+import type { SimSsmFoundParameter } from "./sim-ssm-parameter-read.js";
+import { SimSsmParameterReader } from "./sim-ssm-parameter-reader.js";
 
 interface SimSsmGetParameterCommandsProperties {
   readonly parameters: SimSsmParameterStore;
+  readonly encryption: SimSsmParameterEncryption;
   readonly authorizer: SimSsmAuthorizer;
 }
 
@@ -26,9 +26,9 @@ interface SimSsmGetParameterCommandsOptions {
 /**
  * The commands that read parameter values.
  *
- * `WithDecryption` is accepted and ignored, as real Parameter Store ignores it
- * for `String` and `StringList` parameters. Nothing else here is encrypted,
- * because `SecureString` is not simulated.
+ * `WithDecryption` decrypts a SecureString through simulated KMS and is
+ * ignored for the types stored in the clear, as real Parameter Store ignores
+ * it for them.
  */
 export class SimSsmGetParameterCommands {
   private readonly reader: SimSsmParameterReader;
@@ -40,10 +40,10 @@ export class SimSsmGetParameterCommands {
   /**
    * Read one parameter, refusing if it is not there.
    */
-  get(
+  async get(
     command: SimGetParameterCommand,
     options?: SimSsmGetParameterCommandsOptions,
-  ): SimGetParameterCommandOutput {
+  ): Promise<SimGetParameterCommandOutput> {
     const requested = command.input.Name;
 
     if (requested === undefined || requested.trim() === "") {
@@ -52,11 +52,12 @@ export class SimSsmGetParameterCommands {
       );
     }
 
-    const found = this.reader.read(
-      "ssm:GetParameter",
+    const found = await this.reader.read({
+      action: "ssm:GetParameter",
       requested,
-      options?.caller,
-    );
+      withDecryption: command.input.WithDecryption,
+      caller: options?.caller,
+    });
 
     return { $metadata: {}, Parameter: found.output };
   }
@@ -69,20 +70,22 @@ export class SimSsmGetParameterCommands {
    * nothing on real AWS, so a test that asserts on `Parameters` alone passes
    * while the application reads no configuration at all.
    */
-  getMany(
+  async getMany(
     command: SimGetParametersCommand,
     options?: SimSsmGetParameterCommandsOptions,
-  ): SimGetParametersCommandOutput {
+  ): Promise<SimGetParametersCommandOutput> {
     const names = requireParameterNames(command.input.Names, "GetParameters");
     const found: SimSsmFoundParameter[] = [];
     const invalid: string[] = [];
 
     for (const name of names) {
-      const parameter = this.reader.readOrInvalid(
-        "ssm:GetParameters",
-        name,
-        options?.caller,
-      );
+      // eslint-disable-next-line no-await-in-loop -- one name at a time, so a denial names the first name the caller may not read
+      const parameter = await this.reader.readOrInvalid({
+        action: "ssm:GetParameters",
+        requested: name,
+        withDecryption: command.input.WithDecryption,
+        caller: options?.caller,
+      });
 
       if (parameter === undefined) {
         invalid.push(name);

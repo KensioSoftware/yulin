@@ -6,17 +6,21 @@ import {
 /**
  * The parameter types this simulation stores.
  */
-export type SimSsmParameterTypeName = "String" | "StringList";
+export type SimSsmParameterTypeName = "String" | "StringList" | "SecureString";
 
-const simulatedTypes: ReadonlySet<string> = new Set(["String", "StringList"]);
+const simulatedTypes: ReadonlySet<string> = new Set([
+  "String",
+  "StringList",
+  "SecureString",
+]);
 
 /**
  * The type of one simulated parameter.
  *
- * `SecureString` is refused rather than stored. Nothing in this simulation
- * would encrypt it, so accepting it would let a test pass while proving
- * nothing about the KMS key, the `kms:Decrypt` permission or the
- * `WithDecryption` flag a real deployment depends on.
+ * A `SecureString` is encrypted through simulated KMS rather than stored in
+ * the clear, so the two failures a real deployment hits are reproducible here:
+ * a caller that may read the parameter but may not decrypt with its key, and
+ * a read that forgets `WithDecryption` and gets a ciphertext back.
  */
 export class SimSsmParameterType {
   public readonly value: SimSsmParameterTypeName;
@@ -42,22 +46,20 @@ export class SimSsmParameterType {
   }
 
   private static validated(type: string): SimSsmParameterTypeName {
-    if (type === "SecureString") {
-      throw new SimSsmUnsupportedParameterType(
-        "SecureString parameters are not simulated: nothing here would " +
-          "encrypt the value, so a passing test would say nothing about the " +
-          "KMS key or the kms:Decrypt permission the real parameter needs. " +
-          "Use String or StringList.",
-      );
-    }
-
     if (!simulatedTypes.has(type)) {
       throw new SimSsmUnsupportedParameterType(
-        `Parameter type '${type}' is not a Parameter Store type: use String ` +
-          `or StringList`,
+        `Parameter type '${type}' is not a Parameter Store type: use String, ` +
+          `StringList or SecureString`,
       );
     }
 
     return type as SimSsmParameterTypeName;
+  }
+
+  /**
+   * Whether values of this type are stored encrypted.
+   */
+  get isSecure(): boolean {
+    return this.value === "SecureString";
   }
 }

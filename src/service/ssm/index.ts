@@ -1,6 +1,11 @@
 export { SimSsm, type SimSsmRequestOptions } from "./sim-ssm.js";
 export { SimSsmParameter } from "./parameter/sim-ssm-parameter.js";
 export { SimSsmParameterArn } from "./parameter/sim-ssm-parameter-arn.js";
+export { SimSsmParameterEncryption } from "./parameter/sim-ssm-parameter-encryption.js";
+export {
+  ssmDefaultKeyAlias,
+  type SimSsmKmsCrypto,
+} from "./parameter/sim-ssm-kms-crypto.js";
 export { SimSsmParameterName } from "./parameter/sim-ssm-parameter-name.js";
 export { SimSsmParameterPath } from "./parameter/sim-ssm-parameter-path.js";
 export {
@@ -16,6 +21,7 @@ export {
   SimSsmError,
   SimSsmHierarchyLevelLimitExceededException,
   SimSsmHierarchyTypeMismatchException,
+  SimSsmInvalidKeyId,
   SimSsmParameterAlreadyExists,
   SimSsmParameterNotFound,
   SimSsmParameterPatternMismatchException,

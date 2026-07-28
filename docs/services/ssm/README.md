@@ -18,7 +18,8 @@ Sim SSM currently supports:
 - `GetParametersByPathCommand`, with and without `Recursive`
 - `DeleteParameterCommand` and `DeleteParametersCommand`
 - `DescribeParametersCommand`
-- `String` and `StringList` parameter types
+- `String`, `StringList` and `SecureString` parameter types
+- `SecureString` values encrypted through simulated KMS, decrypted only with `WithDecryption`
 - The `AWS::SSM::Parameter` CloudFormation resource, including `Ref` and `Fn::GetAtt`
 - Parameter name validation, including hierarchy depth and the reserved `aws` and `ssm` prefixes
 - Authorization of every operation by simulated IAM, against the real IAM action and ARN
@@ -533,14 +534,153 @@ console.log(read.Parameter?.ARN);
 // "arn:aws:ssm:eu-west-2:111111111111:parameter/myapp/db-host"
 ```
 
+## SecureString parameters
+
+A `SecureString` value is encrypted through simulated KMS, under the `aws/ssm` AWS managed key unless
+the request names a key of its own. Simulated KMS creates that managed key the first time something
+asks for it, so nothing has to set it up.
+
+A read returns the ciphertext unless it asks for decryption. This is the mistake that is easy to make
+and hard to see: a handler that forgets `WithDecryption` parses a base64 blob as if it were a
+password.
+
+```typescript sim-ssm-secure-string
+/**
+ * Writing and reading a simulated SecureString parameter.
+ */
+
+import { GetParameterCommand, PutParameterCommand } from "@aws-sdk/client-ssm";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const ssm = simAws.ssm();
+
+await ssm.putParameter(
+  new PutParameterCommand({
+    Name: "/myapp/prod/db-password",
+    Type: "SecureString",
+    Value: "hunter2",
+  }),
+);
+
+const encrypted = await ssm.getParameter(
+  new GetParameterCommand({ Name: "/myapp/prod/db-password" }),
+);
+
+console.log(encrypted.Parameter?.Value); // a base64 ciphertext, not "hunter2"
+
+const decrypted = await ssm.getParameter(
+  new GetParameterCommand({
+    Name: "/myapp/prod/db-password",
+    WithDecryption: true,
+  }),
+);
+
+console.log(decrypted.Parameter?.Value); // "hunter2"
+```
+
+`WithDecryption` on a `String` or `StringList` parameter is ignored rather than refused, as real
+Parameter Store ignores it.
+
+Pass `KeyId` to encrypt under a customer managed key instead. A `KeyId` naming a key that does not
+exist, is disabled, or is pending deletion fails with `InvalidKeyId`, which is how real Parameter
+Store reports every KMS key problem.
+
+Each value is bound to its own parameter's ARN as the KMS encryption context, under the
+`PARAMETER_ARN` key, so a ciphertext lifted out of one parameter cannot be decrypted as another.
+
+### Decrypting needs its own permission
+
+Encrypting and decrypting go to simulated KMS as the caller, not as the service. A write needs
+`kms:Encrypt` on the key on top of `ssm:PutParameter` on the parameter, and a decrypting read needs
+`kms:Decrypt` on top of `ssm:GetParameter`. A role granted one and not the other fails here rather
+than in a deployment.
+
+```typescript sim-ssm-secure-string-permissions
+/**
+ * A Role allowed to read a simulated SecureString but not to decrypt it.
+ */
+
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import { CreateKeyCommand } from "@aws-sdk/client-kms";
+import { GetParameterCommand, PutParameterCommand } from "@aws-sdk/client-ssm";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const accountId = simAws.defaultAccountId;
+
+const key = await simAws
+  .kms()
+  .createKey(new CreateKeyCommand({ Description: "Parameter key" }));
+
+await simAws.ssm().putParameter(
+  new PutParameterCommand({
+    Name: "/myapp/prod/db-password",
+    Type: "SecureString",
+    Value: "hunter2",
+    KeyId: key.KeyMetadata?.Arn,
+  }),
+);
+
+const role = await simAws.iam().createRole(
+  new CreateRoleCommand({
+    RoleName: "ConfigReader",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+
+// The parameter is allowed, the key is not.
+await simAws.iam().putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "ConfigReader",
+    PolicyName: "ReadDbPassword",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: "ssm:GetParameter",
+        Resource: "*",
+      },
+    }),
+  }),
+);
+
+const caller = { kind: "arn", arn: role.Role.Arn } as const;
+
+try {
+  await simAws.ssm().getParameter(
+    new GetParameterCommand({
+      Name: "/myapp/prod/db-password",
+      WithDecryption: true,
+    }),
+    { caller },
+  );
+} catch (error) {
+  console.log((error as Error).name); // "AccessDenied"
+}
+```
+
+`DescribeParameters` reports the key each `SecureString` is encrypted under as `KeyId`.
+
 ## Limitations
 
 Current documented limitations:
 
-- `SecureString` is refused rather than stored. Nothing here would encrypt it, so a passing test
-  would say nothing about the KMS key, the `kms:Decrypt` permission or `WithDecryption`.
-  `WithDecryption` is accepted and ignored on reads, as real Parameter Store ignores it for `String`
-  and `StringList`.
+- Only standard tier `SecureString` encryption is simulated, which encrypts under the KMS key
+  directly. The advanced tier's envelope encryption through the AWS Encryption SDK is not, so
+  `kms:GenerateDataKey` is never needed.
+- A `SecureString` under the `aws/ssm` managed key can be decrypted by any caller allowed
+  `kms:Decrypt` on it. Real AWS gives that key a policy nobody can change; simulated KMS gives a
+  managed key the same default policy as a customer key.
 - Parameter labels are not simulated. `LabelParameterVersion` is not implemented, so nothing can
   create a label, and a `name:label` selector is refused with an error saying so.
 - `GetParameterHistory` is not simulated, though earlier versions stay readable by number.
@@ -552,7 +692,8 @@ Current documented limitations:
   `RemoveTagsFromResource` and `ListTagsForResource` are not supported.
 - `AllowedPattern` is refused rather than ignored, because a value it was meant to reject would
   otherwise be stored without complaint.
-- `KeyId` is refused, since it only applies to `SecureString` parameters.
+- `KeyId` on a `String` or `StringList` parameter is refused, since nothing would encrypt a value
+  stored in the clear.
 - `DataType` other than `text` is refused. Real Parameter Store validates an `aws:ec2:image` value
   against EC2, which this simulation cannot do.
 - Filters are refused rather than ignored. `GetParametersByPath` refuses `ParameterFilters`, and

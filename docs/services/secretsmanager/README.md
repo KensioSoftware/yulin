@@ -392,7 +392,10 @@ Current documented limitations:
 
 - Secret values are not encrypted. `KmsKeyId` is accepted and reported by `DescribeSecret`, but
   nothing is encrypted with it and no `kms:Decrypt` check happens. That is looser than real AWS,
-  where a caller also needs permission on the key. Simulated KMS is not wired into this service yet.
+  where a caller also needs permission on the key. Sim SSM does encrypt its `SecureString`
+  parameters through simulated KMS, and the same wiring would fit here, but a secret has versions,
+  staging labels and rotation to carry through it, so it is a change of its own rather than a
+  follow-on.
 - A secret name ending in a hyphen and six alphanumeric characters is refused, which is stricter than
   AWS. Real AWS only advises against such names, because they cannot be told apart from an ARN's
   resource part when a partial ARN is resolved. This rules out ordinary-looking names such as

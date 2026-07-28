@@ -45,9 +45,28 @@ because both name the same ARN, and no IAM policy could tell them apart.
 beside it because the name validator and the authorizer both need the prefix without needing a
 parameter.
 
-`SimSsmParameterValue` holds one version's value and enforces the standard tier's 4KB limit, in
-UTF-8 bytes. A `StringList` is one comma-separated string here, as it is on real AWS, rather than an
-array: handler code that splits it on commas is exercising the shape AWS would give it.
+`SimSsmParameterValue` holds one version's value as it is stored. A `StringList` is one
+comma-separated string here, as it is on real AWS, rather than an array: handler code that splits it
+on commas is exercising the shape AWS would give it. A `SecureString` is the base64 ciphertext,
+which is what a read without `WithDecryption` returns. It is made two ways for that reason: the 4KB
+standard tier limit applies to the plaintext a request submitted, not to the longer ciphertext kept
+in its place.
+
+`SimSsmParameterEncryption` is the whole of the KMS integration. Standard tier Parameter Store
+encrypts under the key directly rather than with a data key, so this is an `Encrypt` and a `Decrypt`
+call and nothing more. Two details matter:
+
+- the calls are made as the caller rather than as the service, so a write needs the caller's own
+  `kms:Encrypt` and a decrypting read needs `kms:Decrypt`, each on top of the SSM permission for the
+  parameter;
+- the parameter's ARN is bound in as the `PARAMETER_ARN` encryption context, as real Parameter Store
+  binds it, so a ciphertext moved into another parameter cannot be decrypted there.
+
+Every key problem KMS reports becomes `InvalidKeyId`, carrying the KMS message, which is how real
+Parameter Store reports a key that is missing, disabled or pending deletion. An access denial is not
+a KMS error and passes through untouched, so a missing `kms:Decrypt` still reads as a denial rather
+than a bad key. The default key is the `aws/ssm` alias, and simulated KMS creates the AWS managed key
+behind it on first use, which is how one appears in a real account.
 
 `SimSsmParameterSelector` parses the `name:version` and `name:label` forms a request may write. A
 parameter name cannot contain a colon, so the first one separates the two parts, and a selector of
@@ -114,8 +133,10 @@ There is no resource policy support, so cross-account access to a parameter cann
 
 ## Divergences worth knowing
 
-- `SecureString` is refused. Nothing here would encrypt it, so accepting it would let a test pass
-  while saying nothing about the KMS key, the `kms:Decrypt` permission or `WithDecryption`.
+- Only standard tier `SecureString` encryption is simulated. The advanced tier's envelope encryption
+  through the AWS Encryption SDK is not, so `kms:GenerateDataKey` is never needed.
+- The `aws/ssm` managed key gets simulated KMS's default customer key policy rather than the
+  unchangeable one real AWS gives it, so a caller allowed `kms:Decrypt` on it can decrypt.
 - Parameter labels are refused rather than looked up. `LabelParameterVersion` is not implemented, so
   nothing could create one, and a label selector says that instead of reporting the parameter as
   missing.

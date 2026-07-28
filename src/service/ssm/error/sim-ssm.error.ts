@@ -110,6 +110,21 @@ export class SimSsmUnsupportedParameterType extends SimSsmError {
 }
 
 /**
+ * Simulated SSM InvalidKeyId error.
+ *
+ * Real Parameter Store reports every KMS key problem this way: a key that does
+ * not exist, one that is disabled, and one that is pending deletion all reach
+ * the caller as InvalidKeyId with the KMS message behind it.
+ */
+export class SimSsmInvalidKeyId extends SimSsmError {
+  public override readonly name = "InvalidKeyId";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
  * Simulated SSM ValidationException error.
  *
  * Real Parameter Store reports a missing or malformed request input this way,

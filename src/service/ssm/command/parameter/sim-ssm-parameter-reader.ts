@@ -1,29 +1,21 @@
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import {
   SimSsmParameterNotFound,
   SimSsmParameterVersionNotFound,
 } from "../../error/sim-ssm.error.js";
+import type { SimSsmParameterEncryption } from "../../parameter/sim-ssm-parameter-encryption.js";
 import { SimSsmParameterName } from "../../parameter/sim-ssm-parameter-name.js";
 import { SimSsmParameterSelector } from "../../parameter/sim-ssm-parameter-selector.js";
 import type { SimSsmParameterStore } from "../../parameter/sim-ssm-parameter-store.js";
 import type { SimSsmAuthorizer } from "../authorize/sim-ssm-authorizer.js";
-import type { SimSsmParameterOutput } from "./parameter.command.js";
+import type {
+  SimSsmFoundParameter,
+  SimSsmParameterReadRequest,
+} from "./sim-ssm-parameter-read.js";
 import { SimSsmParameterView } from "./sim-ssm-parameter-view.js";
-
-/**
- * A parameter a read resolved, with the stored name it is ordered by.
- *
- * The name is carried separately rather than read back off the output because
- * a batch read has to sort by it, and the reported shape leaves every field
- * optional.
- */
-export interface SimSsmFoundParameter {
-  readonly name: string;
-  readonly output: SimSsmParameterOutput;
-}
 
 interface SimSsmParameterReaderProperties {
   readonly parameters: SimSsmParameterStore;
+  readonly encryption: SimSsmParameterEncryption;
   readonly authorizer: SimSsmAuthorizer;
 }
 
@@ -35,11 +27,13 @@ interface SimSsmParameterReaderProperties {
  */
 export class SimSsmParameterReader {
   private readonly parameters: SimSsmParameterStore;
+  private readonly encryption: SimSsmParameterEncryption;
   private readonly authorizer: SimSsmAuthorizer;
   private readonly view = new SimSsmParameterView();
 
   constructor(properties: SimSsmParameterReaderProperties) {
     this.parameters = properties.parameters;
+    this.encryption = properties.encryption;
     this.authorizer = properties.authorizer;
   }
 
@@ -48,28 +42,35 @@ export class SimSsmParameterReader {
    *
    * Authorization comes first because real IAM evaluates a request before the
    * service sees it: a caller with no permission is refused whether or not the
-   * parameter exists, rather than being told it is missing.
+   * parameter exists, rather than being told it is missing. Decrypting a
+   * SecureString authorizes again, this time `kms:Decrypt` against the key.
    */
-  read(
-    action: string,
-    requested: string,
-    caller: SimAwsCaller | undefined,
-  ): SimSsmFoundParameter {
-    const selector = new SimSsmParameterSelector(requested);
+  async read(
+    request: SimSsmParameterReadRequest,
+  ): Promise<SimSsmFoundParameter> {
+    const selector = new SimSsmParameterSelector(request.requested);
 
     this.authorizer.authorizeParameterResource(
-      action,
+      request.action,
       SimSsmParameterName.resourceFor(selector.name),
-      caller,
+      request.caller,
     );
 
     const parameter = this.parameters.require(selector.name);
+    const version = selector.versionOf(parameter);
+    const reportedValue = await this.encryption.reported(
+      parameter,
+      version,
+      request.withDecryption,
+      request.caller,
+    );
 
     return {
       name: parameter.name.value,
       output: this.view.value(
         parameter,
-        selector.versionOf(parameter),
+        version,
+        reportedValue,
         selector.selector,
       ),
     };
@@ -82,13 +83,11 @@ export class SimSsmParameterReader {
    * A refused authorization still throws, because one name the caller may not
    * read fails the whole batch on real AWS.
    */
-  readOrInvalid(
-    action: string,
-    requested: string,
-    caller: SimAwsCaller | undefined,
-  ): SimSsmFoundParameter | undefined {
+  async readOrInvalid(
+    request: SimSsmParameterReadRequest,
+  ): Promise<SimSsmFoundParameter | undefined> {
     try {
-      return this.read(action, requested, caller);
+      return await this.read(request);
     } catch (error: unknown) {
       if (
         error instanceof SimSsmParameterNotFound ||
