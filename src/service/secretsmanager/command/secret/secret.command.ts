@@ -140,6 +140,7 @@ export interface SimListSecretsCommandInput {
   readonly NextToken?: string | undefined;
   readonly Filters?: readonly SimListSecretsFilter[] | undefined;
   readonly SortOrder?: string | undefined;
+  readonly SortBy?: string | undefined;
 }
 
 export interface SimSecretsManagerSecretListEntry {

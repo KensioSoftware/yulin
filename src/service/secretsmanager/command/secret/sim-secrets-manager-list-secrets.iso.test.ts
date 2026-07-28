@@ -181,6 +181,22 @@ describe("Secrets Manager ListSecrets", () => {
     assertInstanceOf(error, SimSecretsManagerInvalidParameterException);
   });
 
+  it("refuses a continuation token past the end of the list", async () => {
+    // Given two secrets.
+    const simAws = await simAwsWithSecrets("first", "second");
+
+    // When a canonical token is presented whose offset is past the end, which
+    // is one this command never issues.
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws
+        .secretsManager()
+        .listSecrets(new ListSecretsCommand({ NextToken: "5" })),
+    );
+
+    // Then it is refused rather than answered with an empty page.
+    assertInstanceOf(error, SimSecretsManagerInvalidParameterException);
+  });
+
   it("refuses a sort order, which is not simulated", async () => {
     // Given a simulated AWS.
     const simAws = await simAwsWithSecrets("only");
@@ -193,6 +209,21 @@ describe("Secrets Manager ListSecrets", () => {
     );
 
     // Then it is refused.
+    assertInstanceOf(error, SimSecretsManagerInvalidParameterException);
+  });
+
+  it("refuses a sort field, which is not simulated", async () => {
+    // Given a simulated AWS.
+    const simAws = await simAwsWithSecrets("only");
+
+    // When a sort field is supplied.
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws
+        .secretsManager()
+        .listSecrets(new ListSecretsCommand({ SortBy: "name" })),
+    );
+
+    // Then it is refused rather than quietly returning creation order.
     assertInstanceOf(error, SimSecretsManagerInvalidParameterException);
   });
 

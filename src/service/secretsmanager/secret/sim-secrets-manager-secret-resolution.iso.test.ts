@@ -200,4 +200,36 @@ describe("Secrets Manager scoping", () => {
         .findSecret("db-creds"),
     );
   });
+
+  it("keeps secrets out of another Account in the same Region", async () => {
+    // Given a secret created in one Account.
+    const simAws = new SimAws();
+    await simAws
+      .account("222222222222")
+      .region("eu-west-2")
+      .secretsManager()
+      .createSecret(
+        new CreateSecretCommand({ Name: "db-creds", SecretString: "hunter2" }),
+      );
+
+    // When another Account in the same Region asks for it.
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws
+        .account("333333333333")
+        .region("eu-west-2")
+        .secretsManager()
+        .getSecretValue(new GetSecretValueCommand({ SecretId: "db-creds" })),
+    );
+
+    // Then it is not there: the Region matching is not enough on its own.
+    assertInstanceOf(error, SimSecretsManagerResourceNotFoundException);
+
+    assertUndefined(
+      simAws
+        .account("333333333333")
+        .region("eu-west-2")
+        .secretsManager()
+        .findSecret("db-creds"),
+    );
+  });
 });

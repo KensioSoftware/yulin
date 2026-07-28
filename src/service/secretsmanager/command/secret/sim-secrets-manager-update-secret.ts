@@ -63,13 +63,19 @@ export class SimSecretsManagerUpdateSecret {
     secret.requireNotScheduledForDeletion();
 
     const value = SimSecretsManagerSecretValue.optional(input);
+
+    // The version is written first because writing it can still fail, on a
+    // client request token already used for a different value. Applying the
+    // metadata first would leave the secret half updated by a request that
+    // then reported an error.
+    const versionId = this.writtenVersionId(secret, value, input);
     this.applyMetadata(secret, input);
 
     return {
       $metadata: {},
       ARN: secret.arn.value,
       Name: secret.name,
-      VersionId: this.writtenVersionId(secret, value, input),
+      VersionId: versionId,
     };
   }
 

@@ -2,6 +2,7 @@ import {
   CreateSecretCommand,
   DescribeSecretCommand,
   GetSecretValueCommand,
+  PutSecretValueCommand,
   UpdateSecretCommand,
 } from "@aws-sdk/client-secrets-manager";
 import {
@@ -13,6 +14,7 @@ import {
   assertObjectEquals,
   assertStringStartsWith,
   assertStringLength,
+  assertThrowsErrorAsync,
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -225,5 +227,47 @@ describe("Secrets Manager UpdateSecret", () => {
     assertObjectEquals(described.VersionIdsToStages, {
       [created.VersionId]: ["AWSCURRENT"],
     });
+  });
+
+  it("leaves metadata alone when the version write fails", async () => {
+    // Given a secret with a version written under a request token.
+    const simAws = new SimAws();
+    await simAws.secretsManager().createSecret(
+      new CreateSecretCommand({
+        Name: "all-or-nothing",
+        SecretString: "first",
+        Description: "As it was",
+      }),
+    );
+    await simAws.secretsManager().putSecretValue(
+      new PutSecretValueCommand({
+        SecretId: "all-or-nothing",
+        SecretString: "second",
+        ClientRequestToken: "reused",
+      }),
+    );
+
+    // When an update reuses that token for a different value, alongside a
+    // metadata change.
+    await assertThrowsErrorAsync(async () =>
+      simAws.secretsManager().updateSecret(
+        new UpdateSecretCommand({
+          SecretId: "all-or-nothing",
+          SecretString: "different",
+          Description: "Should not stick",
+          ClientRequestToken: "reused",
+        }),
+      ),
+    );
+
+    // Then the metadata change did not stick either: a failed request leaves
+    // the secret as it was.
+    const described = await simAws
+      .secretsManager()
+      .describeSecret(
+        new DescribeSecretCommand({ SecretId: "all-or-nothing" }),
+      );
+
+    assertIdentical(described.Description, "As it was");
   });
 });
