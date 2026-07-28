@@ -19,6 +19,7 @@ Sim KMS currently supports:
 - Key lifecycle with `EnableKeyCommand`, `DisableKeyCommand`, `ScheduleKeyDeletionCommand` and `CancelKeyDeletionCommand`
 - Key policy evaluation by simulated IAM, including the rule that an identity policy cannot reach a key its policy does not admit
 - Key ARNs, key IDs, alias names and alias ARNs as interchangeable ways to name a key
+- Creating keys and aliases from `AWS::KMS::Key` and `AWS::KMS::Alias` CloudFormation resources
 - Calls made from inside a simulated Lambda handler, authorized as the function's execution role
 
 The simulator focuses on useful behaviour for isolated tests and local development rather than full KMS feature parity.
@@ -315,6 +316,66 @@ try {
 }
 ```
 
+## Deploying a key from CloudFormation
+
+Simulated CloudFormation creates a key from an `AWS::KMS::Key` resource and points an `AWS::KMS::Alias` at it, in the stack's account and region. The key comes out of the same `CreateKey` path an SDK caller uses, so it has real key material, and a `KeyPolicy` the template declares becomes the key policy. Omitting `KeyPolicy` gets the default root-delegation policy, exactly as `CreateKey` with no `Policy` does.
+
+`Ref` on the key gives its key ID rather than its ARN, as on real AWS, and `Fn::GetAtt` gives `Arn` or `KeyId`. `Ref` on the alias gives the alias name, such as `alias/app-key`, which is itself usable as a `KeyId`. That difference matters: a property wanting a key ID takes the `Ref`, and an IAM policy resource wanting the key needs `Fn::GetAtt … Arn`.
+
+```typescript sim-kms-cloudformation-key
+/**
+ * Deploying a KMS key and alias from a CloudFormation template, then
+ * encrypting through the alias the template created.
+ */
+
+import { DecryptCommand, EncryptCommand } from "@aws-sdk/client-kms";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "app-stack",
+  template: {
+    Resources: {
+      AppKey: {
+        Type: "AWS::KMS::Key",
+        Properties: { Description: "Application data key" },
+      },
+      AppKeyAlias: {
+        Type: "AWS::KMS::Alias",
+        Properties: {
+          AliasName: "alias/app-key",
+          TargetKeyId: { Ref: "AppKey" },
+        },
+      },
+    },
+    Outputs: {
+      KeyArn: { Value: { "Fn::GetAtt": ["AppKey", "Arn"] } },
+    },
+  },
+});
+await stack.waitForDeployComplete();
+
+const kms = simAws.kms();
+
+const encrypted = await kms.encrypt(
+  new EncryptCommand({
+    KeyId: "alias/app-key",
+    Plaintext: Buffer.from("hunter2", "utf8"),
+  }),
+);
+
+const decrypted = await kms.decrypt(
+  new DecryptCommand({ CiphertextBlob: encrypted.CiphertextBlob }),
+);
+
+console.log(Buffer.from(decrypted.Plaintext ?? []).toString("utf8")); // "hunter2"
+console.log(stack.outputs.get("KeyArn")?.value); // "arn:aws:kms:...:key/..."
+```
+
+Properties asking for behaviour that is not simulated refuse the deployment rather than being ignored, so a template does not quietly deploy a key that would behave differently on AWS. `EnableKeyRotation`, `RotationPeriodInDays`, `MultiRegion` and `Tags` are all refused, and an asymmetric or HMAC `KeySpec` or `KeyUsage`, or an `Origin` other than `AWS_KMS`, is refused by `CreateKey` in the same terms it refuses an SDK caller. `Enabled: false` is supported, and deploys a key that is disabled from the moment it exists.
+
 ## Inside a simulated Lambda handler
 
 Function code requiring `@aws-sdk/client-kms` is routed into the same simulated AWS environment, with the function's execution role as the caller. A handler that decrypts a value therefore has to be allowed to, by both the key policy and the role's identity policy, the same as on real AWS. See [simulated Lambda](../lambda/) for how function code and execution roles work.
@@ -326,12 +387,14 @@ Current documented limitations:
 - Only symmetric encryption keys (`SYMMETRIC_DEFAULT`, `ENCRYPT_DECRYPT`) are simulated. Asymmetric keys, HMAC keys, `Sign`, `Verify` and `ReEncrypt` are not.
 - Imported key material and custom key stores are not simulated; `Origin` other than `AWS_KMS` is refused.
 - Grants (`CreateGrant` and friends) are not simulated.
-- Automatic key rotation is not simulated.
-- Multi-Region keys are not simulated.
-- `AWS::KMS::Key` and `AWS::KMS::Alias` CloudFormation resources are not supported yet.
+- Automatic key rotation is not simulated. An `AWS::KMS::Key` declaring `EnableKeyRotation` or `RotationPeriodInDays` is refused.
+- Multi-Region keys are not simulated. An `AWS::KMS::Key` declaring `MultiRegion: true` is refused.
+- `AWS::KMS::Key` accepts but ignores `PendingWindowInDays` and `BypassPolicyLockoutSafetyCheck`. Neither has anything to act on: simulated CloudFormation does not delete stacks, and simulated KMS applies no policy lockout safety check to bypass.
+- CloudFormation creates KMS resources but never changes or removes them: an `AWS::KMS::Alias` cannot be retargeted by a stack update, because `UpdateAlias` and `DeleteAlias` are not simulated.
+- `AWS::KMS::Grant` and `AWS::KMS::ReplicaKey` are not supported; a template declaring one is refused.
 - A key pending deletion stays in that state indefinitely. Advancing the simulated clock past the recovery window does not delete it, so the key ID stays taken.
 - Aliases cannot be updated or deleted; `UpdateAlias` and `DeleteAlias` are not supported.
-- Tags, `ListResourceTags` and the `aws:ResourceTag` condition key are not simulated.
+- Tags, `ListResourceTags` and the `aws:ResourceTag` condition key are not simulated. An `AWS::KMS::Key` declaring `Tags` is refused rather than deploying with the tags dropped.
 - `kms:ViaService`, `kms:EncryptionContext:*` and other KMS-specific condition keys are not derived, so a policy relying on them will not match. Ordinary condition operators on values sim IAM does supply work as usual.
 - AWS managed keys created on demand get the same default key policy as a customer key, rather than the via-service-scoped policy real AWS gives them. Scheduling one for deletion is refused, as on real AWS, but disabling one is not, which real AWS does refuse.
 - Key material lives in process memory for the lifetime of the `SimAws` instance. That is fine for a simulator, but it is not a security boundary: anything sharing the process can reach it.

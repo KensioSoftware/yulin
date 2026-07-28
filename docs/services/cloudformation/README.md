@@ -33,6 +33,7 @@ Sim CloudFormation currently supports:
   - `AWS::CloudFront::Distribution`
   - `AWS::Lambda::Function`
   - `AWS::SecretsManager::Secret`
+  - `AWS::KMS::Key` and `AWS::KMS::Alias`
   - CloudFront Functions used by CDK-generated templates
   - selected CDK custom resources such as CDK S3 BucketDeployment
 
@@ -979,6 +980,7 @@ Current supported resource areas include:
 - `AWS::CloudFront::Distribution`
 - `AWS::Lambda::Function`
 - `AWS::SecretsManager::Secret`
+- `AWS::KMS::Key` and `AWS::KMS::Alias`
 - selected CloudFront Function resources emitted by CDK
 - selected CDK custom resources, including CDK S3 BucketDeployment
 
