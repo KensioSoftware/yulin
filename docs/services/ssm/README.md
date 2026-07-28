@@ -19,6 +19,7 @@ Sim SSM currently supports:
 - `DeleteParameterCommand` and `DeleteParametersCommand`
 - `DescribeParametersCommand`
 - `String` and `StringList` parameter types
+- The `AWS::SSM::Parameter` CloudFormation resource, including `Ref` and `Fn::GetAtt`
 - Parameter name validation, including hierarchy depth and the reserved `aws` and `ssm` prefixes
 - Authorization of every operation by simulated IAM, against the real IAM action and ARN
 - Calls made from inside a simulated Lambda handler, authorized as the function's execution role
@@ -323,6 +324,76 @@ deployment failure a passing test would have hidden. A name:
 A `String` or `StringList` value holds at most 4KB, which is the standard tier limit. This is the one
 people hit, usually by putting a whole JSON configuration blob in one parameter.
 
+## Deploying a parameter from CloudFormation
+
+Simulated CloudFormation creates a parameter from an `AWS::SSM::Parameter` resource, in the stack's
+account and region. The parameter is written through `PutParameter`, so a template-created parameter
+is the same thing an SDK caller would get: the same name validation, the same ARN, version 1.
+
+`Ref` on the resource gives the parameter name rather than its ARN, as it does on real AWS, so it can
+be handed straight to `GetParameter`. `Fn::GetAtt … Type` and `Fn::GetAtt … Value` give those
+properties.
+
+```typescript sim-ssm-cloudformation-parameter
+/**
+ * Deploying a parameter from a CloudFormation template and reading it back.
+ */
+
+import { GetParameterCommand } from "@aws-sdk/client-ssm";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "config-stack",
+  template: {
+    Resources: {
+      DbHost: {
+        Type: "AWS::SSM::Parameter",
+        Properties: {
+          Name: "/myapp/prod/db-host",
+          Type: "String",
+          Value: "db.internal",
+          Description: "Where the application database lives",
+        },
+      },
+    },
+    Outputs: {
+      DbHostParameter: {
+        Value: { Ref: "DbHost" },
+      },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+
+// Ref resolves to the parameter name, so it works as a GetParameter Name.
+const parameterName = stack.outputs.get("DbHostParameter")?.value as string;
+
+const read = await simAws
+  .ssm()
+  .getParameter(new GetParameterCommand({ Name: parameterName }));
+
+console.log(read.Parameter?.Value); // "db.internal"
+console.log(read.Parameter?.Version); // 1
+```
+
+A parameter with no `Name` is named after its logical ID. Real CloudFormation generates a name from
+the stack name and its own random characters, so a template cannot rely on the exact generated name
+either way.
+
+An IAM policy granting access to a template-created parameter needs the ARN rather than the `Ref`.
+Build it with `Fn::Sub`, remembering that the ARN drops the name's leading slash:
+
+```yaml
+Resource: !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/myapp/prod/db-host"
+```
+
+CDK does this for you. `ssm.StringParameter` with `grantRead(fn)` synthesises a template that deploys
+here without hand-editing.
+
 ## Reading configuration in a Lambda handler
 
 Function code that reads its configuration on cold start needs no special treatment. Any
@@ -493,8 +564,19 @@ Current documented limitations:
 - There is no per-account parameter count limit, so `ParameterLimitExceeded` never happens.
 - Deletion is immediate. Real Parameter Store asks for thirty seconds before a deleted name is reused;
   here the name is free straight away.
-- `AWS::SSM::Parameter` is not supported as a CloudFormation resource, and `{{resolve:ssm:...}}`
-  template references are not resolved.
+- `AWS::SSM::Parameter` supports `Name`, `Type`, `Value`, `Description` and `Tier`. `AllowedPattern`,
+  `DataType`, `Policies` and `Tags` reach `PutParameter`, which refuses them for the reasons above.
+  `Type: SecureString` is refused, as real CloudFormation refuses it for this resource type: the
+  plaintext value would sit in the template.
+- The other `AWS::SSM::*` resource types (`Document`, `Association`, `MaintenanceWindow`,
+  `PatchBaseline`, `ResourceDataSync` and the rest) are reported as unsupported and skipped rather
+  than deployed.
+- Every deployment of an `AWS::SSM::Parameter` is a create, so a name another stack already used is
+  refused. Sim CloudFormation has no stack updates, so the in-place overwrite real CloudFormation
+  does when a template changes `Value` cannot happen yet.
+- `{{resolve:ssm:...}}` dynamic references and the `AWS::SSM::Parameter::Value<String>` template
+  parameter type are not supported. Those are CloudFormation engine features rather than Parameter
+  Store ones; pass the name from `Ref` instead.
 - Public parameters under `/aws/service/...` do not exist, and names under the reserved `aws` and
   `ssm` prefixes are refused, as they are on real AWS.
 - The Parameters and Secrets Lambda extension HTTP endpoint is not simulated. Handler code has to use

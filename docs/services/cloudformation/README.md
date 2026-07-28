@@ -969,6 +969,7 @@ Sim CloudFormation supports a subset of CloudFormation. The resource types it cr
 - `AWS::Route53::HostedZone` and `AWS::Route53::RecordSet`
 - `AWS::S3::Bucket` and `AWS::S3::BucketPolicy`
 - `AWS::SecretsManager::Secret`
+- `AWS::SSM::Parameter`
 - selected CDK custom resources, including CDK S3 BucketDeployment
 
 Each service's own docs describe what its resource types support. Notable limitations:

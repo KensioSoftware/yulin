@@ -17,6 +17,7 @@ import { SimSsmGetParameterCommands } from "./command/parameter/sim-ssm-get-para
 import { SimSsmGetParametersByPath } from "./command/parameter/sim-ssm-get-parameters-by-path.js";
 import { SimSsmPutParameter } from "./command/parameter/sim-ssm-put-parameter.js";
 import type * as simSsmCommands from "./command/sim-ssm-command.types.js";
+import { SimSsmCfnResourceFactory } from "./cfn/sim-cfn-ssm-resource-factory.js";
 import type { SimSsmParameter } from "./parameter/sim-ssm-parameter.js";
 import { SimSsmParameterStore } from "./parameter/sim-ssm-parameter-store.js";
 import { SimSsmParameterWriter } from "./parameter/sim-ssm-parameter-writer.js";
@@ -51,6 +52,7 @@ export class SimSsm {
   private readonly describeParametersCommand: SimSsmDescribeParameters;
   private readonly background: BackgroundScheduler;
   private readonly sdkRouter = new SimSsmSdkCommandRouter(this);
+  private readonly cfnFactory = new SimSsmCfnResourceFactory({ ssm: this });
 
   constructor(properties: SimSsmProperties = {}) {
     const {
@@ -176,6 +178,13 @@ export class SimSsm {
   ): Promise<simSsmCommands.SimDescribeParametersCommandOutput> {
     await this.background.sequence();
     return this.describeParametersCommand.handle(command, options);
+  }
+
+  /**
+   * Get the CloudFormation Resource factory for AWS::SSM::* Resources.
+   */
+  cfnResourceFactory(): SimSsmCfnResourceFactory {
+    return this.cfnFactory;
   }
 
   /**
