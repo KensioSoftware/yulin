@@ -174,6 +174,30 @@ describe("Secrets Manager CloudFormation Secret validation", () => {
     );
   });
 
+  it("refuses a half-written tag", async () => {
+    // Given tag entries missing a part CloudFormation requires.
+    // When each Resource is created, then each is refused rather than storing
+    // a tag with nothing to match on.
+    const empty = await createSecretResource({
+      SecretString: "hunter2",
+      Tags: [{}],
+    });
+    assertIdentical(
+      empty.message,
+      "Invalid AWS::SecretsManager::Secret BadSecret: Tags.0.Key must be a string",
+    );
+
+    const noValue = await createSecretResource({
+      SecretString: "hunter2",
+      Tags: [{ Key: "component" }],
+    });
+    assertIdentical(
+      noValue.message,
+      "Invalid AWS::SecretsManager::Secret BadSecret: " +
+        "Tags.0.Value must be a string",
+    );
+  });
+
   it("reports Resource types it does not simulate as unsupported", async () => {
     // Given a Secrets Manager Resource type that is not simulated.
     // When the Resource is created, then it is reported as unsupported, which

@@ -31,6 +31,23 @@ export class SimCfnSecretsManagerPropertyParser {
   }
 
   /**
+   * Parse a property value that has to be there and has to be a string.
+   */
+  requiredString(
+    resource: SimCfnResource,
+    value: SimCfnTemplateValue | undefined,
+    label: string,
+  ): string {
+    const parsed = this.optionalString(resource, value, label);
+
+    if (parsed === undefined) {
+      throw this.invalidPropertyError(resource, label, "a string");
+    }
+
+    return parsed;
+  }
+
+  /**
    * Parse a property value that must be a number when present.
    *
    * CloudFormation carries template numbers as strings often enough that a
@@ -105,6 +122,10 @@ export class SimCfnSecretsManagerPropertyParser {
   /**
    * Parse the Tags property, which CloudFormation carries as a list of
    * Key/Value pairs.
+   *
+   * Both parts of a pair are required, as they are on real CloudFormation. A
+   * half-written tag is refused rather than stored with an absent key or
+   * value, which nothing downstream could match on.
    */
   optionalTags(
     resource: SimCfnResource,
@@ -124,8 +145,8 @@ export class SimCfnSecretsManagerPropertyParser {
       const tag = this.record(resource, entry, entryLabel);
 
       return {
-        Key: this.optionalString(resource, tag["Key"], `${entryLabel}.Key`),
-        Value: this.optionalString(
+        Key: this.requiredString(resource, tag["Key"], `${entryLabel}.Key`),
+        Value: this.requiredString(
           resource,
           tag["Value"],
           `${entryLabel}.Value`,
