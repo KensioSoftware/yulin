@@ -15,8 +15,6 @@ import {
 import type { SimAwsAccountRegionContainer } from "./sim-aws-account-region-scope.js";
 import type { SimS3 } from "../s3/sim-s3.js";
 import type { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
-import type { SimCloudFrontRegistry } from "../cloudfront/registry/sim-cloud-front-registry.js";
-import type { SimLambdaUrlRegistry } from "../lambda/registry/sim-lambda-url-registry.js";
 import type { SimDynamoDb as SimDynamoDatabase } from "../dynamodb/index.js";
 import type { SimCloudFormation } from "../cloudformation/index.js";
 import type { SimRoute53 } from "../route53/index.js";
@@ -25,6 +23,7 @@ import { SimAwsScopeRegistry } from "./scope/sim-aws-scope-registry.js";
 import type { SimAcm } from "../acm/sim-acm.js";
 import type { SimIam } from "../iam/index.js";
 import type { SimIamRegistry } from "../iam/registry/sim-iam-registry.js";
+import type { SimKms } from "../kms/index.js";
 import type { SimLambda } from "../lambda/index.js";
 import type { SimSts } from "../sts/sim-sts.js";
 import type { SimAwsPrincipal } from "./caller/sim-aws-caller.js";
@@ -224,6 +223,13 @@ export class SimAws {
   }
 
   /**
+   * Get simulated KMS in the default Account Region scope.
+   */
+  kms(): SimKms {
+    return this.accountRegionScope().kms();
+  }
+
+  /**
    * Get simulated Lambda in the default Account Region scope.
    */
   lambda(): SimLambda {
@@ -249,29 +255,6 @@ export class SimAws {
    */
   sts(): SimSts {
     return this.accountRegionScope().sts();
-  }
-
-  /**
-   * Get the shared simulated CloudFront registry.
-   *
-   * This is intended for CloudFront service/controller wiring so request routing
-   * uses the same registry as CloudFront SDK command handling.
-   * @internal
-   */
-  cloudFrontRegistry(): SimCloudFrontRegistry {
-    return this.serviceFactory.cloudFrontRegistry;
-  }
-
-  /**
-   * Get the shared simulated Lambda Function URL registry.
-   *
-   * This is intended for Lambda controller wiring, so serving a Function URL
-   * request resolves the owning Account from the same registry the Function
-   * URL commands register ids in.
-   * @internal
-   */
-  lambdaUrlRegistry(): SimLambdaUrlRegistry {
-    return this.serviceFactory.lambdaUrlRegistry;
   }
 
   /**

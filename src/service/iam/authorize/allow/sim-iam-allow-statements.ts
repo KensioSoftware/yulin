@@ -1,6 +1,7 @@
 import type { SimIamPolicyDocumentStatement } from "../../policy/sim-iam-policy.js";
 import type { SimIamAuthZPolicySource } from "../context/sim-iam-auth-z-context.js";
 import { SimIamAllowSides } from "./sim-iam-allow-requirement.js";
+import type { SimIamPrincipalMatch } from "../match/sim-iam-principal-match.js";
 
 /**
  * The matching Allow statements found for one authorization, kept per side.
@@ -15,16 +16,26 @@ export class SimIamAllowStatements {
   private readonly identityStatements: SimIamPolicyDocumentStatement[] = [];
   private readonly resourceStatements: SimIamPolicyDocumentStatement[] = [];
   private readonly trustStatements: SimIamPolicyDocumentStatement[] = [];
+  private readonly delegatedStatements: SimIamPolicyDocumentStatement[] = [];
 
   /**
    * Record a matching Allow against the policy side it came from.
+   *
+   * A resource-policy Allow that matched by way of the caller's Account rather
+   * than the caller itself is kept apart as well, so a rule that cares about
+   * the difference can ask for it.
    */
   record(
     policy: SimIamAuthZPolicySource,
     statement: SimIamPolicyDocumentStatement,
+    principal: SimIamPrincipalMatch,
   ): void {
     if (policy.sourceType === "trust") {
       this.trustStatements.push(statement);
+    }
+
+    if (principal.isAccountDelegation) {
+      this.delegatedStatements.push(statement);
     }
 
     this.sideStatements(policy).push(statement);
@@ -62,9 +73,14 @@ export class SimIamAllowStatements {
    * Which sides produced a matching Allow.
    */
   get sides(): SimIamAllowSides {
+    const delegated = new Set(this.delegatedStatements);
+
     return new SimIamAllowSides({
       identity: this.identityStatements.length > 0,
       resource: this.resourceStatements.length > 0,
+      resourceDirect: this.resourceStatements.some(
+        (statement) => !delegated.has(statement),
+      ),
     });
   }
 

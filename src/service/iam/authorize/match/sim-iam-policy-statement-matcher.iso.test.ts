@@ -26,7 +26,7 @@ describe("SimIamPolicyStatementMatcher", () => {
     });
 
     // When the statement is matched against the caller.
-    const isMatches = matcher.matches(policy, statement);
+    const isMatches = matcher.matches(policy, statement).matched;
 
     // Then the array Principal is accepted because at least one entry matches.
     assertTrue(isMatches);
@@ -45,7 +45,7 @@ describe("SimIamPolicyStatementMatcher", () => {
     });
 
     // When the statement is matched against the caller.
-    const isMatches = matcher.matches(policy, statement);
+    const isMatches = matcher.matches(policy, statement).matched;
 
     // Then the unsupported principal type is ignored and the statement does not match.
     assertFalse(isMatches);
@@ -67,7 +67,7 @@ describe("SimIamPolicyStatementMatcher", () => {
     });
 
     // When the statement is matched against the caller.
-    const isMatches = matcher.matches(policy, statement);
+    const isMatches = matcher.matches(policy, statement).matched;
 
     // Then the AWS Principal array is accepted because at least one entry matches.
     assertTrue(isMatches);
@@ -85,7 +85,7 @@ describe("SimIamPolicyStatementMatcher", () => {
     });
 
     // When the request has no caller ARN.
-    const isMatches = matcher.matches(policy, statement);
+    const isMatches = matcher.matches(policy, statement).matched;
 
     // Then the concrete Principal cannot match.
     assertFalse(isMatches);
@@ -103,7 +103,7 @@ describe("SimIamPolicyStatementMatcher", () => {
     });
 
     // When the statement is matched against the caller.
-    const isMatches = matcher.matches(policy, statement);
+    const isMatches = matcher.matches(policy, statement).matched;
 
     // Then the resource policy is rejected because resource policies must name or exclude a principal.
     assertFalse(isMatches);

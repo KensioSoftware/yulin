@@ -66,6 +66,10 @@
       "import": "./dist/service/iam/index.js",
       "types": "./dist/service/iam/index.d.ts"
     },
+    "./kms": {
+      "import": "./dist/service/kms/index.js",
+      "types": "./dist/service/kms/index.d.ts"
+    },
     "./lambda": {
       "import": "./dist/service/lambda/index.js",
       "types": "./dist/service/lambda/index.d.ts"
@@ -103,6 +107,7 @@
     "@aws-sdk/client-cloudfront": "^3.1095.0",
     "@aws-sdk/client-dynamodb": "^3.1095.0",
     "@aws-sdk/client-iam": "^3.1095.0",
+    "@aws-sdk/client-kms": "^3.1095.0",
     "@aws-sdk/client-lambda": "^3.1095.0",
     "@aws-sdk/client-route-53": "^3.1095.0",
     "@aws-sdk/client-s3": "^3.1095.0",

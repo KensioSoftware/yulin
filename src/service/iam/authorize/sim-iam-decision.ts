@@ -168,7 +168,9 @@ export class SimIamPolicyDecision {
     const parsedPolicy = this.policyDocumentParser.parse(policy.document);
 
     for (const statement of parsedPolicy.statements) {
-      if (!this.statementMatcher.matches(policy, statement)) {
+      const principal = this.statementMatcher.matches(policy, statement);
+
+      if (!principal.matched) {
         continue;
       }
 
@@ -177,7 +179,7 @@ export class SimIamPolicyDecision {
         continue;
       }
 
-      this.allows.record(policy, statement.source);
+      this.allows.record(policy, statement.source, principal);
     }
   }
 }

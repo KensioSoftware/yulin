@@ -1,6 +1,12 @@
 interface SimIamAllowSidesProperties {
   readonly identity: boolean;
   readonly resource: boolean;
+
+  /**
+   * Whether a resource-policy Allow named the caller rather than its Account.
+   * Defaults to the resource side, for callers with no reason to distinguish.
+   */
+  readonly resourceDirect?: boolean | undefined;
 }
 
 /**
@@ -14,10 +20,13 @@ interface SimIamAllowSidesProperties {
 export class SimIamAllowSides {
   private readonly identityAllowed: boolean;
   private readonly resourceAllowed: boolean;
+  private readonly resourceDirectAllowed: boolean;
 
   constructor(properties: SimIamAllowSidesProperties) {
     this.identityAllowed = properties.identity;
     this.resourceAllowed = properties.resource;
+    this.resourceDirectAllowed =
+      properties.resourceDirect ?? properties.resource;
   }
 
   /**
@@ -32,6 +41,22 @@ export class SimIamAllowSides {
    */
   get resource(): boolean {
     return this.resourceAllowed;
+  }
+
+  /**
+   * Whether a resource-based policy allowed the request by naming the caller,
+   * rather than by delegating to the caller's Account.
+   */
+  get resourceDirect(): boolean {
+    return this.resourceDirectAllowed;
+  }
+
+  /**
+   * Whether the resource's policy admitted the caller only by delegating to
+   * its Account, which grants nothing on its own.
+   */
+  get resourceDelegated(): boolean {
+    return this.resourceAllowed && !this.resourceDirectAllowed;
   }
 }
 
@@ -72,5 +97,61 @@ export class SimIamBothSidesAllowRequirement implements SimIamAllowRequirement {
    */
   isSatisfiedBy(allows: SimIamAllowSides): boolean {
     return allows.identity && allows.resource;
+  }
+}
+
+/**
+ * The rule for a resource whose policy is mandatory: it must admit the caller.
+ *
+ * Most AWS resources have no resource policy until someone writes one, and its
+ * absence simply leaves the decision to IAM. A KMS key is not like that: it
+ * always has a key policy, and an identity policy cannot reach the key unless
+ * that policy admits the caller. Services holding such a resource ask for this
+ * rule rather than IAM inferring it, because only the service knows its
+ * resource works that way.
+ *
+ * How the policy admits the caller decides what else is needed. A statement
+ * naming the caller grants access outright, which is why a KMS key policy can
+ * make a key usable by a Role with no permissions of its own. A statement
+ * naming the Account only delegates to that Account's IAM, so an identity
+ * policy still has to allow the action. That second case is the one the
+ * default key policy creates, and getting it wrong would make every key in the
+ * simulation usable by every principal in its Account.
+ */
+export class SimIamMandatoryResourcePolicyRequirement implements SimIamAllowRequirement {
+  /**
+   * Whether the resource's own policy admitted the caller, and whether
+   * anything further is needed for the way it did so.
+   */
+  isSatisfiedBy(allows: SimIamAllowSides): boolean {
+    if (allows.resourceDirect) {
+      return true;
+    }
+
+    return allows.resourceDelegated && allows.identity;
+  }
+}
+
+/**
+ * Every applicable rule at once.
+ *
+ * A request can be subject to more than one: a cross-Account call against a
+ * KMS key has to satisfy both the cross-Account rule and the key's own
+ * mandatory-policy rule, and the stricter answer is the right one.
+ */
+export class SimIamEveryAllowRequirement implements SimIamAllowRequirement {
+  private readonly requirements: readonly SimIamAllowRequirement[];
+
+  constructor(requirements: readonly SimIamAllowRequirement[]) {
+    this.requirements = requirements;
+  }
+
+  /**
+   * Whether every rule is satisfied.
+   */
+  isSatisfiedBy(allows: SimIamAllowSides): boolean {
+    return this.requirements.every((requirement) =>
+      requirement.isSatisfiedBy(allows),
+    );
   }
 }

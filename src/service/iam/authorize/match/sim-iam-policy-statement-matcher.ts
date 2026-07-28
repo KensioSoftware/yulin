@@ -6,6 +6,7 @@ import type { SimIamParsedPolicyStatement } from "../../policy/parse/sim-iam-doc
 import { simIamWildcardMatch } from "../sim-iam-wildcard.js";
 import { SimIamPolicyConditionMatcher } from "./condition/sim-iam-policy-condition-matcher.js";
 import { SimIamPolicyPrincipalMatcher } from "./sim-iam-policy-principal-matcher.js";
+import type { SimIamPrincipalMatch } from "./sim-iam-principal-match.js";
 
 /**
  * Matches one parsed IAM policy statement against one authorization request.
@@ -46,12 +47,14 @@ export class SimIamPolicyStatementMatcher {
   matches(
     policy: SimIamAuthZPolicySource,
     statement: SimIamParsedPolicyStatement,
-  ): boolean {
-    return (
-      this.principalMatcher.matches(policy, statement) &&
-      this.actionMatches(statement) &&
-      this.resourceMatches(policy, statement) &&
-      this.conditionMatcher.matches(statement.condition)
+  ): SimIamPrincipalMatch {
+    const principal = this.principalMatcher.matches(policy, statement);
+
+    return principal.when(
+      principal.matched &&
+        this.actionMatches(statement) &&
+        this.resourceMatches(policy, statement) &&
+        this.conditionMatcher.matches(statement.condition),
     );
   }
 

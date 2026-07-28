@@ -1,4 +1,5 @@
 export { SimIam } from "./sim-iam.js";
+export { SimIamAccessDenied, SimIamError } from "./error/sim-iam.error.js";
 export type { SimIamRequestOptions } from "./command/sim-iam-request-options.js";
 export type { SimIamCredentialIdentity } from "./credential/sim-aws-credentials.js";
 export {
