@@ -95,7 +95,7 @@ async function simAwsWithParameterAndRole(
 describe("SSM SDK interception", () => {
   it("routes an intercepted SSMClient to simulated Parameter Store", async () => {
     // Given an intercepted SSM SDK client.
-    const simSdk = new SimSdk();
+    using simSdk = new SimSdk();
     simSdk.intercept(SSMClient);
 
     const client = new SSMClient({ region: "eu-west-2" });
@@ -117,13 +117,11 @@ describe("SSM SDK interception", () => {
     assertNonNullable(read.Parameter);
     assertIdentical(read.Parameter.Value, "db.internal");
     assertStringIncludes(String(read.Parameter.ARN), "arn:aws:ssm:eu-west-2:");
-
-    simSdk.restoreAll();
   });
 
   it("routes every supported Command through the intercepted client", async () => {
     // Given an intercepted SSM SDK client with two parameters.
-    const simSdk = new SimSdk();
+    using simSdk = new SimSdk();
     simSdk.intercept(SSMClient);
 
     const client = new SSMClient({ region: "eu-west-2" });
@@ -173,8 +171,6 @@ describe("SSM SDK interception", () => {
       ["/myapp/prod/db-host", "/myapp/prod/db-port"],
     );
     assertArrayEquals(deleted.DeletedParameters, ["/myapp/prod/db-host"]);
-
-    simSdk.restoreAll();
   });
 
   it("reads a parameter inside a Lambda handler as the execution Role", async () => {

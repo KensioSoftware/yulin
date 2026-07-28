@@ -46,7 +46,7 @@ beside it because the name validator and the authorizer both need the prefix wit
 parameter.
 
 `SimSsmParameterValue` holds one version's value and enforces the standard tier's 4KB limit, in
-UTF-8 bytes. A `StringList` is one comma separated string here, as it is on real AWS, rather than an
+UTF-8 bytes. A `StringList` is one comma-separated string here, as it is on real AWS, rather than an
 array: handler code that splits it on commas is exercising the shape AWS would give it.
 
 `SimSsmParameterSelector` parses the `name:version` and `name:label` forms a request may write. A

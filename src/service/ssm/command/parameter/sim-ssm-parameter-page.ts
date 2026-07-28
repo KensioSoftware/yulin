@@ -63,9 +63,10 @@ export class SimSsmParameterPage<TItem> {
   /**
    * Read a continuation token as its offset into the listed parameters.
    *
-   * Tokens are the canonical non-negative integer representation these
-   * commands emit, so anything else is refused rather than silently starting
-   * again from the beginning.
+   * Tokens are the canonical positive integer representation these commands
+   * emit, so anything else is refused rather than silently starting again from
+   * the beginning. That includes `0`, which is never issued because the first
+   * page is the one reached without a token at all.
    */
   private static startIndex(
     nextToken: string | undefined,
@@ -79,7 +80,7 @@ export class SimSsmParameterPage<TItem> {
 
     if (
       !Number.isSafeInteger(startIndex) ||
-      startIndex < 0 ||
+      startIndex < 1 ||
       startIndex >= listedCount ||
       String(startIndex) !== nextToken
     ) {

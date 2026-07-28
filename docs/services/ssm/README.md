@@ -276,7 +276,7 @@ request.
 
 ## String lists
 
-A `StringList` value is one comma separated string, on read as well as on write. It is not returned
+A `StringList` value is one comma-separated string, on read as well as on write. It is not returned
 as an array.
 
 ```typescript sim-ssm-string-list

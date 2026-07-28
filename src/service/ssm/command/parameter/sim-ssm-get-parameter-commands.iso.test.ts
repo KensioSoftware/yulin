@@ -54,7 +54,7 @@ describe("SSM GetParameter", () => {
     assertUndefined(read.Parameter.Selector);
   });
 
-  it("returns a StringList as one comma separated string", async () => {
+  it("returns a StringList as one comma-separated string", async () => {
     // Given a StringList parameter.
     const simAws = new SimAws();
     await simAws.ssm().putParameter(

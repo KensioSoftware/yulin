@@ -12,7 +12,7 @@ const maxValueBytes = 4096;
 /**
  * The value held by one version of a simulated parameter.
  *
- * A `StringList` value is a single comma separated string here, as it is on
+ * A `StringList` value is a single comma-separated string here, as it is on
  * real Parameter Store. It is stored and returned that way rather than split
  * into an array, so handler code that splits it on commas is exercising the
  * same shape it would get from AWS.

@@ -208,6 +208,25 @@ describe("SSM GetParametersByPath", () => {
     assertInstanceOf(error, SimSsmValidationException);
   });
 
+  it("refuses a zero token, which no listing ever issues", async () => {
+    // Given a hierarchy.
+    const simAws = await simAwsWithHierarchy();
+
+    // When a listing continues from a token pointing at the first parameter.
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws.ssm().getParametersByPath(
+        new GetParametersByPathCommand({
+          Path: "/myapp",
+          NextToken: "0",
+        }),
+      ),
+    );
+
+    // Then it is refused. The first page is the one reached with no token at
+    // all, so this is a token the simulation could not have issued.
+    assertInstanceOf(error, SimSsmValidationException);
+  });
+
   it("requires a path", async () => {
     // Given a simulated AWS.
     const simAws = new SimAws();
