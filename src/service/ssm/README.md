@@ -72,6 +72,25 @@ rather than one class per command, so the `SimSsm` facade stays a delegation:
 `SimSsmUnsimulatedPutOptions` gathers every PutParameter option this simulation refuses, in one
 readable place, rather than scattering the refusals through the write path.
 
+## CloudFormation
+
+`cfn/` creates parameters from `AWS::SSM::Parameter` Resources. `SimCfnSsmParameterProperties` reads
+the template properties and `SimCfnSsmParameterCreator` hands them to PutParameter, so a
+template-created parameter is the same thing an SDK caller would get and the options this simulation
+refuses are refused in one place.
+
+The one rule that lives in the CloudFormation layer is the type. Real CloudFormation refuses
+`SecureString` for this Resource type whatever Parameter Store itself supports, because the plaintext
+value would sit in the template, so the refusal belongs to the Resource rather than to the
+simulation.
+
+`Ref` and `Fn::GetAtt` behaviour is in `SimSsmParameterCfn`, beside the other services' adapters
+under `cloudformation/resource/cfn/`. `Ref` gives the parameter name rather than its ARN, as
+`AWS::SSM::Parameter` does on real AWS.
+
+Parameter Store is all this service simulates, so the other `AWS::SSM::*` Resource types are reported
+as unsupported and the engine skips them.
+
 As elsewhere, implementation code under `src/` does not import real AWS SDK packages. The structural
 command types in `*.command.ts` match the SDK shapes closely enough for callers to pass real SDK
 command instances.
@@ -105,7 +124,9 @@ There is no resource policy support, so cross-account access to a parameter cann
 - `GetParametersByPath` and `DescribeParameters` refuse filters rather than ignoring them.
 - Every version is kept. Real Parameter Store keeps the hundred most recent and deletes the oldest
   as new ones are made.
-- There is no `AWS::SSM::Parameter` CloudFormation resource and no `{{resolve:ssm:...}}` support
-  yet, so this service has no `cfn/` directory.
+- Every deployment of an `AWS::SSM::Parameter` is a create, because sim CloudFormation has no stack
+  updates. A name another stack already used is refused rather than overwritten.
+- There is no `{{resolve:ssm:...}}` support and no `AWS::SSM::Parameter::Value<String>` template
+  parameter type. Both are CloudFormation engine features rather than Parameter Store ones.
 
 The full list is in [docs/services/ssm](../../../docs/services/ssm/).
