@@ -22,6 +22,7 @@ npm i -D @kensio/yulin
 - [ACM](./docs/services/acm "Simulated ACM docs")
 - [CloudFormation](./docs/services/cloudformation "Simulated CloudFormation docs")
 - [CloudFront](./docs/services/cloudfront "Simulated CloudFront docs")
+- [Cognito user pools](./docs/services/cognito "Simulated Cognito user pools docs")
 - [IAM](./docs/services/iam "Simulated IAM docs")
 - [KMS](./docs/services/kms "Simulated KMS docs")
 - [Lambda](./docs/services/lambda "Simulated Lambda docs")
