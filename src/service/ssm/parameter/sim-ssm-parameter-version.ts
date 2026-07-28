@@ -10,7 +10,7 @@ import type { SimSsmParameterValue } from "./sim-ssm-parameter-value.js";
 export const ssmTextDataType = "text";
 
 /**
- * The details one write of a parameter carries, beyond its value.
+ * The details one stored version of a parameter records, beyond its value.
  */
 export interface SimSsmParameterVersionDetails {
   readonly description?: string | undefined;

@@ -9,19 +9,30 @@ import { SimSsmParameterOverwrite } from "./sim-ssm-parameter-overwrite.js";
 import type { SimSsmParameterStore } from "./sim-ssm-parameter-store.js";
 import type { SimSsmParameterType } from "./sim-ssm-parameter-type.js";
 import { SimSsmParameterValue } from "./sim-ssm-parameter-value.js";
-import type {
-  SimSsmParameterVersion,
-  SimSsmParameterVersionDetails,
-} from "./sim-ssm-parameter-version.js";
+import type { SimSsmParameterVersion } from "./sim-ssm-parameter-version.js";
 
 /**
  * One write of a parameter, as PutParameter describes it.
+ *
+ * This is the request rather than what gets stored, which is why it does not
+ * share the version's details: the two differ on the key. Here it is whatever
+ * the request asked for, and on the version it is the ARN that answered.
  */
-export interface SimSsmParameterWrite extends SimSsmParameterVersionDetails {
+export interface SimSsmParameterWrite {
   readonly name: SimSsmParameterName;
   readonly value: string | undefined;
   readonly type: string | undefined;
   readonly overwrite: boolean | undefined;
+  readonly description: string | undefined;
+  readonly dataType: string | undefined;
+  readonly lastModifiedUser: string | undefined;
+
+  /**
+   * The key the request asked to encrypt with, in any form KMS accepts: an
+   * alias such as `alias/aws/ssm`, a key ID, or a key ARN. Undefined leaves
+   * Parameter Store to pick its own AWS managed key.
+   */
+  readonly keyId: string | undefined;
 
   /**
    * The caller the KMS call for a SecureString is made as, so that encrypting
