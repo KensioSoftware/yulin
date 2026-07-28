@@ -10,6 +10,7 @@ import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { SimSecretsManagerCfnResourceFactory } from "./cfn/sim-cfn-secrets-manager-resource-factory.js";
 import { SimSecretsManagerAuthorizer } from "./command/authorize/sim-secrets-manager-authorizer.js";
 import { SimSecretsManagerLifecycleCommands } from "./command/secret/sim-secrets-manager-lifecycle-commands.js";
 import { SimSecretsManagerListSecrets } from "./command/secret/sim-secrets-manager-list-secrets.js";
@@ -50,6 +51,9 @@ export class SimSecretsManager {
   private readonly valueCommands: SimSecretsManagerValueCommands;
   private readonly background: BackgroundScheduler;
   private readonly sdkRouter = new SimSecretsManagerSdkCommandRouter(this);
+  private readonly cfnFactory = new SimSecretsManagerCfnResourceFactory({
+    secretsManager: this,
+  });
 
   constructor(properties: SimSecretsManagerProperties = {}) {
     const {
@@ -196,6 +200,14 @@ export class SimSecretsManager {
   ): Promise<simSecretsManagerCommands.SimRestoreSecretCommandOutput> {
     await this.background.sequence();
     return this.lifecycleCommands.restore(command, options);
+  }
+
+  /**
+   * Get this service's CloudFormation Resource factory, which creates
+   * simulated secrets from AWS::SecretsManager::* Resources.
+   */
+  cfnResourceFactory(): SimSecretsManagerCfnResourceFactory {
+    return this.cfnFactory;
   }
 
   /**

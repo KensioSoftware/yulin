@@ -89,6 +89,29 @@ There is no resource policy support yet, so unlike KMS this service passes no re
 the IAM decision. Cross-account access to a secret therefore cannot be granted, which is documented
 as a limitation rather than quietly allowed.
 
+## CloudFormation
+
+`cfn/` owns `AWS::SecretsManager::*`, resolved into the CloudFormation engine by
+`sim-cfn-service-resolver.ts`. Only `Secret` is created; the other resource types are reported as
+unsupported, which is what makes the engine skip them rather than fail the stack.
+
+`SimCfnSecretsManagerSecretCreator` goes through the ordinary `CreateSecret` command rather than
+building a secret directly, so a secret a template deployed is the same thing an SDK caller would
+have got, name validation and ARN suffix included. Property reading lives in
+`SimCfnSecretsManagerSecretProperties`, which owns the one rule worth stating in a single place: a
+template supplies a value or asks for one to be generated, never both and never neither.
+
+Password generation lives in `secret/generate/` rather than in `cfn/`, because it is Secrets Manager
+behaviour rather than CloudFormation behaviour — `GetRandomPassword` would use the same rules under
+the same option names. `SimSecretsManagerPasswordSpec` validates a request when it is described, so
+a contradiction such as four required character types in a three-character password is refused
+before anything is generated. The randomness is real rather than seedable: a test that wants the
+generated value reads it back out of the simulation, as a deployed application does.
+
+`Ref` and `Fn::GetAtt … Id` both give the full ARN, through `SimSecretsManagerSecretCfn`. That
+carries the random suffix, which is what makes a `Ref` into an IAM policy resource behave here the
+way it does on real AWS.
+
 ## Divergences worth knowing
 
 - `KmsKeyId` is stored and reported but nothing is encrypted with it, and no `kms:Decrypt` check
@@ -97,5 +120,10 @@ as a limitation rather than quietly allowed.
 - `ListSecrets` refuses `Filters` and `SortOrder` rather than ignoring them.
 - A version that has lost every staging label is kept rather than removed, so it stays readable by
   version id. It is left out of `VersionIdsToStages` either way.
+- An `AWS::SecretsManager::Secret` declaring neither `SecretString` nor `GenerateSecretString` is
+  refused. Real CloudFormation creates an empty secret; a secret with no version is not simulated,
+  and refusing is the fail-closed reading.
+- `ExcludeCharacters` that empties an included character type is refused rather than generating a
+  password quietly missing a type it was told to include.
 
 The full list is in [docs/services/secretsmanager](../../../docs/services/secretsmanager/).
