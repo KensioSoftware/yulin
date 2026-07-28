@@ -10,21 +10,29 @@ import { SimSsmValidationException } from "../error/sim-ssm.error.js";
 const maxValueBytes = 4096;
 
 /**
- * The value held by one version of a simulated parameter.
+ * The value held by one version of a simulated parameter, as it is stored.
  *
  * A `StringList` value is a single comma-separated string here, as it is on
  * real Parameter Store. It is stored and returned that way rather than split
  * into an array, so handler code that splits it on commas is exercising the
  * same shape it would get from AWS.
+ *
+ * A `SecureString` value is stored as the base64 ciphertext KMS produced,
+ * which is what a read without `WithDecryption` returns. The 4KB limit applies
+ * to the plaintext a request submitted rather than to that ciphertext, so the
+ * two ways of making one of these are separate.
  */
 export class SimSsmParameterValue {
   public readonly value: string;
 
-  constructor(value: string | undefined) {
-    this.value = SimSsmParameterValue.validated(value);
+  private constructor(value: string) {
+    this.value = value;
   }
 
-  private static validated(value: string | undefined): string {
+  /**
+   * The value a request submitted, checked against the standard tier limit.
+   */
+  static submitted(value: string | undefined): SimSsmParameterValue {
     if (value === undefined || value === "") {
       throw new SimSsmValidationException(
         "A parameter Value is required and cannot be empty",
@@ -41,6 +49,17 @@ export class SimSsmParameterValue {
       );
     }
 
-    return value;
+    return new SimSsmParameterValue(value);
+  }
+
+  /**
+   * The stored form of an encrypted value.
+   *
+   * This is longer than the plaintext it came from and is not subject to the
+   * limit that plaintext was checked against, because Parameter Store measures
+   * the request rather than what it keeps.
+   */
+  static encrypted(ciphertext: string): SimSsmParameterValue {
+    return new SimSsmParameterValue(ciphertext);
   }
 }

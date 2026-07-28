@@ -43,10 +43,10 @@ export class SimSsmPutParameter {
   /**
    * Create or update a parameter.
    */
-  handle(
+  async handle(
     command: SimPutParameterCommand,
     options?: SimSsmPutParameterOptions,
-  ): SimPutParameterCommandOutput {
+  ): Promise<SimPutParameterCommandOutput> {
     const { input } = command;
 
     this.unsimulatedOptions.refuseIn(input);
@@ -61,14 +61,16 @@ export class SimSsmPutParameter {
       options?.caller,
     );
 
-    const version = this.writer.write({
+    const version = await this.writer.write({
       name,
       value: input.Value,
       type: input.Type,
       overwrite: input.Overwrite,
       description: input.Description,
       dataType: input.DataType,
+      keyId: input.KeyId,
       lastModifiedUser: caller.arn,
+      caller: options?.caller,
     });
 
     return {

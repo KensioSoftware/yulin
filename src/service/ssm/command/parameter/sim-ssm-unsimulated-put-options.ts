@@ -21,11 +21,6 @@ export class SimSsmUnsimulatedPutOptions {
     this.refuse("AllowedPattern", input.AllowedPattern, "value validation");
     this.refuse("Policies", input.Policies, "parameter policies");
     this.refuse("Tags", input.Tags, "parameter tags");
-    this.refuse(
-      "KeyId",
-      input.KeyId,
-      "encryption, which only applies to SecureString parameters",
-    );
   }
 
   private refuseTier(tier: string | undefined): void {

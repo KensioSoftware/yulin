@@ -26,6 +26,7 @@ export interface SimSsmParameterMetadata {
   readonly ARN?: string | undefined;
   readonly DataType?: string | undefined;
   readonly Description?: string | undefined;
+  readonly KeyId?: string | undefined;
   readonly LastModifiedDate?: Date | undefined;
   readonly LastModifiedUser?: string | undefined;
   readonly Name?: string | undefined;

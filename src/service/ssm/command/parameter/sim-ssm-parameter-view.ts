@@ -24,19 +24,24 @@ export class SimSsmParameterView {
   /**
    * The parameter shape that carries a value.
    *
+   * The reported value is passed in rather than read off the version, because
+   * a SecureString reads back as its ciphertext or its plaintext depending on
+   * whether the request asked for decryption.
+   *
    * `Selector` is only reported when the request asked for a version or a
    * label, as real Parameter Store only reports it then.
    */
   value(
     parameter: SimSsmParameter,
     version: SimSsmParameterVersion,
+    reportedValue: string,
     selector?: string,
   ): SimSsmParameterOutput {
     return {
       ARN: parameter.arn.value,
       Name: parameter.name.value,
       Type: parameter.type.value,
-      Value: version.value.value,
+      Value: reportedValue,
       Version: version.version,
       DataType: version.dataType,
       LastModifiedDate: version.lastModifiedDate,
@@ -59,6 +64,7 @@ export class SimSsmParameterView {
       Version: version.version,
       DataType: version.dataType,
       Description: version.description,
+      KeyId: version.keyId,
       LastModifiedDate: version.lastModifiedDate,
       LastModifiedUser: version.lastModifiedUser,
       Policies: [],

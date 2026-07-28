@@ -110,14 +110,4 @@ describe("SSM PutParameter options that are not simulated", () => {
     assertInstanceOf(error, SimSsmValidationException);
     assertStringIncludes(error.message, "Tags");
   });
-
-  it("refuses a KMS key id", async () => {
-    // When a request names a key to encrypt with.
-    const error = await refusedOption({ KeyId: "alias/aws/ssm" });
-
-    // Then it is refused, because only SecureString parameters are encrypted
-    // and those are not simulated either.
-    assertInstanceOf(error, SimSsmValidationException);
-    assertStringIncludes(error.message, "KeyId");
-  });
 });

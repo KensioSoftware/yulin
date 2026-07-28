@@ -272,13 +272,15 @@ export class SimAwsServiceFactory {
    * Create simulated SSM for an Account Region scope.
    *
    * Parameters are Region-scoped on real AWS: a parameter name is unique
-   * within one Account and Region, and its ARN names the Region.
+   * within one Account and Region, and its ARN names the Region. SecureString
+   * values are encrypted through that same scope's simulated KMS.
    */
   createSsm(scope: SimAwsAccountRegionContainer): SimSsm {
     return new SimSsm({
       accountRegionScope: scope.accountRegionScope,
       iam: this.createIam(scope),
       background: this.background,
+      kms: scope.kms(),
     });
   }
 

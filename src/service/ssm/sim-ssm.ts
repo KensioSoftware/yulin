@@ -10,6 +10,7 @@ import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { SimKms } from "../kms/index.js";
 import { SimSsmAuthorizer } from "./command/authorize/sim-ssm-authorizer.js";
 import { SimSsmDeleteParameterCommands } from "./command/parameter/sim-ssm-delete-parameter-commands.js";
 import { SimSsmDescribeParameters } from "./command/parameter/sim-ssm-describe-parameters.js";
@@ -19,6 +20,8 @@ import { SimSsmPutParameter } from "./command/parameter/sim-ssm-put-parameter.js
 import type * as simSsmCommands from "./command/sim-ssm-command.types.js";
 import { SimSsmCfnResourceFactory } from "./cfn/sim-cfn-ssm-resource-factory.js";
 import type { SimSsmParameter } from "./parameter/sim-ssm-parameter.js";
+import { SimSsmParameterEncryption } from "./parameter/sim-ssm-parameter-encryption.js";
+import type { SimSsmKmsCrypto } from "./parameter/sim-ssm-kms-crypto.js";
 import { SimSsmParameterStore } from "./parameter/sim-ssm-parameter-store.js";
 import { SimSsmParameterWriter } from "./parameter/sim-ssm-parameter-writer.js";
 import { SimSsmSdkCommandRouter } from "./sdk/sim-ssm-sdk-command-router.js";
@@ -31,6 +34,13 @@ interface SimSsmProperties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
+
+  /**
+   * The simulated KMS that SecureString values are encrypted through. One is
+   * created for this scope when none is supplied, so a standalone SimSsm still
+   * encrypts rather than quietly storing secrets in the clear.
+   */
+  readonly kms?: SimSsmKmsCrypto;
 }
 
 /**
@@ -61,13 +71,18 @@ export class SimSsm {
       background = new BackgroundTasks(),
     } = properties;
 
+    const { kms = new SimKms({ accountRegionScope, iam, background }) } =
+      properties;
+
     const authorizer = new SimSsmAuthorizer({ iam, accountRegionScope });
+    const encryption = new SimSsmParameterEncryption({ kms });
 
     this.background = background;
     this.parameters = new SimSsmParameterStore();
     this.putParameterCommand = new SimSsmPutParameter({
       writer: new SimSsmParameterWriter({
         parameters: this.parameters,
+        encryption,
         accountRegionScope,
         clock: background,
       }),
@@ -76,10 +91,12 @@ export class SimSsm {
     });
     this.readCommands = new SimSsmGetParameterCommands({
       parameters: this.parameters,
+      encryption,
       authorizer,
     });
     this.pathCommand = new SimSsmGetParametersByPath({
       parameters: this.parameters,
+      encryption,
       authorizer,
       accountRegionScope,
     });
@@ -111,7 +128,7 @@ export class SimSsm {
     options?: SimSsmRequestOptions,
   ): Promise<simSsmCommands.SimPutParameterCommandOutput> {
     await this.background.sequence();
-    return this.putParameterCommand.handle(command, options);
+    return await this.putParameterCommand.handle(command, options);
   }
 
   /**
@@ -122,7 +139,7 @@ export class SimSsm {
     options?: SimSsmRequestOptions,
   ): Promise<simSsmCommands.SimGetParameterCommandOutput> {
     await this.background.sequence();
-    return this.readCommands.get(command, options);
+    return await this.readCommands.get(command, options);
   }
 
   /**
@@ -133,7 +150,7 @@ export class SimSsm {
     options?: SimSsmRequestOptions,
   ): Promise<simSsmCommands.SimGetParametersCommandOutput> {
     await this.background.sequence();
-    return this.readCommands.getMany(command, options);
+    return await this.readCommands.getMany(command, options);
   }
 
   /**
@@ -144,7 +161,7 @@ export class SimSsm {
     options?: SimSsmRequestOptions,
   ): Promise<simSsmCommands.SimGetParametersByPathCommandOutput> {
     await this.background.sequence();
-    return this.pathCommand.handle(command, options);
+    return await this.pathCommand.handle(command, options);
   }
 
   /**

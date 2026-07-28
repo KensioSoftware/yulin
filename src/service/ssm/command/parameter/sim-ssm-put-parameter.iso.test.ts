@@ -170,27 +170,6 @@ describe("SSM PutParameter", () => {
     assertIdentical(put.Version, 2);
   });
 
-  it("refuses a SecureString parameter", async () => {
-    // Given a simulated AWS.
-    const simAws = new SimAws();
-
-    // When a parameter asks to be encrypted.
-    const error = await assertThrowsErrorAsync(async () =>
-      simAws.ssm().putParameter(
-        new PutParameterCommand({
-          Name: "db-password",
-          Type: "SecureString",
-          Value: "hunter2",
-        }),
-      ),
-    );
-
-    // Then it is refused rather than stored in the clear, because nothing here
-    // would encrypt it.
-    assertInstanceOf(error, SimSsmUnsupportedParameterType);
-    assertStringIncludes(error.message, "not simulated");
-  });
-
   it("refuses a type Parameter Store does not have", async () => {
     // Given a simulated AWS.
     const simAws = new SimAws();
