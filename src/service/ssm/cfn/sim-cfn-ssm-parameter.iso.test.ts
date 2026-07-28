@@ -1,6 +1,7 @@
 import { GetParameterCommand } from "@aws-sdk/client-ssm";
 import {
   assertIdentical,
+  assertInstanceOf,
   assertNonNullable,
   assertUndefined,
 } from "@kensio/smartass";
@@ -8,7 +9,7 @@ import { describe, it } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
 import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
-import type { SimSsmParameter } from "../parameter/sim-ssm-parameter.js";
+import { SimSsmParameter } from "../parameter/sim-ssm-parameter.js";
 
 const accountIdOneOnes = "111111111111" as SimAwsAccountId;
 
@@ -158,9 +159,10 @@ describe("SSM CloudFormation Parameter deployment", () => {
     const resource = stack.getResource("DbHost");
     assertNonNullable(resource);
 
-    // Then it is backed by the same simulated parameter the service holds.
-    const parameter = resource.simResource as SimSsmParameter | undefined;
-    assertNonNullable(parameter);
+    // Then it is backed by the same simulated parameter the service holds,
+    // rather than some other simulated resource that happens to have an ARN.
+    const parameter = resource.simResource;
+    assertInstanceOf(parameter, SimSsmParameter);
     assertIdentical(
       simAws.ssm().findParameter("/myapp/prod/db-host")?.arn.value,
       parameter.arn.value,
