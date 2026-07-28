@@ -11,26 +11,21 @@ services, such as simulated CloudFront distributions or simulated S3 bucket webs
 
 Sim Route53 currently supports:
 
-- Creating Hosted Zones with `CreateHostedZoneCommand`
-- Getting Hosted Zones with `GetHostedZoneCommand`
-- Listing Hosted Zones by name with `ListHostedZonesByNameCommand`
-- Changing record sets with `ChangeResourceRecordSetsCommand`
-- Listing record sets in a Hosted Zone with `ListResourceRecordSetsCommand`
-- `CREATE`, `UPSERT`, and `DELETE` record changes
-- Stored record types: `A`, `AAAA`, `CNAME`, `TXT`, `NS`, and `SOA`
+- `CreateHostedZoneCommand`, `GetHostedZoneCommand` and `ListHostedZonesByNameCommand`
+- `ChangeResourceRecordSetsCommand` and `ListResourceRecordSetsCommand`
+- `CREATE`, `UPSERT` and `DELETE` record changes
+- Stored record types: `A`, `AAAA`, `CNAME`, `TXT`, `NS` and `SOA`
 - Local HTTP hostname routing through `CNAME` records that point to simulated service hostnames
 - Alias records, with `AliasTarget.DNSName` stored as the record value
 - Local hostname resolution through `*.sim-aws.localhost`
 - A browser-viewable hosted zone and record summary at `dns.sim-aws.localhost`
-- Real DNS answers over UDP, so records can be queried with `dig` or any DNS client
-- CloudFormation resources:
-  - `AWS::Route53::HostedZone`
-  - `AWS::Route53::RecordSet`
+- DNS answers over UDP, so records can be queried with `dig` or any DNS client
+- The `AWS::Route53::HostedZone` and `AWS::Route53::RecordSet` CloudFormation resources
 - CDK-created Route53 Hosted Zones and records in synthesized templates
 
-The simulator focuses on useful behavior for isolated tests and local development rather than full
-Route53 feature parity. Unsupported Route53 options may be ignored or may throw errors depending on
-whether the simulator needs them to model the requested behavior.
+The simulator focuses on useful behaviour for tests and local development rather than full Route53
+feature parity. Unsupported Route53 options may be ignored or may throw errors depending on whether
+the simulator needs them to model the requested behaviour.
 
 ## Basic Hosted Zone usage
 
@@ -396,8 +391,8 @@ back as `StartRecordName` and `StartRecordType`. Marker names are normalised, so
 and `WWW.EXAMPLE.TEST.` select the same starting point.
 
 Alias records are returned with an `AliasTarget` rather than `ResourceRecords`. The simulator stores
-an alias target as a record value plus an alias flag, so `AliasTarget.DNSName` is returned but
-`AliasTarget.HostedZoneId` is not — it is not part of the stored record.
+an alias target as a record value plus an alias flag, so `AliasTarget.DNSName` is returned.
+`AliasTarget.HostedZoneId` is not part of the stored record and is not returned.
 
 ## Inspecting hosted zones in a browser
 
@@ -584,9 +579,9 @@ number is already held on UDP by something else, DNS binds an ephemeral port ins
 `srv.dnsPort` rather than assuming it matches `srv.port`.
 
 Nothing binds port 53, which would need root. To resolve simulated names system-wide without naming a
-port, point your resolver at the simulator yourself — on macOS, a file such as `/etc/resolver/test`
-containing `nameserver 127.0.0.1` and `port <dnsPort>` makes the whole `.test` TLD resolve through it.
-That is a change to your machine, so Yulin does not make it for you.
+port, point your resolver at the simulator yourself. On macOS, a file such as `/etc/resolver/test`
+containing `nameserver 127.0.0.1` and `port <dnsPort>` makes the whole `.test` TLD resolve through
+it. That is a change to your machine, so Yulin does not make it for you.
 
 ### What is answered
 

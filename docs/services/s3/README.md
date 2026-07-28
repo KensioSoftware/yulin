@@ -1,6 +1,6 @@
 # Simulated S3
 
-Yulin includes a simulated S3 service for isolated tests, local development, and CI.
+Yulin includes a simulated S3 service for tests and local development.
 
 Sim S3 can be used directly through `SimAws` or instantiated on its own as `SimS3` with isolated
 state. Yulin can serve a simulated S3 service on localhost.
@@ -9,17 +9,14 @@ state. Yulin can serve a simulated S3 service on localhost.
 
 Sim S3 currently supports:
 
-- Creating Buckets with `CreateBucketCommand`
-- Listing Buckets with `ListBucketsCommand`
-- Putting Objects with `PutObjectCommand`
-- Getting Objects with `GetObjectCommand`
-- Listing Objects with `ListObjectsCommand`
-- Configuring static website hosting with `PutBucketWebsiteCommand`
-- Bucket policies with `PutBucketPolicyCommand`, `GetBucketPolicyCommand` and
-  `DeleteBucketPolicyCommand`, evaluated by sim IAM alongside identity policies
-- Creating Buckets and Bucket policies from `AWS::S3::Bucket` and `AWS::S3::BucketPolicy`
-- Block Public Access, on by default as in real S3, refusing a public Bucket policy unless the
-  Bucket opts out with `PutPublicAccessBlockCommand` or `PublicAccessBlockConfiguration`
+- `CreateBucketCommand` and `ListBucketsCommand`
+- `PutObjectCommand`, `GetObjectCommand` and `ListObjectsCommand`
+- `PutBucketWebsiteCommand`, for static website hosting
+- `PutBucketPolicyCommand`, `GetBucketPolicyCommand` and `DeleteBucketPolicyCommand`, evaluated by
+  sim IAM alongside identity policies
+- The `AWS::S3::Bucket` and `AWS::S3::BucketPolicy` CloudFormation resources
+- Block Public Access, on by default as in real S3, refusing a public Bucket policy unless the Bucket
+  opts out with `PutPublicAccessBlockCommand` or `PublicAccessBlockConfiguration`
 - Serving static website requests on localhost with `serveSimAws`
 - Serving Object `GET`, `HEAD` and `PUT` over the S3 REST endpoint, authorized by sim IAM
 - Presigned URLs built by the real `@aws-sdk/s3-request-presigner`, with expiry in simulated time
@@ -29,9 +26,9 @@ Sim S3 currently supports:
 - In-memory Object storage by default
 - Optional filesystem-backed Bucket storage with `mountBucketFilesystem(...)`
 
-The simulator focuses on useful behavior for isolated tests and local development rather than full
-S3 feature parity. Unsupported S3 options may be ignored or may throw errors depending on whether
-the simulator needs them to model the requested behaviour.
+The simulator focuses on useful behaviour for tests and local development rather than full S3 feature
+parity. Unsupported S3 options may be ignored or may throw errors depending on whether the simulator
+needs them to model the requested behaviour.
 
 ## Basic usage
 
@@ -399,8 +396,7 @@ Configure Bucket website hosting with `PutBucketWebsiteCommand`.
 
 Website hosting settles which Object answers a request, not who may read it. A browser asking for a
 page is anonymous, and anonymous holds nothing unless a Bucket policy grants it, so a site with no
-Bucket policy answers `403` to every ordinary visitor. That is what real S3 does, and it is the
-mistake this most often catches: a site that works because nothing was checking. See
+Bucket policy answers `403` to every ordinary visitor, as it does on real S3. See
 [Block Public Access](#block-public-access) for the two commands a public site needs; the localhost
 serving example below shows them in place. The examples in this section configure hosting without
 serving it, so they leave that out.
@@ -698,10 +694,10 @@ const response = await fetch(url); // 403
 
 ### Uploads and checksums
 
-Presigned `PutObjectCommand` URLs work in the same way, and bring one trap worth knowing about. The
-AWS SDK computes a checksum when it presigns, which is before there is a body to hash, and hoists it
-into the signed URL. Uploading anything else through that URL then fails against real S3, and fails
-here too, with `XAmzContentChecksumMismatch`. Build the client with
+Presigned `PutObjectCommand` URLs work in the same way, with one thing to watch. The AWS SDK computes
+a checksum when it presigns, which is before there is a body to hash, and hoists it into the signed
+URL. Uploading anything else through that URL then fails against real S3, and fails here too, with
+`XAmzContentChecksumMismatch`. Build the client with
 `requestChecksumCalculation: "WHEN_REQUIRED"` to presign upload URLs that accept a body:
 
 ```typescript

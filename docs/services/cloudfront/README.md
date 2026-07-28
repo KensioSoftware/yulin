@@ -3,18 +3,17 @@
 Yulin includes a simulated CloudFront service for tests and local development.
 
 Sim CloudFront can be used directly through `SimAws`, and it can also be served on localhost
-alongside other simulated AWS services. This is most useful when you want application code to make
-HTTP requests through a CloudFront-like layer without talking to real AWS.
+alongside other simulated AWS services, so application code can make HTTP requests through a
+CloudFront-like layer without talking to real AWS.
 
-Alternatively, you can also instantiate `SimCloudFront` directly on its own, in which case it has
-its own isolated state that is not connected to a wider simulated AWS environment.
+`SimCloudFront` can also be instantiated on its own, in which case it has its own isolated state that
+is not connected to a wider simulated AWS environment.
 
 ## Available functionality
 
 Sim CloudFront currently supports:
 
-- Creating Distributions with `CreateDistributionCommand`
-- Getting Distributions with `GetDistributionCommand`
+- `CreateDistributionCommand` and `GetDistributionCommand`
 - S3 Origins backed by sim S3 Buckets
 - CloudFront Distribution hostnames such as `distro123.cloudfront.net`
 - Default cache Behavior and path-based cache Behaviors
@@ -22,9 +21,9 @@ Sim CloudFront currently supports:
 - Viewer certificates from sim ACM, including CloudFront's `us-east-1` requirement
 - Serving simulated CloudFront traffic on localhost with `serveSimAws`
 
-The simulator focuses on useful behavior for isolated tests and local dev rather than full
-CloudFront feature parity. Unsupported CloudFront options may be ignored or may throw errors
-depending on whether the simulator needs them to model the requested behaviour safely.
+The simulator focuses on useful behaviour for tests and local development rather than full CloudFront
+feature parity. Unsupported CloudFront options may be ignored or may throw errors depending on
+whether the simulator needs them to model the requested behaviour safely.
 
 ## Basic Distribution setup
 
@@ -159,19 +158,17 @@ local Yulin server while preserving the simulated CloudFront hostname.
 
 ## Viewer certificates
 
-A Distribution with alternate domain names needs an ACM certificate, and CloudFront is fussy about
-which one it will take. Sim CloudFront applies the same rules, so a Distribution that real
-CloudFront would reject at deploy time is rejected here first, with
-`InvalidViewerCertificate`:
+A Distribution with alternate domain names needs an ACM certificate, and CloudFront accepts only
+certain ones. Sim CloudFront applies the same rules, so a Distribution that real CloudFront would
+reject at deploy time is rejected here first, with `InvalidViewerCertificate`:
 
 - the certificate must be in `us-east-1`, wherever the rest of your infrastructure lives;
 - the certificate must exist and be `ISSUED`;
-- every alternate domain name must be covered by the certificate's domain name or one of its
-  subject alternative names, with a wildcard covering exactly one label.
+- every alternate domain name must be covered by the certificate's domain name or one of its subject
+  alternative names, with a wildcard covering exactly one label.
 
-The `us-east-1` rule is the one worth knowing about. It catches people out because nothing else in a
-stack cares, so a Distribution in `eu-west-2` with a certificate alongside it looks perfectly
-reasonable until CloudFront refuses it.
+The `us-east-1` rule is easy to miss, because nothing else in a stack cares about it. A Distribution
+in `eu-west-2` with a certificate alongside it looks fine until CloudFront refuses it.
 
 ```typescript sim-cloudfront-viewer-certificate
 /**

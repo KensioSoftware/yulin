@@ -1,39 +1,35 @@
 # Simulated IAM
 
-Yulin includes a simulated IAM service for isolated tests, local development, and CI.
+Yulin includes a simulated IAM service for tests and local development.
 
-Sim IAM can be used directly through `SimAws` or instantiated on its own as `SimIam` with isolated
-state. It stores simulated Roles, Users, and Policies, and evaluates allow/deny authorization
-decisions for them. Other simulated services use sim IAM to authorize their own actions, simulated
-STS uses it to issue temporary Role sessions, and sim CloudFormation can create IAM resources from
-templates.
+Sim IAM stores simulated Roles, Users and Policies, and evaluates allow/deny authorization decisions
+for them. Other simulated services use it to authorize their own actions, simulated STS uses it to
+issue temporary Role sessions, and sim CloudFormation can create IAM resources from templates. It can
+also be instantiated on its own as `SimIam` with isolated state.
 
 ## Available functionality
 
 Sim IAM currently supports:
 
-- Creating Roles with `CreateRoleCommand`, including trust-policy validation
-- Getting and listing Roles with `GetRoleCommand` and `ListRolesCommand`, with pagination
-- Inline Role policies with `PutRolePolicyCommand`
-- Managed Policies with `CreatePolicyCommand`, `GetPolicyCommand`, and `ListPoliciesCommand`
-- Attaching managed Policies to Roles with `AttachRolePolicyCommand`
-- Users with `CreateUserCommand` and inline User policies with `PutUserPolicyCommand`
-- User access keys with `CreateAccessKeyCommand`, registered for credential authentication
+- `CreateRoleCommand`, including trust-policy validation
+- `GetRoleCommand` and `ListRolesCommand`, with pagination
+- `PutRolePolicyCommand`, for inline Role policies
+- `CreatePolicyCommand`, `GetPolicyCommand` and `ListPoliciesCommand`, for managed Policies
+- `AttachRolePolicyCommand`
+- `CreateUserCommand` and `PutUserPolicyCommand`
+- `CreateAccessKeyCommand`, registering access keys for credential authentication
 - Allow/deny authorization decisions with `authorize(...)`, evaluating identity policies,
   service-supplied resource policies, and policy conditions with explicit-deny precedence
 - IAM authorization at simulated service boundaries, such as Route53 actions
-- Resolving the caller of an HTTP request into simulated AWS, from an `x-sim-aws-caller` header or
-  a verified SigV4 signature, defaulting to anonymous
+- Resolving the caller of an HTTP request, from an `x-sim-aws-caller` header or a verified SigV4
+  signature, defaulting to anonymous
 - Temporary Role sessions through simulated STS `AssumeRoleCommand`, evaluated against Role trust
   policies
-- CloudFormation resources:
-  - `AWS::IAM::Role`
-  - `AWS::IAM::ManagedPolicy`
-  - `AWS::IAM::Policy` (inline policies put onto referenced Roles)
+- The `AWS::IAM::Role`, `AWS::IAM::ManagedPolicy` and `AWS::IAM::Policy` CloudFormation resources
 
-The simulator focuses on useful behavior for isolated tests and local development rather than full
-IAM feature parity. Unsupported IAM options may be ignored or may throw errors depending on whether
-the simulator needs them to model the requested behaviour.
+The simulator focuses on useful behaviour for tests and local development rather than full IAM
+feature parity. Unsupported IAM options may be ignored or may throw errors depending on whether the
+simulator needs them to model the requested behaviour.
 
 ## Basic usage
 
@@ -104,7 +100,7 @@ a request was allowed or denied. The decision models the common IAM evaluation r
 - A matching explicit `Deny` statement in any evaluated policy wins
 - Otherwise, within one Account, a matching `Allow` in an identity policy or resource policy allows
   the request
-- Across Accounts, a matching `Allow` is needed from each side — see
+- Across Accounts, a matching `Allow` is needed from each side. See
   [Cross-Account requests](#cross-account-requests)
 - Otherwise the request is implicitly denied
 
@@ -464,18 +460,18 @@ expired sessions are rejected.
 
 ## Callers of HTTP requests
 
-An in-process SDK call can be told who its caller is. A request arriving over HTTP — through
-`serveSimAws`, or through `SimAwsHttp.fetch(...)` in the same process — carries no such thing, so
-sim IAM works the caller out from the request itself, in a fixed order:
+An in-process SDK call can be told who its caller is. A request arriving over HTTP, through
+`serveSimAws` or through `SimAwsHttp.fetch(...)` in the same process, carries no such thing. Sim IAM
+works the caller out from the request itself, in a fixed order:
 
 1. An `x-sim-aws-caller` header naming the principal directly.
 2. An `Authorization: AWS4-HMAC-SHA256` header, verified as a SigV4 signature.
 3. Neither, giving **anonymous**.
 
-The last step matters. Sim IAM treats an omitted in-process caller as the Account root with
-unrestricted access, which is a convenience inside a test. Over HTTP the same default would make
-every unauthenticated request an administrator, so a served request that says nothing about who
-sent it is anonymous instead, and never the Account root.
+Sim IAM treats an omitted in-process caller as the Account root with unrestricted access, which is a
+convenience inside a test. Over HTTP the same default would make every unauthenticated request an
+administrator, so a served request that says nothing about who sent it is anonymous instead, and
+never the Account root.
 
 ### Naming the caller directly
 
@@ -495,8 +491,8 @@ The value is one of three forms:
 | `service:<name>` | An AWS service principal, such as `service:s3.amazonaws.com` |
 | `anonymous`      | Explicitly anonymous                                         |
 
-The header is always enabled and not configurable, it takes precedence over a valid signature, and
-it does not check that the ARN exists — naming a principal is not claiming it was created, exactly
+The header is always enabled and not configurable, and it takes precedence over a valid signature. It
+does not check that the ARN exists, since naming a principal is not claiming it was created, exactly
 as `runAs` behaves. It is stripped before the request reaches the simulated service, so a Lambda
 handler echoing `event.headers` never sees simulator control metadata.
 
@@ -555,10 +551,10 @@ identity `resolveCredentials` returns in process. For an assumed-role session th
 request is attributed to the session while its permissions come from the Role behind it, so a
 policy on the Role applies to a request the session signed.
 
-Sign the URL you actually call. Serving rewrites AWS endpoint hostnames to local ones — a Function
-URL is served at `<url-id>.lambda-url.<region>.sim-aws.localhost:<port>` — and the `host` header is
-part of what a signature covers, so a signature made against the real AWS hostname will not verify
-against the local one.
+Sign the URL you actually call. Serving rewrites AWS endpoint hostnames to local ones, so a Function
+URL is served at `<url-id>.lambda-url.<region>.sim-aws.localhost:<port>`. The `host` header is part of
+what a signature covers, so a signature made against the real AWS hostname will not verify against
+the local one.
 
 A signature whose credential scope names a different service or Region than the endpoint it reached
 is refused before anything else is checked, and says so. The scope feeds the signing key, so without
@@ -584,7 +580,7 @@ request was accepted:
 
 | Header                   | On an accepted request                                                                   | On a refused request                                |
 | ------------------------ | ---------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| `x-sim-aws-caller`       | The principal the request was attributed to, in the same form the request header accepts | Absent — there is no principal to report            |
+| `x-sim-aws-caller`       | The principal the request was attributed to, in the same form the request header accepts | Absent, as there is no principal to report          |
 | `x-sim-aws-auth`         | How that was decided: `caller-header`, `sigv4`, or `none`                                | `rejected`                                          |
 | `x-sim-aws-error`        | Absent                                                                                   | The AWS error code, such as `SignatureDoesNotMatch` |
 | `x-sim-aws-error-detail` | Absent                                                                                   | What the simulator can say about why                |
@@ -662,9 +658,9 @@ that never mention IAM keep working.
 
 Sim CloudFormation can create IAM resources from `AWS::IAM::Role`, `AWS::IAM::ManagedPolicy`, and
 `AWS::IAM::Policy`. An `AWS::IAM::Policy` puts its document onto each Role named in `Roles` as an
-inline policy — the pattern CDK grants such as `bucket.grantRead(fn)` synthesize as a
-"DefaultPolicy" resource. IAM Users and Groups are not simulated as policy principals, so naming
-them fails creation rather than silently dropping the grant.
+inline policy. That is the shape CDK grants such as `bucket.grantRead(fn)` synthesize as a
+"DefaultPolicy" resource. IAM Users and Groups are not simulated as policy principals, so naming them
+fails creation rather than silently dropping the grant.
 
 ```typescript sim-iam-cloudformation
 /**
@@ -802,8 +798,8 @@ Accounts, as it is on AWS:
 Either one on its own is denied. A resource policy naming another Account's principal delegates to
 that Account rather than granting on its behalf, and an Account cannot grant its own principals
 access to somebody else's resource. An explicit `Deny` on either side denies. Callers with no
-identity side — a service principal, or an anonymous request — are unaffected, and are still allowed
-by a resource policy alone.
+identity side, such as a service principal or an anonymous request, are unaffected, and are still
+allowed by a resource policy alone.
 
 ```typescript sim-iam-cross-account
 /**
@@ -888,7 +884,7 @@ nothing, which is also what a principal ARN that was never given any permissions
 
 A standalone `SimIam` has no simulation around it and so no other Account to ask: a principal whose
 ARN belongs to another Account is always denied, however permissive the resource policy. Anonymous
-and service-principal callers are not affected — they have no Account either way, so a resource
+and service-principal callers are not affected, since they have no Account either way, so a resource
 policy still allows them. The Account ID is available as `simIam.accountId`, which is what a test
 naming its own principals should build their ARNs from.
 
@@ -924,9 +920,9 @@ console.log(roleCreation.Role.Arn);
 ```
 
 A standalone `SimIam` instance has its own isolated state, scoped to a generated Account ID, and is
-not connected to a wider `SimAws` environment. Note that other services instantiated standalone,
-such as `new SimRoute53()`, fall back to allow-all authorization — connect services through a
-shared `SimAws` instance when a test should exercise real IAM enforcement.
+not connected to a wider `SimAws` environment. Other services instantiated standalone, such as
+`new SimRoute53()`, fall back to allow-all authorization. Connect services through a shared `SimAws`
+instance when a test should exercise real IAM enforcement.
 
 ## Limitations
 

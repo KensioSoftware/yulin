@@ -1,18 +1,17 @@
 # Simulated STS
 
-Yulin includes a simulated STS (Security Token Service) for isolated tests, local development, and
-CI.
+Yulin includes a simulated STS (Security Token Service) for tests and local development.
 
-Sim STS is used through `SimAws` as `simAws.sts()`, scoped to the Account making the assume
-request. Its job is to simulate assuming IAM Roles: it evaluates the request against
-[simulated IAM](../iam/) policies and issues temporary session credentials that the rest of the
-simulated environment authenticates like real AWS credentials.
+Sim STS is used through `SimAws` as `simAws.sts()`, scoped to the Account making the assume request.
+It simulates assuming IAM Roles: it evaluates the request against [simulated IAM](../iam/) policies
+and issues temporary session credentials that the rest of the simulated environment authenticates
+like real AWS credentials.
 
 ## Available functionality
 
 Sim STS currently supports:
 
-- Assuming Roles with `AssumeRoleCommand`
+- `AssumeRoleCommand`
 - Trust-policy evaluation against the target Role's assume-role policy document
 - Identity-policy evaluation of the source caller, requiring `sts:AssumeRole` permission on the
   target Role
@@ -22,9 +21,9 @@ Sim STS currently supports:
 - Temporary credentials registered with the target Account's sim IAM, including session-token and
   expiry validation
 
-The simulator focuses on useful behavior for isolated tests and local development rather than full
-STS feature parity. Unsupported STS options may be ignored or may throw errors depending on whether
-the simulator needs them to model the requested behaviour.
+The simulator focuses on useful behaviour for tests and local development rather than full STS
+feature parity. Unsupported STS options may be ignored or may throw errors depending on whether the
+simulator needs them to model the requested behaviour.
 
 ## Basic usage
 
@@ -74,10 +73,10 @@ The output matches the AWS shape: `AssumedRoleUser.Arn` is the session ARN, such
 temporary `AccessKeyId`, `SecretAccessKey`, `SessionToken`, and `Expiration`.
 
 The issued credentials are registered with the target Account's sim IAM, so they can authenticate
-later simulated requests — for example as the `caller` of an IAM authorization attempt, where
-identity policies come from the underlying Role. See
-[the sim IAM docs](../iam/#sts-assumerole-sessions) for a full example. Credentials missing their
-session token, or used after `Expiration`, are rejected with an AWS-like invalid-credentials error.
+later simulated requests, for example as the `caller` of an IAM authorization attempt, where identity
+policies come from the underlying Role. See [the sim IAM docs](../iam/#sts-assumerole-sessions) for a
+full example. Credentials missing their session token, or used after `Expiration`, are rejected with
+an AWS-like invalid-credentials error.
 
 `DurationSeconds` controls the session lifetime and defaults to 3600 seconds (one hour); it must be
 a positive integer.
@@ -163,10 +162,10 @@ const assumeRoleOutput = await account.sts().assumeRole(
 console.log(assumeRoleOutput.AssumedRoleUser?.Arn);
 ```
 
-If either side denies the request — the trust policy does not cover the caller, the caller has no
-identity policy allowing `sts:AssumeRole`, or an explicit `Deny` matches — STS throws an AWS-like
-access-denied error with a `403` status code, naming the `sts:AssumeRole` action and the target
-Role ARN, and no session is created.
+STS throws an AWS-like access-denied error if either side denies the request, which happens when the
+trust policy does not cover the caller, the caller has no identity policy allowing `sts:AssumeRole`,
+or an explicit `Deny` matches. The error has a `403` status code and names the `sts:AssumeRole`
+action and the target Role ARN. No session is created.
 
 Cross-Account assumption works the same way: create the source and target Roles in different
 simulated Accounts of the same `SimAws` instance, and call `assumeRole` on the source Account's
@@ -226,8 +225,8 @@ request is denied.
 
 Sim STS models Role assumption rather than the full STS API. Notable gaps:
 
-- `AssumeRoleCommand` is the only supported command — there is no `GetCallerIdentity`, federation,
-  or web-identity support
+- `AssumeRoleCommand` is the only supported command. There is no `GetCallerIdentity`, federation, or
+  web-identity support
 - Session policies (`Policy` / `PolicyArns`), tags, and `SourceIdentity` requests are not evaluated
 - Condition support in trust policies is limited to the operators supported by
   [sim IAM](../iam/#policy-conditions)
