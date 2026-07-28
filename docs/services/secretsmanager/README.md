@@ -20,6 +20,8 @@ Sim Secrets Manager currently supports:
 - Friendly names, full ARNs and partial ARNs as interchangeable ways to name a secret
 - Authorization of every operation by simulated IAM, against the real IAM action
 - Calls made from inside a simulated Lambda handler, authorized as the function's execution role
+- Creating secrets from `AWS::SecretsManager::Secret` CloudFormation resources, including
+  `GenerateSecretString` generated passwords
 
 The simulator focuses on useful behaviour for isolated tests and local development rather than full Secrets Manager feature parity.
 
@@ -271,6 +273,74 @@ try {
 }
 ```
 
+## Deploying a secret from CloudFormation
+
+Simulated CloudFormation creates a secret from an `AWS::SecretsManager::Secret` resource, in the stack's account and region. A template either supplies the value with `SecretString` or asks Secrets Manager to generate one with `GenerateSecretString`, as on real AWS; declaring both is refused, as CloudFormation refuses it.
+
+`Ref` on the resource gives the full secret ARN, random suffix and all, and `Fn::GetAtt … Id` gives the same. That is what makes a `Ref` usable directly as a `SecretId`, whether it goes into a Lambda's environment or into an IAM policy resource.
+
+```typescript sim-secrets-manager-cloudformation-secret
+/**
+ * Deploying a secret from a CloudFormation template and reading back the
+ * password the deployment generated.
+ */
+
+import { GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "database-stack",
+  template: {
+    Resources: {
+      DbSecret: {
+        Type: "AWS::SecretsManager::Secret",
+        Properties: {
+          Name: "db-credentials",
+          Description: "Credentials for the application database",
+          GenerateSecretString: {
+            SecretStringTemplate: JSON.stringify({ username: "app" }),
+            GenerateStringKey: "password",
+            PasswordLength: 24,
+            ExcludePunctuation: true,
+          },
+        },
+      },
+    },
+    Outputs: {
+      DbSecretArn: {
+        Value: { Ref: "DbSecret" },
+      },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+
+// Ref resolves to the ARN including its suffix, so it works as a SecretId.
+const secretArn = stack.outputs.get("DbSecretArn")?.value as string;
+
+const read = await simAws
+  .secretsManager()
+  .getSecretValue(new GetSecretValueCommand({ SecretId: secretArn }));
+
+const credentials = JSON.parse(read.SecretString ?? "{}") as {
+  username?: string;
+  password?: string;
+};
+
+console.log(credentials.username); // "app"
+console.log(credentials.password?.length); // 24
+```
+
+Generated passwords are genuinely random, so a test reads the value back out of the simulation the way a deployed application does rather than predicting it. `SecretStringTemplate` and `GenerateStringKey` go together: the generated password is added to the template's JSON object under that key. Without them, the whole secret value is the generated password, which is what an empty `GenerateSecretString: {}` — the property CDK synthesises for a `secretsmanager.Secret` with no options — produces.
+
+The other generation options behave as they do on real AWS: `PasswordLength` (32 by default), `ExcludeCharacters`, `ExcludeUppercase`, `ExcludeLowercase`, `ExcludeNumbers`, `ExcludePunctuation`, `IncludeSpace`, and `RequireEachIncludedType`, which is on unless turned off so a generated password carries one of every character type it was not told to exclude.
+
+A secret with no `Name` is named after its logical ID. Real CloudFormation names it after the stack and appends its own random characters, so a template relying on the exact generated name would be relying on something it cannot predict anyway.
+
 ## Inside a simulated Lambda handler
 
 Function code requiring `@aws-sdk/client-secrets-manager` is routed into the same simulated AWS environment, with the function's execution role as the caller. A handler fetching a secret therefore has to be allowed to, by that role's policy, the same as on real AWS. See [simulated Lambda](../lambda/ "Simulated Lambda docs") for how function code and execution roles work.
@@ -284,7 +354,10 @@ Current documented limitations:
 - Secret values are not encrypted. `KmsKeyId` is accepted and reported by `DescribeSecret`, but nothing is encrypted with it and no `kms:Decrypt` check happens. That is looser than real AWS, where a caller also needs permission on the key. Simulated KMS is not wired into this service yet.
 - A secret name ending in a hyphen and six alphanumeric characters is refused, which is stricter than AWS. Real AWS only advises against such names, because they cannot be told apart from an ARN's resource part when a partial ARN is resolved. Note that this rules out ordinary-looking names such as `app-secret` and `prod-config`, since `secret` and `config` are six characters; name them `app-credentials` or `prod-settings` instead.
 - `RotateSecret`, `CancelRotateSecret` and the rotation Lambda protocol are not simulated. `DescribeSecret` always reports `RotationEnabled` as `false`.
-- `AWS::SecretsManager::Secret` and the other CloudFormation resource types are not supported yet, and neither are `{{resolve:secretsmanager:...}}` dynamic references.
+- `AWS::SecretsManager::Secret` supports `Name`, `Description`, `KmsKeyId`, `SecretString`, `GenerateSecretString` and `Tags`. `ReplicaRegions` is ignored, and the other resource types — `SecretTargetAttachment`, `RotationSchedule` and `ResourcePolicy` — are reported as unsupported and skipped rather than deployed.
+- A template declaring neither `SecretString` nor `GenerateSecretString` is refused, which is stricter than real CloudFormation: it creates an empty secret in that case, and a secret with no version is not simulated. A secret that nothing can read is more likely a mistake in the template than something to deploy quietly.
+- `ExcludeCharacters` that removes every character of an included type is refused rather than generating a password missing a type it was told to include.
+- `{{resolve:secretsmanager:...}}` dynamic references are not supported. That is a CloudFormation engine feature rather than a Secrets Manager one; pass the ARN from `Ref` instead.
 - Resource policies (`PutResourcePolicy`, `GetResourcePolicy`, `DeleteResourcePolicy`, `ValidateResourcePolicy`) are not simulated, so cross-account access to a secret cannot be granted.
 - Replica regions are not simulated. `AddReplicaRegions`, `ReplicateSecretToRegions` and `RemoveRegionsFromReplication` do nothing, and `ReplicationStatus` is not reported.
 - `BatchGetSecretValue` is not supported, and neither is the Parameters and Secrets Lambda Extension HTTP endpoint.

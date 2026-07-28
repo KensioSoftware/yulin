@@ -18,6 +18,8 @@ import { SimLambdaFunction } from "../../../lambda/function/sim-lambda-function.
 import { SimLambdaFunctionCfn } from "./lambda/sim-lambda-function-cfn.js";
 import { SimLambdaFunctionUrl } from "../../../lambda/function/url/sim-lambda-function-url.js";
 import { SimLambdaFunctionUrlCfn } from "./lambda/sim-lambda-function-url-cfn.js";
+import { SimSecretsManagerSecret } from "../../../secretsmanager/secret/sim-secrets-manager-secret.js";
+import { SimSecretsManagerSecretCfn } from "./secretsmanager/sim-secrets-manager-secret-cfn.js";
 
 export interface SimCfnResourceValueAdapter {
   refValue(): SimCfnTemplateValue;
@@ -104,6 +106,15 @@ export function simCfnResourceValueAdapter(
   ) {
     return new SimLambdaFunctionUrlCfn({
       functionUrl: properties.simResource,
+    });
+  }
+
+  if (
+    properties.type === "AWS::SecretsManager::Secret" &&
+    properties.simResource instanceof SimSecretsManagerSecret
+  ) {
+    return new SimSecretsManagerSecretCfn({
+      secret: properties.simResource,
     });
   }
 

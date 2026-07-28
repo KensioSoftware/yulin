@@ -63,6 +63,9 @@ export function resolveSimCloudFormationServiceResourceFactory(
     case "S3": {
       return scopedAws.s3().cfnResourceFactory();
     }
+    case "SecretsManager": {
+      return scopedAws.secretsManager().cfnResourceFactory();
+    }
     default: {
       throw new Error(
         `Unsupported sim CloudFormation Resource service ${resourceType.serviceName}`,
