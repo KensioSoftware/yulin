@@ -15,6 +15,7 @@ into tests, local development scripts, or small experiments.
 - [Lambda](./services/lambda/ "Simulated Lambda usage docs")
 - [Route53](./services/route53/ "Simulated Route53 usage docs")
 - [S3](./services/s3/ "Simulated S3 usage docs")
+- [Secrets Manager](./services/secretsmanager/ "Simulated Secrets Manager usage docs")
 - [STS](./services/sts/ "Simulated STS usage docs")
 
 ## Feature documentation

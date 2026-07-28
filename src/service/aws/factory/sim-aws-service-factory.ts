@@ -10,12 +10,10 @@ import type { SimCloudFront } from "../../cloudfront/sim-cloudfront.js";
 import { SimDynamoDb as SimDynamoDatabase } from "../../dynamodb/index.js";
 import type { SimRoute53 } from "../../route53/index.js";
 import { SimS3 } from "../../s3/sim-s3.js";
-import { SimS3GlobalRegistry } from "../../s3/sim-s3-global-registry.js";
 import { SimAwsAccountServiceCache } from "./sim-aws-account-service-cache.js";
+import { SimAwsScopedServiceRegistries } from "./sim-aws-scoped-service-registries.js";
 import { SimAcm } from "../../acm/sim-acm.js";
 import { SimRoute53AcmDnsRecords } from "../../acm/validation/sim-route53-acm-dns-records.js";
-import { SimAcmRegistry } from "../../acm/registry/sim-acm-registry.js";
-import { SimRoute53Registry } from "../../route53/registry/sim-route53-registry.js";
 import type { SimIam } from "../../iam/index.js";
 import { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
 import { SimIamAccessKeyRegistry } from "../../iam/registry/sim-iam-access-key-registry.js";
@@ -27,6 +25,7 @@ import { SimLambda } from "../../lambda/index.js";
 import { SimLambdaUrlRegistry } from "../../lambda/registry/sim-lambda-url-registry.js";
 import { SimS3LambdaCodeStore } from "../../lambda/function/code/store/sim-s3-lambda-code-store.js";
 import { SimSdkLambdaVmModuleProvider } from "../../lambda/function/code/vm/sdk/sim-sdk-lambda-vm-module-provider.js";
+import { SimSecretsManager } from "../../secretsmanager/index.js";
 import { SimSts } from "../../sts/sim-sts.js";
 
 interface SimAwsServiceFactoryProperties {
@@ -112,30 +111,9 @@ export class SimAwsServiceFactory {
   private readonly background: BackgroundScheduler & BackgroundCompleter;
 
   /**
-   * Shared simulated ACM registry.
-   *
-   * This indexes the account/region-scoped ACM facades created for one SimAws
-   * instance, so services holding only a Certificate ARN, such as CloudFront,
-   * can resolve the Certificate it names.
+   * The registries this simulation's scoped services share between them.
    */
-  private readonly acmRegistry = new SimAcmRegistry();
-
-  /**
-   * Shared simulated Route53 registry.
-   *
-   * This owns hosted zone and DNS record state that is shared by the
-   * account-scoped Route53 service instances created for one SimAws instance.
-   */
-  private readonly route53Registry = new SimRoute53Registry();
-
-  /**
-   * Shared simulated S3 registry.
-   *
-   * This tracks Bucket ownership across account and region scopes for one
-   * SimAws instance, so region-scoped S3 service instances can enforce the
-   * cross-region uniqueness and lookup behavior of S3 Bucket names.
-   */
-  private readonly s3Registry = new SimS3GlobalRegistry();
+  private readonly registries = new SimAwsScopedServiceRegistries();
 
   private readonly accountServices: SimAwsAccountServiceCache;
 
@@ -145,9 +123,9 @@ export class SimAwsServiceFactory {
     this.accountServices = new SimAwsAccountServiceCache({
       simAws: properties.simAws,
       background: properties.background,
-      acmRegistry: this.acmRegistry,
+      acmRegistry: this.registries.acm,
       cloudFrontRegistry: this.cloudFrontRegistry,
-      route53Registry: this.route53Registry,
+      route53Registry: this.registries.route53,
       iamRegistry: this.iamRegistry,
       accessKeyRegistry: this.accessKeyRegistry,
     });
@@ -166,11 +144,11 @@ export class SimAwsServiceFactory {
       // Certificates validate against Hosted Zones from any simulated Account,
       // as real ACM validates against public DNS.
       dnsRecords: new SimRoute53AcmDnsRecords({
-        route53Registry: this.route53Registry,
+        route53Registry: this.registries.route53,
       }),
     });
 
-    this.acmRegistry.register(scope.accountRegionScope, acm);
+    this.registries.acm.register(scope.accountRegionScope, acm);
 
     return acm;
   }
@@ -269,8 +247,22 @@ export class SimAwsServiceFactory {
 
     return new SimS3({
       accountRegionScope: scope.accountRegionScope,
-      s3GlobalRegistry: this.s3Registry,
+      s3GlobalRegistry: this.registries.s3,
       iam,
+      background: this.background,
+    });
+  }
+
+  /**
+   * Create simulated Secrets Manager for an Account Region scope.
+   *
+   * Secrets are Region-scoped on real AWS: a secret name is unique within one
+   * Account and Region rather than globally.
+   */
+  createSecretsManager(scope: SimAwsAccountRegionContainer): SimSecretsManager {
+    return new SimSecretsManager({
+      accountRegionScope: scope.accountRegionScope,
+      iam: this.createIam(scope),
       background: this.background,
     });
   }

@@ -50,6 +50,9 @@ export function resolveSimSdkCommandRouter(
     case "S3": {
       return scoped.s3().sdkCommandRouter();
     }
+    case "Secrets Manager": {
+      return scoped.secretsManager().sdkCommandRouter();
+    }
     case "STS": {
       return scoped.sts().sdkCommandRouter();
     }
