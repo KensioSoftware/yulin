@@ -260,8 +260,16 @@ describe("Secrets Manager UpdateSecret", () => {
       ),
     );
 
-    // Then the metadata change did not stick either: a failed request leaves
-    // the secret as it was.
+    // Then neither the value nor the metadata changed: a failed request leaves
+    // the secret exactly as it was.
+    const read = await simAws
+      .secretsManager()
+      .getSecretValue(
+        new GetSecretValueCommand({ SecretId: "all-or-nothing" }),
+      );
+
+    assertIdentical(read.SecretString, "second");
+
     const described = await simAws
       .secretsManager()
       .describeSecret(
