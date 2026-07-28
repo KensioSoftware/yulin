@@ -17,6 +17,7 @@ import { SimAws } from "../../../aws/sim-aws.js";
 import {
   SimKmsIncorrectKeyException,
   SimKmsInvalidCiphertextException,
+  SimKmsNotFoundException,
   SimKmsValidationException,
 } from "../../error/sim-kms.error.js";
 
@@ -181,6 +182,31 @@ describe("KMS Encrypt and Decrypt", () => {
 
     // Then KMS reports the caller's expectation was wrong.
     assertInstanceOf(error, SimKmsIncorrectKeyException);
+  });
+
+  it("reports an unknown KeyId on Decrypt as missing, not incorrect", async () => {
+    // Given a ciphertext from a real key.
+    const simAws = new SimAws();
+    const keyArn = await keyArnFor(simAws);
+
+    const encrypted = await simAws
+      .kms()
+      .encrypt(
+        new EncryptCommand({ KeyId: keyArn, Plaintext: plaintext("hunter2") }),
+      );
+
+    // When Decrypt names a key that does not exist at all.
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws.kms().decrypt(
+        new DecryptCommand({
+          CiphertextBlob: encrypted.CiphertextBlob,
+          KeyId: "no-such-key",
+        }),
+      ),
+    );
+
+    // Then it is missing, rather than being reported as the wrong key.
+    assertInstanceOf(error, SimKmsNotFoundException);
   });
 
   it("rejects bytes that are not one of its ciphertexts", async () => {

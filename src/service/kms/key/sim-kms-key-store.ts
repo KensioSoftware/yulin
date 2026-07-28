@@ -4,11 +4,8 @@ import {
   SimKmsNotFoundException,
   SimKmsValidationException,
 } from "../error/sim-kms.error.js";
-import {
-  SimKmsAlias,
-  simKmsAliasPrefix,
-  simKmsAwsAliasPrefix,
-} from "./sim-kms-alias.js";
+import { SimKmsAlias, simKmsAwsAliasPrefix } from "./sim-kms-alias.js";
+import { SimKmsKeyIdentifierParser } from "./sim-kms-key-identifier.js";
 import {
   SimKmsKeyManager,
   type SimKmsKey,
@@ -34,10 +31,14 @@ export class SimKmsKeyStore {
 
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly keyFactory: SimKmsKeyFactory;
+  private readonly identifiers: SimKmsKeyIdentifierParser;
 
   constructor(properties: SimKmsKeyStoreProperties) {
     this.accountRegionScope = properties.accountRegionScope;
     this.keyFactory = properties.keyFactory;
+    this.identifiers = new SimKmsKeyIdentifierParser(
+      properties.accountRegionScope,
+    );
   }
 
   /**
@@ -74,13 +75,17 @@ export class SimKmsKeyStore {
    * needs it asks for it, and it appears without anyone creating it.
    */
   find(keyId: string): SimKmsKey | undefined {
-    const aliasName = this.aliasNameIn(keyId);
+    const identifier = this.identifiers.parse(keyId);
 
-    if (aliasName !== undefined) {
-      return this.findByAlias(aliasName);
+    if (identifier.aliasName !== undefined) {
+      return this.findByAlias(identifier.aliasName);
     }
 
-    return this.keys.get(this.keyIdIn(keyId));
+    if (identifier.keyId === undefined) {
+      return undefined;
+    }
+
+    return this.keys.get(identifier.keyId);
   }
 
   /**
@@ -148,25 +153,5 @@ export class SimKmsKeyStore {
     this.addAlias(aliasName, key);
 
     return key;
-  }
-
-  /**
-   * The alias name in a KeyId, whether given bare or as an alias ARN.
-   */
-  private aliasNameIn(keyId: string): string | undefined {
-    if (keyId.startsWith(simKmsAliasPrefix)) {
-      return keyId;
-    }
-
-    const arnAlias = /:(alias\/.+)$/u.exec(keyId);
-
-    return arnAlias?.[1];
-  }
-
-  /**
-   * The key ID in a KeyId, whether given bare or as a key ARN.
-   */
-  private keyIdIn(keyId: string): SimKmsKeyId {
-    return /:key\/(.+)$/u.exec(keyId)?.[1] ?? keyId;
   }
 }

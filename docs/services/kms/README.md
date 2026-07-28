@@ -231,6 +231,8 @@ Replacing a key policy with `PutKeyPolicyCommand` can lock an account out of its
 
 Every operation takes its target as a `KeyId`, and any of the four forms real KMS accepts will do: a key ID, a key ARN, an alias name such as `alias/app-key`, or an alias ARN.
 
+A key ARN or alias ARN naming another account or region resolves to nothing, rather than having its identifier read out and looked up locally, so a foreign ARN cannot reach a key that happens to share an identifier.
+
 Aliases beginning `alias/aws/` are reserved for AWS managed keys. `CreateAlias` refuses to create one, but referencing one brings the key into existence, the way an AWS managed key appears on real AWS when a service first needs it.
 
 ```typescript sim-kms-aliases
@@ -331,7 +333,7 @@ Current documented limitations:
 - Aliases cannot be updated or deleted; `UpdateAlias` and `DeleteAlias` are not supported.
 - Tags, `ListResourceTags` and the `aws:ResourceTag` condition key are not simulated.
 - `kms:ViaService`, `kms:EncryptionContext:*` and other KMS-specific condition keys are not derived, so a policy relying on them will not match. Ordinary condition operators on values sim IAM does supply work as usual.
-- AWS managed keys created on demand get the same default key policy as a customer key, rather than the via-service-scoped policy real AWS gives them.
+- AWS managed keys created on demand get the same default key policy as a customer key, rather than the via-service-scoped policy real AWS gives them. Scheduling one for deletion is refused, as on real AWS, but disabling one is not, which real AWS does refuse.
 - Key material lives in process memory for the lifetime of the `SimAws` instance. That is fine for a simulator, but it is not a security boundary: anything sharing the process can reach it.
 - No other simulated service encrypts anything with KMS yet. Sim S3, sim DynamoDB and sim Lambda environment variables do not use simulated keys, and do not check `kms:Decrypt`.
 - KMS is not served as an HTTP API by `serveSimAws`.

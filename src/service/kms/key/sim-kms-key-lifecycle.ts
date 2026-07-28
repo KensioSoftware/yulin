@@ -80,6 +80,7 @@ export class SimKmsKeyLifecycle {
    * destroys every ciphertext ever produced under it.
    */
   scheduleDeletion(deletionDate: Date): void {
+    this.refuseWhilePendingDeletion("schedule");
     this.currentState = SimKmsKeyState.PendingDeletion;
     this.scheduledDeletionDate = deletionDate;
   }
@@ -123,7 +124,7 @@ export class SimKmsKeyLifecycle {
   private refuseWhilePendingDeletion(action: string): void {
     if (this.currentState === SimKmsKeyState.PendingDeletion) {
       throw new SimKmsInvalidStateException(
-        `Key ${this.keyArn} is pending deletion and cannot be ${action}d`,
+        `Key ${this.keyArn} is already pending deletion and cannot be ${action}d`,
       );
     }
   }

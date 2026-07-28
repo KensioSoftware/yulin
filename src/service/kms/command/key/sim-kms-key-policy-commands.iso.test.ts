@@ -167,6 +167,32 @@ describe("KMS PutKeyPolicy", () => {
     assertInstanceOf(error, SimKmsValidationException);
   });
 
+  it("refuses JSON that is not a policy document", async () => {
+    // Given a key.
+    const simAws = new SimAws();
+    const created = await simAws.kms().createKey(new CreateKeyCommand({}));
+
+    // When the policy is valid JSON but not an object.
+    const errors = await Promise.all(
+      ["null", "[]", '"a policy"'].map(async (policy) =>
+        assertThrowsErrorAsync(async () =>
+          simAws.kms().putKeyPolicy(
+            new PutKeyPolicyCommand({
+              KeyId: created.KeyMetadata?.Arn,
+              Policy: policy,
+            }),
+          ),
+        ),
+      ),
+    );
+
+    // Then each is refused here, rather than failing obscurely later when
+    // something tries to evaluate it.
+    for (const error of errors) {
+      assertInstanceOf(error, SimKmsValidationException);
+    }
+  });
+
   it("refuses a missing policy", async () => {
     // Given a key.
     const simAws = new SimAws();

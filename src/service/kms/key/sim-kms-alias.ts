@@ -48,11 +48,24 @@ export class SimKmsAlias {
  */
 export class SimKmsAliasName {
   private static readonly allowed = /^[\w/-]+$/u;
+  private static readonly maxLength = 256;
 
   /**
    * Validate an alias name a customer asked to create.
    */
   validateCustomerAlias(aliasName: string): void {
+    if (aliasName.length > SimKmsAliasName.maxLength) {
+      throw new SimKmsValidationException(
+        `Alias '${aliasName}' is longer than the ${String(SimKmsAliasName.maxLength)} character limit`,
+      );
+    }
+
+    if (aliasName === simKmsAliasPrefix) {
+      throw new SimKmsValidationException(
+        `Alias must name something after '${simKmsAliasPrefix}'`,
+      );
+    }
+
     if (!aliasName.startsWith(simKmsAliasPrefix)) {
       throw new SimKmsValidationException(
         `Alias must start with '${simKmsAliasPrefix}': ${aliasName}`,

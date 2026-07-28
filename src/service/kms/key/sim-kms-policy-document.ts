@@ -20,13 +20,7 @@ export class SimKmsPolicyDocument {
       return policy;
     }
 
-    try {
-      return JSON.parse(policy) as SimIamPolicyDocument;
-    } catch {
-      throw new SimKmsValidationException(
-        "Policy is not a valid JSON policy document",
-      );
-    }
+    return this.requireDocument(this.parsed(policy));
   }
 
   /**
@@ -38,5 +32,35 @@ export class SimKmsPolicyDocument {
     }
 
     return this.parse(policy);
+  }
+
+  /**
+   * A policy has to be a JSON object. `null`, an array and a bare scalar are
+   * all valid JSON and none of them is a policy document, so refusing them
+   * here reports the problem where it was made rather than at the point some
+   * later authorization tries to evaluate them.
+   */
+  private requireDocument(parsed: unknown): SimIamPolicyDocument {
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      Array.isArray(parsed)
+    ) {
+      throw new SimKmsValidationException(
+        "Policy is not a valid JSON policy document",
+      );
+    }
+
+    return parsed;
+  }
+
+  private parsed(policy: string): unknown {
+    try {
+      return JSON.parse(policy);
+    } catch {
+      throw new SimKmsValidationException(
+        "Policy is not a valid JSON policy document",
+      );
+    }
   }
 }

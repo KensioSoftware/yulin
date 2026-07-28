@@ -1,4 +1,5 @@
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
+import { SimKmsInvalidStateException } from "../error/sim-kms.error.js";
 import type { SimKmsCiphertextBlobParts } from "./sim-kms-ciphertext-blob.js";
 import type { SimKmsEncryptionContext } from "./sim-kms-encryption-context.js";
 import {
@@ -102,8 +103,21 @@ export class SimKmsKey {
 
   /**
    * Schedule the key for deletion after a recovery window.
+   *
+   * An AWS managed key is refused. The service that owns it created it and
+   * only that service can remove it, so letting a test delete one would let
+   * the test pass on something real AWS would not allow. The failure is
+   * reported as an invalid state, which is one of the errors real
+   * ScheduleKeyDeletion returns, rather than claiming to know exactly which
+   * error AWS picks for this case.
    */
   scheduleDeletion(deletionDate: Date): void {
+    if (this.keyManager === SimKmsKeyManager.Aws) {
+      throw new SimKmsInvalidStateException(
+        `Key ${this.arn} is an AWS managed key and cannot be scheduled for deletion`,
+      );
+    }
+
     this.lifecycle.scheduleDeletion(deletionDate);
   }
 

@@ -4,7 +4,12 @@ import {
   EncryptCommand,
   GenerateDataKeyCommand,
 } from "@aws-sdk/client-kms";
-import { assertInstanceOf, assertThrowsErrorAsync } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertInstanceOf,
+  assertNonNullable,
+  assertThrowsErrorAsync,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import {
@@ -83,7 +88,9 @@ describe("KMS CreateKey validation", () => {
     );
 
     // Then the key is created with the description it was given.
-    assertInstanceOf(created.KeyMetadata?.CreationDate, Date);
+    assertNonNullable(created.KeyMetadata);
+    assertIdentical(created.KeyMetadata.Description, "Application key");
+    assertInstanceOf(created.KeyMetadata.CreationDate, Date);
   });
 });
 
@@ -203,6 +210,7 @@ describe("KMS cryptographic operation validation", () => {
 
     // Then sixteen bytes come back.
     assertInstanceOf(generated.Plaintext, Uint8Array);
+    assertIdentical(generated.Plaintext.byteLength, 16);
   });
 });
 

@@ -51,12 +51,12 @@ export class SimKmsKeyMetadataView {
       AWSAccountId: this.accountId,
       KeyId: key.keyId,
       Arn: key.arn,
-      CreationDate: key.creationDate,
+      CreationDate: new Date(key.creationDate),
       Enabled: key.isEnabled,
       Description: key.description,
       KeyUsage: "ENCRYPT_DECRYPT",
       KeyState: key.keyState,
-      DeletionDate: key.deletionDate,
+      DeletionDate: this.copied(key.deletionDate),
       Origin: "AWS_KMS",
       KeyManager: key.keyManager,
       KeySpec: "SYMMETRIC_DEFAULT",
@@ -64,5 +64,16 @@ export class SimKmsKeyMetadataView {
       EncryptionAlgorithms: ["SYMMETRIC_DEFAULT"],
       MultiRegion: false,
     };
+  }
+
+  /**
+   * Copy a date, so the response never hands out the key's own instance.
+   */
+  private copied(date: Date | undefined): Date | undefined {
+    if (date === undefined) {
+      return undefined;
+    }
+
+    return new Date(date);
   }
 }

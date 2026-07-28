@@ -2,8 +2,6 @@ import {
   CreateAliasCommand,
   CreateKeyCommand,
   DescribeKeyCommand,
-  EncryptCommand,
-  ListAliasesCommand,
   ListKeysCommand,
 } from "@aws-sdk/client-kms";
 import {
@@ -20,12 +18,9 @@ import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
 import { makeSimAwsAccountId } from "../../aws/sim-aws-account.js";
 import {
-  SimKmsAlreadyExistsException,
   SimKmsNotFoundException,
   SimKmsValidationException,
 } from "../error/sim-kms.error.js";
-
-const plaintext = Uint8Array.from(Buffer.from("hunter2", "utf8"));
 
 describe("KMS KeyId resolution", () => {
   it("resolves a key by ID, ARN, alias name and alias ARN", async () => {
@@ -129,188 +124,6 @@ describe("KMS KeyId resolution", () => {
   });
 });
 
-describe("KMS aliases", () => {
-  it("refuses an alias name already in use", async () => {
-    // Given an alias pointing at a key.
-    const simAws = new SimAws();
-    const created = await simAws.kms().createKey(new CreateKeyCommand({}));
-    assertNonNullable(created.KeyMetadata);
-
-    await simAws.kms().createAlias(
-      new CreateAliasCommand({
-        AliasName: "alias/app-key",
-        TargetKeyId: created.KeyMetadata.KeyId,
-      }),
-    );
-
-    // When the same name is created again.
-    const error = await assertThrowsErrorAsync(async () =>
-      simAws.kms().createAlias(
-        new CreateAliasCommand({
-          AliasName: "alias/app-key",
-          TargetKeyId: created.KeyMetadata?.KeyId,
-        }),
-      ),
-    );
-
-    // Then KMS refuses it.
-    assertInstanceOf(error, SimKmsAlreadyExistsException);
-  });
-
-  it("refuses an alias name without the alias prefix", async () => {
-    // Given a key.
-    const simAws = new SimAws();
-    const created = await simAws.kms().createKey(new CreateKeyCommand({}));
-
-    // When an alias is asked for without the required prefix.
-    const error = await assertThrowsErrorAsync(async () =>
-      simAws.kms().createAlias(
-        new CreateAliasCommand({
-          AliasName: "app-key",
-          TargetKeyId: created.KeyMetadata?.KeyId,
-        }),
-      ),
-    );
-
-    // Then it is refused.
-    assertInstanceOf(error, SimKmsValidationException);
-  });
-
-  it("refuses an alias reserved for AWS managed keys", async () => {
-    // Given a key.
-    const simAws = new SimAws();
-    const created = await simAws.kms().createKey(new CreateKeyCommand({}));
-
-    // When a reserved alias is asked for.
-    const error = await assertThrowsErrorAsync(async () =>
-      simAws.kms().createAlias(
-        new CreateAliasCommand({
-          AliasName: "alias/aws/s3",
-          TargetKeyId: created.KeyMetadata?.KeyId,
-        }),
-      ),
-    );
-
-    // Then it is refused, as real KMS refuses the aws/ namespace.
-    assertInstanceOf(error, SimKmsValidationException);
-  });
-
-  it("refuses an alias name with characters KMS does not allow", async () => {
-    // Given a key.
-    const simAws = new SimAws();
-    const created = await simAws.kms().createKey(new CreateKeyCommand({}));
-
-    // When an alias containing a space is asked for.
-    const error = await assertThrowsErrorAsync(async () =>
-      simAws.kms().createAlias(
-        new CreateAliasCommand({
-          AliasName: "alias/app key",
-          TargetKeyId: created.KeyMetadata?.KeyId,
-        }),
-      ),
-    );
-
-    // Then it is refused.
-    assertInstanceOf(error, SimKmsValidationException);
-  });
-
-  it("lists the aliases of one key", async () => {
-    // Given two keys, one of which has two aliases.
-    const simAws = new SimAws();
-    const first = await simAws.kms().createKey(new CreateKeyCommand({}));
-    const second = await simAws.kms().createKey(new CreateKeyCommand({}));
-    assertNonNullable(first.KeyMetadata);
-    assertNonNullable(second.KeyMetadata);
-
-    await Promise.all(
-      ["alias/one", "alias/two"].map(async (aliasName) =>
-        simAws.kms().createAlias(
-          new CreateAliasCommand({
-            AliasName: aliasName,
-            TargetKeyId: first.KeyMetadata?.KeyId,
-          }),
-        ),
-      ),
-    );
-    await simAws.kms().createAlias(
-      new CreateAliasCommand({
-        AliasName: "alias/other",
-        TargetKeyId: second.KeyMetadata.KeyId,
-      }),
-    );
-
-    // When one key's aliases are listed.
-    const listed = await simAws
-      .kms()
-      .listAliases(new ListAliasesCommand({ KeyId: first.KeyMetadata.KeyId }));
-
-    // Then only its own come back.
-    assertArrayLength(listed.Aliases ?? [], 2);
-  });
-
-  it("lists every alias when no key is named", async () => {
-    // Given a key with one alias.
-    const simAws = new SimAws();
-    const created = await simAws.kms().createKey(new CreateKeyCommand({}));
-    await simAws.kms().createAlias(
-      new CreateAliasCommand({
-        AliasName: "alias/app-key",
-        TargetKeyId: created.KeyMetadata?.KeyId,
-      }),
-    );
-
-    // When aliases are listed with no key.
-    const listed = await simAws.kms().listAliases(new ListAliasesCommand({}));
-
-    // Then the alias is reported with its ARN and target.
-    assertArrayLength(listed.Aliases ?? [], 1);
-    assertIdentical(listed.Aliases?.[0]?.AliasName, "alias/app-key");
-  });
-});
-
-describe("KMS AWS managed keys", () => {
-  it("creates an AWS managed key on first reference to its alias", async () => {
-    // Given a simulation where nothing has created a key.
-    const simAws = new SimAws();
-
-    // When a reserved AWS alias is used to encrypt.
-    const encrypted = await simAws
-      .kms()
-      .encrypt(
-        new EncryptCommand({ KeyId: "alias/aws/s3", Plaintext: plaintext }),
-      );
-
-    // Then the key exists, as an AWS managed one, the way it appears on real
-    // AWS when a service first needs it.
-    assertNonNullable(encrypted.KeyId);
-
-    const described = await simAws
-      .kms()
-      .describeKey(new DescribeKeyCommand({ KeyId: "alias/aws/s3" }));
-    assertIdentical(described.KeyMetadata?.KeyManager, "AWS");
-    assertIdentical(described.KeyMetadata.Arn, encrypted.KeyId);
-  });
-
-  it("reuses the same AWS managed key on later references", async () => {
-    // Given an AWS managed key materialised by a first reference.
-    const simAws = new SimAws();
-    const first = await simAws
-      .kms()
-      .describeKey(new DescribeKeyCommand({ KeyId: "alias/aws/s3" }));
-
-    // When the alias is used again.
-    const second = await simAws
-      .kms()
-      .describeKey(new DescribeKeyCommand({ KeyId: "alias/aws/s3" }));
-
-    // Then it is the same key, not a new one each time.
-    assertIdentical(second.KeyMetadata?.Arn, first.KeyMetadata?.Arn);
-
-    const keys = await simAws.kms().listKeys(new ListKeysCommand({}));
-    assertArrayLength(keys.Keys ?? [], 1);
-  });
-});
-
 describe("KMS ListKeys", () => {
   it("truncates the listing at a requested limit", async () => {
     // Given three keys.
@@ -345,5 +158,86 @@ describe("KMS ListKeys", () => {
     // Then nothing is truncated.
     assertArrayLength(listed.Keys ?? [], 2);
     assertFalse(listed.Truncated ?? true);
+  });
+});
+
+describe("KMS ARN scoping", () => {
+  it("does not resolve a key ARN belonging to another Account", async () => {
+    // Given a key, and the same key ID written into another Account's ARN.
+    const accountId = makeSimAwsAccountId();
+    const otherAccountId = makeSimAwsAccountId();
+    const simAws = new SimAws({ defaultAccountId: accountId });
+
+    const created = await simAws.kms().createKey(new CreateKeyCommand({}));
+    assertNonNullable(created.KeyMetadata);
+
+    const foreignArn = `arn:aws:kms:${simAws.defaultRegionName}:${otherAccountId}:key/${created.KeyMetadata.KeyId}`;
+
+    // When the foreign ARN is used.
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws.kms().describeKey(new DescribeKeyCommand({ KeyId: foreignArn })),
+    );
+
+    // Then it resolves to nothing, rather than having its key ID pulled out
+    // and looked up in this Account.
+    assertInstanceOf(error, SimKmsNotFoundException);
+  });
+
+  it("does not resolve a key ARN belonging to another Region", async () => {
+    // Given a key, and the same key ID written into another Region's ARN.
+    const simAws = new SimAws();
+    const created = await simAws
+      .region("eu-west-2")
+      .kms()
+      .createKey(new CreateKeyCommand({}));
+    assertNonNullable(created.KeyMetadata);
+
+    const foreignArn = `arn:aws:kms:us-east-1:${simAws.defaultAccountId}:key/${created.KeyMetadata.KeyId}`;
+
+    // When the foreign ARN is used against the Region that owns the key.
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws
+        .region("eu-west-2")
+        .kms()
+        .describeKey(new DescribeKeyCommand({ KeyId: foreignArn })),
+    );
+
+    // Then it is not found.
+    assertInstanceOf(error, SimKmsNotFoundException);
+  });
+
+  it("does not resolve an ARN for another service", async () => {
+    // Given a simulation with a key.
+    const simAws = new SimAws({ defaultAccountId: makeSimAwsAccountId() });
+    const created = await simAws.kms().createKey(new CreateKeyCommand({}));
+    assertNonNullable(created.KeyMetadata);
+
+    // When an ARN naming a different service is used.
+    const otherServiceArn = `arn:aws:s3:${simAws.defaultRegionName}:${simAws.defaultAccountId}:key/${created.KeyMetadata.KeyId}`;
+
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws
+        .kms()
+        .describeKey(new DescribeKeyCommand({ KeyId: otherServiceArn })),
+    );
+
+    // Then it is not found.
+    assertInstanceOf(error, SimKmsNotFoundException);
+  });
+
+  it("does not resolve an in-scope ARN naming neither a key nor an alias", async () => {
+    // Given a simulation with a key.
+    const simAws = new SimAws({ defaultAccountId: makeSimAwsAccountId() });
+    await simAws.kms().createKey(new CreateKeyCommand({}));
+
+    // When an ARN for this scope names some other kind of KMS resource.
+    const grantArn = `arn:aws:kms:${simAws.defaultRegionName}:${simAws.defaultAccountId}:grant/abc`;
+
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws.kms().describeKey(new DescribeKeyCommand({ KeyId: grantArn })),
+    );
+
+    // Then it is not found, rather than being read as a key identifier.
+    assertInstanceOf(error, SimKmsNotFoundException);
   });
 });

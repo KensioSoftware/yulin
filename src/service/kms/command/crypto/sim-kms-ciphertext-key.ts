@@ -44,13 +44,16 @@ export class SimKmsCiphertextKey {
 
   /**
    * Check a supplied KeyId against the key the ciphertext actually names.
+   *
+   * A KeyId naming no key at all is a missing key rather than the wrong one,
+   * so it is resolved the same way every other operation resolves its target.
    */
   requireExpected(keyId: string | undefined, key: SimKmsKey): void {
     if (keyId === undefined) {
       return;
     }
 
-    if (this.keys.find(keyId)?.keyId !== key.keyId) {
+    if (this.keys.require(keyId).keyId !== key.keyId) {
       throw new SimKmsIncorrectKeyException(
         `The ciphertext was not encrypted under the key '${keyId}'`,
       );

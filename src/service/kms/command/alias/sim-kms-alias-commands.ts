@@ -78,6 +78,16 @@ export class SimKmsAliasCommands {
         TargetKeyId: alias.targetKeyId,
       }));
 
-    return { $metadata: {}, Aliases: aliases, Truncated: false };
+    const limit = command.input?.Limit;
+
+    if (limit === undefined || aliases.length <= limit) {
+      return { $metadata: {}, Aliases: aliases, Truncated: false };
+    }
+
+    return {
+      $metadata: {},
+      Aliases: aliases.slice(0, limit),
+      Truncated: true,
+    };
   }
 }

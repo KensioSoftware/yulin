@@ -62,7 +62,8 @@ describe("KMS key state", () => {
       .describeKey(new DescribeKeyCommand({ KeyId: keyArn }));
 
     // Then it is still there, in the Disabled state.
-    assertIdentical(described.KeyMetadata?.KeyState, "Disabled");
+    assertNonNullable(described.KeyMetadata);
+    assertIdentical(described.KeyMetadata.KeyState, "Disabled");
     assertFalse(described.KeyMetadata.Enabled);
   });
 
@@ -203,6 +204,30 @@ describe("KMS ScheduleKeyDeletion", () => {
     );
 
     // Then it is refused.
+    assertInstanceOf(error, SimKmsInvalidStateException);
+  });
+});
+
+describe("KMS ScheduleKeyDeletion on a key already pending", () => {
+  it("refuses to reschedule a deletion already pending", async () => {
+    // Given a key already scheduled for deletion.
+    const simAws = new SimAws();
+    const keyArn = await keyArnFor(simAws);
+    await simAws
+      .kms()
+      .scheduleKeyDeletion(new ScheduleKeyDeletionCommand({ KeyId: keyArn }));
+
+    // When deletion is scheduled again.
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws.kms().scheduleKeyDeletion(
+        new ScheduleKeyDeletionCommand({
+          KeyId: keyArn,
+          PendingWindowInDays: 7,
+        }),
+      ),
+    );
+
+    // Then it is refused rather than quietly moving the deletion date.
     assertInstanceOf(error, SimKmsInvalidStateException);
   });
 });
