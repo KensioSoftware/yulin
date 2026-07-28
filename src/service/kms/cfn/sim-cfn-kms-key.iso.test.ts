@@ -22,7 +22,7 @@ import { describe, it } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
 import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
-import type { SimKmsKey } from "../key/sim-kms-key.js";
+import { simKmsCfnKey } from "../../../../test/kms/cfn-key-resource.js";
 
 const accountIdOneOnes = "111111111111" as SimAwsAccountId;
 
@@ -185,7 +185,7 @@ describe("KMS CloudFormation Key and Alias deployment", () => {
 
     // Then the deployed key holds that policy verbatim rather than the default
     // one, so GetKeyPolicy returns exactly what the template declared.
-    const key = keyOf(stack.getResource("AppKey")?.simResource);
+    const key = simKmsCfnKey(stack.getResource("AppKey")?.simResource);
     const stored = await simAws
       .kms()
       .getKeyPolicy(new GetKeyPolicyCommand({ KeyId: key.keyId }));
@@ -224,7 +224,7 @@ describe("KMS CloudFormation Key and Alias deployment", () => {
     await stack.waitForDeployComplete();
 
     // When another principal in the account tries to use the key.
-    const key = keyOf(stack.getResource("AppKey")?.simResource);
+    const key = simKmsCfnKey(stack.getResource("AppKey")?.simResource);
     const error = await assertThrowsErrorAsync(async () =>
       simAws.kms().describeKey(new DescribeKeyCommand({ KeyId: key.keyId })),
     );
@@ -246,7 +246,7 @@ describe("KMS CloudFormation Key and Alias deployment", () => {
 
     // Then the key gets the default policy CreateKey applies, which delegates
     // to the account's IAM rather than granting anything outright.
-    const key = keyOf(stack.getResource("AppKey")?.simResource);
+    const key = simKmsCfnKey(stack.getResource("AppKey")?.simResource);
     const stored = await simAws
       .kms()
       .getKeyPolicy(new GetKeyPolicyCommand({ KeyId: key.keyId }));
@@ -273,7 +273,7 @@ describe("KMS CloudFormation Key and Alias deployment", () => {
 
     // Then the key exists and is disabled, so using it fails as it would on
     // real AWS.
-    const key = keyOf(stack.getResource("AppKey")?.simResource);
+    const key = simKmsCfnKey(stack.getResource("AppKey")?.simResource);
     const described = await simAws
       .kms()
       .describeKey(new DescribeKeyCommand({ KeyId: key.keyId }));
@@ -304,14 +304,3 @@ describe("KMS CloudFormation Key and Alias deployment", () => {
     assertUndefined(simAws.kms().findAlias("alias/app-key"));
   });
 });
-
-/**
- * Narrow the simulated resource a CloudFormation Resource is backed by to the
- * key it should be.
- */
-function keyOf(simResource: object | undefined): SimKmsKey {
-  const key = simResource as SimKmsKey | undefined;
-  assertNonNullable(key);
-
-  return key;
-}

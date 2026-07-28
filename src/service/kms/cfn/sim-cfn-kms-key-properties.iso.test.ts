@@ -1,14 +1,10 @@
 import { GetKeyPolicyCommand } from "@aws-sdk/client-kms";
-import {
-  assertFalse,
-  assertIdentical,
-  assertNonNullable,
-} from "@kensio/smartass";
+import { assertFalse, assertIdentical } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
 import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
-import type { SimKmsKey } from "../key/sim-kms-key.js";
+import { simKmsCfnKey } from "../../../../test/kms/cfn-key-resource.js";
 
 const accountIdOneOnes = "111111111111" as SimAwsAccountId;
 
@@ -52,7 +48,7 @@ describe("KMS CloudFormation Key property shapes", () => {
     await stack.waitForDeployComplete();
 
     // Then both are read as the values they stand for.
-    const key = keyOf(stack.getResource("AppKey")?.simResource);
+    const key = simKmsCfnKey(stack.getResource("AppKey")?.simResource);
     const stored = await simAws
       .kms()
       .getKeyPolicy(new GetKeyPolicyCommand({ KeyId: key.keyId }));
@@ -110,7 +106,7 @@ describe("KMS CloudFormation Key property shapes", () => {
 
     // Then the policy the key holds names the resolved account root, so the
     // key delegates to the account's IAM as the CDK construct intends.
-    const key = keyOf(stack.getResource("AppKey")?.simResource);
+    const key = simKmsCfnKey(stack.getResource("AppKey")?.simResource);
     const stored = await simAws
       .kms()
       .getKeyPolicy(new GetKeyPolicyCommand({ KeyId: key.keyId }));
@@ -131,14 +127,3 @@ describe("KMS CloudFormation Key property shapes", () => {
     );
   });
 });
-
-/**
- * Narrow the simulated resource a CloudFormation Resource is backed by to the
- * key it should be.
- */
-function keyOf(simResource: object | undefined): SimKmsKey {
-  const key = simResource as SimKmsKey | undefined;
-  assertNonNullable(key);
-
-  return key;
-}
