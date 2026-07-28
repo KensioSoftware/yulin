@@ -2,32 +2,25 @@
 
 Yulin includes a simulated AWS Certificate Manager (ACM) service for tests and local development.
 
-Sim ACM can be used through `SimAws` to request certificates, inspect certificate details, list
-certificates, and create certificates from sim CloudFormation templates.
-
 ## Available functionality
 
 Sim ACM currently supports:
 
-- Requesting certificates with `RequestCertificateCommand`
-- Describing certificates with `DescribeCertificateCommand`
-- Listing certificates with `ListCertificatesCommand`
+- `RequestCertificateCommand`, `DescribeCertificateCommand` and `ListCertificatesCommand`
 - DNS validation against records in sim Route53
 - CloudFormation-published validation records from `DomainValidationOptions[].HostedZoneId`
-- EMAIL validation method shapes (but validation always succeeds regardless)
+- EMAIL validation method shapes, though validation always succeeds regardless
 - Subject alternative names
 - Certificate tags, up to the ACM limit of 50 tags
-- Deterministic simulated certificate ARNs scoped to account and region
+- Deterministic certificate ARNs scoped to account and region
 - Deterministic DNS validation CNAME records
 - Background certificate issuance from `PENDING_VALIDATION` to `ISSUED`
 - Per-domain validation status for multi-domain certificates
-- CloudFormation resource:
-  - `AWS::CertificateManager::Certificate`
-- CloudFormation `Ref` and `Fn::GetAtt` values for ACM certificates
+- The `AWS::CertificateManager::Certificate` CloudFormation resource, with `Ref` and `Fn::GetAtt`
 
-The simulator focuses on useful behavior for isolated tests and local development rather than full
-ACM feature parity. Unsupported ACM options may be ignored or may throw errors depending on whether
-the simulator needs them to model the requested behavior.
+The simulator focuses on useful behaviour for tests and local development rather than full ACM
+feature parity. Unsupported ACM options may be ignored or may throw errors depending on whether the
+simulator needs them to model the requested behaviour.
 
 ## Basic certificate request
 
@@ -246,9 +239,8 @@ hosted zone covers the certificate domain, the certificate waits for its validat
 covering hosted zone there is nothing to validate against, so the certificate is issued as soon as
 background tasks drain.
 
-That keeps certificates realistic when you are simulating Route53, without getting in the way when
-your DNS lives outside the simulation. Templates commonly reference hosted zones managed by another
-team or another tool, and those certificates keep working here.
+Templates commonly reference hosted zones managed by another team or another tool. Those
+certificates keep working here, because the simulation holds no zone for their domain.
 
 ```typescript sim-acm-dns-validation
 /**
@@ -335,9 +327,8 @@ public DNS. A certificate in one account can be validated by a hosted zone in an
 
 ### Skipping the validation record
 
-If you want a realistic hosted zone but not the certificate ceremony, `completeDnsValidation()`
-publishes the validation records for a pending certificate. The certificate is issued by the time it
-resolves.
+`completeDnsValidation()` publishes the validation records for a pending certificate, for a test that
+wants a hosted zone without the validation steps. The certificate is issued by the time it resolves.
 
 ```typescript sim-acm-complete-dns-validation
 /**

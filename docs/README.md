@@ -1,9 +1,7 @@
 # Simulated AWS usage documentation
 
-This directory contains area-specific documentation for Yulin.
-
-Each section includes explanations of the simulated behaviour and example code that can be copied
-into tests, local development scripts, or small experiments.
+This directory contains area-specific documentation for Yulin. Each page explains the simulated
+behaviour and includes example code that can be copied into tests or local development scripts.
 
 ## Service documentation
 

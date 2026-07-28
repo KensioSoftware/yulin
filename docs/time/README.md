@@ -1,13 +1,12 @@
 # Simulated time
 
 Every timestamp a simulated AWS service produces comes from that simulation's own clock, and that
-clock can be moved. Time can be frozen, set to an instant, or advanced by a duration, so behaviour
-that only becomes interesting once time passes — a temporary session expiring, for one — can be
-tested without waiting for it.
+clock can be moved. Time can be frozen, set to an instant, or advanced by a duration. Behaviour that
+depends on time passing, such as a temporary session expiring, can be tested without waiting for it.
 
-Nothing here replaces the clock for the whole process. Time belongs to a `SimAws` instance, so
-moving it never disturbs another simulation running in the same test file, or the real clock, or
-any other code in the process.
+Nothing here replaces the clock for the whole process. Time belongs to a `SimAws` instance, so moving
+it never disturbs another simulation running in the same test file, the real clock, or any other code
+in the process.
 
 ## Available functionality
 
@@ -28,7 +27,7 @@ By default a new `SimAws` runs in step with the real system clock.
 
 ## Starting at a known instant
 
-Pass a clock to start somewhere specific. `SimFixedClock` is the usual choice — it reports one
+Pass a clock to start somewhere specific. `SimFixedClock` is the usual choice, since it reports one
 instant and does not move on its own:
 
 ```typescript sim-clock-freeze-and-advance
@@ -66,27 +65,26 @@ for a simulation whose time should pass by itself.
 
 ## Frozen and running
 
-There are two modes, and they answer different questions:
+There are two modes:
 
-- **Frozen** — simulated time only moves when something moves it. A frozen clock reports the same
-  instant however long the host takes, so a slow test cannot drift past the state it set up. This
-  is what a deterministic assertion wants.
-- **Running** — simulated time tracks the clock underneath, offset from it. On the default real
-  clock that means time passes by itself, which is what "jump forward an hour and carry on" wants.
+- **Frozen**: simulated time only moves when something moves it. A frozen clock reports the same
+  instant however long the host takes, so a slow test cannot drift past the state it set up. This is
+  what a deterministic assertion wants.
+- **Running**: simulated time tracks the clock underneath, offset from it. On the default real clock
+  that means time passes by itself, which is what "jump forward an hour and carry on" wants.
 
-Moving time deliberately freezes it: `setTo(...)` and `advanceBy(...)` both leave the clock
-stopped where they put it. Having asked for a specific instant, a test should get to assert on that
-instant rather than on that instant plus however long the assertion took. `resume()` is the way
-back to running, and it carries on from where the clock stopped rather than snapping back to the
-clock underneath.
+Moving time deliberately freezes it. `setTo(...)` and `advanceBy(...)` both leave the clock stopped
+where they put it, so a test that asked for a specific instant asserts on that instant rather than on
+that instant plus however long the assertion took. `resume()` is the way back to running, and it
+carries on from where the clock stopped rather than snapping back to the clock underneath.
 
 `simAws.clock().isFrozen` reports which mode the clock is in.
 
 ## Advancing time
 
 `advanceBy(...)` takes a duration written as any combination of `days`, `hours`, `minutes`,
-`seconds` and `milliseconds`, which add together. Durations are never negative — time passing only
-runs forwards, and `setTo(...)` is the explicit way to move a clock back.
+`seconds` and `milliseconds`, which add together. Durations are never negative, since time passing
+only runs forwards. `setTo(...)` is the explicit way to move a clock back.
 
 Advancing does two things: it moves the clock, and it runs whatever the passage of time should have
 caused. Work scheduled for an instant inside the interval is dispatched in due order, each task
@@ -202,8 +200,8 @@ const second = await lambda.invoke(
 console.log(Buffer.from(second.Payload!).toString()); // {"at":"2026-07-26T11:00:00.000Z"}
 ```
 
-How that is arranged depends on where the function code runs, which is worth knowing because one
-of the two touches a process global:
+How that is arranged depends on where the function code runs. One of the two touches a process
+global:
 
 - **Zip code** runs in a vm sandbox owning its own globals, so it is handed a `Date` bound to the
   simulation's clock. Nothing outside the sandbox is affected.

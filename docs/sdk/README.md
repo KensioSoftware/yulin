@@ -1,12 +1,11 @@
 # Simulated AWS SDK
 
 Yulin can intercept AWS SDK clients and route their Commands to simulated AWS services. The code
-under test uses the AWS SDK exactly as it would in production, and never needs to know that it's
-dealing with a simulator behind the scenes.
+under test uses the AWS SDK as it would in production, and needs no knowledge of the simulator.
 
-This is the recommended way to use Yulin for testing implementation code that already uses the AWS
-SDK. Direct interaction with `SimAws` remains useful for seeding and inspecting simulated state
-from within tests.
+This is the recommended way to test implementation code that already uses the AWS SDK. Direct
+interaction with `SimAws` remains useful for seeding and inspecting simulated state from within
+tests.
 
 ## How it works
 
@@ -83,9 +82,8 @@ The resolved caller is passed through to the simulated service, so simulated
 caller without permission for a Command is denied, like real AWS. When no caller can be
 identified, Commands run as the simulation's default Account root.
 
-`runAs` runs a function with an ambient simulated caller, such as an IAM Role. Commands sent
-during the run are attributed to that caller — with no changes to the client or the code under
-test:
+`runAs` runs a function with an ambient simulated caller, such as an IAM Role. Commands sent during
+the run are attributed to that caller, with no changes to the client or the code under test:
 
 ```typescript sim-sdk-run-as
 /**
@@ -163,7 +161,7 @@ Restoring puts back the client's real SDK `send`:
 - `interception.restore()` restores one interception; `simSdk.intercept(...)` returns the handle.
 - `simSdk.restoreAll()` restores everything intercepted through that `SimSdk`.
 - `SimSdk` and interception handles are disposable, so `using simSdk = new SimSdk();` restores
-  automatically at the end of the scope — convenient in tests.
+  automatically at the end of the scope, which is convenient in tests.
 
 ## Choosing Commands to intercept
 
@@ -174,13 +172,13 @@ throw a diagnostic error.
 
 ## Supported services and Commands
 
-All simulated services support SDK interception: ACM, CloudFormation, CloudFront, DynamoDB, IAM,
-Route53, S3, and STS. Each service's own docs under [docs/services](../services/) list the
-Commands it simulates.
+All simulated services support SDK interception: ACM, CloudFormation, CloudFront, DynamoDB, IAM, KMS,
+Lambda, Route53, S3, Secrets Manager and STS. Each service's own docs under
+[docs/services](../services/) list the Commands it simulates.
 
 Sending a Command the simulated service doesn't support throws an error naming the Command and
-listing the supported ones, so gaps show up clearly in test output rather than as silent
-misbehaviour. Clients for AWS services Yulin doesn't simulate at all are rejected the same way.
+listing the supported ones, so gaps show up in test output rather than as silent misbehaviour.
+Clients for AWS services Yulin doesn't simulate at all are rejected the same way.
 
 ## Limitations
 

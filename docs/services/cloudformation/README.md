@@ -1,10 +1,9 @@
 # Simulated CloudFormation
 
-Yulin includes a simulated CloudFormation service for isolated tests, local development, and CI.
+Yulin includes a simulated CloudFormation service for tests and local development.
 
-Sim CloudFormation creates supported simulated AWS resources from CloudFormation templates. It can
-be used with hand-written templates, AWS SDK-style `CreateStackCommand` calls, or synthesized CDK
-template files.
+Sim CloudFormation creates simulated AWS resources from CloudFormation templates. It can be used with
+hand-written templates, AWS SDK-style `CreateStackCommand` calls, or synthesized CDK template files.
 
 The simulator focuses on useful behaviour for tests and local development rather than full
 CloudFormation feature parity. Unsupported resources may be skipped or may fail depending on how
@@ -14,29 +13,17 @@ safely the simulator can model the requested behaviour.
 
 Sim CloudFormation currently supports:
 
-- Creating stacks with `CreateStackCommand`
-- Describing stacks with `DescribeStacksCommand`
+- `CreateStackCommand` and `DescribeStacksCommand`
 - Waiting for simulated stack deployment completion
-- Deploying parsed template objects with `deployTemplate(...)`
-- Deploying synthesized JSON template files with `deployTemplateFile(...)`
+- `deployTemplate(...)` for parsed template objects
+- `deployTemplateFile(...)` for synthesized JSON template files
 - Template `Parameters` with supplied values and defaults
 - Template `Outputs`, resolved after resource creation and read from `stack.outputs`
-- Common intrinsic functions:
-  - `Ref`
-  - `Fn::GetAtt`
-  - `Fn::Join`
-  - `Fn::Sub`
+- The `Ref`, `Fn::GetAtt`, `Fn::Join` and `Fn::Sub` intrinsic functions
 - Explicit resource dependencies with `DependsOn`
 - Implicit dependencies from resource `Ref` expressions
-- Supported simulated resources, including:
-  - `AWS::CloudFormation::WaitConditionHandle`
-  - `AWS::S3::Bucket`
-  - `AWS::CloudFront::Distribution`
-  - `AWS::Lambda::Function`
-  - `AWS::SecretsManager::Secret`
-  - `AWS::KMS::Key` and `AWS::KMS::Alias`
-  - CloudFront Functions used by CDK-generated templates
-  - selected CDK custom resources such as CDK S3 BucketDeployment
+- The resource types listed under [Supported resources](#supported-resources-and-limitations) below,
+  including selected CDK custom resources such as CDK S3 BucketDeployment
 
 ## Basic usage
 
@@ -672,17 +659,16 @@ try {
 }
 ```
 
-The `bindings` array matches a template resource logical ID to a local handler function. This is
-especially useful when CDK has embedded or transformed CloudFront Function source in synthesized
-output, but your test wants to provide an executable local function directly.
+The `bindings` array matches a template resource logical ID to a local handler function. Use it when
+CDK has embedded or transformed CloudFront Function source in synthesized output, but your test wants
+to provide an executable local function directly.
 
 ## Lambda function bindings
 
-`AWS::Lambda::Function` resources support the same bindings, and this is the most convenient way
-to deploy Lambdas through sim CloudFormation: the deployed function is backed by your real
-in-process handler, so tests can close over test state and step through the handler in a debugger,
-while the stack still wires roles, grants, and references exactly as the template declares. A
-bound function may omit template `Code` and `Handler` entirely.
+`AWS::Lambda::Function` resources support the same bindings. The deployed function is backed by your
+real in-process handler, so tests can close over test state and step through the handler in a
+debugger, while the stack still wires roles, grants and references as the template declares. A bound
+function may omit template `Code` and `Handler` entirely.
 
 ```typescript sim-cloudformation-lambda-binding
 /**
@@ -972,41 +958,27 @@ try {
 
 ## Supported resources and limitations
 
-Sim CloudFormation supports a focused subset of CloudFormation.
+Sim CloudFormation supports a subset of CloudFormation. The resource types it creates are:
 
-Current supported resource areas include:
-
+- `AWS::CertificateManager::Certificate`
 - `AWS::CloudFormation::WaitConditionHandle`
-- `AWS::S3::Bucket`
-- `AWS::CloudFront::Distribution`
-- `AWS::Lambda::Function`
-- `AWS::SecretsManager::Secret`
+- `AWS::CloudFront::Distribution` and `AWS::CloudFront::Function`
+- `AWS::IAM::Role`, `AWS::IAM::ManagedPolicy` and `AWS::IAM::Policy`
 - `AWS::KMS::Key` and `AWS::KMS::Alias`
-- selected CloudFront Function resources emitted by CDK
+- `AWS::Lambda::Function`, `AWS::Lambda::Url` and `AWS::Lambda::Permission`
+- `AWS::Route53::HostedZone` and `AWS::Route53::RecordSet`
+- `AWS::S3::Bucket` and `AWS::S3::BucketPolicy`
+- `AWS::SecretsManager::Secret`
 - selected CDK custom resources, including CDK S3 BucketDeployment
 
-Common template features currently supported include:
+Each service's own docs describe what its resource types support. Notable limitations:
 
-- `Parameters`
-- `Outputs`, including `Description` and `Export`
-- `Ref`
-- `Fn::GetAtt`
-- `Fn::Join`
-- `Fn::Sub`
-- `DependsOn`
-
-Notable limitations:
-
-- `TemplateBody` must be JSON when using `CreateStackCommand`; YAML parsing is not currently
-  provided by the CloudFormation service.
+- `TemplateBody` must be JSON when using `CreateStackCommand`. YAML parsing is not currently provided
+  by the CloudFormation service.
 - Only supported resource types create simulated service resources.
 - Unsupported resource properties may be ignored or rejected depending on the resource simulator.
-- Stack updates and deletes are not currently documented as supported operations.
-- Mappings, conditions, and many advanced CloudFormation features are not currently
-  documented as supported operations.
-
-For best results, keep test templates focused on the resources and behaviours your application
-actually needs.
+- Stack updates and deletes are not supported.
+- Mappings, conditions, and many advanced CloudFormation features are not supported.
 
 ## Standalone SimCloudFormation
 

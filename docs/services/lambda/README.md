@@ -1,13 +1,10 @@
 # Simulated Lambda
 
-Yulin includes a simulated AWS Lambda service for tests and local development. Functions are
-created and invoked entirely in-process and in-memory. There is no need for containers or real AWS
-infrastructure.
+Yulin includes a simulated AWS Lambda service for tests and local development. Functions are created
+and invoked in-process and in memory, with no containers and no real AWS infrastructure.
 
-Sim Lambda can be used through `SimAws` to create functions, inspect their configuration, invoke
-them, and create functions from sim CloudFormation templates. Handlers run with their execution
-role as the simulated caller, so AWS calls made inside a handler are authorized by simulated IAM,
-similar to real Lambda.
+Handlers run with their execution role as the simulated caller, so AWS calls made inside a handler
+are authorized by simulated IAM, as on real Lambda.
 
 Lambda-specific helpers are imported from the `@kensio/yulin/lambda` subpath.
 
@@ -15,43 +12,34 @@ Lambda-specific helpers are imported from the `@kensio/yulin/lambda` subpath.
 
 Sim Lambda currently supports:
 
-- Creating functions with `CreateFunctionCommand`
-- Fetching function configuration with `GetFunctionCommand`
-- Invoking functions with `InvokeCommand`, including the `RequestResponse`, `Event`, and `DryRun`
-  invocation types
-- Function URLs, created with `CreateFunctionUrlConfigCommand` and served over real HTTP on
-  localhost with `serveSimAws`, so application code can call a simulated function the way it calls
-  a deployed one
+- `CreateFunctionCommand` and `GetFunctionCommand`
+- `InvokeCommand`, with the `RequestResponse`, `Event` and `DryRun` invocation types
+- Function URLs, created with `CreateFunctionUrlConfigCommand` and served over HTTP on localhost
+  with `serveSimAws`
 - `AuthType: "AWS_IAM"` Function URLs, authorizing `lambda:InvokeFunctionUrl` against the caller
-  resolved from the request and reporting it to the handler as
-  `requestContext.authorizer.iam`
-- Function resource-based policies with `AddPermissionCommand`, `RemovePermissionCommand` and
-  `GetPolicyCommand`, evaluated alongside identity policies, including cross-account invocation,
-  which also needs the caller's own Account to allow the action
+  resolved from the request
+- `AddPermissionCommand`, `RemovePermissionCommand` and `GetPolicyCommand`, for resource-based
+  policies evaluated alongside identity policies
 - Function code from three sources:
   - an in-process handler function passed via `makeLambdaZipFileInput(...)`
   - zip archive bytes on `Code.ZipFile` (build them with `makeLambdaCodeZip(...)`)
   - a zip object stored in sim S3 via `Code.S3Bucket`/`S3Key`
-- A Node.js `vm` runtime for zip-packaged code: warm module state across invocations, relative
-  requires between archived files, Node.js built-in modules, and AWS-like runtime environment
-  variables
-- Per-function environment variables with `Environment.Variables`, isolated from the host process
-  and from other functions
-- Runtime-provided `@aws-sdk/*` packages inside function code, routed into the owning simulated
-  AWS environment
-- Execution roles: handlers run as their execution `Role`, evaluated against simulated IAM
+- A Node.js `vm` runtime for zip-packaged code, with warm module state across invocations
+- Per-function environment variables with `Environment.Variables`
+- Runtime-provided `@aws-sdk/*` packages inside function code, routed into the owning simulated AWS
+  environment
+- Execution roles, evaluated against simulated IAM
 - IAM authorization of the Lambda commands themselves (`lambda:CreateFunction`,
   `lambda:GetFunction`, `lambda:InvokeFunction`, and the Function URL config actions)
-- AWS-like validation and errors, such as `ResourceConflictException` for duplicate function names
-  and `Could not unzip uploaded file` for invalid zip bytes
-- CloudFormation resources `AWS::Lambda::Function`, `AWS::Lambda::Url` and
-  `AWS::Lambda::Permission`, with `Ref`/`Fn::GetAtt` support and deploy-time executable bindings
+- AWS-like validation and errors, such as `ResourceConflictException` for a duplicate function name
+- The `AWS::Lambda::Function`, `AWS::Lambda::Url` and `AWS::Lambda::Permission` CloudFormation
+  resources, with `Ref`/`Fn::GetAtt` support and deploy-time executable bindings
 
 Real `LambdaClient` instances can also be routed into sim Lambda with
 [SDK interception](../../sdk/ "Simulated AWS SDK interception docs").
 
-The simulator focuses on useful behavior for isolated tests and local development rather than full
-Lambda feature parity.
+The simulator focuses on useful behaviour for tests and local development rather than full Lambda
+feature parity.
 
 ## Creating and invoking a function
 
@@ -113,10 +101,10 @@ Creating a function requires an execution `Role` ARN, as on real AWS. A new func
 `Pending` state and becomes `Active` in the background; wait with
 `simAws.backgroundTasksComplete()` when a test asserts on the `Active` state.
 
-Handlers use the same signature as real Node.js Lambda handlers — `(event, context, callback)` —
-and all the real completion styles work: returning a promise, returning a plain value, calling the
-callback, or the legacy context `done`/`fail`/`succeed` methods. Typed handlers written against
-the `aws-lambda` typings package can be passed in unchanged.
+Handlers use the same signature as real Node.js Lambda handlers, `(event, context, callback)`. All
+the real completion styles work: returning a promise, returning a plain value, calling the callback,
+or the legacy context `done`/`fail`/`succeed` methods. Typed handlers written against the
+`aws-lambda` typings package can be passed in unchanged.
 
 A handler that throws is reported AWS-style: the invocation output has `FunctionError:
 "Unhandled"` and the payload is an error document with `errorType`, `errorMessage`, and `trace`,
@@ -190,9 +178,9 @@ The vm runtime models the real Node.js runtime closely:
   modules, and use dependencies bundled under the archive's `node_modules/`.
 - The sandbox provides an AWS-like `process.env` with the standard runtime variables
   (`AWS_REGION`, `AWS_LAMBDA_FUNCTION_NAME`, `AWS_LAMBDA_FUNCTION_MEMORY_SIZE`, ...).
-- Import and handler problems surface as invocation errors with the real runtime error types —
-  `Runtime.ImportModuleError`, `Runtime.HandlerNotFound`, `Runtime.UserCodeSyntaxError`,
-  `Runtime.MalformedHandlerName` — rather than failing creation.
+- Import and handler problems surface as invocation errors rather than failing creation, with the
+  real runtime error types (`Runtime.ImportModuleError`, `Runtime.HandlerNotFound`,
+  `Runtime.UserCodeSyntaxError`, `Runtime.MalformedHandlerName`).
 
 Code is CommonJS, as zipped `.js` files are on the real `nodejs` runtimes; ES module source
 (`export` syntax) is not supported yet and fails with a clear hint. `Code.ZipFile` bytes that are
@@ -447,11 +435,10 @@ A Function URL is an HTTP endpoint for one function. Creating one with
 https://<url-id>.lambda-url.<region>.on.aws/
 ```
 
-Serving that URL with `serveSimAws` is the point of the feature: application code, a frontend dev
-server, or curl can make real HTTP requests to a simulated Lambda function, alongside the other
-simulated services on the same local server. Pass the Function URL through `srv.localUrl(...)`,
-which keeps the endpoint's hostname but sends the request to the local server, in the same way it
-adapts simulated S3 website and CloudFront URLs.
+Serve that URL with `serveSimAws` and application code, a frontend dev server, or curl can make real
+HTTP requests to the function, alongside the other simulated services on the same local server. Pass
+the Function URL through `srv.localUrl(...)`, which keeps the endpoint's hostname but sends the
+request to the local server, in the same way it adapts simulated S3 website and CloudFront URLs.
 
 ```typescript sim-lambda-function-url
 /**
@@ -568,9 +555,9 @@ action from `lambda:InvokeFunction`, which the Invoke API uses: real AWS separat
 policy can grant the HTTP endpoint without granting the SDK operation, and a policy naming only one
 of them does not grant the other here either.
 
-The caller comes from the request itself — a SigV4 signature, or an `x-sim-aws-caller` header
-naming a principal directly. A request that offers neither is anonymous, owns no policies, and is
-refused. See [callers of HTTP requests](../iam/#callers-of-http-requests) in the IAM docs for how
+The caller comes from the request itself, through either a SigV4 signature or an `x-sim-aws-caller`
+header naming a principal directly. A request that offers neither is anonymous, owns no policies, and
+is refused. See [callers of HTTP requests](../iam/#callers-of-http-requests) in the IAM docs for how
 that resolution works and how to sign a served request.
 
 An `AWS_IAM` invocation carries its caller into the event as
@@ -680,9 +667,8 @@ AWS decides a cross-Account request. See
 [Cross-Account requests](../iam/README.md#cross-account-requests).
 
 `AddPermissionCommand` grants a statement, `RemovePermissionCommand` revokes it by `StatementId`,
-and `GetPolicyCommand` returns the assembled document. `AddPermission` is a shorthand for writing a
-statement — Lambda expands the parts into one — so the statement it returns is the clearest account
-of what a grant actually means:
+and `GetPolicyCommand` returns the assembled document. `AddPermission` is a shorthand: Lambda expands
+its parts into one statement, so reading that statement back shows what the grant means:
 
 ```typescript sim-lambda-add-permission
 /**
@@ -826,18 +812,18 @@ The same applies to zip-packaged code in the vm runtime and to functions deploye
 [executable binding](#executable-bindings).
 
 Variable names are validated as on real AWS. A name must match the Lambda name pattern
-`[a-zA-Z]([a-zA-Z0-9_])+` — starting with a letter, at least two characters, and otherwise letters,
-digits and underscores — or it is rejected with `ValidationException`. The names Lambda reserves
-for the runtime (`AWS_REGION`, `AWS_LAMBDA_FUNCTION_NAME`, `LAMBDA_TASK_ROOT` and so on) cannot be
-declared, and are rejected with `InvalidParameterValueException`. As on AWS, the pattern is checked
-first, so a reserved name that also breaks it, such as `_HANDLER`, is reported as the constraint
-violation.
+`[a-zA-Z]([a-zA-Z0-9_])+`, meaning it starts with a letter, is at least two characters, and otherwise
+holds letters, digits and underscores. A name that does not match is rejected with
+`ValidationException`. The names Lambda reserves for the runtime (`AWS_REGION`,
+`AWS_LAMBDA_FUNCTION_NAME`, `LAMBDA_TASK_ROOT` and so on) cannot be declared, and are rejected with
+`InvalidParameterValueException`. As on AWS, the pattern is checked first, so a reserved name that
+also breaks it, such as `_HANDLER`, is reported as the constraint violation.
 
 ### Read environment variables inside the handler
 
-There is one thing to know about functions backed by a real in-process handler function. Because
-that handler is an ordinary function in your test process rather than code loaded into a sandbox,
-it only gets the function's own `process.env` while it is actually running.
+A function backed by a real in-process handler behaves differently here. That handler is an ordinary
+function in your test process rather than code loaded into a sandbox, so it only gets the function's
+own `process.env` while it is actually running.
 
 That means a variable read at module scope is read too early:
 
@@ -852,13 +838,13 @@ export const handler = async () => {
 };
 ```
 
-Moving the read inside the handler is the fix, and is worth doing anyway for testability. Zip
-code in the vm runtime is unaffected, because it is imported at cold start, during an invocation.
+Moving the read inside the handler fixes it. Zip code in the vm runtime is unaffected, because it is
+imported at cold start, during an invocation.
 
-In practice this often does not come up: test suites commonly export the same variables they
-configure their functions with, and then a module-scope read gets the right value regardless. Sim
-Lambda warns on the console when that is not the case, in the two situations where the difference
-actually changes what your code sees:
+This often does not come up, because test suites commonly export the same variables they configure
+their functions with, and then a module-scope read gets the right value anyway. Sim Lambda warns on
+the console when that is not the case, in the two situations where the difference changes what your
+code sees:
 
 - a declared variable whose name the host process also sets, with a different value
 - two simulated functions declaring the same variable name with different values
@@ -970,7 +956,7 @@ Supported function properties:
 - `FunctionName` (defaults to the logical ID)
 - `Role` (typically a `Ref`/`Fn::GetAtt` to a same-stack `AWS::IAM::Role`; both resolve to the
   role's ARN)
-- `Code` — inline `ZipFile` source string, or `S3Bucket`/`S3Key` fetched from same-scope sim S3
+- `Code` (inline `ZipFile` source string, or `S3Bucket`/`S3Key` fetched from same-scope sim S3)
 - `Handler`
 - `Runtime`
 - `Description`
@@ -1092,8 +1078,8 @@ failing the deployment.
 
 ## Executable bindings
 
-Deploy-time `bindings` let a template function be backed by a real in-process handler instead of
-its template code — the CloudFormation counterpart of `makeLambdaZipFileInput(...)`. The bound
+Deploy-time `bindings` let a template function be backed by a real in-process handler instead of its
+template code. They are the CloudFormation counterpart of `makeLambdaZipFileInput(...)`. The bound
 handler runs with the same execution-role attribution as template code, can close over test state,
 and can be stepped through in a debugger.
 
@@ -1158,7 +1144,8 @@ deploy with the unmatched target named for diagnosis.
 Current documented limitations:
 
 - Only `CreateFunctionCommand`, `GetFunctionCommand`, `InvokeCommand`, and the Function URL config
-  commands are supported — no `UpdateFunctionCode`, `DeleteFunction`, or function listing yet.
+  commands are supported. There is no `UpdateFunctionCode`, `DeleteFunction`, or function listing
+  yet.
 - A cross-account grant is only half of what admits a call: the caller's own Account has to allow
   the action too, and its IAM has to be part of the same `SimAws` instance for its policies to be
   found. A caller from an Account the simulation knows nothing about is denied.
@@ -1179,7 +1166,7 @@ Current documented limitations:
 - Function versions, aliases, and qualifiers are not simulated (`Version` is always `$LATEST`).
 - The vm runtime supports CommonJS function code only; ES module source (`.mjs` / `export`
   syntax) is not supported yet.
-- Container image functions (`Code.ImageUri`) are not supported — the simulator stays Docker-free.
+- Container image functions (`Code.ImageUri`) are not supported. The simulator stays Docker-free.
 - Lambda Layers are not simulated.
 - Environment variables declared with `Environment.Variables` reach a real in-process handler
   function only while it runs, so a variable read at module scope sees the host process value

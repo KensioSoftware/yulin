@@ -23,8 +23,11 @@ npm i -D @kensio/yulin
 - [CloudFormation](./docs/services/cloudformation "Simulated CloudFormation docs")
 - [CloudFront](./docs/services/cloudfront "Simulated CloudFront docs")
 - [IAM](./docs/services/iam "Simulated IAM docs")
+- [KMS](./docs/services/kms "Simulated KMS docs")
+- [Lambda](./docs/services/lambda "Simulated Lambda docs")
 - [Route53](./docs/services/route53 "Simulated Route53 docs")
 - [S3](./docs/services/s3 "Simulated S3 docs")
+- [Secrets Manager](./docs/services/secretsmanager "Simulated Secrets Manager docs")
 - [STS](./docs/services/sts "Simulated STS docs")
 
 ## Feature specific docs
