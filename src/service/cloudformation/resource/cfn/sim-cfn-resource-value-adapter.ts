@@ -1,25 +1,13 @@
 import type { SimCfnTemplateValue } from "../../template/value/sim-cfn-template-value.js";
-import { SimS3Bucket } from "../../../s3/bucket/sim-s3-bucket.js";
-import { SimS3BucketCfn } from "./s3/sim-s3-bucket-cfn.js";
+import { acmValueAdapter } from "./acm/sim-acm-cfn-value-adapter.js";
+import { cloudFrontValueAdapter } from "./cloudfront/sim-cloudfront-cfn-value-adapter.js";
+import { iamValueAdapter } from "./iam/sim-iam-cfn-value-adapter.js";
+import { kmsValueAdapter } from "./kms/sim-kms-cfn-value-adapter.js";
+import { lambdaValueAdapter } from "./lambda/sim-lambda-cfn-value-adapter.js";
+import { route53ValueAdapter } from "./route53/sim-route53-cfn-value-adapter.js";
+import { s3ValueAdapter } from "./s3/sim-s3-cfn-value-adapter.js";
+import { secretsManagerValueAdapter } from "./secretsmanager/sim-secrets-manager-cfn-value-adapter.js";
 import { SimCfnDefaultResourceValueAdapter } from "./sim-cfn-default-resource-value-adapter.js";
-import { SimCloudFrontDistribution } from "../../../cloudfront/distribution/sim-cloudfront-distribution.js";
-import { SimCloudFrontDistributionCfn } from "./cloudfront/sim-cloudfront-distribution-cfn.js";
-import { SimCloudFrontFunction } from "../../../cloudfront/cff/sim-cloudfront-function.js";
-import { SimCloudFrontFunctionCfn } from "./cloudfront/sim-cloudfront-function-cfn.js";
-import { SimRoute53HostedZone } from "../../../route53/hosted-zone/sim-route53-hosted-zone.js";
-import { SimRoute53HostedZoneCfn } from "./route53/sim-route53-hosted-zone-cfn.js";
-import { SimAcmCertificateCfn } from "./acm/sim-acm-certificate-cfn.js";
-import { SimAcmCertificate } from "../../../acm/certificate/sim-acm-certificate.js";
-import { SimIamManagedPolicyCfn } from "./iam/sim-iam-managed-policy-cfn.js";
-import type { SimIamManagedPolicy } from "../../../iam/policy/sim-iam-policy.js";
-import { SimIamRoleCfn } from "./iam/sim-iam-role-cfn.js";
-import type { SimIamRole } from "../../../iam/role/sim-iam-role.js";
-import { SimLambdaFunction } from "../../../lambda/function/sim-lambda-function.js";
-import { SimLambdaFunctionCfn } from "./lambda/sim-lambda-function-cfn.js";
-import { SimLambdaFunctionUrl } from "../../../lambda/function/url/sim-lambda-function-url.js";
-import { SimLambdaFunctionUrlCfn } from "./lambda/sim-lambda-function-url-cfn.js";
-import { SimSecretsManagerSecret } from "../../../secretsmanager/secret/sim-secrets-manager-secret.js";
-import { SimSecretsManagerSecretCfn } from "./secretsmanager/sim-secrets-manager-secret-cfn.js";
 
 export interface SimCfnResourceValueAdapter {
   refValue(): SimCfnTemplateValue;
@@ -27,11 +15,17 @@ export interface SimCfnResourceValueAdapter {
   attributeValue(attributeName: string): SimCfnTemplateValue;
 }
 
-interface SimCfnResourceValueAdapterProperties {
+export interface SimCfnResourceValueAdapterProperties {
   readonly logicalId: string;
   readonly type: string | undefined;
   readonly simResource: object | undefined;
 }
+
+/**
+ * The adapter for a Resource type one service owns, or nothing when the
+ * Resource belongs to another service.
+ */
+export type SimCfnServiceValueAdapter = SimCfnResourceValueAdapter | undefined;
 
 /**
  * Build the CloudFormation-facing value adapter for a created simulated
@@ -39,95 +33,26 @@ interface SimCfnResourceValueAdapterProperties {
  *
  * The underlying simulated AWS service object stays service-focused; this
  * adapter owns CloudFormation-specific Ref and Fn::GetAtt behavior.
+ *
+ * Each service matches its own Resource types, beside that service's adapters,
+ * so this registry stays a list of services. A Resource no service claims
+ * falls through to the default adapter, which answers a Ref with the logical
+ * ID.
  */
 export function simCfnResourceValueAdapter(
   properties: SimCfnResourceValueAdapterProperties,
 ): SimCfnResourceValueAdapter {
-  if (
-    properties.type === "AWS::CertificateManager::Certificate" &&
-    properties.simResource instanceof SimAcmCertificate
-  ) {
-    return new SimAcmCertificateCfn({
-      certificate: properties.simResource,
-    });
-  }
-
-  if (
-    properties.type === "AWS::S3::Bucket" &&
-    properties.simResource instanceof SimS3Bucket
-  ) {
-    return new SimS3BucketCfn({
-      bucket: properties.simResource,
-    });
-  }
-
-  if (
-    properties.type === "AWS::CloudFront::Distribution" &&
-    properties.simResource instanceof SimCloudFrontDistribution
-  ) {
-    return new SimCloudFrontDistributionCfn({
-      distro: properties.simResource,
-    });
-  }
-
-  if (
-    properties.type === "AWS::CloudFront::Function" &&
-    properties.simResource instanceof SimCloudFrontFunction
-  ) {
-    return new SimCloudFrontFunctionCfn({
-      cloudFrontFunction: properties.simResource,
-    });
-  }
-
-  if (properties.type === "AWS::IAM::ManagedPolicy") {
-    return new SimIamManagedPolicyCfn({
-      policy: properties.simResource as SimIamManagedPolicy,
-    });
-  }
-
-  if (properties.type === "AWS::IAM::Role") {
-    return new SimIamRoleCfn({
-      role: properties.simResource as SimIamRole,
-    });
-  }
-
-  if (
-    properties.type === "AWS::Lambda::Function" &&
-    properties.simResource instanceof SimLambdaFunction
-  ) {
-    return new SimLambdaFunctionCfn({
-      lambdaFunction: properties.simResource,
-    });
-  }
-
-  if (
-    properties.type === "AWS::Lambda::Url" &&
-    properties.simResource instanceof SimLambdaFunctionUrl
-  ) {
-    return new SimLambdaFunctionUrlCfn({
-      functionUrl: properties.simResource,
-    });
-  }
-
-  if (
-    properties.type === "AWS::SecretsManager::Secret" &&
-    properties.simResource instanceof SimSecretsManagerSecret
-  ) {
-    return new SimSecretsManagerSecretCfn({
-      secret: properties.simResource,
-    });
-  }
-
-  if (
-    properties.type === "AWS::Route53::HostedZone" &&
-    properties.simResource instanceof SimRoute53HostedZone
-  ) {
-    return new SimRoute53HostedZoneCfn({
-      hostedZone: properties.simResource,
-    });
-  }
-
-  return new SimCfnDefaultResourceValueAdapter({
-    logicalId: properties.logicalId,
-  });
+  return (
+    acmValueAdapter(properties) ??
+    cloudFrontValueAdapter(properties) ??
+    iamValueAdapter(properties) ??
+    kmsValueAdapter(properties) ??
+    lambdaValueAdapter(properties) ??
+    route53ValueAdapter(properties) ??
+    s3ValueAdapter(properties) ??
+    secretsManagerValueAdapter(properties) ??
+    new SimCfnDefaultResourceValueAdapter({
+      logicalId: properties.logicalId,
+    })
+  );
 }

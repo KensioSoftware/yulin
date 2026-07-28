@@ -20,6 +20,7 @@ Sim CloudFormation currently supports:
 - Deploying parsed template objects with `deployTemplate(...)`
 - Deploying synthesized JSON template files with `deployTemplateFile(...)`
 - Template `Parameters` with supplied values and defaults
+- Template `Outputs`, resolved after resource creation and read from `stack.outputs`
 - Common intrinsic functions:
   - `Ref`
   - `Fn::GetAtt`
@@ -33,6 +34,7 @@ Sim CloudFormation currently supports:
   - `AWS::CloudFront::Distribution`
   - `AWS::Lambda::Function`
   - `AWS::SecretsManager::Secret`
+  - `AWS::KMS::Key` and `AWS::KMS::Alias`
   - CloudFront Functions used by CDK-generated templates
   - selected CDK custom resources such as CDK S3 BucketDeployment
 
@@ -979,12 +981,14 @@ Current supported resource areas include:
 - `AWS::CloudFront::Distribution`
 - `AWS::Lambda::Function`
 - `AWS::SecretsManager::Secret`
+- `AWS::KMS::Key` and `AWS::KMS::Alias`
 - selected CloudFront Function resources emitted by CDK
 - selected CDK custom resources, including CDK S3 BucketDeployment
 
 Common template features currently supported include:
 
 - `Parameters`
+- `Outputs`, including `Description` and `Export`
 - `Ref`
 - `Fn::GetAtt`
 - `Fn::Join`
@@ -998,7 +1002,7 @@ Notable limitations:
 - Only supported resource types create simulated service resources.
 - Unsupported resource properties may be ignored or rejected depending on the resource simulator.
 - Stack updates and deletes are not currently documented as supported operations.
-- Outputs, mappings, conditions, and many advanced CloudFormation features are not currently
+- Mappings, conditions, and many advanced CloudFormation features are not currently
   documented as supported operations.
 
 For best results, keep test templates focused on the resources and behaviours your application

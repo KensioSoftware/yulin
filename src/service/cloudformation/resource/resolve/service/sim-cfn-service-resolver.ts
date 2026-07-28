@@ -54,6 +54,9 @@ export function resolveSimCloudFormationServiceResourceFactory(
     case "IAM": {
       return scopedAws.iam().cfnResourceFactory();
     }
+    case "KMS": {
+      return scopedAws.kms().cfnResourceFactory();
+    }
     case "Lambda": {
       return scopedAws.lambda().cfnResourceFactory();
     }

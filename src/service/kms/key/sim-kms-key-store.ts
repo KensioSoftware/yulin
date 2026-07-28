@@ -110,6 +110,17 @@ export class SimKmsKeyStore {
   }
 
   /**
+   * Find a stored alias by its name.
+   *
+   * Unlike `find`, this does not materialise an AWS managed key for a reserved
+   * `alias/aws/` name: it reports the alias that exists, not the key one would
+   * reach.
+   */
+  findAlias(aliasName: string): SimKmsAlias | undefined {
+    return this.aliases.get(aliasName);
+  }
+
+  /**
    * The aliases pointing at one key, or all of them.
    */
   aliasesFor(keyId: SimKmsKeyId | undefined): readonly SimKmsAlias[] {

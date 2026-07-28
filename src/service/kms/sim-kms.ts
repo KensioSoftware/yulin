@@ -19,6 +19,8 @@ import { SimKmsKeyCommands } from "./command/key/sim-kms-key-commands.js";
 import { SimKmsListKeys } from "./command/key/sim-kms-list-keys.js";
 import { SimKmsKeyLifecycleCommands } from "./command/key/sim-kms-key-lifecycle-commands.js";
 import { SimKmsKeyPolicyCommands } from "./command/key/sim-kms-key-policy-commands.js";
+import { SimKmsCfnResourceFactory } from "./cfn/sim-cfn-kms-resource-factory.js";
+import type { SimKmsAlias } from "./key/sim-kms-alias.js";
 import type { SimKmsKey } from "./key/sim-kms-key.js";
 import { SimKmsKeyFactory } from "./key/sim-kms-key-factory.js";
 import { SimKmsKeyMetadataView } from "./key/sim-kms-key-metadata.js";
@@ -54,6 +56,7 @@ export class SimKms {
   private readonly generateDataKeyCommand: SimKmsGenerateDataKey;
   private readonly background: BackgroundScheduler;
   private readonly sdkRouter = new SimKmsSdkCommandRouter(this);
+  private readonly cfnFactory = new SimKmsCfnResourceFactory({ kms: this });
 
   constructor(properties: SimKmsProperties = {}) {
     const {
@@ -108,6 +111,16 @@ export class SimKms {
    */
   findKey(keyId: string): SimKmsKey | undefined {
     return this.keys.find(keyId);
+  }
+
+  /**
+   * Find an alias by name.
+   *
+   * This is the simulator's own accessor, alongside `findKey`, for tests and
+   * for CloudFormation Resource creation to get at the alias it just made.
+   */
+  findAlias(aliasName: string): SimKmsAlias | undefined {
+    return this.keys.findAlias(aliasName);
   }
 
   /**
@@ -262,6 +275,14 @@ export class SimKms {
   ): Promise<simKmsCommands.SimGenerateDataKeyCommandOutput> {
     await this.background.sequence();
     return this.generateDataKeyCommand.handle(command, options);
+  }
+
+  /**
+   * Get this service's CloudFormation Resource factory, which creates
+   * simulated keys and aliases from AWS::KMS::* Resources.
+   */
+  cfnResourceFactory(): SimKmsCfnResourceFactory {
+    return this.cfnFactory;
   }
 
   /**

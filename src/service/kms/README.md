@@ -68,6 +68,25 @@ As elsewhere, implementation code under `src/` does not import real AWS SDK pack
 command types in `*.command.ts` match the SDK shapes closely enough for callers to pass real SDK
 command instances.
 
+## CloudFormation
+
+`cfn/` creates keys and aliases from `AWS::KMS::Key` and `AWS::KMS::Alias`. Both creators go
+through the ordinary `CreateKey` and `CreateAlias` commands rather than building the stored objects
+directly, so a template gets the same key material, the same policy handling and the same key-type
+and alias-name refusals an SDK caller gets. `Enabled: false` is the one thing the commands cannot
+express, since neither the real nor the simulated `CreateKey` takes it; the key is disabled after
+creation, as real CloudFormation does.
+
+`SimCfnKmsUnsimulatedKeyProperties` is the counterweight to that reuse. Passing a property through
+to `CreateKey` only fails closed for the properties `CreateKey` knows about, and `AWS::KMS::Key` has
+several the API does not take at all: rotation, multi-Region and tags. Each of those changes what
+the key is, so the Resource is refused before the key exists rather than deploying a key that
+behaves differently here than on AWS.
+
+`Ref` and `Fn::GetAtt` behaviour lives with the other CloudFormation value adapters, in
+`cloudformation/resource/cfn/kms/`. A key's `Ref` is its key ID rather than its ARN, and an alias
+has no `Fn::GetAtt` attributes at all, which is refused rather than answered with the alias ARN.
+
 ## Key policies and IAM
 
 KMS is the first service here whose resource policy is mandatory, and that needed a small addition
