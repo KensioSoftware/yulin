@@ -1,4 +1,4 @@
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimKmsRequestOptions } from "../sim-kms-request-options.js";
 import type { SimKmsKeyStore } from "../../key/sim-kms-key-store.js";
 import type { SimKmsAuthorizer } from "../authorize/sim-kms-authorizer.js";
 import type {
@@ -9,10 +9,6 @@ import type {
 interface SimKmsListKeysProperties {
   readonly keys: SimKmsKeyStore;
   readonly authorizer: SimKmsAuthorizer;
-}
-
-interface SimKmsListKeysOptions {
-  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -36,9 +32,9 @@ export class SimKmsListKeys {
    */
   handle(
     command: SimListKeysCommand,
-    options?: SimKmsListKeysOptions,
+    options?: SimKmsRequestOptions,
   ): SimListKeysCommandOutput {
-    this.authorizer.authorizeAccount("kms:ListKeys", options?.caller);
+    this.authorizer.authorizeAccount("kms:ListKeys", options);
 
     const limit = command.input?.Limit;
     const entries = this.keys.keys

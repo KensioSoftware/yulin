@@ -3,6 +3,7 @@ import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
 import { reportingKeyProblems } from "./sim-ssm-kms-key-problems.js";
 import {
   ssmDefaultKeyAlias,
+  ssmKmsViaService,
   type SimSsmKmsCrypto,
 } from "./sim-ssm-kms-crypto.js";
 
@@ -32,9 +33,14 @@ interface SimSsmParameterKmsProperties {
  * The KMS calls a SecureString parameter makes.
  *
  * The calls are made as the caller rather than as the service, which is the
- * point: a standard tier write needs `kms:Encrypt` on the key and a decrypting
- * read needs `kms:Decrypt`, each on top of the SSM permission for the
- * parameter itself.
+ * point: under a customer managed key a standard tier write needs
+ * `kms:Encrypt` on the key and a decrypting read needs `kms:Decrypt`, each on
+ * top of the SSM permission for the parameter itself.
+ *
+ * They are also made through the service, which is why the `aws/ssm` managed
+ * key needs no KMS permission at all: its policy admits the Account's
+ * principals when `kms:ViaService` names Systems Manager, and Parameter Store
+ * is what supplies that.
  *
  * Standard tier Parameter Store encrypts under the key directly rather than
  * through a data key, so this is one Encrypt and one Decrypt and nothing more.
@@ -65,7 +71,7 @@ export class SimSsmParameterKms {
               EncryptionContext: this.contextFor(parameterArn),
             },
           },
-          { caller },
+          { caller, viaService: ssmKmsViaService },
         ),
     );
 
@@ -97,7 +103,7 @@ export class SimSsmParameterKms {
               EncryptionContext: this.contextFor(parameterArn),
             },
           },
-          { caller },
+          { caller, viaService: ssmKmsViaService },
         ),
     );
 

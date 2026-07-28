@@ -1,4 +1,4 @@
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimKmsRequestOptions } from "../sim-kms-request-options.js";
 import { SimKmsValidationException } from "../../error/sim-kms.error.js";
 import { SimKmsAliasName } from "../../key/sim-kms-alias.js";
 import type { SimKmsKeyStore } from "../../key/sim-kms-key-store.js";
@@ -13,10 +13,6 @@ import type {
 interface SimKmsAliasCommandsProperties {
   readonly keys: SimKmsKeyStore;
   readonly authorizer: SimKmsAuthorizer;
-}
-
-interface SimKmsAliasCommandOptions {
-  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -41,7 +37,7 @@ export class SimKmsAliasCommands {
    */
   create(
     command: SimCreateAliasCommand,
-    options?: SimKmsAliasCommandOptions,
+    options?: SimKmsRequestOptions,
   ): SimCreateAliasCommandOutput {
     const aliasName = command.input.AliasName;
 
@@ -52,7 +48,7 @@ export class SimKmsAliasCommands {
     this.aliasName.validateCustomerAlias(aliasName);
 
     const key = this.keys.require(command.input.TargetKeyId);
-    this.authorizer.authorizeKey("kms:CreateAlias", key, options?.caller);
+    this.authorizer.authorizeKey("kms:CreateAlias", key, options);
     this.keys.addAlias(aliasName, key);
 
     return { $metadata: {} };
@@ -63,9 +59,9 @@ export class SimKmsAliasCommands {
    */
   list(
     command: SimListAliasesCommand,
-    options?: SimKmsAliasCommandOptions,
+    options?: SimKmsRequestOptions,
   ): SimListAliasesCommandOutput {
-    this.authorizer.authorizeAccount("kms:ListAliases", options?.caller);
+    this.authorizer.authorizeAccount("kms:ListAliases", options);
 
     const keyId = command.input?.KeyId;
     const aliases = this.keys

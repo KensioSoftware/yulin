@@ -11,6 +11,17 @@ import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
 export const ssmDefaultKeyAlias = "alias/aws/ssm";
 
 /**
+ * The service Parameter Store's KMS calls are made through, as
+ * `kms:ViaService` names it.
+ *
+ * Supplying it is what lets a caller read a `SecureString` under the
+ * `aws/ssm` managed key with no KMS permission of its own: that key's policy
+ * admits the Account's principals only when the request reached KMS through
+ * Systems Manager.
+ */
+export const ssmKmsViaService = "ssm";
+
+/**
  * The narrow slice of simulated KMS that SecureString parameters need.
  *
  * Standard tier Parameter Store encrypts under the key directly rather than
@@ -26,7 +37,10 @@ export interface SimSsmKmsCrypto {
         EncryptionContext?: Readonly<Record<string, string>> | undefined;
       };
     },
-    options?: { caller?: SimAwsCaller | undefined },
+    options?: {
+      caller?: SimAwsCaller | undefined;
+      viaService?: string | undefined;
+    },
   ): Promise<{
     CiphertextBlob?: Uint8Array | undefined;
     KeyId?: string | undefined;
@@ -39,7 +53,10 @@ export interface SimSsmKmsCrypto {
         EncryptionContext?: Readonly<Record<string, string>> | undefined;
       };
     },
-    options?: { caller?: SimAwsCaller | undefined },
+    options?: {
+      caller?: SimAwsCaller | undefined;
+      viaService?: string | undefined;
+    },
   ): Promise<{
     Plaintext?: Uint8Array | undefined;
     KeyId?: string | undefined;

@@ -205,8 +205,22 @@ describe("SSM SecureString parameters", () => {
   });
 
   it("binds a ciphertext to the ARN of the parameter holding it", async () => {
-    // Given a SecureString parameter and the ciphertext it stores.
-    const simAws = await simAwsWithSecret();
+    // Given a SecureString parameter under a customer managed key, which is
+    // the kind a caller can also use directly, and the ciphertext it stores.
+    const simAws = new SimAws();
+    const key = await simAws
+      .kms()
+      .createKey(new CreateKeyCommand({ Description: "Parameter key" }));
+
+    await simAws.ssm().putParameter(
+      new PutParameterCommand({
+        Name: "/myapp/prod/db-password",
+        Type: "SecureString",
+        Value: "hunter2",
+        KeyId: key.KeyMetadata?.Arn,
+      }),
+    );
+
     const stored = await simAws
       .ssm()
       .getParameter(

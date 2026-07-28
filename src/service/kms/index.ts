@@ -1,4 +1,5 @@
-export { SimKms, type SimKmsRequestOptions } from "./sim-kms.js";
+export { SimKms } from "./sim-kms.js";
+export type { SimKmsRequestOptions } from "./command/sim-kms-request-options.js";
 export {
   SimKmsKey,
   SimKmsKeyManager,
