@@ -138,13 +138,14 @@ describe("SSM SecureString under the aws/ssm managed key", () => {
         new GetParameterCommand({ Name: "/myapp/prod/db-password" }),
         { caller: { kind: "arn", arn: role.Role.Arn } },
       );
-    assertNonNullable(stored.Parameter?.Value);
+    const ciphertext = stored.Parameter?.Value;
+    assertNonNullable(ciphertext);
 
     // When the Role takes the ciphertext to KMS itself.
     const error = await assertThrowsErrorAsync(async () =>
       simAws.kms().decrypt(
         new DecryptCommand({
-          CiphertextBlob: Buffer.from(stored.Parameter?.Value ?? "", "base64"),
+          CiphertextBlob: Buffer.from(ciphertext, "base64"),
         }),
         { caller: { kind: "arn", arn: role.Role.Arn } },
       ),
