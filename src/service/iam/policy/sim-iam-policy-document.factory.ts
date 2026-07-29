@@ -35,6 +35,11 @@ import type { SimIamPolicyDocument } from "./sim-iam-policy.js";
  *
  * There is no default Principal. Leaving it out keeps a statement that names
  * one from merging with a default that names another.
+ *
+ * The default `Effect: "Allow"` only reaches a single-statement override. A
+ * multi-statement policy overrides `Statement` with an array, which replaces
+ * the default rather than merging into each entry, so every statement in an
+ * array needs its own `Effect`.
  */
 export const simIamPolicyDocumentFactory = new MappedFactory<
   SimIamPolicyDocument,

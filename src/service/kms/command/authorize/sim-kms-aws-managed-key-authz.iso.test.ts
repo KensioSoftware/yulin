@@ -4,6 +4,7 @@ import {
   EncryptCommand,
   GetKeyPolicyCommand,
 } from "@aws-sdk/client-kms";
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
   assertIdentical,
   assertInstanceOf,
@@ -13,39 +14,39 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
-import { createSimIamRoleWithPolicy } from "../../../../../test/iam/create-role-with-policy.js";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
+import { simIamPolicyDocumentFactory } from "../../../iam/policy/sim-iam-policy-document.factory.js";
 
 const managedKeyAlias = "alias/aws/ssm";
 const plaintext = Uint8Array.from(Buffer.from("hunter2", "utf8"));
-
-/**
- * A Role in the given Account allowed one action and nothing else.
- */
-async function roleAllowed(
-  simAws: SimAws,
-  accountId: string,
-  action: string,
-): Promise<string> {
-  return await createSimIamRoleWithPolicy({
-    simAws,
-    accountId,
-    roleName: `Role-${action.replace(":", "-")}`,
-    policyName: "OnlyPolicy",
-    action,
-  });
-}
 
 describe("KMS AWS managed key authorization", () => {
   it("lets a caller with no KMS permission use the key through its service", async () => {
     // Given a Role allowed to read parameters and nothing else.
     const simAws = new SimAws();
-    const roleArn = await roleAllowed(
-      simAws,
-      simAws.defaultAccountId,
-      "ssm:GetParameter",
+    const roleIam = simAws.account(simAws.defaultAccountId).iam();
+    const roleCreation = await roleIam.createRole(
+      new CreateRoleCommand({
+        RoleName: "Role-ssm-GetParameter",
+        AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Principal: { AWS: `arn:aws:iam::${simAws.defaultAccountId}:root` },
+            Action: "sts:AssumeRole",
+          },
+        }),
+      }),
     );
+    await roleIam.putRolePolicy(
+      new PutRolePolicyCommand({
+        RoleName: "Role-ssm-GetParameter",
+        PolicyName: "OnlyPolicy",
+        PolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: { Action: "ssm:GetParameter", Resource: "*" },
+        }),
+      }),
+    );
+    const roleArn = roleCreation.Role.Arn;
 
     // When a request reaches the aws/ssm key through Systems Manager.
     const encrypted = await simAws
@@ -67,11 +68,28 @@ describe("KMS AWS managed key authorization", () => {
     // Given a Role IAM allows kms:Decrypt on everything, and a ciphertext made
     // through the owning service.
     const simAws = new SimAws();
-    const roleArn = await roleAllowed(
-      simAws,
-      simAws.defaultAccountId,
-      "kms:Decrypt",
+    const roleIam = simAws.account(simAws.defaultAccountId).iam();
+    const roleCreation = await roleIam.createRole(
+      new CreateRoleCommand({
+        RoleName: "Role-kms-Decrypt",
+        AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Principal: { AWS: `arn:aws:iam::${simAws.defaultAccountId}:root` },
+            Action: "sts:AssumeRole",
+          },
+        }),
+      }),
     );
+    await roleIam.putRolePolicy(
+      new PutRolePolicyCommand({
+        RoleName: "Role-kms-Decrypt",
+        PolicyName: "OnlyPolicy",
+        PolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: { Action: "kms:Decrypt", Resource: "*" },
+        }),
+      }),
+    );
+    const roleArn = roleCreation.Role.Arn;
 
     const encrypted = await simAws
       .kms()
@@ -118,7 +136,28 @@ describe("KMS AWS managed key authorization", () => {
   it("denies a caller from another Account reaching the key through the service", async () => {
     // Given a Role in another Account whose own IAM allows every KMS action.
     const simAws = new SimAws();
-    const foreignRoleArn = await roleAllowed(simAws, "222222222222", "kms:*");
+    const roleIam = simAws.account("222222222222").iam();
+    const roleCreation = await roleIam.createRole(
+      new CreateRoleCommand({
+        RoleName: "Role-kms-all",
+        AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Principal: { AWS: "arn:aws:iam::222222222222:root" },
+            Action: "sts:AssumeRole",
+          },
+        }),
+      }),
+    );
+    await roleIam.putRolePolicy(
+      new PutRolePolicyCommand({
+        RoleName: "Role-kms-all",
+        PolicyName: "OnlyPolicy",
+        PolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: { Action: "kms:*", Resource: "*" },
+        }),
+      }),
+    );
+    const foreignRoleArn = roleCreation.Role.Arn;
 
     // When it reaches the key through Systems Manager.
     const error = await assertThrowsErrorAsync(async () =>
