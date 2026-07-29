@@ -1,4 +1,4 @@
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimKmsRequestOptions } from "../sim-kms-request-options.js";
 import { SimKmsValidationException } from "../../error/sim-kms.error.js";
 import { simKmsKeyPolicyName } from "../../key/sim-kms-key-policy.js";
 import type { SimKmsKeyStore } from "../../key/sim-kms-key-store.js";
@@ -14,10 +14,6 @@ import type {
 interface SimKmsKeyPolicyCommandsProperties {
   readonly keys: SimKmsKeyStore;
   readonly authorizer: SimKmsAuthorizer;
-}
-
-interface SimKmsKeyPolicyCommandOptions {
-  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -43,12 +39,12 @@ export class SimKmsKeyPolicyCommands {
    */
   get(
     command: SimGetKeyPolicyCommand,
-    options?: SimKmsKeyPolicyCommandOptions,
+    options?: SimKmsRequestOptions,
   ): SimGetKeyPolicyCommandOutput {
     this.requireDefaultPolicyName(command.input.PolicyName);
 
     const key = this.keys.require(command.input.KeyId);
-    this.authorizer.authorizeKey("kms:GetKeyPolicy", key, options?.caller);
+    this.authorizer.authorizeKey("kms:GetKeyPolicy", key, options);
 
     return {
       $metadata: {},
@@ -62,7 +58,7 @@ export class SimKmsKeyPolicyCommands {
    */
   put(
     command: SimPutKeyPolicyCommand,
-    options?: SimKmsKeyPolicyCommandOptions,
+    options?: SimKmsRequestOptions,
   ): SimPutKeyPolicyCommandOutput {
     this.requireDefaultPolicyName(command.input.PolicyName);
 
@@ -75,7 +71,7 @@ export class SimKmsKeyPolicyCommands {
     const document = this.policyDocument.parse(policy);
     const key = this.keys.require(command.input.KeyId);
 
-    this.authorizer.authorizeKey("kms:PutKeyPolicy", key, options?.caller);
+    this.authorizer.authorizeKey("kms:PutKeyPolicy", key, options);
     key.policy.replaceWith(document);
 
     return { $metadata: {} };

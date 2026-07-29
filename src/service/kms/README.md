@@ -117,6 +117,21 @@ a pre-existing divergence in shared IAM rather than something this service intro
 generally would change S3 bucket policy, Lambda function policy and role trust policy behaviour, so
 it wants its own change.
 
+Two KMS condition keys are supplied with every request, and they are what makes an AWS managed key
+behave like one. `SimKmsCallerAccountCondition` supplies `kms:CallerAccount`, which can only be
+worked out once IAM has resolved the caller, so it reaches IAM through the `callerConditions` input
+rather than the ordinary condition context. `SimKmsViaService` supplies `kms:ViaService` from the
+`viaService` request option, set by a service calling KMS on a caller's behalf. It holds a service
+name rather than an endpoint, and builds the endpoint with the key's own region, since a key is only
+usable in its own region.
+
+`SimKmsKeyPolicy.awsManaged` is the policy those two exist for. It is the policy real AWS gives an
+AWS managed key: use of the key allowed to `*` conditioned on both keys, and a second statement
+delegating only the key's metadata to the account. Nothing about using the key is delegated, so an
+identity policy granting `kms:Decrypt` on such a key reaches nothing, and a caller with no KMS
+permission at all reaches it through the owning service. The key factory builds it whenever a key is
+made for a service, which the key store does on first reference to a reserved `alias/aws/` name.
+
 Operations with no key to speak of, `CreateKey`, `ListKeys` and `ListAliases`, authorize against the
 region's keys with identity policies alone, because real KMS gives those actions no resource-level
 permissions.

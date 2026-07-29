@@ -56,9 +56,12 @@ in its place.
 encrypts under the key directly rather than with a data key, so this is an `Encrypt` and a `Decrypt`
 call and nothing more. Two details matter:
 
-- the calls are made as the caller rather than as the service, so a write needs the caller's own
-  `kms:Encrypt` and a decrypting read needs `kms:Decrypt`, each on top of the SSM permission for the
-  parameter;
+- the calls are made as the caller rather than as the service, so under a customer managed key a
+  write needs the caller's own `kms:Encrypt` and a decrypting read needs `kms:Decrypt`, each on top
+  of the SSM permission for the parameter;
+- they are made through the service as well, carrying `kms:ViaService`, which is what lets the
+  `aws/ssm` managed key be used by a caller with no KMS permission at all and by nothing calling KMS
+  directly;
 - the parameter's ARN is bound in as the `PARAMETER_ARN` encryption context, as real Parameter Store
   binds it, so a ciphertext moved into another parameter cannot be decrypted there.
 
@@ -135,8 +138,6 @@ There is no resource policy support, so cross-account access to a parameter cann
 
 - Only standard tier `SecureString` encryption is simulated. The advanced tier's envelope encryption
   through the AWS Encryption SDK is not, so `kms:GenerateDataKey` is never needed.
-- The `aws/ssm` managed key gets simulated KMS's default customer key policy rather than the
-  unchangeable one real AWS gives it, so a caller allowed `kms:Decrypt` on it can decrypt.
 - Parameter labels are refused rather than looked up. `LabelParameterVersion` is not implemented, so
   nothing could create one, and a label selector says that instead of reporting the parameter as
   missing.

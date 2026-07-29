@@ -1,5 +1,5 @@
+import type { SimKmsRequestOptions } from "../sim-kms-request-options.js";
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimKmsKeyStore } from "../../key/sim-kms-key-store.js";
 import { SimKmsPendingWindow } from "./sim-kms-pending-window.js";
 import type { SimKmsAuthorizer } from "../authorize/sim-kms-authorizer.js";
@@ -18,10 +18,6 @@ interface SimKmsKeyLifecycleCommandsProperties {
   readonly keys: SimKmsKeyStore;
   readonly authorizer: SimKmsAuthorizer;
   readonly clock: SimClock;
-}
-
-interface SimKmsKeyLifecycleCommandOptions {
-  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -47,10 +43,10 @@ export class SimKmsKeyLifecycleCommands {
    */
   enable(
     command: SimEnableKeyCommand,
-    options?: SimKmsKeyLifecycleCommandOptions,
+    options?: SimKmsRequestOptions,
   ): SimEnableKeyCommandOutput {
     const key = this.keys.require(command.input.KeyId);
-    this.authorizer.authorizeKey("kms:EnableKey", key, options?.caller);
+    this.authorizer.authorizeKey("kms:EnableKey", key, options);
     key.enable();
 
     return { $metadata: {} };
@@ -61,10 +57,10 @@ export class SimKmsKeyLifecycleCommands {
    */
   disable(
     command: SimDisableKeyCommand,
-    options?: SimKmsKeyLifecycleCommandOptions,
+    options?: SimKmsRequestOptions,
   ): SimDisableKeyCommandOutput {
     const key = this.keys.require(command.input.KeyId);
-    this.authorizer.authorizeKey("kms:DisableKey", key, options?.caller);
+    this.authorizer.authorizeKey("kms:DisableKey", key, options);
     key.disable();
 
     return { $metadata: {} };
@@ -79,15 +75,11 @@ export class SimKmsKeyLifecycleCommands {
    */
   scheduleDeletion(
     command: SimScheduleKeyDeletionCommand,
-    options?: SimKmsKeyLifecycleCommandOptions,
+    options?: SimKmsRequestOptions,
   ): SimScheduleKeyDeletionCommandOutput {
     const window = new SimKmsPendingWindow(command.input.PendingWindowInDays);
     const key = this.keys.require(command.input.KeyId);
-    this.authorizer.authorizeKey(
-      "kms:ScheduleKeyDeletion",
-      key,
-      options?.caller,
-    );
+    this.authorizer.authorizeKey("kms:ScheduleKeyDeletion", key, options);
 
     const deletionDate = window.deletionDateFrom(this.clock.now());
     key.scheduleDeletion(deletionDate);
@@ -106,10 +98,10 @@ export class SimKmsKeyLifecycleCommands {
    */
   cancelDeletion(
     command: SimCancelKeyDeletionCommand,
-    options?: SimKmsKeyLifecycleCommandOptions,
+    options?: SimKmsRequestOptions,
   ): SimCancelKeyDeletionCommandOutput {
     const key = this.keys.require(command.input.KeyId);
-    this.authorizer.authorizeKey("kms:CancelKeyDeletion", key, options?.caller);
+    this.authorizer.authorizeKey("kms:CancelKeyDeletion", key, options);
     key.cancelDeletion();
 
     return { $metadata: {}, KeyId: key.arn };

@@ -1,6 +1,11 @@
 import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
 import type { SimIamResourcePolicyInput } from "../../iam/authorize/context/sim-iam-auth-z-context-builder.js";
 import type { SimIamPolicyDocument } from "../../iam/policy/sim-iam-policy.js";
+import { simKmsCallerAccountConditionKey } from "./sim-kms-caller-account.js";
+import {
+  simKmsViaServiceConditionKey,
+  type SimKmsViaService,
+} from "./sim-kms-via-service.js";
 
 /**
  * The name real KMS reports a key's policy under. A KMS key has exactly one
@@ -45,6 +50,58 @@ export class SimKmsKeyPolicy {
           Effect: "Allow",
           Principal: { AWS: `arn:aws:iam::${accountId}:root` },
           Action: "kms:*",
+          Resource: "*",
+        },
+      ],
+    });
+  }
+
+  /**
+   * Build the policy real AWS gives an AWS managed key.
+   *
+   * It is not the customer default with a different name on it. It grants use
+   * of the key to the Account's principals only when the request reaches KMS
+   * through the service that owns the key, and it delegates nothing else to
+   * IAM: the second statement covers reading the key's metadata and no more.
+   *
+   * That is what makes an AWS managed key usable by a caller holding no KMS
+   * permission at all, and unusable by a caller holding kms:Decrypt on it who
+   * calls KMS directly.
+   */
+  static awsManaged(
+    keyArn: string,
+    accountId: SimAwsAccountId,
+    viaService: SimKmsViaService,
+  ): SimKmsKeyPolicy {
+    return new SimKmsKeyPolicy(keyArn, {
+      Version: "2012-10-17",
+      Id: `auto-${viaService.serviceName}-1`,
+      Statement: [
+        {
+          Sid: `Allow access through ${viaService.serviceName} for all principals in the account that are authorized to use ${viaService.serviceName}`,
+          Effect: "Allow",
+          Principal: { AWS: "*" },
+          Action: [
+            "kms:Encrypt",
+            "kms:Decrypt",
+            "kms:ReEncrypt*",
+            "kms:GenerateDataKey*",
+            "kms:CreateGrant",
+            "kms:DescribeKey",
+          ],
+          Resource: "*",
+          Condition: {
+            StringEquals: {
+              [simKmsCallerAccountConditionKey]: accountId,
+              [simKmsViaServiceConditionKey]: viaService.value,
+            },
+          },
+        },
+        {
+          Sid: "Allow direct access to key metadata to the account",
+          Effect: "Allow",
+          Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+          Action: ["kms:Describe*", "kms:Get*", "kms:List*", "kms:RevokeGrant"],
           Resource: "*",
         },
       ],

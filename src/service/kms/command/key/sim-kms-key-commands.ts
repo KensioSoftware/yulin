@@ -1,4 +1,4 @@
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimKmsRequestOptions } from "../sim-kms-request-options.js";
 import type { SimKmsKeyFactory } from "../../key/sim-kms-key-factory.js";
 import { SimKmsPolicyDocument } from "../../key/sim-kms-policy-document.js";
 import { SimKmsKeyType } from "./sim-kms-key-type.js";
@@ -17,10 +17,6 @@ interface SimKmsKeyCommandsProperties {
   readonly keyFactory: SimKmsKeyFactory;
   readonly authorizer: SimKmsAuthorizer;
   readonly metadata: SimKmsKeyMetadataView;
-}
-
-interface SimKmsKeyCommandOptions {
-  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -50,14 +46,14 @@ export class SimKmsKeyCommands {
    */
   create(
     command: SimCreateKeyCommand,
-    options?: SimKmsKeyCommandOptions,
+    options?: SimKmsRequestOptions,
   ): SimCreateKeyCommandOutput {
     this.keyType.require(
       command.input.KeyUsage,
       command.input.KeySpec,
       command.input.Origin,
     );
-    this.authorizer.authorizeAccount("kms:CreateKey", options?.caller);
+    this.authorizer.authorizeAccount("kms:CreateKey", options);
 
     const key = this.keyFactory.make({
       description: command.input.Description,
@@ -74,10 +70,10 @@ export class SimKmsKeyCommands {
    */
   describe(
     command: SimDescribeKeyCommand,
-    options?: SimKmsKeyCommandOptions,
+    options?: SimKmsRequestOptions,
   ): SimDescribeKeyCommandOutput {
     const key = this.keys.require(command.input.KeyId);
-    this.authorizer.authorizeKey("kms:DescribeKey", key, options?.caller);
+    this.authorizer.authorizeKey("kms:DescribeKey", key, options);
 
     return { $metadata: {}, KeyMetadata: this.metadata.describe(key) };
   }

@@ -1,5 +1,5 @@
+import type { SimKmsRequestOptions } from "../sim-kms-request-options.js";
 import { randomBytes } from "node:crypto";
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimKmsKeyStore } from "../../key/sim-kms-key-store.js";
 import type { SimKmsAuthorizer } from "../authorize/sim-kms-authorizer.js";
 import type {
@@ -11,10 +11,6 @@ import { SimKmsDataKeySpec } from "./sim-kms-data-key-spec.js";
 interface SimKmsGenerateDataKeyProperties {
   readonly keys: SimKmsKeyStore;
   readonly authorizer: SimKmsAuthorizer;
-}
-
-interface SimKmsGenerateDataKeyOptions {
-  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -40,7 +36,7 @@ export class SimKmsGenerateDataKey {
    */
   handle(
     command: SimGenerateDataKeyCommand,
-    options?: SimKmsGenerateDataKeyOptions,
+    options?: SimKmsRequestOptions,
   ): SimGenerateDataKeyCommandOutput {
     const length = this.dataKeySpec.lengthFor(
       command.input.KeySpec,
@@ -48,7 +44,7 @@ export class SimKmsGenerateDataKey {
     );
     const key = this.keys.require(command.input.KeyId);
 
-    this.authorizer.authorizeKey("kms:GenerateDataKey", key, options?.caller);
+    this.authorizer.authorizeKey("kms:GenerateDataKey", key, options);
 
     const dataKey = Uint8Array.from(randomBytes(length));
 

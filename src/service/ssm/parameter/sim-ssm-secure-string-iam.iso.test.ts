@@ -1,5 +1,5 @@
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
-import { CreateKeyCommand } from "@aws-sdk/client-kms";
+import { CreateKeyCommand, DecryptCommand } from "@aws-sdk/client-kms";
 import { GetParameterCommand, PutParameterCommand } from "@aws-sdk/client-ssm";
 import {
   assertIdentical,
@@ -10,6 +10,7 @@ import {
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
+import { createSimIamRoleWithPolicy } from "../../../../test/iam/create-role-with-policy.js";
 import { SimAws } from "../../aws/sim-aws.js";
 import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
 import { SimIamAccessDenied } from "../../iam/error/sim-iam.error.js";
@@ -84,6 +85,42 @@ const readParameter = {
   Action: "ssm:GetParameter",
   Resource: "*",
 };
+
+/**
+ * A simulated AWS holding one SecureString parameter under the aws/ssm managed
+ * key, and a Role allowed the given SSM action and nothing else.
+ */
+async function simAwsWithManagedKeySecret(
+  action: string,
+): Promise<SimAwsWithSecret> {
+  const simAws = new SimAws();
+  const accountId = simAws.defaultAccountId;
+
+  await simAws.ssm().putParameter(
+    new PutParameterCommand({
+      Name: "/myapp/prod/db-password",
+      Type: "SecureString",
+      Value: "hunter2",
+    }),
+  );
+
+  const roleArn = await createSimIamRoleWithPolicy({
+    simAws,
+    accountId,
+    roleName: "ConfigReader",
+    policyName: "SsmOnly",
+    action,
+  });
+
+  const managedKey = simAws.kms().findKey("alias/aws/ssm");
+  assertNonNullable(managedKey);
+
+  return {
+    simAws,
+    keyArn: managedKey.arn,
+    caller: { kind: "arn", arn: roleArn },
+  };
+}
 
 describe("SSM SecureString IAM authorization", () => {
   it("decrypts for a caller allowed both the parameter and the key", async () => {
@@ -213,5 +250,76 @@ describe("SSM SecureString IAM authorization", () => {
 
     // Then no half-made parameter is left in the store.
     assertUndefined(simAws.ssm().findParameter("/myapp/prod/api-key"));
+  });
+});
+
+describe("SSM SecureString under the aws/ssm managed key", () => {
+  it("decrypts for a caller holding no KMS permission", async () => {
+    // Given a parameter under the managed key and a Role allowed only
+    // ssm:GetParameter.
+    const { simAws, caller } =
+      await simAwsWithManagedKeySecret("ssm:GetParameter");
+
+    // When it reads the parameter with decryption.
+    const read = await simAws.ssm().getParameter(
+      new GetParameterCommand({
+        Name: "/myapp/prod/db-password",
+        WithDecryption: true,
+      }),
+      { caller },
+    );
+
+    // Then it gets the plaintext with no kms:Decrypt of its own, because the
+    // managed key's policy admits the Account's principals reaching it through
+    // Systems Manager. Asking for that grant is what real AWS does not.
+    assertIdentical(read.Parameter?.Value, "hunter2");
+  });
+
+  it("writes for a caller holding no KMS permission", async () => {
+    // Given a Role allowed only ssm:PutParameter.
+    const { simAws, caller } =
+      await simAwsWithManagedKeySecret("ssm:PutParameter");
+
+    // When it writes a SecureString naming no key of its own.
+    const written = await simAws.ssm().putParameter(
+      new PutParameterCommand({
+        Name: "/myapp/prod/api-key",
+        Type: "SecureString",
+        Value: "secret",
+      }),
+      { caller },
+    );
+
+    // Then the write succeeds: the same rule covers the encrypting side.
+    assertIdentical(written.Version, 1);
+  });
+
+  it("denies the same caller decrypting the value through KMS", async () => {
+    // Given the same parameter, read as its stored ciphertext.
+    const { simAws, caller } =
+      await simAwsWithManagedKeySecret("ssm:GetParameter");
+
+    const stored = await simAws
+      .ssm()
+      .getParameter(
+        new GetParameterCommand({ Name: "/myapp/prod/db-password" }),
+        { caller },
+      );
+
+    assertNonNullable(stored.Parameter?.Value);
+
+    // When the Role takes the ciphertext to KMS itself.
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws.kms().decrypt(
+        new DecryptCommand({
+          CiphertextBlob: Buffer.from(stored.Parameter?.Value ?? "", "base64"),
+        }),
+        { caller },
+      ),
+    );
+
+    // Then it is denied. The managed key is usable through Parameter Store and
+    // not otherwise, so the parameter's own permissions stay in charge of it.
+    assertInstanceOf(error, SimIamAccessDenied);
   });
 });

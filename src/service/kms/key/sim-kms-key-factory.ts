@@ -3,9 +3,10 @@ import type { SimClock } from "../../../util/clock/sim-clock.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimIamPolicyDocument } from "../../iam/policy/sim-iam-policy.js";
 import { SimKmsCiphertextBlob } from "./sim-kms-ciphertext-blob.js";
-import { SimKmsKey, type SimKmsKeyManager } from "./sim-kms-key.js";
+import { SimKmsKey, SimKmsKeyManager } from "./sim-kms-key.js";
 import { SimKmsKeyMaterial } from "./sim-kms-key-material.js";
 import { SimKmsKeyPolicy } from "./sim-kms-key-policy.js";
+import { SimKmsViaService } from "./sim-kms-via-service.js";
 
 interface SimKmsKeyFactoryProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
@@ -15,7 +16,15 @@ interface SimKmsKeyFactoryProperties {
 interface SimKmsMakeKeyProperties {
   readonly description?: string | undefined;
   readonly policy?: SimIamPolicyDocument | undefined;
-  readonly keyManager?: SimKmsKeyManager | undefined;
+
+  /**
+   * The service an AWS managed key belongs to, such as `ssm`.
+   *
+   * Naming it is what makes the key an AWS managed one: it decides both the
+   * key manager and the via-service-scoped policy real AWS gives such a key,
+   * so the two cannot disagree.
+   */
+  readonly awsManagedService?: string | undefined;
 }
 
 /**
@@ -49,21 +58,51 @@ export class SimKmsKeyFactory {
       keyId,
       accountRegionScope: this.accountRegionScope,
       material: new SimKmsKeyMaterial({ keyArn: arn, blob: this.blob }),
-      policy: this.keyPolicy(arn, properties.policy),
+      policy: this.keyPolicy(arn, properties),
       creationDate: this.clock.now(),
       description: properties.description,
-      keyManager: properties.keyManager,
+      keyManager: this.keyManager(properties),
     });
   }
 
-  private keyPolicy(
-    keyArn: string,
-    document: SimIamPolicyDocument | undefined,
-  ): SimKmsKeyPolicy {
-    if (document === undefined) {
-      return SimKmsKeyPolicy.default(keyArn, this.accountRegionScope.accountId);
+  /**
+   * Who manages the key, which is decided by whether a service owns it.
+   */
+  private keyManager(
+    properties: SimKmsMakeKeyProperties,
+  ): SimKmsKeyManager | undefined {
+    if (properties.awsManagedService === undefined) {
+      return undefined;
     }
 
-    return new SimKmsKeyPolicy(keyArn, document);
+    return SimKmsKeyManager.Aws;
+  }
+
+  /**
+   * The policy the key starts with: the one asked for, the AWS managed one, or
+   * the customer default.
+   */
+  private keyPolicy(
+    keyArn: string,
+    properties: SimKmsMakeKeyProperties,
+  ): SimKmsKeyPolicy {
+    if (properties.policy !== undefined) {
+      return new SimKmsKeyPolicy(keyArn, properties.policy);
+    }
+
+    const accountId = this.accountRegionScope.accountId;
+
+    if (properties.awsManagedService !== undefined) {
+      return SimKmsKeyPolicy.awsManaged(
+        keyArn,
+        accountId,
+        new SimKmsViaService(
+          properties.awsManagedService,
+          this.accountRegionScope.regionName,
+        ),
+      );
+    }
+
+    return SimKmsKeyPolicy.default(keyArn, accountId);
   }
 }

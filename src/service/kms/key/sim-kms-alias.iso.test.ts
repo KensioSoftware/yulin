@@ -17,6 +17,8 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
+import { SimIamAccessDenied } from "../../iam/error/sim-iam.error.js";
+import { SimKms } from "../sim-kms.js";
 import {
   SimKmsAlreadyExistsException,
   SimKmsInvalidStateException,
@@ -243,11 +245,13 @@ describe("KMS AWS managed keys", () => {
     // Given a simulation where nothing has created a key.
     const simAws = new SimAws();
 
-    // When a reserved AWS alias is used to encrypt.
+    // When a reserved AWS alias is used to encrypt through the service that
+    // owns it, which is the only way that key can be used.
     const encrypted = await simAws
       .kms()
       .encrypt(
         new EncryptCommand({ KeyId: "alias/aws/s3", Plaintext: plaintext }),
+        { viaService: "s3" },
       );
 
     // Then the key exists, as an AWS managed one, the way it appears on real
@@ -282,13 +286,31 @@ describe("KMS AWS managed keys", () => {
   });
 
   it("refuses to schedule deletion of an AWS managed key", async () => {
-    // Given an AWS managed key materialised by referencing its alias.
+    // Given an AWS managed key in a KMS with no IAM to consult, so nothing
+    // stands between the request and the key itself.
+    const kms = new SimKms();
+    await kms.describeKey(new DescribeKeyCommand({ KeyId: "alias/aws/s3" }));
+
+    // When deletion is scheduled for it.
+    const error = await assertThrowsErrorAsync(async () =>
+      kms.scheduleKeyDeletion(
+        new ScheduleKeyDeletionCommand({ KeyId: "alias/aws/s3" }),
+      ),
+    );
+
+    // Then the key refuses: the owning service created it and only that
+    // service can remove it.
+    assertInstanceOf(error, SimKmsInvalidStateException);
+  });
+
+  it("denies scheduling deletion of an AWS managed key to the Account", async () => {
+    // Given an AWS managed key in a simulation with IAM.
     const simAws = new SimAws();
     await simAws
       .kms()
       .describeKey(new DescribeKeyCommand({ KeyId: "alias/aws/s3" }));
 
-    // When deletion is scheduled for it.
+    // When the Account schedules deletion for it.
     const error = await assertThrowsErrorAsync(async () =>
       simAws
         .kms()
@@ -297,8 +319,9 @@ describe("KMS AWS managed keys", () => {
         ),
     );
 
-    // Then it is refused: the owning service created it and only that service
-    // can remove it.
-    assertInstanceOf(error, SimKmsInvalidStateException);
+    // Then the key policy denies it before the key is asked, as on real AWS:
+    // the policy of an AWS managed key delegates nothing beyond reading its
+    // metadata.
+    assertInstanceOf(error, SimIamAccessDenied);
   });
 });
