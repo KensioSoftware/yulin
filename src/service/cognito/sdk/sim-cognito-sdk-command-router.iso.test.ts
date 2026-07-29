@@ -23,6 +23,14 @@ describe("SimCognitoSdkCommandRouter", () => {
       "DescribeUserPoolClientCommand",
       "DeleteUserPoolClientCommand",
       "ListUserPoolClientsCommand",
+      "AdminCreateUserCommand",
+      "AdminGetUserCommand",
+      "AdminDeleteUserCommand",
+      "AdminSetUserPasswordCommand",
+      "AdminUpdateUserAttributesCommand",
+      "AdminDisableUserCommand",
+      "AdminEnableUserCommand",
+      "ListUsersCommand",
     ]);
   });
 
@@ -34,7 +42,7 @@ describe("SimCognitoSdkCommandRouter", () => {
     const route = simAws
       .cognitoIdentityProvider()
       .sdkCommandRouter()
-      .route("AdminCreateUserCommand");
+      .route("AdminInitiateAuthCommand");
 
     // Then there is no route for it.
     assertUndefined(route);

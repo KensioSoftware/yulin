@@ -44,3 +44,45 @@ export class SimCognitoInvalidParameterException extends SimCognitoError {
     super(message, { httpStatusCode: 400 });
   }
 }
+
+/**
+ * Simulated Cognito UsernameExistsException error.
+ *
+ * Real Cognito reports a second user created with a username the pool already
+ * holds this way.
+ */
+export class SimCognitoUsernameExistsException extends SimCognitoError {
+  public override readonly name = "UsernameExistsException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
+ * Simulated Cognito UserNotFoundException error.
+ *
+ * Real Cognito reports an operation naming a user its pool does not hold this
+ * way, rather than as a missing resource.
+ */
+export class SimCognitoUserNotFoundException extends SimCognitoError {
+  public override readonly name = "UserNotFoundException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
+ * Simulated Cognito InvalidPasswordException error.
+ *
+ * Real Cognito reports a password its pool's password policy does not allow
+ * this way, and says which rule the password broke.
+ */
+export class SimCognitoInvalidPasswordException extends SimCognitoError {
+  public override readonly name = "InvalidPasswordException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}

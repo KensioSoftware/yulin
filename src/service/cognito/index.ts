@@ -30,8 +30,21 @@ export {
   type SimCognitoTokenValidityInput,
   type SimCognitoTokenValidityUnitsType,
 } from "./user-pool/client/sim-cognito-token-validity.js";
+export { SimCognitoUser } from "./user-pool/user/sim-cognito-user.js";
+export type { SimCognitoUsername } from "./user-pool/user/sim-cognito-username.js";
+export {
+  SimCognitoUserStatus,
+  type SimCognitoUserStatusValue,
+} from "./user-pool/user/sim-cognito-user-status.js";
+export {
+  SimCognitoUserAttributes,
+  type SimCognitoAttributeType,
+} from "./user-pool/user/sim-cognito-user-attributes.js";
 export {
   SimCognitoError,
   SimCognitoInvalidParameterException,
+  SimCognitoInvalidPasswordException,
   SimCognitoResourceNotFoundException,
+  SimCognitoUsernameExistsException,
+  SimCognitoUserNotFoundException,
 } from "./error/sim-cognito.error.js";

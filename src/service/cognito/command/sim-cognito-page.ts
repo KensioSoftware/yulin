@@ -8,24 +8,38 @@ const maxMaxResults = 60;
 interface SimCognitoPageProperties {
   readonly maxResults: number;
   readonly nextToken: string | undefined;
+  /**
+   * What this operation calls its page size input. `ListUsers` calls it
+   * `Limit`, so a refusal has to name the input the caller actually wrote.
+   */
+  readonly maxResultsField?: string;
+  /**
+   * What this operation calls its continuation token. `ListUsers` calls it
+   * `PaginationToken`.
+   */
+  readonly nextTokenField?: string;
 }
 
 /**
  * One page of listed items, and the token that reaches the next one.
  *
- * Both Cognito listings page the same way, so the rules live here once. How
+ * Every Cognito listing pages the same way, so the rules live here once. How
  * many items a page holds by default is not shared, because `ListUserPools`
- * insists on being told and `ListUserPoolClients` does not.
+ * insists on being told and the others do not.
  */
 export class SimCognitoPage<TItem> {
   public readonly items: readonly TItem[];
   public readonly nextToken: string | undefined;
 
   constructor(listed: readonly TItem[], properties: SimCognitoPageProperties) {
-    const maxResults = SimCognitoPage.maxResults(properties.maxResults);
+    const maxResults = SimCognitoPage.maxResults(
+      properties.maxResults,
+      properties.maxResultsField ?? "MaxResults",
+    );
     const startIndex = SimCognitoPage.startIndex(
       properties.nextToken,
       listed.length,
+      properties.nextTokenField ?? "NextToken",
     );
     const nextIndex = startIndex + maxResults;
 
@@ -33,14 +47,14 @@ export class SimCognitoPage<TItem> {
     this.nextToken = SimCognitoPage.tokenFor(nextIndex, listed.length);
   }
 
-  private static maxResults(requested: number): number {
+  private static maxResults(requested: number, field: string): number {
     if (
       !Number.isSafeInteger(requested) ||
       requested < 1 ||
       requested > maxMaxResults
     ) {
       throw new SimCognitoInvalidParameterException(
-        `MaxResults must be a whole number between 1 and ${String(maxMaxResults)}`,
+        `${field} must be a whole number between 1 and ${String(maxMaxResults)}`,
       );
     }
 
@@ -58,6 +72,7 @@ export class SimCognitoPage<TItem> {
   private static startIndex(
     nextToken: string | undefined,
     listedCount: number,
+    field: string,
   ): number {
     if (nextToken === undefined) {
       return 0;
@@ -72,7 +87,7 @@ export class SimCognitoPage<TItem> {
       String(startIndex) !== nextToken
     ) {
       throw new SimCognitoInvalidParameterException(
-        "NextToken is not a token this simulation issued",
+        `${field} is not a token this simulation issued`,
       );
     }
 

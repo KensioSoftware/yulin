@@ -12,9 +12,10 @@ export class SimCognitoUserPoolView {
   /**
    * A pool as `CreateUserPool` and `DescribeUserPool` report it.
    *
-   * `MfaConfiguration` is always `OFF` because MFA is not simulated, and
-   * `EstimatedNumberOfUsers` is always zero because a pool holds no users
-   * yet.
+   * `MfaConfiguration` is always `OFF` because MFA is not simulated.
+   * `EstimatedNumberOfUsers` is how many users the pool holds now. Real
+   * Cognito refreshes that number periodically rather than on each write, so
+   * it can lag there in a way it never does here.
    */
   describe(pool: SimCognitoUserPool): SimCognitoUserPoolType {
     return {
@@ -24,7 +25,7 @@ export class SimCognitoUserPoolView {
       Policies: { PasswordPolicy: pool.passwordPolicy.toOutput() },
       DeletionProtection: pool.deletionProtection.value,
       MfaConfiguration: "OFF",
-      EstimatedNumberOfUsers: 0,
+      EstimatedNumberOfUsers: pool.userCount,
       CreationDate: pool.creationDate,
       LastModifiedDate: pool.lastModifiedDate,
     };

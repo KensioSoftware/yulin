@@ -6,6 +6,9 @@ import type { SimCognitoName } from "./sim-cognito-name.js";
 import type { SimCognitoPasswordPolicy } from "./sim-cognito-password-policy.js";
 import type { SimCognitoUserPoolArn } from "./sim-cognito-user-pool-arn.js";
 import type { SimCognitoUserPoolId } from "./sim-cognito-user-pool-id.js";
+import type { SimCognitoUser } from "./user/sim-cognito-user.js";
+import { SimCognitoUserStore } from "./user/sim-cognito-user-store.js";
+import type { SimCognitoUsername } from "./user/sim-cognito-username.js";
 
 interface SimCognitoUserPoolProperties {
   readonly id: SimCognitoUserPoolId;
@@ -32,6 +35,7 @@ export class SimCognitoUserPool {
   public readonly creationDate: Date;
 
   private readonly clientStore = new SimCognitoUserPoolClientStore();
+  private readonly userStore = new SimCognitoUserStore();
 
   constructor(properties: SimCognitoUserPoolProperties) {
     this.id = properties.id;
@@ -94,5 +98,47 @@ export class SimCognitoUserPool {
     clientId: SimCognitoUserPoolClientId,
   ): SimCognitoUserPoolClient {
     return this.clientStore.require(clientId);
+  }
+
+  /**
+   * Every user in this pool, in creation order.
+   */
+  get users(): readonly SimCognitoUser[] {
+    return this.userStore.all;
+  }
+
+  /**
+   * How many users this pool holds.
+   */
+  get userCount(): number {
+    return this.userStore.count;
+  }
+
+  /**
+   * Store a newly created user, refusing a username already in this pool.
+   */
+  addUser(user: SimCognitoUser): void {
+    this.userStore.add(user);
+  }
+
+  /**
+   * Forget a deleted user.
+   */
+  removeUser(user: SimCognitoUser): void {
+    this.userStore.remove(user);
+  }
+
+  /**
+   * Find a user of this pool by username.
+   */
+  findUser(username: string): SimCognitoUser | undefined {
+    return this.userStore.find(username);
+  }
+
+  /**
+   * Resolve a user of this pool by username, or refuse.
+   */
+  requireUser(username: SimCognitoUsername): SimCognitoUser {
+    return this.userStore.require(username);
   }
 }
