@@ -107,6 +107,9 @@ export class SimAwsAccountRegionServiceBuilder {
       accountRegionScope: scope.accountRegionScope,
       iam: this.accountServices.createIam(scope),
       background: this.background,
+      // Pool ids are unique across the simulation, and a pool is reachable by
+      // id alone from the serving layer, whichever scope created it.
+      userPoolRegistry: this.registries.cognito,
     });
   }
 

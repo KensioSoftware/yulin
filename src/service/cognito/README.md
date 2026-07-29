@@ -141,6 +141,21 @@ hands out all three tokens and `reissue` signs a new access and id token for a r
 difference `REFRESH_TOKEN_AUTH` answers with. Everything it issues is recorded on the pool, because
 the pool is what a refresh or a sign-out presents a token back to.
 
+## Served pool endpoints
+
+`serve/` holds the localhost HTTP side, which is the two endpoints real Cognito serves without any
+authentication: `/<userPoolId>/.well-known/jwks.json` and
+`/<userPoolId>/.well-known/openid-configuration`. `SimCognitoServiceController` is the controller the
+serving layer dispatches to, `SimCognitoOpenIdConfiguration` builds the discovery document, and
+`SimCognitoEndpointResponse` builds the responses. The Cognito API itself is not served: an SDK
+client reaches the simulator through `SimSdk`.
+
+The request hostname is `cognito-idp.<region>`, which names the regional endpoint rather than one
+pool, so the pool id comes from the path. That id says nothing about the Account that owns the pool,
+so `SimCognitoUserPoolRegistry` in `registry/` indexes pools across every Account and Region of one
+simulation, in the same way `SimLambdaUrlRegistry` indexes Function URL ids. It is also what pool
+ids are allocated against, so no two Accounts can hold the same one.
+
 ## Authentication model
 
 Sign-in state lives under `user-pool/auth/`.
@@ -251,6 +266,12 @@ resource, here or on real AWS.
 - Users are resolved by username only, and real Cognito also accepts a `sub` there.
 - `AdminListGroupsForUser` sorts by precedence. Real Cognito does not document an order for it.
 - One signing key is published per pool, where real Cognito publishes two and rotates between them.
+- The served OpenID configuration names the localhost origin the request arrived on as its `issuer`,
+  because a client that discovers a document has to be able to fetch the keys it points at. A token's
+  `iss` claim still names the real AWS URL, which is what a verifier built from a pool id checks
+  against, so the two disagree here and agree on real Cognito. The document also names no
+  `authorization_endpoint`, `token_endpoint` or `userinfo_endpoint`, as the hosted UI and the OAuth
+  endpoints are not simulated.
 - The password and refresh flows run on both sides of the API, and only `NEW_PASSWORD_REQUIRED` is
   issued. SRP, `USER_AUTH`, custom authentication, MFA challenges and device tracking are refused
   rather than treated as a flow or challenge that is simulated.

@@ -1,4 +1,5 @@
 import { SimAcmRegistry } from "../../acm/registry/sim-acm-registry.js";
+import { SimCognitoUserPoolRegistry } from "../../cognito/registry/sim-cognito-user-pool-registry.js";
 import { SimRoute53Registry } from "../../route53/registry/sim-route53-registry.js";
 import { SimS3GlobalRegistry } from "../../s3/sim-s3-global-registry.js";
 
@@ -17,6 +18,13 @@ export class SimAwsScopedServiceRegistries {
    * can resolve the Certificate it names.
    */
   public readonly acm = new SimAcmRegistry();
+
+  /**
+   * Indexes the user pools created in any Account and Region of one SimAws
+   * instance, so a served request naming only a pool id, such as one for a
+   * pool's JWKS, finds the pool it belongs to.
+   */
+  public readonly cognito = new SimCognitoUserPoolRegistry();
 
   /**
    * Owns hosted zone and DNS record state shared by the account-scoped Route53

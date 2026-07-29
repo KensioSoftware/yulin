@@ -3,10 +3,10 @@ import type { AwsRegionName } from "../../aws/sim-aws-region.js";
 import { lambdaFunctionUrlHostLabel } from "../../lambda/function/url/sim-lambda-function-url-host.js";
 import { simRoute53LogicalName } from "../local-name/sim-route53-local-name.js";
 import { simRoute53DnsHostName } from "../serve/sim-route53-dns-host.js";
+import { SimRoute53S3ServiceTargets } from "./sim-r53-s3-service-target.js";
 
-const s3WebsiteServiceLabel = "s3-website";
-const s3RestServiceLabel = "s3";
 const cloudFrontServiceLabel = "cloudfront";
+const cognitoIdpServiceLabel = "cognito-idp";
 
 /**
  * Maps Yulin-local service hostnames to simulated AWS service targets.
@@ -22,6 +22,8 @@ const cloudFrontServiceLabel = "cloudfront";
  * target.
  */
 export class SimRoute53ServiceTargetResolver {
+  private readonly s3Targets = new SimRoute53S3ServiceTargets();
+
   /**
    * Convert a Yulin-local hostname into a simulated service target.
    *
@@ -38,10 +40,10 @@ export class SimRoute53ServiceTargetResolver {
 
     return (
       this.route53DnsServiceTarget(logicalName) ??
-      this.s3WebsiteServiceTarget(logicalName) ??
-      this.s3RestServiceTarget(logicalName) ??
+      this.s3Targets.resolve(logicalName) ??
       this.cloudFrontServiceTarget(logicalName) ??
-      this.lambdaFunctionUrlServiceTarget(logicalName)
+      this.lambdaFunctionUrlServiceTarget(logicalName) ??
+      this.cognitoIdpServiceTarget(logicalName)
     );
   }
 
@@ -62,90 +64,6 @@ export class SimRoute53ServiceTargetResolver {
     return {
       service: "route53",
       resourceName: simRoute53DnsHostName,
-    };
-  }
-
-  /**
-   * Resolve S3 website endpoint hostnames.
-   *
-   * Simulated S3 website hostnames use:
-   *
-   *   <bucket-name>.s3-website.<region>
-   *
-   * The bucket name can contain dots, so all labels before the service and region
-   * labels are joined back together as the resource name.
-   */
-  private s3WebsiteServiceTarget(
-    logicalName: string,
-  ): SimAwsServiceTarget | undefined {
-    const labels = logicalName.split(".");
-
-    if (labels.length < 3) {
-      return undefined;
-    }
-
-    const service = labels.at(-2);
-    const regionName = labels.at(-1) as AwsRegionName | undefined;
-
-    if (service !== s3WebsiteServiceLabel || regionName === undefined) {
-      return undefined;
-    }
-
-    const resourceName = labels.slice(0, -2).join(".");
-
-    /* v8 ignore if -- defensive check */
-    if (resourceName.length === 0 || regionName.length === 0) {
-      return undefined;
-    }
-
-    return {
-      service: "s3",
-      resourceName,
-      regionName,
-      endpoint: "website",
-    };
-  }
-
-  /**
-   * Resolve S3 REST API endpoint hostnames.
-   *
-   * Simulated S3 REST hostnames use either of the two forms real S3 offers:
-   *
-   *   <bucket-name>.s3.<region>    virtual-hosted style
-   *   s3.<region>                  path style, naming the Bucket in the path
-   *
-   * Both are needed because the AWS SDK chooses between them for itself. A
-   * Bucket name containing dots cannot be a single host label, so the SDK falls
-   * back to path style for those, and a URL signed one way cannot be served the
-   * other.
-   */
-  private s3RestServiceTarget(
-    logicalName: string,
-  ): SimAwsServiceTarget | undefined {
-    const labels = logicalName.split(".");
-
-    if (labels.length < 2) {
-      return undefined;
-    }
-
-    const service = labels.at(-2);
-    const regionName = labels.at(-1) as AwsRegionName | undefined;
-
-    if (service !== s3RestServiceLabel || regionName === undefined) {
-      return undefined;
-    }
-
-    /* v8 ignore if -- empty labels are rejected before resolution */
-    if (regionName.length === 0) {
-      return undefined;
-    }
-
-    return {
-      service: "s3",
-      // Empty for path style, where the Bucket is the first path segment.
-      resourceName: labels.slice(0, -2).join("."),
-      regionName,
-      endpoint: "rest",
     };
   }
 
@@ -219,6 +137,45 @@ export class SimRoute53ServiceTargetResolver {
     return {
       service: "lambda",
       resourceName: urlId,
+      regionName: regionName as AwsRegionName,
+    };
+  }
+
+  /**
+   * Resolve Cognito user pool endpoint hostnames.
+   *
+   * Simulated Cognito hostnames use:
+   *
+   *   cognito-idp.<region>
+   *
+   * The hostname names the regional Cognito endpoint rather than one pool, as
+   * the real `cognito-idp.<region>.amazonaws.com` does, and the pool id is the
+   * first path segment. The resource name is therefore empty, in the same way
+   * it is for the path-style S3 endpoint.
+   */
+  private cognitoIdpServiceTarget(
+    logicalName: string,
+  ): SimAwsServiceTarget | undefined {
+    const labels = logicalName.split(".");
+
+    if (labels.length !== 2) {
+      return undefined;
+    }
+
+    const [service, regionName] = labels;
+
+    if (service !== cognitoIdpServiceLabel || regionName === undefined) {
+      return undefined;
+    }
+
+    /* v8 ignore if -- empty labels are rejected before resolution */
+    if (regionName.length === 0) {
+      return undefined;
+    }
+
+    return {
+      service: "cognitoIdentityProvider",
+      resourceName: "",
       regionName: regionName as AwsRegionName,
     };
   }

@@ -74,6 +74,7 @@ export class SimAwsLocalUrl {
         hostname,
       ) ??
       /^(?<prefix>s3\.[^.]+)\.amazonaws\.com$/.exec(hostname) ??
+      /^(?<prefix>cognito-idp\.[^.]+)\.amazonaws\.com$/.exec(hostname) ??
       /^(?<prefix>.+\.lambda-url\.[^.]+)\.on\.aws$/.exec(hostname);
 
     return awsHostname?.groups?.["prefix"];

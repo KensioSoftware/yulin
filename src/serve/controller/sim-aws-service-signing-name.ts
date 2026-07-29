@@ -24,5 +24,8 @@ export function simAwsServiceSigningName(
     case "route53": {
       return "route53";
     }
+    case "cognitoIdentityProvider": {
+      return "cognito-idp";
+    }
   }
 }

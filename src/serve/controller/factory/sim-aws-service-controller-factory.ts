@@ -1,6 +1,7 @@
 import type { SimAwsServiceController } from "../sim-service-controller.js";
 import type { SimAws } from "../../../service/aws/sim-aws.js";
 import { SimCloudFrontServiceController } from "../../../service/cloudfront/controller/sim-cloudfront-controller.js";
+import { SimCognitoServiceController } from "../../../service/cognito/serve/sim-cognito-controller.js";
 import { SimLambdaServiceController } from "../../../service/lambda/serve/sim-lambda-controller.js";
 import { SimRoute53ServiceController } from "../../../service/route53/serve/sim-route53-controller.js";
 import { SimS3ServiceController } from "../../../service/s3/serve/sim-s3-controller.js";
@@ -29,6 +30,9 @@ export class SimAwsServiceControllerFactory {
       }
       case "route53": {
         return new SimRoute53ServiceController({ simAws: this.simAws });
+      }
+      case "cognitoIdentityProvider": {
+        return new SimCognitoServiceController({ simAws: this.simAws });
       }
       default: {
         throw new Error(

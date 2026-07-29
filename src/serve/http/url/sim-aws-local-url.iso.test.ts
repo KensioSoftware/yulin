@@ -41,6 +41,20 @@ describe("Simulated AWS local URL", () => {
     );
   });
 
+  it("replaces an AWS Cognito hostname suffix with the local hostname suffix", () => {
+    const url = new SimAwsLocalUrl({
+      input:
+        "https://cognito-idp.eu-west-2.amazonaws.com/eu-west-2_aBcDeFgHi/.well-known/jwks.json",
+      port: "12345",
+    });
+
+    assertIdentical(
+      url.toString(),
+      "http://cognito-idp.eu-west-2.sim-aws.localhost:12345" +
+        "/eu-west-2_aBcDeFgHi/.well-known/jwks.json",
+    );
+  });
+
   it("adds the local hostname suffix to other hostnames", () => {
     const url = new SimAwsLocalUrl({
       input: "https://www.example.test/foo/",
