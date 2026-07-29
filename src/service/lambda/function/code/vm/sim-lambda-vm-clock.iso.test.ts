@@ -17,32 +17,16 @@ const instant = new Date("2026-01-01T00:00:00.000Z");
 const hostDate = Date;
 
 /**
- * A simulation stopped at a known instant, with a zip code function that
- * reports the time JavaScript gives it.
+ * Zip code reporting the time JavaScript gives it, every way of asking.
  */
-async function makeStamperSimulation(): Promise<SimAws> {
-  const simAws = new SimAws({ clock: new SimFixedClock(instant) });
-
-  await simAws.lambda().createFunction(
-    new CreateFunctionCommand({
-      FunctionName: "stamper",
-      Role: "arn:aws:iam::111111111111:role/StamperRole",
-      Handler: "index.handler",
-      Code: {
-        ZipFile: makeLambdaCodeZip(`
-          exports.handler = async () => ({
-            built: new Date().toISOString(),
-            read: Date.now(),
-            stated: new Date("2020-03-12T19:03:58.000Z").toISOString(),
-            isADate: new Date() instanceof Date,
-          });
-        `),
-      },
-    }),
-  );
-
-  return simAws;
-}
+const stamperSource = `
+  exports.handler = async () => ({
+    built: new Date().toISOString(),
+    read: Date.now(),
+    stated: new Date("2020-03-12T19:03:58.000Z").toISOString(),
+    isADate: new Date() instanceof Date,
+  });
+`;
 
 async function invokeStamper(simAws: SimAws): Promise<Record<string, unknown>> {
   const output = await simAws
@@ -60,7 +44,15 @@ async function invokeStamper(simAws: SimAws): Promise<Record<string, unknown>> {
 describe("sim Lambda vm code clock", () => {
   it("gives zip function code the simulation's time", async () => {
     // Given a simulation stopped at a known instant.
-    const simAws = await makeStamperSimulation();
+    const simAws = new SimAws({ clock: new SimFixedClock(instant) });
+    await simAws.lambda().createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "stamper",
+        Role: "arn:aws:iam::111111111111:role/StamperRole",
+        Handler: "index.handler",
+        Code: { ZipFile: makeLambdaCodeZip(stamperSource) },
+      }),
+    );
 
     // When function code in the vm sandbox asks JavaScript for the time.
     const stamped = await invokeStamper(simAws);
@@ -72,7 +64,15 @@ describe("sim Lambda vm code clock", () => {
 
   it("leaves the rest of Date alone in the sandbox", async () => {
     // Given a simulation stopped at a known instant.
-    const simAws = await makeStamperSimulation();
+    const simAws = new SimAws({ clock: new SimFixedClock(instant) });
+    await simAws.lambda().createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "stamper",
+        Role: "arn:aws:iam::111111111111:role/StamperRole",
+        Handler: "index.handler",
+        Code: { ZipFile: makeLambdaCodeZip(stamperSource) },
+      }),
+    );
 
     // When function code builds a date from an instant it states itself.
     const stamped = await invokeStamper(simAws);
@@ -85,7 +85,15 @@ describe("sim Lambda vm code clock", () => {
 
   it("moves with the simulation's clock between invocations", async () => {
     // Given a function that has already reported the time once.
-    const simAws = await makeStamperSimulation();
+    const simAws = new SimAws({ clock: new SimFixedClock(instant) });
+    await simAws.lambda().createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "stamper",
+        Role: "arn:aws:iam::111111111111:role/StamperRole",
+        Handler: "index.handler",
+        Code: { ZipFile: makeLambdaCodeZip(stamperSource) },
+      }),
+    );
     const before = await invokeStamper(simAws);
 
     // When the simulation's clock is advanced.
@@ -100,7 +108,15 @@ describe("sim Lambda vm code clock", () => {
 
   it("leaves the host process's own Date alone", async () => {
     // Given a simulation whose function code has run.
-    const simAws = await makeStamperSimulation();
+    const simAws = new SimAws({ clock: new SimFixedClock(instant) });
+    await simAws.lambda().createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "stamper",
+        Role: "arn:aws:iam::111111111111:role/StamperRole",
+        Handler: "index.handler",
+        Code: { ZipFile: makeLambdaCodeZip(stamperSource) },
+      }),
+    );
     await invokeStamper(simAws);
 
     // When the host process reads its own Date.

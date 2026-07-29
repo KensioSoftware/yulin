@@ -10,6 +10,7 @@ import {
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../../../aws/sim-aws.js";
+import { simIamPolicyDocumentFactory } from "../../../../iam/policy/sim-iam-policy-document.factory.js";
 import { makeLambdaCodeZip } from "../make-lambda-code-zip.js";
 import { SimLambda } from "../../../sim-lambda.js";
 
@@ -25,65 +26,6 @@ exports.handler = async (event) => {
 };
 `;
 
-async function createExecutionRole(
-  simAws: SimAws,
-  roleName: string,
-): Promise<string> {
-  const roleCreation = await simAws.iam().createRole(
-    new CreateRoleCommand({
-      RoleName: roleName,
-      AssumeRolePolicyDocument: JSON.stringify({
-        Version: "2012-10-17",
-        Statement: {
-          Effect: "Allow",
-          Principal: { Service: "lambda.amazonaws.com" },
-          Action: "sts:AssumeRole",
-        },
-      }),
-    }),
-  );
-  return roleCreation.Role.Arn;
-}
-
-async function allowGetObject(
-  simAws: SimAws,
-  roleName: string,
-  bucketName: string,
-): Promise<void> {
-  await simAws.iam().putRolePolicy(
-    new PutRolePolicyCommand({
-      RoleName: roleName,
-      PolicyName: "ReadCodeObject",
-      PolicyDocument: JSON.stringify({
-        Version: "2012-10-17",
-        Statement: {
-          Effect: "Allow",
-          Action: "s3:GetObject",
-          Resource: `arn:aws:s3:::${bucketName}/*`,
-        },
-      }),
-    }),
-  );
-}
-
-async function putObject(
-  simAws: SimAws,
-  bucketName: string,
-  objectKey: string,
-  content: string,
-): Promise<void> {
-  await simAws
-    .s3()
-    .createBucket(new CreateBucketCommand({ Bucket: bucketName }));
-  await simAws.s3().putObject(
-    new PutObjectCommand({
-      Bucket: bucketName,
-      Key: objectKey,
-      Body: content,
-    }),
-  );
-}
-
 function parsePayload(payload: Uint8Array | undefined): unknown {
   assertNonNullable(payload);
   return JSON.parse(Buffer.from(payload).toString()) as unknown;
@@ -91,18 +33,50 @@ function parsePayload(payload: Uint8Array | undefined): unknown {
 
 describe("Lambda vm runtime AWS SDK bridge", () => {
   it("lets vm function code read sim S3 with the provided SDK", async () => {
-    // Given a sim S3 object and an execution role allowed to read it.
+    // Given a sim S3 object.
     const simAws = new SimAws();
-    await putObject(simAws, "data-bucket", "greeting.txt", "Hello from S3");
-    const roleArn = await createExecutionRole(simAws, "ReaderRole");
-    await allowGetObject(simAws, "ReaderRole", "data-bucket");
+    await simAws
+      .s3()
+      .createBucket(new CreateBucketCommand({ Bucket: "data-bucket" }));
+    await simAws.s3().putObject(
+      new PutObjectCommand({
+        Bucket: "data-bucket",
+        Key: "greeting.txt",
+        Body: "Hello from S3",
+      }),
+    );
+
+    // And an execution role allowed to read it.
+    const roleCreation = await simAws.iam().createRole(
+      new CreateRoleCommand({
+        RoleName: "ReaderRole",
+        AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Principal: { Service: "lambda.amazonaws.com" },
+            Action: "sts:AssumeRole",
+          },
+        }),
+      }),
+    );
+    await simAws.iam().putRolePolicy(
+      new PutRolePolicyCommand({
+        RoleName: "ReaderRole",
+        PolicyName: "ReadCodeObject",
+        PolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Action: "s3:GetObject",
+            Resource: "arn:aws:s3:::data-bucket/*",
+          },
+        }),
+      }),
+    );
 
     // And a function whose zip code uses the runtime-provided AWS SDK.
     const simLambda = simAws.lambda();
     await simLambda.createFunction(
       new CreateFunctionCommand({
         FunctionName: "reader",
-        Role: roleArn,
+        Role: roleCreation.Role.Arn,
         Handler: "index.handler",
         Code: { ZipFile: makeLambdaCodeZip(readObjectHandlerSource) },
       }),
@@ -134,16 +108,37 @@ describe("Lambda vm runtime AWS SDK bridge", () => {
   });
 
   it("denies vm SDK calls the execution role has no permission for", async () => {
-    // Given a sim S3 object and an execution role with no S3 permissions.
+    // Given a sim S3 object.
     const simAws = new SimAws();
-    await putObject(simAws, "data-bucket", "greeting.txt", "Hello from S3");
-    const roleArn = await createExecutionRole(simAws, "NoReadRole");
+    await simAws
+      .s3()
+      .createBucket(new CreateBucketCommand({ Bucket: "data-bucket" }));
+    await simAws.s3().putObject(
+      new PutObjectCommand({
+        Bucket: "data-bucket",
+        Key: "greeting.txt",
+        Body: "Hello from S3",
+      }),
+    );
+
+    // And an execution role with no S3 permissions.
+    const roleCreation = await simAws.iam().createRole(
+      new CreateRoleCommand({
+        RoleName: "NoReadRole",
+        AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Principal: { Service: "lambda.amazonaws.com" },
+            Action: "sts:AssumeRole",
+          },
+        }),
+      }),
+    );
 
     const simLambda = simAws.lambda();
     await simLambda.createFunction(
       new CreateFunctionCommand({
         FunctionName: "denied-reader",
-        Role: roleArn,
+        Role: roleCreation.Role.Arn,
         Handler: "index.handler",
         Code: { ZipFile: makeLambdaCodeZip(readObjectHandlerSource) },
       }),

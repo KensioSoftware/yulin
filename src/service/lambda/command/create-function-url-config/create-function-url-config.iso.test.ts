@@ -22,21 +22,17 @@ import {
 import { makeLambdaZipFileInput } from "../../function/code/lambda-zip-file-input.js";
 import { SimLambda } from "../../sim-lambda.js";
 
-async function createGreeter(simLambda: SimLambda): Promise<void> {
-  await simLambda.createFunction(
-    new CreateFunctionCommand({
-      FunctionName: "greeter",
-      Role: "arn:aws:iam::111111111111:role/GreeterRole",
-      Code: { ZipFile: makeLambdaZipFileInput(() => "hello") },
-    }),
-  );
-}
-
 describe("Lambda CreateFunctionUrlConfigCommand", () => {
   it("creates a Function URL in the AWS endpoint format", async () => {
     // Given a sim Lambda function.
     const simAws = new SimAws();
-    await createGreeter(simAws.lambda());
+    await simAws.lambda().createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: "arn:aws:iam::111111111111:role/GreeterRole",
+        Code: { ZipFile: makeLambdaZipFileInput(() => "hello") },
+      }),
+    );
 
     // When a Function URL is created for it.
     const output = await simAws.lambda().createFunctionUrlConfig(
@@ -64,7 +60,13 @@ describe("Lambda CreateFunctionUrlConfigCommand", () => {
   it("keeps the same Function URL when read back", async () => {
     // Given a function with a Function URL.
     const simLambda = new SimLambda();
-    await createGreeter(simLambda);
+    await simLambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: "arn:aws:iam::111111111111:role/GreeterRole",
+        Code: { ZipFile: makeLambdaZipFileInput(() => "hello") },
+      }),
+    );
     const created = await simLambda.createFunctionUrlConfig(
       new CreateFunctionUrlConfigCommand({
         FunctionName: "greeter",
@@ -84,7 +86,13 @@ describe("Lambda CreateFunctionUrlConfigCommand", () => {
   it("gives each function its own Function URL", async () => {
     // Given two sim Lambda functions.
     const simLambda = new SimLambda();
-    await createGreeter(simLambda);
+    await simLambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: "arn:aws:iam::111111111111:role/GreeterRole",
+        Code: { ZipFile: makeLambdaZipFileInput(() => "hello") },
+      }),
+    );
     await simLambda.createFunction(
       new CreateFunctionCommand({
         FunctionName: "other",
@@ -117,7 +125,13 @@ describe("Lambda CreateFunctionUrlConfigCommand", () => {
   it("accepts an AWS_IAM Function URL and a RESPONSE_STREAM invoke mode", async () => {
     // Given a sim Lambda function.
     const simLambda = new SimLambda();
-    await createGreeter(simLambda);
+    await simLambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: "arn:aws:iam::111111111111:role/GreeterRole",
+        Code: { ZipFile: makeLambdaZipFileInput(() => "hello") },
+      }),
+    );
 
     // When a Function URL is created with non-default configuration.
     const output = await simLambda.createFunctionUrlConfig(
@@ -155,7 +169,13 @@ describe("Lambda CreateFunctionUrlConfigCommand", () => {
   it("throws when the function already has a Function URL", async () => {
     // Given a function that already has a Function URL.
     const simLambda = new SimLambda();
-    await createGreeter(simLambda);
+    await simLambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: "arn:aws:iam::111111111111:role/GreeterRole",
+        Code: { ZipFile: makeLambdaZipFileInput(() => "hello") },
+      }),
+    );
     await simLambda.createFunctionUrlConfig(
       new CreateFunctionUrlConfigCommand({
         FunctionName: "greeter",
@@ -181,7 +201,13 @@ describe("Lambda CreateFunctionUrlConfigCommand", () => {
   it("throws on a missing AuthType", async () => {
     // Given a sim Lambda function.
     const simLambda = new SimLambda();
-    await createGreeter(simLambda);
+    await simLambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: "arn:aws:iam::111111111111:role/GreeterRole",
+        Code: { ZipFile: makeLambdaZipFileInput(() => "hello") },
+      }),
+    );
 
     // When a Function URL is created without an AuthType, which the SDK types
     // as required but a plain JavaScript caller can still omit.
@@ -197,7 +223,13 @@ describe("Lambda CreateFunctionUrlConfigCommand", () => {
   it("throws on an unknown AuthType", async () => {
     // Given a sim Lambda function.
     const simLambda = new SimLambda();
-    await createGreeter(simLambda);
+    await simLambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: "arn:aws:iam::111111111111:role/GreeterRole",
+        Code: { ZipFile: makeLambdaZipFileInput(() => "hello") },
+      }),
+    );
 
     // When a Function URL is created with an AuthType AWS does not have.
     const error = await assertThrowsErrorAsync(async () =>
@@ -214,7 +246,13 @@ describe("Lambda CreateFunctionUrlConfigCommand", () => {
   it("throws on an unknown InvokeMode", async () => {
     // Given a sim Lambda function.
     const simLambda = new SimLambda();
-    await createGreeter(simLambda);
+    await simLambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: "arn:aws:iam::111111111111:role/GreeterRole",
+        Code: { ZipFile: makeLambdaZipFileInput(() => "hello") },
+      }),
+    );
 
     // When a Function URL is created with an InvokeMode AWS does not have.
     const error = await assertThrowsErrorAsync(async () =>

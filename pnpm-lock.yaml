@@ -12,8 +12,8 @@ importers:
         specifier: ^10.5.0
         version: 10.5.0
       '@kensio/part-factory':
-        specifier: ^1.6.0
-        version: 1.7.0
+        specifier: ^1.9.0
+        version: 1.9.0
       lodash-es:
         specifier: ^4.18.1
         version: 4.18.1
@@ -626,8 +626,8 @@ packages:
   '@jridgewell/trace-mapping@0.3.31':
     resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
-  '@kensio/part-factory@1.7.0':
-    resolution: {integrity: sha512-LaRxufN/R3Up+YjwxY/zx0yyEaTOiPddPwvyL1sYK6UrkfuXTb++263q9s511gM9vIsNW3Ns/UDqCga19glbIQ==}
+  '@kensio/part-factory@1.9.0':
+    resolution: {integrity: sha512-vaVPwq9uUVvxAsr4K7l/Ux85+SpYFOXjzG+LcV/RYbrCON++mTy2wotwAPgVIzsH5LK3G/m2rM/qj8O7PZwYnQ==}
     engines: {node: '>=22.0.0'}
 
   '@kensio/smartass@1.36.0':
@@ -2591,7 +2591,7 @@ snapshots:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
 
-  '@kensio/part-factory@1.7.0':
+  '@kensio/part-factory@1.9.0':
     dependencies:
       lodash: 4.18.1
 

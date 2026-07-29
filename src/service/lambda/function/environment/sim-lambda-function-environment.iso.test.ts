@@ -14,21 +14,7 @@ import { makeLambdaZipFileInput } from "../code/lambda-zip-file-input.js";
 import type { SimLambdaHandler } from "../sim-lambda-handler.type.js";
 import type { SimLambda } from "../../sim-lambda.js";
 
-async function createFunctionWithEnvironment(
-  simLambda: SimLambda,
-  functionName: string,
-  variables: Record<string, string> | undefined,
-  handlerFunction: SimLambdaHandler,
-): Promise<void> {
-  await simLambda.createFunction(
-    new CreateFunctionCommand({
-      FunctionName: functionName,
-      Role: "arn:aws:iam::111111111111:role/GreeterRole",
-      Code: { ZipFile: makeLambdaZipFileInput(handlerFunction) },
-      ...(variables !== undefined && { Environment: { Variables: variables } }),
-    }),
-  );
-}
+const greeterRoleArn = "arn:aws:iam::111111111111:role/GreeterRole";
 
 async function invoke(
   simLambda: SimLambda,
@@ -46,13 +32,19 @@ describe("sim Lambda in-process handler environment", () => {
     // Given a function declaring variables, backed by a real handler
     // function running in this process.
     const simLambda = new SimAws().lambda();
-    await createFunctionWithEnvironment(
-      simLambda,
-      "greeter",
-      { GREETING: "Hello", TABLE_NAME: "widgets" },
-      () => ({
-        greeting: process.env["GREETING"],
-        tableName: process.env["TABLE_NAME"],
+    await simLambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: greeterRoleArn,
+        Code: {
+          ZipFile: makeLambdaZipFileInput(() => ({
+            greeting: process.env["GREETING"],
+            tableName: process.env["TABLE_NAME"],
+          })),
+        },
+        Environment: {
+          Variables: { GREETING: "Hello", TABLE_NAME: "widgets" },
+        },
       }),
     );
 
@@ -67,14 +59,18 @@ describe("sim Lambda in-process handler environment", () => {
     // Given a function declaring one variable of its own.
     const simAws = new SimAws();
     const simLambda = simAws.lambda();
-    await createFunctionWithEnvironment(
-      simLambda,
-      "greeter",
-      { TABLE_NAME: "widgets" },
-      () => ({
-        region: process.env["AWS_REGION"],
-        functionName: process.env["AWS_LAMBDA_FUNCTION_NAME"],
-        version: process.env["AWS_LAMBDA_FUNCTION_VERSION"],
+    await simLambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: greeterRoleArn,
+        Code: {
+          ZipFile: makeLambdaZipFileInput(() => ({
+            region: process.env["AWS_REGION"],
+            functionName: process.env["AWS_LAMBDA_FUNCTION_NAME"],
+            version: process.env["AWS_LAMBDA_FUNCTION_VERSION"],
+          })),
+        },
+        Environment: { Variables: { TABLE_NAME: "widgets" } },
       }),
     );
 
@@ -95,11 +91,17 @@ describe("sim Lambda in-process handler environment", () => {
 
     try {
       const simLambda = new SimAws().lambda();
-      await createFunctionWithEnvironment(
-        simLambda,
-        "greeter",
-        { TABLE_NAME: "widgets" },
-        () => ({ hostOnly: process.env["YULIN_TEST_HOST_ONLY"] ?? null }),
+      await simLambda.createFunction(
+        new CreateFunctionCommand({
+          FunctionName: "greeter",
+          Role: greeterRoleArn,
+          Code: {
+            ZipFile: makeLambdaZipFileInput(() => ({
+              hostOnly: process.env["YULIN_TEST_HOST_ONLY"] ?? null,
+            })),
+          },
+          Environment: { Variables: { TABLE_NAME: "widgets" } },
+        }),
       );
 
       // When it is invoked.
@@ -119,12 +121,15 @@ describe("sim Lambda in-process handler environment", () => {
 
     try {
       const simLambda = new SimAws().lambda();
-      await createFunctionWithEnvironment(
-        simLambda,
-        "greeter",
-        undefined,
-        () => ({
-          shared: process.env["YULIN_TEST_SHARED"] ?? null,
+      await simLambda.createFunction(
+        new CreateFunctionCommand({
+          FunctionName: "greeter",
+          Role: greeterRoleArn,
+          Code: {
+            ZipFile: makeLambdaZipFileInput(() => ({
+              shared: process.env["YULIN_TEST_SHARED"] ?? null,
+            })),
+          },
         }),
       );
 
@@ -151,17 +156,24 @@ describe("sim Lambda in-process handler environment", () => {
         return { tableName: process.env["TABLE_NAME"] };
       };
 
-    await createFunctionWithEnvironment(
-      simLambda,
-      "reader",
-      { TABLE_NAME: "widgets" },
-      readAfterDelay(6),
+    const slowRead = makeLambdaZipFileInput(readAfterDelay(6));
+    const fastRead = makeLambdaZipFileInput(readAfterDelay(2));
+
+    await simLambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "reader",
+        Role: greeterRoleArn,
+        Code: { ZipFile: slowRead },
+        Environment: { Variables: { TABLE_NAME: "widgets" } },
+      }),
     );
-    await createFunctionWithEnvironment(
-      simLambda,
-      "writer",
-      { TABLE_NAME: "gadgets" },
-      readAfterDelay(2),
+    await simLambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "writer",
+        Role: greeterRoleArn,
+        Code: { ZipFile: fastRead },
+        Environment: { Variables: { TABLE_NAME: "gadgets" } },
+      }),
     );
 
     // When both are invoked at once, so their handlers interleave.
@@ -178,14 +190,18 @@ describe("sim Lambda in-process handler environment", () => {
   it("keeps a write by the handler out of the host environment", async () => {
     // Given a handler that writes to process.env, as function code may.
     const simLambda = new SimAws().lambda();
-    await createFunctionWithEnvironment(
-      simLambda,
-      "greeter",
-      { TABLE_NAME: "widgets" },
-      () => {
-        process.env["YULIN_TEST_WRITTEN"] = "written";
-        return { written: process.env["YULIN_TEST_WRITTEN"] };
-      },
+    await simLambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: greeterRoleArn,
+        Code: {
+          ZipFile: makeLambdaZipFileInput(() => {
+            process.env["YULIN_TEST_WRITTEN"] = "written";
+            return { written: process.env["YULIN_TEST_WRITTEN"] };
+          }),
+        },
+        Environment: { Variables: { TABLE_NAME: "widgets" } },
+      }),
     );
 
     // When it is invoked.

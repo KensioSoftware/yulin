@@ -10,20 +10,8 @@ import { SimAws } from "../../../aws/sim-aws.js";
 import { makeSimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import { SimLambda } from "../../sim-lambda.js";
+import { simIamPolicyDocumentFactory } from "../../../iam/policy/sim-iam-policy-document.factory.js";
 import { makeLambdaZipFileInput } from "../../function/code/lambda-zip-file-input.js";
-
-function createFunctionCommand(
-  functionName: string,
-  roleArn: string,
-): CreateFunctionCommand {
-  return new CreateFunctionCommand({
-    FunctionName: functionName,
-    Role: roleArn,
-    Code: {
-      ZipFile: makeLambdaZipFileInput(() => null),
-    },
-  });
-}
 
 describe("Lambda CreateFunctionCommand IAM authorization", () => {
   it("allows the default Account root caller", async () => {
@@ -32,14 +20,13 @@ describe("Lambda CreateFunctionCommand IAM authorization", () => {
     const simAws = new SimAws({ defaultAccountId: accountId });
 
     // When CreateFunction is called without an explicit caller.
-    const output = await simAws
-      .lambda()
-      .createFunction(
-        createFunctionCommand(
-          "root-function",
-          `arn:aws:iam::${accountId}:role/ExecutionRole`,
-        ),
-      );
+    const output = await simAws.lambda().createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "root-function",
+        Role: `arn:aws:iam::${accountId}:role/ExecutionRole`,
+        Code: { ZipFile: makeLambdaZipFileInput(() => null) },
+      }),
+    );
 
     // Then IAM defaults to Account root and Lambda creates the function.
     assertIdentical(output.FunctionName, "root-function");
@@ -56,10 +43,8 @@ describe("Lambda CreateFunctionCommand IAM authorization", () => {
     const roleCreation = await simIam.createRole(
       new CreateRoleCommand({
         RoleName: "FunctionCreator",
-        AssumeRolePolicyDocument: JSON.stringify({
-          Version: "2012-10-17",
+        AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
           Statement: {
-            Effect: "Allow",
             Principal: { AWS: `arn:aws:iam::${accountId}:root` },
             Action: "sts:AssumeRole",
           },
@@ -71,10 +56,8 @@ describe("Lambda CreateFunctionCommand IAM authorization", () => {
       new PutRolePolicyCommand({
         RoleName: "FunctionCreator",
         PolicyName: "CreateFunctionPolicy",
-        PolicyDocument: JSON.stringify({
-          Version: "2012-10-17",
+        PolicyDocument: simIamPolicyDocumentFactory.make({
           Statement: {
-            Effect: "Allow",
             Action: "lambda:CreateFunction",
             Resource:
               `arn:aws:lambda:${simAws.defaultRegionName}:` +
@@ -85,15 +68,14 @@ describe("Lambda CreateFunctionCommand IAM authorization", () => {
     );
 
     // When the Role creates the function it has permission for.
-    const output = await simAws
-      .lambda()
-      .createFunction(
-        createFunctionCommand(
-          "allowed-function",
-          `arn:aws:iam::${accountId}:role/ExecutionRole`,
-        ),
-        { caller: { kind: "arn", arn: roleCreation.Role.Arn } },
-      );
+    const output = await simAws.lambda().createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "allowed-function",
+        Role: `arn:aws:iam::${accountId}:role/ExecutionRole`,
+        Code: { ZipFile: makeLambdaZipFileInput(() => null) },
+      }),
+      { caller: { kind: "arn", arn: roleCreation.Role.Arn } },
+    );
 
     // Then IAM allows the request and Lambda creates the function.
     assertIdentical(output.FunctionName, "allowed-function");
@@ -109,10 +91,8 @@ describe("Lambda CreateFunctionCommand IAM authorization", () => {
     const roleCreation = await simAws.iam().createRole(
       new CreateRoleCommand({
         RoleName: "NoPermissionsRole",
-        AssumeRolePolicyDocument: JSON.stringify({
-          Version: "2012-10-17",
+        AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
           Statement: {
-            Effect: "Allow",
             Principal: { AWS: `arn:aws:iam::${accountId}:root` },
             Action: "sts:AssumeRole",
           },
@@ -122,15 +102,14 @@ describe("Lambda CreateFunctionCommand IAM authorization", () => {
 
     // When the Role attempts to create a function.
     const error = await assertThrowsErrorAsync(async () =>
-      simAws
-        .lambda()
-        .createFunction(
-          createFunctionCommand(
-            "denied-function",
-            `arn:aws:iam::${accountId}:role/ExecutionRole`,
-          ),
-          { caller: { kind: "arn", arn: roleCreation.Role.Arn } },
-        ),
+      simAws.lambda().createFunction(
+        new CreateFunctionCommand({
+          FunctionName: "denied-function",
+          Role: `arn:aws:iam::${accountId}:role/ExecutionRole`,
+          Code: { ZipFile: makeLambdaZipFileInput(() => null) },
+        }),
+        { caller: { kind: "arn", arn: roleCreation.Role.Arn } },
+      ),
     );
 
     // Then IAM implicitly denies the request.
@@ -145,10 +124,11 @@ describe("Lambda CreateFunctionCommand IAM authorization", () => {
     // When an anonymous caller creates a function through the standalone
     // service.
     const output = await simLambda.createFunction(
-      createFunctionCommand(
-        "standalone-function",
-        "arn:aws:iam::111111111111:role/ExecutionRole",
-      ),
+      new CreateFunctionCommand({
+        FunctionName: "standalone-function",
+        Role: "arn:aws:iam::111111111111:role/ExecutionRole",
+        Code: { ZipFile: makeLambdaZipFileInput(() => null) },
+      }),
       { caller: { kind: "anonymous" } },
     );
 

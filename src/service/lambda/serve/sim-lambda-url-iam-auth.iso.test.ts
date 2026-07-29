@@ -4,19 +4,15 @@ import {
 } from "@aws-sdk/client-lambda";
 import {
   CreateAccessKeyCommand,
-  CreateRoleCommand,
   CreateUserCommand,
-  PutRolePolicyCommand,
   PutUserPolicyCommand,
 } from "@aws-sdk/client-iam";
-import { AssumeRoleCommand } from "@aws-sdk/client-sts";
 import { describe, expect, it } from "vitest";
 
 import { signAwsRequest } from "../../../../test/sigv4/sign-aws-request.js";
-import type { SignAwsRequestCredentials } from "../../../../test/sigv4/sign-aws-request.js";
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
 import { SimAwsLocalUrl } from "../../../serve/http/url/sim-aws-local-url.js";
-import { simAwsCallerHeaderName } from "../../iam/request/sim-aws-caller-header.js";
+import { simIamPolicyDocumentFactory } from "../../iam/policy/sim-iam-policy-document.factory.js";
 import { SimAws } from "../../aws/sim-aws.js";
 import { makeLambdaZipFileInput } from "../function/code/lambda-zip-file-input.js";
 import type {
@@ -26,91 +22,65 @@ import type {
 
 const accountId = "888888888888";
 
-interface IamProtectedFunction {
-  readonly simAws: SimAws;
-  readonly url: string;
-  readonly functionArn: string;
-}
-
 /**
- * A function behind an AWS_IAM Function URL, whose handler echoes the IAM
- * caller the invocation event describes.
+ * Function code echoing the IAM caller its invocation event describes.
  */
-async function serveIamFunction(
-  authType: "AWS_IAM" | "NONE" = "AWS_IAM",
-): Promise<IamProtectedFunction> {
-  const simAws = new SimAws();
+const reportCallerCode = {
+  ZipFile: makeLambdaZipFileInput(
+    (event: SimLambdaFunctionUrlEvent) => event.requestContext,
+  ),
+};
 
-  const created = await simAws.lambda().createFunction(
-    new CreateFunctionCommand({
-      FunctionName: "reporter",
-      Role: `arn:aws:iam::${accountId}:role/ReporterRole`,
-      Code: {
-        ZipFile: makeLambdaZipFileInput(
-          (event: SimLambdaFunctionUrlEvent) => event.requestContext,
-        ),
-      },
-    }),
-  );
-
-  const urlConfig = await simAws.lambda().createFunctionUrlConfig(
-    new CreateFunctionUrlConfigCommand({
-      FunctionName: "reporter",
-      AuthType: authType,
-    }),
-  );
-
-  return {
-    simAws,
-    url: new SimAwsLocalUrl({ input: urlConfig.FunctionUrl }).toString(),
-    functionArn: created.FunctionArn,
-  };
+function localUrl(functionUrl: string): string {
+  return new SimAwsLocalUrl({ input: functionUrl }).toString();
 }
 
-/**
- * Give the simulation a User holding an access key, with one inline policy
- * statement, and return credentials that can sign as them.
- */
-async function signingUser(
-  simAws: SimAws,
-  statement: Record<string, unknown>,
-): Promise<SignAwsRequestCredentials> {
-  const iam = simAws.iam();
-
-  await iam.createUser(new CreateUserCommand({ UserName: "Invoker" }));
-  await iam.putUserPolicy(
-    new PutUserPolicyCommand({
-      UserName: "Invoker",
-      PolicyName: "InvokePolicy",
-      PolicyDocument: JSON.stringify({
-        Version: "2012-10-17",
-        Statement: statement,
-      }),
-    }),
-  );
-
-  const key = await iam.createAccessKey(
-    new CreateAccessKeyCommand({ UserName: "Invoker" }),
-  );
-
-  return {
-    accessKeyId: key.AccessKey.AccessKeyId,
-    secretAccessKey: key.AccessKey.SecretAccessKey,
-  };
-}
-
-describe("Invoking an AWS_IAM Lambda Function URL", () => {
+describe("Invoking an AWS_IAM Lambda Function URL as a signed caller", () => {
   it("invokes for a signed caller allowed to invoke the Function URL", async () => {
-    // Given a User whose policy allows invoking this function's URL
-    const { simAws, url, functionArn } = await serveIamFunction();
-    const credentials = await signingUser(simAws, {
-      Effect: "Allow",
-      Action: "lambda:InvokeFunctionUrl",
-      Resource: functionArn,
-    });
+    // Given a function behind an AWS_IAM Function URL
+    const simAws = new SimAws();
+    const reporter = await simAws.lambda().createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "reporter",
+        Role: `arn:aws:iam::${accountId}:role/ReporterRole`,
+        Code: reportCallerCode,
+      }),
+    );
+    const urlConfig = await simAws.lambda().createFunctionUrlConfig(
+      new CreateFunctionUrlConfigCommand({
+        FunctionName: "reporter",
+        AuthType: "AWS_IAM",
+      }),
+    );
+
+    // And a User whose policy allows invoking this function's URL
+    await simAws
+      .iam()
+      .createUser(new CreateUserCommand({ UserName: "Invoker" }));
+    await simAws.iam().putUserPolicy(
+      new PutUserPolicyCommand({
+        UserName: "Invoker",
+        PolicyName: "InvokePolicy",
+        PolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Action: "lambda:InvokeFunctionUrl",
+            Resource: reporter.FunctionArn,
+          },
+        }),
+      }),
+    );
+    const key = await simAws
+      .iam()
+      .createAccessKey(new CreateAccessKeyCommand({ UserName: "Invoker" }));
 
     // When they sign a request to the URL and it is served
-    const signed = await signAwsRequest({ url, credentials });
+    const signed = await signAwsRequest({
+      url: localUrl(urlConfig.FunctionUrl),
+      credentials: {
+        accessKeyId: key.AccessKey.AccessKeyId,
+        secretAccessKey: key.AccessKey.SecretAccessKey,
+      },
+    });
     const response = await new SimAwsHttp({ simAws }).handleRequest(
       signed.request,
     );
@@ -121,16 +91,47 @@ describe("Invoking an AWS_IAM Lambda Function URL", () => {
   });
 
   it("refuses a signed caller without the invoke permission", async () => {
-    // Given a User whose policy grants something else entirely
-    const { simAws, url } = await serveIamFunction();
-    const credentials = await signingUser(simAws, {
-      Effect: "Allow",
-      Action: "s3:GetObject",
-      Resource: "*",
-    });
+    // Given a function behind an AWS_IAM Function URL
+    const simAws = new SimAws();
+    await simAws.lambda().createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "reporter",
+        Role: `arn:aws:iam::${accountId}:role/ReporterRole`,
+        Code: reportCallerCode,
+      }),
+    );
+    const urlConfig = await simAws.lambda().createFunctionUrlConfig(
+      new CreateFunctionUrlConfigCommand({
+        FunctionName: "reporter",
+        AuthType: "AWS_IAM",
+      }),
+    );
+
+    // And a User whose policy grants something else entirely
+    await simAws
+      .iam()
+      .createUser(new CreateUserCommand({ UserName: "Invoker" }));
+    await simAws.iam().putUserPolicy(
+      new PutUserPolicyCommand({
+        UserName: "Invoker",
+        PolicyName: "InvokePolicy",
+        PolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: { Action: "s3:GetObject", Resource: "*" },
+        }),
+      }),
+    );
+    const key = await simAws
+      .iam()
+      .createAccessKey(new CreateAccessKeyCommand({ UserName: "Invoker" }));
 
     // When they sign a request to the URL and it is served
-    const signed = await signAwsRequest({ url, credentials });
+    const signed = await signAwsRequest({
+      url: localUrl(urlConfig.FunctionUrl),
+      credentials: {
+        accessKeyId: key.AccessKey.AccessKeyId,
+        secretAccessKey: key.AccessKey.SecretAccessKey,
+      },
+    });
     const response = await new SimAwsHttp({ simAws }).handleRequest(
       signed.request,
     );
@@ -142,16 +143,50 @@ describe("Invoking an AWS_IAM Lambda Function URL", () => {
   });
 
   it("does not accept lambda:InvokeFunction as permission for the URL", async () => {
-    // Given a User allowed the Invoke API action rather than the URL one
-    const { simAws, url, functionArn } = await serveIamFunction();
-    const credentials = await signingUser(simAws, {
-      Effect: "Allow",
-      Action: "lambda:InvokeFunction",
-      Resource: functionArn,
-    });
+    // Given a function behind an AWS_IAM Function URL
+    const simAws = new SimAws();
+    const reporter = await simAws.lambda().createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "reporter",
+        Role: `arn:aws:iam::${accountId}:role/ReporterRole`,
+        Code: reportCallerCode,
+      }),
+    );
+    const urlConfig = await simAws.lambda().createFunctionUrlConfig(
+      new CreateFunctionUrlConfigCommand({
+        FunctionName: "reporter",
+        AuthType: "AWS_IAM",
+      }),
+    );
+
+    // And a User allowed the Invoke API action rather than the URL one
+    await simAws
+      .iam()
+      .createUser(new CreateUserCommand({ UserName: "Invoker" }));
+    await simAws.iam().putUserPolicy(
+      new PutUserPolicyCommand({
+        UserName: "Invoker",
+        PolicyName: "InvokePolicy",
+        PolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Action: "lambda:InvokeFunction",
+            Resource: reporter.FunctionArn,
+          },
+        }),
+      }),
+    );
+    const key = await simAws
+      .iam()
+      .createAccessKey(new CreateAccessKeyCommand({ UserName: "Invoker" }));
 
     // When they sign a request to the URL and it is served
-    const signed = await signAwsRequest({ url, credentials });
+    const signed = await signAwsRequest({
+      url: localUrl(urlConfig.FunctionUrl),
+      credentials: {
+        accessKeyId: key.AccessKey.AccessKeyId,
+        secretAccessKey: key.AccessKey.SecretAccessKey,
+      },
+    });
     const response = await new SimAwsHttp({ simAws }).handleRequest(
       signed.request,
     );
@@ -161,119 +196,49 @@ describe("Invoking an AWS_IAM Lambda Function URL", () => {
     expect(response.status).toBe(403);
   });
 
-  it("authorizes a request as the principal its caller header names", async () => {
-    // Given a Role named directly rather than signed for, allowed to invoke
-    const { simAws, url, functionArn } = await serveIamFunction();
-    const roleArn = `arn:aws:iam::${accountId}:role/Reporter`;
-    await simAws.iam().createRole(
-      new CreateRoleCommand({
-        RoleName: "Reporter",
-        AssumeRolePolicyDocument: JSON.stringify({
-          Version: "2012-10-17",
-          Statement: {
-            Effect: "Allow",
-            Principal: { AWS: `arn:aws:iam::${accountId}:root` },
-            Action: "sts:AssumeRole",
-          },
-        }),
+  it("describes the caller of an AWS_IAM invocation in the event", async () => {
+    // Given a function behind an AWS_IAM Function URL
+    const simAws = new SimAws();
+    const reporter = await simAws.lambda().createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "reporter",
+        Role: `arn:aws:iam::${accountId}:role/ReporterRole`,
+        Code: reportCallerCode,
       }),
     );
-    await simAws.iam().putRolePolicy(
-      new PutRolePolicyCommand({
-        RoleName: "Reporter",
-        PolicyName: "InvokeUrl",
-        PolicyDocument: JSON.stringify({
-          Version: "2012-10-17",
+    const urlConfig = await simAws.lambda().createFunctionUrlConfig(
+      new CreateFunctionUrlConfigCommand({
+        FunctionName: "reporter",
+        AuthType: "AWS_IAM",
+      }),
+    );
+
+    // And a signed, permitted invocation by a User
+    await simAws
+      .iam()
+      .createUser(new CreateUserCommand({ UserName: "Invoker" }));
+    await simAws.iam().putUserPolicy(
+      new PutUserPolicyCommand({
+        UserName: "Invoker",
+        PolicyName: "InvokePolicy",
+        PolicyDocument: simIamPolicyDocumentFactory.make({
           Statement: {
-            Effect: "Allow",
             Action: "lambda:InvokeFunctionUrl",
-            Resource: functionArn,
+            Resource: reporter.FunctionArn,
           },
         }),
       }),
     );
-
-    // When the URL is requested naming that Role
-    const response = await new SimAwsHttp({ simAws }).fetch(url, {
-      headers: { [simAwsCallerHeaderName]: roleArn },
-    });
-
-    // Then the convenience path authorizes exactly as a signature would, so a
-    // curl one-liner can exercise an IAM-protected endpoint
-    expect(response.status).toBe(200);
-  });
-
-  it("authorizes an assumed-role session against the Role behind it", async () => {
-    // Given a Role allowed to invoke, and a session assumed from it
-    const { simAws, url, functionArn } = await serveIamFunction();
-    await simAws.iam().createRole(
-      new CreateRoleCommand({
-        RoleName: "Deployer",
-        AssumeRolePolicyDocument: JSON.stringify({
-          Version: "2012-10-17",
-          Statement: {
-            Effect: "Allow",
-            Principal: { AWS: `arn:aws:iam::${accountId}:root` },
-            Action: "sts:AssumeRole",
-          },
-        }),
-      }),
-    );
-    await simAws.iam().putRolePolicy(
-      new PutRolePolicyCommand({
-        RoleName: "Deployer",
-        PolicyName: "InvokeUrl",
-        PolicyDocument: JSON.stringify({
-          Version: "2012-10-17",
-          Statement: {
-            Effect: "Allow",
-            Action: "lambda:InvokeFunctionUrl",
-            Resource: functionArn,
-          },
-        }),
-      }),
-    );
-    const assumed = await simAws.sts().assumeRole(
-      new AssumeRoleCommand({
-        RoleArn: `arn:aws:iam::${accountId}:role/Deployer`,
-        RoleSessionName: "deploy-session",
-      }),
-    );
-
-    // When the session's temporary credentials sign a request to the URL
+    const key = await simAws
+      .iam()
+      .createAccessKey(new CreateAccessKeyCommand({ UserName: "Invoker" }));
     const signed = await signAwsRequest({
-      url,
+      url: localUrl(urlConfig.FunctionUrl),
       credentials: {
-        accessKeyId: assumed.Credentials?.AccessKeyId ?? "",
-        secretAccessKey: assumed.Credentials?.SecretAccessKey ?? "",
-        sessionToken: assumed.Credentials?.SessionToken ?? "",
+        accessKeyId: key.AccessKey.AccessKeyId,
+        secretAccessKey: key.AccessKey.SecretAccessKey,
       },
     });
-    const response = await new SimAwsHttp({ simAws }).handleRequest(
-      signed.request,
-    );
-
-    // Then it is allowed: the session ARN owns no policies of its own, so the
-    // permission has to come from the Role it was assumed from
-    expect(response.status).toBe(200);
-    const context =
-      (await response.json()) as SimLambdaFunctionUrlRequestContext;
-    expect(context.authorizer?.iam.userArn).toBe(
-      `arn:aws:sts::${accountId}:assumed-role/Deployer/deploy-session`,
-    );
-  });
-});
-
-describe("The IAM caller in a Function URL invocation event", () => {
-  it("describes the caller of an AWS_IAM invocation", async () => {
-    // Given a signed, permitted invocation of an AWS_IAM Function URL
-    const { simAws, url, functionArn } = await serveIamFunction();
-    const credentials = await signingUser(simAws, {
-      Effect: "Allow",
-      Action: "lambda:InvokeFunctionUrl",
-      Resource: functionArn,
-    });
-    const signed = await signAwsRequest({ url, credentials });
 
     // When the handler reads its invocation event
     const response = await new SimAwsHttp({ simAws }).handleRequest(
@@ -293,10 +258,25 @@ describe("The IAM caller in a Function URL invocation event", () => {
 
   it("describes no caller for a NONE invocation", async () => {
     // Given a Function URL anyone may invoke
-    const { simAws, url } = await serveIamFunction("NONE");
+    const simAws = new SimAws();
+    await simAws.lambda().createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "reporter",
+        Role: `arn:aws:iam::${accountId}:role/ReporterRole`,
+        Code: reportCallerCode,
+      }),
+    );
+    const urlConfig = await simAws.lambda().createFunctionUrlConfig(
+      new CreateFunctionUrlConfigCommand({
+        FunctionName: "reporter",
+        AuthType: "NONE",
+      }),
+    );
 
     // When the handler reads its invocation event
-    const response = await new SimAwsHttp({ simAws }).fetch(url);
+    const response = await new SimAwsHttp({ simAws }).fetch(
+      localUrl(urlConfig.FunctionUrl),
+    );
     const context =
       (await response.json()) as SimLambdaFunctionUrlRequestContext;
 

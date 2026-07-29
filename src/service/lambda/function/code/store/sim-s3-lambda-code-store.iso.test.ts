@@ -1,4 +1,3 @@
-import type { Readable } from "node:stream";
 import {
   assertIdentical,
   assertInstanceOf,
@@ -11,22 +10,14 @@ import {
   SimS3LambdaCodeStore,
 } from "./sim-s3-lambda-code-store.js";
 
-function makeStore(getObject: () => Promise<{ Body?: Readable }>): {
-  store: SimS3LambdaCodeStore;
-} {
-  const s3: SimLambdaCodeObjectSource = {
-    getObject: async () => await getObject(),
-  };
-  return { store: new SimS3LambdaCodeStore({ s3 }) };
-}
-
 describe("sim S3 Lambda code store", () => {
   it("wraps a non-Error S3 failure in an Error", async () => {
     // Given an object source failing with a non-Error value.
-    const { store } = makeStore(() =>
+    const s3: SimLambdaCodeObjectSource = {
       // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
-      Promise.reject("catastrophic string failure"),
-    );
+      getObject: () => Promise.reject("catastrophic string failure"),
+    };
+    const store = new SimS3LambdaCodeStore({ s3 });
 
     // When the code zip fetch fails.
     const error = await assertThrowsErrorAsync(async () =>
@@ -40,7 +31,10 @@ describe("sim S3 Lambda code store", () => {
 
   it("requires the fetched S3 object to have a body", async () => {
     // Given an object source returning an object with no body stream.
-    const { store } = makeStore(() => Promise.resolve({}));
+    const s3: SimLambdaCodeObjectSource = {
+      getObject: () => Promise.resolve({}),
+    };
+    const store = new SimS3LambdaCodeStore({ s3 });
 
     // When the code zip fetch completes without a body.
     const error = await assertThrowsErrorAsync(async () =>

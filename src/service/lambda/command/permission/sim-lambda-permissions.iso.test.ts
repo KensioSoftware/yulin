@@ -10,28 +10,20 @@ import { SimAws } from "../../../aws/sim-aws.js";
 import { SimLambdaResourceConflictException } from "../../error/sim-lambda.error.js";
 import { SimLambdaResourceNotFoundException } from "../../error/sim-lambda.error.js";
 import { makeLambdaZipFileInput } from "../../function/code/lambda-zip-file-input.js";
-import type { SimLambda } from "../../sim-lambda.js";
 
 const functionArn = "arn:aws:lambda:us-east-1:888888888888:function:greeter";
-
-async function serveGreeter(): Promise<SimLambda> {
-  const simAws = new SimAws();
-
-  await simAws.lambda().createFunction(
-    new CreateFunctionCommand({
-      FunctionName: "greeter",
-      Role: "arn:aws:iam::888888888888:role/GreeterRole",
-      Code: { ZipFile: makeLambdaZipFileInput(() => "hello") },
-    }),
-  );
-
-  return simAws.lambda();
-}
 
 describe("Simulated Lambda function resource policies", () => {
   it("grants a permission and reports it back as a policy document", async () => {
     // Given a function with nothing granted on it
-    const lambda = await serveGreeter();
+    const lambda = new SimAws().lambda();
+    await lambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: "arn:aws:iam::888888888888:role/GreeterRole",
+        Code: { ZipFile: makeLambdaZipFileInput(() => "hello") },
+      }),
+    );
 
     // When another Account is granted permission to invoke its Function URL
     const added = await lambda.addPermission(
@@ -70,7 +62,14 @@ describe("Simulated Lambda function resource policies", () => {
 
   it("expands each principal shorthand AddPermission accepts", async () => {
     // Given a function granted permissions naming a principal three ways
-    const lambda = await serveGreeter();
+    const lambda = new SimAws().lambda();
+    await lambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: "arn:aws:iam::888888888888:role/GreeterRole",
+        Code: { ZipFile: makeLambdaZipFileInput(() => "hello") },
+      }),
+    );
     const grant = async (
       statementId: string,
       principal: string,
@@ -106,7 +105,14 @@ describe("Simulated Lambda function resource policies", () => {
 
   it("refuses a statement id already in use", async () => {
     // Given a function with a permission already granted
-    const lambda = await serveGreeter();
+    const lambda = new SimAws().lambda();
+    await lambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: "arn:aws:iam::888888888888:role/GreeterRole",
+        Code: { ZipFile: makeLambdaZipFileInput(() => "hello") },
+      }),
+    );
     const command = new AddPermissionCommand({
       FunctionName: "greeter",
       StatementId: "AllowInvoke",
@@ -124,7 +130,14 @@ describe("Simulated Lambda function resource policies", () => {
 
   it("removes a permission by its statement id", async () => {
     // Given a function with one permission granted
-    const lambda = await serveGreeter();
+    const lambda = new SimAws().lambda();
+    await lambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: "arn:aws:iam::888888888888:role/GreeterRole",
+        Code: { ZipFile: makeLambdaZipFileInput(() => "hello") },
+      }),
+    );
     await lambda.addPermission(
       new AddPermissionCommand({
         FunctionName: "greeter",
@@ -151,7 +164,14 @@ describe("Simulated Lambda function resource policies", () => {
 
   it("errors when removing a statement that was never granted", async () => {
     // Given a function with no permissions
-    const lambda = await serveGreeter();
+    const lambda = new SimAws().lambda();
+    await lambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: "arn:aws:iam::888888888888:role/GreeterRole",
+        Code: { ZipFile: makeLambdaZipFileInput(() => "hello") },
+      }),
+    );
 
     // When an unknown statement id is removed
     // Then it is reported as not found, as AWS does
@@ -167,7 +187,14 @@ describe("Simulated Lambda function resource policies", () => {
 
   it("changes the policy revision with every grant and revocation", async () => {
     // Given a function with one permission granted
-    const lambda = await serveGreeter();
+    const lambda = new SimAws().lambda();
+    await lambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: "arn:aws:iam::888888888888:role/GreeterRole",
+        Code: { ZipFile: makeLambdaZipFileInput(() => "hello") },
+      }),
+    );
     const grant = (statementId: string): Promise<unknown> =>
       lambda.addPermission(
         new AddPermissionCommand({

@@ -19,21 +19,17 @@ import { SimLambdaResourceNotFoundException } from "../../error/sim-lambda.error
 import { makeLambdaZipFileInput } from "../../function/code/lambda-zip-file-input.js";
 import { SimLambda } from "../../sim-lambda.js";
 
-async function createGreeter(simLambda: SimLambda): Promise<void> {
-  await simLambda.createFunction(
-    new CreateFunctionCommand({
-      FunctionName: "greeter",
-      Role: "arn:aws:iam::111111111111:role/GreeterRole",
-      Code: { ZipFile: makeLambdaZipFileInput(() => "hello") },
-    }),
-  );
-}
-
 describe("Lambda ListFunctionUrlConfigsCommand", () => {
   it("lists the Function URL a function has", async () => {
     // Given a function with a Function URL.
     const simLambda = new SimLambda();
-    await createGreeter(simLambda);
+    await simLambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: "arn:aws:iam::111111111111:role/GreeterRole",
+        Code: { ZipFile: makeLambdaZipFileInput(() => "hello") },
+      }),
+    );
     const created = await simLambda.createFunctionUrlConfig(
       new CreateFunctionUrlConfigCommand({
         FunctionName: "greeter",
@@ -56,7 +52,13 @@ describe("Lambda ListFunctionUrlConfigsCommand", () => {
   it("lists nothing for a function without a Function URL", async () => {
     // Given a function without a Function URL.
     const simLambda = new SimLambda();
-    await createGreeter(simLambda);
+    await simLambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: "arn:aws:iam::111111111111:role/GreeterRole",
+        Code: { ZipFile: makeLambdaZipFileInput(() => "hello") },
+      }),
+    );
 
     // When its Function URL configs are listed.
     const output = await simLambda.listFunctionUrlConfigs(

@@ -1,14 +1,15 @@
 import { GetPolicyCommand } from "@aws-sdk/client-lambda";
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import { assertTypeString } from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
-import { createSimIamRoleWithPolicy } from "../../../../../test/iam/create-role-with-policy.js";
 import { SimAwsHttp } from "../../../../serve/http/sim-aws-http.js";
 import { SimAwsLocalUrl } from "../../../../serve/http/url/sim-aws-local-url.js";
 import { SimAws } from "../../../aws/sim-aws.js";
 import type { CfnTemplateBodyRecord } from "../../../cloudformation/template/sim-cfn-template.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import { simAwsCallerHeaderName } from "../../../iam/request/sim-aws-caller-header.js";
+import { simIamPolicyDocumentFactory } from "../../../iam/policy/sim-iam-policy-document.factory.js";
 import { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import { SimLambdaPermission } from "../../function/policy/sim-lambda-permission.js";
@@ -16,23 +17,6 @@ import { SimCfnLambdaPermissionCreator } from "./sim-cfn-lambda-permission-creat
 
 const callerAccountId = "222222222222";
 const callerRoleArn = `arn:aws:iam::${callerAccountId}:role/Caller`;
-
-/**
- * The calling Role in its own Account, allowed to invoke Function URLs there.
- *
- * A cross-Account call needs an allow from the caller's Account as well as the
- * grant on the function, so a template grant can only be shown to take effect
- * with this side in place too.
- */
-async function allowedCallerRole(simAws: SimAws): Promise<void> {
-  await createSimIamRoleWithPolicy({
-    simAws,
-    accountId: callerAccountId,
-    roleName: "Caller",
-    policyName: "InvokeUrl",
-    action: "lambda:InvokeFunctionUrl",
-  });
-}
 
 function greeterTemplate(
   permissionProperties: SimCfnTemplateValueRecord,
@@ -125,7 +109,31 @@ describe("Lambda CloudFormation Permission deployment", () => {
       }),
     });
     await stack.waitForDeployComplete();
-    await allowedCallerRole(simAws);
+    // And the calling Role in its own Account, allowed to invoke Function URLs
+    // there. A cross-Account call needs an allow from the caller's Account as
+    // well as the grant on the function, so the template grant can only be
+    // shown to take effect with this side in place too.
+    const callerIam = simAws.account(callerAccountId).iam();
+    await callerIam.createRole(
+      new CreateRoleCommand({
+        RoleName: "Caller",
+        AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Principal: { AWS: `arn:aws:iam::${callerAccountId}:root` },
+            Action: "sts:AssumeRole",
+          },
+        }),
+      }),
+    );
+    await callerIam.putRolePolicy(
+      new PutRolePolicyCommand({
+        RoleName: "Caller",
+        PolicyName: "InvokeUrl",
+        PolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: { Action: "lambda:InvokeFunctionUrl", Resource: "*" },
+        }),
+      }),
+    );
     const functionUrl = stack.outputs.get("FunctionUrl")?.value;
     assertTypeString(functionUrl);
     const url = new SimAwsLocalUrl({ input: functionUrl }).toString();
