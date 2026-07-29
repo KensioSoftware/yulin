@@ -11,8 +11,17 @@ const maxPasswordLength = 256;
  */
 const symbolPattern = /[\^$*.[\]{}()?"!@#%&/\\,><':;|_~`+= -]/u;
 
-const uppercasePattern = /\p{Lu}/u;
-const lowercasePattern = /\p{Ll}/u;
+/**
+ * The letters Cognito counts towards the uppercase and lowercase requirements.
+ *
+ * A password may hold any Unicode character, and which of them satisfy these
+ * two rules is not documented, so basic Latin is what counts here. That
+ * refuses a password of, say, Greek letters that real Cognito might accept.
+ * Refusing one it would have taken is a puzzling test failure; taking one it
+ * would have refused is a sign-up that fails in a deployment.
+ */
+const uppercasePattern = /[A-Z]/u;
+const lowercasePattern = /[a-z]/u;
 const numberPattern = /\d/u;
 
 /**

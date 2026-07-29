@@ -100,6 +100,19 @@ describe("sim Cognito password policy", () => {
     assertStringIncludes(error.message, "must have symbol characters");
   });
 
+  it("refuses a password whose only letters are outside basic Latin", async () => {
+    // Given the default policy, which wants an uppercase letter.
+    // When a password of Greek letters is set.
+    const error = await assertThrowsErrorAsync(async () => {
+      await setPassword("Δοκιμή1!");
+    });
+
+    // Then it is refused. Which characters count towards the uppercase and
+    // lowercase rules is not documented, so only basic Latin counts here.
+    assertInstanceOf(error, SimCognitoInvalidPasswordException);
+    assertStringIncludes(error.message, "must have uppercase characters");
+  });
+
   it("refuses a password shorter than the pool wants", async () => {
     // Given a pool wanting twelve characters.
     // When a shorter password is set.

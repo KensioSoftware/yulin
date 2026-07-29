@@ -21,8 +21,8 @@ Sim Cognito currently supports:
   `AdminEnableUserCommand` and `ListUsersCommand`
 - Pool ids in the real `<region>_<nine characters>` form, and pool ARNs built from them
 - The real default password policy, applied to the passwords users are given
-- The real user status lifecycle, so an admin-created user cannot sign in until it has a permanent
-  password
+- The real user status lifecycle, so an admin-created user stays in `FORCE_CHANGE_PASSWORD` until it
+  has a permanent password
 - App client authentication flows, token lifetimes and generated client secrets
 - Authorization of every operation by simulated IAM, against the real IAM action and ARN
 - Calls made from inside a simulated Lambda handler, authorized as the function's execution role
@@ -108,13 +108,14 @@ with `InvalidPasswordException`, saying which rule it broke.
 
 ## Users
 
-`AdminCreateUser` creates a user. The user it creates cannot sign in: its status is
-`FORCE_CHANGE_PASSWORD`, which is where real Cognito leaves a user an admin made. Setting a permanent
-password moves it to `CONFIRMED`.
+`AdminCreateUser` creates a user in `FORCE_CHANGE_PASSWORD`, which is where real Cognito leaves a
+user an admin made: it has a temporary password and cannot sign in with it. Setting a permanent
+password moves the user to `CONFIRMED`. Nothing signs in here yet, so that status is what a test can
+assert on now, and what the authentication flows will read when they arrive.
 
 ```typescript sim-cognito-create-user
 /**
- * Creating a simulated user that could actually sign in.
+ * Creating a simulated user and confirming it.
  */
 
 import {
@@ -513,6 +514,8 @@ Current documented limitations:
   `AdminUpdateUserAttributes` refuses `ClientMetadata` the same way.
 - `ListUsers` refuses `Filter` and `AttributesToGet` rather than ignoring them, and lists users in
   creation order. Real Cognito chooses its own order and does not promise one.
+- `ListUsers` refuses a `Limit` of zero, which the real operation accepts without saying what it
+  returns. Refusing it is better than guessing between an empty page and a full one.
 - Only the standard user attributes exist, because a pool is created without a `Schema`. A `custom:`
   attribute is refused, and so is a request setting `sub`. `AdminDeleteUserAttributes` is not
   implemented, so an attribute can be changed but not removed.

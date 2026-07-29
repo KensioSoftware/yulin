@@ -96,8 +96,8 @@ rather than one class per command, so the `SimCognitoIdentityProvider` facade st
   and clock they share, so the service facade stays delegation
 
 `SimCognitoUserResolver` is what every user operation starts with: authorize against the pool's ARN,
-then find the pool, then find the user. A user has no ARN of its own, so the pool's is what IAM
-sees.
+then find the pool. A user has no ARN of its own, so the pool's is what IAM sees. An operation
+naming an existing user goes on to resolve it; `AdminCreateUser` and `ListUsers` stop at the pool.
 
 `SimCognitoUnsimulatedUserPoolOptions`, `SimCognitoUnsimulatedUserPoolClientOptions` and
 `SimCognitoUnsimulatedUserOptions` gather every input this simulation refuses, in one readable place

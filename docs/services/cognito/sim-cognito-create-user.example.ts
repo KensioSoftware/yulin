@@ -1,5 +1,5 @@
 /**
- * Creating a simulated user that could actually sign in.
+ * Creating a simulated user and confirming it.
  */
 
 import {
