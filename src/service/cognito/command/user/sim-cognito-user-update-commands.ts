@@ -1,7 +1,7 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { SimCognitoPasswordCheck } from "../../user-pool/sim-cognito-password-check.js";
 import { SimCognitoUnsimulatedUserOptions } from "./sim-cognito-unsimulated-user-options.js";
-import type { SimCognitoUserResolver } from "./sim-cognito-user-resolver.js";
+import type { SimCognitoRequestResolver } from "../sim-cognito-request-resolver.js";
 import type {
   SimAdminDisableUserCommand,
   SimAdminDisableUserCommandOutput,
@@ -14,7 +14,7 @@ import type {
 } from "./user.command.js";
 
 interface SimCognitoUserUpdateCommandsProperties {
-  readonly resolver: SimCognitoUserResolver;
+  readonly resolver: SimCognitoRequestResolver;
 }
 
 interface SimCognitoCommandOptions {
@@ -29,7 +29,7 @@ interface SimCognitoCommandOptions {
  * on again.
  */
 export class SimCognitoUserUpdateCommands {
-  private readonly resolver: SimCognitoUserResolver;
+  private readonly resolver: SimCognitoRequestResolver;
   private readonly unsimulatedOptions = new SimCognitoUnsimulatedUserOptions();
 
   constructor(properties: SimCognitoUserUpdateCommandsProperties) {

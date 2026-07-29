@@ -4,7 +4,7 @@ import type { SimCognitoUserPool } from "../../user-pool/sim-cognito-user-pool.j
 import type { SimCognitoUserFactory } from "../../user-pool/user/sim-cognito-user-factory.js";
 import { requireSimCognitoUsername } from "../../user-pool/user/sim-cognito-username.js";
 import { SimCognitoUnsimulatedUserOptions } from "./sim-cognito-unsimulated-user-options.js";
-import type { SimCognitoUserResolver } from "./sim-cognito-user-resolver.js";
+import type { SimCognitoRequestResolver } from "../sim-cognito-request-resolver.js";
 import { SimCognitoUserView } from "./sim-cognito-user-view.js";
 import type {
   SimAdminCreateUserCommand,
@@ -16,7 +16,7 @@ import type {
 } from "./user.command.js";
 
 interface SimCognitoUserCommandsProperties {
-  readonly resolver: SimCognitoUserResolver;
+  readonly resolver: SimCognitoRequestResolver;
   readonly userFactory: SimCognitoUserFactory;
 }
 
@@ -31,7 +31,7 @@ interface SimCognitoCommandOptions {
  * own.
  */
 export class SimCognitoUserCommands {
-  private readonly resolver: SimCognitoUserResolver;
+  private readonly resolver: SimCognitoRequestResolver;
   private readonly userFactory: SimCognitoUserFactory;
   private readonly view = new SimCognitoUserView();
   private readonly unsimulatedOptions = new SimCognitoUnsimulatedUserOptions();

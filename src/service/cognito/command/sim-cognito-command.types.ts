@@ -64,3 +64,33 @@ export type {
   SimListUsersCommandInput,
   SimListUsersCommandOutput,
 } from "./user/list-users.command.js";
+export type {
+  SimCognitoGroupCommandInput,
+  SimCognitoGroupType,
+  SimCreateGroupCommand,
+  SimCreateGroupCommandInput,
+  SimCreateGroupCommandOutput,
+  SimDeleteGroupCommand,
+  SimDeleteGroupCommandOutput,
+  SimGetGroupCommand,
+  SimGetGroupCommandOutput,
+  SimListGroupsCommand,
+  SimListGroupsCommandInput,
+  SimListGroupsCommandOutput,
+  SimUpdateGroupCommand,
+  SimUpdateGroupCommandInput,
+  SimUpdateGroupCommandOutput,
+} from "./group/group.command.js";
+export type {
+  SimAdminAddUserToGroupCommand,
+  SimAdminAddUserToGroupCommandOutput,
+  SimAdminListGroupsForUserCommand,
+  SimAdminListGroupsForUserCommandInput,
+  SimAdminListGroupsForUserCommandOutput,
+  SimAdminRemoveUserFromGroupCommand,
+  SimAdminRemoveUserFromGroupCommandOutput,
+  SimCognitoGroupMembershipCommandInput,
+  SimListUsersInGroupCommand,
+  SimListUsersInGroupCommandInput,
+  SimListUsersInGroupCommandOutput,
+} from "./group/group-membership.command.js";

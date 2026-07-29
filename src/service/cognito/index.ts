@@ -30,6 +30,7 @@ export {
   type SimCognitoTokenValidityInput,
   type SimCognitoTokenValidityUnitsType,
 } from "./user-pool/client/sim-cognito-token-validity.js";
+export { SimCognitoUserDirectory } from "./sim-cognito-user-directory.js";
 export { SimCognitoUser } from "./user-pool/user/sim-cognito-user.js";
 export type { SimCognitoUsername } from "./user-pool/user/sim-cognito-username.js";
 export {
@@ -40,8 +41,15 @@ export {
   SimCognitoUserAttributes,
   type SimCognitoAttributeType,
 } from "./user-pool/user/sim-cognito-user-attributes.js";
+export { SimCognitoGroup } from "./user-pool/group/sim-cognito-group.js";
+export type { SimCognitoGroupName } from "./user-pool/group/sim-cognito-group-name.js";
+export {
+  SimCognitoGroupSettings,
+  type SimCognitoGroupSettingsInput,
+} from "./user-pool/group/sim-cognito-group-settings.js";
 export {
   SimCognitoError,
+  SimCognitoGroupExistsException,
   SimCognitoInvalidParameterException,
   SimCognitoInvalidPasswordException,
   SimCognitoResourceNotFoundException,

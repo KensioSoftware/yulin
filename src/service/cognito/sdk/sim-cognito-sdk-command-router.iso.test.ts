@@ -31,6 +31,15 @@ describe("SimCognitoSdkCommandRouter", () => {
       "AdminDisableUserCommand",
       "AdminEnableUserCommand",
       "ListUsersCommand",
+      "CreateGroupCommand",
+      "GetGroupCommand",
+      "UpdateGroupCommand",
+      "DeleteGroupCommand",
+      "ListGroupsCommand",
+      "AdminAddUserToGroupCommand",
+      "AdminRemoveUserFromGroupCommand",
+      "AdminListGroupsForUserCommand",
+      "ListUsersInGroupCommand",
     ]);
   });
 

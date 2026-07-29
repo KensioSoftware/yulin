@@ -9,6 +9,19 @@ import type {
   SimDescribeUserPoolClientCommand,
 } from "../command/client/user-pool-client.command.js";
 import type { SimListUserPoolClientsCommand } from "../command/client/list-user-pool-clients.command.js";
+import type {
+  SimAdminAddUserToGroupCommand,
+  SimAdminListGroupsForUserCommand,
+  SimAdminRemoveUserFromGroupCommand,
+  SimListUsersInGroupCommand,
+} from "../command/group/group-membership.command.js";
+import type {
+  SimCreateGroupCommand,
+  SimDeleteGroupCommand,
+  SimGetGroupCommand,
+  SimListGroupsCommand,
+  SimUpdateGroupCommand,
+} from "../command/group/group.command.js";
 import type { SimListUsersCommand } from "../command/user/list-users.command.js";
 import type {
   SimAdminCreateUserCommand,
@@ -160,6 +173,78 @@ export class SimCognitoSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simCognito.listUsers(
             command as SimListUsersCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "CreateGroupCommand",
+        async (command, context): Promise<unknown> =>
+          await simCognito.createGroup(
+            command as SimCreateGroupCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "GetGroupCommand",
+        async (command, context): Promise<unknown> =>
+          await simCognito.getGroup(
+            command as SimGetGroupCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "UpdateGroupCommand",
+        async (command, context): Promise<unknown> =>
+          await simCognito.updateGroup(
+            command as SimUpdateGroupCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteGroupCommand",
+        async (command, context): Promise<unknown> =>
+          await simCognito.deleteGroup(
+            command as SimDeleteGroupCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListGroupsCommand",
+        async (command, context): Promise<unknown> =>
+          await simCognito.listGroups(
+            command as SimListGroupsCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "AdminAddUserToGroupCommand",
+        async (command, context): Promise<unknown> =>
+          await simCognito.adminAddUserToGroup(
+            command as SimAdminAddUserToGroupCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "AdminRemoveUserFromGroupCommand",
+        async (command, context): Promise<unknown> =>
+          await simCognito.adminRemoveUserFromGroup(
+            command as SimAdminRemoveUserFromGroupCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "AdminListGroupsForUserCommand",
+        async (command, context): Promise<unknown> =>
+          await simCognito.adminListGroupsForUser(
+            command as SimAdminListGroupsForUserCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListUsersInGroupCommand",
+        async (command, context): Promise<unknown> =>
+          await simCognito.listUsersInGroup(
+            command as SimListUsersInGroupCommand,
             simSdkCallerOptions(context),
           ),
       ],

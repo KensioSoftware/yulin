@@ -3,14 +3,17 @@
 This directory contains the simulated Cognito user pools implementation. Cognito identity pools,
 which exchange a token for AWS credentials, are a separate service and are not simulated at all.
 
-The pool, the app client, the users in it and the authorizer are here. An app client's
-authentication flows are validated and stored, and nothing acts on them: groups, tokens and sign-in
-itself are not here yet.
+The pool, the app client, the users and groups in it, and the authorizer are here. An app client's
+authentication flows are validated and stored, and nothing acts on them: tokens and sign-in itself
+are not here yet.
 
 ## Entry points
 
 - `sim-cognito-identity-provider.ts` is the main in-memory service object for one account/region
-  scope.
+  scope. It holds the pool and app client operations, and extends
+  `sim-cognito-user-directory.ts`, which holds the user and group ones. A caller sees one service
+  object, as the real API is one service; the split is because a pool's settings and a pool's
+  contents are two concerns, and one class holding both had outgrown reading in one sitting.
 - `index.ts` exports the public Cognito simulator API for `@kensio/yulin/cognito`.
 
 A `SimCognitoIdentityProvider` instance owns a `SimCognitoUserPoolStore` holding its pools. The
@@ -79,6 +82,31 @@ rather than among its attributes, because Cognito allocates it and a request can
 so when the value given is some user's `sub`, because real Cognito accepts a `sub` there and this
 simulation does not.
 
+`SimCognitoIdentifier` is the form a username and a group name share: required, at most 128
+characters, and no whitespace. Cognito gives both the same rule, so it lives in one place and
+`requireSimCognitoUsername` and `requireSimCognitoGroupName` each name their own field in the
+refusal.
+
+## Group model
+
+Group state lives under `user-pool/group/`, and the pool owns its groups the way it owns its users.
+
+`SimCognitoGroup` holds the group's properties and its members. Membership lives on the group rather
+than on the user because that is the direction deletion runs: deleting a group takes the membership
+with it and leaves the users alone. Deleting a user is the other way round, so `SimCognitoUserPool`
+sweeps the group store when a user goes, and no group is left holding a member the pool cannot
+describe.
+
+`SimCognitoGroupSettings` validates the three properties a request can set: the description, the
+precedence and the role ARN. `UpdateGroup` builds a fresh one and replaces what the group had, so an
+omitted property is cleared. Real Cognito does not document whether it replaces or merges, and a
+request naming every property behaves the same either way, which is what the refusal to guess pushes
+callers towards.
+
+`SimCognitoGroupStore.forUser` is where precedence ordering happens: lowest value first, groups with
+no precedence last, and groups sharing one in creation order. That is the order the `cognito:groups`
+claim will use, so `AdminListGroupsForUser` reads the same way the claim will.
+
 ## Command handling
 
 AWS SDK-style operations are implemented under `command/`, grouped by the collaborators they share
@@ -89,15 +117,19 @@ rather than one class per command, so the `SimCognitoIdentityProvider` facade st
 - `command/client/`: the same for app clients
 - `command/user/`: the same for users, split between the commands that create, read and delete one
   and the commands that change one afterwards
+- `command/group/`: the same for groups, split between the commands that act on a group and the
+  commands that move users in and out of one
 - `command/authorize/`: the shared IAM authorizer
 - `command/sim-cognito-page.ts`: the paging every listing shares, which takes the names of the
-  inputs it is reading because `ListUsers` calls them `Limit` and `PaginationToken`
+  inputs it is reading because `ListUsers` calls its page size `Limit` and its token
+  `PaginationToken`, while the group listings call theirs `Limit` and `NextToken`
 - `command/sim-cognito-commands.ts`: builds the command handlers with the authorizer, pool store
   and clock they share, so the service facade stays delegation
 
-`SimCognitoUserResolver` is what every user operation starts with: authorize against the pool's ARN,
-then find the pool. A user has no ARN of its own, so the pool's is what IAM sees. An operation
-naming an existing user goes on to resolve it; `AdminCreateUser` and `ListUsers` stop at the pool.
+`SimCognitoRequestResolver` is what every user and group operation starts with: authorize against
+the pool's ARN, then find the pool. Neither a user nor a group has an ARN of its own, so the pool's
+is what IAM sees. An operation naming an existing user or group goes on to resolve it; the ones that
+create or list stop at the pool.
 
 `SimCognitoUnsimulatedUserPoolOptions`, `SimCognitoUnsimulatedUserPoolClientOptions` and
 `SimCognitoUnsimulatedUserOptions` gather every input this simulation refuses, in one readable place
@@ -135,6 +167,8 @@ resource, here or on real AWS.
 - `SchemaAttributes` is not reported on a pool, though every pool holds the standard schema and
   validates user attributes against it.
 - Users are resolved by username only, and real Cognito also accepts a `sub` there.
+- `AdminListGroupsForUser` sorts by precedence. Real Cognito does not document an order for it.
+- `UpdateGroup` replaces all three group properties rather than merging an omitted one.
 - A password is checked and discarded rather than stored, because nothing authenticates yet.
 - No message is delivered, so `AdminCreateUser` accepts `MessageAction: SUPPRESS` and refuses
   `RESEND` and `DesiredDeliveryMediums`.
