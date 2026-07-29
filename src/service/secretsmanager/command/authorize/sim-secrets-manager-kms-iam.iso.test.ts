@@ -13,75 +13,43 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
-
-interface SimAwsWithSecret {
-  readonly simAws: SimAws;
-  readonly caller: SimAwsCaller;
-}
-
-/**
- * A simulated AWS holding one secret, and a Role allowed the given actions and
- * nothing else.
- *
- * The secret is created by the Account root, so what the Role is allowed only
- * decides whether it can read the secret afterwards.
- */
-async function simAwsWithSecret(
-  actions: readonly string[],
-  keyed: "default-key" | "customer-key",
-): Promise<SimAwsWithSecret> {
-  const simAws = new SimAws();
-  const accountId = simAws.defaultAccountId;
-
-  const key = await simAws
-    .kms()
-    .createKey(new CreateKeyCommand({ Description: "Secret key" }));
-
-  await simAws.secretsManager().createSecret(
-    new CreateSecretCommand({
-      Name: "db-credentials",
-      SecretString: "hunter2",
-      KmsKeyId: keyed === "customer-key" ? key.KeyMetadata?.Arn : undefined,
-    }),
-  );
-
-  const role = await simAws.iam().createRole(
-    new CreateRoleCommand({
-      RoleName: "SecretReader",
-      AssumeRolePolicyDocument: JSON.stringify({
-        Version: "2012-10-17",
-        Statement: {
-          Effect: "Allow",
-          Principal: { AWS: `arn:aws:iam::${accountId}:root` },
-          Action: "sts:AssumeRole",
-        },
-      }),
-    }),
-  );
-
-  await simAws.iam().putRolePolicy(
-    new PutRolePolicyCommand({
-      RoleName: "SecretReader",
-      PolicyName: "SecretPolicy",
-      PolicyDocument: JSON.stringify({
-        Version: "2012-10-17",
-        Statement: { Effect: "Allow", Action: actions, Resource: "*" },
-      }),
-    }),
-  );
-
-  return { simAws, caller: { kind: "arn", arn: role.Role.Arn } };
-}
+import { simIamPolicyDocumentFactory } from "../../../iam/policy/sim-iam-policy-document.factory.js";
 
 describe("Secrets Manager KMS authorization", () => {
   it("reads a secret under the default key with no KMS permission", async () => {
-    // Given a secret under the aws/secretsmanager key and a Role allowed only
-    // to read it.
-    const { simAws, caller } = await simAwsWithSecret(
-      ["secretsmanager:GetSecretValue"],
-      "default-key",
+    // Given a secret under the aws/secretsmanager key.
+    const simAws = new SimAws();
+    await simAws.secretsManager().createSecret(
+      new CreateSecretCommand({
+        Name: "db-credentials",
+        SecretString: "hunter2",
+      }),
+    );
+
+    // And a Role allowed only to read it.
+    const role = await simAws.iam().createRole(
+      new CreateRoleCommand({
+        RoleName: "SecretReader",
+        AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Principal: { AWS: `arn:aws:iam::${simAws.defaultAccountId}:root` },
+            Action: "sts:AssumeRole",
+          },
+        }),
+      }),
+    );
+    await simAws.iam().putRolePolicy(
+      new PutRolePolicyCommand({
+        RoleName: "SecretReader",
+        PolicyName: "SecretPolicy",
+        PolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Action: "secretsmanager:GetSecretValue",
+            Resource: "*",
+          },
+        }),
+      }),
     );
 
     // When it reads the secret.
@@ -89,9 +57,7 @@ describe("Secrets Manager KMS authorization", () => {
       .secretsManager()
       .getSecretValue(
         new GetSecretValueCommand({ SecretId: "db-credentials" }),
-        {
-          caller,
-        },
+        { caller: { kind: "arn", arn: role.Role.Arn } },
       );
 
     // Then it gets the value with no KMS grant of its own, because the managed
@@ -100,10 +66,42 @@ describe("Secrets Manager KMS authorization", () => {
   });
 
   it("denies a read under a customer managed key with no kms:Decrypt", async () => {
-    // Given the same Role, and a secret under a customer managed key.
-    const { simAws, caller } = await simAwsWithSecret(
-      ["secretsmanager:GetSecretValue"],
-      "customer-key",
+    // Given a secret under a customer managed key.
+    const simAws = new SimAws();
+    const key = await simAws
+      .kms()
+      .createKey(new CreateKeyCommand({ Description: "Secret key" }));
+    await simAws.secretsManager().createSecret(
+      new CreateSecretCommand({
+        Name: "db-credentials",
+        SecretString: "hunter2",
+        KmsKeyId: key.KeyMetadata?.Arn,
+      }),
+    );
+
+    // And a Role allowed only to read the secret.
+    const role = await simAws.iam().createRole(
+      new CreateRoleCommand({
+        RoleName: "SecretReader",
+        AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Principal: { AWS: `arn:aws:iam::${simAws.defaultAccountId}:root` },
+            Action: "sts:AssumeRole",
+          },
+        }),
+      }),
+    );
+    await simAws.iam().putRolePolicy(
+      new PutRolePolicyCommand({
+        RoleName: "SecretReader",
+        PolicyName: "SecretPolicy",
+        PolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Action: "secretsmanager:GetSecretValue",
+            Resource: "*",
+          },
+        }),
+      }),
     );
 
     // When it reads the secret.
@@ -112,7 +110,7 @@ describe("Secrets Manager KMS authorization", () => {
         .secretsManager()
         .getSecretValue(
           new GetSecretValueCommand({ SecretId: "db-credentials" }),
-          { caller },
+          { caller: { kind: "arn", arn: role.Role.Arn } },
         ),
     );
 
@@ -123,10 +121,42 @@ describe("Secrets Manager KMS authorization", () => {
   });
 
   it("reads under a customer managed key once kms:Decrypt is granted", async () => {
-    // Given a Role allowed both the secret and the key.
-    const { simAws, caller } = await simAwsWithSecret(
-      ["secretsmanager:GetSecretValue", "kms:Decrypt"],
-      "customer-key",
+    // Given a secret under a customer managed key.
+    const simAws = new SimAws();
+    const key = await simAws
+      .kms()
+      .createKey(new CreateKeyCommand({ Description: "Secret key" }));
+    await simAws.secretsManager().createSecret(
+      new CreateSecretCommand({
+        Name: "db-credentials",
+        SecretString: "hunter2",
+        KmsKeyId: key.KeyMetadata?.Arn,
+      }),
+    );
+
+    // And a Role allowed both the secret and the key.
+    const role = await simAws.iam().createRole(
+      new CreateRoleCommand({
+        RoleName: "SecretReader",
+        AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Principal: { AWS: `arn:aws:iam::${simAws.defaultAccountId}:root` },
+            Action: "sts:AssumeRole",
+          },
+        }),
+      }),
+    );
+    await simAws.iam().putRolePolicy(
+      new PutRolePolicyCommand({
+        RoleName: "SecretReader",
+        PolicyName: "SecretPolicy",
+        PolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Action: ["secretsmanager:GetSecretValue", "kms:Decrypt"],
+            Resource: "*",
+          },
+        }),
+      }),
     );
 
     // When it reads the secret.
@@ -134,9 +164,7 @@ describe("Secrets Manager KMS authorization", () => {
       .secretsManager()
       .getSecretValue(
         new GetSecretValueCommand({ SecretId: "db-credentials" }),
-        {
-          caller,
-        },
+        { caller: { kind: "arn", arn: role.Role.Arn } },
       );
 
     // Then it gets the value.
@@ -144,10 +172,42 @@ describe("Secrets Manager KMS authorization", () => {
   });
 
   it("denies a write under a customer managed key with no kms:GenerateDataKey", async () => {
-    // Given a Role allowed to write the secret but nothing on its key.
-    const { simAws, caller } = await simAwsWithSecret(
-      ["secretsmanager:PutSecretValue"],
-      "customer-key",
+    // Given a secret under a customer managed key.
+    const simAws = new SimAws();
+    const key = await simAws
+      .kms()
+      .createKey(new CreateKeyCommand({ Description: "Secret key" }));
+    await simAws.secretsManager().createSecret(
+      new CreateSecretCommand({
+        Name: "db-credentials",
+        SecretString: "hunter2",
+        KmsKeyId: key.KeyMetadata?.Arn,
+      }),
+    );
+
+    // And a Role allowed to write the secret but nothing on its key.
+    const role = await simAws.iam().createRole(
+      new CreateRoleCommand({
+        RoleName: "SecretReader",
+        AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Principal: { AWS: `arn:aws:iam::${simAws.defaultAccountId}:root` },
+            Action: "sts:AssumeRole",
+          },
+        }),
+      }),
+    );
+    await simAws.iam().putRolePolicy(
+      new PutRolePolicyCommand({
+        RoleName: "SecretReader",
+        PolicyName: "SecretPolicy",
+        PolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Action: "secretsmanager:PutSecretValue",
+            Resource: "*",
+          },
+        }),
+      }),
     );
 
     // When it writes a new version.
@@ -157,7 +217,7 @@ describe("Secrets Manager KMS authorization", () => {
           SecretId: "db-credentials",
           SecretString: "hunter3",
         }),
-        { caller },
+        { caller: { kind: "arn", arn: role.Role.Arn } },
       ),
     );
 
@@ -168,10 +228,42 @@ describe("Secrets Manager KMS authorization", () => {
   });
 
   it("writes under a customer managed key once kms:GenerateDataKey is granted", async () => {
-    // Given a Role allowed the secret and the data key.
-    const { simAws, caller } = await simAwsWithSecret(
-      ["secretsmanager:PutSecretValue", "kms:GenerateDataKey"],
-      "customer-key",
+    // Given a secret under a customer managed key.
+    const simAws = new SimAws();
+    const key = await simAws
+      .kms()
+      .createKey(new CreateKeyCommand({ Description: "Secret key" }));
+    await simAws.secretsManager().createSecret(
+      new CreateSecretCommand({
+        Name: "db-credentials",
+        SecretString: "hunter2",
+        KmsKeyId: key.KeyMetadata?.Arn,
+      }),
+    );
+
+    // And a Role allowed the secret and the data key.
+    const role = await simAws.iam().createRole(
+      new CreateRoleCommand({
+        RoleName: "SecretReader",
+        AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Principal: { AWS: `arn:aws:iam::${simAws.defaultAccountId}:root` },
+            Action: "sts:AssumeRole",
+          },
+        }),
+      }),
+    );
+    await simAws.iam().putRolePolicy(
+      new PutRolePolicyCommand({
+        RoleName: "SecretReader",
+        PolicyName: "SecretPolicy",
+        PolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Action: ["secretsmanager:PutSecretValue", "kms:GenerateDataKey"],
+            Resource: "*",
+          },
+        }),
+      }),
     );
 
     // When it writes a new version.
@@ -180,7 +272,7 @@ describe("Secrets Manager KMS authorization", () => {
         SecretId: "db-credentials",
         SecretString: "hunter3",
       }),
-      { caller },
+      { caller: { kind: "arn", arn: role.Role.Arn } },
     );
 
     // Then the write succeeds.
@@ -188,10 +280,38 @@ describe("Secrets Manager KMS authorization", () => {
   });
 
   it("writes under the default key with no KMS permission", async () => {
-    // Given a Role allowed only to write the secret, under the managed key.
-    const { simAws, caller } = await simAwsWithSecret(
-      ["secretsmanager:PutSecretValue"],
-      "default-key",
+    // Given a secret under the aws/secretsmanager key.
+    const simAws = new SimAws();
+    await simAws.secretsManager().createSecret(
+      new CreateSecretCommand({
+        Name: "db-credentials",
+        SecretString: "hunter2",
+      }),
+    );
+
+    // And a Role allowed only to write the secret.
+    const role = await simAws.iam().createRole(
+      new CreateRoleCommand({
+        RoleName: "SecretReader",
+        AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Principal: { AWS: `arn:aws:iam::${simAws.defaultAccountId}:root` },
+            Action: "sts:AssumeRole",
+          },
+        }),
+      }),
+    );
+    await simAws.iam().putRolePolicy(
+      new PutRolePolicyCommand({
+        RoleName: "SecretReader",
+        PolicyName: "SecretPolicy",
+        PolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Action: "secretsmanager:PutSecretValue",
+            Resource: "*",
+          },
+        }),
+      }),
     );
 
     // When it writes a new version.
@@ -200,7 +320,7 @@ describe("Secrets Manager KMS authorization", () => {
         SecretId: "db-credentials",
         SecretString: "hunter3",
       }),
-      { caller },
+      { caller: { kind: "arn", arn: role.Role.Arn } },
     );
 
     // Then the write succeeds, for the same reason the read does.

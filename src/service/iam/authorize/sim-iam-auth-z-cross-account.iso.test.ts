@@ -1,4 +1,4 @@
-import { CreateRoleCommand } from "@aws-sdk/client-iam";
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
   assertArrayLength,
   assertFalse,
@@ -7,8 +7,8 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
-import { createSimIamRoleWithPolicy } from "../../../../test/iam/create-role-with-policy.js";
 import { SimAws } from "../../aws/sim-aws.js";
+import { simIamPolicyDocumentFactory } from "../policy/sim-iam-policy-document.factory.js";
 import type { SimIamPolicyDocument } from "../policy/sim-iam-policy.js";
 import { SimIamPolicyDecisionValue } from "./sim-iam-decision.js";
 
@@ -16,42 +16,6 @@ const ownerAccountId = "111111111111";
 const callerAccountId = "222222222222";
 const callerRoleArn = `arn:aws:iam::${callerAccountId}:role/Caller`;
 const objectArn = "arn:aws:s3:::reports-bucket/summary.csv";
-
-/**
- * A resource policy on the object granting the other Account's Role.
- */
-function grantingResourcePolicy(
-  effect: "Allow" | "Deny",
-): SimIamPolicyDocument {
-  return {
-    Version: "2012-10-17",
-    Statement: {
-      Effect: effect,
-      Principal: { AWS: callerRoleArn },
-      Action: "s3:GetObject",
-      Resource: objectArn,
-    },
-  };
-}
-
-/**
- * Create the calling Role in its own Account, with an inline policy of the
- * given effect for reading the object.
- */
-async function callerRole(
-  simAws: SimAws,
-  effect: "Allow" | "Deny",
-): Promise<void> {
-  await createSimIamRoleWithPolicy({
-    simAws,
-    accountId: callerAccountId,
-    roleName: "Caller",
-    policyName: "ReadReports",
-    action: "s3:GetObject",
-    resource: objectArn,
-    effect,
-  });
-}
 
 /**
  * Authorize the other Account's Role against the resource-owning Account.
@@ -80,7 +44,15 @@ describe("sim IAM cross-Account authorization", () => {
     simAws.account(callerAccountId).iam();
 
     // When the request is authorized
-    const decision = authorizeCaller(simAws, grantingResourcePolicy("Allow"));
+    const decision = authorizeCaller(simAws, {
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { AWS: callerRoleArn },
+        Action: "s3:GetObject",
+        Resource: objectArn,
+      },
+    });
 
     // Then it is implicitly denied: a resource policy delegates to the caller's
     // Account rather than granting on its behalf
@@ -94,10 +66,42 @@ describe("sim IAM cross-Account authorization", () => {
     // Given the same resource policy, and an identity policy for the Role in
     // its own Account
     const simAws = new SimAws();
-    await callerRole(simAws, "Allow");
+    const callerIam = simAws.account(callerAccountId).iam();
+    await callerIam.createRole(
+      new CreateRoleCommand({
+        RoleName: "Caller",
+        AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Principal: { AWS: `arn:aws:iam::${callerAccountId}:root` },
+            Action: "sts:AssumeRole",
+          },
+        }),
+      }),
+    );
+    await callerIam.putRolePolicy(
+      new PutRolePolicyCommand({
+        RoleName: "Caller",
+        PolicyName: "ReadReports",
+        PolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Effect: "Allow",
+            Action: "s3:GetObject",
+            Resource: objectArn,
+          },
+        }),
+      }),
+    );
 
     // When the request is authorized
-    const decision = authorizeCaller(simAws, grantingResourcePolicy("Allow"));
+    const decision = authorizeCaller(simAws, {
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { AWS: callerRoleArn },
+        Action: "s3:GetObject",
+        Resource: objectArn,
+      },
+    });
 
     // Then it is allowed, with a matching Allow from each side, as real AWS
     // requires for a cross-Account request
@@ -110,10 +114,42 @@ describe("sim IAM cross-Account authorization", () => {
   it("denies when the resource policy explicitly denies", async () => {
     // Given a Role its own Account allows, denied by the resource policy
     const simAws = new SimAws();
-    await callerRole(simAws, "Allow");
+    const callerIam = simAws.account(callerAccountId).iam();
+    await callerIam.createRole(
+      new CreateRoleCommand({
+        RoleName: "Caller",
+        AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Principal: { AWS: `arn:aws:iam::${callerAccountId}:root` },
+            Action: "sts:AssumeRole",
+          },
+        }),
+      }),
+    );
+    await callerIam.putRolePolicy(
+      new PutRolePolicyCommand({
+        RoleName: "Caller",
+        PolicyName: "ReadReports",
+        PolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Effect: "Allow",
+            Action: "s3:GetObject",
+            Resource: objectArn,
+          },
+        }),
+      }),
+    );
 
     // When the request is authorized
-    const decision = authorizeCaller(simAws, grantingResourcePolicy("Deny"));
+    const decision = authorizeCaller(simAws, {
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Deny",
+        Principal: { AWS: callerRoleArn },
+        Action: "s3:GetObject",
+        Resource: objectArn,
+      },
+    });
 
     // Then the explicit Deny wins, as it does on either side
     assertIdentical(decision.value, SimIamPolicyDecisionValue.ExplicitDeny);
@@ -123,10 +159,42 @@ describe("sim IAM cross-Account authorization", () => {
   it("denies when the caller's own Account explicitly denies", async () => {
     // Given a Role granted by the resource policy, denied by its own Account
     const simAws = new SimAws();
-    await callerRole(simAws, "Deny");
+    const callerIam = simAws.account(callerAccountId).iam();
+    await callerIam.createRole(
+      new CreateRoleCommand({
+        RoleName: "Caller",
+        AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Principal: { AWS: `arn:aws:iam::${callerAccountId}:root` },
+            Action: "sts:AssumeRole",
+          },
+        }),
+      }),
+    );
+    await callerIam.putRolePolicy(
+      new PutRolePolicyCommand({
+        RoleName: "Caller",
+        PolicyName: "ReadReports",
+        PolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Effect: "Deny",
+            Action: "s3:GetObject",
+            Resource: objectArn,
+          },
+        }),
+      }),
+    );
 
     // When the request is authorized
-    const decision = authorizeCaller(simAws, grantingResourcePolicy("Allow"));
+    const decision = authorizeCaller(simAws, {
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { AWS: callerRoleArn },
+        Action: "s3:GetObject",
+        Resource: objectArn,
+      },
+    });
 
     // Then the caller's Account denies the request the resource policy invited
     assertIdentical(decision.value, SimIamPolicyDecisionValue.ExplicitDeny);
@@ -139,7 +207,15 @@ describe("sim IAM cross-Account authorization", () => {
     const simAws = new SimAws();
 
     // When the request is authorized
-    const decision = authorizeCaller(simAws, grantingResourcePolicy("Allow"));
+    const decision = authorizeCaller(simAws, {
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { AWS: callerRoleArn },
+        Action: "s3:GetObject",
+        Resource: objectArn,
+      },
+    });
 
     // Then it is denied: an Account with no IAM state grants nothing, which is
     // what a principal ARN nobody gave permissions to means on AWS
@@ -239,10 +315,8 @@ describe("sim IAM cross-Account authorization", () => {
     const roleCreation = await iam.createRole(
       new CreateRoleCommand({
         RoleName: "OwnAccountReader",
-        AssumeRolePolicyDocument: JSON.stringify({
-          Version: "2012-10-17",
+        AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
           Statement: {
-            Effect: "Allow",
             Principal: { AWS: `arn:aws:iam::${ownerAccountId}:root` },
             Action: "sts:AssumeRole",
           },

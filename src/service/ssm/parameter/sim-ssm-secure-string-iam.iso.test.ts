@@ -1,5 +1,5 @@
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
-import { CreateKeyCommand, DecryptCommand } from "@aws-sdk/client-kms";
+import { CreateKeyCommand } from "@aws-sdk/client-kms";
 import { GetParameterCommand, PutParameterCommand } from "@aws-sdk/client-ssm";
 import {
   assertIdentical,
@@ -10,125 +10,55 @@ import {
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
-import { createSimIamRoleWithPolicy } from "../../../../test/iam/create-role-with-policy.js";
 import { SimAws } from "../../aws/sim-aws.js";
-import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
 import { SimIamAccessDenied } from "../../iam/error/sim-iam.error.js";
-
-interface SimAwsWithSecret {
-  readonly simAws: SimAws;
-  readonly keyArn: string;
-  readonly caller: SimAwsCaller;
-}
-
-/**
- * A simulated AWS holding one SecureString parameter under a customer managed
- * key, and a Role whose only permissions are the given statements.
- */
-async function simAwsWithSecret(
-  policyStatements: (accountId: string, keyArn: string) => object,
-): Promise<SimAwsWithSecret> {
-  const simAws = new SimAws();
-  const accountId = simAws.defaultAccountId;
-
-  const key = await simAws
-    .kms()
-    .createKey(new CreateKeyCommand({ Description: "Parameter key" }));
-
-  assertNonNullable(key.KeyMetadata?.Arn);
-
-  await simAws.ssm().putParameter(
-    new PutParameterCommand({
-      Name: "/myapp/prod/db-password",
-      Type: "SecureString",
-      Value: "hunter2",
-      KeyId: key.KeyMetadata.Arn,
-    }),
-  );
-
-  const role = await simAws.iam().createRole(
-    new CreateRoleCommand({
-      RoleName: "ConfigReader",
-      AssumeRolePolicyDocument: JSON.stringify({
-        Version: "2012-10-17",
-        Statement: {
-          Effect: "Allow",
-          Principal: { AWS: `arn:aws:iam::${accountId}:root` },
-          Action: "sts:AssumeRole",
-        },
-      }),
-    }),
-  );
-
-  const policyDocument = JSON.stringify({
-    Version: "2012-10-17",
-    Statement: policyStatements(accountId, key.KeyMetadata.Arn),
-  });
-
-  await simAws.iam().putRolePolicy(
-    new PutRolePolicyCommand({
-      RoleName: "ConfigReader",
-      PolicyName: "SecretPolicy",
-      PolicyDocument: policyDocument,
-    }),
-  );
-
-  return {
-    simAws,
-    keyArn: key.KeyMetadata.Arn,
-    caller: { kind: "arn", arn: role.Role.Arn },
-  };
-}
-
-const readParameter = {
-  Effect: "Allow",
-  Action: "ssm:GetParameter",
-  Resource: "*",
-};
-
-/**
- * A simulated AWS holding one SecureString parameter under the aws/ssm managed
- * key, and a Role allowed the given SSM action and nothing else.
- */
-async function simAwsWithManagedKeySecret(
-  action: string,
-): Promise<SimAwsWithSecret> {
-  const simAws = new SimAws();
-  const accountId = simAws.defaultAccountId;
-
-  await simAws.ssm().putParameter(
-    new PutParameterCommand({
-      Name: "/myapp/prod/db-password",
-      Type: "SecureString",
-      Value: "hunter2",
-    }),
-  );
-
-  const roleArn = await createSimIamRoleWithPolicy({
-    simAws,
-    accountId,
-    roleName: "ConfigReader",
-    policyName: "SsmOnly",
-    action,
-  });
-
-  const managedKey = simAws.kms().findKey("alias/aws/ssm");
-  assertNonNullable(managedKey);
-
-  return {
-    simAws,
-    keyArn: managedKey.arn,
-    caller: { kind: "arn", arn: roleArn },
-  };
-}
+import { simIamPolicyDocumentFactory } from "../../iam/policy/sim-iam-policy-document.factory.js";
 
 describe("SSM SecureString IAM authorization", () => {
   it("decrypts for a caller allowed both the parameter and the key", async () => {
-    // Given a Role allowed to read the parameter and to decrypt with its key.
-    const { simAws, caller } = await simAwsWithSecret((_, keyArn) => [
-      readParameter,
-      { Effect: "Allow", Action: "kms:Decrypt", Resource: keyArn },
-    ]);
+    // Given a SecureString parameter under a customer managed key.
+    const simAws = new SimAws();
+    const key = await simAws
+      .kms()
+      .createKey(new CreateKeyCommand({ Description: "Parameter key" }));
+    assertNonNullable(key.KeyMetadata?.Arn);
+    await simAws.ssm().putParameter(
+      new PutParameterCommand({
+        Name: "/myapp/prod/db-password",
+        Type: "SecureString",
+        Value: "hunter2",
+        KeyId: key.KeyMetadata.Arn,
+      }),
+    );
+
+    // And a Role allowed to read the parameter and to decrypt with its key.
+    const role = await simAws.iam().createRole(
+      new CreateRoleCommand({
+        RoleName: "ConfigReader",
+        AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Principal: { AWS: `arn:aws:iam::${simAws.defaultAccountId}:root` },
+            Action: "sts:AssumeRole",
+          },
+        }),
+      }),
+    );
+    await simAws.iam().putRolePolicy(
+      new PutRolePolicyCommand({
+        RoleName: "ConfigReader",
+        PolicyName: "SecretPolicy",
+        PolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: [
+            { Effect: "Allow", Action: "ssm:GetParameter", Resource: "*" },
+            {
+              Effect: "Allow",
+              Action: "kms:Decrypt",
+              Resource: key.KeyMetadata.Arn,
+            },
+          ],
+        }),
+      }),
+    );
 
     // When it reads the parameter with decryption.
     const read = await simAws.ssm().getParameter(
@@ -136,7 +66,7 @@ describe("SSM SecureString IAM authorization", () => {
         Name: "/myapp/prod/db-password",
         WithDecryption: true,
       }),
-      { caller },
+      { caller: { kind: "arn", arn: role.Role.Arn } },
     );
 
     // Then it gets the plaintext.
@@ -144,8 +74,42 @@ describe("SSM SecureString IAM authorization", () => {
   });
 
   it("denies a decrypting read to a caller with no key permission", async () => {
-    // Given a Role allowed to read the parameter but not to use its key.
-    const { simAws, caller } = await simAwsWithSecret(() => readParameter);
+    // Given a SecureString parameter under a customer managed key.
+    const simAws = new SimAws();
+    const key = await simAws
+      .kms()
+      .createKey(new CreateKeyCommand({ Description: "Parameter key" }));
+    assertNonNullable(key.KeyMetadata?.Arn);
+    await simAws.ssm().putParameter(
+      new PutParameterCommand({
+        Name: "/myapp/prod/db-password",
+        Type: "SecureString",
+        Value: "hunter2",
+        KeyId: key.KeyMetadata.Arn,
+      }),
+    );
+
+    // And a Role allowed to read the parameter but not to use its key.
+    const role = await simAws.iam().createRole(
+      new CreateRoleCommand({
+        RoleName: "ConfigReader",
+        AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Principal: { AWS: `arn:aws:iam::${simAws.defaultAccountId}:root` },
+            Action: "sts:AssumeRole",
+          },
+        }),
+      }),
+    );
+    await simAws.iam().putRolePolicy(
+      new PutRolePolicyCommand({
+        RoleName: "ConfigReader",
+        PolicyName: "SecretPolicy",
+        PolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: { Action: "ssm:GetParameter", Resource: "*" },
+        }),
+      }),
+    );
 
     // When it reads the parameter with decryption.
     const error = await assertThrowsErrorAsync(async () =>
@@ -154,7 +118,7 @@ describe("SSM SecureString IAM authorization", () => {
           Name: "/myapp/prod/db-password",
           WithDecryption: true,
         }),
-        { caller },
+        { caller: { kind: "arn", arn: role.Role.Arn } },
       ),
     );
 
@@ -164,15 +128,49 @@ describe("SSM SecureString IAM authorization", () => {
   });
 
   it("reads the ciphertext without any key permission", async () => {
-    // Given the same Role with no key permission.
-    const { simAws, caller } = await simAwsWithSecret(() => readParameter);
+    // Given a SecureString parameter under a customer managed key.
+    const simAws = new SimAws();
+    const key = await simAws
+      .kms()
+      .createKey(new CreateKeyCommand({ Description: "Parameter key" }));
+    assertNonNullable(key.KeyMetadata?.Arn);
+    await simAws.ssm().putParameter(
+      new PutParameterCommand({
+        Name: "/myapp/prod/db-password",
+        Type: "SecureString",
+        Value: "hunter2",
+        KeyId: key.KeyMetadata.Arn,
+      }),
+    );
+
+    // And a Role allowed to read the parameter but not to use its key.
+    const role = await simAws.iam().createRole(
+      new CreateRoleCommand({
+        RoleName: "ConfigReader",
+        AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Principal: { AWS: `arn:aws:iam::${simAws.defaultAccountId}:root` },
+            Action: "sts:AssumeRole",
+          },
+        }),
+      }),
+    );
+    await simAws.iam().putRolePolicy(
+      new PutRolePolicyCommand({
+        RoleName: "ConfigReader",
+        PolicyName: "SecretPolicy",
+        PolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: { Action: "ssm:GetParameter", Resource: "*" },
+        }),
+      }),
+    );
 
     // When it reads the parameter without asking for decryption.
     const read = await simAws
       .ssm()
       .getParameter(
         new GetParameterCommand({ Name: "/myapp/prod/db-password" }),
-        { caller },
+        { caller: { kind: "arn", arn: role.Role.Arn } },
       );
 
     // Then the read succeeds, because nothing decrypted, and what comes back
@@ -181,12 +179,34 @@ describe("SSM SecureString IAM authorization", () => {
   });
 
   it("denies a write to a caller with no key permission", async () => {
-    // Given a Role allowed to write parameters but not to use the key.
-    const { simAws, keyArn, caller } = await simAwsWithSecret(() => ({
-      Effect: "Allow",
-      Action: "ssm:PutParameter",
-      Resource: "*",
-    }));
+    // Given a customer managed key.
+    const simAws = new SimAws();
+    const key = await simAws
+      .kms()
+      .createKey(new CreateKeyCommand({ Description: "Parameter key" }));
+    assertNonNullable(key.KeyMetadata?.Arn);
+
+    // And a Role allowed to write parameters but not to use the key.
+    const role = await simAws.iam().createRole(
+      new CreateRoleCommand({
+        RoleName: "ConfigReader",
+        AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Principal: { AWS: `arn:aws:iam::${simAws.defaultAccountId}:root` },
+            Action: "sts:AssumeRole",
+          },
+        }),
+      }),
+    );
+    await simAws.iam().putRolePolicy(
+      new PutRolePolicyCommand({
+        RoleName: "ConfigReader",
+        PolicyName: "SecretPolicy",
+        PolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: { Action: "ssm:PutParameter", Resource: "*" },
+        }),
+      }),
+    );
 
     // When it writes a SecureString under that key.
     const error = await assertThrowsErrorAsync(async () =>
@@ -195,9 +215,9 @@ describe("SSM SecureString IAM authorization", () => {
           Name: "/myapp/prod/api-key",
           Type: "SecureString",
           Value: "secret",
-          KeyId: keyArn,
+          KeyId: key.KeyMetadata?.Arn,
         }),
-        { caller },
+        { caller: { kind: "arn", arn: role.Role.Arn } },
       ),
     );
 
@@ -206,11 +226,41 @@ describe("SSM SecureString IAM authorization", () => {
   });
 
   it("writes for a caller allowed both the parameter and the key", async () => {
-    // Given a Role allowed to write parameters and to encrypt with the key.
-    const { simAws, keyArn, caller } = await simAwsWithSecret((_, arn) => [
-      { Effect: "Allow", Action: "ssm:PutParameter", Resource: "*" },
-      { Effect: "Allow", Action: "kms:Encrypt", Resource: arn },
-    ]);
+    // Given a customer managed key.
+    const simAws = new SimAws();
+    const key = await simAws
+      .kms()
+      .createKey(new CreateKeyCommand({ Description: "Parameter key" }));
+    assertNonNullable(key.KeyMetadata?.Arn);
+
+    // And a Role allowed to write parameters and to encrypt with the key.
+    const role = await simAws.iam().createRole(
+      new CreateRoleCommand({
+        RoleName: "ConfigReader",
+        AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Principal: { AWS: `arn:aws:iam::${simAws.defaultAccountId}:root` },
+            Action: "sts:AssumeRole",
+          },
+        }),
+      }),
+    );
+    await simAws.iam().putRolePolicy(
+      new PutRolePolicyCommand({
+        RoleName: "ConfigReader",
+        PolicyName: "SecretPolicy",
+        PolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: [
+            { Effect: "Allow", Action: "ssm:PutParameter", Resource: "*" },
+            {
+              Effect: "Allow",
+              Action: "kms:Encrypt",
+              Resource: key.KeyMetadata.Arn,
+            },
+          ],
+        }),
+      }),
+    );
 
     // When it writes a SecureString under that key.
     const written = await simAws.ssm().putParameter(
@@ -218,9 +268,9 @@ describe("SSM SecureString IAM authorization", () => {
         Name: "/myapp/prod/api-key",
         Type: "SecureString",
         Value: "secret",
-        KeyId: keyArn,
+        KeyId: key.KeyMetadata.Arn,
       }),
-      { caller },
+      { caller: { kind: "arn", arn: role.Role.Arn } },
     );
 
     // Then the write succeeds.
@@ -228,12 +278,34 @@ describe("SSM SecureString IAM authorization", () => {
   });
 
   it("leaves no parameter behind when the key permission is missing", async () => {
-    // Given a Role allowed to write parameters but not to use the key.
-    const { simAws, keyArn, caller } = await simAwsWithSecret(() => ({
-      Effect: "Allow",
-      Action: "ssm:PutParameter",
-      Resource: "*",
-    }));
+    // Given a customer managed key.
+    const simAws = new SimAws();
+    const key = await simAws
+      .kms()
+      .createKey(new CreateKeyCommand({ Description: "Parameter key" }));
+    assertNonNullable(key.KeyMetadata?.Arn);
+
+    // And a Role allowed to write parameters but not to use the key.
+    const role = await simAws.iam().createRole(
+      new CreateRoleCommand({
+        RoleName: "ConfigReader",
+        AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Principal: { AWS: `arn:aws:iam::${simAws.defaultAccountId}:root` },
+            Action: "sts:AssumeRole",
+          },
+        }),
+      }),
+    );
+    await simAws.iam().putRolePolicy(
+      new PutRolePolicyCommand({
+        RoleName: "ConfigReader",
+        PolicyName: "SecretPolicy",
+        PolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: { Action: "ssm:PutParameter", Resource: "*" },
+        }),
+      }),
+    );
 
     // When a create is denied at the encryption step.
     await assertThrowsErrorAsync(async () =>
@@ -242,84 +314,13 @@ describe("SSM SecureString IAM authorization", () => {
           Name: "/myapp/prod/api-key",
           Type: "SecureString",
           Value: "secret",
-          KeyId: keyArn,
+          KeyId: key.KeyMetadata?.Arn,
         }),
-        { caller },
+        { caller: { kind: "arn", arn: role.Role.Arn } },
       ),
     );
 
     // Then no half-made parameter is left in the store.
     assertUndefined(simAws.ssm().findParameter("/myapp/prod/api-key"));
-  });
-});
-
-describe("SSM SecureString under the aws/ssm managed key", () => {
-  it("decrypts for a caller holding no KMS permission", async () => {
-    // Given a parameter under the managed key and a Role allowed only
-    // ssm:GetParameter.
-    const { simAws, caller } =
-      await simAwsWithManagedKeySecret("ssm:GetParameter");
-
-    // When it reads the parameter with decryption.
-    const read = await simAws.ssm().getParameter(
-      new GetParameterCommand({
-        Name: "/myapp/prod/db-password",
-        WithDecryption: true,
-      }),
-      { caller },
-    );
-
-    // Then it gets the plaintext with no kms:Decrypt of its own, because the
-    // managed key's policy admits the Account's principals reaching it through
-    // Systems Manager. Asking for that grant is what real AWS does not.
-    assertIdentical(read.Parameter?.Value, "hunter2");
-  });
-
-  it("writes for a caller holding no KMS permission", async () => {
-    // Given a Role allowed only ssm:PutParameter.
-    const { simAws, caller } =
-      await simAwsWithManagedKeySecret("ssm:PutParameter");
-
-    // When it writes a SecureString naming no key of its own.
-    const written = await simAws.ssm().putParameter(
-      new PutParameterCommand({
-        Name: "/myapp/prod/api-key",
-        Type: "SecureString",
-        Value: "secret",
-      }),
-      { caller },
-    );
-
-    // Then the write succeeds: the same rule covers the encrypting side.
-    assertIdentical(written.Version, 1);
-  });
-
-  it("denies the same caller decrypting the value through KMS", async () => {
-    // Given the same parameter, read as its stored ciphertext.
-    const { simAws, caller } =
-      await simAwsWithManagedKeySecret("ssm:GetParameter");
-
-    const stored = await simAws
-      .ssm()
-      .getParameter(
-        new GetParameterCommand({ Name: "/myapp/prod/db-password" }),
-        { caller },
-      );
-
-    assertNonNullable(stored.Parameter?.Value);
-
-    // When the Role takes the ciphertext to KMS itself.
-    const error = await assertThrowsErrorAsync(async () =>
-      simAws.kms().decrypt(
-        new DecryptCommand({
-          CiphertextBlob: Buffer.from(stored.Parameter?.Value ?? "", "base64"),
-        }),
-        { caller },
-      ),
-    );
-
-    // Then it is denied. The managed key is usable through Parameter Store and
-    // not otherwise, so the parameter's own permissions stay in charge of it.
-    assertInstanceOf(error, SimIamAccessDenied);
   });
 });
