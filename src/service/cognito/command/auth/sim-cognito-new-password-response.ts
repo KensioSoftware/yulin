@@ -1,5 +1,8 @@
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
-import { requireSimCognitoSignInUser } from "../../user-pool/auth/sim-cognito-sign-in.js";
+import {
+  requireSimCognitoEnabled,
+  requireSimCognitoSignInUser,
+} from "../../user-pool/auth/sim-cognito-sign-in.js";
 import { SimCognitoPasswordCheck } from "../../user-pool/sim-cognito-password-check.js";
 import type { SimCognitoTokenIssuer } from "../../user-pool/token/sim-cognito-token-issuer.js";
 import { SimCognitoAuthenticationResult } from "./sim-cognito-authentication-result.js";
@@ -57,6 +60,10 @@ export class SimCognitoNewPasswordResponse {
       now: this.clock.now(),
     });
     const user = requireSimCognitoSignInUser(pool, client, username);
+
+    // A user disabled between the challenge and this response cannot finish
+    // the sign-in, as it cannot start one.
+    requireSimCognitoEnabled(user);
 
     user.setPassword(
       new SimCognitoPasswordCheck(pool.passwordPolicy).require(

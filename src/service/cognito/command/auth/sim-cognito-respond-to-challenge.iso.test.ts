@@ -2,6 +2,7 @@
    response names are Cognito's own, rather than identifier names. */
 import {
   AdminCreateUserCommand,
+  AdminDisableUserCommand,
   CreateUserPoolClientCommand,
   CreateUserPoolCommand,
   InitiateAuthCommand,
@@ -27,6 +28,7 @@ const newPassword = "Sup3rSecret!";
 
 interface SimCognitoChallenged {
   readonly cognito: SimCognitoIdentityProvider;
+  readonly userPoolId: string;
   readonly clientId: string;
   readonly session: string;
 }
@@ -74,7 +76,7 @@ async function simCognitoChallenged(): Promise<SimCognitoChallenged> {
 
   assertNonNullable(challenged.Session);
 
-  return { cognito, clientId, session: challenged.Session };
+  return { cognito, userPoolId, clientId, session: challenged.Session };
 }
 
 function respond(
@@ -122,6 +124,29 @@ describe("sim Cognito RespondToAuthChallenge", () => {
 
     // Then it gets tokens rather than the challenge again.
     assertNonNullable(signedIn.AuthenticationResult?.AccessToken);
+  });
+
+  it("refuses a user disabled since the challenge was issued", async () => {
+    // Given a challenged user that has been disabled in the meantime.
+    const { cognito, userPoolId, clientId, session } =
+      await simCognitoChallenged();
+
+    await cognito.adminDisableUser(
+      new AdminDisableUserCommand({
+        UserPoolId: userPoolId,
+        Username: "alice",
+      }),
+    );
+
+    // When it answers the challenge.
+    const error = await assertThrowsErrorAsync(async () => {
+      await cognito.respondToAuthChallenge(respond(clientId, session));
+    });
+
+    // Then it is refused, and the password it asked for is not set: a
+    // disabled user cannot finish a sign-in any more than it can start one.
+    assertInstanceOf(error, SimCognitoNotAuthorizedException);
+    assertStringIncludes(error.message, "User is disabled");
   });
 
   it("refuses a session that has already been used", async () => {

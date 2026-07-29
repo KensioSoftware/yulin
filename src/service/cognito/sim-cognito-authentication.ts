@@ -41,7 +41,7 @@ export abstract class SimCognitoAuthentication {
     options?: SimCognitoIdentityProviderRequestOptions,
   ): Promise<simCognitoCommands.SimAdminInitiateAuthCommandOutput> {
     await this.background.sequence();
-    return this.commands.adminInitiateAuth.handle(command, options);
+    return this.commands.auth.adminInitiateAuth.handle(command, options);
   }
 
   /**
@@ -52,7 +52,7 @@ export abstract class SimCognitoAuthentication {
     options?: SimCognitoIdentityProviderRequestOptions,
   ): Promise<simCognitoCommands.SimAdminRespondToAuthChallengeCommandOutput> {
     await this.background.sequence();
-    return this.commands.adminRespondToChallenge.handle(command, options);
+    return this.commands.auth.adminRespondToChallenge.handle(command, options);
   }
 
   /**
@@ -65,7 +65,7 @@ export abstract class SimCognitoAuthentication {
     command: simCognitoCommands.SimInitiateAuthCommand,
   ): Promise<simCognitoCommands.SimInitiateAuthCommandOutput> {
     await this.background.sequence();
-    return this.commands.initiateAuth.handle(command);
+    return this.commands.auth.initiateAuth.handle(command);
   }
 
   /**
@@ -75,7 +75,7 @@ export abstract class SimCognitoAuthentication {
     command: simCognitoCommands.SimRespondToAuthChallengeCommand,
   ): Promise<simCognitoCommands.SimRespondToAuthChallengeCommandOutput> {
     await this.background.sequence();
-    return this.commands.respondToChallenge.handle(command);
+    return this.commands.auth.respondToChallenge.handle(command);
   }
 
   /**
@@ -87,7 +87,7 @@ export abstract class SimCognitoAuthentication {
     command: simCognitoCommands.SimGlobalSignOutCommand,
   ): Promise<simCognitoCommands.SimGlobalSignOutCommandOutput> {
     await this.background.sequence();
-    return this.commands.signOut.globalSignOut(command);
+    return this.commands.auth.signOut.globalSignOut(command);
   }
 
   /**
@@ -98,6 +98,6 @@ export abstract class SimCognitoAuthentication {
     options?: SimCognitoIdentityProviderRequestOptions,
   ): Promise<simCognitoCommands.SimAdminUserGlobalSignOutCommandOutput> {
     await this.background.sequence();
-    return this.commands.signOut.adminUserGlobalSignOut(command, options);
+    return this.commands.auth.signOut.adminUserGlobalSignOut(command, options);
   }
 }

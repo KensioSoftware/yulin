@@ -207,7 +207,9 @@ describe("sim Cognito GlobalSignOut", () => {
     // Given a signed-in user.
     const signedIn = await simCognitoSignedIn();
 
-    // When a sign-out names no token.
+    // When a sign-out names no token. The SDK's own command type requires
+    // one, so the request is built structurally, which is what reaches a real
+    // pool from code that read the token out of somewhere it was not.
     const error = await assertThrowsErrorAsync(async () => {
       await signedIn.cognito.globalSignOut({ input: {} });
     });

@@ -190,7 +190,8 @@ rather than one class per command, so the `SimCognitoIdentityProvider` facade st
   inputs it is reading because `ListUsers` calls its page size `Limit` and its token
   `PaginationToken`, while the group listings call theirs `Limit` and `NextToken`
 - `command/sim-cognito-commands.ts`: builds the command handlers with the authorizer, pool store
-  and clock they share, so the service facade stays delegation
+  and clock they share, so the service facade stays delegation. The authentication ones are built by
+  `command/auth/sim-cognito-auth-commands.ts`, because the collaborators they share are theirs alone
 
 The four sign-in commands are thin because the parts they share are collaborators.
 `SimCognitoAuthFlow` knows a flow's name, the `ExplicitAuthFlows` entry that opens it and the legacy
@@ -198,7 +199,9 @@ entry it replaced; `SimCognitoAuthFlows` is the set one entry point runs, which 
 `ADMIN_USER_PASSWORD_AUTH` is refused for `InitiateAuth` as it is on real Cognito.
 `SimCognitoAuthFlowRunner` runs the resolved flow through `SimCognitoPasswordSignIn` or
 `SimCognitoRefreshSignIn`, and `SimCognitoNewPasswordResponse` is the body both challenge responses
-share. What is left in each command is how it reaches the pool and what it is allowed to run.
+share, and refuses a user disabled since the challenge was issued, because a disabled user cannot
+finish a sign-in any more than it can start one. What is left in each command is how it reaches the
+pool and what it is allowed to run.
 
 `SimCognitoRequestResolver` is what every user and group operation starts with: authorize against
 the pool's ARN, then find the pool. Neither a user nor a group has an ARN of its own, so the pool's
