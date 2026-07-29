@@ -152,7 +152,9 @@ console.log(described.UserPoolClient?.RefreshTokenValidity); // 30, the default
 A client created without `GenerateSecret` has no `ClientSecret` at all, rather than an empty one. A
 client created without `ExplicitAuthFlows` supports `ALLOW_REFRESH_TOKEN_AUTH`, `ALLOW_USER_SRP_AUTH`
 and `ALLOW_CUSTOM_AUTH`, which is what real Cognito gives it. Sign-in with a username and password is
-not among them, which is why `USER_PASSWORD_AUTH` fails on a client nobody configured for it.
+not among them, which on real AWS is why `USER_PASSWORD_AUTH` fails on a client nobody configured for
+it. Nothing signs in here yet, so the flows a client supports are validated and stored rather than
+acted on.
 
 Token lifetimes default to an hour for access and ID tokens and thirty days for refresh tokens. The
 units are separate inputs, so `AccessTokenValidity: 1` means an hour and `RefreshTokenValidity: 1`

@@ -55,7 +55,7 @@ export class SimCognitoTokenLifetime {
     const { field, validity, defaultSeconds, leastSeconds, mostSeconds } =
       properties;
 
-    this.unit = SimCognitoTokenLifetime.requireUnit(
+    this.unit = requireCognitoTokenValidityUnit(
       field,
       properties.unit,
       properties.defaultUnit,
@@ -85,23 +85,30 @@ export class SimCognitoTokenLifetime {
 
     this.seconds = seconds;
   }
+}
 
-  private static requireUnit(
-    field: string,
-    unit: string | undefined,
-    fallback: SimCognitoTokenValidityUnit,
-  ): SimCognitoTokenValidityUnit {
-    if (unit === undefined) {
-      return fallback;
-    }
-
-    if (!Object.hasOwn(secondsPerUnit, unit)) {
-      throw new SimCognitoInvalidParameterException(
-        `TokenValidityUnits for ${field} is '${unit}', which is not a ` +
-          `Cognito token validity unit: use seconds, minutes, hours or days`,
-      );
-    }
-
-    return unit as SimCognitoTokenValidityUnit;
+/**
+ * Read a requested token validity unit, or refuse one Cognito does not have.
+ *
+ * This is separate from the lifetime it belongs to because a unit is refused
+ * whether or not the validity counted in it is used. A request naming a unit
+ * and no validity still fails on real Cognito, so it fails here.
+ */
+export function requireCognitoTokenValidityUnit(
+  field: string,
+  unit: string | undefined,
+  fallback: SimCognitoTokenValidityUnit,
+): SimCognitoTokenValidityUnit {
+  if (unit === undefined) {
+    return fallback;
   }
+
+  if (!Object.hasOwn(secondsPerUnit, unit)) {
+    throw new SimCognitoInvalidParameterException(
+      `TokenValidityUnits for ${field} is '${unit}', which is not a ` +
+        `Cognito token validity unit: use seconds, minutes, hours or days`,
+    );
+  }
+
+  return unit as SimCognitoTokenValidityUnit;
 }

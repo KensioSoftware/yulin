@@ -4,7 +4,8 @@ This directory contains the simulated Cognito user pools implementation. Cognito
 which exchange a token for AWS credentials, are a separate service and are not simulated at all.
 
 This is the foundation the rest of simulated Cognito is built on: the pool, the app client, and the
-authorizer. Users, groups, tokens and authentication flows are not here yet.
+authorizer. An app client's authentication flows are validated and stored here, and nothing acts on
+them: users, groups, tokens and sign-in itself are not here yet.
 
 ## Entry points
 

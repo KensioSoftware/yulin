@@ -1,9 +1,8 @@
+import { makeSimCognitoRefreshTokenLifetime } from "./sim-cognito-refresh-token-lifetime.js";
 import { SimCognitoTokenLifetime } from "./sim-cognito-token-lifetime.js";
 import {
   accessTokenLifetimeSpec,
-  defaultRefreshTokenValidityDays,
   idTokenLifetimeSpec,
-  refreshTokenLifetimeSpec,
 } from "./sim-cognito-token-lifetime-specs.js";
 
 /**
@@ -56,36 +55,10 @@ export class SimCognitoTokenValidity {
       validity: input.IdTokenValidity,
       unit: units?.IdToken,
     });
-    this.refreshToken = SimCognitoTokenValidity.refreshTokenLifetime(
+    this.refreshToken = makeSimCognitoRefreshTokenLifetime(
       input.RefreshTokenValidity,
       units?.RefreshToken,
     );
-  }
-
-  /**
-   * Build the refresh token lifetime, applying the thirty days Cognito
-   * substitutes both for an absent value and for a zero.
-   *
-   * The substituted default is thirty days whatever unit the request named,
-   * so the unit is left out along with the value it would have counted.
-   */
-  private static refreshTokenLifetime(
-    requested: number | undefined,
-    unit: string | undefined,
-  ): SimCognitoTokenLifetime {
-    if (requested === undefined || requested === 0) {
-      return new SimCognitoTokenLifetime({
-        ...refreshTokenLifetimeSpec,
-        validity: defaultRefreshTokenValidityDays,
-        unit: undefined,
-      });
-    }
-
-    return new SimCognitoTokenLifetime({
-      ...refreshTokenLifetimeSpec,
-      validity: requested,
-      unit,
-    });
   }
 
   /**
