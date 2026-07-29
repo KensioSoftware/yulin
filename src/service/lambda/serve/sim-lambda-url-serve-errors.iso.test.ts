@@ -2,7 +2,6 @@ import {
   CreateFunctionCommand,
   CreateFunctionUrlConfigCommand,
   DeleteFunctionUrlConfigCommand,
-  UpdateFunctionUrlConfigCommand,
 } from "@aws-sdk/client-lambda";
 import { assertIdentical, assertObjectEquals } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -11,29 +10,6 @@ import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
 import { SimAwsLocalUrl } from "../../../serve/http/url/sim-aws-local-url.js";
 import { SimAws } from "../../aws/sim-aws.js";
 import { makeLambdaZipFileInput } from "../function/code/lambda-zip-file-input.js";
-import type { SimLambdaHandler } from "../function/sim-lambda-handler.type.js";
-
-async function serveFunction(
-  simAws: SimAws,
-  handler: SimLambdaHandler,
-): Promise<string> {
-  await simAws.lambda().createFunction(
-    new CreateFunctionCommand({
-      FunctionName: "greeter",
-      Role: "arn:aws:iam::111111111111:role/GreeterRole",
-      Code: { ZipFile: makeLambdaZipFileInput(handler) },
-    }),
-  );
-
-  const created = await simAws.lambda().createFunctionUrlConfig(
-    new CreateFunctionUrlConfigCommand({
-      FunctionName: "greeter",
-      AuthType: "NONE",
-    }),
-  );
-
-  return created.FunctionUrl;
-}
 
 function localUrl(functionUrl: string): string {
   return new SimAwsLocalUrl({ input: functionUrl }).toString();
@@ -59,7 +35,23 @@ describe("Serving sim Lambda Function URL failures", () => {
   it("returns 404 once the Function URL has been deleted", async () => {
     // Given a served Function URL that is then deleted.
     const simAws = new SimAws();
-    const functionUrl = await serveFunction(simAws, () => "hello");
+    await simAws.lambda().createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: "arn:aws:iam::111111111111:role/GreeterRole",
+        Code: { ZipFile: makeLambdaZipFileInput(() => "hello") },
+      }),
+    );
+
+    // And a public Function URL for it.
+    const { FunctionUrl: functionUrl } = await simAws
+      .lambda()
+      .createFunctionUrlConfig(
+        new CreateFunctionUrlConfigCommand({
+          FunctionName: "greeter",
+          AuthType: "NONE",
+        }),
+      );
     await simAws
       .lambda()
       .deleteFunctionUrlConfig(
@@ -78,7 +70,23 @@ describe("Serving sim Lambda Function URL failures", () => {
   it("returns 404 when the host names a different region", async () => {
     // Given a Function URL in the default region.
     const simAws = new SimAws();
-    const functionUrl = await serveFunction(simAws, () => "hello");
+    await simAws.lambda().createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: "arn:aws:iam::111111111111:role/GreeterRole",
+        Code: { ZipFile: makeLambdaZipFileInput(() => "hello") },
+      }),
+    );
+
+    // And a public Function URL for it.
+    const { FunctionUrl: functionUrl } = await simAws
+      .lambda()
+      .createFunctionUrlConfig(
+        new CreateFunctionUrlConfigCommand({
+          FunctionName: "greeter",
+          AuthType: "NONE",
+        }),
+      );
 
     // When the same URL id is requested in another region.
     const response = await new SimAwsHttp({ simAws }).fetch(
@@ -92,13 +100,23 @@ describe("Serving sim Lambda Function URL failures", () => {
   it("refuses an AWS_IAM Function URL request", async () => {
     // Given a Function URL that requires IAM authentication.
     const simAws = new SimAws();
-    const functionUrl = await serveFunction(simAws, () => "hello");
-    await simAws.lambda().updateFunctionUrlConfig(
-      new UpdateFunctionUrlConfigCommand({
+    await simAws.lambda().createFunction(
+      new CreateFunctionCommand({
         FunctionName: "greeter",
-        AuthType: "AWS_IAM",
+        Role: "arn:aws:iam::111111111111:role/GreeterRole",
+        Code: { ZipFile: makeLambdaZipFileInput(() => "hello") },
       }),
     );
+
+    // And a Function URL for it that requires IAM authentication.
+    const { FunctionUrl: functionUrl } = await simAws
+      .lambda()
+      .createFunctionUrlConfig(
+        new CreateFunctionUrlConfigCommand({
+          FunctionName: "greeter",
+          AuthType: "AWS_IAM",
+        }),
+      );
 
     // When it is requested without a signature.
     const response = await new SimAwsHttp({ simAws }).fetch(
@@ -113,9 +131,27 @@ describe("Serving sim Lambda Function URL failures", () => {
   it("returns 502 when the handler throws", async () => {
     // Given a function whose handler fails.
     const simAws = new SimAws();
-    const functionUrl = await serveFunction(simAws, () => {
-      throw new Error("handler exploded");
-    });
+    await simAws.lambda().createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: "arn:aws:iam::111111111111:role/GreeterRole",
+        Code: {
+          ZipFile: makeLambdaZipFileInput(() => {
+            throw new Error("handler exploded");
+          }),
+        },
+      }),
+    );
+
+    // And a public Function URL for it.
+    const { FunctionUrl: functionUrl } = await simAws
+      .lambda()
+      .createFunctionUrlConfig(
+        new CreateFunctionUrlConfigCommand({
+          FunctionName: "greeter",
+          AuthType: "NONE",
+        }),
+      );
 
     // When the Function URL is requested.
     const response = await new SimAwsHttp({ simAws }).fetch(

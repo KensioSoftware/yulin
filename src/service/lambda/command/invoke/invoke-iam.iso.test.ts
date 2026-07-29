@@ -9,35 +9,12 @@ import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { makeSimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
+import { simIamPolicyDocumentFactory } from "../../../iam/policy/sim-iam-policy-document.factory.js";
 import { makeLambdaZipFileInput } from "../../function/code/lambda-zip-file-input.js";
-
-async function createCallerRole(
-  simAws: SimAws,
-  accountId: string,
-  roleName: string,
-): Promise<string> {
-  const roleCreation = await simAws
-    .account(accountId)
-    .iam()
-    .createRole(
-      new CreateRoleCommand({
-        RoleName: roleName,
-        AssumeRolePolicyDocument: JSON.stringify({
-          Version: "2012-10-17",
-          Statement: {
-            Effect: "Allow",
-            Principal: { AWS: `arn:aws:iam::${accountId}:root` },
-            Action: "sts:AssumeRole",
-          },
-        }),
-      }),
-    );
-  return roleCreation.Role.Arn;
-}
 
 describe("Lambda InvokeCommand IAM authorization", () => {
   it("allows a Role when its policy permits lambda:InvokeFunction", async () => {
-    // Given a function and a Role allowed to invoke it.
+    // Given a function.
     const accountId = makeSimAwsAccountId();
     const simAws = new SimAws({ defaultAccountId: accountId });
     const simLambda = simAws.lambda();
@@ -45,25 +22,30 @@ describe("Lambda InvokeCommand IAM authorization", () => {
       new CreateFunctionCommand({
         FunctionName: "invokable",
         Role: `arn:aws:iam::${accountId}:role/ExecutionRole`,
-        Code: {
-          ZipFile: makeLambdaZipFileInput(() => "invoked"),
-        },
+        Code: { ZipFile: makeLambdaZipFileInput(() => "invoked") },
       }),
     );
 
-    const callerRoleArn = await createCallerRole(
-      simAws,
-      accountId,
-      "FunctionInvoker",
+    // And a Role in the same Account.
+    const roleCreation = await simAws.iam().createRole(
+      new CreateRoleCommand({
+        RoleName: "FunctionInvoker",
+        AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+            Action: "sts:AssumeRole",
+          },
+        }),
+      }),
     );
+
+    // And an identity policy allowing that Role to invoke the function.
     await simAws.iam().putRolePolicy(
       new PutRolePolicyCommand({
         RoleName: "FunctionInvoker",
         PolicyName: "InvokePolicy",
-        PolicyDocument: JSON.stringify({
-          Version: "2012-10-17",
+        PolicyDocument: simIamPolicyDocumentFactory.make({
           Statement: {
-            Effect: "Allow",
             Action: "lambda:InvokeFunction",
             Resource:
               `arn:aws:lambda:${simAws.defaultRegionName}:` +
@@ -76,7 +58,7 @@ describe("Lambda InvokeCommand IAM authorization", () => {
     // When the Role invokes the function.
     const output = await simLambda.invoke(
       new InvokeCommand({ FunctionName: "invokable" }),
-      { caller: { kind: "arn", arn: callerRoleArn } },
+      { caller: { kind: "arn", arn: roleCreation.Role.Arn } },
     );
 
     // Then IAM allows the request and the handler runs.
@@ -86,7 +68,7 @@ describe("Lambda InvokeCommand IAM authorization", () => {
   });
 
   it("implicitly denies a Role with no matching policy", async () => {
-    // Given a function and a Role with no Lambda permissions.
+    // Given a function counting the times it runs.
     const accountId = makeSimAwsAccountId();
     const simAws = new SimAws({ defaultAccountId: accountId });
     const simLambda = simAws.lambda();
@@ -104,16 +86,23 @@ describe("Lambda InvokeCommand IAM authorization", () => {
       }),
     );
 
-    const callerRoleArn = await createCallerRole(
-      simAws,
-      accountId,
-      "NoPermissionsRole",
+    // And a Role with no Lambda permissions.
+    const roleCreation = await simAws.iam().createRole(
+      new CreateRoleCommand({
+        RoleName: "NoPermissionsRole",
+        AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+            Action: "sts:AssumeRole",
+          },
+        }),
+      }),
     );
 
     // When the Role attempts to invoke the function.
     const error = await assertThrowsErrorAsync(async () =>
       simLambda.invoke(new InvokeCommand({ FunctionName: "guarded" }), {
-        caller: { kind: "arn", arn: callerRoleArn },
+        caller: { kind: "arn", arn: roleCreation.Role.Arn },
       }),
     );
 

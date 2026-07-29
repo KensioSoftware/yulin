@@ -20,30 +20,25 @@ import {
 import { makeLambdaZipFileInput } from "../../function/code/lambda-zip-file-input.js";
 import { SimLambda } from "../../sim-lambda.js";
 
-async function createGreeterWithUrl(simLambda: SimLambda): Promise<string> {
-  await simLambda.createFunction(
-    new CreateFunctionCommand({
-      FunctionName: "greeter",
-      Role: "arn:aws:iam::111111111111:role/GreeterRole",
-      Code: { ZipFile: makeLambdaZipFileInput(() => "hello") },
-    }),
-  );
-
-  const created = await simLambda.createFunctionUrlConfig(
-    new CreateFunctionUrlConfigCommand({
-      FunctionName: "greeter",
-      AuthType: "NONE",
-    }),
-  );
-
-  return created.FunctionUrl;
-}
-
 describe("Lambda UpdateFunctionUrlConfigCommand", () => {
   it("updates the auth type without changing the URL", async () => {
     // Given a function with a public Function URL.
     const simLambda = new SimLambda();
-    const functionUrl = await createGreeterWithUrl(simLambda);
+    await simLambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: "arn:aws:iam::111111111111:role/GreeterRole",
+        Code: { ZipFile: makeLambdaZipFileInput(() => "hello") },
+      }),
+    );
+
+    // And a public Function URL for it.
+    const created = await simLambda.createFunctionUrlConfig(
+      new CreateFunctionUrlConfigCommand({
+        FunctionName: "greeter",
+        AuthType: "NONE",
+      }),
+    );
 
     // When the auth type is updated.
     const output = await simLambda.updateFunctionUrlConfig(
@@ -55,16 +50,25 @@ describe("Lambda UpdateFunctionUrlConfigCommand", () => {
 
     // Then the new auth type applies to the same URL.
     assertIdentical(output.AuthType, "AWS_IAM");
-    assertIdentical(output.FunctionUrl, functionUrl);
+    assertIdentical(output.FunctionUrl, created.FunctionUrl);
   });
 
   it("leaves omitted values as they are", async () => {
     // Given a Function URL with a non-default invoke mode.
     const simLambda = new SimLambda();
-    await createGreeterWithUrl(simLambda);
-    await simLambda.updateFunctionUrlConfig(
-      new UpdateFunctionUrlConfigCommand({
+    await simLambda.createFunction(
+      new CreateFunctionCommand({
         FunctionName: "greeter",
+        Role: "arn:aws:iam::111111111111:role/GreeterRole",
+        Code: { ZipFile: makeLambdaZipFileInput(() => "hello") },
+      }),
+    );
+
+    // And a Function URL for it with a non-default invoke mode.
+    await simLambda.createFunctionUrlConfig(
+      new CreateFunctionUrlConfigCommand({
+        FunctionName: "greeter",
+        AuthType: "NONE",
         InvokeMode: "RESPONSE_STREAM",
       }),
     );
@@ -130,7 +134,21 @@ describe("Lambda UpdateFunctionUrlConfigCommand", () => {
   it("throws on an unknown auth type", async () => {
     // Given a function with a Function URL.
     const simLambda = new SimLambda();
-    await createGreeterWithUrl(simLambda);
+    await simLambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: "arn:aws:iam::111111111111:role/GreeterRole",
+        Code: { ZipFile: makeLambdaZipFileInput(() => "hello") },
+      }),
+    );
+
+    // And a Function URL for it.
+    await simLambda.createFunctionUrlConfig(
+      new CreateFunctionUrlConfigCommand({
+        FunctionName: "greeter",
+        AuthType: "NONE",
+      }),
+    );
 
     // When it is updated to an auth type AWS does not have.
     const error = await assertThrowsErrorAsync(async () =>

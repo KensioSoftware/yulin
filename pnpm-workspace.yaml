@@ -2,5 +2,5 @@ allowBuilds:
   esbuild: true
 minimumReleaseAgeExclude:
   - '@kensio/smartass@1.33.0'
-  - '@kensio/part-factory@1.4.0'
+  - '@kensio/part-factory@1.4.0 || 1.9.0'
 useNodeVersion: 24.18.0

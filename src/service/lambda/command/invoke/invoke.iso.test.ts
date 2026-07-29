@@ -10,27 +10,14 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
-import type { SimLambda } from "../../sim-lambda.js";
 import {
   SimLambdaError,
   SimLambdaInvalidRequestContentException,
   SimLambdaResourceNotFoundException,
 } from "../../error/sim-lambda.error.js";
 import { makeLambdaZipFileInput } from "../../function/code/lambda-zip-file-input.js";
-import type { SimLambdaHandler } from "../../function/sim-lambda-handler.type.js";
 
-async function createGreeter(
-  simLambda: SimLambda,
-  handlerFunction: SimLambdaHandler<{ name: string }>,
-): Promise<void> {
-  await simLambda.createFunction(
-    new CreateFunctionCommand({
-      FunctionName: "greeter",
-      Role: "arn:aws:iam::111111111111:role/GreeterRole",
-      Code: { ZipFile: makeLambdaZipFileInput(handlerFunction) },
-    }),
-  );
-}
+const greeterRoleArn = "arn:aws:iam::111111111111:role/GreeterRole";
 
 function parsePayload(payload: Uint8Array | undefined): unknown {
   assertNonNullable(payload);
@@ -39,12 +26,22 @@ function parsePayload(payload: Uint8Array | undefined): unknown {
 
 describe("Lambda InvokeCommand", () => {
   it("invokes the handler with the request payload event", async () => {
+    // Given a function greeting the name in its event.
     const simAws = new SimAws();
     const simLambda = simAws.lambda();
-    await createGreeter(simLambda, (event) => ({
-      greeting: `Hello ${event.name}`,
-    }));
+    await simLambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: greeterRoleArn,
+        Code: {
+          ZipFile: makeLambdaZipFileInput<{ name: string }>((event) => ({
+            greeting: `Hello ${event.name}`,
+          })),
+        },
+      }),
+    );
 
+    // When it is invoked with a JSON payload.
     const output = await simLambda.invoke(
       new InvokeCommand({
         FunctionName: "greeter",
@@ -52,6 +49,7 @@ describe("Lambda InvokeCommand", () => {
       }),
     );
 
+    // Then the handler saw the payload as its event.
     assertIdentical(output.StatusCode, 200);
     assertIdentical(output.ExecutedVersion, "$LATEST");
     assertUndefined(output.FunctionError);
@@ -63,80 +61,129 @@ describe("Lambda InvokeCommand", () => {
   });
 
   it("invokes the handler with a Uint8Array request payload", async () => {
-    const simAws = new SimAws();
-    const simLambda = simAws.lambda();
-    await createGreeter(simLambda, (event) => ({
-      greeting: `Hello ${event.name}`,
-    }));
+    // Given a function greeting the name in its event.
+    const simLambda = new SimAws().lambda();
+    await simLambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: greeterRoleArn,
+        Code: {
+          ZipFile: makeLambdaZipFileInput<{ name: string }>((event) => ({
+            greeting: `Hello ${event.name}`,
+          })),
+        },
+      }),
+    );
 
+    // When it is invoked with the payload as bytes.
     const bytesPayload = Buffer.from(JSON.stringify({ name: "Bytes" }));
     const output = await simLambda.invoke(
       new InvokeCommand({ FunctionName: "greeter", Payload: bytesPayload }),
     );
 
+    // Then the bytes were read as the JSON event.
     assertObjectEquals(parsePayload(output.Payload) as object, {
       greeting: "Hello Bytes",
     });
   });
 
   it("invokes the handler with an empty object event for an empty payload", async () => {
-    const simAws = new SimAws();
-    const simLambda = simAws.lambda();
+    // Given a function recording the event it is given.
+    const simLambda = new SimAws().lambda();
     let observedEvent: unknown;
-    await createGreeter(simLambda, (event) => {
-      observedEvent = event;
-      return null;
-    });
+    await simLambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: greeterRoleArn,
+        Code: {
+          ZipFile: makeLambdaZipFileInput((event) => {
+            observedEvent = event;
+            return null;
+          }),
+        },
+      }),
+    );
 
+    // When it is invoked with an empty payload.
     const output = await simLambda.invoke(
       new InvokeCommand({ FunctionName: "greeter", Payload: "" }),
     );
 
+    // Then the handler saw an empty object.
     assertIdentical(output.StatusCode, 200);
     assertObjectEquals(observedEvent as object, {});
   });
 
   it("invokes the handler with an empty object event when no payload is given", async () => {
-    const simAws = new SimAws();
-    const simLambda = simAws.lambda();
+    // Given a function recording the event it is given.
+    const simLambda = new SimAws().lambda();
     let observedEvent: unknown;
-    await createGreeter(simLambda, (event) => {
-      observedEvent = event;
-      return null;
-    });
+    await simLambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: greeterRoleArn,
+        Code: {
+          ZipFile: makeLambdaZipFileInput((event) => {
+            observedEvent = event;
+            return null;
+          }),
+        },
+      }),
+    );
 
+    // When it is invoked without a payload at all.
     const output = await simLambda.invoke(
       new InvokeCommand({ FunctionName: "greeter" }),
     );
 
+    // Then the handler saw an empty object.
     assertIdentical(output.StatusCode, 200);
     assertObjectEquals(observedEvent as object, {});
     assertIdentical(parsePayload(output.Payload), null);
   });
 
   it("serialises an undefined handler result as a null payload", async () => {
-    const simAws = new SimAws();
-    const simLambda = simAws.lambda();
-    await createGreeter(simLambda, () => undefined);
+    // Given a function returning nothing.
+    const simLambda = new SimAws().lambda();
+    await simLambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: greeterRoleArn,
+        Code: { ZipFile: makeLambdaZipFileInput(() => undefined) },
+      }),
+    );
 
+    // When it is invoked.
     const output = await simLambda.invoke(
       new InvokeCommand({ FunctionName: "greeter", Payload: "{}" }),
     );
 
+    // Then the response payload is null.
     assertIdentical(parsePayload(output.Payload), null);
   });
 
   it("reports a handler error as an unhandled function error payload", async () => {
-    const simAws = new SimAws();
-    const simLambda = simAws.lambda();
-    await createGreeter(simLambda, () => {
-      throw new RangeError("greeting out of range");
-    });
+    // Given a function whose handler throws.
+    const simLambda = new SimAws().lambda();
+    await simLambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: greeterRoleArn,
+        Code: {
+          ZipFile: makeLambdaZipFileInput(() => {
+            throw new RangeError("greeting out of range");
+          }),
+        },
+      }),
+    );
 
+    // When it is invoked.
     const output = await simLambda.invoke(
       new InvokeCommand({ FunctionName: "greeter", Payload: "{}" }),
     );
 
+    // Then the failure comes back as an unhandled function error, the way real
+    // Lambda reports one.
     assertIdentical(output.StatusCode, 200);
     assertIdentical(output.FunctionError, "Unhandled");
     const errorPayload = parsePayload(output.Payload) as {
@@ -150,25 +197,40 @@ describe("Lambda InvokeCommand", () => {
   });
 
   it("throws on a payload that is not valid JSON", async () => {
-    const simAws = new SimAws();
-    const simLambda = simAws.lambda();
-    await createGreeter(simLambda, () => null);
+    // Given a function.
+    const simLambda = new SimAws().lambda();
+    await simLambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: greeterRoleArn,
+        Code: { ZipFile: makeLambdaZipFileInput(() => null) },
+      }),
+    );
 
+    // When it is invoked with a payload that is not JSON.
     const error = await assertThrowsErrorAsync(async () =>
       simLambda.invoke(
         new InvokeCommand({ FunctionName: "greeter", Payload: "{not json" }),
       ),
     );
 
+    // Then the request content is rejected.
     assertInstanceOf(error, SimLambdaInvalidRequestContentException);
     assertIdentical(error.$metadata.httpStatusCode, 400);
   });
 
   it("throws on an unsupported payload input type", async () => {
-    const simAws = new SimAws();
-    const simLambda = simAws.lambda();
-    await createGreeter(simLambda, () => null);
+    // Given a function.
+    const simLambda = new SimAws().lambda();
+    await simLambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: greeterRoleArn,
+        Code: { ZipFile: makeLambdaZipFileInput(() => null) },
+      }),
+    );
 
+    // When it is invoked with a payload of a type the SDK does not send.
     const error = await assertThrowsErrorAsync(async () =>
       simLambda.invoke(
         new InvokeCommand({
@@ -178,17 +240,21 @@ describe("Lambda InvokeCommand", () => {
       ),
     );
 
+    // Then the unsupported type is reported.
     assertInstanceOf(error, SimLambdaError);
     assertStringIncludes(error.message, "string and Uint8Array");
   });
 
   it("throws on a function that does not exist", async () => {
+    // Given a simulated AWS with no functions.
     const simAws = new SimAws();
 
+    // When a missing function is invoked.
     const error = await assertThrowsErrorAsync(async () =>
       simAws.lambda().invoke(new InvokeCommand({ FunctionName: "missing" })),
     );
 
+    // Then the missing function is named in the failure.
     assertInstanceOf(error, SimLambdaResourceNotFoundException);
     assertStringIncludes(
       error.message,
@@ -199,12 +265,15 @@ describe("Lambda InvokeCommand", () => {
   });
 
   it("throws on undefined function name", async () => {
+    // Given a simulated AWS with no functions.
     const simAws = new SimAws();
 
+    // When an invocation names no function.
     const error = await assertThrowsErrorAsync(async () =>
       simAws.lambda().invoke(new InvokeCommand({ FunctionName: undefined })),
     );
 
+    // Then the missing input is reported.
     assertStringIncludes(
       error.message,
       "InvokeCommand.input.FunctionName required",

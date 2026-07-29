@@ -1,8 +1,7 @@
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import { assertIdentical, assertTypeString } from "@kensio/smartass";
 import path from "node:path";
 import { describe, it } from "vitest";
-
-import { createSimIamRoleWithPolicy } from "../../../../../test/iam/create-role-with-policy.js";
 
 /**
  * Slower local integration test. Calls the real CDK CLI to synth the output
@@ -12,6 +11,7 @@ import { createSimIamRoleWithPolicy } from "../../../../../test/iam/create-role-
 import { serveSimAws } from "../../../../serve/index.js";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { simAwsCallerHeaderName } from "../../../iam/request/sim-aws-caller-header.js";
+import { simIamPolicyDocumentFactory } from "../../../iam/policy/sim-iam-policy-document.factory.js";
 import { TemporaryDirectory } from "../../../../util/filesystem/temporary-directory.js";
 import { TestCdkProject } from "../../../../util/filesystem/test-cdk-project.js";
 
@@ -24,20 +24,6 @@ import { TestCdkProject } from "../../../../util/filesystem/test-cdk-project.js"
 const accountId = "888888888888";
 
 const otherAccountId = "222222222222";
-
-/**
- * The calling Role in the other Account, allowed to invoke Function URLs by
- * that Account's own identity policy.
- */
-async function grantOtherAccountRole(simAws: SimAws): Promise<void> {
-  await createSimIamRoleWithPolicy({
-    simAws,
-    accountId: otherAccountId,
-    roleName: "Anything",
-    policyName: "InvokeUrl",
-    action: "lambda:InvokeFunctionUrl",
-  });
-}
 
 describe("Sim CDK Lambda grantInvokeUrl local integration", () => {
   it("deploys grantInvokeUrl grants that admit the granted principals", async () => {
@@ -104,7 +90,29 @@ app.synth();
     // And the other Account allows its own Role to invoke Function URLs. That
     // is the side a CDK app in this Account cannot write, and a cross-account
     // call needs an allow from each Account.
-    await grantOtherAccountRole(simAws);
+    // And the calling Role in the other Account, allowed to invoke Function
+    // URLs by that Account's own identity policy.
+    const otherIam = simAws.account(otherAccountId).iam();
+    await otherIam.createRole(
+      new CreateRoleCommand({
+        RoleName: "Anything",
+        AssumeRolePolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: {
+            Principal: { AWS: `arn:aws:iam::${otherAccountId}:root` },
+            Action: "sts:AssumeRole",
+          },
+        }),
+      }),
+    );
+    await otherIam.putRolePolicy(
+      new PutRolePolicyCommand({
+        RoleName: "Anything",
+        PolicyName: "InvokeUrl",
+        PolicyDocument: simIamPolicyDocumentFactory.make({
+          Statement: { Action: "lambda:InvokeFunctionUrl", Resource: "*" },
+        }),
+      }),
+    );
 
     const srv = await serveSimAws({ simAws });
     const invokeAs = async (arn: string): Promise<Response> =>

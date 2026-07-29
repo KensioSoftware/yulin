@@ -20,28 +20,25 @@ import { SimLambdaResourceNotFoundException } from "../../error/sim-lambda.error
 import { makeLambdaZipFileInput } from "../../function/code/lambda-zip-file-input.js";
 import { SimLambda } from "../../sim-lambda.js";
 
-async function createGreeterWithUrl(simLambda: SimLambda): Promise<void> {
-  await simLambda.createFunction(
-    new CreateFunctionCommand({
-      FunctionName: "greeter",
-      Role: "arn:aws:iam::111111111111:role/GreeterRole",
-      Code: { ZipFile: makeLambdaZipFileInput(() => "hello") },
-    }),
-  );
-
-  await simLambda.createFunctionUrlConfig(
-    new CreateFunctionUrlConfigCommand({
-      FunctionName: "greeter",
-      AuthType: "NONE",
-    }),
-  );
-}
-
 describe("Lambda DeleteFunctionUrlConfigCommand", () => {
   it("deletes a Function URL so it can no longer be read", async () => {
     // Given a function with a Function URL.
     const simLambda = new SimLambda();
-    await createGreeterWithUrl(simLambda);
+    await simLambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: "arn:aws:iam::111111111111:role/GreeterRole",
+        Code: { ZipFile: makeLambdaZipFileInput(() => "hello") },
+      }),
+    );
+
+    // And a Function URL for it.
+    await simLambda.createFunctionUrlConfig(
+      new CreateFunctionUrlConfigCommand({
+        FunctionName: "greeter",
+        AuthType: "NONE",
+      }),
+    );
 
     // When the Function URL is deleted.
     await simLambda.deleteFunctionUrlConfig(
@@ -60,7 +57,21 @@ describe("Lambda DeleteFunctionUrlConfigCommand", () => {
   it("stops the deleted URL id resolving to a Function URL", async () => {
     // Given a function with a Function URL.
     const simLambda = new SimLambda();
-    await createGreeterWithUrl(simLambda);
+    await simLambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: "arn:aws:iam::111111111111:role/GreeterRole",
+        Code: { ZipFile: makeLambdaZipFileInput(() => "hello") },
+      }),
+    );
+
+    // And a Function URL for it.
+    await simLambda.createFunctionUrlConfig(
+      new CreateFunctionUrlConfigCommand({
+        FunctionName: "greeter",
+        AuthType: "NONE",
+      }),
+    );
     const functionUrl = simLambda.getSimFunctionUrl("greeter");
     assertNonNullable(functionUrl);
 
@@ -76,7 +87,21 @@ describe("Lambda DeleteFunctionUrlConfigCommand", () => {
   it("allows a new Function URL after deleting the old one", async () => {
     // Given a function whose Function URL has been deleted.
     const simLambda = new SimLambda();
-    await createGreeterWithUrl(simLambda);
+    await simLambda.createFunction(
+      new CreateFunctionCommand({
+        FunctionName: "greeter",
+        Role: "arn:aws:iam::111111111111:role/GreeterRole",
+        Code: { ZipFile: makeLambdaZipFileInput(() => "hello") },
+      }),
+    );
+
+    // And a Function URL for it.
+    await simLambda.createFunctionUrlConfig(
+      new CreateFunctionUrlConfigCommand({
+        FunctionName: "greeter",
+        AuthType: "NONE",
+      }),
+    );
     await simLambda.deleteFunctionUrlConfig(
       new DeleteFunctionUrlConfigCommand({ FunctionName: "greeter" }),
     );

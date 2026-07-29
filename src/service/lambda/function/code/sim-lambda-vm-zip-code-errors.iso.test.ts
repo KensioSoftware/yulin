@@ -6,54 +6,17 @@ import {
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
-import { SimZipArchive } from "../../../../util/zip/zip-archive.js";
-import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
-import type { AwsRegionName } from "../../../aws/sim-aws-region.js";
+import { simLambdaVmZipFunctionFactory } from "./sim-lambda-vm-zip-function.factory.js";
 import { SimLambdaRuntimeError } from "../../error/sim-lambda-runtime.error.js";
-import { SimLambdaEnvironment } from "../environment/sim-lambda-environment.js";
-import { SimLambdaFunction } from "../sim-lambda-function.js";
-import {
-  type LambdaCodeZipFiles,
-  makeLambdaCodeZip,
-} from "./make-lambda-code-zip.js";
-import {
-  parseLambdaHandlerName,
-  SimLambdaVmZipCode,
-} from "./sim-lambda-vm-zip-code.js";
-
-const accountRegionScope = {
-  accountId: "111111111111" as SimAwsAccountId,
-  regionName: "eu-west-2" as AwsRegionName,
-};
-
-function makeVmFunction(
-  code: string | LambdaCodeZipFiles,
-  handlerName = "index.handler",
-): SimLambdaFunction {
-  const archive = SimZipArchive.fromBytes(makeLambdaCodeZip(code));
-  return new SimLambdaFunction({
-    name: "vm-error-test",
-    roleArn: "arn:aws:iam::111111111111:role/VmErrorRole",
-    accountRegionScope,
-    code: new SimLambdaVmZipCode({
-      archive,
-      handlerName,
-      environment: new SimLambdaEnvironment({
-        functionName: "vm-error-test",
-        regionName: "eu-west-2",
-        memorySizeMb: 128,
-      }),
-    }),
-  });
-}
+import { parseLambdaHandlerName } from "./sim-lambda-vm-zip-code.js";
 
 describe("sim Lambda vm zip code runtime errors", () => {
   it("reports a missing handler module as Runtime.ImportModuleError", async () => {
     // Given an archive without the module the handler name references.
-    const simFunction = makeVmFunction(
-      { "other.js": "exports.handler = async () => null;" },
-      "index.handler",
-    );
+    const simFunction = simLambdaVmZipFunctionFactory.make({
+      code: { "other.js": "exports.handler = async () => null;" },
+      handlerName: "index.handler",
+    });
 
     // When the function is invoked, the cold start fails.
     const error = await assertThrowsErrorAsync(async () =>
@@ -68,10 +31,10 @@ describe("sim Lambda vm zip code runtime errors", () => {
   });
 
   it("reports an ES module handler file as unsupported", async () => {
-    const simFunction = makeVmFunction(
-      { "index.mjs": "export const handler = async () => null;" },
-      "index.handler",
-    );
+    const simFunction = simLambdaVmZipFunctionFactory.make({
+      code: { "index.mjs": "export const handler = async () => null;" },
+      handlerName: "index.handler",
+    });
 
     const error = await assertThrowsErrorAsync(async () =>
       simFunction.invoke({}),
@@ -88,7 +51,13 @@ describe("sim Lambda vm zip code runtime errors", () => {
 
     const [nullExportError, undefinedExportError] = await Promise.all(
       sources.map(async (source) =>
-        assertThrowsErrorAsync(async () => makeVmFunction(source).invoke({})),
+        assertThrowsErrorAsync(async () =>
+          simLambdaVmZipFunctionFactory
+            .make({
+              code: source,
+            })
+            .invoke({}),
+        ),
       ),
     );
 
@@ -101,8 +70,9 @@ describe("sim Lambda vm zip code runtime errors", () => {
   it("re-attempts a failed module require, as Node.js does", async () => {
     // Given a module that fails at import time and code that catches the
     // require error and retries.
-    const simFunction = makeVmFunction({
-      "index.js": `
+    const simFunction = simLambdaVmZipFunctionFactory.make({
+      code: {
+        "index.js": `
         const attempts = [];
         for (let attempt = 0; attempt < 2; attempt += 1) {
           try {
@@ -114,7 +84,8 @@ describe("sim Lambda vm zip code runtime errors", () => {
         }
         exports.handler = async () => attempts.join(",");
       `,
-      "broken.js": "throw new Error('broken module');",
+        "broken.js": "throw new Error('broken module');",
+      },
     });
 
     // When the function is invoked.
@@ -126,9 +97,9 @@ describe("sim Lambda vm zip code runtime errors", () => {
   });
 
   it("reports a missing export as Runtime.HandlerNotFound", async () => {
-    const simFunction = makeVmFunction(
-      "exports.somethingElse = async () => null;",
-    );
+    const simFunction = simLambdaVmZipFunctionFactory.make({
+      code: "exports.somethingElse = async () => null;",
+    });
 
     const error = await assertThrowsErrorAsync(async () =>
       simFunction.invoke({}),
@@ -142,10 +113,10 @@ describe("sim Lambda vm zip code runtime errors", () => {
   it("reports an inherited property as Runtime.HandlerNotFound", async () => {
     // Given a module that does not export the named handler, where that name
     // happens to exist on Object.prototype.
-    const simFunction = makeVmFunction(
-      "exports.somethingElse = async () => null;",
-      "index.constructor",
-    );
+    const simFunction = simLambdaVmZipFunctionFactory.make({
+      code: "exports.somethingElse = async () => null;",
+      handlerName: "index.constructor",
+    });
 
     // When the function is invoked.
     const error = await assertThrowsErrorAsync(async () =>
@@ -159,7 +130,9 @@ describe("sim Lambda vm zip code runtime errors", () => {
   });
 
   it("reports invalid source as Runtime.UserCodeSyntaxError", async () => {
-    const simFunction = makeVmFunction("exports.handler = async ((( => null;");
+    const simFunction = simLambdaVmZipFunctionFactory.make({
+      code: "exports.handler = async ((( => null;",
+    });
 
     const error = await assertThrowsErrorAsync(async () =>
       simFunction.invoke({}),
@@ -171,9 +144,9 @@ describe("sim Lambda vm zip code runtime errors", () => {
   });
 
   it("hints that ES module syntax needs CommonJS instead", async () => {
-    const simFunction = makeVmFunction(
-      "export const handler = async () => null;",
-    );
+    const simFunction = simLambdaVmZipFunctionFactory.make({
+      code: "export const handler = async () => null;",
+    });
 
     const error = await assertThrowsErrorAsync(async () =>
       simFunction.invoke({}),
@@ -185,9 +158,11 @@ describe("sim Lambda vm zip code runtime errors", () => {
   });
 
   it("reports a module top-level failure as Runtime.ImportModuleError", async () => {
-    const simFunction = makeVmFunction(`
+    const simFunction = simLambdaVmZipFunctionFactory.make({
+      code: `
       throw new Error("boom at init");
-    `);
+    `,
+    });
 
     const error = await assertThrowsErrorAsync(async () =>
       simFunction.invoke({}),
@@ -201,10 +176,12 @@ describe("sim Lambda vm zip code runtime errors", () => {
   it("reports an unbundled dependency as Runtime.ImportModuleError", async () => {
     // Given code requiring a dependency that is not in the archive; on real
     // Lambda dependencies must be bundled into the deployment package.
-    const simFunction = makeVmFunction(`
+    const simFunction = simLambdaVmZipFunctionFactory.make({
+      code: `
       const missing = require("not-bundled");
       exports.handler = async () => missing;
-    `);
+    `,
+    });
 
     const error = await assertThrowsErrorAsync(async () =>
       simFunction.invoke({}),
@@ -217,13 +194,15 @@ describe("sim Lambda vm zip code runtime errors", () => {
 
   it("reports an unreadable bundled package.json as an import error", async () => {
     // Given a bundled dependency whose package.json cannot be parsed.
-    const simFunction = makeVmFunction({
-      "index.js": `
+    const simFunction = simLambdaVmZipFunctionFactory.make({
+      code: {
+        "index.js": `
         const broken = require("broken");
         exports.handler = async () => broken;
       `,
-      "node_modules/broken/package.json": "{not json",
-      "node_modules/broken/index.js": "module.exports = 1;",
+        "node_modules/broken/package.json": "{not json",
+        "node_modules/broken/index.js": "module.exports = 1;",
+      },
     });
 
     const error = await assertThrowsErrorAsync(async () =>
@@ -237,12 +216,14 @@ describe("sim Lambda vm zip code runtime errors", () => {
 
   it("reports an unparseable JSON module as an import error", async () => {
     // Given code requiring a JSON module that cannot be parsed.
-    const simFunction = makeVmFunction({
-      "index.js": `
+    const simFunction = simLambdaVmZipFunctionFactory.make({
+      code: {
+        "index.js": `
         const config = require("./config.json");
         exports.handler = async () => config;
       `,
-      "config.json": "{not valid json",
+        "config.json": "{not valid json",
+      },
     });
 
     const error = await assertThrowsErrorAsync(async () =>
@@ -256,7 +237,9 @@ describe("sim Lambda vm zip code runtime errors", () => {
 
   it("keeps failing on repeated invocations after a failed cold start", async () => {
     // Given code that fails at import time.
-    const simFunction = makeVmFunction("throw new Error('boom at init');");
+    const simFunction = simLambdaVmZipFunctionFactory.make({
+      code: "throw new Error('boom at init');",
+    });
 
     // When the function is invoked twice.
     const first = await assertThrowsErrorAsync(async () =>

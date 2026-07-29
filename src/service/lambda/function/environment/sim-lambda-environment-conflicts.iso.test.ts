@@ -4,19 +4,7 @@
 import { assertArrayLength, assertStringIncludes } from "@kensio/smartass";
 import { describe, it, vi } from "vitest";
 import { SimLambdaEnvironmentConflicts } from "./sim-lambda-environment-conflicts.js";
-import { SimLambdaEnvironment } from "./sim-lambda-environment.js";
-
-function makeEnvironment(
-  functionName: string,
-  declaredVariables: Record<string, string>,
-): SimLambdaEnvironment {
-  return new SimLambdaEnvironment({
-    functionName,
-    regionName: "eu-west-2",
-    memorySizeMb: 128,
-    declaredVariables: new Map(Object.entries(declaredVariables)),
-  });
-}
+import { simLambdaEnvironmentFactory } from "./sim-lambda-environment.factory.js";
 
 /**
  * Collect the warnings a check emits, keeping them out of the test output.
@@ -40,8 +28,11 @@ describe("sim Lambda environment conflicts", () => {
     process.env["YULIN_CONFLICT"] = "host value";
 
     try {
-      const environment = makeEnvironment("greeter", {
-        YULIN_CONFLICT: "declared value",
+      const environment = simLambdaEnvironmentFactory.make({
+        functionName: "greeter",
+        declaredVariables: {
+          YULIN_CONFLICT: "declared value",
+        },
       });
 
       // When the new function's environment is checked.
@@ -64,8 +55,11 @@ describe("sim Lambda environment conflicts", () => {
     process.env["YULIN_AGREES"] = "same value";
 
     try {
-      const environment = makeEnvironment("greeter", {
-        YULIN_AGREES: "same value",
+      const environment = simLambdaEnvironmentFactory.make({
+        functionName: "greeter",
+        declaredVariables: {
+          YULIN_AGREES: "same value",
+        },
       });
 
       // When the new function's environment is checked.
@@ -83,8 +77,11 @@ describe("sim Lambda environment conflicts", () => {
 
   it("stays quiet when the host process does not set the name", () => {
     // Given a declared variable the host process knows nothing about.
-    const environment = makeEnvironment("greeter", {
-      YULIN_UNSET_ON_HOST: "declared value",
+    const environment = simLambdaEnvironmentFactory.make({
+      functionName: "greeter",
+      declaredVariables: {
+        YULIN_UNSET_ON_HOST: "declared value",
+      },
     });
 
     // When the new function's environment is checked.
@@ -98,8 +95,14 @@ describe("sim Lambda environment conflicts", () => {
 
   it("warns when another function declares the name differently", () => {
     // Given an existing function declaring a different value for the name.
-    const existing = makeEnvironment("reader", { TABLE_NAME: "widgets" });
-    const environment = makeEnvironment("writer", { TABLE_NAME: "gadgets" });
+    const existing = simLambdaEnvironmentFactory.make({
+      functionName: "reader",
+      declaredVariables: { TABLE_NAME: "widgets" },
+    });
+    const environment = simLambdaEnvironmentFactory.make({
+      functionName: "writer",
+      declaredVariables: { TABLE_NAME: "gadgets" },
+    });
 
     // When the new function's environment is checked against it.
     const warnings = warningsFrom(() => {
@@ -115,8 +118,14 @@ describe("sim Lambda environment conflicts", () => {
 
   it("stays quiet when functions agree on the value", () => {
     // Given two functions declaring the same value for the same name.
-    const existing = makeEnvironment("reader", { TABLE_NAME: "widgets" });
-    const environment = makeEnvironment("writer", { TABLE_NAME: "widgets" });
+    const existing = simLambdaEnvironmentFactory.make({
+      functionName: "reader",
+      declaredVariables: { TABLE_NAME: "widgets" },
+    });
+    const environment = simLambdaEnvironmentFactory.make({
+      functionName: "writer",
+      declaredVariables: { TABLE_NAME: "widgets" },
+    });
 
     // When the new function's environment is checked against it.
     const warnings = warningsFrom(() => {
@@ -129,8 +138,14 @@ describe("sim Lambda environment conflicts", () => {
 
   it("stays quiet when another function declares nothing in common", () => {
     // Given an existing function declaring an unrelated variable.
-    const existing = makeEnvironment("reader", { QUEUE_URL: "widgets" });
-    const environment = makeEnvironment("writer", { TABLE_NAME: "gadgets" });
+    const existing = simLambdaEnvironmentFactory.make({
+      functionName: "reader",
+      declaredVariables: { QUEUE_URL: "widgets" },
+    });
+    const environment = simLambdaEnvironmentFactory.make({
+      functionName: "writer",
+      declaredVariables: { TABLE_NAME: "gadgets" },
+    });
 
     // When the new function's environment is checked against it.
     const warnings = warningsFrom(() => {
@@ -144,16 +159,27 @@ describe("sim Lambda environment conflicts", () => {
   it("reports each variable name only once", () => {
     // Given a conflict that would be found again by a later function.
     const conflicts = new SimLambdaEnvironmentConflicts();
-    const existing = makeEnvironment("reader", { TABLE_NAME: "widgets" });
+    const existing = simLambdaEnvironmentFactory.make({
+      functionName: "reader",
+      declaredVariables: { TABLE_NAME: "widgets" },
+    });
 
     // When two more functions are checked against it.
     const warnings = warningsFrom(() => {
-      conflicts.check(makeEnvironment("writer", { TABLE_NAME: "gadgets" }), [
-        existing,
-      ]);
-      conflicts.check(makeEnvironment("deleter", { TABLE_NAME: "sprockets" }), [
-        existing,
-      ]);
+      conflicts.check(
+        simLambdaEnvironmentFactory.make({
+          functionName: "writer",
+          declaredVariables: { TABLE_NAME: "gadgets" },
+        }),
+        [existing],
+      );
+      conflicts.check(
+        simLambdaEnvironmentFactory.make({
+          functionName: "deleter",
+          declaredVariables: { TABLE_NAME: "sprockets" },
+        }),
+        [existing],
+      );
     });
 
     // Then the same variable name is only reported the first time.

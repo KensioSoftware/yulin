@@ -1,32 +1,12 @@
 import { assertIdentical, assertStringIncludes } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
-import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
-import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
-import type { SimLambdaFunctionName } from "../sim-lambda-function.js";
-import {
-  makeSimLambdaFunctionUrlId,
-  SimLambdaFunctionUrl,
-} from "./sim-lambda-function-url.js";
-
-const accountRegionScope: SimAwsAccountRegionScope = {
-  accountId: "111111111111" as SimAwsAccountId,
-  regionName: "eu-west-2",
-};
-
-function makeFunctionUrl(): SimLambdaFunctionUrl {
-  return new SimLambdaFunctionUrl({
-    urlId: makeSimLambdaFunctionUrlId(),
-    functionName: "greeter" as SimLambdaFunctionName,
-    functionArn: "arn:aws:lambda:eu-west-2:111111111111:function:greeter",
-    accountRegionScope,
-  });
-}
+import { simLambdaFunctionUrlFactory } from "./sim-lambda-function-url.factory.js";
 
 describe("Sim Lambda Function URL", () => {
   it("builds the AWS endpoint URL for its scope", () => {
     // Given a Function URL in eu-west-2.
-    const functionUrl = makeFunctionUrl();
+    const functionUrl = simLambdaFunctionUrlFactory.make();
 
     // When its endpoint is read.
     const url = functionUrl.url;
@@ -41,7 +21,7 @@ describe("Sim Lambda Function URL", () => {
 
   it("defaults to a public buffered endpoint", () => {
     // Given a Function URL created without configuration.
-    const functionUrl = makeFunctionUrl();
+    const functionUrl = simLambdaFunctionUrlFactory.make();
 
     // When its configuration is read.
     const configuration = functionUrl.configuration();
@@ -54,7 +34,7 @@ describe("Sim Lambda Function URL", () => {
 
   it("keeps values that an update omits", () => {
     // Given a Function URL with a non-default invoke mode.
-    const functionUrl = makeFunctionUrl();
+    const functionUrl = simLambdaFunctionUrlFactory.make();
     functionUrl.update({ invokeMode: "RESPONSE_STREAM" });
 
     // When only the auth type is updated.
@@ -67,7 +47,7 @@ describe("Sim Lambda Function URL", () => {
 
   it("keeps its endpoint across updates", () => {
     // Given a Function URL.
-    const functionUrl = makeFunctionUrl();
+    const functionUrl = simLambdaFunctionUrlFactory.make();
     const url = functionUrl.url;
 
     // When it is updated.
