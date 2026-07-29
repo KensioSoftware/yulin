@@ -17,6 +17,7 @@ import type { SimS3 } from "../s3/sim-s3.js";
 import type { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
 import type { SimDynamoDb as SimDynamoDatabase } from "../dynamodb/index.js";
 import type { SimCloudFormation } from "../cloudformation/index.js";
+import type { SimCognitoIdentityProvider } from "../cognito/index.js";
 import type { SimRoute53 } from "../route53/index.js";
 import { SimAwsServiceFactory } from "./factory/sim-aws-service-factory.js";
 import { SimAwsScopeRegistry } from "./scope/sim-aws-scope-registry.js";
@@ -189,86 +190,67 @@ export class SimAws {
     return this.scopes.accountRegionScope(accountId, regionName);
   }
 
-  /**
-   * Get simulated ACM in the default Account Region scope.
-   */
+  /** Get simulated ACM in the default Account Region scope. */
   acm(): SimAcm {
     return this.accountRegionScope().acm();
   }
 
-  /**
-   * Get simulated CloudFormation in the default Account Region scope.
-   */
+  /** Get simulated CloudFormation in the default Account Region scope. */
   cloudFormation(): SimCloudFormation {
     return this.accountRegionScope().cloudFormation();
   }
 
-  /**
-   * Get simulated CloudFront in the default Account scope.
-   */
+  /** Get simulated CloudFront in the default Account scope. */
   cloudFront(): SimCloudFront {
     return this.accountRegionScope().cloudFront();
   }
 
-  /**
-   * Get simulated DynamoDB in the default Account Region scope.
-   */
+  /** Get simulated Cognito user pools in the default Account Region scope. */
+  cognitoIdentityProvider(): SimCognitoIdentityProvider {
+    return this.accountRegionScope().cognitoIdentityProvider();
+  }
+
+  /** Get simulated DynamoDB in the default Account Region scope. */
   dynamoDb(): SimDynamoDatabase {
     return this.accountRegionScope().dynamoDb();
   }
 
-  /**
-   * Get simulated IAM in the default Account scope.
-   */
+  /** Get simulated IAM in the default Account scope. */
   iam(): SimIam {
     return this.accountRegionScope().iam();
   }
 
-  /**
-   * Get simulated KMS in the default Account Region scope.
-   */
+  /** Get simulated KMS in the default Account Region scope. */
   kms(): SimKms {
     return this.accountRegionScope().kms();
   }
 
-  /**
-   * Get simulated Lambda in the default Account Region scope.
-   */
+  /** Get simulated Lambda in the default Account Region scope. */
   lambda(): SimLambda {
     return this.accountRegionScope().lambda();
   }
 
-  /**
-   * Get simulated Route53 in the default Account scope.
-   */
+  /** Get simulated Route53 in the default Account scope. */
   route53(): SimRoute53 {
     return this.accountRegionScope().route53();
   }
 
-  /**
-   * Get simulated S3 in the default Account Region scope.
-   */
+  /** Get simulated S3 in the default Account Region scope. */
   s3(): SimS3 {
     return this.accountRegionScope().s3();
   }
 
-  /**
-   * Get simulated Secrets Manager in the default Account Region scope.
-   */
+  /** Get simulated Secrets Manager in the default Account Region scope. */
   secretsManager(): SimSecretsManager {
     return this.accountRegionScope().secretsManager();
   }
 
-  /**
-   * Get simulated SSM in the default Account Region scope.
-   */
+  /** Get simulated SSM in the default Account Region scope. */
   ssm(): SimSsm {
     return this.accountRegionScope().ssm();
   }
 
-  /**
-   * Get simulated STS in the default Account Region scope.
-   */
+  /** Get simulated STS in the default Account Region scope. */
   sts(): SimSts {
     return this.accountRegionScope().sts();
   }

@@ -6,6 +6,7 @@ import type { SimS3 } from "../s3/sim-s3.js";
 import type { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
 import type { SimDynamoDb as SimDynamoDatabase } from "../dynamodb/index.js";
 import type { SimCloudFormation } from "../cloudformation/index.js";
+import type { SimCognitoIdentityProvider } from "../cognito/index.js";
 import type { SimRoute53 } from "../route53/index.js";
 import type { SimAcm } from "../acm/sim-acm.js";
 import type { SimIam } from "../iam/index.js";
@@ -76,6 +77,15 @@ export class SimAwsAccountRegionContainer {
   cloudFront(): SimCloudFront {
     return this.memo.getOrCreate("cloudFront", () =>
       this.simAws.serviceFactory.createCloudFront(this),
+    );
+  }
+
+  /**
+   * Get simulated Cognito user pools for this account and region.
+   */
+  cognitoIdentityProvider(): SimCognitoIdentityProvider {
+    return this.memo.getOrCreate("cognitoIdentityProvider", () =>
+      this.simAws.serviceFactory.createCognitoIdentityProvider(this),
     );
   }
 
