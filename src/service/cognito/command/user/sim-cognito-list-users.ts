@@ -1,7 +1,7 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { SimCognitoPage } from "../sim-cognito-page.js";
 import { SimCognitoUnsimulatedUserOptions } from "./sim-cognito-unsimulated-user-options.js";
-import type { SimCognitoUserResolver } from "./sim-cognito-user-resolver.js";
+import type { SimCognitoRequestResolver } from "../sim-cognito-request-resolver.js";
 import { SimCognitoUserView } from "./sim-cognito-user-view.js";
 import type {
   SimListUsersCommand,
@@ -9,7 +9,7 @@ import type {
 } from "./list-users.command.js";
 
 interface SimCognitoListUsersProperties {
-  readonly resolver: SimCognitoUserResolver;
+  readonly resolver: SimCognitoRequestResolver;
 }
 
 interface SimCognitoCommandOptions {
@@ -30,7 +30,7 @@ const defaultLimit = 60;
  * `NextToken`, which is how the real operation names them.
  */
 export class SimCognitoListUsers {
-  private readonly resolver: SimCognitoUserResolver;
+  private readonly resolver: SimCognitoRequestResolver;
   private readonly view = new SimCognitoUserView();
   private readonly unsimulatedOptions = new SimCognitoUnsimulatedUserOptions();
 

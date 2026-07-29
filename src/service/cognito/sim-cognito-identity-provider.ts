@@ -3,7 +3,6 @@ import {
   BackgroundTasks,
 } from "../../util/background/background.js";
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
-import type { SimAwsCaller } from "../aws/caller/sim-aws-caller.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import {
@@ -13,13 +12,16 @@ import {
 import type * as simCognitoCommands from "./command/sim-cognito-command.types.js";
 import { SimCognitoCommands } from "./command/sim-cognito-commands.js";
 import { SimCognitoSdkCommandRouter } from "./sdk/sim-cognito-sdk-command-router.js";
+import {
+  type SimCognitoIdentityProviderRequestOptions,
+  SimCognitoUserDirectory,
+} from "./sim-cognito-user-directory.js";
+
 import type { SimCognitoUserPool } from "./user-pool/sim-cognito-user-pool.js";
 import type { SimCognitoUserPoolId } from "./user-pool/sim-cognito-user-pool-id.js";
 import { SimCognitoUserPoolStore } from "./user-pool/sim-cognito-user-pool-store.js";
 
-export interface SimCognitoIdentityProviderRequestOptions {
-  readonly caller?: SimAwsCaller;
-}
+export type { SimCognitoIdentityProviderRequestOptions } from "./sim-cognito-user-directory.js";
 
 interface SimCognitoIdentityProviderProperties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
@@ -35,13 +37,15 @@ interface SimCognitoIdentityProviderProperties {
  * id names the region it was created in, and an app client id is only
  * meaningful inside its pool.
  *
+ * The pool and app client operations are here. The user and group operations
+ * are on `SimCognitoUserDirectory`, which this extends, so a caller reaches
+ * all of them on one service object.
+ *
  * Only user pools are simulated. Cognito identity pools, which hand out AWS
  * credentials, are a different service and are not simulated at all.
  */
-export class SimCognitoIdentityProvider {
-  private readonly pools = new SimCognitoUserPoolStore();
-  private readonly commands: SimCognitoCommands;
-  private readonly background: BackgroundScheduler;
+export class SimCognitoIdentityProvider extends SimCognitoUserDirectory {
+  private readonly pools: SimCognitoUserPoolStore;
   private readonly sdkRouter = new SimCognitoSdkCommandRouter(this);
 
   constructor(properties: SimCognitoIdentityProviderProperties = {}) {
@@ -50,14 +54,19 @@ export class SimCognitoIdentityProvider {
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
     } = properties;
+    const pools = new SimCognitoUserPoolStore();
 
-    this.background = background;
-    this.commands = new SimCognitoCommands({
-      accountRegionScope,
-      iam,
-      clock: background,
-      pools: this.pools,
+    super({
+      commands: new SimCognitoCommands({
+        accountRegionScope,
+        iam,
+        clock: background,
+        pools,
+      }),
+      background,
     });
+
+    this.pools = pools;
   }
 
   /**
@@ -156,94 +165,6 @@ export class SimCognitoIdentityProvider {
   ): Promise<simCognitoCommands.SimListUserPoolClientsCommandOutput> {
     await this.background.sequence();
     return this.commands.listClients.handle(command, options);
-  }
-
-  /**
-   * Handle an AdminCreateUser Command from the SDK.
-   */
-  async adminCreateUser(
-    command: simCognitoCommands.SimAdminCreateUserCommand,
-    options?: SimCognitoIdentityProviderRequestOptions,
-  ): Promise<simCognitoCommands.SimAdminCreateUserCommandOutput> {
-    await this.background.sequence();
-    return this.commands.users.create(command, options);
-  }
-
-  /**
-   * Handle an AdminGetUser Command from the SDK.
-   */
-  async adminGetUser(
-    command: simCognitoCommands.SimAdminGetUserCommand,
-    options?: SimCognitoIdentityProviderRequestOptions,
-  ): Promise<simCognitoCommands.SimAdminGetUserCommandOutput> {
-    await this.background.sequence();
-    return this.commands.users.get(command, options);
-  }
-
-  /**
-   * Handle an AdminDeleteUser Command from the SDK.
-   */
-  async adminDeleteUser(
-    command: simCognitoCommands.SimAdminDeleteUserCommand,
-    options?: SimCognitoIdentityProviderRequestOptions,
-  ): Promise<simCognitoCommands.SimAdminDeleteUserCommandOutput> {
-    await this.background.sequence();
-    return this.commands.users.delete(command, options);
-  }
-
-  /**
-   * Handle an AdminSetUserPassword Command from the SDK.
-   */
-  async adminSetUserPassword(
-    command: simCognitoCommands.SimAdminSetUserPasswordCommand,
-    options?: SimCognitoIdentityProviderRequestOptions,
-  ): Promise<simCognitoCommands.SimAdminSetUserPasswordCommandOutput> {
-    await this.background.sequence();
-    return this.commands.userUpdates.setPassword(command, options);
-  }
-
-  /**
-   * Handle an AdminUpdateUserAttributes Command from the SDK.
-   */
-  async adminUpdateUserAttributes(
-    command: simCognitoCommands.SimAdminUpdateUserAttributesCommand,
-    options?: SimCognitoIdentityProviderRequestOptions,
-  ): Promise<simCognitoCommands.SimAdminUpdateUserAttributesCommandOutput> {
-    await this.background.sequence();
-    return this.commands.userUpdates.updateAttributes(command, options);
-  }
-
-  /**
-   * Handle an AdminDisableUser Command from the SDK.
-   */
-  async adminDisableUser(
-    command: simCognitoCommands.SimAdminDisableUserCommand,
-    options?: SimCognitoIdentityProviderRequestOptions,
-  ): Promise<simCognitoCommands.SimAdminDisableUserCommandOutput> {
-    await this.background.sequence();
-    return this.commands.userUpdates.disable(command, options);
-  }
-
-  /**
-   * Handle an AdminEnableUser Command from the SDK.
-   */
-  async adminEnableUser(
-    command: simCognitoCommands.SimAdminEnableUserCommand,
-    options?: SimCognitoIdentityProviderRequestOptions,
-  ): Promise<simCognitoCommands.SimAdminEnableUserCommandOutput> {
-    await this.background.sequence();
-    return this.commands.userUpdates.enable(command, options);
-  }
-
-  /**
-   * Handle a ListUsers Command from the SDK.
-   */
-  async listUsers(
-    command: simCognitoCommands.SimListUsersCommand,
-    options?: SimCognitoIdentityProviderRequestOptions,
-  ): Promise<simCognitoCommands.SimListUsersCommandOutput> {
-    await this.background.sequence();
-    return this.commands.listUsers.handle(command, options);
   }
 
   /**

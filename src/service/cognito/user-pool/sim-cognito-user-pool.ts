@@ -1,6 +1,9 @@
 import type { SimCognitoUserPoolClient } from "./client/sim-cognito-user-pool-client.js";
 import type { SimCognitoUserPoolClientId } from "./client/sim-cognito-user-pool-client-id.js";
 import { SimCognitoUserPoolClientStore } from "./client/sim-cognito-user-pool-client-store.js";
+import type { SimCognitoGroup } from "./group/sim-cognito-group.js";
+import type { SimCognitoGroupName } from "./group/sim-cognito-group-name.js";
+import { SimCognitoGroupStore } from "./group/sim-cognito-group-store.js";
 import type { SimCognitoDeletionProtection } from "./sim-cognito-deletion-protection.js";
 import type { SimCognitoName } from "./sim-cognito-name.js";
 import type { SimCognitoPasswordPolicy } from "./sim-cognito-password-policy.js";
@@ -36,6 +39,7 @@ export class SimCognitoUserPool {
 
   private readonly clientStore = new SimCognitoUserPoolClientStore();
   private readonly userStore = new SimCognitoUserStore();
+  private readonly groupStore = new SimCognitoGroupStore();
 
   constructor(properties: SimCognitoUserPoolProperties) {
     this.id = properties.id;
@@ -122,10 +126,14 @@ export class SimCognitoUserPool {
   }
 
   /**
-   * Forget a deleted user.
+   * Forget a deleted user, and take them out of every group.
+   *
+   * A group holding a user that no longer exists would answer `ListUsersInGroup`
+   * with a member this pool cannot describe.
    */
   removeUser(user: SimCognitoUser): void {
     this.userStore.remove(user);
+    this.groupStore.forgetUser(user.username);
   }
 
   /**
@@ -140,5 +148,47 @@ export class SimCognitoUserPool {
    */
   requireUser(username: SimCognitoUsername): SimCognitoUser {
     return this.userStore.require(username);
+  }
+
+  /**
+   * Every group in this pool, in creation order.
+   */
+  get groups(): readonly SimCognitoGroup[] {
+    return this.groupStore.all;
+  }
+
+  /**
+   * Store a newly created group, refusing a name already in this pool.
+   */
+  addGroup(group: SimCognitoGroup): void {
+    this.groupStore.add(group);
+  }
+
+  /**
+   * Forget a deleted group, and with it the membership of its users.
+   */
+  removeGroup(group: SimCognitoGroup): void {
+    this.groupStore.remove(group);
+  }
+
+  /**
+   * Find a group of this pool by name.
+   */
+  findGroup(groupName: string): SimCognitoGroup | undefined {
+    return this.groupStore.find(groupName);
+  }
+
+  /**
+   * Resolve a group of this pool by name, or refuse.
+   */
+  requireGroup(groupName: SimCognitoGroupName): SimCognitoGroup {
+    return this.groupStore.require(groupName);
+  }
+
+  /**
+   * The groups a user of this pool belongs to, strongest precedence first.
+   */
+  groupsOf(username: string): readonly SimCognitoGroup[] {
+    return this.groupStore.forUser(username);
   }
 }

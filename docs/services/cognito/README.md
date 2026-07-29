@@ -19,10 +19,14 @@ Sim Cognito currently supports:
 - `AdminCreateUserCommand`, `AdminGetUserCommand`, `AdminDeleteUserCommand`,
   `AdminSetUserPasswordCommand`, `AdminUpdateUserAttributesCommand`, `AdminDisableUserCommand`,
   `AdminEnableUserCommand` and `ListUsersCommand`
+- `CreateGroupCommand`, `GetGroupCommand`, `UpdateGroupCommand`, `DeleteGroupCommand`,
+  `ListGroupsCommand`, `AdminAddUserToGroupCommand`, `AdminRemoveUserFromGroupCommand`,
+  `AdminListGroupsForUserCommand` and `ListUsersInGroupCommand`
 - Pool ids in the real `<region>_<nine characters>` form, and pool ARNs built from them
 - The real default password policy, applied to the passwords users are given
 - The real user status lifecycle, so an admin-created user stays in `FORCE_CHANGE_PASSWORD` until it
   has a permanent password
+- Group membership, and the precedence order the `cognito:groups` claim will use
 - App client authentication flows, token lifetimes and generated client secrets
 - Authorization of every operation by simulated IAM, against the real IAM action and ARN
 - Calls made from inside a simulated Lambda handler, authorized as the function's execution role
@@ -225,6 +229,100 @@ console.log(listed.Users?.map((user) => user.Username)); // [ "alice", "bob" ]
 `Filter` is refused rather than ignored. A filter that was quietly dropped would answer with the
 wrong users rather than with an error, which is the kind of pass that turns into a failure in a
 deployment. List the users and filter them in the test instead.
+
+## Groups
+
+Most authorization code built on Cognito reads `cognito:groups` off a verified token and decides
+what the caller may do. Groups are what put a user in that claim.
+
+A group belongs to a pool, holds users, and carries a `Precedence` that decides which of a user's
+groups comes first.
+
+```typescript sim-cognito-groups
+/**
+ * Putting a simulated user in groups, and reading them back by precedence.
+ */
+
+import {
+  AdminAddUserToGroupCommand,
+  AdminCreateUserCommand,
+  AdminListGroupsForUserCommand,
+  CreateGroupCommand,
+  CreateUserPoolCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const cognito = simAws.cognitoIdentityProvider();
+
+const pool = await cognito.createUserPool(
+  new CreateUserPoolCommand({ PoolName: "myapp-users" }),
+);
+const userPoolId = pool.UserPool?.Id;
+
+await cognito.adminCreateUser(
+  new AdminCreateUserCommand({ UserPoolId: userPoolId, Username: "alice" }),
+);
+
+await cognito.createGroup(
+  new CreateGroupCommand({
+    UserPoolId: userPoolId,
+    GroupName: "readers",
+    Precedence: 10,
+  }),
+);
+await cognito.createGroup(
+  new CreateGroupCommand({
+    UserPoolId: userPoolId,
+    GroupName: "admins",
+    Precedence: 1,
+  }),
+);
+
+await cognito.adminAddUserToGroup(
+  new AdminAddUserToGroupCommand({
+    UserPoolId: userPoolId,
+    Username: "alice",
+    GroupName: "readers",
+  }),
+);
+await cognito.adminAddUserToGroup(
+  new AdminAddUserToGroupCommand({
+    UserPoolId: userPoolId,
+    Username: "alice",
+    GroupName: "admins",
+  }),
+);
+
+const groups = await cognito.adminListGroupsForUser(
+  new AdminListGroupsForUserCommand({
+    UserPoolId: userPoolId,
+    Username: "alice",
+  }),
+);
+
+console.log(groups.Groups?.map((group) => group.GroupName));
+// [ "admins", "readers" ], strongest precedence first
+```
+
+Zero is the strongest precedence, not the weakest, and a group created without one is weaker than
+any group that has one. `AdminListGroupsForUser` sorts by it, lowest value first, which is the order
+the `cognito:groups` claim will use once tokens are simulated. `ListGroups` does not sort: it lists
+a pool's groups in creation order.
+
+Adding a user to a group they are already in succeeds and changes nothing, as it does on real
+Cognito, so nothing has to check first. Removing a user who was never in the group succeeds too.
+
+Deleting a group takes the membership with it and leaves the users alone. Deleting a user takes them
+out of every group, so a group never holds a member the pool cannot describe.
+
+`ListUsersInGroup` reads the membership the other way round, and answers with the same user shape
+`ListUsers` does.
+
+`UpdateGroup` replaces the description, the precedence and the role together, so a property the
+request leaves out is cleared. Real Cognito does not document whether it replaces or merges here,
+and naming every property is the one thing that behaves the same either way.
 
 ## App clients
 
@@ -514,8 +612,18 @@ Current documented limitations:
   `AdminUpdateUserAttributes` refuses `ClientMetadata` the same way.
 - `ListUsers` refuses `Filter` and `AttributesToGet` rather than ignoring them, and lists users in
   creation order. Real Cognito chooses its own order and does not promise one.
-- `ListUsers` refuses a `Limit` of zero, which the real operation accepts without saying what it
-  returns. Refusing it is better than guessing between an empty page and a full one.
+- `ListUsers`, `ListGroups`, `AdminListGroupsForUser` and `ListUsersInGroup` refuse a `Limit` of
+  zero, which the real operations accept without saying what they return. Refusing it is better than
+  guessing between an empty page and a full one.
+- Real Cognito does not document the order `AdminListGroupsForUser` returns groups in. Here it is by
+  precedence, because that is the order the `cognito:groups` claim uses, and it is what a test
+  reading the first group is usually after.
+- `UpdateGroup` replaces all three group properties rather than merging, so an omitted one is
+  cleared. Real Cognito does not say which it does.
+- A group's `RoleArn` is stored and reported, and nothing assumes that role. It reaches the
+  `cognito:roles` and `cognito:preferred_role` claims, which are not simulated yet, and identity
+  pools, which are not simulated at all.
+- Group to IAM role mapping is an identity pool feature and is not simulated.
 - Only the standard user attributes exist, because a pool is created without a `Schema`. A `custom:`
   attribute is refused, and so is a request setting `sub`. `AdminDeleteUserAttributes` is not
   implemented, so an attribute can be changed but not removed.

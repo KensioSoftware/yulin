@@ -60,6 +60,20 @@ export class SimCognitoUsernameExistsException extends SimCognitoError {
 }
 
 /**
+ * Simulated Cognito GroupExistsException error.
+ *
+ * Real Cognito reports a second group created with a name the pool already
+ * holds this way.
+ */
+export class SimCognitoGroupExistsException extends SimCognitoError {
+  public override readonly name = "GroupExistsException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
  * Simulated Cognito UserNotFoundException error.
  *
  * Real Cognito reports an operation naming a user its pool does not hold this
