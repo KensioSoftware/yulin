@@ -42,21 +42,23 @@ export class SimCognitoUserCommands {
   }
 
   /**
-   * Check a temporary password against the pool's policy.
+   * Read the temporary password the request named, or none.
    *
-   * A request naming no temporary password is fine: real Cognito generates one
-   * and sends it to the user. Nothing is delivered here, and the generated
-   * password would be unusable anyway, so none is generated.
+   * A request naming none is fine, and leaves the user with no password at
+   * all: real Cognito generates one and sends it to the user, and nothing
+   * here delivers a message for the user to read it from. Such a user reaches
+   * the `NEW_PASSWORD_REQUIRED` challenge with no password to get past it, so
+   * name a `TemporaryPassword` when the test means to sign in.
    */
-  private static requireAllowedTemporaryPassword(
+  private static allowedTemporaryPassword(
     pool: SimCognitoUserPool,
     temporaryPassword: string | undefined,
-  ): void {
+  ): string | undefined {
     if (temporaryPassword === undefined) {
-      return;
+      return undefined;
     }
 
-    new SimCognitoPasswordCheck(pool.passwordPolicy).require(
+    return new SimCognitoPasswordCheck(pool.passwordPolicy).require(
       "TemporaryPassword",
       temporaryPassword,
     );
@@ -83,14 +85,14 @@ export class SimCognitoUserCommands {
     const username = requireSimCognitoUsername(input.Username);
 
     this.unsimulatedOptions.refuseInCreate(input);
-    SimCognitoUserCommands.requireAllowedTemporaryPassword(
-      pool,
-      input.TemporaryPassword,
-    );
 
     const user = this.userFactory.make({
       username,
       attributes: input.UserAttributes,
+      temporaryPassword: SimCognitoUserCommands.allowedTemporaryPassword(
+        pool,
+        input.TemporaryPassword,
+      ),
     });
 
     pool.addUser(user);

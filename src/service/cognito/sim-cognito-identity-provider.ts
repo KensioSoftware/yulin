@@ -18,7 +18,10 @@ import {
 } from "./sim-cognito-user-directory.js";
 
 import type { SimCognitoUserPool } from "./user-pool/sim-cognito-user-pool.js";
-import type { SimCognitoUserPoolId } from "./user-pool/sim-cognito-user-pool-id.js";
+import {
+  requireSimCognitoUserPoolId,
+  type SimCognitoUserPoolId,
+} from "./user-pool/sim-cognito-user-pool-id.js";
 import { SimCognitoUserPoolStore } from "./user-pool/sim-cognito-user-pool-store.js";
 
 export type { SimCognitoIdentityProviderRequestOptions } from "./sim-cognito-user-directory.js";
@@ -77,6 +80,16 @@ export class SimCognitoIdentityProvider extends SimCognitoUserDirectory {
    */
   findUserPool(userPoolId: string): SimCognitoUserPool | undefined {
     return this.pools.find(userPoolId as SimCognitoUserPoolId);
+  }
+
+  /**
+   * Get a user pool by id, or refuse.
+   *
+   * This is the simulator's own accessor too, and it is what a test reaches
+   * for to hand a pool's JWKS to a token verifier.
+   */
+  userPool(userPoolId: string): SimCognitoUserPool {
+    return this.pools.require(requireSimCognitoUserPoolId(userPoolId));
   }
 
   /**

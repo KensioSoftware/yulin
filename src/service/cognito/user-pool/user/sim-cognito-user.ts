@@ -3,6 +3,7 @@ import type {
   SimCognitoAttributeType,
   SimCognitoUserAttributes,
 } from "./sim-cognito-user-attributes.js";
+import { SimCognitoUserPassword } from "./sim-cognito-user-password.js";
 import { SimCognitoUserStatus } from "./sim-cognito-user-status.js";
 import type { SimCognitoUsername } from "./sim-cognito-username.js";
 
@@ -10,6 +11,7 @@ interface SimCognitoUserProperties {
   readonly username: SimCognitoUsername;
   readonly sub: string;
   readonly attributes: SimCognitoUserAttributes;
+  readonly password?: SimCognitoUserPassword | undefined;
   readonly clock: SimClock;
 }
 
@@ -32,6 +34,7 @@ export class SimCognitoUser {
   private readonly clock: SimClock;
   private readonly userAttributes: SimCognitoUserAttributes;
   private userStatus = SimCognitoUserStatus.forceChangePassword;
+  private userPassword: SimCognitoUserPassword | undefined;
   private isEnabled = true;
   private modifiedDate: Date;
 
@@ -39,6 +42,7 @@ export class SimCognitoUser {
     this.username = properties.username;
     this.sub = properties.sub;
     this.userAttributes = properties.attributes;
+    this.userPassword = properties.password;
     this.clock = properties.clock;
     this.creationDate = this.clock.now();
     this.modifiedDate = this.creationDate;
@@ -80,16 +84,38 @@ export class SimCognitoUser {
   }
 
   /**
-   * Note that an admin has set a password on this user.
+   * The user's attributes by name, without the `sub` Cognito allocated.
    *
-   * The password itself is checked against the pool's policy and not kept,
-   * because nothing authenticates here yet. What it changes is the user's
-   * status: a permanent password is the user's own, and a temporary one
-   * leaves the user having to replace it before it can sign in.
+   * This is what an id token's claims are built from: every attribute there
+   * has a value, and the sub is a claim of its own.
    */
-  setPassword(permanent: boolean | undefined): void {
+  get attributeValues(): ReadonlyMap<string, string> {
+    return this.userAttributes.values;
+  }
+
+  /**
+   * Set the password an admin gave this user.
+   *
+   * A permanent password is the user's own, and confirms it. A temporary one
+   * leaves the user in `FORCE_CHANGE_PASSWORD`, having to replace it through
+   * the `NEW_PASSWORD_REQUIRED` challenge before it can sign in normally.
+   */
+  setPassword(password: string, permanent: boolean | undefined): void {
+    this.userPassword = new SimCognitoUserPassword(password);
     this.userStatus = SimCognitoUserStatus.afterPasswordSet(permanent);
     this.touch();
+  }
+
+  /**
+   * Whether a candidate password is this user's.
+   *
+   * A user with no password at all matches nothing. `AdminCreateUser` leaves
+   * one that way when the request named no `TemporaryPassword`: real Cognito
+   * generates one and sends it to the user, and nothing here delivers a
+   * message for the user to read it from.
+   */
+  hasPassword(candidate: string | undefined): boolean {
+    return this.userPassword?.matches(candidate) ?? false;
   }
 
   /**

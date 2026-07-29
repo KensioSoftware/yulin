@@ -3,9 +3,9 @@
 This directory contains the simulated Cognito user pools implementation. Cognito identity pools,
 which exchange a token for AWS credentials, are a separate service and are not simulated at all.
 
-The pool, the app client, the users and groups in it, and the authorizer are here. An app client's
-authentication flows are validated and stored, and nothing acts on them: tokens and sign-in itself
-are not here yet.
+The pool, the app client, the users and groups in it, the admin sign-in flow, the tokens it issues
+and the authorizer are all here. The client-side flows are not: `InitiateAuth`, SRP and the hosted
+UI are a separate piece of work.
 
 ## Entry points
 
@@ -63,10 +63,12 @@ User state lives under `user-pool/user/`, and the pool owns its users for the sa
 its app clients: deleting a pool takes them with it, and a username means nothing outside the pool
 holding it.
 
-`SimCognitoUser` is the stored user: its username, its `sub`, its attributes, its status and whether
-it is enabled. The `sub` is a fresh UUID rather than anything derived from the username, because
-that is the difference most code gets wrong. A user holds no password. Passwords are checked against
-the pool's policy and discarded, since nothing authenticates yet and nothing reads one back.
+`SimCognitoUser` is the stored user: its username, its `sub`, its attributes, its status, whether it
+is enabled and the password it signs in with. The `sub` is a fresh UUID rather than anything derived
+from the username, because that is the difference most code gets wrong. The password is checked
+against the pool's policy when it is set, and held as a `SimCognitoUserPassword` that answers
+whether a candidate matches and exposes nothing, the same modelling choice simulated KMS key
+material makes.
 
 `SimCognitoUserStatus` holds the two statuses this simulation can reach, and the transition between
 them. `AdminCreateUser` leaves a user in `FORCE_CHANGE_PASSWORD`, and only a permanent password
@@ -105,7 +107,43 @@ callers towards.
 
 `SimCognitoGroupStore.forUser` is where precedence ordering happens: lowest value first, groups with
 no precedence last, and groups sharing one in creation order. That is the order the `cognito:groups`
-claim will use, so `AdminListGroupsForUser` reads the same way the claim will.
+claim uses, so `AdminListGroupsForUser` reads the same way the claim does.
+
+## Token model
+
+Token state lives under `user-pool/token/`.
+
+`SimCognitoSigningKey` holds a real RSA key pair generated with `node:crypto`, and signs real RS256
+JWTs. Each pool has its own, as each real pool does, so a token from one pool carries a signature
+another pool's JWKS cannot verify. A pool generates its key the first time it signs or publishes
+one, rather than when it is created, because 2048-bit generation takes long enough to notice and
+most pools in a suite never sign anything. Nothing is written to disk and no key material is in the
+repository.
+
+`SimCognitoIdToken` and `SimCognitoAccessToken` build the claims of each token, and
+`SimCognitoSharedTokenClaims` builds what both carry. They are separate because the difference
+between them is the point: an id token has `aud`, `cognito:username` and the user's attributes, and
+an access token has `client_id`, `username` and a `scope`. Code reading the wrong one for a claim
+fails here the way it fails in production.
+
+`SimCognitoTokenIssuer` ties them together and takes every timestamp from the injectable clock, so a
+sign-in in the simulated past produces a token a verifier already considers expired. It also mints
+the refresh token, which is an opaque string rather than a JWT, as it is on real Cognito.
+
+## Authentication model
+
+Sign-in state lives under `user-pool/auth/`.
+
+`SimCognitoAuthSession` is what an unfinished authentication carries between the request that started
+it and the response that completes it. A session is opaque, single use, tied to its user and app
+client, and lasts the three minutes real Cognito gives one.
+
+`requireSimCognitoSecretHash` checks the `SECRET_HASH` a client with a secret has to send, computed
+the way the AWS SDKs compute it. Checking it is what makes a test notice a client secret it forgot to
+use.
+
+`SimCognitoUserPassword` holds what a user signs in with. It answers whether a candidate matches and
+nothing exposes it, the same modelling choice simulated KMS key material makes.
 
 ## Command handling
 
@@ -119,6 +157,8 @@ rather than one class per command, so the `SimCognitoIdentityProvider` facade st
   and the commands that change one afterwards
 - `command/group/`: the same for groups, split between the commands that act on a group and the
   commands that move users in and out of one
+- `command/auth/`: `AdminInitiateAuth` and `AdminRespondToAuthChallenge`, the flow and challenge
+  names they accept, and the parameters they read
 - `command/authorize/`: the shared IAM authorizer
 - `command/sim-cognito-page.ts`: the paging every listing shares, which takes the names of the
   inputs it is reading because `ListUsers` calls its page size `Limit` and its token
@@ -168,8 +208,14 @@ resource, here or on real AWS.
   validates user attributes against it.
 - Users are resolved by username only, and real Cognito also accepts a `sub` there.
 - `AdminListGroupsForUser` sorts by precedence. Real Cognito does not document an order for it.
+- One signing key is published per pool, where real Cognito publishes two and rotates between them.
+- Only `ADMIN_USER_PASSWORD_AUTH` runs, and only `NEW_PASSWORD_REQUIRED` is issued. Every other flow
+  and challenge is refused rather than treated as one of those.
+- A verifier reading the host clock judges an already-issued token by host time. Advancing the
+  simulated clock moves the timestamps of tokens issued after it, and signing in in the simulated
+  past is what produces a token such a verifier refuses.
 - `UpdateGroup` replaces all three group properties rather than merging an omitted one.
-- A password is checked and discarded rather than stored, because nothing authenticates yet.
+- A password is held so a user can sign in with it, and nothing reads one back.
 - No message is delivered, so `AdminCreateUser` accepts `MessageAction: SUPPRESS` and refuses
   `RESEND` and `DesiredDeliveryMediums`.
 - Listings are in creation order and carry no filtering. `ListUsers` refuses a `Filter` rather than

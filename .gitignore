@@ -308,6 +308,3 @@ dmypy.json
 tmp/
 *.tmp
 *.tmp.*
-
-# Video demo project (see .claude/video/HOUSE-STYLE.md)
-/yulin-demo/

@@ -10,6 +10,10 @@ import type {
 } from "../command/client/user-pool-client.command.js";
 import type { SimListUserPoolClientsCommand } from "../command/client/list-user-pool-clients.command.js";
 import type {
+  SimAdminInitiateAuthCommand,
+  SimAdminRespondToAuthChallengeCommand,
+} from "../command/auth/auth.command.js";
+import type {
   SimAdminAddUserToGroupCommand,
   SimAdminListGroupsForUserCommand,
   SimAdminRemoveUserFromGroupCommand,
@@ -237,6 +241,22 @@ export class SimCognitoSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simCognito.adminListGroupsForUser(
             command as SimAdminListGroupsForUserCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "AdminInitiateAuthCommand",
+        async (command, context): Promise<unknown> =>
+          await simCognito.adminInitiateAuth(
+            command as SimAdminInitiateAuthCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "AdminRespondToAuthChallengeCommand",
+        async (command, context): Promise<unknown> =>
+          await simCognito.adminRespondToAuthChallenge(
+            command as SimAdminRespondToAuthChallengeCommand,
             simSdkCallerOptions(context),
           ),
       ],

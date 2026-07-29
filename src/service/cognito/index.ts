@@ -48,10 +48,21 @@ export {
   type SimCognitoGroupSettingsInput,
 } from "./user-pool/group/sim-cognito-group-settings.js";
 export {
+  SimCognitoSigningKey,
+  type SimCognitoJwk,
+  type SimCognitoJwks,
+} from "./user-pool/token/sim-cognito-signing-key.js";
+export {
+  SimCognitoTokenIssuer,
+  type SimCognitoIssuedTokens,
+} from "./user-pool/token/sim-cognito-token-issuer.js";
+export { SimCognitoAuthSession } from "./user-pool/auth/sim-cognito-auth-session.js";
+export {
   SimCognitoError,
   SimCognitoGroupExistsException,
   SimCognitoInvalidParameterException,
   SimCognitoInvalidPasswordException,
+  SimCognitoNotAuthorizedException,
   SimCognitoResourceNotFoundException,
   SimCognitoUsernameExistsException,
   SimCognitoUserNotFoundException,

@@ -5,6 +5,7 @@ import {
   SimCognitoUserAttributes,
 } from "./sim-cognito-user-attributes.js";
 import { SimCognitoUser } from "./sim-cognito-user.js";
+import { SimCognitoUserPassword } from "./sim-cognito-user-password.js";
 import type { SimCognitoUsername } from "./sim-cognito-username.js";
 
 interface SimCognitoUserFactoryProperties {
@@ -14,6 +15,11 @@ interface SimCognitoUserFactoryProperties {
 interface SimCognitoMakeUserProperties {
   readonly username: SimCognitoUsername;
   readonly attributes?: readonly SimCognitoAttributeType[] | undefined;
+  /**
+   * The password the user starts with, already checked against the pool's
+   * policy. A user made without one has no password at all.
+   */
+  readonly temporaryPassword?: string | undefined;
 }
 
 /**
@@ -24,6 +30,16 @@ export class SimCognitoUserFactory {
 
   constructor(properties: SimCognitoUserFactoryProperties) {
     this.clock = properties.clock;
+  }
+
+  private static passwordFor(
+    temporaryPassword: string | undefined,
+  ): SimCognitoUserPassword | undefined {
+    if (temporaryPassword === undefined) {
+      return undefined;
+    }
+
+    return new SimCognitoUserPassword(temporaryPassword);
   }
 
   /**
@@ -38,6 +54,7 @@ export class SimCognitoUserFactory {
       username: properties.username,
       sub: randomUUID(),
       attributes: new SimCognitoUserAttributes(properties.attributes),
+      password: SimCognitoUserFactory.passwordFor(properties.temporaryPassword),
       clock: this.clock,
     });
   }

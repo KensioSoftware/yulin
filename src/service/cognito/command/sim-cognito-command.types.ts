@@ -94,3 +94,12 @@ export type {
   SimListUsersInGroupCommandInput,
   SimListUsersInGroupCommandOutput,
 } from "./group/group-membership.command.js";
+export type {
+  SimAdminInitiateAuthCommand,
+  SimAdminInitiateAuthCommandInput,
+  SimAdminInitiateAuthCommandOutput,
+  SimAdminRespondToAuthChallengeCommand,
+  SimAdminRespondToAuthChallengeCommandInput,
+  SimAdminRespondToAuthChallengeCommandOutput,
+  SimCognitoAuthenticationResultType,
+} from "./auth/auth.command.js";
