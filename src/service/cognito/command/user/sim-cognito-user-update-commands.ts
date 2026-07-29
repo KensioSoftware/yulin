@@ -55,12 +55,12 @@ export class SimCognitoUserUpdateCommands {
       options,
     );
 
-    new SimCognitoPasswordCheck(pool.passwordPolicy).require(
+    const password = new SimCognitoPasswordCheck(pool.passwordPolicy).require(
       "Password",
       input.Password,
     );
 
-    user.setPassword(input.Permanent);
+    user.setPassword(password, input.Permanent);
 
     return { $metadata: {} };
   }

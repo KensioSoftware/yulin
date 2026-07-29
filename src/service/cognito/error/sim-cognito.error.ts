@@ -88,6 +88,21 @@ export class SimCognitoUserNotFoundException extends SimCognitoError {
 }
 
 /**
+ * Simulated Cognito NotAuthorizedException error.
+ *
+ * Real Cognito reports a failed sign-in this way, whether the password was
+ * wrong, the user was disabled or the request could not be verified. It says
+ * no more than that on purpose, and neither does this.
+ */
+export class SimCognitoNotAuthorizedException extends SimCognitoError {
+  public override readonly name = "NotAuthorizedException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
  * Simulated Cognito InvalidPasswordException error.
  *
  * Real Cognito reports a password its pool's password policy does not allow

@@ -120,6 +120,28 @@ export abstract class SimCognitoUserDirectory {
   }
 
   /**
+   * Handle an AdminInitiateAuth Command from the SDK.
+   */
+  async adminInitiateAuth(
+    command: simCognitoCommands.SimAdminInitiateAuthCommand,
+    options?: SimCognitoIdentityProviderRequestOptions,
+  ): Promise<simCognitoCommands.SimAdminInitiateAuthCommandOutput> {
+    await this.background.sequence();
+    return this.commands.initiateAuth.handle(command, options);
+  }
+
+  /**
+   * Handle an AdminRespondToAuthChallenge Command from the SDK.
+   */
+  async adminRespondToAuthChallenge(
+    command: simCognitoCommands.SimAdminRespondToAuthChallengeCommand,
+    options?: SimCognitoIdentityProviderRequestOptions,
+  ): Promise<simCognitoCommands.SimAdminRespondToAuthChallengeCommandOutput> {
+    await this.background.sequence();
+    return this.commands.respondToChallenge.handle(command, options);
+  }
+
+  /**
    * Handle a CreateGroup Command from the SDK.
    */
   async createGroup(

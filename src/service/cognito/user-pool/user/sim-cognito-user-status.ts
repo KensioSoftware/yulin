@@ -45,4 +45,14 @@ export class SimCognitoUserStatus {
 
     return this.forceChangePassword;
   }
+
+  /**
+   * Whether the user has to replace its password before it can sign in.
+   *
+   * This is what turns an authentication into the `NEW_PASSWORD_REQUIRED`
+   * challenge rather than into tokens.
+   */
+  get mustChangePassword(): boolean {
+    return this.value === "FORCE_CHANGE_PASSWORD";
+  }
 }

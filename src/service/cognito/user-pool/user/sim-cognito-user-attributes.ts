@@ -103,6 +103,13 @@ export class SimCognitoUserAttributes {
   }
 
   /**
+   * The attributes by name, in the order they were first set.
+   */
+  get values(): ReadonlyMap<string, string> {
+    return this.byName;
+  }
+
+  /**
    * The attributes, in the order they were first set.
    */
   get entries(): readonly SimCognitoAttributeType[] {

@@ -1,5 +1,6 @@
 import {
   AdminCreateUserCommand,
+  AdminInitiateAuthCommand,
   AdminGetUserCommand,
   AdminSetUserPasswordCommand,
   CreateUserPoolCommand,
@@ -90,6 +91,32 @@ async function simCognitoWithRole(
 }
 
 describe("sim Cognito user IAM authorization", () => {
+  it("denies an authentication the caller's policy does not permit", async () => {
+    // Given a Role allowed to read users but not to sign them in.
+    const { simAws, caller, userPoolId } = await simCognitoWithRole({
+      Effect: "Allow",
+      Action: "cognito-idp:AdminGetUser",
+      Resource: userPoolArn("*"),
+    });
+
+    // When that Role starts an authentication.
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws.cognitoIdentityProvider().adminInitiateAuth(
+        new AdminInitiateAuthCommand({
+          UserPoolId: userPoolId,
+          ClientId: "aaaaaaaaaaaaaaaaaaaaaaaaaa",
+          AuthFlow: "ADMIN_USER_PASSWORD_AUTH",
+          AuthParameters: { USERNAME: "alice", PASSWORD: "Sup3rSecret!" },
+        }),
+        { caller },
+      );
+    });
+
+    // Then it is denied against the pool's ARN, before the app client or the
+    // password is looked at.
+    assertInstanceOf(error, SimIamAccessDenied);
+  });
+
   it("allows a user operation the caller's policy permits on the pool", async () => {
     // Given a Role allowed to read users in one pool.
     const { simAws, caller, userPoolId } = await simCognitoWithRole({

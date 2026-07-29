@@ -1,3 +1,8 @@
+import type { SimCognitoAuthSession } from "./auth/sim-cognito-auth-session.js";
+import {
+  SimCognitoAuthSessionStore,
+  type SimCognitoAuthSessionRequest,
+} from "./auth/sim-cognito-auth-session-store.js";
 import type { SimCognitoUserPoolClient } from "./client/sim-cognito-user-pool-client.js";
 import type { SimCognitoUserPoolClientId } from "./client/sim-cognito-user-pool-client-id.js";
 import { SimCognitoUserPoolClientStore } from "./client/sim-cognito-user-pool-client-store.js";
@@ -9,6 +14,10 @@ import type { SimCognitoName } from "./sim-cognito-name.js";
 import type { SimCognitoPasswordPolicy } from "./sim-cognito-password-policy.js";
 import type { SimCognitoUserPoolArn } from "./sim-cognito-user-pool-arn.js";
 import type { SimCognitoUserPoolId } from "./sim-cognito-user-pool-id.js";
+import {
+  SimCognitoSigningKey,
+  type SimCognitoJwks,
+} from "./token/sim-cognito-signing-key.js";
 import type { SimCognitoUser } from "./user/sim-cognito-user.js";
 import { SimCognitoUserStore } from "./user/sim-cognito-user-store.js";
 import type { SimCognitoUsername } from "./user/sim-cognito-username.js";
@@ -40,6 +49,7 @@ export class SimCognitoUserPool {
   private readonly clientStore = new SimCognitoUserPoolClientStore();
   private readonly userStore = new SimCognitoUserStore();
   private readonly groupStore = new SimCognitoGroupStore();
+  private readonly authSessions = new SimCognitoAuthSessionStore();
 
   constructor(properties: SimCognitoUserPoolProperties) {
     this.id = properties.id;
@@ -48,6 +58,38 @@ export class SimCognitoUserPool {
     this.passwordPolicy = properties.passwordPolicy;
     this.deletionProtection = properties.deletionProtection;
     this.creationDate = properties.createdDate;
+  }
+
+  /**
+   * The URL a token from this pool names as its issuer.
+   *
+   * The region comes out of the pool id, which is where SDK code and token
+   * verifiers get it from too.
+   */
+  get issuerUrl(): string {
+    const [regionName] = this.id.split("_", 1);
+
+    return `https://cognito-idp.${String(regionName)}.amazonaws.com/${this.id}`;
+  }
+
+  /**
+   * The key this pool signs its tokens with.
+   */
+  get signingKey(): SimCognitoSigningKey {
+    return SimCognitoSigningKey.shared();
+  }
+
+  /**
+   * The public keys this pool publishes, in the shape its JWKS endpoint
+   * serves.
+   *
+   * A verifier configured for this pool takes this document and verifies the
+   * pool's tokens with nothing else needed. Real Cognito publishes two keys
+   * and rotates between them, and this publishes one, so code assuming a
+   * single entry passes here and is still wrong against real AWS.
+   */
+  jwks(): SimCognitoJwks {
+    return { keys: [this.signingKey.publicJwk()] };
   }
 
   /**
@@ -190,5 +232,28 @@ export class SimCognitoUserPool {
    */
   groupsOf(username: string): readonly SimCognitoGroup[] {
     return this.groupStore.forUser(username);
+  }
+
+  /**
+   * Remember a challenge session an authentication was left waiting on.
+   */
+  addAuthSession(session: SimCognitoAuthSession): void {
+    this.authSessions.add(session);
+  }
+
+  /**
+   * Resolve the challenge session a response carries, or refuse.
+   */
+  requireAuthSession(
+    request: SimCognitoAuthSessionRequest,
+  ): SimCognitoAuthSession {
+    return this.authSessions.require(request);
+  }
+
+  /**
+   * Forget a challenge session that has been used.
+   */
+  removeAuthSession(session: SimCognitoAuthSession): void {
+    this.authSessions.remove(session);
   }
 }

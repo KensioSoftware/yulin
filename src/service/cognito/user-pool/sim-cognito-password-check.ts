@@ -46,12 +46,12 @@ export class SimCognitoPasswordCheck {
   }
 
   /**
-   * Refuse a password this pool would not accept.
+   * Read a password this pool accepts, or refuse it.
    *
    * A missing password is a validation error rather than a policy failure,
    * because real Cognito rejects the request before it reaches the policy.
    */
-  require(field: string, password: string | undefined): void {
+  require(field: string, password: string | undefined): string {
     if (password === undefined || password === "") {
       throw new SimCognitoInvalidParameterException(
         `${field} is required: give the user a password the pool's policy allows`,
@@ -66,6 +66,8 @@ export class SimCognitoPasswordCheck {
     }
 
     this.requirePolicy(password);
+
+    return password;
   }
 
   private requirePolicy(password: string): void {

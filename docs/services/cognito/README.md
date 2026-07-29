@@ -22,16 +22,21 @@ Sim Cognito currently supports:
 - `CreateGroupCommand`, `GetGroupCommand`, `UpdateGroupCommand`, `DeleteGroupCommand`,
   `ListGroupsCommand`, `AdminAddUserToGroupCommand`, `AdminRemoveUserFromGroupCommand`,
   `AdminListGroupsForUserCommand` and `ListUsersInGroupCommand`
+- `AdminInitiateAuthCommand` and `AdminRespondToAuthChallengeCommand`, for the
+  `ADMIN_USER_PASSWORD_AUTH` flow and the `NEW_PASSWORD_REQUIRED` challenge
+- Real RS256 JWTs, signed by a key the pool publishes as a JWKS, so a verifier configured for the
+  pool verifies them unchanged
 - Pool ids in the real `<region>_<nine characters>` form, and pool ARNs built from them
 - The real default password policy, applied to the passwords users are given
 - The real user status lifecycle, so an admin-created user stays in `FORCE_CHANGE_PASSWORD` until it
   has a permanent password
-- Group membership, and the precedence order the `cognito:groups` claim will use
+- Group membership, and the precedence order the `cognito:groups` claim uses
 - App client authentication flows, token lifetimes and generated client secrets
 - Authorization of every operation by simulated IAM, against the real IAM action and ARN
 - Calls made from inside a simulated Lambda handler, authorized as the function's execution role
 
-Nothing signs in yet. Tokens and the authentication flows themselves are a separate piece of work.
+The client-side flows are a separate piece of work: `InitiateAuth`, SRP and the hosted UI are not
+implemented.
 
 ## Creating a pool and an app client
 
@@ -387,6 +392,253 @@ The legacy authentication flows (`ADMIN_NO_SRP_AUTH`, `CUSTOM_AUTH_FLOW_ONLY` an
 `USER_PASSWORD_AUTH`) work on their own, and a request mixing them with the `ALLOW_` prefixed values
 is refused, as real Cognito refuses it.
 
+## Signing in and verifying tokens
+
+`AdminInitiateAuth` runs the `ADMIN_USER_PASSWORD_AUTH` flow and answers with real signed tokens. The
+app client has to be created with `ALLOW_ADMIN_USER_PASSWORD_AUTH` among its `ExplicitAuthFlows`, as
+it does on real Cognito, and a request against a client without it is refused whatever the password
+was.
+
+The tokens are RS256 JWTs signed by a key the pool publishes. Hand that JWKS to a verifier and it
+verifies them with nothing stubbed and nothing on the network.
+
+```typescript sim-cognito-sign-in
+/**
+ * Signing a simulated user in, and verifying the token with aws-jwt-verify.
+ */
+
+import {
+  AdminCreateUserCommand,
+  AdminInitiateAuthCommand,
+  AdminSetUserPasswordCommand,
+  CreateUserPoolClientCommand,
+  CreateUserPoolCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+import { CognitoJwtVerifier } from "aws-jwt-verify";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const cognito = simAws.cognitoIdentityProvider();
+
+const pool = await cognito.createUserPool(
+  new CreateUserPoolCommand({ PoolName: "myapp-users" }),
+);
+const userPoolId = pool.UserPool!.Id!;
+
+const appClient = await cognito.createUserPoolClient(
+  new CreateUserPoolClientCommand({
+    UserPoolId: userPoolId,
+    ClientName: "web",
+    ExplicitAuthFlows: ["ALLOW_ADMIN_USER_PASSWORD_AUTH"],
+  }),
+);
+const clientId = appClient.UserPoolClient!.ClientId!;
+
+await cognito.adminCreateUser(
+  new AdminCreateUserCommand({ UserPoolId: userPoolId, Username: "alice" }),
+);
+await cognito.adminSetUserPassword(
+  new AdminSetUserPasswordCommand({
+    UserPoolId: userPoolId,
+    Username: "alice",
+    Password: "Sup3rSecret!",
+    Permanent: true,
+  }),
+);
+
+const { AuthenticationResult } = await cognito.adminInitiateAuth(
+  new AdminInitiateAuthCommand({
+    UserPoolId: userPoolId,
+    ClientId: clientId,
+    AuthFlow: "ADMIN_USER_PASSWORD_AUTH",
+    AuthParameters: { USERNAME: "alice", PASSWORD: "Sup3rSecret!" },
+  }),
+);
+
+// The verifier is the one the application uses, configured as it is there.
+const verifier = CognitoJwtVerifier.create({
+  userPoolId,
+  tokenUse: "access",
+  clientId,
+});
+
+// The pool's own JWKS, so nothing reaches for the network.
+verifier.cacheJwks(cognito.userPool(userPoolId).jwks());
+
+const payload = await verifier.verify(AuthenticationResult!.AccessToken!);
+
+console.log(payload.username); // "alice"
+console.log(payload.sub); // a UUID, and not "alice"
+```
+
+An `AuthenticationResult` carries an `AccessToken`, an `IdToken`, a `RefreshToken`, an `ExpiresIn` of
+3600 and a `TokenType` of `Bearer`. The refresh token is an opaque string rather than a JWT, as it is
+on real Cognito, and nothing here consumes it: `REFRESH_TOKEN_AUTH` is not simulated.
+
+The claim split is the real one. The id token carries `aud`, `token_use: "id"`, `cognito:username`
+and the user's attributes. The access token carries `client_id` and no `aud`, `token_use: "access"`,
+`username` and a `scope` of `aws.cognito.signin.user.admin`. Both carry the same `sub`, and both
+carry `cognito:groups` in precedence order when the user is in any groups. Code reading the wrong
+token for a claim fails here the way it would in production.
+
+The `iss` claim is `https://cognito-idp.<region>.amazonaws.com/<userPoolId>`, and the JWT header
+names `RS256` and a `kid` the pool's JWKS holds. That is everything a verifier checks.
+
+## The new password challenge
+
+A user an admin created is in `FORCE_CHANGE_PASSWORD` and cannot sign in. Signing in with its
+temporary password answers with the `NEW_PASSWORD_REQUIRED` challenge and a session rather than
+tokens, and `AdminRespondToAuthChallenge` completes it.
+
+```typescript sim-cognito-new-password-challenge
+/**
+ * Getting a simulated user past the NEW_PASSWORD_REQUIRED challenge.
+ */
+
+import {
+  AdminCreateUserCommand,
+  AdminInitiateAuthCommand,
+  AdminRespondToAuthChallengeCommand,
+  CreateUserPoolClientCommand,
+  CreateUserPoolCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const cognito = simAws.cognitoIdentityProvider();
+
+const pool = await cognito.createUserPool(
+  new CreateUserPoolCommand({ PoolName: "myapp-users" }),
+);
+const userPoolId = pool.UserPool!.Id!;
+
+const appClient = await cognito.createUserPoolClient(
+  new CreateUserPoolClientCommand({
+    UserPoolId: userPoolId,
+    ClientName: "web",
+    ExplicitAuthFlows: ["ALLOW_ADMIN_USER_PASSWORD_AUTH"],
+  }),
+);
+const clientId = appClient.UserPoolClient!.ClientId!;
+
+await cognito.adminCreateUser(
+  new AdminCreateUserCommand({
+    UserPoolId: userPoolId,
+    Username: "alice",
+    TemporaryPassword: "Temp0rary!",
+  }),
+);
+
+const challenged = await cognito.adminInitiateAuth(
+  new AdminInitiateAuthCommand({
+    UserPoolId: userPoolId,
+    ClientId: clientId,
+    AuthFlow: "ADMIN_USER_PASSWORD_AUTH",
+    AuthParameters: { USERNAME: "alice", PASSWORD: "Temp0rary!" },
+  }),
+);
+
+console.log(challenged.ChallengeName); // "NEW_PASSWORD_REQUIRED"
+
+const signedIn = await cognito.adminRespondToAuthChallenge(
+  new AdminRespondToAuthChallengeCommand({
+    UserPoolId: userPoolId,
+    ClientId: clientId,
+    ChallengeName: "NEW_PASSWORD_REQUIRED",
+    Session: challenged.Session,
+    ChallengeResponses: { USERNAME: "alice", NEW_PASSWORD: "Sup3rSecret!" },
+  }),
+);
+
+console.log(signedIn.AuthenticationResult?.IdToken?.split(".").length); // 3
+```
+
+Name a `TemporaryPassword` on `AdminCreateUser` when the test means to sign the user in. Real Cognito
+generates one and emails it, and nothing here delivers a message, so a user created without one has
+no password that works.
+
+The new password is checked against the pool's policy and confirms the user, which signs in normally
+from then on. A session is single use and lasts three minutes of simulated time, so a replayed one
+and one left too long both fail with `NotAuthorizedException`.
+
+A wrong password and a disabled user fail with `NotAuthorizedException` too, saying no more than real
+Cognito says. An app client created with `GenerateSecret: true` needs a correct `SECRET_HASH` in
+`AuthParameters`, which is the HMAC-SHA256 of the username and client id keyed by the client secret.
+
+## Token timestamps and expiry
+
+`iat`, `exp` and `auth_time` come from the simulation's clock rather than the host's, and the tokens
+last the hour a pool's tokens last unless the app client says otherwise.
+
+That makes an expired token something a test can produce: sign the user in with the simulated clock
+set far enough in the past, and the token a verifier gets is already expired.
+
+```typescript sim-cognito-expired-token
+/**
+ * Producing a simulated token that a verifier rejects as expired.
+ */
+
+import {
+  AdminCreateUserCommand,
+  AdminInitiateAuthCommand,
+  AdminSetUserPasswordCommand,
+  CreateUserPoolClientCommand,
+  CreateUserPoolCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const cognito = simAws.cognitoIdentityProvider();
+
+const pool = await cognito.createUserPool(
+  new CreateUserPoolCommand({ PoolName: "myapp-users" }),
+);
+const userPoolId = pool.UserPool!.Id!;
+
+const appClient = await cognito.createUserPoolClient(
+  new CreateUserPoolClientCommand({
+    UserPoolId: userPoolId,
+    ClientName: "web",
+    ExplicitAuthFlows: ["ALLOW_ADMIN_USER_PASSWORD_AUTH"],
+  }),
+);
+
+await cognito.adminCreateUser(
+  new AdminCreateUserCommand({ UserPoolId: userPoolId, Username: "alice" }),
+);
+await cognito.adminSetUserPassword(
+  new AdminSetUserPasswordCommand({
+    UserPoolId: userPoolId,
+    Username: "alice",
+    Password: "Sup3rSecret!",
+    Permanent: true,
+  }),
+);
+
+// Sign in two hours ago, so the hour the token lasts is already over.
+await simAws.clock().setTo(new Date(Date.now() - 2 * 60 * 60 * 1000));
+
+const signedIn = await cognito.adminInitiateAuth(
+  new AdminInitiateAuthCommand({
+    UserPoolId: userPoolId,
+    ClientId: appClient.UserPoolClient!.ClientId!,
+    AuthFlow: "ADMIN_USER_PASSWORD_AUTH",
+    AuthParameters: { USERNAME: "alice", PASSWORD: "Sup3rSecret!" },
+  }),
+);
+
+// A verifier now refuses this token, because its exp has passed.
+console.log(signedIn.AuthenticationResult?.ExpiresIn); // 3600
+```
+
+Advancing the clock after a sign-in is a different thing. It moves what the simulation calls now, and
+the timestamps on tokens issued after it, but a verifier reading the host clock still judges a token
+it already holds by host time. Signing in in the past is what produces a token such a verifier
+refuses.
+
 ## Pool ARNs and IAM policies
 
 A pool ARN is the pool id after `userpool/`, so the region appears twice:
@@ -590,14 +842,19 @@ without `DeletionProtection` if the test needs to delete it.
 
 Current documented limitations:
 
-- There are no tokens and no authentication. `InitiateAuth`, `AdminInitiateAuth`,
-  `RespondToAuthChallenge` and `GetTokensFromRefreshToken` are not implemented, and neither are the
-  `cognito:groups` and `cognito:preferred_role` claims. An app client's `ExplicitAuthFlows` and token
-  lifetimes are stored and reported, and nothing reads them yet. A user's status, its `Enabled` flag
-  and its group membership are the same: they are kept as real Cognito keeps them, and nothing signs
-  in for them to act on.
-- A password is checked against the pool's policy and then discarded, because nothing authenticates
-  yet. Nothing reads a password back, so no operation reveals that.
+- Only the admin authentication flow is simulated. `InitiateAuth`, `RespondToAuthChallenge`,
+  `GetTokensFromRefreshToken` and `GlobalSignOut` are not implemented, so the client-side flows, SRP,
+  MFA challenges, custom authentication challenges and device tracking are all out. `AuthFlow` values
+  other than `ADMIN_USER_PASSWORD_AUTH` are refused rather than run as that one.
+- A refresh token is issued and nothing consumes it. `REFRESH_TOKEN_AUTH` is not simulated, and no
+  token can be revoked.
+- The `cognito:preferred_role` and `cognito:roles` claims are not on the tokens. A group's `RoleArn`
+  is stored and reported, and nothing assumes that role.
+- A pool publishes one signing key where real Cognito publishes two and rotates between them, and
+  every pool in a process publishes the same key. Code assuming a single JWKS entry passes here and
+  is still wrong against real AWS. The key is generated with `node:crypto` on first use and kept in
+  memory for the process.
+- A password is kept so a user can sign in with it, and nothing reads one back.
 - Users are resolved by username only. Real Cognito also accepts a user's `sub` where an admin
   operation asks for a username, and that fails here with `UserNotFoundException`.
 - Self-service sign-up is not simulated. `SignUp`, `ConfirmSignUp`, `ForgotPassword`,
