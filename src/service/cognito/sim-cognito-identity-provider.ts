@@ -10,16 +10,10 @@ import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
-import { SimCognitoAuthorizer } from "./command/authorize/sim-cognito-authorizer.js";
-import { SimCognitoListUserPoolClients } from "./command/client/sim-cognito-list-user-pool-clients.js";
-import { SimCognitoUserPoolClientCommands } from "./command/client/sim-cognito-user-pool-client-commands.js";
 import type * as simCognitoCommands from "./command/sim-cognito-command.types.js";
-import { SimCognitoListUserPools } from "./command/user-pool/sim-cognito-list-user-pools.js";
-import { SimCognitoUserPoolCommands } from "./command/user-pool/sim-cognito-user-pool-commands.js";
+import { SimCognitoCommands } from "./command/sim-cognito-commands.js";
 import { SimCognitoSdkCommandRouter } from "./sdk/sim-cognito-sdk-command-router.js";
-import { SimCognitoUserPoolClientFactory } from "./user-pool/client/sim-cognito-user-pool-client-factory.js";
 import type { SimCognitoUserPool } from "./user-pool/sim-cognito-user-pool.js";
-import { SimCognitoUserPoolFactory } from "./user-pool/sim-cognito-user-pool-factory.js";
 import type { SimCognitoUserPoolId } from "./user-pool/sim-cognito-user-pool-id.js";
 import { SimCognitoUserPoolStore } from "./user-pool/sim-cognito-user-pool-store.js";
 
@@ -45,11 +39,8 @@ interface SimCognitoIdentityProviderProperties {
  * credentials, are a different service and are not simulated at all.
  */
 export class SimCognitoIdentityProvider {
-  private readonly pools: SimCognitoUserPoolStore;
-  private readonly userPoolCommands: SimCognitoUserPoolCommands;
-  private readonly listUserPoolsCommand: SimCognitoListUserPools;
-  private readonly clientCommands: SimCognitoUserPoolClientCommands;
-  private readonly listClientsCommand: SimCognitoListUserPoolClients;
+  private readonly pools = new SimCognitoUserPoolStore();
+  private readonly commands: SimCognitoCommands;
   private readonly background: BackgroundScheduler;
   private readonly sdkRouter = new SimCognitoSdkCommandRouter(this);
 
@@ -60,31 +51,12 @@ export class SimCognitoIdentityProvider {
       background = new BackgroundTasks(),
     } = properties;
 
-    const authorizer = new SimCognitoAuthorizer({ iam, accountRegionScope });
-
     this.background = background;
-    this.pools = new SimCognitoUserPoolStore();
-    this.userPoolCommands = new SimCognitoUserPoolCommands({
+    this.commands = new SimCognitoCommands({
+      accountRegionScope,
+      iam,
+      clock: background,
       pools: this.pools,
-      poolFactory: new SimCognitoUserPoolFactory({
-        accountRegionScope,
-        pools: this.pools,
-        clock: background,
-      }),
-      authorizer,
-    });
-    this.listUserPoolsCommand = new SimCognitoListUserPools({
-      pools: this.pools,
-      authorizer,
-    });
-    this.clientCommands = new SimCognitoUserPoolClientCommands({
-      pools: this.pools,
-      clientFactory: new SimCognitoUserPoolClientFactory({ clock: background }),
-      authorizer,
-    });
-    this.listClientsCommand = new SimCognitoListUserPoolClients({
-      pools: this.pools,
-      authorizer,
     });
   }
 
@@ -106,7 +78,7 @@ export class SimCognitoIdentityProvider {
     options?: SimCognitoIdentityProviderRequestOptions,
   ): Promise<simCognitoCommands.SimCreateUserPoolCommandOutput> {
     await this.background.sequence();
-    return this.userPoolCommands.create(command, options);
+    return this.commands.userPools.create(command, options);
   }
 
   /**
@@ -117,7 +89,7 @@ export class SimCognitoIdentityProvider {
     options?: SimCognitoIdentityProviderRequestOptions,
   ): Promise<simCognitoCommands.SimDescribeUserPoolCommandOutput> {
     await this.background.sequence();
-    return this.userPoolCommands.describe(command, options);
+    return this.commands.userPools.describe(command, options);
   }
 
   /**
@@ -128,7 +100,7 @@ export class SimCognitoIdentityProvider {
     options?: SimCognitoIdentityProviderRequestOptions,
   ): Promise<simCognitoCommands.SimDeleteUserPoolCommandOutput> {
     await this.background.sequence();
-    return this.userPoolCommands.delete(command, options);
+    return this.commands.userPools.delete(command, options);
   }
 
   /**
@@ -139,7 +111,7 @@ export class SimCognitoIdentityProvider {
     options?: SimCognitoIdentityProviderRequestOptions,
   ): Promise<simCognitoCommands.SimListUserPoolsCommandOutput> {
     await this.background.sequence();
-    return this.listUserPoolsCommand.handle(command, options);
+    return this.commands.listUserPools.handle(command, options);
   }
 
   /**
@@ -150,7 +122,7 @@ export class SimCognitoIdentityProvider {
     options?: SimCognitoIdentityProviderRequestOptions,
   ): Promise<simCognitoCommands.SimCreateUserPoolClientCommandOutput> {
     await this.background.sequence();
-    return this.clientCommands.create(command, options);
+    return this.commands.clients.create(command, options);
   }
 
   /**
@@ -161,7 +133,7 @@ export class SimCognitoIdentityProvider {
     options?: SimCognitoIdentityProviderRequestOptions,
   ): Promise<simCognitoCommands.SimDescribeUserPoolClientCommandOutput> {
     await this.background.sequence();
-    return this.clientCommands.describe(command, options);
+    return this.commands.clients.describe(command, options);
   }
 
   /**
@@ -172,7 +144,7 @@ export class SimCognitoIdentityProvider {
     options?: SimCognitoIdentityProviderRequestOptions,
   ): Promise<simCognitoCommands.SimDeleteUserPoolClientCommandOutput> {
     await this.background.sequence();
-    return this.clientCommands.delete(command, options);
+    return this.commands.clients.delete(command, options);
   }
 
   /**
@@ -183,7 +155,95 @@ export class SimCognitoIdentityProvider {
     options?: SimCognitoIdentityProviderRequestOptions,
   ): Promise<simCognitoCommands.SimListUserPoolClientsCommandOutput> {
     await this.background.sequence();
-    return this.listClientsCommand.handle(command, options);
+    return this.commands.listClients.handle(command, options);
+  }
+
+  /**
+   * Handle an AdminCreateUser Command from the SDK.
+   */
+  async adminCreateUser(
+    command: simCognitoCommands.SimAdminCreateUserCommand,
+    options?: SimCognitoIdentityProviderRequestOptions,
+  ): Promise<simCognitoCommands.SimAdminCreateUserCommandOutput> {
+    await this.background.sequence();
+    return this.commands.users.create(command, options);
+  }
+
+  /**
+   * Handle an AdminGetUser Command from the SDK.
+   */
+  async adminGetUser(
+    command: simCognitoCommands.SimAdminGetUserCommand,
+    options?: SimCognitoIdentityProviderRequestOptions,
+  ): Promise<simCognitoCommands.SimAdminGetUserCommandOutput> {
+    await this.background.sequence();
+    return this.commands.users.get(command, options);
+  }
+
+  /**
+   * Handle an AdminDeleteUser Command from the SDK.
+   */
+  async adminDeleteUser(
+    command: simCognitoCommands.SimAdminDeleteUserCommand,
+    options?: SimCognitoIdentityProviderRequestOptions,
+  ): Promise<simCognitoCommands.SimAdminDeleteUserCommandOutput> {
+    await this.background.sequence();
+    return this.commands.users.delete(command, options);
+  }
+
+  /**
+   * Handle an AdminSetUserPassword Command from the SDK.
+   */
+  async adminSetUserPassword(
+    command: simCognitoCommands.SimAdminSetUserPasswordCommand,
+    options?: SimCognitoIdentityProviderRequestOptions,
+  ): Promise<simCognitoCommands.SimAdminSetUserPasswordCommandOutput> {
+    await this.background.sequence();
+    return this.commands.userUpdates.setPassword(command, options);
+  }
+
+  /**
+   * Handle an AdminUpdateUserAttributes Command from the SDK.
+   */
+  async adminUpdateUserAttributes(
+    command: simCognitoCommands.SimAdminUpdateUserAttributesCommand,
+    options?: SimCognitoIdentityProviderRequestOptions,
+  ): Promise<simCognitoCommands.SimAdminUpdateUserAttributesCommandOutput> {
+    await this.background.sequence();
+    return this.commands.userUpdates.updateAttributes(command, options);
+  }
+
+  /**
+   * Handle an AdminDisableUser Command from the SDK.
+   */
+  async adminDisableUser(
+    command: simCognitoCommands.SimAdminDisableUserCommand,
+    options?: SimCognitoIdentityProviderRequestOptions,
+  ): Promise<simCognitoCommands.SimAdminDisableUserCommandOutput> {
+    await this.background.sequence();
+    return this.commands.userUpdates.disable(command, options);
+  }
+
+  /**
+   * Handle an AdminEnableUser Command from the SDK.
+   */
+  async adminEnableUser(
+    command: simCognitoCommands.SimAdminEnableUserCommand,
+    options?: SimCognitoIdentityProviderRequestOptions,
+  ): Promise<simCognitoCommands.SimAdminEnableUserCommandOutput> {
+    await this.background.sequence();
+    return this.commands.userUpdates.enable(command, options);
+  }
+
+  /**
+   * Handle a ListUsers Command from the SDK.
+   */
+  async listUsers(
+    command: simCognitoCommands.SimListUsersCommand,
+    options?: SimCognitoIdentityProviderRequestOptions,
+  ): Promise<simCognitoCommands.SimListUsersCommandOutput> {
+    await this.background.sequence();
+    return this.commands.listUsers.handle(command, options);
   }
 
   /**

@@ -37,3 +37,30 @@ export type {
   SimListUserPoolClientsCommandInput,
   SimListUserPoolClientsCommandOutput,
 } from "./client/list-user-pool-clients.command.js";
+export type {
+  SimAdminCreateUserCommand,
+  SimAdminCreateUserCommandInput,
+  SimAdminCreateUserCommandOutput,
+  SimAdminDeleteUserCommand,
+  SimAdminDeleteUserCommandOutput,
+  SimAdminDisableUserCommand,
+  SimAdminDisableUserCommandOutput,
+  SimAdminEnableUserCommand,
+  SimAdminEnableUserCommandOutput,
+  SimAdminGetUserCommand,
+  SimAdminGetUserCommandOutput,
+  SimAdminSetUserPasswordCommand,
+  SimAdminSetUserPasswordCommandInput,
+  SimAdminSetUserPasswordCommandOutput,
+  SimAdminUpdateUserAttributesCommand,
+  SimAdminUpdateUserAttributesCommandInput,
+  SimAdminUpdateUserAttributesCommandOutput,
+  SimCognitoAdminUserCommandInput,
+  SimCognitoDescribedUser,
+  SimCognitoUserType,
+} from "./user/user.command.js";
+export type {
+  SimListUsersCommand,
+  SimListUsersCommandInput,
+  SimListUsersCommandOutput,
+} from "./user/list-users.command.js";

@@ -9,6 +9,16 @@ import type {
   SimDescribeUserPoolClientCommand,
 } from "../command/client/user-pool-client.command.js";
 import type { SimListUserPoolClientsCommand } from "../command/client/list-user-pool-clients.command.js";
+import type { SimListUsersCommand } from "../command/user/list-users.command.js";
+import type {
+  SimAdminCreateUserCommand,
+  SimAdminDeleteUserCommand,
+  SimAdminDisableUserCommand,
+  SimAdminEnableUserCommand,
+  SimAdminGetUserCommand,
+  SimAdminSetUserPasswordCommand,
+  SimAdminUpdateUserAttributesCommand,
+} from "../command/user/user.command.js";
 import type { SimListUserPoolsCommand } from "../command/user-pool/list-user-pools.command.js";
 import type {
   SimCreateUserPoolCommand,
@@ -86,6 +96,70 @@ export class SimCognitoSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simCognito.listUserPoolClients(
             command as SimListUserPoolClientsCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "AdminCreateUserCommand",
+        async (command, context): Promise<unknown> =>
+          await simCognito.adminCreateUser(
+            command as SimAdminCreateUserCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "AdminGetUserCommand",
+        async (command, context): Promise<unknown> =>
+          await simCognito.adminGetUser(
+            command as SimAdminGetUserCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "AdminDeleteUserCommand",
+        async (command, context): Promise<unknown> =>
+          await simCognito.adminDeleteUser(
+            command as SimAdminDeleteUserCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "AdminSetUserPasswordCommand",
+        async (command, context): Promise<unknown> =>
+          await simCognito.adminSetUserPassword(
+            command as SimAdminSetUserPasswordCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "AdminUpdateUserAttributesCommand",
+        async (command, context): Promise<unknown> =>
+          await simCognito.adminUpdateUserAttributes(
+            command as SimAdminUpdateUserAttributesCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "AdminDisableUserCommand",
+        async (command, context): Promise<unknown> =>
+          await simCognito.adminDisableUser(
+            command as SimAdminDisableUserCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "AdminEnableUserCommand",
+        async (command, context): Promise<unknown> =>
+          await simCognito.adminEnableUser(
+            command as SimAdminEnableUserCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListUsersCommand",
+        async (command, context): Promise<unknown> =>
+          await simCognito.listUsers(
+            command as SimListUsersCommand,
             simSdkCallerOptions(context),
           ),
       ],

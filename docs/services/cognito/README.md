@@ -16,14 +16,19 @@ Sim Cognito currently supports:
   `ListUserPoolsCommand`
 - `CreateUserPoolClientCommand`, `DescribeUserPoolClientCommand`, `DeleteUserPoolClientCommand` and
   `ListUserPoolClientsCommand`
+- `AdminCreateUserCommand`, `AdminGetUserCommand`, `AdminDeleteUserCommand`,
+  `AdminSetUserPasswordCommand`, `AdminUpdateUserAttributesCommand`, `AdminDisableUserCommand`,
+  `AdminEnableUserCommand` and `ListUsersCommand`
 - Pool ids in the real `<region>_<nine characters>` form, and pool ARNs built from them
-- The real default password policy, and a policy the request sets
+- The real default password policy, applied to the passwords users are given
+- The real user status lifecycle, so an admin-created user stays in `FORCE_CHANGE_PASSWORD` until it
+  has a permanent password
 - App client authentication flows, token lifetimes and generated client secrets
 - Authorization of every operation by simulated IAM, against the real IAM action and ARN
 - Calls made from inside a simulated Lambda handler, authorized as the function's execution role
 
-There are no users yet, so nothing signs in. Users, groups, tokens and the authentication flows
-themselves are separate pieces of work.
+Nothing signs in yet. Groups, tokens and the authentication flows themselves are separate pieces of
+work.
 
 ## Creating a pool and an app client
 
@@ -98,7 +103,128 @@ console.log(passwordPolicy?.MinimumLength); // 12
 console.log(passwordPolicy?.RequireSymbols); // true, the default
 ```
 
-Nothing checks a password against the policy yet, because a pool holds no users.
+Every password a user is given is checked against this policy. A password that breaks it is refused
+with `InvalidPasswordException`, saying which rule it broke.
+
+## Users
+
+`AdminCreateUser` creates a user in `FORCE_CHANGE_PASSWORD`, which is where real Cognito leaves a
+user an admin made: it has a temporary password and cannot sign in with it. Setting a permanent
+password moves the user to `CONFIRMED`. Nothing signs in here yet, so that status is what a test can
+assert on now, and what the authentication flows will read when they arrive.
+
+```typescript sim-cognito-create-user
+/**
+ * Creating a simulated user and confirming it.
+ */
+
+import {
+  AdminCreateUserCommand,
+  AdminGetUserCommand,
+  AdminSetUserPasswordCommand,
+  CreateUserPoolCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const cognito = simAws.cognitoIdentityProvider();
+
+const pool = await cognito.createUserPool(
+  new CreateUserPoolCommand({ PoolName: "myapp-users" }),
+);
+const userPoolId = pool.UserPool?.Id;
+
+const created = await cognito.adminCreateUser(
+  new AdminCreateUserCommand({
+    UserPoolId: userPoolId,
+    Username: "alice",
+    UserAttributes: [{ Name: "email", Value: "alice@example.com" }],
+  }),
+);
+
+console.log(created.User?.UserStatus); // "FORCE_CHANGE_PASSWORD"
+
+// Without this the user stays in FORCE_CHANGE_PASSWORD and cannot sign in.
+await cognito.adminSetUserPassword(
+  new AdminSetUserPasswordCommand({
+    UserPoolId: userPoolId,
+    Username: "alice",
+    Password: "Sup3rSecret!",
+    Permanent: true,
+  }),
+);
+
+const read = await cognito.adminGetUser(
+  new AdminGetUserCommand({ UserPoolId: userPoolId, Username: "alice" }),
+);
+
+console.log(read.UserStatus); // "CONFIRMED"
+console.log(read.UserAttributes?.find((each) => each.Name === "sub")?.Value);
+// A UUID, and not "alice"
+```
+
+A password set without `Permanent: true` is temporary, and leaves the user in
+`FORCE_CHANGE_PASSWORD` again.
+
+A user's `sub` is a UUID Cognito allocates, reported among its attributes. It is not the username,
+and code treating the two as interchangeable fails here rather than in a deployment. Admin
+operations here name a user by its username only. Real Cognito also accepts a `sub` where an
+operation asks for a username, so that is one thing that works there and not here. The refusal says
+so when the username given is some user's `sub`.
+
+Attributes come back under `Attributes` from `AdminCreateUser` and `ListUsers`, and under
+`UserAttributes` from `AdminGetUser`, which is how the real API names them.
+
+`AdminUpdateUserAttributes` changes the attributes it names and leaves the rest alone.
+`AdminDisableUser` sets `Enabled` to `false` without changing the user's status, and
+`AdminEnableUser` sets it back.
+
+Only the standard attributes exist. A pool here is created without a `Schema` of its own, so a
+`custom:` attribute is refused, as it would be on a real pool created the same way.
+
+## Listing users
+
+`ListUsers` pages by `Limit` and `PaginationToken`, which is what the real operation calls them.
+
+```typescript sim-cognito-list-users
+/**
+ * Listing the users of a simulated user pool.
+ */
+
+import {
+  AdminCreateUserCommand,
+  CreateUserPoolCommand,
+  ListUsersCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const cognito = simAws.cognitoIdentityProvider();
+
+const pool = await cognito.createUserPool(
+  new CreateUserPoolCommand({ PoolName: "myapp-users" }),
+);
+const userPoolId = pool.UserPool?.Id;
+
+await cognito.adminCreateUser(
+  new AdminCreateUserCommand({ UserPoolId: userPoolId, Username: "alice" }),
+);
+await cognito.adminCreateUser(
+  new AdminCreateUserCommand({ UserPoolId: userPoolId, Username: "bob" }),
+);
+
+const listed = await cognito.listUsers(
+  new ListUsersCommand({ UserPoolId: userPoolId }),
+);
+
+console.log(listed.Users?.map((user) => user.Username)); // [ "alice", "bob" ]
+```
+
+`Filter` is refused rather than ignored. A filter that was quietly dropped would answer with the
+wrong users rather than with an error, which is the kind of pass that turns into a failure in a
+deployment. List the users and filter them in the test instead.
 
 ## App clients
 
@@ -367,11 +493,36 @@ without `DeletionProtection` if the test needs to delete it.
 
 Current documented limitations:
 
-- There are no users. `AdminCreateUser`, `SignUp`, `AdminGetUser`, `ListUsers` and the rest are not
-  implemented, so a pool is a directory with nothing in it. `EstimatedNumberOfUsers` is always zero.
 - There are no groups, no tokens and no authentication. `InitiateAuth`, `AdminInitiateAuth`,
   `RespondToAuthChallenge` and `GetTokensFromRefreshToken` are not implemented. An app client's
-  `ExplicitAuthFlows` and token lifetimes are stored and reported, and nothing reads them yet.
+  `ExplicitAuthFlows` and token lifetimes are stored and reported, and nothing reads them yet. A
+  user's status and its `Enabled` flag are the same: they are kept as real Cognito keeps them, and
+  nothing signs in for them to stop.
+- A password is checked against the pool's policy and then discarded, because nothing authenticates
+  yet. Nothing reads a password back, so no operation reveals that.
+- Users are resolved by username only. Real Cognito also accepts a user's `sub` where an admin
+  operation asks for a username, and that fails here with `UserNotFoundException`.
+- Self-service sign-up is not simulated. `SignUp`, `ConfirmSignUp`, `ForgotPassword`,
+  `ChangePassword` and `ResendConfirmationCode` are not implemented, so the `UNCONFIRMED` and
+  `RESET_REQUIRED` statuses cannot be reached. `AdminCreateUser` is the only way to make a user.
+- No message is ever delivered. `AdminCreateUser` sends no invitation, so `MessageAction: SUPPRESS`
+  is accepted and changes nothing, `RESEND` is refused, and `DesiredDeliveryMediums` is refused.
+- A temporary password never expires. `TemporaryPasswordValidityDays` is stored on the pool and
+  nothing acts on it.
+- Unsimulated `AdminCreateUser` inputs are refused rather than ignored: `DesiredDeliveryMediums`,
+  `ForceAliasCreation`, `ValidationData`, `ClientMetadata`, and a `MessageAction` of `RESEND`.
+  `AdminUpdateUserAttributes` refuses `ClientMetadata` the same way.
+- `ListUsers` refuses `Filter` and `AttributesToGet` rather than ignoring them, and lists users in
+  creation order. Real Cognito chooses its own order and does not promise one.
+- `ListUsers` refuses a `Limit` of zero, which the real operation accepts without saying what it
+  returns. Refusing it is better than guessing between an empty page and a full one.
+- Only the standard user attributes exist, because a pool is created without a `Schema`. A `custom:`
+  attribute is refused, and so is a request setting `sub`. `AdminDeleteUserAttributes` is not
+  implemented, so an attribute can be changed but not removed.
+- `EstimatedNumberOfUsers` is how many users the pool holds now. Real Cognito refreshes that number
+  periodically rather than on each write, so it can lag there in a way it never does here.
+- MFA is not simulated, so `AdminGetUser` reports no `UserMFASettingList`, `PreferredMfaSetting` or
+  `MFAOptions`.
 - Nothing updates a pool or an app client. `UpdateUserPool` and `UpdateUserPoolClient` are not
   implemented, so `LastModifiedDate` is always the creation date.
 - A pool with `DeletionProtection: ACTIVE` cannot be deleted at all, because deactivating the
