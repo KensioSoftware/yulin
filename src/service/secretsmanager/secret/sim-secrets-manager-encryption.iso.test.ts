@@ -7,6 +7,7 @@ import {
 } from "@aws-sdk/client-secrets-manager";
 import {
   assertArrayEquals,
+  assertArrayLength,
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
@@ -21,6 +22,7 @@ import type { SimSecretsManagerSecretVersion } from "./sim-secrets-manager-secre
 import {
   SimSecretsManagerDecryptionFailure,
   SimSecretsManagerEncryptionFailure,
+  SimSecretsManagerResourceExistsException,
 } from "../error/sim-secrets-manager.error.js";
 
 /**
@@ -246,6 +248,57 @@ describe("Secrets Manager value encryption", () => {
 
     // And no half-made secret is left holding the name.
     assertUndefined(simAws.secretsManager().findSecret("no-such-key"));
+  });
+
+  it("frees the name again after a create the key refused", async () => {
+    // Given a create that failed on its key.
+    const simAws = new SimAws();
+    await assertThrowsErrorAsync(async () =>
+      simAws.secretsManager().createSecret(
+        new CreateSecretCommand({
+          Name: "second-attempt",
+          SecretString: "hunter2",
+          KmsKeyId: "alias/nothing-here",
+        }),
+      ),
+    );
+
+    // When the same name is created again, this time under the default key.
+    const created = await simAws.secretsManager().createSecret(
+      new CreateSecretCommand({
+        Name: "second-attempt",
+        SecretString: "hunter2",
+      }),
+    );
+
+    // Then it succeeds: the failed attempt let the name go.
+    assertNonNullable(created.ARN);
+  });
+
+  it("refuses a second create of the same name racing the first", async () => {
+    // Given two creates of one name, started before either has finished
+    // encrypting its first version.
+    const simAws = new SimAws();
+    const create = async (): Promise<unknown> =>
+      await simAws
+        .secretsManager()
+        .createSecret(
+          new CreateSecretCommand({ Name: "raced", SecretString: "hunter2" }),
+        );
+
+    // When both are run together.
+    const outcomes = await Promise.allSettled([create(), create()]);
+
+    // Then one wins and the other is refused, rather than the second quietly
+    // replacing the first.
+    assertArrayLength(
+      outcomes.filter((outcome) => outcome.status === "fulfilled"),
+      1,
+    );
+
+    const rejected = outcomes.find((outcome) => outcome.status === "rejected");
+    assertNonNullable(rejected);
+    assertInstanceOf(rejected.reason, SimSecretsManagerResourceExistsException);
   });
 
   it("refuses a read of a version whose key is gone", async () => {

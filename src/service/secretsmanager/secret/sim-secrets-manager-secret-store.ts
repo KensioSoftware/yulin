@@ -22,6 +22,12 @@ interface SimSecretsManagerSecretStoreProperties {
  */
 export class SimSecretsManagerSecretStore {
   private readonly secrets = new Map<string, SimSecretsManagerSecret>();
+
+  /**
+   * The names of secrets being created, which are taken but not yet stored.
+   */
+  private readonly claimedNames = new Set<string>();
+
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly secretIds: SimSecretsManagerSecretIdParser;
 
@@ -97,6 +103,30 @@ export class SimSecretsManagerSecretStore {
   }
 
   /**
+   * Take a name for a secret being created, refusing one already taken.
+   *
+   * The name is held from here rather than from when the secret is stored,
+   * because creating one is not instant: its first version is encrypted
+   * through KMS in between. Two creates racing for the same name would
+   * otherwise both get past the check and the second would overwrite the
+   * first, where real Secrets Manager refuses it.
+   */
+  claimName(name: string): void {
+    this.requireNameAvailable(name);
+    this.claimedNames.add(name);
+  }
+
+  /**
+   * Give up a claimed name.
+   *
+   * A create that failed leaves the name free again, and one that succeeded
+   * has the stored secret holding it from then on.
+   */
+  releaseName(name: string): void {
+    this.claimedNames.delete(name);
+  }
+
+  /**
    * Refuse a name that is already taken, saying which way it is taken.
    *
    * A name held by a secret waiting out its recovery window is the failure
@@ -104,6 +134,12 @@ export class SimSecretsManagerSecretStore {
    * telling apart from a name held by a live secret.
    */
   requireNameAvailable(name: string): void {
+    if (this.claimedNames.has(name)) {
+      throw new SimSecretsManagerResourceExistsException(
+        `The secret '${name}' already exists`,
+      );
+    }
+
     const existing = this.secrets
       .values()
       .find((secret) => secret.name === name);

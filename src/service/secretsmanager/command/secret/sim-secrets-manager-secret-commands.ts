@@ -69,27 +69,33 @@ export class SimSecretsManagerSecretCommands {
       secret,
       options?.caller,
     );
-    this.secrets.requireNameAvailable(secret.name);
+    // The name is claimed for the whole of the create, because the first
+    // version is encrypted through KMS in between: another create of the same
+    // name is refused rather than overwriting this one. The secret itself is
+    // stored only once that version exists, so a create refused for a key it
+    // cannot use leaves nothing behind.
+    this.secrets.claimName(secret.name);
 
-    // The first version is written, and so encrypted, before the secret is
-    // stored, so a create refused for a key it cannot use leaves no secret
-    // holding the name.
-    const version = await this.versionWriter.write({
-      secret,
-      value,
-      input,
-      keyId: secret.kmsKeyId,
-      caller: options?.caller,
-    });
+    try {
+      const version = await this.versionWriter.write({
+        secret,
+        value,
+        input,
+        keyId: secret.kmsKeyId,
+        caller: options?.caller,
+      });
 
-    this.secrets.add(secret);
+      this.secrets.add(secret);
 
-    return {
-      $metadata: {},
-      ARN: secret.arn.value,
-      Name: secret.name,
-      VersionId: version.versionId,
-    };
+      return {
+        $metadata: {},
+        ARN: secret.arn.value,
+        Name: secret.name,
+        VersionId: version.versionId,
+      };
+    } finally {
+      this.secrets.releaseName(secret.name);
+    }
   }
 
   /**
