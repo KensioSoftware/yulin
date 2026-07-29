@@ -1,11 +1,12 @@
 import type { BackgroundScheduler } from "../../util/background/background.js";
-import type { SimAwsCaller } from "../aws/caller/sim-aws-caller.js";
 import type * as simCognitoCommands from "./command/sim-cognito-command.types.js";
 import type { SimCognitoCommands } from "./command/sim-cognito-commands.js";
+import {
+  SimCognitoAuthentication,
+  type SimCognitoIdentityProviderRequestOptions,
+} from "./sim-cognito-authentication.js";
 
-export interface SimCognitoIdentityProviderRequestOptions {
-  readonly caller?: SimAwsCaller;
-}
+export type { SimCognitoIdentityProviderRequestOptions } from "./sim-cognito-authentication.js";
 
 interface SimCognitoUserDirectoryProperties {
   readonly commands: SimCognitoCommands;
@@ -16,19 +17,15 @@ interface SimCognitoUserDirectoryProperties {
  * The directory half of simulated Cognito: the users in a pool, and the
  * groups they belong to.
  *
- * `SimCognitoIdentityProvider` extends this, so a caller reaches these
- * operations on the one service object the way the real API presents them.
- * They are here rather than there because a pool's contents and a pool's
- * settings are two separate concerns, and each is long enough to read on its
- * own.
+ * `SimCognitoIdentityProvider` extends this, which extends
+ * `SimCognitoAuthentication`, so a caller reaches every operation on the one
+ * service object the way the real API presents them. They are split up because
+ * a pool's settings, a pool's contents and signing in are three separate
+ * concerns, and each is long enough to read on its own.
  */
-export abstract class SimCognitoUserDirectory {
-  protected readonly commands: SimCognitoCommands;
-  protected readonly background: BackgroundScheduler;
-
+export abstract class SimCognitoUserDirectory extends SimCognitoAuthentication {
   protected constructor(properties: SimCognitoUserDirectoryProperties) {
-    this.commands = properties.commands;
-    this.background = properties.background;
+    super(properties);
   }
 
   /**
@@ -117,28 +114,6 @@ export abstract class SimCognitoUserDirectory {
   ): Promise<simCognitoCommands.SimListUsersCommandOutput> {
     await this.background.sequence();
     return this.commands.listUsers.handle(command, options);
-  }
-
-  /**
-   * Handle an AdminInitiateAuth Command from the SDK.
-   */
-  async adminInitiateAuth(
-    command: simCognitoCommands.SimAdminInitiateAuthCommand,
-    options?: SimCognitoIdentityProviderRequestOptions,
-  ): Promise<simCognitoCommands.SimAdminInitiateAuthCommandOutput> {
-    await this.background.sequence();
-    return this.commands.initiateAuth.handle(command, options);
-  }
-
-  /**
-   * Handle an AdminRespondToAuthChallenge Command from the SDK.
-   */
-  async adminRespondToAuthChallenge(
-    command: simCognitoCommands.SimAdminRespondToAuthChallengeCommand,
-    options?: SimCognitoIdentityProviderRequestOptions,
-  ): Promise<simCognitoCommands.SimAdminRespondToAuthChallengeCommandOutput> {
-    await this.background.sequence();
-    return this.commands.respondToChallenge.handle(command, options);
   }
 
   /**

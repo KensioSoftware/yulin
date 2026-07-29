@@ -2,8 +2,8 @@ import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import { SimCognitoAuthSession } from "../../user-pool/auth/sim-cognito-auth-session.js";
 import type { SimCognitoUserPool } from "../../user-pool/sim-cognito-user-pool.js";
 import type { SimCognitoUser } from "../../user-pool/user/sim-cognito-user.js";
-import { newPasswordRequiredChallenge } from "./sim-cognito-auth-flow.js";
-import type { SimAdminInitiateAuthCommandOutput } from "./auth.command.js";
+import { newPasswordRequiredChallenge } from "./sim-cognito-auth-challenge.js";
+import type { SimCognitoAuthenticationOutput } from "./auth.command.js";
 
 interface SimCognitoNewPasswordChallengeProperties {
   readonly clock: SimClock;
@@ -33,7 +33,7 @@ export class SimCognitoNewPasswordChallenge {
    */
   issue(
     properties: SimCognitoChallengeProperties,
-  ): SimAdminInitiateAuthCommandOutput {
+  ): SimCognitoAuthenticationOutput {
     const { pool, clientId, user } = properties;
     const session = new SimCognitoAuthSession({
       username: user.username,
@@ -42,7 +42,7 @@ export class SimCognitoNewPasswordChallenge {
       issuedAt: this.clock.now(),
     });
 
-    pool.addAuthSession(session);
+    pool.auth.addSession(session);
 
     return {
       $metadata: {},

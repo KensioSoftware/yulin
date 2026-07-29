@@ -26,12 +26,6 @@ export class SimCognitoUnsimulatedUserPoolClientOptions {
       true,
       "token revocation",
     );
-    this.unsimulated.refuseUnless(
-      "PreventUserExistenceErrors",
-      input.PreventUserExistenceErrors,
-      "LEGACY",
-      "hiding whether a user exists",
-    );
     this.unsimulated.refuse(
       "ClientSecret",
       input.ClientSecret,

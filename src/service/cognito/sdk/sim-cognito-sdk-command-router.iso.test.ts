@@ -42,6 +42,10 @@ describe("SimCognitoSdkCommandRouter", () => {
       "ListUsersInGroupCommand",
       "AdminInitiateAuthCommand",
       "AdminRespondToAuthChallengeCommand",
+      "InitiateAuthCommand",
+      "RespondToAuthChallengeCommand",
+      "GlobalSignOutCommand",
+      "AdminUserGlobalSignOutCommand",
     ]);
   });
 
@@ -53,7 +57,7 @@ describe("SimCognitoSdkCommandRouter", () => {
     const route = simAws
       .cognitoIdentityProvider()
       .sdkCommandRouter()
-      .route("InitiateAuthCommand");
+      .route("GetTokensFromRefreshTokenCommand");
 
     // Then there is no route for it.
     assertUndefined(route);

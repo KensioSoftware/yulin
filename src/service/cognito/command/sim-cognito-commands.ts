@@ -9,8 +9,15 @@ import { SimCognitoUserFactory } from "../user-pool/user/sim-cognito-user-factor
 import { SimCognitoTokenIssuer } from "../user-pool/token/sim-cognito-token-issuer.js";
 import { SimCognitoAdminInitiateAuth } from "./auth/sim-cognito-admin-initiate-auth.js";
 import { SimCognitoAdminRespondToChallenge } from "./auth/sim-cognito-admin-respond-to-challenge.js";
+import { SimCognitoAuthFlowRunner } from "./auth/sim-cognito-auth-flow-runner.js";
 import { SimCognitoAuthResolver } from "./auth/sim-cognito-auth-resolver.js";
+import { SimCognitoInitiateAuth } from "./auth/sim-cognito-initiate-auth.js";
 import { SimCognitoNewPasswordChallenge } from "./auth/sim-cognito-new-password-challenge.js";
+import { SimCognitoNewPasswordResponse } from "./auth/sim-cognito-new-password-response.js";
+import { SimCognitoPasswordSignIn } from "./auth/sim-cognito-password-sign-in.js";
+import { SimCognitoRefreshSignIn } from "./auth/sim-cognito-refresh-sign-in.js";
+import { SimCognitoRespondToChallenge } from "./auth/sim-cognito-respond-to-challenge.js";
+import { SimCognitoSignOutCommands } from "./auth/sim-cognito-sign-out.js";
 import { SimCognitoAuthorizer } from "./authorize/sim-cognito-authorizer.js";
 import { SimCognitoListUserPoolClients } from "./client/sim-cognito-list-user-pool-clients.js";
 import { SimCognitoGroupCommands } from "./group/sim-cognito-group-commands.js";
@@ -49,8 +56,11 @@ export class SimCognitoCommands {
   public readonly groups: SimCognitoGroupCommands;
   public readonly groupMembership: SimCognitoGroupMembershipCommands;
   public readonly listGroups: SimCognitoListGroups;
-  public readonly initiateAuth: SimCognitoAdminInitiateAuth;
-  public readonly respondToChallenge: SimCognitoAdminRespondToChallenge;
+  public readonly adminInitiateAuth: SimCognitoAdminInitiateAuth;
+  public readonly adminRespondToChallenge: SimCognitoAdminRespondToChallenge;
+  public readonly initiateAuth: SimCognitoInitiateAuth;
+  public readonly respondToChallenge: SimCognitoRespondToChallenge;
+  public readonly signOut: SimCognitoSignOutCommands;
 
   constructor(properties: SimCognitoCommandsProperties) {
     const { accountRegionScope, iam, clock, pools } = properties;
@@ -85,18 +95,38 @@ export class SimCognitoCommands {
     });
     this.groupMembership = new SimCognitoGroupMembershipCommands({ resolver });
     this.listGroups = new SimCognitoListGroups({ resolver });
-    const authResolver = new SimCognitoAuthResolver({ resolver });
+    const authResolver = new SimCognitoAuthResolver({ resolver, pools });
     const tokenIssuer = new SimCognitoTokenIssuer({ clock });
-
-    this.initiateAuth = new SimCognitoAdminInitiateAuth({
-      authResolver,
-      tokenIssuer,
-      challenge: new SimCognitoNewPasswordChallenge({ clock }),
+    const flowRunner = new SimCognitoAuthFlowRunner({
+      passwordSignIn: new SimCognitoPasswordSignIn({
+        authResolver,
+        tokenIssuer,
+        challenge: new SimCognitoNewPasswordChallenge({ clock }),
+      }),
+      refreshSignIn: new SimCognitoRefreshSignIn({ tokenIssuer, clock }),
     });
-    this.respondToChallenge = new SimCognitoAdminRespondToChallenge({
+    const newPassword = new SimCognitoNewPasswordResponse({
       authResolver,
       tokenIssuer,
       clock,
     });
+
+    this.adminInitiateAuth = new SimCognitoAdminInitiateAuth({
+      authResolver,
+      flowRunner,
+    });
+    this.adminRespondToChallenge = new SimCognitoAdminRespondToChallenge({
+      authResolver,
+      newPassword,
+    });
+    this.initiateAuth = new SimCognitoInitiateAuth({
+      authResolver,
+      flowRunner,
+    });
+    this.respondToChallenge = new SimCognitoRespondToChallenge({
+      authResolver,
+      newPassword,
+    });
+    this.signOut = new SimCognitoSignOutCommands({ resolver, pools, clock });
   }
 }

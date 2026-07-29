@@ -251,19 +251,20 @@ describe("sim Cognito AdminInitiateAuth", () => {
     // Given a pool with an app client.
     const { cognito, userPoolId, clientId } = await simCognitoWithClient();
 
-    // When a refresh token flow is asked for.
+    // When SRP sign-in is asked for.
     const error = await assertThrowsErrorAsync(async () => {
       await cognito.adminInitiateAuth(
         new AdminInitiateAuthCommand({
           UserPoolId: userPoolId,
           ClientId: clientId,
-          AuthFlow: "REFRESH_TOKEN_AUTH",
-          AuthParameters: { REFRESH_TOKEN: "whatever" },
+          AuthFlow: "USER_SRP_AUTH",
+          AuthParameters: { USERNAME: "alice", SRP_A: "abc" },
         }),
       );
     });
 
-    // Then it is refused rather than run as the one flow that is simulated.
+    // Then it is refused rather than run as one of the flows that are
+    // simulated.
     assertInstanceOf(error, SimCognitoInvalidParameterException);
     assertStringIncludes(error.message, "is not simulated");
   });

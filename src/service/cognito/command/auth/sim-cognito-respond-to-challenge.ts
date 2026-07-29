@@ -1,35 +1,31 @@
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { SimCognitoAuthParameters } from "./sim-cognito-auth-parameters.js";
 import type { SimCognitoAuthResolver } from "./sim-cognito-auth-resolver.js";
 import { requireSimCognitoNewPasswordChallenge } from "./sim-cognito-auth-challenge.js";
 import type { SimCognitoNewPasswordResponse } from "./sim-cognito-new-password-response.js";
 import { SimCognitoUnsimulatedAuthOptions } from "./sim-cognito-unsimulated-auth-options.js";
 import type {
-  SimAdminRespondToAuthChallengeCommand,
-  SimAdminRespondToAuthChallengeCommandOutput,
+  SimRespondToAuthChallengeCommand,
+  SimRespondToAuthChallengeCommandOutput,
 } from "./auth.command.js";
 
-interface SimCognitoAdminRespondToChallengeProperties {
+interface SimCognitoRespondToChallengeProperties {
   readonly authResolver: SimCognitoAuthResolver;
   readonly newPassword: SimCognitoNewPasswordResponse;
 }
 
-interface SimCognitoCommandOptions {
-  readonly caller?: SimAwsCaller;
-}
-
 /**
- * The AdminRespondToAuthChallenge command.
+ * The RespondToAuthChallenge command.
  *
- * Only `NEW_PASSWORD_REQUIRED` is answered, and the caller needs the
- * `cognito-idp:AdminRespondToAuthChallenge` permission on the pool.
+ * This completes a challenge an `InitiateAuth` request was answered with, so
+ * it names the app client rather than the pool and needs no IAM permission,
+ * as real Cognito needs none for it.
  */
-export class SimCognitoAdminRespondToChallenge {
+export class SimCognitoRespondToChallenge {
   private readonly authResolver: SimCognitoAuthResolver;
   private readonly newPassword: SimCognitoNewPasswordResponse;
   private readonly unsimulatedOptions = new SimCognitoUnsimulatedAuthOptions();
 
-  constructor(properties: SimCognitoAdminRespondToChallengeProperties) {
+  constructor(properties: SimCognitoRespondToChallengeProperties) {
     this.authResolver = properties.authResolver;
     this.newPassword = properties.newPassword;
   }
@@ -38,17 +34,12 @@ export class SimCognitoAdminRespondToChallenge {
    * Answer a challenge.
    */
   handle(
-    command: SimAdminRespondToAuthChallengeCommand,
-    options?: SimCognitoCommandOptions,
-  ): SimAdminRespondToAuthChallengeCommandOutput {
+    command: SimRespondToAuthChallengeCommand,
+  ): SimRespondToAuthChallengeCommandOutput {
     const { input } = command;
-    const { pool, client } = this.authResolver.poolClient(
-      "cognito-idp:AdminRespondToAuthChallenge",
-      input,
-      options,
-    );
+    const { pool, client } = this.authResolver.client(input.ClientId);
 
-    this.unsimulatedOptions.refuseInAdminResponse(input);
+    this.unsimulatedOptions.refuseInResponse(input);
     requireSimCognitoNewPasswordChallenge(input.ChallengeName);
 
     return this.newPassword.handle({

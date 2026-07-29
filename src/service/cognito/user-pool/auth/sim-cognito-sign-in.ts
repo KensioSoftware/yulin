@@ -1,5 +1,51 @@
 import { SimCognitoNotAuthorizedException } from "../../error/sim-cognito.error.js";
+import type { SimCognitoUserPoolClient } from "../client/sim-cognito-user-pool-client.js";
+import type { SimCognitoUserPool } from "../sim-cognito-user-pool.js";
 import type { SimCognitoUser } from "../user/sim-cognito-user.js";
+import { requireSimCognitoUsername } from "../user/sim-cognito-username.js";
+
+/**
+ * Resolve the user a sign-in names, as the app client reports one that is not
+ * there.
+ *
+ * A client with `PreventUserExistenceErrors` of `ENABLED` answers with the
+ * same refusal a wrong password gets, and one left on the `LEGACY` default
+ * says the user does not exist.
+ */
+export function requireSimCognitoSignInUser(
+  pool: SimCognitoUserPool,
+  client: SimCognitoUserPoolClient,
+  username: string,
+): SimCognitoUser {
+  const named = requireSimCognitoUsername(username);
+
+  if (!client.preventUserExistenceErrors.hidesUserExistence) {
+    return pool.requireUser(named);
+  }
+
+  const user = pool.findUser(named);
+
+  if (user === undefined) {
+    throw new SimCognitoNotAuthorizedException(
+      "Incorrect username or password.",
+    );
+  }
+
+  return user;
+}
+
+/**
+ * Refuse a user that has been disabled.
+ *
+ * Disabling a user stops it authenticating at all, so it is checked by a token
+ * refresh as well as by a sign-in: a user disabled after signing in cannot go
+ * on renewing its session.
+ */
+export function requireSimCognitoEnabled(user: SimCognitoUser): void {
+  if (!user.enabled) {
+    throw new SimCognitoNotAuthorizedException("User is disabled.");
+  }
+}
 
 /**
  * Refuse a sign-in the user cannot make.
@@ -14,9 +60,7 @@ export function requireSimCognitoSignIn(
   user: SimCognitoUser,
   password: string,
 ): void {
-  if (!user.enabled) {
-    throw new SimCognitoNotAuthorizedException("User is disabled.");
-  }
+  requireSimCognitoEnabled(user);
 
   if (!user.hasPassword(password)) {
     throw new SimCognitoNotAuthorizedException(
