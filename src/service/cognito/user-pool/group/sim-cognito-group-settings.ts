@@ -22,7 +22,16 @@ const maxPrecedence = 2 ** 31 - 1;
 
 const roleArnLength = { least: 20, most: 2048 };
 
-const roleArnPattern = /^arn:[\w+=/,.@-]+:[\w+=/,.@-]+:[\w+=/,.@-]*:\d+:\S+$/u;
+/**
+ * The ARN form Cognito accepts for a group's role.
+ *
+ * Every part is limited to the characters Cognito allows, resource included:
+ * an ARN holding a character it rejects has to fail here rather than in a
+ * deployment. Real Cognito also caps the resource at three colon-separated
+ * segments, which this does not count.
+ */
+const roleArnPattern =
+  /^arn:[\w+=/,.@-]+:[\w+=/,.@-]+:[\w+=/,.@-]*:\d+:[\w+=/,.@:-]+$/u;
 
 /**
  * The settable properties of one simulated group.

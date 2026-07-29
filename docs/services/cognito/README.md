@@ -31,8 +31,7 @@ Sim Cognito currently supports:
 - Authorization of every operation by simulated IAM, against the real IAM action and ARN
 - Calls made from inside a simulated Lambda handler, authorized as the function's execution role
 
-Nothing signs in yet. Groups, tokens and the authentication flows themselves are separate pieces of
-work.
+Nothing signs in yet. Tokens and the authentication flows themselves are a separate piece of work.
 
 ## Creating a pool and an app client
 
@@ -591,11 +590,12 @@ without `DeletionProtection` if the test needs to delete it.
 
 Current documented limitations:
 
-- There are no groups, no tokens and no authentication. `InitiateAuth`, `AdminInitiateAuth`,
-  `RespondToAuthChallenge` and `GetTokensFromRefreshToken` are not implemented. An app client's
-  `ExplicitAuthFlows` and token lifetimes are stored and reported, and nothing reads them yet. A
-  user's status and its `Enabled` flag are the same: they are kept as real Cognito keeps them, and
-  nothing signs in for them to stop.
+- There are no tokens and no authentication. `InitiateAuth`, `AdminInitiateAuth`,
+  `RespondToAuthChallenge` and `GetTokensFromRefreshToken` are not implemented, and neither are the
+  `cognito:groups` and `cognito:preferred_role` claims. An app client's `ExplicitAuthFlows` and token
+  lifetimes are stored and reported, and nothing reads them yet. A user's status, its `Enabled` flag
+  and its group membership are the same: they are kept as real Cognito keeps them, and nothing signs
+  in for them to act on.
 - A password is checked against the pool's policy and then discarded, because nothing authenticates
   yet. Nothing reads a password back, so no operation reveals that.
 - Users are resolved by username only. Real Cognito also accepts a user's `sub` where an admin
