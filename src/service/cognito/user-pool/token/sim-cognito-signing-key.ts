@@ -48,21 +48,6 @@ const modulusLength = 2048;
  * runs in production.
  */
 export class SimCognitoSigningKey {
-  /**
-   * The one key pair this process signs with.
-   *
-   * Generating 2048-bit RSA takes long enough to notice, and a test suite
-   * makes many pools, so the pair is generated once on first use and shared.
-   * Every pool publishes it under the same `kid`, which is a divergence from
-   * real Cognito: there, each pool has its own keys. Nothing that verifies a
-   * token can tell, because a verifier reaches the right pool through the
-   * `iss` claim and its own JWKS rather than through the key.
-   *
-   * Nothing is written to disk, and no key material is committed: a private
-   * key in the repository would set off secret scanners for no gain.
-   */
-  static #shared: SimCognitoSigningKey | undefined;
-
   public readonly kid: string;
 
   private readonly privateKey: KeyObject;
@@ -85,12 +70,16 @@ export class SimCognitoSigningKey {
   }
 
   /**
-   * Get the key this process signs with, generating it on first use.
+   * Generate a key pair for a pool.
+   *
+   * A pool generates its own on first use rather than at creation, because
+   * generating 2048-bit RSA takes long enough to notice and most pools in a
+   * test suite never sign anything. Nothing is written to disk, and no key
+   * material is committed: a private key in the repository would set off
+   * secret scanners for no gain.
    */
-  static shared(): SimCognitoSigningKey {
-    this.#shared ??= new SimCognitoSigningKey();
-
-    return this.#shared;
+  static generate(): SimCognitoSigningKey {
+    return new SimCognitoSigningKey();
   }
 
   /**

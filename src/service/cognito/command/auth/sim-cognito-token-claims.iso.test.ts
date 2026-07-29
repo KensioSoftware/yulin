@@ -11,6 +11,7 @@ import {
   assertArrayEquals,
   assertIdentical,
   assertNonNullable,
+  assertTrue,
   assertTypeString,
   assertUndefined,
 } from "@kensio/smartass";
@@ -157,6 +158,34 @@ describe("sim Cognito token claims", () => {
     assertIdentical(header["kid"], key.kid);
     assertIdentical(key.kty, "RSA");
     assertIdentical(key.use, "sig");
+  });
+
+  it("gives each pool its own key", async () => {
+    // Given two pools in one simulation.
+    const cognito = new SimAws().cognitoIdentityProvider();
+    const first = await cognito.createUserPool(
+      new CreateUserPoolCommand({ PoolName: "first" }),
+    );
+    const second = await cognito.createUserPool(
+      new CreateUserPoolCommand({ PoolName: "second" }),
+    );
+
+    assertNonNullable(first.UserPool?.Id);
+    assertNonNullable(second.UserPool?.Id);
+
+    // When each publishes its JWKS.
+    const [firstKey] = cognito.userPool(first.UserPool.Id).jwks().keys;
+    const [secondKey] = cognito.userPool(second.UserPool.Id).jwks().keys;
+
+    // Then the keys are different, as they are on two real pools, and each
+    // pool keeps the one it generated.
+    assertNonNullable(firstKey);
+    assertNonNullable(secondKey);
+    assertTrue(firstKey.kid !== secondKey.kid);
+    assertIdentical(
+      cognito.userPool(first.UserPool.Id).jwks().keys[0]?.kid,
+      firstKey.kid,
+    );
   });
 
   it("names the pool as the issuer", async () => {

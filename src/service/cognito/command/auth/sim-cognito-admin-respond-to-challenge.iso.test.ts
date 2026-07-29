@@ -226,6 +226,66 @@ describe("sim Cognito AdminRespondToAuthChallenge", () => {
     assertStringIncludes(error.message, "Invalid session");
   });
 
+  it("keeps a session that is still live when another is issued", async () => {
+    // Given a user challenged twice, so two sessions are outstanding.
+    const { cognito, userPoolId, clientId, session } =
+      await simCognitoChallenged();
+
+    await cognito.adminInitiateAuth(
+      new AdminInitiateAuthCommand({
+        UserPoolId: userPoolId,
+        ClientId: clientId,
+        AuthFlow: "ADMIN_USER_PASSWORD_AUTH",
+        AuthParameters: { USERNAME: "alice", PASSWORD: temporaryPassword },
+      }),
+    );
+
+    // When the first one is answered.
+    const signedIn = await cognito.adminRespondToAuthChallenge(
+      respond(userPoolId, clientId, session, newPassword),
+    );
+
+    // Then it still works: issuing a session does not cancel one that has not
+    // run out.
+    assertNonNullable(signedIn.AuthenticationResult?.AccessToken);
+  });
+
+  it("drops a session nobody answered once it has run out", async () => {
+    // Given a challenge that was left for four minutes of simulated time.
+    const { simAws, cognito, userPoolId, clientId, session } =
+      await simCognitoChallenged();
+
+    await simAws.clock().advanceBy({ minutes: 4 });
+
+    // When the user starts again and answers the new challenge.
+    const challenged = await cognito.adminInitiateAuth(
+      new AdminInitiateAuthCommand({
+        UserPoolId: userPoolId,
+        ClientId: clientId,
+        AuthFlow: "ADMIN_USER_PASSWORD_AUTH",
+        AuthParameters: { USERNAME: "alice", PASSWORD: temporaryPassword },
+      }),
+    );
+
+    assertNonNullable(challenged.Session);
+
+    const signedIn = await cognito.adminRespondToAuthChallenge(
+      respond(userPoolId, clientId, challenged.Session, newPassword),
+    );
+
+    // Then that works, and the session left behind is gone rather than kept
+    // for a simulation that runs for a long time.
+    assertNonNullable(signedIn.AuthenticationResult?.AccessToken);
+
+    const error = await assertThrowsErrorAsync(async () => {
+      await cognito.adminRespondToAuthChallenge(
+        respond(userPoolId, clientId, session, newPassword),
+      );
+    });
+
+    assertInstanceOf(error, SimCognitoNotAuthorizedException);
+  });
+
   it("refuses a new password the pool's policy does not allow", async () => {
     // Given a user waiting on the challenge.
     const { cognito, userPoolId, clientId, session } =

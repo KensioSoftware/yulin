@@ -850,10 +850,10 @@ Current documented limitations:
   token can be revoked.
 - The `cognito:preferred_role` and `cognito:roles` claims are not on the tokens. A group's `RoleArn`
   is stored and reported, and nothing assumes that role.
-- A pool publishes one signing key where real Cognito publishes two and rotates between them, and
-  every pool in a process publishes the same key. Code assuming a single JWKS entry passes here and
-  is still wrong against real AWS. The key is generated with `node:crypto` on first use and kept in
-  memory for the process.
+- A pool publishes one signing key where real Cognito publishes two and rotates between them, so
+  code assuming a single JWKS entry passes here and is still wrong against real AWS. The key is
+  generated with `node:crypto` the first time the pool signs or publishes one, and kept in memory
+  for the life of the simulation.
 - A password is kept so a user can sign in with it, and nothing reads one back.
 - Users are resolved by username only. Real Cognito also accepts a user's `sub` where an admin
   operation asks for a username, and that fails here with `UserNotFoundException`.

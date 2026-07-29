@@ -22,8 +22,13 @@ export class SimCognitoAuthSessionStore {
 
   /**
    * Remember a session a challenge was issued with.
+   *
+   * A session nobody answered is dropped here once it has run out, so a
+   * simulation left running does not hold every abandoned sign-in. The new
+   * session's own issue time is the simulation's now, so no clock is needed.
    */
   add(session: SimCognitoAuthSession): void {
+    this.forgetExpired(session.issuedAt);
     this.sessions.set(session.id, session);
   }
 
@@ -66,5 +71,13 @@ export class SimCognitoAuthSessionStore {
    */
   remove(session: SimCognitoAuthSession): void {
     this.sessions.delete(session.id);
+  }
+
+  private forgetExpired(now: Date): void {
+    for (const session of this.sessions.values()) {
+      if (session.isExpiredAt(now)) {
+        this.remove(session);
+      }
+    }
   }
 }

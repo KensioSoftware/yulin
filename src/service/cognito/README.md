@@ -63,10 +63,12 @@ User state lives under `user-pool/user/`, and the pool owns its users for the sa
 its app clients: deleting a pool takes them with it, and a username means nothing outside the pool
 holding it.
 
-`SimCognitoUser` is the stored user: its username, its `sub`, its attributes, its status and whether
-it is enabled. The `sub` is a fresh UUID rather than anything derived from the username, because
-that is the difference most code gets wrong. A user holds no password. Passwords are checked against
-the pool's policy and discarded, since nothing authenticates yet and nothing reads one back.
+`SimCognitoUser` is the stored user: its username, its `sub`, its attributes, its status, whether it
+is enabled and the password it signs in with. The `sub` is a fresh UUID rather than anything derived
+from the username, because that is the difference most code gets wrong. The password is checked
+against the pool's policy when it is set, and held as a `SimCognitoUserPassword` that answers
+whether a candidate matches and exposes nothing, the same modelling choice simulated KMS key
+material makes.
 
 `SimCognitoUserStatus` holds the two statuses this simulation can reach, and the transition between
 them. `AdminCreateUser` leaves a user in `FORCE_CHANGE_PASSWORD`, and only a permanent password
@@ -112,10 +114,10 @@ claim uses, so `AdminListGroupsForUser` reads the same way the claim does.
 Token state lives under `user-pool/token/`.
 
 `SimCognitoSigningKey` holds a real RSA key pair generated with `node:crypto`, and signs real RS256
-JWTs. The pair is generated on first use and shared for the process: 2048-bit generation takes long
-enough to notice, and a suite makes many pools. Every pool therefore publishes the same key, which a
-verifier cannot tell, because it reaches the right pool through the `iss` claim and the JWKS it was
-given rather than through the key. Nothing is written to disk and no key material is in the
+JWTs. Each pool has its own, as each real pool does, so a token from one pool carries a signature
+another pool's JWKS cannot verify. A pool generates its key the first time it signs or publishes
+one, rather than when it is created, because 2048-bit generation takes long enough to notice and
+most pools in a suite never sign anything. Nothing is written to disk and no key material is in the
 repository.
 
 `SimCognitoIdToken` and `SimCognitoAccessToken` build the claims of each token, and
@@ -206,15 +208,14 @@ resource, here or on real AWS.
   validates user attributes against it.
 - Users are resolved by username only, and real Cognito also accepts a `sub` there.
 - `AdminListGroupsForUser` sorts by precedence. Real Cognito does not document an order for it.
-- One signing key is published per pool where real Cognito publishes two and rotates between them,
-  and every pool in a process shares it.
+- One signing key is published per pool, where real Cognito publishes two and rotates between them.
 - Only `ADMIN_USER_PASSWORD_AUTH` runs, and only `NEW_PASSWORD_REQUIRED` is issued. Every other flow
   and challenge is refused rather than treated as one of those.
 - A verifier reading the host clock judges an already-issued token by host time. Advancing the
   simulated clock moves the timestamps of tokens issued after it, and signing in in the simulated
   past is what produces a token such a verifier refuses.
 - `UpdateGroup` replaces all three group properties rather than merging an omitted one.
-- A password is checked and discarded rather than stored, because nothing authenticates yet.
+- A password is held so a user can sign in with it, and nothing reads one back.
 - No message is delivered, so `AdminCreateUser` accepts `MessageAction: SUPPRESS` and refuses
   `RESEND` and `DesiredDeliveryMediums`.
 - Listings are in creation order and carry no filtering. `ListUsers` refuses a `Filter` rather than

@@ -51,6 +51,8 @@ export class SimCognitoUserPool {
   private readonly groupStore = new SimCognitoGroupStore();
   private readonly authSessions = new SimCognitoAuthSessionStore();
 
+  #signingKey: SimCognitoSigningKey | undefined;
+
   constructor(properties: SimCognitoUserPoolProperties) {
     this.id = properties.id;
     this.arn = properties.arn;
@@ -73,10 +75,15 @@ export class SimCognitoUserPool {
   }
 
   /**
-   * The key this pool signs its tokens with.
+   * The key this pool signs its tokens with, generated on first use.
+   *
+   * The key belongs to the pool, as it does on real Cognito, so a token from
+   * one pool does not carry a signature another pool's JWKS can verify.
    */
   get signingKey(): SimCognitoSigningKey {
-    return SimCognitoSigningKey.shared();
+    this.#signingKey ??= SimCognitoSigningKey.generate();
+
+    return this.#signingKey;
   }
 
   /**
