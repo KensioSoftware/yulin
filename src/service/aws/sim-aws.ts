@@ -90,7 +90,7 @@ export class SimAws {
     this.iamRegistry = this.serviceFactory.iamRegistry;
     this.scopes = new SimAwsScopeRegistry({ simAws: this });
     this.requestAuthentication = new SimAwsRequestAuthentication({
-      serviceFactory: this.serviceFactory,
+      requestAuth: this.serviceFactory.requestAuth,
       clock: background,
     });
   }
