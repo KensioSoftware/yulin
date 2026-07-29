@@ -32,6 +32,9 @@ export function resolveSimSdkCommandRouter(
     case "CloudFront": {
       return scoped.cloudFront().sdkCommandRouter();
     }
+    case "Cognito Identity Provider": {
+      return scoped.cognitoIdentityProvider().sdkCommandRouter();
+    }
     case "DynamoDB": {
       return scoped.dynamoDb().sdkCommandRouter();
     }

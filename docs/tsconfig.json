@@ -12,6 +12,7 @@
       "@kensio/yulin/cloudfront/globals": [
         "../src/service/cloudfront/globals.ts"
       ],
+      "@kensio/yulin/cognito": ["../src/service/cognito/index.ts"],
       "@kensio/yulin/dynamodb": ["../src/service/dynamodb/index.ts"],
       "@kensio/yulin/eslint": ["../src/config/eslint/index.ts"],
       "@kensio/yulin/iam": ["../src/service/iam/index.ts"],

@@ -5,6 +5,7 @@ import type {
 import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-scope.js";
 import type { SimAws } from "../sim-aws.js";
 import { SimCloudFormation } from "../../cloudformation/index.js";
+import { SimCognitoIdentityProvider } from "../../cognito/index.js";
 import { SimCloudFrontRegistry } from "../../cloudfront/registry/sim-cloud-front-registry.js";
 import type { SimCloudFront } from "../../cloudfront/sim-cloudfront.js";
 import { SimDynamoDb as SimDynamoDatabase } from "../../dynamodb/index.js";
@@ -132,9 +133,7 @@ export class SimAwsServiceFactory {
     });
   }
 
-  /**
-   * Create simulated ACM for an Account Region scope.
-   */
+  /** Create simulated ACM for an Account Region scope. */
   createAcm(scope: SimAwsAccountRegionContainer): SimAcm {
     const iam = this.createIam(scope);
 
@@ -154,9 +153,7 @@ export class SimAwsServiceFactory {
     return acm;
   }
 
-  /**
-   * Create simulated CloudFormation for an Account Region scope.
-   */
+  /** Create simulated CloudFormation for an Account Region scope. */
   createCloudFormation(scope: SimAwsAccountRegionContainer): SimCloudFormation {
     return new SimCloudFormation({
       simAws: this.simAws,
@@ -166,16 +163,28 @@ export class SimAwsServiceFactory {
     });
   }
 
-  /**
-   * Create or get simulated CloudFront for an Account scope.
-   */
+  /** Create or get simulated CloudFront for an Account scope. */
   createCloudFront(scope: SimAwsAccountRegionContainer): SimCloudFront {
     return this.accountServices.createCloudFront(scope);
   }
 
   /**
-   * Create simulated DynamoDB for an Account Region scope.
+   * Create simulated Cognito user pools for an Account Region scope.
+   *
+   * User pools are Region-scoped on real AWS: a pool id names its Region, and
+   * a pool cannot be reached from another one.
    */
+  createCognitoIdentityProvider(
+    scope: SimAwsAccountRegionContainer,
+  ): SimCognitoIdentityProvider {
+    return new SimCognitoIdentityProvider({
+      accountRegionScope: scope.accountRegionScope,
+      iam: this.createIam(scope),
+      background: this.background,
+    });
+  }
+
+  /** Create simulated DynamoDB for an Account Region scope. */
   createDynamoDb(scope: SimAwsAccountRegionContainer): SimDynamoDatabase {
     const iam = this.createIam(scope);
 
@@ -186,9 +195,7 @@ export class SimAwsServiceFactory {
     });
   }
 
-  /**
-   * Create or get simulated IAM for an Account scope.
-   */
+  /** Create or get simulated IAM for an Account scope. */
   createIam(scope: SimAwsAccountRegionContainer): SimIam {
     return this.accountServices.createIam(scope);
   }
@@ -233,16 +240,12 @@ export class SimAwsServiceFactory {
     });
   }
 
-  /**
-   * Create or get simulated Route53 for an Account scope.
-   */
+  /** Create or get simulated Route53 for an Account scope. */
   createRoute53(scope: SimAwsAccountRegionContainer): SimRoute53 {
     return this.accountServices.createRoute53(scope);
   }
 
-  /**
-   * Create simulated S3 for an Account Region scope.
-   */
+  /** Create simulated S3 for an Account Region scope. */
   createS3(scope: SimAwsAccountRegionContainer): SimS3 {
     const iam = this.createIam(scope);
 
@@ -284,9 +287,7 @@ export class SimAwsServiceFactory {
     });
   }
 
-  /**
-   * Create simulated STS for an Account/Region scope.
-   */
+  /** Create simulated STS for an Account/Region scope. */
   createSts(scope: SimAwsAccountRegionContainer): SimSts {
     this.createIam(scope);
 
