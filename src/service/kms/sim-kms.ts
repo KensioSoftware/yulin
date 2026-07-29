@@ -2,7 +2,6 @@ import {
   type BackgroundScheduler,
   BackgroundTasks,
 } from "../../util/background/background.js";
-import type { SimAwsCaller } from "../aws/caller/sim-aws-caller.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import {
@@ -12,6 +11,7 @@ import {
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
 import { SimKmsAliasCommands } from "./command/alias/sim-kms-alias-commands.js";
 import type * as simKmsCommands from "./command/sim-kms-command.types.js";
+import type { SimKmsRequestOptions } from "./command/sim-kms-request-options.js";
 import { SimKmsAuthorizer } from "./command/authorize/sim-kms-authorizer.js";
 import { SimKmsCryptoCommands } from "./command/crypto/sim-kms-crypto-commands.js";
 import { SimKmsGenerateDataKey } from "./command/crypto/sim-kms-generate-data-key.js";
@@ -26,10 +26,6 @@ import { SimKmsKeyFactory } from "./key/sim-kms-key-factory.js";
 import { SimKmsKeyMetadataView } from "./key/sim-kms-key-metadata.js";
 import { SimKmsKeyStore } from "./key/sim-kms-key-store.js";
 import { SimKmsSdkCommandRouter } from "./sdk/sim-kms-sdk-command-router.js";
-
-export interface SimKmsRequestOptions {
-  readonly caller?: SimAwsCaller;
-}
 
 interface SimKmsProperties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;

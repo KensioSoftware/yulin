@@ -1,4 +1,4 @@
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimKmsRequestOptions } from "../sim-kms-request-options.js";
 import { SimKmsValidationException } from "../../error/sim-kms.error.js";
 import { SimKmsCiphertextBlob } from "../../key/sim-kms-ciphertext-blob.js";
 import type { SimKmsKeyStore } from "../../key/sim-kms-key-store.js";
@@ -28,10 +28,6 @@ interface SimKmsCryptoCommandsProperties {
   readonly authorizer: SimKmsAuthorizer;
 }
 
-interface SimKmsCryptoCommandOptions {
-  readonly caller?: SimAwsCaller;
-}
-
 /**
  * The Encrypt and Decrypt commands of one simulated KMS scope.
  *
@@ -55,7 +51,7 @@ export class SimKmsCryptoCommands {
    */
   encrypt(
     command: SimEncryptCommand,
-    options?: SimKmsCryptoCommandOptions,
+    options?: SimKmsRequestOptions,
   ): SimEncryptCommandOutput {
     const plaintext = command.input.Plaintext;
 
@@ -74,7 +70,7 @@ export class SimKmsCryptoCommands {
     }
 
     const key = this.keys.require(command.input.KeyId);
-    this.authorizer.authorizeKey("kms:Encrypt", key, options?.caller);
+    this.authorizer.authorizeKey("kms:Encrypt", key, options);
 
     return {
       $metadata: {},
@@ -93,7 +89,7 @@ export class SimKmsCryptoCommands {
    */
   decrypt(
     command: SimDecryptCommand,
-    options?: SimKmsCryptoCommandOptions,
+    options?: SimKmsRequestOptions,
   ): SimDecryptCommandOutput {
     const ciphertextBlob = command.input.CiphertextBlob;
 
@@ -108,7 +104,7 @@ export class SimKmsCryptoCommands {
     const parts = this.blob.decode(ciphertextBlob);
     const key = this.ciphertextKey.behind(parts.keyArn);
 
-    this.authorizer.authorizeKey("kms:Decrypt", key, options?.caller);
+    this.authorizer.authorizeKey("kms:Decrypt", key, options);
     this.ciphertextKey.requireExpected(command.input.KeyId, key);
 
     return {

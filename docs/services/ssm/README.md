@@ -590,12 +590,12 @@ Store reports every KMS key problem.
 Each value is bound to its own parameter's ARN as the KMS encryption context, under the
 `PARAMETER_ARN` key, so a ciphertext lifted out of one parameter cannot be decrypted as another.
 
-### Decrypting needs its own permission
+### A customer managed key needs its own permission
 
-Encrypting and decrypting go to simulated KMS as the caller, not as the service. A write needs
-`kms:Encrypt` on the key on top of `ssm:PutParameter` on the parameter, and a decrypting read needs
-`kms:Decrypt` on top of `ssm:GetParameter`. A role granted one and not the other fails here rather
-than in a deployment.
+Encrypting and decrypting go to simulated KMS as the caller, not as the service. Under a customer
+managed key a write needs `kms:Encrypt` on the key on top of `ssm:PutParameter` on the parameter, and
+a decrypting read needs `kms:Decrypt` on top of `ssm:GetParameter`. A role granted one and not the
+other fails here rather than in a deployment.
 
 ```typescript sim-ssm-secure-string-permissions
 /**
@@ -669,6 +669,78 @@ try {
 }
 ```
 
+### The aws/ssm managed key needs no permission
+
+A parameter naming no key is encrypted under the `aws/ssm` AWS managed key, and that key asks the
+caller for nothing. Parameter Store supplies `kms:ViaService`, and the managed key's policy allows
+the account's principals to use it through Systems Manager. A role holding only `ssm:GetParameter`
+therefore reads the decrypted value, as it does on real AWS.
+
+The same role cannot take the ciphertext to KMS itself, because that policy allows nothing to a
+request arriving directly.
+
+```typescript sim-ssm-secure-string-managed-key
+/**
+ * Reading a simulated SecureString under the aws/ssm managed key.
+ */
+
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import { GetParameterCommand, PutParameterCommand } from "@aws-sdk/client-ssm";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const accountId = simAws.defaultAccountId;
+
+await simAws.ssm().putParameter(
+  new PutParameterCommand({
+    Name: "/myapp/prod/db-password",
+    Type: "SecureString",
+    Value: "hunter2",
+  }),
+);
+
+const role = await simAws.iam().createRole(
+  new CreateRoleCommand({
+    RoleName: "ConfigReader",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+
+// The parameter, and no KMS permission at all.
+await simAws.iam().putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "ConfigReader",
+    PolicyName: "ReadDbPassword",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: "ssm:GetParameter",
+        Resource: "*",
+      },
+    }),
+  }),
+);
+
+const read = await simAws.ssm().getParameter(
+  new GetParameterCommand({
+    Name: "/myapp/prod/db-password",
+    WithDecryption: true,
+  }),
+  { caller: { kind: "arn", arn: role.Role.Arn } },
+);
+
+console.log(read.Parameter?.Value); // "hunter2"
+```
+
 `DescribeParameters` reports the key each `SecureString` is encrypted under as `KeyId`.
 
 ## Limitations
@@ -678,9 +750,6 @@ Current documented limitations:
 - Only standard tier `SecureString` encryption is simulated, which encrypts under the KMS key
   directly. The advanced tier's envelope encryption through the AWS Encryption SDK is not, so
   `kms:GenerateDataKey` is never needed.
-- A `SecureString` under the `aws/ssm` managed key can be decrypted by any caller allowed
-  `kms:Decrypt` on it. Real AWS gives that key a policy nobody can change; simulated KMS gives a
-  managed key the same default policy as a customer key.
 - Parameter labels are not simulated. `LabelParameterVersion` is not implemented, so nothing can
   create a label, and a `name:label` selector is refused with an error saying so.
 - `GetParameterHistory` is not simulated, though earlier versions stay readable by number.

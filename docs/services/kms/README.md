@@ -238,6 +238,72 @@ try {
 Replacing a key policy with `PutKeyPolicyCommand` can lock an account out of its own key, as it can
 on real KMS.
 
+## AWS managed keys and `kms:ViaService`
+
+An alias beginning `alias/aws/` names an AWS managed key, and the key is created the first time
+something references it. Such a key gets the policy real AWS gives it, which is not the customer
+default:
+
+- Use of the key is allowed to any principal in the owning account, but only when `kms:ViaService`
+  names the service that owns the key, such as `ssm.us-east-1.amazonaws.com` for `aws/ssm`.
+- The account root is allowed to read the key's metadata, and nothing more. Nothing about using the
+  key is delegated to IAM.
+
+That is why a role holding only `ssm:GetParameter` reads a decrypted `SecureString` under `aws/ssm`,
+and why a role holding `kms:Decrypt` on that key still cannot use it by calling KMS itself.
+
+`kms:ViaService` is set by the service making the call on the caller's behalf. Sim SSM does this for
+`SecureString` parameters. Code calling simulated KMS directly sets it with the `viaService` request
+option, naming the service on its own rather than as an endpoint, since the region is the key's.
+
+```typescript sim-kms-aws-managed-key
+/**
+ * An AWS managed key, usable only through the service that owns it.
+ */
+
+import { EncryptCommand, GetKeyPolicyCommand } from "@aws-sdk/client-kms";
+
+import { SimAws } from "@kensio/yulin";
+import { SimIamAccessDenied } from "@kensio/yulin/iam";
+
+const simAws = new SimAws();
+
+// A request reaching the key through Systems Manager, as Parameter Store makes
+// it. No KMS permission is involved.
+const encrypted = await simAws.kms().encrypt(
+  new EncryptCommand({
+    KeyId: "alias/aws/ssm",
+    Plaintext: Buffer.from("hunter2", "utf8"),
+  }),
+  { viaService: "ssm" },
+);
+
+console.log(encrypted.KeyId); // the ARN of the aws/ssm key
+
+// The same request made directly is denied, whatever IAM allows.
+try {
+  await simAws.kms().encrypt(
+    new EncryptCommand({
+      KeyId: "alias/aws/ssm",
+      Plaintext: Buffer.from("hunter2", "utf8"),
+    }),
+  );
+} catch (error) {
+  console.log(error instanceof SimIamAccessDenied); // true
+}
+
+// Reading the key's metadata is allowed, because that much is delegated.
+const policy = await simAws
+  .kms()
+  .getKeyPolicy(new GetKeyPolicyCommand({ KeyId: "alias/aws/ssm" }));
+
+console.log(policy.Policy); // the via-service-scoped policy
+```
+
+A key policy of your own can use `kms:ViaService` too, with the ordinary condition operators, and it
+matches for requests carrying the option. A request that names no service has no value for the key,
+so a condition on it does not match.
+
 ## Naming a key
 
 Every operation takes its target as a `KeyId`, and any of the four forms real KMS accepts will do: a
@@ -443,12 +509,12 @@ Current documented limitations:
 - Aliases cannot be updated or deleted; `UpdateAlias` and `DeleteAlias` are not supported.
 - Tags, `ListResourceTags` and the `aws:ResourceTag` condition key are not simulated. An
   `AWS::KMS::Key` declaring `Tags` is refused rather than deploying with the tags dropped.
-- `kms:ViaService`, `kms:EncryptionContext:*` and other KMS-specific condition keys are not derived,
-  so a policy relying on them will not match. Ordinary condition operators on values sim IAM does
-  supply work as usual.
-- AWS managed keys created on demand get the same default key policy as a customer key, rather than
-  the via-service-scoped policy real AWS gives them. Scheduling one for deletion is refused, as on
-  real AWS, but disabling one is not, which real AWS does refuse.
+- `kms:EncryptionContext:*` and other KMS-specific condition keys beyond `kms:ViaService` and
+  `kms:CallerAccount` are not derived, so a policy relying on them will not match. Ordinary condition
+  operators on values sim IAM does supply work as usual.
+- The service an AWS managed key belongs to is taken from its alias, so `alias/aws/ebs` is scoped to
+  `ebs.<region>.amazonaws.com`. Real AWS scopes that one to EC2. The two agree for every service
+  Yulin simulates.
 - Key material lives in process memory for the lifetime of the `SimAws` instance. That is not a
   security boundary: anything sharing the process can reach it.
 - Sim SSM encrypts `SecureString` parameters with simulated keys and checks `kms:Encrypt` and

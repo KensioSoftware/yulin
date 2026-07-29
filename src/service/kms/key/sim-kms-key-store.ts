@@ -6,11 +6,7 @@ import {
 } from "../error/sim-kms.error.js";
 import { SimKmsAlias, simKmsAwsAliasPrefix } from "./sim-kms-alias.js";
 import { SimKmsKeyIdentifierParser } from "./sim-kms-key-identifier.js";
-import {
-  SimKmsKeyManager,
-  type SimKmsKey,
-  type SimKmsKeyId,
-} from "./sim-kms-key.js";
+import type { SimKmsKey, SimKmsKeyId } from "./sim-kms-key.js";
 import type { SimKmsKeyFactory } from "./sim-kms-key-factory.js";
 
 interface SimKmsKeyStoreProperties {
@@ -153,11 +149,17 @@ export class SimKmsKeyStore {
 
   /**
    * Create an AWS managed key on first reference to its reserved alias.
+   *
+   * The service that owns the key is the part of the alias after the reserved
+   * prefix, so `alias/aws/ssm` is the key Systems Manager owns. That is also
+   * the service its policy is scoped to through `kms:ViaService`.
    */
   private makeAwsManagedKey(aliasName: string): SimKmsKey {
+    const serviceName = aliasName.slice(simKmsAwsAliasPrefix.length);
+
     const key = this.keyFactory.make({
-      description: `Default key that protects my ${aliasName.slice(simKmsAwsAliasPrefix.length)} resources when no other key is defined`,
-      keyManager: SimKmsKeyManager.Aws,
+      description: `Default key that protects my ${serviceName} resources when no other key is defined`,
+      awsManagedService: serviceName,
     });
 
     this.add(key);

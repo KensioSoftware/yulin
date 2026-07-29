@@ -14,6 +14,7 @@ import type {
   SimIamPolicyDocument,
 } from "../../policy/sim-iam-policy.js";
 import type { SimIamRole, SimIamRoleName } from "../../role/sim-iam-role.js";
+import type { SimIamCallerConditionSource } from "./sim-iam-caller-condition-source.js";
 import type {
   SimIamAuthZContext,
   SimIamAuthZPolicySource,
@@ -58,6 +59,15 @@ export interface SimIamAuthorizationInput {
    */
   readonly conditionContext?:
     Readonly<Record<string, SimIamConditionValue>> | undefined;
+
+  /**
+   * Condition values the service can only supply once IAM has resolved the
+   * caller, such as the Account a KMS request came from.
+   *
+   * These are combined with the values supplied directly, and IAM-derived
+   * values still take precedence over both.
+   */
+  readonly callerConditions?: SimIamCallerConditionSource | undefined;
 
   /**
    * Simulated request caller.
@@ -211,25 +221,41 @@ export class SimIamAuthZContextBuilder {
 
   /**
    * Combine service-provided condition values with global values that IAM can
-   * derive from the resolved caller. AWS:PrincipalArn identifies the IAM
-   * identity whose policies apply; for temporary Role credentials this is the
-   * underlying Role ARN, rather than the STS assumed-role session ARN retained
-   * as the effective caller for diagnostics.
+   * derive from the resolved caller.
+   *
+   * A service supplies values it knows from the request, and values it can
+   * only work out once the caller is resolved. IAM's own values are applied
+   * last, so nothing a service supplies can overwrite them.
    */
   private conditionContext(
     input: SimIamAuthorizationInput,
     caller: SimAwsResolvedCaller,
   ): Readonly<Record<string, SimIamConditionValue>> {
+    return {
+      ...input.conditionContext,
+      ...input.callerConditions?.conditionValuesFor(caller),
+      ...this.callerDerivedConditions(caller),
+    };
+  }
+
+  /**
+   * The condition values IAM derives from the caller itself.
+   *
+   * AWS:PrincipalArn identifies the IAM identity whose policies apply; for
+   * temporary Role credentials this is the underlying Role ARN, rather than
+   * the STS assumed-role session ARN retained as the effective caller for
+   * diagnostics.
+   */
+  private callerDerivedConditions(
+    caller: SimAwsResolvedCaller,
+  ): Readonly<Record<string, SimIamConditionValue>> {
     const principalArn = caller.identityPolicyArn ?? caller.arn;
 
     if (principalArn === undefined) {
-      return input.conditionContext ?? {};
+      return {};
     }
 
-    return {
-      ...input.conditionContext,
-      "aws:PrincipalArn": principalArn,
-    };
+    return { "aws:PrincipalArn": principalArn };
   }
 
   /**
