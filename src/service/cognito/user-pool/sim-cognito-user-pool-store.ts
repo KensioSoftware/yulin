@@ -1,6 +1,28 @@
-import { SimCognitoResourceNotFoundException } from "../error/sim-cognito.error.js";
+import {
+  SimCognitoNotAuthorizedException,
+  SimCognitoResourceNotFoundException,
+} from "../error/sim-cognito.error.js";
+import type { SimCognitoIssuedToken } from "./auth/sim-cognito-issued-token.js";
+import type { SimCognitoUserPoolClient } from "./client/sim-cognito-user-pool-client.js";
+import type { SimCognitoUserPoolClientId } from "./client/sim-cognito-user-pool-client-id.js";
 import type { SimCognitoUserPool } from "./sim-cognito-user-pool.js";
 import type { SimCognitoUserPoolId } from "./sim-cognito-user-pool-id.js";
+
+/**
+ * An app client, and the pool that issued its id.
+ */
+export interface SimCognitoClientInPool {
+  readonly pool: SimCognitoUserPool;
+  readonly client: SimCognitoUserPoolClient;
+}
+
+/**
+ * An access token, and the pool that signed it.
+ */
+export interface SimCognitoAccessTokenInPool {
+  readonly pool: SimCognitoUserPool;
+  readonly token: SimCognitoIssuedToken;
+}
 
 /**
  * The user pools of one simulated Cognito scope.
@@ -10,6 +32,17 @@ import type { SimCognitoUserPoolId } from "./sim-cognito-user-pool-id.js";
  */
 export class SimCognitoUserPoolStore {
   private readonly pools = new Map<string, SimCognitoUserPool>();
+
+  private static unexpired(
+    issued: SimCognitoIssuedToken,
+    now: Date,
+  ): SimCognitoIssuedToken {
+    if (issued.isExpiredAt(now)) {
+      throw new SimCognitoNotAuthorizedException("Access Token has expired.");
+    }
+
+    return issued;
+  }
 
   /**
    * Every pool in this scope, in creation order.
@@ -59,5 +92,48 @@ export class SimCognitoUserPoolStore {
     }
 
     return found;
+  }
+
+  /**
+   * Resolve an app client by id alone, and the pool holding it, or refuse.
+   *
+   * `InitiateAuth` names no pool, because an app client id is enough to find
+   * one on real Cognito, so this is the lookup the client-side flows start
+   * from.
+   */
+  requireClient(clientId: SimCognitoUserPoolClientId): SimCognitoClientInPool {
+    for (const pool of this.all) {
+      const client = pool.findClient(clientId);
+
+      if (client !== undefined) {
+        return { pool, client };
+      }
+    }
+
+    throw new SimCognitoResourceNotFoundException(
+      `App client ${clientId} does not exist.`,
+    );
+  }
+
+  /**
+   * Resolve the access token a request is authorized with, and the pool that
+   * signed it, or refuse.
+   *
+   * `GlobalSignOut` names no pool either: the token is what says which pool
+   * the request is for. A token from a signed-out session has been forgotten
+   * by then, which is what real Cognito reports as a revoked access token.
+   */
+  requireAccessToken(value: string, now: Date): SimCognitoAccessTokenInPool {
+    for (const pool of this.all) {
+      const issued = pool.auth.findAccessToken(value);
+
+      if (issued !== undefined) {
+        return { pool, token: SimCognitoUserPoolStore.unexpired(issued, now) };
+      }
+    }
+
+    throw new SimCognitoNotAuthorizedException(
+      "Access Token has been revoked.",
+    );
   }
 }

@@ -1,5 +1,6 @@
 import {
   type CreateUserPoolClientCommandInput,
+  type PreventUserExistenceErrorTypes,
   CreateUserPoolClientCommand,
   CreateUserPoolCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
@@ -36,11 +37,6 @@ const refusedInputs: readonly RefusedInput[] = [
     label: "EnableTokenRevocation",
     input: { EnableTokenRevocation: false },
     says: "token revocation",
-  },
-  {
-    label: "PreventUserExistenceErrors",
-    input: { PreventUserExistenceErrors: "ENABLED" },
-    says: "hiding whether a user exists",
   },
   {
     label: "AllowedOAuthFlows",
@@ -169,11 +165,62 @@ describe("sim Cognito app client unsimulated options", () => {
         SupportedIdentityProviders: ["COGNITO"],
         AllowedOAuthFlowsUserPoolClient: false,
         EnableTokenRevocation: true,
-        PreventUserExistenceErrors: "LEGACY",
       }),
     );
 
     // Then it is created rather than refused.
     assertIdentical(created.UserPoolClient?.ClientName, "web");
+  });
+
+  it("takes a PreventUserExistenceErrors of either value", async () => {
+    // Given a user pool.
+    const withPool = await simCognitoWithPool();
+
+    // When a client hides whether a user exists.
+    const created = await withPool.cognito.createUserPoolClient(
+      new CreateUserPoolClientCommand({
+        UserPoolId: withPool.userPoolId,
+        ClientName: "web",
+        PreventUserExistenceErrors: "ENABLED",
+      }),
+    );
+
+    // Then the setting is kept, and a client that said nothing gets the
+    // LEGACY the API defaults to.
+    assertIdentical(
+      created.UserPoolClient?.PreventUserExistenceErrors,
+      "ENABLED",
+    );
+
+    const quiet = await withPool.cognito.createUserPoolClient(
+      new CreateUserPoolClientCommand({
+        UserPoolId: withPool.userPoolId,
+        ClientName: "mobile",
+      }),
+    );
+
+    assertIdentical(quiet.UserPoolClient?.PreventUserExistenceErrors, "LEGACY");
+  });
+
+  it("refuses a PreventUserExistenceErrors that is neither", async () => {
+    // Given a user pool.
+    const withPool = await simCognitoWithPool();
+
+    // When a client asks for a setting Cognito does not have.
+    const error = await refusedClient(
+      withPool,
+      // The SDK types name the two values Cognito has, and the wire format
+      // takes any string, so this is what reaches a real pool from code that
+      // built the request itself.
+      {
+        PreventUserExistenceErrors:
+          "DISABLED" as PreventUserExistenceErrorTypes,
+      },
+      "PreventUserExistenceErrors",
+    );
+
+    // Then it is refused, rather than kept and quietly ignored later.
+    assertInstanceOf(error, SimCognitoInvalidParameterException);
+    assertStringIncludes(error.message, "is not a Cognito setting");
   });
 });

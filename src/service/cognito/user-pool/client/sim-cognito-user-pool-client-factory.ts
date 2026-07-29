@@ -3,6 +3,7 @@ import { SimCognitoName } from "../sim-cognito-name.js";
 import type { SimCognitoUserPool } from "../sim-cognito-user-pool.js";
 import { makeSimCognitoClientSecret } from "./sim-cognito-client-secret.js";
 import { SimCognitoExplicitAuthFlows } from "./sim-cognito-explicit-auth-flows.js";
+import { SimCognitoPreventUserExistenceErrors } from "./sim-cognito-prevent-user-existence-errors.js";
 import {
   SimCognitoTokenValidity,
   type SimCognitoTokenValidityInput,
@@ -19,6 +20,7 @@ interface SimCognitoMakeUserPoolClientProperties {
   readonly name: string | undefined;
   readonly generateSecret?: boolean | undefined;
   readonly explicitAuthFlows?: readonly string[] | undefined;
+  readonly preventUserExistenceErrors?: string | undefined;
   readonly tokenValidity: SimCognitoTokenValidityInput;
 }
 
@@ -54,6 +56,9 @@ export class SimCognitoUserPoolClientFactory {
       secret: this.secretFor(properties.generateSecret),
       explicitAuthFlows: new SimCognitoExplicitAuthFlows(
         properties.explicitAuthFlows,
+      ),
+      preventUserExistenceErrors: new SimCognitoPreventUserExistenceErrors(
+        properties.preventUserExistenceErrors,
       ),
       tokenValidity: new SimCognitoTokenValidity(properties.tokenValidity),
       createdDate: this.clock.now(),

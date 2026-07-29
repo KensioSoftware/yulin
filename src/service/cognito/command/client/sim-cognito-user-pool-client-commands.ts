@@ -67,6 +67,7 @@ export class SimCognitoUserPoolClientCommands {
       name: input.ClientName,
       generateSecret: input.GenerateSecret,
       explicitAuthFlows: input.ExplicitAuthFlows,
+      preventUserExistenceErrors: input.PreventUserExistenceErrors,
       tokenValidity: input,
     });
 

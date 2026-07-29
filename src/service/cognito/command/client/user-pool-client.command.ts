@@ -15,6 +15,7 @@ export interface SimCognitoUserPoolClientType {
   readonly UserPoolId?: string | undefined;
   readonly ClientSecret?: string | undefined;
   readonly ExplicitAuthFlows?: readonly string[] | undefined;
+  readonly PreventUserExistenceErrors?: string | undefined;
   readonly AccessTokenValidity?: number | undefined;
   readonly IdTokenValidity?: number | undefined;
   readonly RefreshTokenValidity?: number | undefined;

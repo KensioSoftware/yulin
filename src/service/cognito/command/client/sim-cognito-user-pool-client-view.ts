@@ -16,7 +16,8 @@ export class SimCognitoUserPoolClientView {
    *
    * `AccessTokenValidity` and `IdTokenValidity` appear only when the request
    * set them, which is what real Cognito does. `RefreshTokenValidity` always
-   * appears, defaulted to thirty days.
+   * appears, defaulted to thirty days, and so does
+   * `PreventUserExistenceErrors`, defaulted to `LEGACY`.
    */
   describe(client: SimCognitoUserPoolClient): SimCognitoUserPoolClientType {
     const { tokenValidity } = client;
@@ -27,6 +28,7 @@ export class SimCognitoUserPoolClientView {
       UserPoolId: client.userPoolId,
       ClientSecret: client.secret,
       ExplicitAuthFlows: client.explicitAuthFlows.values,
+      PreventUserExistenceErrors: client.preventUserExistenceErrors.value,
       AccessTokenValidity: tokenValidity.accessToken.validity,
       IdTokenValidity: tokenValidity.idToken.validity,
       RefreshTokenValidity: tokenValidity.refreshToken.validity,

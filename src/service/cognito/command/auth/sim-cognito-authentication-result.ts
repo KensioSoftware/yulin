@@ -9,15 +9,22 @@ export class SimCognitoAuthenticationResult {
    * The tokens as an `AuthenticationResult`.
    *
    * `ExpiresIn` is the access token's lifetime in seconds, which is what real
-   * Cognito reports there, and `TokenType` is always `Bearer`.
+   * Cognito reports there, and `TokenType` is always `Bearer`. A refresh
+   * carries no `RefreshToken` at all, rather than an empty one, because that
+   * is what a caller keeping the token it already has has to notice.
    */
   of(tokens: SimCognitoIssuedTokens): SimCognitoAuthenticationResultType {
-    return {
+    const issued = {
       AccessToken: tokens.accessToken,
       IdToken: tokens.idToken,
-      RefreshToken: tokens.refreshToken,
       ExpiresIn: tokens.expiresIn,
       TokenType: "Bearer",
     };
+
+    if (tokens.refreshToken === undefined) {
+      return issued;
+    }
+
+    return { ...issued, RefreshToken: tokens.refreshToken };
   }
 }

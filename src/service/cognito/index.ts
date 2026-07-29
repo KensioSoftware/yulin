@@ -21,6 +21,7 @@ export {
 export { SimCognitoUserPoolClient } from "./user-pool/client/sim-cognito-user-pool-client.js";
 export type { SimCognitoUserPoolClientId } from "./user-pool/client/sim-cognito-user-pool-client-id.js";
 export { SimCognitoExplicitAuthFlows } from "./user-pool/client/sim-cognito-explicit-auth-flows.js";
+export { SimCognitoPreventUserExistenceErrors } from "./user-pool/client/sim-cognito-prevent-user-existence-errors.js";
 export {
   SimCognitoTokenLifetime,
   type SimCognitoTokenValidityUnit,
@@ -31,6 +32,7 @@ export {
   type SimCognitoTokenValidityUnitsType,
 } from "./user-pool/client/sim-cognito-token-validity.js";
 export { SimCognitoUserDirectory } from "./sim-cognito-user-directory.js";
+export { SimCognitoAuthentication } from "./sim-cognito-authentication.js";
 export { SimCognitoUser } from "./user-pool/user/sim-cognito-user.js";
 export type { SimCognitoUsername } from "./user-pool/user/sim-cognito-username.js";
 export {
@@ -57,6 +59,8 @@ export {
   type SimCognitoIssuedTokens,
 } from "./user-pool/token/sim-cognito-token-issuer.js";
 export { SimCognitoAuthSession } from "./user-pool/auth/sim-cognito-auth-session.js";
+export { SimCognitoIssuedToken } from "./user-pool/auth/sim-cognito-issued-token.js";
+export { SimCognitoPoolAuth } from "./user-pool/auth/sim-cognito-pool-auth.js";
 export {
   SimCognitoError,
   SimCognitoGroupExistsException,

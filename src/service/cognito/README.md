@@ -3,17 +3,19 @@
 This directory contains the simulated Cognito user pools implementation. Cognito identity pools,
 which exchange a token for AWS credentials, are a separate service and are not simulated at all.
 
-The pool, the app client, the users and groups in it, the admin sign-in flow, the tokens it issues
-and the authorizer are all here. The client-side flows are not: `InitiateAuth`, SRP and the hosted
-UI are a separate piece of work.
+The pool, the app client, the users and groups in it, the sign-in flows on both sides of the API,
+the tokens it issues and the authorizer are all here. SRP, the hosted UI, MFA and device tracking
+are not.
 
 ## Entry points
 
 - `sim-cognito-identity-provider.ts` is the main in-memory service object for one account/region
   scope. It holds the pool and app client operations, and extends
-  `sim-cognito-user-directory.ts`, which holds the user and group ones. A caller sees one service
-  object, as the real API is one service; the split is because a pool's settings and a pool's
-  contents are two concerns, and one class holding both had outgrown reading in one sitting.
+  `sim-cognito-user-directory.ts`, which holds the user and group ones and extends
+  `sim-cognito-authentication.ts`, which holds signing in and signing out. A caller sees one service
+  object, as the real API is one service; the split is because a pool's settings, a pool's contents
+  and authenticating against it are three concerns, and one class holding all of them had outgrown
+  reading in one sitting.
 - `index.ts` exports the public Cognito simulator API for `@kensio/yulin/cognito`.
 
 A `SimCognitoIdentityProvider` instance owns a `SimCognitoUserPoolStore` holding its pools. The
@@ -47,6 +49,12 @@ is part of the pool's state and the checking is not, and because both `AdminCrea
 are checked rather than stored as written, because a typo in a flow name would otherwise turn into a
 puzzling sign-in failure much later, and the legacy and `ALLOW_` prefixed flows cannot be mixed, as
 real Cognito refuses to mix them.
+
+`SimCognitoPreventUserExistenceErrors` is the setting that decides whether a sign-in naming an
+unknown user says so or is refused the way a wrong password is. It is honoured rather than picked,
+because a test asserting the generic refusal against a client that actually leaks user existence is
+asserting the wrong thing. The API default is `LEGACY`, which leaks it, and the console applies
+`ENABLED` to a client made there.
 
 `SimCognitoTokenValidity` and `SimCognitoTokenLifetime` resolve the three token lifetimes. A validity
 is a number in a unit, and the two arrive in separate request inputs, so the same `1` means an hour
@@ -128,15 +136,33 @@ fails here the way it fails in production.
 
 `SimCognitoTokenIssuer` ties them together and takes every timestamp from the injectable clock, so a
 sign-in in the simulated past produces a token a verifier already considers expired. It also mints
-the refresh token, which is an opaque string rather than a JWT, as it is on real Cognito.
+the refresh token, which is an opaque string rather than a JWT, as it is on real Cognito. `issue`
+hands out all three tokens and `reissue` signs a new access and id token for a refresh, which is the
+difference `REFRESH_TOKEN_AUTH` answers with. Everything it issues is recorded on the pool, because
+the pool is what a refresh or a sign-out presents a token back to.
 
 ## Authentication model
 
 Sign-in state lives under `user-pool/auth/`.
 
+`SimCognitoPoolAuth` is a pool's authentication state: the sign-ins part way through it, and the
+tokens the finished ones handed out. The two live together because signing a user out reaches both,
+and because keeping them here leaves `SimCognitoUserPool` as what it is elsewhere, a resource
+holding its contents.
+
 `SimCognitoAuthSession` is what an unfinished authentication carries between the request that started
 it and the response that completes it. A session is opaque, single use, tied to its user and app
 client, and lasts the three minutes real Cognito gives one.
+
+`SimCognitoIssuedToken` is a token the pool has handed out, and `SimCognitoIssuedTokenStore` holds
+them. A refresh token is kept because the pool is what exchanges it later, and an access token
+because the pool is what a sign-out presents one to. Signing a user out forgets both kinds, which is
+what makes a later refresh fail: real Cognito revokes a signed-out user's tokens rather than waiting
+for them to run out. Deleting a user does the same, so no token outlives the user it names.
+
+`SimCognitoUserPoolStore.requireClient` and `.requireAccessToken` are the scope-wide lookups the
+client-side operations need. `InitiateAuth` names an app client and no pool, and `GlobalSignOut`
+names neither, so the client id and the access token are what find the pool.
 
 `requireSimCognitoSecretHash` checks the `SECRET_HASH` a client with a secret has to send, computed
 the way the AWS SDKs compute it. Checking it is what makes a test notice a client secret it forgot to
@@ -157,14 +183,25 @@ rather than one class per command, so the `SimCognitoIdentityProvider` facade st
   and the commands that change one afterwards
 - `command/group/`: the same for groups, split between the commands that act on a group and the
   commands that move users in and out of one
-- `command/auth/`: `AdminInitiateAuth` and `AdminRespondToAuthChallenge`, the flow and challenge
+- `command/auth/`: the four sign-in operations and the two sign-out ones, the flow and challenge
   names they accept, and the parameters they read
 - `command/authorize/`: the shared IAM authorizer
 - `command/sim-cognito-page.ts`: the paging every listing shares, which takes the names of the
   inputs it is reading because `ListUsers` calls its page size `Limit` and its token
   `PaginationToken`, while the group listings call theirs `Limit` and `NextToken`
 - `command/sim-cognito-commands.ts`: builds the command handlers with the authorizer, pool store
-  and clock they share, so the service facade stays delegation
+  and clock they share, so the service facade stays delegation. The authentication ones are built by
+  `command/auth/sim-cognito-auth-commands.ts`, because the collaborators they share are theirs alone
+
+The four sign-in commands are thin because the parts they share are collaborators.
+`SimCognitoAuthFlow` knows a flow's name, the `ExplicitAuthFlows` entry that opens it and the legacy
+entry it replaced; `SimCognitoAuthFlows` is the set one entry point runs, which is why
+`ADMIN_USER_PASSWORD_AUTH` is refused for `InitiateAuth` as it is on real Cognito.
+`SimCognitoAuthFlowRunner` runs the resolved flow through `SimCognitoPasswordSignIn` or
+`SimCognitoRefreshSignIn`, and `SimCognitoNewPasswordResponse` is the body both challenge responses
+share, and refuses a user disabled since the challenge was issued, because a disabled user cannot
+finish a sign-in any more than it can start one. What is left in each command is how it reaches the
+pool and what it is allowed to run.
 
 `SimCognitoRequestResolver` is what every user and group operation starts with: authorize against
 the pool's ARN, then find the pool. Neither a user nor a group has an ARN of its own, so the pool's
@@ -189,6 +226,11 @@ command instances.
 - `CreateUserPool` and `ListUserPools` authorize against `*`, because real Cognito gives those two
   actions no resource-level permissions, so a policy naming individual pool ARNs grants nothing.
 
+`InitiateAuth`, `RespondToAuthChallenge` and `GlobalSignOut` authorize nothing, and read no caller.
+Real Cognito evaluates no IAM policy for them: they are what an application calls on behalf of a
+user, holding no AWS credentials at all. Authorizing them here would pass code that a real
+deployment refuses, and refuse code that really works.
+
 A policy granting an app client action on a pool therefore reaches every client in that pool, and a
 policy granting a user action reaches every user in it. There is no way to narrow either to one
 resource, here or on real AWS.
@@ -209,8 +251,15 @@ resource, here or on real AWS.
 - Users are resolved by username only, and real Cognito also accepts a `sub` there.
 - `AdminListGroupsForUser` sorts by precedence. Real Cognito does not document an order for it.
 - One signing key is published per pool, where real Cognito publishes two and rotates between them.
-- Only `ADMIN_USER_PASSWORD_AUTH` runs, and only `NEW_PASSWORD_REQUIRED` is issued. Every other flow
-  and challenge is refused rather than treated as one of those.
+- The password and refresh flows run on both sides of the API, and only `NEW_PASSWORD_REQUIRED` is
+  issued. SRP, `USER_AUTH`, custom authentication, MFA challenges and device tracking are refused
+  rather than treated as a flow or challenge that is simulated.
+- A refresh answers with no new refresh token, as real Cognito does with refresh token rotation off.
+  `RefreshTokenRotation` is refused on an app client, and `GetTokensFromRefreshToken` and
+  `RevokeToken` are not implemented.
+- Signing out revokes the user's tokens here, and a token already handed to a verifier goes on
+  verifying against the pool's JWKS until it expires. Verification asks this simulation nothing, so
+  nothing here can tell a verifier the token was revoked.
 - A verifier reading the host clock judges an already-issued token by host time. Advancing the
   simulated clock moves the timestamps of tokens issued after it, and signing in in the simulated
   past is what produces a token such a verifier refuses.

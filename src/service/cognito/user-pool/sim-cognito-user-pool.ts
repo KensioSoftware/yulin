@@ -1,8 +1,4 @@
-import type { SimCognitoAuthSession } from "./auth/sim-cognito-auth-session.js";
-import {
-  SimCognitoAuthSessionStore,
-  type SimCognitoAuthSessionRequest,
-} from "./auth/sim-cognito-auth-session-store.js";
+import { SimCognitoPoolAuth } from "./auth/sim-cognito-pool-auth.js";
 import type { SimCognitoUserPoolClient } from "./client/sim-cognito-user-pool-client.js";
 import type { SimCognitoUserPoolClientId } from "./client/sim-cognito-user-pool-client-id.js";
 import { SimCognitoUserPoolClientStore } from "./client/sim-cognito-user-pool-client-store.js";
@@ -46,10 +42,14 @@ export class SimCognitoUserPool {
   public readonly deletionProtection: SimCognitoDeletionProtection;
   public readonly creationDate: Date;
 
+  /**
+   * The sign-ins part way through this pool, and the tokens it has issued.
+   */
+  public readonly auth = new SimCognitoPoolAuth();
+
   private readonly clientStore = new SimCognitoUserPoolClientStore();
   private readonly userStore = new SimCognitoUserStore();
   private readonly groupStore = new SimCognitoGroupStore();
-  private readonly authSessions = new SimCognitoAuthSessionStore();
 
   #signingKey: SimCognitoSigningKey | undefined;
 
@@ -175,14 +175,17 @@ export class SimCognitoUserPool {
   }
 
   /**
-   * Forget a deleted user, and take them out of every group.
+   * Forget a deleted user, take them out of every group, and forget the
+   * tokens they hold.
    *
    * A group holding a user that no longer exists would answer `ListUsersInGroup`
-   * with a member this pool cannot describe.
+   * with a member this pool cannot describe, and a refresh token outliving its
+   * user would sign in someone the pool cannot describe either.
    */
   removeUser(user: SimCognitoUser): void {
     this.userStore.remove(user);
     this.groupStore.forgetUser(user.username);
+    this.auth.signOut(user.username);
   }
 
   /**
@@ -239,28 +242,5 @@ export class SimCognitoUserPool {
    */
   groupsOf(username: string): readonly SimCognitoGroup[] {
     return this.groupStore.forUser(username);
-  }
-
-  /**
-   * Remember a challenge session an authentication was left waiting on.
-   */
-  addAuthSession(session: SimCognitoAuthSession): void {
-    this.authSessions.add(session);
-  }
-
-  /**
-   * Resolve the challenge session a response carries, or refuse.
-   */
-  requireAuthSession(
-    request: SimCognitoAuthSessionRequest,
-  ): SimCognitoAuthSession {
-    return this.authSessions.require(request);
-  }
-
-  /**
-   * Forget a challenge session that has been used.
-   */
-  removeAuthSession(session: SimCognitoAuthSession): void {
-    this.authSessions.remove(session);
   }
 }

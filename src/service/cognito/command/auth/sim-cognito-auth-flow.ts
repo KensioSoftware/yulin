@@ -1,76 +1,72 @@
 import { SimCognitoInvalidParameterException } from "../../error/sim-cognito.error.js";
 import type { SimCognitoUserPoolClient } from "../../user-pool/client/sim-cognito-user-pool-client.js";
 
-/**
- * The one authentication flow this simulation runs.
- */
-export const adminUserPasswordFlow = "ADMIN_USER_PASSWORD_AUTH";
-
-/**
- * The app client setting that opens that flow.
- */
-const adminUserPasswordAuthFlow = "ALLOW_ADMIN_USER_PASSWORD_AUTH";
-
-/**
- * The challenge this simulation can answer.
- */
-export const newPasswordRequiredChallenge = "NEW_PASSWORD_REQUIRED";
-
-/**
- * Refuse an authentication flow this simulation does not run.
- *
- * The others are refused rather than treated as this one, because which flow
- * a request uses decides what the app client has to be configured for and
- * what the caller has to send.
- */
-export function requireSimCognitoAdminUserPasswordFlow(
-  authFlow: string | undefined,
-): void {
-  if (authFlow === adminUserPasswordFlow) {
-    return;
-  }
-
-  throw new SimCognitoInvalidParameterException(
-    `AuthFlow '${String(authFlow)}' is not simulated: ` +
-      `${adminUserPasswordFlow} is the only flow this simulation runs. SRP, ` +
-      `custom authentication and refresh token flows are not implemented.`,
-  );
+interface SimCognitoAuthFlowProperties {
+  readonly name: string;
+  readonly clientSetting: string;
+  readonly legacySettings?: readonly string[];
+  readonly aliases?: readonly string[];
+  readonly exchangesRefreshToken?: boolean;
 }
 
 /**
- * Refuse a challenge this simulation cannot answer.
- */
-export function requireSimCognitoNewPasswordChallenge(
-  challengeName: string | undefined,
-): void {
-  if (challengeName === newPasswordRequiredChallenge) {
-    return;
-  }
-
-  throw new SimCognitoInvalidParameterException(
-    `ChallengeName '${String(challengeName)}' is not simulated: ` +
-      `${newPasswordRequiredChallenge} is the only challenge this ` +
-      `simulation issues.`,
-  );
-}
-
-/**
- * Refuse a flow the app client is not configured for.
+ * One authentication flow this simulation runs.
  *
- * Real Cognito refuses this before it looks at the user at all, which is why
- * a client created without the flow fails the same way whatever the password
- * was.
+ * A flow knows the `ExplicitAuthFlows` entry that opens it, because which flow
+ * a request uses decides what the app client has to be configured for. That is
+ * checked before the user is looked at, as real Cognito checks it, so a client
+ * created without the flow fails the same way whatever the password was.
  */
-export function requireSimCognitoFlowEnabled(
-  client: SimCognitoUserPoolClient,
-): void {
-  if (client.explicitAuthFlows.allows(adminUserPasswordAuthFlow)) {
-    return;
+export class SimCognitoAuthFlow {
+  public readonly name: string;
+  public readonly clientSetting: string;
+
+  /**
+   * Whether the flow trades a refresh token for new tokens rather than signing
+   * a user in with a password.
+   */
+  public readonly exchangesRefreshToken: boolean;
+
+  private readonly aliases: readonly string[];
+  private readonly settings: readonly string[];
+
+  constructor(properties: SimCognitoAuthFlowProperties) {
+    this.name = properties.name;
+    this.clientSetting = properties.clientSetting;
+    this.exchangesRefreshToken = properties.exchangesRefreshToken ?? false;
+    this.aliases = properties.aliases ?? [];
+    this.settings = [
+      properties.clientSetting,
+      ...(properties.legacySettings ?? []),
+    ];
   }
 
-  throw new SimCognitoInvalidParameterException(
-    `${adminUserPasswordFlow} is not enabled for the client ${client.id}: ` +
-      `create the app client with ${adminUserPasswordAuthFlow} among its ` +
-      `ExplicitAuthFlows`,
-  );
+  /**
+   * Whether a requested `AuthFlow` names this flow.
+   */
+  matches(authFlow: string): boolean {
+    return authFlow === this.name || this.aliases.includes(authFlow);
+  }
+
+  /**
+   * Refuse a flow the app client is not configured for.
+   *
+   * The legacy `ExplicitAuthFlows` value a flow replaced opens it too, as it
+   * does on real Cognito, so a client made before the `ALLOW_` prefixed
+   * settings existed still signs users in.
+   */
+  requireEnabledFor(client: SimCognitoUserPoolClient): void {
+    const enabled = this.settings.some((setting) =>
+      client.explicitAuthFlows.allows(setting),
+    );
+
+    if (enabled) {
+      return;
+    }
+
+    throw new SimCognitoInvalidParameterException(
+      `${this.name} is not enabled for the client ${client.id}: create the ` +
+        `app client with ${this.clientSetting} among its ExplicitAuthFlows`,
+    );
+  }
 }

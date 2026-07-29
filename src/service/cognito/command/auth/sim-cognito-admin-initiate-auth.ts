@@ -1,15 +1,8 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
-import { requireSimCognitoSignIn } from "../../user-pool/auth/sim-cognito-sign-in.js";
-import type { SimCognitoTokenIssuer } from "../../user-pool/token/sim-cognito-token-issuer.js";
-import { requireSimCognitoUsername } from "../../user-pool/user/sim-cognito-username.js";
-import { SimCognitoAuthenticationResult } from "./sim-cognito-authentication-result.js";
 import { SimCognitoAuthParameters } from "./sim-cognito-auth-parameters.js";
 import type { SimCognitoAuthResolver } from "./sim-cognito-auth-resolver.js";
-import {
-  requireSimCognitoAdminUserPasswordFlow,
-  requireSimCognitoFlowEnabled,
-} from "./sim-cognito-auth-flow.js";
-import type { SimCognitoNewPasswordChallenge } from "./sim-cognito-new-password-challenge.js";
+import { adminAuthFlows } from "./sim-cognito-auth-flows.js";
+import type { SimCognitoAuthFlowRunner } from "./sim-cognito-auth-flow-runner.js";
 import { SimCognitoUnsimulatedAuthOptions } from "./sim-cognito-unsimulated-auth-options.js";
 import type {
   SimAdminInitiateAuthCommand,
@@ -18,8 +11,7 @@ import type {
 
 interface SimCognitoAdminInitiateAuthProperties {
   readonly authResolver: SimCognitoAuthResolver;
-  readonly tokenIssuer: SimCognitoTokenIssuer;
-  readonly challenge: SimCognitoNewPasswordChallenge;
+  readonly flowRunner: SimCognitoAuthFlowRunner;
 }
 
 interface SimCognitoCommandOptions {
@@ -29,21 +21,20 @@ interface SimCognitoCommandOptions {
 /**
  * The AdminInitiateAuth command.
  *
- * Only `ADMIN_USER_PASSWORD_AUTH` runs. A user that gets past its password
- * either receives tokens or, if it still has to replace that password, the
- * `NEW_PASSWORD_REQUIRED` challenge and a session.
+ * This is the server-side entry point, so the caller needs the
+ * `cognito-idp:AdminInitiateAuth` permission on the pool. It runs
+ * `ADMIN_USER_PASSWORD_AUTH` and `REFRESH_TOKEN_AUTH`. A user that gets past
+ * its password either receives tokens or, if it still has to replace that
+ * password, the `NEW_PASSWORD_REQUIRED` challenge and a session.
  */
 export class SimCognitoAdminInitiateAuth {
   private readonly authResolver: SimCognitoAuthResolver;
-  private readonly tokenIssuer: SimCognitoTokenIssuer;
-  private readonly challenge: SimCognitoNewPasswordChallenge;
-  private readonly result = new SimCognitoAuthenticationResult();
+  private readonly flowRunner: SimCognitoAuthFlowRunner;
   private readonly unsimulatedOptions = new SimCognitoUnsimulatedAuthOptions();
 
   constructor(properties: SimCognitoAdminInitiateAuthProperties) {
     this.authResolver = properties.authResolver;
-    this.tokenIssuer = properties.tokenIssuer;
-    this.challenge = properties.challenge;
+    this.flowRunner = properties.flowRunner;
   }
 
   /**
@@ -60,28 +51,19 @@ export class SimCognitoAdminInitiateAuth {
       options,
     );
 
-    this.unsimulatedOptions.refuseInInitiate(input);
-    requireSimCognitoAdminUserPasswordFlow(input.AuthFlow);
-    requireSimCognitoFlowEnabled(client);
+    this.unsimulatedOptions.refuseInAdminInitiate(input);
 
-    const parameters = new SimCognitoAuthParameters(
-      "AuthParameters",
-      input.AuthParameters,
-    );
-    const username = this.authResolver.username(client, parameters);
-    const user = pool.requireUser(requireSimCognitoUsername(username));
+    const flow = adminAuthFlows.require(input.AuthFlow);
 
-    requireSimCognitoSignIn(user, parameters.require("PASSWORD"));
+    flow.requireEnabledFor(client);
 
-    if (user.status.mustChangePassword) {
-      return this.challenge.issue({ pool, clientId: client.id, user });
-    }
-
-    return {
-      $metadata: {},
-      AuthenticationResult: this.result.of(
-        this.tokenIssuer.issue({ pool, client, user }),
+    return this.flowRunner.run(flow, {
+      pool,
+      client,
+      parameters: new SimCognitoAuthParameters(
+        "AuthParameters",
+        input.AuthParameters,
       ),
-    };
+    });
   }
 }

@@ -65,9 +65,10 @@ export class SimCognitoUser {
   /**
    * Whether the user may authenticate at all.
    *
-   * A disabled user keeps its password and its attributes, and real Cognito
-   * refuses to sign it in. Nothing signs in here yet, so this is stored and
-   * reported rather than acted on.
+   * A disabled user keeps its password and its attributes, and neither real
+   * Cognito nor this simulation signs it in. A refresh is refused too, so
+   * disabling a user ends the sessions it has rather than only stopping new
+   * ones.
    */
   get enabled(): boolean {
     return this.isEnabled;
