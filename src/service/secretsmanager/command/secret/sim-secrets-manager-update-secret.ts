@@ -5,6 +5,7 @@ import type { SimSecretsManagerSecretStore } from "../../secret/sim-secrets-mana
 import { SimSecretsManagerSecretValue } from "../../secret/sim-secrets-manager-secret-value.js";
 import type { SimSecretsManagerVersionWriter } from "../../secret/sim-secrets-manager-version-writer.js";
 import type { SimSecretsManagerAuthorizer } from "../authorize/sim-secrets-manager-authorizer.js";
+import { SimSecretsManagerMetadataUpdate } from "./sim-secrets-manager-metadata-update.js";
 import type {
   SimUpdateSecretCommand,
   SimUpdateSecretCommandInput,
@@ -33,13 +34,15 @@ export class SimSecretsManagerUpdateSecret {
   private readonly secrets: SimSecretsManagerSecretStore;
   private readonly versionWriter: SimSecretsManagerVersionWriter;
   private readonly authorizer: SimSecretsManagerAuthorizer;
-  private readonly clock: SimClock;
+  private readonly metadata: SimSecretsManagerMetadataUpdate;
 
   constructor(properties: SimSecretsManagerUpdateSecretProperties) {
     this.secrets = properties.secrets;
     this.versionWriter = properties.versionWriter;
     this.authorizer = properties.authorizer;
-    this.clock = properties.clock;
+    this.metadata = new SimSecretsManagerMetadataUpdate({
+      clock: properties.clock,
+    });
   }
 
   /**
@@ -48,10 +51,10 @@ export class SimSecretsManagerUpdateSecret {
    * Supplying a value writes a new version and makes it current, the same as
    * PutSecretValue does.
    */
-  handle(
+  async handle(
     command: SimUpdateSecretCommand,
     options?: SimSecretsManagerUpdateSecretOptions,
-  ): SimUpdateSecretCommandOutput {
+  ): Promise<SimUpdateSecretCommandOutput> {
     const { input } = command;
     const secret = this.secrets.require(input.SecretId);
 
@@ -68,8 +71,13 @@ export class SimSecretsManagerUpdateSecret {
     // client request token already used for a different value. Applying the
     // metadata first would leave the secret half updated by a request that
     // then reported an error.
-    const versionId = this.writtenVersionId(secret, value, input);
-    this.applyMetadata(secret, input);
+    const versionId = await this.writtenVersionId(
+      secret,
+      value,
+      input,
+      options?.caller,
+    );
+    this.metadata.apply(secret, input);
 
     return {
       $metadata: {},
@@ -80,35 +88,30 @@ export class SimSecretsManagerUpdateSecret {
   }
 
   /**
-   * Apply the metadata fields an UpdateSecret request carries.
+   * Write the new version, if the request carried a value.
    *
-   * Omitting a field leaves it as it was, which is how real Secrets Manager
-   * treats an absent Description or KmsKeyId.
+   * A request changing the key and the value together encrypts the new version
+   * under the new key, as real AWS does. The versions already written keep the
+   * key they were made with, so they stay readable.
    */
-  private applyMetadata(
-    secret: SimSecretsManagerSecret,
-    input: SimUpdateSecretCommandInput,
-  ): void {
-    if (input.Description !== undefined) {
-      secret.description = input.Description;
-    }
-
-    if (input.KmsKeyId !== undefined) {
-      secret.kmsKeyId = input.KmsKeyId;
-    }
-
-    secret.lastChangedDate = this.clock.now();
-  }
-
-  private writtenVersionId(
+  private async writtenVersionId(
     secret: SimSecretsManagerSecret,
     value: SimSecretsManagerSecretValue | undefined,
     input: SimUpdateSecretCommandInput,
-  ): string | undefined {
+    caller: SimAwsCaller | undefined,
+  ): Promise<string | undefined> {
     if (value === undefined) {
       return undefined;
     }
 
-    return this.versionWriter.write(secret, value, input).versionId;
+    const version = await this.versionWriter.write({
+      secret,
+      value,
+      input,
+      keyId: input.KmsKeyId ?? secret.kmsKeyId,
+      caller,
+    });
+
+    return version.versionId;
   }
 }

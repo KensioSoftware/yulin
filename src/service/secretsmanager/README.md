@@ -41,7 +41,26 @@ the data model: a label names exactly one version at a time, and making a versio
 the one that was to `AWSPREVIOUS` while whatever held `AWSPREVIOUS` loses it.
 
 `SimSecretsManagerSecretValue` holds one content field rather than two optional ones, so the
-invariant that a version is either text or binary and never both is true by construction.
+invariant that a version is either text or binary and never both is true by construction. It is the
+plaintext form: a request carries one in, and a read hands one back, but nothing stores one.
+
+`SimSecretsManagerEncryptedValue` is what a version does store. Encryption is envelope encryption,
+as it is on real Secrets Manager: `SimSecretsManagerValueEncryption` asks KMS for a data key per
+version, `SimSecretsManagerValueCipher` encrypts the value with the plaintext copy, and the
+encrypted copy is kept beside the ciphertext. That is why a write needs `kms:GenerateDataKey` and a
+read needs `kms:Decrypt`, rather than the `kms:Encrypt` a direct encryption would ask for. The
+encrypted data key names the KMS key that made it, so a version stays readable after the secret is
+pointed at a different key.
+
+The encryption context is `SecretARN` and `SecretVersionId`, which real Secrets Manager binds too.
+KMS binds it to the data key, so a data key lifted out of one version cannot be recovered as
+another, and the cipher out here needs no binding of its own.
+
+An encrypted value also keeps a digest of its plaintext. A repeated `ClientRequestToken` is a no-op
+when it carries the same value and a failure when it does not, and the two have to be told apart
+without the stored one being readable: decrypting it would need a `kms:Decrypt` that real AWS does
+not ask a writer for. The digest is a modelling shortcut rather than a security boundary, which is
+the same footing as key material living in process memory.
 
 `SimSecretsManagerSecretStore` owns `SecretId` resolution and name availability.
 `SimSecretsManagerSecretIdParser` is the part that turns the three forms a `SecretId` can take into
@@ -53,9 +72,12 @@ simulation's clock rather than the host's. This is what makes advancing simulate
 name up again, which is the behaviour a redeployed stack actually depends on.
 
 `SimSecretsManagerVersionWriter` is shared by every write. `CreateSecret`, `PutSecretValue` and
-`UpdateSecret` all end in the same place — a new version carrying the value, labelled `AWSCURRENT`
-unless told otherwise — so keeping it in one collaborator is what stops the three commands drifting
-apart on staging labels or on request-token idempotency.
+`UpdateSecret` all end in the same place — a new version carrying the encrypted value, labelled
+`AWSCURRENT` unless told otherwise — so keeping it in one collaborator is what stops the three
+commands drifting apart on staging labels, on request-token idempotency or on which key the value is
+encrypted under. The key comes in with the write rather than being read off the secret, because
+`UpdateSecret` can change the key and the value in one request and the new version belongs to the
+new key.
 
 ## Command handling
 
@@ -84,6 +106,13 @@ command instances.
   all;
 - `ListSecrets` authorizes against `*`, because real Secrets Manager gives that action no
   resource-level permissions, so a policy naming individual secret ARNs grants nothing.
+
+The KMS call a value makes is authorized separately, by KMS, as the same caller. A secret under a
+customer managed key therefore needs `kms:GenerateDataKey` to write and `kms:Decrypt` to read, on top
+of the Secrets Manager permission. A secret under the `aws/secretsmanager` managed key needs neither,
+because the calls carry `kms:ViaService` and that key's policy admits the account's principals
+reaching it through this service. Both are what real AWS asks for, and the second is why the common
+case stays as convenient as it was before anything was encrypted.
 
 There is no resource policy support yet, so unlike KMS this service passes no resource policies into
 the IAM decision. Cross-account access to a secret therefore cannot be granted, which is documented
@@ -114,10 +143,9 @@ way it does on real AWS.
 
 ## Divergences worth knowing
 
-- `KmsKeyId` is stored and reported but nothing is encrypted with it, and no `kms:Decrypt` check
-  happens. This is looser than real AWS. Sim SSM shows the shape the wiring would take for
-  `SecureString` parameters, but a secret has versions, staging labels and rotation to carry through
-  it, so it stands as its own change rather than a follow-on.
+- A `KmsKeyId` is checked when a version is written under it, not when it is set on its own. An
+  `UpdateSecret` that changes only the key accepts a key that does not exist; the next write of a
+  value fails.
 - Names ending in a hyphen and six characters are refused, which is stricter than real AWS.
 - `ListSecrets` refuses `Filters` and `SortOrder` rather than ignoring them.
 - A version that has lost every staging label is kept rather than removed, so it stays readable by

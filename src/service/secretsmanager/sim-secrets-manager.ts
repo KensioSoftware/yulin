@@ -10,6 +10,7 @@ import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { SimKms } from "../kms/index.js";
 import { SimSecretsManagerCfnResourceFactory } from "./cfn/sim-cfn-secrets-manager-resource-factory.js";
 import { SimSecretsManagerAuthorizer } from "./command/authorize/sim-secrets-manager-authorizer.js";
 import { SimSecretsManagerLifecycleCommands } from "./command/secret/sim-secrets-manager-lifecycle-commands.js";
@@ -22,6 +23,8 @@ import type { SimSecretsManagerSecret } from "./secret/sim-secrets-manager-secre
 import { SimSecretsManagerSecretExpiry } from "./secret/sim-secrets-manager-secret-expiry.js";
 import { SimSecretsManagerSecretFactory } from "./secret/sim-secrets-manager-secret-factory.js";
 import { SimSecretsManagerSecretStore } from "./secret/sim-secrets-manager-secret-store.js";
+import type { SimSecretsManagerKmsCrypto } from "./secret/sim-secrets-manager-kms-crypto.js";
+import { SimSecretsManagerValueEncryption } from "./secret/sim-secrets-manager-value-encryption.js";
 import { SimSecretsManagerVersionWriter } from "./secret/sim-secrets-manager-version-writer.js";
 import { SimSecretsManagerSdkCommandRouter } from "./sdk/sim-secrets-manager-sdk-command-router.js";
 
@@ -33,6 +36,13 @@ interface SimSecretsManagerProperties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
+
+  /**
+   * The simulated KMS that secret values are encrypted through. One is created
+   * for this scope when none is supplied, so a standalone SimSecretsManager
+   * still encrypts rather than quietly storing secrets in the clear.
+   */
+  readonly kms?: SimSecretsManagerKmsCrypto;
 }
 
 /**
@@ -62,9 +72,14 @@ export class SimSecretsManager {
       background = new BackgroundTasks(),
     } = properties;
 
+    const { kms = new SimKms({ accountRegionScope, iam, background }) } =
+      properties;
+
     const authorizer = new SimSecretsManagerAuthorizer({ iam });
+    const encryption = new SimSecretsManagerValueEncryption({ kms });
     const versionWriter = new SimSecretsManagerVersionWriter({
       clock: background,
+      encryption,
     });
 
     this.background = background;
@@ -100,6 +115,7 @@ export class SimSecretsManager {
     this.valueCommands = new SimSecretsManagerValueCommands({
       secrets: this.secrets,
       versionWriter,
+      encryption,
       authorizer,
     });
   }
@@ -122,7 +138,7 @@ export class SimSecretsManager {
     options?: SimSecretsManagerRequestOptions,
   ): Promise<simSecretsManagerCommands.SimCreateSecretCommandOutput> {
     await this.background.sequence();
-    return this.secretCommands.create(command, options);
+    return await this.secretCommands.create(command, options);
   }
 
   /**
@@ -144,7 +160,7 @@ export class SimSecretsManager {
     options?: SimSecretsManagerRequestOptions,
   ): Promise<simSecretsManagerCommands.SimUpdateSecretCommandOutput> {
     await this.background.sequence();
-    return this.updateSecretCommand.handle(command, options);
+    return await this.updateSecretCommand.handle(command, options);
   }
 
   /**
@@ -166,7 +182,7 @@ export class SimSecretsManager {
     options?: SimSecretsManagerRequestOptions,
   ): Promise<simSecretsManagerCommands.SimGetSecretValueCommandOutput> {
     await this.background.sequence();
-    return this.valueCommands.get(command, options);
+    return await this.valueCommands.get(command, options);
   }
 
   /**
@@ -177,7 +193,7 @@ export class SimSecretsManager {
     options?: SimSecretsManagerRequestOptions,
   ): Promise<simSecretsManagerCommands.SimPutSecretValueCommandOutput> {
     await this.background.sequence();
-    return this.valueCommands.put(command, options);
+    return await this.valueCommands.put(command, options);
   }
 
   /**

@@ -258,16 +258,15 @@ export class SimAwsServiceFactory {
   }
 
   /**
-   * Create simulated Secrets Manager for an Account Region scope.
-   *
-   * Secrets are Region-scoped on real AWS: a secret name is unique within one
-   * Account and Region rather than globally.
+   * Create simulated Secrets Manager for an Account Region scope, whose secret
+   * values are encrypted through that same scope's simulated KMS.
    */
   createSecretsManager(scope: SimAwsAccountRegionContainer): SimSecretsManager {
     return new SimSecretsManager({
       accountRegionScope: scope.accountRegionScope,
       iam: this.createIam(scope),
       background: this.background,
+      kms: scope.kms(),
     });
   }
 

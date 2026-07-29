@@ -517,7 +517,8 @@ Current documented limitations:
   Yulin simulates.
 - Key material lives in process memory for the lifetime of the `SimAws` instance. That is not a
   security boundary: anything sharing the process can reach it.
-- Sim SSM encrypts `SecureString` parameters with simulated keys and checks `kms:Encrypt` and
-  `kms:Decrypt` for them. No other simulated service does: sim S3, sim DynamoDB, sim Secrets Manager
-  and sim Lambda environment variables do not use simulated keys, and do not check `kms:Decrypt`.
+- Sim SSM encrypts `SecureString` parameters with simulated keys, checking `kms:Encrypt` and
+  `kms:Decrypt`, and sim Secrets Manager encrypts every secret version, checking
+  `kms:GenerateDataKey` and `kms:Decrypt`. No other simulated service uses simulated keys: sim S3,
+  sim DynamoDB and sim Lambda environment variables do not, and do not check `kms:Decrypt`.
 - KMS is not served as an HTTP API by `serveSimAws`.

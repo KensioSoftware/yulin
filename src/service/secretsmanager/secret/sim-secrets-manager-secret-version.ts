@@ -1,4 +1,4 @@
-import type { SimSecretsManagerSecretValue } from "./sim-secrets-manager-secret-value.js";
+import type { SimSecretsManagerEncryptedValue } from "./sim-secrets-manager-encrypted-value.js";
 
 /**
  * The staging labels Secrets Manager gives a meaning of its own.
@@ -16,7 +16,7 @@ export type SimSecretsManagerStagingLabel =
 
 interface SimSecretsManagerSecretVersionProperties {
   readonly versionId: string;
-  readonly value: SimSecretsManagerSecretValue;
+  readonly value: SimSecretsManagerEncryptedValue;
   readonly createdDate: Date;
 }
 
@@ -29,7 +29,13 @@ interface SimSecretsManagerSecretVersionProperties {
  */
 export class SimSecretsManagerSecretVersion {
   public readonly versionId: string;
-  public readonly value: SimSecretsManagerSecretValue;
+
+  /**
+   * The version's value, as it is stored: encrypted under a data key of the
+   * secret's KMS key. Reading it back is a KMS call.
+   */
+  public readonly value: SimSecretsManagerEncryptedValue;
+
   public readonly createdDate: Date;
 
   private readonly labels = new Set<string>();
