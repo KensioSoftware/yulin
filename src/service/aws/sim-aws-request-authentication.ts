@@ -1,11 +1,11 @@
 import type { SimIamCredentialIdentity } from "../iam/credential/sim-aws-credentials.js";
 import type { SimAwsRequestCaller } from "../iam/request/sim-aws-request-caller.js";
 import { simIamSigV4SignedRequest } from "../iam/sigv4/sim-iam-sigv4-signed-request.js";
-import type { SimAwsServiceFactory } from "./factory/sim-aws-service-factory.js";
+import type { SimAwsRequestAuthWiring } from "./factory/sim-aws-request-auth-wiring.js";
 import type { SimAwsRequestCallerOptions } from "./sim-aws-properties.js";
 
 interface SimAwsRequestAuthenticationProperties {
-  readonly serviceFactory: SimAwsServiceFactory;
+  readonly requestAuth: SimAwsRequestAuthWiring;
   readonly clock: { now(): Date };
 }
 
@@ -20,11 +20,11 @@ interface SimAwsRequestAuthenticationProperties {
  * this is the one place that has to remember it.
  */
 export class SimAwsRequestAuthentication {
-  private readonly serviceFactory: SimAwsServiceFactory;
+  private readonly requestAuth: SimAwsRequestAuthWiring;
   private readonly clock: { now(): Date };
 
   constructor(properties: SimAwsRequestAuthenticationProperties) {
-    this.serviceFactory = properties.serviceFactory;
+    this.requestAuth = properties.requestAuth;
     this.clock = properties.clock;
   }
 
@@ -35,7 +35,7 @@ export class SimAwsRequestAuthentication {
     request: Request,
     body: Uint8Array | undefined,
   ): SimIamCredentialIdentity {
-    return this.serviceFactory.signedRequests.verify(
+    return this.requestAuth.signedRequests.verify(
       simIamSigV4SignedRequest(request, body),
       { now: this.clock.now() },
     );
@@ -48,7 +48,7 @@ export class SimAwsRequestAuthentication {
     request: Request,
     options: SimAwsRequestCallerOptions,
   ): SimAwsRequestCaller {
-    return this.serviceFactory.requestCallers.resolve(
+    return this.requestAuth.requestCallers.resolve(
       simIamSigV4SignedRequest(request, options.body),
       { expectedScope: options.expectedScope, now: this.clock.now() },
     );

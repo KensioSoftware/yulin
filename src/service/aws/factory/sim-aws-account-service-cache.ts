@@ -36,7 +36,8 @@ interface SimAwsAccountServiceCacheProperties {
  * SimAwsServiceFactory owns the top-level service construction policy and the
  * shared registries for one SimAws instance. This class is the narrower cache
  * it delegates to for services whose AWS state is scoped to an account rather
- * than to an account/region pair.
+ * than to an account/region pair, as SimAwsAccountRegionServiceBuilder is the
+ * one it delegates to for the rest.
  *
  * This class is the account-scoped service catalog: it records which simulated
  * AWS services share one instance across all regions in an account. A single
