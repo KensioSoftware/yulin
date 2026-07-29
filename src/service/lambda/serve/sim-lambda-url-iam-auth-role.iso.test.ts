@@ -4,6 +4,7 @@ import {
 } from "@aws-sdk/client-lambda";
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import { AssumeRoleCommand } from "@aws-sdk/client-sts";
+import { assertNonNullable } from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import { signAwsRequest } from "../../../../test/sigv4/sign-aws-request.js";
@@ -138,12 +139,18 @@ describe("Invoking an AWS_IAM Lambda Function URL as a Role", () => {
     );
 
     // When the session's temporary credentials sign a request to the URL
+    const credentials = assumed.Credentials;
+    assertNonNullable(credentials);
+    assertNonNullable(credentials.AccessKeyId);
+    assertNonNullable(credentials.SecretAccessKey);
+    assertNonNullable(credentials.SessionToken);
+
     const signed = await signAwsRequest({
       url: localUrl(urlConfig.FunctionUrl),
       credentials: {
-        accessKeyId: assumed.Credentials?.AccessKeyId ?? "",
-        secretAccessKey: assumed.Credentials?.SecretAccessKey ?? "",
-        sessionToken: assumed.Credentials?.SessionToken ?? "",
+        accessKeyId: credentials.AccessKeyId,
+        secretAccessKey: credentials.SecretAccessKey,
+        sessionToken: credentials.SessionToken,
       },
     });
     const response = await new SimAwsHttp({ simAws }).handleRequest(

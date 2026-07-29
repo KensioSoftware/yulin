@@ -26,11 +26,6 @@ const callerRoleArn = `arn:aws:iam::${callerAccountId}:role/Caller`;
 
 const reporterCode = { ZipFile: makeLambdaZipFileInput(() => ({ ok: true })) };
 
-const invokeUrlStatement = {
-  Action: "lambda:InvokeFunctionUrl",
-  Resource: "*",
-};
-
 function localUrl(functionUrl: string): string {
   return new SimAwsLocalUrl({ input: functionUrl }).toString();
 }
@@ -63,7 +58,7 @@ describe("What a cross-account grant on a Function URL covers", () => {
         UserName: "Caller",
         PolicyName: "InvokeUrl",
         PolicyDocument: simIamPolicyDocumentFactory.make({
-          Statement: invokeUrlStatement,
+          Statement: { Action: "lambda:InvokeFunctionUrl", Resource: "*" },
         }),
       }),
     );
@@ -135,7 +130,7 @@ describe("What a cross-account grant on a Function URL covers", () => {
         RoleName: "Caller",
         PolicyName: "InvokeUrl",
         PolicyDocument: simIamPolicyDocumentFactory.make({
-          Statement: invokeUrlStatement,
+          Statement: { Action: "lambda:InvokeFunctionUrl", Resource: "*" },
         }),
       }),
     );
@@ -209,7 +204,7 @@ describe("What a cross-account grant on a Function URL covers", () => {
         RoleName: "Caller",
         PolicyName: "InvokeUrl",
         PolicyDocument: simIamPolicyDocumentFactory.make({
-          Statement: invokeUrlStatement,
+          Statement: { Action: "lambda:InvokeFunctionUrl", Resource: "*" },
         }),
       }),
     );
@@ -273,7 +268,7 @@ describe("What a cross-account grant on a Function URL covers", () => {
         RoleName: "Caller",
         PolicyName: "InvokeUrl",
         PolicyDocument: simIamPolicyDocumentFactory.make({
-          Statement: invokeUrlStatement,
+          Statement: { Action: "lambda:InvokeFunctionUrl", Resource: "*" },
         }),
       }),
     );

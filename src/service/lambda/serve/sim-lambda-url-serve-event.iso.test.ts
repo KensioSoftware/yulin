@@ -22,6 +22,14 @@ import { SimFixedClock } from "../../../util/clock/sim-clock.js";
 import { SimLambdaServiceController } from "./sim-lambda-controller.js";
 import { SimLambdaUrlRouter } from "./sim-lambda-url-router.js";
 
+/**
+ * Function code echoing the invocation event straight back, so a test can
+ * assert on what the serving layer built.
+ */
+const echoEventCode = {
+  ZipFile: makeLambdaZipFileInput((event: SimLambdaFunctionUrlEvent) => event),
+};
+
 function localUrl(functionUrl: string, path = ""): string {
   return new SimAwsLocalUrl({ input: `${functionUrl}${path}` }).toString();
 }
@@ -34,11 +42,7 @@ describe("The event a served sim Lambda Function URL builds", () => {
       new CreateFunctionCommand({
         FunctionName: "greeter",
         Role: "arn:aws:iam::111111111111:role/GreeterRole",
-        Code: {
-          ZipFile: makeLambdaZipFileInput(
-            (event: SimLambdaFunctionUrlEvent) => event,
-          ),
-        },
+        Code: echoEventCode,
       }),
     );
 
@@ -77,11 +81,7 @@ describe("The event a served sim Lambda Function URL builds", () => {
       new CreateFunctionCommand({
         FunctionName: "greeter",
         Role: "arn:aws:iam::111111111111:role/GreeterRole",
-        Code: {
-          ZipFile: makeLambdaZipFileInput(
-            (event: SimLambdaFunctionUrlEvent) => event,
-          ),
-        },
+        Code: echoEventCode,
       }),
     );
 
@@ -115,11 +115,7 @@ describe("The event a served sim Lambda Function URL builds", () => {
       new CreateFunctionCommand({
         FunctionName: "greeter",
         Role: "arn:aws:iam::111111111111:role/GreeterRole",
-        Code: {
-          ZipFile: makeLambdaZipFileInput(
-            (event: SimLambdaFunctionUrlEvent) => event,
-          ),
-        },
+        Code: echoEventCode,
       }),
     );
 
@@ -161,11 +157,7 @@ describe("The event a served sim Lambda Function URL builds", () => {
       new CreateFunctionCommand({
         FunctionName: "greeter",
         Role: "arn:aws:iam::111111111111:role/GreeterRole",
-        Code: {
-          ZipFile: makeLambdaZipFileInput(
-            (event: SimLambdaFunctionUrlEvent) => event,
-          ),
-        },
+        Code: echoEventCode,
       }),
     );
 
@@ -203,11 +195,7 @@ describe("The event a served sim Lambda Function URL builds", () => {
       new CreateFunctionCommand({
         FunctionName: "greeter",
         Role: "arn:aws:iam::111111111111:role/GreeterRole",
-        Code: {
-          ZipFile: makeLambdaZipFileInput(
-            (event: SimLambdaFunctionUrlEvent) => event,
-          ),
-        },
+        Code: echoEventCode,
       }),
     );
 
