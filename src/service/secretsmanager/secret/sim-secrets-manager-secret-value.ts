@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { SimSecretsManagerInvalidParameterException } from "../error/sim-secrets-manager.error.js";
 
 /**
@@ -7,6 +8,17 @@ export interface SimSecretsManagerSecretValueInput {
   readonly SecretString?: string | undefined;
   readonly SecretBinary?: Uint8Array | undefined;
 }
+
+/**
+ * The markers that tell the two kinds of value apart once a value is bytes.
+ *
+ * A value is encrypted as bytes, and what comes back out has to say which of
+ * SecretString and SecretBinary it was, since the two are different fields on
+ * the way out and a caller storing UTF-8 bytes as binary must not get text
+ * back.
+ */
+const textMarker = 0;
+const binaryMarker = 1;
 
 /**
  * The value held by one version of a simulated secret.
@@ -65,12 +77,18 @@ export class SimSecretsManagerSecretValue {
     return undefined;
   }
 
-  private static bytesEqual(mine: Uint8Array, theirs: Uint8Array): boolean {
-    if (mine.length !== theirs.length) {
-      return false;
+  /**
+   * Read a value back from the bytes it was encrypted as.
+   */
+  static fromBytes(bytes: Uint8Array): SimSecretsManagerSecretValue {
+    const buffer = Buffer.from(bytes);
+    const content = buffer.subarray(1);
+
+    if (buffer.at(0) === textMarker) {
+      return new SimSecretsManagerSecretValue(content.toString("utf8"));
     }
 
-    return mine.every((byte, index) => byte === theirs.at(index));
+    return new SimSecretsManagerSecretValue(Uint8Array.from(content));
   }
 
   /**
@@ -99,16 +117,31 @@ export class SimSecretsManagerSecretValue {
   }
 
   /**
-   * Whether another value holds exactly the same content.
-   *
-   * This is what makes a retried write with the same client request token a
-   * no-op rather than a failure, as it is on real AWS.
+   * The value as the bytes it is encrypted as, marked with its kind.
    */
-  equals(other: SimSecretsManagerSecretValue): boolean {
-    if (typeof this.content === "string" || typeof other.content === "string") {
-      return this.content === other.content;
+  get bytes(): Uint8Array {
+    if (typeof this.content === "string") {
+      return this.markedBytes(textMarker, Buffer.from(this.content, "utf8"));
     }
 
-    return SimSecretsManagerSecretValue.bytesEqual(this.content, other.content);
+    return this.markedBytes(binaryMarker, Buffer.from(this.content));
+  }
+
+  /**
+   * A digest of the value, standing in for the value itself where two of them
+   * have to be compared.
+   *
+   * This is what makes a retried write with the same client request token a
+   * no-op rather than a failure, as it is on real AWS. Real Secrets Manager
+   * compares the two values; a stored version here holds only ciphertext, and
+   * decrypting it would need a `kms:Decrypt` that real AWS does not ask a
+   * writer for.
+   */
+  get digest(): string {
+    return createHash("sha256").update(this.bytes).digest("hex");
+  }
+
+  private markedBytes(marker: number, content: Buffer): Uint8Array {
+    return Uint8Array.from(Buffer.concat([Buffer.of(marker), content]));
   }
 }

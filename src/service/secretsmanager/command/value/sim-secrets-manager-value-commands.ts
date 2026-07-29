@@ -2,6 +2,7 @@ import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimSecretsManagerSecretStore } from "../../secret/sim-secrets-manager-secret-store.js";
 import { SimSecretsManagerSecretValue } from "../../secret/sim-secrets-manager-secret-value.js";
 import { SimSecretsManagerVersionSelector } from "../../secret/sim-secrets-manager-version-selector.js";
+import type { SimSecretsManagerValueEncryption } from "../../secret/sim-secrets-manager-value-encryption.js";
 import type { SimSecretsManagerVersionWriter } from "../../secret/sim-secrets-manager-version-writer.js";
 import type { SimSecretsManagerAuthorizer } from "../authorize/sim-secrets-manager-authorizer.js";
 import type {
@@ -14,6 +15,7 @@ import type {
 interface SimSecretsManagerValueCommandsProperties {
   readonly secrets: SimSecretsManagerSecretStore;
   readonly versionWriter: SimSecretsManagerVersionWriter;
+  readonly encryption: SimSecretsManagerValueEncryption;
   readonly authorizer: SimSecretsManagerAuthorizer;
 }
 
@@ -30,22 +32,29 @@ interface SimSecretsManagerValueCommandOptions {
 export class SimSecretsManagerValueCommands {
   private readonly secrets: SimSecretsManagerSecretStore;
   private readonly versionWriter: SimSecretsManagerVersionWriter;
+  private readonly encryption: SimSecretsManagerValueEncryption;
   private readonly authorizer: SimSecretsManagerAuthorizer;
   private readonly versionSelector = new SimSecretsManagerVersionSelector();
 
   constructor(properties: SimSecretsManagerValueCommandsProperties) {
     this.secrets = properties.secrets;
     this.versionWriter = properties.versionWriter;
+    this.encryption = properties.encryption;
     this.authorizer = properties.authorizer;
   }
 
   /**
    * Read a secret's value, defaulting to the version labelled AWSCURRENT.
+   *
+   * Decryption goes to KMS as the caller, so a secret under a customer managed
+   * key needs `kms:Decrypt` on top of `secretsmanager:GetSecretValue`. There is
+   * no flag for reading a secret without decrypting it: GetSecretValue either
+   * returns the plaintext or fails.
    */
-  get(
+  async get(
     command: SimGetSecretValueCommand,
     options?: SimSecretsManagerValueCommandOptions,
-  ): SimGetSecretValueCommandOutput {
+  ): Promise<SimGetSecretValueCommandOutput> {
     const { input } = command;
     const secret = this.secrets.require(input.SecretId);
 
@@ -57,14 +66,19 @@ export class SimSecretsManagerValueCommands {
     secret.requireNotScheduledForDeletion();
 
     const version = this.versionSelector.select(secret, input);
+    const value = await this.encryption.decrypt(
+      { secretArn: secret.arn.value, versionId: version.versionId },
+      version.value,
+      options?.caller,
+    );
 
     return {
       $metadata: {},
       ARN: secret.arn.value,
       Name: secret.name,
       VersionId: version.versionId,
-      SecretString: version.value.secretString,
-      SecretBinary: version.value.secretBinary,
+      SecretString: value.secretString,
+      SecretBinary: value.secretBinary,
       VersionStages: version.stages,
       CreatedDate: version.createdDate,
     };
@@ -76,10 +90,10 @@ export class SimSecretsManagerValueCommands {
    * The new version becomes AWSCURRENT unless VersionStages says otherwise,
    * and the version that was current becomes AWSPREVIOUS.
    */
-  put(
+  async put(
     command: SimPutSecretValueCommand,
     options?: SimSecretsManagerValueCommandOptions,
-  ): SimPutSecretValueCommandOutput {
+  ): Promise<SimPutSecretValueCommandOutput> {
     const { input } = command;
     const secret = this.secrets.require(input.SecretId);
 
@@ -91,7 +105,13 @@ export class SimSecretsManagerValueCommands {
     secret.requireNotScheduledForDeletion();
 
     const value = SimSecretsManagerSecretValue.required(input);
-    const version = this.versionWriter.write(secret, value, input);
+    const version = await this.versionWriter.write({
+      secret,
+      value,
+      input,
+      keyId: secret.kmsKeyId,
+      caller: options?.caller,
+    });
 
     return {
       $metadata: {},

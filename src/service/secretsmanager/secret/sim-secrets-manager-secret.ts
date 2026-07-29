@@ -33,12 +33,12 @@ export class SimSecretsManagerSecret {
   public description: string | undefined;
 
   /**
-   * The KMS key the secret says it is encrypted under.
+   * The KMS key new versions of the secret are encrypted under, in any form
+   * KMS accepts. Undefined means the `aws/secretsmanager` managed key.
    *
-   * Nothing is actually encrypted with it and no kms:Decrypt check happens, so
-   * this is looser than real AWS. Simulated KMS is not wired into this service
-   * yet; the value is stored and reported so that code reading it behaves the
-   * same, and the divergence is documented.
+   * Changing it applies to versions written afterwards. The versions already
+   * written keep the key they were made with, as they do on real AWS, so they
+   * stay readable.
    */
   public kmsKeyId: string | undefined;
 

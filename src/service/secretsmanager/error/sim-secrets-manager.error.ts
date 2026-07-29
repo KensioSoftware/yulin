@@ -60,6 +60,36 @@ export class SimSecretsManagerInvalidRequestException extends SimSecretsManagerE
 }
 
 /**
+ * Simulated Secrets Manager EncryptionFailure error.
+ *
+ * Real Secrets Manager reports a KMS key it cannot encrypt a new version with
+ * this way, whether the key is missing, disabled or pending deletion. A
+ * caller not allowed to use the key is denied by KMS instead, and that denial
+ * passes through as itself.
+ */
+export class SimSecretsManagerEncryptionFailure extends SimSecretsManagerError {
+  public override readonly name = "EncryptionFailure";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
+ * Simulated Secrets Manager DecryptionFailure error.
+ *
+ * The counterpart of EncryptionFailure, for a version whose key can no longer
+ * decrypt it.
+ */
+export class SimSecretsManagerDecryptionFailure extends SimSecretsManagerError {
+  public override readonly name = "DecryptionFailure";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
  * Simulated Secrets Manager InvalidParameterException error.
  *
  * This is the failure a malformed or contradictory request input produces,

@@ -1,3 +1,4 @@
+import { CreateAliasCommand, CreateKeyCommand } from "@aws-sdk/client-kms";
 import {
   CreateSecretCommand,
   DescribeSecretCommand,
@@ -122,6 +123,14 @@ describe("Secrets Manager DescribeSecret", () => {
   it("reports the metadata a secret was created with", async () => {
     // Given a secret created with a description, a KMS key and tags.
     const simAws = new SimAws();
+    const key = await simAws.kms().createKey(new CreateKeyCommand({}));
+    await simAws.kms().createAlias(
+      new CreateAliasCommand({
+        AliasName: "alias/app-key",
+        TargetKeyId: key.KeyMetadata?.KeyId,
+      }),
+    );
+
     await simAws.secretsManager().createSecret(
       new CreateSecretCommand({
         Name: "described",

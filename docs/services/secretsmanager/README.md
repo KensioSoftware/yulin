@@ -18,6 +18,8 @@ Sim Secrets Manager currently supports:
 - Secret ARNs carrying the six random characters real Secrets Manager appends
 - Friendly names, full ARNs and partial ARNs as interchangeable ways to name a secret
 - Authorization of every operation by simulated IAM, against the real IAM action
+- Encryption of every version through simulated KMS, under `KmsKeyId` or the `aws/secretsmanager`
+  managed key
 - Calls made from inside a simulated Lambda handler, authorized as the function's execution role
 - The `AWS::SecretsManager::Secret` CloudFormation resource, including `GenerateSecretString`
 
@@ -61,6 +63,102 @@ console.log(credentials.password); // "hunter2"
 
 `SecretString` and `SecretBinary` are mutually exclusive on write, and exactly one of them comes back
 on read.
+
+## Encryption and KMS permissions
+
+Every version is encrypted through simulated KMS when it is written and decrypted when
+`GetSecretValue` reads it. There is no flag for reading a secret without decrypting it: the read
+either returns the plaintext or fails.
+
+A secret naming no `KmsKeyId` uses the `aws/secretsmanager` AWS managed key, which asks the caller
+for no KMS permission at all. Secrets Manager supplies `kms:ViaService`, and that key's policy allows
+the account's principals to use it through Secrets Manager. A Lambda role granted only
+`secretsmanager:GetSecretValue` therefore reads the secret, as it does on real AWS.
+
+Pass `KmsKeyId` to encrypt under a customer managed key instead, and the caller's own permissions on
+that key start to matter. Secrets Manager uses envelope encryption, asking KMS for a data key per
+version, so a write needs `kms:GenerateDataKey` and a read needs `kms:Decrypt`. A role granted the
+secret but not the key fails here rather than in a deployment.
+
+```typescript sim-secrets-manager-customer-key
+/**
+ * A Role allowed to read a simulated secret but not to decrypt it.
+ */
+
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import { CreateKeyCommand } from "@aws-sdk/client-kms";
+import {
+  CreateSecretCommand,
+  GetSecretValueCommand,
+} from "@aws-sdk/client-secrets-manager";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const accountId = simAws.defaultAccountId;
+
+const key = await simAws
+  .kms()
+  .createKey(new CreateKeyCommand({ Description: "Secret key" }));
+
+await simAws.secretsManager().createSecret(
+  new CreateSecretCommand({
+    Name: "db-credentials",
+    SecretString: "hunter2",
+    KmsKeyId: key.KeyMetadata?.Arn,
+  }),
+);
+
+const role = await simAws.iam().createRole(
+  new CreateRoleCommand({
+    RoleName: "SecretReader",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+
+// The secret is allowed, the key is not.
+await simAws.iam().putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "SecretReader",
+    PolicyName: "ReadDbCredentials",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: "secretsmanager:GetSecretValue",
+        Resource: "*",
+      },
+    }),
+  }),
+);
+
+const caller = { kind: "arn", arn: role.Role.Arn } as const;
+
+try {
+  await simAws
+    .secretsManager()
+    .getSecretValue(new GetSecretValueCommand({ SecretId: "db-credentials" }), {
+      caller,
+    });
+} catch (error) {
+  console.log((error as Error).name); // "AccessDenied"
+}
+```
+
+Each version is bound to its own secret ARN and version id as the KMS encryption context, as real
+Secrets Manager binds them. A `KmsKeyId` naming a key that does not exist, is disabled, or is pending
+deletion fails with `EncryptionFailure` when a value is written under it, and a version whose key has
+since become unusable fails with `DecryptionFailure` when it is read.
+
+Changing `KmsKeyId` applies to versions written afterwards. The versions already written keep the key
+they were made with and stay readable, which is what real AWS does too.
 
 ## Secret ARNs and IAM policies
 
@@ -390,12 +488,9 @@ code into the simulation with nothing touching the network. See
 
 Current documented limitations:
 
-- Secret values are not encrypted. `KmsKeyId` is accepted and reported by `DescribeSecret`, but
-  nothing is encrypted with it and no `kms:Decrypt` check happens. That is looser than real AWS,
-  where a caller also needs permission on the key. Sim SSM does encrypt its `SecureString`
-  parameters through simulated KMS, and the same wiring would fit here, but a secret has versions,
-  staging labels and rotation to carry through it, so it is a change of its own rather than a
-  follow-on.
+- A `KmsKeyId` is checked when a version is written under it, not when it is set on its own. An
+  `UpdateSecret` changing only the key accepts a key that does not exist, and the next write of a
+  value fails.
 - A secret name ending in a hyphen and six alphanumeric characters is refused, which is stricter than
   AWS. Real AWS only advises against such names, because they cannot be told apart from an ARN's
   resource part when a partial ARN is resolved. This rules out ordinary-looking names such as

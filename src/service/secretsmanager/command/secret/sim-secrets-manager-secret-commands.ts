@@ -51,10 +51,10 @@ export class SimSecretsManagerSecretCommands {
    * and all, so a policy allowing `secretsmanager:CreateSecret` on a bare name
    * fails here just as it would on real AWS.
    */
-  create(
+  async create(
     command: SimCreateSecretCommand,
     options?: SimSecretsManagerCommandOptions,
-  ): SimCreateSecretCommandOutput {
+  ): Promise<SimCreateSecretCommandOutput> {
     const { input } = command;
     const secret = this.secretFactory.make({
       name: input.Name,
@@ -71,7 +71,17 @@ export class SimSecretsManagerSecretCommands {
     );
     this.secrets.requireNameAvailable(secret.name);
 
-    const version = this.versionWriter.write(secret, value, input);
+    // The first version is written, and so encrypted, before the secret is
+    // stored, so a create refused for a key it cannot use leaves no secret
+    // holding the name.
+    const version = await this.versionWriter.write({
+      secret,
+      value,
+      input,
+      keyId: secret.kmsKeyId,
+      caller: options?.caller,
+    });
+
     this.secrets.add(secret);
 
     return {
