@@ -141,6 +141,29 @@ hands out all three tokens and `reissue` signs a new access and id token for a r
 difference `REFRESH_TOKEN_AUTH` answers with. Everything it issues is recorded on the pool, because
 the pool is what a refresh or a sign-out presents a token back to.
 
+## CloudFormation resources
+
+`cfn/` creates `AWS::Cognito::UserPool`, `AWS::Cognito::UserPoolClient` and
+`AWS::Cognito::UserPoolGroup`, one creator per type behind
+`SimCognitoCfnResourceFactory`. Each creator goes through the ordinary Command rather than
+constructing the model, so a deployed pool is the same thing an SDK caller would have got, refusals
+included.
+
+A properties class per type turns the template's properties into that Command's input.
+`UserPoolName` is the one property whose CloudFormation name differs from the API's `PoolName`.
+`SimCfnCognitoPropertyParser` and the `SimCfnCognitoValueParser` it extends read the property
+shapes, accepting the quoted forms CloudFormation carries numbers and booleans in.
+
+Each type states the properties it simulates, and every other property is refused. That is an
+allow-list rather than a list of known-unsimulated properties, because CloudFormation has properties
+the Cognito API does not, `EnabledMfas` among them, and those would otherwise be dropped on the way
+to a Command that has nowhere to refuse them. Properties the API does know, such as
+`MfaConfiguration`, are passed through instead, so the refusal that reaches the reader is the one
+that says why.
+
+`Ref` and `Fn::GetAtt` live in `cloudformation/resource/cfn/cognito/`, one adapter per Resource
+type, rather than on the service objects.
+
 ## Served pool endpoints
 
 `serve/` holds the localhost HTTP side, which is the two endpoints real Cognito serves without any
