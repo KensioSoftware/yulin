@@ -46,6 +46,31 @@ export class SimSqsQueueStore {
   }
 
   /**
+   * Find a queue by its ARN.
+   *
+   * Whole ARNs are compared rather than the name being read out of one, which
+   * keeps the Account and Region in the comparison: an ARN naming another scope
+   * finds no queue here, as it names no queue this simulated SQS holds.
+   */
+  findByArn(arn: string): SimSqsQueue | undefined {
+    return this.all.find((queue) => queue.arn.value === arn);
+  }
+
+  /**
+   * Bring every queue in this scope up to date at an instant.
+   *
+   * A message moves to its dead-letter queue when the source queue notices its
+   * visibility has lapsed, and nothing schedules that. A test that only reads
+   * the dead-letter queue would otherwise find it empty, so every queue is
+   * brought up to date before any one of them is answered from.
+   */
+  applyLifecycle(instant: Date): void {
+    for (const queue of this.all) {
+      queue.applyLifecycle(instant);
+    }
+  }
+
+  /**
    * Resolve a queue by name, or refuse.
    */
   require(name: string): SimSqsQueue {

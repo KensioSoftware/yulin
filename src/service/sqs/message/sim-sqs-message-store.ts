@@ -51,6 +51,21 @@ export class SimSqsMessageStore {
   }
 
   /**
+   * The messages that have used up their receives and are receivable again.
+   *
+   * These are the ones a redrive policy moves to the dead-letter queue. Being
+   * visible again is the trigger: a message is only out of attempts once the
+   * visibility timeout of its last receive has lapsed, and until then the
+   * consumer holding it may still delete it.
+   */
+  exhausted(instant: Date, maxReceiveCount: number): readonly SimSqsMessage[] {
+    return this.messages.filter(
+      (message) =>
+        message.isVisibleAt(instant) && message.receiveCount >= maxReceiveCount,
+    );
+  }
+
+  /**
    * Record that a message was handed out under a receipt handle.
    */
   recordHandle(receiptHandle: string, message: SimSqsMessage): void {

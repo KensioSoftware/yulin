@@ -41,6 +41,15 @@ splits reading an attribute from setting one: an attribute real SQS has and this
 is left out of a response, as real SQS leaves out an attribute a queue has no value for, but setting
 one is refused rather than ignored.
 
+`SimSqsRedrivePolicy` is held apart from the numeric attributes, because it is a JSON object and
+because a queue has none until one is set. It keeps the string it was parsed from, so
+`GetQueueAttributes` reports back what was set rather than a re-serialised version of it.
+`SimSqsDeadLetterTargets` resolves the queue a policy names, matching whole ARNs rather than reading
+the name out of one: that keeps the account and region in the comparison, which is what makes an ARN
+naming another scope find nothing. The target is checked when the policy is set, because a policy
+pointing at nothing would look like a working dead-letter queue and lose the messages it was supposed
+to keep.
+
 `SimSqsDeletedQueueNames` holds a deleted queue's name for 60 seconds, as real SQS holds it. The hold
 is measured on the simulation's clock, so advancing simulated time frees the name. That is the
 failure a redeployed stack actually hits.
@@ -71,7 +80,14 @@ has been issued can tell those two apart.
 
 Retention is applied whenever the messages are looked at rather than scheduled, so advancing
 simulated time past `MessageRetentionPeriod` loses the messages AWS would have dropped instead of
-keeping them indefinitely.
+keeping them indefinitely. Moving a message to a dead-letter queue works the same way, in
+`SimSqsQueue.applyLifecycle`: a message that has used up its receives moves the next time its
+visibility lapses, and nothing has to fire for that to happen.
+
+The one thing redrive needs that retention does not is that a queue other than the one being asked
+about can change. So `SimSqsQueueStore.applyLifecycle` brings every queue in the scope up to date,
+and `SimSqsQueueAccess` runs it before answering from any of them. A test reading only the dead-letter
+queue would otherwise find it empty, because the source queue is what notices the move.
 
 ## Command handling
 
@@ -153,7 +169,10 @@ refused rather than quietly answered with a local queue of the same name.
   The 60 second hold on a deleted queue's name is simulated.
 - A queue name ending in `.fifo` is refused, as are the FIFO-only request fields.
 - `SenderId` is not reported, because a simulated principal has no user or role id to report it as.
-- Tags, `RedrivePolicy`, queue policies and the encryption attributes are refused rather than ignored,
-  whether a request or a CloudFormation template asks for them.
+- Tags, `RedriveAllowPolicy`, queue policies and the encryption attributes are refused rather than
+  ignored, whether a request or a CloudFormation template asks for them. So is `RedrivePolicy` on a
+  CloudFormation resource, where it is not simulated, unlike the queue attribute of the same name.
+- A message moved to a dead-letter queue keeps its sent timestamp, which is documented AWS behaviour,
+  and starts its receive count again, which is not documented either way.
 
 The full list is in [docs/services/sqs](../../../docs/services/sqs/).

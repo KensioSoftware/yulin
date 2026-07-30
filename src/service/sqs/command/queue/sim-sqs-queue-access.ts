@@ -1,3 +1,4 @@
+import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import {
@@ -23,6 +24,7 @@ interface SimSqsQueueAccessProperties {
   readonly queues: SimSqsQueueStore;
   readonly authorizer: SimSqsAuthorizer;
   readonly accountRegionScope: SimAwsAccountRegionScope;
+  readonly clock: BackgroundScheduler;
 }
 
 /**
@@ -38,11 +40,13 @@ export class SimSqsQueueAccess {
   private readonly queues: SimSqsQueueStore;
   private readonly authorizer: SimSqsAuthorizer;
   private readonly accountRegionScope: SimAwsAccountRegionScope;
+  private readonly clock: BackgroundScheduler;
 
   constructor(properties: SimSqsQueueAccessProperties) {
     this.queues = properties.queues;
     this.authorizer = properties.authorizer;
     this.accountRegionScope = properties.accountRegionScope;
+    this.clock = properties.clock;
   }
 
   /**
@@ -79,7 +83,7 @@ export class SimSqsQueueAccess {
 
     this.authorizeName(action, name, caller);
 
-    return this.queues.require(name);
+    return this.upToDate(name);
   }
 
   /**
@@ -93,6 +97,19 @@ export class SimSqsQueueAccess {
     const name = this.nameFromUrl(action, queueUrl);
 
     this.authorizeName(action, name, caller);
+
+    return this.upToDate(name);
+  }
+
+  /**
+   * The queue of a name, with every queue brought up to date first.
+   *
+   * Every queue and not just this one, because a message moves to a dead-letter
+   * queue when its source queue notices, and a request may be about the
+   * dead-letter queue rather than the source.
+   */
+  private upToDate(name: string): SimSqsQueue {
+    this.queues.applyLifecycle(this.clock.now());
 
     return this.queues.require(name);
   }

@@ -185,6 +185,102 @@ A handle whose visibility timeout has lapsed with nobody else having received th
 still the most recent one, so deleting with it works. A handle the queue never issued fails with
 `ReceiptHandleIsInvalid`, and a repeated delete of a message already gone succeeds.
 
+## Dead-letter queues
+
+A `RedrivePolicy` says where a message goes once a consumer has had enough attempts at it. Once a
+message has been received `maxReceiveCount` times without being deleted, the next lapse of its
+visibility timeout moves it to the queue named by `deadLetterTargetArn` rather than making it
+receivable again. Advancing the clock is what drives the move, as it drives the timeout itself.
+
+```typescript sim-sqs-dead-letter-queue
+/**
+ * A message a consumer keeps failing on, ending up on the dead-letter queue.
+ */
+
+import {
+  CreateQueueCommand,
+  GetQueueAttributesCommand,
+  ReceiveMessageCommand,
+  SendMessageCommand,
+} from "@aws-sdk/client-sqs";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const sqs = simAws.sqs();
+
+// The dead-letter queue has to exist before anything can point at it.
+const { QueueUrl: DeadLetterQueueUrl } = await sqs.createQueue(
+  new CreateQueueCommand({ QueueName: "orders-dlq" }),
+);
+
+const deadLetter = await sqs.getQueueAttributes(
+  new GetQueueAttributesCommand({
+    QueueUrl: DeadLetterQueueUrl,
+    AttributeNames: ["QueueArn"],
+  }),
+);
+
+const { QueueUrl } = await sqs.createQueue(
+  new CreateQueueCommand({
+    QueueName: "orders",
+    Attributes: {
+      VisibilityTimeout: "30",
+      RedrivePolicy: JSON.stringify({
+        deadLetterTargetArn: deadLetter.Attributes?.["QueueArn"],
+        maxReceiveCount: 3,
+      }),
+    },
+  }),
+);
+
+await sqs.sendMessage(
+  new SendMessageCommand({ QueueUrl, MessageBody: "order-1" }),
+);
+
+// A consumer takes the message and never gets as far as deleting it.
+async function failToHandleMessage(): Promise<void> {
+  await sqs.receiveMessage(new ReceiveMessageCommand({ QueueUrl }));
+  await simAws.clock().advanceBy({ seconds: 31 });
+}
+
+await failToHandleMessage();
+await failToHandleMessage();
+await failToHandleMessage();
+
+// The source queue has given up on it.
+const empty = await sqs.receiveMessage(new ReceiveMessageCommand({ QueueUrl }));
+
+console.log(empty.Messages); // undefined
+
+const dead = await sqs.receiveMessage(
+  new ReceiveMessageCommand({ QueueUrl: DeadLetterQueueUrl }),
+);
+
+console.log(dead.Messages?.[0]?.Body); // "order-1"
+```
+
+The message arrives with its `MessageId`, body and message attributes unchanged, so a test can
+identify it. `ApproximateNumberOfMessages` on both queues reflects the move. A message deleted before
+its attempts run out never gets there, and a message still inside its visibility timeout has not moved
+yet, because the consumer holding it may still delete it.
+
+`SentTimestamp` is unchanged by the move, as it is on a real standard queue. The dead-letter queue's
+`MessageRetentionPeriod` therefore runs from when the message was first sent rather than restarting,
+which is why AWS suggests giving a dead-letter queue a longer retention period than the queue feeding
+it. `ApproximateReceiveCount` starts again from one, since a receive count counts receives from one
+queue and the message has not been received from this one yet. A moved message also reports
+`DeadLetterQueueSourceArn`, naming the queue it came from.
+
+The policy is validated when it is set, whether by `CreateQueue` or `SetQueueAttributes`. It has to be
+a JSON object with both a `deadLetterTargetArn` and a `maxReceiveCount` between 1 and 1000, carried as
+a JSON number or as a string holding one. The `deadLetterTargetArn` has to name a queue that already
+exists in the same account and region, as real SQS requires, so a policy pointing at nothing fails
+there and then rather than quietly losing messages later. Anything else fails with
+`InvalidParameterValue`.
+
+`GetQueueAttributes` reports `RedrivePolicy` back as the string it was set with.
+
 ## Delays
 
 `DelaySeconds` hides a new message until it lapses, either set on the queue for every message or on
@@ -344,10 +440,13 @@ console.log(read.Attributes?.["ApproximateNumberOfMessagesNotVisible"]); // "1"
 console.log(read.Attributes?.["QueueArn"]); // "arn:aws:sqs:us-east-1:888888888888:orders"
 ```
 
-An attribute real SQS reports and this simulation does not model, `RedrivePolicy` for one, is left out
-of a response rather than refused, since that is what real SQS does with an attribute a queue has no
-value for. Setting one is refused, because a queue that appeared to accept a redrive policy would
-behave differently here than on AWS.
+`RedrivePolicy` is the one other settable attribute, covered under
+[dead-letter queues](#dead-letter-queues) above.
+
+An attribute real SQS reports and this simulation does not model, `RedriveAllowPolicy` for one, is
+left out of a response rather than refused, since that is what real SQS does with an attribute a queue
+has no value for. Setting one is refused, because a queue that appeared to accept it would behave
+differently here than on AWS.
 
 `PurgeQueue` deletes everything on a queue, hidden messages included.
 
@@ -764,9 +863,10 @@ Sim SQS currently supports:
 - `ReceiveMessageCommand`, up to ten messages at a time, each under a fresh receipt handle
 - `DeleteMessageCommand`, `DeleteMessageBatchCommand` and `ChangeMessageVisibilityCommand`
 - Visibility timeouts, delays and message retention, all on the simulation's clock
+- `RedrivePolicy`, moving a message to its dead-letter queue once its receives run out
 - `MessageAttributes` round-tripping, with real `MD5OfMessageBody` and `MD5OfMessageAttributes` digests
-- The `SentTimestamp`, `ApproximateReceiveCount` and `ApproximateFirstReceiveTimestamp` system
-  attributes
+- The `SentTimestamp`, `ApproximateReceiveCount`, `ApproximateFirstReceiveTimestamp` and
+  `DeadLetterQueueSourceArn` system attributes
 - Authorization of every operation by simulated IAM, against the real IAM action and queue ARN
 - Calls made from inside a simulated Lambda handler, authorized as the function's execution role
 - `AWS::SQS::Queue` in a CloudFormation or CDK template, with `Ref` giving the queue URL and
@@ -789,8 +889,18 @@ Current documented limitations:
 - `DeleteQueue` and `PurgeQueue` take effect immediately, where real SQS may take up to 60 seconds
   over either. The 60 second hold on a deleted queue's name is simulated, so recreating a queue
   straight after deleting it fails with `QueueDeletedRecently` until the clock moves on.
-- Dead-letter queues are not simulated. `RedrivePolicy` and `RedriveAllowPolicy` are refused rather
-  than ignored, and a message that fails repeatedly stays on its queue.
+- Dead-letter queues are simulated for standard queues only, and only the `RedrivePolicy` half of
+  them. `RedriveAllowPolicy` is refused, so a dead-letter queue cannot restrict which queues may
+  redrive to it. `ListDeadLetterSourceQueues` and the `StartMessageMoveTask` family for draining a
+  dead-letter queue back to its source are not supported, so a redriven message is moved back by a
+  test sending it again.
+- `ApproximateReceiveCount` starting again from one on a dead-letter queue is this simulation's
+  reading of SQS rather than something AWS documents. A receive count counts receives from one queue,
+  and the moved message has not been received from the dead-letter queue yet. `SentTimestamp` being
+  unchanged by the move is documented AWS behaviour, and is simulated as such.
+- The `RedrivePolicy` property on `AWS::SQS::Queue` is not simulated, so a dead-letter queue is
+  configured by an SDK call rather than by a template. The property fails the resource rather than
+  being dropped.
 - Queue policies are not simulated (`AddPermission`, `RemovePermission` and the `Policy` attribute),
   so cross-account access to a queue cannot be granted. A request naming a
   `QueueOwnerAWSAccountId` other than the scope's own Account is refused.
@@ -805,8 +915,7 @@ Current documented limitations:
   for, and they are left out of the response.
 - SQS condition keys are not derived, so a policy relying on them will not match. Ordinary condition
   operators on values sim IAM does supply work as usual.
-- `ChangeMessageVisibilityBatch`, `ListDeadLetterSourceQueues`, the message move tasks and the batch
-  size limit (`BatchRequestTooLong`) are not supported.
+- `ChangeMessageVisibilityBatch` and the batch size limit (`BatchRequestTooLong`) are not supported.
 - Lambda event source mappings are not simulated, so a queue does not invoke a function on its own. A
   test invokes the consumer itself, as the Lambda example above does.
 - `AWS::SQS::Queue` is the only SQS resource type CloudFormation creates. `AWS::SQS::QueuePolicy` is
