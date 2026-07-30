@@ -152,6 +152,41 @@ describe("Serving a sim Cognito user pool's public endpoints", () => {
     assertIdentical(apiPath.status, 404);
   });
 
+  it("reports a path below an endpoint as not found", async () => {
+    // Given a simulated user pool.
+    const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
+    const userPoolId = await poolIdIn(simAws);
+
+    // When something below the JWKS path is requested.
+    const response = await new SimAwsHttp({ simAws }).fetch(
+      localUrl(
+        `https://cognito-idp.eu-west-2.amazonaws.com/${userPoolId}/.well-known/jwks.json/keys`,
+      ),
+    );
+
+    // Then it is not served, rather than treated as the JWKS path with
+    // something after it.
+    assertIdentical(response.status, 404);
+  });
+
+  it("answers only the methods a document is read with", async () => {
+    // Given a simulated user pool.
+    const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
+    const userPoolId = await poolIdIn(simAws);
+
+    // When its JWKS is asked for with a method that does not read one.
+    const response = await new SimAwsHttp({ simAws }).fetch(
+      localUrl(
+        `https://cognito-idp.eu-west-2.amazonaws.com/${userPoolId}/.well-known/jwks.json`,
+      ),
+      { method: "POST" },
+    );
+
+    // Then the endpoint refuses it and says what it does answer.
+    assertIdentical(response.status, 405);
+    assertIdentical(response.headers.get("allow"), "GET, HEAD");
+  });
+
   it("stops serving a pool that has been deleted", async () => {
     // Given a pool that is then deleted.
     const simAws = new SimAws({ defaultRegionName: "eu-west-2" });

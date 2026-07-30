@@ -13,6 +13,11 @@ import { SimCognitoOpenIdConfiguration } from "./sim-cognito-openid-configuratio
  */
 const wellKnownSegment = ".well-known";
 
+/**
+ * The methods a published document is read with.
+ */
+const readMethods = new Set(["GET", "HEAD"]);
+
 interface SimCognitoServiceControllerProperties {
   readonly simAws?: SimAws;
 }
@@ -47,10 +52,25 @@ export class SimCognitoServiceController implements SimAwsServiceController {
   }
 
   private respond(serviceRequest: SimAwsServiceRequest): Response {
-    const url = new URL(serviceRequest.request.url);
-    const [userPoolId, wellKnown, document] = url.pathname.slice(1).split("/");
+    const { request } = serviceRequest;
+    const url = new URL(request.url);
 
-    if (userPoolId === undefined || wellKnown !== wellKnownSegment) {
+    if (!readMethods.has(request.method)) {
+      return this.response.notRead(request.method);
+    }
+
+    // A path is exactly '<userPoolId>/.well-known/<document>'. Anything
+    // longer is a path real Cognito has nothing at, rather than a prefix of
+    // one it serves.
+    const [userPoolId, wellKnown, document, ...rest] = url.pathname
+      .slice(1)
+      .split("/");
+
+    if (
+      userPoolId === undefined ||
+      wellKnown !== wellKnownSegment ||
+      rest.length > 0
+    ) {
       return this.response.noSuchEndpoint(url.pathname);
     }
 
