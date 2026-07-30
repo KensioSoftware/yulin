@@ -51,6 +51,9 @@ export function resolveSimCloudFormationServiceResourceFactory(
     case "CloudFront": {
       return scopedAws.cloudFront().cfnResourceFactory();
     }
+    case "Cognito": {
+      return scopedAws.cognitoIdentityProvider().cfnResourceFactory();
+    }
     case "IAM": {
       return scopedAws.iam().cfnResourceFactory();
     }

@@ -9,6 +9,7 @@ import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { SimCognitoCfnResourceFactory } from "./cfn/sim-cfn-cognito-resource-factory.js";
 import type * as simCognitoCommands from "./command/sim-cognito-command.types.js";
 import { SimCognitoCommands } from "./command/sim-cognito-commands.js";
 import { SimCognitoUserPoolRegistry } from "./registry/sim-cognito-user-pool-registry.js";
@@ -53,6 +54,9 @@ export class SimCognitoIdentityProvider extends SimCognitoUserDirectory {
   private readonly pools: SimCognitoUserPoolStore;
   private readonly userPoolRegistry: SimCognitoUserPoolRegistry;
   private readonly sdkRouter = new SimCognitoSdkCommandRouter(this);
+  private readonly cfnFactory = new SimCognitoCfnResourceFactory({
+    cognito: this,
+  });
 
   constructor(properties: SimCognitoIdentityProviderProperties = {}) {
     const {
@@ -195,6 +199,13 @@ export class SimCognitoIdentityProvider extends SimCognitoUserDirectory {
   ): Promise<simCognitoCommands.SimListUserPoolClientsCommandOutput> {
     await this.background.sequence();
     return this.commands.listClients.handle(command, options);
+  }
+
+  /**
+   * Get this service's CloudFormation Resource factory.
+   */
+  cfnResourceFactory(): SimCognitoCfnResourceFactory {
+    return this.cfnFactory;
   }
 
   /**
