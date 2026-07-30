@@ -47,6 +47,19 @@ describe("sim Lambda event source mapping commands", () => {
     assertIdentical(error.name, "ResourceNotFoundException");
   });
 
+  it("refuses a request naming no mapping at all", async () => {
+    // Given a simulated AWS with one mapping on it.
+    const { simAws } = await simAwsWithSqsEventSource();
+
+    // When a mapping is read with no UUID.
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws.lambda().getEventSourceMapping({ input: {} });
+    });
+
+    // Then the request is refused as invalid.
+    assertIdentical(error.name, "ValidationException");
+  });
+
   it("lists the mappings of a queue", async () => {
     // Given a mapping between a queue and a function.
     const { simAws, queueArn, uuid } = await simAwsWithSqsEventSource();

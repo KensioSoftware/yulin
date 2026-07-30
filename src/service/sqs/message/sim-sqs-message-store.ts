@@ -51,6 +51,22 @@ export class SimSqsMessageStore {
   }
 
   /**
+   * When the earliest message that cannot be received yet becomes receivable,
+   * or nothing when every message here is receivable already.
+   */
+  nextAvailability(instant: Date): Date | undefined {
+    const pending = this.messages
+      .filter((message) => !message.isVisibleAt(instant))
+      .map((message) => message.availableFrom.getTime());
+
+    if (pending.length === 0) {
+      return undefined;
+    }
+
+    return new Date(Math.min(...pending));
+  }
+
+  /**
    * The messages that have used up their receives and are receivable again.
    *
    * These are the ones a redrive policy moves to the dead-letter queue. Being

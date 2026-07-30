@@ -120,6 +120,17 @@ describe("sim Lambda CreateEventSourceMapping validation", () => {
     assertStringIncludes(error.message, "BatchSize 50 is out of range");
   });
 
+  it("refuses a batch size that is not a whole number", async () => {
+    // Given a queue and a function.
+    const ready = await simAwsReadyToMap();
+
+    // When a mapping asks for two and a half messages at a time.
+    const error = await refusedMapping(ready, { BatchSize: 2.5 });
+
+    // Then it is refused here rather than failing later inside a poll.
+    assertStringIncludes(error.message, "BatchSize 2.5 is out of range");
+  });
+
   it("refuses a batching window, which nothing here would wait out", async () => {
     // Given a queue and a function.
     const ready = await simAwsReadyToMap();

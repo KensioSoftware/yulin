@@ -1,4 +1,8 @@
-import { assertStringIncludes, assertThrowsErrorAsync } from "@kensio/smartass";
+import {
+  assertStringIncludes,
+  assertThrowsErrorAsync,
+  assertUndefined,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimLambdaNoEventSourceQueues } from "./sim-lambda-event-source-queues.js";
@@ -38,11 +42,14 @@ describe("sim Lambda event source queues with no simulated SQS", () => {
     // Given a simulated Lambda with no simulated SQS behind it.
     const queues = new SimLambdaNoEventSourceQueues();
 
-    // When a poller watches and stops watching a queue.
+    // When a poller watches a queue, asks when to look again, and stops.
     queues.watch();
+
+    const availability = queues.nextAvailability();
+
     queues.unwatch();
 
-    // Then nothing happens, which is all there is to check: a mapping on one
-    // of these was refused when it was created.
+    // Then it never has anything to come back for.
+    assertUndefined(availability);
   });
 });

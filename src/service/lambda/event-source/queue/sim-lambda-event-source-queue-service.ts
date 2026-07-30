@@ -49,6 +49,7 @@ export interface SimLambdaEventSourceQueueService {
  * The part of simulated SQS that says when a message has arrived on a queue.
  */
 export interface SimLambdaEventSourceQueueActivity {
+  nextAvailability(queueArn: string): Date | undefined;
   watch(queueArn: string, watcher: SimLambdaEventSourceQueueWatcher): void;
   unwatch(queueArn: string, watcher: SimLambdaEventSourceQueueWatcher): void;
 }

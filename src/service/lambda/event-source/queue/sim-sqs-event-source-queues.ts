@@ -97,6 +97,14 @@ export class SimSqsEventSourceQueues implements SimLambdaEventSourceQueues {
   }
 
   /**
+   * When the earliest message the queue cannot hand out yet becomes
+   * receivable.
+   */
+  nextAvailability(queueArn: string): Date | undefined {
+    return this.sqs.queueActivity().nextAvailability(queueArn);
+  }
+
+  /**
    * Watch a queue for messages arriving on it.
    */
   watch(queueArn: string, watcher: SimLambdaEventSourceQueueWatcher): void {

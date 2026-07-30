@@ -24,11 +24,15 @@ export function batchSizeIn(
   const batchSize =
     input.BatchSize ?? DEFAULT_SIM_LAMBDA_EVENT_SOURCE_BATCH_SIZE;
 
-  if (batchSize < 1 || batchSize > maximumBatchSize) {
+  if (
+    !Number.isSafeInteger(batchSize) ||
+    batchSize < 1 ||
+    batchSize > maximumBatchSize
+  ) {
     throw new SimLambdaInvalidParameterValueException(
       `BatchSize ${String(batchSize)} is out of range: a queue with no ` +
-        `batching window delivers between 1 and ` +
-        `${String(maximumBatchSize)} messages at a time`,
+        `batching window delivers a whole number of messages between 1 and ` +
+        `${String(maximumBatchSize)} at a time`,
     );
   }
 

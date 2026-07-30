@@ -57,7 +57,7 @@ export class SimSqs {
   private readonly deletionCommands: SimSqsDeleteMessageCommands;
   private readonly visibilityCommand: SimSqsChangeMessageVisibility;
   private readonly background: BackgroundScheduler;
-  private readonly activity = new SimSqsQueueActivity();
+  private readonly activity: SimSqsQueueActivity;
   private readonly sdkRouter = new SimSqsSdkCommandRouter(this);
   private readonly cfnFactory = new SimSqsCfnResourceFactory({ sqs: this });
 
@@ -76,6 +76,10 @@ export class SimSqs {
     });
 
     this.background = background;
+    this.activity = new SimSqsQueueActivity({
+      queues: this.queues,
+      clock: background,
+    });
     this.queueCreation = new SimSqsCreateQueue({
       queues: this.queues,
       access,
@@ -123,12 +127,12 @@ export class SimSqs {
   }
 
   /**
-   * Watch the queues in this scope for messages arriving on them.
+   * Keep up with the queues in this scope without polling them.
    *
-   * This is not an SQS API operation. Real SQS is polled continuously by
-   * whatever consumes it, and nothing in this simulation runs continuously, so a
+   * Not an SQS API operation. Real SQS is polled continuously by whatever
+   * consumes it, and nothing in this simulation runs continuously, so a
    * simulated consumer that would poll is told when there is something to poll
-   * for instead. A Lambda event source mapping is what uses it.
+   * for. A Lambda event source mapping is what uses it.
    */
   queueActivity(): SimSqsQueueActivity {
     return this.activity;

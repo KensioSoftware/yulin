@@ -268,6 +268,11 @@ clock, so advancing simulated time is what redelivers it. Scheduling a failed ba
 clock even for a zero visibility timeout is deliberate: a poll that ran straight back round would
 spin on a batch the function keeps failing.
 
+An announcement only reaches a mapping that was already watching, so a poll that finds nothing asks
+the queue when its earliest hidden message comes back and schedules itself for then. That is what
+delivers the messages a mapping was created alongside, rather than stranding a queue whose messages
+were all in flight when the mapping was made.
+
 `queue/` is the port onto SQS. `SimLambdaEventSourceQueues` is what polling needs from a queue, and
 `SimSqsEventSourceQueues` implements it over the ordinary SQS commands, as the function's execution
 role, so simulated IAM authorizes each poll the way real IAM does. A standalone `SimLambda` has no

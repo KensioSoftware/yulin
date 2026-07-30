@@ -67,7 +67,7 @@ export class SimSqsChangeMessageVisibility {
       );
     }
 
-    message.hideFor(changedAt, timeout);
+    queue.hideMessage(message, changedAt, timeout);
 
     return { $metadata: {} };
   }

@@ -1,3 +1,6 @@
+import type { SimClock } from "../../../util/clock/sim-clock.js";
+import type { SimSqsQueueStore } from "./sim-sqs-queue-store.js";
+
 /**
  * Something outside SQS waiting for messages to arrive on a queue.
  *
@@ -15,8 +18,15 @@ export interface SimSqsQueueWatcher {
   messageAvailable(availableFrom: Date): void;
 }
 
+interface SimSqsQueueActivityProperties {
+  readonly queues: SimSqsQueueStore;
+  readonly clock: SimClock;
+}
+
 /**
- * The watchers on the queues of one simulated SQS scope.
+ * What a consumer that cannot poll continuously needs from the queues of one
+ * simulated SQS scope: to be told when a message can next be received, and to
+ * be able to ask when none has been announced.
  *
  * Watchers are held by queue ARN rather than on the queue itself, so a watcher
  * survives whatever the queue does, and so the queue model stays a queue rather
@@ -24,6 +34,25 @@ export interface SimSqsQueueWatcher {
  */
 export class SimSqsQueueActivity {
   private readonly watchers = new Map<string, SimSqsQueueWatcher[]>();
+  private readonly queues: SimSqsQueueStore;
+  private readonly clock: SimClock;
+
+  constructor(properties: SimSqsQueueActivityProperties) {
+    this.queues = properties.queues;
+    this.clock = properties.clock;
+  }
+
+  /**
+   * When the earliest message a queue cannot hand out yet becomes receivable,
+   * or nothing when it holds no such message.
+   *
+   * A consumer that started watching a queue whose messages were all in flight
+   * or delayed has nothing to wake it, because their arrival was announced
+   * before it was watching. Asking is how it finds out when to look.
+   */
+  nextAvailability(queueArn: string): Date | undefined {
+    return this.queues.findByArn(queueArn)?.nextAvailability(this.clock.now());
+  }
 
   /**
    * Watch a queue for messages arriving on it.
@@ -43,9 +72,13 @@ export class SimSqsQueueActivity {
   }
 
   /**
-   * Tell a queue's watchers a message has arrived on it.
+   * Tell a queue's watchers when a message on it can next be received.
+   *
+   * A message arriving, a message being handed out and hidden, and a message
+   * having its visibility changed are all the same thing to a watcher: there is
+   * something to poll for at an instant.
    */
-  messageAdded(queueArn: string, availableFrom: Date): void {
+  messageAvailableAt(queueArn: string, availableFrom: Date): void {
     for (const watcher of this.watchersOf(queueArn)) {
       watcher.messageAvailable(availableFrom);
     }

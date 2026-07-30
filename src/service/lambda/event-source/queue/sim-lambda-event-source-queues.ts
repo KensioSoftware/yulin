@@ -84,6 +84,15 @@ export interface SimLambdaEventSourceQueues {
   deleteMessages(request: SimLambdaEventSourceDeleteRequest): Promise<void>;
 
   /**
+   * When the earliest message the queue cannot hand out yet becomes
+   * receivable, or nothing when it holds no such message.
+   *
+   * A poll that found nothing asks this, because a queue whose messages are all
+   * in flight or delayed has nothing to announce when they come back.
+   */
+  nextAvailability(queueArn: string): Date | undefined;
+
+  /**
    * Watch a queue for messages arriving on it.
    */
   watch(queueArn: string, watcher: SimLambdaEventSourceQueueWatcher): void;
@@ -122,6 +131,13 @@ export class SimLambdaNoEventSourceQueues implements SimLambdaEventSourceQueues 
    */
   deleteMessages(request: SimLambdaEventSourceDeleteRequest): Promise<void> {
     return Promise.reject(this.noQueues(request.queueArn));
+  }
+
+  /**
+   * Answer with nothing: there is no queue to look at.
+   */
+  nextAvailability(): Date | undefined {
+    return;
   }
 
   /**

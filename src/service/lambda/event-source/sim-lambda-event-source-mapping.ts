@@ -89,7 +89,9 @@ export class SimLambdaEventSourceMapping {
     this.functionArn = properties.functionArn;
     this.batchSize =
       properties.batchSize ?? DEFAULT_SIM_LAMBDA_EVENT_SOURCE_BATCH_SIZE;
-    this.functionResponseTypes = properties.functionResponseTypes ?? [];
+    // Copied rather than held, so a caller keeping the list it passed in
+    // cannot change what this mapping does with a batch afterwards.
+    this.functionResponseTypes = [...(properties.functionResponseTypes ?? [])];
     this.enabled = properties.enabled ?? true;
     this.lastModified = properties.createdAt;
   }

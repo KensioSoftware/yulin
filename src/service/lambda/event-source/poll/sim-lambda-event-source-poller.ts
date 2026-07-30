@@ -113,6 +113,8 @@ export class SimLambdaEventSourcePoller implements SimLambdaEventSourceQueueWatc
     });
 
     if (messages.length === 0) {
+      this.pollWhenSomethingComesBack();
+
       return;
     }
 
@@ -139,6 +141,23 @@ export class SimLambdaEventSourcePoller implements SimLambdaEventSourceQueueWatc
     }
 
     return this.properties.functions.find(this.properties.mapping.functionName);
+  }
+
+  /**
+   * Look again when a message the queue could not hand out becomes
+   * receivable.
+   *
+   * A mapping created while every message on its queue is in flight, or one
+   * whose queue holds only delayed messages, has nothing to wake it otherwise.
+   */
+  private pollWhenSomethingComesBack(): void {
+    const availableFrom = this.properties.queues.nextAvailability(
+      this.properties.eventSourceArn.value,
+    );
+
+    if (availableFrom !== undefined) {
+      this.schedule.at(availableFrom);
+    }
   }
 
   /**
