@@ -102,6 +102,23 @@ describe("SQS CloudFormation Queue validation", () => {
     assertNonNullable(simAws.sqs().findQueue("orders"));
   });
 
+  it("refuses a FifoQueue value that is neither true nor false", async () => {
+    // Given a template carrying something else as FifoQueue, which real
+    // CloudFormation refuses as well.
+    // When the Resource is created, then it is refused rather than read as
+    // false, since the queue it asked for is not knowable.
+    const error = await createQueueResource({
+      QueueName: "orders",
+      FifoQueue: "yes",
+    });
+
+    assertIdentical(
+      error.message,
+      "Invalid AWS::SQS::Queue Resource BadQueue: FifoQueue must be true or " +
+        "false",
+    );
+  });
+
   it("refuses the properties this simulation does not model", async () => {
     // Given templates declaring properties with behaviour that is not
     // simulated.

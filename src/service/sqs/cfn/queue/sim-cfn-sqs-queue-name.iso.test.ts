@@ -1,4 +1,9 @@
-import { assertIdentical, assertStringLength } from "@kensio/smartass";
+import {
+  assertFalse,
+  assertIdentical,
+  assertStringLength,
+  assertStringStartsWith,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimCfnSqsQueueName } from "./sim-cfn-sqs-queue-name.js";
@@ -45,6 +50,38 @@ describe("SimCfnSqsQueueName", () => {
     // When the generated name is read, then it is trimmed to fit, keeping the
     // start, so the stack name is still in it.
     assertStringLength(name.value, 80);
-    assertIdentical(name.value, `${"a".repeat(60)}-OrdersQueueWithARat`);
+    assertStringStartsWith(name.value, `${"a".repeat(60)}-OrdersQu`);
+
+    // And the same template generates the same name again, rather than a new
+    // one each deployment.
+    assertIdentical(
+      name.value,
+      new SimCfnSqsQueueName({
+        stackName: "a".repeat(60),
+        logicalId: "OrdersQueueWithARatherLongLogicalId",
+      }).value,
+    );
+  });
+
+  it("keeps two trimmed names apart where only the trimmed-off part differs", () => {
+    // Given two logical IDs that are the same up to the point a generated name
+    // is trimmed at. CDK puts its disambiguating hash at the end of a logical
+    // ID, which is the part trimming takes off.
+    const stackName = "a".repeat(40);
+    const sharedPrefix = "OrdersQueue".repeat(4);
+    const first = new SimCfnSqsQueueName({
+      stackName,
+      logicalId: `${sharedPrefix}E6CA6235`,
+    });
+    const second = new SimCfnSqsQueueName({
+      stackName,
+      logicalId: `${sharedPrefix}1B3D8A07`,
+    });
+
+    // When both names are read, then they are different names, so the two
+    // queues do not collide on one name.
+    assertStringLength(first.value, 80);
+    assertStringLength(second.value, 80);
+    assertFalse(first.value === second.value);
   });
 });

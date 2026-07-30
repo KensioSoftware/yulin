@@ -736,7 +736,8 @@ The properties applied to the queue are `VisibilityTimeout`, `DelaySeconds`,
 A queue with no `QueueName` is named from the stack name and the logical ID, so the queue above with
 its name left out would be `orders-stack-OrdersQueue`. Real CloudFormation adds random characters to
 that, which a template cannot predict either way. The generated name is trimmed to the 80 characters
-a queue name allows.
+a queue name allows, ending in a hash of the untrimmed name so two long names that start the same
+stay apart.
 
 `FifoQueue: true` fails the resource, because only standard queues are simulated and a FIFO queue
 created as a standard one would take messages in an order the deployment does not promise. The

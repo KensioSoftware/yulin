@@ -1,4 +1,12 @@
+import { createHash } from "node:crypto";
+
 const maximumNameLength = 80;
+
+/**
+ * How many characters of the hash of the untrimmed name a trimmed one ends
+ * with, so two long names that start the same do not become one name.
+ */
+const distinguisherLength = 8;
 
 interface SimCfnSqsQueueNameProperties {
   readonly stackName: string | undefined;
@@ -16,7 +24,10 @@ interface SimCfnSqsQueueNameProperties {
  *
  * A queue name is at most 80 characters, so a long stack name and logical ID
  * together are trimmed to fit. The start is kept, since that is where the stack
- * name is.
+ * name is, and the trimmed name ends in a hash of the untrimmed one. CDK puts
+ * its own disambiguating hash at the end of a logical ID, which is exactly what
+ * trimming cuts off, so without that two queues in one stack could end up
+ * asking for the same name.
  */
 export class SimCfnSqsQueueName {
   private readonly stackName: string | undefined;
@@ -31,7 +42,28 @@ export class SimCfnSqsQueueName {
    * The generated queue name.
    */
   get value(): string {
-    return this.composed().slice(0, maximumNameLength);
+    const composed = this.composed();
+
+    if (composed.length <= maximumNameLength) {
+      return composed;
+    }
+
+    const kept = composed.slice(0, maximumNameLength - distinguisherLength - 1);
+
+    return `${kept}-${this.distinguisher(composed)}`;
+  }
+
+  /**
+   * The tail a trimmed name ends with, derived from the whole untrimmed name.
+   *
+   * It is a hash rather than the random characters real CloudFormation uses, so
+   * the name stays the same between deployments of the same template.
+   */
+  private distinguisher(composed: string): string {
+    return createHash("sha1")
+      .update(composed)
+      .digest("hex")
+      .slice(0, distinguisherLength);
   }
 
   /**

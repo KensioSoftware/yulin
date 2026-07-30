@@ -41,9 +41,18 @@ const unsimulatedPropertyNames: ReadonlySet<string> = new Set([
  * The FifoQueue values that ask for a FIFO queue. CloudFormation carries a
  * boolean property as either, depending on where the value came from.
  */
-const fifoQueueValues: ReadonlySet<SimCfnTemplateValue | undefined> = new Set([
+const fifoQueueValues: ReadonlySet<SimCfnTemplateValue> = new Set([
   true,
   "true",
+]);
+
+/**
+ * The FifoQueue values that ask for a standard queue, which is the only kind
+ * this simulation creates.
+ */
+const standardQueueValues: ReadonlySet<SimCfnTemplateValue> = new Set([
+  false,
+  "false",
 ]);
 
 /**
@@ -105,18 +114,29 @@ export class SimCfnSqsQueuePropertyRules {
    *
    * Only standard queues are simulated, and a FIFO queue quietly created as a
    * standard one would take messages in an order the deployment does not
-   * promise, so the Resource fails instead.
+   * promise, so the Resource fails instead. A value that is neither true nor
+   * false is refused as well, rather than read as false: CloudFormation would
+   * refuse it too, and the queue it asked for is not knowable.
    */
   private refuseFifoQueue(): void {
-    if (!fifoQueueValues.has(this.properties["FifoQueue"])) {
+    const fifo = this.properties["FifoQueue"];
+
+    if (fifo === undefined || standardQueueValues.has(fifo)) {
       return;
+    }
+
+    if (fifoQueueValues.has(fifo)) {
+      throw sqsQueuePropertyError(
+        this.logicalId,
+        "FifoQueue names a FIFO queue, which simulated SQS does not " +
+          "simulate. Only standard queues are simulated, so the queue is not " +
+          "created rather than created as a standard queue",
+      );
     }
 
     throw sqsQueuePropertyError(
       this.logicalId,
-      "FifoQueue names a FIFO queue, which simulated SQS does not simulate. " +
-        "Only standard queues are simulated, so the queue is not created " +
-        "rather than created as a standard queue",
+      "FifoQueue must be true or false",
     );
   }
 
