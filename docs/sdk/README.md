@@ -173,7 +173,7 @@ throw a diagnostic error.
 ## Supported services and Commands
 
 All simulated services support SDK interception: ACM, CloudFormation, CloudFront, Cognito, DynamoDB,
-IAM, KMS, Lambda, Route53, S3, Secrets Manager, SSM and STS. Each service's own docs under
+IAM, KMS, Lambda, Route53, S3, Secrets Manager, SQS, SSM and STS. Each service's own docs under
 [docs/services](../services/) list the Commands it simulates.
 
 Both kinds of gap are refused on send rather than misbehaving silently, with a different error each:
