@@ -15,6 +15,7 @@ behaviour and includes example code that can be copied into tests or local devel
 - [Route53](./services/route53/ "Simulated Route53 usage docs")
 - [S3](./services/s3/ "Simulated S3 usage docs")
 - [Secrets Manager](./services/secretsmanager/ "Simulated Secrets Manager usage docs")
+- [SQS](./services/sqs/ "Simulated SQS usage docs")
 - [SSM Parameter Store](./services/ssm/ "Simulated SSM Parameter Store usage docs")
 - [STS](./services/sts/ "Simulated STS usage docs")
 

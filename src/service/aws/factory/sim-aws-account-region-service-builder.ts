@@ -17,6 +17,7 @@ import { SimS3LambdaCodeStore } from "../../lambda/function/code/store/sim-s3-la
 import { SimSdkLambdaVmModuleProvider } from "../../lambda/function/code/vm/sdk/sim-sdk-lambda-vm-module-provider.js";
 import { SimS3 } from "../../s3/sim-s3.js";
 import { SimSecretsManager } from "../../secretsmanager/index.js";
+import { SimSqs } from "../../sqs/index.js";
 import { SimSsm } from "../../ssm/index.js";
 import { SimSts } from "../../sts/sim-sts.js";
 import type { SimAwsAccountServiceCache } from "./sim-aws-account-service-cache.js";
@@ -180,6 +181,20 @@ export class SimAwsAccountRegionServiceBuilder {
       iam: this.accountServices.createIam(scope),
       background: this.background,
       kms: scope.kms(),
+    });
+  }
+
+  /**
+   * Create simulated SQS for an Account Region scope.
+   *
+   * Queues are Region-scoped on real AWS: a queue URL and ARN both name the
+   * Region, and a queue cannot be reached from another one.
+   */
+  createSqs(scope: SimAwsAccountRegionContainer): SimSqs {
+    return new SimSqs({
+      accountRegionScope: scope.accountRegionScope,
+      iam: this.accountServices.createIam(scope),
+      background: this.background,
     });
   }
 

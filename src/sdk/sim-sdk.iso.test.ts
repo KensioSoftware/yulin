@@ -295,7 +295,7 @@ describe("simulated AWS SDK", () => {
     using simSdk = new SimSdk();
     // A structurally valid SDK client for a service Yulin does not simulate.
     const client: SdkClientLike = {
-      config: { serviceId: "SQS", region: "us-east-1" },
+      config: { serviceId: "SNS", region: "us-east-1" },
       send: () => Promise.resolve("real send"),
     };
     simSdk.intercept(client);
@@ -304,7 +304,7 @@ describe("simulated AWS SDK", () => {
       await client.send({ input: {} });
     });
 
-    assertStringIncludes(error.message, "SQS");
+    assertStringIncludes(error.message, "SNS");
   });
 
   it("rejects intercepting a client that is already intercepted", () => {

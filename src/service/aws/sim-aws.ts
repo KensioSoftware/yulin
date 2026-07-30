@@ -27,6 +27,7 @@ import type { SimIamRegistry } from "../iam/registry/sim-iam-registry.js";
 import type { SimKms } from "../kms/index.js";
 import type { SimLambda } from "../lambda/index.js";
 import type { SimSecretsManager } from "../secretsmanager/index.js";
+import type { SimSqs } from "../sqs/index.js";
 import type { SimSsm } from "../ssm/index.js";
 import type { SimSts } from "../sts/sim-sts.js";
 import type { SimAwsPrincipal } from "./caller/sim-aws-caller.js";
@@ -243,6 +244,11 @@ export class SimAws {
   /** Get simulated Secrets Manager in the default Account Region scope. */
   secretsManager(): SimSecretsManager {
     return this.accountRegionScope().secretsManager();
+  }
+
+  /** Get simulated SQS in the default Account Region scope. */
+  sqs(): SimSqs {
+    return this.accountRegionScope().sqs();
   }
 
   /** Get simulated SSM in the default Account Region scope. */
