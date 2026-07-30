@@ -692,9 +692,11 @@ Current documented limitations:
 
 - Standard queues only. A queue name ending in `.fifo` is refused, as are `MessageGroupId`,
   `MessageDeduplicationId` and `ReceiveRequestAttemptId`.
-- Delivery is exactly once and in order. Real standard queues guarantee at-least-once delivery and
-  make no ordering promise, so a test relying on the order messages come back in, or on a message
-  arriving only once, is relying on something AWS does not promise.
+- Ordering and duplicates are stricter here than AWS promises. Messages come back oldest first, and a
+  message is handed out to one consumer at a time. Real standard queues make no ordering promise and
+  guarantee at-least-once delivery, so there a copy of a message can arrive twice and messages can
+  arrive out of order. Redelivery after a visibility timeout lapses is simulated, since that follows
+  from the timeout; a duplicate arriving on its own is not.
 - Long polling does not wait. `WaitTimeSeconds` and `ReceiveMessageWaitTimeSeconds` are accepted and
   validated, and a receive returns at once. Nothing else is running in process that could send a
   message during the wait, so waiting could only ever time out.

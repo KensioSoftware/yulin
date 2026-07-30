@@ -20,6 +20,7 @@ const knownNames = new Set<string>([
   "SenderId",
   "SentTimestamp",
   "SequenceNumber",
+  "SqsManagedSseEnabled",
 ]);
 
 /**

@@ -144,6 +144,54 @@ describe("SQS message attributes", () => {
     assertUndefined(received.Messages?.[0]?.MD5OfMessageAttributes);
   });
 
+  it("keeps a binary attribute clear of the arrays either side of it", async () => {
+    // Given a queue and a binary attribute value the sender still holds.
+    const { simAws, queueUrl } = await simAwsWithQueue();
+    const payload = new Uint8Array([1, 2, 3]);
+
+    await simAws.sqs().sendMessage(
+      new SendMessageCommand({
+        QueueUrl: queueUrl,
+        MessageBody: "order-1",
+        MessageAttributes: {
+          payload: { DataType: "Binary", BinaryValue: payload },
+        },
+      }),
+    );
+
+    // When the sender mutates its own array afterwards, and a consumer mutates
+    // the one it is given.
+    payload[0] = 9;
+
+    const first = await simAws.sqs().receiveMessage(
+      new ReceiveMessageCommand({
+        QueueUrl: queueUrl,
+        MessageAttributeNames: ["All"],
+        VisibilityTimeout: 0,
+      }),
+    );
+    const received = first.Messages?.[0]?.MessageAttributes?.["payload"];
+
+    assertNonNullable(received?.BinaryValue);
+    received.BinaryValue[1] = 9;
+
+    // Then the message still carries the bytes it was sent with.
+    const again = await simAws.sqs().receiveMessage(
+      new ReceiveMessageCommand({
+        QueueUrl: queueUrl,
+        MessageAttributeNames: ["All"],
+      }),
+    );
+
+    assertArrayEquals(
+      [
+        ...(again.Messages?.[0]?.MessageAttributes?.["payload"]?.BinaryValue ??
+          []),
+      ],
+      [1, 2, 3],
+    );
+  });
+
   it("refuses an attribute name real SQS would refuse", async () => {
     // Given a queue.
     const { simAws, queueUrl } = await simAwsWithQueue();

@@ -55,10 +55,13 @@ export class SimSqsBinaryPayload implements SimSqsMessageAttributePayload {
   public readonly transportType = 2;
   public readonly bytes: Buffer;
 
-  private readonly value: Uint8Array;
-
+  /**
+   * The bytes are copied on the way in and again on the way out, so a sent
+   * message does not share an array with the sender or with a consumer. Real SQS
+   * holds bytes a caller cannot reach afterwards, and a simulation that handed
+   * the same array back would let a mutation reach across a send.
+   */
   constructor(value: Uint8Array) {
-    this.value = value;
     this.bytes = Buffer.from(value);
   }
 
@@ -66,6 +69,6 @@ export class SimSqsBinaryPayload implements SimSqsMessageAttributePayload {
    * This value as SQS reports it, alongside its data type.
    */
   reported(dataType: string): SimSqsMessageAttributeValue {
-    return { DataType: dataType, BinaryValue: this.value };
+    return { DataType: dataType, BinaryValue: Uint8Array.from(this.bytes) };
   }
 }

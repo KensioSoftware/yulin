@@ -123,8 +123,10 @@ refused rather than quietly answered with a local queue of the same name.
 
 ## Divergences worth knowing
 
-- Delivery is exactly once and in order. Real standard queues promise at-least-once and no ordering,
-  so a test relying on the order here is relying on something AWS does not promise.
+- Ordering and duplicates are stricter than AWS promises: messages come back oldest first, and a
+  message is handed out to one consumer at a time. Real standard queues make no ordering promise and
+  deliver at least once. Redelivery once a visibility timeout lapses is simulated, since that follows
+  from the timeout; a duplicate arriving on its own is not.
 - `ReceiveMessageWaitTimeSeconds` and `WaitTimeSeconds` are accepted and not waited out. Nothing else
   is running that could send a message during the wait, so waiting could only ever time out.
 - `DeleteQueue` and `PurgeQueue` happen at once, where real SQS may take up to a minute over either.

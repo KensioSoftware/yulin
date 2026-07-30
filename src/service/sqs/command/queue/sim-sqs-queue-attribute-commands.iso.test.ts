@@ -22,23 +22,7 @@ import {
   SimSqsUnsupportedOperation,
   SimSqsValidationException,
 } from "../../error/sim-sqs.error.js";
-
-/**
- * A simulated AWS with one queue, and that queue's URL.
- */
-async function simAwsWithQueue(
-  attributes?: Record<string, string>,
-): Promise<{ simAws: SimAws; queueUrl: string }> {
-  const simAws = new SimAws();
-  const created = await simAws.sqs().createQueue(
-    new CreateQueueCommand({
-      QueueName: "orders",
-      ...(attributes !== undefined && { Attributes: attributes }),
-    }),
-  );
-
-  return { simAws, queueUrl: created.QueueUrl ?? "" };
-}
+import { simAwsWithQueue } from "../../../../../test/sqs/queue-fixture.js";
 
 describe("SQS queue attribute commands", () => {
   it("gives a new queue the attribute defaults real SQS gives it", async () => {

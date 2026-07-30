@@ -13,6 +13,7 @@ import {
   ReceiveMessageCommand,
   SendMessageCommand,
 } from "@aws-sdk/client-sqs";
+import { assertNonNullable } from "@kensio/smartass";
 
 import { SimAws } from "../../src/service/aws/sim-aws.js";
 
@@ -46,7 +47,9 @@ export async function simAwsWithQueue(
     }),
   );
 
-  return { simAws, queueUrl: created.QueueUrl ?? "" };
+  assertNonNullable(created.QueueUrl, "CreateQueue answered with a queue URL");
+
+  return { simAws, queueUrl: created.QueueUrl };
 }
 
 /**
@@ -67,9 +70,12 @@ export async function simAwsWithReceivedMessage(
     .sqs()
     .receiveMessage(new ReceiveMessageCommand({ QueueUrl: queueUrl }));
 
-  return {
-    simAws,
-    queueUrl,
-    receiptHandle: received.Messages?.[0]?.ReceiptHandle ?? "",
-  };
+  const receiptHandle = received.Messages?.[0]?.ReceiptHandle;
+
+  assertNonNullable(
+    receiptHandle,
+    "ReceiveMessage answered with a receipt handle",
+  );
+
+  return { simAws, queueUrl, receiptHandle };
 }

@@ -50,11 +50,15 @@ export class SimSqsMessageAttributes {
 
   /**
    * The MD5 digest of these attributes, as SQS reports it.
+   *
+   * The names are ordered by their code units rather than by a locale, because
+   * the order decides the digest. A locale-aware comparison sorts mixed-case
+   * names differently from AWS, and differently on different machines.
    */
   digest(): string {
     const digested = Buffer.concat(
       this.attributes
-        .toSorted((one, other) => one.name.localeCompare(other.name))
+        .toSorted(byName)
         .map((attribute) => attribute.digestBytes()),
     );
 
@@ -96,6 +100,21 @@ export class SimSqsMessageAttributes {
       ),
     );
   }
+}
+
+/**
+ * Order two attributes by name, comparing code units rather than by locale.
+ */
+function byName(
+  one: SimSqsMessageAttribute,
+  other: SimSqsMessageAttribute,
+): number {
+  // Attribute names within one message are unique, so there is no equal case.
+  if (one.name < other.name) {
+    return -1;
+  }
+
+  return 1;
 }
 
 /**
