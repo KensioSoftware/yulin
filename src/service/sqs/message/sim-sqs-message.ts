@@ -10,6 +10,7 @@ interface SimSqsMessageProperties {
   readonly attributes: SimSqsMessageAttributes;
   readonly sentAt: Date;
   readonly visibleFrom: Date;
+  readonly deadLetterSourceArn?: string | undefined;
 }
 
 /**
@@ -25,6 +26,7 @@ export class SimSqsMessage {
   public readonly sentAt: Date;
 
   private readonly visibility: SimSqsMessageVisibility;
+  private readonly deadLetterSourceArn: string | undefined;
   private receiptHandle: string | undefined;
 
   constructor(properties: SimSqsMessageProperties) {
@@ -33,6 +35,14 @@ export class SimSqsMessage {
     this.attributes = properties.attributes;
     this.sentAt = properties.sentAt;
     this.visibility = new SimSqsMessageVisibility(properties.visibleFrom);
+    this.deadLetterSourceArn = properties.deadLetterSourceArn;
+  }
+
+  /**
+   * How many times this message has been handed out without being deleted.
+   */
+  get receiveCount(): number {
+    return this.visibility.receiveCount;
   }
 
   /**
@@ -100,13 +110,38 @@ export class SimSqsMessage {
   }
 
   /**
+   * This message as it arrives on a dead-letter queue.
+   *
+   * What the message is carries over unchanged: the id, the body, the message
+   * attributes and the sent timestamp. Real SQS leaves the enqueue timestamp
+   * alone when it moves a message off a standard queue, so the dead-letter
+   * queue's retention period still runs from when the message was first sent
+   * rather than restarting.
+   *
+   * What does not carry over is the receive count, because a receive count
+   * counts receives from one queue and this message has not been received from
+   * this one. It is receivable straight away: the move is not a send, so the
+   * dead-letter queue's delay does not apply to it.
+   */
+  onDeadLetterQueue(instant: Date, sourceQueueArn: string): SimSqsMessage {
+    return new SimSqsMessage({
+      messageId: this.messageId,
+      body: this.body,
+      attributes: this.attributes,
+      sentAt: this.sentAt,
+      visibleFrom: instant,
+      deadLetterSourceArn: sourceQueueArn,
+    });
+  }
+
+  /**
    * The message system attributes SQS knows about this message.
    *
    * Only the attributes a receive request names are reported, so this is what is
    * available rather than what is returned.
    */
   systemAttributeValues(): ReadonlyMap<string, string> {
-    return new Map<string, string>([
+    const values = new Map<string, string>([
       ["SentTimestamp", String(this.sentAt.getTime())],
       ["ApproximateReceiveCount", String(this.visibility.receiveCount)],
       [
@@ -114,5 +149,11 @@ export class SimSqsMessage {
         String(this.visibility.firstReceived.getTime()),
       ],
     ]);
+
+    if (this.deadLetterSourceArn !== undefined) {
+      values.set("DeadLetterQueueSourceArn", this.deadLetterSourceArn);
+    }
+
+    return values;
   }
 }

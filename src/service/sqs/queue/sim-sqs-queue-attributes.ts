@@ -1,6 +1,6 @@
-import { SimSqsInvalidAttributeValue } from "../error/sim-sqs.error.js";
-import { SimSqsQueueAttributeNames } from "./sim-sqs-queue-attribute-names.js";
-import type { SimSqsQueueAttributeSpec } from "./sim-sqs-queue-attribute-specs.js";
+import { SimSqsQueueAttributeNumbers } from "./sim-sqs-queue-attribute-numbers.js";
+import { simSqsRedrivePolicyAttributeName } from "./sim-sqs-queue-attribute-specs.js";
+import { SimSqsRedrivePolicy } from "./sim-sqs-redrive-policy.js";
 
 /**
  * Queue attributes as a request carries them: SQS passes every attribute value
@@ -10,97 +10,66 @@ export type SimSqsQueueAttributeInput = Readonly<
   Record<string, string | undefined>
 >;
 
-const integerPattern = /^-?\d+$/;
-
-/**
- * Read an attribute value, refusing anything outside the range real SQS
- * accepts for it.
- */
-function attributeNumber(
-  spec: SimSqsQueueAttributeSpec,
-  value: string,
-): number {
-  const invalid = new SimSqsInvalidAttributeValue(
-    `Value ${value} for parameter ${spec.name} is invalid. Reason: Must be ` +
-      `an integer from ${String(spec.minimum)} to ${String(spec.maximum)}.`,
-  );
-
-  if (!integerPattern.test(value)) {
-    throw invalid;
-  }
-
-  const parsed = Number(value);
-
-  if (parsed < spec.minimum || parsed > spec.maximum) {
-    throw invalid;
-  }
-
-  return parsed;
-}
-
 /**
  * The attribute values held by one simulated queue.
  *
- * Attributes are held as numbers rather than as the strings a request carries,
- * because that is what the queue's behaviour is expressed in: a visibility
- * timeout is an amount of time, and a maximum message size is a number of
- * bytes. Strings are a wire format, applied on the way in and reported on the
- * way out.
+ * They come in two kinds. Most are amounts, held as numbers because that is
+ * what the queue's behaviour is expressed in. The redrive policy is a JSON
+ * object, and a queue has none until one is set, so it is held apart from the
+ * rest rather than squeezed into the same map.
  */
 export class SimSqsQueueAttributes {
-  private readonly values: ReadonlyMap<string, number>;
+  private readonly numbers: SimSqsQueueAttributeNumbers;
+  private readonly redrive: SimSqsRedrivePolicy | undefined;
 
-  private constructor(values: ReadonlyMap<string, number>) {
-    this.values = values;
+  private constructor(
+    numbers: SimSqsQueueAttributeNumbers,
+    redrive: SimSqsRedrivePolicy | undefined,
+  ) {
+    this.numbers = numbers;
+    this.redrive = redrive;
   }
 
   /**
    * The attribute values a queue created with no attributes has.
    */
   static defaults(): SimSqsQueueAttributes {
-    return new this(
-      new Map(
-        SimSqsQueueAttributeNames.settable.map((spec) => [
-          spec.name,
-          spec.defaultValue,
-        ]),
-      ),
-    );
+    return new this(SimSqsQueueAttributeNumbers.defaults(), undefined);
   }
 
   /** The delay a new message with no delay of its own waits out. */
   get delaySeconds(): number {
-    return this.numberFor("DelaySeconds");
+    return this.numbers.get("DelaySeconds");
   }
 
   /** The longest message body the queue accepts, in bytes. */
   get maximumMessageSizeBytes(): number {
-    return this.numberFor("MaximumMessageSize");
+    return this.numbers.get("MaximumMessageSize");
   }
 
   /** How long a message stays on the queue before SQS drops it. */
   get messageRetentionSeconds(): number {
-    return this.numberFor("MessageRetentionPeriod");
+    return this.numbers.get("MessageRetentionPeriod");
   }
 
   /** How long a received message is hidden from other consumers. */
   get visibilityTimeoutSeconds(): number {
-    return this.numberFor("VisibilityTimeout");
+    return this.numbers.get("VisibilityTimeout");
+  }
+
+  /** Where failed messages go, and after how many receives, if anywhere. */
+  get redrivePolicy(): SimSqsRedrivePolicy | undefined {
+    return this.redrive;
   }
 
   /**
    * Apply the attribute values a request asks for, leaving the rest as they are.
    */
   with(requested: SimSqsQueueAttributeInput): SimSqsQueueAttributes {
-    const values = new Map(this.values);
-
-    for (const [name, value] of definedEntries(requested)) {
-      const spec = SimSqsQueueAttributeNames.specForSetting(name);
-
-      values.set(spec.name, attributeNumber(spec, value));
-    }
-
-    return new SimSqsQueueAttributes(values);
+    return new SimSqsQueueAttributes(
+      this.numbers.with(requested),
+      this.redriveIn(requested),
+    );
   }
 
   /**
@@ -111,45 +80,51 @@ export class SimSqsQueueAttributes {
    * request carrying none matches any existing queue.
    */
   matches(requested: SimSqsQueueAttributeInput): boolean {
-    return definedEntries(requested).every(([name, value]) => {
-      const spec = SimSqsQueueAttributeNames.specForSetting(name);
-
-      return this.numberFor(spec.name) === attributeNumber(spec, value);
-    });
+    return this.redriveMatches(requested) && this.numbers.matches(requested);
   }
 
   /**
    * The attributes as SQS reports them, back in their string form.
+   *
+   * The redrive policy is reported as the string it was set with, since that is
+   * the string SQS holds the attribute as. A queue with no redrive policy
+   * reports none, as real SQS leaves out an attribute a queue has no value for.
    */
   reported(): ReadonlyMap<string, string> {
-    return new Map(
-      this.values.entries().map(([name, value]) => [name, String(value)]),
-    );
-  }
+    const reported = new Map(this.numbers.reported());
 
-  private numberFor(name: string): number {
-    const value = this.values.get(name);
-
-    /* v8 ignore next 3 -- unreachable: every settable attribute is present from
-       construction, and only settable names are ever read. */
-    if (value === undefined) {
-      throw new SimSqsInvalidAttributeValue(`No value for attribute ${name}`);
+    if (this.redrive !== undefined) {
+      reported.set(simSqsRedrivePolicyAttributeName, this.redrive.value);
     }
 
-    return value;
+    return reported;
   }
-}
 
-/**
- * The attribute entries a request actually carries.
- *
- * An SDK attribute map is a partial record, so an explicitly undefined value is
- * the absence of an attribute rather than a request to set one.
- */
-function definedEntries(
-  requested: SimSqsQueueAttributeInput,
-): readonly [string, string][] {
-  return Object.entries(requested).filter(
-    (entry): entry is [string, string] => entry[1] !== undefined,
-  );
+  /**
+   * The redrive policy after a request, which is the one it sets or the one
+   * already there.
+   */
+  private redriveIn(
+    requested: SimSqsQueueAttributeInput,
+  ): SimSqsRedrivePolicy | undefined {
+    // eslint-disable-next-line security/detect-object-injection -- a fixed key.
+    const value = requested[simSqsRedrivePolicyAttributeName];
+
+    if (value === undefined) {
+      return this.redrive;
+    }
+
+    return SimSqsRedrivePolicy.parse(value);
+  }
+
+  private redriveMatches(requested: SimSqsQueueAttributeInput): boolean {
+    // eslint-disable-next-line security/detect-object-injection -- a fixed key.
+    const value = requested[simSqsRedrivePolicyAttributeName];
+
+    if (value === undefined) {
+      return true;
+    }
+
+    return this.redrive?.matches(SimSqsRedrivePolicy.parse(value)) === true;
+  }
 }

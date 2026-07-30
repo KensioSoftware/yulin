@@ -2,28 +2,21 @@ import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-
 import { SimSqsQueueNameExists } from "../error/sim-sqs.error.js";
 import type { SimSqsMessage } from "../message/sim-sqs-message.js";
 import { SimSqsMessageStore } from "../message/sim-sqs-message-store.js";
+import type { SimSqsDeadLetterTargets } from "./sim-sqs-dead-letter-targets.js";
 import { SimSqsQueueArn } from "./sim-sqs-queue-arn.js";
 import type { SimSqsQueueName } from "./sim-sqs-queue-name.js";
 import type {
   SimSqsQueueAttributeInput,
   SimSqsQueueAttributes,
 } from "./sim-sqs-queue-attributes.js";
-
-const millisecondsPerSecond = 1000;
-
-/**
- * Real SQS reports the two queue timestamps in whole seconds since the epoch,
- * unlike the message timestamps, which are in milliseconds.
- */
-function epochSeconds(instant: Date): string {
-  return String(Math.floor(instant.getTime() / millisecondsPerSecond));
-}
+import { simSqsReportedQueueAttributes } from "./sim-sqs-queue-report.js";
 
 interface SimSqsQueueProperties {
   readonly name: SimSqsQueueName;
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly attributes: SimSqsQueueAttributes;
   readonly createdAt: Date;
+  readonly deadLetterTargets: SimSqsDeadLetterTargets;
 }
 
 /**
@@ -32,9 +25,9 @@ interface SimSqsQueueProperties {
  * The queue owns its messages rather than a service-wide message table owning
  * them, because everything a message does depends on the queue's attributes: how
  * long it stays hidden once received, how long it is kept, and how big it is
- * allowed to be. Retention is applied whenever the messages are looked at, so
- * moving simulated time forward loses the messages AWS would have dropped
- * instead of holding them indefinitely.
+ * allowed to be. Retention and redrive are both applied whenever the messages
+ * are looked at, so moving simulated time forward loses the messages AWS would
+ * have dropped and moves the ones it would have given up on.
  */
 export class SimSqsQueue {
   public readonly name: SimSqsQueueName;
@@ -42,6 +35,7 @@ export class SimSqsQueue {
   public readonly createdAt: Date;
 
   private readonly messages = new SimSqsMessageStore();
+  private readonly deadLetterTargets: SimSqsDeadLetterTargets;
   private settings: SimSqsQueueAttributes;
   private lastModifiedAt: Date;
 
@@ -54,6 +48,7 @@ export class SimSqsQueue {
     this.createdAt = properties.createdAt;
     this.lastModifiedAt = properties.createdAt;
     this.settings = properties.attributes;
+    this.deadLetterTargets = properties.deadLetterTargets;
   }
 
   /**
@@ -90,12 +85,21 @@ export class SimSqsQueue {
 
   /**
    * Apply the attribute values a request asks for, as SetQueueAttributes does.
+   *
+   * A redrive policy is only accepted once its dead-letter queue is there to
+   * accept messages, as real SQS only accepts one then. A policy naming a queue
+   * that does not exist would look like a working dead-letter queue and lose
+   * the messages it was supposed to keep, so it fails here instead of later.
    */
   applyAttributes(
     requested: SimSqsQueueAttributeInput,
     modifiedAt: Date,
   ): void {
-    this.settings = this.settings.with(requested);
+    const updated = this.settings.with(requested);
+
+    this.deadLetterTargets.assertRequestedTarget(requested);
+
+    this.settings = updated;
     this.lastModifiedAt = modifiedAt;
   }
 
@@ -110,9 +114,27 @@ export class SimSqsQueue {
    * The messages that can be received at an instant, oldest first.
    */
   receivable(instant: Date, limit: number): readonly SimSqsMessage[] {
-    this.dropExpired(instant);
+    this.applyLifecycle(instant);
 
     return this.messages.receivable(instant, limit);
+  }
+
+  /**
+   * Bring this queue up to date at an instant.
+   *
+   * Nothing is scheduled to age a message out or to give up on one. Both happen
+   * on the simulation's clock: what the retention period has outlived is
+   * dropped, and what has run out of receives moves to the dead-letter queue.
+   * Running it twice at one instant does nothing the second time.
+   */
+  applyLifecycle(instant: Date): void {
+    this.dropExpired(instant);
+    this.deadLetterTargets.move({
+      policy: this.settings.redrivePolicy,
+      messages: this.messages,
+      sourceQueueArn: this.arn.value,
+      instant,
+    });
   }
 
   /**
@@ -130,7 +152,7 @@ export class SimSqsQueue {
     receiptHandle: string,
     instant: Date,
   ): SimSqsMessage | undefined {
-    this.dropExpired(instant);
+    this.applyLifecycle(instant);
 
     return this.messages.forHandle(receiptHandle);
   }
@@ -155,19 +177,15 @@ export class SimSqsQueue {
    * timestamps no request can set.
    */
   reportedAttributes(instant: Date): ReadonlyMap<string, string> {
-    this.dropExpired(instant);
+    this.applyLifecycle(instant);
 
-    const counts = this.messages.countsAt(instant);
-
-    return new Map<string, string>([
-      ...this.settings.reported(),
-      ["ApproximateNumberOfMessages", String(counts.visible)],
-      ["ApproximateNumberOfMessagesDelayed", String(counts.delayed)],
-      ["ApproximateNumberOfMessagesNotVisible", String(counts.inFlight)],
-      ["CreatedTimestamp", epochSeconds(this.createdAt)],
-      ["LastModifiedTimestamp", epochSeconds(this.lastModifiedAt)],
-      ["QueueArn", this.arn.value],
-    ]);
+    return simSqsReportedQueueAttributes({
+      settings: this.settings,
+      counts: this.messages.countsAt(instant),
+      createdAt: this.createdAt,
+      lastModifiedAt: this.lastModifiedAt,
+      queueArn: this.arn.value,
+    });
   }
 
   private dropExpired(instant: Date): void {

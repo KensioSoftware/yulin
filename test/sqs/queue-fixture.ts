@@ -38,8 +38,9 @@ export interface SimSqsReceivedMessageFixture extends SimSqsQueueFixture {
  */
 export async function simAwsWithQueue(
   attributes?: Record<string, string>,
+  existing?: SimAws,
 ): Promise<SimSqsQueueFixture> {
-  const simAws = new SimAws();
+  const simAws = existing ?? new SimAws();
   const created = await simAws.sqs().createQueue(
     new CreateQueueCommand({
       QueueName: "orders",
@@ -50,6 +51,65 @@ export async function simAwsWithQueue(
   assertNonNullable(created.QueueUrl, "CreateQueue answered with a queue URL");
 
   return { simAws, queueUrl: created.QueueUrl };
+}
+
+/**
+ * One simulated AWS holding a queue that redrives to a dead-letter queue.
+ */
+export interface SimSqsDeadLetterQueueFixture extends SimSqsQueueFixture {
+  readonly deadLetterQueueUrl: string;
+  readonly deadLetterQueueArn: string;
+}
+
+/**
+ * Make a simulated AWS holding a queue named `orders` that gives up on a message
+ * after `maxReceiveCount` receives and moves it to a queue named `orders-dlq`.
+ */
+export async function simAwsWithDeadLetterQueue(
+  maxReceiveCount: number,
+): Promise<SimSqsDeadLetterQueueFixture> {
+  const simAws = new SimAws();
+  const created = await simAws
+    .sqs()
+    .createQueue(new CreateQueueCommand({ QueueName: "orders-dlq" }));
+
+  assertNonNullable(created.QueueUrl, "CreateQueue answered with a queue URL");
+
+  const deadLetterQueueArn = simAws.sqs().findQueue("orders-dlq")?.arn.value;
+
+  assertNonNullable(deadLetterQueueArn, "The dead-letter queue has an ARN");
+
+  const { queueUrl } = await simAwsWithQueue(
+    {
+      VisibilityTimeout: "30",
+      RedrivePolicy: JSON.stringify({
+        deadLetterTargetArn: deadLetterQueueArn,
+        maxReceiveCount,
+      }),
+    },
+    simAws,
+  );
+
+  return {
+    simAws,
+    queueUrl,
+    deadLetterQueueUrl: created.QueueUrl,
+    deadLetterQueueArn,
+  };
+}
+
+/**
+ * Receive a message and leave it undeleted until its visibility timeout lapses,
+ * which is how a consumer that cannot handle a message fails to handle it.
+ */
+export async function failToHandleMessage(
+  simAws: SimAws,
+  queueUrl: string,
+): Promise<void> {
+  await simAws
+    .sqs()
+    .receiveMessage(new ReceiveMessageCommand({ QueueUrl: queueUrl }));
+  await simAws.clock().advanceBy({ seconds: 31 });
 }
 
 /**

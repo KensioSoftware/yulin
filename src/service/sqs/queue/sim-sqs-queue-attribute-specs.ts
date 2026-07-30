@@ -1,4 +1,10 @@
 /**
+ * The one settable attribute that is a JSON object rather than a number, so it
+ * has no numeric range to be checked against.
+ */
+export const simSqsRedrivePolicyAttributeName = "RedrivePolicy";
+
+/**
  * One queue attribute a request may set, and the range real SQS accepts for it.
  */
 export interface SimSqsQueueAttributeSpec {

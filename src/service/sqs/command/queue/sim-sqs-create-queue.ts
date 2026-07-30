@@ -1,6 +1,7 @@
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
+import type { SimSqsDeadLetterTargets } from "../../queue/sim-sqs-dead-letter-targets.js";
 import { SimSqsQueue } from "../../queue/sim-sqs-queue.js";
 import {
   type SimSqsQueueAttributeInput,
@@ -20,6 +21,7 @@ interface SimSqsCreateQueueProperties {
   readonly access: SimSqsQueueAccess;
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly clock: BackgroundScheduler;
+  readonly deadLetterTargets: SimSqsDeadLetterTargets;
 }
 
 interface SimSqsCreateQueueOptions {
@@ -39,12 +41,14 @@ export class SimSqsCreateQueue {
   private readonly access: SimSqsQueueAccess;
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly clock: BackgroundScheduler;
+  private readonly deadLetterTargets: SimSqsDeadLetterTargets;
 
   constructor(properties: SimSqsCreateQueueProperties) {
     this.queues = properties.queues;
     this.access = properties.access;
     this.accountRegionScope = properties.accountRegionScope;
     this.clock = properties.clock;
+    this.deadLetterTargets = properties.deadLetterTargets;
   }
 
   /**
@@ -77,6 +81,11 @@ export class SimSqsCreateQueue {
 
   /**
    * Create the queue itself, once the name is known to be free.
+   *
+   * The requested attributes are applied to the new queue rather than folded
+   * into its defaults, so a queue created with a redrive policy has that policy
+   * checked the same way SetQueueAttributes checks one. The queue is only
+   * stored once the attributes have been accepted.
    */
   private created(
     name: SimSqsQueueName,
@@ -89,10 +98,12 @@ export class SimSqsCreateQueue {
     const queue = new SimSqsQueue({
       name,
       accountRegionScope: this.accountRegionScope,
-      attributes: SimSqsQueueAttributes.defaults().with(requested),
+      attributes: SimSqsQueueAttributes.defaults(),
       createdAt,
+      deadLetterTargets: this.deadLetterTargets,
     });
 
+    queue.applyAttributes(requested, createdAt);
     this.queues.add(queue);
 
     return queue;

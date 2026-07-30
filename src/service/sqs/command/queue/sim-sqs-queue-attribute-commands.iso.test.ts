@@ -109,11 +109,11 @@ describe("SQS queue attribute commands", () => {
     // Given a queue.
     const { simAws, queueUrl } = await simAwsWithQueue();
 
-    // When a redrive policy is asked for.
+    // When a redrive allow policy is asked for.
     const read = await simAws.sqs().getQueueAttributes(
       new GetQueueAttributesCommand({
         QueueUrl: queueUrl,
-        AttributeNames: ["RedrivePolicy"],
+        AttributeNames: ["RedriveAllowPolicy"],
       }),
     );
 
@@ -264,12 +264,12 @@ describe("SQS queue attribute commands", () => {
     // Given a queue.
     const { simAws, queueUrl } = await simAwsWithQueue();
 
-    // When a redrive policy is set.
+    // When a queue policy is set.
     const error = await assertThrowsErrorAsync(async () => {
       await simAws.sqs().setQueueAttributes(
         new SetQueueAttributesCommand({
           QueueUrl: queueUrl,
-          Attributes: { RedrivePolicy: "{}" },
+          Attributes: { Policy: "{}" },
         }),
       );
     });

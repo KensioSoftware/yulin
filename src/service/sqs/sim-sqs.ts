@@ -22,6 +22,7 @@ import { SimSqsQueueCommands } from "./command/queue/sim-sqs-queue-commands.js";
 import type * as simSqsCommands from "./command/sim-sqs-command.types.js";
 import { SimSqsCfnResourceFactory } from "./cfn/sim-sqs-cfn-resource-factory.js";
 import { SimSqsMessageWriter } from "./message/sim-sqs-message-writer.js";
+import { SimSqsDeadLetterTargets } from "./queue/sim-sqs-dead-letter-targets.js";
 import type { SimSqsQueue } from "./queue/sim-sqs-queue.js";
 import { SimSqsQueueStore } from "./queue/sim-sqs-queue-store.js";
 import { SimSqsSdkCommandRouter } from "./sdk/sim-sqs-sdk-command-router.js";
@@ -69,6 +70,7 @@ export class SimSqs {
       queues: this.queues,
       authorizer: new SimSqsAuthorizer({ iam, accountRegionScope }),
       accountRegionScope,
+      clock: background,
     });
 
     this.background = background;
@@ -77,6 +79,7 @@ export class SimSqs {
       access,
       accountRegionScope,
       clock: background,
+      deadLetterTargets: new SimSqsDeadLetterTargets({ queues: this.queues }),
     });
     this.queueCommands = new SimSqsQueueCommands({
       queues: this.queues,

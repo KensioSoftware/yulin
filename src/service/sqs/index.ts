@@ -11,6 +11,7 @@ export {
   SimSqsQueueAttributes,
 } from "./queue/sim-sqs-queue-attributes.js";
 export { SimSqsQueueName } from "./queue/sim-sqs-queue-name.js";
+export { SimSqsRedrivePolicy } from "./queue/sim-sqs-redrive-policy.js";
 export {
   SimSqsQueueUrl,
   type SimSqsQueueUrlParts,
