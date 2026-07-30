@@ -33,6 +33,9 @@ Sim Cognito currently supports:
   pool verifies them unchanged
 - A pool's `.well-known/jwks.json` and `.well-known/openid-configuration` served over HTTP by
   `serveSimAws`, anonymously, so a verifier fetches the keys rather than being handed them
+- `AWS::Cognito::UserPool`, `AWS::Cognito::UserPoolClient` and `AWS::Cognito::UserPoolGroup`
+  deployed from a CloudFormation template, with the `Ref` and `Fn::GetAtt` values real
+  CloudFormation returns
 - Pool ids in the real `<region>_<nine characters>` form, and pool ARNs built from them
 - The real default password policy, applied to the passwords users are given
 - The real user status lifecycle, so an admin-created user stays in `FORCE_CHANGE_PASSWORD` until it
@@ -975,6 +978,137 @@ Both listings are in creation order and hold at most sixty entries. Follow `Next
 rest. A listed pool carries no ARN and a listed app client carries no secret, as real Cognito leaves
 those out of a listing.
 
+## Deploying a pool from CloudFormation
+
+`AWS::Cognito::UserPool`, `AWS::Cognito::UserPoolClient` and
+`AWS::Cognito::UserPoolGroup` deploy into simulated Cognito, so a stack that already declares a pool
+does not have to be duplicated in SDK calls to be tested.
+
+```typescript sim-cognito-cloudformation
+/**
+ * Deploying a user pool, an app client and a group from a template.
+ */
+
+import {
+  AdminAddUserToGroupCommand,
+  AdminCreateUserCommand,
+  AdminInitiateAuthCommand,
+  AdminSetUserPasswordCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "app-stack",
+  template: {
+    Resources: {
+      AppPool: {
+        Type: "AWS::Cognito::UserPool",
+        Properties: {
+          UserPoolName: "myapp-users",
+          Policies: { PasswordPolicy: { MinimumLength: 12 } },
+        },
+      },
+      AppClient: {
+        Type: "AWS::Cognito::UserPoolClient",
+        Properties: {
+          UserPoolId: { Ref: "AppPool" },
+          ClientName: "web",
+          ExplicitAuthFlows: ["ALLOW_ADMIN_USER_PASSWORD_AUTH"],
+        },
+      },
+      AdminsGroup: {
+        Type: "AWS::Cognito::UserPoolGroup",
+        Properties: {
+          UserPoolId: { Ref: "AppPool" },
+          GroupName: "admins",
+          Precedence: 0,
+        },
+      },
+    },
+    Outputs: {
+      UserPoolId: { Value: { Ref: "AppPool" } },
+      ClientId: { Value: { Ref: "AppClient" } },
+      ProviderUrl: { Value: { "Fn::GetAtt": ["AppPool", "ProviderURL"] } },
+    },
+  },
+});
+await stack.waitForDeployComplete();
+
+const userPoolId = stack.outputs.get("UserPoolId")?.value as string;
+const clientId = stack.outputs.get("ClientId")?.value as string;
+
+console.log(userPoolId); // "eu-west-2_aBcDeFgHi"
+console.log(stack.outputs.get("ProviderUrl")?.value);
+// "https://cognito-idp.eu-west-2.amazonaws.com/eu-west-2_aBcDeFgHi"
+
+// The deployed pool, client and group are what the test then works with.
+const cognito = simAws.cognitoIdentityProvider();
+
+await cognito.adminCreateUser(
+  new AdminCreateUserCommand({ UserPoolId: userPoolId, Username: "alice" }),
+);
+await cognito.adminSetUserPassword(
+  new AdminSetUserPasswordCommand({
+    UserPoolId: userPoolId,
+    Username: "alice",
+    Password: "Sup3rSecretPassw0rd!",
+    Permanent: true,
+  }),
+);
+await cognito.adminAddUserToGroup(
+  new AdminAddUserToGroupCommand({
+    UserPoolId: userPoolId,
+    Username: "alice",
+    GroupName: "admins",
+  }),
+);
+
+// The sign-in runs through the flow the template opened on the app client.
+const { AuthenticationResult } = await cognito.adminInitiateAuth(
+  new AdminInitiateAuthCommand({
+    UserPoolId: userPoolId,
+    ClientId: clientId,
+    AuthFlow: "ADMIN_USER_PASSWORD_AUTH",
+    AuthParameters: { USERNAME: "alice", PASSWORD: "Sup3rSecretPassw0rd!" },
+  }),
+);
+
+console.log(AuthenticationResult?.AccessToken !== undefined); // true
+```
+
+`Ref` and `Fn::GetAtt` answer what real CloudFormation answers:
+
+| Resource type                  | `Ref`      | `Fn::GetAtt`                                       |
+| ------------------------------ | ---------- | -------------------------------------------------- |
+| `AWS::Cognito::UserPool`       | pool id    | `Arn`, `ProviderName`, `ProviderURL`, `UserPoolId` |
+| `AWS::Cognito::UserPoolClient` | client id  | `ClientId`                                         |
+| `AWS::Cognito::UserPoolGroup`  | group name | none                                               |
+
+`ProviderName` is `cognito-idp.<region>.amazonaws.com/<userPoolId>` and `ProviderURL` is the same
+with an `https://` prefix, which is also the `iss` claim of the tokens the pool issues.
+
+An app client publishes no `ClientSecret` attribute, because real CloudFormation publishes none. Read
+the secret with `DescribeUserPoolClient`, which reports it here as it does on real Cognito.
+
+The properties each type reads are the ones this simulation models:
+
+- `AWS::Cognito::UserPool`: `UserPoolName`, `Policies`, `DeletionProtection`, `MfaConfiguration` and
+  `UserPoolTier`. The last two are accepted at their AWS defaults and refused otherwise, as
+  `CreateUserPool` refuses them.
+- `AWS::Cognito::UserPoolClient`: `UserPoolId`, `ClientName`, `GenerateSecret`, `ExplicitAuthFlows`,
+  `PreventUserExistenceErrors`, `AccessTokenValidity`, `IdTokenValidity`, `RefreshTokenValidity` and
+  `TokenValidityUnits`.
+- `AWS::Cognito::UserPoolGroup`: `UserPoolId`, `GroupName`, `Description`, `Precedence` and
+  `RoleArn`.
+
+Any other property is refused at deploy time, naming the logical id and the property, rather than
+deploying a resource that would behave differently on AWS. A stack that forgets
+`ALLOW_ADMIN_USER_PASSWORD_AUTH` therefore fails at the sign-in here as it would in a deployment,
+which is the point of deploying the template rather than restating it.
+
 ## Serving a pool's JWKS on localhost
 
 `serveSimAws` serves the two public endpoints of every simulated pool:
@@ -1258,8 +1392,11 @@ Current documented limitations:
 - Tags are not simulated. `UserPoolTags` is refused, and `TagResource`, `UntagResource` and
   `ListTagsForResource` are not implemented.
 - Listings carry no filtering, and are in creation order rather than any order real Cognito chooses.
-- `AWS::Cognito::UserPool` and the other `AWS::Cognito::*` CloudFormation resource types are reported
-  as unsupported and skipped rather than deployed.
+- Of the CloudFormation resource types, only `AWS::Cognito::UserPool`,
+  `AWS::Cognito::UserPoolClient` and `AWS::Cognito::UserPoolGroup` deploy. The others, including
+  `AWS::Cognito::UserPoolDomain`, `AWS::Cognito::UserPoolIdentityProvider`,
+  `AWS::Cognito::UserPoolUser` and everything under `AWS::Cognito::IdentityPool`, are reported as
+  unsupported and skipped rather than deployed.
 - The Cognito API itself is not served as HTTP by `serveSimAws`, only the two public pool endpoints.
   A `CognitoIdentityProviderClient` reaches the simulator through `SimSdk` rather than through an
   endpoint override.

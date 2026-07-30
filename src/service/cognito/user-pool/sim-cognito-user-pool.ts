@@ -75,6 +75,17 @@ export class SimCognitoUserPool {
   }
 
   /**
+   * The name this pool is known by where a scheme would be wrong.
+   *
+   * This is the issuer URL without `https://`, and it is what an identity pool
+   * names a user pool provider by, and what `AWS::Cognito::UserPool` answers
+   * `Fn::GetAtt ProviderName` with.
+   */
+  get providerName(): string {
+    return this.issuerUrl.replace("https://", "");
+  }
+
+  /**
    * The key this pool signs its tokens with, generated on first use.
    *
    * The key belongs to the pool, as it does on real Cognito, so a token from
