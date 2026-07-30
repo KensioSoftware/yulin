@@ -8,26 +8,6 @@ Only Parameter Store is simulated. Nothing else in Systems Manager is.
 
 SSM-specific types are imported from the `@kensio/yulin/ssm` subpath.
 
-## Available functionality
-
-Sim SSM currently supports:
-
-- `PutParameterCommand`, creating a parameter or overwriting one
-- `GetParameterCommand`, by name, by `name:version` or by `name:label`
-- `GetParametersCommand`, reporting names it could not resolve in `InvalidParameters`
-- `GetParametersByPathCommand`, with and without `Recursive`
-- `DeleteParameterCommand` and `DeleteParametersCommand`
-- `DescribeParametersCommand`
-- `String`, `StringList` and `SecureString` parameter types
-- `SecureString` values encrypted through simulated KMS, decrypted only with `WithDecryption`
-- The `AWS::SSM::Parameter` CloudFormation resource, including `Ref` and `Fn::GetAtt`
-- Parameter name validation, including hierarchy depth and the reserved `aws` and `ssm` prefixes
-- Authorization of every operation by simulated IAM, against the real IAM action and ARN
-- Calls made from inside a simulated Lambda handler, authorized as the function's execution role
-
-The simulator focuses on useful behaviour for tests and local development rather than full Parameter
-Store feature parity.
-
 ## Writing and reading a parameter
 
 `PutParameter` needs a `Type` when the parameter is new. `GetParameter` returns the current version.
@@ -742,6 +722,23 @@ console.log(read.Parameter?.Value); // "hunter2"
 ```
 
 `DescribeParameters` reports the key each `SecureString` is encrypted under as `KeyId`.
+
+## Available functionality
+
+Sim SSM currently supports:
+
+- `PutParameterCommand`, creating a parameter or overwriting one
+- `GetParameterCommand`, by name, by `name:version` or by `name:label`
+- `GetParametersCommand`, reporting names it could not resolve in `InvalidParameters`
+- `GetParametersByPathCommand`, with and without `Recursive`
+- `DeleteParameterCommand` and `DeleteParametersCommand`
+- `DescribeParametersCommand`
+- `String`, `StringList` and `SecureString` parameter types
+- `SecureString` values encrypted through simulated KMS, decrypted only with `WithDecryption`
+- The `AWS::SSM::Parameter` CloudFormation resource, including `Ref` and `Fn::GetAtt`
+- Parameter name validation, including hierarchy depth and the reserved `aws` and `ssm` prefixes
+- Authorization of every operation by simulated IAM, against the real IAM action and ARN
+- Calls made from inside a simulated Lambda handler, authorized as the function's execution role
 
 ## Limitations
 

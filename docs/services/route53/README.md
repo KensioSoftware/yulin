@@ -7,26 +7,6 @@ by sim CloudFormation when deploying Route53 resources from CloudFormation or CD
 served on localhost, Route53 records can route custom local hostnames to other simulated AWS
 services, such as simulated CloudFront distributions or simulated S3 bucket websites.
 
-## Available functionality
-
-Sim Route53 currently supports:
-
-- `CreateHostedZoneCommand`, `GetHostedZoneCommand` and `ListHostedZonesByNameCommand`
-- `ChangeResourceRecordSetsCommand` and `ListResourceRecordSetsCommand`
-- `CREATE`, `UPSERT` and `DELETE` record changes
-- Stored record types: `A`, `AAAA`, `CNAME`, `TXT`, `NS` and `SOA`
-- Local HTTP hostname routing through `CNAME` records that point to simulated service hostnames
-- Alias records, with `AliasTarget.DNSName` stored as the record value
-- Local hostname resolution through `*.sim-aws.localhost`
-- A browser-viewable hosted zone and record summary at `dns.sim-aws.localhost`
-- DNS answers over UDP, so records can be queried with `dig` or any DNS client
-- The `AWS::Route53::HostedZone` and `AWS::Route53::RecordSet` CloudFormation resources
-- CDK-created Route53 Hosted Zones and records in synthesized templates
-
-The simulator focuses on useful behaviour for tests and local development rather than full Route53
-feature parity. Unsupported Route53 options may be ignored or may throw errors depending on whether
-the simulator needs them to model the requested behaviour.
-
 ## Basic Hosted Zone usage
 
 Create a simulated AWS environment, get simulated Route53, and create a Hosted Zone.
@@ -959,3 +939,23 @@ console.log(hostedZoneCreation.HostedZone?.Id);
 
 A standalone `SimRoute53` instance has its own isolated state and is not connected to a wider
 `SimAws` environment. Use `SimAws` when Route53 needs to resolve names to other simulated services.
+
+## Available functionality
+
+Sim Route53 currently supports:
+
+- `CreateHostedZoneCommand`, `GetHostedZoneCommand` and `ListHostedZonesByNameCommand`
+- `ChangeResourceRecordSetsCommand` and `ListResourceRecordSetsCommand`
+- `CREATE`, `UPSERT` and `DELETE` record changes
+- Stored record types: `A`, `AAAA`, `CNAME`, `TXT`, `NS` and `SOA`
+- Local HTTP hostname routing through `CNAME` records that point to simulated service hostnames
+- Alias records, with `AliasTarget.DNSName` stored as the record value
+- Local hostname resolution through `*.sim-aws.localhost`
+- A browser-viewable hosted zone and record summary at `dns.sim-aws.localhost`
+- DNS answers over UDP, so records can be queried with `dig` or any DNS client
+- The `AWS::Route53::HostedZone` and `AWS::Route53::RecordSet` CloudFormation resources
+- CDK-created Route53 Hosted Zones and records in synthesized templates
+
+The simulator focuses on useful behaviour for tests and local development rather than full Route53
+feature parity. Unsupported Route53 options may be ignored or may throw errors depending on whether
+the simulator needs them to model the requested behaviour.

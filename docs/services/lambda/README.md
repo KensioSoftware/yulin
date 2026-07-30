@@ -6,40 +6,9 @@ and invoked in-process and in memory, with no containers and no real AWS infrast
 Handlers run with their execution role as the simulated caller, so AWS calls made inside a handler
 are authorized by simulated IAM, as on real Lambda.
 
-Lambda-specific helpers are imported from the `@kensio/yulin/lambda` subpath.
-
-## Available functionality
-
-Sim Lambda currently supports:
-
-- `CreateFunctionCommand` and `GetFunctionCommand`
-- `InvokeCommand`, with the `RequestResponse`, `Event` and `DryRun` invocation types
-- Function URLs, created with `CreateFunctionUrlConfigCommand` and served over HTTP on localhost
-  with `serveSimAws`
-- `AuthType: "AWS_IAM"` Function URLs, authorizing `lambda:InvokeFunctionUrl` against the caller
-  resolved from the request
-- `AddPermissionCommand`, `RemovePermissionCommand` and `GetPolicyCommand`, for resource-based
-  policies evaluated alongside identity policies
-- Function code from three sources:
-  - an in-process handler function passed via `makeLambdaZipFileInput(...)`
-  - zip archive bytes on `Code.ZipFile` (build them with `makeLambdaCodeZip(...)`)
-  - a zip object stored in sim S3 via `Code.S3Bucket`/`S3Key`
-- A Node.js `vm` runtime for zip-packaged code, with warm module state across invocations
-- Per-function environment variables with `Environment.Variables`
-- Runtime-provided `@aws-sdk/*` packages inside function code, routed into the owning simulated AWS
-  environment
-- Execution roles, evaluated against simulated IAM
-- IAM authorization of the Lambda commands themselves (`lambda:CreateFunction`,
-  `lambda:GetFunction`, `lambda:InvokeFunction`, and the Function URL config actions)
-- AWS-like validation and errors, such as `ResourceConflictException` for a duplicate function name
-- The `AWS::Lambda::Function`, `AWS::Lambda::Url` and `AWS::Lambda::Permission` CloudFormation
-  resources, with `Ref`/`Fn::GetAtt` support and deploy-time executable bindings
-
-Real `LambdaClient` instances can also be routed into sim Lambda with
+Lambda-specific helpers are imported from the `@kensio/yulin/lambda` subpath. Real `LambdaClient`
+instances can be routed into sim Lambda with
 [SDK interception](../../sdk/ "Simulated AWS SDK interception docs").
-
-The simulator focuses on useful behaviour for tests and local development rather than full Lambda
-feature parity.
 
 ## Creating and invoking a function
 
@@ -1138,6 +1107,33 @@ A binding can target the function by `logicalId` (which also matches a CDK const
 omit template `Code` and `Handler` entirely; unbound functions in the same template keep their
 template code on the vm path. A binding that does not resolve to any template resource fails the
 deploy with the unmatched target named for diagnosis.
+
+## Available functionality
+
+Sim Lambda currently supports:
+
+- `CreateFunctionCommand` and `GetFunctionCommand`
+- `InvokeCommand`, with the `RequestResponse`, `Event` and `DryRun` invocation types
+- Function URLs, created with `CreateFunctionUrlConfigCommand` and served over HTTP on localhost
+  with `serveSimAws`
+- `AuthType: "AWS_IAM"` Function URLs, authorizing `lambda:InvokeFunctionUrl` against the caller
+  resolved from the request
+- `AddPermissionCommand`, `RemovePermissionCommand` and `GetPolicyCommand`, for resource-based
+  policies evaluated alongside identity policies
+- Function code from three sources:
+  - an in-process handler function passed via `makeLambdaZipFileInput(...)`
+  - zip archive bytes on `Code.ZipFile` (build them with `makeLambdaCodeZip(...)`)
+  - a zip object stored in sim S3 via `Code.S3Bucket`/`S3Key`
+- A Node.js `vm` runtime for zip-packaged code, with warm module state across invocations
+- Per-function environment variables with `Environment.Variables`
+- Runtime-provided `@aws-sdk/*` packages inside function code, routed into the owning simulated AWS
+  environment
+- Execution roles, evaluated against simulated IAM
+- IAM authorization of the Lambda commands themselves (`lambda:CreateFunction`,
+  `lambda:GetFunction`, `lambda:InvokeFunction`, and the Function URL config actions)
+- AWS-like validation and errors, such as `ResourceConflictException` for a duplicate function name
+- The `AWS::Lambda::Function`, `AWS::Lambda::Url` and `AWS::Lambda::Permission` CloudFormation
+  resources, with `Ref`/`Fn::GetAtt` support and deploy-time executable bindings
 
 ## Limitations
 

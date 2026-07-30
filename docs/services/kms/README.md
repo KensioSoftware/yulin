@@ -8,25 +8,6 @@ wrong encryption context fails.
 
 KMS-specific types are imported from the `@kensio/yulin/kms` subpath.
 
-## Available functionality
-
-Sim KMS currently supports:
-
-- `CreateKeyCommand`, for symmetric encryption keys
-- `DescribeKeyCommand` and `ListKeysCommand`
-- `GetKeyPolicyCommand` and `PutKeyPolicyCommand`
-- `EncryptCommand` and `DecryptCommand`, including encryption context
-- `GenerateDataKeyCommand`, by `KeySpec` or `NumberOfBytes`
-- `CreateAliasCommand` and `ListAliasesCommand`, including AWS managed key aliases
-- `EnableKeyCommand`, `DisableKeyCommand`, `ScheduleKeyDeletionCommand`, `CancelKeyDeletionCommand`
-- Key policy evaluation by simulated IAM
-- Key ARNs, key IDs, alias names and alias ARNs as interchangeable ways to name a key
-- The `AWS::KMS::Key` and `AWS::KMS::Alias` CloudFormation resources
-- Calls made from inside a simulated Lambda handler, authorized as the function's execution role
-
-The simulator focuses on useful behaviour for tests and local development rather than full KMS
-feature parity.
-
 ## Encrypting and decrypting
 
 Create a key and use it. `Decrypt` needs no `KeyId` for a symmetric key, because the ciphertext already names the key that produced it.
@@ -484,6 +465,22 @@ Function code requiring `@aws-sdk/client-kms` is routed into the same simulated 
 the function's execution role as the caller. A handler that decrypts a value therefore has to be
 allowed to, by both the key policy and the role's identity policy, the same as on real AWS. See
 [simulated Lambda](../lambda/) for how function code and execution roles work.
+
+## Available functionality
+
+Sim KMS currently supports:
+
+- `CreateKeyCommand`, for symmetric encryption keys
+- `DescribeKeyCommand` and `ListKeysCommand`
+- `GetKeyPolicyCommand` and `PutKeyPolicyCommand`
+- `EncryptCommand` and `DecryptCommand`, including encryption context
+- `GenerateDataKeyCommand`, by `KeySpec` or `NumberOfBytes`
+- `CreateAliasCommand` and `ListAliasesCommand`, including AWS managed key aliases
+- `EnableKeyCommand`, `DisableKeyCommand`, `ScheduleKeyDeletionCommand`, `CancelKeyDeletionCommand`
+- Key policy evaluation by simulated IAM
+- Key ARNs, key IDs, alias names and alias ARNs as interchangeable ways to name a key
+- The `AWS::KMS::Key` and `AWS::KMS::Alias` CloudFormation resources
+- Calls made from inside a simulated Lambda handler, authorized as the function's execution role
 
 ## Limitations
 

@@ -2,26 +2,6 @@
 
 Yulin includes a simulated AWS Certificate Manager (ACM) service for tests and local development.
 
-## Available functionality
-
-Sim ACM currently supports:
-
-- `RequestCertificateCommand`, `DescribeCertificateCommand` and `ListCertificatesCommand`
-- DNS validation against records in sim Route53
-- CloudFormation-published validation records from `DomainValidationOptions[].HostedZoneId`
-- EMAIL validation method shapes, though validation always succeeds regardless
-- Subject alternative names
-- Certificate tags, up to the ACM limit of 50 tags
-- Deterministic certificate ARNs scoped to account and region
-- Deterministic DNS validation CNAME records
-- Background certificate issuance from `PENDING_VALIDATION` to `ISSUED`
-- Per-domain validation status for multi-domain certificates
-- The `AWS::CertificateManager::Certificate` CloudFormation resource, with `Ref` and `Fn::GetAtt`
-
-The simulator focuses on useful behaviour for tests and local development rather than full ACM
-feature parity. Unsupported ACM options may be ignored or may throw errors depending on whether the
-simulator needs them to model the requested behaviour.
-
 ## Basic certificate request
 
 Create a simulated AWS environment, get simulated ACM, and request a certificate.
@@ -710,6 +690,25 @@ nothing authoritative for its domain, it is issued without validation.
 If a hosted zone does cover the domain but the validation record never appears, the stack fails
 rather than hanging. Real CloudFormation sits in `CREATE_IN_PROGRESS` for hours before timing out
 here, which is no use in a test, so the resource fails immediately naming the record it waited for.
+
+## Available functionality
+
+Sim ACM currently supports:
+
+- `RequestCertificateCommand`, `DescribeCertificateCommand` and `ListCertificatesCommand`
+- DNS validation against records in sim Route53
+- CloudFormation-published validation records from `DomainValidationOptions[].HostedZoneId`
+- EMAIL validation method shapes, though validation always succeeds regardless
+- Subject alternative names
+- Certificate tags, up to the ACM limit of 50 tags
+- Deterministic certificate ARNs scoped to account and region
+- Deterministic DNS validation CNAME records
+- Background certificate issuance from `PENDING_VALIDATION` to `ISSUED`
+- Per-domain validation status for multi-domain certificates
+- The `AWS::CertificateManager::Certificate` CloudFormation resource, with `Ref` and `Fn::GetAtt`
+
+Unsupported ACM options may be ignored or may throw errors depending on whether the simulator needs
+them to model the requested behaviour.
 
 ## Limitations
 

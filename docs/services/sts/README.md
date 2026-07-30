@@ -7,24 +7,6 @@ It simulates assuming IAM Roles: it evaluates the request against [simulated IAM
 and issues temporary session credentials that the rest of the simulated environment authenticates
 like real AWS credentials.
 
-## Available functionality
-
-Sim STS currently supports:
-
-- `AssumeRoleCommand`
-- Trust-policy evaluation against the target Role's assume-role policy document
-- Identity-policy evaluation of the source caller, requiring `sts:AssumeRole` permission on the
-  target Role
-- Role-to-Role and cross-Account assumption
-- `ExternalId` matching through the `sts:ExternalId` trust-policy condition key
-- Session duration with `DurationSeconds`, defaulting to one hour
-- Temporary credentials registered with the target Account's sim IAM, including session-token and
-  expiry validation
-
-The simulator focuses on useful behaviour for tests and local development rather than full STS
-feature parity. Unsupported STS options may be ignored or may throw errors depending on whether the
-simulator needs them to model the requested behaviour.
-
 ## Basic usage
 
 Create a Role whose trust policy allows the Account to assume it, then assume it through STS. An
@@ -220,6 +202,23 @@ console.log(assumeRoleOutput.AssumedRoleUser?.Arn);
 
 An omitted or mismatched `ExternalId` leaves the trust-policy condition unmatched, so the assume
 request is denied.
+
+## Available functionality
+
+Sim STS currently supports:
+
+- `AssumeRoleCommand`
+- Trust-policy evaluation against the target Role's assume-role policy document
+- Identity-policy evaluation of the source caller, requiring `sts:AssumeRole` permission on the
+  target Role
+- Role-to-Role and cross-Account assumption
+- `ExternalId` matching through the `sts:ExternalId` trust-policy condition key
+- Session duration with `DurationSeconds`, defaulting to one hour
+- Temporary credentials registered with the target Account's sim IAM, including session-token and
+  expiry validation
+
+Unsupported STS options may be ignored or may throw errors depending on whether the simulator needs
+them to model the requested behaviour.
 
 ## Limitations
 
