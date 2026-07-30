@@ -978,6 +978,7 @@ The resource types it creates are:
 - `AWS::Route53::HostedZone` and `AWS::Route53::RecordSet`
 - `AWS::S3::Bucket` and `AWS::S3::BucketPolicy`
 - `AWS::SecretsManager::Secret`
+- `AWS::SQS::Queue`
 - `AWS::SSM::Parameter`
 - selected CDK custom resources, including CDK S3 BucketDeployment
 

@@ -103,6 +103,26 @@ As elsewhere, implementation code under `src/` does not import real AWS SDK pack
 command types in `*.command.ts` match the SDK shapes closely enough for callers to pass real SDK
 command instances.
 
+## CloudFormation
+
+`cfn/` holds the `AWS::SQS::Queue` resource factory. `SimCfnSqsQueueProperties` reads the template
+properties into the shape `CreateQueue` takes, and `SimCfnSqsQueueCreator` sends that command, so a
+queue a template deployed is the same thing an SDK caller would have got. Nothing about the attribute
+ranges or the name rules is repeated here.
+
+The properties this simulation has no behaviour for fail the resource rather than being dropped,
+including `FifoQueue: true`. A queue deployed without its redrive policy would look to the template
+like a queue with a dead-letter queue and have none. The failures are worded as an invalid resource
+rather than an unsupported one, because sim CloudFormation skips a resource whose error reads as
+unsupported, and skipping is the wrong answer for a queue that cannot be created as asked.
+
+`SimCfnSqsQueueName` generates the name for a queue the template does not name, from the stack name
+and the logical ID. The random characters real CloudFormation adds are left out so a test can predict
+the name.
+
+`Ref` and `Fn::GetAtt` behaviour lives with the other CloudFormation value adapters, in
+`cloudformation/resource/cfn/sqs/`. `Ref` gives the queue URL, as real CloudFormation does.
+
 ## Authorization
 
 `SimSqsAuthorizer` authorizes each operation against the queue's ARN, which carries the queue name
@@ -133,6 +153,7 @@ refused rather than quietly answered with a local queue of the same name.
   The 60 second hold on a deleted queue's name is simulated.
 - A queue name ending in `.fifo` is refused, as are the FIFO-only request fields.
 - `SenderId` is not reported, because a simulated principal has no user or role id to report it as.
-- Tags, `RedrivePolicy`, queue policies and the encryption attributes are refused rather than ignored.
+- Tags, `RedrivePolicy`, queue policies and the encryption attributes are refused rather than ignored,
+  whether a request or a CloudFormation template asks for them.
 
 The full list is in [docs/services/sqs](../../../docs/services/sqs/).

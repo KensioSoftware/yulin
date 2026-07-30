@@ -30,6 +30,7 @@ export function makeSimCfnStackResourceMap(
         accountRegionScope,
         background,
         logicalId: resourceTemplate.logicalId,
+        stackName: template.stackName,
         template: resourceTemplate.template,
         parameters: template.parameters,
         resourceLogicalIds,

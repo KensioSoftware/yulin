@@ -26,6 +26,7 @@ export interface SimCloudFormationResourceProperties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
   readonly background?: BackgroundScheduler;
   readonly logicalId?: string;
+  readonly stackName?: string | undefined;
   readonly template?: SimCfnTemplateValueRecord;
   readonly cfnResourceFactory?: SimCfnServiceResourceFactory | undefined;
   readonly parameters?: SimCfnParameters | undefined;
@@ -69,6 +70,8 @@ export interface SimCloudFormationResourceCreateContext {
 export class SimCfnResource<T extends object = object> {
   public readonly accountRegionScope: SimAwsAccountRegionScope;
   public readonly logicalId: string;
+  /** The Stack this Resource belongs to, where a generated name comes from. */
+  public readonly stackName: string | undefined;
   public readonly template: SimCfnTemplateValueRecord;
   private readonly creationState = new SimCfnResourceCreationState<T>();
   private readonly resourceTemplateReader: SimCfnResourceTemplateReader;
@@ -82,6 +85,7 @@ export class SimCfnResource<T extends object = object> {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       background = new BackgroundTasks(),
       logicalId = "Resource",
+      stackName,
       template = {},
       cfnResourceFactory,
       parameters,
@@ -91,6 +95,7 @@ export class SimCfnResource<T extends object = object> {
     this.accountRegionScope = accountRegionScope;
     this.background = background;
     this.logicalId = logicalId;
+    this.stackName = stackName;
     this.template = template;
     this.resourceTemplateReader = new SimCfnResourceTemplateReader(template);
     this.propertyResolver = new SimCfnResourcePropertyResolver({ parameters });
