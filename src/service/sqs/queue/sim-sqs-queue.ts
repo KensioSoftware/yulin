@@ -3,6 +3,7 @@ import { SimSqsQueueNameExists } from "../error/sim-sqs.error.js";
 import type { SimSqsMessage } from "../message/sim-sqs-message.js";
 import { SimSqsMessageStore } from "../message/sim-sqs-message-store.js";
 import type { SimSqsDeadLetterTargets } from "./sim-sqs-dead-letter-targets.js";
+import type { SimSqsQueueActivity } from "./sim-sqs-queue-activity.js";
 import { SimSqsQueueArn } from "./sim-sqs-queue-arn.js";
 import type { SimSqsQueueName } from "./sim-sqs-queue-name.js";
 import type {
@@ -17,6 +18,7 @@ interface SimSqsQueueProperties {
   readonly attributes: SimSqsQueueAttributes;
   readonly createdAt: Date;
   readonly deadLetterTargets: SimSqsDeadLetterTargets;
+  readonly activity: SimSqsQueueActivity;
 }
 
 /**
@@ -36,6 +38,7 @@ export class SimSqsQueue {
 
   private readonly messages = new SimSqsMessageStore();
   private readonly deadLetterTargets: SimSqsDeadLetterTargets;
+  private readonly activity: SimSqsQueueActivity;
   private settings: SimSqsQueueAttributes;
   private lastModifiedAt: Date;
 
@@ -49,6 +52,7 @@ export class SimSqsQueue {
     this.lastModifiedAt = properties.createdAt;
     this.settings = properties.attributes;
     this.deadLetterTargets = properties.deadLetterTargets;
+    this.activity = properties.activity;
   }
 
   /**
@@ -105,9 +109,15 @@ export class SimSqsQueue {
 
   /**
    * Take a newly sent message.
+   *
+   * Anything watching the queue is told, which is how a Lambda event source
+   * mapping learns there is something to poll for. A message moved here from
+   * another queue arrives the same way, so a dead-letter queue with a mapping on
+   * it is polled too.
    */
   add(message: SimSqsMessage): void {
     this.messages.add(message);
+    this.announceAvailability(message);
   }
 
   /**
@@ -117,6 +127,20 @@ export class SimSqsQueue {
     this.applyLifecycle(instant);
 
     return this.messages.receivable(instant, limit);
+  }
+
+  /**
+   * When the earliest message this queue cannot hand out yet becomes
+   * receivable, or nothing when it holds no such message.
+   *
+   * This is not something SQS reports. It is how a consumer that cannot poll
+   * continuously, such as a Lambda event source mapping, knows when to look
+   * again at a queue whose messages are all in flight or delayed.
+   */
+  nextAvailability(instant: Date): Date | undefined {
+    this.applyLifecycle(instant);
+
+    return this.messages.nextAvailability(instant);
   }
 
   /**
@@ -139,9 +163,27 @@ export class SimSqsQueue {
 
   /**
    * Record that a message was handed out under a receipt handle.
+   *
+   * A message handed out is hidden until its visibility timeout lapses, and
+   * watchers are told when that is. Without it, a message another consumer
+   * received would come back to the queue with nothing watching for it.
    */
   recordHandle(receiptHandle: string, message: SimSqsMessage): void {
     this.messages.recordHandle(receiptHandle, message);
+    this.announceAvailability(message);
+  }
+
+  /**
+   * Hide a message for a visibility timeout starting now, as
+   * ChangeMessageVisibility does, telling watchers when it comes back.
+   */
+  hideMessage(
+    message: SimSqsMessage,
+    instant: Date,
+    visibilityTimeoutSeconds: number,
+  ): void {
+    message.hideFor(instant, visibilityTimeoutSeconds);
+    this.announceAvailability(message);
   }
 
   /**
@@ -186,6 +228,13 @@ export class SimSqsQueue {
       lastModifiedAt: this.lastModifiedAt,
       queueArn: this.arn.value,
     });
+  }
+
+  /**
+   * Tell this queue's watchers when a message can next be received.
+   */
+  private announceAvailability(message: SimSqsMessage): void {
+    this.activity.messageAvailableAt(this.arn.value, message.availableFrom);
   }
 
   private dropExpired(instant: Date): void {

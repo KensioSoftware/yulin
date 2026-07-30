@@ -38,6 +38,13 @@ export class SimLambdaFunctionLookup {
   }
 
   /**
+   * Get a function by name, or nothing when the name belongs to no function.
+   */
+  find(functionName: string): SimLambdaFunction | undefined {
+    return this.functions.get(functionName as SimLambdaFunctionName);
+  }
+
+  /**
    * Get a function by name, or fail as AWS does when there is no such
    * function.
    */

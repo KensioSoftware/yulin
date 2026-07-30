@@ -13,6 +13,7 @@ import type { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
 import { SimKms } from "../../kms/index.js";
 import { SimLambda } from "../../lambda/index.js";
 import type { SimLambdaUrlRegistry } from "../../lambda/registry/sim-lambda-url-registry.js";
+import { SimSqsEventSourceQueues } from "../../lambda/event-source/queue/sim-sqs-event-source-queues.js";
 import { SimS3LambdaCodeStore } from "../../lambda/function/code/store/sim-s3-lambda-code-store.js";
 import { SimSdkLambdaVmModuleProvider } from "../../lambda/function/code/vm/sdk/sim-sdk-lambda-vm-module-provider.js";
 import { SimS3 } from "../../s3/sim-s3.js";
@@ -145,6 +146,9 @@ export class SimAwsAccountRegionServiceBuilder {
    * code running in the vm runtime is provided host-installed AWS SDK
    * packages intercepted into this SimAws, as the real Lambda runtime
    * provides the SDK.
+   *
+   * Event source mappings poll the same scope's simulated SQS, as a queue can
+   * only be an event source for a function in its own Account and Region.
    */
   createLambda(scope: SimAwsAccountRegionContainer): SimLambda {
     return new SimLambda({
@@ -154,6 +158,7 @@ export class SimAwsAccountRegionServiceBuilder {
       runAsOwner: this.simAws,
       urlRegistry: this.lambdaUrlRegistry,
       codeStore: new SimS3LambdaCodeStore({ s3: scope.s3() }),
+      eventSourceQueues: new SimSqsEventSourceQueues({ sqs: scope.sqs() }),
       vmSdkModuleProvider: new SimSdkLambdaVmModuleProvider({
         simAws: this.simAws,
         regionName: scope.accountRegionScope.regionName,

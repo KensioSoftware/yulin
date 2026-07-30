@@ -11,6 +11,21 @@ export type {
   SimAddPermissionCommandOutput,
 } from "./add-permission/add-permission.command.js";
 export type {
+  SimCreateEventSourceMappingCommand,
+  SimCreateEventSourceMappingCommandInput,
+  SimCreateEventSourceMappingCommandOutput,
+  SimDeleteEventSourceMappingCommand,
+  SimDeleteEventSourceMappingCommandInput,
+  SimDeleteEventSourceMappingCommandOutput,
+  SimEventSourceMappingCommandOutput,
+  SimGetEventSourceMappingCommand,
+  SimGetEventSourceMappingCommandInput,
+  SimGetEventSourceMappingCommandOutput,
+  SimListEventSourceMappingsCommand,
+  SimListEventSourceMappingsCommandInput,
+  SimListEventSourceMappingsCommandOutput,
+} from "./event-source-mapping/event-source-mapping.command.js";
+export type {
   SimCreateFunctionCommand,
   SimCreateFunctionCommandOutput,
 } from "./create-function/create-function.command.js";

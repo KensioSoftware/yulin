@@ -53,14 +53,16 @@ Current command areas include:
   `update-function-url-config/`, `delete-function-url-config/`,
   `list-function-url-configs/`
 - `add-permission/`, `remove-permission/`, `get-policy/`
+- `event-source-mapping/`
 
 Commands sharing a set of collaborators are grouped behind one class per area — `command/function/`,
-`command/function-url/`, `command/permission/` — so the `SimLambda` facade stays a delegation
-rather than repeating the same wiring block per command. `command/sim-lambda-command.types.ts`
-gathers the command types for the same reason.
+`command/function-url/`, `command/permission/`, `command/event-source-mapping/` — so the `SimLambda`
+facade stays a delegation rather than repeating the same wiring block per command.
+`command/sim-lambda-command.types.ts` gathers the command types for the same reason.
 
 The main `SimLambda` class delegates command execution to handlers rather than keeping command
-handling logic inline.
+handling logic inline. `sim-lambda-commands.ts` holds the wiring of those command areas, so the
+facade itself is state and delegation and nothing else.
 
 ## Function model
 
@@ -249,6 +251,48 @@ execution roles.
 A standalone `SimLambda` (constructed directly rather than through `SimAws`) is its own run-as
 owner, keeping its ambient callers isolated.
 
+## Event source mappings
+
+`event-source/` owns delivery from a simulated SQS queue to a function.
+
+Real Lambda polls a queue continuously, and nothing in this simulation runs continuously, so the
+queue says when there is something to poll for. `SimSqsQueueActivity` (in sim SQS) holds the
+watchers on a queue, `SimSqsQueue.add` tells them a message has arrived, and
+`SimLambdaEventSourcePoller` schedules a poll in response. A message moved to a dead-letter queue
+arrives the same way, so a mapping on a dead-letter queue is polled too.
+
+`SimLambdaEventSourcePollSchedule` decides when that poll happens. A message that is receivable now
+schedules a background task; one sent with a delay is scheduled for the instant it becomes
+receivable; and a batch that came back is scheduled for the end of its visibility timeout, on the
+clock, so advancing simulated time is what redelivers it. Scheduling a failed batch's retry on the
+clock even for a zero visibility timeout is deliberate: a poll that ran straight back round would
+spin on a batch the function keeps failing.
+
+An announcement only reaches a mapping that was already watching, so a poll that finds nothing asks
+the queue when its earliest hidden message comes back and schedules itself for then. That is what
+delivers the messages a mapping was created alongside, rather than stranding a queue whose messages
+were all in flight when the mapping was made.
+
+`queue/` is the port onto SQS. `SimLambdaEventSourceQueues` is what polling needs from a queue, and
+`SimSqsEventSourceQueues` implements it over the ordinary SQS commands, as the function's execution
+role, so simulated IAM authorizes each poll the way real IAM does. A standalone `SimLambda` has no
+sim SQS, and `SimLambdaNoEventSourceQueues` refuses with guidance rather than silently delivering
+nothing. `SimLambdaSqsEventSourceArn` reads a queue ARN into the URL requests name it by and the
+Region event records report.
+
+Creating a mapping checks what real Lambda checks before it will make one: that the queue exists,
+and that the execution role may call `ReceiveMessage`, `DeleteMessage` and `GetQueueAttributes` on
+it (`SimLambdaEventSourceRolePermissions`). Both failures are the mapping's, not the poller's: a
+mapping that cannot poll looks like a working subscription and delivers nothing.
+
+`poll/` holds what one poll does. `SimLambdaEventSourceDelivery` invokes the function directly
+rather than through the Invoke command, because the handler error has to be seen: the asynchronous
+invoke path drops it, and this is what decides whether the batch goes back on the queue.
+`SimLambdaSqsBatchResponse` reads what the function said about the batch, including a
+`batchItemFailures` report when the mapping was told to expect one, and returns the whole batch for
+a report it cannot trust. `SimLambdaSqsEventBuilder` turns a batch into the event's own shape,
+which is the lower-case record naming and the base64 binary attribute values real AWS uses.
+
 ## Function URLs
 
 `function/url/` owns Function URLs: `SimLambdaFunctionUrl` is the stored resource and
@@ -373,13 +417,21 @@ omit template `Code` and `Handler`. Unbound functions keep their template code o
 `src/service/cloudformation/resource/cfn/lambda/`, keeping the function model free of
 CloudFormation concerns.
 
-Other `AWS::Lambda::*` resource types (`Version`, `Alias`, `Permission`, `EventSourceMapping`, ...)
-are not supported and are skipped by the CloudFormation engine with an "Unsupported" diagnostic.
+`cfn/event-source-mapping/` creates `AWS::Lambda::EventSourceMapping`, which is what CDK's
+`fn.addEventSource(new SqsEventSource(queue))` emits. The properties this simulation has no
+behaviour for fail the resource rather than being dropped, worded as an invalid resource so the
+engine does not skip it: a stack that deployed the queue and the function and nothing between them
+would look like a working subscription.
+
+Other `AWS::Lambda::*` resource types (`Version`, `Alias`, ...) are not supported and are skipped by
+the CloudFormation engine with an "Unsupported" diagnostic.
 
 ## Not simulated yet
 
-- `AWS::Lambda::*` CloudFormation resource types other than `AWS::Lambda::Function` and
-  `AWS::Lambda::Url`
+- `AWS::Lambda::*` CloudFormation resource types other than `AWS::Lambda::Function`,
+  `AWS::Lambda::Url`, `AWS::Lambda::Permission` and `AWS::Lambda::EventSourceMapping`
+- event sources other than SQS queues, `FilterCriteria`, `UpdateEventSourceMapping`, and polling
+  concurrency
 - Function URL `Cors` configuration and OPTIONS preflight handling
 - `InvokeMode: RESPONSE_STREAM`, which is accepted and reported but always served buffered
 - ES module function code (`.mjs` / `export` syntax) in the vm runtime

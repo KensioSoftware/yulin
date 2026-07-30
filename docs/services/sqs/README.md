@@ -768,6 +768,130 @@ work. The same applies to `SimSdk` interception: intercepting `SQSClient` routes
 the simulation with nothing touching the network. See
 [AWS SDK interception](../../sdk/ "Simulated AWS SDK docs").
 
+## Triggering a Lambda from a queue
+
+A Lambda event source mapping delivers messages from a queue to a function without anything calling
+`ReceiveMessage` itself. Messages sent to the queue arrive at the handler as an SQS event, in
+batches of up to `BatchSize`.
+
+Delivery runs on the simulation's background scheduler, so a test waits for it with
+`simAws.backgroundTasksComplete()`.
+
+```typescript sim-sqs-lambda-event-source
+/**
+ * A message sent to a queue reaching a Lambda through an event source mapping.
+ */
+
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import {
+  CreateEventSourceMappingCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-lambda";
+import {
+  CreateQueueCommand,
+  ReceiveMessageCommand,
+  SendMessageCommand,
+} from "@aws-sdk/client-sqs";
+
+import { SimAws } from "@kensio/yulin";
+import {
+  makeLambdaZipFileInput,
+  type SimLambdaSqsEvent,
+} from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+const queueArn = `arn:aws:sqs:${simAws.defaultRegionName}:${simAws.defaultAccountId}:orders`;
+
+const { QueueUrl } = await simAws
+  .sqs()
+  .createQueue(new CreateQueueCommand({ QueueName: "orders" }));
+
+const role = await simAws.iam().createRole(
+  new CreateRoleCommand({
+    RoleName: "OrderConsumerRole",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { Service: "lambda.amazonaws.com" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+
+// Lambda polls the queue as the execution role, so the role has to allow it.
+await simAws.iam().putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "OrderConsumerRole",
+    PolicyName: "ConsumeOrders",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: [
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes",
+        ],
+        Resource: queueArn,
+      },
+    }),
+  }),
+);
+
+const consumed: string[] = [];
+
+await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "order-consumer",
+    Role: role.Role.Arn,
+    Code: {
+      ZipFile: makeLambdaZipFileInput((event: SimLambdaSqsEvent) => {
+        for (const record of event.Records) {
+          consumed.push(record.body);
+        }
+      }),
+    },
+  }),
+);
+
+await simAws.lambda().createEventSourceMapping(
+  new CreateEventSourceMappingCommand({
+    EventSourceArn: queueArn,
+    FunctionName: "order-consumer",
+  }),
+);
+
+await simAws
+  .sqs()
+  .sendMessage(new SendMessageCommand({ QueueUrl, MessageBody: "order-1" }));
+
+await simAws.backgroundTasksComplete();
+
+console.log(consumed); // ["order-1"]
+
+// The handler returned, so the message has been deleted from the queue.
+const remaining = await simAws
+  .sqs()
+  .receiveMessage(new ReceiveMessageCommand({ QueueUrl }));
+
+console.log(remaining.Messages); // undefined
+```
+
+A handler that throws leaves the whole batch on the queue instead. The messages stay hidden until
+their visibility timeout lapses, come back after that, and eventually move to the dead-letter queue
+if the queue has a `RedrivePolicy`. That is the same path any other failing consumer takes, so
+advancing the clock is what drives it:
+
+```typescript
+await simAws.clock().advanceBy({ seconds: 31 });
+```
+
+See [simulated Lambda](../lambda/#triggering-a-function-from-an-sqs-queue "Simulated Lambda event
+source mapping docs") for the event shape, partial batch failures, and the
+`AWS::Lambda::EventSourceMapping` template resource.
+
 ## Deploying a queue from CloudFormation
 
 Simulated CloudFormation creates a queue from an `AWS::SQS::Queue` resource, in the stack's account
@@ -869,6 +993,8 @@ Sim SQS currently supports:
   `DeadLetterQueueSourceArn` system attributes
 - Authorization of every operation by simulated IAM, against the real IAM action and queue ARN
 - Calls made from inside a simulated Lambda handler, authorized as the function's execution role
+- Lambda event source mappings, delivering messages to a simulated function and deleting the batches
+  it handles
 - `AWS::SQS::Queue` in a CloudFormation or CDK template, with `Ref` giving the queue URL and
   `Fn::GetAtt` giving `Arn`, `QueueName` and `QueueUrl`
 
@@ -916,8 +1042,10 @@ Current documented limitations:
 - SQS condition keys are not derived, so a policy relying on them will not match. Ordinary condition
   operators on values sim IAM does supply work as usual.
 - `ChangeMessageVisibilityBatch` and the batch size limit (`BatchRequestTooLong`) are not supported.
-- Lambda event source mappings are not simulated, so a queue does not invoke a function on its own. A
-  test invokes the consumer itself, as the Lambda example above does.
+- A Lambda event source mapping polls one batch at a time. Real Lambda runs several pollers at once
+  and scales them with the queue, so nothing here shows what that concurrency does to ordering. See
+  [simulated Lambda](../lambda/#triggering-a-function-from-an-sqs-queue "Simulated Lambda event
+source mapping docs") for the rest of the mapping limitations.
 - `AWS::SQS::Queue` is the only SQS resource type CloudFormation creates. `AWS::SQS::QueuePolicy` is
   skipped, and the queue properties this simulation has no behaviour for fail the resource rather
   than being dropped.

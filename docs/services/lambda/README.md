@@ -395,6 +395,182 @@ console.log(dryRunOutput.StatusCode);
 `Event` invocation handler errors are dropped, as sim Lambda does not simulate asynchronous
 retries or failure destinations yet.
 
+## Triggering a function from an SQS queue
+
+An event source mapping connects a [simulated queue](../sqs/ "Simulated SQS docs") to a function.
+Messages sent to the queue are delivered to the handler as an SQS event, with the `Records` shape
+real Lambda uses.
+
+Polling runs on the simulation's background scheduler, so a test awaits
+`simAws.backgroundTasksComplete()` and then asserts, rather than sleeping.
+
+`BatchSize` says how many messages one invocation may be given, and defaults to 10. The queue and
+the function have to be in the same account and region, as they do on real AWS.
+
+```typescript sim-lambda-sqs-event-source
+/**
+ * Delivering messages from a simulated queue to a simulated function.
+ */
+
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import {
+  CreateEventSourceMappingCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-lambda";
+import { CreateQueueCommand, SendMessageCommand } from "@aws-sdk/client-sqs";
+
+import { SimAws } from "@kensio/yulin";
+import {
+  makeLambdaZipFileInput,
+  type SimLambdaSqsEvent,
+} from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+const queueArn = `arn:aws:sqs:${simAws.defaultRegionName}:${simAws.defaultAccountId}:orders`;
+
+const { QueueUrl } = await simAws
+  .sqs()
+  .createQueue(new CreateQueueCommand({ QueueName: "orders" }));
+
+// The execution role needs the three SQS actions Lambda polls a queue with.
+const role = await simAws.iam().createRole(
+  new CreateRoleCommand({
+    RoleName: "OrderConsumerRole",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { Service: "lambda.amazonaws.com" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+
+await simAws.iam().putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "OrderConsumerRole",
+    PolicyName: "ConsumeOrders",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: [
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes",
+        ],
+        Resource: queueArn,
+      },
+    }),
+  }),
+);
+
+const consumed: string[] = [];
+
+await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "order-consumer",
+    Role: role.Role.Arn,
+    Code: {
+      ZipFile: makeLambdaZipFileInput((event: SimLambdaSqsEvent) => {
+        for (const record of event.Records) {
+          consumed.push(record.body);
+        }
+      }),
+    },
+  }),
+);
+
+await simAws.lambda().createEventSourceMapping(
+  new CreateEventSourceMappingCommand({
+    EventSourceArn: queueArn,
+    FunctionName: "order-consumer",
+    BatchSize: 5,
+  }),
+);
+
+await simAws
+  .sqs()
+  .sendMessage(new SendMessageCommand({ QueueUrl, MessageBody: "order-1" }));
+
+// Delivery happens in the background, so wait for the simulation to settle.
+await simAws.backgroundTasksComplete();
+
+console.log(consumed); // ["order-1"]
+```
+
+Each record carries `messageId`, `receiptHandle`, `body`, `md5OfBody`, `messageAttributes`,
+`eventSource`, `eventSourceARN`, `awsRegion`, and the `attributes` map holding `SentTimestamp`,
+`ApproximateReceiveCount` and `ApproximateFirstReceiveTimestamp`. `SimLambdaSqsEvent` and
+`SimLambdaSqsEventRecord` are exported from `@kensio/yulin/lambda` for typing a handler, and are
+minimal structural equivalents of the `SQSEvent` and `SQSRecord` types from the `aws-lambda` typings
+package, so a handler already written against those can be passed in unchanged. `SenderId` is not
+reported, because a simulated caller has no user or role id to report it as.
+
+Creating the mapping checks two things real Lambda checks: that the queue exists, and that the
+function's execution role is allowed `sqs:ReceiveMessage`, `sqs:DeleteMessage` and
+`sqs:GetQueueAttributes` on it. A role missing one of them fails with
+`InvalidParameterValueException` naming the operation, rather than leaving a mapping that quietly
+delivers nothing.
+
+`GetEventSourceMappingCommand`, `ListEventSourceMappingsCommand` and
+`DeleteEventSourceMappingCommand` read and remove mappings. A mapping is `Creating` when the command
+returns and `Enabled` once the simulation has caught up, as on real Lambda. Deleting it stops the
+polling.
+
+### When the handler fails
+
+A handler that returns normally has handled the batch, and the messages are deleted from the queue.
+A handler that throws returns the whole batch: the messages stay on the queue, hidden until their
+visibility timeout lapses, and are delivered again after that. Advancing the simulation's clock is
+what brings them back:
+
+```typescript
+await simAws.clock().advanceBy({ seconds: 31 });
+```
+
+A queue with a `RedrivePolicy` eventually gives up on a message the handler keeps throwing on and
+moves it to the dead-letter queue, exactly as it would for any other failing consumer. See
+[dead-letter queues](../sqs/#dead-letter-queues "Simulated SQS dead-letter queue docs").
+
+The handler error itself is not reported to whoever sent the message, as it is not on real AWS. What
+the sender sees is the message coming back.
+
+### Reporting individual message failures
+
+A mapping created with `FunctionResponseTypes: ["ReportBatchItemFailures"]` takes the
+`batchItemFailures` list the handler returns: the message ids named in it go back to the queue, and
+the rest of the batch is deleted.
+
+```typescript
+await simAws.lambda().createEventSourceMapping(
+  new CreateEventSourceMappingCommand({
+    EventSourceArn: queueArn,
+    FunctionName: "order-consumer",
+    FunctionResponseTypes: ["ReportBatchItemFailures"],
+  }),
+);
+
+// The handler reports the message ids it could not handle.
+const handler = (event: SimLambdaSqsEvent) => ({
+  batchItemFailures: event.Records.filter((record) => !canHandle(record)).map(
+    (record) => ({ itemIdentifier: record.messageId }),
+  ),
+});
+```
+
+A report naming an id that was not in the batch returns the whole batch, as real Lambda does with a
+report it cannot trust. So does an entry with no `itemIdentifier`. A handler that returns nothing,
+or an empty `batchItemFailures` list, has handled the whole batch.
+
+### Event source mappings in templates
+
+`AWS::Lambda::EventSourceMapping` deploys the same thing, which is what CDK's
+`fn.addEventSource(new SqsEventSource(queue))` emits. `EventSourceArn` and `FunctionName` accept the
+`Fn::GetAtt` and `Ref` values a template gives them, `Ref` on the mapping returns its UUID, and
+`Fn::GetAtt` exposes `Id` and `EventSourceMappingArn`.
+
 ## Function URLs
 
 A Function URL is an HTTP endpoint for one function. Creating one with
@@ -1120,6 +1296,11 @@ Sim Lambda currently supports:
   resolved from the request
 - `AddPermissionCommand`, `RemovePermissionCommand` and `GetPolicyCommand`, for resource-based
   policies evaluated alongside identity policies
+- SQS event source mappings, created with `CreateEventSourceMappingCommand` and read with
+  `GetEventSourceMappingCommand`, `ListEventSourceMappingsCommand` and
+  `DeleteEventSourceMappingCommand`, delivering real-shaped SQS events and honouring `BatchSize`
+- `FunctionResponseTypes: ["ReportBatchItemFailures"]`, returning only the message ids the handler
+  reported
 - Function code from three sources:
   - an in-process handler function passed via `makeLambdaZipFileInput(...)`
   - zip archive bytes on `Code.ZipFile` (build them with `makeLambdaCodeZip(...)`)
@@ -1132,17 +1313,18 @@ Sim Lambda currently supports:
 - IAM authorization of the Lambda commands themselves (`lambda:CreateFunction`,
   `lambda:GetFunction`, `lambda:InvokeFunction`, and the Function URL config actions)
 - AWS-like validation and errors, such as `ResourceConflictException` for a duplicate function name
-- The `AWS::Lambda::Function`, `AWS::Lambda::Url` and `AWS::Lambda::Permission` CloudFormation
-  resources, with `Ref`/`Fn::GetAtt` support and deploy-time executable bindings
+- The `AWS::Lambda::Function`, `AWS::Lambda::Url`, `AWS::Lambda::Permission` and
+  `AWS::Lambda::EventSourceMapping` CloudFormation resources, with `Ref`/`Fn::GetAtt` support and
+  deploy-time executable bindings
 
 ## Limitations
 
 Current documented limitations:
 
 - Only `CreateFunctionCommand`, `GetFunctionCommand`, `InvokeCommand`, the permission commands
-  (`AddPermissionCommand`, `RemovePermissionCommand`, `GetPolicyCommand`) and the Function URL config
-  commands are supported. There is no `UpdateFunctionCode`, `DeleteFunction`, or function listing
-  yet.
+  (`AddPermissionCommand`, `RemovePermissionCommand`, `GetPolicyCommand`), the Function URL config
+  commands and the event source mapping commands are supported. There is no `UpdateFunctionCode`,
+  `DeleteFunction`, or function listing yet.
 - A cross-account grant is only half of what admits a call: the caller's own Account has to allow
   the action too, and its IAM has to be part of the same `SimAws` instance for its policies to be
   found. A caller from an Account the simulation knows nothing about is denied.
@@ -1175,9 +1357,20 @@ Current documented limitations:
   invocation and sees the host clock. See [The time inside a handler](#the-time-inside-a-handler).
 - `Event` invocations do not simulate retries or failure destinations; handler errors are dropped.
 - `Code.S3ObjectVersion` is accepted but ignored, as sim S3 has no object versioning yet.
-- CloudFormation resource types other than `AWS::Lambda::Function`, `AWS::Lambda::Url` and
-  `AWS::Lambda::Permission` (`Version`, `Alias`, `EventSourceMapping`, ...) are skipped with an
-  "Unsupported" diagnostic.
+- SQS queues are the only event source. DynamoDB streams, Kinesis, Kafka and DocumentDB sources are
+  refused rather than accepted and never delivered from, and so are `FilterCriteria`, `ScalingConfig`,
+  `DestinationConfig`, `MaximumRetryAttempts` and the other mapping inputs this simulation has no
+  behaviour for.
+- `MaximumBatchingWindowInSeconds` is only simulated as 0: a partial batch is delivered as soon as
+  anything is on the queue, so a batching window would have nothing to wait for. A non-zero value is
+  refused, which also caps `BatchSize` at 10.
+- `UpdateEventSourceMapping` is not supported, so a mapping's batch size or enabled state is fixed
+  once it is created. `Enabled: false` at creation is simulated.
+- One poll delivers one batch. Real Lambda runs several pollers at once and scales them with the
+  queue, so nothing here shows what concurrency does to ordering or to a downstream service.
+- CloudFormation resource types other than `AWS::Lambda::Function`, `AWS::Lambda::Url`,
+  `AWS::Lambda::Permission` and `AWS::Lambda::EventSourceMapping` (`Version`, `Alias`, ...) are
+  skipped with an "Unsupported" diagnostic.
 - The `vm` context is a namespacing convenience, not a security boundary: function code runs
   in-process with the same trust as the test suite itself. Do not run untrusted code through the
   simulator.

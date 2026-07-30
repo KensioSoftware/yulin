@@ -89,6 +89,22 @@ about can change. So `SimSqsQueueStore.applyLifecycle` brings every queue in the
 and `SimSqsQueueAccess` runs it before answering from any of them. A test reading only the dead-letter
 queue would otherwise find it empty, because the source queue is what notices the move.
 
+`SimSqsQueueActivity` is how a consumer that cannot poll continuously keeps up with a queue. Real SQS
+is polled continuously by whatever consumes it, and nothing in this simulation runs continuously, so
+a simulated consumer that would poll is told instead.
+
+The queue announces every transition it makes: a message arriving (`add`, which covers a move to a
+dead-letter queue as well as a send), a message being handed out and hidden (`recordHandle`), and a
+message having its visibility changed (`hideMessage`). Each carries the instant the message becomes
+receivable rather than now, because a delayed or in-flight message is not receivable yet. Without the
+last two, a message another consumer took would come back to the queue with nothing watching for it.
+
+An announcement only reaches whoever was watching at the time, so `nextAvailability` answers the
+other half: when the earliest message a queue cannot hand out yet becomes receivable. A consumer that
+started watching a queue whose messages were all in flight asks that rather than waiting for an
+announcement that has already been made. A Lambda event source mapping is the one thing using either
+(see [the Lambda service README](../lambda/README.md)).
+
 ## Command handling
 
 AWS SDK-style operations are implemented under `command/`, grouped by the collaborators they share
@@ -174,5 +190,7 @@ refused rather than quietly answered with a local queue of the same name.
   CloudFormation resource, where it is not simulated, unlike the queue attribute of the same name.
 - A message moved to a dead-letter queue keeps its sent timestamp, which is documented AWS behaviour,
   and starts its receive count again, which is not documented either way.
+- A Lambda event source mapping polls one batch at a time, where real Lambda runs several pollers and
+  scales them with the queue.
 
 The full list is in [docs/services/sqs](../../../docs/services/sqs/).

@@ -7,6 +7,7 @@ import {
   type SimSqsQueueAttributeInput,
   SimSqsQueueAttributes,
 } from "../../queue/sim-sqs-queue-attributes.js";
+import type { SimSqsQueueActivity } from "../../queue/sim-sqs-queue-activity.js";
 import { SimSqsQueueName } from "../../queue/sim-sqs-queue-name.js";
 import type { SimSqsQueueStore } from "../../queue/sim-sqs-queue-store.js";
 import type { SimSqsQueueAccess } from "./sim-sqs-queue-access.js";
@@ -22,6 +23,7 @@ interface SimSqsCreateQueueProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly clock: BackgroundScheduler;
   readonly deadLetterTargets: SimSqsDeadLetterTargets;
+  readonly activity: SimSqsQueueActivity;
 }
 
 interface SimSqsCreateQueueOptions {
@@ -42,6 +44,7 @@ export class SimSqsCreateQueue {
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly clock: BackgroundScheduler;
   private readonly deadLetterTargets: SimSqsDeadLetterTargets;
+  private readonly activity: SimSqsQueueActivity;
 
   constructor(properties: SimSqsCreateQueueProperties) {
     this.queues = properties.queues;
@@ -49,6 +52,7 @@ export class SimSqsCreateQueue {
     this.accountRegionScope = properties.accountRegionScope;
     this.clock = properties.clock;
     this.deadLetterTargets = properties.deadLetterTargets;
+    this.activity = properties.activity;
   }
 
   /**
@@ -101,6 +105,7 @@ export class SimSqsCreateQueue {
       attributes: SimSqsQueueAttributes.defaults(),
       createdAt,
       deadLetterTargets: this.deadLetterTargets,
+      activity: this.activity,
     });
 
     queue.applyAttributes(requested, createdAt);
