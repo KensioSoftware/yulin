@@ -68,6 +68,7 @@ export class SimCognitoServiceController implements SimAwsServiceController {
 
     if (
       userPoolId === undefined ||
+      userPoolId.length === 0 ||
       wellKnown !== wellKnownSegment ||
       rest.length > 0
     ) {
@@ -81,12 +82,13 @@ export class SimCognitoServiceController implements SimAwsServiceController {
     }
 
     if (document === "jwks.json") {
-      return this.response.document(pool.jwks());
+      return this.response.document(pool.jwks(), request.method);
     }
 
     if (document === "openid-configuration") {
       return this.response.document(
         this.openIdConfiguration.document(pool, url.origin),
+        request.method,
       );
     }
 

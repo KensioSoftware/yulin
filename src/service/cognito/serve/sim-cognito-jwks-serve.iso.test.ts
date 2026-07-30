@@ -173,18 +173,47 @@ describe("Serving a sim Cognito user pool's public endpoints", () => {
     // Given a simulated user pool.
     const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
     const userPoolId = await poolIdIn(simAws);
+    const jwksUrl = localUrl(
+      `https://cognito-idp.eu-west-2.amazonaws.com/${userPoolId}/.well-known/jwks.json`,
+    );
+    const simAwsHttp = new SimAwsHttp({ simAws });
 
     // When its JWKS is asked for with a method that does not read one.
+    const posted = await simAwsHttp.fetch(jwksUrl, { method: "POST" });
+
+    // And when it is asked for with HEAD.
+    const headed = await simAwsHttp.fetch(jwksUrl, { method: "HEAD" });
+
+    // Then the write is refused, and says what the endpoint does answer.
+    assertIdentical(posted.status, 405);
+    assertIdentical(posted.headers.get("allow"), "GET, HEAD");
+
+    // And the HEAD answers the headers a GET would, with no document.
+    assertIdentical(headed.status, 200);
+    assertIdentical(headed.headers.get("content-type"), "application/json");
+    const jwks = simAws.cognitoIdentityProvider().userPool(userPoolId).jwks();
+    const jwksLength = Buffer.byteLength(JSON.stringify(jwks));
+    assertIdentical(headed.headers.get("content-length"), String(jwksLength));
+    assertIdentical(await headed.text(), "");
+  });
+
+  it("reports a path naming no pool as not found", async () => {
+    // Given a simulated user pool.
+    const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
+    await poolIdIn(simAws);
+
+    // When the JWKS path is requested with no pool id in it.
     const response = await new SimAwsHttp({ simAws }).fetch(
       localUrl(
-        `https://cognito-idp.eu-west-2.amazonaws.com/${userPoolId}/.well-known/jwks.json`,
+        "https://cognito-idp.eu-west-2.amazonaws.com//.well-known/jwks.json",
       ),
-      { method: "POST" },
     );
 
-    // Then the endpoint refuses it and says what it does answer.
-    assertIdentical(response.status, 405);
-    assertIdentical(response.headers.get("allow"), "GET, HEAD");
+    // Then there is no endpoint there, rather than a pool with no name.
+    assertIdentical(response.status, 404);
+    assertObjectEquals(await response.json(), {
+      message: "No simulated Cognito endpoint at //.well-known/jwks.json",
+    });
   });
 
   it("stops serving a pool that has been deleted", async () => {

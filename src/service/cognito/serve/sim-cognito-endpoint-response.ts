@@ -7,9 +7,22 @@
 export class SimCognitoEndpointResponse {
   /**
    * Serve a document the pool publishes.
+   *
+   * A HEAD asks for the headers a GET would answer with and no body, so the
+   * document is measured rather than sent.
    */
-  document(body: object): Response {
-    return Response.json(body);
+  document(body: object, method: string): Response {
+    const json = JSON.stringify(body);
+    const headers = {
+      "content-type": "application/json",
+      "content-length": String(Buffer.byteLength(json)),
+    };
+
+    if (method === "HEAD") {
+      return new Response(undefined, { status: 200, headers });
+    }
+
+    return new Response(json, { status: 200, headers });
   }
 
   /**
