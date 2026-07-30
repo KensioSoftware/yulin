@@ -1,6 +1,10 @@
 export { SimSqs, type SimSqsRequestOptions } from "./sim-sqs.js";
 export { SimSqsQueue } from "./queue/sim-sqs-queue.js";
 export {
+  SimSqsQueueActivity,
+  type SimSqsQueueWatcher,
+} from "./queue/sim-sqs-queue-activity.js";
+export {
   sqsAnyQueueArn,
   SimSqsQueueArn,
   sqsQueueArnPrefix,

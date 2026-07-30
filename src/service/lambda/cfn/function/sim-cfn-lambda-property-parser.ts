@@ -76,6 +76,27 @@ export class SimCfnLambdaPropertyParser {
   }
 
   /**
+   * Parse a property value that must be a list of strings when present.
+   */
+  optionalStringList(
+    resource: SimCfnResource,
+    value: SimCfnTemplateValue | undefined,
+    label: string,
+  ): readonly string[] | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    if (!Array.isArray(value)) {
+      throw this.invalidPropertyError(resource, label, "a list");
+    }
+
+    return value.map((entry: SimCfnTemplateValue, index: number) =>
+      this.requiredString(resource, entry, `${label}[${String(index)}]`),
+    );
+  }
+
+  /**
    * Parse a property value that must be a record of strings when present.
    *
    * CloudFormation has no typed map, so every value has to be checked: a

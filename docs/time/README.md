@@ -229,6 +229,12 @@ because a retry or a delayed delivery runs later than the time the work was for.
 follows the same rule where it builds events: a Function URL request carries simulated time in
 `requestContext.time` and `requestContext.timeEpoch`.
 
+An SQS event source mapping does the same: the `SentTimestamp` and
+`ApproximateFirstReceiveTimestamp` attributes on a delivered record are simulated time, so a handler
+reading the event's time reads the clock the test controls. See
+[simulated Lambda](../services/lambda/#triggering-a-function-from-an-sqs-queue "Simulated Lambda
+event source mapping docs").
+
 Handler code that takes a clock as a dependency stays the most testable option, on real AWS and
 here, and needs none of the machinery above.
 

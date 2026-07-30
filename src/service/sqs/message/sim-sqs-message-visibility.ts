@@ -32,6 +32,13 @@ export class SimSqsMessageVisibility {
   }
 
   /**
+   * The instant from which the message can be received.
+   */
+  get availableFrom(): Date {
+    return this.visibleFrom;
+  }
+
+  /**
    * When the message was first handed out.
    *
    * Only a message being handed out reports its attributes, and handing one out

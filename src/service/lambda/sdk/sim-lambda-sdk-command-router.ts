@@ -5,6 +5,12 @@ import {
 } from "../../../sdk/index.js";
 import type { SimAddPermissionCommand } from "../command/add-permission/add-permission.command.js";
 import type { SimCreateFunctionCommand } from "../command/create-function/create-function.command.js";
+import type {
+  SimCreateEventSourceMappingCommand,
+  SimDeleteEventSourceMappingCommand,
+  SimGetEventSourceMappingCommand,
+  SimListEventSourceMappingsCommand,
+} from "../command/event-source-mapping/event-source-mapping.command.js";
 import type { SimCreateFunctionUrlConfigCommand } from "../command/create-function-url-config/create-function-url-config.command.js";
 import type { SimDeleteFunctionUrlConfigCommand } from "../command/delete-function-url-config/delete-function-url-config.command.js";
 import type { SimGetFunctionCommand } from "../command/get-function/get-function.command.js";
@@ -77,6 +83,38 @@ export class SimLambdaSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simLambda.deleteFunctionUrlConfig(
             command as SimDeleteFunctionUrlConfigCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "CreateEventSourceMappingCommand",
+        async (command, context): Promise<unknown> =>
+          await simLambda.createEventSourceMapping(
+            command as SimCreateEventSourceMappingCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "GetEventSourceMappingCommand",
+        async (command, context): Promise<unknown> =>
+          await simLambda.getEventSourceMapping(
+            command as SimGetEventSourceMappingCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListEventSourceMappingsCommand",
+        async (command, context): Promise<unknown> =>
+          await simLambda.listEventSourceMappings(
+            command as SimListEventSourceMappingsCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteEventSourceMappingCommand",
+        async (command, context): Promise<unknown> =>
+          await simLambda.deleteEventSourceMapping(
+            command as SimDeleteEventSourceMappingCommand,
             simSdkCallerOptions(context),
           ),
       ],

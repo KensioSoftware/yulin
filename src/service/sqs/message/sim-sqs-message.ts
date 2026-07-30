@@ -46,6 +46,16 @@ export class SimSqsMessage {
   }
 
   /**
+   * The instant from which this message can be received.
+   *
+   * A message sent with a delay is not receivable when it arrives, so anything
+   * waiting for it has to wait for this rather than for the send.
+   */
+  get availableFrom(): Date {
+    return this.visibility.availableFrom;
+  }
+
+  /**
    * Whether this message can be received at an instant.
    */
   isVisibleAt(instant: Date): boolean {

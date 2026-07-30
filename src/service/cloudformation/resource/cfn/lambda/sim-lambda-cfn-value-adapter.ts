@@ -1,3 +1,5 @@
+import { SimLambdaEventSourceMapping } from "../../../../lambda/event-source/sim-lambda-event-source-mapping.js";
+import { SimLambdaEventSourceMappingCfn } from "./sim-lambda-event-source-mapping-cfn.js";
 import { SimLambdaFunction } from "../../../../lambda/function/sim-lambda-function.js";
 import { SimLambdaFunctionUrl } from "../../../../lambda/function/url/sim-lambda-function-url.js";
 import { SimLambdaFunctionCfn } from "./sim-lambda-function-cfn.js";
@@ -25,6 +27,15 @@ export function lambdaValueAdapter(
     properties.simResource instanceof SimLambdaFunctionUrl
   ) {
     return new SimLambdaFunctionUrlCfn({ functionUrl: properties.simResource });
+  }
+
+  if (
+    properties.type === "AWS::Lambda::EventSourceMapping" &&
+    properties.simResource instanceof SimLambdaEventSourceMapping
+  ) {
+    return new SimLambdaEventSourceMappingCfn({
+      mapping: properties.simResource,
+    });
   }
 
   return undefined;

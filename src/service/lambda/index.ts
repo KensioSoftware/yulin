@@ -18,3 +18,8 @@ export type {
   SimLambdaFunctionUrlEvent,
   SimLambdaFunctionUrlResult,
 } from "./serve/event/sim-lambda-url-event.type.js";
+export type {
+  SimLambdaSqsEvent,
+  SimLambdaSqsEventMessageAttribute,
+  SimLambdaSqsEventRecord,
+} from "./event-source/poll/sim-lambda-sqs-event.js";

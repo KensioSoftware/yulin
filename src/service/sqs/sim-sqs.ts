@@ -24,6 +24,7 @@ import { SimSqsCfnResourceFactory } from "./cfn/sim-sqs-cfn-resource-factory.js"
 import { SimSqsMessageWriter } from "./message/sim-sqs-message-writer.js";
 import { SimSqsDeadLetterTargets } from "./queue/sim-sqs-dead-letter-targets.js";
 import type { SimSqsQueue } from "./queue/sim-sqs-queue.js";
+import { SimSqsQueueActivity } from "./queue/sim-sqs-queue-activity.js";
 import { SimSqsQueueStore } from "./queue/sim-sqs-queue-store.js";
 import { SimSqsSdkCommandRouter } from "./sdk/sim-sqs-sdk-command-router.js";
 
@@ -56,6 +57,7 @@ export class SimSqs {
   private readonly deletionCommands: SimSqsDeleteMessageCommands;
   private readonly visibilityCommand: SimSqsChangeMessageVisibility;
   private readonly background: BackgroundScheduler;
+  private readonly activity = new SimSqsQueueActivity();
   private readonly sdkRouter = new SimSqsSdkCommandRouter(this);
   private readonly cfnFactory = new SimSqsCfnResourceFactory({ sqs: this });
 
@@ -80,6 +82,7 @@ export class SimSqs {
       accountRegionScope,
       clock: background,
       deadLetterTargets: new SimSqsDeadLetterTargets({ queues: this.queues }),
+      activity: this.activity,
     });
     this.queueCommands = new SimSqsQueueCommands({
       queues: this.queues,
@@ -117,6 +120,18 @@ export class SimSqs {
    */
   findQueue(name: string): SimSqsQueue | undefined {
     return this.queues.find(name);
+  }
+
+  /**
+   * Watch the queues in this scope for messages arriving on them.
+   *
+   * This is not an SQS API operation. Real SQS is polled continuously by
+   * whatever consumes it, and nothing in this simulation runs continuously, so a
+   * simulated consumer that would poll is told when there is something to poll
+   * for instead. A Lambda event source mapping is what uses it.
+   */
+  queueActivity(): SimSqsQueueActivity {
+    return this.activity;
   }
 
   /**

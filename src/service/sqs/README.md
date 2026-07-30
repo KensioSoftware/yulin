@@ -89,6 +89,14 @@ about can change. So `SimSqsQueueStore.applyLifecycle` brings every queue in the
 and `SimSqsQueueAccess` runs it before answering from any of them. A test reading only the dead-letter
 queue would otherwise find it empty, because the source queue is what notices the move.
 
+`SimSqsQueueActivity` is how something outside SQS learns a message has arrived. Real SQS is polled
+continuously by whatever consumes it, and nothing in this simulation runs continuously, so a
+simulated consumer that would poll is told instead. `SimSqsQueue.add` tells the queue's watchers,
+which covers a message moved to a dead-letter queue as well as a send, and carries the instant the
+message becomes receivable rather than now, because a delayed message is not receivable yet. A
+Lambda event source mapping is the one thing using it (see
+[the Lambda service README](../lambda/README.md)).
+
 ## Command handling
 
 AWS SDK-style operations are implemented under `command/`, grouped by the collaborators they share
@@ -174,5 +182,7 @@ refused rather than quietly answered with a local queue of the same name.
   CloudFormation resource, where it is not simulated, unlike the queue attribute of the same name.
 - A message moved to a dead-letter queue keeps its sent timestamp, which is documented AWS behaviour,
   and starts its receive count again, which is not documented either way.
+- A Lambda event source mapping polls one batch at a time, where real Lambda runs several pollers and
+  scales them with the queue.
 
 The full list is in [docs/services/sqs](../../../docs/services/sqs/).
