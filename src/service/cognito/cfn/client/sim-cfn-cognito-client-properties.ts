@@ -26,6 +26,11 @@ const simulatedProperties = [
   "TokenValidityUnits",
 ];
 
+/**
+ * The `TokenValidityUnits` fields, which are all of them.
+ */
+const modelledValidityUnits = ["AccessToken", "IdToken", "RefreshToken"];
+
 interface SimCfnCognitoClientPropertiesProperties {
   readonly resource: SimCfnResource;
   readonly properties: SimCfnTemplateValueRecord;
@@ -112,6 +117,13 @@ export class SimCfnCognitoClientProperties {
     if (units === undefined) {
       return undefined;
     }
+
+    this.propertyParser.requireOnlyKeys(
+      this.resource,
+      units,
+      modelledValidityUnits,
+      "TokenValidityUnits ",
+    );
 
     return {
       AccessToken: this.unit(units["AccessToken"], "AccessToken"),

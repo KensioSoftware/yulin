@@ -1,11 +1,14 @@
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValue } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
-import type {
-  SimCognitoSignInPolicyType,
-  SimCognitoUserPoolPoliciesType,
-} from "../../user-pool/sim-cognito-password-policy.js";
+import type { SimCognitoUserPoolPoliciesType } from "../../user-pool/sim-cognito-password-policy.js";
 import type { SimCfnCognitoPropertyParser } from "../sim-cfn-cognito-property-parser.js";
 import { SimCfnCognitoPasswordPolicy } from "./sim-cfn-cognito-password-policy.js";
+import { SimCfnCognitoSignInPolicy } from "./sim-cfn-cognito-sign-in-policy.js";
+
+/**
+ * The `Policies` fields this simulation reads, which are all of them.
+ */
+const modelledFields = ["PasswordPolicy", "SignInPolicy"];
 
 interface SimCfnCognitoPoliciesProperties {
   readonly resource: SimCfnResource;
@@ -16,8 +19,9 @@ interface SimCfnCognitoPoliciesProperties {
  * Reads the `Policies` property of an AWS::Cognito::UserPool Resource into the
  * shape CreateUserPool takes.
  *
- * The sign-in policy is read rather than dropped, so a template asking for one
- * reaches CreateUserPool and is refused there, in the words that say why.
+ * The two policies inside it each have their own reader, because a password
+ * policy is state this simulation keeps and a sign-in policy is one it
+ * refuses.
  */
 export class SimCfnCognitoPolicies {
   private readonly resource: SimCfnResource;
@@ -44,33 +48,24 @@ export class SimCfnCognitoPolicies {
       return undefined;
     }
 
-    return {
-      PasswordPolicy: new SimCfnCognitoPasswordPolicy({
-        resource: this.resource,
-        propertyParser: this.propertyParser,
-      }).parse(policies["PasswordPolicy"]),
-      SignInPolicy: this.signInPolicy(policies["SignInPolicy"]),
-    };
-  }
-
-  private signInPolicy(
-    value: SimCfnTemplateValue | undefined,
-  ): SimCognitoSignInPolicyType | undefined {
-    const policy = this.propertyParser.optionalRecord(
+    this.propertyParser.requireOnlyKeys(
       this.resource,
-      value,
-      "Policies SignInPolicy",
+      policies,
+      modelledFields,
+      "Policies ",
     );
 
-    if (policy === undefined) {
-      return undefined;
-    }
+    const collaborators = {
+      resource: this.resource,
+      propertyParser: this.propertyParser,
+    };
 
     return {
-      AllowedFirstAuthFactors: this.propertyParser.optionalStringArray(
-        this.resource,
-        policy["AllowedFirstAuthFactors"],
-        "Policies SignInPolicy AllowedFirstAuthFactors",
+      PasswordPolicy: new SimCfnCognitoPasswordPolicy(collaborators).parse(
+        policies["PasswordPolicy"],
+      ),
+      SignInPolicy: new SimCfnCognitoSignInPolicy(collaborators).parse(
+        policies["SignInPolicy"],
       ),
     };
   }

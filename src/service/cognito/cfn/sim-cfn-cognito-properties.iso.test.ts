@@ -1,41 +1,18 @@
 import {
   assertFalse,
   assertIdentical,
-  assertInstanceOf,
   assertNonNullable,
   assertStringIncludes,
-  assertThrowsErrorAsync,
   assertTrue,
   assertTypeString,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
-import { SimAws } from "../../aws/sim-aws.js";
 import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
-
-function simAwsInEuWest2(): SimAws {
-  return new SimAws({ defaultRegionName: "eu-west-2" });
-}
-
-/**
- * Deploy a template that is expected to fail, and give back the error.
- */
-async function deployFailure(
-  simAws: SimAws,
-  resources: SimCfnTemplateValueRecord,
-): Promise<Error> {
-  const error = await assertThrowsErrorAsync(async () => {
-    const stack = await simAws.cloudFormation().deployTemplate({
-      stackName: "app-stack",
-      template: { Resources: resources },
-    });
-    await stack.waitForDeployComplete();
-  });
-
-  assertInstanceOf(error, Error);
-
-  return error;
-}
+import {
+  deployFailure,
+  simAwsInEuWest2,
+} from "../../../../test/cognito/cfn-deploy.js";
 
 const appPool = {
   Type: "AWS::Cognito::UserPool",
@@ -130,6 +107,41 @@ describe("Cognito CloudFormation property shapes", () => {
     );
   });
 
+  it("refuses a nested property key it does not model", async () => {
+    // Given templates carrying a key nothing reads inside each of the nested
+    // objects.
+    const passwordPolicyError = await deployFailure(simAwsInEuWest2(), {
+      AppPool: {
+        Type: "AWS::Cognito::UserPool",
+        Properties: {
+          UserPoolName: "myapp-users",
+          Policies: { PasswordPolicy: { RequireEmoji: true } },
+        },
+      },
+    });
+    const unitsError = await deployFailure(simAwsInEuWest2(), {
+      AppPool: appPool,
+      AppClient: {
+        Type: "AWS::Cognito::UserPoolClient",
+        Properties: {
+          UserPoolId: { Ref: "AppPool" },
+          TokenValidityUnits: { SessionToken: "minutes" },
+        },
+      },
+    });
+
+    // Then each is refused where it sits, rather than dropped on the way to
+    // the Command as the top-level properties would not be.
+    assertStringIncludes(
+      passwordPolicyError.message,
+      "property Policies PasswordPolicy RequireEmoji is not simulated",
+    );
+    assertStringIncludes(
+      unitsError.message,
+      "property TokenValidityUnits SessionToken is not simulated",
+    );
+  });
+
   it("refuses a Policies value that is not an object", async () => {
     // Given a template whose Policies is a string.
     const simAws = simAwsInEuWest2();
@@ -168,7 +180,8 @@ describe("Cognito CloudFormation property shapes", () => {
     // Then the failure says a list was expected.
     assertStringIncludes(
       error.message,
-      "ExplicitAuthFlows must be a list of strings",
+      "AWS::Cognito::UserPoolClient AppClient: ExplicitAuthFlows must be a " +
+        "list of strings",
     );
   });
 
@@ -191,7 +204,8 @@ describe("Cognito CloudFormation property shapes", () => {
     // Then the failure names the entry that was wrong.
     assertStringIncludes(
       error.message,
-      "ExplicitAuthFlows[0] must be a string",
+      "AWS::Cognito::UserPoolClient AppClient: ExplicitAuthFlows[0] must be " +
+        "a string",
     );
   });
 
@@ -223,8 +237,10 @@ describe("Cognito CloudFormation property shapes", () => {
     );
 
     // Then both failures say what it should have been.
-    assertStringIncludes(wordError.message, "Precedence must be a number");
-    assertStringIncludes(booleanError.message, "Precedence must be a number");
+    const expected =
+      "AWS::Cognito::UserPoolGroup AdminsGroup: Precedence must be a number";
+    assertStringIncludes(wordError.message, expected);
+    assertStringIncludes(booleanError.message, expected);
   });
 
   it("refuses a boolean property that is not a boolean", async () => {
@@ -244,7 +260,10 @@ describe("Cognito CloudFormation property shapes", () => {
     });
 
     // Then the failure says what it should have been.
-    assertStringIncludes(error.message, "GenerateSecret must be a boolean");
+    assertStringIncludes(
+      error.message,
+      "AWS::Cognito::UserPoolClient AppClient: GenerateSecret must be a boolean",
+    );
   });
 
   it("refuses a TokenValidityUnits that is not an object", async () => {
@@ -280,6 +299,9 @@ describe("Cognito CloudFormation property shapes", () => {
     });
 
     // Then the failure says the pool has to be named.
-    assertStringIncludes(error.message, "UserPoolId must be a string");
+    assertStringIncludes(
+      error.message,
+      "AWS::Cognito::UserPoolClient AppClient: UserPoolId must be a string",
+    );
   });
 });

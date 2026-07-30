@@ -143,7 +143,7 @@ describe("Cognito CloudFormation user pool deployment", () => {
     assertIdentical(output(stack, "PoolIdAttribute"), userPoolId);
     assertIdentical(
       output(stack, "PoolArn"),
-      `arn:aws:cognito-idp:eu-west-2:111111111111:userpool/${userPoolId}`,
+      `arn:aws:cognito-idp:eu-west-2:${accountIdOneOnes}:userpool/${userPoolId}`,
     );
     assertIdentical(
       output(stack, "ProviderName"),

@@ -5,43 +5,17 @@ import {
   assertNonNullable,
   assertStringIncludes,
   assertStringLength,
-  assertThrowsErrorAsync,
   assertTypeString,
   assertUndefined,
 } from "@kensio/smartass";
 import { DescribeUserPoolClientCommand } from "@aws-sdk/client-cognito-identity-provider";
 import { describe, it } from "vitest";
 
-import { SimAws } from "../../aws/sim-aws.js";
-import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
-
-function simAwsInEuWest2(): SimAws {
-  return new SimAws({ defaultRegionName: "eu-west-2" });
-}
-
-/**
- * Deploy a template that is expected to fail, and give back the error.
- */
-async function deployFailure(
-  simAws: SimAws,
-  resources: SimCfnTemplateValueRecord,
-  outputs?: SimCfnTemplateValueRecord,
-): Promise<Error> {
-  const error = await assertThrowsErrorAsync(async () => {
-    const stack = await simAws.cloudFormation().deployTemplate({
-      stackName: "app-stack",
-      template: {
-        Resources: resources,
-        ...(outputs !== undefined && { Outputs: outputs }),
-      },
-    });
-    await stack.waitForDeployComplete();
-  });
-
-  assertInstanceOf(error, Error);
-
-  return error;
-}
+import { SimCognitoUserPool } from "../../cognito/user-pool/sim-cognito-user-pool.js";
+import {
+  deployFailure,
+  simAwsInEuWest2,
+} from "../../../../test/cognito/cfn-deploy.js";
 
 describe("Cognito CloudFormation validation", () => {
   it("generates a client secret only when the template asks for one", async () => {
@@ -276,5 +250,9 @@ describe("Cognito CloudFormation validation", () => {
     // is created as usual.
     assertArrayLength(stack.skippedResources, 1);
     assertIdentical(stack.skippedResources[0].logicalId, "AppDomain");
+    assertInstanceOf(
+      stack.getResource("AppPool")?.simResource,
+      SimCognitoUserPool,
+    );
   });
 });

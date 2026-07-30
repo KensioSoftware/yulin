@@ -3,6 +3,19 @@ import type { SimCfnTemplateValue } from "../../../cloudformation/template/value
 import type { SimCognitoPasswordPolicyType } from "../../user-pool/sim-cognito-password-policy.js";
 import type { SimCfnCognitoPropertyParser } from "../sim-cfn-cognito-property-parser.js";
 
+/**
+ * The `PasswordPolicy` fields this simulation reads, which are all of them.
+ */
+const modelledFields = [
+  "MinimumLength",
+  "RequireUppercase",
+  "RequireLowercase",
+  "RequireNumbers",
+  "RequireSymbols",
+  "TemporaryPasswordValidityDays",
+  "PasswordHistorySize",
+];
+
 interface SimCfnCognitoPasswordPolicyProperties {
   readonly resource: SimCfnResource;
   readonly propertyParser: SimCfnCognitoPropertyParser;
@@ -39,6 +52,13 @@ export class SimCfnCognitoPasswordPolicy {
     if (policy === undefined) {
       return undefined;
     }
+
+    this.propertyParser.requireOnlyKeys(
+      this.resource,
+      policy,
+      modelledFields,
+      "Policies PasswordPolicy ",
+    );
 
     return {
       MinimumLength: this.number(policy["MinimumLength"], "MinimumLength"),

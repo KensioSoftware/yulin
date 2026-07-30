@@ -39,9 +39,30 @@ export class SimCfnCognitoPropertyParser extends SimCfnCognitoValueParser {
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
   ): void {
-    for (const name of Object.keys(properties)) {
-      if (!this.simulated.includes(name)) {
-        throw this.unsimulatedPropertyError(resource, name);
+    this.requireOnlyKeys(resource, properties, this.simulated);
+  }
+
+  /**
+   * Refuse every key of a nested property object that is not modelled.
+   *
+   * A nested object is held to the same rule as the properties around it. A
+   * `Policies` or a `TokenValidityUnits` carrying a key nothing here reads
+   * would otherwise be dropped on the way to the Command, which is the quiet
+   * ignoring the top-level allow-list exists to prevent.
+   */
+  requireOnlyKeys(
+    resource: SimCfnResource,
+    record: SimCfnTemplateValueRecord,
+    modelled: readonly string[],
+    path = "",
+  ): void {
+    for (const name of Object.keys(record)) {
+      if (!modelled.includes(name)) {
+        throw this.unsimulatedPropertyError(
+          resource,
+          `${path}${name}`,
+          modelled,
+        );
       }
     }
   }
@@ -92,12 +113,13 @@ export class SimCfnCognitoPropertyParser extends SimCfnCognitoValueParser {
   private unsimulatedPropertyError(
     resource: SimCfnResource,
     label: string,
+    modelled: readonly string[],
   ): Error {
     return new Error(
       `${this.resourceType} ${resource.logicalId} property ${label} is not ` +
         `simulated, and a deployed Resource ignoring it would behave ` +
         `differently here than on AWS. The simulated properties are ` +
-        `${this.simulated.join(", ")}.`,
+        `${modelled.join(", ")}.`,
     );
   }
 }
