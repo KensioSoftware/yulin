@@ -72,6 +72,9 @@ export function resolveSimCloudFormationServiceResourceFactory(
     case "SecretsManager": {
       return scopedAws.secretsManager().cfnResourceFactory();
     }
+    case "SQS": {
+      return scopedAws.sqs().cfnResourceFactory();
+    }
     case "SSM": {
       return scopedAws.ssm().cfnResourceFactory();
     }

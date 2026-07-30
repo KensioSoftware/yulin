@@ -20,6 +20,7 @@ import { SimSqsCreateQueue } from "./command/queue/sim-sqs-create-queue.js";
 import { SimSqsQueueAttributeCommands } from "./command/queue/sim-sqs-queue-attribute-commands.js";
 import { SimSqsQueueCommands } from "./command/queue/sim-sqs-queue-commands.js";
 import type * as simSqsCommands from "./command/sim-sqs-command.types.js";
+import { SimSqsCfnResourceFactory } from "./cfn/sim-sqs-cfn-resource-factory.js";
 import { SimSqsMessageWriter } from "./message/sim-sqs-message-writer.js";
 import type { SimSqsQueue } from "./queue/sim-sqs-queue.js";
 import { SimSqsQueueStore } from "./queue/sim-sqs-queue-store.js";
@@ -55,6 +56,7 @@ export class SimSqs {
   private readonly visibilityCommand: SimSqsChangeMessageVisibility;
   private readonly background: BackgroundScheduler;
   private readonly sdkRouter = new SimSqsSdkCommandRouter(this);
+  private readonly cfnFactory = new SimSqsCfnResourceFactory({ sqs: this });
 
   constructor(properties: SimSqsProperties = {}) {
     const {
@@ -255,6 +257,13 @@ export class SimSqs {
   ): Promise<simSqsCommands.SimChangeMessageVisibilityCommandOutput> {
     await this.background.sequence();
     return this.visibilityCommand.handle(command, options);
+  }
+
+  /**
+   * Get this service's CloudFormation Resource factory.
+   */
+  cfnResourceFactory(): SimSqsCfnResourceFactory {
+    return this.cfnFactory;
   }
 
   /**

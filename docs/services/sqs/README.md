@@ -669,6 +669,90 @@ work. The same applies to `SimSdk` interception: intercepting `SQSClient` routes
 the simulation with nothing touching the network. See
 [AWS SDK interception](../../sdk/ "Simulated AWS SDK docs").
 
+## Deploying a queue from CloudFormation
+
+Simulated CloudFormation creates a queue from an `AWS::SQS::Queue` resource, in the stack's account
+and region. The queue is created through `CreateQueue`, so a template-created queue is the same thing
+an SDK caller would get: the same name validation, the same attribute ranges, the same ARN and URL.
+
+`Ref` on the resource gives the queue URL rather than its name or ARN, as it does on real AWS, so it
+can be handed straight to `SendMessage`. `Fn::GetAtt … Arn`, `Fn::GetAtt … QueueName` and
+`Fn::GetAtt … QueueUrl` give those.
+
+```typescript sim-sqs-cloudformation-queue
+/**
+ * Deploying a queue from a CloudFormation template and sending to it.
+ */
+
+import { SendMessageCommand } from "@aws-sdk/client-sqs";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "orders-stack",
+  template: {
+    Resources: {
+      OrdersQueue: {
+        Type: "AWS::SQS::Queue",
+        Properties: {
+          QueueName: "orders",
+          VisibilityTimeout: 120,
+          MessageRetentionPeriod: 3600,
+        },
+      },
+    },
+    Outputs: {
+      OrdersQueueUrl: {
+        Value: { Ref: "OrdersQueue" },
+      },
+      OrdersQueueArn: {
+        Value: { "Fn::GetAtt": ["OrdersQueue", "Arn"] },
+      },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+
+// Ref resolves to the queue URL, so it works as a SendMessage QueueUrl.
+const queueUrl = stack.outputs.get("OrdersQueueUrl")?.value as string;
+
+await simAws
+  .sqs()
+  .sendMessage(
+    new SendMessageCommand({ QueueUrl: queueUrl, MessageBody: "order-1" }),
+  );
+
+console.log(stack.outputs.get("OrdersQueueArn")?.value);
+// "arn:aws:sqs:us-east-1:888888888888:orders"
+```
+
+The properties applied to the queue are `VisibilityTimeout`, `DelaySeconds`,
+`MessageRetentionPeriod`, `MaximumMessageSize` and `ReceiveMessageWaitTimeSeconds`. Each is passed to
+`CreateQueue`, so a value outside the range real SQS accepts fails the resource.
+
+A queue with no `QueueName` is named from the stack name and the logical ID, so the queue above with
+its name left out would be `orders-stack-OrdersQueue`. Real CloudFormation adds random characters to
+that, which a template cannot predict either way. The generated name is trimmed to the 80 characters
+a queue name allows, ending in a hash of the untrimmed name so two long names that start the same
+stay apart.
+
+`FifoQueue: true` fails the resource, because only standard queues are simulated and a FIFO queue
+created as a standard one would take messages in an order the deployment does not promise. The
+properties with behaviour that is not simulated fail the resource in the same way rather than being
+dropped: `RedrivePolicy`, `RedriveAllowPolicy`, `KmsMasterKeyId`, `KmsDataKeyReusePeriodSeconds`,
+`SqsManagedSseEnabled`, `ContentBasedDeduplication`, `DeduplicationScope`, `FifoThroughputLimit` and
+`Tags`. So does a property `AWS::SQS::Queue` does not have.
+
+`AWS::SQS::QueuePolicy` is skipped rather than deployed, since queue policies are not simulated. The
+rest of the stack still deploys.
+
+CDK works without hand-editing. An `sqs.Queue` with `grantSendMessages(fn)` synthesises a template
+that deploys here, with the queue URL reaching the function through its environment and the grant
+policy naming the queue by the ARN `Fn::GetAtt` gives.
+
 ## Available functionality
 
 Sim SQS currently supports:
@@ -685,6 +769,8 @@ Sim SQS currently supports:
   attributes
 - Authorization of every operation by simulated IAM, against the real IAM action and queue ARN
 - Calls made from inside a simulated Lambda handler, authorized as the function's execution role
+- `AWS::SQS::Queue` in a CloudFormation or CDK template, with `Ref` giving the queue URL and
+  `Fn::GetAtt` giving `Arn`, `QueueName` and `QueueUrl`
 
 ## Limitations
 
@@ -723,6 +809,7 @@ Current documented limitations:
   size limit (`BatchRequestTooLong`) are not supported.
 - Lambda event source mappings are not simulated, so a queue does not invoke a function on its own. A
   test invokes the consumer itself, as the Lambda example above does.
-- There is no `AWS::SQS::Queue` CloudFormation resource yet, so a queue is created through the SDK
-  rather than deployed from a template.
+- `AWS::SQS::Queue` is the only SQS resource type CloudFormation creates. `AWS::SQS::QueuePolicy` is
+  skipped, and the queue properties this simulation has no behaviour for fail the resource rather
+  than being dropped.
 - SQS is not served as an HTTP API by `serveSimAws`.
