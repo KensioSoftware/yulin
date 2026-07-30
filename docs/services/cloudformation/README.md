@@ -5,26 +5,6 @@ Yulin includes a simulated CloudFormation service for tests and local developmen
 Sim CloudFormation creates simulated AWS resources from CloudFormation templates. It can be used with
 hand-written templates, AWS SDK-style `CreateStackCommand` calls, or synthesized CDK template files.
 
-The simulator focuses on useful behaviour for tests and local development rather than full
-CloudFormation feature parity. Unsupported resources may be skipped or may fail depending on how
-safely the simulator can model the requested behaviour.
-
-## Available functionality
-
-Sim CloudFormation currently supports:
-
-- `CreateStackCommand` and `DescribeStacksCommand`
-- Waiting for simulated stack deployment completion
-- `deployTemplate(...)` for parsed template objects
-- `deployTemplateFile(...)` for synthesized JSON template files
-- Template `Parameters` with supplied values and defaults
-- Template `Outputs`, resolved after resource creation and read from `stack.outputs`
-- The `Ref`, `Fn::GetAtt`, `Fn::Join` and `Fn::Sub` intrinsic functions
-- Explicit resource dependencies with `DependsOn`
-- Implicit dependencies from resource `Ref` expressions
-- The resource types listed under [Supported resources](#supported-resources-and-limitations) below,
-  including selected CDK custom resources such as CDK S3 BucketDeployment
-
 ## Basic usage
 
 Create a simulated AWS environment, get simulated CloudFormation, and deploy a template.
@@ -956,9 +936,36 @@ try {
 }
 ```
 
-## Supported resources and limitations
+## Standalone SimCloudFormation
 
-Sim CloudFormation supports a subset of CloudFormation. The resource types it creates are:
+Most users should access CloudFormation through `SimAws` so that CloudFormation can create resources
+in the same simulated AWS environment as S3, CloudFront, and other services.
+
+```typescript
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const simCfn = simAws.cloudFormation();
+```
+
+`SimCloudFormation` is also exported from `@kensio/yulin/cloudformation` for advanced cases. In
+normal application tests, prefer the `SimAws` entry point.
+
+## Available functionality
+
+Sim CloudFormation currently supports:
+
+- `CreateStackCommand` and `DescribeStacksCommand`
+- Waiting for simulated stack deployment completion
+- `deployTemplate(...)` for parsed template objects
+- `deployTemplateFile(...)` for synthesized JSON template files
+- Template `Parameters` with supplied values and defaults
+- Template `Outputs`, resolved after resource creation and read from `stack.outputs`
+- The `Ref`, `Fn::GetAtt`, `Fn::Join` and `Fn::Sub` intrinsic functions
+- Explicit resource dependencies with `DependsOn`
+- Implicit dependencies from resource `Ref` expressions
+
+The resource types it creates are:
 
 - `AWS::CertificateManager::Certificate`
 - `AWS::CloudFormation::WaitConditionHandle`
@@ -974,26 +981,14 @@ Sim CloudFormation supports a subset of CloudFormation. The resource types it cr
 - `AWS::SSM::Parameter`
 - selected CDK custom resources, including CDK S3 BucketDeployment
 
-Each service's own docs describe what its resource types support. Notable limitations:
+Each service's own docs describe what its resource types support.
+
+## Limitations
 
 - `TemplateBody` must be JSON when using `CreateStackCommand`. YAML parsing is not currently provided
   by the CloudFormation service.
-- Only supported resource types create simulated service resources.
+- Only supported resource types create simulated service resources. An unsupported resource may be
+  skipped or may fail the stack, depending on how safely the simulator can model it.
 - Unsupported resource properties may be ignored or rejected depending on the resource simulator.
 - Stack updates and deletes are not supported.
 - Mappings, conditions, and many advanced CloudFormation features are not supported.
-
-## Standalone SimCloudFormation
-
-Most users should access CloudFormation through `SimAws` so that CloudFormation can create resources
-in the same simulated AWS environment as S3, CloudFront, and other services.
-
-```typescript
-import { SimAws } from "@kensio/yulin";
-
-const simAws = new SimAws();
-const simCfn = simAws.cloudFormation();
-```
-
-`SimCloudFormation` is also exported from `@kensio/yulin/cloudformation` for advanced cases. In
-normal application tests, prefer the `SimAws` entry point.

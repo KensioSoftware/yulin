@@ -7,30 +7,6 @@ for them. Other simulated services use it to authorize their own actions, simula
 issue temporary Role sessions, and sim CloudFormation can create IAM resources from templates. It can
 also be instantiated on its own as `SimIam` with isolated state.
 
-## Available functionality
-
-Sim IAM currently supports:
-
-- `CreateRoleCommand`, including trust-policy validation
-- `GetRoleCommand` and `ListRolesCommand`, with pagination
-- `PutRolePolicyCommand`, for inline Role policies
-- `CreatePolicyCommand`, `GetPolicyCommand` and `ListPoliciesCommand`, for managed Policies
-- `AttachRolePolicyCommand`
-- `CreateUserCommand` and `PutUserPolicyCommand`
-- `CreateAccessKeyCommand`, registering access keys for credential authentication
-- Allow/deny authorization decisions with `authorize(...)`, evaluating identity policies,
-  service-supplied resource policies, and policy conditions with explicit-deny precedence
-- IAM authorization at simulated service boundaries, such as Route53 actions
-- Resolving the caller of an HTTP request, from an `x-sim-aws-caller` header or a verified SigV4
-  signature, defaulting to anonymous
-- Temporary Role sessions through simulated STS `AssumeRoleCommand`, evaluated against Role trust
-  policies
-- The `AWS::IAM::Role`, `AWS::IAM::ManagedPolicy` and `AWS::IAM::Policy` CloudFormation resources
-
-The simulator focuses on useful behaviour for tests and local development rather than full IAM
-feature parity. Unsupported IAM options may be ignored or may throw errors depending on whether the
-simulator needs them to model the requested behaviour.
-
 ## Basic usage
 
 Create a simulated AWS environment, get simulated IAM, create a Role with an inline policy, and
@@ -923,6 +899,29 @@ A standalone `SimIam` instance has its own isolated state, scoped to a generated
 not connected to a wider `SimAws` environment. Other services instantiated standalone, such as
 `new SimRoute53()`, fall back to allow-all authorization. Connect services through a shared `SimAws`
 instance when a test should exercise real IAM enforcement.
+
+## Available functionality
+
+Sim IAM currently supports:
+
+- `CreateRoleCommand`, including trust-policy validation
+- `GetRoleCommand` and `ListRolesCommand`, with pagination
+- `PutRolePolicyCommand`, for inline Role policies
+- `CreatePolicyCommand`, `GetPolicyCommand` and `ListPoliciesCommand`, for managed Policies
+- `AttachRolePolicyCommand`
+- `CreateUserCommand` and `PutUserPolicyCommand`
+- `CreateAccessKeyCommand`, registering access keys for credential authentication
+- Allow/deny authorization decisions with `authorize(...)`, evaluating identity policies,
+  service-supplied resource policies, and policy conditions with explicit-deny precedence
+- IAM authorization at simulated service boundaries, such as Route53 actions
+- Resolving the caller of an HTTP request, from an `x-sim-aws-caller` header or a verified SigV4
+  signature, defaulting to anonymous
+- Temporary Role sessions through simulated STS `AssumeRoleCommand`, evaluated against Role trust
+  policies
+- The `AWS::IAM::Role`, `AWS::IAM::ManagedPolicy` and `AWS::IAM::Policy` CloudFormation resources
+
+Unsupported IAM options may be ignored or may throw errors depending on whether the simulator needs
+them to model the requested behaviour.
 
 ## Limitations
 

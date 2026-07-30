@@ -5,27 +5,6 @@ in memory, versioned by staging label, and every operation is authorized by simu
 
 Secrets Manager-specific types are imported from the `@kensio/yulin/secretsmanager` subpath.
 
-## Available functionality
-
-Sim Secrets Manager currently supports:
-
-- `CreateSecretCommand`, holding either a string or binary
-- `GetSecretValueCommand`, by staging label or by version id
-- `PutSecretValueCommand` and `UpdateSecretCommand`, each writing a new version
-- `DescribeSecretCommand` and `ListSecretsCommand`
-- `DeleteSecretCommand`, with a recovery window, and `RestoreSecretCommand`
-- `AWSCURRENT` and `AWSPREVIOUS` staging labels, and custom labels
-- Secret ARNs carrying the six random characters real Secrets Manager appends
-- Friendly names, full ARNs and partial ARNs as interchangeable ways to name a secret
-- Authorization of every operation by simulated IAM, against the real IAM action
-- Encryption of every version through simulated KMS, under `KmsKeyId` or the `aws/secretsmanager`
-  managed key
-- Calls made from inside a simulated Lambda handler, authorized as the function's execution role
-- The `AWS::SecretsManager::Secret` CloudFormation resource, including `GenerateSecretString`
-
-The simulator focuses on useful behaviour for tests and local development rather than full Secrets
-Manager feature parity.
-
 ## Creating and reading a secret
 
 ```typescript sim-secrets-manager-create-and-read
@@ -483,6 +462,24 @@ work.
 The same applies to `SimSdk` interception: intercepting `SecretsManagerClient` routes ordinary SDK
 code into the simulation with nothing touching the network. See
 [AWS SDK interception](../../sdk/ "Simulated AWS SDK docs").
+
+## Available functionality
+
+Sim Secrets Manager currently supports:
+
+- `CreateSecretCommand`, holding either a string or binary
+- `GetSecretValueCommand`, by staging label or by version id
+- `PutSecretValueCommand` and `UpdateSecretCommand`, each writing a new version
+- `DescribeSecretCommand` and `ListSecretsCommand`
+- `DeleteSecretCommand`, with a recovery window, and `RestoreSecretCommand`
+- `AWSCURRENT` and `AWSPREVIOUS` staging labels, and custom labels
+- Secret ARNs carrying the six random characters real Secrets Manager appends
+- Friendly names, full ARNs and partial ARNs as interchangeable ways to name a secret
+- Authorization of every operation by simulated IAM, against the real IAM action
+- Encryption of every version through simulated KMS, under `KmsKeyId` or the `aws/secretsmanager`
+  managed key
+- Calls made from inside a simulated Lambda handler, authorized as the function's execution role
+- The `AWS::SecretsManager::Secret` CloudFormation resource, including `GenerateSecretString`
 
 ## Limitations
 

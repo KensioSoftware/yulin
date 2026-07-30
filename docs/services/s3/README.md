@@ -5,31 +5,6 @@ Yulin includes a simulated S3 service for tests and local development.
 Sim S3 can be used directly through `SimAws` or instantiated on its own as `SimS3` with isolated
 state. Yulin can serve a simulated S3 service on localhost.
 
-## Available functionality
-
-Sim S3 currently supports:
-
-- `CreateBucketCommand` and `ListBucketsCommand`
-- `PutObjectCommand`, `GetObjectCommand` and `ListObjectsCommand`
-- `PutBucketWebsiteCommand`, for static website hosting
-- `PutBucketPolicyCommand`, `GetBucketPolicyCommand` and `DeleteBucketPolicyCommand`, evaluated by
-  sim IAM alongside identity policies
-- The `AWS::S3::Bucket` and `AWS::S3::BucketPolicy` CloudFormation resources
-- Block Public Access, on by default as in real S3, refusing a public Bucket policy unless the Bucket
-  opts out with `PutPublicAccessBlockCommand` or `PublicAccessBlockConfiguration`
-- Serving static website requests on localhost with `serveSimAws`
-- Serving Object `GET`, `HEAD` and `PUT` over the S3 REST endpoint, authorized by sim IAM
-- Presigned URLs built by the real `@aws-sdk/s3-request-presigner`, with expiry in simulated time
-- Bucket website index documents, error documents, trailing-slash redirects, redirect-all
-  configuration, and routing-rule redirects
-- Bucket-global uniqueness within a `SimAws` instance across simulated Accounts and Regions
-- In-memory Object storage by default
-- Optional filesystem-backed Bucket storage with `mountBucketFilesystem(...)`
-
-The simulator focuses on useful behaviour for tests and local development rather than full S3 feature
-parity. Unsupported S3 options may be ignored or may throw errors depending on whether the simulator
-needs them to model the requested behaviour.
-
 ## Basic usage
 
 Create a simulated AWS environment, get simulated S3, create a Bucket, and put an Object into it.
@@ -942,3 +917,28 @@ await simS3.putObject(
 
 A standalone `SimS3` instance has its own isolated state and is not connected to a wider `SimAws`
 environment.
+
+## Available functionality
+
+Sim S3 currently supports:
+
+- `CreateBucketCommand` and `ListBucketsCommand`
+- `PutObjectCommand`, `GetObjectCommand` and `ListObjectsCommand`
+- `PutBucketWebsiteCommand`, for static website hosting
+- `PutBucketPolicyCommand`, `GetBucketPolicyCommand` and `DeleteBucketPolicyCommand`, evaluated by
+  sim IAM alongside identity policies
+- The `AWS::S3::Bucket` and `AWS::S3::BucketPolicy` CloudFormation resources
+- Block Public Access, on by default as in real S3, refusing a public Bucket policy unless the Bucket
+  opts out with `PutPublicAccessBlockCommand` or `PublicAccessBlockConfiguration`
+- Serving static website requests on localhost with `serveSimAws`
+- Serving Object `GET`, `HEAD` and `PUT` over the S3 REST endpoint, authorized by sim IAM
+- Presigned URLs built by the real `@aws-sdk/s3-request-presigner`, with expiry in simulated time
+- Bucket website index documents, error documents, trailing-slash redirects, redirect-all
+  configuration, and routing-rule redirects
+- Bucket-global uniqueness within a `SimAws` instance across simulated Accounts and Regions
+- In-memory Object storage by default
+- Optional filesystem-backed Bucket storage with `mountBucketFilesystem(...)`
+
+The simulator focuses on useful behaviour for tests and local development rather than full S3 feature
+parity. Unsupported S3 options may be ignored or may throw errors depending on whether the simulator
+needs them to model the requested behaviour.

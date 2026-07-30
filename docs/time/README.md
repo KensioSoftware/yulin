@@ -8,15 +8,6 @@ Nothing here replaces the clock for the whole process. Time belongs to a `SimAws
 it never disturbs another simulation running in the same test file, the real clock, or any other code
 in the process.
 
-## Available functionality
-
-- `simAws.now()` reads what the simulation currently calls the time.
-- `new SimAws({ clock })` starts a simulation at a given instant.
-- `simAws.clock()` returns the control: `freeze()`, `resume()`, `setTo(instant)`, `advanceBy(duration)`.
-- Advancing runs whatever falls due during the interval and returns once the simulation has
-  settled, so the next line can assert.
-- Served HTTP responses report simulated time in their `Date` header.
-
 ## Reading the time
 
 `simAws.now()` is what the simulation means by "now", which is not necessarily what the host clock

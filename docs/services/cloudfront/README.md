@@ -9,22 +9,6 @@ CloudFront-like layer without talking to real AWS.
 `SimCloudFront` can also be instantiated on its own, in which case it has its own isolated state that
 is not connected to a wider simulated AWS environment.
 
-## Available functionality
-
-Sim CloudFront currently supports:
-
-- `CreateDistributionCommand` and `GetDistributionCommand`
-- S3 Origins backed by sim S3 Buckets
-- CloudFront Distribution hostnames such as `distro123.cloudfront.net`
-- Default cache Behavior and path-based cache Behaviors
-- `viewer-request` and `viewer-response` CloudFront Functions
-- Viewer certificates from sim ACM, including CloudFront's `us-east-1` requirement
-- Serving simulated CloudFront traffic on localhost with `serveSimAws`
-
-The simulator focuses on useful behaviour for tests and local development rather than full CloudFront
-feature parity. Unsupported CloudFront options may be ignored or may throw errors depending on
-whether the simulator needs them to model the requested behaviour safely.
-
 ## Basic Distribution setup
 
 Create a simulated AWS environment, add a sim S3 Bucket, and create a sim CloudFront Distribution
@@ -401,3 +385,19 @@ export function handler(event) {
   return request;
 }
 ```
+
+## Available functionality
+
+Sim CloudFront currently supports:
+
+- `CreateDistributionCommand` and `GetDistributionCommand`
+- S3 Origins backed by sim S3 Buckets
+- CloudFront Distribution hostnames such as `distro123.cloudfront.net`
+- Default cache Behavior and path-based cache Behaviors
+- `viewer-request` and `viewer-response` CloudFront Functions
+- Viewer certificates from sim ACM, including CloudFront's `us-east-1` requirement
+- Serving simulated CloudFront traffic on localhost with `serveSimAws`
+
+The simulator focuses on useful behaviour for tests and local development rather than full CloudFront
+feature parity. Unsupported CloudFront options may be ignored or may throw errors depending on
+whether the simulator needs them to model the requested behaviour safely.

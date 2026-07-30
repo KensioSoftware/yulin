@@ -8,50 +8,6 @@ are a different service and are not simulated.
 
 Cognito-specific types are imported from the `@kensio/yulin/cognito` subpath.
 
-## Available functionality
-
-Sim Cognito currently supports:
-
-- `CreateUserPoolCommand`, `DescribeUserPoolCommand`, `DeleteUserPoolCommand` and
-  `ListUserPoolsCommand`
-- `CreateUserPoolClientCommand`, `DescribeUserPoolClientCommand`, `DeleteUserPoolClientCommand` and
-  `ListUserPoolClientsCommand`
-- `AdminCreateUserCommand`, `AdminGetUserCommand`, `AdminDeleteUserCommand`,
-  `AdminSetUserPasswordCommand`, `AdminUpdateUserAttributesCommand`, `AdminDisableUserCommand`,
-  `AdminEnableUserCommand` and `ListUsersCommand`
-- `CreateGroupCommand`, `GetGroupCommand`, `UpdateGroupCommand`, `DeleteGroupCommand`,
-  `ListGroupsCommand`, `AdminAddUserToGroupCommand`, `AdminRemoveUserFromGroupCommand`,
-  `AdminListGroupsForUserCommand` and `ListUsersInGroupCommand`
-- `AdminInitiateAuthCommand` and `AdminRespondToAuthChallengeCommand`, for the
-  `ADMIN_USER_PASSWORD_AUTH` and `REFRESH_TOKEN_AUTH` flows and the `NEW_PASSWORD_REQUIRED`
-  challenge
-- `InitiateAuthCommand` and `RespondToAuthChallengeCommand`, for the client-side
-  `USER_PASSWORD_AUTH` and `REFRESH_TOKEN_AUTH` flows, authorized by no IAM policy as they are on
-  real Cognito
-- `GlobalSignOutCommand` and `AdminUserGlobalSignOutCommand`, which revoke the tokens a user holds
-- Real RS256 JWTs, signed by a key the pool publishes as a JWKS, so a verifier configured for the
-  pool verifies them unchanged
-- A pool's `.well-known/jwks.json` and `.well-known/openid-configuration` served over HTTP by
-  `serveSimAws`, anonymously, so a verifier fetches the keys rather than being handed them
-- `AWS::Cognito::UserPool`, `AWS::Cognito::UserPoolClient` and `AWS::Cognito::UserPoolGroup`
-  deployed from a CloudFormation template, with the `Ref` and `Fn::GetAtt` values real
-  CloudFormation returns
-- Pool ids in the real `<region>_<nine characters>` form, and pool ARNs built from them
-- The real default password policy, applied to the passwords users are given
-- The real user status lifecycle, so an admin-created user stays in `FORCE_CHANGE_PASSWORD` until it
-  has a permanent password
-- Group membership, and the precedence order the `cognito:groups` claim uses
-- App client authentication flows, token lifetimes, generated client secrets and
-  `PreventUserExistenceErrors`
-- Refresh tokens that expire at the app client's `RefreshTokenValidity`, thirty days by default on
-  the simulated clock
-- Authorization of the administrative operations by simulated IAM, against the real IAM action and
-  ARN
-- Calls made from inside a simulated Lambda handler, authorized as the function's execution role
-
-SRP, the hosted UI and managed login, MFA, custom authentication challenges and device tracking are
-not implemented.
-
 ## Creating a pool and an app client
 
 A pool needs a name. Everything else has a default, and the defaults here are the ones real Cognito
@@ -1293,6 +1249,47 @@ opposite of what the console does. A pool created with `DeletionProtection: "ACT
 Real Cognito wants an `UpdateUserPool` request deactivating the protection before the pool can go.
 `UpdateUserPool` is not simulated, so a protected pool cannot be deleted here at all. Create the pool
 without `DeletionProtection` if the test needs to delete it.
+
+## Available functionality
+
+Sim Cognito currently supports:
+
+- `CreateUserPoolCommand`, `DescribeUserPoolCommand`, `DeleteUserPoolCommand` and
+  `ListUserPoolsCommand`
+- `CreateUserPoolClientCommand`, `DescribeUserPoolClientCommand`, `DeleteUserPoolClientCommand` and
+  `ListUserPoolClientsCommand`
+- `AdminCreateUserCommand`, `AdminGetUserCommand`, `AdminDeleteUserCommand`,
+  `AdminSetUserPasswordCommand`, `AdminUpdateUserAttributesCommand`, `AdminDisableUserCommand`,
+  `AdminEnableUserCommand` and `ListUsersCommand`
+- `CreateGroupCommand`, `GetGroupCommand`, `UpdateGroupCommand`, `DeleteGroupCommand`,
+  `ListGroupsCommand`, `AdminAddUserToGroupCommand`, `AdminRemoveUserFromGroupCommand`,
+  `AdminListGroupsForUserCommand` and `ListUsersInGroupCommand`
+- `AdminInitiateAuthCommand` and `AdminRespondToAuthChallengeCommand`, for the
+  `ADMIN_USER_PASSWORD_AUTH` and `REFRESH_TOKEN_AUTH` flows and the `NEW_PASSWORD_REQUIRED`
+  challenge
+- `InitiateAuthCommand` and `RespondToAuthChallengeCommand`, for the client-side
+  `USER_PASSWORD_AUTH` and `REFRESH_TOKEN_AUTH` flows, authorized by no IAM policy as they are on
+  real Cognito
+- `GlobalSignOutCommand` and `AdminUserGlobalSignOutCommand`, which revoke the tokens a user holds
+- Real RS256 JWTs, signed by a key the pool publishes as a JWKS, so a verifier configured for the
+  pool verifies them unchanged
+- A pool's `.well-known/jwks.json` and `.well-known/openid-configuration` served over HTTP by
+  `serveSimAws`, anonymously, so a verifier fetches the keys rather than being handed them
+- `AWS::Cognito::UserPool`, `AWS::Cognito::UserPoolClient` and `AWS::Cognito::UserPoolGroup`
+  deployed from a CloudFormation template, with the `Ref` and `Fn::GetAtt` values real
+  CloudFormation returns
+- Pool ids in the real `<region>_<nine characters>` form, and pool ARNs built from them
+- The real default password policy, applied to the passwords users are given
+- The real user status lifecycle, so an admin-created user stays in `FORCE_CHANGE_PASSWORD` until it
+  has a permanent password
+- Group membership, and the precedence order the `cognito:groups` claim uses
+- App client authentication flows, token lifetimes, generated client secrets and
+  `PreventUserExistenceErrors`
+- Refresh tokens that expire at the app client's `RefreshTokenValidity`, thirty days by default on
+  the simulated clock
+- Authorization of the administrative operations by simulated IAM, against the real IAM action and
+  ARN
+- Calls made from inside a simulated Lambda handler, authorized as the function's execution role
 
 ## Limitations
 
