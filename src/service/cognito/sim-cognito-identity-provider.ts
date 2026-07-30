@@ -11,6 +11,7 @@ import {
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
 import type * as simCognitoCommands from "./command/sim-cognito-command.types.js";
 import { SimCognitoCommands } from "./command/sim-cognito-commands.js";
+import { SimCognitoUserPoolRegistry } from "./registry/sim-cognito-user-pool-registry.js";
 import { SimCognitoSdkCommandRouter } from "./sdk/sim-cognito-sdk-command-router.js";
 import {
   type SimCognitoIdentityProviderRequestOptions,
@@ -30,6 +31,7 @@ interface SimCognitoIdentityProviderProperties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
+  readonly userPoolRegistry?: SimCognitoUserPoolRegistry;
 }
 
 /**
@@ -49,6 +51,7 @@ interface SimCognitoIdentityProviderProperties {
  */
 export class SimCognitoIdentityProvider extends SimCognitoUserDirectory {
   private readonly pools: SimCognitoUserPoolStore;
+  private readonly userPoolRegistry: SimCognitoUserPoolRegistry;
   private readonly sdkRouter = new SimCognitoSdkCommandRouter(this);
 
   constructor(properties: SimCognitoIdentityProviderProperties = {}) {
@@ -56,8 +59,9 @@ export class SimCognitoIdentityProvider extends SimCognitoUserDirectory {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
+      userPoolRegistry = new SimCognitoUserPoolRegistry(),
     } = properties;
-    const pools = new SimCognitoUserPoolStore();
+    const pools = new SimCognitoUserPoolStore({ registry: userPoolRegistry });
 
     super({
       commands: new SimCognitoCommands({
@@ -70,6 +74,19 @@ export class SimCognitoIdentityProvider extends SimCognitoUserDirectory {
     });
 
     this.pools = pools;
+    this.userPoolRegistry = userPoolRegistry;
+  }
+
+  /**
+   * Find a user pool by id, in whichever Account and Region created it.
+   *
+   * A pool id is unique across a simulation, as it is across real AWS, so this
+   * is what the served JWKS and OpenID configuration endpoints resolve a pool
+   * from: the request hostname carries the region and the path carries the id,
+   * and neither says which Account owns the pool.
+   */
+  findUserPoolInAnyAccount(userPoolId: string): SimCognitoUserPool | undefined {
+    return this.userPoolRegistry.find(userPoolId);
   }
 
   /**

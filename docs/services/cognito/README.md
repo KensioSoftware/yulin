@@ -31,6 +31,8 @@ Sim Cognito currently supports:
 - `GlobalSignOutCommand` and `AdminUserGlobalSignOutCommand`, which revoke the tokens a user holds
 - Real RS256 JWTs, signed by a key the pool publishes as a JWKS, so a verifier configured for the
   pool verifies them unchanged
+- A pool's `.well-known/jwks.json` and `.well-known/openid-configuration` served over HTTP by
+  `serveSimAws`, anonymously, so a verifier fetches the keys rather than being handed them
 - Pool ids in the real `<region>_<nine characters>` form, and pool ARNs built from them
 - The real default password policy, applied to the passwords users are given
 - The real user status lifecycle, so an admin-created user stays in `FORCE_CHANGE_PASSWORD` until it
@@ -973,6 +975,114 @@ Both listings are in creation order and hold at most sixty entries. Follow `Next
 rest. A listed pool carries no ARN and a listed app client carries no secret, as real Cognito leaves
 those out of a listing.
 
+## Serving a pool's JWKS on localhost
+
+`serveSimAws` serves the two public endpoints of every simulated pool:
+
+- `GET /<userPoolId>/.well-known/jwks.json`
+- `GET /<userPoolId>/.well-known/openid-configuration`
+
+Both are anonymous, as they are on real Cognito, so no SigV4 signature is needed to fetch them. The
+real hostname `cognito-idp.<region>.amazonaws.com` maps to `cognito-idp.<region>.sim-aws.localhost`,
+and `srv.localUrl(...)` does that rewriting for you. An unknown pool id gets a 404, as does a pool
+reached through another region's hostname.
+
+```typescript sim-cognito-serve-jwks
+/**
+ * Fetching a simulated user pool's JWKS over HTTP.
+ */
+
+import {
+  AdminCreateUserCommand,
+  AdminInitiateAuthCommand,
+  AdminSetUserPasswordCommand,
+  CreateUserPoolClientCommand,
+  CreateUserPoolCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+import { CognitoJwtVerifier } from "aws-jwt-verify";
+import type { Jwks } from "aws-jwt-verify/jwk";
+
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
+const cognito = simAws.cognitoIdentityProvider();
+
+const pool = await cognito.createUserPool(
+  new CreateUserPoolCommand({ PoolName: "myapp-users" }),
+);
+const userPoolId = pool.UserPool!.Id!;
+
+const appClient = await cognito.createUserPoolClient(
+  new CreateUserPoolClientCommand({
+    UserPoolId: userPoolId,
+    ClientName: "web",
+    ExplicitAuthFlows: ["ALLOW_ADMIN_USER_PASSWORD_AUTH"],
+  }),
+);
+const clientId = appClient.UserPoolClient!.ClientId!;
+
+await cognito.adminCreateUser(
+  new AdminCreateUserCommand({ UserPoolId: userPoolId, Username: "alice" }),
+);
+await cognito.adminSetUserPassword(
+  new AdminSetUserPasswordCommand({
+    UserPoolId: userPoolId,
+    Username: "alice",
+    Password: "Sup3rSecret!",
+    Permanent: true,
+  }),
+);
+
+const { AuthenticationResult } = await cognito.adminInitiateAuth(
+  new AdminInitiateAuthCommand({
+    UserPoolId: userPoolId,
+    ClientId: clientId,
+    AuthFlow: "ADMIN_USER_PASSWORD_AUTH",
+    AuthParameters: { USERNAME: "alice", PASSWORD: "Sup3rSecret!" },
+  }),
+);
+
+const srv = await serveSimAws({ simAws });
+
+try {
+  // The real Cognito JWKS URL, adapted for the local server.
+  const jwksUrl = srv.localUrl(
+    `https://cognito-idp.eu-west-2.amazonaws.com/${userPoolId}/.well-known/jwks.json`,
+  );
+  console.log(jwksUrl.pathname);
+  // "/eu-west-2_aBcDeFgHi/.well-known/jwks.json"
+
+  const response = await fetch(jwksUrl);
+  const jwks = (await response.json()) as Jwks;
+
+  const verifier = CognitoJwtVerifier.create({
+    userPoolId,
+    tokenUse: "access",
+    clientId,
+  });
+  verifier.cacheJwks(jwks);
+
+  const payload = await verifier.verify(AuthenticationResult!.AccessToken!);
+
+  console.log(payload.username); // "alice"
+} finally {
+  srv.close();
+}
+```
+
+`aws-jwt-verify` fetches over HTTPS only, and `CognitoJwtVerifier` builds its own JWKS URI from the
+pool id rather than taking one, so it cannot be pointed at the local URL. Fetching the document and
+calling `cacheJwks` with it is one way round that. The other is to hand the verifier a
+`SimpleJwksCache` from `aws-jwt-verify/jwk` whose fetcher passes the URI through `srv.localUrl`,
+which leaves the verifier setup in the application untouched. A verifier that takes a `jwksUri` and
+accepts plain HTTP can be pointed at the local URL as it is.
+
+The OpenID configuration names the origin the request arrived on in `issuer` and `jwks_uri`, so a
+client that discovers the document can go on to fetch the keys it points at. The tokens keep the
+real `https://cognito-idp.<region>.amazonaws.com/<userPoolId>` in `iss`, which is what a verifier
+built from a pool id checks against, so the two disagree here where they agree on real Cognito.
+
 ## Intercepting the SDK client
 
 Code that builds its own `CognitoIdentityProviderClient` needs no changes. Intercepting the client
@@ -1135,9 +1245,14 @@ Current documented limitations:
 - A pool does not report `SchemaAttributes`. Real Cognito reports the standard attribute schema on
   every pool, and there are no user attributes here to describe.
 - Managed login and the hosted UI are not simulated, and neither are the OAuth endpoints, the
-  `/oauth2/token` endpoint among them. Nothing is served over HTTP.
-- The JWKS endpoint at `.../.well-known/jwks.json` is not served. A pool's JWKS is read from the
-  simulator with `cognito.userPool(userPoolId).jwks()` and handed to a verifier directly.
+  `/oauth2/token` endpoint among them.
+- The served OpenID configuration therefore carries no `authorization_endpoint`, `token_endpoint` or
+  `userinfo_endpoint`, where real Cognito names all three. A client that needs one of them finds
+  nothing rather than an address that would not answer.
+- The served `issuer` and `jwks_uri` name the localhost origin the request arrived on, so a client
+  can fetch the keys they point at. A token's `iss` claim still names the real
+  `https://cognito-idp.<region>.amazonaws.com/<userPoolId>`, so the two disagree here and agree on
+  real Cognito.
 - Identity providers, resource servers, user pool domains, MFA configuration, risk configuration and
   Lambda triggers are not simulated.
 - Tags are not simulated. `UserPoolTags` is refused, and `TagResource`, `UntagResource` and
@@ -1145,5 +1260,7 @@ Current documented limitations:
 - Listings carry no filtering, and are in creation order rather than any order real Cognito chooses.
 - `AWS::Cognito::UserPool` and the other `AWS::Cognito::*` CloudFormation resource types are reported
   as unsupported and skipped rather than deployed.
-- Cognito is not served as an HTTP API by `serveSimAws`.
+- The Cognito API itself is not served as HTTP by `serveSimAws`, only the two public pool endpoints.
+  A `CognitoIdentityProviderClient` reaches the simulator through `SimSdk` rather than through an
+  endpoint override.
 - Cognito identity pools are a different service and nothing about them is simulated.

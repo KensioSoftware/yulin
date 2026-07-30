@@ -16,7 +16,8 @@ import { SimAwsRequestCaller } from "../../service/iam/request/sim-aws-request-c
 export type SimAwsServiceEndpoint = "rest" | "website";
 
 export interface SimAwsServiceTarget {
-  readonly service: "s3" | "cloudFront" | "lambda" | "route53";
+  readonly service:
+    "s3" | "cloudFront" | "lambda" | "route53" | "cognitoIdentityProvider";
   readonly resourceName: string;
   // regionName is used for validation, not look-up
   readonly regionName?: AwsRegionName;

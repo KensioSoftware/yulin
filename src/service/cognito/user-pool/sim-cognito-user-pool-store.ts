@@ -2,6 +2,7 @@ import {
   SimCognitoNotAuthorizedException,
   SimCognitoResourceNotFoundException,
 } from "../error/sim-cognito.error.js";
+import { SimCognitoUserPoolRegistry } from "../registry/sim-cognito-user-pool-registry.js";
 import type { SimCognitoIssuedToken } from "./auth/sim-cognito-issued-token.js";
 import type { SimCognitoUserPoolClient } from "./client/sim-cognito-user-pool-client.js";
 import type { SimCognitoUserPoolClientId } from "./client/sim-cognito-user-pool-client-id.js";
@@ -24,14 +25,27 @@ export interface SimCognitoAccessTokenInPool {
   readonly token: SimCognitoIssuedToken;
 }
 
+interface SimCognitoUserPoolStoreProperties {
+  readonly registry?: SimCognitoUserPoolRegistry;
+}
+
 /**
  * The user pools of one simulated Cognito scope.
  *
  * Pools are keyed by id rather than by name, as real Cognito keys them: two
  * pools may share a name, and only the id ever identifies one.
+ *
+ * A store also keeps the simulation-wide registry up to date, because a pool
+ * id has to be unique beyond this one scope and the serving layer resolves a
+ * pool from its id alone.
  */
 export class SimCognitoUserPoolStore {
   private readonly pools = new Map<string, SimCognitoUserPool>();
+  private readonly registry: SimCognitoUserPoolRegistry;
+
+  constructor(properties: SimCognitoUserPoolStoreProperties = {}) {
+    this.registry = properties.registry ?? new SimCognitoUserPoolRegistry();
+  }
 
   private static unexpired(
     issued: SimCognitoIssuedToken,
@@ -53,9 +67,13 @@ export class SimCognitoUserPoolStore {
 
   /**
    * The pool ids already in use, so a new one can avoid them.
+   *
+   * These come from the whole simulation rather than from this scope, because
+   * a pool id is what the serving layer looks a pool up by and two Accounts
+   * sharing one would be ambiguous.
    */
   get ids(): Set<string> {
-    return new Set(this.pools.keys());
+    return this.registry.ids;
   }
 
   /**
@@ -63,6 +81,7 @@ export class SimCognitoUserPoolStore {
    */
   add(pool: SimCognitoUserPool): void {
     this.pools.set(pool.id, pool);
+    this.registry.register(pool);
   }
 
   /**
@@ -70,6 +89,7 @@ export class SimCognitoUserPoolStore {
    */
   remove(pool: SimCognitoUserPool): void {
     this.pools.delete(pool.id);
+    this.registry.deregister(pool);
   }
 
   /**
