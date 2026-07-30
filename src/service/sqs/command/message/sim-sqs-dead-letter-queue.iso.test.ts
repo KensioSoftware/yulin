@@ -272,6 +272,40 @@ describe("SQS dead-letter queues", () => {
     );
   });
 
+  it("accepts a late delete from the consumer whose message was moved", async () => {
+    // Given a consumer holding the handle from the receive that used up the
+    // message's last attempt, which has since moved to the dead-letter queue.
+    const { simAws, queueUrl, deadLetterQueueUrl } =
+      await simAwsWithDeadLetterQueue(1);
+    await simAws
+      .sqs()
+      .sendMessage(
+        new SendMessageCommand({ QueueUrl: queueUrl, MessageBody: "order-1" }),
+      );
+    const received = await simAws
+      .sqs()
+      .receiveMessage(new ReceiveMessageCommand({ QueueUrl: queueUrl }));
+    await simAws.clock().advanceBy({ seconds: 31 });
+
+    // When that consumer finally finishes and deletes.
+    await simAws.sqs().deleteMessage(
+      new DeleteMessageCommand({
+        QueueUrl: queueUrl,
+        ReceiptHandle: received.Messages?.[0]?.ReceiptHandle,
+      }),
+    );
+
+    // Then the delete succeeds and deletes nothing, as a delete under a
+    // superseded handle does, leaving the message on the dead-letter queue.
+    const dead = await simAws
+      .sqs()
+      .receiveMessage(
+        new ReceiveMessageCommand({ QueueUrl: deadLetterQueueUrl }),
+      );
+
+    assertIdentical(dead.Messages?.[0]?.Body, "order-1");
+  });
+
   it("leaves messages where they are once the dead-letter queue is deleted", async () => {
     // Given a queue whose dead-letter queue has been deleted.
     const { simAws, queueUrl, deadLetterQueueUrl } =
