@@ -215,7 +215,10 @@ try {
     new DeleteTableCommand({ TableName: "ProtectedTable" }),
   );
 } catch (error) {
-  console.log((error as Error).name); // "ValidationException"
+  if ((error as Error).name !== "ValidationException") {
+    throw error;
+  }
+  console.log("the table is protected from deletion");
 }
 
 const description = await dynamoDb.describeTable(
@@ -300,7 +303,8 @@ table, so it authorizes against `*`.
 - `ListTables`, ordered by UTF-8 bytes and paged with `Limit` and `ExclusiveStartTableName`.
 - `DeleteTable`, following the table status DynamoDB moves a deleted table through, and refusing a
   table that is protected from deletion.
-- `PutItem`, in an earlier form than the table commands.
+- `PutItem`, in an earlier form than the table commands. It reaches its table the same way
+  they do, so it takes a table name or ARN and authorizes before the lookup.
 - SDK interception, so an intercepted `DynamoDBClient` reaches the simulation.
 
 ## Limitations
@@ -340,6 +344,6 @@ table, so it authorizes against `*`.
   refuses that status anyway, for when it can.
 - Nothing enforces capacity. A provisioned table's throughput is stored and reported, and no request
   is ever throttled with `ProvisionedThroughputExceededException`.
-- `UpdateTable`, `DeleteTable` and the item commands other than `PutItem` are not implemented yet,
-  and neither is `AWS::DynamoDB::Table` in CloudFormation.
+- `UpdateTable` and the item commands other than `PutItem` are not implemented yet, and neither is
+  `AWS::DynamoDB::Table` in CloudFormation.
 - DynamoDB is not served as an HTTP API by `serveSimAws`.

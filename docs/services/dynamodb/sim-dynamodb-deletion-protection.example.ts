@@ -29,7 +29,10 @@ try {
     new DeleteTableCommand({ TableName: "ProtectedTable" }),
   );
 } catch (error) {
-  console.log((error as Error).name); // "ValidationException"
+  if ((error as Error).name !== "ValidationException") {
+    throw error;
+  }
+  console.log("the table is protected from deletion");
 }
 
 const description = await dynamoDb.describeTable(

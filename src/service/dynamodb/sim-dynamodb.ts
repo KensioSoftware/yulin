@@ -48,7 +48,7 @@ interface SimDynamoDatabaseProperties {
 export class SimDynamoDb {
   private readonly tables = new SimDynamoDbTableStore();
 
-  private readonly authorizer: SimDynamoDbAuthorizer;
+  private readonly access: SimDynamoDbTableAccess;
   private readonly background: BackgroundScheduler;
   private readonly tableCreation: SimDynamoDbCreateTable;
   private readonly tableCommands: SimDynamoDbTableCommands;
@@ -61,21 +61,23 @@ export class SimDynamoDb {
       background = new BackgroundTasks(),
     } = properties;
 
+    const authorizer = new SimDynamoDbAuthorizer({ iam, accountRegionScope });
+
     this.background = background;
-    this.authorizer = new SimDynamoDbAuthorizer({ iam, accountRegionScope });
+    this.access = new SimDynamoDbTableAccess({
+      tables: this.tables,
+      authorizer,
+      accountRegionScope,
+    });
     this.tableCreation = new SimDynamoDbCreateTable({
       tables: this.tables,
-      authorizer: this.authorizer,
+      authorizer,
       accountRegionScope,
       background,
     });
     this.tableCommands = new SimDynamoDbTableCommands({
       tables: this.tables,
-      access: new SimDynamoDbTableAccess({
-        tables: this.tables,
-        authorizer: this.authorizer,
-        accountRegionScope,
-      }),
+      access: this.access,
       background,
     });
   }
@@ -132,10 +134,7 @@ export class SimDynamoDb {
     command: SimPutItemCommand,
     options?: SimDynamoDbRequestOptions,
   ): Promise<SimPutItemCommandOutput> {
-    const handler = new PutItemCommandHandler({
-      tables: this.tables,
-      authorizer: this.authorizer,
-    });
+    const handler = new PutItemCommandHandler({ access: this.access });
     return await handler.handle(command, options);
   }
 

@@ -200,10 +200,15 @@ create tables concurrently and still assert a deterministic list.
 
 ## DescribeTable, ListTables and DeleteTable behavior
 
-`SimDynamoDbTableCommands` implements all three. They share how a request names its table:
-`readSimDynamoDbTableReference` takes either a table name or a table ARN, as real DynamoDB does, and
-refuses an ARN for another Account or Region rather than resolving it to the local table of that
-name.
+`SimDynamoDbTableCommands` implements all three, reaching their tables through
+`SimDynamoDbTableAccess`. That is where the order every command follows lives: read the table the
+request names, authorize the caller against it, and only then look it up.
+
+DescribeTable and DeleteTable name one table, and `readSimDynamoDbTableReference` takes either its
+name or its ARN, as real DynamoDB does. An ARN for another Account or Region is refused rather than
+resolved to the local table of that name. ListTables names no table at all: its
+`ExclusiveStartTableName` is a pagination token rather than a table reference, and it authorizes
+against every table in the Account and Region.
 
 DescribeTable answers with `table.toDescription()`, the same description CreateTable answered with.
 
@@ -226,7 +231,9 @@ DeleteTable follows the status DynamoDB moves a deleted table through:
 
 ## PutItem behavior
 
-`PutItemCommandHandler` implements item writes.
+`PutItemCommandHandler` implements item writes. It reaches its table through the same
+`SimDynamoDbTableAccess` the table commands use, so it takes a table name or ARN and authorizes
+before the lookup.
 
 Important behavior:
 

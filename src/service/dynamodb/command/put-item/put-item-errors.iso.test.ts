@@ -6,6 +6,7 @@ import {
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import { SimAws } from "../../../aws/sim-aws.js";
+import { SimDynamoDbValidationException as SimDynamoDatabaseValidationException } from "../../error/dynamodb.error.js";
 
 describe("DynamoDB PutItemCommand errors", () => {
   it("rejects when missing partition key", async () => {
@@ -167,11 +168,8 @@ describe("DynamoDB PutItemCommand errors", () => {
       );
     });
 
-    assertInstanceOf(error, Error);
-    assertStringIncludes(
-      error.message,
-      "PutItemCommand.input.TableName required",
-    );
+    assertInstanceOf(error, SimDynamoDatabaseValidationException);
+    assertStringIncludes(error.message, "A TableName is required");
   });
 
   it("rejects non-existent table", async () => {

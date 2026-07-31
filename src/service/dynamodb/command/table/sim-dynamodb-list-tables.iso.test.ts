@@ -4,6 +4,7 @@ import {
 } from "@aws-sdk/client-dynamodb";
 import {
   assertArrayEquals,
+  assertIdentical,
   assertInstanceOf,
   assertStringIncludes,
   assertThrowsErrorAsync,
@@ -78,18 +79,19 @@ describe("DynamoDB ListTablesCommand", () => {
 
     // Then the loop ends, having seen every table once.
     assertArrayEquals(listed, ["TableA", "TableB", "TableC"]);
-    assertArrayEquals([pages], [2]);
+    assertIdentical(pages, 2);
 
     await simAws.backgroundTasksComplete();
   });
 
   it("resumes at the first name after the one it is given", async () => {
-    // Given three tables, one of which is deleted before the next page.
+    // Given three tables.
     const simAws = new SimAws();
     const simDynamoDb = simAws.dynamoDb();
     await createTables(simDynamoDb, ["TableA", "TableB", "TableC"]);
 
-    // When a page resumes from a name that is no longer there.
+    // When a page resumes from a name no table has, as a token for a table
+    // deleted since the last page would be.
     const listing = await simDynamoDb.listTables(
       new ListTablesCommand({ ExclusiveStartTableName: "TableAA" }),
     );

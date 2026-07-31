@@ -3,17 +3,13 @@ import type {
   SimPutItemCommand,
   SimPutItemCommandOutput,
 } from "./put-item.command.js";
-import { SimDynamoDbTableName } from "../../table/sim-dynamodb-table-name.js";
-import type { SimDynamoDbTableStore } from "../../table/sim-dynamodb-table-store.js";
 import { DynamoDbItem as DynamoDatabaseItem } from "../../item/dynamodb-item.js";
-import { SimDynamoDbResourceNotFoundException as SimDynamoDatabaseResourceNotFoundException } from "../../error/dynamodb.error.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
-import type { SimDynamoDbAuthorizer } from "../authorize/sim-dynamodb-authorizer.js";
+import type { SimDynamoDbTableAccess } from "../table/sim-dynamodb-table-access.js";
 
 interface PutItemCommandHandlerProperties {
-  readonly tables: SimDynamoDbTableStore;
-  readonly authorizer: SimDynamoDbAuthorizer;
+  readonly access: SimDynamoDbTableAccess;
 }
 
 interface PutItemCommandHandlerOptions {
@@ -29,12 +25,10 @@ export class PutItemCommandHandler implements CommandHandler<
   SimPutItemCommand,
   SimPutItemCommandOutput
 > {
-  private readonly tables: SimDynamoDbTableStore;
-  private readonly authorizer: SimDynamoDbAuthorizer;
+  private readonly access: SimDynamoDbTableAccess;
 
   constructor(properties: PutItemCommandHandlerProperties) {
-    this.tables = properties.tables;
-    this.authorizer = properties.authorizer;
+    this.access = properties.access;
   }
 
   /**
@@ -44,24 +38,11 @@ export class PutItemCommandHandler implements CommandHandler<
     command: SimPutItemCommand,
     options?: PutItemCommandHandlerOptions,
   ): Promise<SimPutItemCommandOutput> {
-    assertDefined(
-      command.input.TableName,
-      "PutItemCommand.input.TableName required",
-    );
-    const tableName = SimDynamoDbTableName.of(command.input.TableName);
-
-    this.authorizer.authorizeTable(
+    const table = this.access.required(
       "dynamodb:PutItem",
-      tableName.value,
+      command.input.TableName,
       options?.caller,
     );
-
-    const table = this.tables.find(tableName);
-    if (table === undefined) {
-      throw new SimDynamoDatabaseResourceNotFoundException(
-        `No DynamoDB Table named ${tableName.value}`,
-      );
-    }
 
     assertDefined(command.input.Item, "PutItemCommand.input.Item required");
 
