@@ -367,10 +367,135 @@ reports nothing removed. Its `ReturnValues` takes `NONE` and `ALL_OLD`, as `PutI
 
 Both take the table's name or its ARN, as the table commands do.
 
+## Updating items
+
+`UpdateItem` changes part of an item, where `PutItem` replaces the whole thing. What to change is
+written as an `UpdateExpression` made of a `SET` clause, a `REMOVE` clause, or both in either order.
+Each keyword appears at most once, and the actions inside a clause are separated by commas.
+
+A `SET` action is `path = operand`, where an operand is a value from `ExpressionAttributeValues`,
+another document path, or `if_not_exists(path, operand)`. An update expression carries no literals,
+so every constant arrives through `ExpressionAttributeValues`. A `REMOVE` action is a document path
+on its own, and removing an attribute that is not there succeeds without changing the item.
+
+Every action reads the item as it stood before the request, rather than the item being built. So
+this expression, against `{ a: 1, b: 2, c: 3 }`:
+
+```text
+REMOVE a SET b = a, c = b
+```
+
+leaves `{ b: 1, c: 2 }`. Both assignments read the values from before the update, and `a` is still
+there to be read even though the `REMOVE` is written first.
+
+```typescript sim-dynamodb-update-item
+/**
+ * Changing part of an item, against the item as it stood before the update.
+ */
+
+import {
+  CreateTableCommand,
+  PutItemCommand,
+  UpdateItemCommand,
+} from "@aws-sdk/client-dynamodb";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const dynamoDb = simAws.dynamoDb();
+
+await dynamoDb.createTable(
+  new CreateTableCommand({
+    TableName: "FoobarTable",
+    KeySchema: [{ AttributeName: "orderId", KeyType: "HASH" }],
+    AttributeDefinitions: [{ AttributeName: "orderId", AttributeType: "S" }],
+    BillingMode: "PAY_PER_REQUEST",
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+await dynamoDb.putItem(
+  new PutItemCommand({
+    TableName: "FoobarTable",
+    Item: {
+      orderId: { S: "order-1" },
+      a: { N: "1" },
+      b: { N: "2" },
+      c: { N: "3" },
+      draft: { BOOL: true },
+    },
+  }),
+);
+
+// Both assignments read the values from before the update, so removing `a`
+// first does not take it away from the assignment reading it.
+const updated = await dynamoDb.updateItem(
+  new UpdateItemCommand({
+    TableName: "FoobarTable",
+    Key: { orderId: { S: "order-1" } },
+    UpdateExpression: "REMOVE a, draft SET b = a, c = b",
+    ReturnValues: "ALL_NEW",
+  }),
+);
+
+console.log(updated.Attributes?.["b"]?.N); // "1"
+console.log(updated.Attributes?.["c"]?.N); // "2"
+console.log(updated.Attributes?.["a"]); // undefined
+
+// if_not_exists keeps a value that is already there, and assigns one when it
+// is not.
+const defaulted = await dynamoDb.updateItem(
+  new UpdateItemCommand({
+    TableName: "FoobarTable",
+    Key: { orderId: { S: "order-1" } },
+    UpdateExpression: "SET #s = if_not_exists(#s, :packing)",
+    ExpressionAttributeNames: { "#s": "status" },
+    ExpressionAttributeValues: { ":packing": { S: "packing" } },
+    ReturnValues: "ALL_NEW",
+  }),
+);
+
+console.log(defaulted.Attributes?.["status"]?.S); // "packing"
+
+// UpdateItem upserts, so a key holding nothing gets an item built from the Key
+// and the SET actions.
+await dynamoDb.updateItem(
+  new UpdateItemCommand({
+    TableName: "FoobarTable",
+    Key: { orderId: { S: "order-2" } },
+    UpdateExpression: "SET #s = :new",
+    ExpressionAttributeNames: { "#s": "status" },
+    ExpressionAttributeValues: { ":new": { S: "new" } },
+  }),
+);
+```
+
+An assignment reading a document path the item does not have is a `ValidationException` rather than
+an assignment of nothing, as it is on AWS. `if_not_exists` is how an expression says what to assign
+when the attribute may be absent.
+
+Assigning into a map the item does not carry is a `ValidationException` too. `SET address.city = :c`
+needs an `address` map to write into, and an update does not make one on the way past.
+
+An update cannot move an item's primary key. Assigning to a key attribute, or removing one, is a
+`ValidationException` naming the attribute, since the request already names the item it works on
+through its `Key`.
+
+A request with no `UpdateExpression` at all still writes. It leaves a stored item as it was, and
+creates one holding nothing but the `Key` when the key held nothing.
+
+`ReturnValues` takes `NONE`, `ALL_OLD` and `ALL_NEW`. `ALL_OLD` answers with the item as it stood
+before the update, and carries nothing when the key held nothing. `ALL_NEW` answers with the item as
+it now is.
+
+`UpdateItem` takes a `ConditionExpression` as well, checked the same way as on the other writes.
+Both expressions draw on the same `ExpressionAttributeNames` and `ExpressionAttributeValues`, and a
+placeholder used by either counts as used.
+
 ## Conditional writes
 
-`PutItem` and `DeleteItem` take a `ConditionExpression`, which is checked against whatever is stored
-under the key before anything changes. A condition that does not hold leaves the item exactly as it
+`PutItem`, `DeleteItem` and `UpdateItem` take a `ConditionExpression`, which is checked against
+whatever is stored under the key before anything changes. A condition that does not hold leaves the item exactly as it
 was and throws `ConditionalCheckFailedException`, with the name and message real DynamoDB uses.
 
 That is how a write becomes an insert if absent, and how a version attribute becomes optimistic
@@ -773,8 +898,8 @@ the ARN `Fn::GetAtt` gives.
 it looks the name up. A caller with no permission is denied whether or not the name is free, so an
 unauthorized caller cannot find out which names are taken.
 
-`DescribeTable`, `PutItem`, `GetItem` and `DeleteItem` authorize against the table ARN in the same
-way, each against the `dynamodb:` action of its own name. `ListTables` names no table, so it
+`DescribeTable`, `PutItem`, `GetItem`, `DeleteItem` and `UpdateItem` authorize against the table ARN
+in the same way, each against the `dynamodb:` action of its own name. `ListTables` names no table, so it
 authorizes against `*`.
 
 ## Available functionality
@@ -793,7 +918,10 @@ authorizes against `*`.
 - `ProjectionExpression` on `GetItem`, with document paths, list indexing and `ExpressionAttributeNames`
   placeholders.
 - `DeleteItem`, removing the item under a primary key and answering with it for `ALL_OLD`.
-- `ConditionExpression` on `PutItem` and `DeleteItem`, with the six comparators, `BETWEEN`, `IN`,
+- `UpdateItem`, with `SET` and `REMOVE` update expressions, `if_not_exists`, upserting when the key
+  holds nothing, and `NONE`, `ALL_OLD` and `ALL_NEW` for `ReturnValues`. Every action reads the item
+  as it stood before the update.
+- `ConditionExpression` on `PutItem`, `DeleteItem` and `UpdateItem`, with the six comparators, `BETWEEN`, `IN`,
   `AND`, `OR`, `NOT`, brackets, and the `attribute_exists`, `attribute_not_exists`, `attribute_type`,
   `begins_with`, `contains` and `size` functions.
 - `AWS::DynamoDB::Table` in CloudFormation, created through `CreateTable`, with `Ref` giving the
@@ -834,7 +962,7 @@ authorizes against `*`.
   refuses that status anyway, for when it can.
 - Nothing enforces capacity. A provisioned table's throughput is stored and reported, and no request
   is ever throttled with `ProvisionedThroughputExceededException`.
-- `UpdateTable`, `UpdateItem`, `Query`, `Scan` and the batch item commands are not implemented yet.
+- `UpdateTable`, `Query`, `Scan` and the batch item commands are not implemented yet.
 - A CloudFormation stack reaches `CREATE_COMPLETE` while the table it created is still `CREATING`.
   Real CloudFormation waits for the table to be `ACTIVE`, so a test reading the status after the
   stack deployed calls `simAws.backgroundTasksComplete()` first.
@@ -850,9 +978,21 @@ authorizes against `*`.
   evaluated.
 - Reads are always strongly consistent. `ConsistentRead` is accepted either way and changes nothing,
   so a test cannot observe a stale read here the way it might against a real table.
-- Condition expressions are simulated on `PutItem` and `DeleteItem` only. `UpdateItem`, the
+- Condition expressions are simulated on `PutItem`, `DeleteItem` and `UpdateItem` only. The
   transactional condition checks and the key condition and filter expressions of `Query` and `Scan`
   are not implemented yet, so there is nothing else to guard.
+- The `ADD` and `DELETE` clauses of an update expression are refused rather than applied, and so are
+  arithmetic such as `SET n = n + :one`, `list_append`, and list element paths such as
+  `SET lines[0] = :line`. An update that quietly left one of them out would leave a test passing
+  against an item the real call would have changed.
+- `UPDATED_OLD` and `UPDATED_NEW` are refused. Both answer with the attributes the update touched,
+  which is a different answer to the whole item rather than a smaller one, and nothing here tracks
+  which attributes those were.
+- The legacy `AttributeUpdates` is refused rather than ignored, for the same reason `Expected` is.
+  `UpdateExpression` replaced it, and real DynamoDB has built nothing on it since.
+- A `REMOVE` whose path reaches through an attribute that is missing, or that is not a map, changes
+  nothing rather than being refused. `REMOVE` names a place rather than a value, so there was nothing
+  there to remove either way.
 - The legacy `Expected` and `ConditionalOperator` are refused rather than ignored, since an
   expectation that is never evaluated would let a write or a delete through that DynamoDB would have
   turned away. `ConditionExpression` replaced them, and real DynamoDB has built nothing on them

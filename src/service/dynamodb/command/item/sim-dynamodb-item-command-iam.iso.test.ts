@@ -3,6 +3,7 @@ import {
   DeleteItemCommand,
   GetItemCommand,
   PutItemCommand,
+  UpdateItemCommand,
 } from "@aws-sdk/client-dynamodb";
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
@@ -105,6 +106,32 @@ async function allow(
         }),
       }),
     );
+}
+
+/**
+ * An update setting the note on the one item this scope holds.
+ */
+function noteUpdate(): UpdateItemCommand {
+  return new UpdateItemCommand({
+    TableName: "ItemTable",
+    Key: { id: { S: "item-1" } },
+    UpdateExpression: "SET note = :note",
+    ExpressionAttributeValues: { ":note": { S: "second" } },
+  });
+}
+
+/**
+ * The note on the item this scope holds.
+ */
+async function storedNote(scope: ItemScope): Promise<string | undefined> {
+  const output = await scope.simDynamoDb.getItem(
+    new GetItemCommand({
+      TableName: "ItemTable",
+      Key: { id: { S: "item-1" } },
+    }),
+  );
+
+  return output.Item?.["note"]?.S;
 }
 
 describe("DynamoDB GetItemCommand IAM authorization", () => {
@@ -244,5 +271,46 @@ describe("DynamoDB DeleteItemCommand IAM authorization", () => {
       }),
     );
     assertIdentical(output.Item?.["note"]?.S, "first");
+  });
+});
+
+describe("DynamoDB UpdateItemCommand IAM authorization", () => {
+  it("allows a Role its policy permits dynamodb:UpdateItem", async () => {
+    // Given a Role allowed to update items in the table.
+    const scope = await itemScope();
+    const roleArn = await roleArnFor(scope, "ItemUpdater");
+    await allow(scope, "ItemUpdater", "dynamodb:UpdateItem");
+
+    // When the Role updates an item.
+    await scope.simDynamoDb.updateItem(noteUpdate(), {
+      caller: { kind: "arn", arn: roleArn },
+    });
+
+    // Then IAM allows the request and the change landed.
+    assertIdentical(await storedNote(scope), "second");
+  });
+
+  it("denies the update before it changes anything", async () => {
+    // Given a Role allowed only to write whole items.
+    const scope = await itemScope();
+    const roleArn = await roleArnFor(scope, "WholeItemWriter");
+    await allow(scope, "WholeItemWriter", "dynamodb:PutItem");
+
+    // When the Role attempts to update one.
+    const error = await assertThrowsErrorAsync(async () =>
+      scope.simDynamoDb.updateItem(noteUpdate(), {
+        caller: { kind: "arn", arn: roleArn },
+      }),
+    );
+
+    // Then each DynamoDB operation is its own IAM action, and the item is as
+    // it was.
+    assertInstanceOf(error, SimIamAccessDenied);
+    assertIdentical(error.action, "dynamodb:UpdateItem");
+    assertIdentical(
+      error.resource,
+      `arn:aws:dynamodb:${scope.region}:${scope.accountId}:table/ItemTable`,
+    );
+    assertIdentical(await storedNote(scope), "first");
   });
 });

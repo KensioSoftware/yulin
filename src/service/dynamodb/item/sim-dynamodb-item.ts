@@ -62,6 +62,23 @@ export class SimDynamoDbItem {
   }
 
   /**
+   * Hold the attributes an update made of an item.
+   *
+   * The values were all checked on the way in, either as part of the item that
+   * was there or as an expression value. What the update may have changed is
+   * how big the item is, so that is checked again.
+   */
+  static ofUpdatedAttributes(
+    attributes: ReadonlyMap<string, SimDynamoDbValue>,
+  ): SimDynamoDbItem {
+    const item = new this(attributes);
+
+    item.assertWithinSizeLimit();
+
+    return item;
+  }
+
+  /**
    * Get one of this item's attributes, if it has it.
    */
   attribute(name: string): SimDynamoDbValue | undefined {

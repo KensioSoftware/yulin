@@ -7,6 +7,7 @@ import { SimDynamoDbAuthorizer } from "./command/authorize/sim-dynamodb-authoriz
 import { SimDynamoDbDeleteItem } from "./command/item/sim-dynamodb-delete-item.js";
 import { SimDynamoDbGetItem } from "./command/item/sim-dynamodb-get-item.js";
 import { SimDynamoDbPutItem } from "./command/item/sim-dynamodb-put-item.js";
+import { SimDynamoDbUpdateItem } from "./command/item/sim-dynamodb-update-item.js";
 import { SimDynamoDbCreateTable } from "./command/table/sim-dynamodb-create-table.js";
 import { SimDynamoDbTableAccess } from "./command/table/sim-dynamodb-table-access.js";
 import { SimDynamoDbTableCommands } from "./command/table/sim-dynamodb-table-commands.js";
@@ -28,6 +29,8 @@ import type {
   SimGetItemCommandOutput,
   SimPutItemCommand,
   SimPutItemCommandOutput,
+  SimUpdateItemCommand,
+  SimUpdateItemCommandOutput,
 } from "./command/item/item.command.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import type { SimAwsCaller } from "../aws/caller/sim-aws-caller.js";
@@ -63,6 +66,7 @@ export class SimDynamoDb {
   private readonly itemWrites: SimDynamoDbPutItem;
   private readonly itemReads: SimDynamoDbGetItem;
   private readonly itemDeletions: SimDynamoDbDeleteItem;
+  private readonly itemUpdates: SimDynamoDbUpdateItem;
   private readonly sdkRouter = new SimDynamoDatabaseSdkCommandRouter(this);
   private readonly cfnFactory = new SimDynamoDbCfnResourceFactory({
     dynamoDb: this,
@@ -97,6 +101,7 @@ export class SimDynamoDb {
     this.itemWrites = new SimDynamoDbPutItem({ access: this.access });
     this.itemReads = new SimDynamoDbGetItem({ access: this.access });
     this.itemDeletions = new SimDynamoDbDeleteItem({ access: this.access });
+    this.itemUpdates = new SimDynamoDbUpdateItem({ access: this.access });
   }
 
   /**
@@ -175,6 +180,17 @@ export class SimDynamoDb {
   ): Promise<SimDeleteItemCommandOutput> {
     await this.background.sequence();
     return this.itemDeletions.handle(command, options);
+  }
+
+  /**
+   * Handle an Update Item Command from the SDK.
+   */
+  async updateItem(
+    command: SimUpdateItemCommand,
+    options?: SimDynamoDbRequestOptions,
+  ): Promise<SimUpdateItemCommandOutput> {
+    await this.background.sequence();
+    return this.itemUpdates.handle(command, options);
   }
 
   /**

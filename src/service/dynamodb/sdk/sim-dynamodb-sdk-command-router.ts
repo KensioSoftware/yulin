@@ -13,6 +13,7 @@ import type {
   SimDeleteItemCommand,
   SimGetItemCommand,
   SimPutItemCommand,
+  SimUpdateItemCommand,
 } from "../command/item/item.command.js";
 import type { SimDynamoDb as SimDynamoDatabase } from "../sim-dynamodb.js";
 
@@ -69,6 +70,14 @@ export class SimDynamoDatabaseSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simDynamoDatabase.getItem(
             command as SimGetItemCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "UpdateItemCommand",
+        async (command, context): Promise<unknown> =>
+          await simDynamoDatabase.updateItem(
+            command as SimUpdateItemCommand,
             simSdkCallerOptions(context),
           ),
       ],

@@ -5,7 +5,7 @@ import type {
   SimDynamoDbConditionOperand,
   SimDynamoDbPathOperand,
 } from "./sim-dynamodb-condition-operand.js";
-import type { SimDynamoDbConditionSubject } from "./sim-dynamodb-condition-subject.js";
+import type { SimDynamoDbItemSnapshot } from "../sim-dynamodb-item-snapshot.js";
 
 /**
  * Whether an item has the attribute a path names.
@@ -25,7 +25,7 @@ export class SimDynamoDbAttributeExistsCondition implements SimDynamoDbCondition
   /**
    * Whether the item has the attribute, or does not, as the function asked.
    */
-  holdsFor(subject: SimDynamoDbConditionSubject): boolean {
+  holdsFor(subject: SimDynamoDbItemSnapshot): boolean {
     return (this.operand.valueIn(subject) !== undefined) === this.wanted;
   }
 }
@@ -48,7 +48,7 @@ export class SimDynamoDbAttributeTypeCondition implements SimDynamoDbCondition {
   /**
    * Whether what the path names is stored under the descriptor asked about.
    */
-  holdsFor(subject: SimDynamoDbConditionSubject): boolean {
+  holdsFor(subject: SimDynamoDbItemSnapshot): boolean {
     return this.operand.valueIn(subject)?.kind === this.type;
   }
 }
@@ -74,7 +74,7 @@ export class SimDynamoDbBeginsWithCondition implements SimDynamoDbCondition {
   /**
    * Whether what the path names starts with the prefix.
    */
-  holdsFor(subject: SimDynamoDbConditionSubject): boolean {
+  holdsFor(subject: SimDynamoDbItemSnapshot): boolean {
     const value = this.operand.valueIn(subject);
     const prefix = this.prefix.valueIn(subject);
 
@@ -123,7 +123,7 @@ export class SimDynamoDbContainsCondition implements SimDynamoDbCondition {
   /**
    * Whether what the path names holds what was sought.
    */
-  holdsFor(subject: SimDynamoDbConditionSubject): boolean {
+  holdsFor(subject: SimDynamoDbItemSnapshot): boolean {
     const value = this.operand.valueIn(subject);
     const sought = this.sought.valueIn(subject);
 

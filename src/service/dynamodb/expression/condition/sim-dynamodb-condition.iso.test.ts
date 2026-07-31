@@ -9,7 +9,7 @@ import { describe, it } from "vitest";
 import type { SimDynamoDbAttributeValue } from "../../command/item/item.types.js";
 import { SimDynamoDbItem } from "../../item/sim-dynamodb-item.js";
 import { readSimDynamoDbCondition } from "./sim-dynamodb-condition-expression.js";
-import { SimDynamoDbConditionSubject } from "./sim-dynamodb-condition-subject.js";
+import { SimDynamoDbItemSnapshot } from "../sim-dynamodb-item-snapshot.js";
 
 /**
  * The order this test guards conditions against.
@@ -29,7 +29,7 @@ const order: Readonly<Record<string, SimDynamoDbAttributeValue>> = {
 function holdsFor(
   expression: string,
   values: Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined,
-  subject: SimDynamoDbConditionSubject,
+  subject: SimDynamoDbItemSnapshot,
 ): boolean {
   const condition = readSimDynamoDbCondition({
     ConditionExpression: expression,
@@ -50,7 +50,7 @@ function holds(
   return holdsFor(
     expression,
     values,
-    new SimDynamoDbConditionSubject(SimDynamoDbItem.fromAttributeValues(order)),
+    new SimDynamoDbItemSnapshot(SimDynamoDbItem.fromAttributeValues(order)),
   );
 }
 
@@ -62,7 +62,7 @@ function holdsForNothing(
   expression: string,
   values?: Readonly<Record<string, SimDynamoDbAttributeValue>>,
 ): boolean {
-  return holdsFor(expression, values, new SimDynamoDbConditionSubject());
+  return holdsFor(expression, values, new SimDynamoDbItemSnapshot());
 }
 
 describe("DynamoDB condition expressions", () => {
@@ -202,7 +202,7 @@ describe("DynamoDB condition expressions", () => {
     });
     assertNonNullable(condition);
 
-    const subject = new SimDynamoDbConditionSubject(
+    const subject = new SimDynamoDbItemSnapshot(
       SimDynamoDbItem.fromAttributeValues(nested),
     );
 

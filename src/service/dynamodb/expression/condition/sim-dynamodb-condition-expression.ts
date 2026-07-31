@@ -28,7 +28,28 @@ export function readSimDynamoDbCondition(
   }
 
   const parameters = new SimDynamoDbExpressionParameters(request);
-  const condition = new SimDynamoDbConditionParser({
+  const condition = parseSimDynamoDbCondition(expression, parameters);
+
+  parameters.assertAllUsed();
+
+  return condition;
+}
+
+/**
+ * Read one ConditionExpression against placeholders that have already been
+ * gathered.
+ *
+ * A request can carry a condition alongside another expression, and both draw
+ * on the same `ExpressionAttributeNames` and `ExpressionAttributeValues`.
+ * Parsing against the parameters rather than against the request is what lets
+ * an UpdateItem check its placeholders once both of its expressions have been
+ * read.
+ */
+export function parseSimDynamoDbCondition(
+  expression: string,
+  parameters: SimDynamoDbExpressionParameters,
+): SimDynamoDbCondition {
+  return new SimDynamoDbConditionParser({
     tokens: SimDynamoDbExpressionTokens.of(
       expressionName,
       expression,
@@ -37,8 +58,4 @@ export function readSimDynamoDbCondition(
     names: parameters.names,
     values: parameters.values,
   }).parse();
-
-  parameters.assertAllUsed();
-
-  return condition;
 }

@@ -48,7 +48,7 @@ Current command areas include:
 
 - `authorize/` (shared IAM authorization for every DynamoDB command)
 - `table/` (CreateTable, DescribeTable, ListTables and DeleteTable)
-- `item/` (PutItem, GetItem, DeleteItem, and the structural types for the item commands)
+- `item/` (PutItem, GetItem, DeleteItem, UpdateItem, and the structural types for the item commands)
 
 `table/` is the layout newer commands follow: one directory per group of related commands, with the
 structural command types in `table.command.ts`, the value and description shapes they are made of in
@@ -302,9 +302,45 @@ Important behavior:
   use them in is a `ValidationException` rather than an unsupported operation, because real DynamoDB
   refuses that too. DeleteItem refuses the same conditional write and reporting inputs PutItem does.
 
-Scans, queries, indexes, condition expressions and streams are not implemented. Billing mode and
-provisioned capacity are read and stored by CreateTable, but nothing enforces them: no write is ever
-throttled.
+## UpdateItem behavior
+
+`SimDynamoDbUpdateItem` changes part of an item, where PutItem replaces the whole thing. It reaches
+its table the same way, and reads its `Key` through the same `readSimDynamoDbKey`.
+
+The order it works in matters:
+
+1. `refuseUnsimulatedItemUpdateInput` refuses the inputs this simulation does not model, including
+   the legacy `AttributeUpdates`.
+2. `SimDynamoDbUpdatePlan` reads both expressions, before the table is reached.
+3. The table is found and the caller authorized against `dynamodb:UpdateItem`.
+4. The condition is checked against what is stored.
+5. The update is refused if it would move the primary key, and then applied.
+
+`SimDynamoDbUpdatePlan` is what holds an update and its condition together. UpdateItem is the first
+command to carry two expressions at once, and both draw on the same `ExpressionAttributeNames` and
+`ExpressionAttributeValues`. Reading them against one `SimDynamoDbExpressionParameters` is what lets
+a placeholder used by either count as used, so `parseSimDynamoDbCondition` takes the parameters
+rather than reading them from the request the way `readSimDynamoDbCondition` does.
+
+Important behavior:
+
+- every action is evaluated against `SimDynamoDbItemSnapshot` of the item as it stood before the
+  request, rather than against the item being built. `REMOVE a SET b = a, c = b` on `{ a: 1, b: 2,
+c: 3 }` leaves `{ b: 1, c: 2 }`, which an implementation applying actions left to right answers
+  differently.
+- UpdateItem upserts. With nothing stored under the key, the new item is built from the `Key` plus
+  the SET actions, and the snapshot every action reads holds nothing.
+- a SET operand pointing at an attribute the item does not have is a `ValidationException`, as it is
+  on AWS. `if_not_exists` is how an expression says what to assign when the attribute may be absent.
+- assigning into a map the item does not carry is a `ValidationException`. An update does not make a
+  map on the way past.
+- an update cannot move the primary key. `SimDynamoDbUpdate.assertLeavesKeyAlone` refuses an action
+  writing to a key attribute, since the request already names the item it works on.
+- `ReturnValues` takes `NONE`, `ALL_OLD` and `ALL_NEW`, through the same `SimDynamoDbReturnValues`
+  the other item writes use. `UPDATED_OLD` and `UPDATED_NEW` are refused by name.
+
+Scans, queries, indexes and streams are not implemented. Billing mode and provisioned capacity are
+read and stored by CreateTable, but nothing enforces them: no write is ever throttled.
 
 ## Expressions
 
@@ -335,11 +371,13 @@ The shared parts:
 - `simDynamoDbExpressionError` builds every refusal, so they all read as
   `Invalid <parameter>: <reason>`. A request can carry several expressions, so naming which one was
   wrong matters.
+- `SimDynamoDbItemSnapshot` is the item an expression is read against: the item stored under the
+  key, which may be nothing at all. That is what makes `attribute_not_exists(id)` an insert if
+  absent, since every path resolves to nothing when there is no item. Conditions and updates both
+  read it, which is why it sits here rather than with either of them.
 
 `expression/condition/` reads a ConditionExpression into a `SimDynamoDbCondition`, which answers yes
-or no for a `SimDynamoDbConditionSubject`: the item stored under the key, which may be nothing at
-all. That is what makes `attribute_not_exists(id)` an insert if absent, since every path resolves to
-nothing when there is no item.
+or no for a snapshot.
 
 `SimDynamoDbConditionParser` is recursive descent with one method per precedence level, so the
 precedence DynamoDB documents is the shape of the class rather than a table somewhere. The operands
@@ -357,6 +395,25 @@ which is what makes a comparison between them false rather than an error.
 the expression before the table is reached, so an expression DynamoDB would refuse is refused
 whether or not the key holds anything, and it throws
 `SimDynamoDbConditionalCheckFailedException` before anything is written.
+
+`expression/update/` reads an UpdateExpression into a `SimDynamoDbUpdate`, which is the actions it
+asks for. `SimDynamoDbUpdateParser` reads the clauses, each keyword at most once and in either
+order, and `SimDynamoDbUpdateOperandParser` reads what a SET action assigns.
+
+The parts an update is made of split by what they know:
+
+- `SimDynamoDbUpdateTarget` is where an action writes. It is a document path that has been checked
+  for what an update can change, and it holds the attribute names rather than the segments, since a
+  list element path is refused.
+- `SimDynamoDbUpdateDocument` is the item being built. Nothing reads from it, which is what keeps
+  the snapshot rule true however the actions are ordered.
+- `SimDynamoDbUpdateOperand` is what a SET action assigns: a supplied value, a document path, or
+  `if_not_exists`. Update expressions have no literals, so every constant arrives through
+  `ExpressionAttributeValues`.
+
+The parts of an update expression real DynamoDB has and this simulation does not apply are refused
+rather than dropped, in `sim-dynamodb-update-refusal.ts`: the ADD and DELETE clauses, arithmetic,
+`list_append`, and list element paths.
 
 `expression/projection/` is the other consumer. `readSimDynamoDbProjection` reads a
 `ProjectionExpression` and its names into a `SimDynamoDbProjection`, and `SimDynamoDbProjectionNode`

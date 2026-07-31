@@ -4,7 +4,7 @@ import { describe, it } from "vitest";
 import type { SimDynamoDbAttributeValue } from "../../command/item/item.types.js";
 import { SimDynamoDbItem } from "../../item/sim-dynamodb-item.js";
 import { readSimDynamoDbCondition } from "./sim-dynamodb-condition-expression.js";
-import { SimDynamoDbConditionSubject } from "./sim-dynamodb-condition-subject.js";
+import { SimDynamoDbItemSnapshot } from "../sim-dynamodb-item-snapshot.js";
 
 /**
  * The order these conditions are evaluated against.
@@ -27,10 +27,8 @@ const order: Readonly<Record<string, SimDynamoDbAttributeValue>> = {
  */
 function subjectOf(
   item: Readonly<Record<string, SimDynamoDbAttributeValue>>,
-): SimDynamoDbConditionSubject {
-  return new SimDynamoDbConditionSubject(
-    SimDynamoDbItem.fromAttributeValues(item),
-  );
+): SimDynamoDbItemSnapshot {
+  return new SimDynamoDbItemSnapshot(SimDynamoDbItem.fromAttributeValues(item));
 }
 
 /**

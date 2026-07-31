@@ -1,4 +1,4 @@
-import type { SimDynamoDbConditionSubject } from "./sim-dynamodb-condition-subject.js";
+import type { SimDynamoDbItemSnapshot } from "../sim-dynamodb-item-snapshot.js";
 
 /**
  * One condition a write is guarded by.
@@ -9,7 +9,7 @@ import type { SimDynamoDbConditionSubject } from "./sim-dynamodb-condition-subje
  * the condition it named actually held.
  */
 export interface SimDynamoDbCondition {
-  holdsFor(subject: SimDynamoDbConditionSubject): boolean;
+  holdsFor(subject: SimDynamoDbItemSnapshot): boolean;
 }
 
 /**
@@ -27,7 +27,7 @@ export class SimDynamoDbAndCondition implements SimDynamoDbCondition {
   /**
    * Whether both sides hold for an item.
    */
-  holdsFor(subject: SimDynamoDbConditionSubject): boolean {
+  holdsFor(subject: SimDynamoDbItemSnapshot): boolean {
     return this.left.holdsFor(subject) && this.right.holdsFor(subject);
   }
 }
@@ -47,7 +47,7 @@ export class SimDynamoDbOrCondition implements SimDynamoDbCondition {
   /**
    * Whether either side holds for an item.
    */
-  holdsFor(subject: SimDynamoDbConditionSubject): boolean {
+  holdsFor(subject: SimDynamoDbItemSnapshot): boolean {
     return this.left.holdsFor(subject) || this.right.holdsFor(subject);
   }
 }
@@ -65,7 +65,7 @@ export class SimDynamoDbNotCondition implements SimDynamoDbCondition {
   /**
    * Whether the condition inside does not hold for an item.
    */
-  holdsFor(subject: SimDynamoDbConditionSubject): boolean {
+  holdsFor(subject: SimDynamoDbItemSnapshot): boolean {
     return !this.condition.holdsFor(subject);
   }
 }
