@@ -4,6 +4,8 @@ import {
 } from "../../util/background/background.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { SimDynamoDbAuthorizer } from "./command/authorize/sim-dynamodb-authorizer.js";
+import { SimDynamoDbDeleteItem } from "./command/item/sim-dynamodb-delete-item.js";
+import { SimDynamoDbGetItem } from "./command/item/sim-dynamodb-get-item.js";
 import { SimDynamoDbPutItem } from "./command/item/sim-dynamodb-put-item.js";
 import { SimDynamoDbCreateTable } from "./command/table/sim-dynamodb-create-table.js";
 import { SimDynamoDbTableAccess } from "./command/table/sim-dynamodb-table-access.js";
@@ -20,6 +22,10 @@ import type {
   SimListTablesCommandOutput,
 } from "./command/table/table.command.js";
 import type {
+  SimDeleteItemCommand,
+  SimDeleteItemCommandOutput,
+  SimGetItemCommand,
+  SimGetItemCommandOutput,
   SimPutItemCommand,
   SimPutItemCommandOutput,
 } from "./command/item/item.command.js";
@@ -52,7 +58,9 @@ export class SimDynamoDb {
   private readonly background: BackgroundScheduler;
   private readonly tableCreation: SimDynamoDbCreateTable;
   private readonly tableCommands: SimDynamoDbTableCommands;
-  private readonly itemCommands: SimDynamoDbPutItem;
+  private readonly itemWrites: SimDynamoDbPutItem;
+  private readonly itemReads: SimDynamoDbGetItem;
+  private readonly itemDeletions: SimDynamoDbDeleteItem;
   private readonly sdkRouter = new SimDynamoDatabaseSdkCommandRouter(this);
 
   constructor(properties: SimDynamoDatabaseProperties = {}) {
@@ -81,7 +89,9 @@ export class SimDynamoDb {
       access: this.access,
       background,
     });
-    this.itemCommands = new SimDynamoDbPutItem({ access: this.access });
+    this.itemWrites = new SimDynamoDbPutItem({ access: this.access });
+    this.itemReads = new SimDynamoDbGetItem({ access: this.access });
+    this.itemDeletions = new SimDynamoDbDeleteItem({ access: this.access });
   }
 
   /**
@@ -137,7 +147,29 @@ export class SimDynamoDb {
     options?: SimDynamoDbRequestOptions,
   ): Promise<SimPutItemCommandOutput> {
     await this.background.sequence();
-    return this.itemCommands.handle(command, options);
+    return this.itemWrites.handle(command, options);
+  }
+
+  /**
+   * Handle a Get Item Command from the SDK.
+   */
+  async getItem(
+    command: SimGetItemCommand,
+    options?: SimDynamoDbRequestOptions,
+  ): Promise<SimGetItemCommandOutput> {
+    await this.background.sequence();
+    return this.itemReads.handle(command, options);
+  }
+
+  /**
+   * Handle a Delete Item Command from the SDK.
+   */
+  async deleteItem(
+    command: SimDeleteItemCommand,
+    options?: SimDynamoDbRequestOptions,
+  ): Promise<SimDeleteItemCommandOutput> {
+    await this.background.sequence();
+    return this.itemDeletions.handle(command, options);
   }
 
   /**

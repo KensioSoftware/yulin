@@ -89,6 +89,32 @@ export class SimDynamoDbItemKey {
   }
 
   /**
+   * Make the primary key string for the Key a request names an item by.
+   *
+   * A Key is the whole primary key and nothing else. An item may carry any
+   * attributes alongside its key, but the commands that name one item by its
+   * key cannot: an attribute that is not part of the key has nothing to match
+   * against, so DynamoDB refuses it rather than ignoring it.
+   *
+   * Real DynamoDB answers `The provided key element does not match the schema`
+   * without saying which attribute was at fault. The attribute is named here as
+   * well, since a test reading the failure is better off knowing.
+   */
+  ofKey(key: SimDynamoDbItem): string {
+    for (const attributeName of key.attributeNames()) {
+      if (!this.keySchema.attributeNames().includes(attributeName)) {
+        throw new SimDynamoDbValidationException(
+          `The provided key element does not match the schema: the Key names ` +
+            `the attribute ${attributeName}, which is not part of the ` +
+            `table's primary key`,
+        );
+      }
+    }
+
+    return this.of(key);
+  }
+
+  /**
    * Read one key attribute of an item, checking it against the key schema.
    */
   private keyValue(item: SimDynamoDbItem, attributeName: string): string {

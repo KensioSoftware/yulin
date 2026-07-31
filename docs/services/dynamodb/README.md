@@ -284,6 +284,89 @@ An item has to carry its whole primary key, each key attribute has to be the typ
 declared, and a key attribute cannot be empty. An empty string or empty binary value is fine
 anywhere else in the item.
 
+## Reading and deleting items
+
+`GetItem` reads one item by its primary key, and `DeleteItem` removes one the same way. The `Key`
+both take is the whole primary key and nothing else. A missing key element, an attribute that is not
+part of the key, or a value whose type does not match the table's `AttributeDefinitions` is a
+`ValidationException` naming the attribute at fault.
+
+```typescript sim-dynamodb-get-delete-item
+/**
+ * Writing an item, reading it back, and deleting it.
+ */
+
+import {
+  CreateTableCommand,
+  DeleteItemCommand,
+  GetItemCommand,
+  PutItemCommand,
+} from "@aws-sdk/client-dynamodb";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const dynamoDb = simAws.dynamoDb();
+
+await dynamoDb.createTable(
+  new CreateTableCommand({
+    TableName: "OrdersTable",
+    KeySchema: [{ AttributeName: "orderId", KeyType: "HASH" }],
+    AttributeDefinitions: [{ AttributeName: "orderId", AttributeType: "S" }],
+    BillingMode: "PAY_PER_REQUEST",
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+await dynamoDb.putItem(
+  new PutItemCommand({
+    TableName: "OrdersTable",
+    Item: { orderId: { S: "order-1" }, total: { N: "19.99" } },
+  }),
+);
+
+const found = await dynamoDb.getItem(
+  new GetItemCommand({
+    TableName: "OrdersTable",
+    Key: { orderId: { S: "order-1" } },
+  }),
+);
+
+console.log(found.Item?.["total"]?.N); // "19.99"
+
+const removed = await dynamoDb.deleteItem(
+  new DeleteItemCommand({
+    TableName: "OrdersTable",
+    Key: { orderId: { S: "order-1" } },
+    ReturnValues: "ALL_OLD",
+  }),
+);
+
+console.log(removed.Attributes?.["total"]?.N); // "19.99"
+
+const missing = await dynamoDb.getItem(
+  new GetItemCommand({
+    TableName: "OrdersTable",
+    Key: { orderId: { S: "order-1" } },
+  }),
+);
+
+console.log(missing.Item); // undefined
+```
+
+A key that holds nothing comes back with no `Item` at all, rather than an empty one. That absence is
+how a caller tells a miss from an item carrying nothing but its key.
+
+`ConsistentRead` is accepted whichever way it is set, and changes nothing. Every write has landed by
+the time the call that made it returns, so an eventually consistent read still answers with the
+latest write.
+
+`DeleteItem` names a key rather than an item, so deleting a key that is already free succeeds and
+reports nothing removed. Its `ReturnValues` takes `NONE` and `ALL_OLD`, as `PutItem` does, and
+`ALL_OLD` answers with the item that was removed.
+
+Both take the table's name or its ARN, as the table commands do.
+
 ## Numbers
 
 A DynamoDB number carries up to 38 significant digits, where a JavaScript number carries about 15.
@@ -409,8 +492,9 @@ Creating a name that is already taken in the same scope fails with `ResourceInUs
 it looks the name up. A caller with no permission is denied whether or not the name is free, so an
 unauthorized caller cannot find out which names are taken.
 
-`DescribeTable` and `PutItem` authorize against the table ARN in the same way. `ListTables` names no
-table, so it authorizes against `*`.
+`DescribeTable`, `PutItem`, `GetItem` and `DeleteItem` authorize against the table ARN in the same
+way, each against the `dynamodb:` action of its own name. `ListTables` names no table, so it
+authorizes against `*`.
 
 ## Available functionality
 
@@ -423,6 +507,9 @@ table, so it authorizes against `*`.
 - `PutItem`, with the attribute value model behind it: numbers keep their digits, sets compare by
   value, and key attributes are checked against what the table declared. It takes a table name or
   ARN and authorizes before the lookup.
+- `GetItem`, answering with the whole item under a primary key, and with no `Item` at all when the
+  key holds nothing.
+- `DeleteItem`, removing the item under a primary key and answering with it for `ALL_OLD`.
 - SDK interception, so an intercepted `DynamoDBClient` reaches the simulation.
 
 ## Limitations
@@ -459,15 +546,22 @@ table, so it authorizes against `*`.
   refuses that status anyway, for when it can.
 - Nothing enforces capacity. A provisioned table's throughput is stored and reported, and no request
   is ever throttled with `ProvisionedThroughputExceededException`.
-- `UpdateTable` and the item commands other than `PutItem` are not implemented yet, and neither is
-  `AWS::DynamoDB::Table` in CloudFormation. There is no way to read an item back yet, so a written
-  item is observed through the `ALL_OLD` a later write answers with.
+- `UpdateTable`, `UpdateItem`, `Query`, `Scan` and the batch item commands are not implemented yet,
+  and neither is `AWS::DynamoDB::Table` in CloudFormation.
+- Projection is not simulated. `ProjectionExpression` and `AttributesToGet` are refused rather than
+  ignored, since an item that came back whole where part of it was asked for would hide an
+  application reading an attribute it never requested.
+- Reads are always strongly consistent. `ConsistentRead` is accepted either way and changes nothing,
+  so a test cannot observe a stale read here the way it might against a real table.
 - Condition expressions are not simulated. `ConditionExpression`, `ExpressionAttributeNames`,
   `ExpressionAttributeValues`, `Expected` and `ConditionalOperator` are refused rather than ignored,
-  since a condition that is never evaluated would let a write through that DynamoDB would have
-  turned away.
+  since a condition that is never evaluated would let a write or a delete through that DynamoDB would
+  have turned away.
 - Capacity and item collection reporting are not simulated. `ReturnConsumedCapacity` and
   `ReturnItemCollectionMetrics` are refused unless they name `NONE`.
+- A `Key` that does not match the table's key schema is refused with the attribute named. Real
+  DynamoDB answers `The provided key element does not match the schema` without saying which
+  attribute was at fault.
 - A number comes back in plain decimal notation, whatever notation it was written in, so a request
   carrying `1E5` reads back `100000`. The value is the one that was written either way, but the text
   is not always character for character what real DynamoDB would answer with for a number at the

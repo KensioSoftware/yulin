@@ -1,12 +1,14 @@
 import { describe, it } from "vitest";
 import {
   CreateTableCommand,
+  DeleteItemCommand,
   DeleteTableCommand,
   DescribeTableCommand,
   DynamoDBClient,
   GetItemCommand,
   ListTablesCommand,
   PutItemCommand,
+  UpdateItemCommand,
 } from "@aws-sdk/client-dynamodb";
 import {
   assertIdentical,
@@ -14,6 +16,7 @@ import {
   assertNonNullable,
   assertStringIncludes,
   assertThrowsErrorAsync,
+  assertUndefined,
 } from "@kensio/smartass";
 import { SimSdk } from "../../../sdk/index.js";
 import { SimIamAccessDenied } from "../../iam/error/sim-iam.error.js";
@@ -63,7 +66,7 @@ describe("simulated DynamoDB SDK Command routing", () => {
     assertIdentical(emptyListOut.TableNames?.length, 0);
   });
 
-  it("routes PutItemCommand through an intercepted client", async () => {
+  it("round-trips Item Commands through an intercepted client", async () => {
     using simSdk = new SimSdk();
     const client = new DynamoDBClient({ region: "eu-west-2" });
     simSdk.intercept(client);
@@ -86,6 +89,31 @@ describe("simulated DynamoDB SDK Command routing", () => {
     );
 
     assertNonNullable(putOut.$metadata);
+
+    const readOut = await client.send(
+      new GetItemCommand({
+        TableName: "ItemTable",
+        Key: { id: { S: "item-1" } },
+      }),
+    );
+    assertIdentical(readOut.Item?.["name"]?.S, "First item");
+
+    const removalOut = await client.send(
+      new DeleteItemCommand({
+        TableName: "ItemTable",
+        Key: { id: { S: "item-1" } },
+        ReturnValues: "ALL_OLD",
+      }),
+    );
+    assertIdentical(removalOut.Attributes?.["name"]?.S, "First item");
+
+    const missOut = await client.send(
+      new GetItemCommand({
+        TableName: "ItemTable",
+        Key: { id: { S: "item-1" } },
+      }),
+    );
+    assertUndefined(missOut.Item);
   });
 
   it("does not give a denied run-as caller root privileges", async () => {
@@ -128,14 +156,15 @@ describe("simulated DynamoDB SDK Command routing", () => {
 
     const error = await assertThrowsErrorAsync(async () => {
       await client.send(
-        new GetItemCommand({
+        new UpdateItemCommand({
           TableName: "InterceptTable",
           Key: { id: { S: "item-1" } },
+          UpdateExpression: "SET #n = :n",
         }),
       );
     });
 
-    assertStringIncludes(error.message, "GetItemCommand");
+    assertStringIncludes(error.message, "UpdateItemCommand");
     assertStringIncludes(error.message, "PutItemCommand");
   });
 });

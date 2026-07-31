@@ -9,7 +9,11 @@ import type {
   SimDescribeTableCommand,
   SimListTablesCommand,
 } from "../command/table/table.command.js";
-import type { SimPutItemCommand } from "../command/item/item.command.js";
+import type {
+  SimDeleteItemCommand,
+  SimGetItemCommand,
+  SimPutItemCommand,
+} from "../command/item/item.command.js";
 import type { SimDynamoDb as SimDynamoDatabase } from "../sim-dynamodb.js";
 
 /**
@@ -57,6 +61,22 @@ export class SimDynamoDatabaseSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simDynamoDatabase.putItem(
             command as SimPutItemCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "GetItemCommand",
+        async (command, context): Promise<unknown> =>
+          await simDynamoDatabase.getItem(
+            command as SimGetItemCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteItemCommand",
+        async (command, context): Promise<unknown> =>
+          await simDynamoDatabase.deleteItem(
+            command as SimDeleteItemCommand,
             simSdkCallerOptions(context),
           ),
       ],

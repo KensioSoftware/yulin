@@ -130,4 +130,21 @@ export class SimDynamoDbTable {
   public putItem(item: SimDynamoDbItem): SimDynamoDbItem | undefined {
     return this.items.put(this.itemKey.of(item), item);
   }
+
+  /**
+   * Read the item a primary key names, if the table holds one.
+   *
+   * Every write has landed by the time it returns, so this reads the latest
+   * one. That is what real DynamoDB gives a strongly consistent read.
+   */
+  public getItem(key: SimDynamoDbItem): SimDynamoDbItem | undefined {
+    return this.items.get(this.itemKey.ofKey(key));
+  }
+
+  /**
+   * Remove the item a primary key names, and answer with whatever was removed.
+   */
+  public deleteItem(key: SimDynamoDbItem): SimDynamoDbItem | undefined {
+    return this.items.remove(this.itemKey.ofKey(key));
+  }
 }
