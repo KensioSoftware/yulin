@@ -32,6 +32,25 @@ describe("readSimDynamoDbProjection", () => {
     assertUndefined(readSimDynamoDbProjection({}));
   });
 
+  it("refuses names with no expression before it looks at their keys", () => {
+    // Given a request carrying names with no expression, keyed by the
+    // attribute name rather than by a placeholder.
+    // When the projection is read, then the refusal is that there is no
+    // expression to use them in, which is the one real DynamoDB gives and the
+    // one that says what to do about it.
+    const error = assertThrowsError(() =>
+      readSimDynamoDbProjection({
+        ExpressionAttributeNames: { status: "status" },
+      }),
+    );
+
+    assertIdentical(
+      error.message,
+      "ExpressionAttributeNames can only be specified when using " +
+        "expressions, and this request carries none",
+    );
+  });
+
   it("refuses a placeholder the request never defined", () => {
     // Given an expression using a placeholder with no entry for it.
     // When the projection is read, then it is refused naming the placeholder.

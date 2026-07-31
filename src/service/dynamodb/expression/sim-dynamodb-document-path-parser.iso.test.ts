@@ -99,6 +99,20 @@ describe("SimDynamoDbDocumentPathParser", () => {
     );
   });
 
+  it("refuses a whole number written as a fraction", () => {
+    // Given an index that works out to a whole number but is not written as
+    // one, which real DynamoDB reads as digits and refuses.
+    // When it is parsed, then it is refused rather than rounded to 2, so a
+    // path that works here is one that works on AWS.
+    const error = assertThrowsError(() => parsePath("lines[2.0]"));
+
+    assertIdentical(
+      error.message,
+      "Invalid ProjectionExpression: a list index is a whole number, and " +
+        "'2.0' is not in the document path 'lines'",
+    );
+  });
+
   it("refuses a path deeper than an item nests", () => {
     // Given a path of 33 attributes, one past where an item can go.
     const tooDeep = Array.from(

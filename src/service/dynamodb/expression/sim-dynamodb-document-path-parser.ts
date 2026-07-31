@@ -98,7 +98,15 @@ export class SimDynamoDbDocumentPathParser {
     const token = this.tokens.next("a list index");
     const index = Number(token.text);
 
-    if (token.kind !== "number" || !Number.isSafeInteger(index)) {
+    // A fraction is refused on how it was written rather than on what it works
+    // out to, so `[2.0]` is refused along with `[2.5]`. Real DynamoDB reads an
+    // index as digits, and one written any other way is a syntax error there
+    // whether or not it lands on a whole number.
+    if (
+      token.kind !== "number" ||
+      token.text.includes(".") ||
+      !Number.isSafeInteger(index)
+    ) {
       throw this.pathError(
         `a list index is a whole number, and '${token.text}' is not`,
       );

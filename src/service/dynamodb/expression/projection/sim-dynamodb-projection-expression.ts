@@ -27,11 +27,6 @@ export function readSimDynamoDbProjection(
   request: SimDynamoDbProjectionRequest,
 ): SimDynamoDbProjection | undefined {
   const expression = request.ProjectionExpression;
-  const names = new SimDynamoDbExpressionPlaceholders({
-    parameterName: "ExpressionAttributeNames",
-    marker: "#",
-    entries: request.ExpressionAttributeNames,
-  });
 
   if (expression === undefined) {
     assertNoNamesWithoutExpression(request.ExpressionAttributeNames);
@@ -39,6 +34,11 @@ export function readSimDynamoDbProjection(
     return undefined;
   }
 
+  const names = new SimDynamoDbExpressionPlaceholders({
+    parameterName: "ExpressionAttributeNames",
+    marker: "#",
+    entries: request.ExpressionAttributeNames,
+  });
   const paths = projectedPaths(expression, names);
   names.assertAllUsed();
 
