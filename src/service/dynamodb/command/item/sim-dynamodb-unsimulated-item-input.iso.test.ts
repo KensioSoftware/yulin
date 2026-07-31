@@ -1,5 +1,6 @@
 import { CreateTableCommand, PutItemCommand } from "@aws-sdk/client-dynamodb";
 import {
+  assertIdentical,
   assertInstanceOf,
   assertStringIncludes,
   assertThrowsErrorAsync,
@@ -105,7 +106,13 @@ describe("DynamoDB PutItemCommand unsimulated input", () => {
       }),
     );
 
-    // Then nothing is refused and the item is written.
+    // Then nothing is refused, and the item is there for the next write to
+    // replace.
     assertUndefined(output.Attributes);
+
+    const replacing = await simDynamoDb.putItem(
+      new PutItemCommand({ ...itemInput, ReturnValues: "ALL_OLD" }),
+    );
+    assertIdentical(replacing.Attributes?.["userId"]?.S, "user-1");
   });
 });

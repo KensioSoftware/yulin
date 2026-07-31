@@ -60,6 +60,28 @@ describe("SimDynamoDbItem attribute values", () => {
     });
   });
 
+  it("keeps its own copy of the bytes it was given", () => {
+    // Given binary values a caller still holds.
+    const picture = new Uint8Array([1, 2, 3]);
+    const tag = new Uint8Array([4, 5, 6]);
+    const item = SimDynamoDbItem.fromAttributeValues({
+      picture: { B: picture },
+      tags: { BS: [tag] },
+    });
+
+    // When the caller changes them after writing, and changes what it reads
+    // back as well.
+    picture[0] = 99;
+    tag[0] = 99;
+    const read = item.toAttributeValues();
+    (read["picture"]?.B ?? new Uint8Array())[0] = 77;
+
+    // Then the item still holds the bytes it was written with.
+    const reread = item.toAttributeValues();
+    assertArrayEquals([...(reread["picture"]?.B ?? [])], [1, 2, 3]);
+    assertArrayEquals([...(reread["tags"]?.BS?.[0] ?? [])], [4, 5, 6]);
+  });
+
   it("normalises the numbers in a number set", () => {
     // When a number set carries numbers written loosely.
     const attributes = roundTrip({ readings: { NS: ["1.50", "0007", "2e2"] } });

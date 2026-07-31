@@ -1,4 +1,5 @@
 import type { SimDynamoDbAttributeValue } from "../command/item/item.types.js";
+import { simDynamoDbBinaryCopy } from "./sim-dynamodb-binary.js";
 import type { SimDynamoDbValue } from "./sim-dynamodb-value.js";
 
 /**
@@ -18,7 +19,7 @@ export function writeSimDynamoDbValue(
       return { N: value.number.text };
     }
     case "B": {
-      return { B: value.bytes };
+      return { B: simDynamoDbBinaryCopy(value.bytes) };
     }
     case "BOOL": {
       return { BOOL: value.boolean };
@@ -33,7 +34,7 @@ export function writeSimDynamoDbValue(
       return { NS: value.numbers.map((number) => number.text) };
     }
     case "BS": {
-      return { BS: value.bytes };
+      return { BS: value.bytes.map((member) => simDynamoDbBinaryCopy(member)) };
     }
     case "L": {
       return {

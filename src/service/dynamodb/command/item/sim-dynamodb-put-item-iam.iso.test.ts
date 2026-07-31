@@ -41,7 +41,7 @@ describe("DynamoDB PutItemCommand IAM authorization", () => {
       }),
     );
 
-    // Then IAM defaults to Account root and DynamoDB stores the item.
+    // Then IAM defaults to Account root and the write is allowed.
     assertUndefined(output.Attributes);
   });
 
@@ -104,7 +104,7 @@ describe("DynamoDB PutItemCommand IAM authorization", () => {
       { caller: { kind: "arn", arn: roleArn } },
     );
 
-    // Then IAM allows the request and DynamoDB stores the item.
+    // Then IAM allows the request.
     assertUndefined(output.Attributes);
   });
 
@@ -297,7 +297,7 @@ describe("DynamoDB PutItemCommand IAM authorization", () => {
       { caller: { kind: "anonymous" } },
     );
 
-    // Then the allow-all fallback permits the request and DynamoDB stores the item.
+    // Then the allow-all fallback permits the request.
     assertUndefined(output.Attributes);
   });
 });

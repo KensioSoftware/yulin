@@ -1,6 +1,9 @@
 import type { SimDynamoDbAttributeValue } from "../command/item/item.types.js";
 import { SimDynamoDbValidationException } from "../error/dynamodb.error.js";
-import { simDynamoDbBinaryText } from "./sim-dynamodb-binary.js";
+import {
+  simDynamoDbBinaryCopy,
+  simDynamoDbBinaryText,
+} from "./sim-dynamodb-binary.js";
 import { SimDynamoDbNumber } from "./sim-dynamodb-number.js";
 import type { SimDynamoDbValue } from "./sim-dynamodb-value.js";
 
@@ -104,7 +107,7 @@ function readBinarySet(members: readonly unknown[]): SimDynamoDbValue {
       );
     }
 
-    return member as Uint8Array;
+    return simDynamoDbBinaryCopy(member as Uint8Array);
   });
 
   assertSet(

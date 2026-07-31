@@ -1,5 +1,6 @@
 import type { SimDynamoDbAttributeValue } from "../command/item/item.types.js";
 import { SimDynamoDbValidationException } from "../error/dynamodb.error.js";
+import { simDynamoDbBinaryCopy } from "./sim-dynamodb-binary.js";
 import { SimDynamoDbNumber } from "./sim-dynamodb-number.js";
 import { readSimDynamoDbSet } from "./sim-dynamodb-value-set.js";
 import type { SimDynamoDbValue } from "./sim-dynamodb-value.js";
@@ -116,7 +117,7 @@ function readBytes(value: Uint8Array | undefined): Uint8Array {
     );
   }
 
-  return value;
+  return simDynamoDbBinaryCopy(value);
 }
 
 /**
