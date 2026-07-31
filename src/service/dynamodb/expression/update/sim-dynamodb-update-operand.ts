@@ -29,7 +29,11 @@ export interface SimDynamoDbUpdateOperand {
 export class SimDynamoDbUpdateValueOperand implements SimDynamoDbUpdateOperand {
   public readonly text: string;
 
-  private readonly value: SimDynamoDbValue;
+  /**
+   * The value itself, which is the same whatever the item holds. ADD and DELETE
+   * read it directly, since neither of them takes anything else.
+   */
+  public readonly value: SimDynamoDbValue;
 
   constructor(text: string, value: SimDynamoDbValue) {
     this.text = text;

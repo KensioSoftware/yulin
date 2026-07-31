@@ -310,4 +310,44 @@ describe("DynamoDB UpdateItemCommand", () => {
     const stored = await storedOrder(simDynamoDb);
     assertIdentical(stored["orderId"]?.S, "order-1");
   });
+
+  it("applies the clauses of one expression together", async () => {
+    // Given an order with a status and one tag.
+    const simAws = new SimAws();
+    const simDynamoDb = await tableFor(simAws);
+    await simDynamoDb.putItem(
+      new PutItemCommand({
+        TableName: "FooTable",
+        Item: {
+          orderId: { S: "order-1" },
+          status: { S: "packing" },
+          draft: { BOOL: true },
+          tags: { SS: ["new"] },
+        },
+      }),
+    );
+
+    // When one expression sets, removes, adds and deletes.
+    await simDynamoDb.updateItem(
+      new UpdateItemCommand({
+        TableName: "FooTable",
+        Key: { orderId: { S: "order-1" } },
+        UpdateExpression:
+          "SET #s = :shipped REMOVE draft ADD views :one DELETE tags :old",
+        ExpressionAttributeNames: { "#s": "status" },
+        ExpressionAttributeValues: {
+          ":shipped": { S: "shipped" },
+          ":one": { N: "1" },
+          ":old": { SS: ["new"] },
+        },
+      }),
+    );
+
+    // Then every clause was applied to the one item.
+    const stored = await storedOrder(simDynamoDb);
+    assertIdentical(stored["status"]?.S, "shipped");
+    assertUndefined(stored["draft"]);
+    assertIdentical(stored["views"]?.N, "1");
+    assertUndefined(stored["tags"]);
+  });
 });

@@ -1,6 +1,8 @@
 import { SimDynamoDbValidationException } from "../error/dynamodb.error.js";
 import { compareSimDynamoDbMagnitudes } from "./sim-dynamodb-number-order.js";
 import { assertSimDynamoDbNumberInRange } from "./sim-dynamodb-number-range.js";
+import { sumSimDynamoDbNumberTexts } from "./sim-dynamodb-number-sum.js";
+import { simDynamoDbPlainDecimal } from "./sim-dynamodb-number-text.js";
 
 /**
  * A number as DynamoDB takes it on the wire: digits, an optional fraction, and
@@ -11,27 +13,6 @@ import { assertSimDynamoDbNumberInRange } from "./sim-dynamodb-number-range.js";
 // backtracks a digit at a time rather than combinatorially.
 // eslint-disable-next-line security/detect-unsafe-regex -- no nested quantifier.
 const numberPattern = /^(-?)(\d+)(?:\.(\d+))?(?:[Ee]([+-]?\d+))?$/;
-
-/**
- * Render a number in plain decimal notation.
- *
- * Every number DynamoDB takes fits in plain notation: the widest is 126 digits
- * before the point and the smallest 130 zeros after it, so nothing here needs
- * an exponent to stay readable.
- */
-function plainDecimal(sign: string, digits: string, scale: number): string {
-  if (scale >= 0) {
-    return sign + digits + "0".repeat(scale);
-  }
-
-  const pointPosition = digits.length + scale;
-
-  if (pointPosition > 0) {
-    return `${sign + digits.slice(0, pointPosition)}.${digits.slice(pointPosition)}`;
-  }
-
-  return `${sign}0.${"0".repeat(-pointPosition)}${digits}`;
-}
 
 /**
  * One DynamoDB number.
@@ -101,7 +82,7 @@ export class SimDynamoDbNumber {
     assertSimDynamoDbNumberInRange(value, significand, scale + trailingZeros);
 
     return new this(
-      plainDecimal(sign, significand, scale + trailingZeros),
+      simDynamoDbPlainDecimal(sign, significand, scale + trailingZeros),
       significand.length,
     );
   }
@@ -128,6 +109,28 @@ export class SimDynamoDbNumber {
     }
 
     return magnitude;
+  }
+
+  /**
+   * This number with another added to it.
+   *
+   * The digits are added rather than converted, so a total past what a
+   * JavaScript number holds is exact. A total outside the range DynamoDB
+   * stores is refused the same way one a request wrote would be.
+   */
+  plus(other: SimDynamoDbNumber): SimDynamoDbNumber {
+    return SimDynamoDbNumber.of(
+      sumSimDynamoDbNumberTexts(this.text, other.text, 1),
+    );
+  }
+
+  /**
+   * This number with another taken away from it.
+   */
+  minus(other: SimDynamoDbNumber): SimDynamoDbNumber {
+    return SimDynamoDbNumber.of(
+      sumSimDynamoDbNumberTexts(this.text, other.text, -1),
+    );
   }
 
   /**

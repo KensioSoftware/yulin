@@ -1,7 +1,8 @@
-import { SimDynamoDbValidationException } from "../../error/dynamodb.error.js";
 import { SimDynamoDbItem } from "../../item/sim-dynamodb-item.js";
 import type { SimDynamoDbValue } from "../../item/sim-dynamodb-value.js";
+import { simDynamoDbValueWithout } from "./sim-dynamodb-update-erase.js";
 import type { SimDynamoDbUpdateTarget } from "./sim-dynamodb-update-target.js";
+import { simDynamoDbValueWith } from "./sim-dynamodb-update-write.js";
 
 /**
  * The item an update is building.
@@ -26,7 +27,12 @@ export class SimDynamoDbUpdateDocument {
 
     written.set(
       target.head,
-      valueWith(written.get(target.head), target.rest, value, target),
+      simDynamoDbValueWith(
+        written.get(target.head),
+        target.rest,
+        value,
+        target,
+      ),
     );
 
     this.attributes = written;
@@ -41,7 +47,7 @@ export class SimDynamoDbUpdateDocument {
    */
   remove(target: SimDynamoDbUpdateTarget): void {
     const written = new Map(this.attributes);
-    const kept = valueWithout(written.get(target.head), target.rest);
+    const kept = simDynamoDbValueWithout(written.get(target.head), target.rest);
 
     if (kept === undefined) {
       written.delete(target.head);
@@ -58,69 +64,4 @@ export class SimDynamoDbUpdateDocument {
   toItem(): SimDynamoDbItem {
     return SimDynamoDbItem.ofUpdatedAttributes(this.attributes);
   }
-}
-
-/**
- * A value with something written into it, at the names below it.
- *
- * With no names left, the value itself is what was written. Otherwise the value
- * has to be a map, since an update cannot make one on the way past: real
- * DynamoDB refuses `SET address.city = :c` where the item has no `address`.
- */
-function valueWith(
-  value: SimDynamoDbValue | undefined,
-  names: readonly string[],
-  written: SimDynamoDbValue,
-  target: SimDynamoDbUpdateTarget,
-): SimDynamoDbValue {
-  const head = names.at(0);
-
-  if (head === undefined) {
-    return written;
-  }
-
-  if (value?.kind !== "M") {
-    throw new SimDynamoDbValidationException(
-      `The document path provided in the update expression is invalid for ` +
-        `update: '${target.text}' reaches into an attribute that is not a map`,
-    );
-  }
-
-  const entries = new Map(value.entries);
-  entries.set(
-    head,
-    valueWith(entries.get(head), names.slice(1), written, target),
-  );
-
-  return { kind: "M", entries };
-}
-
-/**
- * A value with whatever the names below it point at taken away, or nothing when
- * the value itself is what was pointed at.
- */
-function valueWithout(
-  value: SimDynamoDbValue | undefined,
-  names: readonly string[],
-): SimDynamoDbValue | undefined {
-  const head = names.at(0);
-
-  if (head === undefined) {
-    return undefined;
-  }
-
-  if (value?.kind !== "M") {
-    return value;
-  }
-
-  const kept = valueWithout(value.entries.get(head), names.slice(1));
-  const entries = new Map(value.entries);
-
-  if (kept === undefined) {
-    entries.delete(head);
-  } else {
-    entries.set(head, kept);
-  }
-
-  return { kind: "M", entries };
 }

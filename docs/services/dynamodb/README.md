@@ -370,13 +370,14 @@ Both take the table's name or its ARN, as the table commands do.
 ## Updating items
 
 `UpdateItem` changes part of an item, where `PutItem` replaces the whole thing. What to change is
-written as an `UpdateExpression` made of a `SET` clause, a `REMOVE` clause, or both in either order.
+written as an `UpdateExpression` made of `SET`, `REMOVE`, `ADD` and `DELETE` clauses, in any order.
 Each keyword appears at most once, and the actions inside a clause are separated by commas.
 
 A `SET` action is `path = operand`, where an operand is a value from `ExpressionAttributeValues`,
-another document path, or `if_not_exists(path, operand)`. An update expression carries no literals,
-so every constant arrives through `ExpressionAttributeValues`. A `REMOVE` action is a document path
-on its own, and removing an attribute that is not there succeeds without changing the item.
+another document path, or a call to `if_not_exists(path, operand)` or `list_append(one, other)`. Two
+operands can be joined by one `+` or `-`. An update expression carries no literals, so every constant
+arrives through `ExpressionAttributeValues`. A `REMOVE` action is a document path on its own, and
+removing an attribute that is not there succeeds without changing the item.
 
 Every action reads the item as it stood before the request, rather than the item being built. So
 this expression, against `{ a: 1, b: 2, c: 3 }`:
@@ -474,6 +475,122 @@ An assignment reading a document path the item does not have is a `ValidationExc
 an assignment of nothing, as it is on AWS. `if_not_exists` is how an expression says what to assign
 when the attribute may be absent.
 
+### Counting and appending
+
+`SET count = count + :n` and `SET count = count - :n` work out a number. DynamoDB takes one operator
+between two operands, with no chaining and no brackets, so `:a + :b + :c` is refused. Arithmetic
+against an attribute that is not there is a `ValidationException`, which is why a counter is usually
+written `SET count = if_not_exists(count, :zero) + :one`.
+
+The arithmetic runs on the decimal digits an item holds rather than on JavaScript numbers. Adding 1
+to `9007199254740993` answers `9007199254740994` here, where an implementation going through a
+double answers `9007199254740992`. A total wider than the 38 significant digits DynamoDB carries is
+refused rather than rounded.
+
+`list_append(one, other)` puts two lists end to end in the order they were written, so
+`list_append(history, :entry)` appends and `list_append(:entry, history)` prepends.
+
+A `SET` at a list index past the end of the list appends rather than leaving a gap, and a `REMOVE`
+of a list element closes the list up. Every index an expression names is read against the stored
+item, so `REMOVE lines[0], lines[1]` takes away the first two elements rather than the first and
+the one that moved down into its place.
+
+### Adding to numbers and sets
+
+`ADD path :value` and `DELETE path :value` are written as a path and a value with nothing between
+them. Both work on a top-level attribute, as they do on AWS, and both take a value the request
+carries rather than a document path.
+
+`ADD` on a number adds mathematically. An attribute that is not there counts as zero, and a negative
+value counts down. `ADD` on a set unions the value into the stored set, and creates the attribute
+when it is not there. The two sets have to be the same kind: adding a number set to a string set is
+refused.
+
+AWS recommends `SET` over `ADD` for a number, and it is worth repeating here. A retried `ADD` counts
+twice, where a retried `SET` writes the same value again.
+
+```typescript sim-dynamodb-update-counter
+/**
+ * Counting a view, appending to a list, and tagging an item.
+ */
+
+import {
+  CreateTableCommand,
+  PutItemCommand,
+  UpdateItemCommand,
+} from "@aws-sdk/client-dynamodb";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const dynamoDb = simAws.dynamoDb();
+
+await dynamoDb.createTable(
+  new CreateTableCommand({
+    TableName: "FoobarTable",
+    KeySchema: [{ AttributeName: "pageId", KeyType: "HASH" }],
+    AttributeDefinitions: [{ AttributeName: "pageId", AttributeType: "S" }],
+    BillingMode: "PAY_PER_REQUEST",
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+await dynamoDb.putItem(
+  new PutItemCommand({
+    TableName: "FoobarTable",
+    Item: {
+      pageId: { S: "page-1" },
+      history: { L: [{ S: "created" }] },
+      tags: { SS: ["draft"] },
+    },
+  }),
+);
+
+const counted = await dynamoDb.updateItem(
+  new UpdateItemCommand({
+    TableName: "FoobarTable",
+    Key: { pageId: { S: "page-1" } },
+    UpdateExpression:
+      "SET views = if_not_exists(views, :zero) + :one, " +
+      "history = list_append(history, :entry) " +
+      "ADD tags :added",
+    ExpressionAttributeValues: {
+      ":zero": { N: "0" },
+      ":one": { N: "1" },
+      ":entry": { L: [{ S: "viewed" }] },
+      ":added": { SS: ["published"] },
+    },
+    ReturnValues: "UPDATED_NEW",
+  }),
+);
+
+// UPDATED_NEW answers with the attributes the expression touched.
+console.log(counted.Attributes?.["views"]?.N); // "1"
+console.log(counted.Attributes?.["history"]?.L?.length); // 2
+console.log(counted.Attributes?.["tags"]?.SS); // [ "draft", "published" ]
+console.log(counted.Attributes?.["pageId"]); // undefined
+
+// Two actions cannot write to one attribute, so taking a tag away is its own
+// update rather than a DELETE alongside the ADD above.
+const untagged = await dynamoDb.updateItem(
+  new UpdateItemCommand({
+    TableName: "FoobarTable",
+    Key: { pageId: { S: "page-1" } },
+    UpdateExpression: "DELETE tags :gone",
+    ExpressionAttributeValues: { ":gone": { SS: ["draft"] } },
+    ReturnValues: "UPDATED_NEW",
+  }),
+);
+
+console.log(untagged.Attributes?.["tags"]?.SS); // [ "published" ]
+```
+
+`DELETE` is set subtraction and nothing else. The value has to be a set of the kind the attribute
+holds, a member the set does not hold is not an error, and a subtraction that empties the set takes
+the attribute away with it, since DynamoDB has no empty set.
+
+`ADD` and `DELETE` against a String, Binary, List or Map attribute are refused, as they are on AWS.
+
 Assigning into a map the item does not carry is a `ValidationException` too. `SET address.city = :c`
 needs an `address` map to write into, and an update does not make one on the way past.
 
@@ -484,9 +601,11 @@ through its `Key`.
 A request with no `UpdateExpression` at all still writes. It leaves a stored item as it was, and
 creates one holding nothing but the `Key` when the key held nothing.
 
-`ReturnValues` takes `NONE`, `ALL_OLD` and `ALL_NEW`. `ALL_OLD` answers with the item as it stood
-before the update, and carries nothing when the key held nothing. `ALL_NEW` answers with the item as
-it now is.
+`ReturnValues` takes `NONE`, `ALL_OLD`, `ALL_NEW`, `UPDATED_OLD` and `UPDATED_NEW`. The `ALL_` modes
+answer with the whole item, as it stood before the update or as it now is. The `UPDATED_` modes
+answer with the parts of it the expression touched and nothing else, nested the way the item nests
+them. `ALL_OLD` and `UPDATED_OLD` carry nothing when the key held nothing, and `UPDATED_NEW` carries
+nothing when the expression only removed attributes.
 
 `UpdateItem` takes a `ConditionExpression` as well, checked the same way as on the other writes.
 Both expressions draw on the same `ExpressionAttributeNames` and `ExpressionAttributeValues`, and a
@@ -918,9 +1037,9 @@ authorizes against `*`.
 - `ProjectionExpression` on `GetItem`, with document paths, list indexing and `ExpressionAttributeNames`
   placeholders.
 - `DeleteItem`, removing the item under a primary key and answering with it for `ALL_OLD`.
-- `UpdateItem`, with `SET` and `REMOVE` update expressions, `if_not_exists`, upserting when the key
-  holds nothing, and `NONE`, `ALL_OLD` and `ALL_NEW` for `ReturnValues`. Every action reads the item
-  as it stood before the update.
+- `UpdateItem`, with `SET`, `REMOVE`, `ADD` and `DELETE` update expressions, `if_not_exists`,
+  `list_append`, decimal arithmetic, list element paths, upserting when the key holds nothing, and
+  all five `ReturnValues` modes. Every action reads the item as it stood before the update.
 - `ConditionExpression` on `PutItem`, `DeleteItem` and `UpdateItem`, with the six comparators, `BETWEEN`, `IN`,
   `AND`, `OR`, `NOT`, brackets, and the `attribute_exists`, `attribute_not_exists`, `attribute_type`,
   `begins_with`, `contains` and `size` functions.
@@ -981,13 +1100,12 @@ authorizes against `*`.
 - Condition expressions are simulated on `PutItem`, `DeleteItem` and `UpdateItem` only. The
   transactional condition checks and the key condition and filter expressions of `Query` and `Scan`
   are not implemented yet, so there is nothing else to guard.
-- The `ADD` and `DELETE` clauses of an update expression are refused rather than applied, and so are
-  arithmetic such as `SET n = n + :one`, `list_append`, and list element paths such as
-  `SET lines[0] = :line`. An update that quietly left one of them out would leave a test passing
-  against an item the real call would have changed.
-- `UPDATED_OLD` and `UPDATED_NEW` are refused. Both answer with the attributes the update touched,
-  which is a different answer to the whole item rather than a smaller one, and nothing here tracks
-  which attributes those were.
+- Two update actions cannot write to overlapping paths, so `ADD tags :added DELETE tags :gone` in one
+  expression is refused as it is on AWS. Taking members out of a set an expression also adds to is a
+  second update.
+- An update is applied in one go, so nothing here shows the concurrency an atomic counter is for. A
+  simulated `ADD` counts exactly once per call, where a real one is what makes two callers counting
+  at the same time both count.
 - The legacy `AttributeUpdates` is refused rather than ignored, for the same reason `Expected` is.
   `UpdateExpression` replaced it, and real DynamoDB has built nothing on it since.
 - A `REMOVE` whose path reaches through an attribute that is missing, or that is not a map, changes

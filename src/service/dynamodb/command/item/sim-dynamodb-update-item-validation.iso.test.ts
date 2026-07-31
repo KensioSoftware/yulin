@@ -13,7 +13,10 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
-import { SimDynamoDbValidationException } from "../../error/dynamodb.error.js";
+import {
+  SimDynamoDbUnsupportedOperation,
+  SimDynamoDbValidationException,
+} from "../../error/dynamodb.error.js";
 import type { SimDynamoDb } from "../../sim-dynamodb.js";
 
 /**
@@ -98,7 +101,7 @@ describe("DynamoDB UpdateItemCommand validation", () => {
     // Then the refusal names the expression and what was expected.
     assertInstanceOf(error, SimDynamoDbValidationException);
     assertStringIncludes(error.message, "Invalid UpdateExpression");
-    assertStringIncludes(error.message, "SET or REMOVE expected");
+    assertStringIncludes(error.message, "SET, REMOVE, ADD or DELETE expected");
   });
 
   it("refuses a SET action that assigns nothing", async () => {
@@ -325,5 +328,22 @@ describe("DynamoDB UpdateItemCommand validation", () => {
     // Then the write is refused, as it would be for a PutItem of that item.
     assertInstanceOf(error, SimDynamoDbValidationException);
     assertStringIncludes(error.message, "Item size has exceeded");
+  });
+
+  it("refuses the legacy AttributeUpdates", async () => {
+    // Given a table holding an order.
+    const simAws = new SimAws();
+    const simDynamoDb = await tableFor(simAws);
+
+    // When an update says what to change the old way.
+    const error = await refusalOf(simDynamoDb, {
+      AttributeUpdates: {
+        status: { Value: { S: "shipped" }, Action: "PUT" },
+      },
+    });
+
+    // Then it is refused by name, rather than leaving the item unchanged.
+    assertInstanceOf(error, SimDynamoDbUnsupportedOperation);
+    assertStringIncludes(error.message, "AttributeUpdates is not simulated");
   });
 });
