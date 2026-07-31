@@ -18,6 +18,12 @@ export interface SimDynamoDbConditionOperand {
   readonly text: string;
 
   /**
+   * What this operand names, as text no other operand can produce. Two
+   * operands are the same operand when their identities match.
+   */
+  readonly identity: string;
+
+  /**
    * The value this operand has for an item, if it has one.
    */
   valueIn(subject: SimDynamoDbConditionSubject): SimDynamoDbValue | undefined;
@@ -35,6 +41,10 @@ export class SimDynamoDbPathOperand implements SimDynamoDbConditionOperand {
 
   get text(): string {
     return this.path.text;
+  }
+
+  get identity(): string {
+    return this.path.identity;
   }
 
   valueIn(subject: SimDynamoDbConditionSubject): SimDynamoDbValue | undefined {
@@ -56,6 +66,13 @@ export class SimDynamoDbValueOperand implements SimDynamoDbConditionOperand {
   constructor(text: string, value: SimDynamoDbValue) {
     this.text = text;
     this.value = value;
+  }
+
+  /**
+   * A placeholder names itself, and no path can be written to look like one.
+   */
+  get identity(): string {
+    return this.text;
   }
 
   valueIn(): SimDynamoDbValue {
@@ -80,6 +97,10 @@ export class SimDynamoDbSizeOperand implements SimDynamoDbConditionOperand {
 
   get text(): string {
     return `size(${this.operand.text})`;
+  }
+
+  get identity(): string {
+    return `size(${this.operand.identity})`;
   }
 
   valueIn(subject: SimDynamoDbConditionSubject): SimDynamoDbValue | undefined {

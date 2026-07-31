@@ -101,7 +101,7 @@ export class SimDynamoDbConditionFunctionParser {
       }
       case "begins_with": {
         return new SimDynamoDbBeginsWithCondition(
-          this.operands.parse(),
+          this.operands.parsePath(name),
           this.arguments.second(),
         );
       }
@@ -115,7 +115,7 @@ export class SimDynamoDbConditionFunctionParser {
    * Read `contains`, whose two operands have to differ.
    */
   private contains(): SimDynamoDbCondition {
-    const operand = this.operands.parse();
+    const operand = this.operands.parsePath("contains");
 
     return new SimDynamoDbContainsCondition(
       operand,

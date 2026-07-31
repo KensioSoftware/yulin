@@ -82,13 +82,17 @@ export class SimDynamoDbConditionFunctionArguments {
    *
    * Asking whether something contains itself has one answer whatever the item
    * holds, so real DynamoDB refuses it rather than always answering yes.
+   *
+   * They are told apart by what they name rather than by how they print, so
+   * an attribute whose name carries a dot is not confused with the two
+   * attributes it prints as.
    */
   distinctSecond(
     operand: SimDynamoDbConditionOperand,
   ): SimDynamoDbConditionOperand {
     const sought = this.second();
 
-    if (operand.text === sought.text) {
+    if (operand.identity === sought.identity) {
       throw this.tokens.error(
         `the first operand must be distinct from the second operand for ` +
           `operator contains, and both are '${operand.text}'`,

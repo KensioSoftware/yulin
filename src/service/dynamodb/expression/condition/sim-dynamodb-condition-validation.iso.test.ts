@@ -220,10 +220,18 @@ describe("DynamoDB condition expression validation", () => {
         "operator contains",
     );
 
-    // And the refusal names a size operand the way the expression wrote it.
+    // And a first operand naming no place in the item is refused before the
+    // two are compared at all, since contains reads a path there.
     assertStringIncludes(
       refusal("contains(size(tags), size(tags))").message,
-      "both are 'size(tags)'",
+      "the first operand of contains names a place in the item",
+    );
+    assertStringIncludes(
+      refusal("begins_with(:a, :b)", {
+        ":a": { S: "a" },
+        ":b": { S: "b" },
+      }).message,
+      "the first operand of begins_with names a place in the item",
     );
   });
 });

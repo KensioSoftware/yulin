@@ -459,13 +459,18 @@ works as well as `AND`.
 The functions are `attribute_exists`, `attribute_not_exists`, `attribute_type`, `begins_with`,
 `contains` and `size`. Function names are read in lower case only, as they are on real AWS.
 `attribute_exists` is true for an attribute stored as `NULL`, since `NULL` is a value rather than an
-absent one. `size` is a number rather than a condition, so it goes beside a comparator: a string and
+absent one. The first operand of every one of them names a path in the item, so a supplied value
+there is refused rather than compared. `size` is a number rather than a condition, so it goes beside a comparator: a string and
 binary measure in bytes, and a set, a list or a map in how many things it holds.
 
 Strings compare by UTF-8 byte order, numbers compare by their digits rather than by what they round
-to, and binary compares as unsigned bytes. A comparison between two different types is false rather
-than an error, and so is one naming a path the item does not have. That is what real DynamoDB does,
-and it is what lets one condition guard items that do not all carry the same attributes.
+to, and binary compares as unsigned bytes.
+
+A comparison between two different types is never an error. Equality works across types, so a string
+and a number are not equal: `=` is false and `<>` is true. Ordering does not, so `<`, `<=`, `>` and
+`>=` are all false between them, as they are for a path the item does not have. That is what real
+DynamoDB does, and it is what lets one condition guard items that do not all carry the same
+attributes.
 
 `ExpressionAttributeNames` and `ExpressionAttributeValues` have to agree exactly with the expression,
 in both directions: a placeholder the request does not define is a `ValidationException`, and so is

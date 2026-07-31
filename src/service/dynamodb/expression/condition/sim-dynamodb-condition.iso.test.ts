@@ -89,13 +89,17 @@ describe("DynamoDB condition expressions", () => {
     );
   });
 
-  it("is false rather than an error between two different types", () => {
-    // Given a comparison between a string attribute and a number.
-    // When it is evaluated, then it is false, which is what real DynamoDB
-    // does rather than refusing the request.
+  it("compares two different types without refusing the request", () => {
+    // Given comparisons between a string attribute and a number.
+    // When they are evaluated, then none is an error, which is what real
+    // DynamoDB does. Ordering has no answer across types, so it is false.
     assertFalse(holds("status = :one", { ":one": { N: "1" } }));
     assertFalse(holds("status < :one", { ":one": { N: "1" } }));
     assertFalse(holds("paid > :one", { ":one": { N: "1" } }));
+
+    // And `<>` is true, because equality works across types and a string
+    // really is not a number.
+    assertTrue(holds("status <> :one", { ":one": { N: "1" } }));
   });
 
   it("is false for a path the item does not have", () => {
@@ -155,9 +159,14 @@ describe("DynamoDB condition expressions", () => {
       holds("status = :wrong AND (status = :wrong OR status = :right)", values),
     );
 
-    // And NOT applies to what follows it rather than to the whole AND, so
-    // `NOT false AND true` is true.
-    assertTrue(holds("NOT status = :wrong AND status = :right", values));
+    // And NOT applies to what follows it rather than to the whole
+    // expression: `NOT true OR true` is true read as `(NOT true) OR true`,
+    // and false read as `NOT (true OR true)`.
+    assertTrue(
+      holds("NOT status = :right OR status = :right", {
+        ":right": values[":right"],
+      }),
+    );
   });
 
   it("reads keywords in any case", () => {

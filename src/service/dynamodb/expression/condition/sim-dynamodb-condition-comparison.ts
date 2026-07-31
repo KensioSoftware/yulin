@@ -19,6 +19,9 @@ export const simDynamoDbComparators: ReadonlySet<string> = new Set([
 
 /**
  * Whether an ordering satisfies a comparator.
+ *
+ * Only the four ordering comparators reach here, so the last of them is the
+ * remaining case. `=` and `<>` are answered by equality before this is asked.
  */
 function ordered(comparator: string, order: number): boolean {
   switch (comparator) {
@@ -40,10 +43,11 @@ function ordered(comparator: string, order: number): boolean {
 /**
  * Two operands compared against each other.
  *
- * A comparison between two types DynamoDB does not order, such as a string and
- * a number, is false rather than an error. That is what real DynamoDB does, and
- * it is what lets one condition guard items that do not all carry the same
- * attributes.
+ * A comparison between two types is never an error, which is what lets one
+ * condition guard items that do not all carry the same attributes. What it
+ * answers depends on the comparator. Equality works across types, so a string
+ * and a number are not equal: `=` is false and `<>` is true. Ordering does
+ * not, so `<`, `<=`, `>` and `>=` are all false between them.
  */
 export class SimDynamoDbComparisonCondition implements SimDynamoDbCondition {
   private readonly left: SimDynamoDbConditionOperand;
