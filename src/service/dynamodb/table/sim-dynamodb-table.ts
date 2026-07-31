@@ -132,6 +132,18 @@ export class SimDynamoDbTable {
   }
 
   /**
+   * The item already stored under the same primary key as this one.
+   *
+   * A conditional write is checked against what is there before it, and what is
+   * there is found by the key inside the item rather than by a Key of its own.
+   * The key is read the same way a write reads it, so an item that could not be
+   * written does not quietly find nothing here either.
+   */
+  public itemUnder(item: SimDynamoDbItem): SimDynamoDbItem | undefined {
+    return this.items.get(this.itemKey.of(item));
+  }
+
+  /**
    * Read the item a primary key names, if the table holds one.
    *
    * Every write has landed by the time it returns, so this reads the latest

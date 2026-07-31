@@ -1,3 +1,5 @@
+import { jsonStringify } from "../../../util/type-guard/json.js";
+
 /**
  * One step of a document path: an attribute of a map.
  */
@@ -40,6 +42,18 @@ export class SimDynamoDbDocumentPath {
    */
   get depth(): number {
     return this.segments.length;
+  }
+
+  /**
+   * What this path names, as text no other path can produce.
+   *
+   * Two paths that print the same are not always the same path: an attribute
+   * whose name carries a dot has to be written as a placeholder, and prints as
+   * though it were two attributes. Anything comparing paths compares this
+   * rather than the printed form.
+   */
+  get identity(): string {
+    return jsonStringify(this.segments);
   }
 
   /**

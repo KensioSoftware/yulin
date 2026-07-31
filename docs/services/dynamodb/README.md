@@ -367,6 +367,115 @@ reports nothing removed. Its `ReturnValues` takes `NONE` and `ALL_OLD`, as `PutI
 
 Both take the table's name or its ARN, as the table commands do.
 
+## Conditional writes
+
+`PutItem` and `DeleteItem` take a `ConditionExpression`, which is checked against whatever is stored
+under the key before anything changes. A condition that does not hold leaves the item exactly as it
+was and throws `ConditionalCheckFailedException`, with the name and message real DynamoDB uses.
+
+That is how a write becomes an insert if absent, and how a version attribute becomes optimistic
+locking.
+
+```typescript sim-dynamodb-conditional-write
+/**
+ * Inserting only if absent, and writing only against the version last read.
+ */
+
+import { CreateTableCommand, PutItemCommand } from "@aws-sdk/client-dynamodb";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const dynamoDb = simAws.dynamoDb();
+
+await dynamoDb.createTable(
+  new CreateTableCommand({
+    TableName: "FoobarTable",
+    KeySchema: [{ AttributeName: "orderId", KeyType: "HASH" }],
+    AttributeDefinitions: [{ AttributeName: "orderId", AttributeType: "S" }],
+    BillingMode: "PAY_PER_REQUEST",
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+const order = {
+  TableName: "FoobarTable",
+  Item: { orderId: { S: "order-1" }, version: { N: "1" } },
+  ConditionExpression: "attribute_not_exists(orderId)",
+};
+
+// The key is free, so the insert goes through.
+await dynamoDb.putItem(new PutItemCommand(order));
+
+// The key is taken now, so the same insert is turned away.
+try {
+  await dynamoDb.putItem(new PutItemCommand(order));
+} catch (error) {
+  console.log((error as Error).name); // "ConditionalCheckFailedException"
+}
+
+// Optimistic locking: write only if the version is still the one last read.
+await dynamoDb.putItem(
+  new PutItemCommand({
+    TableName: "FoobarTable",
+    Item: { orderId: { S: "order-1" }, version: { N: "2" } },
+    ConditionExpression: "version = :was",
+    ExpressionAttributeValues: { ":was": { N: "1" } },
+  }),
+);
+
+// A second writer holding the same stale version now loses the race.
+try {
+  await dynamoDb.putItem(
+    new PutItemCommand({
+      TableName: "FoobarTable",
+      Item: { orderId: { S: "order-1" }, version: { N: "2" } },
+      ConditionExpression: "version = :was",
+      ExpressionAttributeValues: { ":was": { N: "1" } },
+      ReturnValuesOnConditionCheckFailure: "ALL_OLD",
+    }),
+  );
+} catch (error) {
+  // ALL_OLD puts the item it lost to on the exception, so a retry needs no
+  // second read.
+  console.log((error as { Item?: Record<string, { N?: string }> }).Item);
+  // { orderId: { S: "order-1" }, version: { N: "2" } }
+}
+```
+
+`ReturnValuesOnConditionCheckFailure` takes `NONE` and `ALL_OLD`. `ALL_OLD` puts the stored item on
+the exception as `Item`, and there is no `Item` when the key held nothing.
+
+The expression is read before the table is reached, so an expression DynamoDB would refuse is
+refused whether or not the key holds anything.
+
+### What a condition can say
+
+The comparators are `=`, `<>`, `<`, `<=`, `>` and `>=`. `BETWEEN` takes two bounds and counts both as
+inside. `IN` takes up to 100 operands. `AND`, `OR`, `NOT` and brackets combine them, with `NOT`
+binding tighter than `AND` and `AND` tighter than `OR`. Keywords are read in any case, so `and`
+works as well as `AND`.
+
+The functions are `attribute_exists`, `attribute_not_exists`, `attribute_type`, `begins_with`,
+`contains` and `size`. Function names are read in lower case only, as they are on real AWS.
+`attribute_exists` is true for an attribute stored as `NULL`, since `NULL` is a value rather than an
+absent one. The first operand of every one of them names a path in the item, so a supplied value
+there is refused rather than compared. `size` is a number rather than a condition, so it goes beside a comparator: a string and
+binary measure in bytes, and a set, a list or a map in how many things it holds.
+
+Strings compare by UTF-8 byte order, numbers compare by their digits rather than by what they round
+to, and binary compares as unsigned bytes.
+
+A comparison between two different types is never an error. Equality works across types, so a string
+and a number are not equal: `=` is false and `<>` is true. Ordering does not, so `<`, `<=`, `>` and
+`>=` are all false between them, as they are for a path the item does not have. That is what real
+DynamoDB does, and it is what lets one condition guard items that do not all carry the same
+attributes.
+
+`ExpressionAttributeNames` and `ExpressionAttributeValues` have to agree exactly with the expression,
+in both directions: a placeholder the request does not define is a `ValidationException`, and so is
+an entry no expression uses.
+
 ## Projecting attributes
 
 `GetItem` takes a `ProjectionExpression`, which is a comma-separated list of document paths. Only
@@ -684,6 +793,9 @@ authorizes against `*`.
 - `ProjectionExpression` on `GetItem`, with document paths, list indexing and `ExpressionAttributeNames`
   placeholders.
 - `DeleteItem`, removing the item under a primary key and answering with it for `ALL_OLD`.
+- `ConditionExpression` on `PutItem` and `DeleteItem`, with the six comparators, `BETWEEN`, `IN`,
+  `AND`, `OR`, `NOT`, brackets, and the `attribute_exists`, `attribute_not_exists`, `attribute_type`,
+  `begins_with`, `contains` and `size` functions.
 - `AWS::DynamoDB::Table` in CloudFormation, created through `CreateTable`, with `Ref` giving the
   table name and `Fn::GetAtt … Arn` the table ARN.
 - SDK interception, so an intercepted `DynamoDBClient` reaches the simulation.
@@ -738,10 +850,15 @@ authorizes against `*`.
   evaluated.
 - Reads are always strongly consistent. `ConsistentRead` is accepted either way and changes nothing,
   so a test cannot observe a stale read here the way it might against a real table.
-- Condition expressions are not simulated. `ConditionExpression`, `ExpressionAttributeNames`,
-  `ExpressionAttributeValues`, `Expected` and `ConditionalOperator` are refused rather than ignored,
-  since a condition that is never evaluated would let a write or a delete through that DynamoDB would
-  have turned away.
+- Condition expressions are simulated on `PutItem` and `DeleteItem` only. `UpdateItem`, the
+  transactional condition checks and the key condition and filter expressions of `Query` and `Scan`
+  are not implemented yet, so there is nothing else to guard.
+- The legacy `Expected` and `ConditionalOperator` are refused rather than ignored, since an
+  expectation that is never evaluated would let a write or a delete through that DynamoDB would have
+  turned away. `ConditionExpression` replaced them, and real DynamoDB has built nothing on them
+  since.
+- The 4 KB limit on an expression and the 300 operator limit are not enforced. Nothing here is slower
+  for a long expression, so an expression real DynamoDB would refuse for its size is evaluated.
 - Capacity and item collection reporting are not simulated. `ReturnConsumedCapacity` and
   `ReturnItemCollectionMetrics` are refused unless they name `NONE`.
 - A `Key` that does not match the table's key schema is refused with the attribute named. Real

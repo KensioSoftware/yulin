@@ -293,6 +293,10 @@ Important behavior:
   free succeeds and reports nothing removed.
 - DeleteItem takes the same `ReturnValues` as PutItem, through `SimDynamoDbReturnValues`, which is
   where the two modes and the error text for a third live.
+- Both take a `ConditionExpression`, through the shared `SimDynamoDbConditionCheck`. The condition is
+  checked against what is stored before anything changes, so a write it turns away leaves the item
+  exactly as it was. PutItem finds what is stored through `SimDynamoDbTable.itemUnder`, which reads
+  the key out of the item being written rather than out of a Key of its own.
 - GetItem refuses the legacy `AttributesToGet` and a `ReturnConsumedCapacity` that asks for anything,
   in `sim-dynamodb-unsimulated-item-read-input.ts`. `ExpressionAttributeNames` with no expression to
   use them in is a `ValidationException` rather than an unsupported operation, because real DynamoDB
@@ -332,7 +336,29 @@ The shared parts:
   `Invalid <parameter>: <reason>`. A request can carry several expressions, so naming which one was
   wrong matters.
 
-`expression/projection/` is the first consumer. `readSimDynamoDbProjection` reads a
+`expression/condition/` reads a ConditionExpression into a `SimDynamoDbCondition`, which answers yes
+or no for a `SimDynamoDbConditionSubject`: the item stored under the key, which may be nothing at
+all. That is what makes `attribute_not_exists(id)` an insert if absent, since every path resolves to
+nothing when there is no item.
+
+`SimDynamoDbConditionParser` is recursive descent with one method per precedence level, so the
+precedence DynamoDB documents is the shape of the class rather than a table somewhere. The operands
+and the function calls have parsers of their own, because deciding whether `size` is a call or an
+attribute named `size` is a different job from deciding whether an OR binds looser than an AND.
+
+The comparison rules live in `item/sim-dynamodb-value-comparison.ts` rather than inside the
+evaluator, because sort key conditions and filter expressions compare the same way when `Query` and
+`Scan` arrive. Strings compare by UTF-8 bytes rather than by UTF-16 code units, numbers compare
+through `SimDynamoDbNumber.compareTo` so digits past what a JavaScript number holds still order
+correctly, and binary compares as unsigned bytes. Two values of different types have no order at all,
+which is what makes a comparison between them false rather than an error.
+
+`SimDynamoDbConditionCheck` under `command/item/` is what PutItem and DeleteItem both use. It reads
+the expression before the table is reached, so an expression DynamoDB would refuse is refused
+whether or not the key holds anything, and it throws
+`SimDynamoDbConditionalCheckFailedException` before anything is written.
+
+`expression/projection/` is the other consumer. `readSimDynamoDbProjection` reads a
 `ProjectionExpression` and its names into a `SimDynamoDbProjection`, and `SimDynamoDbProjectionNode`
 merges the paths into a tree before anything is read, so `address.city` and `address.postcode` become
 one `address` holding two attributes. Two paths where one contains the other are refused there, as
@@ -396,6 +422,12 @@ Current specialized errors:
   - name: `ValidationException`
   - HTTP status: `400`
   - used for request input real DynamoDB would refuse
+- `SimDynamoDbConditionalCheckFailedException`
+  - name: `ConditionalCheckFailedException`
+  - HTTP status: `400`
+  - used when a ConditionExpression did not hold, with the message real DynamoDB uses so SDK error
+    handling matches. It carries the stored item when the request asked for it with
+    `ReturnValuesOnConditionCheckFailure`.
 - `SimDynamoDbUnsupportedOperation`
   - name: `UnsupportedOperation`
   - HTTP status: `400`

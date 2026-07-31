@@ -1,3 +1,5 @@
+import type { SimDynamoDbAttributeValue } from "../command/item/item.types.js";
+
 /**
  * Minimal metadata shape for simulated DynamoDB errors.
  */
@@ -51,6 +53,28 @@ export class SimDynamoDbValidationException extends SimDynamoDbError {
 
   constructor(message: string) {
     super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
+ * Simulated DynamoDB ConditionalCheckFailedException error.
+ *
+ * This is what a write guarded by a ConditionExpression fails with when the
+ * condition did not hold. The name and the message are the ones real DynamoDB
+ * uses, so code that catches it by either works here unchanged.
+ *
+ * `Item` carries the item that was there, and only when the request asked for
+ * it with ReturnValuesOnConditionCheckFailure.
+ */
+export class SimDynamoDbConditionalCheckFailedException extends SimDynamoDbError {
+  public override readonly name = "ConditionalCheckFailedException";
+
+  public readonly Item:
+    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+
+  constructor(item?: Readonly<Record<string, SimDynamoDbAttributeValue>>) {
+    super("The conditional request failed.", { httpStatusCode: 400 });
+    this.Item = item;
   }
 }
 

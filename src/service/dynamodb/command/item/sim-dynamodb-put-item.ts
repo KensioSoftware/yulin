@@ -7,6 +7,7 @@ import type {
   SimPutItemCommandInput,
   SimPutItemCommandOutput,
 } from "./item.command.js";
+import { SimDynamoDbConditionCheck } from "./sim-dynamodb-condition-check.js";
 import { SimDynamoDbReturnValues } from "./sim-dynamodb-return-values.js";
 import { refuseUnsimulatedItemWriteInput } from "./sim-dynamodb-unsimulated-item-write-input.js";
 
@@ -35,6 +36,9 @@ function readItem(input: SimPutItemCommandInput): SimDynamoDbItem {
  * A put replaces the whole item under its primary key rather than merging into
  * it, which is what makes PutItem different from UpdateItem. The item is
  * written before the call returns, so a read that follows finds it.
+ *
+ * A ConditionExpression is checked against whatever is stored under the key
+ * already. A condition that does not hold leaves the table exactly as it was.
  */
 export class SimDynamoDbPutItem {
   private readonly access: SimDynamoDbTableAccess;
@@ -54,13 +58,20 @@ export class SimDynamoDbPutItem {
 
     refuseUnsimulatedItemWriteInput(input, "PutItem");
 
+    // The condition is read before the table is reached, so an expression
+    // DynamoDB would refuse is refused whether or not the key holds anything.
+    const check = SimDynamoDbConditionCheck.read(input, "PutItem");
     const table = this.access.required(
       "dynamodb:PutItem",
       input.TableName,
       options?.caller,
     );
     const asked = SimDynamoDbReturnValues.read(input.ReturnValues, "PutItem");
-    const replaced = table.putItem(readItem(input));
+    const item = readItem(input);
+
+    check.assertHoldsFor(table.itemUnder(item));
+
+    const replaced = table.putItem(item);
 
     if (!asked.wantsOldItem() || replaced === undefined) {
       return { $metadata: {} };

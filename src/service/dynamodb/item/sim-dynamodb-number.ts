@@ -1,4 +1,6 @@
 import { SimDynamoDbValidationException } from "../error/dynamodb.error.js";
+import { compareSimDynamoDbMagnitudes } from "./sim-dynamodb-number-order.js";
+import { assertSimDynamoDbNumberInRange } from "./sim-dynamodb-number-range.js";
 
 /**
  * A number as DynamoDB takes it on the wire: digits, an optional fraction, and
@@ -9,10 +11,6 @@ import { SimDynamoDbValidationException } from "../error/dynamodb.error.js";
 // backtracks a digit at a time rather than combinatorially.
 // eslint-disable-next-line security/detect-unsafe-regex -- no nested quantifier.
 const numberPattern = /^(-?)(\d+)(?:\.(\d+))?(?:[Ee]([+-]?\d+))?$/;
-
-const greatestSignificantDigits = 38;
-const greatestAdjustedExponent = 125;
-const leastAdjustedExponent = -130;
 
 /**
  * Render a number in plain decimal notation.
@@ -100,7 +98,7 @@ export class SimDynamoDbNumber {
     const significand = withoutLeadingZeros.replace(/0+$/, "");
     const trailingZeros = withoutLeadingZeros.length - significand.length;
 
-    this.assertInRange(value, significand, scale + trailingZeros);
+    assertSimDynamoDbNumberInRange(value, significand, scale + trailingZeros);
 
     return new this(
       plainDecimal(sign, significand, scale + trailingZeros),
@@ -109,34 +107,27 @@ export class SimDynamoDbNumber {
   }
 
   /**
-   * Refuse a number outside the range real DynamoDB stores.
+   * Compare this number with another, as DynamoDB orders numbers.
+   *
+   * The digits are compared rather than converted, so two numbers past what a
+   * JavaScript number holds still order by what they say. Converting them
+   * would round both to the same value and call them equal.
    */
-  private static assertInRange(
-    value: string,
-    significand: string,
-    scale: number,
-  ): void {
-    if (significand.length > greatestSignificantDigits) {
-      throw new SimDynamoDbValidationException(
-        `Number ${value} has ${significand.length.toString()} significant ` +
-          `digits, and DynamoDB numbers carry ${greatestSignificantDigits.toString()}`,
-      );
+  compareTo(other: SimDynamoDbNumber): number {
+    if (this.negative !== other.negative) {
+      return this.signOrder();
     }
 
-    // The exponent the number has when written as one digit, a point and the
-    // rest, which is how DynamoDB documents its range.
-    const adjustedExponent = scale + significand.length - 1;
+    const magnitude = compareSimDynamoDbMagnitudes(
+      this.withoutSign(),
+      other.withoutSign(),
+    );
 
-    if (
-      adjustedExponent > greatestAdjustedExponent ||
-      adjustedExponent < leastAdjustedExponent
-    ) {
-      throw new SimDynamoDbValidationException(
-        `Number ${value} is outside the range DynamoDB stores, which is ` +
-          `1E-130 to 9.9999999999999999999999999999999999999E+125 and its ` +
-          `negative mirror`,
-      );
+    if (this.negative) {
+      return -magnitude;
     }
+
+    return magnitude;
   }
 
   /**
@@ -147,5 +138,30 @@ export class SimDynamoDbNumber {
    */
   get sizeInBytes(): number {
     return Math.ceil(this.significantDigits / 2) + 1;
+  }
+
+  /**
+   * Whether this number is below zero.
+   */
+  private get negative(): boolean {
+    return this.text.startsWith("-");
+  }
+
+  /**
+   * Which way round this number goes against one of the other sign.
+   */
+  private signOrder(): number {
+    if (this.negative) {
+      return -1;
+    }
+
+    return 1;
+  }
+
+  /**
+   * The digits of this number, without the sign in front of them.
+   */
+  private withoutSign(): string {
+    return this.text.replace("-", "");
   }
 }
