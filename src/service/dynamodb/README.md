@@ -282,21 +282,66 @@ the same checks PutItem applies on the way in.
 Important behavior:
 
 - GetItem leaves `Item` out altogether on a miss, rather than answering with an empty map. That
-  absence is how a caller tells a miss from an item carrying nothing but its key.
+  absence is how a caller tells a miss from an item carrying nothing but its key. A projection that
+  found none of what it asked for is the other case: the key was there, so `Item` is present and
+  empty.
+- GetItem reads its `ProjectionExpression` before it reaches the table, so an expression DynamoDB
+  would refuse is refused whether or not the key holds anything.
 - `ConsistentRead` is accepted either way and changes nothing. Nothing about a write is scheduled, so
   there is no window in which an eventually consistent read could answer with something older.
 - DeleteItem is idempotent. It names a key rather than an item, so deleting a key that is already
   free succeeds and reports nothing removed.
 - DeleteItem takes the same `ReturnValues` as PutItem, through `SimDynamoDbReturnValues`, which is
   where the two modes and the error text for a third live.
-- GetItem refuses `ProjectionExpression`, `AttributesToGet`, `ExpressionAttributeNames` and a
-  `ReturnConsumedCapacity` that asks for anything, in
-  `sim-dynamodb-unsimulated-item-read-input.ts`. DeleteItem refuses the same conditional write and
-  reporting inputs PutItem does.
+- GetItem refuses the legacy `AttributesToGet` and a `ReturnConsumedCapacity` that asks for anything,
+  in `sim-dynamodb-unsimulated-item-read-input.ts`. `ExpressionAttributeNames` with no expression to
+  use them in is a `ValidationException` rather than an unsupported operation, because real DynamoDB
+  refuses that too. DeleteItem refuses the same conditional write and reporting inputs PutItem does.
 
 Scans, queries, indexes, condition expressions and streams are not implemented. Billing mode and
 provisioned capacity are read and stored by CreateTable, but nothing enforces them: no write is ever
 throttled.
+
+## Expressions
+
+`expression/` holds the parts every DynamoDB expression parameter is made of. Projections,
+conditions, filters, key conditions and updates are all written in the same lexical shapes and all
+point at parts of an item the same way, so those parts are built once rather than once per
+expression kind. Writing them per feature is how the parsers drift apart and start disagreeing about
+what `a.b[0]` means.
+
+The shared parts:
+
+- `SimDynamoDbExpressionTokeniser` reads an expression into `name`, `namePlaceholder`,
+  `valuePlaceholder`, `number` and `symbol` tokens. The set of symbols it knows is deliberately
+  small, and grows as expression kinds arrive: a character outside it is refused rather than passed
+  through to a parser that would ignore it. A fraction is read as one number token, so an index of
+  `1.5` can be refused as a fraction rather than as a syntax error somewhere after it.
+- `SimDynamoDbExpressionTokens` is a parser's place in those tokens. Reading forwards, peeking, and
+  what happens at the end live there rather than in each parser.
+- `SimDynamoDbExpressionPlaceholders` holds one of `ExpressionAttributeNames` or
+  `ExpressionAttributeValues`. Both are a map of placeholders to what they stand for, so one generic
+  class holds either. It fails closed in both directions: a placeholder an expression uses and the
+  request does not define is refused, and so is an entry no expression used.
+- `SimDynamoDbDocumentPath` is where an expression is pointing, as attribute and index segments
+  rather than as text to split later. `SimDynamoDbDocumentPathParser` reads one, substituting name
+  placeholders as it goes, so everything downstream sees one kind of path. It stops at the first
+  token that cannot continue a path, leaving it for whatever is reading around it, such as the comma
+  between two projected paths.
+- `simDynamoDbExpressionError` builds every refusal, so they all read as
+  `Invalid <parameter>: <reason>`. A request can carry several expressions, so naming which one was
+  wrong matters.
+
+`expression/projection/` is the first consumer. `readSimDynamoDbProjection` reads a
+`ProjectionExpression` and its names into a `SimDynamoDbProjection`, and `SimDynamoDbProjectionNode`
+merges the paths into a tree before anything is read, so `address.city` and `address.postcode` become
+one `address` holding two attributes. Two paths where one contains the other are refused there, as
+real DynamoDB refuses them.
+
+Applying a projection is `undefined` for anything the item does not have, at every level: a missing
+attribute, an index past the end of a list, and a path reaching into the wrong kind of value all
+come back as nothing rather than as an error. A projected list is closed up, so `lines[2]` on its own
+answers with a one element list.
 
 ## CloudFormation
 

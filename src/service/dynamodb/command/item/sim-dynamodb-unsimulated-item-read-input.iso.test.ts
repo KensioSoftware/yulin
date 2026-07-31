@@ -11,7 +11,10 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
-import { SimDynamoDbUnsupportedOperation } from "../../error/dynamodb.error.js";
+import {
+  SimDynamoDbUnsupportedOperation,
+  SimDynamoDbValidationException,
+} from "../../error/dynamodb.error.js";
 import type { SimDynamoDb } from "../../sim-dynamodb.js";
 import type { SimGetItemCommandInput } from "./item.command.js";
 
@@ -48,14 +51,6 @@ async function tableFor(simAws: SimAws): Promise<SimDynamoDb> {
 
 describe("DynamoDB GetItemCommand unsimulated input", () => {
   it.each([
-    {
-      named: "ProjectionExpression",
-      input: { ProjectionExpression: "userId, note" },
-    },
-    {
-      named: "ExpressionAttributeNames",
-      input: { ExpressionAttributeNames: { "#u": "userId" } },
-    },
     {
       named: "AttributesToGet",
       input: { AttributesToGet: ["userId"] },
@@ -99,5 +94,26 @@ describe("DynamoDB GetItemCommand unsimulated input", () => {
 
     // Then nothing is refused, and the item comes back.
     assertIdentical(output.Item?.["note"]?.S, "first");
+  });
+
+  it("refuses ExpressionAttributeNames with no expression to use them in", async () => {
+    // Given a table holding an item.
+    const simAws = new SimAws();
+    const simDynamoDb = await tableFor(simAws);
+
+    // When a read defines names and carries no expression.
+    const error = await assertThrowsErrorAsync(async () =>
+      simDynamoDb.getItem({
+        input: { ...keyInput, ExpressionAttributeNames: { "#n": "note" } },
+      }),
+    );
+
+    // Then it is a ValidationException rather than an unsupported operation:
+    // real DynamoDB refuses this too, since nothing would ever read them.
+    assertInstanceOf(error, SimDynamoDbValidationException);
+    assertStringIncludes(
+      error.message,
+      "ExpressionAttributeNames can only be specified when using expressions",
+    );
   });
 });

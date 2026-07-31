@@ -6,6 +6,7 @@ import type {
 } from "./item.command.js";
 import { readSimDynamoDbKey } from "./sim-dynamodb-key-input.js";
 import { refuseUnsimulatedItemReadInput } from "./sim-dynamodb-unsimulated-item-read-input.js";
+import { readSimDynamoDbProjection } from "../../expression/projection/sim-dynamodb-projection-expression.js";
 
 interface SimDynamoDbGetItemProperties {
   readonly access: SimDynamoDbTableAccess;
@@ -44,6 +45,9 @@ export class SimDynamoDbGetItem {
 
     refuseUnsimulatedItemReadInput(input);
 
+    // The projection is read before the table is reached, so an expression
+    // DynamoDB would refuse is refused whether or not the key holds anything.
+    const projection = readSimDynamoDbProjection(input);
     const table = this.access.required(
       "dynamodb:GetItem",
       input.TableName,
@@ -55,6 +59,11 @@ export class SimDynamoDbGetItem {
       return { $metadata: {} };
     }
 
-    return { Item: found.toAttributeValues(), $metadata: {} };
+    // A projection that found none of what it asked for leaves an item with no
+    // attributes, which is answered with as an empty Item rather than as a
+    // miss: the key was there, and nothing the request asked for was.
+    const projected = projection?.apply(found) ?? found;
+
+    return { Item: projected.toAttributeValues(), $metadata: {} };
   }
 }
