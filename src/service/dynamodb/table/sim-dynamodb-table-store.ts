@@ -37,6 +37,17 @@ export class SimDynamoDbTableStore {
   }
 
   /**
+   * Find a table by a plain name, without reading it as a table name first.
+   *
+   * A name real DynamoDB would refuse belongs to no table, so it is simply not
+   * found. That is what lets a caller holding a name rather than a request look
+   * a table up.
+   */
+  findByName(name: string): SimDynamoDbTable | undefined {
+    return this.tables.get(name as DynamoDbTableName);
+  }
+
+  /**
    * Forget a table, and the items it was holding with it.
    */
   remove(name: SimDynamoDbTableName): void {
