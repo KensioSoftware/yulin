@@ -21,4 +21,26 @@ export class SimDynamoDbTableItems {
 
     return replaced;
   }
+
+  /**
+   * Read the item held under a key, if there is one.
+   */
+  get(key: string): SimDynamoDbItem | undefined {
+    return this.items.get(key);
+  }
+
+  /**
+   * Remove the item held under a key, and answer with whatever was removed.
+   *
+   * A key holding nothing is not a failure. DynamoDB deletes by key rather than
+   * by item, so removing a key that is already free asks for the state it is
+   * already in.
+   */
+  remove(key: string): SimDynamoDbItem | undefined {
+    const removed = this.items.get(key);
+
+    this.items.delete(key);
+
+    return removed;
+  }
 }

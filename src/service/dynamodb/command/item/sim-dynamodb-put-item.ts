@@ -7,7 +7,8 @@ import type {
   SimPutItemCommandInput,
   SimPutItemCommandOutput,
 } from "./item.command.js";
-import { refuseUnsimulatedItemInput } from "./sim-dynamodb-unsimulated-item-input.js";
+import { SimDynamoDbReturnValues } from "./sim-dynamodb-return-values.js";
+import { refuseUnsimulatedItemWriteInput } from "./sim-dynamodb-unsimulated-item-write-input.js";
 
 interface SimDynamoDbPutItemProperties {
   readonly access: SimDynamoDbTableAccess;
@@ -15,31 +16,6 @@ interface SimDynamoDbPutItemProperties {
 
 interface SimDynamoDbPutItemOptions {
   readonly caller?: SimAwsCaller;
-}
-
-/**
- * The values PutItem takes for ReturnValues. Real PutItem answers with the item
- * it replaced or with nothing at all, so the other modes UpdateItem has are not
- * valid here.
- */
-const returnValues: ReadonlySet<string> = new Set(["NONE", "ALL_OLD"]);
-
-/**
- * Read what a request asks to be given back.
- */
-function readReturnValues(value: string | undefined): string {
-  if (value === undefined) {
-    return "NONE";
-  }
-
-  if (!returnValues.has(value)) {
-    throw new SimDynamoDbValidationException(
-      `Return values set to invalid value: ${value}. PutItem takes NONE or ` +
-        `ALL_OLD.`,
-    );
-  }
-
-  return value;
 }
 
 /**
@@ -76,17 +52,17 @@ export class SimDynamoDbPutItem {
   ): SimPutItemCommandOutput {
     const input = command.input;
 
-    refuseUnsimulatedItemInput(input);
+    refuseUnsimulatedItemWriteInput(input, "PutItem");
 
     const table = this.access.required(
       "dynamodb:PutItem",
       input.TableName,
       options?.caller,
     );
-    const asked = readReturnValues(input.ReturnValues);
+    const asked = SimDynamoDbReturnValues.read(input.ReturnValues, "PutItem");
     const replaced = table.putItem(readItem(input));
 
-    if (asked === "NONE" || replaced === undefined) {
+    if (!asked.wantsOldItem() || replaced === undefined) {
       return { $metadata: {} };
     }
 

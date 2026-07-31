@@ -55,6 +55,13 @@ export class SimDynamoDbItem {
   }
 
   /**
+   * The attributes this item carries, in the order they arrived.
+   */
+  attributeNames(): readonly string[] {
+    return this.attributes.keys().toArray();
+  }
+
+  /**
    * The bytes this item takes up, counting attribute names as DynamoDB does.
    */
   sizeInBytes(): number {

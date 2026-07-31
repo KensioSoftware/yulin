@@ -48,7 +48,7 @@ Current command areas include:
 
 - `authorize/` (shared IAM authorization for every DynamoDB command)
 - `table/` (CreateTable, DescribeTable, ListTables and DeleteTable)
-- `item/` (PutItem, and the structural types for the item commands)
+- `item/` (PutItem, GetItem, DeleteItem, and the structural types for the item commands)
 
 `table/` is the layout newer commands follow: one directory per group of related commands, with the
 structural command types in `table.command.ts`, the value and description shapes they are made of in
@@ -263,12 +263,40 @@ Important behavior:
 - `ReturnValues` takes `NONE` and `ALL_OLD`, which are the two real PutItem has. `ALL_OLD` answers
   with the item that was replaced, and with nothing when there was none.
 - the inputs this simulation does not model are refused by name in
-  `sim-dynamodb-unsimulated-item-input.ts`, and a request naming only their `NONE` default is let
-  through.
+  `sim-dynamodb-unsimulated-item-write-input.ts`, which DeleteItem shares, and a request naming only
+  their `NONE` default is let through. `SimDynamoDbUnsimulatedInput` is what each refusal is made of,
+  so the wording is the same across the item commands.
 
-Reads, scans, queries, indexes, condition expressions and streams are not implemented. Billing mode
-and provisioned capacity are read and stored by CreateTable, but nothing enforces them: no write is
-ever throttled.
+## GetItem and DeleteItem behavior
+
+`SimDynamoDbGetItem` and `SimDynamoDbDeleteItem` name one item by its primary key, and reach their
+table the same way PutItem does.
+
+Both read their `Key` through `readSimDynamoDbKey`, which reads it as an item so the attribute values
+it carries are checked, and then through `SimDynamoDbItemKey.ofKey()`, which is the shared key
+validator. A Key is the whole primary key and nothing else: an item may carry any attributes
+alongside its key, but a Key has nothing to match an extra attribute against, so one is refused
+naming the attribute. Missing key elements, type mismatches and empty key values come back through
+the same checks PutItem applies on the way in.
+
+Important behavior:
+
+- GetItem leaves `Item` out altogether on a miss, rather than answering with an empty map. That
+  absence is how a caller tells a miss from an item carrying nothing but its key.
+- `ConsistentRead` is accepted either way and changes nothing. Nothing about a write is scheduled, so
+  there is no window in which an eventually consistent read could answer with something older.
+- DeleteItem is idempotent. It names a key rather than an item, so deleting a key that is already
+  free succeeds and reports nothing removed.
+- DeleteItem takes the same `ReturnValues` as PutItem, through `SimDynamoDbReturnValues`, which is
+  where the two modes and the error text for a third live.
+- GetItem refuses `ProjectionExpression`, `AttributesToGet`, `ExpressionAttributeNames` and a
+  `ReturnConsumedCapacity` that asks for anything, in
+  `sim-dynamodb-unsimulated-item-read-input.ts`. DeleteItem refuses the same conditional write and
+  reporting inputs PutItem does.
+
+Scans, queries, indexes, condition expressions and streams are not implemented. Billing mode and
+provisioned capacity are read and stored by CreateTable, but nothing enforces them: no write is ever
+throttled.
 
 ## Error model
 
