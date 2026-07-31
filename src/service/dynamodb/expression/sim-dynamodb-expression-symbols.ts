@@ -8,9 +8,12 @@ const longSymbols: readonly string[] = ["<=", ">=", "<>"];
  * The single characters that mean something in the expressions supported so
  * far.
  *
- * This set grows as filter and update expressions arrive. Until then, a
- * character outside it is refused rather than passed through, so an expression
- * this simulation cannot evaluate fails rather than half works.
+ * This set grows as filter expressions arrive. Until then, a character outside
+ * it is refused rather than passed through, so an expression this simulation
+ * cannot evaluate fails rather than half works.
+ *
+ * `+` is here for the arithmetic an update expression can carry, which is read
+ * so that it can be refused by name rather than as an unexpected character.
  */
 const symbols: ReadonlySet<string> = new Set([
   ".",
@@ -18,6 +21,7 @@ const symbols: ReadonlySet<string> = new Set([
   "[",
   "]",
   "-",
+  "+",
   "(",
   ")",
   "=",

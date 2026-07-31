@@ -113,12 +113,12 @@ describe("SimDynamoDbExpressionTokeniser", () => {
     // Given an expression carrying a character no supported expression uses.
     // When it is tokenised, then it is refused rather than passed through to a
     // parser that would ignore it.
-    const error = assertThrowsError(() => tokenise("id + 3"));
+    const error = assertThrowsError(() => tokenise("id * 3"));
 
     assertInstanceOf(error, SimDynamoDbValidationException);
     assertIdentical(
       error.message,
-      "Invalid ProjectionExpression: syntax error; unexpected character '+'",
+      "Invalid ProjectionExpression: syntax error; unexpected character '*'",
     );
   });
 

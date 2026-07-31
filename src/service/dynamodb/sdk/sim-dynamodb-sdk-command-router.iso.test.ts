@@ -8,6 +8,7 @@ import {
   GetItemCommand,
   ListTablesCommand,
   PutItemCommand,
+  QueryCommand,
   UpdateItemCommand,
 } from "@aws-sdk/client-dynamodb";
 import {
@@ -98,6 +99,18 @@ describe("simulated DynamoDB SDK Command routing", () => {
     );
     assertIdentical(readOut.Item?.["name"]?.S, "First item");
 
+    const updateOut = await client.send(
+      new UpdateItemCommand({
+        TableName: "ItemTable",
+        Key: { id: { S: "item-1" } },
+        UpdateExpression: "SET #n = :name",
+        ExpressionAttributeNames: { "#n": "name" },
+        ExpressionAttributeValues: { ":name": { S: "Renamed item" } },
+        ReturnValues: "ALL_NEW",
+      }),
+    );
+    assertIdentical(updateOut.Attributes?.["name"]?.S, "Renamed item");
+
     const removalOut = await client.send(
       new DeleteItemCommand({
         TableName: "ItemTable",
@@ -105,7 +118,7 @@ describe("simulated DynamoDB SDK Command routing", () => {
         ReturnValues: "ALL_OLD",
       }),
     );
-    assertIdentical(removalOut.Attributes?.["name"]?.S, "First item");
+    assertIdentical(removalOut.Attributes?.["name"]?.S, "Renamed item");
 
     const missOut = await client.send(
       new GetItemCommand({
@@ -156,15 +169,15 @@ describe("simulated DynamoDB SDK Command routing", () => {
 
     const error = await assertThrowsErrorAsync(async () => {
       await client.send(
-        new UpdateItemCommand({
+        new QueryCommand({
           TableName: "InterceptTable",
-          Key: { id: { S: "item-1" } },
-          UpdateExpression: "SET #n = :n",
+          KeyConditionExpression: "id = :id",
+          ExpressionAttributeValues: { ":id": { S: "item-1" } },
         }),
       );
     });
 
-    assertStringIncludes(error.message, "UpdateItemCommand");
+    assertStringIncludes(error.message, "QueryCommand");
     assertStringIncludes(error.message, "PutItemCommand");
   });
 });

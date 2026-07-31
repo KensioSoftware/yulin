@@ -3,7 +3,7 @@ import { compareSimDynamoDbValues } from "../../item/sim-dynamodb-value-order.js
 import type { SimDynamoDbValue } from "../../item/sim-dynamodb-value.js";
 import type { SimDynamoDbCondition } from "./sim-dynamodb-condition.js";
 import type { SimDynamoDbConditionOperand } from "./sim-dynamodb-condition-operand.js";
-import type { SimDynamoDbConditionSubject } from "./sim-dynamodb-condition-subject.js";
+import type { SimDynamoDbItemSnapshot } from "../sim-dynamodb-item-snapshot.js";
 
 /**
  * The comparators a condition expression can put between two operands.
@@ -67,7 +67,7 @@ export class SimDynamoDbComparisonCondition implements SimDynamoDbCondition {
   /**
    * Whether the two operands stand in the relation the comparator asked for.
    */
-  holdsFor(subject: SimDynamoDbConditionSubject): boolean {
+  holdsFor(subject: SimDynamoDbItemSnapshot): boolean {
     const left = this.left.valueIn(subject);
     const right = this.right.valueIn(subject);
 
@@ -119,7 +119,7 @@ export class SimDynamoDbBetweenCondition implements SimDynamoDbCondition {
   /**
    * Whether the operand is at or between the two bounds.
    */
-  holdsFor(subject: SimDynamoDbConditionSubject): boolean {
+  holdsFor(subject: SimDynamoDbItemSnapshot): boolean {
     return (
       this.aboveLower.holdsFor(subject) && this.belowUpper.holdsFor(subject)
     );
@@ -144,7 +144,7 @@ export class SimDynamoDbInCondition implements SimDynamoDbCondition {
   /**
    * Whether the operand equals any one of the candidates.
    */
-  holdsFor(subject: SimDynamoDbConditionSubject): boolean {
+  holdsFor(subject: SimDynamoDbItemSnapshot): boolean {
     const value = this.operand.valueIn(subject);
 
     if (value === undefined) {

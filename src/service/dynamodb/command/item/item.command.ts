@@ -1,6 +1,7 @@
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
 import type {
   SimDynamoDbAttributeValue,
+  SimDynamoDbAttributeValueUpdate,
   SimDynamoDbExpectedAttributeValue,
 } from "./item.types.js";
 
@@ -115,6 +116,50 @@ export interface SimDeleteItemCommandInput {
  * Minimal structural sim DynamoDB DeleteItem output.
  */
 export interface SimDeleteItemCommandOutput {
+  readonly Attributes?:
+    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+  readonly $metadata: SimResponseMetadata;
+}
+
+/**
+ * Minimal structural sim DynamoDB UpdateItem command.
+ */
+export interface SimUpdateItemCommand {
+  readonly input: SimUpdateItemCommandInput;
+}
+
+/**
+ * Minimal structural sim DynamoDB UpdateItem input.
+ *
+ * `AttributeUpdates` is the legacy way of saying what to change, which
+ * `UpdateExpression` replaced. It is declared so a request carrying one is
+ * refused by name.
+ */
+export interface SimUpdateItemCommandInput {
+  readonly TableName?: string | undefined;
+  readonly Key?:
+    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+  readonly UpdateExpression?: string | undefined;
+  readonly ReturnValues?: string | undefined;
+  readonly ConditionExpression?: string | undefined;
+  readonly ExpressionAttributeNames?:
+    Readonly<Record<string, string>> | undefined;
+  readonly ExpressionAttributeValues?:
+    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+  readonly ReturnConsumedCapacity?: string | undefined;
+  readonly ReturnItemCollectionMetrics?: string | undefined;
+  readonly ReturnValuesOnConditionCheckFailure?: string | undefined;
+  readonly AttributeUpdates?:
+    Readonly<Record<string, SimDynamoDbAttributeValueUpdate>> | undefined;
+  readonly Expected?:
+    Readonly<Record<string, SimDynamoDbExpectedAttributeValue>> | undefined;
+  readonly ConditionalOperator?: string | undefined;
+}
+
+/**
+ * Minimal structural sim DynamoDB UpdateItem output.
+ */
+export interface SimUpdateItemCommandOutput {
   readonly Attributes?:
     Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
   readonly $metadata: SimResponseMetadata;

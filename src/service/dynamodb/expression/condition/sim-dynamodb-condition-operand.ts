@@ -2,7 +2,7 @@ import { SimDynamoDbNumber } from "../../item/sim-dynamodb-number.js";
 import { simDynamoDbTextSize } from "../../item/sim-dynamodb-value-size.js";
 import type { SimDynamoDbValue } from "../../item/sim-dynamodb-value.js";
 import type { SimDynamoDbDocumentPath } from "../sim-dynamodb-document-path.js";
-import type { SimDynamoDbConditionSubject } from "./sim-dynamodb-condition-subject.js";
+import type { SimDynamoDbItemSnapshot } from "../sim-dynamodb-item-snapshot.js";
 
 /**
  * One side of a comparison in a condition expression.
@@ -26,7 +26,7 @@ export interface SimDynamoDbConditionOperand {
   /**
    * The value this operand has for an item, if it has one.
    */
-  valueIn(subject: SimDynamoDbConditionSubject): SimDynamoDbValue | undefined;
+  valueIn(subject: SimDynamoDbItemSnapshot): SimDynamoDbValue | undefined;
 }
 
 /**
@@ -47,7 +47,7 @@ export class SimDynamoDbPathOperand implements SimDynamoDbConditionOperand {
     return this.path.identity;
   }
 
-  valueIn(subject: SimDynamoDbConditionSubject): SimDynamoDbValue | undefined {
+  valueIn(subject: SimDynamoDbItemSnapshot): SimDynamoDbValue | undefined {
     return subject.valueAt(this.path);
   }
 }
@@ -103,7 +103,7 @@ export class SimDynamoDbSizeOperand implements SimDynamoDbConditionOperand {
     return `size(${this.operand.identity})`;
   }
 
-  valueIn(subject: SimDynamoDbConditionSubject): SimDynamoDbValue | undefined {
+  valueIn(subject: SimDynamoDbItemSnapshot): SimDynamoDbValue | undefined {
     const value = this.operand.valueIn(subject);
 
     if (value === undefined) {

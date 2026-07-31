@@ -1,19 +1,23 @@
-import type { SimDynamoDbItem } from "../../item/sim-dynamodb-item.js";
-import type { SimDynamoDbValue } from "../../item/sim-dynamodb-value.js";
+import type { SimDynamoDbItem } from "../item/sim-dynamodb-item.js";
+import type { SimDynamoDbValue } from "../item/sim-dynamodb-value.js";
 import type {
   SimDynamoDbDocumentPath,
   SimDynamoDbDocumentPathSegment,
-} from "../sim-dynamodb-document-path.js";
+} from "./sim-dynamodb-document-path.js";
 
 /**
- * The item a condition is evaluated against.
+ * The item an expression is read against, as it stood when the request reached
+ * it.
  *
  * A conditional write is checked against whatever is stored under its key,
- * which may be nothing at all. That is what makes
- * `attribute_not_exists(id)` the way to insert only if absent: with no item
- * there, every path resolves to nothing.
+ * which may be nothing at all. That is what makes `attribute_not_exists(id)`
+ * the way to insert only if absent: with no item there, every path resolves to
+ * nothing.
+ *
+ * An update expression reads the same snapshot. Every action reads it rather
+ * than the item being built, so `REMOVE a SET b = a` still finds `a`.
  */
-export class SimDynamoDbConditionSubject {
+export class SimDynamoDbItemSnapshot {
   private readonly item: SimDynamoDbItem | undefined;
 
   constructor(item?: SimDynamoDbItem) {

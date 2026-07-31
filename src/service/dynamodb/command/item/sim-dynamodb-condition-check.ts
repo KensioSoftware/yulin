@@ -4,7 +4,7 @@ import {
 } from "../../error/dynamodb.error.js";
 import { readSimDynamoDbCondition } from "../../expression/condition/sim-dynamodb-condition-expression.js";
 import type { SimDynamoDbCondition } from "../../expression/condition/sim-dynamodb-condition.js";
-import { SimDynamoDbConditionSubject } from "../../expression/condition/sim-dynamodb-condition-subject.js";
+import { SimDynamoDbItemSnapshot } from "../../expression/sim-dynamodb-item-snapshot.js";
 import type { SimDynamoDbItem } from "../../item/sim-dynamodb-item.js";
 import type { SimDynamoDbAttributeValue } from "./item.types.js";
 
@@ -53,8 +53,22 @@ export class SimDynamoDbConditionCheck {
     input: SimDynamoDbConditionCheckInput,
     operation: string,
   ): SimDynamoDbConditionCheck {
+    return this.of(readSimDynamoDbCondition(input), input, operation);
+  }
+
+  /**
+   * Guard a write with a condition that has already been read.
+   *
+   * UpdateItem reads its condition alongside its update expression, since the
+   * two share the request's placeholders, and then hands the condition here.
+   */
+  static of(
+    condition: SimDynamoDbCondition | undefined,
+    input: SimDynamoDbConditionCheckInput,
+    operation: string,
+  ): SimDynamoDbConditionCheck {
     return new this({
-      condition: readSimDynamoDbCondition(input),
+      condition,
       reportsItem: this.reportsItemFor(input, operation),
     });
   }
@@ -93,7 +107,7 @@ export class SimDynamoDbConditionCheck {
       return;
     }
 
-    if (this.condition.holdsFor(new SimDynamoDbConditionSubject(existing))) {
+    if (this.condition.holdsFor(new SimDynamoDbItemSnapshot(existing))) {
       return;
     }
 

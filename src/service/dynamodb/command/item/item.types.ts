@@ -137,6 +137,18 @@ export type SimDynamoDbAttributeValue =
     };
 
 /**
+ * Minimal structural sim DynamoDB attribute value update.
+ *
+ * This is the older way of changing part of an item, which simulated DynamoDB
+ * refuses rather than models. It is declared so a request carrying one is
+ * refused by name.
+ */
+export interface SimDynamoDbAttributeValueUpdate {
+  readonly Value?: SimDynamoDbAttributeValue | undefined;
+  readonly Action?: string | undefined;
+}
+
+/**
  * Minimal structural sim DynamoDB expected attribute value.
  *
  * This is the older conditional write input, which simulated DynamoDB refuses
