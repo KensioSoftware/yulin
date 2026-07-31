@@ -3,9 +3,12 @@ import {
   type SimSdkCommandRoute,
   type SimSdkCommandRouter,
 } from "../../../sdk/index.js";
-import type { SimCreateTableCommand } from "../command/table/table.command.js";
-import type { SimDescribeTableCommand } from "../command/describe-table/describe-table.command.js";
-import type { SimListTablesCommand } from "../command/list-tables/list-tables.command.js";
+import type {
+  SimCreateTableCommand,
+  SimDeleteTableCommand,
+  SimDescribeTableCommand,
+  SimListTablesCommand,
+} from "../command/table/table.command.js";
 import type { SimPutItemCommand } from "../command/put-item/put-item.command.js";
 import type { SimDynamoDb as SimDynamoDatabase } from "../sim-dynamodb.js";
 
@@ -38,6 +41,14 @@ export class SimDynamoDatabaseSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simDynamoDatabase.listTables(
             command as SimListTablesCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteTableCommand",
+        async (command, context): Promise<unknown> =>
+          await simDynamoDatabase.deleteTable(
+            command as SimDeleteTableCommand,
             simSdkCallerOptions(context),
           ),
       ],

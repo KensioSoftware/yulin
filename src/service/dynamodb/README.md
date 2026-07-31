@@ -47,14 +47,14 @@ instances.
 Current command areas include:
 
 - `authorize/` (shared IAM authorization for every DynamoDB command)
-- `table/` (CreateTable, and the structural types for the table commands)
-- `describe-table/`
-- `list-tables/`
+- `table/` (CreateTable, DescribeTable, ListTables and DeleteTable)
 - `put-item/`
 
 `table/` is the layout newer commands follow: one directory per group of related commands, with the
-structural command types in `table.command.ts` and one class per command. The older command
-directories are one per operation, and move into the grouped layout as they are rebuilt.
+structural command types in `table.command.ts`, the value and description shapes they are made of in
+`table.types.ts`, and one class per command or closely related group. `put-item/` is one directory
+per operation, the older layout, and moves into the grouped layout as the item commands are built
+out.
 
 The main `SimDynamoDb` class delegates command execution to command classes and handlers rather than
 keeping command handling logic inline.
@@ -70,7 +70,7 @@ Region scope, so the ARN is put together in one place. ListTables names no table
 `authorizeAnyTable()` authorizes it against `*`.
 
 The table need not exist. Real IAM evaluates a request before the service handles it, so
-authorization comes before any lookup in the table map.
+authorization comes before any lookup in the table store.
 
 ## Table model
 
@@ -187,36 +187,42 @@ Unsimulated inputs are refused with `SimDynamoDbUnsupportedOperation` rather tha
 is listed in the Limitations section of
 [the usage docs](../../../docs/services/dynamodb/ "Simulated DynamoDB usage docs").
 
-## DescribeTable behavior
+## Table store
 
-`DescribeTableCommandHandler` implements table lookup by name.
+`SimDynamoDbTableStore` holds the tables of one simulated DynamoDB, keyed by name. Listing them in
+order lives there rather than in ListTables, because the order is a property of the tables rather
+than of the request that reads them.
 
-Important behavior:
+The order is by UTF-8 bytes, which is DynamoDB's, applied through
+`compareSimDynamoDbTableNames`. Table names are ASCII, so this is the same order the characters are
+in, but comparing bytes keeps it the same whatever locale the host runs in. It also means tests can
+create tables concurrently and still assert a deterministic list.
 
-- `TableName` is required.
-- the handler waits for background sequencing before reading table state.
-- unknown tables throw `SimDynamoDbResourceNotFoundException`.
-- the returned description is currently minimal and includes:
-  - `TableName`
-  - `TableStatus`
+## DescribeTable, ListTables and DeleteTable behavior
 
-This command is useful for observing the asynchronous transition from `CREATING` to `ACTIVE` after
-background tasks complete.
+`SimDynamoDbTableCommands` implements all three. They share how a request names its table:
+`readSimDynamoDbTableReference` takes either a table name or a table ARN, as real DynamoDB does, and
+refuses an ARN for another Account or Region rather than resolving it to the local table of that
+name.
 
-## ListTables behavior
+DescribeTable answers with `table.toDescription()`, the same description CreateTable answered with.
 
-`ListTablesCommandHandler` implements deterministic in-memory table listing.
+ListTables pages through the store's ordered names in `SimDynamoDbTablePage`:
 
-Important behavior:
+- `Limit` is a whole number from 1 to 100, and defaults to 100.
+- `ExclusiveStartTableName` resumes at the first name strictly greater than it, so a token still
+  works when the table it names has been deleted.
+- `LastEvaluatedTableName` is only set when names remain after the page, so a caller looping until
+  the token is absent terminates.
 
-- the handler waits for background sequencing before listing tables.
-- tables are sorted alphabetically by table name.
-- `Limit` is supported and defaults to `100`.
-- `ExclusiveStartTableName` is supported by starting after the named table.
-- `LastEvaluatedTableName` is currently set to the last table name in the returned page.
+DeleteTable follows the status DynamoDB moves a deleted table through:
 
-Because table names are sorted before pagination, tests can safely create tables concurrently and still
-assert deterministic list order.
+- a table protected by `DeletionProtectionEnabled` refuses the delete and stays as it was.
+- a CREATING or UPDATING table throws `SimDynamoDbResourceInUseException`.
+- an ACTIVE table goes to DELETING, and a background task then removes it from the store, taking its
+  items with it.
+- a table already DELETING is not an error, since the request asks for a state it is heading to.
+- a table that is not there throws `SimDynamoDbResourceNotFoundException`.
 
 ## PutItem behavior
 
@@ -277,8 +283,10 @@ Current uses:
 - `SimDynamoDb.createTable()` calls `background.sequence()` before creation to allow realistic
   non-deterministic async sequencing.
 - table activation is scheduled after table creation.
-- `DescribeTableCommandHandler` and `ListTablesCommandHandler` sequence background tasks before
-  reading table state.
+- `SimDynamoDb` sequences background tasks before every table command, so a command reads table
+  state at a realistic point rather than always the earliest one.
+- DeleteTable schedules the removal of the table from the store, which is what takes a table from
+  DELETING to gone.
 - `SimDynamoDbTable.putItem()` schedules the actual writing of the item.
 
 Tests that need eventual state should call the broader sim AWS background-drain helper, for example:

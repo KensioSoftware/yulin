@@ -287,6 +287,9 @@ export default defineConfig(
     files: ["docs/**/*.example.ts", "docs/**/*.examples.ts"],
     rules: {
       "no-console": "off",
+      // Paging through an AWS API is sequential by nature, and an example
+      // reads better as the loop a caller would write than as a workaround.
+      "no-await-in-loop": "off",
       "@typescript-eslint/no-non-null-assertion": "off",
       // Examples model real AWS-shaped data, such as UPPER_SNAKE_CASE Lambda
       // environment variable names, rather than code identifier names.

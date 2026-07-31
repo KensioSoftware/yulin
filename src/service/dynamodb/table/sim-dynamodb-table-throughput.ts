@@ -1,7 +1,7 @@
 import type {
   SimDynamoDbProvisionedThroughput,
   SimDynamoDbProvisionedThroughputDescription,
-} from "../command/table/table.command.js";
+} from "../command/table/table.types.js";
 import { SimDynamoDbValidationException } from "../error/dynamodb.error.js";
 
 /**

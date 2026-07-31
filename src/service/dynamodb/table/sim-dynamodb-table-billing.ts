@@ -3,7 +3,7 @@ import type {
   SimDynamoDbBillingModeSummary,
   SimDynamoDbProvisionedThroughput,
   SimDynamoDbProvisionedThroughputDescription,
-} from "../command/table/table.command.js";
+} from "../command/table/table.types.js";
 import { SimDynamoDbValidationException } from "../error/dynamodb.error.js";
 import { SimDynamoDbTableThroughput } from "./sim-dynamodb-table-throughput.js";
 

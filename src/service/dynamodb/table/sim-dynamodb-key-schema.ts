@@ -2,7 +2,7 @@ import { assertDefined } from "../../../util/type-guard/defined.js";
 import type {
   SimDynamoDbKeySchemaElement,
   SimDynamoDbKeySchemaElementInput,
-} from "../command/table/table.command.js";
+} from "../command/table/table.types.js";
 import { SimDynamoDbValidationException } from "../error/dynamodb.error.js";
 import type { DynamoDbItem } from "../item/dynamodb-item.js";
 import { SimDynamoDbItemKey } from "./sim-dynamodb-item-key.js";
