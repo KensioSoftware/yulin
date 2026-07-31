@@ -6,6 +6,7 @@ import {
   simDynamoDbMatchingSets,
 } from "../../item/sim-dynamodb-set-members.js";
 import type { SimDynamoDbValue } from "../../item/sim-dynamodb-value.js";
+import { simDynamoDbUpdateError } from "./sim-dynamodb-update-refusal.js";
 
 /**
  * The stored value and the value being applied, as two sets of one kind.
@@ -36,9 +37,9 @@ export function simDynamoDbIncorrectOperand(
   kind: string,
   text: string,
 ): SimDynamoDbValidationException {
-  return new SimDynamoDbValidationException(
-    `Invalid UpdateExpression: Incorrect operand type for operator or ` +
-      `function; operator: ${clause}, operand type: ${kind}, in '${text}'`,
+  return simDynamoDbUpdateError(
+    `Incorrect operand type for operator or function; operator: ${clause}, ` +
+      `operand type: ${kind}, in '${text}'`,
   );
 }
 

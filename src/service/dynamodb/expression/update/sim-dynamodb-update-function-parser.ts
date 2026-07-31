@@ -61,7 +61,10 @@ export class SimDynamoDbUpdateFunctionParser {
    */
   parse(): SimDynamoDbUpdateOperand {
     const name = this.tokens.next("a function name").text;
-    this.tokens.next("(");
+    this.tokens.expectSymbol(
+      "(",
+      `syntax error; ${name} is not called with '('`,
+    );
 
     const called = this.called(name);
     this.tokens.expectSymbol(")", `syntax error; ${name} is not closed`);

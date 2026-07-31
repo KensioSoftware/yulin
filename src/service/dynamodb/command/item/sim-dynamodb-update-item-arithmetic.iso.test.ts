@@ -196,9 +196,9 @@ describe("DynamoDB UpdateItemCommand arithmetic", () => {
       ExpressionAttributeValues: { ":one": { N: "1" } },
     });
 
-    // Then it is refused, naming the type it was given.
+    // Then it is refused, naming the operator and the type it was given.
     assertInstanceOf(error, SimDynamoDbValidationException);
-    assertStringIncludes(error.message, "Incorrect operand type");
+    assertStringIncludes(error.message, "operator or function: +");
     assertStringIncludes(error.message, "operand type: S");
   });
 

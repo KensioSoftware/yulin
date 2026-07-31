@@ -1,8 +1,9 @@
-import { SimDynamoDbValidationException } from "../../error/dynamodb.error.js";
+import type { SimDynamoDbValidationException } from "../../error/dynamodb.error.js";
 import type { SimDynamoDbNumber } from "../../item/sim-dynamodb-number.js";
 import type { SimDynamoDbValue } from "../../item/sim-dynamodb-value.js";
 import type { SimDynamoDbItemSnapshot } from "../sim-dynamodb-item-snapshot.js";
 import type { SimDynamoDbUpdateOperand } from "./sim-dynamodb-update-operand.js";
+import { simDynamoDbUpdateError } from "./sim-dynamodb-update-refusal.js";
 
 /**
  * `list_append(one, other)`, which is the two lists end to end in the order
@@ -121,7 +122,7 @@ export class SimDynamoDbArithmeticOperand implements SimDynamoDbUpdateOperand {
    */
   private numberOf(value: SimDynamoDbValue): SimDynamoDbNumber {
     if (value.kind !== "N") {
-      throw incorrectOperandType("+ or -", value.kind, this.text);
+      throw incorrectOperandType(this.operator, value.kind, this.text);
     }
 
     return value.number;
@@ -136,9 +137,8 @@ function incorrectOperandType(
   kind: string,
   text: string,
 ): SimDynamoDbValidationException {
-  return new SimDynamoDbValidationException(
-    `Invalid UpdateExpression: Incorrect operand type for operator or ` +
-      `function; operator or function: ${operation}, operand type: ${kind}, ` +
-      `in '${text}'`,
+  return simDynamoDbUpdateError(
+    `Incorrect operand type for operator or function; operator or function: ` +
+      `${operation}, operand type: ${kind}, in '${text}'`,
   );
 }
