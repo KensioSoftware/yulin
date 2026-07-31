@@ -46,13 +46,31 @@ instances.
 
 Current command areas include:
 
-- `create-table/`
+- `authorize/` (shared IAM authorization for every DynamoDB command)
+- `table/` (CreateTable, and the structural types for the table commands)
 - `describe-table/`
 - `list-tables/`
 - `put-item/`
 
-The main `SimDynamoDb` class delegates command execution to handlers rather than keeping command
-handling logic inline.
+`table/` is the layout newer commands follow: one directory per group of related commands, with the
+structural command types in `table.command.ts` and one class per command. The older command
+directories are one per operation, and move into the grouped layout as they are rebuilt.
+
+The main `SimDynamoDb` class delegates command execution to command classes and handlers rather than
+keeping command handling logic inline.
+
+## Authorization
+
+`SimDynamoDbAuthorizer` applies simulated IAM to every DynamoDB command. One authorizer is built by
+`SimDynamoDb` and passed to the command classes, rather than each command having its own.
+
+AWS maps each DynamoDB API operation to the `dynamodb:` action of the same name, and the resource is
+the ARN of the table the operation names. `authorizeTable()` builds that ARN from the Account and
+Region scope, so the ARN is put together in one place. ListTables names no table, so
+`authorizeAnyTable()` authorizes it against `*`.
+
+The table need not exist. Real IAM evaluates a request before the service handles it, so
+authorization comes before any lookup in the table map.
 
 ## Table model
 
@@ -61,26 +79,42 @@ Table state lives under `table/`.
 `SimDynamoDbTable` represents a simulated table. It tracks:
 
 - table name
-- table ARN
+- table ARN and table ID
 - creation time
 - current table status
-- key schema
+- key schema and attribute definitions
+- billing mode, provisioned throughput, table class and deletion protection
 - in-memory items
 
-Tables start in `CREATING` status. `CreateTableCommandHandler` schedules a background task that
-later activates the table by changing its status to `ACTIVE`.
+A table is built from values that have already been checked, not from a command object. Anything
+that can produce those values can make one, which is what will let CloudFormation create a table
+without a CreateTable command to hand it. `toDescription()` is how a table reports itself back, so
+the description lives with the table rather than in the command that made it.
+
+Tables start in `CREATING` status. `SimDynamoDbCreateTable` schedules a background task that later
+activates the table by changing its status to `ACTIVE`.
 
 This means tests may observe `CREATING` immediately after creation, then call
 `simAws.backgroundTasksComplete()` when they need all scheduled state transitions to have completed.
 
+Each part of a table validates its own input, and each throws `SimDynamoDbValidationException`
+naming what was wrong:
+
+- `SimDynamoDbTableName` for the name pattern and length
+- `SimDynamoDbKeySchema` for key element order, position and attribute names
+- `SimDynamoDbAttributeDefinitions` for attribute types, duplicates, and matching the key schema in
+  both directions
+- `SimDynamoDbTableBilling` for the billing mode and the throughput that goes with it
+
 ## Key schema handling
 
-`DynamoDbKeySchema` extracts the table primary key definition from `CreateTableCommand` input.
+`SimDynamoDbKeySchema` holds the table primary key.
 
 Supported key schema behavior:
 
-- a `HASH` key is required
-- a `RANGE` key is optional
+- a `HASH` element is required, and comes first
+- a `RANGE` element is optional, and comes second
+- key attributes are `S`, `N` or `B`, and must have a matching attribute definition
 - item partition and sort key values must be strings or numbers
 - item keys are serialized as JSON and used as the internal item map key
 
@@ -128,29 +162,30 @@ Unsupported `AttributeValue` shapes throw an error.
 
 ## CreateTable behavior
 
-`CreateTableCommandHandler` implements table creation.
+`SimDynamoDbCreateTable` implements table creation.
 
-Important behavior:
+The order it works in matters:
 
-- `TableName` is required.
-- `KeySchema` must be present and non-empty.
-- duplicate table names throw `SimDynamoDbResourceInUseException`.
-- table ARNs are account/region-specific.
-- new tables are inserted into the service table map immediately.
-- the returned table description reports the table status at creation time, usually `CREATING`.
-- activation is scheduled as a background task.
+1. `refuseUnsimulatedTableInput` refuses the request inputs this simulation does not model, before
+   anything else looks at the request.
+2. The table name is read and checked, because the ARN is built from it.
+3. IAM authorizes `dynamodb:CreateTable` against that ARN. This runs before the table map is looked
+   at, so an unauthorized caller cannot find out which names are taken.
+4. The key schema, attribute definitions, billing and table class are read and checked.
+5. Only then is the name checked against the table map and taken.
 
-The current returned `TableDescription` is minimal. It includes fields such as:
+`SimDynamoDb.createTable()` awaits `background.sequence()` and then calls `handle()`, which is
+synchronous. Nothing is awaited between finding a name free and taking it, so two creates racing for
+the same name cannot both get it. The second gets `SimDynamoDbResourceInUseException`.
 
-- `TableName`
-- `TableArn`
-- `TableStatus`
-- `CreationDateTime`
-- empty `AttributeDefinitions`
-- empty `KeySchema`
-- empty `GlobalSecondaryIndexes`
+The returned `TableDescription` reports the table back: `TableName`, `TableArn`, `TableId`,
+`KeySchema`, `AttributeDefinitions`, `TableStatus`, `CreationDateTime`, `ProvisionedThroughput`,
+`DeletionProtectionEnabled`, and `BillingModeSummary` or `TableClassSummary` when the request named
+a billing mode or a table class. `ItemCount` and `TableSizeBytes` stay at 0.
 
-Not every field from real DynamoDB is populated.
+Unsimulated inputs are refused with `SimDynamoDbUnsupportedOperation` rather than dropped. Each one
+is listed in the Limitations section of
+[the usage docs](../../../docs/services/dynamodb/ "Simulated DynamoDB usage docs").
 
 ## DescribeTable behavior
 
@@ -200,7 +235,8 @@ Important behavior:
   `AttributeValue` form.
 
 The simulator does not currently implement condition expressions, return value modes, update
-expressions, reads, scans, queries, indexes, capacity, billing modes, or streams.
+expressions, reads, scans, queries, indexes, or streams. Billing mode and provisioned capacity are
+read and stored by CreateTable, but nothing enforces them: no write is ever throttled.
 
 ## Error model
 
@@ -218,9 +254,19 @@ Current specialized errors:
   - name: `ResourceNotFoundException`
   - HTTP status: `400`
   - used when a table lookup fails
+- `SimDynamoDbValidationException`
+  - name: `ValidationException`
+  - HTTP status: `400`
+  - used for request input real DynamoDB would refuse
+- `SimDynamoDbUnsupportedOperation`
+  - name: `UnsupportedOperation`
+  - HTTP status: `400`
+  - used for request input real DynamoDB accepts and this simulation does not model. Real DynamoDB
+    has no error of this name, so it stays distinct from `ValidationException`: a refusal here says
+    the simulation stops short, not that the request was wrong.
 
-Some validation failures still throw plain `Error` or `TypeError`. This is acceptable for current
-coverage, but future changes may choose to model more AWS exception types as needed.
+Item key failures still throw `TypeError`. Table creation no longer does: every input it refuses
+comes back as an AWS-like exception.
 
 ## Background scheduling
 
@@ -228,7 +274,7 @@ DynamoDB uses the shared background task infrastructure to emulate asynchronous 
 
 Current uses:
 
-- `CreateTableCommandHandler` calls `background.sequence()` before creation to allow realistic
+- `SimDynamoDb.createTable()` calls `background.sequence()` before creation to allow realistic
   non-deterministic async sequencing.
 - table activation is scheduled after table creation.
 - `DescribeTableCommandHandler` and `ListTablesCommandHandler` sequence background tasks before

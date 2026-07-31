@@ -153,6 +153,10 @@ describe("DynamoDB PutItemCommand", () => {
         new CreateTableCommand({
           TableName: "FooTable",
           KeySchema: [{ AttributeName: "userId", KeyType: "HASH" }],
+          AttributeDefinitions: [
+            { AttributeName: "userId", AttributeType: "S" },
+          ],
+          BillingMode: "PAY_PER_REQUEST",
         }),
       );
 
@@ -190,6 +194,11 @@ describe("DynamoDB PutItemCommand", () => {
           { AttributeName: "userId", KeyType: "HASH" },
           { AttributeName: "orderId", KeyType: "RANGE" },
         ],
+        AttributeDefinitions: [
+          { AttributeName: "userId", AttributeType: "S" },
+          { AttributeName: "orderId", AttributeType: "S" },
+        ],
+        BillingMode: "PAY_PER_REQUEST",
       }),
     );
 

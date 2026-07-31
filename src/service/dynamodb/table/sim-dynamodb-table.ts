@@ -1,58 +1,87 @@
-import type { Brand } from "../../../util/brand.type.js";
-import {
-  makeSimArn,
-  type SimArn,
-  type SimArnComponents,
-} from "../../aws/arn.js";
-import type { DynamoDbKeySchema as DynamoDatabaseKeySchema } from "./dynamodb-key-schema.js";
-import type { DynamoDbItem as DynamoDatabaseItem } from "../item/dynamodb-item.js";
+import { randomUUID } from "node:crypto";
+import type { SimArn } from "../../aws/arn.js";
 import {
   type BackgroundScheduler,
   BackgroundTasks,
 } from "../../../util/background/background.js";
 import type {
-  SimCreateTableCommand,
-  SimDynamoDbTableStatus as SimDynamoDatabaseTableStatus,
-} from "../command/create-table/create-table.command.js";
-import { DynamoDbTableCreateInput as DynamoDatabaseTableCreateInput } from "./dynamodb-table-create-input.js";
+  SimDynamoDbTableClass,
+  SimDynamoDbTableClassSummary,
+  SimDynamoDbTableDescription,
+  SimDynamoDbTableStatus,
+} from "../command/table/table.command.js";
+import type { DynamoDbItem } from "../item/dynamodb-item.js";
+import type { SimDynamoDbAttributeDefinitions } from "./sim-dynamodb-attribute-definitions.js";
+import type { SimDynamoDbKeySchema } from "./sim-dynamodb-key-schema.js";
+import type { SimDynamoDbTableBilling } from "./sim-dynamodb-table-billing.js";
+import type {
+  DynamoDbTableName,
+  SimDynamoDbTableName,
+} from "./sim-dynamodb-table-name.js";
 
-export type DynamoDbTableName = Brand<string, "DynamoDbTableName">;
-
-interface SimDynamoDatabaseTableProperties {
-  readonly tableCommand: SimCreateTableCommand;
-  readonly arn?: SimArn;
+interface SimDynamoDbTableProperties {
+  readonly name: SimDynamoDbTableName;
+  readonly arn: SimArn;
+  readonly keySchema: SimDynamoDbKeySchema;
+  readonly attributeDefinitions: SimDynamoDbAttributeDefinitions;
+  readonly billing: SimDynamoDbTableBilling;
+  readonly tableClass?: SimDynamoDbTableClass | undefined;
+  readonly deletionProtectionEnabled?: boolean | undefined;
   readonly background?: BackgroundScheduler;
 }
 
 /**
- * Simulated DynamoDB Table.
+ * One simulated DynamoDB Table.
+ *
+ * A table is built from values a request has already been checked against,
+ * rather than from the request itself, so anything that can produce those
+ * values can make one. That is what lets CloudFormation create a table without
+ * a CreateTable command to hand it.
  */
 export class SimDynamoDbTable {
   public readonly creationDateTime: Date;
-
   public readonly tableName: DynamoDbTableName;
   public readonly arn: SimArn;
+  public readonly tableId: string;
+  public readonly keySchema: SimDynamoDbKeySchema;
+  public readonly attributeDefinitions: SimDynamoDbAttributeDefinitions;
+  public readonly billing: SimDynamoDbTableBilling;
+  public readonly tableClass: SimDynamoDbTableClass | undefined;
+  public readonly deletionProtectionEnabled: boolean;
 
   private readonly background: BackgroundScheduler;
-  readonly #keySchema: DynamoDatabaseKeySchema;
-  #status: SimDynamoDatabaseTableStatus = "CREATING";
+  private readonly items = new Map<string, DynamoDbItem>();
+  #status: SimDynamoDbTableStatus = "CREATING";
 
-  private readonly items = new Map<string, DynamoDatabaseItem>();
-
-  constructor(properties: SimDynamoDatabaseTableProperties) {
+  constructor(properties: SimDynamoDbTableProperties) {
     const {
-      tableCommand,
-      arn = makeSimDynamoDbTableArn(),
+      name,
+      arn,
+      keySchema,
+      attributeDefinitions,
+      billing,
+      tableClass,
+      deletionProtectionEnabled = false,
       background = new BackgroundTasks(),
     } = properties;
-    const tableInput = new DynamoDatabaseTableCreateInput(tableCommand);
 
+    this.tableName = name.value;
     this.arn = arn;
+    this.tableId = randomUUID();
+    this.keySchema = keySchema;
+    this.attributeDefinitions = attributeDefinitions;
+    this.billing = billing;
+    this.tableClass = tableClass;
+    this.deletionProtectionEnabled = deletionProtectionEnabled;
     this.background = background;
-
-    this.tableName = tableInput.tableName();
     this.creationDateTime = background.now();
-    this.#keySchema = tableInput.keySchema();
+  }
+
+  /**
+   * Get the current table status.
+   */
+  public get status(): SimDynamoDbTableStatus {
+    return this.#status;
   }
 
   /**
@@ -64,34 +93,48 @@ export class SimDynamoDbTable {
   }
 
   /**
-   * Get the current table status.
+   * Describe this table the way DynamoDB reports it.
    */
-  public get status(): SimDynamoDatabaseTableStatus {
-    return this.#status;
+  toDescription(): SimDynamoDbTableDescription {
+    return {
+      TableName: this.tableName,
+      TableArn: this.arn,
+      TableId: this.tableId,
+      KeySchema: this.keySchema.elements,
+      AttributeDefinitions: this.attributeDefinitions.elements,
+      TableStatus: this.#status,
+      CreationDateTime: this.creationDateTime,
+      BillingModeSummary: this.billing.summary(),
+      ProvisionedThroughput: this.billing.throughputDescription(),
+      TableClassSummary: this.tableClassSummary(),
+      DeletionProtectionEnabled: this.deletionProtectionEnabled,
+      // Neither figure is tracked yet. Real DynamoDB updates both about every
+      // six hours, so they lag behind the items anyway.
+      ItemCount: 0,
+      TableSizeBytes: 0,
+    };
   }
 
   /**
    * Put an item into the table.
    */
-  public putItem(item: DynamoDatabaseItem): Promise<void> {
-    const keyString = this.#keySchema.makeItemKey(item);
+  public putItem(item: DynamoDbItem): Promise<void> {
+    const keyString = this.keySchema.makeItemKey(item);
     this.background.schedule(() => {
       this.items.set(keyString, item);
       return Promise.resolve();
     });
     return Promise.resolve();
   }
-}
 
-/**
- * Generate a fake simulated DynamoDB Table ARN.
- */
-export function makeSimDynamoDbTableArn(
-  overrides?: Exclude<Partial<SimArnComponents>, "service" | "resourceType">,
-): SimArn {
-  return makeSimArn({
-    service: "dynamodb",
-    resourceType: "table",
-    ...overrides,
-  });
+  /**
+   * How the table reports its class, when the request that made it named one.
+   */
+  private tableClassSummary(): SimDynamoDbTableClassSummary | undefined {
+    if (this.tableClass === undefined) {
+      return undefined;
+    }
+
+    return { TableClass: this.tableClass };
+  }
 }

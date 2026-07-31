@@ -3,29 +3,20 @@ import type {
   SimDescribeTableCommandOutput,
 } from "./describe-table.command.js";
 import type { CommandHandler } from "../../../../command/command-handler.js";
-import type {
-  DynamoDbTableName as DynamoDatabaseTableName,
-  SimDynamoDbTable as SimDynamoDatabaseTable,
-} from "../../table/sim-dynamodb-table.js";
-import { SimDynamoDbResourceNotFoundException as SimDynamoDatabaseResourceNotFoundException } from "../../error/dynamodb.error.js";
+import type { SimDynamoDbTable } from "../../table/sim-dynamodb-table.js";
+import type { DynamoDbTableName } from "../../table/sim-dynamodb-table-name.js";
+import { SimDynamoDbResourceNotFoundException } from "../../error/dynamodb.error.js";
 import {
   type BackgroundScheduler,
   BackgroundTasks,
 } from "../../../../util/background/background.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
-import {
-  SimIamAllowAllAuth,
-  type SimIamInterServiceAuthZ,
-} from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
-import { DescribeTableAuthorizer } from "./describe-table-authorizer.js";
-import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
-import type { SimArn } from "../../../aws/arn.js";
+import type { SimDynamoDbAuthorizer } from "../authorize/sim-dynamodb-authorizer.js";
 
 interface DescribeTableCommandHandlerProperties {
-  readonly accountRegionScope: SimAwsAccountRegionScope;
-  readonly tables: Map<DynamoDatabaseTableName, SimDynamoDatabaseTable>;
-  readonly iam?: SimIamInterServiceAuthZ;
+  readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>;
+  readonly authorizer: SimDynamoDbAuthorizer;
   readonly background?: BackgroundScheduler;
 }
 
@@ -42,21 +33,18 @@ export class DescribeTableCommandHandler implements CommandHandler<
   SimDescribeTableCommand,
   SimDescribeTableCommandOutput
 > {
-  private readonly accountRegionScope: SimAwsAccountRegionScope;
-  private readonly tables: Map<DynamoDatabaseTableName, SimDynamoDatabaseTable>;
-  private readonly authorizer: DescribeTableAuthorizer;
+  private readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>;
+  private readonly authorizer: SimDynamoDbAuthorizer;
   private readonly background: BackgroundScheduler;
 
   constructor(properties: DescribeTableCommandHandlerProperties) {
     const {
-      accountRegionScope,
       tables,
-      iam = new SimIamAllowAllAuth(),
+      authorizer,
       background = new BackgroundTasks(),
     } = properties;
-    this.accountRegionScope = accountRegionScope;
     this.tables = tables;
-    this.authorizer = new DescribeTableAuthorizer({ iam });
+    this.authorizer = authorizer;
     this.background = background;
   }
 
@@ -71,18 +59,20 @@ export class DescribeTableCommandHandler implements CommandHandler<
       command.input.TableName,
       "DescribeTableCommand.input.TableName",
     );
-    const tableName = command.input.TableName as DynamoDatabaseTableName;
+    const tableName = command.input.TableName as DynamoDbTableName;
 
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    const tableArn: SimArn = `arn:aws:dynamodb:${this.accountRegionScope.regionName}:${this.accountRegionScope.accountId}:table/${tableName}`;
-
-    this.authorizer.authorize(tableArn, options?.caller);
+    this.authorizer.authorizeTable(
+      "dynamodb:DescribeTable",
+      tableName,
+      options?.caller,
+    );
 
     const table = this.tables.get(tableName);
     if (table === undefined) {
-      throw new SimDynamoDatabaseResourceNotFoundException(
+      throw new SimDynamoDbResourceNotFoundException(
         `No DynamoDB Table named ${tableName}`,
       );
     }

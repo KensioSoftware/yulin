@@ -27,6 +27,8 @@ describe("simulated DynamoDB SDK Command routing", () => {
       new CreateTableCommand({
         TableName: "InterceptTable",
         KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+        AttributeDefinitions: [{ AttributeName: "id", AttributeType: "S" }],
+        BillingMode: "PAY_PER_REQUEST",
       }),
     );
     assertIdentical(
@@ -60,6 +62,8 @@ describe("simulated DynamoDB SDK Command routing", () => {
       new CreateTableCommand({
         TableName: "ItemTable",
         KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+        AttributeDefinitions: [{ AttributeName: "id", AttributeType: "S" }],
+        BillingMode: "PAY_PER_REQUEST",
       }),
     );
     await simSdk.simAws.backgroundTasksComplete();
@@ -91,6 +95,10 @@ describe("simulated DynamoDB SDK Command routing", () => {
             new CreateTableCommand({
               TableName: "DeniedTable",
               KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+              AttributeDefinitions: [
+                { AttributeName: "id", AttributeType: "S" },
+              ],
+              BillingMode: "PAY_PER_REQUEST",
             }),
           );
         },

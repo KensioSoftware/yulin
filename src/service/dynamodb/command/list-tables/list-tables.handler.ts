@@ -3,24 +3,18 @@ import type {
   SimListTablesCommand,
   SimListTablesCommandOutput,
 } from "./list-tables.command.js";
-import type {
-  DynamoDbTableName as DynamoDatabaseTableName,
-  SimDynamoDbTable as SimDynamoDatabaseTable,
-} from "../../table/sim-dynamodb-table.js";
+import type { SimDynamoDbTable as SimDynamoDatabaseTable } from "../../table/sim-dynamodb-table.js";
+import type { DynamoDbTableName as DynamoDatabaseTableName } from "../../table/sim-dynamodb-table-name.js";
 import {
   type BackgroundScheduler,
   BackgroundTasks,
 } from "../../../../util/background/background.js";
-import {
-  SimIamAllowAllAuth,
-  type SimIamInterServiceAuthZ,
-} from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
-import { ListTablesAuthorizer } from "./list-tables-authorizer.js";
+import type { SimDynamoDbAuthorizer } from "../authorize/sim-dynamodb-authorizer.js";
 
 interface ListTablesCommandHandlerProperties {
   readonly tables: Map<DynamoDatabaseTableName, SimDynamoDatabaseTable>;
-  readonly iam?: SimIamInterServiceAuthZ;
+  readonly authorizer: SimDynamoDbAuthorizer;
   readonly background?: BackgroundScheduler;
 }
 
@@ -38,17 +32,17 @@ export class ListTablesCommandHandler implements CommandHandler<
   SimListTablesCommandOutput
 > {
   private readonly tables: Map<DynamoDatabaseTableName, SimDynamoDatabaseTable>;
-  private readonly authorizer: ListTablesAuthorizer;
+  private readonly authorizer: SimDynamoDbAuthorizer;
   private readonly background: BackgroundScheduler;
 
   constructor(properties: ListTablesCommandHandlerProperties) {
     const {
       tables,
-      iam = new SimIamAllowAllAuth(),
+      authorizer,
       background = new BackgroundTasks(),
     } = properties;
     this.tables = tables;
-    this.authorizer = new ListTablesAuthorizer({ iam });
+    this.authorizer = authorizer;
     this.background = background;
   }
 
@@ -62,7 +56,7 @@ export class ListTablesCommandHandler implements CommandHandler<
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    this.authorizer.authorize(options?.caller);
+    this.authorizer.authorizeAnyTable("dynamodb:ListTables", options?.caller);
 
     const tables = this.tables.values().toArray();
     tables.sort((a, b) => a.tableName.localeCompare(b.tableName));
