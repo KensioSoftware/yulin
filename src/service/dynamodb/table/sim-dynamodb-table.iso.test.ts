@@ -3,6 +3,7 @@ import {
   assertIdentical,
   assertInstanceOf,
   assertStringIncludes,
+  assertStringLength,
   assertThrowsError,
   assertUndefined,
 } from "@kensio/smartass";
@@ -80,6 +81,18 @@ describe("SimDynamoDbTableName", () => {
     // Then it is refused the way real DynamoDB refuses it.
     assertInstanceOf(error, SimDynamoDbValidationException);
     assertStringIncludes(error.message, "TableName 'ab' is invalid");
+  });
+
+  it("allows a name of the greatest length real DynamoDB allows", () => {
+    // When a 255 character table name is read.
+    const name = SimDynamoDbTableName.of("a".repeat(255));
+
+    // Then it is accepted, and one character longer is not.
+    assertStringLength(name.value, 255);
+    assertInstanceOf(
+      assertThrowsError(() => SimDynamoDbTableName.of("a".repeat(256))),
+      SimDynamoDbValidationException,
+    );
   });
 
   it("allows the characters real DynamoDB allows", () => {

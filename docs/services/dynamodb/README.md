@@ -58,6 +58,9 @@ DynamoDB is only schemaless about the attributes that are not keys.
 
 A key attribute is one of `S`, `N` or `B`.
 
+A table with a binary key can be created, but no item can be written to it yet. `PutItem` only
+computes an item key from string and number key values.
+
 ## Billing modes and throughput
 
 `BillingMode` defaults to `PROVISIONED`, which makes `ProvisionedThroughput` required with at least
@@ -114,7 +117,7 @@ is unique within an Account and Region, and the table ARN is built from that sco
 
 ```typescript sim-dynamodb-scoping
 /**
- * The same table name in two Accounts is two tables.
+ * The same table name in two Accounts, or two Regions, is two tables.
  */
 
 import { CreateTableCommand } from "@aws-sdk/client-dynamodb";
@@ -130,22 +133,33 @@ const tableInput = {
   BillingMode: "PAY_PER_REQUEST" as const,
 };
 
-const first = await simAws
+// Two Accounts, one Region.
+const firstAccount = await simAws
   .account("111111111111")
   .region("eu-west-2")
   .dynamoDb()
   .createTable(new CreateTableCommand(tableInput));
 
-const second = await simAws
+const secondAccount = await simAws
   .account("222222222222")
+  .region("eu-west-2")
+  .dynamoDb()
+  .createTable(new CreateTableCommand(tableInput));
+
+console.log(firstAccount.TableDescription?.TableArn);
+// "arn:aws:dynamodb:eu-west-2:111111111111:table/FoobarTable"
+console.log(secondAccount.TableDescription?.TableArn);
+// "arn:aws:dynamodb:eu-west-2:222222222222:table/FoobarTable"
+
+// One Account, two Regions.
+const otherRegion = await simAws
+  .account("111111111111")
   .region("us-east-1")
   .dynamoDb()
   .createTable(new CreateTableCommand(tableInput));
 
-console.log(first.TableDescription?.TableArn);
-// "arn:aws:dynamodb:eu-west-2:111111111111:table/FoobarTable"
-console.log(second.TableDescription?.TableArn);
-// "arn:aws:dynamodb:us-east-1:222222222222:table/FoobarTable"
+console.log(otherRegion.TableDescription?.TableArn);
+// "arn:aws:dynamodb:us-east-1:111111111111:table/FoobarTable"
 
 await simAws.backgroundTasksComplete();
 ```
@@ -173,15 +187,18 @@ table, so it authorizes against `*`.
 
 - Global and local secondary indexes are not simulated. `GlobalSecondaryIndexes` and
   `LocalSecondaryIndexes` are refused rather than dropped, since a table missing an index it was
-  asked for would answer queries differently to the real one.
-- Table tags are not simulated. `Tags` is refused rather than dropped, and there is no
-  `TagResource`, `UntagResource` or `ListTagsOfResource`.
+  asked for would answer queries differently to the real one. An empty list asks for no index, so it
+  is accepted.
+- Table tags are not simulated. A non-empty `Tags` list is refused rather than dropped, and there is
+  no `TagResource`, `UntagResource` or `ListTagsOfResource`.
 - Time to live is not simulated. There is no `UpdateTimeToLive` or `DescribeTimeToLive`, and no item
   expires.
-- DynamoDB streams are not simulated. `StreamSpecification` is refused, so a table whose changes
-  nothing is publishing cannot be created by accident.
-- Encryption at rest is not simulated. `SSESpecification` is refused rather than reported back
-  against items held in the clear.
+- DynamoDB streams are not simulated. A `StreamSpecification` with `StreamEnabled` set is refused,
+  so a table whose changes nothing is publishing cannot be created by accident. One that switches
+  streams off describes the table this simulation already makes, so it is accepted.
+- Encryption at rest is not simulated. An `SSESpecification` with `Enabled` set is refused rather
+  than reported back against items held in the clear. `Enabled: false` asks for the AWS owned key
+  real DynamoDB uses by default, so it is accepted.
 - Table resource policies are not simulated. `ResourcePolicy` is refused, since a table left open to
   callers the policy would have kept out is the wrong way to fail.
 - `OnDemandThroughput` and `WarmThroughput` are refused. Nothing here applies a request-unit maximum
@@ -191,6 +208,9 @@ table, so it authorizes against `*`.
   was created.
 - `ItemCount` and `TableSizeBytes` are always 0. Real DynamoDB updates both about every six hours, so
   they lag behind the items there too.
+- A binary key attribute is accepted by `CreateTable`, since real DynamoDB accepts one, but
+  `PutItem` refuses an item whose key value is binary. Item keys are computed from string and
+  number values only.
 - Nothing enforces capacity. A provisioned table's throughput is stored and reported, and no request
   is ever throttled with `ProvisionedThroughputExceededException`.
 - `UpdateTable`, `DeleteTable` and the item commands other than `PutItem` are not implemented yet,

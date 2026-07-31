@@ -235,7 +235,8 @@ Important behavior:
   `AttributeValue` form.
 
 The simulator does not currently implement condition expressions, return value modes, update
-expressions, reads, scans, queries, indexes, capacity, billing modes, or streams.
+expressions, reads, scans, queries, indexes, or streams. Billing mode and provisioned capacity are
+read and stored by CreateTable, but nothing enforces them: no write is ever throttled.
 
 ## Error model
 

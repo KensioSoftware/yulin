@@ -1,4 +1,5 @@
 import {
+  assertIdentical,
   assertInstanceOf,
   assertStringIncludes,
   assertThrowsErrorAsync,
@@ -114,6 +115,29 @@ describe("DynamoDB CreateTableCommand unsimulated input", () => {
     // Then the limits are refused.
     assertInstanceOf(error, SimDynamoDbUnsupportedOperation);
     assertStringIncludes(error.message, "OnDemandThroughput maximums");
+  });
+
+  it("creates a table for input that asks for none of it", async () => {
+    // Given a simulated DynamoDB.
+    const simAws = new SimAws();
+
+    // When a table is created with empty lists and everything switched off,
+    // which describes the table this simulation already makes.
+    const creation = await simAws.dynamoDb().createTable({
+      input: {
+        ...tableInput,
+        GlobalSecondaryIndexes: [],
+        LocalSecondaryIndexes: [],
+        Tags: [],
+        StreamSpecification: { StreamEnabled: false },
+        SSESpecification: { Enabled: false },
+      },
+    });
+
+    // Then nothing is refused and the table is created.
+    assertIdentical(creation.TableDescription?.TableName, "FoobarTable");
+
+    await simAws.backgroundTasksComplete();
   });
 
   it("refuses warm throughput", async () => {

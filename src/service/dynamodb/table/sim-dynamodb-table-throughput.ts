@@ -6,9 +6,12 @@ import { SimDynamoDbValidationException } from "../error/dynamodb.error.js";
 
 /**
  * Read a capacity unit count a provisioned table has to carry.
+ *
+ * Capacity is a whole number of units, so a fraction is refused along with
+ * NaN and Infinity, which a plain `< 1` comparison would let through.
  */
 function capacityUnits(units: number | undefined, name: string): number {
-  if (units === undefined || units < 1) {
+  if (units === undefined || !Number.isSafeInteger(units) || units < 1) {
     throw new SimDynamoDbValidationException(
       `One or more parameter values were invalid: ${name} must be at least 1 ` +
         `when BillingMode is PROVISIONED`,

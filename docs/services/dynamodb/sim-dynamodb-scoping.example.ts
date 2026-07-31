@@ -1,5 +1,5 @@
 /**
- * The same table name in two Accounts is two tables.
+ * The same table name in two Accounts, or two Regions, is two tables.
  */
 
 import { CreateTableCommand } from "@aws-sdk/client-dynamodb";
@@ -15,21 +15,32 @@ const tableInput = {
   BillingMode: "PAY_PER_REQUEST" as const,
 };
 
-const first = await simAws
+// Two Accounts, one Region.
+const firstAccount = await simAws
   .account("111111111111")
   .region("eu-west-2")
   .dynamoDb()
   .createTable(new CreateTableCommand(tableInput));
 
-const second = await simAws
+const secondAccount = await simAws
   .account("222222222222")
+  .region("eu-west-2")
+  .dynamoDb()
+  .createTable(new CreateTableCommand(tableInput));
+
+console.log(firstAccount.TableDescription?.TableArn);
+// "arn:aws:dynamodb:eu-west-2:111111111111:table/FoobarTable"
+console.log(secondAccount.TableDescription?.TableArn);
+// "arn:aws:dynamodb:eu-west-2:222222222222:table/FoobarTable"
+
+// One Account, two Regions.
+const otherRegion = await simAws
+  .account("111111111111")
   .region("us-east-1")
   .dynamoDb()
   .createTable(new CreateTableCommand(tableInput));
 
-console.log(first.TableDescription?.TableArn);
-// "arn:aws:dynamodb:eu-west-2:111111111111:table/FoobarTable"
-console.log(second.TableDescription?.TableArn);
-// "arn:aws:dynamodb:us-east-1:222222222222:table/FoobarTable"
+console.log(otherRegion.TableDescription?.TableArn);
+// "arn:aws:dynamodb:us-east-1:111111111111:table/FoobarTable"
 
 await simAws.backgroundTasksComplete();

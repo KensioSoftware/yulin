@@ -9,6 +9,10 @@ import type { SimCreateTableCommandInput } from "./table.command.js";
  * asked for: queries would run against indexes that were never built, and items
  * would outlive a time to live that was never applied. Refusing is the louder
  * failure, and the one that happens here rather than in a deployment.
+ *
+ * Only input that asks for something is refused. An empty index or tag list,
+ * and a stream or encryption specification that is switched off, describe the
+ * table this simulation already makes, so they are let through.
  */
 export function refuseUnsimulatedTableInput(
   input: SimCreateTableCommandInput,
@@ -32,14 +36,14 @@ export function refuseUnsimulatedTableInput(
  * Refuse the secondary indexes a table would answer queries from.
  */
 function refuseSecondaryIndexes(input: SimCreateTableCommandInput): void {
-  if (input.GlobalSecondaryIndexes !== undefined) {
+  if ((input.GlobalSecondaryIndexes ?? []).length > 0) {
     throw new SimDynamoDbUnsupportedOperation(
       "Global secondary indexes are not simulated, so CreateTable refuses " +
         "them rather than creating a table that is missing them",
     );
   }
 
-  if (input.LocalSecondaryIndexes !== undefined) {
+  if ((input.LocalSecondaryIndexes ?? []).length > 0) {
     throw new SimDynamoDbUnsupportedOperation(
       "Local secondary indexes are not simulated, so CreateTable refuses " +
         "them rather than creating a table that is missing them",
@@ -51,7 +55,7 @@ function refuseSecondaryIndexes(input: SimCreateTableCommandInput): void {
  * Refuse tags a table would be found and billed by.
  */
 function refuseTags(input: SimCreateTableCommandInput): void {
-  if (input.Tags !== undefined) {
+  if ((input.Tags ?? []).length > 0) {
     throw new SimDynamoDbUnsupportedOperation(
       "Table tags are not simulated, so CreateTable refuses them rather than " +
         "dropping them",
@@ -63,7 +67,7 @@ function refuseTags(input: SimCreateTableCommandInput): void {
  * Refuse the stream a table's changes would be published to.
  */
 function refuseStreams(input: SimCreateTableCommandInput): void {
-  if (input.StreamSpecification !== undefined) {
+  if (input.StreamSpecification?.StreamEnabled === true) {
     throw new SimDynamoDbUnsupportedOperation(
       "DynamoDB streams are not simulated, so CreateTable refuses a " +
         "StreamSpecification rather than creating a table whose changes are " +
@@ -74,9 +78,13 @@ function refuseStreams(input: SimCreateTableCommandInput): void {
 
 /**
  * Refuse the encryption a table's items would be held under.
+ *
+ * `Enabled: false` is the default rather than a request for anything: real
+ * DynamoDB encrypts every table with an AWS owned key, and the flag only asks
+ * for a customer managed one.
  */
 function refuseEncryption(input: SimCreateTableCommandInput): void {
-  if (input.SSESpecification !== undefined) {
+  if (input.SSESpecification?.Enabled === true) {
     throw new SimDynamoDbUnsupportedOperation(
       "Table encryption at rest is not simulated, so CreateTable refuses an " +
         "SSESpecification rather than reporting an encryption key it is not " +

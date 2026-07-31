@@ -86,6 +86,21 @@ describe("DynamoDB CreateTableCommand billing", () => {
     );
   });
 
+  it("refuses capacity that is not a whole number of units", async () => {
+    // When a table is created with a capacity that is not a number of units.
+    const error = await refusedCreateTable({
+      ...keyInput,
+      ProvisionedThroughput: {
+        ReadCapacityUnits: NaN,
+        WriteCapacityUnits: 1,
+      },
+    });
+
+    // Then it is refused, rather than stored as the table's capacity.
+    assertInstanceOf(error, SimDynamoDbValidationException);
+    assertStringIncludes(error.message, "ReadCapacityUnits must be at least 1");
+  });
+
   it("refuses a billing mode that is neither of the two", async () => {
     // When a table is created with a billing mode DynamoDB has no such thing as.
     const error = await refusedCreateTable({
