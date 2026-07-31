@@ -1,0 +1,151 @@
+import { SimDynamoDbValidationException } from "../error/dynamodb.error.js";
+
+/**
+ * A number as DynamoDB takes it on the wire: digits, an optional fraction, and
+ * an optional exponent. It arrives as a string and never as a JavaScript
+ * number, which is the whole point of holding it this way.
+ */
+// Each part consumes a distinct character, so a value that fails to match
+// backtracks a digit at a time rather than combinatorially.
+// eslint-disable-next-line security/detect-unsafe-regex -- no nested quantifier.
+const numberPattern = /^(-?)(\d+)(?:\.(\d+))?(?:[Ee]([+-]?\d+))?$/;
+
+const greatestSignificantDigits = 38;
+const greatestAdjustedExponent = 125;
+const leastAdjustedExponent = -130;
+
+/**
+ * Render a number in plain decimal notation.
+ *
+ * Every number DynamoDB takes fits in plain notation: the widest is 126 digits
+ * before the point and the smallest 130 zeros after it, so nothing here needs
+ * an exponent to stay readable.
+ */
+function plainDecimal(sign: string, digits: string, scale: number): string {
+  if (scale >= 0) {
+    return sign + digits + "0".repeat(scale);
+  }
+
+  const pointPosition = digits.length + scale;
+
+  if (pointPosition > 0) {
+    return `${sign + digits.slice(0, pointPosition)}.${digits.slice(pointPosition)}`;
+  }
+
+  return `${sign}0.${"0".repeat(-pointPosition)}${digits}`;
+}
+
+/**
+ * One DynamoDB number.
+ *
+ * DynamoDB numbers carry up to 38 significant digits, where a JavaScript
+ * number carries about 15, so the digits are kept as text and never converted.
+ * An identifier, a monetary amount or a large counter comes back exactly as it
+ * was written.
+ *
+ * The text is normalised: leading and trailing zeros are trimmed, and an
+ * exponent is worked back into plain notation. Two numbers written differently
+ * for the same value normalise to the same text, which is what makes a number
+ * set compare by value.
+ */
+export class SimDynamoDbNumber {
+  public readonly text: string;
+  public readonly significantDigits: number;
+
+  private constructor(text: string, significantDigits: number) {
+    this.text = text;
+    this.significantDigits = significantDigits;
+  }
+
+  /**
+   * Read a number from the text a request carries.
+   */
+  static of(value: string): SimDynamoDbNumber {
+    const match = numberPattern.exec(value);
+
+    if (match === null) {
+      throw new SimDynamoDbValidationException(
+        `The parameter cannot be converted to a numeric value: ${value}`,
+      );
+    }
+
+    const [
+      ,
+      sign = "",
+      integerDigits = "",
+      fractionDigits = "",
+      exponent = "0",
+    ] = match;
+    const digits = integerDigits + fractionDigits;
+    const scale = Number(exponent) - fractionDigits.length;
+
+    return this.ofDigits(value, sign, digits, scale);
+  }
+
+  /**
+   * Build a number from its digits and the power of ten they are scaled by.
+   */
+  private static ofDigits(
+    value: string,
+    sign: string,
+    digits: string,
+    scale: number,
+  ): SimDynamoDbNumber {
+    const withoutLeadingZeros = digits.replace(/^0+/, "");
+
+    if (withoutLeadingZeros === "") {
+      return new this("0", 1);
+    }
+
+    const significand = withoutLeadingZeros.replace(/0+$/, "");
+    const trailingZeros = withoutLeadingZeros.length - significand.length;
+
+    this.assertInRange(value, significand, scale + trailingZeros);
+
+    return new this(
+      plainDecimal(sign, significand, scale + trailingZeros),
+      significand.length,
+    );
+  }
+
+  /**
+   * Refuse a number outside the range real DynamoDB stores.
+   */
+  private static assertInRange(
+    value: string,
+    significand: string,
+    scale: number,
+  ): void {
+    if (significand.length > greatestSignificantDigits) {
+      throw new SimDynamoDbValidationException(
+        `Number ${value} has ${significand.length.toString()} significant ` +
+          `digits, and DynamoDB numbers carry ${greatestSignificantDigits.toString()}`,
+      );
+    }
+
+    // The exponent the number has when written as one digit, a point and the
+    // rest, which is how DynamoDB documents its range.
+    const adjustedExponent = scale + significand.length - 1;
+
+    if (
+      adjustedExponent > greatestAdjustedExponent ||
+      adjustedExponent < leastAdjustedExponent
+    ) {
+      throw new SimDynamoDbValidationException(
+        `Number ${value} is outside the range DynamoDB stores, which is ` +
+          `1E-130 to 9.9999999999999999999999999999999999999E+125 and its ` +
+          `negative mirror`,
+      );
+    }
+  }
+
+  /**
+   * The bytes this number counts towards the item size.
+   *
+   * Real DynamoDB counts a number as about one byte per two significant digits,
+   * plus one.
+   */
+  get sizeInBytes(): number {
+    return Math.ceil(this.significantDigits / 2) + 1;
+  }
+}

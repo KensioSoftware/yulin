@@ -1,89 +1,120 @@
-import { assertDefined } from "../../../util/type-guard/defined.js";
 import { jsonStringify } from "../../../util/type-guard/json.js";
-import type { DynamoDBAttributeType } from "../item/dynamodb-item-attribute.js";
-import type { DynamoDbItem } from "../item/dynamodb-item.js";
-
-type DynamoDbKey = number | string;
+import { SimDynamoDbValidationException } from "../error/dynamodb.error.js";
+import { simDynamoDbBinaryText } from "../item/sim-dynamodb-binary.js";
+import type { SimDynamoDbItem } from "../item/sim-dynamodb-item.js";
+import type {
+  SimDynamoDbBinaryValue,
+  SimDynamoDbNumberValue,
+  SimDynamoDbStringValue,
+  SimDynamoDbValue,
+} from "../item/sim-dynamodb-value.js";
+import type { SimDynamoDbScalarAttributeType } from "../command/table/table.types.js";
+import type { SimDynamoDbAttributeDefinitions } from "./sim-dynamodb-attribute-definitions.js";
+import type { SimDynamoDbKeySchema } from "./sim-dynamodb-key-schema.js";
 
 /**
- * Check if a given value can be used as a DynamoDB partition key or sort key.
+ * A value a key attribute can hold. DynamoDB keys are scalar: a set, a list or
+ * a map cannot be one.
  */
-function canBeDynamoDbKey(value: DynamoDBAttributeType): value is DynamoDbKey {
-  return typeof value === "string" || typeof value === "number";
+type SimDynamoDbKeyValue =
+  SimDynamoDbStringValue | SimDynamoDbNumberValue | SimDynamoDbBinaryValue;
+
+/**
+ * Refuse a key value of a type the table did not declare for it.
+ */
+function assertDeclaredType(
+  attributeName: string,
+  value: SimDynamoDbValue,
+  declared: SimDynamoDbScalarAttributeType,
+): asserts value is SimDynamoDbKeyValue {
+  if (value.kind !== declared) {
+    throw new SimDynamoDbValidationException(
+      `One or more parameter values were invalid: Type mismatch for key ` +
+        `attribute ${attributeName}, expected ${declared} but got ${value.kind}`,
+    );
+  }
+}
+
+/**
+ * The text a key value is marshalled to, which is what makes two items with
+ * the same key the same item.
+ *
+ * Binary goes through base64, so two key values holding the same bytes marshal
+ * the same way. A number goes through its normalised digits, so `1` and `1.0`
+ * are one key rather than two.
+ */
+function keyText(value: SimDynamoDbKeyValue): string {
+  switch (value.kind) {
+    case "S": {
+      return value.text;
+    }
+    case "N": {
+      return value.number.text;
+    }
+    case "B": {
+      return simDynamoDbBinaryText(value.bytes);
+    }
+  }
 }
 
 /**
  * Reads the primary key of an item, following a table's key schema.
  *
- * The key is serialized as JSON and used as the internal item map key, so two
- * items with the same partition and sort key values are the same item.
+ * A key attribute has to be there, has to be the type the table declared for
+ * it, and cannot be empty. Real DynamoDB checks all three before it writes,
+ * because an item that broke any of them could never be read back by key.
  */
 export class SimDynamoDbItemKey {
-  private readonly hashKeyAttributeName: string;
-  private readonly rangeKeyAttributeName: string | undefined;
+  private readonly keySchema: SimDynamoDbKeySchema;
+  private readonly attributeDefinitions: SimDynamoDbAttributeDefinitions;
 
   constructor(
-    hashKeyAttributeName: string,
-    rangeKeyAttributeName: string | undefined,
+    keySchema: SimDynamoDbKeySchema,
+    attributeDefinitions: SimDynamoDbAttributeDefinitions,
   ) {
-    this.hashKeyAttributeName = hashKeyAttributeName;
-    this.rangeKeyAttributeName = rangeKeyAttributeName;
+    this.keySchema = keySchema;
+    this.attributeDefinitions = attributeDefinitions;
   }
 
   /**
    * Make the primary key string for an item.
    */
-  of(item: DynamoDbItem): string {
-    const partitionKey = this.partitionKeyValue(item);
-
-    if (this.rangeKeyAttributeName === undefined) {
-      return jsonStringify({ [this.hashKeyAttributeName]: partitionKey });
-    }
-
-    return jsonStringify({
-      [this.hashKeyAttributeName]: partitionKey,
-      [this.rangeKeyAttributeName]: this.sortKeyValue(
-        item,
-        this.rangeKeyAttributeName,
-      ),
-    });
+  of(item: SimDynamoDbItem): string {
+    return jsonStringify(
+      this.keySchema.elements.map((element) => [
+        element.AttributeName,
+        this.keyValue(item, element.AttributeName),
+      ]),
+    );
   }
 
   /**
-   * Read an item's partition key value.
+   * Read one key attribute of an item, checking it against the key schema.
    */
-  private partitionKeyValue(item: DynamoDbItem): DynamoDbKey {
-    const attribute = item.attribute(this.hashKeyAttributeName);
-    assertDefined(
-      attribute,
-      `DynamoDB Item partition key ${this.hashKeyAttributeName} required`,
+  private keyValue(item: SimDynamoDbItem, attributeName: string): string {
+    const value = item.attribute(attributeName);
+
+    if (value === undefined) {
+      throw new SimDynamoDbValidationException(
+        `One of the required keys was not given a value: ${attributeName}`,
+      );
+    }
+
+    assertDeclaredType(
+      attributeName,
+      value,
+      this.attributeDefinitions.typeOf(attributeName),
     );
 
-    if (!canBeDynamoDbKey(attribute.value)) {
-      throw new TypeError(
-        `DynamoDB Item partition key ${this.hashKeyAttributeName} must be string or number`,
+    const text = keyText(value);
+
+    if (text === "") {
+      throw new SimDynamoDbValidationException(
+        `One or more parameter values are not valid. The AttributeValue for ` +
+          `key attribute ${attributeName} cannot be empty`,
       );
     }
 
-    return attribute.value;
-  }
-
-  /**
-   * Read an item's sort key value.
-   */
-  private sortKeyValue(item: DynamoDbItem, attributeName: string): DynamoDbKey {
-    const attribute = item.attribute(attributeName);
-    if (attribute === undefined) {
-      throw new TypeError(
-        `DynamoDB Item sort key ${attributeName} is undefined`,
-      );
-    }
-    if (!canBeDynamoDbKey(attribute.value)) {
-      throw new TypeError(
-        `DynamoDB Item sort key ${attributeName} must be string or number`,
-      );
-    }
-
-    return attribute.value;
+    return `${value.kind}:${text}`;
   }
 }

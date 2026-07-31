@@ -9,7 +9,8 @@ import type {
   SimDynamoDbTableDescription,
   SimDynamoDbTableStatus,
 } from "../command/table/table.types.js";
-import type { DynamoDbItem } from "../item/dynamodb-item.js";
+import type { SimDynamoDbItem } from "../item/sim-dynamodb-item.js";
+import { SimDynamoDbItemKey } from "./sim-dynamodb-item-key.js";
 import { describeSimDynamoDbTable } from "./sim-dynamodb-table-description.js";
 import { SimDynamoDbTableItems } from "./sim-dynamodb-table-items.js";
 import { SimDynamoDbTableLifecycle } from "./sim-dynamodb-table-lifecycle.js";
@@ -51,7 +52,8 @@ export class SimDynamoDbTable {
   public readonly tableClass: SimDynamoDbTableClass | undefined;
   public readonly deletionProtectionEnabled: boolean;
 
-  private readonly items: SimDynamoDbTableItems;
+  private readonly items = new SimDynamoDbTableItems();
+  private readonly itemKey: SimDynamoDbItemKey;
   private readonly lifecycle: SimDynamoDbTableLifecycle;
 
   constructor(properties: SimDynamoDbTableProperties) {
@@ -72,7 +74,7 @@ export class SimDynamoDbTable {
     this.billing = billing;
     this.tableClass = properties.tableClass;
     this.deletionProtectionEnabled = deletionProtectionEnabled;
-    this.items = new SimDynamoDbTableItems(background);
+    this.itemKey = new SimDynamoDbItemKey(keySchema, attributeDefinitions);
     this.lifecycle = new SimDynamoDbTableLifecycle({
       tableName: name.value,
       deletionProtectionEnabled,
@@ -120,10 +122,12 @@ export class SimDynamoDbTable {
   }
 
   /**
-   * Put an item into the table.
+   * Put an item into the table, and answer with whatever it replaced.
+   *
+   * The item is there by the time this returns. Real DynamoDB acknowledges a
+   * write once it is durable, so a read that follows it finds it.
    */
-  public putItem(item: DynamoDbItem): Promise<void> {
-    this.items.put(this.keySchema.makeItemKey(item), item);
-    return Promise.resolve();
+  public putItem(item: SimDynamoDbItem): SimDynamoDbItem | undefined {
+    return this.items.put(this.itemKey.of(item), item);
   }
 }

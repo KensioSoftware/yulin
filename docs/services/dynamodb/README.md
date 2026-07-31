@@ -57,10 +57,8 @@ The key schema holds one `HASH` element, optionally followed by one `RANGE` elem
 defined that no key uses is a `ValidationException`, and so is a key attribute with no definition.
 DynamoDB is only schemaless about the attributes that are not keys.
 
-A key attribute is one of `S`, `N` or `B`.
-
-A table with a binary key can be created, but no item can be written to it yet. `PutItem` only
-computes an item key from string and number key values.
+A key attribute is one of `S`, `N` or `B`, and an item written to the table has to carry every key
+attribute as the type the table declared for it.
 
 ## Billing modes and throughput
 
@@ -230,6 +228,125 @@ console.log(description.Table?.TableStatus); // "ACTIVE"
 
 `DeleteTable` takes the table's name or its ARN, as `DescribeTable` does.
 
+## Writing items
+
+`PutItem` writes one item, replacing the whole item under its primary key rather than merging into
+it. The item is there by the time the call returns, so a write and the read that follows it need
+nothing in between.
+
+```typescript sim-dynamodb-put-item
+/**
+ * Writing an item, and reading back the item it replaced.
+ */
+
+import { CreateTableCommand, PutItemCommand } from "@aws-sdk/client-dynamodb";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const dynamoDb = simAws.dynamoDb();
+
+await dynamoDb.createTable(
+  new CreateTableCommand({
+    TableName: "OrdersTable",
+    KeySchema: [{ AttributeName: "orderId", KeyType: "HASH" }],
+    AttributeDefinitions: [{ AttributeName: "orderId", AttributeType: "S" }],
+    BillingMode: "PAY_PER_REQUEST",
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+const written = await dynamoDb.putItem(
+  new PutItemCommand({
+    TableName: "OrdersTable",
+    Item: { orderId: { S: "order-1" }, total: { N: "19.99" } },
+  }),
+);
+
+console.log(written.Attributes); // undefined
+
+const replaced = await dynamoDb.putItem(
+  new PutItemCommand({
+    TableName: "OrdersTable",
+    Item: { orderId: { S: "order-1" }, total: { N: "24.99" } },
+    ReturnValues: "ALL_OLD",
+  }),
+);
+
+console.log(replaced.Attributes?.["total"]?.N); // "19.99"
+```
+
+A write with no `ReturnValues` answers with no `Attributes`, as real DynamoDB does. `ALL_OLD` gives
+back the item that was replaced, or nothing when the key was free. Those are the only two modes
+PutItem has.
+
+An item has to carry its whole primary key, each key attribute has to be the type the table
+declared, and a key attribute cannot be empty. An empty string or empty binary value is fine
+anywhere else in the item.
+
+## Numbers
+
+A DynamoDB number carries up to 38 significant digits, where a JavaScript number carries about 15.
+Numbers are held here as the digits they were written with, so an identifier, a monetary amount or a
+large counter comes back exactly as it went in.
+
+```typescript sim-dynamodb-number-precision
+/**
+ * A number too large for a JavaScript number, kept whole.
+ */
+
+import { CreateTableCommand, PutItemCommand } from "@aws-sdk/client-dynamodb";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const dynamoDb = simAws.dynamoDb();
+
+await dynamoDb.createTable(
+  new CreateTableCommand({
+    TableName: "CountersTable",
+    KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+    AttributeDefinitions: [{ AttributeName: "id", AttributeType: "S" }],
+    BillingMode: "PAY_PER_REQUEST",
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+await dynamoDb.putItem(
+  new PutItemCommand({
+    TableName: "CountersTable",
+    Item: { id: { S: "counter" }, count: { N: "9007199254740993" } },
+  }),
+);
+
+const replaced = await dynamoDb.putItem(
+  new PutItemCommand({
+    TableName: "CountersTable",
+    Item: { id: { S: "counter" }, count: { N: "9007199254740994" } },
+    ReturnValues: "ALL_OLD",
+  }),
+);
+
+// A JavaScript number would have rounded this to 9007199254740992.
+console.log(replaced.Attributes?.["count"]?.N); // "9007199254740993"
+```
+
+The digits are normalised the way DynamoDB normalises them: leading and trailing zeros are trimmed,
+and an exponent is worked back into plain notation, so `1E5` and `100000.00` are the same number.
+That is what makes `{ N: "1" }` and `{ N: "1.0" }` the same key.
+
+A number with more than 38 significant digits, or outside the range `1E-130` to
+`9.9999999999999999999999999999999999999E+125` and its negative mirror, is a `ValidationException`.
+
+## Sets, lists and maps
+
+A set holds one kind of value, holds at least one, and holds each value once. Binary members compare
+by their bytes rather than by object identity, so two `Uint8Array` values holding the same bytes are
+one member and are refused as a duplicate.
+
+Lists and maps nest up to 32 levels, and one item is at most 400 KB counting its attribute names as
+well as its values. Both are `ValidationException` when exceeded.
+
 ## Table names and ARNs
 
 A table name is 3 to 255 characters of letters, numbers, underscores, hyphens and periods. The name
@@ -303,8 +420,9 @@ table, so it authorizes against `*`.
 - `ListTables`, ordered by UTF-8 bytes and paged with `Limit` and `ExclusiveStartTableName`.
 - `DeleteTable`, following the table status DynamoDB moves a deleted table through, and refusing a
   table that is protected from deletion.
-- `PutItem`, in an earlier form than the table commands. It reaches its table the same way
-  they do, so it takes a table name or ARN and authorizes before the lookup.
+- `PutItem`, with the attribute value model behind it: numbers keep their digits, sets compare by
+  value, and key attributes are checked against what the table declared. It takes a table name or
+  ARN and authorizes before the lookup.
 - SDK interception, so an intercepted `DynamoDBClient` reaches the simulation.
 
 ## Limitations
@@ -332,9 +450,6 @@ table, so it authorizes against `*`.
   was created.
 - `ItemCount` and `TableSizeBytes` are always 0. Real DynamoDB updates both about every six hours, so
   they lag behind the items there too.
-- A binary key attribute is accepted by `CreateTable`, since real DynamoDB accepts one, but
-  `PutItem` refuses an item whose key value is binary. Item keys are computed from string and
-  number values only.
 - Deletion happens as soon as the background work runs, where real DynamoDB may take a while over a
   large table. Nothing waits for a `DELETING` table to go, so a test that needs it gone calls
   `simAws.backgroundTasksComplete()`.
@@ -345,5 +460,20 @@ table, so it authorizes against `*`.
 - Nothing enforces capacity. A provisioned table's throughput is stored and reported, and no request
   is ever throttled with `ProvisionedThroughputExceededException`.
 - `UpdateTable` and the item commands other than `PutItem` are not implemented yet, and neither is
-  `AWS::DynamoDB::Table` in CloudFormation.
+  `AWS::DynamoDB::Table` in CloudFormation. There is no way to read an item back yet, so a written
+  item is observed through the `ALL_OLD` a later write answers with.
+- Condition expressions are not simulated. `ConditionExpression`, `ExpressionAttributeNames`,
+  `ExpressionAttributeValues`, `Expected` and `ConditionalOperator` are refused rather than ignored,
+  since a condition that is never evaluated would let a write through that DynamoDB would have
+  turned away.
+- Capacity and item collection reporting are not simulated. `ReturnConsumedCapacity` and
+  `ReturnItemCollectionMetrics` are refused unless they name `NONE`.
+- A number comes back in plain decimal notation, whatever notation it was written in, so a request
+  carrying `1E5` reads back `100000`. The value is the one that was written either way, but the text
+  is not always character for character what real DynamoDB would answer with for a number at the
+  extremes of its range.
+- Item sizes follow the figures AWS documents for its 400 KB limit, which AWS itself describes as
+  approximate. An item near the limit here is near the limit there, but the byte counts are not
+  identical.
+- DynamoDB Streams and PartiQL are not simulated, and are not on the roadmap for this service.
 - DynamoDB is not served as an HTTP API by `serveSimAws`.

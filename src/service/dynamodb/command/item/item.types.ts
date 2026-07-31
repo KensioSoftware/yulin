@@ -1,28 +1,3 @@
-import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
-
-/**
- * Minimal structural sim DynamoDB PutItem command.
- */
-export interface SimPutItemCommand {
-  readonly input: SimPutItemCommandInput;
-}
-
-/**
- * Minimal structural sim DynamoDB PutItem input.
- */
-export interface SimPutItemCommandInput {
-  readonly TableName?: string | undefined;
-  readonly Item?: Record<string, SimDynamoDbAttributeValue> | undefined;
-}
-
-/**
- * Minimal structural sim DynamoDB PutItem output.
- */
-export interface SimPutItemCommandOutput {
-  readonly Attributes?: Record<string, SimDynamoDbAttributeValue> | undefined;
-  readonly $metadata: SimResponseMetadata;
-}
-
 /**
  * Minimal structural sim DynamoDB AttributeValue.
  */
@@ -160,3 +135,18 @@ export type SimDynamoDbAttributeValue =
       readonly S?: never;
       readonly SS?: never;
     };
+
+/**
+ * Minimal structural sim DynamoDB expected attribute value.
+ *
+ * This is the older conditional write input, which simulated DynamoDB refuses
+ * rather than models. It is declared so a request carrying one is refused by
+ * name.
+ */
+export interface SimDynamoDbExpectedAttributeValue {
+  readonly Value?: SimDynamoDbAttributeValue | undefined;
+  readonly Exists?: boolean | undefined;
+  readonly ComparisonOperator?: string | undefined;
+  readonly AttributeValueList?:
+    readonly SimDynamoDbAttributeValue[] | undefined;
+}

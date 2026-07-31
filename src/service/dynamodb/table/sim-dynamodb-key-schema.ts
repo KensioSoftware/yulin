@@ -4,8 +4,6 @@ import type {
   SimDynamoDbKeySchemaElementInput,
 } from "../command/table/table.types.js";
 import { SimDynamoDbValidationException } from "../error/dynamodb.error.js";
-import type { DynamoDbItem } from "../item/dynamodb-item.js";
-import { SimDynamoDbItemKey } from "./sim-dynamodb-item-key.js";
 import { readSimDynamoDbKeySchemaElement } from "./sim-dynamodb-key-schema-element.js";
 
 /**
@@ -18,8 +16,6 @@ export class SimDynamoDbKeySchema {
   public readonly elements: readonly SimDynamoDbKeySchemaElement[];
   public readonly hashKeyAttributeName: string;
   public readonly rangeKeyAttributeName: string | undefined;
-
-  private readonly itemKey: SimDynamoDbItemKey;
 
   private constructor(elements: readonly SimDynamoDbKeySchemaElement[]) {
     const [hashKey, rangeKey] = elements;
@@ -35,10 +31,6 @@ export class SimDynamoDbKeySchema {
     this.elements = elements;
     this.hashKeyAttributeName = hashKey.AttributeName;
     this.rangeKeyAttributeName = rangeKey?.AttributeName;
-    this.itemKey = new SimDynamoDbItemKey(
-      this.hashKeyAttributeName,
-      this.rangeKeyAttributeName,
-    );
   }
 
   /**
@@ -73,12 +65,5 @@ export class SimDynamoDbKeySchema {
    */
   attributeNames(): readonly string[] {
     return this.elements.map((element) => element.AttributeName);
-  }
-
-  /**
-   * Make a primary key string for an item based on this key schema.
-   */
-  makeItemKey(item: DynamoDbItem): string {
-    return this.itemKey.of(item);
   }
 }
