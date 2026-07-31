@@ -1,31 +1,28 @@
-import type { SimDynamoDbTable } from "./table/sim-dynamodb-table.js";
-import type { DynamoDbTableName } from "./table/sim-dynamodb-table-name.js";
 import {
   type BackgroundScheduler,
   BackgroundTasks,
 } from "../../util/background/background.js";
-import { ListTablesCommandHandler } from "./command/list-tables/list-tables.handler.js";
-import { DescribeTableCommandHandler } from "./command/describe-table/describe-table.handler.js";
 import { PutItemCommandHandler } from "./command/put-item/put-item.handler.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { SimDynamoDbAuthorizer } from "./command/authorize/sim-dynamodb-authorizer.js";
 import { SimDynamoDbCreateTable } from "./command/table/sim-dynamodb-create-table.js";
+import { SimDynamoDbTableAccess } from "./command/table/sim-dynamodb-table-access.js";
+import { SimDynamoDbTableCommands } from "./command/table/sim-dynamodb-table-commands.js";
+import { SimDynamoDbTableStore } from "./table/sim-dynamodb-table-store.js";
 import type {
   SimCreateTableCommand,
   SimCreateTableCommandOutput,
+  SimDeleteTableCommand,
+  SimDeleteTableCommandOutput,
+  SimDescribeTableCommand,
+  SimDescribeTableCommandOutput,
+  SimListTablesCommand,
+  SimListTablesCommandOutput,
 } from "./command/table/table.command.js";
 import type {
   SimPutItemCommand,
   SimPutItemCommandOutput,
 } from "./command/put-item/put-item.command.js";
-import type {
-  SimListTablesCommand,
-  SimListTablesCommandOutput,
-} from "./command/list-tables/list-tables.command.js";
-import type {
-  SimDescribeTableCommand,
-  SimDescribeTableCommandOutput,
-} from "./command/describe-table/describe-table.command.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import type { SimAwsCaller } from "../aws/caller/sim-aws-caller.js";
 import {
@@ -49,11 +46,12 @@ interface SimDynamoDatabaseProperties {
  * Simulated DynamoDB. Handles SDK commands. Emulates AWS behaviour and state.
  */
 export class SimDynamoDb {
-  private readonly tables = new Map<DynamoDbTableName, SimDynamoDbTable>();
+  private readonly tables = new SimDynamoDbTableStore();
 
-  private readonly authorizer: SimDynamoDbAuthorizer;
+  private readonly access: SimDynamoDbTableAccess;
   private readonly background: BackgroundScheduler;
   private readonly tableCreation: SimDynamoDbCreateTable;
+  private readonly tableCommands: SimDynamoDbTableCommands;
   private readonly sdkRouter = new SimDynamoDatabaseSdkCommandRouter(this);
 
   constructor(properties: SimDynamoDatabaseProperties = {}) {
@@ -63,12 +61,23 @@ export class SimDynamoDb {
       background = new BackgroundTasks(),
     } = properties;
 
+    const authorizer = new SimDynamoDbAuthorizer({ iam, accountRegionScope });
+
     this.background = background;
-    this.authorizer = new SimDynamoDbAuthorizer({ iam, accountRegionScope });
+    this.access = new SimDynamoDbTableAccess({
+      tables: this.tables,
+      authorizer,
+      accountRegionScope,
+    });
     this.tableCreation = new SimDynamoDbCreateTable({
       tables: this.tables,
-      authorizer: this.authorizer,
+      authorizer,
       accountRegionScope,
+      background,
+    });
+    this.tableCommands = new SimDynamoDbTableCommands({
+      tables: this.tables,
+      access: this.access,
       background,
     });
   }
@@ -86,33 +95,36 @@ export class SimDynamoDb {
   }
 
   /**
-   * Handle a List Tables Command from the SDK.
-   */
-  async listTables(
-    command: SimListTablesCommand,
-    options?: SimDynamoDbRequestOptions,
-  ): Promise<SimListTablesCommandOutput> {
-    const handler = new ListTablesCommandHandler({
-      tables: this.tables,
-      authorizer: this.authorizer,
-      background: this.background,
-    });
-    return await handler.handle(command, options);
-  }
-
-  /**
    * Handle a Describe Table Command from the SDK.
    */
   async describeTable(
     command: SimDescribeTableCommand,
     options?: SimDynamoDbRequestOptions,
   ): Promise<SimDescribeTableCommandOutput> {
-    const handler = new DescribeTableCommandHandler({
-      tables: this.tables,
-      authorizer: this.authorizer,
-      background: this.background,
-    });
-    return await handler.handle(command, options);
+    await this.background.sequence();
+    return this.tableCommands.describeTable(command, options);
+  }
+
+  /**
+   * Handle a List Tables Command from the SDK.
+   */
+  async listTables(
+    command: SimListTablesCommand,
+    options?: SimDynamoDbRequestOptions,
+  ): Promise<SimListTablesCommandOutput> {
+    await this.background.sequence();
+    return this.tableCommands.listTables(command, options);
+  }
+
+  /**
+   * Handle a Delete Table Command from the SDK.
+   */
+  async deleteTable(
+    command: SimDeleteTableCommand,
+    options?: SimDynamoDbRequestOptions,
+  ): Promise<SimDeleteTableCommandOutput> {
+    await this.background.sequence();
+    return this.tableCommands.deleteTable(command, options);
   }
 
   /**
@@ -122,10 +134,7 @@ export class SimDynamoDb {
     command: SimPutItemCommand,
     options?: SimDynamoDbRequestOptions,
   ): Promise<SimPutItemCommandOutput> {
-    const handler = new PutItemCommandHandler({
-      tables: this.tables,
-      authorizer: this.authorizer,
-    });
+    const handler = new PutItemCommandHandler({ access: this.access });
     return await handler.handle(command, options);
   }
 

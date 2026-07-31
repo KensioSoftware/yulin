@@ -2,7 +2,7 @@ import type {
   SimDynamoDbAttributeDefinition,
   SimDynamoDbAttributeDefinitionInput,
   SimDynamoDbScalarAttributeType,
-} from "../command/table/table.command.js";
+} from "../command/table/table.types.js";
 import { SimDynamoDbValidationException } from "../error/dynamodb.error.js";
 import type { SimDynamoDbKeySchema } from "./sim-dynamodb-key-schema.js";
 

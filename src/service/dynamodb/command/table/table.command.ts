@@ -1,5 +1,16 @@
-import type { SimArn } from "../../../aws/arn.js";
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
+import type {
+  SimDynamoDbAttributeDefinitionInput,
+  SimDynamoDbKeySchemaElementInput,
+  SimDynamoDbOnDemandThroughput,
+  SimDynamoDbProvisionedThroughput,
+  SimDynamoDbSecondaryIndexInput,
+  SimDynamoDbSseSpecification,
+  SimDynamoDbStreamSpecification,
+  SimDynamoDbTableDescription,
+  SimDynamoDbTag,
+  SimDynamoDbWarmThroughput,
+} from "./table.types.js";
 
 /**
  * Minimal structural sim DynamoDB CreateTable command.
@@ -45,199 +56,73 @@ export interface SimCreateTableCommandOutput {
 }
 
 /**
- * Minimal structural sim DynamoDB table description.
+ * Minimal structural sim DynamoDB DescribeTable command.
  */
-export interface SimDynamoDbTableDescription {
-  readonly AttributeDefinitions?:
-    readonly SimDynamoDbAttributeDefinition[] | undefined;
+export interface SimDescribeTableCommand {
+  readonly input: SimDescribeTableCommandInput;
+}
+
+/**
+ * Minimal structural sim DynamoDB DescribeTable input.
+ *
+ * `TableName` takes the table's name or its ARN, as real DynamoDB does.
+ */
+export interface SimDescribeTableCommandInput {
   readonly TableName?: string | undefined;
-  readonly TableArn?: SimArn | undefined;
-  readonly TableId?: string | undefined;
-  readonly KeySchema?: readonly SimDynamoDbKeySchemaElement[] | undefined;
-  readonly TableStatus?: SimDynamoDbTableStatus | undefined;
-  readonly CreationDateTime?: Date | undefined;
-  readonly BillingModeSummary?: SimDynamoDbBillingModeSummary | undefined;
-  readonly ProvisionedThroughput?:
-    SimDynamoDbProvisionedThroughputDescription | undefined;
-  readonly TableClassSummary?: SimDynamoDbTableClassSummary | undefined;
-  readonly DeletionProtectionEnabled?: boolean | undefined;
-  readonly ItemCount?: number | undefined;
-  readonly TableSizeBytes?: number | undefined;
-  readonly GlobalSecondaryIndexes?:
-    readonly SimDynamoDbGlobalSecondaryIndexDescription[] | undefined;
 }
 
 /**
- * Minimal structural sim DynamoDB attribute definition, as a request carries it.
+ * Minimal structural sim DynamoDB DescribeTable output.
  */
-export interface SimDynamoDbAttributeDefinitionInput {
-  readonly AttributeName?: string | undefined;
-  readonly AttributeType?: string | undefined;
+export interface SimDescribeTableCommandOutput {
+  readonly Table?: SimDynamoDbTableDescription | undefined;
+  readonly $metadata: SimResponseMetadata;
 }
 
 /**
- * Minimal structural sim DynamoDB attribute definition, as a table reports it.
+ * Minimal structural sim DynamoDB DeleteTable command.
  */
-export interface SimDynamoDbAttributeDefinition {
-  readonly AttributeName: string;
-  readonly AttributeType: SimDynamoDbScalarAttributeType;
+export interface SimDeleteTableCommand {
+  readonly input: SimDeleteTableCommandInput;
 }
 
 /**
- * Minimal structural sim DynamoDB key schema element, as a request carries it.
+ * Minimal structural sim DynamoDB DeleteTable input.
+ *
+ * `TableName` takes the table's name or its ARN, as real DynamoDB does.
  */
-export interface SimDynamoDbKeySchemaElementInput {
-  readonly AttributeName?: string | undefined;
-  readonly KeyType?: string | undefined;
+export interface SimDeleteTableCommandInput {
+  readonly TableName?: string | undefined;
 }
 
 /**
- * Minimal structural sim DynamoDB key schema element, as a table reports it.
+ * Minimal structural sim DynamoDB DeleteTable output.
  */
-export interface SimDynamoDbKeySchemaElement {
-  readonly AttributeName: string;
-  readonly KeyType: SimDynamoDbKeyType;
+export interface SimDeleteTableCommandOutput {
+  readonly TableDescription?: SimDynamoDbTableDescription | undefined;
+  readonly $metadata: SimResponseMetadata;
 }
 
 /**
- * Minimal structural sim DynamoDB provisioned throughput.
+ * Minimal structural sim DynamoDB ListTables command.
  */
-export interface SimDynamoDbProvisionedThroughput {
-  readonly ReadCapacityUnits?: number | undefined;
-  readonly WriteCapacityUnits?: number | undefined;
+export interface SimListTablesCommand {
+  readonly input: SimListTablesCommandInput;
 }
 
 /**
- * Minimal structural sim DynamoDB provisioned throughput description.
+ * Minimal structural sim DynamoDB ListTables input.
  */
-export interface SimDynamoDbProvisionedThroughputDescription {
-  readonly ReadCapacityUnits: number;
-  readonly WriteCapacityUnits: number;
-  readonly NumberOfDecreasesToday: number;
+export interface SimListTablesCommandInput {
+  readonly ExclusiveStartTableName?: string | undefined;
+  readonly Limit?: number | undefined;
 }
 
 /**
- * Minimal structural sim DynamoDB billing mode summary.
+ * Minimal structural sim DynamoDB ListTables output.
  */
-export interface SimDynamoDbBillingModeSummary {
-  readonly BillingMode: SimDynamoDbBillingMode;
+export interface SimListTablesCommandOutput {
+  readonly TableNames?: readonly string[] | undefined;
+  readonly LastEvaluatedTableName?: string | undefined;
+  readonly $metadata: SimResponseMetadata;
 }
-
-/**
- * Minimal structural sim DynamoDB table class summary.
- */
-export interface SimDynamoDbTableClassSummary {
-  readonly TableClass: SimDynamoDbTableClass;
-}
-
-/**
- * Minimal structural sim DynamoDB tag.
- */
-export interface SimDynamoDbTag {
-  readonly Key?: string | undefined;
-  readonly Value?: string | undefined;
-}
-
-/**
- * Minimal structural sim DynamoDB secondary index, global or local.
- */
-export interface SimDynamoDbSecondaryIndexInput {
-  readonly IndexName?: string | undefined;
-}
-
-/**
- * Minimal structural sim DynamoDB stream specification.
- */
-export interface SimDynamoDbStreamSpecification {
-  readonly StreamEnabled?: boolean | undefined;
-  readonly StreamViewType?: string | undefined;
-}
-
-/**
- * Minimal structural sim DynamoDB server-side encryption specification.
- */
-export interface SimDynamoDbSseSpecification {
-  readonly Enabled?: boolean | undefined;
-  readonly SSEType?: string | undefined;
-  readonly KMSMasterKeyId?: string | undefined;
-}
-
-/**
- * Minimal structural sim DynamoDB on-demand throughput.
- */
-export interface SimDynamoDbOnDemandThroughput {
-  readonly MaxReadRequestUnits?: number | undefined;
-  readonly MaxWriteRequestUnits?: number | undefined;
-}
-
-/**
- * Minimal structural sim DynamoDB warm throughput.
- */
-export interface SimDynamoDbWarmThroughput {
-  readonly ReadUnitsPerSecond?: number | undefined;
-  readonly WriteUnitsPerSecond?: number | undefined;
-}
-
-/**
- * Minimal structural sim DynamoDB key type.
- */
-export type SimDynamoDbKeyType = "HASH" | "RANGE";
-
-/**
- * Minimal structural sim DynamoDB scalar attribute type.
- */
-export type SimDynamoDbScalarAttributeType = "S" | "N" | "B";
-
-/**
- * Minimal structural sim DynamoDB billing mode.
- */
-export type SimDynamoDbBillingMode = "PROVISIONED" | "PAY_PER_REQUEST";
-
-/**
- * Minimal structural sim DynamoDB table class.
- */
-export type SimDynamoDbTableClass = "STANDARD" | "STANDARD_INFREQUENT_ACCESS";
-
-/**
- * Minimal structural sim DynamoDB table status.
- */
-export type SimDynamoDbTableStatus =
-  | "CREATING"
-  | "UPDATING"
-  | "DELETING"
-  | "ACTIVE"
-  | "INACCESSIBLE_ENCRYPTION_CREDENTIALS"
-  | "ARCHIVING"
-  | "ARCHIVED";
-
-/**
- * Minimal structural sim DynamoDB global secondary index description.
- */
-export interface SimDynamoDbGlobalSecondaryIndexDescription {
-  readonly IndexName?: string | undefined;
-  readonly KeySchema?: readonly SimDynamoDbKeySchemaElement[] | undefined;
-  readonly Projection?: SimDynamoDbProjection | undefined;
-  readonly IndexStatus?: SimDynamoDbIndexStatus | undefined;
-  readonly IndexArn?: SimArn | undefined;
-  readonly ItemCount?: number | undefined;
-  readonly IndexSizeBytes?: number | undefined;
-}
-
-/**
- * Minimal structural sim DynamoDB projection.
- */
-export interface SimDynamoDbProjection {
-  readonly ProjectionType?: SimDynamoDbProjectionType | undefined;
-  readonly NonKeyAttributes?: readonly string[] | undefined;
-}
-
-/**
- * Minimal structural sim DynamoDB projection type.
- */
-export type SimDynamoDbProjectionType = "ALL" | "KEYS_ONLY" | "INCLUDE";
-
-/**
- * Minimal structural sim DynamoDB index status.
- */
-export type SimDynamoDbIndexStatus =
-  "CREATING" | "UPDATING" | "DELETING" | "ACTIVE";

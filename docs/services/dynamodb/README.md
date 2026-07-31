@@ -3,8 +3,9 @@
 Yulin includes a simulated DynamoDB for tests and local development. Tables are held in memory, and
 every operation is authorized by simulated IAM.
 
-This page covers creating tables. Table creation is checked the way real DynamoDB checks it, so a
-table that can be created here is one that could be created on AWS.
+This page covers creating, describing, listing and deleting tables. What a request says is checked
+the way real DynamoDB checks it, so a table that can be created here is one that could be created on
+AWS.
 
 DynamoDB-specific types are imported from the `@kensio/yulin/dynamodb` subpath.
 
@@ -107,8 +108,127 @@ await simAws.backgroundTasksComplete();
 An on-demand table reports `ReadCapacityUnits` and `WriteCapacityUnits` of 0, which is what real
 DynamoDB reports for one.
 
-`TableClass` and `DeletionProtectionEnabled` are stored and reported. Neither changes what the table
-does here: nothing bills a table, and nothing deletes one yet.
+`TableClass` is stored and reported, and changes nothing else: nothing bills a table here.
+`DeletionProtectionEnabled` does change what the table does, and is covered under deleting a table.
+
+## Describing a table
+
+`DescribeTable` answers with the same description `CreateTable` did, read off the table itself. A
+test can check a table came out the way the request or the CloudFormation template meant it to.
+
+The `TableName` parameter takes the table's name or its ARN.
+
+## Listing tables
+
+`ListTables` returns table names in DynamoDB's order, which is by UTF-8 bytes. `Limit` takes a whole
+number from 1 to 100 and defaults to 100.
+
+`LastEvaluatedTableName` is the name to resume from, and it is absent on the last page. That is what
+lets a caller loop until it is gone rather than until a page comes back empty.
+
+```typescript sim-dynamodb-list-tables
+/**
+ * Paging through every simulated table, a page at a time.
+ */
+
+import {
+  CreateTableCommand,
+  ListTablesCommand,
+} from "@aws-sdk/client-dynamodb";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const dynamoDb = simAws.dynamoDb();
+
+for (const tableName of ["TableC", "TableA", "TableB"]) {
+  await dynamoDb.createTable(
+    new CreateTableCommand({
+      TableName: tableName,
+      KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+      AttributeDefinitions: [{ AttributeName: "id", AttributeType: "S" }],
+      BillingMode: "PAY_PER_REQUEST",
+    }),
+  );
+}
+
+const names: string[] = [];
+let startAfter: string | undefined;
+
+do {
+  const page = await dynamoDb.listTables(
+    new ListTablesCommand({ Limit: 2, ExclusiveStartTableName: startAfter }),
+  );
+  names.push(...(page.TableNames ?? []));
+  startAfter = page.LastEvaluatedTableName;
+} while (startAfter !== undefined);
+
+console.log(names); // ["TableA", "TableB", "TableC"]
+
+await simAws.backgroundTasksComplete();
+```
+
+A token naming a table that has since been deleted still works: a page resumes at the first name
+after the token rather than at a remembered position.
+
+## Deleting a table
+
+`DeleteTable` puts the table into `DELETING` and answers with its description. The table is still
+there to describe until the scheduled background work has run, at which point it and its items are
+gone.
+
+Real DynamoDB only deletes a table that is `ACTIVE`. One that is still `CREATING` or `UPDATING`
+answers `ResourceInUseException`, and one that has gone answers `ResourceNotFoundException`.
+Deleting a table that is already deleting is not an error.
+
+A table created with `DeletionProtectionEnabled` refuses to be deleted at all, and stays as it was.
+
+```typescript sim-dynamodb-deletion-protection
+/**
+ * A simulated table that is protected from deletion.
+ */
+
+import {
+  CreateTableCommand,
+  DeleteTableCommand,
+  DescribeTableCommand,
+} from "@aws-sdk/client-dynamodb";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const dynamoDb = simAws.dynamoDb();
+
+await dynamoDb.createTable(
+  new CreateTableCommand({
+    TableName: "ProtectedTable",
+    KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+    AttributeDefinitions: [{ AttributeName: "id", AttributeType: "S" }],
+    BillingMode: "PAY_PER_REQUEST",
+    DeletionProtectionEnabled: true,
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+try {
+  await dynamoDb.deleteTable(
+    new DeleteTableCommand({ TableName: "ProtectedTable" }),
+  );
+} catch (error) {
+  if ((error as Error).name !== "ValidationException") {
+    throw error;
+  }
+  console.log("the table is protected from deletion");
+}
+
+const description = await dynamoDb.describeTable(
+  new DescribeTableCommand({ TableName: "ProtectedTable" }),
+);
+
+console.log(description.Table?.TableStatus); // "ACTIVE"
+```
+
+`DeleteTable` takes the table's name or its ARN, as `DescribeTable` does.
 
 ## Table names and ARNs
 
@@ -179,8 +299,12 @@ table, so it authorizes against `*`.
 
 - `CreateTable`, with table name, key schema, attribute definition, billing mode and throughput
   validation.
-- `DescribeTable`, `ListTables` and `PutItem`, in an earlier form than `CreateTable`. Their output is
-  minimal and is being filled in.
+- `DescribeTable`, answering with the full table description, by table name or ARN.
+- `ListTables`, ordered by UTF-8 bytes and paged with `Limit` and `ExclusiveStartTableName`.
+- `DeleteTable`, following the table status DynamoDB moves a deleted table through, and refusing a
+  table that is protected from deletion.
+- `PutItem`, in an earlier form than the table commands. It reaches its table the same way
+  they do, so it takes a table name or ARN and authorizes before the lookup.
 - SDK interception, so an intercepted `DynamoDBClient` reaches the simulation.
 
 ## Limitations
@@ -211,8 +335,15 @@ table, so it authorizes against `*`.
 - A binary key attribute is accepted by `CreateTable`, since real DynamoDB accepts one, but
   `PutItem` refuses an item whose key value is binary. Item keys are computed from string and
   number values only.
+- Deletion happens as soon as the background work runs, where real DynamoDB may take a while over a
+  large table. Nothing waits for a `DELETING` table to go, so a test that needs it gone calls
+  `simAws.backgroundTasksComplete()`.
+- A table ARN naming another Account or Region is refused rather than resolved to the local table of
+  that name. Cross-account table access needs a resource policy, which is not simulated.
+- `UpdateTable` is not implemented, so a table never reaches `UPDATING` on its own. `DeleteTable`
+  refuses that status anyway, for when it can.
 - Nothing enforces capacity. A provisioned table's throughput is stored and reported, and no request
   is ever throttled with `ProvisionedThroughputExceededException`.
-- `UpdateTable`, `DeleteTable` and the item commands other than `PutItem` are not implemented yet,
-  and neither is `AWS::DynamoDB::Table` in CloudFormation.
+- `UpdateTable` and the item commands other than `PutItem` are not implemented yet, and neither is
+  `AWS::DynamoDB::Table` in CloudFormation.
 - DynamoDB is not served as an HTTP API by `serveSimAws`.

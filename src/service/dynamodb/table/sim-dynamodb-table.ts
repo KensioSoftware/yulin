@@ -6,11 +6,13 @@ import {
 } from "../../../util/background/background.js";
 import type {
   SimDynamoDbTableClass,
-  SimDynamoDbTableClassSummary,
   SimDynamoDbTableDescription,
   SimDynamoDbTableStatus,
-} from "../command/table/table.command.js";
+} from "../command/table/table.types.js";
 import type { DynamoDbItem } from "../item/dynamodb-item.js";
+import { describeSimDynamoDbTable } from "./sim-dynamodb-table-description.js";
+import { SimDynamoDbTableItems } from "./sim-dynamodb-table-items.js";
+import { SimDynamoDbTableLifecycle } from "./sim-dynamodb-table-lifecycle.js";
 import type { SimDynamoDbAttributeDefinitions } from "./sim-dynamodb-attribute-definitions.js";
 import type { SimDynamoDbKeySchema } from "./sim-dynamodb-key-schema.js";
 import type { SimDynamoDbTableBilling } from "./sim-dynamodb-table-billing.js";
@@ -49,31 +51,32 @@ export class SimDynamoDbTable {
   public readonly tableClass: SimDynamoDbTableClass | undefined;
   public readonly deletionProtectionEnabled: boolean;
 
-  private readonly background: BackgroundScheduler;
-  private readonly items = new Map<string, DynamoDbItem>();
-  #status: SimDynamoDbTableStatus = "CREATING";
+  private readonly items: SimDynamoDbTableItems;
+  private readonly lifecycle: SimDynamoDbTableLifecycle;
 
   constructor(properties: SimDynamoDbTableProperties) {
     const {
       name,
-      arn,
       keySchema,
       attributeDefinitions,
       billing,
-      tableClass,
       deletionProtectionEnabled = false,
       background = new BackgroundTasks(),
     } = properties;
 
     this.tableName = name.value;
-    this.arn = arn;
+    this.arn = properties.arn;
     this.tableId = randomUUID();
     this.keySchema = keySchema;
     this.attributeDefinitions = attributeDefinitions;
     this.billing = billing;
-    this.tableClass = tableClass;
+    this.tableClass = properties.tableClass;
     this.deletionProtectionEnabled = deletionProtectionEnabled;
-    this.background = background;
+    this.items = new SimDynamoDbTableItems(background);
+    this.lifecycle = new SimDynamoDbTableLifecycle({
+      tableName: name.value,
+      deletionProtectionEnabled,
+    });
     this.creationDateTime = background.now();
   }
 
@@ -81,60 +84,46 @@ export class SimDynamoDbTable {
    * Get the current table status.
    */
   public get status(): SimDynamoDbTableStatus {
-    return this.#status;
+    return this.lifecycle.status;
   }
 
   /**
    * Simulate the table entering ACTIVE status.
    */
   activate(): Promise<void> {
-    this.#status = "ACTIVE";
+    this.lifecycle.activate();
     return Promise.resolve();
+  }
+
+  /**
+   * Refuse a delete this table is not in a state to take.
+   */
+  assertDeletable(): void {
+    this.lifecycle.assertDeletable();
+  }
+
+  /**
+   * Simulate the table entering DELETING status.
+   *
+   * The table is still there to describe while it is deleting, as it is on
+   * AWS. What removes it is the background task the delete schedules.
+   */
+  beginDeletion(): void {
+    this.lifecycle.beginDeletion();
   }
 
   /**
    * Describe this table the way DynamoDB reports it.
    */
   toDescription(): SimDynamoDbTableDescription {
-    return {
-      TableName: this.tableName,
-      TableArn: this.arn,
-      TableId: this.tableId,
-      KeySchema: this.keySchema.elements,
-      AttributeDefinitions: this.attributeDefinitions.elements,
-      TableStatus: this.#status,
-      CreationDateTime: this.creationDateTime,
-      BillingModeSummary: this.billing.summary(),
-      ProvisionedThroughput: this.billing.throughputDescription(),
-      TableClassSummary: this.tableClassSummary(),
-      DeletionProtectionEnabled: this.deletionProtectionEnabled,
-      // Neither figure is tracked yet. Real DynamoDB updates both about every
-      // six hours, so they lag behind the items anyway.
-      ItemCount: 0,
-      TableSizeBytes: 0,
-    };
+    return describeSimDynamoDbTable(this);
   }
 
   /**
    * Put an item into the table.
    */
   public putItem(item: DynamoDbItem): Promise<void> {
-    const keyString = this.keySchema.makeItemKey(item);
-    this.background.schedule(() => {
-      this.items.set(keyString, item);
-      return Promise.resolve();
-    });
+    this.items.put(this.keySchema.makeItemKey(item), item);
     return Promise.resolve();
-  }
-
-  /**
-   * How the table reports its class, when the request that made it named one.
-   */
-  private tableClassSummary(): SimDynamoDbTableClassSummary | undefined {
-    if (this.tableClass === undefined) {
-      return undefined;
-    }
-
-    return { TableClass: this.tableClass };
   }
 }

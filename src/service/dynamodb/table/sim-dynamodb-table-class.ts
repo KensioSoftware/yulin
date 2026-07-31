@@ -1,4 +1,4 @@
-import type { SimDynamoDbTableClass } from "../command/table/table.command.js";
+import type { SimDynamoDbTableClass } from "../command/table/table.types.js";
 import { SimDynamoDbValidationException } from "../error/dynamodb.error.js";
 
 const tableClasses: ReadonlySet<string> = new Set([

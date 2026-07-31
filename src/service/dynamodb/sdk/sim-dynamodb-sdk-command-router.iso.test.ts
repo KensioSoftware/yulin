@@ -1,6 +1,7 @@
 import { describe, it } from "vitest";
 import {
   CreateTableCommand,
+  DeleteTableCommand,
   DescribeTableCommand,
   DynamoDBClient,
   GetItemCommand,
@@ -51,6 +52,15 @@ describe("simulated DynamoDB SDK Command routing", () => {
       .dynamoDb()
       .listTables(new ListTablesCommand({}));
     assertIdentical(directListOut.TableNames?.[0], "InterceptTable");
+
+    const deletionOut = await client.send(
+      new DeleteTableCommand({ TableName: "InterceptTable" }),
+    );
+    assertIdentical(deletionOut.TableDescription?.TableStatus, "DELETING");
+    await simSdk.simAws.backgroundTasksComplete();
+
+    const emptyListOut = await client.send(new ListTablesCommand({}));
+    assertIdentical(emptyListOut.TableNames?.length, 0);
   });
 
   it("routes PutItemCommand through an intercepted client", async () => {

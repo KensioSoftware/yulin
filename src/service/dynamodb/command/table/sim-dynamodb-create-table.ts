@@ -9,7 +9,7 @@ import { simDynamoDbTableArn } from "../../table/sim-dynamodb-table-arn.js";
 import { SimDynamoDbTableBilling } from "../../table/sim-dynamodb-table-billing.js";
 import { readSimDynamoDbTableClass } from "../../table/sim-dynamodb-table-class.js";
 import { SimDynamoDbTableName } from "../../table/sim-dynamodb-table-name.js";
-import type { DynamoDbTableName } from "../../table/sim-dynamodb-table-name.js";
+import type { SimDynamoDbTableStore } from "../../table/sim-dynamodb-table-store.js";
 import type { SimDynamoDbAuthorizer } from "../authorize/sim-dynamodb-authorizer.js";
 import type {
   SimCreateTableCommand,
@@ -19,7 +19,7 @@ import type {
 import { refuseUnsimulatedTableInput } from "./sim-dynamodb-unsimulated-table-input.js";
 
 interface SimDynamoDbCreateTableProperties {
-  readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>;
+  readonly tables: SimDynamoDbTableStore;
   readonly authorizer: SimDynamoDbAuthorizer;
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly background: BackgroundScheduler;
@@ -43,7 +43,7 @@ interface SimDynamoDbCreateTableOptions {
  * get it.
  */
 export class SimDynamoDbCreateTable {
-  private readonly tables: Map<DynamoDbTableName, SimDynamoDbTable>;
+  private readonly tables: SimDynamoDbTableStore;
   private readonly authorizer: SimDynamoDbAuthorizer;
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly background: BackgroundScheduler;
@@ -92,13 +92,13 @@ export class SimDynamoDbCreateTable {
   ): SimDynamoDbTable {
     const table = this.tableFrom(name, input);
 
-    if (this.tables.has(name.value)) {
+    if (this.tables.has(name)) {
       throw new SimDynamoDbResourceInUseException(
         `DynamoDB Table ${name.value} already exists`,
       );
     }
 
-    this.tables.set(name.value, table);
+    this.tables.add(table);
     this.background.schedule(() => table.activate());
 
     return table;
