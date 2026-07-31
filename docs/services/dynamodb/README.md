@@ -367,6 +367,89 @@ reports nothing removed. Its `ReturnValues` takes `NONE` and `ALL_OLD`, as `PutI
 
 Both take the table's name or its ARN, as the table commands do.
 
+## Projecting attributes
+
+`GetItem` takes a `ProjectionExpression`, which is a comma-separated list of document paths. Only
+those paths come back. A path is an attribute name, then any number of `.attribute` dereferences and
+`[n]` list indexes: `address.city`, `lines[0].sku`.
+
+An attribute name that is a DynamoDB reserved word, or that has a character an expression cannot
+carry, is written as a `#name` placeholder and defined in `ExpressionAttributeNames`.
+
+```typescript sim-dynamodb-projection-expression
+/**
+ * Reading part of an item with a projection expression.
+ */
+
+import {
+  CreateTableCommand,
+  GetItemCommand,
+  PutItemCommand,
+} from "@aws-sdk/client-dynamodb";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const dynamoDb = simAws.dynamoDb();
+
+await dynamoDb.createTable(
+  new CreateTableCommand({
+    TableName: "FoobarTable",
+    KeySchema: [{ AttributeName: "orderId", KeyType: "HASH" }],
+    AttributeDefinitions: [{ AttributeName: "orderId", AttributeType: "S" }],
+    BillingMode: "PAY_PER_REQUEST",
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+await dynamoDb.putItem(
+  new PutItemCommand({
+    TableName: "FoobarTable",
+    Item: {
+      orderId: { S: "order-1" },
+      status: { S: "shipped" },
+      address: { M: { city: { S: "Leeds" }, postcode: { S: "LS1 1AA" } } },
+      lines: { L: [{ S: "widget" }, { S: "gasket" }] },
+    },
+  }),
+);
+
+const output = await dynamoDb.getItem(
+  new GetItemCommand({
+    TableName: "FoobarTable",
+    Key: { orderId: { S: "order-1" } },
+    ProjectionExpression: "#s, address.city, lines[0]",
+    ExpressionAttributeNames: { "#s": "status" },
+  }),
+);
+
+console.log(Object.keys(output.Item ?? {}));
+// [ "status", "address", "lines" ]
+
+// The nested shape is kept: the address holds only the projected attribute.
+console.log(output.Item?.["address"]?.M);
+// { city: { S: "Leeds" } }
+
+// A projected list element comes back as a one element list.
+console.log(output.Item?.["lines"]?.L?.length);
+// 1
+```
+
+A projected path the item does not have is left out. It is not an error, and it does not come back
+as a `NULL`, so an item with none of the projected paths answers with an `Item` holding nothing.
+
+The placeholders and the expression have to agree exactly, in both directions. A `#name` the request
+does not define is a `ValidationException`, and so is an `ExpressionAttributeNames` entry no
+expression uses. The second is what a request hits after an expression is edited and the old
+placeholder is left behind.
+
+Two paths where one contains the other, such as `address, address.city`, are a `ValidationException`,
+as they are on real AWS: the pair does not say whether the whole map or one attribute of it was
+wanted. Naming one path twice counts the same way.
+
+A document path goes at most 32 levels deep, which is as far as an item nests. A negative index, a
+fractional index and a path past that depth are each a `ValidationException` naming the path.
+
 ## Numbers
 
 A DynamoDB number carries up to 38 significant digits, where a JavaScript number carries about 15.
@@ -596,8 +679,10 @@ authorizes against `*`.
 - `PutItem`, with the attribute value model behind it: numbers keep their digits, sets compare by
   value, and key attributes are checked against what the table declared. It takes a table name or
   ARN and authorizes before the lookup.
-- `GetItem`, answering with the whole item under a primary key, and with no `Item` at all when the
-  key holds nothing.
+- `GetItem`, answering with the item under a primary key, and with no `Item` at all when the key
+  holds nothing.
+- `ProjectionExpression` on `GetItem`, with document paths, list indexing and `ExpressionAttributeNames`
+  placeholders.
 - `DeleteItem`, removing the item under a primary key and answering with it for `ALL_OLD`.
 - `AWS::DynamoDB::Table` in CloudFormation, created through `CreateTable`, with `Ref` giving the
   table name and `Fn::GetAtt … Arn` the table ARN.
@@ -643,9 +728,14 @@ authorizes against `*`.
   stack deployed calls `simAws.backgroundTasksComplete()` first.
 - CloudFormation stack updates and deletes are not simulated, so neither is table replacement or the
   `DeletionPolicy` a template sets on a table.
-- Projection is not simulated. `ProjectionExpression` and `AttributesToGet` are refused rather than
-  ignored, since an item that came back whole where part of it was asked for would hide an
-  application reading an attribute it never requested.
+- `ProjectionExpression` is simulated on `GetItem` only. `BatchGetItem`, `Query` and `Scan` are not
+  implemented yet, so they have nothing to project from.
+- The legacy `AttributesToGet` is refused rather than ignored, since an item that came back whole
+  where part of it was asked for would hide an application reading an attribute it never requested.
+  `ProjectionExpression` replaced it, and real DynamoDB has built nothing on it since.
+- The 4 KB limit on an expression and the 255 byte limit on a placeholder are not enforced. Nothing
+  here is slower for a long expression, so an expression real DynamoDB would refuse for its size is
+  evaluated.
 - Reads are always strongly consistent. `ConsistentRead` is accepted either way and changes nothing,
   so a test cannot observe a stale read here the way it might against a real table.
 - Condition expressions are not simulated. `ConditionExpression`, `ExpressionAttributeNames`,

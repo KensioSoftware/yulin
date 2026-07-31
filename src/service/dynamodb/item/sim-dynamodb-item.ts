@@ -48,6 +48,20 @@ export class SimDynamoDbItem {
   }
 
   /**
+   * Hold attributes that have already been read and checked.
+   *
+   * Nothing is checked again here. It is for building an item out of another
+   * item's attributes, such as the part of one a projection asked for, where
+   * every value came from an item that was checked on the way in and the
+   * result is no bigger than that one.
+   */
+  static ofAttributes(
+    attributes: ReadonlyMap<string, SimDynamoDbValue>,
+  ): SimDynamoDbItem {
+    return new this(attributes);
+  }
+
+  /**
    * Get one of this item's attributes, if it has it.
    */
   attribute(name: string): SimDynamoDbValue | undefined {
@@ -59,6 +73,13 @@ export class SimDynamoDbItem {
    */
   attributeNames(): readonly string[] {
     return this.attributes.keys().toArray();
+  }
+
+  /**
+   * Every attribute this item carries, in the order they arrived.
+   */
+  entries(): ReadonlyMap<string, SimDynamoDbValue> {
+    return this.attributes;
   }
 
   /**
