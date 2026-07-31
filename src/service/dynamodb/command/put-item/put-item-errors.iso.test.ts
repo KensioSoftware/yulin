@@ -17,6 +17,8 @@ describe("DynamoDB PutItemCommand errors", () => {
       new CreateTableCommand({
         TableName: "FooTable",
         KeySchema: [{ AttributeName: "userId", KeyType: "HASH" }],
+        AttributeDefinitions: [{ AttributeName: "userId", AttributeType: "S" }],
+        BillingMode: "PAY_PER_REQUEST",
       }),
     );
 
@@ -51,6 +53,11 @@ describe("DynamoDB PutItemCommand errors", () => {
           { AttributeName: "userId", KeyType: "HASH" },
           { AttributeName: "orderId", KeyType: "RANGE" },
         ],
+        AttributeDefinitions: [
+          { AttributeName: "userId", AttributeType: "S" },
+          { AttributeName: "orderId", AttributeType: "S" },
+        ],
+        BillingMode: "PAY_PER_REQUEST",
       }),
     );
 
@@ -82,6 +89,8 @@ describe("DynamoDB PutItemCommand errors", () => {
       new CreateTableCommand({
         TableName: "FooTable",
         KeySchema: [{ AttributeName: "userId", KeyType: "HASH" }],
+        AttributeDefinitions: [{ AttributeName: "userId", AttributeType: "S" }],
+        BillingMode: "PAY_PER_REQUEST",
       }),
     );
 
@@ -115,6 +124,11 @@ describe("DynamoDB PutItemCommand errors", () => {
           { AttributeName: "userId", KeyType: "HASH" },
           { AttributeName: "orderId", KeyType: "RANGE" },
         ],
+        AttributeDefinitions: [
+          { AttributeName: "userId", AttributeType: "S" },
+          { AttributeName: "orderId", AttributeType: "S" },
+        ],
+        BillingMode: "PAY_PER_REQUEST",
       }),
     );
 
@@ -189,6 +203,8 @@ describe("DynamoDB PutItemCommand errors", () => {
       new CreateTableCommand({
         TableName: "FooTable",
         KeySchema: [{ AttributeName: "userId", KeyType: "HASH" }],
+        AttributeDefinitions: [{ AttributeName: "userId", AttributeType: "S" }],
+        BillingMode: "PAY_PER_REQUEST",
       }),
     );
 

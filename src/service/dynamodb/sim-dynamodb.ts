@@ -1,8 +1,5 @@
-import type {
-  DynamoDbTableName as DynamoDatabaseTableName,
-  SimDynamoDbTable as SimDynamoDatabaseTable,
-} from "./table/sim-dynamodb-table.js";
-import { CreateTableCommandHandler } from "./command/create-table/create-table.handler.js";
+import type { SimDynamoDbTable } from "./table/sim-dynamodb-table.js";
+import type { DynamoDbTableName } from "./table/sim-dynamodb-table-name.js";
 import {
   type BackgroundScheduler,
   BackgroundTasks,
@@ -11,10 +8,12 @@ import { ListTablesCommandHandler } from "./command/list-tables/list-tables.hand
 import { DescribeTableCommandHandler } from "./command/describe-table/describe-table.handler.js";
 import { PutItemCommandHandler } from "./command/put-item/put-item.handler.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
+import { SimDynamoDbAuthorizer } from "./command/authorize/sim-dynamodb-authorizer.js";
+import { SimDynamoDbCreateTable } from "./command/table/sim-dynamodb-create-table.js";
 import type {
   SimCreateTableCommand,
   SimCreateTableCommandOutput,
-} from "./command/create-table/create-table.command.js";
+} from "./command/table/table.command.js";
 import type {
   SimPutItemCommand,
   SimPutItemCommandOutput,
@@ -50,14 +49,11 @@ interface SimDynamoDatabaseProperties {
  * Simulated DynamoDB. Handles SDK commands. Emulates AWS behaviour and state.
  */
 export class SimDynamoDb {
-  private readonly tables = new Map<
-    DynamoDatabaseTableName,
-    SimDynamoDatabaseTable
-  >();
+  private readonly tables = new Map<DynamoDbTableName, SimDynamoDbTable>();
 
-  private readonly accountRegionScope: SimAwsAccountRegionScope;
-  private readonly iam: SimIamInterServiceAuthZ;
+  private readonly authorizer: SimDynamoDbAuthorizer;
   private readonly background: BackgroundScheduler;
+  private readonly tableCreation: SimDynamoDbCreateTable;
   private readonly sdkRouter = new SimDynamoDatabaseSdkCommandRouter(this);
 
   constructor(properties: SimDynamoDatabaseProperties = {}) {
@@ -67,9 +63,14 @@ export class SimDynamoDb {
       background = new BackgroundTasks(),
     } = properties;
 
-    this.accountRegionScope = accountRegionScope;
-    this.iam = iam;
     this.background = background;
+    this.authorizer = new SimDynamoDbAuthorizer({ iam, accountRegionScope });
+    this.tableCreation = new SimDynamoDbCreateTable({
+      tables: this.tables,
+      authorizer: this.authorizer,
+      accountRegionScope,
+      background,
+    });
   }
 
   /**
@@ -79,13 +80,9 @@ export class SimDynamoDb {
     command: SimCreateTableCommand,
     options?: SimDynamoDbRequestOptions,
   ): Promise<SimCreateTableCommandOutput> {
-    const handler = new CreateTableCommandHandler({
-      accountRegionScope: this.accountRegionScope,
-      tables: this.tables,
-      iam: this.iam,
-      background: this.background,
-    });
-    return await handler.handle(command, options);
+    // Allow for potential non-deterministic sequencing of async events.
+    await this.background.sequence();
+    return this.tableCreation.handle(command, options);
   }
 
   /**
@@ -97,7 +94,7 @@ export class SimDynamoDb {
   ): Promise<SimListTablesCommandOutput> {
     const handler = new ListTablesCommandHandler({
       tables: this.tables,
-      iam: this.iam,
+      authorizer: this.authorizer,
       background: this.background,
     });
     return await handler.handle(command, options);
@@ -111,9 +108,8 @@ export class SimDynamoDb {
     options?: SimDynamoDbRequestOptions,
   ): Promise<SimDescribeTableCommandOutput> {
     const handler = new DescribeTableCommandHandler({
-      accountRegionScope: this.accountRegionScope,
       tables: this.tables,
-      iam: this.iam,
+      authorizer: this.authorizer,
       background: this.background,
     });
     return await handler.handle(command, options);
@@ -127,9 +123,8 @@ export class SimDynamoDb {
     options?: SimDynamoDbRequestOptions,
   ): Promise<SimPutItemCommandOutput> {
     const handler = new PutItemCommandHandler({
-      accountRegionScope: this.accountRegionScope,
       tables: this.tables,
-      iam: this.iam,
+      authorizer: this.authorizer,
     });
     return await handler.handle(command, options);
   }

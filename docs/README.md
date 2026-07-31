@@ -9,6 +9,7 @@ behaviour and includes example code that can be copied into tests or local devel
 - [CloudFormation](./services/cloudformation/ "Simulated CloudFormation usage docs")
 - [CloudFront](./services/cloudfront/ "Simulated CloudFront usage docs")
 - [Cognito user pools](./services/cognito/ "Simulated Cognito user pools usage docs")
+- [DynamoDB](./services/dynamodb/ "Simulated DynamoDB usage docs")
 - [IAM](./services/iam/ "Simulated IAM usage docs")
 - [KMS](./services/kms/ "Simulated KMS usage docs")
 - [Lambda](./services/lambda/ "Simulated Lambda usage docs")

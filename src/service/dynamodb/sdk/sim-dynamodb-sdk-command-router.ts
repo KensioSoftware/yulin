@@ -3,7 +3,7 @@ import {
   type SimSdkCommandRoute,
   type SimSdkCommandRouter,
 } from "../../../sdk/index.js";
-import type { SimCreateTableCommand } from "../command/create-table/create-table.command.js";
+import type { SimCreateTableCommand } from "../command/table/table.command.js";
 import type { SimDescribeTableCommand } from "../command/describe-table/describe-table.command.js";
 import type { SimListTablesCommand } from "../command/list-tables/list-tables.command.js";
 import type { SimPutItemCommand } from "../command/put-item/put-item.command.js";
