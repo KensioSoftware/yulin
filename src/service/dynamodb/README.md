@@ -298,6 +298,39 @@ Scans, queries, indexes, condition expressions and streams are not implemented. 
 provisioned capacity are read and stored by CreateTable, but nothing enforces them: no write is ever
 throttled.
 
+## CloudFormation
+
+`cfn/` owns the `AWS::DynamoDB::*` resource types, following the rule that CloudFormation
+orchestrates and services create.
+
+`SimDynamoDbCfnResourceFactory` is the entry point, resolved into the CloudFormation engine by
+`sim-cfn-service-resolver.ts`. `Table` is the only resource type it creates. Anything else, including
+`GlobalTable`, throws an `Unsupported sim DynamoDB CloudFormation Resource` error, which is the
+wording that marks a resource as skipped rather than failing the stack.
+
+The parts under `cfn/table/` split by responsibility:
+
+- `SimCfnDynamoDbTablePropertyRules` decides what a property means. A simulated property is passed
+  on, a real property that is not simulated skips the resource with a reason naming it, and anything
+  that is not an `AWS::DynamoDB::Table` property at all fails the resource, because that is a
+  template real CloudFormation would refuse too.
+- `SimCfnDynamoDbTableValues` reads the plain shapes a property can hold, naming the property path in
+  each refusal. It takes a number from the string a template Parameter carries one as.
+- `SimCfnDynamoDbTableProperties` turns the template properties into `CreateTable` input, and
+  generates a name for a table the template did not name, through the shared
+  `SimCfnGeneratedResourceName`.
+- `SimCfnDynamoDbTableCreator` calls `SimDynamoDb.createTable()` with that input and finds the
+  created table through `SimDynamoDb.findTable()`.
+
+Nothing here decides what a key schema, a billing mode or a table class is allowed to be. Creating
+the table through the ordinary command is what keeps a template-created table the same thing an SDK
+caller would have got.
+
+`Ref` and `Fn::GetAtt` behaviour lives with the CloudFormation engine rather than on the table, in
+`SimDynamoDbTableCfn` under `cloudformation/resource/cfn/dynamodb/`. `Ref` answers with the table
+name and `Fn::GetAtt Arn` with the table ARN. `StreamArn` is refused by name, since an invented
+stream ARN would read as a working stream.
+
 ## Error model
 
 DynamoDB-specific errors live under `error/`.

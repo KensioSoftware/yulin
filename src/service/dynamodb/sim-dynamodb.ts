@@ -37,6 +37,8 @@ import {
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimDynamoDatabaseSdkCommandRouter } from "./sdk/sim-dynamodb-sdk-command-router.js";
 import type { SimSdkCommandRouter } from "../../sdk/index.js";
+import { SimDynamoDbCfnResourceFactory } from "./cfn/sim-cfn-dynamodb-resource-factory.js";
+import type { SimDynamoDbTable } from "./table/sim-dynamodb-table.js";
 
 export interface SimDynamoDbRequestOptions {
   readonly caller?: SimAwsCaller;
@@ -62,6 +64,9 @@ export class SimDynamoDb {
   private readonly itemReads: SimDynamoDbGetItem;
   private readonly itemDeletions: SimDynamoDbDeleteItem;
   private readonly sdkRouter = new SimDynamoDatabaseSdkCommandRouter(this);
+  private readonly cfnFactory = new SimDynamoDbCfnResourceFactory({
+    dynamoDb: this,
+  });
 
   constructor(properties: SimDynamoDatabaseProperties = {}) {
     const {
@@ -170,6 +175,25 @@ export class SimDynamoDb {
   ): Promise<SimDeleteItemCommandOutput> {
     await this.background.sequence();
     return this.itemDeletions.handle(command, options);
+  }
+
+  /**
+   * Find a table by name, if there is one here.
+   *
+   * Not a DynamoDB API operation. It reads the simulated state directly, for
+   * the parts of the simulator that hold a table rather than describe one, such
+   * as CloudFormation after it has created one. A name real DynamoDB would
+   * refuse belongs to no table, so it is not found rather than an error.
+   */
+  findTable(name: string): SimDynamoDbTable | undefined {
+    return this.tables.findByName(name);
+  }
+
+  /**
+   * Get this service's CloudFormation Resource factory.
+   */
+  cfnResourceFactory(): SimDynamoDbCfnResourceFactory {
+    return this.cfnFactory;
   }
 
   /**

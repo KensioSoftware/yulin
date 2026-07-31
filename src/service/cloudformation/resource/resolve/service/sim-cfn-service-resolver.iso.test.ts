@@ -105,8 +105,8 @@ describe("resolveSimCloudFormationServiceResourceFactory", () => {
         accountRegionScope,
         {
           providerName: "AWS",
-          serviceName: "DynamoDB",
-          resourceTypeName: "Table",
+          serviceName: "SNS",
+          resourceTypeName: "Topic",
         },
       ),
     );
@@ -114,8 +114,35 @@ describe("resolveSimCloudFormationServiceResourceFactory", () => {
     // Then the unsupported service name is included for diagnosis.
     assertIdentical(
       error.message,
-      "Unsupported sim CloudFormation Resource service DynamoDB",
+      "Unsupported sim CloudFormation Resource service SNS",
     );
+  });
+
+  it("resolves the DynamoDB Resource factory in the requested Account and Region scope", () => {
+    // Given a parsed AWS::DynamoDB Resource type and an explicit scope.
+    const simAws = new SimAws();
+    const accountRegionScope: SimAwsAccountRegionScope = {
+      accountId: "111111111111" as SimAwsAccountId,
+      regionName: "eu-west-2",
+    };
+    const scopedAws = simAws.accountRegionScope(
+      accountRegionScope.accountId,
+      accountRegionScope.regionName,
+    );
+
+    // When the service Resource factory is resolved.
+    const factory = resolveSimCloudFormationServiceResourceFactory(
+      simAws,
+      accountRegionScope,
+      {
+        providerName: "AWS",
+        serviceName: "DynamoDB",
+        resourceTypeName: "Table",
+      },
+    );
+
+    // Then the factory comes from the DynamoDB service for that exact scope.
+    assertIdentical(factory, scopedAws.dynamoDb().cfnResourceFactory());
   });
 
   it("rejects non-AWS and non-Custom Resource providers", () => {

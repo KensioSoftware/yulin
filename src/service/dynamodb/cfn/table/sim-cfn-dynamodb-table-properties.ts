@@ -1,0 +1,138 @@
+import { SimCfnGeneratedResourceName } from "../../../cloudformation/resource/name/sim-cfn-generated-resource-name.js";
+import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
+import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
+import type {
+  SimDynamoDbAttributeDefinitionInput,
+  SimDynamoDbKeySchemaElementInput,
+  SimDynamoDbProvisionedThroughput,
+} from "../../command/table/table.types.js";
+import { SimCfnDynamoDbTablePropertyRules } from "./sim-cfn-dynamodb-table-property-rules.js";
+import { SimCfnDynamoDbTableValues } from "./sim-cfn-dynamodb-table-values.js";
+
+/**
+ * A table name is at most 255 characters, so a generated one is trimmed to fit.
+ */
+const maximumNameLength = 255;
+
+interface SimCfnDynamoDbTablePropertiesProperties {
+  readonly resource: SimCfnResource;
+  readonly properties: SimCfnTemplateValueRecord;
+}
+
+/**
+ * Reads AWS::DynamoDB::Table CloudFormation properties into the shape
+ * CreateTable takes.
+ *
+ * Nothing here decides what a key schema, a billing mode or a table class is
+ * allowed to be. Each value is passed through to CreateTable in the shape it
+ * takes, so the table a template deployed had to pass the same validation an
+ * SDK caller's table does.
+ */
+export class SimCfnDynamoDbTableProperties {
+  private readonly resource: SimCfnResource;
+  private readonly rules: SimCfnDynamoDbTablePropertyRules;
+  private readonly values: SimCfnDynamoDbTableValues;
+
+  constructor(properties: SimCfnDynamoDbTablePropertiesProperties) {
+    this.resource = properties.resource;
+    this.rules = new SimCfnDynamoDbTablePropertyRules({
+      logicalId: properties.resource.logicalId,
+      properties: properties.properties,
+    });
+    this.values = new SimCfnDynamoDbTableValues({
+      logicalId: properties.resource.logicalId,
+      properties: properties.properties,
+    });
+  }
+
+  /**
+   * Refuse everything about this Resource that is not simulated, before
+   * anything is read off it.
+   */
+  assertSimulated(): void {
+    this.rules.assertSimulated();
+  }
+
+  /**
+   * The table name.
+   *
+   * An unnamed table is named after the stack and the logical ID, as real
+   * CloudFormation names one, so one template deployed under two stack names
+   * makes two tables.
+   */
+  name(): string {
+    return this.values.string("TableName") ?? this.generatedName();
+  }
+
+  /**
+   * The table's primary key elements, in the order the template lists them.
+   */
+  keySchema(): readonly SimDynamoDbKeySchemaElementInput[] {
+    return this.values.list("KeySchema").map((element) => {
+      return {
+        AttributeName: element.string("AttributeName"),
+        KeyType: element.string("KeyType"),
+      };
+    });
+  }
+
+  /**
+   * The definitions of the attributes the table's keys are made of.
+   */
+  attributeDefinitions(): readonly SimDynamoDbAttributeDefinitionInput[] {
+    return this.values.list("AttributeDefinitions").map((definition) => {
+      return {
+        AttributeName: definition.string("AttributeName"),
+        AttributeType: definition.string("AttributeType"),
+      };
+    });
+  }
+
+  /**
+   * The billing mode, which CreateTable checks and defaults.
+   */
+  billingMode(): string | undefined {
+    return this.values.string("BillingMode");
+  }
+
+  /**
+   * The capacity a provisioned table is created with.
+   */
+  provisionedThroughput(): SimDynamoDbProvisionedThroughput | undefined {
+    const throughput = this.values.object("ProvisionedThroughput");
+
+    if (throughput === undefined) {
+      return undefined;
+    }
+
+    return {
+      ReadCapacityUnits: throughput.number("ReadCapacityUnits"),
+      WriteCapacityUnits: throughput.number("WriteCapacityUnits"),
+    };
+  }
+
+  /**
+   * The table class, which CreateTable checks.
+   */
+  tableClass(): string | undefined {
+    return this.values.string("TableClass");
+  }
+
+  /**
+   * Whether the table is protected from deletion.
+   */
+  deletionProtectionEnabled(): boolean | undefined {
+    return this.values.boolean("DeletionProtectionEnabled");
+  }
+
+  /**
+   * The name for a table the template did not name.
+   */
+  private generatedName(): string {
+    return new SimCfnGeneratedResourceName({
+      stackName: this.resource.stackName,
+      logicalId: this.resource.logicalId,
+      maximumLength: maximumNameLength,
+    }).value;
+  }
+}

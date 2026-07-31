@@ -486,6 +486,95 @@ await simAws.backgroundTasksComplete();
 
 Creating a name that is already taken in the same scope fails with `ResourceInUseException`.
 
+## Deploying a table from CloudFormation
+
+Simulated CloudFormation creates a table from an `AWS::DynamoDB::Table` resource, in the stack's
+account and region. The table is created through `CreateTable`, so a template-created table is the
+same thing an SDK caller would get: the same name validation, the same key schema and attribute
+definition rules, the same ARN.
+
+`Ref` on the resource gives the table name, as it does on real AWS, so it can be handed straight to
+`PutItem`. `Fn::GetAtt … Arn` gives the table ARN, which is what an IAM policy names it by.
+
+```typescript sim-dynamodb-cloudformation-table
+/**
+ * Deploying a table from a CloudFormation template and writing to it.
+ */
+
+import { PutItemCommand } from "@aws-sdk/client-dynamodb";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "orders-stack",
+  template: {
+    Resources: {
+      OrdersTable: {
+        Type: "AWS::DynamoDB::Table",
+        Properties: {
+          KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+          AttributeDefinitions: [{ AttributeName: "id", AttributeType: "S" }],
+          BillingMode: "PAY_PER_REQUEST",
+        },
+      },
+    },
+    Outputs: {
+      OrdersTableName: { Value: { Ref: "OrdersTable" } },
+      OrdersTableArn: { Value: { "Fn::GetAtt": ["OrdersTable", "Arn"] } },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+await simAws.backgroundTasksComplete();
+
+// Ref resolves to the table name, so it works as a PutItem TableName.
+const tableName = stack.outputs.get("OrdersTableName")?.value as string;
+
+console.log(tableName);
+// "orders-stack-OrdersTable"
+
+await simAws
+  .dynamoDb()
+  .putItem(
+    new PutItemCommand({ TableName: tableName, Item: { id: { S: "1" } } }),
+  );
+
+console.log(stack.outputs.get("OrdersTableArn")?.value);
+// "arn:aws:dynamodb:us-east-1:888888888888:table/orders-stack-OrdersTable"
+```
+
+The properties that are read are `TableName`, `KeySchema`, `AttributeDefinitions`, `BillingMode`,
+`ProvisionedThroughput`, `TableClass` and `DeletionProtectionEnabled`. Each one is passed to
+`CreateTable` rather than applied here, so a value the template gets wrong fails the same way it
+would for an SDK caller.
+
+A table with no `TableName` is named after the stack and its logical ID, so the table above with its
+name left out would be `orders-stack-OrdersTable`. Real CloudFormation adds random characters to
+that, which a template cannot predict either way. Two stacks deploying the same template get two
+differently named tables. The generated name is trimmed to the 255 characters a table name allows,
+ending in a hash of the untrimmed name so two long names that start the same stay apart.
+
+`Fn::GetAtt … StreamArn` is refused by name. Streams are not simulated, and an invented stream ARN
+would read as a working stream to whatever the template handed it to.
+
+A property with behaviour that is not simulated skips the resource, with a reason naming the
+property, and the rest of the stack still deploys: `GlobalSecondaryIndexes`, `LocalSecondaryIndexes`,
+`TimeToLiveSpecification`, `Tags`, `StreamSpecification`, `KinesisStreamSpecification`,
+`SSESpecification`, `PointInTimeRecoverySpecification`, `ContributorInsightsSpecification`,
+`ImportSourceSpecification`, `ResourcePolicy`, `OnDemandThroughput` and `WarmThroughput`. A property
+`AWS::DynamoDB::Table` does not have fails the resource instead, since that is a template real
+CloudFormation would refuse too.
+
+`AWS::DynamoDB::GlobalTable` is skipped rather than deployed, since replication across regions is
+not simulated.
+
+CDK works without hand-editing. A `dynamodb.Table` synthesises a template that deploys here, with
+the table name reaching a function through its environment and a grant policy naming the table by
+the ARN `Fn::GetAtt` gives.
+
 ## IAM authorization
 
 `CreateTable` authorizes `dynamodb:CreateTable` against the ARN the table is about to have, before
@@ -510,6 +599,8 @@ authorizes against `*`.
 - `GetItem`, answering with the whole item under a primary key, and with no `Item` at all when the
   key holds nothing.
 - `DeleteItem`, removing the item under a primary key and answering with it for `ALL_OLD`.
+- `AWS::DynamoDB::Table` in CloudFormation, created through `CreateTable`, with `Ref` giving the
+  table name and `Fn::GetAtt … Arn` the table ARN.
 - SDK interception, so an intercepted `DynamoDBClient` reaches the simulation.
 
 ## Limitations
@@ -546,8 +637,12 @@ authorizes against `*`.
   refuses that status anyway, for when it can.
 - Nothing enforces capacity. A provisioned table's throughput is stored and reported, and no request
   is ever throttled with `ProvisionedThroughputExceededException`.
-- `UpdateTable`, `UpdateItem`, `Query`, `Scan` and the batch item commands are not implemented yet,
-  and neither is `AWS::DynamoDB::Table` in CloudFormation.
+- `UpdateTable`, `UpdateItem`, `Query`, `Scan` and the batch item commands are not implemented yet.
+- A CloudFormation stack reaches `CREATE_COMPLETE` while the table it created is still `CREATING`.
+  Real CloudFormation waits for the table to be `ACTIVE`, so a test reading the status after the
+  stack deployed calls `simAws.backgroundTasksComplete()` first.
+- CloudFormation stack updates and deletes are not simulated, so neither is table replacement or the
+  `DeletionPolicy` a template sets on a table.
 - Projection is not simulated. `ProjectionExpression` and `AttributesToGet` are refused rather than
   ignored, since an item that came back whole where part of it was asked for would hide an
   application reading an attribute it never requested.

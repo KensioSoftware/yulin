@@ -972,6 +972,7 @@ The resource types it creates are:
 - `AWS::CloudFront::Distribution` and `AWS::CloudFront::Function`
 - `AWS::Cognito::UserPool`, `AWS::Cognito::UserPoolClient` and
   `AWS::Cognito::UserPoolGroup`
+- `AWS::DynamoDB::Table`
 - `AWS::IAM::Role`, `AWS::IAM::ManagedPolicy` and `AWS::IAM::Policy`
 - `AWS::KMS::Key` and `AWS::KMS::Alias`
 - `AWS::Lambda::Function`, `AWS::Lambda::Url` and `AWS::Lambda::Permission`

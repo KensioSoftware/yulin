@@ -2,6 +2,7 @@ import type { SimCfnTemplateValue } from "../../template/value/sim-cfn-template-
 import { acmValueAdapter } from "./acm/sim-acm-cfn-value-adapter.js";
 import { cloudFrontValueAdapter } from "./cloudfront/sim-cloudfront-cfn-value-adapter.js";
 import { cognitoValueAdapter } from "./cognito/sim-cognito-cfn-value-adapter.js";
+import { dynamoDbValueAdapter } from "./dynamodb/sim-dynamodb-cfn-value-adapter.js";
 import { iamValueAdapter } from "./iam/sim-iam-cfn-value-adapter.js";
 import { kmsValueAdapter } from "./kms/sim-kms-cfn-value-adapter.js";
 import { lambdaValueAdapter } from "./lambda/sim-lambda-cfn-value-adapter.js";
@@ -49,6 +50,7 @@ export function simCfnResourceValueAdapter(
     acmValueAdapter(properties) ??
     cloudFrontValueAdapter(properties) ??
     cognitoValueAdapter(properties) ??
+    dynamoDbValueAdapter(properties) ??
     iamValueAdapter(properties) ??
     kmsValueAdapter(properties) ??
     lambdaValueAdapter(properties) ??
