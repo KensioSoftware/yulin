@@ -17,18 +17,24 @@ describe("DynamoDB ListTablesCommand", () => {
         new CreateTableCommand({
           TableName: "TableA",
           KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+          AttributeDefinitions: [{ AttributeName: "id", AttributeType: "S" }],
+          BillingMode: "PAY_PER_REQUEST",
         }),
       ),
       simDynamoDatabase.createTable(
         new CreateTableCommand({
           TableName: "TableB",
           KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+          AttributeDefinitions: [{ AttributeName: "id", AttributeType: "S" }],
+          BillingMode: "PAY_PER_REQUEST",
         }),
       ),
       simDynamoDatabase.createTable(
         new CreateTableCommand({
           TableName: "TableC",
           KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+          AttributeDefinitions: [{ AttributeName: "id", AttributeType: "S" }],
+          BillingMode: "PAY_PER_REQUEST",
         }),
       ),
     ]);
@@ -56,18 +62,24 @@ describe("DynamoDB ListTablesCommand", () => {
         new CreateTableCommand({
           TableName: "TableA",
           KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+          AttributeDefinitions: [{ AttributeName: "id", AttributeType: "S" }],
+          BillingMode: "PAY_PER_REQUEST",
         }),
       ),
       simDynamoDatabase.createTable(
         new CreateTableCommand({
           TableName: "TableB",
           KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+          AttributeDefinitions: [{ AttributeName: "id", AttributeType: "S" }],
+          BillingMode: "PAY_PER_REQUEST",
         }),
       ),
       simDynamoDatabase.createTable(
         new CreateTableCommand({
           TableName: "TableC",
           KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+          AttributeDefinitions: [{ AttributeName: "id", AttributeType: "S" }],
+          BillingMode: "PAY_PER_REQUEST",
         }),
       ),
     ]);
@@ -94,18 +106,24 @@ describe("DynamoDB ListTablesCommand", () => {
         new CreateTableCommand({
           TableName: "TableA",
           KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+          AttributeDefinitions: [{ AttributeName: "id", AttributeType: "S" }],
+          BillingMode: "PAY_PER_REQUEST",
         }),
       ),
       simDynamoDatabase.createTable(
         new CreateTableCommand({
           TableName: "TableB",
           KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+          AttributeDefinitions: [{ AttributeName: "id", AttributeType: "S" }],
+          BillingMode: "PAY_PER_REQUEST",
         }),
       ),
       simDynamoDatabase.createTable(
         new CreateTableCommand({
           TableName: "TableC",
           KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+          AttributeDefinitions: [{ AttributeName: "id", AttributeType: "S" }],
+          BillingMode: "PAY_PER_REQUEST",
         }),
       ),
     ]);

@@ -26,6 +26,15 @@ export class DynamoDbItem {
   }
 
   /**
+   * Get one of this item's attributes, if it has it.
+   */
+  attribute(name: string): DynamoDBItemAttribute | undefined {
+    // An item is keyed by whatever attribute names it was written with, so the
+    // lookup is by a name the caller supplies rather than a fixed one.
+    return this.attributes[name];
+  }
+
+  /**
    * Convert this DynamoDbItem to an AttributeValue structure.
    */
   toAttributeValues(): Record<string, SimDynamoDatabaseAttributeValue> {

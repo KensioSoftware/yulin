@@ -235,6 +235,60 @@ describe("DynamoDB CreateTableCommand IAM authorization", () => {
     assertIdentical(error.$metadata.httpStatusCode, 403);
   });
 
+  it("refuses an unauthorized caller before looking the table up", async () => {
+    // Given an Account with a table already created, and a Role with no
+    // DynamoDB permissions.
+    const accountId = makeSimAwsAccountId();
+    const region = makeAwsRegionName();
+    const simAws = new SimAws();
+    const simIam = simAws.account(accountId).iam();
+    const simDynamoDatabase = simAws
+      .account(accountId)
+      .region(region)
+      .dynamoDb();
+
+    await simDynamoDatabase.createTable(
+      new CreateTableCommand({
+        TableName: "TakenTable",
+        KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+        AttributeDefinitions: [{ AttributeName: "id", AttributeType: "S" }],
+        BillingMode: "PAY_PER_REQUEST",
+      }),
+    );
+
+    const roleCreation = await simIam.createRole(
+      new CreateRoleCommand({
+        RoleName: "ProbingRole",
+        AssumeRolePolicyDocument: JSON.stringify({
+          Version: "2012-10-17",
+          Statement: {
+            Effect: "Allow",
+            Principal: { AWS: `arn:aws:iam::${accountId}:root` },
+            Action: "sts:AssumeRole",
+          },
+        }),
+      }),
+    );
+
+    // When the Role attempts to create a table with the name already taken.
+    const error = await assertThrowsErrorAsync(async () =>
+      simDynamoDatabase.createTable(
+        new CreateTableCommand({
+          TableName: "TakenTable",
+          KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+          AttributeDefinitions: [{ AttributeName: "id", AttributeType: "S" }],
+          BillingMode: "PAY_PER_REQUEST",
+        }),
+        { caller: { kind: "arn", arn: roleCreation.Role.Arn } },
+      ),
+    );
+
+    // Then it is denied, rather than told the name is in use.
+    assertInstanceOf(error, SimIamAccessDenied);
+
+    await simAws.backgroundTasksComplete();
+  });
+
   it("uses allow-all authorization when SimDynamoDb is instantiated directly", async () => {
     // Given a directly constructed DynamoDB service with no IAM implementation supplied.
     const simDynamoDatabase = new SimDynamoDatabase();
