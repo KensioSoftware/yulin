@@ -3,6 +3,7 @@ import type {
   SimDynamoDbAttributeDefinitionInput,
   SimDynamoDbScalarAttributeType,
 } from "../command/table/table.types.js";
+import { assertDefined } from "../../../util/type-guard/defined.js";
 import { SimDynamoDbValidationException } from "../error/dynamodb.error.js";
 import type { SimDynamoDbKeySchema } from "./sim-dynamodb-key-schema.js";
 
@@ -71,6 +72,22 @@ export class SimDynamoDbAttributeDefinitions {
     }
 
     return new this(elements);
+  }
+
+  /**
+   * The type declared for an attribute.
+   *
+   * Every key attribute has a definition by the time a table exists, since
+   * CreateTable refuses a key schema and definitions that do not match.
+   */
+  typeOf(attributeName: string): SimDynamoDbScalarAttributeType {
+    const definition = this.elements.find(
+      (element) => element.AttributeName === attributeName,
+    );
+
+    assertDefined(definition, `AttributeDefinition for ${attributeName}`);
+
+    return definition.AttributeType;
   }
 
   /**

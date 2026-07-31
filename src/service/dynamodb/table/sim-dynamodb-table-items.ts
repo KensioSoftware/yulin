@@ -1,28 +1,24 @@
-import type { BackgroundScheduler } from "../../../util/background/background.js";
-import type { DynamoDbItem } from "../item/dynamodb-item.js";
+import type { SimDynamoDbItem } from "../item/sim-dynamodb-item.js";
 
 /**
- * The items one simulated table holds, keyed by primary key.
+ * The items one simulated table holds, keyed by marshalled primary key.
  *
- * A write is scheduled rather than applied at once, so a test sees the same
- * ordering of an item write against other simulated work that it would see on
- * AWS.
+ * A write lands before the call that made it returns, so a table is
+ * read-your-writes as real DynamoDB is for a strongly consistent read. Nothing
+ * here is scheduled: an item that a request has been told was written is an
+ * item that is there.
  */
 export class SimDynamoDbTableItems {
-  private readonly items = new Map<string, DynamoDbItem>();
-  private readonly background: BackgroundScheduler;
-
-  constructor(background: BackgroundScheduler) {
-    this.background = background;
-  }
+  private readonly items = new Map<string, SimDynamoDbItem>();
 
   /**
-   * Write an item, replacing whatever was under the same primary key.
+   * Write an item, and answer with whatever it replaced.
    */
-  put(key: string, item: DynamoDbItem): void {
-    this.background.schedule(() => {
-      this.items.set(key, item);
-      return Promise.resolve();
-    });
+  put(key: string, item: SimDynamoDbItem): SimDynamoDbItem | undefined {
+    const replaced = this.items.get(key);
+
+    this.items.set(key, item);
+
+    return replaced;
   }
 }

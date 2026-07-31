@@ -48,13 +48,12 @@ Current command areas include:
 
 - `authorize/` (shared IAM authorization for every DynamoDB command)
 - `table/` (CreateTable, DescribeTable, ListTables and DeleteTable)
-- `put-item/`
+- `item/` (PutItem, and the structural types for the item commands)
 
 `table/` is the layout newer commands follow: one directory per group of related commands, with the
 structural command types in `table.command.ts`, the value and description shapes they are made of in
-`table.types.ts`, and one class per command or closely related group. `put-item/` is one directory
-per operation, the older layout, and moves into the grouped layout as the item commands are built
-out.
+`table.types.ts`, and one class per command or closely related group. `item/` follows the same shape
+for the item commands.
 
 The main `SimDynamoDb` class delegates command execution to command classes and handlers rather than
 keeping command handling logic inline.
@@ -138,27 +137,44 @@ uses the key schema to overwrite items with the same primary key.
 
 Item state lives under `item/`.
 
-`DynamoDbItem` wraps a record of item attributes. It also converts between internal item
-representation and DynamoDB `AttributeValue`-style structures.
+`SimDynamoDbItem` holds one item's attributes, reads them from the `AttributeValue` structures a
+request carries, and writes them back. `SimDynamoDbValue` is the stored value: ten shapes, one per
+DynamoDB descriptor, each holding what the request gave rather than a JavaScript stand-in for it.
 
-`DynamoDBItemAttribute` is the internal value wrapper. It supports conversion for these DynamoDB
-attribute kinds:
+- `S` → the string, which may be empty
+- `N` → `SimDynamoDbNumber`, digits rather than a JavaScript number
+- `B` → the `Uint8Array` bytes
+- `BOOL` → the boolean
+- `NULL` → nothing; the kind is the value
+- `SS`, `NS`, `BS` → the members, in the order they arrived
+- `L` → the element values
+- `M` → a `Map` of name to value
 
-- `S` → `string`
-- `N` → `number`
-- `B` → `Uint8Array`
-- `BOOL` → `boolean`
-- `NULL` → `null`
-- `SS` → `Set<string>`
-- `NS` → `Set<number>`
-- `BS` → `Set<Uint8Array>`
-- `L` → array of nested internal values
-- `M` → object of nested internal values
+The work is split by direction, which is what keeps each part small:
 
-Numbers are accepted in AWS-style input as strings, then converted to JavaScript numbers internally.
-When converted back to `AttributeValue` output, numbers are serialized back to strings.
+- `sim-dynamodb-value-reader.ts` reads a request's `AttributeValue`, checking the descriptor, the
+  nesting depth and the shape of what it carries.
+- `sim-dynamodb-value-set.ts` reads the three set kinds, which are the ones with rules of their own.
+- `sim-dynamodb-value-writer.ts` writes a stored value back out.
+- `sim-dynamodb-value-size.ts` counts the bytes an item takes towards the 400 KB limit.
 
-Unsupported `AttributeValue` shapes throw an error.
+### Numbers
+
+`SimDynamoDbNumber` is the reason this model exists. DynamoDB numbers carry up to 38 significant
+digits and a JavaScript number carries about 15, so a number is held as text and never converted.
+
+The text is normalised: leading and trailing zeros are trimmed, and an exponent is worked back into
+plain notation, so `1E5`, `100000` and `100000.00` are one value. That is what lets a number set and
+a number key compare by value rather than by how they were written.
+
+A number outside DynamoDB's range, or with more than 38 significant digits, is a
+`SimDynamoDbValidationException` rather than a rounded value.
+
+### Sets
+
+A set holds one kind of value, holds at least one, and holds each value once. Binary members compare
+by their bytes rather than by object identity, through `simDynamoDbBinaryText`, and number members
+compare by their normalised digits.
 
 ## CreateTable behavior
 
@@ -231,25 +247,28 @@ DeleteTable follows the status DynamoDB moves a deleted table through:
 
 ## PutItem behavior
 
-`PutItemCommandHandler` implements item writes. It reaches its table through the same
+`SimDynamoDbPutItem` implements item writes. It reaches its table through the same
 `SimDynamoDbTableAccess` the table commands use, so it takes a table name or ARN and authorizes
 before the lookup.
 
 Important behavior:
 
-- `TableName` is required.
-- the target table must exist, otherwise `SimDynamoDbResourceNotFoundException` is thrown.
-- `Item` is required.
-- input `AttributeValue` structures are converted to a `DynamoDbItem`.
-- the table key schema is used to compute the item key.
-- items with the same computed key overwrite earlier items.
-- the actual item map write is scheduled through the table's background scheduler.
-- the command output currently returns `Attributes` containing the written item converted back to
-  `AttributeValue` form.
+- `Item` is required, and is read into a `SimDynamoDbItem`, which is where value and size checks
+  happen.
+- `SimDynamoDbItemKey` marshals the primary key from the item, requiring every key attribute to be
+  there, to be the type the table declared for it, and not to be empty.
+- a put replaces the whole item under that key rather than merging into it.
+- the write lands before the call returns, so the table is read-your-writes. Nothing about it is
+  scheduled.
+- `ReturnValues` takes `NONE` and `ALL_OLD`, which are the two real PutItem has. `ALL_OLD` answers
+  with the item that was replaced, and with nothing when there was none.
+- the inputs this simulation does not model are refused by name in
+  `sim-dynamodb-unsimulated-item-input.ts`, and a request naming only their `NONE` default is let
+  through.
 
-The simulator does not currently implement condition expressions, return value modes, update
-expressions, reads, scans, queries, indexes, or streams. Billing mode and provisioned capacity are
-read and stored by CreateTable, but nothing enforces them: no write is ever throttled.
+Reads, scans, queries, indexes, condition expressions and streams are not implemented. Billing mode
+and provisioned capacity are read and stored by CreateTable, but nothing enforces them: no write is
+ever throttled.
 
 ## Error model
 
@@ -294,7 +313,8 @@ Current uses:
   state at a realistic point rather than always the earliest one.
 - DeleteTable schedules the removal of the table from the store, which is what takes a table from
   DELETING to gone.
-- `SimDynamoDbTable.putItem()` schedules the actual writing of the item.
+- `SimDynamoDbTable.putItem()` writes the item at once. A write a caller has been told about is a
+  write that is there, so nothing about it waits on the scheduler.
 
 Tests that need eventual state should call the broader sim AWS background-drain helper, for example:
 

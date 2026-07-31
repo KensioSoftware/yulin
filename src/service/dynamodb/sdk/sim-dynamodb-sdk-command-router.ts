@@ -9,7 +9,7 @@ import type {
   SimDescribeTableCommand,
   SimListTablesCommand,
 } from "../command/table/table.command.js";
-import type { SimPutItemCommand } from "../command/put-item/put-item.command.js";
+import type { SimPutItemCommand } from "../command/item/item.command.js";
 import type { SimDynamoDb as SimDynamoDatabase } from "../sim-dynamodb.js";
 
 /**

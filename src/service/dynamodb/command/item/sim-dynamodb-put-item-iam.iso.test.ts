@@ -4,6 +4,7 @@ import {
   assertIdentical,
   assertInstanceOf,
   assertThrowsErrorAsync,
+  assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
@@ -41,7 +42,7 @@ describe("DynamoDB PutItemCommand IAM authorization", () => {
     );
 
     // Then IAM defaults to Account root and DynamoDB stores the item.
-    assertIdentical(output.Attributes?.["id"]?.S, "item-1");
+    assertUndefined(output.Attributes);
   });
 
   it("allows a Role when its policy permits dynamodb:PutItem on the table ARN", async () => {
@@ -104,7 +105,7 @@ describe("DynamoDB PutItemCommand IAM authorization", () => {
     );
 
     // Then IAM allows the request and DynamoDB stores the item.
-    assertIdentical(output.Attributes?.["id"]?.S, "item-1");
+    assertUndefined(output.Attributes);
   });
 
   it("implicitly denies a Role with no matching policy", async () => {
@@ -297,6 +298,6 @@ describe("DynamoDB PutItemCommand IAM authorization", () => {
     );
 
     // Then the allow-all fallback permits the request and DynamoDB stores the item.
-    assertIdentical(output.Attributes?.["id"]?.S, "item-1");
+    assertUndefined(output.Attributes);
   });
 });

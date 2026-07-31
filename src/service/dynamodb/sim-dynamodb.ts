@@ -2,9 +2,9 @@ import {
   type BackgroundScheduler,
   BackgroundTasks,
 } from "../../util/background/background.js";
-import { PutItemCommandHandler } from "./command/put-item/put-item.handler.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { SimDynamoDbAuthorizer } from "./command/authorize/sim-dynamodb-authorizer.js";
+import { SimDynamoDbPutItem } from "./command/item/sim-dynamodb-put-item.js";
 import { SimDynamoDbCreateTable } from "./command/table/sim-dynamodb-create-table.js";
 import { SimDynamoDbTableAccess } from "./command/table/sim-dynamodb-table-access.js";
 import { SimDynamoDbTableCommands } from "./command/table/sim-dynamodb-table-commands.js";
@@ -22,7 +22,7 @@ import type {
 import type {
   SimPutItemCommand,
   SimPutItemCommandOutput,
-} from "./command/put-item/put-item.command.js";
+} from "./command/item/item.command.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import type { SimAwsCaller } from "../aws/caller/sim-aws-caller.js";
 import {
@@ -52,6 +52,7 @@ export class SimDynamoDb {
   private readonly background: BackgroundScheduler;
   private readonly tableCreation: SimDynamoDbCreateTable;
   private readonly tableCommands: SimDynamoDbTableCommands;
+  private readonly itemCommands: SimDynamoDbPutItem;
   private readonly sdkRouter = new SimDynamoDatabaseSdkCommandRouter(this);
 
   constructor(properties: SimDynamoDatabaseProperties = {}) {
@@ -80,6 +81,7 @@ export class SimDynamoDb {
       access: this.access,
       background,
     });
+    this.itemCommands = new SimDynamoDbPutItem({ access: this.access });
   }
 
   /**
@@ -134,8 +136,8 @@ export class SimDynamoDb {
     command: SimPutItemCommand,
     options?: SimDynamoDbRequestOptions,
   ): Promise<SimPutItemCommandOutput> {
-    const handler = new PutItemCommandHandler({ access: this.access });
-    return await handler.handle(command, options);
+    await this.background.sequence();
+    return this.itemCommands.handle(command, options);
   }
 
   /**
