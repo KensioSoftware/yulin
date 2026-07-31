@@ -1,7 +1,4 @@
-import type {
-  SimDynamoDbAttributeValue,
-  SimDynamoDbExpectedAttributeValue,
-} from "./item.types.js";
+import type { SimDynamoDbExpectedAttributeValue } from "./item.types.js";
 import { SimDynamoDbUnsimulatedInput } from "./sim-dynamodb-unsimulated-input.js";
 
 /**
@@ -10,14 +7,8 @@ import { SimDynamoDbUnsimulatedInput } from "./sim-dynamodb-unsimulated-input.js
  * other, so they refuse the same ones.
  */
 interface SimDynamoDbItemWriteInput {
-  readonly ConditionExpression?: string | undefined;
-  readonly ExpressionAttributeNames?:
-    Readonly<Record<string, string>> | undefined;
-  readonly ExpressionAttributeValues?:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
   readonly ReturnConsumedCapacity?: string | undefined;
   readonly ReturnItemCollectionMetrics?: string | undefined;
-  readonly ReturnValuesOnConditionCheckFailure?: string | undefined;
   readonly Expected?:
     Readonly<Record<string, SimDynamoDbExpectedAttributeValue>> | undefined;
   readonly ConditionalOperator?: string | undefined;
@@ -27,9 +18,12 @@ interface SimDynamoDbItemWriteInput {
  * Refuse the inputs this simulation does not model on a command that changes an
  * item.
  *
- * A condition that is never evaluated would let a change through that DynamoDB
- * would have turned away, and capacity figures that are never measured would
- * report a cost nothing here incurs. Both are refused rather than ignored.
+ * `Expected` and `ConditionalOperator` are the conditional write that
+ * `ConditionExpression` replaced, and real DynamoDB has built nothing on them
+ * since. An expectation that is never evaluated would let a change through that
+ * DynamoDB would have turned away, and capacity figures that are never measured
+ * would report a cost nothing here incurs. Both are refused rather than
+ * ignored.
  */
 export function refuseUnsimulatedItemWriteInput(
   input: SimDynamoDbItemWriteInput,
@@ -37,21 +31,6 @@ export function refuseUnsimulatedItemWriteInput(
 ): void {
   const unsimulated = new SimDynamoDbUnsimulatedInput(operation);
 
-  unsimulated.refuse(
-    input.ConditionExpression !== undefined,
-    "ConditionExpression",
-    "applying a change the condition may have ruled out",
-  );
-  unsimulated.refuseNamed(
-    input.ExpressionAttributeNames,
-    "ExpressionAttributeNames",
-    "accepting names for an expression it cannot evaluate",
-  );
-  unsimulated.refuseNamed(
-    input.ExpressionAttributeValues,
-    "ExpressionAttributeValues",
-    "accepting values for an expression it cannot evaluate",
-  );
   unsimulated.refuseReporting(
     input.ReturnConsumedCapacity,
     "ReturnConsumedCapacity",
@@ -61,11 +40,6 @@ export function refuseUnsimulatedItemWriteInput(
     input.ReturnItemCollectionMetrics,
     "ReturnItemCollectionMetrics",
     "reporting item collection sizes nothing here tracks",
-  );
-  unsimulated.refuseReporting(
-    input.ReturnValuesOnConditionCheckFailure,
-    "ReturnValuesOnConditionCheckFailure",
-    "answering for a condition check that never happens",
   );
   unsimulated.refuseNamed(
     input.Expected,

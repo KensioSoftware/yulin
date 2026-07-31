@@ -96,16 +96,29 @@ describe("SimDynamoDbExpressionTokeniser", () => {
     );
   });
 
+  it("reads a two character operator as one operator", () => {
+    // Given the comparators written with two characters, which a reader
+    // taking one character at a time would split.
+    // When they are tokenised.
+    const tokens = tokenise("a <= b >= c <> d = e");
+
+    // Then each is one token, so a parser reads `<=` rather than `<` and `=`.
+    assertIdentical(tokens.at(1)?.text, "<=");
+    assertIdentical(tokens.at(3)?.text, ">=");
+    assertIdentical(tokens.at(5)?.text, "<>");
+    assertIdentical(tokens.at(7)?.text, "=");
+  });
+
   it("refuses a character that means nothing in an expression", () => {
     // Given an expression carrying a character no supported expression uses.
     // When it is tokenised, then it is refused rather than passed through to a
     // parser that would ignore it.
-    const error = assertThrowsError(() => tokenise("id = 3"));
+    const error = assertThrowsError(() => tokenise("id + 3"));
 
     assertInstanceOf(error, SimDynamoDbValidationException);
     assertIdentical(
       error.message,
-      "Invalid ProjectionExpression: syntax error; unexpected character '='",
+      "Invalid ProjectionExpression: syntax error; unexpected character '+'",
     );
   });
 

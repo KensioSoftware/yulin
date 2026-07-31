@@ -1,4 +1,5 @@
 import { simDynamoDbExpressionError } from "./sim-dynamodb-expression-error.js";
+import { readSimDynamoDbSymbol } from "./sim-dynamodb-expression-symbols.js";
 import type {
   SimDynamoDbExpressionToken,
   SimDynamoDbExpressionTokenKind,
@@ -32,22 +33,17 @@ const digitsPattern = /^\d+/;
 const fractionPattern = /^\.\d+/;
 
 /**
- * The single characters that mean something in the expressions supported so
- * far.
- *
- * This set grows as condition, filter and update expressions arrive. Until
- * then, a character outside it is refused rather than passed through, so an
- * expression this simulation cannot evaluate fails rather than half works.
- */
-const symbols: ReadonlySet<string> = new Set([".", ",", "[", "]", "-"]);
-
-/**
  * A token before it is told where in the expression it was found.
  */
 export type SimDynamoDbUnplacedToken = Omit<
   SimDynamoDbExpressionToken,
   "position"
 >;
+
+/**
+ * A token, or nothing where the text does not start with one of that kind.
+ */
+type MaybeToken = SimDynamoDbUnplacedToken | undefined;
 
 /**
  * Reads the one token an expression starts with.
@@ -79,7 +75,7 @@ export class SimDynamoDbExpressionTokenReader {
   /**
    * Read an attribute name written into the expression itself.
    */
-  private name(remaining: string): SimDynamoDbUnplacedToken | undefined {
+  private name(remaining: string): MaybeToken {
     const text = namePattern.exec(remaining)?.[0];
 
     if (text === undefined) {
@@ -99,7 +95,7 @@ export class SimDynamoDbExpressionTokenReader {
     kind: SimDynamoDbExpressionTokenKind,
     marker: string,
     remaining: string,
-  ): SimDynamoDbUnplacedToken | undefined {
+  ): MaybeToken {
     if (!remaining.startsWith(marker)) {
       return undefined;
     }
@@ -120,7 +116,7 @@ export class SimDynamoDbExpressionTokenReader {
    * Read a number, which is its digits and the fraction after them if it has
    * one.
    */
-  private number(remaining: string): SimDynamoDbUnplacedToken | undefined {
+  private number(remaining: string): MaybeToken {
     const digits = digitsPattern.exec(remaining)?.[0];
 
     if (digits === undefined) {
@@ -137,13 +133,15 @@ export class SimDynamoDbExpressionTokenReader {
    * Read a single character that means something on its own.
    */
   private symbol(remaining: string): SimDynamoDbUnplacedToken {
-    const character = remaining.slice(0, 1);
+    const text = readSimDynamoDbSymbol(remaining);
 
-    if (!symbols.has(character)) {
-      throw this.error(`syntax error; unexpected character '${character}'`);
+    if (text === undefined) {
+      throw this.error(
+        `syntax error; unexpected character '${remaining.slice(0, 1)}'`,
+      );
     }
 
-    return { kind: "symbol", text: character };
+    return { kind: "symbol", text };
   }
 
   /**

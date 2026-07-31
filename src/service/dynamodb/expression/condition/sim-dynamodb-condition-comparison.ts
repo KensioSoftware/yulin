@@ -1,0 +1,156 @@
+import { simDynamoDbValuesEqual } from "../../item/sim-dynamodb-value-comparison.js";
+import { compareSimDynamoDbValues } from "../../item/sim-dynamodb-value-order.js";
+import type { SimDynamoDbValue } from "../../item/sim-dynamodb-value.js";
+import type { SimDynamoDbCondition } from "./sim-dynamodb-condition.js";
+import type { SimDynamoDbConditionOperand } from "./sim-dynamodb-condition-operand.js";
+import type { SimDynamoDbConditionSubject } from "./sim-dynamodb-condition-subject.js";
+
+/**
+ * The comparators a condition expression can put between two operands.
+ */
+export const simDynamoDbComparators: ReadonlySet<string> = new Set([
+  "=",
+  "<>",
+  "<",
+  "<=",
+  ">",
+  ">=",
+]);
+
+/**
+ * Whether an ordering satisfies a comparator.
+ */
+function ordered(comparator: string, order: number): boolean {
+  switch (comparator) {
+    case "<": {
+      return order < 0;
+    }
+    case "<=": {
+      return order <= 0;
+    }
+    case ">": {
+      return order > 0;
+    }
+    default: {
+      return order >= 0;
+    }
+  }
+}
+
+/**
+ * Two operands compared against each other.
+ *
+ * A comparison between two types DynamoDB does not order, such as a string and
+ * a number, is false rather than an error. That is what real DynamoDB does, and
+ * it is what lets one condition guard items that do not all carry the same
+ * attributes.
+ */
+export class SimDynamoDbComparisonCondition implements SimDynamoDbCondition {
+  private readonly left: SimDynamoDbConditionOperand;
+  private readonly comparator: string;
+  private readonly right: SimDynamoDbConditionOperand;
+
+  constructor(
+    left: SimDynamoDbConditionOperand,
+    comparator: string,
+    right: SimDynamoDbConditionOperand,
+  ) {
+    this.left = left;
+    this.comparator = comparator;
+    this.right = right;
+  }
+
+  /**
+   * Whether the two operands stand in the relation the comparator asked for.
+   */
+  holdsFor(subject: SimDynamoDbConditionSubject): boolean {
+    const left = this.left.valueIn(subject);
+    const right = this.right.valueIn(subject);
+
+    if (left === undefined || right === undefined) {
+      return false;
+    }
+
+    return this.holdsBetween(left, right);
+  }
+
+  private holdsBetween(
+    left: SimDynamoDbValue,
+    right: SimDynamoDbValue,
+  ): boolean {
+    if (this.comparator === "=") {
+      return simDynamoDbValuesEqual(left, right);
+    }
+
+    if (this.comparator === "<>") {
+      return !simDynamoDbValuesEqual(left, right);
+    }
+
+    const order = compareSimDynamoDbValues(left, right);
+
+    if (order === undefined) {
+      return false;
+    }
+
+    return ordered(this.comparator, order);
+  }
+}
+
+/**
+ * An operand between two bounds, both of which count as inside.
+ */
+export class SimDynamoDbBetweenCondition implements SimDynamoDbCondition {
+  private readonly aboveLower: SimDynamoDbComparisonCondition;
+  private readonly belowUpper: SimDynamoDbComparisonCondition;
+
+  constructor(
+    operand: SimDynamoDbConditionOperand,
+    lower: SimDynamoDbConditionOperand,
+    upper: SimDynamoDbConditionOperand,
+  ) {
+    this.aboveLower = new SimDynamoDbComparisonCondition(lower, "<=", operand);
+    this.belowUpper = new SimDynamoDbComparisonCondition(operand, "<=", upper);
+  }
+
+  /**
+   * Whether the operand is at or between the two bounds.
+   */
+  holdsFor(subject: SimDynamoDbConditionSubject): boolean {
+    return (
+      this.aboveLower.holdsFor(subject) && this.belowUpper.holdsFor(subject)
+    );
+  }
+}
+
+/**
+ * An operand equal to any one of a list of others.
+ */
+export class SimDynamoDbInCondition implements SimDynamoDbCondition {
+  private readonly operand: SimDynamoDbConditionOperand;
+  private readonly candidates: readonly SimDynamoDbConditionOperand[];
+
+  constructor(
+    operand: SimDynamoDbConditionOperand,
+    candidates: readonly SimDynamoDbConditionOperand[],
+  ) {
+    this.operand = operand;
+    this.candidates = candidates;
+  }
+
+  /**
+   * Whether the operand equals any one of the candidates.
+   */
+  holdsFor(subject: SimDynamoDbConditionSubject): boolean {
+    const value = this.operand.valueIn(subject);
+
+    if (value === undefined) {
+      return false;
+    }
+
+    return this.candidates.some((candidate) => {
+      const other = candidate.valueIn(subject);
+
+      return other !== undefined && simDynamoDbValuesEqual(value, other);
+    });
+  }
+}

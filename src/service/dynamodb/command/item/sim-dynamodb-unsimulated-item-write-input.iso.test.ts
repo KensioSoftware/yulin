@@ -30,21 +30,9 @@ const keyInput = {
 } as const satisfies SimDeleteItemCommandInput;
 
 /**
- * The conditional write and reporting inputs PutItem and DeleteItem share.
+ * The reporting and legacy conditional inputs PutItem and DeleteItem share.
  */
 const writeInputs = [
-  {
-    named: "ConditionExpression",
-    input: { ConditionExpression: "attribute_not_exists(userId)" },
-  },
-  {
-    named: "ExpressionAttributeNames",
-    input: { ExpressionAttributeNames: { "#u": "userId" } },
-  },
-  {
-    named: "ExpressionAttributeValues",
-    input: { ExpressionAttributeValues: { ":u": { S: "user-1" } } },
-  },
   {
     named: "ReturnConsumedCapacity",
     input: { ReturnConsumedCapacity: "TOTAL" },
@@ -52,10 +40,6 @@ const writeInputs = [
   {
     named: "ReturnItemCollectionMetrics",
     input: { ReturnItemCollectionMetrics: "SIZE" },
-  },
-  {
-    named: "ReturnValuesOnConditionCheckFailure",
-    input: { ReturnValuesOnConditionCheckFailure: "ALL_OLD" },
   },
   {
     named: "Expected",
