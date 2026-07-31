@@ -2,24 +2,19 @@ import type { SimDynamoDbValue } from "../../item/sim-dynamodb-value.js";
 import { SimDynamoDbDocumentPathParser } from "../sim-dynamodb-document-path-parser.js";
 import type { SimDynamoDbExpressionPlaceholders } from "../sim-dynamodb-expression-placeholders.js";
 import type { SimDynamoDbExpressionTokens } from "../sim-dynamodb-expression-tokens.js";
+import { SimDynamoDbArithmeticOperand } from "./sim-dynamodb-update-computed-operand.js";
+import { SimDynamoDbUpdateFunctionParser } from "./sim-dynamodb-update-function-parser.js";
 import {
-  SimDynamoDbIfNotExistsOperand,
   type SimDynamoDbUpdateOperand,
   SimDynamoDbUpdatePathOperand,
   SimDynamoDbUpdateValueOperand,
 } from "./sim-dynamodb-update-operand.js";
-import { simDynamoDbUpdateUnsupported } from "./sim-dynamodb-update-refusal.js";
+import { simDynamoDbUpdateError } from "./sim-dynamodb-update-refusal.js";
 
 /**
- * The one function a SET action can call in the expressions supported so far.
+ * The operators an update expression carries between two operands.
  */
-const ifNotExistsName = "if_not_exists";
-
-/**
- * The operators an update expression can carry between two operands, which this
- * simulation does not work out.
- */
-const arithmetic: ReadonlySet<string> = new Set(["+", "-"]);
+const operators: ReadonlySet<string> = new Set(["+", "-"]);
 
 interface SimDynamoDbUpdateOperandParserProperties {
   readonly tokens: SimDynamoDbExpressionTokens;
@@ -30,37 +25,94 @@ interface SimDynamoDbUpdateOperandParserProperties {
 /**
  * Reads what a SET action assigns.
  *
- * An operand is a value the request supplied, a document path, or an
- * `if_not_exists` call. Which one it is shows in its first token, so nothing
- * here has to look far ahead.
+ * An operand is a value the request supplied, a document path, or a call to
+ * `if_not_exists` or `list_append`. Which one it is shows in its first token,
+ * so nothing here has to look far ahead.
+ *
+ * Two operands may be joined by one `+` or `-`. DynamoDB takes exactly one,
+ * with no chaining and no brackets, so `:a + :b + :c` is a syntax error there
+ * and here.
  */
 export class SimDynamoDbUpdateOperandParser {
   private readonly tokens: SimDynamoDbExpressionTokens;
   private readonly names: SimDynamoDbExpressionPlaceholders<string>;
   private readonly values: SimDynamoDbExpressionPlaceholders<SimDynamoDbValue>;
+  private readonly functions: SimDynamoDbUpdateFunctionParser;
 
   constructor(properties: SimDynamoDbUpdateOperandParserProperties) {
     this.tokens = properties.tokens;
     this.names = properties.names;
     this.values = properties.values;
+    this.functions = new SimDynamoDbUpdateFunctionParser({
+      tokens: properties.tokens,
+      operands: this,
+    });
   }
 
   /**
-   * Read one operand, refusing arithmetic on what follows it.
+   * Read what a SET action assigns, which is one operand or two with an
+   * operator between them.
    */
   parse(): SimDynamoDbUpdateOperand {
-    const operand = this.operand();
+    const left = this.operand();
+    const operator = this.operator();
 
-    this.refuseArithmetic();
+    if (operator === undefined) {
+      return left;
+    }
 
-    return operand;
+    const total = new SimDynamoDbArithmeticOperand(
+      left,
+      operator,
+      this.operand(),
+    );
+
+    this.refuseFurtherOperators();
+
+    return total;
   }
 
   /**
-   * Read a document path, which is what both `if_not_exists` and a bare operand
-   * point with.
+   * Read the value a request supplied, which is what ADD and DELETE take.
+   *
+   * Neither reads a document path: they change one attribute by an amount the
+   * request carries, so a path there has nothing to mean.
    */
-  private parsePath(): SimDynamoDbUpdatePathOperand {
+  parseValue(clause: string): SimDynamoDbUpdateValueOperand {
+    const token = this.tokens.peek();
+
+    if (token?.kind !== "valuePlaceholder") {
+      throw simDynamoDbUpdateError(
+        `syntax error; ${clause} takes a document path and a value from ` +
+          `ExpressionAttributeValues, and ` +
+          `'${token?.text ?? "the end of the expression"}' is not one`,
+      );
+    }
+
+    return this.valueOperand(token.text);
+  }
+
+  /**
+   * Read one operand, which is where the grammar stops nesting.
+   */
+  operand(): SimDynamoDbUpdateOperand {
+    const token = this.tokens.peek();
+
+    if (token?.kind === "valuePlaceholder") {
+      return this.valueOperand(token.text);
+    }
+
+    if (this.functions.isCall()) {
+      return this.functions.parse();
+    }
+
+    return this.path();
+  }
+
+  /**
+   * Read a document path.
+   */
+  path(): SimDynamoDbUpdatePathOperand {
     return new SimDynamoDbUpdatePathOperand(
       new SimDynamoDbDocumentPathParser({
         tokens: this.tokens,
@@ -70,83 +122,42 @@ export class SimDynamoDbUpdateOperandParser {
   }
 
   /**
-   * Read whichever of the three shapes an operand is.
+   * Read the value placeholder the expression is sitting on.
    */
-  private operand(): SimDynamoDbUpdateOperand {
-    const token = this.tokens.peek();
+  private valueOperand(placeholder: string): SimDynamoDbUpdateValueOperand {
+    this.tokens.next("a value");
 
-    if (token?.kind === "valuePlaceholder") {
-      this.tokens.next("a value");
-
-      return new SimDynamoDbUpdateValueOperand(
-        token.text,
-        this.values.required(token.text),
-      );
-    }
-
-    if (this.isFunctionCall()) {
-      return this.call();
-    }
-
-    return this.parsePath();
-  }
-
-  /**
-   * Whether what comes next is a function call rather than a path starting with
-   * an attribute of that name.
-   */
-  private isFunctionCall(): boolean {
-    const token = this.tokens.peek();
-    const after = this.tokens.peek(1);
-
-    return (
-      token?.kind === "name" && after?.kind === "symbol" && after.text === "("
+    return new SimDynamoDbUpdateValueOperand(
+      placeholder,
+      this.values.required(placeholder),
     );
   }
 
   /**
-   * Read a function call, refusing every function but `if_not_exists`.
+   * Read the operator between two operands, if there is one.
    */
-  private call(): SimDynamoDbUpdateOperand {
-    const name = this.tokens.next("a function name").text;
-    this.tokens.next("(");
-
-    if (name !== ifNotExistsName) {
-      throw simDynamoDbUpdateUnsupported(
-        `The update expression function ${name}`,
-        "working out a value it cannot build",
-      );
+  private operator(): "+" | "-" | undefined {
+    if (this.tokens.takeSymbol("+")) {
+      return "+";
     }
 
-    const stored = this.parsePath();
-    this.tokens.expectSymbol(
-      ",",
-      `syntax error; ${ifNotExistsName} takes a document path and a value`,
-    );
+    if (this.tokens.takeSymbol("-")) {
+      return "-";
+    }
 
-    const otherwise = this.parse();
-    this.tokens.expectSymbol(
-      ")",
-      `syntax error; ${ifNotExistsName} is not closed`,
-    );
-
-    return new SimDynamoDbIfNotExistsOperand(stored, otherwise);
+    return undefined;
   }
 
   /**
-   * Refuse the arithmetic an update expression can carry between two operands.
-   *
-   * `SET n = n + :one` is a valid update on AWS. Reading the operator and
-   * refusing it by name says so, where leaving `+` out of the expressions this
-   * simulation reads at all would refuse it as an unexpected character.
+   * Refuse the second operator of a sum DynamoDB will not work out.
    */
-  private refuseArithmetic(): void {
+  private refuseFurtherOperators(): void {
     const token = this.tokens.peek();
 
-    if (token?.kind === "symbol" && arithmetic.has(token.text)) {
-      throw simDynamoDbUpdateUnsupported(
-        `Arithmetic in an update expression, at '${token.text}'`,
-        "assigning a value it has not worked out",
+    if (token?.kind === "symbol" && operators.has(token.text)) {
+      throw simDynamoDbUpdateError(
+        `syntax error; one '+' or '-' joins two operands, and '${token.text}' ` +
+          `starts a third`,
       );
     }
   }

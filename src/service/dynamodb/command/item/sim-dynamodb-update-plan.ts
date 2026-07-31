@@ -1,15 +1,14 @@
-import { parseSimDynamoDbCondition } from "../../expression/condition/sim-dynamodb-condition-expression.js";
-import type { SimDynamoDbCondition } from "../../expression/condition/sim-dynamodb-condition.js";
-import type { SimDynamoDbExpressionParameterInput } from "../../expression/sim-dynamodb-expression-parameters.js";
-import { SimDynamoDbExpressionParameters } from "../../expression/sim-dynamodb-expression-parameters.js";
-import { parseSimDynamoDbUpdate } from "../../expression/update/sim-dynamodb-update-expression.js";
+import { SimDynamoDbProjection } from "../../expression/projection/sim-dynamodb-projection.js";
+import { updateExpressionName } from "../../expression/update/sim-dynamodb-update-refusal.js";
 import type { SimDynamoDbUpdate } from "../../expression/update/sim-dynamodb-update.js";
 import type { SimDynamoDbItem } from "../../item/sim-dynamodb-item.js";
 import { SimDynamoDbConditionCheck } from "./sim-dynamodb-condition-check.js";
+import {
+  readSimDynamoDbUpdateExpressions,
+  type SimDynamoDbUpdateExpressionInput,
+} from "./sim-dynamodb-update-expressions.js";
 
-interface SimDynamoDbUpdatePlanInput extends SimDynamoDbExpressionParameterInput {
-  readonly UpdateExpression?: string | undefined;
-  readonly ConditionExpression?: string | undefined;
+interface SimDynamoDbUpdatePlanInput extends SimDynamoDbUpdateExpressionInput {
   readonly ReturnValuesOnConditionCheckFailure?: string | undefined;
 }
 
@@ -20,11 +19,6 @@ interface SimDynamoDbUpdatePlanProperties {
 
 /**
  * What an UpdateItem request says to do, and what it is guarded by.
- *
- * An update carries two expressions, and both draw on the same
- * `ExpressionAttributeNames` and `ExpressionAttributeValues`. Reading them
- * together is what lets a placeholder used by either count as used, so a
- * request naming one only in its UpdateExpression is not refused for it.
  */
 export class SimDynamoDbUpdatePlan {
   public readonly check: SimDynamoDbConditionCheck;
@@ -55,15 +49,11 @@ export class SimDynamoDbUpdatePlan {
       });
     }
 
-    const parameters = new SimDynamoDbExpressionParameters(input);
-    const update = parseSimDynamoDbUpdate(expression, parameters);
-    const condition = conditionIn(input.ConditionExpression, parameters);
-
-    parameters.assertAllUsed();
+    const read = readSimDynamoDbUpdateExpressions(input, expression);
 
     return new this({
-      update,
-      check: SimDynamoDbConditionCheck.of(condition, input, operation),
+      update: read.update,
+      check: SimDynamoDbConditionCheck.of(read.condition, input, operation),
     });
   }
 
@@ -72,6 +62,23 @@ export class SimDynamoDbUpdatePlan {
    */
   assertLeavesKeyAlone(keyAttributeNames: readonly string[]): void {
     this.update?.assertLeavesKeyAlone(keyAttributeNames);
+  }
+
+  /**
+   * The parts of an item this update touched, for the reporting modes that
+   * answer with those and nothing else.
+   *
+   * A request that says nothing to change touched nothing, so the projection it
+   * answers with finds nothing in either item.
+   */
+  touched(): SimDynamoDbProjection {
+    return (
+      this.update?.touched() ??
+      new SimDynamoDbProjection({
+        expressionName: updateExpressionName,
+        paths: [],
+      })
+    );
   }
 
   /**
@@ -90,18 +97,4 @@ export class SimDynamoDbUpdatePlan {
 
     return this.update.applyTo(existing, key);
   }
-}
-
-/**
- * Read the condition guarding an update, if it names one.
- */
-function conditionIn(
-  expression: string | undefined,
-  parameters: SimDynamoDbExpressionParameters,
-): SimDynamoDbCondition | undefined {
-  if (expression === undefined) {
-    return undefined;
-  }
-
-  return parseSimDynamoDbCondition(expression, parameters);
 }

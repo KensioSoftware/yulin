@@ -1,5 +1,4 @@
 import type { SimDynamoDbValue } from "../../item/sim-dynamodb-value.js";
-import { SimDynamoDbDocumentPathParser } from "../sim-dynamodb-document-path-parser.js";
 import type { SimDynamoDbExpressionPlaceholders } from "../sim-dynamodb-expression-placeholders.js";
 import type { SimDynamoDbExpressionTokens } from "../sim-dynamodb-expression-tokens.js";
 import {
@@ -7,23 +6,11 @@ import {
   type SimDynamoDbUpdateAction,
   SimDynamoDbSetAction,
 } from "./sim-dynamodb-update-action.js";
+import { SimDynamoDbAddAction } from "./sim-dynamodb-update-add-action.js";
+import { SimDynamoDbUpdateClauses } from "./sim-dynamodb-update-clause.js";
+import { SimDynamoDbDeleteAction } from "./sim-dynamodb-update-delete-action.js";
 import { SimDynamoDbUpdateOperandParser } from "./sim-dynamodb-update-operand-parser.js";
-import {
-  simDynamoDbUpdateError,
-  simDynamoDbUpdateUnsupported,
-} from "./sim-dynamodb-update-refusal.js";
-import { SimDynamoDbUpdateTarget } from "./sim-dynamodb-update-target.js";
 import { SimDynamoDbUpdate } from "./sim-dynamodb-update.js";
-
-/**
- * The clause keywords this simulation applies.
- */
-const simulatedClauses: ReadonlySet<string> = new Set(["SET", "REMOVE"]);
-
-/**
- * The clause keywords real DynamoDB has and this simulation does not apply.
- */
-const unsimulatedClauses: ReadonlySet<string> = new Set(["ADD", "DELETE"]);
 
 interface SimDynamoDbUpdateParserProperties {
   readonly tokens: SimDynamoDbExpressionTokens;
@@ -35,19 +22,18 @@ interface SimDynamoDbUpdateParserProperties {
  * Reads an UpdateExpression into the actions it asks for.
  *
  * An expression is a run of clauses, each of which is a keyword and then its
- * comma-separated actions. The clauses may come in either order, and each
- * keyword appears at most once.
+ * comma-separated actions. The clauses may come in any order, and each keyword
+ * appears at most once.
  */
 export class SimDynamoDbUpdateParser {
   private readonly tokens: SimDynamoDbExpressionTokens;
-  private readonly names: SimDynamoDbExpressionPlaceholders<string>;
+  private readonly clauses: SimDynamoDbUpdateClauses;
   private readonly operands: SimDynamoDbUpdateOperandParser;
-  private readonly clauses = new Set<string>();
   private readonly actions: SimDynamoDbUpdateAction[] = [];
 
   constructor(properties: SimDynamoDbUpdateParserProperties) {
     this.tokens = properties.tokens;
-    this.names = properties.names;
+    this.clauses = new SimDynamoDbUpdateClauses(properties);
     this.operands = new SimDynamoDbUpdateOperandParser(properties);
   }
 
@@ -63,86 +49,52 @@ export class SimDynamoDbUpdateParser {
   }
 
   /**
-   * Read one clause, which is its keyword and then its actions.
+   * Read one clause, which is its keyword and then its comma-separated actions.
    */
   private clause(): void {
-    const word = this.keyword();
+    const word = this.clauses.keyword();
 
-    if (this.clauses.has(word)) {
-      throw simDynamoDbUpdateError(
-        `The "${word}" section can only be used once in an update expression;`,
-      );
-    }
+    do {
+      this.actions.push(this.action(word));
+    } while (this.tokens.takeSymbol(","));
+  }
 
-    this.clauses.add(word);
-
+  /**
+   * Read one action of the clause that was named.
+   */
+  private action(word: string): SimDynamoDbUpdateAction {
     if (word === "SET") {
-      this.setActions();
-
-      return;
+      return this.setAction();
     }
 
-    this.removeActions();
-  }
+    if (word === "REMOVE") {
+      return new SimDynamoDbRemoveAction(this.clauses.target());
+    }
 
-  /**
-   * Read the keyword a clause starts with.
-   */
-  private keyword(): string {
-    const token = this.tokens.next("SET or REMOVE");
-    const word = token.text.toUpperCase();
-
-    if (token.kind === "name" && unsimulatedClauses.has(word)) {
-      throw simDynamoDbUpdateUnsupported(
-        `The ${word} clause of an update expression`,
-        "applying a change this simulation cannot work out",
+    if (word === "ADD") {
+      return new SimDynamoDbAddAction(
+        this.clauses.attributeTarget(word),
+        this.operands.parseValue(word),
       );
     }
 
-    if (token.kind !== "name" || !simulatedClauses.has(word)) {
-      throw simDynamoDbUpdateError(
-        `syntax error; SET or REMOVE expected, but '${token.text}' was given`,
-      );
-    }
-
-    return word;
-  }
-
-  /**
-   * Read the `path = operand` actions of a SET clause.
-   */
-  private setActions(): void {
-    do {
-      const target = this.target();
-      this.tokens.expectSymbol(
-        "=",
-        `syntax error; a SET action assigns to a document path with '='`,
-      );
-
-      this.actions.push(
-        new SimDynamoDbSetAction(target, this.operands.parse()),
-      );
-    } while (this.tokens.takeSymbol(","));
-  }
-
-  /**
-   * Read the document paths of a REMOVE clause.
-   */
-  private removeActions(): void {
-    do {
-      this.actions.push(new SimDynamoDbRemoveAction(this.target()));
-    } while (this.tokens.takeSymbol(","));
-  }
-
-  /**
-   * Read the document path one action writes to.
-   */
-  private target(): SimDynamoDbUpdateTarget {
-    return new SimDynamoDbUpdateTarget(
-      new SimDynamoDbDocumentPathParser({
-        tokens: this.tokens,
-        names: this.names,
-      }).parse(),
+    return new SimDynamoDbDeleteAction(
+      this.clauses.attributeTarget(word),
+      this.operands.parseValue(word),
     );
+  }
+
+  /**
+   * Read a `path = operand` action of a SET clause.
+   */
+  private setAction(): SimDynamoDbUpdateAction {
+    const target = this.clauses.target();
+
+    this.tokens.expectSymbol(
+      "=",
+      `syntax error; a SET action assigns to a document path with '='`,
+    );
+
+    return new SimDynamoDbSetAction(target, this.operands.parse());
   }
 }

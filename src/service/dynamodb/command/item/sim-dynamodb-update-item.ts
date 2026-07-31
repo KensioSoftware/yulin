@@ -1,5 +1,4 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
-import type { SimDynamoDbItem } from "../../item/sim-dynamodb-item.js";
 import type { SimDynamoDbTableAccess } from "../table/sim-dynamodb-table-access.js";
 import type {
   SimUpdateItemCommand,
@@ -8,6 +7,7 @@ import type {
 import { readSimDynamoDbKey } from "./sim-dynamodb-key-input.js";
 import { SimDynamoDbReturnValues } from "./sim-dynamodb-return-values.js";
 import { refuseUnsimulatedItemUpdateInput } from "./sim-dynamodb-unsimulated-item-update-input.js";
+import { SimDynamoDbUpdateAnswer } from "./sim-dynamodb-update-answer.js";
 import { SimDynamoDbUpdatePlan } from "./sim-dynamodb-update-plan.js";
 
 interface SimDynamoDbUpdateItemProperties {
@@ -68,28 +68,9 @@ export class SimDynamoDbUpdateItem {
     const updated = plan.applyTo(existing, key);
     table.putItem(updated);
 
-    return this.answer(asked, existing, updated);
-  }
-
-  /**
-   * Answer with as much of the item as the request asked for.
-   *
-   * ALL_OLD carries nothing when the key held nothing, since there was no item
-   * to report. ALL_NEW always carries one, since an update always leaves one.
-   */
-  private answer(
-    asked: SimDynamoDbReturnValues,
-    existing: SimDynamoDbItem | undefined,
-    updated: SimDynamoDbItem,
-  ): SimUpdateItemCommandOutput {
-    if (asked.wantsNewItem()) {
-      return { Attributes: updated.toAttributeValues(), $metadata: {} };
-    }
-
-    if (!asked.wantsOldItem() || existing === undefined) {
-      return { $metadata: {} };
-    }
-
-    return { Attributes: existing.toAttributeValues(), $metadata: {} };
+    return new SimDynamoDbUpdateAnswer({
+      asked,
+      touched: plan.touched(),
+    }).of(existing, updated);
   }
 }

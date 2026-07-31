@@ -14,10 +14,7 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
-import {
-  SimDynamoDbUnsupportedOperation,
-  SimDynamoDbValidationException,
-} from "../../error/dynamodb.error.js";
+import { SimDynamoDbValidationException } from "../../error/dynamodb.error.js";
 import type { SimDynamoDb } from "../../sim-dynamodb.js";
 
 /**
@@ -125,20 +122,60 @@ describe("DynamoDB UpdateItemCommand ReturnValues", () => {
     assertIdentical(output.Attributes["orderId"]?.S, "order-1");
   });
 
-  it("refuses the modes that report only what the update touched", async () => {
-    // Given an order.
+  it("answers with only the attributes it changed for UPDATED_NEW", async () => {
+    // Given an order that is packing.
     const simAws = new SimAws();
     const simDynamoDb = await tableFor(simAws);
     await orderAt(simDynamoDb, "packing");
 
     // When an update asks for the attributes it changed.
-    const error = await assertThrowsErrorAsync(async () =>
-      simDynamoDb.updateItem(updateTo("shipped", "UPDATED_NEW")),
+    const output = await simDynamoDb.updateItem(
+      updateTo("shipped", "UPDATED_NEW"),
     );
 
-    // Then it is refused by name rather than answered with the whole item.
-    assertInstanceOf(error, SimDynamoDbUnsupportedOperation);
-    assertStringIncludes(error.message, "ReturnValues UPDATED_NEW");
+    // Then the attribute it set comes back, and the rest of the item does not.
+    assertNonNullable(output.Attributes);
+    assertIdentical(output.Attributes["status"]?.S, "shipped");
+    assertUndefined(output.Attributes["orderId"]);
+  });
+
+  it("answers with the values it changed for UPDATED_OLD", async () => {
+    // Given an order that is packing.
+    const simAws = new SimAws();
+    const simDynamoDb = await tableFor(simAws);
+    await orderAt(simDynamoDb, "packing");
+
+    // When an update asks for what those attributes held before it.
+    const output = await simDynamoDb.updateItem(
+      updateTo("shipped", "UPDATED_OLD"),
+    );
+
+    // Then the attribute it set comes back as it was, and nothing else does.
+    assertNonNullable(output.Attributes);
+    assertIdentical(output.Attributes["status"]?.S, "packing");
+    assertUndefined(output.Attributes["orderId"]);
+  });
+
+  it("answers with nothing for UPDATED_NEW when the update only removed", async () => {
+    // Given an order that is packing.
+    const simAws = new SimAws();
+    const simDynamoDb = await tableFor(simAws);
+    await orderAt(simDynamoDb, "packing");
+
+    // When an update takes an attribute away and asks what it left.
+    const output = await simDynamoDb.updateItem(
+      new UpdateItemCommand({
+        TableName: "FooTable",
+        Key: { orderId: { S: "order-1" } },
+        UpdateExpression: "REMOVE #s",
+        ExpressionAttributeNames: { "#s": "status" },
+        ReturnValues: "UPDATED_NEW",
+      }),
+    );
+
+    // Then there is no Attributes at all, since the attribute it touched is
+    // gone.
+    assertUndefined(output.Attributes);
   });
 
   it("refuses a mode UpdateItem does not have", async () => {
@@ -165,7 +202,7 @@ describe("DynamoDB UpdateItemCommand ReturnValues", () => {
     assertInstanceOf(error, SimDynamoDbValidationException);
     assertStringIncludes(
       error.message,
-      "UpdateItem takes NONE, ALL_OLD or ALL_NEW.",
+      "UpdateItem takes NONE, ALL_OLD, ALL_NEW, UPDATED_OLD or UPDATED_NEW.",
     );
   });
 });

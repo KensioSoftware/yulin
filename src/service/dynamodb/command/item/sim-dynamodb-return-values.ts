@@ -1,7 +1,4 @@
-import {
-  SimDynamoDbUnsupportedOperation,
-  SimDynamoDbValidationException,
-} from "../../error/dynamodb.error.js";
+import { SimDynamoDbValidationException } from "../../error/dynamodb.error.js";
 
 /**
  * The values PutItem and DeleteItem take for ReturnValues. Both answer with the
@@ -12,20 +9,31 @@ const writeModes: ReadonlySet<string> = new Set(["NONE", "ALL_OLD"]);
 
 /**
  * The values UpdateItem takes. It changes part of an item rather than replacing
- * it, so it can answer with the item as it was or as it now is.
+ * it, so it can answer with the item as it was or as it now is, either whole or
+ * cut down to the parts the update touched.
  */
 const updateModes: ReadonlySet<string> = new Set([
   "NONE",
   "ALL_OLD",
   "ALL_NEW",
+  "UPDATED_OLD",
+  "UPDATED_NEW",
 ]);
 
 /**
- * The values real UpdateItem takes and this simulation does not report. Both
- * answer with the attributes the update touched, which is a different answer to
- * the whole item rather than a smaller one.
+ * The modes that report the item as it stood before the update.
  */
-const unsimulatedUpdateModes: ReadonlySet<string> = new Set([
+const beforeModes: ReadonlySet<string> = new Set(["ALL_OLD", "UPDATED_OLD"]);
+
+/**
+ * The modes that report the item as it now is.
+ */
+const afterModes: ReadonlySet<string> = new Set(["ALL_NEW", "UPDATED_NEW"]);
+
+/**
+ * The modes that report only the parts of the item the update touched.
+ */
+const changedModes: ReadonlySet<string> = new Set([
   "UPDATED_OLD",
   "UPDATED_NEW",
 ]);
@@ -53,26 +61,16 @@ export class SimDynamoDbReturnValues {
 
   /**
    * Read the ReturnValues an update carries.
-   *
-   * The two modes that report only the attributes the update touched are
-   * refused by name, rather than answered with the whole item.
    */
   static readForUpdate(
     value: string | undefined,
     operation: string,
   ): SimDynamoDbReturnValues {
-    if (value !== undefined && unsimulatedUpdateModes.has(value)) {
-      throw new SimDynamoDbUnsupportedOperation(
-        `ReturnValues ${value} is not simulated, so ${operation} refuses it ` +
-          `rather than answering with more of the item than was asked for`,
-      );
-    }
-
     return this.oneOf(
       value,
       operation,
       updateModes,
-      "NONE, ALL_OLD or ALL_NEW",
+      "NONE, ALL_OLD, ALL_NEW, UPDATED_OLD or UPDATED_NEW",
     );
   }
 
@@ -100,16 +98,24 @@ export class SimDynamoDbReturnValues {
   }
 
   /**
-   * Whether the request asked for the item that was there before it.
+   * Whether the request asked for the item as it stood before the write.
    */
-  wantsOldItem(): boolean {
-    return this.mode === "ALL_OLD";
+  reportsBefore(): boolean {
+    return beforeModes.has(this.mode);
   }
 
   /**
    * Whether the request asked for the item as it now is.
    */
-  wantsNewItem(): boolean {
-    return this.mode === "ALL_NEW";
+  reportsAfter(): boolean {
+    return afterModes.has(this.mode);
+  }
+
+  /**
+   * Whether the request asked for the parts the update touched rather than the
+   * whole item.
+   */
+  reportsOnlyChanged(): boolean {
+    return changedModes.has(this.mode);
   }
 }

@@ -336,8 +336,11 @@ c: 3 }` leaves `{ b: 1, c: 2 }`, which an implementation applying actions left t
   map on the way past.
 - an update cannot move the primary key. `SimDynamoDbUpdate.assertLeavesKeyAlone` refuses an action
   writing to a key attribute, since the request already names the item it works on.
-- `ReturnValues` takes `NONE`, `ALL_OLD` and `ALL_NEW`, through the same `SimDynamoDbReturnValues`
-  the other item writes use. `UPDATED_OLD` and `UPDATED_NEW` are refused by name.
+- `ReturnValues` takes all five modes, through the same `SimDynamoDbReturnValues` the other item
+  writes use. `SimDynamoDbUpdateAnswer` reads the mode as two questions rather than five answers:
+  which item is reported, and whether the whole of it is. `UPDATED_OLD` and `UPDATED_NEW` report the
+  parts the expression touched by applying a `SimDynamoDbProjection` of the action targets, which is
+  the same machinery a ProjectionExpression uses.
 
 Scans, queries, indexes and streams are not implemented. Billing mode and provisioned capacity are
 read and stored by CreateTable, but nothing enforces them: no write is ever throttled.
@@ -403,17 +406,22 @@ order, and `SimDynamoDbUpdateOperandParser` reads what a SET action assigns.
 The parts an update is made of split by what they know:
 
 - `SimDynamoDbUpdateTarget` is where an action writes. It is a document path that has been checked
-  for what an update can change, and it holds the attribute names rather than the segments, since a
-  list element path is refused.
+  for what an update can change: it starts at an attribute, since an item is a map, and what follows
+  may be attributes or list indexes.
 - `SimDynamoDbUpdateDocument` is the item being built. Nothing reads from it, which is what keeps
-  the snapshot rule true however the actions are ordered.
-- `SimDynamoDbUpdateOperand` is what a SET action assigns: a supplied value, a document path, or
-  `if_not_exists`. Update expressions have no literals, so every constant arrives through
-  `ExpressionAttributeValues`.
+  the snapshot rule true however the actions are ordered. Writing into it and taking things out of
+  it are a level at a time, in `sim-dynamodb-update-write.ts` and `sim-dynamodb-update-erase.ts`.
+- `SimDynamoDbUpdateOperand` is what a SET action assigns: a supplied value, a document path, a call
+  to `if_not_exists` or `list_append`, or two operands with one `+` or `-` between them. Update
+  expressions have no literals, so every constant arrives through `ExpressionAttributeValues`.
+- `SimDynamoDbAddAction` and `SimDynamoDbDeleteAction` are the two clauses that work from what is
+  stored rather than replacing it. What they share is in `sim-dynamodb-update-accumulate-values.ts`:
+  pairing the stored value with the one being applied, and the two refusals for when they do not go
+  together.
 
-The parts of an update expression real DynamoDB has and this simulation does not apply are refused
-rather than dropped, in `sim-dynamodb-update-refusal.ts`: the ADD and DELETE clauses, arithmetic,
-`list_append`, and list element paths.
+DynamoDB takes one operator between two operands, with no chaining and no brackets, so the operand
+parser reads one and refuses a second. That is a grammar rule rather than a simulation limit: real
+DynamoDB refuses `:a + :b + :c` as a syntax error too.
 
 `expression/projection/` is the other consumer. `readSimDynamoDbProjection` reads a
 `ProjectionExpression` and its names into a `SimDynamoDbProjection`, and `SimDynamoDbProjectionNode`

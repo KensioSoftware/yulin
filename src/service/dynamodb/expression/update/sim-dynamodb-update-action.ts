@@ -18,6 +18,12 @@ export interface SimDynamoDbUpdateAction {
   /** What this action does, for a refusal to name. */
   readonly verb: string;
 
+  /**
+   * Whether this action closes a list up as it applies, moving the elements
+   * after the one it takes out down.
+   */
+  readonly closesUpLists: boolean;
+
   applyTo(
     document: SimDynamoDbUpdateDocument,
     snapshot: SimDynamoDbItemSnapshot,
@@ -34,6 +40,7 @@ export interface SimDynamoDbUpdateAction {
 export class SimDynamoDbSetAction implements SimDynamoDbUpdateAction {
   public readonly target: SimDynamoDbUpdateTarget;
   public readonly verb = "update";
+  public readonly closesUpLists = false;
 
   private readonly operand: SimDynamoDbUpdateOperand;
 
@@ -71,6 +78,7 @@ export class SimDynamoDbSetAction implements SimDynamoDbUpdateAction {
 export class SimDynamoDbRemoveAction implements SimDynamoDbUpdateAction {
   public readonly target: SimDynamoDbUpdateTarget;
   public readonly verb = "remove";
+  public readonly closesUpLists = true;
 
   constructor(target: SimDynamoDbUpdateTarget) {
     this.target = target;
