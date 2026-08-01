@@ -40,6 +40,14 @@ import type {
   SimBatchWriteItemCommand,
   SimBatchWriteItemCommandOutput,
 } from "./command/batch/batch.command.js";
+import type {
+  SimTransactGetItemsCommand,
+  SimTransactGetItemsCommandOutput,
+  SimTransactWriteItemsCommand,
+  SimTransactWriteItemsCommandOutput,
+} from "./command/transact/transact.command.js";
+import { SimDynamoDbTransactGetItems } from "./command/transact/sim-dynamodb-transact-get-items.js";
+import { SimDynamoDbTransactWriteItems } from "./command/transact/sim-dynamodb-transact-write-items.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import type { SimAwsCaller } from "../aws/caller/sim-aws-caller.js";
 import {
@@ -77,6 +85,8 @@ export class SimDynamoDb {
   private readonly itemUpdates: SimDynamoDbUpdateItem;
   private readonly itemBatchWrites: SimDynamoDbBatchWriteItem;
   private readonly itemBatchReads: SimDynamoDbBatchGetItem;
+  private readonly itemTransactWrites: SimDynamoDbTransactWriteItems;
+  private readonly itemTransactReads: SimDynamoDbTransactGetItems;
   private readonly sdkRouter = new SimDynamoDatabaseSdkCommandRouter(this);
   private readonly cfnFactory = new SimDynamoDbCfnResourceFactory({
     dynamoDb: this,
@@ -116,6 +126,13 @@ export class SimDynamoDb {
       access: this.access,
     });
     this.itemBatchReads = new SimDynamoDbBatchGetItem({ access: this.access });
+    this.itemTransactWrites = new SimDynamoDbTransactWriteItems({
+      access: this.access,
+      clock: background,
+    });
+    this.itemTransactReads = new SimDynamoDbTransactGetItems({
+      access: this.access,
+    });
   }
 
   /**
@@ -227,6 +244,28 @@ export class SimDynamoDb {
   ): Promise<SimBatchGetItemCommandOutput> {
     await this.background.sequence();
     return this.itemBatchReads.handle(command, options);
+  }
+
+  /**
+   * Handle a Transact Write Items Command from the SDK.
+   */
+  async transactWriteItems(
+    command: SimTransactWriteItemsCommand,
+    options?: SimDynamoDbRequestOptions,
+  ): Promise<SimTransactWriteItemsCommandOutput> {
+    await this.background.sequence();
+    return this.itemTransactWrites.handle(command, options);
+  }
+
+  /**
+   * Handle a Transact Get Items Command from the SDK.
+   */
+  async transactGetItems(
+    command: SimTransactGetItemsCommand,
+    options?: SimDynamoDbRequestOptions,
+  ): Promise<SimTransactGetItemsCommandOutput> {
+    await this.background.sequence();
+    return this.itemTransactReads.handle(command, options);
   }
 
   /**

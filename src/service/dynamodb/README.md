@@ -50,6 +50,7 @@ Current command areas include:
 - `table/` (CreateTable, DescribeTable, ListTables and DeleteTable)
 - `item/` (PutItem, GetItem, DeleteItem, UpdateItem, and the structural types for the item commands)
 - `batch/` (BatchWriteItem and BatchGetItem)
+- `transact/` (TransactWriteItems and TransactGetItems)
 
 `table/` is the layout newer commands follow: one directory per group of related commands, with the
 structural command types in `table.command.ts`, the value and description shapes they are made of in
@@ -390,6 +391,63 @@ than written unconditionally.
 Scans, queries, indexes and streams are not implemented. Billing mode and provisioned capacity are
 read and stored by CreateTable, but nothing enforces them: no write is ever throttled.
 
+## TransactWriteItems and TransactGetItems behavior
+
+`SimDynamoDbTransactWriteItems` and `SimDynamoDbTransactGetItems` work on several items across
+several tables in one step, where either all of it happens or none of it does.
+
+Atomicity here follows from the order the work is done in rather than from unwinding a partial
+write:
+
+1. Everything that can be read without a table is read: the action count, which of the four actions
+   each entry carries, the items, the keys, the expressions and the request size.
+2. Every table is reached and the caller authorized against it. A transaction is authorized as the
+   operations it is made of, so each action carries its own `dynamodb:` action, and a ConditionCheck
+   needs `dynamodb:ConditionCheckItem`.
+3. Every key is marshalled through its table's key schema, which is both the key check and what
+   tells two actions on one item apart. Unlike a batch, one table may be named as often as the
+   request likes.
+4. Every action is checked against what is stored, and only then does the first of them write.
+
+The parts a transaction is made of split by what they know:
+
+- `SimDynamoDbTransactWrite` is one action, as the item or key it carries, the condition guarding
+  it, the IAM action it needs and what it does to a table. The four implementations are in
+  `sim-dynamodb-transact-put-action.ts`, `sim-dynamodb-transact-update-action.ts` and
+  `sim-dynamodb-transact-key-actions.ts`, which holds the delete and the condition check together
+  since both are a key and a condition against what is stored under it. Each file reads its own
+  action from the request, so what a Put requires lives with the Put.
+- `sim-dynamodb-transact-write.ts` reads one entry into one of those, refusing an entry carrying two
+  of the four or none of them.
+- `sim-dynamodb-transact-writes.ts` reads a whole `TransactItems`, applying the 100 action cap and
+  the 4 MB request size.
+- `sim-dynamodb-transact-gets.ts` does the same for a transactional read, reading each `Get`'s
+  `ProjectionExpression` through the same `readSimDynamoDbProjection` GetItem uses.
+- `reachSimDynamoDbTransactTables` is how both reach their tables, and where the one-action-per-item
+  rule is applied.
+- `sim-dynamodb-transact-cancellation.ts` is the check and the writing, in that order. It asks every
+  action whether it applies, turning a `SimDynamoDbConditionalCheckFailedException` into that
+  action's cancellation reason and leaving anything else to throw, since a request DynamoDB would
+  refuse is refused rather than cancelled. Only once every action has answered does the first of
+  them write.
+
+Every action is checked rather than stopping at the first failure, because a caller reads which of
+its actions failed out of `CancellationReasons`. The reasons line up with the request positionally,
+including the actions nothing was wrong with, which carry `None`.
+
+`SimDynamoDbTransactionTokens` is the idempotency of `ClientRequestToken`. It holds the payload a
+token was used with and when, so a replay inside ten minutes is answered without applying anything,
+and a replay with a different payload is refused. The window is measured on the simulated clock,
+which is why `SimDynamoDbTransactWriteItems` takes one. Only a transaction that was applied is
+recorded, since one that was cancelled never happened.
+
+The replay is checked after the request has been read and the caller authorized, rather than before.
+Real IAM evaluates a request before the service handles it, so a caller with no permission is
+refused whichever token it carries.
+
+A transactional read answers positionally too. `Responses` is never compacted: a key holding nothing
+gives an entry with no `Item`, where BatchGetItem leaves the item out altogether.
+
 ## Expressions
 
 `expression/` holds the parts every DynamoDB expression parameter is made of. Projections,
@@ -538,6 +596,16 @@ Current specialized errors:
   - used when a ConditionExpression did not hold, with the message real DynamoDB uses so SDK error
     handling matches. It carries the stored item when the request asked for it with
     `ReturnValuesOnConditionCheckFailure`.
+- `SimDynamoDbTransactionCanceledException`
+  - name: `TransactionCanceledException`
+  - HTTP status: `400`
+  - used when any action of a transactional write could not be applied. It carries
+    `CancellationReasons`, one per action and in request order, and lists the codes in its message
+    the way real DynamoDB does.
+- `SimDynamoDbIdempotentParameterMismatchException`
+  - name: `IdempotentParameterMismatchException`
+  - HTTP status: `400`
+  - used when a `ClientRequestToken` is replayed inside its window with a different request
 - `SimDynamoDbUnsupportedOperation`
   - name: `UnsupportedOperation`
   - HTTP status: `400`
@@ -563,6 +631,8 @@ Current uses:
   DELETING to gone.
 - `SimDynamoDbTable.putItem()` writes the item at once. A write a caller has been told about is a
   write that is there, so nothing about it waits on the scheduler.
+- `SimDynamoDbTransactionTokens` reads the scheduler's clock, which is what makes the ten minute
+  `ClientRequestToken` window something `simAws.clock().advanceBy(...)` can move past.
 
 Tests that need eventual state should call the broader sim AWS background-drain helper, for example:
 
