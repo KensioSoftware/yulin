@@ -1609,20 +1609,20 @@ Commands sent through the document one. See
 
 ### Which native types map to which descriptors
 
-| Written as                                        | Stored as | Read back as         |
-| ------------------------------------------------- | --------- | -------------------- |
-| `string`                                          | `S`       | `string`             |
-| `number`                                          | `N`       | `number`             |
-| `bigint`                                          | `N`       | `number` or `bigint` |
-| `NumberValue`                                     | `N`       | `number` or `bigint` |
-| `boolean`                                         | `BOOL`    | `boolean`            |
-| `null`                                            | `NULL`    | `null`               |
-| `Uint8Array`, `Buffer` and the other typed arrays | `B`       | `Uint8Array`         |
-| `Set` of strings                                  | `SS`      | `Set` of strings     |
-| `Set` of numbers or bigints                       | `NS`      | `Set` of numbers     |
-| `Set` of binary                                   | `BS`      | `Set` of binary      |
-| `Array`                                           | `L`       | `Array`              |
-| plain object, `Map`                               | `M`       | plain object         |
+| Written as                                        | Stored as | Read back as                |
+| ------------------------------------------------- | --------- | --------------------------- |
+| `string`                                          | `S`       | `string`                    |
+| `number`                                          | `N`       | `number`                    |
+| `bigint`                                          | `N`       | `number` or `bigint`        |
+| `NumberValue`                                     | `N`       | `number` or `bigint`        |
+| `boolean`                                         | `BOOL`    | `boolean`                   |
+| `null`                                            | `NULL`    | `null`                      |
+| `Uint8Array`, `Buffer` and the other typed arrays | `B`       | `Uint8Array`                |
+| `Set` of strings                                  | `SS`      | `Set` of strings            |
+| `Set` of numbers, bigints or `NumberValue`        | `NS`      | `Set` of numbers or bigints |
+| `Set` of binary                                   | `BS`      | `Set` of binary             |
+| `Array`                                           | `L`       | `Array`                     |
+| plain object, `Map`                               | `M`       | plain object                |
 
 A class instance is not converted. The real document client refuses one unless it was built with
 `convertClassInstanceToMap`, so an object with behaviour is not quietly flattened into attributes.

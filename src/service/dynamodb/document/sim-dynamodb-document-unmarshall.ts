@@ -84,8 +84,15 @@ export function simDynamoDbDocumentNativeValues(
   const native: Record<string, unknown> = {};
 
   for (const [name, value] of Object.entries(values)) {
-    // eslint-disable-next-line security/detect-object-injection -- an attribute name the table holds, copied into an object built here.
-    native[name] = simDynamoDbDocumentNativeValue(value, `${path}.${name}`);
+    // Defined rather than assigned, so an attribute named `__proto__` comes
+    // back as an ordinary attribute instead of reaching the prototype setter.
+    // The real document client assigns, and so loses that attribute.
+    Object.defineProperty(native, name, {
+      value: simDynamoDbDocumentNativeValue(value, `${path}.${name}`),
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
   }
 
   return native;

@@ -247,6 +247,48 @@ describe("simulated DynamoDB document client", () => {
     assertUndefined(read.Item);
   });
 
+  it("puts and deletes in one batch write", async () => {
+    // Given a table holding one item.
+    using simSdk = new SimSdk();
+    const documents = await interceptedDocuments(simSdk);
+
+    await documents.send(
+      new PutCommand({
+        TableName: "OrdersTable",
+        Item: { orderId: "order-1", total: 42 },
+      }),
+    );
+
+    // When one batch both writes another item and deletes that one.
+    await documents.send(
+      new BatchWriteCommand({
+        RequestItems: {
+          OrdersTable: [
+            { PutRequest: { Item: { orderId: "order-2", total: 7 } } },
+            { DeleteRequest: { Key: { orderId: "order-1" } } },
+          ],
+        },
+      }),
+    );
+
+    // Then both happened, so the two kinds of request are converted at the
+    // places each carries its values.
+    const read = await documents.send(
+      new BatchGetCommand({
+        RequestItems: {
+          OrdersTable: {
+            Keys: [{ orderId: "order-1" }, { orderId: "order-2" }],
+          },
+        },
+      }),
+    );
+
+    const items = read.Responses?.["OrdersTable"];
+    assertNonNullable(items);
+    assertArrayLength(items, 1);
+    assertObjectEquals(items[0], { orderId: "order-2", total: 7 });
+  });
+
   it("leaves a batch get key that holds nothing out of the answer", async () => {
     // Given a table holding one of the two items asked for.
     using simSdk = new SimSdk();

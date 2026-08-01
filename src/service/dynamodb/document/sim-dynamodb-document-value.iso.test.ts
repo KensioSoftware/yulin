@@ -22,30 +22,6 @@ import { SimSdk } from "../../../sdk/index.js";
 import { SimDynamoDbDocumentValueError } from "../error/dynamodb.error.js";
 
 /**
- * An intercepted document client over a table keyed by `id`.
- */
-async function interceptedDocuments(
-  simSdk: SimSdk,
-): Promise<DynamoDBDocumentClient> {
-  const documents = DynamoDBDocumentClient.from(
-    new DynamoDBClient({ region: "eu-west-2" }),
-  );
-  simSdk.intercept(documents);
-
-  await documents.send(
-    new CreateTableCommand({
-      TableName: "ValuesTable",
-      KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
-      AttributeDefinitions: [{ AttributeName: "id", AttributeType: "S" }],
-      BillingMode: "PAY_PER_REQUEST",
-    }),
-  );
-  await simSdk.simAws.backgroundTasksComplete();
-
-  return documents;
-}
-
-/**
  * Write one attribute natively and read the whole item back natively.
  */
 async function roundTrip(
@@ -86,6 +62,30 @@ async function storedAs(
     );
 
   return read.Item?.["value"];
+}
+
+/**
+ * An intercepted document client over a table keyed by `id`.
+ */
+async function interceptedDocuments(
+  simSdk: SimSdk,
+): Promise<DynamoDBDocumentClient> {
+  const documents = DynamoDBDocumentClient.from(
+    new DynamoDBClient({ region: "eu-west-2" }),
+  );
+  simSdk.intercept(documents);
+
+  await documents.send(
+    new CreateTableCommand({
+      TableName: "ValuesTable",
+      KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+      AttributeDefinitions: [{ AttributeName: "id", AttributeType: "S" }],
+      BillingMode: "PAY_PER_REQUEST",
+    }),
+  );
+  await simSdk.simAws.backgroundTasksComplete();
+
+  return documents;
 }
 
 describe("simulated DynamoDB document values", () => {
@@ -289,8 +289,8 @@ describe("simulated DynamoDB document numbers", () => {
   });
 
   it("rounds a stored decimal the way the document client rounds it", async () => {
-    // Given a decimal held exactly by the simulated table, written through the
-    // ordinary Command so nothing converts it.
+    // Given a decimal written through the document client as a NumberValue,
+    // which is what carries its digits through the conversion into the table.
     using simSdk = new SimSdk();
     const documents = await interceptedDocuments(simSdk);
     const digits = "1.2345678901234567890123456789";

@@ -8,10 +8,12 @@ import {
 import {
   DynamoDBDocumentClient,
   GetCommand,
+  NumberValue,
   PutCommand,
 } from "@aws-sdk/lib-dynamodb";
 import {
   assertArrayEquals,
+  assertIdentical,
   assertInstanceOf,
   assertObjectEquals,
   assertStringIncludes,
@@ -20,30 +22,6 @@ import {
 import { describe, it } from "vitest";
 import { SimSdk } from "../../../sdk/index.js";
 import { SimDynamoDbDocumentValueError } from "../error/dynamodb.error.js";
-
-/**
- * An intercepted document client over a table keyed by `id`.
- */
-async function interceptedDocuments(
-  simSdk: SimSdk,
-): Promise<DynamoDBDocumentClient> {
-  const documents = DynamoDBDocumentClient.from(
-    new DynamoDBClient({ region: "eu-west-2" }),
-  );
-  simSdk.intercept(documents);
-
-  await documents.send(
-    new CreateTableCommand({
-      TableName: "ValuesTable",
-      KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
-      AttributeDefinitions: [{ AttributeName: "id", AttributeType: "S" }],
-      BillingMode: "PAY_PER_REQUEST",
-    }),
-  );
-  await simSdk.simAws.backgroundTasksComplete();
-
-  return documents;
-}
 
 /**
  * Write one attribute natively and read the whole item back natively.
@@ -87,6 +65,30 @@ async function readNatively(
   );
 
   return read.Item?.["value"];
+}
+
+/**
+ * An intercepted document client over a table keyed by `id`.
+ */
+async function interceptedDocuments(
+  simSdk: SimSdk,
+): Promise<DynamoDBDocumentClient> {
+  const documents = DynamoDBDocumentClient.from(
+    new DynamoDBClient({ region: "eu-west-2" }),
+  );
+  simSdk.intercept(documents);
+
+  await documents.send(
+    new CreateTableCommand({
+      TableName: "ValuesTable",
+      KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+      AttributeDefinitions: [{ AttributeName: "id", AttributeType: "S" }],
+      BillingMode: "PAY_PER_REQUEST",
+    }),
+  );
+  await simSdk.simAws.backgroundTasksComplete();
+
+  return documents;
 }
 
 describe("simulated DynamoDB document value kinds", () => {
@@ -169,6 +171,75 @@ describe("simulated DynamoDB document value kinds", () => {
     assertObjectEquals(stored.Item?.["value"], {
       NS: ["9007199254740993", "2"],
     });
+  });
+
+  it("writes a Set of NumberValues as a number set", async () => {
+    // Given an item carrying a Set of decimals too long for a JavaScript
+    // number, which is the case NumberValue exists for.
+    using simSdk = new SimSdk();
+    const documents = await interceptedDocuments(simSdk);
+    const value = new Set([
+      NumberValue.from("1.2345678901234567890123456789"),
+      NumberValue.from("2.3456789012345678901234567890"),
+    ]);
+
+    await documents.send(
+      new PutCommand({ TableName: "ValuesTable", Item: { id: "a", value } }),
+    );
+
+    // When the descriptors are read.
+    const stored = await simSdk.simAws
+      .region("eu-west-2")
+      .dynamoDb()
+      .getItem(
+        new GetItemCommand({
+          TableName: "ValuesTable",
+          Key: { id: { S: "a" } },
+        }),
+      );
+
+    // Then every digit of every member survives.
+    assertObjectEquals(stored.Item?.["value"], {
+      NS: ["1.2345678901234567890123456789", "2.345678901234567890123456789"],
+    });
+  });
+
+  it("reads a number set member past the safe range back as a bigint", async () => {
+    // Given a table holding a number set with a member no JavaScript number
+    // carries exactly.
+    using simSdk = new SimSdk();
+    const documents = await interceptedDocuments(simSdk);
+
+    // When it is read through the document client.
+    const read = await readNatively(simSdk, documents, {
+      NS: ["9007199254740993", "2"],
+    });
+
+    // Then the large member is a bigint and the small one is a number, the
+    // same rule a single number attribute follows.
+    assertInstanceOf(read, Set);
+    assertArrayEquals([...read], [9_007_199_254_740_993n, 2]);
+  });
+
+  it("keeps an attribute named __proto__ as an ordinary attribute", async () => {
+    // Given a nested attribute with the one name that reaches an object's
+    // prototype when it is assigned rather than defined. The key is written
+    // out rather than named in the literal, since a literal `__proto__` sets
+    // the prototype instead of making an attribute.
+    using simSdk = new SimSdk();
+    const documents = await interceptedDocuments(simSdk);
+    const name = "__proto__";
+
+    // When it is written and read back.
+    const read = await roundTrip(documents, { [name]: "not a prototype" });
+
+    // Then it is still an attribute of its own, rather than having quietly
+    // become the object's prototype. The real document client assigns, and so
+    // loses it.
+    assertIdentical(
+      Object.getOwnPropertyDescriptor(read as object, name)?.value,
+      "not a prototype",
+    );
   });
 
   it("leaves a function out of a map, as the real client leaves it out", async () => {

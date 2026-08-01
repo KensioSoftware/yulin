@@ -1,20 +1,11 @@
 import type { SimDynamoDbAttributeValue } from "../command/item/item.types.js";
 import { SimDynamoDbDocumentValueError } from "../error/dynamodb.error.js";
 import { isSimDynamoDbDocumentBinary } from "./sim-dynamodb-document-binary.js";
-import { simDynamoDbDocumentNumberAttribute } from "./sim-dynamodb-document-number.js";
+import {
+  isSimDynamoDbDocumentNumberValue,
+  simDynamoDbDocumentNumberAttribute,
+} from "./sim-dynamodb-document-number.js";
 import { simDynamoDbDocumentSetAttribute } from "./sim-dynamodb-document-set.js";
-
-/**
- * A value carrying its own Number attribute, which is what lib-dynamodb's
- * `NumberValue` is.
- *
- * It is recognised by the method rather than by its class, since importing the
- * SDK from simulated AWS is not something this package does. That is also what
- * lets a `NumberValue` from a different copy of the SDK work here.
- */
-interface SimDynamoDbDocumentNumberValue {
-  toAttributeValue: () => { N: string };
-}
 
 /**
  * Read a native JavaScript value as the AttributeValue it stands for.
@@ -90,7 +81,7 @@ function scalar(value: unknown, path: string): SimDynamoDbAttributeValue {
     return simDynamoDbDocumentNumberAttribute(value, path);
   }
 
-  if (isNumberValue(value)) {
+  if (isSimDynamoDbDocumentNumberValue(value)) {
     return { N: value.toAttributeValue().N };
   }
 
@@ -139,11 +130,15 @@ function mapEntries(
 
     const key = String(name);
 
-    // eslint-disable-next-line security/detect-object-injection -- an attribute name the request wrote, copied into an object built here.
-    attributes[key] = simDynamoDbDocumentAttributeValue(
-      member,
-      `${path}.${key}`,
-    );
+    // Defined rather than assigned, so an attribute named `__proto__` becomes
+    // an ordinary attribute instead of reaching the prototype setter. The real
+    // document client assigns, and so loses that attribute.
+    Object.defineProperty(attributes, key, {
+      value: simDynamoDbDocumentAttributeValue(member, `${path}.${key}`),
+      enumerable: true,
+      writable: true,
+      configurable: true,
+    });
   }
 
   return attributes;
@@ -164,16 +159,4 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   const name = (value as { constructor?: { name?: string } }).constructor?.name;
 
   return name === "Object" || name === undefined;
-}
-
-/**
- * Whether a value carries its own Number attribute.
- */
-function isNumberValue(
-  value: unknown,
-): value is SimDynamoDbDocumentNumberValue {
-  return (
-    typeof (value as SimDynamoDbDocumentNumberValue).toAttributeValue ===
-    "function"
-  );
 }

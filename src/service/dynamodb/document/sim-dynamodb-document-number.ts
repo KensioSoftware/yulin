@@ -2,6 +2,32 @@ import type { SimDynamoDbAttributeValue } from "../command/item/item.types.js";
 import { SimDynamoDbDocumentValueError } from "../error/dynamodb.error.js";
 
 /**
+ * A value carrying its own Number attribute, which is what lib-dynamodb's
+ * `NumberValue` is.
+ *
+ * It is recognised by the method rather than by its class, since importing the
+ * SDK from simulated AWS is not something this package does. That is also what
+ * lets a `NumberValue` from a different copy of the SDK work here.
+ */
+export interface SimDynamoDbDocumentNumberValue {
+  toAttributeValue: () => { N: string };
+}
+
+/**
+ * Whether a value carries its own Number attribute.
+ */
+export function isSimDynamoDbDocumentNumberValue(
+  value: unknown,
+): value is SimDynamoDbDocumentNumberValue {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    typeof (value as SimDynamoDbDocumentNumberValue).toAttributeValue ===
+      "function"
+  );
+}
+
+/**
  * Read a JavaScript number as a Number attribute.
  *
  * The document client refuses a number outside the safe integer range rather
