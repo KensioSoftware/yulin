@@ -170,6 +170,76 @@ intercept only specific Commands, pass an allow list of Command classes or names
 `simSdk.intercept(s3Client, { commands: [GetObjectCommand] })`. Commands outside the allow list
 throw a diagnostic error.
 
+## The DynamoDB document client
+
+`@aws-sdk/lib-dynamodb` lets application code write `{ id: "a", count: 1 }` rather than
+`{ id: { S: "a" }, count: { N: "1" } }`. Intercept the document client and its Commands reach
+simulated DynamoDB with the values converted, so code written against it needs no changes to run
+against the simulator.
+
+```typescript sim-sdk-document-client
+/**
+ * An intercepted DynamoDB document client, writing plain JavaScript values.
+ */
+
+import { CreateTableCommand, DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import {
+  DynamoDBDocumentClient,
+  GetCommand,
+  PutCommand,
+} from "@aws-sdk/lib-dynamodb";
+
+import { SimSdk } from "@kensio/yulin/sdk";
+
+using simSdk = new SimSdk();
+
+const documents = DynamoDBDocumentClient.from(
+  new DynamoDBClient({ region: "eu-west-2" }),
+);
+
+// The document client is what gets intercepted, not the client it was built
+// from.
+simSdk.intercept(documents);
+
+// A document client forwards a Command it has no document form of, so the
+// table is created through the same client.
+await documents.send(
+  new CreateTableCommand({
+    TableName: "OrdersTable",
+    KeySchema: [{ AttributeName: "orderId", KeyType: "HASH" }],
+    AttributeDefinitions: [{ AttributeName: "orderId", AttributeType: "S" }],
+    BillingMode: "PAY_PER_REQUEST",
+  }),
+);
+await simSdk.simAws.backgroundTasksComplete();
+
+await documents.send(
+  new PutCommand({
+    TableName: "OrdersTable",
+    Item: { orderId: "order-1", total: 42, paid: true },
+  }),
+);
+
+const read = await documents.send(
+  new GetCommand({ TableName: "OrdersTable", Key: { orderId: "order-1" } }),
+);
+
+console.log(read.Item?.["total"]); // 42
+console.log(read.Item?.["paid"]); // true
+```
+
+`DynamoDBDocumentClient.from(client)` builds a separate object rather than wrapping the client in
+place, and that object is not an instance of `DynamoDBClient`. Intercepting the base client
+therefore does nothing for Commands sent through the document client. Intercept the document
+client. Both can be intercepted at once, and they reach the same simulated tables, since the
+document client shares the base client's config and so resolves the same Account and Region.
+
+The real document client converts values in middleware, which runs inside the `send` that
+interception replaces. So the conversion happens at the interception boundary instead, using the
+option defaults `lib-dynamodb` sets rather than the `util-dynamodb` ones. Which native types map to
+which descriptors is in
+[the sim DynamoDB docs](../services/dynamodb/README.md#the-document-client).
+
 ## Supported services and Commands
 
 All simulated services support SDK interception: ACM, CloudFormation, CloudFront, Cognito, DynamoDB,
@@ -192,3 +262,8 @@ Both kinds of gap are refused on send rather than misbehaving silently, with a d
 - Simulated errors carry SDK-shaped `name` and `$metadata`, but are not instances of the real SDK
   exception classes: match errors with `error.name`, not `instanceof`.
 - The callback form of `send(command, callback)` is not supported; use the promise form.
+- The translate config a document client is built with,
+  `DynamoDBDocumentClient.from(client, { marshallOptions, unmarshallOptions })`, is not read. The
+  conversion always uses the defaults, so `removeUndefinedValues: true` in particular does not
+  apply: an `undefined` attribute is refused here where AWS would have dropped it. The refusal names
+  the attribute and says so.

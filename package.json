@@ -132,6 +132,7 @@
     "@aws-sdk/client-sqs": "^3.1097.0",
     "@aws-sdk/client-ssm": "^3.1095.0",
     "@aws-sdk/client-sts": "^3.1095.0",
+    "@aws-sdk/lib-dynamodb": "^3.1100.0",
     "@aws-sdk/s3-request-presigner": "^3.1095.0",
     "@eslint/js": "^10.0.1",
     "@kensio/smartass": "^1.34.0",

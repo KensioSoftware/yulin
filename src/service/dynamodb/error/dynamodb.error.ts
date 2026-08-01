@@ -126,6 +126,24 @@ export class SimDynamoDbIdempotentParameterMismatchException extends SimDynamoDb
 }
 
 /**
+ * Simulated DynamoDB DocumentValueError.
+ *
+ * Real DynamoDB has no error of this name, and neither does the real document
+ * client, which refuses a value it cannot convert with a plain Error. It is
+ * what the simulated document client layer refuses one with, before the request
+ * reaches the simulated service, which is where the real one refuses it too.
+ *
+ * The message names the path the value sits at, which the real one does not.
+ */
+export class SimDynamoDbDocumentValueError extends SimDynamoDbError {
+  public override readonly name = "DocumentValueError";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
  * Simulated DynamoDB UnsupportedOperation error.
  *
  * Real DynamoDB has no error of this name. It is what simulated DynamoDB

@@ -1523,6 +1523,125 @@ one member and are refused as a duplicate.
 Lists and maps nest up to 32 levels, and one item is at most 400 KB counting its attribute names as
 well as its values. Both are `ValidationException` when exceeded.
 
+## The document client
+
+`@aws-sdk/lib-dynamodb` takes plain JavaScript values in place of AttributeValues. Intercept a
+`DynamoDBDocumentClient` and its Commands reach simulated DynamoDB with the values converted, so
+code written against the document client runs against the simulator unchanged.
+
+```typescript sim-dynamodb-document-client
+/**
+ * Reading and writing items as plain JavaScript with the document client.
+ */
+
+import { CreateTableCommand, DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import {
+  DynamoDBDocumentClient,
+  GetCommand,
+  PutCommand,
+  UpdateCommand,
+} from "@aws-sdk/lib-dynamodb";
+
+import { SimSdk } from "@kensio/yulin/sdk";
+
+using simSdk = new SimSdk();
+
+const documents = DynamoDBDocumentClient.from(
+  new DynamoDBClient({ region: "eu-west-2" }),
+);
+simSdk.intercept(documents);
+
+await documents.send(
+  new CreateTableCommand({
+    TableName: "OrdersTable",
+    KeySchema: [{ AttributeName: "orderId", KeyType: "HASH" }],
+    AttributeDefinitions: [{ AttributeName: "orderId", AttributeType: "S" }],
+    BillingMode: "PAY_PER_REQUEST",
+  }),
+);
+await simSdk.simAws.backgroundTasksComplete();
+
+// Nested objects, lists and Sets all go in as themselves.
+await documents.send(
+  new PutCommand({
+    TableName: "OrdersTable",
+    Item: {
+      orderId: "order-1",
+      total: 42,
+      paid: false,
+      lines: [{ sku: "widget", quantity: 2 }],
+      tags: new Set(["priority", "gift"]),
+    },
+  }),
+);
+
+const updated = await documents.send(
+  new UpdateCommand({
+    TableName: "OrdersTable",
+    Key: { orderId: "order-1" },
+    UpdateExpression: "SET paid = :paid",
+    ExpressionAttributeValues: { ":paid": true },
+    ReturnValues: "ALL_NEW",
+  }),
+);
+
+console.log(updated.Attributes?.["paid"]); // true
+
+const read = await documents.send(
+  new GetCommand({ TableName: "OrdersTable", Key: { orderId: "order-1" } }),
+);
+
+const lines = read.Item?.["lines"] as { sku: string; quantity: number }[];
+console.log(lines[0]?.quantity); // 2
+
+const tags = read.Item?.["tags"] as Set<string>;
+console.log(tags.has("priority")); // true
+```
+
+`PutCommand`, `GetCommand`, `DeleteCommand`, `UpdateCommand`, `BatchWriteCommand` and
+`BatchGetCommand` are converted. A document Command with no route here, such as
+`TransactWriteCommand`, is refused by name before anything tries to convert its values.
+
+Intercept the document client itself. `DynamoDBDocumentClient.from(client)` builds a separate object
+that is not an instance of `DynamoDBClient`, so intercepting the base client does nothing for
+Commands sent through the document one. See
+[the SDK docs](../../sdk/README.md#the-dynamodb-document-client).
+
+### Which native types map to which descriptors
+
+| Written as                                        | Stored as | Read back as         |
+| ------------------------------------------------- | --------- | -------------------- |
+| `string`                                          | `S`       | `string`             |
+| `number`                                          | `N`       | `number`             |
+| `bigint`                                          | `N`       | `number` or `bigint` |
+| `NumberValue`                                     | `N`       | `number` or `bigint` |
+| `boolean`                                         | `BOOL`    | `boolean`            |
+| `null`                                            | `NULL`    | `null`               |
+| `Uint8Array`, `Buffer` and the other typed arrays | `B`       | `Uint8Array`         |
+| `Set` of strings                                  | `SS`      | `Set` of strings     |
+| `Set` of numbers or bigints                       | `NS`      | `Set` of numbers     |
+| `Set` of binary                                   | `BS`      | `Set` of binary      |
+| `Array`                                           | `L`       | `Array`              |
+| plain object, `Map`                               | `M`       | plain object         |
+
+A class instance is not converted. The real document client refuses one unless it was built with
+`convertClassInstanceToMap`, so an object with behaviour is not quietly flattened into attributes.
+
+### Numbers through the document client
+
+A simulated table holds a number's digits exactly, but the document client converts to and from
+JavaScript numbers, and that is where digits are lost. It is the same loss AWS has, so a test that
+passes here is telling you something true about the real thing.
+
+- Writing a `number` outside the safe integer range is refused rather than stored already rounded.
+  Write a `bigint`, or a `NumberValue` from `@aws-sdk/lib-dynamodb`, to keep the digits.
+- Reading a stored number outside the safe integer range gives a `bigint`.
+- Reading a stored decimal with more digits than a JavaScript number carries gives a rounded
+  `number`. The table still holds every digit; the rounding is the document client's. Read through
+  an ordinary `GetItemCommand` to see the stored digits.
+- Reading a stored number that is outside the safe integer range and is not whole is refused, since
+  there is nothing to answer with.
+
 ## Table names and ARNs
 
 A table name is 3 to 255 characters of letters, numbers, underscores, hyphens and periods. The name
@@ -1724,9 +1843,21 @@ nothing is written.
   table name, `Fn::GetAtt … Arn` the table ARN, `TimeToLiveSpecification` deploying a table that
   expires items, and `Tags` deploying a tagged table.
 - SDK interception, so an intercepted `DynamoDBClient` reaches the simulation.
+- The `@aws-sdk/lib-dynamodb` document client, with `PutCommand`, `GetCommand`, `DeleteCommand`,
+  `UpdateCommand`, `BatchWriteCommand` and `BatchGetCommand` converting native JavaScript values on
+  the way in and out.
 
 ## Limitations
 
+- The document client's `Query`, `Scan`, transaction and PartiQL Commands are not converted, since
+  the first two are operations this simulation does not have yet. `TransactWriteCommand` and
+  `TransactGetCommand` are the exception: the operations behind them are simulated, so only the
+  document form is missing. All of them are refused by name rather than half converted.
+- A document client's translate config is not read, so the marshalling options it was built with do
+  not apply. See [the SDK docs](../../sdk/README.md#limitations).
+- `Expected`, `ConditionalOperator` and `AttributeUpdates` are not converted for the document
+  client, because simulated DynamoDB refuses all three anyway. A request carrying one is refused by
+  the operation rather than by the conversion.
 - Global and local secondary indexes are not simulated. `GlobalSecondaryIndexes` and
   `LocalSecondaryIndexes` are refused rather than dropped, since a table missing an index it was
   asked for would answer queries differently to the real one. An empty list asks for no index, so it
