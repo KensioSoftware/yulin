@@ -1289,6 +1289,157 @@ These are the rules a request is held to, each a `ValidationException`:
 them. A query reads one item collection, which sits under one partition key and so inside one
 segment.
 
+## Filtering a read
+
+`FilterExpression` drops items a `Query` or a `Scan` read. It is the same grammar a
+[conditional write](#conditional-writes) is guarded by, evaluated against each item the read
+reached.
+
+It runs after the read rather than during it, and that order is what the counts report. The walk is
+cut at the `Limit` first, and the filter then drops items from the page that came back.
+`ScannedCount` is how many items the read evaluated, and `Count` how many of those survived.
+
+```typescript sim-dynamodb-query-filter
+/**
+ * Reading a customer's open orders, and counting what that cost.
+ */
+
+import {
+  CreateTableCommand,
+  PutItemCommand,
+  QueryCommand,
+} from "@aws-sdk/client-dynamodb";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const dynamoDb = simAws.dynamoDb();
+
+await dynamoDb.createTable(
+  new CreateTableCommand({
+    TableName: "OrdersTable",
+    KeySchema: [
+      { AttributeName: "customerId", KeyType: "HASH" },
+      { AttributeName: "orderId", KeyType: "RANGE" },
+    ],
+    AttributeDefinitions: [
+      { AttributeName: "customerId", AttributeType: "S" },
+      { AttributeName: "orderId", AttributeType: "S" },
+    ],
+    BillingMode: "PAY_PER_REQUEST",
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+const orders = [
+  { orderId: "2026-01", status: "OPEN" },
+  { orderId: "2026-02", status: "SHIPPED" },
+  { orderId: "2026-03", status: "OPEN" },
+  { orderId: "2026-04", status: "SHIPPED" },
+];
+
+for (const order of orders) {
+  await dynamoDb.putItem(
+    new PutItemCommand({
+      TableName: "OrdersTable",
+      Item: {
+        customerId: { S: "c-1" },
+        orderId: { S: order.orderId },
+        status: { S: order.status },
+      },
+    }),
+  );
+}
+
+const page = await dynamoDb.query(
+  new QueryCommand({
+    TableName: "OrdersTable",
+    KeyConditionExpression: "customerId = :customer",
+    FilterExpression: "#status = :open",
+    ExpressionAttributeNames: { "#status": "status" },
+    ExpressionAttributeValues: {
+      ":customer": { S: "c-1" },
+      ":open": { S: "OPEN" },
+    },
+    Limit: 3,
+  }),
+);
+
+console.log(page.Items?.map((item) => item["orderId"]?.S));
+// [ "2026-01", "2026-03" ]
+
+// Three items were read, and two of them survived the filter.
+console.log(page.ScannedCount); // 3
+console.log(page.Count); // 2
+
+// There is more to read, even though the page came back shorter than the Limit.
+console.log(page.LastEvaluatedKey?.["orderId"]?.S); // "2026-03"
+
+// Select COUNT counts the same read and answers with no items at all.
+const counted = await dynamoDb.query(
+  new QueryCommand({
+    TableName: "OrdersTable",
+    KeyConditionExpression: "customerId = :customer",
+    FilterExpression: "#status = :open",
+    ExpressionAttributeNames: { "#status": "status" },
+    ExpressionAttributeValues: {
+      ":customer": { S: "c-1" },
+      ":open": { S: "OPEN" },
+    },
+    Select: "COUNT",
+  }),
+);
+
+console.log(counted.Count); // 2
+console.log(counted.ScannedCount); // 4
+console.log(counted.Items); // undefined
+```
+
+A filter saves nothing. Every item it drops was read, so a filtered query is charged for what it
+threw away on AWS.
+
+A `Count` below the `Limit` therefore says nothing about whether the collection is exhausted. A page
+can even come back with no items at all and a `LastEvaluatedKey`, when the filter dropped every item
+on it. Loop until the token is gone rather than until a page looks short or empty.
+
+An item that does not have what the filter points at fails it. `status = :open` drops an item with no
+`status`, the same way a condition on a write does not hold for an attribute that is not there.
+
+### What a filter may name
+
+A `Query` filter may not name a key attribute, and a `Scan` filter may name any attribute at all. A
+query has already narrowed the read by its `KeyConditionExpression`, so a filter on the partition key
+or the sort key is either that condition written twice or a condition the key condition should have
+carried. Real DynamoDB refuses it as a `ValidationException`, and so does this. A scan narrows
+nothing, so there a key attribute is an attribute like any other.
+
+The rule is about where a path starts, so `details.customerId` is allowed on a query with a
+`customerId` partition key: it names an attribute of a map rather than the key. Writing the key
+attribute as an `ExpressionAttributeNames` placeholder does not get past it either.
+
+The key condition and the filter share one set of placeholders. A `#name` or `:value` either of them
+uses counts as used, and one neither uses is refused the way an unused placeholder always is.
+
+### Counting and projecting with Select
+
+`Select` says which attributes a read answers with. A table read defaults to `ALL_ATTRIBUTES`, which
+is whole items.
+
+`COUNT` answers with `Count` and `ScannedCount` and no `Items` at all, as at the end of the example
+above. It reads and filters the same items, and leaves them out of the response. `Limit` and
+`LastEvaluatedKey` page a counted read the same way.
+
+The other two values are held to the rules AWS holds them to, each a `ValidationException`:
+
+- `SPECIFIC_ATTRIBUTES` needs a `ProjectionExpression` to name what to answer with.
+- a `ProjectionExpression` alongside any `Select` other than `SPECIFIC_ATTRIBUTES`. That one is the
+  `Select` that projects. Writing a `ProjectionExpression` and no `Select` at all is fine.
+- `ALL_PROJECTED_ATTRIBUTES` without an `IndexName`. It asks for the attributes an index projects,
+  and a table read has no index to project from.
+
+Projecting a `Query` or a `Scan` is not simulated, so `SPECIFIC_ATTRIBUTES` gets as far as the
+`ProjectionExpression` refusal rather than being accepted with nothing to project.
+
 ## Reading and writing items in batches
 
 `BatchWriteItem` puts and deletes items across tables in one call, and `BatchGetItem` reads them by
@@ -2212,6 +2363,10 @@ nothing is written.
   `ScanIndexForward`, and `Limit`, `LastEvaluatedKey` and `ExclusiveStartKey` paging.
 - `Scan`, reading every item in a table with the same paging, and `Segment` and `TotalSegments`
   dividing a table between parallel workers.
+- `FilterExpression` on `Query` and `Scan`, applied after the `Limit` so that `ScannedCount` counts
+  what was read and `Count` what survived, and refused on a `Query` when it names a key attribute.
+- `Select` on `Query` and `Scan`, with `COUNT` answering with counts alone and the rules tying
+  `SPECIFIC_ATTRIBUTES`, `ALL_PROJECTED_ATTRIBUTES` and a projection together.
 - `ConditionExpression` on `PutItem`, `DeleteItem` and `UpdateItem`, with the six comparators, `BETWEEN`, `IN`,
   `AND`, `OR`, `NOT`, brackets, and the `attribute_exists`, `attribute_not_exists`, `attribute_type`,
   `begins_with`, `contains` and `size` functions.
@@ -2327,16 +2482,11 @@ nothing is written.
   DynamoDB accepts it. The shape of a key condition is fixed, so there is nothing for brackets to
   group, and being stricter is the direction that fails safely: it is a puzzling refusal here rather
   than a query that means something different on AWS.
-- `IndexName`, `FilterExpression`, `ProjectionExpression` and `Select` are refused on `Query` and on
-  `Scan`, since each of them changes which items the operation answers with or which parts of them.
-  `Select` naming `ALL_ATTRIBUTES` is the default a table read already behaves as, so it is accepted.
-  Scanning a secondary index goes with the indexes themselves, which are not simulated.
-- `ExpressionAttributeNames` and `ExpressionAttributeValues` on a `Scan` are refused as unsimulated
-  input, where real DynamoDB calls placeholders with no expression to use them a
-  `ValidationException`. Every expression a scan can carry is refused already, so the request fails
-  either way, and naming the parameter is more use than matching the error class.
-- `Count` and `ScannedCount` are always the same number. They differ only when a `FilterExpression`
-  drops items a query or scan evaluated, and filters are not simulated.
+- `IndexName` and `ProjectionExpression` are refused on `Query` and on `Scan`, since each of them
+  changes which items the operation answers with or which parts of them. Reading a secondary index
+  goes with the indexes themselves, which are not simulated.
+- A `Query` filter is held to the table's key schema, since indexes are not simulated. Which
+  attributes a filter may name on an index read is settled when index reads land.
 - `UnprocessedItems` and `UnprocessedKeys` are always empty. Nothing here is throttled and no
   response stops at a size, so the branch of a batch retry loop that resends what did not go through
   is never taken against the simulator.
@@ -2375,8 +2525,7 @@ nothing is written.
   whether a request sets it once for a read or per table for a batch read, so a test cannot observe a
   stale read here the way it might against a real table.
 - Condition expressions are simulated on `PutItem`, `DeleteItem`, `UpdateItem` and the actions of
-  `TransactWriteItems`, and key conditions on `Query`. Filter expressions are not implemented yet, on
-  either `Query` or `Scan`.
+  `TransactWriteItems`, key conditions on `Query`, and filters on `Query` and `Scan`.
 - Two update actions cannot write to overlapping paths, so `ADD tags :added DELETE tags :gone` in one
   expression is refused as it is on AWS. Taking members out of a set an expression also adds to is a
   second update.

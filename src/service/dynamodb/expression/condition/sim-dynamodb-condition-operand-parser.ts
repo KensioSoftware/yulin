@@ -1,4 +1,5 @@
 import type { SimDynamoDbValue } from "../../item/sim-dynamodb-value.js";
+import type { SimDynamoDbDocumentPath } from "../sim-dynamodb-document-path.js";
 import { SimDynamoDbDocumentPathParser } from "../sim-dynamodb-document-path-parser.js";
 import type { SimDynamoDbExpressionPlaceholders } from "../sim-dynamodb-expression-placeholders.js";
 import type { SimDynamoDbExpressionTokens } from "../sim-dynamodb-expression-tokens.js";
@@ -33,11 +34,23 @@ export class SimDynamoDbConditionOperandParser {
   private readonly tokens: SimDynamoDbExpressionTokens;
   private readonly names: SimDynamoDbExpressionPlaceholders<string>;
   private readonly values: SimDynamoDbExpressionPlaceholders<SimDynamoDbValue>;
+  private readonly read: SimDynamoDbDocumentPath[] = [];
 
   constructor(properties: SimDynamoDbConditionOperandParserProperties) {
     this.tokens = properties.tokens;
     this.names = properties.names;
     this.values = properties.values;
+  }
+
+  /**
+   * Every place in the item the expression named, in the order it named them.
+   *
+   * A condition on a write has no use for these, since it is checked against
+   * one item the request already named. A filter does: which attributes it
+   * names is what a query is held to.
+   */
+  get paths(): readonly SimDynamoDbDocumentPath[] {
+    return this.read;
   }
 
   /**
@@ -115,11 +128,13 @@ export class SimDynamoDbConditionOperandParser {
    * Read a document path, which is what an operand is when it is nothing else.
    */
   private path(): SimDynamoDbPathOperand {
-    return new SimDynamoDbPathOperand(
-      new SimDynamoDbDocumentPathParser({
-        tokens: this.tokens,
-        names: this.names,
-      }).parse(),
-    );
+    const path = new SimDynamoDbDocumentPathParser({
+      tokens: this.tokens,
+      names: this.names,
+    }).parse();
+
+    this.read.push(path);
+
+    return new SimDynamoDbPathOperand(path);
   }
 }

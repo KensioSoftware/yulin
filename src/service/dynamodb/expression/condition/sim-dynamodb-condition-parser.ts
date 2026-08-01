@@ -1,4 +1,5 @@
 import type { SimDynamoDbValue } from "../../item/sim-dynamodb-value.js";
+import type { SimDynamoDbDocumentPath } from "../sim-dynamodb-document-path.js";
 import type { SimDynamoDbExpressionPlaceholders } from "../sim-dynamodb-expression-placeholders.js";
 import type { SimDynamoDbExpressionTokens } from "../sim-dynamodb-expression-tokens.js";
 import {
@@ -30,6 +31,7 @@ interface SimDynamoDbConditionParserProperties {
  */
 export class SimDynamoDbConditionParser {
   private readonly tokens: SimDynamoDbExpressionTokens;
+  private readonly operands: SimDynamoDbConditionOperandParser;
   private readonly comparisons: SimDynamoDbConditionComparisonParser;
   private readonly functions: SimDynamoDbConditionFunctionParser;
 
@@ -41,6 +43,7 @@ export class SimDynamoDbConditionParser {
     });
 
     this.tokens = properties.tokens;
+    this.operands = operands;
     this.comparisons = new SimDynamoDbConditionComparisonParser({
       tokens: properties.tokens,
       operands,
@@ -49,6 +52,13 @@ export class SimDynamoDbConditionParser {
       tokens: properties.tokens,
       operands,
     });
+  }
+
+  /**
+   * Every place in the item the expression named.
+   */
+  get paths(): readonly SimDynamoDbDocumentPath[] {
+    return this.operands.paths;
   }
 
   /**

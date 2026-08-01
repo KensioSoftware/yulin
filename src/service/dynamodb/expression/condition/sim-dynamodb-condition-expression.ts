@@ -1,8 +1,7 @@
 import type { SimDynamoDbExpressionParameterInput } from "../sim-dynamodb-expression-parameters.js";
 import { SimDynamoDbExpressionParameters } from "../sim-dynamodb-expression-parameters.js";
-import { SimDynamoDbExpressionTokens } from "../sim-dynamodb-expression-tokens.js";
 import type { SimDynamoDbCondition } from "./sim-dynamodb-condition.js";
-import { SimDynamoDbConditionParser } from "./sim-dynamodb-condition-parser.js";
+import { simDynamoDbConditionParser } from "./sim-dynamodb-condition-grammar.js";
 
 const expressionName = "ConditionExpression";
 
@@ -49,13 +48,9 @@ export function parseSimDynamoDbCondition(
   expression: string,
   parameters: SimDynamoDbExpressionParameters,
 ): SimDynamoDbCondition {
-  return new SimDynamoDbConditionParser({
-    tokens: SimDynamoDbExpressionTokens.of(
-      expressionName,
-      expression,
-      "the expression says nothing, and an expression cannot be empty",
-    ),
-    names: parameters.names,
-    values: parameters.values,
-  }).parse();
+  return simDynamoDbConditionParser(
+    expressionName,
+    expression,
+    parameters,
+  ).parse();
 }

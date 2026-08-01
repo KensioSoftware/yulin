@@ -37,9 +37,9 @@ interface SimDynamoDbItemPageProperties {
  * One page of items, as a Query hands them out.
  *
  * `Limit` counts the items a walk evaluated rather than the items it answers
- * with, which is the same number here because nothing filters a query yet. The
- * distinction matters once `FilterExpression` arrives, and the walk is written
- * around evaluation so it keeps meaning the same thing.
+ * with. A page is cut here and filtered afterwards, which is what makes
+ * `ScannedCount` the items the read evaluated and lets a filtered page come
+ * back shorter than the limit, or empty.
  *
  * `LastEvaluatedKey` is there whenever the walk stopped at the limit, including
  * when it stopped on the last matching item. A caller looping until the token

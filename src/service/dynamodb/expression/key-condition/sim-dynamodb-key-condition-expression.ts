@@ -1,6 +1,8 @@
 import { SimDynamoDbValidationException } from "../../error/dynamodb.error.js";
-import type { SimDynamoDbExpressionParameterInput } from "../sim-dynamodb-expression-parameters.js";
-import { SimDynamoDbExpressionParameters } from "../sim-dynamodb-expression-parameters.js";
+import type {
+  SimDynamoDbExpressionParameterInput,
+  SimDynamoDbExpressionParameters,
+} from "../sim-dynamodb-expression-parameters.js";
 import { SimDynamoDbExpressionTokens } from "../sim-dynamodb-expression-tokens.js";
 import { keyConditionExpressionName } from "./sim-dynamodb-key-condition-error.js";
 import { SimDynamoDbKeyConditionParser } from "./sim-dynamodb-key-condition-parser.js";
@@ -16,9 +18,14 @@ interface SimDynamoDbKeyConditionRequest extends SimDynamoDbExpressionParameterI
  * A query names one item collection, so unlike every other expression parameter
  * this one is required rather than optional: a request without it is asking for
  * a scan.
+ *
+ * The placeholders are passed in rather than gathered here, since a query can
+ * carry a filter alongside its key condition and both draw on the same ones.
+ * They are checked once every expression on the request has been read.
  */
 export function readSimDynamoDbKeyCondition(
   request: SimDynamoDbKeyConditionRequest,
+  parameters: SimDynamoDbExpressionParameters,
 ): SimDynamoDbKeyConditionTerms {
   const expression = request.KeyConditionExpression;
 
@@ -29,7 +36,6 @@ export function readSimDynamoDbKeyCondition(
     );
   }
 
-  const parameters = new SimDynamoDbExpressionParameters(request);
   const terms = new SimDynamoDbKeyConditionParser({
     tokens: SimDynamoDbExpressionTokens.of(
       keyConditionExpressionName,
@@ -39,8 +45,6 @@ export function readSimDynamoDbKeyCondition(
     names: parameters.names,
     values: parameters.values,
   }).parse();
-
-  parameters.assertAllUsed();
 
   return new SimDynamoDbKeyConditionTerms(terms);
 }
