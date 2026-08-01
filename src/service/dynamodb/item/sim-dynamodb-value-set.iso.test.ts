@@ -31,7 +31,7 @@ describe("SimDynamoDbItem sets", () => {
     // When a string set carries something that is not a string.
     const error = assertThrowsError(() =>
       roundTrip({
-        colours: { SS: ["purple", 7] as unknown as readonly string[] },
+        colours: { SS: ["purple", 7] as unknown as string[] },
       }),
     );
 

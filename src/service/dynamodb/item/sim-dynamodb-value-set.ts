@@ -49,7 +49,7 @@ function membersOf(
     );
   }
 
-  return members as readonly unknown[];
+  return members;
 }
 
 /**

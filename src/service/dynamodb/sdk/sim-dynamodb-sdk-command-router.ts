@@ -15,6 +15,7 @@ import type {
   SimPutItemCommand,
   SimUpdateItemCommand,
 } from "../command/item/item.command.js";
+import type { SimQueryCommand } from "../command/query/query.command.js";
 import type {
   SimBatchGetItemCommand,
   SimBatchWriteItemCommand,
@@ -32,6 +33,7 @@ import type {
   SimDescribeTimeToLiveCommand,
   SimUpdateTimeToLiveCommand,
 } from "../command/time-to-live/time-to-live.command.js";
+import { refuseSimDynamoDbDocumentCommand } from "../document/sim-dynamodb-document-command.js";
 import { simDynamoDbDocumentRoutes } from "../document/sim-dynamodb-document-routes.js";
 import type { SimDynamoDb as SimDynamoDatabase } from "../sim-dynamodb.js";
 
@@ -106,6 +108,19 @@ export class SimDynamoDatabaseSdkCommandRouter implements SimSdkCommandRouter {
             command as SimDeleteItemCommand,
             simSdkCallerOptions(context),
           ),
+      ],
+      [
+        "QueryCommand",
+        async (command, context): Promise<unknown> => {
+          // The document client names its Query the same as this one, so the
+          // Command name alone cannot tell them apart.
+          refuseSimDynamoDbDocumentCommand(command, "QueryCommand");
+
+          return await simDynamoDatabase.query(
+            command as SimQueryCommand,
+            simSdkCallerOptions(context),
+          );
+        },
       ],
       [
         "BatchWriteItemCommand",

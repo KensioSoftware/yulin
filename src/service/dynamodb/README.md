@@ -49,6 +49,7 @@ Current command areas include:
 - `authorize/` (shared IAM authorization for every DynamoDB command)
 - `table/` (CreateTable, DescribeTable, ListTables and DeleteTable)
 - `item/` (PutItem, GetItem, DeleteItem, UpdateItem, and the structural types for the item commands)
+- `query/` (Query)
 - `batch/` (BatchWriteItem and BatchGetItem)
 - `transact/` (TransactWriteItems and TransactGetItems)
 - `tag/` (TagResource, UntagResource and ListTagsOfResource)
@@ -384,6 +385,55 @@ c: 3 }` leaves `{ b: 1, c: 2 }`, which an implementation applying actions left t
   parts the expression touched by applying a `SimDynamoDbProjection` of the action targets, which is
   the same machinery a ProjectionExpression uses.
 
+## Query behavior
+
+`SimDynamoDbQuery` reads one item collection: the items under one partition key, in sort key order.
+It reaches its table the same way the item commands do, and authorizes `dynamodb:Query` before the
+lookup.
+
+The order it works in is the order the other commands follow, with one addition:
+
+1. `refuseUnsimulatedQueryInput` refuses the inputs this simulation does not model.
+2. `readSimDynamoDbKeyCondition` reads the `KeyConditionExpression`, before the table is reached, so
+   an expression DynamoDB would refuse is refused whether or not the table is there.
+3. The table is found and the caller authorized.
+4. `SimDynamoDbKeyConditionTerms.forTable` reads the terms against the table's key schema, which is
+   the part that could not be checked without it: which attribute is the partition key, and what type
+   the sort key is.
+5. The collection is gathered, walked, and cut to a page.
+
+The parts a query is made of split by what they know:
+
+- `expression/key-condition/` reads the expression. It is a closed grammar of its own rather than the
+  general condition grammar, for the reason in the Expressions section below.
+- `SimDynamoDbItemCollection` under `table/` is the items one key condition names, in sort key order.
+  A table holds its items in a map keyed by the marshalled primary key, which carries no order at
+  all, so a collection is gathered and ordered when it is read. `SimDynamoDbSortKeyOrder` is the
+  order itself, and is where a table with no sort key stops mattering: such a table holds at most one
+  item under a partition key, so every question about ordering has a trivial answer.
+- `SimDynamoDbItemPage` under `command/item/` is `Limit` and `LastEvaluatedKey`. It takes items and a
+  key schema rather than a query, so `Scan` can use it unchanged.
+- `readSimDynamoDbQueryStartKey` reads the `ExclusiveStartKey`. It goes through the table's own key
+  reading, so a token that is not a whole primary key is refused the way any Key is, and then checks
+  that it names the collection being read.
+
+Important behavior:
+
+- `ScanIndexForward` defaults to true. Setting it to false reads the collection backwards, and
+  resumes backwards too.
+- `Limit` counts the items a walk evaluated. Nothing filters a query yet, so that is also the number
+  it answers with, and `Count` and `ScannedCount` are the same.
+- `LastEvaluatedKey` is there whenever the walk stopped at the limit, including when it stopped on
+  the last matching item. A caller looping until the token is absent therefore reads one empty page
+  at the end, which is what real DynamoDB does: it cannot know the range is exhausted without looking
+  past it.
+- `ExclusiveStartKey` resumes exclusively, by comparing sort keys rather than by looking the item up,
+  so a token still works when the item it names has since been deleted. That is the same choice
+  `ListTables` and `ListTagsOfResource` make.
+- `IndexName`, `FilterExpression`, `ProjectionExpression` and `Select` are refused by name, since each
+  changes which items a query answers with or which parts of them. `Select: ALL_ATTRIBUTES` is the
+  default a table query already behaves as, so it is let through.
+
 ## BatchWriteItem and BatchGetItem behavior
 
 `SimDynamoDbBatchWriteItem` and `SimDynamoDbBatchGetItem` work on several items across several
@@ -428,8 +478,8 @@ A batch write takes no `ConditionExpression`, as a real one does not. `SimDynamo
 `SimDynamoDbDeleteRequest` declare one anyway, so a request carrying it is refused by name rather
 than written unconditionally.
 
-Scans, queries, indexes and streams are not implemented. Billing mode and provisioned capacity are
-read and stored by CreateTable, but nothing enforces them: no write is ever throttled.
+Scans, indexes and streams are not implemented. Billing mode and provisioned capacity are read and
+stored by CreateTable, but nothing enforces them: no write is ever throttled.
 
 ## TransactWriteItems and TransactGetItems behavior
 
@@ -530,12 +580,39 @@ precedence DynamoDB documents is the shape of the class rather than a table some
 and the function calls have parsers of their own, because deciding whether `size` is a call or an
 attribute named `size` is a different job from deciding whether an OR binds looser than an AND.
 
-The comparison rules live in `item/sim-dynamodb-value-comparison.ts` rather than inside the
-evaluator, because sort key conditions and filter expressions compare the same way when `Query` and
-`Scan` arrive. Strings compare by UTF-8 bytes rather than by UTF-16 code units, numbers compare
-through `SimDynamoDbNumber.compareTo` so digits past what a JavaScript number holds still order
-correctly, and binary compares as unsigned bytes. Two values of different types have no order at all,
-which is what makes a comparison between them false rather than an error.
+The comparison rules live in `item/sim-dynamodb-value-comparison.ts` and
+`item/sim-dynamodb-value-order.ts` rather than inside the evaluator, because a sort key condition
+compares the same way a condition expression does, and a filter expression will when `Scan` arrives.
+Strings compare by UTF-8 bytes rather than by UTF-16 code units, numbers compare through
+`SimDynamoDbNumber.compareTo` so digits past what a JavaScript number holds still order correctly,
+and binary compares as unsigned bytes. Two values of different types have no order at all, which is
+what makes a comparison between them false rather than an error. `simDynamoDbValueBeginsWith` in
+`item/sim-dynamodb-value-prefix.ts` is the same arrangement for a prefix, which `begins_with` asks
+for in both grammars.
+
+`expression/key-condition/` reads a KeyConditionExpression into the terms it is made of. It is a
+grammar of its own rather than a use of the condition parser, and deliberately so: sharing one parser
+would let a query accept `OR`, which real DynamoDB refuses in a key condition, and that is the kind
+of divergence that passes here and fails on deploy.
+
+The parts split by what they know:
+
+- `SimDynamoDbKeyConditionParser` reads the shape a key condition is allowed to take. It knows
+  nothing about which attribute is the partition key, since that belongs to the table.
+- `SimDynamoDbKeyConditionOperands` reads the three pieces every term is built from: the key
+  attribute, the comparator, and the value.
+- `SimDynamoDbKeyConditionRefusals` is what a key condition is refused for being rather than for what
+  it says: `OR`, `NOT`, brackets, a function that is not `begins_with`, and a dereferenced attribute.
+- The three terms are a class each, in `sim-dynamodb-comparison-key-term.ts`,
+  `sim-dynamodb-between-key-term.ts` and `sim-dynamodb-begins-with-key-term.ts`. Each knows what it
+  refuses: a BETWEEN whose bounds run backwards or are different types, and a `begins_with` against a
+  Number sort key. `assertUsableOn` is where a term is held to the type the table declared for the
+  key attribute, through the shared `assertSimDynamoDbKeyValueType`. A value of another type is
+  refused rather than matching nothing, since an empty page would read as a collection that happens
+  to hold nothing.
+- `SimDynamoDbKeyConditionTerms` holds the terms to the key schema once the table has been reached,
+  and answers with a `SimDynamoDbKeyCondition`: the partition key value whose collection is read, and
+  the run of it the sort key condition asks for.
 
 `SimDynamoDbConditionCheck` under `command/item/` is what PutItem and DeleteItem both use. It reads
 the expression before the table is reached, so an expression DynamoDB would refuse is refused

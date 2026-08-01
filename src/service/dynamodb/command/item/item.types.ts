@@ -1,5 +1,11 @@
 /**
  * Minimal structural sim DynamoDB AttributeValue.
+ *
+ * The arrays are mutable and `$unknown` is a mutable tuple, matching the shape
+ * the AWS SDK declares, so a value the simulator answers with can be passed
+ * straight back into an SDK Command. That is what a paging loop does with a
+ * `LastEvaluatedKey`, and a readonly array here would make the SDK's own types
+ * refuse it.
  */
 export type SimDynamoDbAttributeValue =
   | {
@@ -27,7 +33,7 @@ export type SimDynamoDbAttributeValue =
       readonly SS?: never;
     }
   | {
-      readonly BS: readonly Uint8Array[];
+      readonly BS: Uint8Array[];
       readonly B?: never;
       readonly BOOL?: never;
       readonly L?: never;
@@ -39,7 +45,7 @@ export type SimDynamoDbAttributeValue =
       readonly SS?: never;
     }
   | {
-      readonly L: readonly SimDynamoDbAttributeValue[];
+      readonly L: SimDynamoDbAttributeValue[];
       readonly B?: never;
       readonly BOOL?: never;
       readonly BS?: never;
@@ -75,7 +81,7 @@ export type SimDynamoDbAttributeValue =
       readonly SS?: never;
     }
   | {
-      readonly NS: readonly string[];
+      readonly NS: string[];
       readonly B?: never;
       readonly BOOL?: never;
       readonly BS?: never;
@@ -111,7 +117,7 @@ export type SimDynamoDbAttributeValue =
       readonly SS?: never;
     }
   | {
-      readonly SS: readonly string[];
+      readonly SS: string[];
       readonly B?: never;
       readonly BOOL?: never;
       readonly BS?: never;
@@ -123,7 +129,7 @@ export type SimDynamoDbAttributeValue =
       readonly S?: never;
     }
   | {
-      readonly $unknown: readonly [string, unknown];
+      readonly $unknown: [string, unknown];
       readonly B?: never;
       readonly BOOL?: never;
       readonly BS?: never;
@@ -146,6 +152,19 @@ export type SimDynamoDbAttributeValue =
 export interface SimDynamoDbAttributeValueUpdate {
   readonly Value?: SimDynamoDbAttributeValue | undefined;
   readonly Action?: string | undefined;
+}
+
+/**
+ * Minimal structural sim DynamoDB legacy condition.
+ *
+ * This is the older way of saying which items a read wants, which
+ * `KeyConditionExpression` and `FilterExpression` replaced. It is declared so a
+ * request carrying one is refused by name.
+ */
+export interface SimDynamoDbLegacyCondition {
+  readonly ComparisonOperator?: string | undefined;
+  readonly AttributeValueList?:
+    readonly SimDynamoDbAttributeValue[] | undefined;
 }
 
 /**
