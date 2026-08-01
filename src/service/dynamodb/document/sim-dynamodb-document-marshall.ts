@@ -106,7 +106,7 @@ function scalar(value: unknown, path: string): SimDynamoDbAttributeValue {
 function listMembers(
   values: readonly unknown[],
   path: string,
-): readonly SimDynamoDbAttributeValue[] {
+): SimDynamoDbAttributeValue[] {
   return values
     .filter((member) => typeof member !== "function")
     .map((member, index) =>

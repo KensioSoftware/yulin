@@ -12,7 +12,7 @@ import {
   ListTablesCommand,
   PutItemCommand,
   ListTagsOfResourceCommand,
-  QueryCommand,
+  ScanCommand,
   TagResourceCommand,
   TransactGetItemsCommand,
   TransactWriteItemsCommand,
@@ -355,16 +355,10 @@ describe("simulated DynamoDB SDK Command routing", () => {
     simSdk.intercept(client);
 
     const error = await assertThrowsErrorAsync(async () => {
-      await client.send(
-        new QueryCommand({
-          TableName: "InterceptTable",
-          KeyConditionExpression: "id = :id",
-          ExpressionAttributeValues: { ":id": { S: "item-1" } },
-        }),
-      );
+      await client.send(new ScanCommand({ TableName: "InterceptTable" }));
     });
 
-    assertStringIncludes(error.message, "QueryCommand");
+    assertStringIncludes(error.message, "ScanCommand");
     assertStringIncludes(error.message, "PutItemCommand");
   });
 });

@@ -14,6 +14,8 @@ import type { SimDynamoDbTimeToLiveDescription } from "../command/time-to-live/t
 import { SimDynamoDbTableExpiry } from "../time-to-live/sim-dynamodb-table-expiry.js";
 import { SimDynamoDbTimeToLive } from "../time-to-live/sim-dynamodb-time-to-live.js";
 import type { SimDynamoDbTimeToLiveSpecification } from "../time-to-live/sim-dynamodb-time-to-live-specification.js";
+import type { SimDynamoDbKeyCondition } from "../expression/key-condition/sim-dynamodb-key-condition.js";
+import { SimDynamoDbItemCollection } from "./sim-dynamodb-item-collection.js";
 import { SimDynamoDbItemKey } from "./sim-dynamodb-item-key.js";
 import { describeSimDynamoDbTable } from "./sim-dynamodb-table-description.js";
 import { SimDynamoDbTableItems } from "./sim-dynamodb-table-items.js";
@@ -236,5 +238,22 @@ export class SimDynamoDbTable {
    */
   public deleteItem(key: SimDynamoDbItem): SimDynamoDbItem | undefined {
     return this.items.remove(this.itemKey.ofKey(key));
+  }
+
+  /**
+   * The items a key condition names, in sort key order.
+   *
+   * A Query reads a whole item collection rather than one key, so the items are
+   * reachable together as well as one at a time. The ordering belongs to the
+   * collection rather than to the command that reads it.
+   */
+  public itemCollection(
+    keyCondition: SimDynamoDbKeyCondition,
+  ): SimDynamoDbItemCollection {
+    return new SimDynamoDbItemCollection({
+      items: this.items.entries().values(),
+      keySchema: this.keySchema,
+      keyCondition,
+    });
   }
 }

@@ -1,5 +1,8 @@
 import { simDynamoDbValuesEqual } from "../../item/sim-dynamodb-value-comparison.js";
-import { compareSimDynamoDbValues } from "../../item/sim-dynamodb-value-order.js";
+import {
+  compareSimDynamoDbValues,
+  simDynamoDbOrderHolds,
+} from "../../item/sim-dynamodb-value-order.js";
 import type { SimDynamoDbValue } from "../../item/sim-dynamodb-value.js";
 import type { SimDynamoDbCondition } from "./sim-dynamodb-condition.js";
 import type { SimDynamoDbConditionOperand } from "./sim-dynamodb-condition-operand.js";
@@ -16,29 +19,6 @@ export const simDynamoDbComparators: ReadonlySet<string> = new Set([
   ">",
   ">=",
 ]);
-
-/**
- * Whether an ordering satisfies a comparator.
- *
- * Only the four ordering comparators reach here, so the last of them is the
- * remaining case. `=` and `<>` are answered by equality before this is asked.
- */
-function ordered(comparator: string, order: number): boolean {
-  switch (comparator) {
-    case "<": {
-      return order < 0;
-    }
-    case "<=": {
-      return order <= 0;
-    }
-    case ">": {
-      return order > 0;
-    }
-    default: {
-      return order >= 0;
-    }
-  }
-}
 
 /**
  * Two operands compared against each other.
@@ -96,7 +76,7 @@ export class SimDynamoDbComparisonCondition implements SimDynamoDbCondition {
       return false;
     }
 
-    return ordered(this.comparator, order);
+    return simDynamoDbOrderHolds(this.comparator, order);
   }
 }
 

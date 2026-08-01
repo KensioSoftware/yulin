@@ -28,6 +28,34 @@ function compareTexts(first: string, second: string): number {
 }
 
 /**
+ * Whether an ordering satisfies one of the four ordering comparators.
+ *
+ * Only those four reach here: `=` and `<>` are answered by equality rather than
+ * by an order, so the last of the four is the remaining case. Condition
+ * expressions and key conditions both read a comparator this way, which is why
+ * it sits with the item model.
+ */
+export function simDynamoDbOrderHolds(
+  comparator: string,
+  order: number,
+): boolean {
+  switch (comparator) {
+    case "<": {
+      return order < 0;
+    }
+    case "<=": {
+      return order <= 0;
+    }
+    case ">": {
+      return order > 0;
+    }
+    default: {
+      return order >= 0;
+    }
+  }
+}
+
+/**
  * Order two stored values, or nothing when they cannot be ordered.
  *
  * DynamoDB orders strings, numbers and binary, and only against a value of the

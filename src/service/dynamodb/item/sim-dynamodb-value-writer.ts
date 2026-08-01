@@ -28,7 +28,7 @@ export function writeSimDynamoDbValue(
       return { NULL: true };
     }
     case "SS": {
-      return { SS: value.texts };
+      return { SS: [...value.texts] };
     }
     case "NS": {
       return { NS: value.numbers.map((number) => number.text) };

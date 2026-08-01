@@ -1,4 +1,5 @@
 import { simDynamoDbValuesEqual } from "../../item/sim-dynamodb-value-comparison.js";
+import { simDynamoDbValueBeginsWith } from "../../item/sim-dynamodb-value-prefix.js";
 import type { SimDynamoDbValue } from "../../item/sim-dynamodb-value.js";
 import type { SimDynamoDbCondition } from "./sim-dynamodb-condition.js";
 import type {
@@ -82,27 +83,8 @@ export class SimDynamoDbBeginsWithCondition implements SimDynamoDbCondition {
       return false;
     }
 
-    if (value.kind === "S" && prefix.kind === "S") {
-      return value.text.startsWith(prefix.text);
-    }
-
-    if (value.kind === "B" && prefix.kind === "B") {
-      return beginsWithBytes(value.bytes, prefix.bytes);
-    }
-
-    return false;
+    return simDynamoDbValueBeginsWith(value, prefix);
   }
-}
-
-/**
- * Whether some bytes start with some other bytes.
- */
-function beginsWithBytes(bytes: Uint8Array, prefix: Uint8Array): boolean {
-  if (prefix.length > bytes.length) {
-    return false;
-  }
-
-  return prefix.every((byte, at) => bytes.at(at) === byte);
 }
 
 /**

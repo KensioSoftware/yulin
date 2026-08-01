@@ -30,6 +30,11 @@ export type {
   SimUpdateItemCommandOutput,
 } from "./item/item.command.js";
 export type {
+  SimQueryCommand,
+  SimQueryCommandInput,
+  SimQueryCommandOutput,
+} from "./query/query.command.js";
+export type {
   SimBatchGetItemCommand,
   SimBatchGetItemCommandInput,
   SimBatchGetItemCommandOutput,

@@ -903,6 +903,192 @@ wanted. Naming one path twice counts the same way.
 A document path goes at most 32 levels deep, which is as far as an item nests. A negative index, a
 fractional index and a path past that depth are each a `ValidationException` naming the path.
 
+## Querying an item collection
+
+A table with a sort key holds an item collection under each partition key: the items with that
+partition key, ordered by their sort key. `Query` reads one of those collections.
+
+`KeyConditionExpression` says which. It is one equality on the partition key, optionally joined by
+`AND` to one condition on the sort key. The sort key condition is `=`, `<`, `<=`, `>`, `>=`,
+`BETWEEN` or `begins_with`, and both bounds of a `BETWEEN` are inside the range.
+
+```typescript sim-dynamodb-query
+/**
+ * Reading a customer's orders back in sort key order.
+ */
+
+import {
+  CreateTableCommand,
+  PutItemCommand,
+  QueryCommand,
+} from "@aws-sdk/client-dynamodb";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const dynamoDb = simAws.dynamoDb();
+
+await dynamoDb.createTable(
+  new CreateTableCommand({
+    TableName: "OrdersTable",
+    KeySchema: [
+      { AttributeName: "customerId", KeyType: "HASH" },
+      { AttributeName: "orderId", KeyType: "RANGE" },
+    ],
+    AttributeDefinitions: [
+      { AttributeName: "customerId", AttributeType: "S" },
+      { AttributeName: "orderId", AttributeType: "S" },
+    ],
+    BillingMode: "PAY_PER_REQUEST",
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+for (const orderId of ["2026-03-01", "2026-01-14", "2027-01-02"]) {
+  await dynamoDb.putItem(
+    new PutItemCommand({
+      TableName: "OrdersTable",
+      Item: { customerId: { S: "c-1" }, orderId: { S: orderId } },
+    }),
+  );
+}
+
+const page = await dynamoDb.query(
+  new QueryCommand({
+    TableName: "OrdersTable",
+    KeyConditionExpression:
+      "customerId = :customer AND begins_with(orderId, :prefix)",
+    ExpressionAttributeValues: {
+      ":customer": { S: "c-1" },
+      ":prefix": { S: "2026-" },
+    },
+  }),
+);
+
+console.log(page.Items?.map((item) => item["orderId"]?.S));
+// [ "2026-01-14", "2026-03-01" ]
+
+console.log(page.Count); // 2
+console.log(page.ScannedCount); // 2
+
+// ScanIndexForward reads the collection backwards.
+const newestFirst = await dynamoDb.query(
+  new QueryCommand({
+    TableName: "OrdersTable",
+    KeyConditionExpression: "customerId = :customer",
+    ExpressionAttributeValues: { ":customer": { S: "c-1" } },
+    ScanIndexForward: false,
+  }),
+);
+
+console.log(newestFirst.Items?.map((item) => item["orderId"]?.S));
+// [ "2027-01-02", "2026-03-01", "2026-01-14" ]
+```
+
+The order is DynamoDB's rather than JavaScript's. A String sort key orders by its UTF-8 bytes, a
+Binary one as unsigned bytes, and a Number one by value however it was written, so `1E2` and `100`
+are one key rather than two and `9` sorts below `20`.
+
+`begins_with` reads a prefix of a String or Binary sort key. Against a Number sort key it is a
+`ValidationException`, as it is on AWS: a number is stored as a value rather than as the digits it
+was written with, so it has no prefix.
+
+A query on a table with no sort key is allowed, and reads the one item under the partition key.
+
+### What a key condition can say
+
+The grammar is closed, and deliberately narrower than a `ConditionExpression`. Each of these is a
+`ValidationException` naming what was wrong:
+
+- a key condition that does not test the partition key for equality
+- a range operator or `begins_with` applied to the partition key
+- an operator or function a sort key condition does not take, such as `<>` or `contains`
+- an attribute that is not part of the table's primary key
+- `OR` or `NOT` anywhere
+- the same key attribute tested twice
+- a `BETWEEN` whose upper bound is below its lower bound, or whose bounds are different types
+- a value written into the expression rather than supplied through `ExpressionAttributeValues`
+
+An attribute name that is a DynamoDB reserved word is written as a `#name` placeholder and defined in
+`ExpressionAttributeNames`, as in any other expression.
+
+### Paging a collection
+
+`Limit` counts the items a query evaluated. `LastEvaluatedKey` is the primary key of the item the
+walk stopped on, and the next request passes it back as `ExclusiveStartKey` to resume after it.
+
+```typescript sim-dynamodb-query-paging
+/**
+ * Paging through an item collection until the token runs out.
+ */
+
+import {
+  CreateTableCommand,
+  PutItemCommand,
+  QueryCommand,
+} from "@aws-sdk/client-dynamodb";
+import type { AttributeValue } from "@aws-sdk/client-dynamodb";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const dynamoDb = simAws.dynamoDb();
+
+await dynamoDb.createTable(
+  new CreateTableCommand({
+    TableName: "EventsTable",
+    KeySchema: [
+      { AttributeName: "streamId", KeyType: "HASH" },
+      { AttributeName: "eventId", KeyType: "RANGE" },
+    ],
+    AttributeDefinitions: [
+      { AttributeName: "streamId", AttributeType: "S" },
+      { AttributeName: "eventId", AttributeType: "N" },
+    ],
+    BillingMode: "PAY_PER_REQUEST",
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+for (const eventId of ["1", "2", "3"]) {
+  await dynamoDb.putItem(
+    new PutItemCommand({
+      TableName: "EventsTable",
+      Item: { streamId: { S: "stream-1" }, eventId: { N: eventId } },
+    }),
+  );
+}
+
+const read: string[] = [];
+let exclusiveStartKey: Record<string, AttributeValue> | undefined;
+
+do {
+  const page = await dynamoDb.query(
+    new QueryCommand({
+      TableName: "EventsTable",
+      KeyConditionExpression: "streamId = :stream",
+      ExpressionAttributeValues: { ":stream": { S: "stream-1" } },
+      Limit: 2,
+      ExclusiveStartKey: exclusiveStartKey,
+    }),
+  );
+
+  read.push(...(page.Items ?? []).map((item) => item["eventId"]?.N ?? ""));
+  exclusiveStartKey = page.LastEvaluatedKey;
+} while (exclusiveStartKey !== undefined);
+
+console.log(read); // [ "1", "2", "3" ]
+```
+
+`LastEvaluatedKey` is left out only when the key range ran out inside the `Limit`. Reaching the limit
+on the last matching item still hands out a token, and the next call answers with an empty page and
+no token. That is what real DynamoDB does, since it cannot know the range is exhausted without
+looking past it, so a loop like the one above is the way to read a whole collection.
+
+A token still works when the item it names has since been deleted: it says where to resume rather
+than which position to return to. A token from a different partition key is refused, since it names
+a collection this query is not reading.
+
 ## Reading and writing items in batches
 
 `BatchWriteItem` puts and deletes items across tables in one call, and `BatchGetItem` reads them by
@@ -1822,6 +2008,8 @@ nothing is written.
 - `UpdateItem`, with `SET`, `REMOVE`, `ADD` and `DELETE` update expressions, `if_not_exists`,
   `list_append`, decimal arithmetic, list element paths, upserting when the key holds nothing, and
   all five `ReturnValues` modes. Every action reads the item as it stood before the update.
+- `Query`, reading one item collection in sort key order, with the seven sort key conditions,
+  `ScanIndexForward`, and `Limit`, `LastEvaluatedKey` and `ExclusiveStartKey` paging.
 - `ConditionExpression` on `PutItem`, `DeleteItem` and `UpdateItem`, with the six comparators, `BETWEEN`, `IN`,
   `AND`, `OR`, `NOT`, brackets, and the `attribute_exists`, `attribute_not_exists`, `attribute_type`,
   `begins_with`, `contains` and `size` functions.
@@ -1849,10 +2037,12 @@ nothing is written.
 
 ## Limitations
 
-- The document client's `Query`, `Scan`, transaction and PartiQL Commands are not converted, since
-  the first two are operations this simulation does not have yet. `TransactWriteCommand` and
-  `TransactGetCommand` are the exception: the operations behind them are simulated, so only the
-  document form is missing. All of them are refused by name rather than half converted.
+- The document client's `Query`, `Scan`, transaction and PartiQL Commands are not converted. `Scan`
+  and PartiQL are operations this simulation does not have yet. `Query`, `TransactWriteCommand` and
+  `TransactGetCommand` are simulated as operations, so only the document form is missing: for the
+  transaction Commands that is simply not written yet, and for `Query` it is because
+  `@aws-sdk/lib-dynamodb` and `@aws-sdk/client-dynamodb` both name their Command `QueryCommand`,
+  which the interception routes by. All of them are refused by name rather than half converted.
 - A document client's translate config is not read, so the marshalling options it was built with do
   not apply. See [the SDK docs](../../sdk/README.md#limitations).
 - `Expected`, `ConditionalOperator` and `AttributeUpdates` are not converted for the document
@@ -1860,8 +2050,8 @@ nothing is written.
   the operation rather than by the conversion.
 - Global and local secondary indexes are not simulated. `GlobalSecondaryIndexes` and
   `LocalSecondaryIndexes` are refused rather than dropped, since a table missing an index it was
-  asked for would answer queries differently to the real one. An empty list asks for no index, so it
-  is accepted.
+  asked for would answer queries differently to the real one, and a `Query` naming an `IndexName` is
+  refused for the same reason. An empty list asks for no index, so it is accepted.
 - Tagging is immediate. AWS documents `TagResource` and `UntagResource` as eventually consistent, so
   a real `ListTagsOfResource` issued straight after one of them may answer with the previous tags or
   with none. Here the change is there by the time the call returns, so a test cannot observe the
@@ -1920,7 +2110,21 @@ nothing is written.
   refuses that status anyway, for when it can.
 - Nothing enforces capacity. A provisioned table's throughput is stored and reported, and no request
   is ever throttled with `ProvisionedThroughputExceededException`.
-- `UpdateTable`, `Query` and `Scan` are not implemented yet.
+- `UpdateTable` and `Scan` are not implemented yet.
+- A query page is never cut short by size. Real DynamoDB stops a page at 1 MB and hands out a
+  `LastEvaluatedKey`, which is not modelled here, so a page breaks only on a `Limit`. A test reading
+  a large collection with no `Limit` gets all of it in one page where a real one would page.
+- Nothing here throttles or measures a query, so `ReturnConsumedCapacity` is refused unless it names
+  `NONE`, and a `Limit` is the only thing that ends a page early.
+- A key condition takes no brackets. `(customerId = :c) AND orderId > :o` is refused here, where real
+  DynamoDB accepts it. The shape of a key condition is fixed, so there is nothing for brackets to
+  group, and being stricter is the direction that fails safely: it is a puzzling refusal here rather
+  than a query that means something different on AWS.
+- `IndexName`, `FilterExpression`, `ProjectionExpression` and `Select` are refused on `Query`, since
+  each of them changes which items a query answers with or which parts of them. `Select` naming
+  `ALL_ATTRIBUTES` is the default a table query already behaves as, so it is accepted.
+- `Count` and `ScannedCount` are always the same number. They differ only when a `FilterExpression`
+  drops items a query evaluated, and filters are not simulated.
 - `UnprocessedItems` and `UnprocessedKeys` are always empty. Nothing here is throttled and no
   response stops at a size, so the branch of a batch retry loop that resends what did not go through
   is never taken against the simulator.
@@ -1947,8 +2151,8 @@ nothing is written.
   stack deployed calls `simAws.backgroundTasksComplete()` first.
 - CloudFormation stack updates and deletes are not simulated, so neither is table replacement or the
   `DeletionPolicy` a template sets on a table.
-- `ProjectionExpression` is simulated on `GetItem`, `BatchGetItem` and `TransactGetItems`. `Query`
-  and `Scan` are not implemented yet, so they have nothing to project from.
+- `ProjectionExpression` is simulated on `GetItem`, `BatchGetItem` and `TransactGetItems`. On `Query`
+  it is refused rather than ignored, and `Scan` is not implemented yet.
 - The legacy `AttributesToGet` is refused rather than ignored, since an item that came back whole
   where part of it was asked for would hide an application reading an attribute it never requested.
   `ProjectionExpression` replaced it, and real DynamoDB has built nothing on it since.
@@ -1959,8 +2163,8 @@ nothing is written.
   whether a request sets it once for a read or per table for a batch read, so a test cannot observe a
   stale read here the way it might against a real table.
 - Condition expressions are simulated on `PutItem`, `DeleteItem`, `UpdateItem` and the actions of
-  `TransactWriteItems`. The key condition and filter expressions of `Query` and `Scan` are not
-  implemented yet, so there is nothing else to guard.
+  `TransactWriteItems`, and key conditions on `Query`. Filter expressions are not implemented yet, on
+  either `Query` or `Scan`.
 - Two update actions cannot write to overlapping paths, so `ADD tags :added DELETE tags :gone` in one
   expression is refused as it is on AWS. Taking members out of a set an expression also adds to is a
   second update.

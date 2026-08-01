@@ -189,7 +189,7 @@ describe("DynamoDB condition expressions", () => {
       orderId: { S: "order-1" },
       address: { M: { city: { S: "Leeds" } } },
       lines: { L: [{ S: "widget" }] },
-    } as const;
+    };
 
     // When a condition reaches into both, then it reads what is there.
     const condition = readSimDynamoDbCondition({
