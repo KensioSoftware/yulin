@@ -8,7 +8,7 @@ import type {
   SimDynamoDbSseSpecification,
   SimDynamoDbStreamSpecification,
   SimDynamoDbTableDescription,
-  SimDynamoDbTag,
+  SimDynamoDbTagInput,
   SimDynamoDbWarmThroughput,
 } from "./table.types.js";
 
@@ -39,7 +39,7 @@ export interface SimCreateTableCommandInput {
     readonly SimDynamoDbSecondaryIndexInput[] | undefined;
   readonly LocalSecondaryIndexes?:
     readonly SimDynamoDbSecondaryIndexInput[] | undefined;
-  readonly Tags?: readonly SimDynamoDbTag[] | undefined;
+  readonly Tags?: readonly SimDynamoDbTagInput[] | undefined;
   readonly StreamSpecification?: SimDynamoDbStreamSpecification | undefined;
   readonly SSESpecification?: SimDynamoDbSseSpecification | undefined;
   readonly ResourcePolicy?: string | undefined;

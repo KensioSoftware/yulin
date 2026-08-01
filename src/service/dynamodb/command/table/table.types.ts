@@ -87,11 +87,21 @@ export interface SimDynamoDbTableClassSummary {
 }
 
 /**
- * Minimal structural sim DynamoDB tag.
+ * Minimal structural sim DynamoDB tag, as a request carries it.
  */
-export interface SimDynamoDbTag {
+export interface SimDynamoDbTagInput {
   readonly Key?: string | undefined;
   readonly Value?: string | undefined;
+}
+
+/**
+ * Minimal structural sim DynamoDB tag, as a resource reports it.
+ *
+ * A tag that is held has both halves, where a request may be missing either.
+ */
+export interface SimDynamoDbTag {
+  readonly Key: string;
+  readonly Value: string;
 }
 
 /**

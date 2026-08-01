@@ -3,16 +3,7 @@ import {
   BackgroundTasks,
 } from "../../util/background/background.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
-import { SimDynamoDbAuthorizer } from "./command/authorize/sim-dynamodb-authorizer.js";
-import { SimDynamoDbBatchGetItem } from "./command/batch/sim-dynamodb-batch-get-item.js";
-import { SimDynamoDbBatchWriteItem } from "./command/batch/sim-dynamodb-batch-write-item.js";
-import { SimDynamoDbDeleteItem } from "./command/item/sim-dynamodb-delete-item.js";
-import { SimDynamoDbGetItem } from "./command/item/sim-dynamodb-get-item.js";
-import { SimDynamoDbPutItem } from "./command/item/sim-dynamodb-put-item.js";
-import { SimDynamoDbUpdateItem } from "./command/item/sim-dynamodb-update-item.js";
-import { SimDynamoDbCreateTable } from "./command/table/sim-dynamodb-create-table.js";
-import { SimDynamoDbTableAccess } from "./command/table/sim-dynamodb-table-access.js";
-import { SimDynamoDbTableCommands } from "./command/table/sim-dynamodb-table-commands.js";
+import { SimDynamoDbCommandHandlers } from "./command/sim-dynamodb-command-handlers.js";
 import { SimDynamoDbTableStore } from "./table/sim-dynamodb-table-store.js";
 import type {
   SimCreateTableCommand,
@@ -46,8 +37,14 @@ import type {
   SimTransactWriteItemsCommand,
   SimTransactWriteItemsCommandOutput,
 } from "./command/transact/transact.command.js";
-import { SimDynamoDbTransactGetItems } from "./command/transact/sim-dynamodb-transact-get-items.js";
-import { SimDynamoDbTransactWriteItems } from "./command/transact/sim-dynamodb-transact-write-items.js";
+import type {
+  SimListTagsOfResourceCommand,
+  SimListTagsOfResourceCommandOutput,
+  SimTagResourceCommand,
+  SimTagResourceCommandOutput,
+  SimUntagResourceCommand,
+  SimUntagResourceCommandOutput,
+} from "./command/tag/tag.command.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import type { SimAwsCaller } from "../aws/caller/sim-aws-caller.js";
 import {
@@ -74,19 +71,8 @@ interface SimDynamoDatabaseProperties {
  */
 export class SimDynamoDb {
   private readonly tables = new SimDynamoDbTableStore();
-
-  private readonly access: SimDynamoDbTableAccess;
   private readonly background: BackgroundScheduler;
-  private readonly tableCreation: SimDynamoDbCreateTable;
-  private readonly tableCommands: SimDynamoDbTableCommands;
-  private readonly itemWrites: SimDynamoDbPutItem;
-  private readonly itemReads: SimDynamoDbGetItem;
-  private readonly itemDeletions: SimDynamoDbDeleteItem;
-  private readonly itemUpdates: SimDynamoDbUpdateItem;
-  private readonly itemBatchWrites: SimDynamoDbBatchWriteItem;
-  private readonly itemBatchReads: SimDynamoDbBatchGetItem;
-  private readonly itemTransactWrites: SimDynamoDbTransactWriteItems;
-  private readonly itemTransactReads: SimDynamoDbTransactGetItems;
+  private readonly commands: SimDynamoDbCommandHandlers;
   private readonly sdkRouter = new SimDynamoDatabaseSdkCommandRouter(this);
   private readonly cfnFactory = new SimDynamoDbCfnResourceFactory({
     dynamoDb: this,
@@ -99,39 +85,12 @@ export class SimDynamoDb {
       background = new BackgroundTasks(),
     } = properties;
 
-    const authorizer = new SimDynamoDbAuthorizer({ iam, accountRegionScope });
-
     this.background = background;
-    this.access = new SimDynamoDbTableAccess({
+    this.commands = new SimDynamoDbCommandHandlers({
       tables: this.tables,
-      authorizer,
       accountRegionScope,
-    });
-    this.tableCreation = new SimDynamoDbCreateTable({
-      tables: this.tables,
-      authorizer,
-      accountRegionScope,
+      iam,
       background,
-    });
-    this.tableCommands = new SimDynamoDbTableCommands({
-      tables: this.tables,
-      access: this.access,
-      background,
-    });
-    this.itemWrites = new SimDynamoDbPutItem({ access: this.access });
-    this.itemReads = new SimDynamoDbGetItem({ access: this.access });
-    this.itemDeletions = new SimDynamoDbDeleteItem({ access: this.access });
-    this.itemUpdates = new SimDynamoDbUpdateItem({ access: this.access });
-    this.itemBatchWrites = new SimDynamoDbBatchWriteItem({
-      access: this.access,
-    });
-    this.itemBatchReads = new SimDynamoDbBatchGetItem({ access: this.access });
-    this.itemTransactWrites = new SimDynamoDbTransactWriteItems({
-      access: this.access,
-      clock: background,
-    });
-    this.itemTransactReads = new SimDynamoDbTransactGetItems({
-      access: this.access,
     });
   }
 
@@ -144,7 +103,7 @@ export class SimDynamoDb {
   ): Promise<SimCreateTableCommandOutput> {
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
-    return this.tableCreation.handle(command, options);
+    return this.commands.tableCreation.handle(command, options);
   }
 
   /**
@@ -155,7 +114,7 @@ export class SimDynamoDb {
     options?: SimDynamoDbRequestOptions,
   ): Promise<SimDescribeTableCommandOutput> {
     await this.background.sequence();
-    return this.tableCommands.describeTable(command, options);
+    return this.commands.tables.describeTable(command, options);
   }
 
   /**
@@ -166,7 +125,7 @@ export class SimDynamoDb {
     options?: SimDynamoDbRequestOptions,
   ): Promise<SimListTablesCommandOutput> {
     await this.background.sequence();
-    return this.tableCommands.listTables(command, options);
+    return this.commands.tables.listTables(command, options);
   }
 
   /**
@@ -177,7 +136,7 @@ export class SimDynamoDb {
     options?: SimDynamoDbRequestOptions,
   ): Promise<SimDeleteTableCommandOutput> {
     await this.background.sequence();
-    return this.tableCommands.deleteTable(command, options);
+    return this.commands.tables.deleteTable(command, options);
   }
 
   /**
@@ -188,7 +147,7 @@ export class SimDynamoDb {
     options?: SimDynamoDbRequestOptions,
   ): Promise<SimPutItemCommandOutput> {
     await this.background.sequence();
-    return this.itemWrites.handle(command, options);
+    return this.commands.itemWrites.handle(command, options);
   }
 
   /**
@@ -199,7 +158,7 @@ export class SimDynamoDb {
     options?: SimDynamoDbRequestOptions,
   ): Promise<SimGetItemCommandOutput> {
     await this.background.sequence();
-    return this.itemReads.handle(command, options);
+    return this.commands.itemReads.handle(command, options);
   }
 
   /**
@@ -210,7 +169,7 @@ export class SimDynamoDb {
     options?: SimDynamoDbRequestOptions,
   ): Promise<SimDeleteItemCommandOutput> {
     await this.background.sequence();
-    return this.itemDeletions.handle(command, options);
+    return this.commands.itemDeletions.handle(command, options);
   }
 
   /**
@@ -221,7 +180,7 @@ export class SimDynamoDb {
     options?: SimDynamoDbRequestOptions,
   ): Promise<SimUpdateItemCommandOutput> {
     await this.background.sequence();
-    return this.itemUpdates.handle(command, options);
+    return this.commands.itemUpdates.handle(command, options);
   }
 
   /**
@@ -232,7 +191,7 @@ export class SimDynamoDb {
     options?: SimDynamoDbRequestOptions,
   ): Promise<SimBatchWriteItemCommandOutput> {
     await this.background.sequence();
-    return this.itemBatchWrites.handle(command, options);
+    return this.commands.itemBatchWrites.handle(command, options);
   }
 
   /**
@@ -243,7 +202,7 @@ export class SimDynamoDb {
     options?: SimDynamoDbRequestOptions,
   ): Promise<SimBatchGetItemCommandOutput> {
     await this.background.sequence();
-    return this.itemBatchReads.handle(command, options);
+    return this.commands.itemBatchReads.handle(command, options);
   }
 
   /**
@@ -254,7 +213,7 @@ export class SimDynamoDb {
     options?: SimDynamoDbRequestOptions,
   ): Promise<SimTransactWriteItemsCommandOutput> {
     await this.background.sequence();
-    return this.itemTransactWrites.handle(command, options);
+    return this.commands.itemTransactWrites.handle(command, options);
   }
 
   /**
@@ -265,7 +224,40 @@ export class SimDynamoDb {
     options?: SimDynamoDbRequestOptions,
   ): Promise<SimTransactGetItemsCommandOutput> {
     await this.background.sequence();
-    return this.itemTransactReads.handle(command, options);
+    return this.commands.itemTransactReads.handle(command, options);
+  }
+
+  /**
+   * Handle a Tag Resource Command from the SDK.
+   */
+  async tagResource(
+    command: SimTagResourceCommand,
+    options?: SimDynamoDbRequestOptions,
+  ): Promise<SimTagResourceCommandOutput> {
+    await this.background.sequence();
+    return this.commands.tags.tagResource(command, options);
+  }
+
+  /**
+   * Handle an Untag Resource Command from the SDK.
+   */
+  async untagResource(
+    command: SimUntagResourceCommand,
+    options?: SimDynamoDbRequestOptions,
+  ): Promise<SimUntagResourceCommandOutput> {
+    await this.background.sequence();
+    return this.commands.tags.untagResource(command, options);
+  }
+
+  /**
+   * Handle a List Tags Of Resource Command from the SDK.
+   */
+  async listTagsOfResource(
+    command: SimListTagsOfResourceCommand,
+    options?: SimDynamoDbRequestOptions,
+  ): Promise<SimListTagsOfResourceCommandOutput> {
+    await this.background.sequence();
+    return this.commands.tags.listTagsOfResource(command, options);
   }
 
   /**

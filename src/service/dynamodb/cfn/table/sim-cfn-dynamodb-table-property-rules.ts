@@ -15,6 +15,7 @@ const simulatedPropertyNames: ReadonlySet<string> = new Set([
   "ProvisionedThroughput",
   "TableClass",
   "TableName",
+  "Tags",
 ]);
 
 /**
@@ -36,7 +37,6 @@ const unsimulatedPropertyNames: ReadonlySet<string> = new Set([
   "ResourcePolicy",
   "SSESpecification",
   "StreamSpecification",
-  "Tags",
   "TimeToLiveSpecification",
   "WarmThroughput",
 ]);

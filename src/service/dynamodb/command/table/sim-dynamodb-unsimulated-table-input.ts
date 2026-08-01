@@ -10,15 +10,14 @@ import type { SimCreateTableCommandInput } from "./table.command.js";
  * would outlive a time to live that was never applied. Refusing is the louder
  * failure, and the one that happens here rather than in a deployment.
  *
- * Only input that asks for something is refused. An empty index or tag list,
- * and a stream or encryption specification that is switched off, describe the
- * table this simulation already makes, so they are let through.
+ * Only input that asks for something is refused. An empty index list, and a
+ * stream or encryption specification that is switched off, describe the table
+ * this simulation already makes, so they are let through.
  */
 export function refuseUnsimulatedTableInput(
   input: SimCreateTableCommandInput,
 ): void {
   refuseSecondaryIndexes(input);
-  refuseTags(input);
   refuseStreams(input);
   refuseEncryption(input);
   refuseThroughputExtras(input);
@@ -47,18 +46,6 @@ function refuseSecondaryIndexes(input: SimCreateTableCommandInput): void {
     throw new SimDynamoDbUnsupportedOperation(
       "Local secondary indexes are not simulated, so CreateTable refuses " +
         "them rather than creating a table that is missing them",
-    );
-  }
-}
-
-/**
- * Refuse tags a table would be found and billed by.
- */
-function refuseTags(input: SimCreateTableCommandInput): void {
-  if ((input.Tags ?? []).length > 0) {
-    throw new SimDynamoDbUnsupportedOperation(
-      "Table tags are not simulated, so CreateTable refuses them rather than " +
-        "dropping them",
     );
   }
 }

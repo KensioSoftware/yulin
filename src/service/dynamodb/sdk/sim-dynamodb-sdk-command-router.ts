@@ -20,6 +20,11 @@ import type {
   SimBatchWriteItemCommand,
 } from "../command/batch/batch.command.js";
 import type {
+  SimListTagsOfResourceCommand,
+  SimTagResourceCommand,
+  SimUntagResourceCommand,
+} from "../command/tag/tag.command.js";
+import type {
   SimTransactGetItemsCommand,
   SimTransactWriteItemsCommand,
 } from "../command/transact/transact.command.js";
@@ -118,6 +123,30 @@ export class SimDynamoDatabaseSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simDynamoDatabase.transactWriteItems(
             command as SimTransactWriteItemsCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "TagResourceCommand",
+        async (command, context): Promise<unknown> =>
+          await simDynamoDatabase.tagResource(
+            command as SimTagResourceCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "UntagResourceCommand",
+        async (command, context): Promise<unknown> =>
+          await simDynamoDatabase.untagResource(
+            command as SimUntagResourceCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListTagsOfResourceCommand",
+        async (command, context): Promise<unknown> =>
+          await simDynamoDatabase.listTagsOfResource(
+            command as SimListTagsOfResourceCommand,
             simSdkCallerOptions(context),
           ),
       ],

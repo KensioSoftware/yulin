@@ -10,9 +10,12 @@ import {
   GetItemCommand,
   ListTablesCommand,
   PutItemCommand,
+  ListTagsOfResourceCommand,
   QueryCommand,
+  TagResourceCommand,
   TransactGetItemsCommand,
   TransactWriteItemsCommand,
+  UntagResourceCommand,
   UpdateItemCommand,
 } from "@aws-sdk/client-dynamodb";
 import {
@@ -236,6 +239,46 @@ describe("simulated DynamoDB SDK Command routing", () => {
     assertArrayLength(responses, 2);
     assertIdentical(responses[0].Item?.["name"]?.S, "Second item");
     assertObjectEquals(responses[1], {});
+  });
+
+  it("round-trips tag Commands through an intercepted client", async () => {
+    using simSdk = new SimSdk();
+    const client = new DynamoDBClient({ region: "eu-west-2" });
+    simSdk.intercept(client);
+
+    const creation = await client.send(
+      new CreateTableCommand({
+        TableName: "TaggedTable",
+        KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+        AttributeDefinitions: [{ AttributeName: "id", AttributeType: "S" }],
+        BillingMode: "PAY_PER_REQUEST",
+        Tags: [{ Key: "Environment", Value: "test" }],
+      }),
+    );
+    await simSdk.simAws.backgroundTasksComplete();
+
+    const tableArn = creation.TableDescription?.TableArn;
+    assertNonNullable(tableArn);
+
+    await client.send(
+      new TagResourceCommand({
+        ResourceArn: tableArn,
+        Tags: [{ Key: "Owner", Value: "platform" }],
+      }),
+    );
+    await client.send(
+      new UntagResourceCommand({
+        ResourceArn: tableArn,
+        TagKeys: ["Environment"],
+      }),
+    );
+
+    const listed = await client.send(
+      new ListTagsOfResourceCommand({ ResourceArn: tableArn }),
+    );
+    assertNonNullable(listed.Tags);
+    assertArrayLength(listed.Tags, 1);
+    assertObjectEquals(listed.Tags[0], { Key: "Owner", Value: "platform" });
   });
 
   it("does not give a denied run-as caller root privileges", async () => {

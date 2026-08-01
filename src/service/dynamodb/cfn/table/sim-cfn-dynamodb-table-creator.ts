@@ -49,6 +49,7 @@ export class SimCfnDynamoDbTableCreator {
         ProvisionedThroughput: tableProperties.provisionedThroughput(),
         TableClass: tableProperties.tableClass(),
         DeletionProtectionEnabled: tableProperties.deletionProtectionEnabled(),
+        Tags: tableProperties.tags(),
       },
     });
 

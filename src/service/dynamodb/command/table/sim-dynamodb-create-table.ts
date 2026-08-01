@@ -9,6 +9,7 @@ import { simDynamoDbTableArn } from "../../table/sim-dynamodb-table-arn.js";
 import { SimDynamoDbTableBilling } from "../../table/sim-dynamodb-table-billing.js";
 import { readSimDynamoDbTableClass } from "../../table/sim-dynamodb-table-class.js";
 import { SimDynamoDbTableName } from "../../table/sim-dynamodb-table-name.js";
+import { SimDynamoDbTableTags } from "../../table/sim-dynamodb-table-tags.js";
 import type { SimDynamoDbTableStore } from "../../table/sim-dynamodb-table-store.js";
 import type { SimDynamoDbAuthorizer } from "../authorize/sim-dynamodb-authorizer.js";
 import type {
@@ -125,6 +126,7 @@ export class SimDynamoDbCreateTable {
       billing: SimDynamoDbTableBilling.fromInput(input),
       tableClass: readSimDynamoDbTableClass(input.TableClass),
       deletionProtectionEnabled: input.DeletionProtectionEnabled,
+      tags: SimDynamoDbTableTags.fromInput(input.Tags),
       background: this.background,
     });
   }

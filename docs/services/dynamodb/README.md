@@ -228,6 +228,106 @@ console.log(description.Table?.TableStatus); // "ACTIVE"
 
 `DeleteTable` takes the table's name or its ARN, as `DescribeTable` does.
 
+## Tagging tables
+
+A table is tagged by `CreateTable`, or afterwards by `TagResource`. `UntagResource` takes tags off,
+and `ListTagsOfResource` reads them back. The three tag commands name their resource by ARN, in
+`ResourceArn`, where the table commands take a name or an ARN.
+
+```typescript sim-dynamodb-tag-table
+/**
+ * Tagging a table on creation and afterwards, and reading the tags back.
+ */
+
+import {
+  CreateTableCommand,
+  ListTagsOfResourceCommand,
+  TagResourceCommand,
+  UntagResourceCommand,
+} from "@aws-sdk/client-dynamodb";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const dynamoDb = simAws.dynamoDb();
+
+const creation = await dynamoDb.createTable(
+  new CreateTableCommand({
+    TableName: "OrdersTable",
+    KeySchema: [{ AttributeName: "orderId", KeyType: "HASH" }],
+    AttributeDefinitions: [{ AttributeName: "orderId", AttributeType: "S" }],
+    BillingMode: "PAY_PER_REQUEST",
+    Tags: [{ Key: "Environment", Value: "test" }],
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+const tableArn = creation.TableDescription?.TableArn ?? "";
+
+await dynamoDb.tagResource(
+  new TagResourceCommand({
+    ResourceArn: tableArn,
+    Tags: [
+      { Key: "Owner", Value: "platform" },
+      // A key that is already there has its value replaced.
+      { Key: "Environment", Value: "staging" },
+    ],
+  }),
+);
+
+await dynamoDb.untagResource(
+  new UntagResourceCommand({ ResourceArn: tableArn, TagKeys: ["Owner"] }),
+);
+
+const { Tags } = await dynamoDb.listTagsOfResource(
+  new ListTagsOfResourceCommand({ ResourceArn: tableArn }),
+);
+
+console.log(Tags); // [{ Key: "Environment", Value: "staging" }]
+```
+
+`TagResource` and `UntagResource` answer with an empty body, so `ListTagsOfResource` is the only way
+to see what either did. Untagging a key that is not there is not an error: the request asks for a
+table without that key, and that is what it gets either way.
+
+The rules a tag is held to are DynamoDB's:
+
+- a key is 1 to 128 characters, and a value is 0 to 256, so a key with nothing to say about itself
+  is a tag with an empty value
+- both are written with letters, whitespace, digits and `+ - = . _ : /`, which is narrower than
+  the set some other AWS services take: there is no `@` in it
+- a key beginning `aws:` is refused, since that prefix is AWS's to assign
+- a resource holds 50 tags
+
+A request that breaks one of those is refused whole, so a call carrying one good tag and one bad one
+leaves the table's tags exactly as they were.
+
+`ListTagsOfResource` pages with `NextToken`, and leaves the token off the last page:
+
+```typescript
+const tags = [];
+let nextToken: string | undefined;
+
+do {
+  const page = await dynamoDb.listTagsOfResource(
+    new ListTagsOfResourceCommand({
+      ResourceArn: tableArn,
+      NextToken: nextToken,
+    }),
+  );
+
+  tags.push(...page.Tags);
+  nextToken = page.NextToken;
+} while (nextToken !== undefined);
+```
+
+A page carries 25 tags. The API has no page size parameter, so that number is this simulator's
+rather than DynamoDB's: it is half of the 50 a resource holds, so an ordinarily tagged table lists
+in one page and a test that wants to see a `NextToken` can reach one with 26 tags.
+
+An `AWS::DynamoDB::Table` template property of `Tags` is deployed the same way, so a CDK app calling
+`Tags.of(stack).add("Environment", "test")` gets a tagged table.
+
 ## Writing items
 
 `PutItem` writes one item, replacing the whole item under its primary key rather than merging into
@@ -1441,7 +1541,7 @@ would read as a working stream to whatever the template handed it to.
 
 A property with behaviour that is not simulated skips the resource, with a reason naming the
 property, and the rest of the stack still deploys: `GlobalSecondaryIndexes`, `LocalSecondaryIndexes`,
-`TimeToLiveSpecification`, `Tags`, `StreamSpecification`, `KinesisStreamSpecification`,
+`TimeToLiveSpecification`, `StreamSpecification`, `KinesisStreamSpecification`,
 `SSESpecification`, `PointInTimeRecoverySpecification`, `ContributorInsightsSpecification`,
 `ImportSourceSpecification`, `ResourcePolicy`, `OnDemandThroughput` and `WarmThroughput`. A property
 `AWS::DynamoDB::Table` does not have fails the resource instead, since that is a template real
@@ -1501,8 +1601,10 @@ nothing is written.
   `ClientRequestToken` making a retry idempotent for ten simulated minutes.
 - `TransactGetItems`, reading up to 100 items in one step, with a positional `Responses` array in
   which a missing item is an entry with no `Item`.
+- `Tags` on `CreateTable`, with `TagResource`, `UntagResource` and `ListTagsOfResource` addressing
+  the table by ARN, the key, value and count rules DynamoDB applies, and `NextToken` paging.
 - `AWS::DynamoDB::Table` in CloudFormation, created through `CreateTable`, with `Ref` giving the
-  table name and `Fn::GetAtt … Arn` the table ARN.
+  table name, `Fn::GetAtt … Arn` the table ARN, and `Tags` deploying a tagged table.
 - SDK interception, so an intercepted `DynamoDBClient` reaches the simulation.
 
 ## Limitations
@@ -1511,8 +1613,24 @@ nothing is written.
   `LocalSecondaryIndexes` are refused rather than dropped, since a table missing an index it was
   asked for would answer queries differently to the real one. An empty list asks for no index, so it
   is accepted.
-- Table tags are not simulated. A non-empty `Tags` list is refused rather than dropped, and there is
-  no `TagResource`, `UntagResource` or `ListTagsOfResource`.
+- Tagging is immediate. AWS documents `TagResource` and `UntagResource` as eventually consistent, so
+  a real `ListTagsOfResource` issued straight after one of them may answer with the previous tags or
+  with none. Here the change is there by the time the call returns, so a test cannot observe the
+  window a retry would be written for.
+- A `ListTagsOfResource` page carries 25 tags. The API has no page size parameter, so the number is
+  this simulator's choice rather than DynamoDB's, and a real page may hold a different number.
+- The 10 KB limit on the total size of a resource's tags is not enforced. The 50 tag count and the
+  key and value lengths are, and 50 tags of the greatest key and value length are over 10 KB, so a
+  set of tags real DynamoDB would refuse for its size is accepted here.
+- Exceeding the 50 tag limit is a `ValidationException`. Real DynamoDB documents
+  `LimitExceededException` for `TagResource`, but describes it entirely in terms of how many table
+  operations are running at once, which is a different thing from how many tags a table carries.
+- Tag based IAM condition keys are not simulated. `aws:RequestTag`, `aws:ResourceTag` and
+  `aws:TagKeys` are not evaluated, so a policy that allows tagging only under a particular key
+  allows all of it here.
+- Tables are the only taggable DynamoDB resource here. Backups and global table replicas are not
+  simulated, so an ARN naming one of those names nothing. Real DynamoDB also copies a table's tags
+  onto its secondary indexes, which have nothing to copy to yet.
 - Time to live is not simulated. There is no `UpdateTimeToLive` or `DescribeTimeToLive`, and no item
   expires.
 - DynamoDB streams are not simulated. A `StreamSpecification` with `StreamEnabled` set is refused,
