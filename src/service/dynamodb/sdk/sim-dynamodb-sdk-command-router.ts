@@ -15,6 +15,10 @@ import type {
   SimPutItemCommand,
   SimUpdateItemCommand,
 } from "../command/item/item.command.js";
+import type {
+  SimBatchGetItemCommand,
+  SimBatchWriteItemCommand,
+} from "../command/batch/batch.command.js";
 import type { SimDynamoDb as SimDynamoDatabase } from "../sim-dynamodb.js";
 
 /**
@@ -86,6 +90,22 @@ export class SimDynamoDatabaseSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simDynamoDatabase.deleteItem(
             command as SimDeleteItemCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "BatchWriteItemCommand",
+        async (command, context): Promise<unknown> =>
+          await simDynamoDatabase.batchWriteItem(
+            command as SimBatchWriteItemCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "BatchGetItemCommand",
+        async (command, context): Promise<unknown> =>
+          await simDynamoDatabase.batchGetItem(
+            command as SimBatchGetItemCommand,
             simSdkCallerOptions(context),
           ),
       ],

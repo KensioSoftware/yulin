@@ -4,6 +4,8 @@ import {
 } from "../../util/background/background.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { SimDynamoDbAuthorizer } from "./command/authorize/sim-dynamodb-authorizer.js";
+import { SimDynamoDbBatchGetItem } from "./command/batch/sim-dynamodb-batch-get-item.js";
+import { SimDynamoDbBatchWriteItem } from "./command/batch/sim-dynamodb-batch-write-item.js";
 import { SimDynamoDbDeleteItem } from "./command/item/sim-dynamodb-delete-item.js";
 import { SimDynamoDbGetItem } from "./command/item/sim-dynamodb-get-item.js";
 import { SimDynamoDbPutItem } from "./command/item/sim-dynamodb-put-item.js";
@@ -32,6 +34,12 @@ import type {
   SimUpdateItemCommand,
   SimUpdateItemCommandOutput,
 } from "./command/item/item.command.js";
+import type {
+  SimBatchGetItemCommand,
+  SimBatchGetItemCommandOutput,
+  SimBatchWriteItemCommand,
+  SimBatchWriteItemCommandOutput,
+} from "./command/batch/batch.command.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import type { SimAwsCaller } from "../aws/caller/sim-aws-caller.js";
 import {
@@ -67,6 +75,8 @@ export class SimDynamoDb {
   private readonly itemReads: SimDynamoDbGetItem;
   private readonly itemDeletions: SimDynamoDbDeleteItem;
   private readonly itemUpdates: SimDynamoDbUpdateItem;
+  private readonly itemBatchWrites: SimDynamoDbBatchWriteItem;
+  private readonly itemBatchReads: SimDynamoDbBatchGetItem;
   private readonly sdkRouter = new SimDynamoDatabaseSdkCommandRouter(this);
   private readonly cfnFactory = new SimDynamoDbCfnResourceFactory({
     dynamoDb: this,
@@ -102,6 +112,10 @@ export class SimDynamoDb {
     this.itemReads = new SimDynamoDbGetItem({ access: this.access });
     this.itemDeletions = new SimDynamoDbDeleteItem({ access: this.access });
     this.itemUpdates = new SimDynamoDbUpdateItem({ access: this.access });
+    this.itemBatchWrites = new SimDynamoDbBatchWriteItem({
+      access: this.access,
+    });
+    this.itemBatchReads = new SimDynamoDbBatchGetItem({ access: this.access });
   }
 
   /**
@@ -191,6 +205,28 @@ export class SimDynamoDb {
   ): Promise<SimUpdateItemCommandOutput> {
     await this.background.sequence();
     return this.itemUpdates.handle(command, options);
+  }
+
+  /**
+   * Handle a Batch Write Item Command from the SDK.
+   */
+  async batchWriteItem(
+    command: SimBatchWriteItemCommand,
+    options?: SimDynamoDbRequestOptions,
+  ): Promise<SimBatchWriteItemCommandOutput> {
+    await this.background.sequence();
+    return this.itemBatchWrites.handle(command, options);
+  }
+
+  /**
+   * Handle a Batch Get Item Command from the SDK.
+   */
+  async batchGetItem(
+    command: SimBatchGetItemCommand,
+    options?: SimDynamoDbRequestOptions,
+  ): Promise<SimBatchGetItemCommandOutput> {
+    await this.background.sequence();
+    return this.itemBatchReads.handle(command, options);
   }
 
   /**
