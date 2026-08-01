@@ -51,8 +51,8 @@ describe("DynamoDB CloudFormation Table validation", () => {
   });
 
   it("skips a table with a property that is not simulated", async () => {
-    // Given a template asking for a time to live, which is not simulated, in a
-    // stack with another Resource in it.
+    // Given a template asking for point in time recovery, which is not
+    // simulated, in a stack with another Resource in it.
     const simAws = new SimAws();
 
     // When the template is deployed.
@@ -63,9 +63,8 @@ describe("DynamoDB CloudFormation Table validation", () => {
           OrdersTable: simCfnDynamoDbTableResourceFactory.make({
             tableName: "orders",
             properties: {
-              TimeToLiveSpecification: {
-                AttributeName: "expiresAt",
-                Enabled: true,
+              PointInTimeRecoverySpecification: {
+                PointInTimeRecoveryEnabled: true,
               },
             },
           }),
@@ -82,8 +81,8 @@ describe("DynamoDB CloudFormation Table validation", () => {
     assertTrue(resource.skipped);
     assertStringIncludes(
       resource.skippedReason ?? "",
-      "TimeToLiveSpecification is a real AWS::DynamoDB::Table property that " +
-        "simulated DynamoDB does not simulate",
+      "PointInTimeRecoverySpecification is a real AWS::DynamoDB::Table " +
+        "property that simulated DynamoDB does not simulate",
     );
     assertUndefined(simAws.dynamoDb().findTable("orders"));
 

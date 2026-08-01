@@ -53,6 +53,8 @@ export class SimCfnDynamoDbTableCreator {
       },
     });
 
+    await this.applyTimeToLive(name, tableProperties);
+
     const table = this.dynamoDb.findTable(name);
     assertDefined(
       table,
@@ -60,5 +62,32 @@ export class SimCfnDynamoDbTableCreator {
     );
 
     return table;
+  }
+
+  /**
+   * Switch the table's time to live on, when the template asked for it.
+   *
+   * CreateTable has no TimeToLiveSpecification of its own on real DynamoDB
+   * either, so CloudFormation makes the table and then updates it, and this
+   * does the same through the ordinary UpdateTimeToLive command.
+   *
+   * A template asking for time to live to be off describes the state a new
+   * table is already in, and DynamoDB refuses an UpdateTimeToLive that asks for
+   * the state it is already in, so there is nothing to send. The specification
+   * is still read, so a template holding the wrong shape is still refused.
+   */
+  private async applyTimeToLive(
+    name: string,
+    tableProperties: SimCfnDynamoDbTableProperties,
+  ): Promise<void> {
+    const specification = tableProperties.timeToLiveSpecification();
+
+    if (specification?.Enabled !== true) {
+      return;
+    }
+
+    await this.dynamoDb.updateTimeToLive({
+      input: { TableName: name, TimeToLiveSpecification: specification },
+    });
   }
 }

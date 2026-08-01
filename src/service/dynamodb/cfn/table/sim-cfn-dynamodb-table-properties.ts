@@ -7,7 +7,9 @@ import type {
   SimDynamoDbProvisionedThroughput,
   SimDynamoDbTagInput,
 } from "../../command/table/table.types.js";
+import type { SimDynamoDbTimeToLiveSpecificationInput } from "../../command/time-to-live/time-to-live.types.js";
 import { SimCfnDynamoDbTablePropertyRules } from "./sim-cfn-dynamodb-table-property-rules.js";
+import { readSimCfnDynamoDbTableTimeToLive } from "./sim-cfn-dynamodb-table-time-to-live.js";
 import { SimCfnDynamoDbTableValues } from "./sim-cfn-dynamodb-table-values.js";
 
 /**
@@ -137,6 +139,14 @@ export class SimCfnDynamoDbTableProperties {
    */
   deletionProtectionEnabled(): boolean | undefined {
     return this.values.boolean("DeletionProtectionEnabled");
+  }
+
+  /**
+   * The time to live the template asks for, when it asks for one.
+   */
+  timeToLiveSpecification():
+    SimDynamoDbTimeToLiveSpecificationInput | undefined {
+    return readSimCfnDynamoDbTableTimeToLive(this.values);
   }
 
   /**

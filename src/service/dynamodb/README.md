@@ -52,6 +52,7 @@ Current command areas include:
 - `batch/` (BatchWriteItem and BatchGetItem)
 - `transact/` (TransactWriteItems and TransactGetItems)
 - `tag/` (TagResource, UntagResource and ListTagsOfResource)
+- `time-to-live/` (UpdateTimeToLive and DescribeTimeToLive)
 
 `table/` is the layout newer commands follow: one directory per group of related commands, with the
 structural command types in `table.command.ts`, the value and description shapes they are made of in
@@ -669,6 +670,33 @@ Current uses:
   write that is there, so nothing about it waits on the scheduler.
 - `SimDynamoDbTransactionTokens` reads the scheduler's clock, which is what makes the ten minute
   `ClientRequestToken` window something `simAws.clock().advanceBy(...)` can move past.
+- UpdateTimeToLive schedules the settle that takes the status from ENABLING to ENABLED, or from
+  DISABLING to DISABLED, the same way table activation is scheduled.
+- `SimDynamoDbTableExpiry` uses `scheduleAt` rather than `schedule`, so an item's removal is due at
+  a simulated instant rather than on the next drain. Only moving the clock through `simAws.clock()`
+  dispatches it, which is why `backgroundTasksComplete()` does not expire anything.
+
+## Time to live
+
+Time to live lives under `time-to-live/`, away from the commands that switch it on, because it is
+table state rather than request handling.
+
+- `SimDynamoDbTimeToLive` is one table's setting: the status, the attribute name, and when it was
+  last updated. It owns the two rules an update has to pass: that it changes the state, and that it
+  is at least an hour after the last one. Both are measured on the simulated clock.
+- `SimDynamoDbTimeToLiveSpecification` is a checked `TimeToLiveSpecification`. Real DynamoDB
+  requires both fields even when switching time to live off, so both are required here.
+- `simDynamoDbItemDeletionInstant` works out when an item should be deleted, which is 48 hours after
+  its TTL timestamp rather than on it. That window is the deliberate divergence: AWS promises a
+  range and this picks the far end. The reasoning is in the constant's comment. It also applies the
+  five year eligibility rule, which is why it takes the instant to read the timestamp against.
+- `SimDynamoDbTableExpiry` schedules the removal and re-checks at fire time, the same shape as
+  `SimSecretsManagerSecretExpiry`. The re-check recomputes the deletion instant from whatever is
+  under the key now, so one check covers a deleted item, an overwrite with a later TTL, a TTL
+  attribute that has gone or changed type, and time to live having been switched off.
+
+`SimDynamoDbTable.putItem()` is the single hook. Every write in the service goes through it,
+including batch and transactional ones, so nothing needs a scheduling call of its own.
 
 Tests that need eventual state should call the broader sim AWS background-drain helper, for example:
 

@@ -16,15 +16,15 @@ const simulatedPropertyNames: ReadonlySet<string> = new Set([
   "TableClass",
   "TableName",
   "Tags",
+  "TimeToLiveSpecification",
 ]);
 
 /**
  * Real AWS::DynamoDB::Table properties this simulation does not model.
  *
  * Each one changes what the table does. A table deployed without its secondary
- * indexes would answer queries differently, and one deployed without its time
- * to live would hold items that should have expired, so the Resource is
- * skipped rather than deployed as something else.
+ * indexes would answer queries differently, so the Resource is skipped rather
+ * than deployed as something else.
  */
 const unsimulatedPropertyNames: ReadonlySet<string> = new Set([
   "ContributorInsightsSpecification",
@@ -37,7 +37,6 @@ const unsimulatedPropertyNames: ReadonlySet<string> = new Set([
   "ResourcePolicy",
   "SSESpecification",
   "StreamSpecification",
-  "TimeToLiveSpecification",
   "WarmThroughput",
 ]);
 

@@ -30,6 +30,16 @@ export class SimDynamoDbTableItems {
   }
 
   /**
+   * Every item held here, with the key it is held under.
+   *
+   * Switching time to live on has to reach items that were already written, so
+   * the items are readable as a whole rather than only one key at a time.
+   */
+  entries(): ReadonlyMap<string, SimDynamoDbItem> {
+    return this.items;
+  }
+
+  /**
    * Remove the item held under a key, and answer with whatever was removed.
    *
    * A key holding nothing is not a failure. DynamoDB deletes by key rather than
