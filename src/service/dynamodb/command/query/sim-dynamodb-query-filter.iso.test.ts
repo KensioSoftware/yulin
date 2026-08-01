@@ -144,6 +144,27 @@ describe("DynamoDB QueryCommand FilterExpression", () => {
     assertIdentical(output.Count, 0);
     assertIdentical(output.ScannedCount, 1);
     assertNonNullable(output.LastEvaluatedKey);
+
+    // And that token resumes after the item the filter dropped, so a caller
+    // looping on it reads the rest of the collection rather than stopping at
+    // the empty page.
+    const resumed = await simDynamoDb.query(
+      new QueryCommand({
+        TableName: "OrdersTable",
+        KeyConditionExpression: "customerId = :customer AND orderId > :after",
+        FilterExpression: "#status = :open",
+        ExpressionAttributeNames: { "#status": "status" },
+        ExpressionAttributeValues: {
+          ":customer": { S: "c-1" },
+          ":after": { S: "2026-01" },
+          ":open": { S: "OPEN" },
+        },
+        ExclusiveStartKey: output.LastEvaluatedKey,
+      }),
+    );
+
+    assertArrayEquals(orderIds(resumed), ["2026-03"]);
+    assertIdentical(resumed.ScannedCount, 2);
   });
 
   it("reads the whole condition grammar", async () => {
