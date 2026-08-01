@@ -1,5 +1,4 @@
 import {
-  CreateTableCommand,
   GetItemCommand,
   TransactWriteItemsCommand,
 } from "@aws-sdk/client-dynamodb";
@@ -15,26 +14,7 @@ import {
   SimDynamoDbResourceNotFoundException,
   SimDynamoDbValidationException,
 } from "../../error/dynamodb.error.js";
-import type { SimDynamoDb } from "../../sim-dynamodb.js";
-
-/**
- * A ledger table, holding nothing yet.
- */
-async function ledgerTable(simAws: SimAws): Promise<SimDynamoDb> {
-  const simDynamoDb = simAws.dynamoDb();
-
-  await simDynamoDb.createTable(
-    new CreateTableCommand({
-      TableName: "LedgerTable",
-      KeySchema: [{ AttributeName: "entryId", KeyType: "HASH" }],
-      AttributeDefinitions: [{ AttributeName: "entryId", AttributeType: "S" }],
-      BillingMode: "PAY_PER_REQUEST",
-    }),
-  );
-  await simAws.backgroundTasksComplete();
-
-  return simDynamoDb;
-}
+import { simDynamoDbCreatedTableFactory } from "../../table/sim-dynamodb-created-table.factory.js";
 
 const entryPut = {
   Put: { TableName: "LedgerTable", Item: { entryId: { S: "entry-1" } } },
@@ -44,7 +24,12 @@ describe("DynamoDB TransactWriteItemsCommand request validation", () => {
   it("requires TransactItems naming an action", async () => {
     // Given a table.
     const simAws = new SimAws();
-    const simDynamoDb = await ledgerTable(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "LedgerTable", partitionKeyName: "entryId" },
+      simAws,
+    );
 
     // When a transaction asks for nothing.
     const error = await assertThrowsErrorAsync(async () =>
@@ -64,7 +49,12 @@ describe("DynamoDB TransactWriteItemsCommand request validation", () => {
   it("requires TransactItems at all", async () => {
     // Given a table.
     const simAws = new SimAws();
-    const simDynamoDb = await ledgerTable(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "LedgerTable", partitionKeyName: "entryId" },
+      simAws,
+    );
 
     // When a transaction names no actions at all, under a token.
     const error = await assertThrowsErrorAsync(async () =>
@@ -84,7 +74,12 @@ describe("DynamoDB TransactWriteItemsCommand request validation", () => {
   it("refuses more actions than a transaction takes", async () => {
     // Given a table.
     const simAws = new SimAws();
-    const simDynamoDb = await ledgerTable(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "LedgerTable", partitionKeyName: "entryId" },
+      simAws,
+    );
 
     // When a transaction asks for 101 actions.
     const error = await assertThrowsErrorAsync(async () =>
@@ -111,7 +106,12 @@ describe("DynamoDB TransactWriteItemsCommand request validation", () => {
   it("refuses an entry carrying two of the four actions", async () => {
     // Given a table.
     const simAws = new SimAws();
-    const simDynamoDb = await ledgerTable(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "LedgerTable", partitionKeyName: "entryId" },
+      simAws,
+    );
 
     // When one entry asks for both a put and a delete.
     const error = await assertThrowsErrorAsync(async () =>
@@ -141,7 +141,12 @@ describe("DynamoDB TransactWriteItemsCommand request validation", () => {
   it("refuses an entry carrying none of the four actions", async () => {
     // Given a table.
     const simAws = new SimAws();
-    const simDynamoDb = await ledgerTable(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "LedgerTable", partitionKeyName: "entryId" },
+      simAws,
+    );
 
     // When one entry asks for nothing.
     const error = await assertThrowsErrorAsync(async () =>
@@ -158,7 +163,12 @@ describe("DynamoDB TransactWriteItemsCommand request validation", () => {
   it("requires an Item on a Put", async () => {
     // Given a table.
     const simAws = new SimAws();
-    const simDynamoDb = await ledgerTable(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "LedgerTable", partitionKeyName: "entryId" },
+      simAws,
+    );
 
     // When a put carries no Item.
     const error = await assertThrowsErrorAsync(async () =>
@@ -175,7 +185,12 @@ describe("DynamoDB TransactWriteItemsCommand request validation", () => {
   it("requires an UpdateExpression on an Update", async () => {
     // Given a table.
     const simAws = new SimAws();
-    const simDynamoDb = await ledgerTable(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "LedgerTable", partitionKeyName: "entryId" },
+      simAws,
+    );
 
     // When an update says nothing to change.
     const error = await assertThrowsErrorAsync(async () =>
@@ -205,7 +220,12 @@ describe("DynamoDB TransactWriteItemsCommand request validation", () => {
   it("requires a ConditionExpression on a ConditionCheck", async () => {
     // Given a table.
     const simAws = new SimAws();
-    const simDynamoDb = await ledgerTable(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "LedgerTable", partitionKeyName: "entryId" },
+      simAws,
+    );
 
     // When a condition check names no condition.
     const error = await assertThrowsErrorAsync(async () =>
@@ -234,7 +254,12 @@ describe("DynamoDB TransactWriteItemsCommand request validation", () => {
   it("requires a Key on a Delete", async () => {
     // Given a table.
     const simAws = new SimAws();
-    const simDynamoDb = await ledgerTable(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "LedgerTable", partitionKeyName: "entryId" },
+      simAws,
+    );
 
     // When a delete carries no Key.
     const error = await assertThrowsErrorAsync(async () =>
@@ -251,7 +276,12 @@ describe("DynamoDB TransactWriteItemsCommand request validation", () => {
   it("refuses two actions on one item of a table", async () => {
     // Given a table.
     const simAws = new SimAws();
-    const simDynamoDb = await ledgerTable(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "LedgerTable", partitionKeyName: "entryId" },
+      simAws,
+    );
 
     // When a transaction writes and deletes the same item.
     const error = await assertThrowsErrorAsync(async () =>
@@ -282,7 +312,12 @@ describe("DynamoDB TransactWriteItemsCommand request validation", () => {
   it("refuses a transaction naming a table that is not there", async () => {
     // Given a table.
     const simAws = new SimAws();
-    const simDynamoDb = await ledgerTable(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "LedgerTable", partitionKeyName: "entryId" },
+      simAws,
+    );
 
     // When one action names a table that was never created.
     const error = await assertThrowsErrorAsync(async () =>
@@ -316,7 +351,12 @@ describe("DynamoDB TransactWriteItemsCommand request validation", () => {
   it("refuses an update that would move the primary key", async () => {
     // Given a table.
     const simAws = new SimAws();
-    const simDynamoDb = await ledgerTable(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "LedgerTable", partitionKeyName: "entryId" },
+      simAws,
+    );
 
     // When one action writes to a key attribute.
     const error = await assertThrowsErrorAsync(async () =>

@@ -1,11 +1,9 @@
 import {
-  CreateTableCommand,
   GetItemCommand,
   PutItemCommand,
   TransactGetItemsCommand,
   TransactWriteItemsCommand,
 } from "@aws-sdk/client-dynamodb";
-import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
   assertIdentical,
   assertInstanceOf,
@@ -15,53 +13,8 @@ import {
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
-
-const ledgerTable = new CreateTableCommand({
-  TableName: "LedgerTable",
-  KeySchema: [{ AttributeName: "entryId", KeyType: "HASH" }],
-  AttributeDefinitions: [{ AttributeName: "entryId", AttributeType: "S" }],
-  BillingMode: "PAY_PER_REQUEST",
-});
-
-const trustPolicy = (accountId: string): string =>
-  JSON.stringify({
-    Version: "2012-10-17",
-    Statement: {
-      Effect: "Allow",
-      Principal: { AWS: `arn:aws:iam::${accountId}:root` },
-      Action: "sts:AssumeRole",
-    },
-  });
-
-/**
- * A Role allowed the DynamoDB actions it is given, and nothing else.
- */
-async function roleAllowed(
-  simAws: SimAws,
-  roleName: string,
-  actions: readonly string[],
-): Promise<string> {
-  const simIam = simAws.iam();
-  const creation = await simIam.createRole(
-    new CreateRoleCommand({
-      RoleName: roleName,
-      AssumeRolePolicyDocument: trustPolicy(simAws.defaultAccountId),
-    }),
-  );
-
-  await simIam.putRolePolicy(
-    new PutRolePolicyCommand({
-      RoleName: roleName,
-      PolicyName: `${roleName}Policy`,
-      PolicyDocument: JSON.stringify({
-        Version: "2012-10-17",
-        Statement: { Effect: "Allow", Action: actions, Resource: "*" },
-      }),
-    }),
-  );
-
-  return creation.Role.Arn;
-}
+import { simIamRoleWithPolicyFactory } from "../../../iam/role/sim-iam-role-with-policy.factory.js";
+import { simDynamoDbCreatedTableFactory } from "../../table/sim-dynamodb-created-table.factory.js";
 
 describe("DynamoDB transactional item command IAM authorization", () => {
   it("authorizes a transaction as the operations it is made of", async () => {
@@ -69,13 +22,18 @@ describe("DynamoDB transactional item command IAM authorization", () => {
     const simAws = new SimAws();
     const simDynamoDb = simAws.dynamoDb();
 
-    await simDynamoDb.createTable(ledgerTable);
-    await simAws.backgroundTasksComplete();
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "LedgerTable", partitionKeyName: "entryId" },
+      simAws,
+    );
 
-    const arn = await roleAllowed(simAws, "LedgerWriter", [
-      "dynamodb:PutItem",
-      "dynamodb:UpdateItem",
-    ]);
+    const role = await simIamRoleWithPolicyFactory.make(
+      {
+        roleName: "LedgerWriter",
+        actions: ["dynamodb:PutItem", "dynamodb:UpdateItem"],
+      },
+      simAws,
+    );
 
     // When the Role writes a transaction doing both.
     await simDynamoDb.transactWriteItems(
@@ -97,7 +55,7 @@ describe("DynamoDB transactional item command IAM authorization", () => {
           },
         ],
       }),
-      { caller: { kind: "arn", arn } },
+      { caller: { kind: "arn", arn: role.Arn } },
     );
 
     // Then IAM allows the request, since a transaction needs the actions of
@@ -116,8 +74,10 @@ describe("DynamoDB transactional item command IAM authorization", () => {
     const simAws = new SimAws();
     const simDynamoDb = simAws.dynamoDb();
 
-    await simDynamoDb.createTable(ledgerTable);
-    await simAws.backgroundTasksComplete();
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "LedgerTable", partitionKeyName: "entryId" },
+      simAws,
+    );
 
     await simDynamoDb.putItem(
       new PutItemCommand({
@@ -126,9 +86,10 @@ describe("DynamoDB transactional item command IAM authorization", () => {
       }),
     );
 
-    const arn = await roleAllowed(simAws, "PutOnlyWriter", [
-      "dynamodb:PutItem",
-    ]);
+    const role = await simIamRoleWithPolicyFactory.make(
+      { roleName: "PutOnlyWriter", actions: ["dynamodb:PutItem"] },
+      simAws,
+    );
 
     // When the Role writes a transaction that puts one item and deletes
     // another.
@@ -150,7 +111,7 @@ describe("DynamoDB transactional item command IAM authorization", () => {
             },
           ],
         }),
-        { caller: { kind: "arn", arn } },
+        { caller: { kind: "arn", arn: role.Arn } },
       ),
     );
 
@@ -180,12 +141,15 @@ describe("DynamoDB transactional item command IAM authorization", () => {
     const simAws = new SimAws();
     const simDynamoDb = simAws.dynamoDb();
 
-    await simDynamoDb.createTable(ledgerTable);
-    await simAws.backgroundTasksComplete();
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "LedgerTable", partitionKeyName: "entryId" },
+      simAws,
+    );
 
-    const arn = await roleAllowed(simAws, "CheckLessWriter", [
-      "dynamodb:PutItem",
-    ]);
+    const role = await simIamRoleWithPolicyFactory.make(
+      { roleName: "CheckLessWriter", actions: ["dynamodb:PutItem"] },
+      simAws,
+    );
 
     // When the Role writes a transaction guarded by a condition check.
     const error = await assertThrowsErrorAsync(async () =>
@@ -207,7 +171,7 @@ describe("DynamoDB transactional item command IAM authorization", () => {
             },
           ],
         }),
-        { caller: { kind: "arn", arn } },
+        { caller: { kind: "arn", arn: role.Arn } },
       ),
     );
 
@@ -221,8 +185,10 @@ describe("DynamoDB transactional item command IAM authorization", () => {
     const simAws = new SimAws();
     const simDynamoDb = simAws.dynamoDb();
 
-    await simDynamoDb.createTable(ledgerTable);
-    await simAws.backgroundTasksComplete();
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "LedgerTable", partitionKeyName: "entryId" },
+      simAws,
+    );
 
     const entry = {
       TransactItems: [
@@ -238,12 +204,15 @@ describe("DynamoDB transactional item command IAM authorization", () => {
 
     await simDynamoDb.transactWriteItems(new TransactWriteItemsCommand(entry));
 
-    const arn = await roleAllowed(simAws, "NoWriter", ["dynamodb:GetItem"]);
+    const role = await simIamRoleWithPolicyFactory.make(
+      { roleName: "NoWriter", actions: ["dynamodb:GetItem"] },
+      simAws,
+    );
 
     // When a Role with no permission to write replays the same token.
     const error = await assertThrowsErrorAsync(async () =>
       simDynamoDb.transactWriteItems(new TransactWriteItemsCommand(entry), {
-        caller: { kind: "arn", arn },
+        caller: { kind: "arn", arn: role.Arn },
       }),
     );
 
@@ -258,12 +227,15 @@ describe("DynamoDB transactional item command IAM authorization", () => {
     const simAws = new SimAws();
     const simDynamoDb = simAws.dynamoDb();
 
-    await simDynamoDb.createTable(ledgerTable);
-    await simAws.backgroundTasksComplete();
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "LedgerTable", partitionKeyName: "entryId" },
+      simAws,
+    );
 
-    const arn = await roleAllowed(simAws, "WriteOnlyReader", [
-      "dynamodb:PutItem",
-    ]);
+    const role = await simIamRoleWithPolicyFactory.make(
+      { roleName: "WriteOnlyReader", actions: ["dynamodb:PutItem"] },
+      simAws,
+    );
 
     // When the Role reads a transaction.
     const error = await assertThrowsErrorAsync(async () =>
@@ -278,7 +250,7 @@ describe("DynamoDB transactional item command IAM authorization", () => {
             },
           ],
         }),
-        { caller: { kind: "arn", arn } },
+        { caller: { kind: "arn", arn: role.Arn } },
       ),
     );
 

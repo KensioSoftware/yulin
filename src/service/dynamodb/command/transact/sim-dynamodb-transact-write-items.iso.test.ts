@@ -1,70 +1,27 @@
 import {
-  CreateTableCommand,
   GetItemCommand,
   PutItemCommand,
   TransactWriteItemsCommand,
 } from "@aws-sdk/client-dynamodb";
-import {
-  assertIdentical,
-  assertNonNullable,
-  assertUndefined,
-} from "@kensio/smartass";
+import { assertIdentical, assertUndefined } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
-import type { SimDynamoDb } from "../../sim-dynamodb.js";
-
-/**
- * A ledger and the account balances its entries move, as two tables.
- */
-async function ledgerTables(simAws: SimAws): Promise<SimDynamoDb> {
-  const simDynamoDb = simAws.dynamoDb();
-
-  await simDynamoDb.createTable(
-    new CreateTableCommand({
-      TableName: "AccountsTable",
-      KeySchema: [{ AttributeName: "accountId", KeyType: "HASH" }],
-      AttributeDefinitions: [
-        { AttributeName: "accountId", AttributeType: "S" },
-      ],
-      BillingMode: "PAY_PER_REQUEST",
-    }),
-  );
-  await simDynamoDb.createTable(
-    new CreateTableCommand({
-      TableName: "LedgerTable",
-      KeySchema: [{ AttributeName: "entryId", KeyType: "HASH" }],
-      AttributeDefinitions: [{ AttributeName: "entryId", AttributeType: "S" }],
-      BillingMode: "PAY_PER_REQUEST",
-    }),
-  );
-  await simAws.backgroundTasksComplete();
-
-  return simDynamoDb;
-}
-
-/**
- * The account these tests move money in and out of.
- */
-async function storedAccount(
-  simDynamoDb: SimDynamoDb,
-): Promise<Record<string, { readonly N?: string; readonly S?: string }>> {
-  const output = await simDynamoDb.getItem(
-    new GetItemCommand({
-      TableName: "AccountsTable",
-      Key: { accountId: { S: "account-1" } },
-    }),
-  );
-
-  assertNonNullable(output.Item);
-
-  return output.Item;
-}
+import { simDynamoDbCreatedTableFactory } from "../../table/sim-dynamodb-created-table.factory.js";
 
 describe("DynamoDB TransactWriteItemsCommand", () => {
   it("writes a ledger entry and the balance it moves in one call", async () => {
-    // Given an account holding a balance.
+    // Given an account holding a balance, and a ledger to record it in.
     const simAws = new SimAws();
-    const simDynamoDb = await ledgerTables(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "AccountsTable", partitionKeyName: "accountId" },
+      simAws,
+    );
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "LedgerTable", partitionKeyName: "entryId" },
+      simAws,
+    );
 
     await simDynamoDb.putItem(
       new PutItemCommand({
@@ -104,14 +61,28 @@ describe("DynamoDB TransactWriteItemsCommand", () => {
     );
     assertIdentical(entry.Item?.["amount"]?.N, "25");
 
-    const account = await storedAccount(simDynamoDb);
-    assertIdentical(account["balance"]?.N, "75");
+    const account = await simDynamoDb.getItem(
+      new GetItemCommand({
+        TableName: "AccountsTable",
+        Key: { accountId: { S: "account-1" } },
+      }),
+    );
+    assertIdentical(account.Item?.["balance"]?.N, "75");
   });
 
   it("deletes one item and puts another in one call", async () => {
-    // Given an account and a ledger entry.
+    // Given a ledger entry, and an account holding nothing yet.
     const simAws = new SimAws();
-    const simDynamoDb = await ledgerTables(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "AccountsTable", partitionKeyName: "accountId" },
+      simAws,
+    );
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "LedgerTable", partitionKeyName: "entryId" },
+      simAws,
+    );
 
     await simDynamoDb.putItem(
       new PutItemCommand({
@@ -149,14 +120,24 @@ describe("DynamoDB TransactWriteItemsCommand", () => {
     );
     assertUndefined(entry.Item);
 
-    const account = await storedAccount(simDynamoDb);
-    assertIdentical(account["balance"]?.N, "0");
+    const account = await simDynamoDb.getItem(
+      new GetItemCommand({
+        TableName: "AccountsTable",
+        Key: { accountId: { S: "account-1" } },
+      }),
+    );
+    assertIdentical(account.Item?.["balance"]?.N, "0");
   });
 
   it("deletes a key that holds nothing", async () => {
     // Given a table holding no items.
     const simAws = new SimAws();
-    const simDynamoDb = await ledgerTables(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "LedgerTable", partitionKeyName: "entryId" },
+      simAws,
+    );
 
     // When a transaction deletes a key nothing was written under.
     await simDynamoDb.transactWriteItems(
@@ -183,9 +164,18 @@ describe("DynamoDB TransactWriteItemsCommand", () => {
   });
 
   it("writes when a ConditionCheck on another item holds", async () => {
-    // Given an open account.
+    // Given an open account, and a ledger to write against it.
     const simAws = new SimAws();
-    const simDynamoDb = await ledgerTables(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "AccountsTable", partitionKeyName: "accountId" },
+      simAws,
+    );
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "LedgerTable", partitionKeyName: "entryId" },
+      simAws,
+    );
 
     await simDynamoDb.putItem(
       new PutItemCommand({
@@ -226,14 +216,24 @@ describe("DynamoDB TransactWriteItemsCommand", () => {
     );
     assertIdentical(entry.Item?.["entryId"]?.S, "entry-1");
 
-    const account = await storedAccount(simDynamoDb);
-    assertIdentical(account["status"]?.S, "open");
+    const account = await simDynamoDb.getItem(
+      new GetItemCommand({
+        TableName: "AccountsTable",
+        Key: { accountId: { S: "account-1" } },
+      }),
+    );
+    assertIdentical(account.Item?.["status"]?.S, "open");
   });
 
   it("upserts an item an Update names when the key holds nothing", async () => {
     // Given a table holding no items.
     const simAws = new SimAws();
-    const simDynamoDb = await ledgerTables(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "AccountsTable", partitionKeyName: "accountId" },
+      simAws,
+    );
 
     // When a transactional update names a key nothing is stored under.
     await simDynamoDb.transactWriteItems(
@@ -253,15 +253,25 @@ describe("DynamoDB TransactWriteItemsCommand", () => {
 
     // Then the item is built from the Key and what the update set, as
     // UpdateItem builds it.
-    const account = await storedAccount(simDynamoDb);
-    assertIdentical(account["accountId"]?.S, "account-1");
-    assertIdentical(account["balance"]?.N, "10");
+    const account = await simDynamoDb.getItem(
+      new GetItemCommand({
+        TableName: "AccountsTable",
+        Key: { accountId: { S: "account-1" } },
+      }),
+    );
+    assertIdentical(account.Item?.["accountId"]?.S, "account-1");
+    assertIdentical(account.Item["balance"]?.N, "10");
   });
 
   it("names one table for several of its items", async () => {
     // Given a table holding no items.
     const simAws = new SimAws();
-    const simDynamoDb = await ledgerTables(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "LedgerTable", partitionKeyName: "entryId" },
+      simAws,
+    );
 
     // When a transaction writes two items of the same table.
     await simDynamoDb.transactWriteItems(
@@ -299,26 +309,18 @@ describe("DynamoDB TransactWriteItemsCommand", () => {
     const simAws = new SimAws();
     const simDynamoDb = simAws.dynamoDb();
 
-    const creation = await simDynamoDb.createTable(
-      new CreateTableCommand({
-        TableName: "LedgerTable",
-        KeySchema: [{ AttributeName: "entryId", KeyType: "HASH" }],
-        AttributeDefinitions: [
-          { AttributeName: "entryId", AttributeType: "S" },
-        ],
-        BillingMode: "PAY_PER_REQUEST",
-      }),
+    const table = await simDynamoDbCreatedTableFactory.make(
+      { tableName: "LedgerTable", partitionKeyName: "entryId" },
+      simAws,
     );
-    await simAws.backgroundTasksComplete();
-
-    const tableArn = creation.TableDescription?.TableArn;
-    assertNonNullable(tableArn);
 
     // When a transaction names the table by its ARN.
     await simDynamoDb.transactWriteItems(
       new TransactWriteItemsCommand({
         TransactItems: [
-          { Put: { TableName: tableArn, Item: { entryId: { S: "entry-1" } } } },
+          {
+            Put: { TableName: table.arn, Item: { entryId: { S: "entry-1" } } },
+          },
         ],
       }),
     );
@@ -336,7 +338,12 @@ describe("DynamoDB TransactWriteItemsCommand", () => {
   it("takes the 100 actions a transaction holds", async () => {
     // Given a table.
     const simAws = new SimAws();
-    const simDynamoDb = await ledgerTables(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "LedgerTable", partitionKeyName: "entryId" },
+      simAws,
+    );
 
     // When a transaction writes exactly 100 items.
     await simDynamoDb.transactWriteItems(

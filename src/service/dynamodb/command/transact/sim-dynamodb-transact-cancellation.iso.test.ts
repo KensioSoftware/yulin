@@ -1,5 +1,4 @@
 import {
-  CreateTableCommand,
   GetItemCommand,
   PutItemCommand,
   TransactWriteItemsCommand,
@@ -15,48 +14,7 @@ import {
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimDynamoDbTransactionCanceledException } from "../../error/dynamodb.error.js";
-import type { SimDynamoDb } from "../../sim-dynamodb.js";
-
-/**
- * A ledger and the account balances its entries move, as two tables.
- */
-async function ledgerTables(simAws: SimAws): Promise<SimDynamoDb> {
-  const simDynamoDb = simAws.dynamoDb();
-
-  await simDynamoDb.createTable(
-    new CreateTableCommand({
-      TableName: "AccountsTable",
-      KeySchema: [{ AttributeName: "accountId", KeyType: "HASH" }],
-      AttributeDefinitions: [
-        { AttributeName: "accountId", AttributeType: "S" },
-      ],
-      BillingMode: "PAY_PER_REQUEST",
-    }),
-  );
-  await simDynamoDb.createTable(
-    new CreateTableCommand({
-      TableName: "LedgerTable",
-      KeySchema: [{ AttributeName: "entryId", KeyType: "HASH" }],
-      AttributeDefinitions: [{ AttributeName: "entryId", AttributeType: "S" }],
-      BillingMode: "PAY_PER_REQUEST",
-    }),
-  );
-  await simAws.backgroundTasksComplete();
-
-  return simDynamoDb;
-}
-
-/**
- * A closed account, which the conditions these tests write are about.
- */
-async function closedAccount(simDynamoDb: SimDynamoDb): Promise<void> {
-  await simDynamoDb.putItem(
-    new PutItemCommand({
-      TableName: "AccountsTable",
-      Item: { accountId: { S: "account-1" }, status: { S: "closed" } },
-    }),
-  );
-}
+import { simDynamoDbCreatedTableFactory } from "../../table/sim-dynamodb-created-table.factory.js";
 
 /**
  * A ledger entry, and an update that only moves an open account's balance.
@@ -86,9 +44,23 @@ describe("DynamoDB transactional write cancellation", () => {
   it("reports every action, including the one nothing was wrong with", async () => {
     // Given a closed account.
     const simAws = new SimAws();
-    const simDynamoDb = await ledgerTables(simAws);
+    const simDynamoDb = simAws.dynamoDb();
 
-    await closedAccount(simDynamoDb);
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "AccountsTable", partitionKeyName: "accountId" },
+      simAws,
+    );
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "LedgerTable", partitionKeyName: "entryId" },
+      simAws,
+    );
+
+    await simDynamoDb.putItem(
+      new PutItemCommand({
+        TableName: "AccountsTable",
+        Item: { accountId: { S: "account-1" }, status: { S: "closed" } },
+      }),
+    );
 
     // When a transaction writes an entry and moves the balance of it.
     const cancelled = await assertThrowsErrorAsync(async () =>
@@ -119,9 +91,23 @@ describe("DynamoDB transactional write cancellation", () => {
   it("leaves the action that would have gone through unwritten", async () => {
     // Given a closed account.
     const simAws = new SimAws();
-    const simDynamoDb = await ledgerTables(simAws);
+    const simDynamoDb = simAws.dynamoDb();
 
-    await closedAccount(simDynamoDb);
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "AccountsTable", partitionKeyName: "accountId" },
+      simAws,
+    );
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "LedgerTable", partitionKeyName: "entryId" },
+      simAws,
+    );
+
+    await simDynamoDb.putItem(
+      new PutItemCommand({
+        TableName: "AccountsTable",
+        Item: { accountId: { S: "account-1" }, status: { S: "closed" } },
+      }),
+    );
 
     // When the transaction is cancelled.
     await assertThrowsErrorAsync(async () =>
@@ -153,9 +139,19 @@ describe("DynamoDB transactional write cancellation", () => {
   it("puts the item on the reason for ALL_OLD", async () => {
     // Given a closed account.
     const simAws = new SimAws();
-    const simDynamoDb = await ledgerTables(simAws);
+    const simDynamoDb = simAws.dynamoDb();
 
-    await closedAccount(simDynamoDb);
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "AccountsTable", partitionKeyName: "accountId" },
+      simAws,
+    );
+
+    await simDynamoDb.putItem(
+      new PutItemCommand({
+        TableName: "AccountsTable",
+        Item: { accountId: { S: "account-1" }, status: { S: "closed" } },
+      }),
+    );
 
     // When the action that fails asked for the item it lost to.
     const cancelled = await assertThrowsErrorAsync(async () =>
@@ -192,7 +188,12 @@ describe("DynamoDB transactional write cancellation", () => {
   it("leaves the item off the reason when the key holds nothing", async () => {
     // Given a table holding no items.
     const simAws = new SimAws();
-    const simDynamoDb = await ledgerTables(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "AccountsTable", partitionKeyName: "accountId" },
+      simAws,
+    );
 
     // When an action asking for ALL_OLD fails against a key holding nothing.
     const cancelled = await assertThrowsErrorAsync(async () =>
@@ -225,9 +226,23 @@ describe("DynamoDB transactional write cancellation", () => {
   it("reports every action whose condition failed", async () => {
     // Given a closed account and a ledger entry that is already there.
     const simAws = new SimAws();
-    const simDynamoDb = await ledgerTables(simAws);
+    const simDynamoDb = simAws.dynamoDb();
 
-    await closedAccount(simDynamoDb);
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "AccountsTable", partitionKeyName: "accountId" },
+      simAws,
+    );
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "LedgerTable", partitionKeyName: "entryId" },
+      simAws,
+    );
+
+    await simDynamoDb.putItem(
+      new PutItemCommand({
+        TableName: "AccountsTable",
+        Item: { accountId: { S: "account-1" }, status: { S: "closed" } },
+      }),
+    );
     await simDynamoDb.putItem(
       new PutItemCommand({
         TableName: "LedgerTable",
@@ -271,7 +286,12 @@ describe("DynamoDB transactional write cancellation", () => {
   it("cancels a transaction a Put's own condition turns away", async () => {
     // Given a ledger entry that is already there.
     const simAws = new SimAws();
-    const simDynamoDb = await ledgerTables(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "LedgerTable", partitionKeyName: "entryId" },
+      simAws,
+    );
 
     await simDynamoDb.putItem(
       new PutItemCommand({

@@ -1,7 +1,4 @@
-import {
-  CreateTableCommand,
-  TransactWriteItemsCommand,
-} from "@aws-sdk/client-dynamodb";
+import { TransactWriteItemsCommand } from "@aws-sdk/client-dynamodb";
 import {
   assertInstanceOf,
   assertStringIncludes,
@@ -13,26 +10,7 @@ import {
   SimDynamoDbUnsupportedOperation,
   SimDynamoDbValidationException,
 } from "../../error/dynamodb.error.js";
-import type { SimDynamoDb } from "../../sim-dynamodb.js";
-
-/**
- * A ledger table, holding nothing yet.
- */
-async function ledgerTable(simAws: SimAws): Promise<SimDynamoDb> {
-  const simDynamoDb = simAws.dynamoDb();
-
-  await simDynamoDb.createTable(
-    new CreateTableCommand({
-      TableName: "LedgerTable",
-      KeySchema: [{ AttributeName: "entryId", KeyType: "HASH" }],
-      AttributeDefinitions: [{ AttributeName: "entryId", AttributeType: "S" }],
-      BillingMode: "PAY_PER_REQUEST",
-    }),
-  );
-  await simAws.backgroundTasksComplete();
-
-  return simDynamoDb;
-}
+import { simDynamoDbCreatedTableFactory } from "../../table/sim-dynamodb-created-table.factory.js";
 
 const entryPut = {
   Put: { TableName: "LedgerTable", Item: { entryId: { S: "entry-1" } } },
@@ -42,7 +20,12 @@ describe("DynamoDB transactional write limits and reporting", () => {
   it("refuses a transaction over the size a request holds", async () => {
     // Given a table.
     const simAws = new SimAws();
-    const simDynamoDb = await ledgerTable(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "LedgerTable", partitionKeyName: "entryId" },
+      simAws,
+    );
 
     // When 100 items of 45 KB each are written in one transaction.
     const padding = "x".repeat(45 * 1024);
@@ -75,7 +58,12 @@ describe("DynamoDB transactional write limits and reporting", () => {
   it("refuses the write reporting inputs this simulation does not model", async () => {
     // Given a table.
     const simAws = new SimAws();
-    const simDynamoDb = await ledgerTable(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "LedgerTable", partitionKeyName: "entryId" },
+      simAws,
+    );
 
     // When a transaction asks for a capacity cost.
     const capacity = await assertThrowsErrorAsync(async () =>

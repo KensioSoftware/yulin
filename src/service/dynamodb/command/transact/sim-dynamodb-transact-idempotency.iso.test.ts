@@ -1,5 +1,4 @@
 import {
-  CreateTableCommand,
   GetItemCommand,
   PutItemCommand,
   TransactWriteItemsCommand,
@@ -18,34 +17,7 @@ import {
   SimDynamoDbValidationException,
 } from "../../error/dynamodb.error.js";
 import type { SimDynamoDb } from "../../sim-dynamodb.js";
-
-/**
- * An account holding a balance of 100.
- */
-async function accountWithBalance(simAws: SimAws): Promise<SimDynamoDb> {
-  const simDynamoDb = simAws.dynamoDb();
-
-  await simDynamoDb.createTable(
-    new CreateTableCommand({
-      TableName: "AccountsTable",
-      KeySchema: [{ AttributeName: "accountId", KeyType: "HASH" }],
-      AttributeDefinitions: [
-        { AttributeName: "accountId", AttributeType: "S" },
-      ],
-      BillingMode: "PAY_PER_REQUEST",
-    }),
-  );
-  await simAws.backgroundTasksComplete();
-
-  await simDynamoDb.putItem(
-    new PutItemCommand({
-      TableName: "AccountsTable",
-      Item: { accountId: { S: "account-1" }, balance: { N: "100" } },
-    }),
-  );
-
-  return simDynamoDb;
-}
+import { simDynamoDbCreatedTableFactory } from "../../table/sim-dynamodb-created-table.factory.js";
 
 /**
  * The balance the account is currently holding.
@@ -84,7 +56,18 @@ describe("DynamoDB transactional write idempotency", () => {
   it("does not apply the writes again for the same token and payload", async () => {
     // Given an account that has already had a withdrawal applied to it.
     const simAws = new SimAws();
-    const simDynamoDb = await accountWithBalance(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "AccountsTable", partitionKeyName: "accountId" },
+      simAws,
+    );
+    await simDynamoDb.putItem(
+      new PutItemCommand({
+        TableName: "AccountsTable",
+        Item: { accountId: { S: "account-1" }, balance: { N: "100" } },
+      }),
+    );
 
     await simDynamoDb.transactWriteItems(
       new TransactWriteItemsCommand(withdrawal),
@@ -103,7 +86,18 @@ describe("DynamoDB transactional write idempotency", () => {
   it("refuses a token replayed with a different payload", async () => {
     // Given an account that has already had a withdrawal applied to it.
     const simAws = new SimAws();
-    const simDynamoDb = await accountWithBalance(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "AccountsTable", partitionKeyName: "accountId" },
+      simAws,
+    );
+    await simDynamoDb.putItem(
+      new PutItemCommand({
+        TableName: "AccountsTable",
+        Item: { accountId: { S: "account-1" }, balance: { N: "100" } },
+      }),
+    );
 
     await simDynamoDb.transactWriteItems(
       new TransactWriteItemsCommand(withdrawal),
@@ -136,7 +130,18 @@ describe("DynamoDB transactional write idempotency", () => {
   it("applies the writes again once the token window has passed", async () => {
     // Given an account that has already had a withdrawal applied to it.
     const simAws = new SimAws();
-    const simDynamoDb = await accountWithBalance(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "AccountsTable", partitionKeyName: "accountId" },
+      simAws,
+    );
+    await simDynamoDb.putItem(
+      new PutItemCommand({
+        TableName: "AccountsTable",
+        Item: { accountId: { S: "account-1" }, balance: { N: "100" } },
+      }),
+    );
 
     await simDynamoDb.transactWriteItems(
       new TransactWriteItemsCommand(withdrawal),
@@ -155,7 +160,18 @@ describe("DynamoDB transactional write idempotency", () => {
   it("still treats a token inside the window as a retry", async () => {
     // Given an account that has already had a withdrawal applied to it.
     const simAws = new SimAws();
-    const simDynamoDb = await accountWithBalance(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "AccountsTable", partitionKeyName: "accountId" },
+      simAws,
+    );
+    await simDynamoDb.putItem(
+      new PutItemCommand({
+        TableName: "AccountsTable",
+        Item: { accountId: { S: "account-1" }, balance: { N: "100" } },
+      }),
+    );
 
     await simDynamoDb.transactWriteItems(
       new TransactWriteItemsCommand(withdrawal),
@@ -174,7 +190,18 @@ describe("DynamoDB transactional write idempotency", () => {
   it("does not remember a transaction that was cancelled", async () => {
     // Given a transaction that was cancelled by its condition.
     const simAws = new SimAws();
-    const simDynamoDb = await accountWithBalance(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "AccountsTable", partitionKeyName: "accountId" },
+      simAws,
+    );
+    await simDynamoDb.putItem(
+      new PutItemCommand({
+        TableName: "AccountsTable",
+        Item: { accountId: { S: "account-1" }, balance: { N: "100" } },
+      }),
+    );
 
     const guarded = {
       TransactItems: [
@@ -221,7 +248,18 @@ describe("DynamoDB transactional write idempotency", () => {
   it("refuses a ClientRequestToken of a length DynamoDB does not take", async () => {
     // Given an account.
     const simAws = new SimAws();
-    const simDynamoDb = await accountWithBalance(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "AccountsTable", partitionKeyName: "accountId" },
+      simAws,
+    );
+    await simDynamoDb.putItem(
+      new PutItemCommand({
+        TableName: "AccountsTable",
+        Item: { accountId: { S: "account-1" }, balance: { N: "100" } },
+      }),
+    );
 
     // When a transaction carries an empty token.
     const empty = await assertThrowsErrorAsync(async () =>
@@ -254,7 +292,18 @@ describe("DynamoDB transactional write idempotency", () => {
   it("applies each transaction that carries no token", async () => {
     // Given an account.
     const simAws = new SimAws();
-    const simDynamoDb = await accountWithBalance(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "AccountsTable", partitionKeyName: "accountId" },
+      simAws,
+    );
+    await simDynamoDb.putItem(
+      new PutItemCommand({
+        TableName: "AccountsTable",
+        Item: { accountId: { S: "account-1" }, balance: { N: "100" } },
+      }),
+    );
 
     const untokened = {
       TransactItems: withdrawal.TransactItems,
@@ -275,7 +324,18 @@ describe("DynamoDB transactional write idempotency", () => {
   it("leaves a table alone when a mismatched token is refused", async () => {
     // Given an account with no second account beside it.
     const simAws = new SimAws();
-    const simDynamoDb = await accountWithBalance(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbCreatedTableFactory.make(
+      { tableName: "AccountsTable", partitionKeyName: "accountId" },
+      simAws,
+    );
+    await simDynamoDb.putItem(
+      new PutItemCommand({
+        TableName: "AccountsTable",
+        Item: { accountId: { S: "account-1" }, balance: { N: "100" } },
+      }),
+    );
 
     await simDynamoDb.transactWriteItems(
       new TransactWriteItemsCommand(withdrawal),
