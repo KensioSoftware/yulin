@@ -32,6 +32,7 @@ import type {
   SimDescribeTimeToLiveCommand,
   SimUpdateTimeToLiveCommand,
 } from "../command/time-to-live/time-to-live.command.js";
+import { simDynamoDbDocumentRoutes } from "../document/sim-dynamodb-document-routes.js";
 import type { SimDynamoDb as SimDynamoDatabase } from "../sim-dynamodb.js";
 
 /**
@@ -178,6 +179,9 @@ export class SimDynamoDatabaseSdkCommandRouter implements SimSdkCommandRouter {
             simSdkCallerOptions(context),
           ),
       ],
+      // The document client's Commands, which carry native JavaScript values
+      // and so are converted on the way in and out.
+      ...simDynamoDbDocumentRoutes(simDynamoDatabase),
     ]);
   }
 

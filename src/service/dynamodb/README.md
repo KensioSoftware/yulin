@@ -54,6 +54,9 @@ Current command areas include:
 - `tag/` (TagResource, UntagResource and ListTagsOfResource)
 - `time-to-live/` (UpdateTimeToLive and DescribeTimeToLive)
 
+The `@aws-sdk/lib-dynamodb` document client's Commands are handled under `document/` rather than
+here, since they are the same operations with a conversion around them.
+
 `table/` is the layout newer commands follow: one directory per group of related commands, with the
 structural command types in `table.command.ts`, the value and description shapes they are made of in
 `table.types.ts`, and one class per command or closely related group. `item/` follows the same shape
@@ -675,6 +678,41 @@ Current uses:
 - `SimDynamoDbTableExpiry` uses `scheduleAt` rather than `schedule`, so an item's removal is due at
   a simulated instant rather than on the next drain. Only moving the clock through `simAws.clock()`
   dispatches it, which is why `backgroundTasksComplete()` does not expire anything.
+
+## The document client
+
+`document/` handles `@aws-sdk/lib-dynamodb` Commands, which carry native JavaScript values rather
+than AttributeValues.
+
+The real document client converts in middleware added to the underlying Command's stack, and that
+middleware is reached through `resolveMiddleware`, which `installSendPatch` replaces. So an
+intercepted send never runs it and the conversion happens at the interception boundary instead.
+
+- `sim-dynamodb-document-marshall.ts` reads a native value as an AttributeValue, and
+  `-unmarshall.ts` reads one back. The rules and their order are `convertToAttr` and
+  `convertToNative` from `util-dynamodb`, restated here rather than imported: no implementation file
+  imports the AWS SDK, and `lib-dynamodb` is a devDependency. `-number.ts`, `-set.ts` and
+  `-binary.ts` hold the parts with rules of their own.
+- The option defaults `lib-dynamodb` sets, `convertTopLevelContainer` and
+  `convertWithoutMapWrapper`, amount to converting one value at a time with no top-level unwrapping,
+  which is what these functions do. The `util-dynamodb` defaults would drop the `M` wrapper off a
+  nested object, which is not an attribute value at all.
+- `sim-dynamodb-document-path.ts` says where in a Command the native values sit, since a Command
+  carries ordinary request values everywhere else. `-command-paths.ts` states them per Command,
+  mirroring the key nodes the real client declares on its own Commands, which are `protected` and so
+  not read from it.
+- `sim-dynamodb-document-route.ts` converts, sends to the ordinary facade method, and converts back.
+  `-routes.ts` builds one per Command for the SDK router to merge in.
+
+A document Command is named differently to the Command it stands for, so `PutCommand` and
+`PutItemCommand` route separately. One with no route, such as `TransactWriteCommand`, is refused by
+name before anything tries to convert its values.
+
+Which object a user intercepts is settled: the document client itself.
+`DynamoDBDocumentClient.from(client)` builds a separate object that extends the same `Client` base as
+`DynamoDBClient` rather than extending `DynamoDBClient`, so patching the base client's send does not
+reach it. It does share the base client's `config`, so `serviceId` and `region` resolve the same way
+for both.
 
 ## Time to live
 
