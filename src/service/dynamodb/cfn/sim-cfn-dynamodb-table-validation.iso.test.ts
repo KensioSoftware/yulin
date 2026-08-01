@@ -10,16 +10,7 @@ import {
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
-
-/**
- * The key schema and definitions a valid table carries, so a test can change
- * one property without restating the rest.
- */
-const validKeyProperties = {
-  KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
-  AttributeDefinitions: [{ AttributeName: "id", AttributeType: "S" }],
-  BillingMode: "PAY_PER_REQUEST",
-};
+import { simCfnDynamoDbTableResourceFactory } from "./table/sim-cfn-dynamodb-table-resource.factory.js";
 
 describe("DynamoDB CloudFormation Table validation", () => {
   it("fails a table the CreateTable rules refuse", async () => {
@@ -33,17 +24,14 @@ describe("DynamoDB CloudFormation Table validation", () => {
         stackName: "orders-stack",
         template: {
           Resources: {
-            OrdersTable: {
-              Type: "AWS::DynamoDB::Table",
-              Properties: {
-                TableName: "orders",
-                KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+            OrdersTable: simCfnDynamoDbTableResourceFactory.make({
+              tableName: "orders",
+              properties: {
                 AttributeDefinitions: [
                   { AttributeName: "customerId", AttributeType: "S" },
                 ],
-                BillingMode: "PAY_PER_REQUEST",
               },
-            },
+            }),
           },
         },
       });
@@ -72,17 +60,15 @@ describe("DynamoDB CloudFormation Table validation", () => {
       stackName: "orders-stack",
       template: {
         Resources: {
-          OrdersTable: {
-            Type: "AWS::DynamoDB::Table",
-            Properties: {
-              TableName: "orders",
-              ...validKeyProperties,
+          OrdersTable: simCfnDynamoDbTableResourceFactory.make({
+            tableName: "orders",
+            properties: {
               TimeToLiveSpecification: {
                 AttributeName: "expiresAt",
                 Enabled: true,
               },
             },
-          },
+          }),
           OrdersBucket: { Type: "AWS::S3::Bucket" },
         },
       },
@@ -116,8 +102,10 @@ describe("DynamoDB CloudFormation Table validation", () => {
       template: {
         Resources: {
           OrdersTable: {
+            ...simCfnDynamoDbTableResourceFactory.make({
+              tableName: "orders",
+            }),
             Type: "AWS::DynamoDB::GlobalTable",
-            Properties: { TableName: "orders", ...validKeyProperties },
           },
         },
       },
@@ -147,14 +135,12 @@ describe("DynamoDB CloudFormation Table validation", () => {
       template: {
         Parameters: { TableProtected: { Type: "String" } },
         Resources: {
-          OrdersTable: {
-            Type: "AWS::DynamoDB::Table",
-            Properties: {
-              TableName: "orders",
-              ...validKeyProperties,
+          OrdersTable: simCfnDynamoDbTableResourceFactory.make({
+            tableName: "orders",
+            properties: {
               DeletionProtectionEnabled: { Ref: "TableProtected" },
             },
-          },
+          }),
         },
       },
     });
@@ -177,14 +163,12 @@ describe("DynamoDB CloudFormation Table validation", () => {
       template: {
         Parameters: { TableProtected: { Type: "String" } },
         Resources: {
-          OrdersTable: {
-            Type: "AWS::DynamoDB::Table",
-            Properties: {
-              TableName: "orders",
-              ...validKeyProperties,
+          OrdersTable: simCfnDynamoDbTableResourceFactory.make({
+            tableName: "orders",
+            properties: {
               DeletionProtectionEnabled: { Ref: "TableProtected" },
             },
-          },
+          }),
         },
       },
     });

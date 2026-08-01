@@ -1,7 +1,11 @@
-import { ListTagsOfResourceCommand } from "@aws-sdk/client-dynamodb";
+import {
+  DescribeTableCommand,
+  ListTagsOfResourceCommand,
+} from "@aws-sdk/client-dynamodb";
 import {
   assertArrayLength,
   assertInstanceOf,
+  assertNonNullable,
   assertObjectEquals,
   assertStringIncludes,
   assertThrowsErrorAsync,
@@ -9,51 +13,28 @@ import {
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
-import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
-import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
 import { SimDynamoDbValidationException } from "../error/dynamodb.error.js";
-
-const accountIdOneOnes = "111111111111" as SimAwsAccountId;
-
-function simAwsInEuWest2(): SimAws {
-  return new SimAws({
-    defaultAccountId: accountIdOneOnes,
-    defaultRegionName: "eu-west-2",
-  });
-}
-
-/**
- * A table Resource with the properties every one of these tests needs.
- */
-function tableProperties(
-  tags: SimCfnTemplateValueRecord[],
-): SimCfnTemplateValueRecord {
-  return {
-    TableName: "orders",
-    KeySchema: [{ AttributeName: "orderId", KeyType: "HASH" }],
-    AttributeDefinitions: [{ AttributeName: "orderId", AttributeType: "S" }],
-    BillingMode: "PAY_PER_REQUEST",
-    Tags: tags,
-  };
-}
+import { simCfnDynamoDbTableResourceFactory } from "./table/sim-cfn-dynamodb-table-resource.factory.js";
 
 describe("DynamoDB CloudFormation Table tagging", () => {
   it("creates a table carrying the tags the template puts on it", async () => {
     // Given a template tagging its table, as a CDK app applying Tags.of does.
-    const simAws = simAwsInEuWest2();
+    const simAws = new SimAws();
 
     // When the template is deployed.
     const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "orders-stack",
       template: {
         Resources: {
-          OrdersTable: {
-            Type: "AWS::DynamoDB::Table",
-            Properties: tableProperties([
-              { Key: "Environment", Value: "test" },
-              { Key: "Owner", Value: "platform" },
-            ]),
-          },
+          OrdersTable: simCfnDynamoDbTableResourceFactory.make({
+            tableName: "orders",
+            properties: {
+              Tags: [
+                { Key: "Environment", Value: "test" },
+                { Key: "Owner", Value: "platform" },
+              ],
+            },
+          }),
         },
       },
     });
@@ -61,9 +42,14 @@ describe("DynamoDB CloudFormation Table tagging", () => {
     await simAws.backgroundTasksComplete();
 
     // Then the tags are on the table an SDK caller reads.
+    const described = await simAws
+      .dynamoDb()
+      .describeTable(new DescribeTableCommand({ TableName: "orders" }));
+    assertNonNullable(described.Table?.TableArn);
+
     const output = await simAws.dynamoDb().listTagsOfResource(
       new ListTagsOfResourceCommand({
-        ResourceArn: "arn:aws:dynamodb:eu-west-2:111111111111:table/orders",
+        ResourceArn: described.Table.TableArn,
       }),
     );
 
@@ -74,7 +60,7 @@ describe("DynamoDB CloudFormation Table tagging", () => {
 
   it("fails the Resource for a tag DynamoDB would refuse", async () => {
     // Given a template tagging its table under the reserved aws: prefix.
-    const simAws = simAwsInEuWest2();
+    const simAws = new SimAws();
 
     // When the template is deployed.
     const error = await assertThrowsErrorAsync(async () => {
@@ -82,12 +68,10 @@ describe("DynamoDB CloudFormation Table tagging", () => {
         stackName: "orders-stack",
         template: {
           Resources: {
-            OrdersTable: {
-              Type: "AWS::DynamoDB::Table",
-              Properties: tableProperties([
-                { Key: "aws:owner", Value: "platform" },
-              ]),
-            },
+            OrdersTable: simCfnDynamoDbTableResourceFactory.make({
+              tableName: "orders",
+              properties: { Tags: [{ Key: "aws:owner", Value: "platform" }] },
+            }),
           },
         },
       });
