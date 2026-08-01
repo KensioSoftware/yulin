@@ -3,6 +3,7 @@ import type {
   SimDynamoDbTableClassSummary,
   SimDynamoDbTableDescription,
 } from "../command/table/table.types.js";
+import { simDynamoDbIndexStatus } from "../secondary-index/sim-dynamodb-index-status.js";
 import type { SimDynamoDbTable } from "./sim-dynamodb-table.js";
 
 /**
@@ -39,6 +40,9 @@ export function describeSimDynamoDbTable(
     BillingModeSummary: table.billing.summary(),
     ProvisionedThroughput: table.billing.throughputDescription(),
     TableClassSummary: tableClassSummary(table.tableClass),
+    GlobalSecondaryIndexes: table.indexes.descriptions(
+      simDynamoDbIndexStatus(table.status),
+    ),
     DeletionProtectionEnabled: table.deletionProtectionEnabled,
     // Neither figure is tracked yet. Real DynamoDB updates both about every
     // six hours, so they lag behind the items anyway.

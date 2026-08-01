@@ -109,6 +109,95 @@ DynamoDB reports for one.
 `TableClass` is stored and reported, and changes nothing else: nothing bills a table here.
 `DeletionProtectionEnabled` does change what the table does, and is covered under deleting a table.
 
+## Global secondary indexes
+
+`GlobalSecondaryIndexes` on `CreateTable` declares indexes with a key of their own over the same
+items. Each index needs an `IndexName`, a `KeySchema` and a `Projection`.
+
+```typescript sim-dynamodb-global-secondary-index
+/**
+ * Declaring a global secondary index on a simulated table.
+ */
+
+import { CreateTableCommand, PutItemCommand } from "@aws-sdk/client-dynamodb";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const dynamoDb = simAws.dynamoDb();
+
+const creation = await dynamoDb.createTable(
+  new CreateTableCommand({
+    TableName: "OrdersTable",
+    KeySchema: [{ AttributeName: "orderId", KeyType: "HASH" }],
+    // Every index key attribute needs a definition, alongside the table's own.
+    AttributeDefinitions: [
+      { AttributeName: "orderId", AttributeType: "S" },
+      { AttributeName: "status", AttributeType: "S" },
+      { AttributeName: "orderedAt", AttributeType: "N" },
+    ],
+    BillingMode: "PAY_PER_REQUEST",
+    GlobalSecondaryIndexes: [
+      {
+        IndexName: "byStatus",
+        KeySchema: [
+          { AttributeName: "status", KeyType: "HASH" },
+          { AttributeName: "orderedAt", KeyType: "RANGE" },
+        ],
+        Projection: { ProjectionType: "ALL" },
+      },
+    ],
+  }),
+);
+
+const index = creation.TableDescription?.GlobalSecondaryIndexes?.[0];
+console.log(index?.IndexName); // "byStatus"
+console.log(index?.IndexStatus); // "CREATING"
+console.log(index?.IndexArn); // ".../table/OrdersTable/index/byStatus"
+
+await simAws.backgroundTasksComplete();
+
+// This order carries neither index key attribute, so it is absent from
+// byStatus rather than refused. Missing either one is enough.
+await dynamoDb.putItem(
+  new PutItemCommand({
+    TableName: "OrdersTable",
+    Item: { orderId: { S: "order-1" }, total: { N: "42" } },
+  }),
+);
+```
+
+`AttributeDefinitions` has to match the table key schema and every index key schema exactly, in both
+directions. Declaring an index without adding its key attribute definitions is a
+`ValidationException`, and so is defining an attribute no key uses. This is where `CreateTable` input
+most often goes wrong.
+
+An index key schema takes the same shape the table's does: one `HASH` element, optionally followed by
+one `RANGE` element, with key attributes of `S`, `N` or `B`. Index names are unique within a table,
+and a table holds at most 20 indexes.
+
+`Projection` says which attributes the index carries. `ALL` is the whole item, `KEYS_ONLY` is the
+index keys plus the table keys, and `INCLUDE` adds 1 to 20 `NonKeyAttributes` to those. `INCLUDE`
+with no attributes named is refused, since it would add nothing to `KEYS_ONLY`, and attributes named
+under either of the other two types are refused as well.
+
+A table projects at most 100 `NonKeyAttributes` across all of its indexes, as well as 20 in any one
+of them. An attribute projected into two indexes counts twice.
+
+A provisioned table needs a `ProvisionedThroughput` per index as well as its own. `PAY_PER_REQUEST`
+refuses one, since an on-demand index has no capacity to provision.
+
+The description reports each index with its `IndexName`, `IndexArn`, `KeySchema`, `Projection`,
+`ProvisionedThroughput` and `IndexStatus`. The index ARN is the table's own with the index named
+under it. An index status follows its table's, so it is `CREATING` on the `CreateTable` response and
+`ACTIVE` once the table is. A table that declared no index leaves `GlobalSecondaryIndexes` out of its
+description altogether.
+
+An index is sparse, so an item missing any one of an index's key attributes is absent from that index
+rather than refused on the write. An index keyed on two attributes needs both. The one thing a write
+is held to on account of an index is the type: an item carrying an index key attribute as a type the
+index did not declare is a `ValidationException`, since the index could never hold it.
+
 ## Describing a table
 
 `DescribeTable` answers with the same description `CreateTable` did, read off the table itself. A
@@ -2317,6 +2406,9 @@ property, and the rest of the stack still deploys: `GlobalSecondaryIndexes`, `Lo
 `AWS::DynamoDB::Table` does not have fails the resource instead, since that is a template real
 CloudFormation would refuse too.
 
+`GlobalSecondaryIndexes` is among those, even though `CreateTable` takes it. The template property is
+not read yet, so a stack declaring one skips the table rather than deploying it without its index.
+
 `AWS::DynamoDB::GlobalTable` is skipped rather than deployed, since replication across regions is
 not simulated.
 
@@ -2344,6 +2436,9 @@ nothing is written.
 
 - `CreateTable`, with table name, key schema, attribute definition, billing mode and throughput
   validation.
+- `GlobalSecondaryIndexes` on `CreateTable`, with index name, key schema, projection and per-index
+  throughput validation, `AttributeDefinitions` matched against every key schema in the request, and
+  each index reported in the table description.
 - `DescribeTable`, answering with the full table description, by table name or ARN.
 - `ListTables`, ordered by UTF-8 bytes and paged with `Limit` and `ExclusiveStartTableName`.
 - `DeleteTable`, following the table status DynamoDB moves a deleted table through, and refusing a
@@ -2405,10 +2500,19 @@ nothing is written.
 - `Expected`, `ConditionalOperator` and `AttributeUpdates` are not converted for the document
   client, because simulated DynamoDB refuses all three anyway. A request carrying one is refused by
   the operation rather than by the conversion.
-- Global and local secondary indexes are not simulated. `GlobalSecondaryIndexes` and
-  `LocalSecondaryIndexes` are refused rather than dropped, since a table missing an index it was
-  asked for would answer queries differently to the real one, and a `Query` naming an `IndexName` is
-  refused for the same reason. An empty list asks for no index, so it is accepted.
+- Reading a global secondary index is not simulated yet. An index is declared, validated and
+  reported, and the write path is held to its key attribute types, but `IndexName` on `Query` and
+  `Scan` is still refused rather than reading the table instead.
+- Local secondary indexes are not simulated. `LocalSecondaryIndexes` is refused rather than dropped,
+  since a table missing an index it was asked for would answer queries differently to the real one.
+  An empty list asks for no index, so it is accepted.
+- An index key is one attribute, or two. Real DynamoDB now takes more than that, and a key schema of
+  more than two elements is refused here.
+- `ItemCount` and `IndexSizeBytes` are 0 for every index, the same way the table's own figures are.
+- Per-index `ProvisionedThroughput` is read, validated and reported, and enforces nothing. No read or
+  write against an index is throttled, since none against the table is either.
+- `UpdateTable` is not simulated, so an index cannot be added to or removed from a table after it has
+  been created.
 - Tagging is immediate. AWS documents `TagResource` and `UntagResource` as eventually consistent, so
   a real `ListTagsOfResource` issued straight after one of them may answer with the previous tags or
   with none. Here the change is there by the time the call returns, so a test cannot observe the

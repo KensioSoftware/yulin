@@ -91,6 +91,7 @@ Table state lives under `table/`.
 - creation time
 - current table status
 - key schema and attribute definitions
+- global secondary indexes
 - billing mode, provisioned throughput, table class and deletion protection
 - tags
 - in-memory items
@@ -111,13 +112,13 @@ naming what was wrong:
 
 - `SimDynamoDbTableName` for the name pattern and length
 - `SimDynamoDbKeySchema` for key element order, position and attribute names
-- `SimDynamoDbAttributeDefinitions` for attribute types, duplicates, and matching the key schema in
+- `SimDynamoDbAttributeDefinitions` for attribute types, duplicates, and matching every key schema in
   both directions
 - `SimDynamoDbTableBilling` for the billing mode and the throughput that goes with it
 
 ## Key schema handling
 
-`SimDynamoDbKeySchema` holds the table primary key.
+`SimDynamoDbKeySchema` holds the key of a table or of one of its secondary indexes.
 
 Supported key schema behavior:
 
@@ -126,6 +127,11 @@ Supported key schema behavior:
 - key attributes are `S`, `N` or `B`, and must have a matching attribute definition
 - item partition and sort key values must be strings or numbers
 - item keys are serialized as JSON and used as the internal item map key
+
+A request carries several key schemas: the table's own, and one per index. `SimDynamoDbKeySchemaSubject`
+is which of them a key schema is, and it travels with the key schema so a refusal names the one that
+was wrong. That is also what lets `SimDynamoDbAttributeDefinitions.assertMatches` take every key
+schema at once and report an undefined index key attribute against the index that declared it.
 
 For a table with only a partition key named `id`, an item with `{ id: { S: "abc" } }` is stored
 under an internal key equivalent to:
@@ -142,6 +148,35 @@ For a table with partition key `pk` and sort key `sk`, the internal key includes
 
 This is an implementation detail, but it is important when changing item storage because `putItem()`
 uses the key schema to overwrite items with the same primary key.
+
+## Secondary index model
+
+Index state lives under `secondary-index/`.
+
+`SimDynamoDbGlobalSecondaryIndex` is one index, as the name, key schema, projection and throughput a
+read of it needs. `SimDynamoDbGlobalSecondaryIndexes` is the indexes one table carries, and owns what
+is about how many there are: the 20 index cap and the uniqueness of a name. That is the same split
+the table tags follow.
+
+The parts an index is made of are a file each, since each has rules of its own:
+
+- `sim-dynamodb-index-name.ts` is the name pattern and length, which is the table name rule.
+- `sim-dynamodb-index-projection.ts` is `SimDynamoDbIndexProjection`: the three projection types, and
+  the two directions `INCLUDE` and `NonKeyAttributes` have to agree in.
+- `sim-dynamodb-index-throughput.ts` is the capacity an index is provisioned with, which contradicts
+  the billing mode in both directions the way the table's own does.
+- `sim-dynamodb-index-status.ts` maps a table status to the index status. Nothing here adds an index
+  to an existing table, so the index status follows the table's rather than being tracked apart from
+  it: `CREATING` on the CreateTable response, `ACTIVE` once the table is.
+
+Which items an index holds is worked out when the index is read rather than maintained on every
+write, following the precedent `SimSqsQueue.applyLifecycle` sets. So PutItem, UpdateItem and
+DeleteItem stay unaware of indexes apart from one check.
+
+That check is `assertItemKeyTypes`, applied in `SimDynamoDbTable.putItem`, which every write in the
+service goes through. An item missing an index key attribute is fine, since a global secondary index
+is sparse and simply does not hold it. An item carrying one as a type the index did not declare is a
+`ValidationException`, since the index could never hold it.
 
 ## Tagging behavior
 
@@ -231,7 +266,9 @@ The order it works in matters:
 2. The table name is read and checked, because the ARN is built from it.
 3. IAM authorizes `dynamodb:CreateTable` against that ARN. This runs before the table map is looked
    at, so an unauthorized caller cannot find out which names are taken.
-4. The key schema, attribute definitions, billing and table class are read and checked.
+4. The key schema, billing, secondary indexes, attribute definitions and table class are read and
+   checked. The indexes come before the attribute definitions, since the definitions have to match
+   every key schema the request carries and the indexes are where the rest of those are.
 5. Only then is the name checked against the table map and taken.
 
 `SimDynamoDb.createTable()` awaits `background.sequence()` and then calls `handle()`, which is
@@ -241,7 +278,8 @@ the same name cannot both get it. The second gets `SimDynamoDbResourceInUseExcep
 The returned `TableDescription` reports the table back: `TableName`, `TableArn`, `TableId`,
 `KeySchema`, `AttributeDefinitions`, `TableStatus`, `CreationDateTime`, `ProvisionedThroughput`,
 `DeletionProtectionEnabled`, and `BillingModeSummary` or `TableClassSummary` when the request named
-a billing mode or a table class. `ItemCount` and `TableSizeBytes` stay at 0.
+a billing mode or a table class. `GlobalSecondaryIndexes` is there when the table has any, and left
+out altogether when it has none. `ItemCount` and `TableSizeBytes` stay at 0.
 
 Unsimulated inputs are refused with `SimDynamoDbUnsupportedOperation` rather than dropped. Each one
 is listed in the Limitations section of
@@ -549,8 +587,9 @@ A batch write takes no `ConditionExpression`, as a real one does not. `SimDynamo
 `SimDynamoDbDeleteRequest` declare one anyway, so a request carrying it is refused by name rather
 than written unconditionally.
 
-Indexes and streams are not implemented. Billing mode and provisioned capacity are read and
-stored by CreateTable, but nothing enforces them: no write is ever throttled.
+Streams are not implemented, and neither is reading a secondary index. Billing mode and provisioned
+capacity are read and stored by CreateTable, for the table and for each index, but nothing enforces
+them: no write is ever throttled.
 
 ## TransactWriteItems and TransactGetItems behavior
 

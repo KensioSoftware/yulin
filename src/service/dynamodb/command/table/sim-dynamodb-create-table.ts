@@ -2,6 +2,7 @@ import type { BackgroundScheduler } from "../../../../util/background/background
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import { SimDynamoDbResourceInUseException } from "../../error/dynamodb.error.js";
+import { SimDynamoDbGlobalSecondaryIndexes } from "../../secondary-index/sim-dynamodb-global-secondary-indexes.js";
 import { SimDynamoDbAttributeDefinitions } from "../../table/sim-dynamodb-attribute-definitions.js";
 import { SimDynamoDbKeySchema } from "../../table/sim-dynamodb-key-schema.js";
 import { SimDynamoDbTable } from "../../table/sim-dynamodb-table.js";
@@ -107,23 +108,34 @@ export class SimDynamoDbCreateTable {
 
   /**
    * Build the table a request describes, checking what it describes.
+   *
+   * The indexes are read before the attribute definitions, since the
+   * definitions have to match every key schema the request carries and the
+   * indexes are where the rest of those are.
    */
   private tableFrom(
     name: SimDynamoDbTableName,
     input: SimCreateTableCommandInput,
   ): SimDynamoDbTable {
+    const arn = simDynamoDbTableArn(this.accountRegionScope, name.value);
     const keySchema = SimDynamoDbKeySchema.fromInput(input.KeySchema);
+    const billing = SimDynamoDbTableBilling.fromInput(input);
+    const indexes = SimDynamoDbGlobalSecondaryIndexes.fromInput(
+      input.GlobalSecondaryIndexes,
+      { tableArn: arn, billing },
+    );
     const attributeDefinitions = SimDynamoDbAttributeDefinitions.fromInput(
       input.AttributeDefinitions,
     );
-    attributeDefinitions.assertMatches(keySchema);
+    attributeDefinitions.assertMatches([keySchema, ...indexes.keySchemas()]);
 
     return new SimDynamoDbTable({
       name,
-      arn: simDynamoDbTableArn(this.accountRegionScope, name.value),
+      arn,
       keySchema,
       attributeDefinitions,
-      billing: SimDynamoDbTableBilling.fromInput(input),
+      billing,
+      indexes,
       tableClass: readSimDynamoDbTableClass(input.TableClass),
       deletionProtectionEnabled: input.DeletionProtectionEnabled,
       tags: SimDynamoDbTableTags.fromInput(input.Tags),

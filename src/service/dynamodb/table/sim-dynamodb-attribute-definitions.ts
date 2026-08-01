@@ -91,20 +91,30 @@ export class SimDynamoDbAttributeDefinitions {
   }
 
   /**
-   * Check these definitions and a key schema name exactly the same attributes.
+   * Check these definitions and the key schemas using them name exactly the
+   * same attributes.
+   *
+   * Every key schema a request carries takes part: the table's own, and one for
+   * each secondary index. Declaring an index whose key attribute has no
+   * definition is the mistake this catches, and it is where CreateTable input
+   * most often goes wrong.
    */
-  assertMatches(keySchema: SimDynamoDbKeySchema): void {
+  assertMatches(keySchemas: readonly SimDynamoDbKeySchema[]): void {
     const definedNames = new Set(
       this.elements.map((element) => element.AttributeName),
     );
-    const keyNames = new Set(keySchema.attributeNames());
+    const keyNames = new Set<string>();
 
-    for (const keyName of keyNames) {
-      if (!definedNames.has(keyName)) {
-        throw new SimDynamoDbValidationException(
-          `The KeySchema names the attribute ${keyName}, which has no ` +
-            `AttributeDefinition`,
-        );
+    for (const keySchema of keySchemas) {
+      for (const keyName of keySchema.attributeNames()) {
+        keyNames.add(keyName);
+
+        if (!definedNames.has(keyName)) {
+          throw new SimDynamoDbValidationException(
+            `The KeySchema${keySchema.subject.owner} names the attribute ` +
+              `${keyName}, which has no AttributeDefinition`,
+          );
+        }
       }
     }
 

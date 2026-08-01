@@ -17,6 +17,24 @@ const tableInput = {
 } as const satisfies SimCreateTableCommandInput;
 
 /**
+ * A table carrying one index, for the settings an index has of its own.
+ */
+const indexedTableInput = {
+  ...tableInput,
+  AttributeDefinitions: [
+    { AttributeName: "id", AttributeType: "S" },
+    { AttributeName: "status", AttributeType: "S" },
+  ],
+  GlobalSecondaryIndexes: [
+    {
+      IndexName: "byStatus",
+      KeySchema: [{ AttributeName: "status", KeyType: "HASH" }],
+      Projection: { ProjectionType: "KEYS_ONLY" },
+    },
+  ],
+} as const satisfies SimCreateTableCommandInput;
+
+/**
  * Create a table asking for something the simulation does not model.
  */
 async function refusedCreateTable(
@@ -30,18 +48,6 @@ async function refusedCreateTable(
 }
 
 describe("DynamoDB CreateTableCommand unsimulated input", () => {
-  it("refuses global secondary indexes", async () => {
-    // When a table is created with a global secondary index.
-    const error = await refusedCreateTable({
-      ...tableInput,
-      GlobalSecondaryIndexes: [{ IndexName: "byEmail" }],
-    });
-
-    // Then the index is refused rather than quietly left out.
-    assertInstanceOf(error, SimDynamoDbUnsupportedOperation);
-    assertStringIncludes(error.message, "Global secondary indexes");
-  });
-
   it("refuses local secondary indexes", async () => {
     // When a table is created with a local secondary index.
     const error = await refusedCreateTable({
@@ -138,5 +144,49 @@ describe("DynamoDB CreateTableCommand unsimulated input", () => {
     // Then the warm throughput is refused.
     assertInstanceOf(error, SimDynamoDbUnsupportedOperation);
     assertStringIncludes(error.message, "WarmThroughput");
+  });
+
+  it("refuses on-demand throughput maximums on an index", async () => {
+    // When an index is created with on-demand throughput limits of its own.
+    const error = await refusedCreateTable({
+      ...indexedTableInput,
+      GlobalSecondaryIndexes: [
+        {
+          ...indexedTableInput.GlobalSecondaryIndexes[0],
+          OnDemandThroughput: { MaxReadRequestUnits: 100 },
+        },
+      ],
+    });
+
+    // Then the limits are refused, naming the index carrying them.
+    assertInstanceOf(error, SimDynamoDbUnsupportedOperation);
+    assertStringIncludes(
+      error.message,
+      "OnDemandThroughput maximums are not simulated, so CreateTable refuses " +
+        "them on index byStatus",
+    );
+  });
+
+  it("refuses warm throughput on an index", async () => {
+    // When an index with no name yet is created pre-warmed for traffic.
+    const error = await refusedCreateTable({
+      ...indexedTableInput,
+      GlobalSecondaryIndexes: [
+        {
+          ...indexedTableInput.GlobalSecondaryIndexes[0],
+          IndexName: undefined,
+          WarmThroughput: { ReadUnitsPerSecond: 12_000 },
+        },
+      ],
+    });
+
+    // Then the warm throughput is refused, naming the entry by its position.
+    // Unsimulated input is refused before any name is read, so the position is
+    // what an unnamed index can be pointed at by.
+    assertInstanceOf(error, SimDynamoDbUnsupportedOperation);
+    assertStringIncludes(
+      error.message,
+      "refuses it on GlobalSecondaryIndexes entry 1",
+    );
   });
 });
