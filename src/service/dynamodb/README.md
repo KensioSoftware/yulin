@@ -413,8 +413,10 @@ The parts a transaction is made of split by what they know:
 
 - `SimDynamoDbTransactWrite` is one action, as the item or key it carries, the condition guarding
   it, the IAM action it needs and what it does to a table. The four implementations are in
-  `sim-dynamodb-transact-actions.ts`, and each reads itself from the request, so what a Put requires
-  lives with the Put.
+  `sim-dynamodb-transact-put-action.ts`, `sim-dynamodb-transact-update-action.ts` and
+  `sim-dynamodb-transact-key-actions.ts`, which holds the delete and the condition check together
+  since both are a key and a condition against what is stored under it. Each file reads its own
+  action from the request, so what a Put requires lives with the Put.
 - `sim-dynamodb-transact-write.ts` reads one entry into one of those, refusing an entry carrying two
   of the four or none of them.
 - `sim-dynamodb-transact-writes.ts` reads a whole `TransactItems`, applying the 100 action cap and
