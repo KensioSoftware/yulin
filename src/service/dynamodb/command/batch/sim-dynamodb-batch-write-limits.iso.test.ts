@@ -193,6 +193,14 @@ describe("DynamoDB BatchWriteItemCommand whole batch refusals", () => {
 
     // Then both went through: two operations on one item are two operations on
     // one item of one table.
+    const order = await simDynamoDb.getItem(
+      new GetItemCommand({
+        TableName: "OrdersTable",
+        Key: { orderId: { S: "order-1" } },
+      }),
+    );
+    assertIdentical(order.Item?.["orderId"]?.S, "order-1");
+
     const archived = await simDynamoDb.getItem(
       new GetItemCommand({
         TableName: "ArchivedOrdersTable",

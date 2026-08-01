@@ -1,12 +1,15 @@
 import {
   BatchWriteItemCommand,
   CreateTableCommand,
+  GetItemCommand,
 } from "@aws-sdk/client-dynamodb";
 import {
   assertInstanceOf,
+  assertNonNullable,
   assertObjectEquals,
   assertStringIncludes,
   assertThrowsErrorAsync,
+  assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
@@ -216,6 +219,58 @@ describe("DynamoDB BatchWriteItemCommand request validation", () => {
       error.message,
       "A DeleteRequest takes no ConditionExpression",
     );
+  });
+
+  it("refuses one table named by both its name and its ARN", async () => {
+    // Given a table.
+    const simAws = new SimAws();
+    const simDynamoDb = simAws.dynamoDb();
+
+    const creation = await simDynamoDb.createTable(ordersTable);
+    await simAws.backgroundTasksComplete();
+
+    const tableArn = creation.TableDescription?.TableArn;
+    assertNonNullable(tableArn);
+
+    // When one batch writes the same item under both references.
+    const error = await assertThrowsErrorAsync(async () =>
+      simDynamoDb.batchWriteItem(
+        new BatchWriteItemCommand({
+          RequestItems: {
+            OrdersTable: [
+              {
+                PutRequest: {
+                  Item: { orderId: { S: "order-1" }, note: { S: "first" } },
+                },
+              },
+            ],
+            [tableArn]: [
+              {
+                PutRequest: {
+                  Item: { orderId: { S: "order-1" }, note: { S: "second" } },
+                },
+              },
+            ],
+          },
+        }),
+      ),
+    );
+
+    // Then the whole batch is refused, since a table is named once per
+    // request whichever way it is named, and nothing was written.
+    assertInstanceOf(error, SimDynamoDbValidationException);
+    assertStringIncludes(
+      error.message,
+      "Each table name or ARN can be used only once",
+    );
+
+    const output = await simDynamoDb.getItem(
+      new GetItemCommand({
+        TableName: "OrdersTable",
+        Key: { orderId: { S: "order-1" } },
+      }),
+    );
+    assertUndefined(output.Item);
   });
 
   it("refuses reporting a capacity cost nothing measures", async () => {

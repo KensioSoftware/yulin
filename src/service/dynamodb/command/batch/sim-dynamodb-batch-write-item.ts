@@ -1,17 +1,15 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
-import type { SimDynamoDbTable } from "../../table/sim-dynamodb-table.js";
 import type { SimDynamoDbTableAccess } from "../table/sim-dynamodb-table-access.js";
 import type {
   SimBatchWriteItemCommand,
   SimBatchWriteItemCommandOutput,
 } from "./batch.command.js";
 import { assertDistinctBatchItems } from "./sim-dynamodb-batch-request-items.js";
-import type { SimDynamoDbBatchWrite } from "./sim-dynamodb-batch-write.js";
-import {
-  readSimDynamoDbBatchWrites,
-  type SimDynamoDbBatchTableWrites,
-} from "./sim-dynamodb-batch-writes.js";
+import { reachSimDynamoDbBatchTables } from "./sim-dynamodb-batch-tables.js";
+import { readSimDynamoDbBatchWrites } from "./sim-dynamodb-batch-writes.js";
 import { refuseUnsimulatedBatchWriteInput } from "./sim-dynamodb-unsimulated-batch-input.js";
+
+const operation = "BatchWriteItem";
 
 interface SimDynamoDbBatchWriteItemProperties {
   readonly access: SimDynamoDbTableAccess;
@@ -19,14 +17,6 @@ interface SimDynamoDbBatchWriteItemProperties {
 
 interface SimDynamoDbBatchWriteItemOptions {
   readonly caller?: SimAwsCaller;
-}
-
-/**
- * The writes of one table, against the table they are for.
- */
-interface SimDynamoDbPlannedWrites {
-  readonly table: SimDynamoDbTable;
-  readonly writes: readonly SimDynamoDbBatchWrite[];
 }
 
 /**
@@ -58,11 +48,24 @@ export class SimDynamoDbBatchWriteItem {
 
     refuseUnsimulatedBatchWriteInput(input);
 
-    const requested = readSimDynamoDbBatchWrites(input.RequestItems);
-    const planned = requested.map((table) => this.plan(table, options?.caller));
+    const reached = reachSimDynamoDbBatchTables(
+      readSimDynamoDbBatchWrites(input.RequestItems),
+      { access: this.access, operation, caller: options?.caller },
+    );
 
-    for (const { table, writes } of planned) {
-      for (const write of writes) {
+    // Marshalling every key checks it against the table's key schema, and is
+    // what tells two operations on one item apart. Every table is checked
+    // before any of them is written to.
+    for (const { table, requested } of reached) {
+      assertDistinctBatchItems(
+        requested.writes.map((write) => write.keyIn(table)),
+        requested.reference,
+        operation,
+      );
+    }
+
+    for (const { table, requested } of reached) {
+      for (const write of requested.writes) {
         write.applyTo(table);
       }
     }
@@ -70,29 +73,5 @@ export class SimDynamoDbBatchWriteItem {
     // Nothing here throttles, so nothing is ever left unprocessed. The map is
     // still answered with, since that is the shape a retry loop reads.
     return { UnprocessedItems: {}, $metadata: {} };
-  }
-
-  /**
-   * Reach the table one part of the batch names, and check its keys.
-   */
-  private plan(
-    requested: SimDynamoDbBatchTableWrites,
-    caller: SimAwsCaller | undefined,
-  ): SimDynamoDbPlannedWrites {
-    const table = this.access.required(
-      "dynamodb:BatchWriteItem",
-      requested.reference,
-      caller,
-    );
-
-    // Marshalling every key checks it against the table's key schema, and is
-    // what tells two operations on one item apart.
-    assertDistinctBatchItems(
-      requested.writes.map((write) => write.keyIn(table)),
-      requested.reference,
-      "BatchWriteItem",
-    );
-
-    return { table, writes: requested.writes };
   }
 }

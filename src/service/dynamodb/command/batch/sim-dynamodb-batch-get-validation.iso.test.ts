@@ -5,6 +5,7 @@ import {
 } from "@aws-sdk/client-dynamodb";
 import {
   assertInstanceOf,
+  assertNonNullable,
   assertStringIncludes,
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
@@ -64,7 +65,7 @@ describe("DynamoDB BatchGetItemCommand request validation", () => {
     );
   });
 
-  it("refuses a table named with no Keys at all", async () => {
+  it("refuses a table with no Keys property at all", async () => {
     // Given a table.
     const simAws = new SimAws();
     const simDynamoDb = simAws.dynamoDb();
@@ -86,7 +87,7 @@ describe("DynamoDB BatchGetItemCommand request validation", () => {
     );
   });
 
-  it("refuses a table named with no Keys", async () => {
+  it("refuses a table named with an empty list of Keys", async () => {
     // Given a table.
     const simAws = new SimAws();
     const simDynamoDb = simAws.dynamoDb();
@@ -215,6 +216,37 @@ describe("DynamoDB BatchGetItemCommand request validation", () => {
     assertStringIncludes(
       error.message,
       "The provided key element does not match the schema",
+    );
+  });
+
+  it("refuses one table named by both its name and its ARN", async () => {
+    // Given a table.
+    const simAws = new SimAws();
+    const simDynamoDb = simAws.dynamoDb();
+    const creation = await simDynamoDb.createTable(ordersTable);
+    await simAws.backgroundTasksComplete();
+
+    const tableArn = creation.TableDescription?.TableArn;
+    assertNonNullable(tableArn);
+
+    // When one batch reads the same key under both references.
+    const error = await assertThrowsErrorAsync(async () =>
+      simDynamoDb.batchGetItem(
+        new BatchGetItemCommand({
+          RequestItems: {
+            OrdersTable: { Keys: [{ orderId: { S: "order-1" } }] },
+            [tableArn]: { Keys: [{ orderId: { S: "order-1" } }] },
+          },
+        }),
+      ),
+    );
+
+    // Then it is refused, since a table is named once per request whichever
+    // way it is named.
+    assertInstanceOf(error, SimDynamoDbValidationException);
+    assertStringIncludes(
+      error.message,
+      "Each table name or ARN can be used only once",
     );
   });
 

@@ -891,9 +891,12 @@ Six things take the whole batch down rather than one entry of it, leaving nothin
 - a table that is not there
 - key attributes that do not match the table's key schema
 - more than one operation on the same item of one table
+- one table named twice, once by its name and once by its ARN
 - more than 25 write requests, counted across every table the request names
 - an item over the 400 KB an item holds
-- a request over 16 MB
+
+Real DynamoDB also refuses a request over 16 MB. That one is not simulated, for the reason under
+Limitations.
 
 The same key in two different tables is two items rather than one, so a batch may write both.
 
@@ -981,14 +984,17 @@ caller that needs to tell its items apart reads the key attributes off them rath
 where they are in the list.
 
 More than 100 keys in one call, counted across every table the request names, is a
-`ValidationException`. So is the same key twice for one table.
+`ValidationException`. So is the same key twice for one table, and so is one table named twice, once
+by its name and once by its ARN.
 
 Both commands answer with the map of what they could not get to, `UnprocessedItems` for a write and
 `UnprocessedKeys` for a read. Both are always empty here, since nothing is throttled, but they are
 there rather than absent, so the retry loop real code is written around still terminates:
 
 ```typescript
-let unprocessed = { OrdersTable: [{ PutRequest: { Item: item } }] };
+let unprocessed = {
+  OrdersTable: [{ PutRequest: { Item: { orderId: { S: "order-1" } } } }],
+};
 
 while (Object.keys(unprocessed).length > 0) {
   const output = await dynamoDb.batchWriteItem(

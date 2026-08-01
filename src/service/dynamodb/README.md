@@ -354,7 +354,8 @@ The order both work in is the same, and it is what makes a batch all or nothing:
 
 1. Everything that can be read without a table is read: the request cap, the per entry shapes, the
    items, the keys and the projections. Nothing here has reached the table store.
-2. Every table is reached and the caller authorized against it.
+2. Every table is reached and the caller authorized against it. The tables are then compared, since
+   a name and an ARN are two entries naming one table, which real DynamoDB refuses.
 3. Every key is marshalled through the table's key schema, which is both the key check and what
    tells two operations on one item apart.
 4. Only then is the first item written.
@@ -373,7 +374,10 @@ The parts a batch is made of split by what they know:
   cap across every table the request names.
 - `sim-dynamodb-batch-reads.ts` does the same for a batch read, applying the 100 key cap and reading
   each table's `ProjectionExpression` through the same `readSimDynamoDbProjection` GetItem uses.
-- `assertDistinctBatchItems` is the duplicate check both use, over marshalled keys.
+- `assertDistinctBatchItems` is the duplicate item check both use, over marshalled keys.
+- `reachSimDynamoDbBatchTables` is how both reach their tables: it authorizes the caller against
+  each, and refuses a request naming one table twice, comparing the tables the references resolved
+  to rather than the references themselves.
 
 `UnprocessedItems` and `UnprocessedKeys` are always empty maps. Nothing here is throttled and no
 response stops at a size, so no request is ever left over, but the map is answered with rather than
