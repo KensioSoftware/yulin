@@ -54,18 +54,6 @@ describe("DynamoDB CreateTableCommand unsimulated input", () => {
     assertStringIncludes(error.message, "Local secondary indexes");
   });
 
-  it("refuses tags", async () => {
-    // When a table is created with tags.
-    const error = await refusedCreateTable({
-      ...tableInput,
-      Tags: [{ Key: "team", Value: "platform" }],
-    });
-
-    // Then the tags are refused rather than dropped.
-    assertInstanceOf(error, SimDynamoDbUnsupportedOperation);
-    assertStringIncludes(error.message, "Table tags");
-  });
-
   it("refuses a stream specification", async () => {
     // When a table is created with a stream.
     const error = await refusedCreateTable({

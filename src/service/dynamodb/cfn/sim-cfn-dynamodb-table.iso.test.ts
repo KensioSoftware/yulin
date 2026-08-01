@@ -14,36 +14,18 @@ import {
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
-import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
-
-const accountIdOneOnes = "111111111111" as SimAwsAccountId;
-
-function simAwsInEuWest2(): SimAws {
-  return new SimAws({
-    defaultAccountId: accountIdOneOnes,
-    defaultRegionName: "eu-west-2",
-  });
-}
+import { simCfnDynamoDbTableResourceFactory } from "./table/sim-cfn-dynamodb-table-resource.factory.js";
 
 /**
- * A template holding one on-demand table with a partition and a sort key.
+ * A template holding one unnamed on-demand table with a partition and a sort
+ * key.
  */
 const ordersTableTemplate = {
   Resources: {
-    OrdersTable: {
-      Type: "AWS::DynamoDB::Table",
-      Properties: {
-        KeySchema: [
-          { AttributeName: "customerId", KeyType: "HASH" },
-          { AttributeName: "orderId", KeyType: "RANGE" },
-        ],
-        AttributeDefinitions: [
-          { AttributeName: "customerId", AttributeType: "S" },
-          { AttributeName: "orderId", AttributeType: "S" },
-        ],
-        BillingMode: "PAY_PER_REQUEST",
-      },
-    },
+    OrdersTable: simCfnDynamoDbTableResourceFactory.make({
+      partitionKeyName: "customerId",
+      sortKeyName: "orderId",
+    }),
   },
   Outputs: {
     OrdersTableName: { Value: { Ref: "OrdersTable" } },
@@ -53,30 +35,22 @@ const ordersTableTemplate = {
 describe("DynamoDB CloudFormation Table deployment", () => {
   it("creates a table carrying the key schema and attribute definitions", async () => {
     // Given a template declaring a named table.
-    const simAws = simAwsInEuWest2();
+    const simAws = new SimAws();
 
     // When the template is deployed.
     const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "orders-stack",
       template: {
         Resources: {
-          OrdersTable: {
-            Type: "AWS::DynamoDB::Table",
-            Properties: {
-              TableName: "orders",
-              KeySchema: [
-                { AttributeName: "customerId", KeyType: "HASH" },
-                { AttributeName: "orderId", KeyType: "RANGE" },
-              ],
-              AttributeDefinitions: [
-                { AttributeName: "customerId", AttributeType: "S" },
-                { AttributeName: "orderId", AttributeType: "S" },
-              ],
-              BillingMode: "PAY_PER_REQUEST",
+          OrdersTable: simCfnDynamoDbTableResourceFactory.make({
+            tableName: "orders",
+            partitionKeyName: "customerId",
+            sortKeyName: "orderId",
+            properties: {
               TableClass: "STANDARD_INFREQUENT_ACCESS",
               DeletionProtectionEnabled: true,
             },
-          },
+          }),
         },
       },
     });
@@ -96,7 +70,8 @@ describe("DynamoDB CloudFormation Table deployment", () => {
     assertIdentical(described.Table.TableStatus, "ACTIVE");
     assertIdentical(
       described.Table.TableArn,
-      "arn:aws:dynamodb:eu-west-2:111111111111:table/orders",
+      `arn:aws:dynamodb:${simAws.defaultRegionName}:` +
+        `${simAws.defaultAccountId}:table/orders`,
     );
     assertIdentical(
       described.Table.KeySchema.at(0)?.AttributeName,
@@ -121,28 +96,23 @@ describe("DynamoDB CloudFormation Table deployment", () => {
   it("provisions a table with the throughput the template sets", async () => {
     // Given a template asking for provisioned capacity, as CDK emits for a
     // table with no billing mode of its own.
-    const simAws = simAwsInEuWest2();
+    const simAws = new SimAws();
 
     // When the template is deployed.
     const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "orders-stack",
       template: {
         Resources: {
-          OrdersTable: {
-            Type: "AWS::DynamoDB::Table",
-            Properties: {
-              TableName: "orders",
-              KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
-              AttributeDefinitions: [
-                { AttributeName: "id", AttributeType: "S" },
-              ],
-              BillingMode: "PROVISIONED",
+          OrdersTable: simCfnDynamoDbTableResourceFactory.make({
+            tableName: "orders",
+            billingMode: "PROVISIONED",
+            properties: {
               ProvisionedThroughput: {
                 ReadCapacityUnits: 5,
                 WriteCapacityUnits: 3,
               },
             },
-          },
+          }),
         },
       },
     });
@@ -164,7 +134,7 @@ describe("DynamoDB CloudFormation Table deployment", () => {
   it("provisions capacity a template Parameter supplies as a string", async () => {
     // Given a template taking its read capacity from a Parameter, which
     // resolves to a string rather than the number a literal property carries.
-    const simAws = simAwsInEuWest2();
+    const simAws = new SimAws();
 
     // When the template is deployed with a value for it.
     const stack = await simAws.cloudFormation().deployTemplate({
@@ -173,6 +143,9 @@ describe("DynamoDB CloudFormation Table deployment", () => {
       template: {
         Parameters: { TableReadCapacity: { Type: "Number" } },
         Resources: {
+          // Written out rather than built, since this is the one table here
+          // with no BillingMode at all: the Parameter resolves into the
+          // provisioned capacity CreateTable then defaults to.
           OrdersTable: {
             Type: "AWS::DynamoDB::Table",
             Properties: {
@@ -205,24 +178,16 @@ describe("DynamoDB CloudFormation Table deployment", () => {
 
   it("resolves Ref to the table name and Fn::GetAtt Arn to the table ARN", async () => {
     // Given a template referencing its table both ways.
-    const simAws = simAwsInEuWest2();
+    const simAws = new SimAws();
 
     // When the template is deployed.
     const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "orders-stack",
       template: {
         Resources: {
-          OrdersTable: {
-            Type: "AWS::DynamoDB::Table",
-            Properties: {
-              TableName: "orders",
-              KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
-              AttributeDefinitions: [
-                { AttributeName: "id", AttributeType: "S" },
-              ],
-              BillingMode: "PAY_PER_REQUEST",
-            },
-          },
+          OrdersTable: simCfnDynamoDbTableResourceFactory.make({
+            tableName: "orders",
+          }),
         },
         Outputs: {
           TableRef: { Value: { Ref: "OrdersTable" } },
@@ -235,15 +200,19 @@ describe("DynamoDB CloudFormation Table deployment", () => {
     // Then Ref is the table name, as AWS::DynamoDB::Table Ref is, so it can be
     // handed straight to PutItem.
     assertIdentical(stack.outputs.get("TableRef")?.value, "orders");
+
+    const described = await simAws
+      .dynamoDb()
+      .describeTable(new DescribeTableCommand({ TableName: "orders" }));
     assertIdentical(
       stack.outputs.get("TableArn")?.value,
-      "arn:aws:dynamodb:eu-west-2:111111111111:table/orders",
+      described.Table?.TableArn,
     );
   });
 
   it("writes and reads an item through the table a Ref names", async () => {
     // Given a deployed table whose name the stack outputs.
-    const simAws = simAwsInEuWest2();
+    const simAws = new SimAws();
     const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "orders-stack",
       template: ordersTableTemplate,
@@ -279,7 +248,7 @@ describe("DynamoDB CloudFormation Table deployment", () => {
   it("names an unnamed table after the stack and its logical ID", async () => {
     // Given a template leaving TableName out, as CDK does for a table with no
     // explicit name.
-    const simAws = simAwsInEuWest2();
+    const simAws = new SimAws();
 
     // When the template is deployed.
     const stack = await simAws.cloudFormation().deployTemplate({
@@ -299,7 +268,7 @@ describe("DynamoDB CloudFormation Table deployment", () => {
 
   it("gives two stacks deploying one template two differently named tables", async () => {
     // Given one template with no TableName in it, deployed twice.
-    const simAws = simAwsInEuWest2();
+    const simAws = new SimAws();
 
     // When both stacks are deployed.
     const first = await simAws.cloudFormation().deployTemplate({
@@ -336,17 +305,9 @@ describe("DynamoDB CloudFormation Table deployment", () => {
       stackName: "orders-stack",
       template: {
         Resources: {
-          OrdersTable: {
-            Type: "AWS::DynamoDB::Table",
-            Properties: {
-              TableName: "orders",
-              KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
-              AttributeDefinitions: [
-                { AttributeName: "id", AttributeType: "S" },
-              ],
-              BillingMode: "PAY_PER_REQUEST",
-            },
-          },
+          OrdersTable: simCfnDynamoDbTableResourceFactory.make({
+            tableName: "orders",
+          }),
         },
         Outputs: {
           TableArn: { Value: { "Fn::GetAtt": ["OrdersTable", "Arn"] } },

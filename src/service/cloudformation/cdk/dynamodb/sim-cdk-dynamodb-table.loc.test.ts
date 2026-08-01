@@ -1,11 +1,14 @@
 import {
   DescribeTableCommand,
   GetItemCommand,
+  ListTagsOfResourceCommand,
   PutItemCommand,
 } from "@aws-sdk/client-dynamodb";
 import {
+  assertArrayLength,
   assertIdentical,
   assertNonNullable,
+  assertObjectEquals,
   assertStringStartsWith,
   assertTypeString,
 } from "@kensio/smartass";
@@ -26,7 +29,7 @@ const accountIdOneOnes = "111111111111" as SimAwsAccountId;
 describe("Sim CDK DynamoDB Table deployment local integration", () => {
   it("deploys a CDK table an SDK caller then writes to and reads from", async () => {
     // Given a CDK stack with an unnamed on-demand table with a partition and a
-    // sort key.
+    // sort key, and a tag applied to everything in the stack.
     const cdkProject = new TestCdkProject();
     await cdkProject.writeCdkAppFile(
       `
@@ -43,6 +46,8 @@ const ordersTable = new dynamodb.Table(stack, "OrdersTable", {
   sortKey: { name: "orderId", type: dynamodb.AttributeType.STRING },
   billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
 });
+
+cdk.Tags.of(stack).add("Environment", "test");
 
 new cdk.CfnOutput(stack, "OrdersTableName", {
   value: ordersTable.tableName,
@@ -97,6 +102,16 @@ app.synth();
       stack.outputs.get("OrdersTableArn")?.value,
       described.Table.TableArn,
     );
+
+    // And the tag the stack applied is on the table, since CDK puts it on
+    // every taggable Resource in the template.
+    const tags = await scoped.dynamoDb().listTagsOfResource(
+      new ListTagsOfResourceCommand({
+        ResourceArn: described.Table.TableArn,
+      }),
+    );
+    assertArrayLength(tags.Tags, 1);
+    assertObjectEquals(tags.Tags[0], { Key: "Environment", Value: "test" });
 
     // And an item written to it reads back off it.
     await scoped.dynamoDb().putItem(

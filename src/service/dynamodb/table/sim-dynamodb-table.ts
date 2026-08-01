@@ -14,6 +14,7 @@ import { SimDynamoDbItemKey } from "./sim-dynamodb-item-key.js";
 import { describeSimDynamoDbTable } from "./sim-dynamodb-table-description.js";
 import { SimDynamoDbTableItems } from "./sim-dynamodb-table-items.js";
 import { SimDynamoDbTableLifecycle } from "./sim-dynamodb-table-lifecycle.js";
+import { SimDynamoDbTableTags } from "./sim-dynamodb-table-tags.js";
 import type { SimDynamoDbAttributeDefinitions } from "./sim-dynamodb-attribute-definitions.js";
 import type { SimDynamoDbKeySchema } from "./sim-dynamodb-key-schema.js";
 import type { SimDynamoDbTableBilling } from "./sim-dynamodb-table-billing.js";
@@ -30,6 +31,7 @@ interface SimDynamoDbTableProperties {
   readonly billing: SimDynamoDbTableBilling;
   readonly tableClass?: SimDynamoDbTableClass | undefined;
   readonly deletionProtectionEnabled?: boolean | undefined;
+  readonly tags?: SimDynamoDbTableTags;
   readonly background?: BackgroundScheduler;
 }
 
@@ -52,6 +54,14 @@ export class SimDynamoDbTable {
   public readonly tableClass: SimDynamoDbTableClass | undefined;
   public readonly deletionProtectionEnabled: boolean;
 
+  /**
+   * The tags this table carries.
+   *
+   * Tags are the table's own state rather than something a command holds, so
+   * TagResource, UntagResource and ListTagsOfResource all work through this.
+   */
+  public readonly tags: SimDynamoDbTableTags;
+
   private readonly items = new SimDynamoDbTableItems();
   private readonly itemKey: SimDynamoDbItemKey;
   private readonly lifecycle: SimDynamoDbTableLifecycle;
@@ -63,6 +73,7 @@ export class SimDynamoDbTable {
       attributeDefinitions,
       billing,
       deletionProtectionEnabled = false,
+      tags = SimDynamoDbTableTags.fromInput([]),
       background = new BackgroundTasks(),
     } = properties;
 
@@ -74,6 +85,7 @@ export class SimDynamoDbTable {
     this.billing = billing;
     this.tableClass = properties.tableClass;
     this.deletionProtectionEnabled = deletionProtectionEnabled;
+    this.tags = tags;
     this.itemKey = new SimDynamoDbItemKey(keySchema, attributeDefinitions);
     this.lifecycle = new SimDynamoDbTableLifecycle({
       tableName: name.value,

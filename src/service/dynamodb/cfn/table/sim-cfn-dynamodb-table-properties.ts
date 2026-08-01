@@ -5,6 +5,7 @@ import type {
   SimDynamoDbAttributeDefinitionInput,
   SimDynamoDbKeySchemaElementInput,
   SimDynamoDbProvisionedThroughput,
+  SimDynamoDbTagInput,
 } from "../../command/table/table.types.js";
 import { SimCfnDynamoDbTablePropertyRules } from "./sim-cfn-dynamodb-table-property-rules.js";
 import { SimCfnDynamoDbTableValues } from "./sim-cfn-dynamodb-table-values.js";
@@ -116,6 +117,19 @@ export class SimCfnDynamoDbTableProperties {
    */
   tableClass(): string | undefined {
     return this.values.string("TableClass");
+  }
+
+  /**
+   * The tags the template puts on the table.
+   *
+   * A CDK app calling `Tags.of(stack).add(...)` puts these on every taggable
+   * Resource in the template, so a tagged table is the ordinary case rather
+   * than an unusual one.
+   */
+  tags(): readonly SimDynamoDbTagInput[] {
+    return this.values.list("Tags").map((tag) => {
+      return { Key: tag.string("Key"), Value: tag.string("Value") };
+    });
   }
 
   /**

@@ -51,6 +51,7 @@ Current command areas include:
 - `item/` (PutItem, GetItem, DeleteItem, UpdateItem, and the structural types for the item commands)
 - `batch/` (BatchWriteItem and BatchGetItem)
 - `transact/` (TransactWriteItems and TransactGetItems)
+- `tag/` (TagResource, UntagResource and ListTagsOfResource)
 
 `table/` is the layout newer commands follow: one directory per group of related commands, with the
 structural command types in `table.command.ts`, the value and description shapes they are made of in
@@ -85,6 +86,7 @@ Table state lives under `table/`.
 - current table status
 - key schema and attribute definitions
 - billing mode, provisioned throughput, table class and deletion protection
+- tags
 - in-memory items
 
 A table is built from values that have already been checked, not from a command object. Anything
@@ -134,6 +136,40 @@ For a table with partition key `pk` and sort key `sk`, the internal key includes
 
 This is an implementation detail, but it is important when changing item storage because `putItem()`
 uses the key schema to overwrite items with the same primary key.
+
+## Tagging behavior
+
+`SimDynamoDbTableTags` is the tags one table holds, and `SimDynamoDbTableTag` is one of them. Every
+rule a tag is held to lives on the tag itself: the key and value lengths, the characters a tag is
+written with, and the reserved `aws:` prefix. A tag that arrived with CreateTable is checked the same
+way one from TagResource is, because it is the same class reading it.
+
+The 50 tag limit belongs to the collection rather than the tag, since it is about how many there are.
+Real DynamoDB answers it with a `ValidationException` rather than the `LimitExceededException` its
+API reference lists for TagResource, which is documented entirely in terms of how many table
+operations are running at once.
+
+A request is read whole before any of it is kept, so a call carrying one good tag and one bad one
+leaves the table's tags exactly as they were. `TagResource` replaces the value of a key that is
+already there, which is what makes it a way of changing a tag as well as adding one, and
+`UntagResource` takes a key that is not there in its stride: it asks for a state rather than a
+change.
+
+`SimDynamoDbTagCommands` implements all three commands. They reach their table through the same
+`SimDynamoDbTableAccess` every other command uses, so an ARN naming no table gives
+`SimDynamoDbResourceNotFoundException` and an unauthorized caller is refused before the lookup. Each
+authorizes the `dynamodb:` action of its own name.
+
+Unlike the table commands, a tag command takes an ARN only. A bare table name is refused rather than
+resolved, since real DynamoDB would refuse it too, and finding the table anyway would let a test pass
+on a request AWS rejects.
+
+`SimDynamoDbTagPage` pages ListTagsOfResource. The API has no page size parameter, so 25 is this
+simulator's choice: half of the 50 a resource holds, so an ordinarily tagged table lists in one page
+while a test can still reach a `NextToken`. As with ListTables, the token is the key to resume after
+rather than an opaque cursor, so it still works when the tag it names has since been removed. Tags
+are ordered by UTF-8 bytes, which is one of the orders DynamoDB allows and the one that makes paging
+resumable.
 
 ## Item and attribute model
 
