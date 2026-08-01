@@ -16,6 +16,7 @@ import type {
   SimUpdateItemCommand,
 } from "../command/item/item.command.js";
 import type { SimQueryCommand } from "../command/query/query.command.js";
+import type { SimScanCommand } from "../command/scan/scan.command.js";
 import type {
   SimBatchGetItemCommand,
   SimBatchWriteItemCommand,
@@ -118,6 +119,19 @@ export class SimDynamoDatabaseSdkCommandRouter implements SimSdkCommandRouter {
 
           return await simDynamoDatabase.query(
             command as SimQueryCommand,
+            simSdkCallerOptions(context),
+          );
+        },
+      ],
+      [
+        "ScanCommand",
+        async (command, context): Promise<unknown> => {
+          // The document client names its Scan the same as this one, so the
+          // Command name alone cannot tell them apart.
+          refuseSimDynamoDbDocumentCommand(command, "ScanCommand");
+
+          return await simDynamoDatabase.scan(
+            command as SimScanCommand,
             simSdkCallerOptions(context),
           );
         },

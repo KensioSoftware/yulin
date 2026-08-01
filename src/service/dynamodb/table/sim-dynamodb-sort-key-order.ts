@@ -74,6 +74,23 @@ export class SimDynamoDbSortKeyOrder {
   }
 
   /**
+   * Order two items of one table by their sort keys.
+   *
+   * With no sort key a partition key value names at most one item, so two items
+   * that reach here are the same item and nothing separates them. A scan orders
+   * a whole table this way once it has ordered by partition key.
+   */
+  compareItems(first: SimDynamoDbItem, second: SimDynamoDbItem): number {
+    const attributeName = this.attributeName;
+
+    if (attributeName === undefined) {
+      return 0;
+    }
+
+    return this.compare(first, second, attributeName);
+  }
+
+  /**
    * Which way along the sort key the walk is going.
    */
   private direction(forward: boolean): number {

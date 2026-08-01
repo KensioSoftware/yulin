@@ -35,6 +35,11 @@ export type {
   SimQueryCommandOutput,
 } from "./query/query.command.js";
 export type {
+  SimScanCommand,
+  SimScanCommandInput,
+  SimScanCommandOutput,
+} from "./scan/scan.command.js";
+export type {
   SimBatchGetItemCommand,
   SimBatchGetItemCommandInput,
   SimBatchGetItemCommandOutput,

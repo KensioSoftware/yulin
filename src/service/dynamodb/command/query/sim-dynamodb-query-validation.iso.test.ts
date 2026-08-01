@@ -266,4 +266,34 @@ describe("DynamoDB QueryCommand key condition validation", () => {
     assertInstanceOf(error, SimDynamoDbValidationException);
     assertStringIncludes(error.message, ":spare");
   });
+
+  it.each([
+    { name: "Segment", input: { Segment: 0 } },
+    { name: "TotalSegments", input: { TotalSegments: 4 } },
+    { name: "both", input: { Segment: 0, TotalSegments: 4 } },
+  ])(
+    "refuses a Query dividing itself into segments, given $name",
+    async (example) => {
+      // Given a table.
+      const simAws = new SimAws();
+      const simDynamoDb = await ordersTable(simAws);
+
+      // When a query carries the parallel scan parameters.
+      const error = await assertThrowsErrorAsync(async () =>
+        simDynamoDb.query({
+          input: {
+            TableName: "OrdersTable",
+            KeyConditionExpression: "customerId = :customer",
+            ExpressionAttributeValues: { ":customer": { S: "c-1" } },
+            ...example.input,
+          },
+        }),
+      );
+
+      // Then it is refused. Segment and TotalSegments divide a Scan, and a query
+      // reads one item collection, which sits inside one segment.
+      assertInstanceOf(error, SimDynamoDbValidationException);
+      assertStringIncludes(error.message, "Scan");
+    },
+  );
 });

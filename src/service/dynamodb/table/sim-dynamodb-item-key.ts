@@ -115,6 +115,16 @@ export class SimDynamoDbItemKey {
   }
 
   /**
+   * The marshalled partition key of an item, on its own.
+   *
+   * A Scan orders a table by this and a parallel Scan divides one by it, since
+   * the items sharing a partition key are the items DynamoDB keeps together.
+   */
+  partitionOf(item: SimDynamoDbItem): string {
+    return this.keyValue(item, this.keySchema.hashKeyAttributeName);
+  }
+
+  /**
    * Read one key attribute of an item, checking it against the key schema.
    */
   private keyValue(item: SimDynamoDbItem, attributeName: string): string {

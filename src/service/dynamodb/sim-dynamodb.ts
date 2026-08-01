@@ -156,6 +156,17 @@ export class SimDynamoDb {
   }
 
   /**
+   * Handle a Scan Command from the SDK.
+   */
+  async scan(
+    command: simDynamoDbCommands.SimScanCommand,
+    options?: SimDynamoDbRequestOptions,
+  ): Promise<simDynamoDbCommands.SimScanCommandOutput> {
+    await this.background.sequence();
+    return this.commands.itemScans.handle(command, options);
+  }
+
+  /**
    * Handle a Batch Write Item Command from the SDK.
    */
   async batchWriteItem(

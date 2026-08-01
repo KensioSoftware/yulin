@@ -10,6 +10,7 @@ import { SimDynamoDbGetItem } from "./item/sim-dynamodb-get-item.js";
 import { SimDynamoDbPutItem } from "./item/sim-dynamodb-put-item.js";
 import { SimDynamoDbUpdateItem } from "./item/sim-dynamodb-update-item.js";
 import { SimDynamoDbQuery } from "./query/sim-dynamodb-query.js";
+import { SimDynamoDbScan } from "./scan/sim-dynamodb-scan.js";
 import { SimDynamoDbTagCommands } from "./tag/sim-dynamodb-tag-commands.js";
 import { SimDynamoDbTimeToLiveCommands } from "./time-to-live/sim-dynamodb-time-to-live-commands.js";
 import { SimDynamoDbCreateTable } from "./table/sim-dynamodb-create-table.js";
@@ -42,6 +43,7 @@ export class SimDynamoDbCommandHandlers {
   public readonly itemDeletions: SimDynamoDbDeleteItem;
   public readonly itemUpdates: SimDynamoDbUpdateItem;
   public readonly itemQueries: SimDynamoDbQuery;
+  public readonly itemScans: SimDynamoDbScan;
   public readonly itemBatchWrites: SimDynamoDbBatchWriteItem;
   public readonly itemBatchReads: SimDynamoDbBatchGetItem;
   public readonly itemTransactWrites: SimDynamoDbTransactWriteItems;
@@ -74,6 +76,7 @@ export class SimDynamoDbCommandHandlers {
     this.itemDeletions = new SimDynamoDbDeleteItem({ access });
     this.itemUpdates = new SimDynamoDbUpdateItem({ access });
     this.itemQueries = new SimDynamoDbQuery({ access });
+    this.itemScans = new SimDynamoDbScan({ access });
     this.itemBatchWrites = new SimDynamoDbBatchWriteItem({ access });
     this.itemBatchReads = new SimDynamoDbBatchGetItem({ access });
     this.itemTransactWrites = new SimDynamoDbTransactWriteItems({
