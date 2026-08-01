@@ -1,6 +1,7 @@
 import { SimDynamoDbValidationException } from "../../error/dynamodb.error.js";
 import type { SimDynamoDbItem } from "../../item/sim-dynamodb-item.js";
 import type { SimDynamoDbKeySchema } from "../../table/sim-dynamodb-key-schema.js";
+import type { SimDynamoDbReadView } from "../../table/sim-dynamodb-read-view.js";
 import type { SimDynamoDbCondition } from "../condition/sim-dynamodb-condition.js";
 import type { SimDynamoDbDocumentPath } from "../sim-dynamodb-document-path.js";
 import { SimDynamoDbItemSnapshot } from "../sim-dynamodb-item-snapshot.js";
@@ -41,7 +42,19 @@ export class SimDynamoDbFilter {
   }
 
   /**
-   * Refuse a filter naming a key attribute of the table being read.
+   * Refuse a filter naming an attribute the view being read does not carry.
+   *
+   * An index holds only what it projects, so a filter on an attribute outside
+   * that would drop every item rather than the ones it meant. An empty page is
+   * the worst way to fail: it reads as a collection that happens to hold
+   * nothing. Real DynamoDB refuses it, so this does too.
+   */
+  assertNamesOnlyCarried(view: SimDynamoDbReadView): void {
+    view.assertCarriesPaths(this.paths);
+  }
+
+  /**
+   * Refuse a filter naming a key attribute of what is being read.
    *
    * Real DynamoDB refuses this on a query and allows it on a scan. A query has
    * already narrowed the read to the keys its key condition names, so a filter

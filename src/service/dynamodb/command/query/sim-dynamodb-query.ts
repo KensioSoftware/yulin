@@ -1,6 +1,7 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { SimDynamoDbItemPage } from "../item/sim-dynamodb-item-page.js";
 import { SimDynamoDbReadAnswer } from "../read/sim-dynamodb-read-answer.js";
+import { refuseSimDynamoDbConsistentIndexRead } from "../read/sim-dynamodb-consistent-read.js";
 import { SimDynamoDbSelect } from "../read/sim-dynamodb-select.js";
 import type { SimDynamoDbTableAccess } from "../table/sim-dynamodb-table-access.js";
 import type {
@@ -51,34 +52,45 @@ export class SimDynamoDbQuery {
     refuseUnsimulatedQueryInput(input);
     refuseSimDynamoDbQuerySegment(input);
 
+    refuseSimDynamoDbConsistentIndexRead(input);
+
     const expressions = readSimDynamoDbQueryExpressions(input);
     const table = this.access.required(
       "dynamodb:Query",
       input.TableName,
       options?.caller,
     );
-    const keyCondition = expressions.terms.forTable(table);
+
+    // What is being read is settled here: the table, or one of its indexes. An
+    // IndexName the table does not have is refused rather than read as the
+    // table. Everything after this asks the view rather than the table, so a
+    // query of an index is the same query against a narrower thing.
+    const view = table.view(input.IndexName);
+    const keyCondition = expressions.terms.forTable(view);
+
+    select.assertAnswerableBy(view);
 
     // A query has narrowed the read by its key condition already, so a filter
     // naming a key attribute is refused. That needs the key schema, so it
-    // waits for the table the same way the key condition does.
-    expressions.filter?.assertNamesNoKeyAttribute(table.keySchema);
+    // waits for the view the same way the key condition does.
+    expressions.filter?.assertNamesNoKeyAttribute(view.keySchema);
+    expressions.filter?.assertNamesOnlyCarried(view);
 
     // The token names an item of the collection being read, so it can only be
     // checked once that collection is known.
     const after = readSimDynamoDbQueryStartKey({
-      table,
+      view,
       keyCondition,
       exclusiveStartKey: input.ExclusiveStartKey,
     });
 
     const page = new SimDynamoDbItemPage({
-      items: table.itemCollection(keyCondition).walk({
+      items: view.itemCollection(keyCondition).walk({
         forward: input.ScanIndexForward ?? true,
         after,
       }),
       limit: input.Limit,
-      keySchema: table.keySchema,
+      view,
     });
 
     return {
@@ -86,6 +98,7 @@ export class SimDynamoDbQuery {
         page,
         filter: expressions.filter,
         select,
+        view,
       }).fields(),
       $metadata: {},
     };

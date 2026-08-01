@@ -3,11 +3,11 @@ import { SimDynamoDbValidationException } from "../../error/dynamodb.error.js";
 import type { SimDynamoDbKeyCondition } from "../../expression/key-condition/sim-dynamodb-key-condition.js";
 import { SimDynamoDbItem } from "../../item/sim-dynamodb-item.js";
 import { simDynamoDbValuesEqual } from "../../item/sim-dynamodb-value-comparison.js";
-import type { SimDynamoDbTable } from "../../table/sim-dynamodb-table.js";
+import type { SimDynamoDbReadView } from "../../table/sim-dynamodb-read-view.js";
 import type { SimDynamoDbAttributeValue } from "../item/item.types.js";
 
 interface SimDynamoDbQueryStartKeyProperties {
-  readonly table: SimDynamoDbTable;
+  readonly view: SimDynamoDbReadView;
   readonly keyCondition: SimDynamoDbKeyCondition;
   readonly exclusiveStartKey:
     Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
@@ -28,7 +28,7 @@ interface SimDynamoDbQueryStartKeyProperties {
 export function readSimDynamoDbQueryStartKey(
   properties: SimDynamoDbQueryStartKeyProperties,
 ): SimDynamoDbItem | undefined {
-  const { table, keyCondition } = properties;
+  const { view, keyCondition } = properties;
   const attributeValues = properties.exclusiveStartKey;
 
   if (attributeValues === undefined) {
@@ -44,11 +44,12 @@ export function readSimDynamoDbQueryStartKey(
 
   const startKey = SimDynamoDbItem.fromAttributeValues(attributeValues);
 
-  // Reading the key through the table checks it against the key schema, which
-  // is what makes a token DynamoDB would refuse refused here too.
-  table.keyOfKey(startKey);
+  // Reading the key through the view checks it against the key schema, which
+  // is what makes a token DynamoDB would refuse refused here too. A read of an
+  // index takes a token carrying the index key and the table key together.
+  view.assertStartKey(startKey);
 
-  assertSamePartition(startKey, table, keyCondition);
+  assertSamePartition(startKey, view, keyCondition);
 
   return startKey;
 }
@@ -58,10 +59,10 @@ export function readSimDynamoDbQueryStartKey(
  */
 function assertSamePartition(
   startKey: SimDynamoDbItem,
-  table: SimDynamoDbTable,
+  view: SimDynamoDbReadView,
   keyCondition: SimDynamoDbKeyCondition,
 ): void {
-  const attributeName = table.keySchema.hashKeyAttributeName;
+  const attributeName = view.keySchema.hashKeyAttributeName;
   const value = startKey.attribute(attributeName);
 
   assertDefined(

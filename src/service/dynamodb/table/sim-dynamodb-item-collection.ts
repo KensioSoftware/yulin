@@ -3,11 +3,12 @@ import type { SimDynamoDbKeyCondition } from "../expression/key-condition/sim-dy
 import type { SimDynamoDbItem } from "../item/sim-dynamodb-item.js";
 import { simDynamoDbValuesEqual } from "../item/sim-dynamodb-value-comparison.js";
 import type { SimDynamoDbKeySchema } from "./sim-dynamodb-key-schema.js";
-import { SimDynamoDbSortKeyOrder } from "./sim-dynamodb-sort-key-order.js";
+import type { SimDynamoDbSortKeyOrder } from "./sim-dynamodb-sort-key-order.js";
 
 interface SimDynamoDbItemCollectionProperties {
   readonly items: Iterable<SimDynamoDbItem>;
   readonly keySchema: SimDynamoDbKeySchema;
+  readonly order: SimDynamoDbSortKeyOrder;
   readonly keyCondition: SimDynamoDbKeyCondition;
 }
 
@@ -24,14 +25,18 @@ interface SimDynamoDbItemCollectionWalk {
  * it is read rather than kept that way. Real DynamoDB keeps a collection in
  * sort key order, and a query reads the same items in the same order either
  * way.
+ *
+ * The key schema is the one being read by, which for a query on an index is the
+ * index's own rather than the table's. The order comes in alongside it, since
+ * what separates two items sharing a sort key is the view's business rather
+ * than the collection's.
  */
 export class SimDynamoDbItemCollection {
   private readonly order: SimDynamoDbSortKeyOrder;
   private readonly ascending: readonly SimDynamoDbItem[];
 
   constructor(properties: SimDynamoDbItemCollectionProperties) {
-    const { keySchema, keyCondition } = properties;
-    const order = new SimDynamoDbSortKeyOrder(keySchema.rangeKeyAttributeName);
+    const { keySchema, keyCondition, order } = properties;
 
     this.order = order;
     this.ascending = order.ascending(

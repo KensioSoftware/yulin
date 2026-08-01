@@ -1,5 +1,6 @@
 import type { SimDynamoDbFilter } from "../../expression/filter/sim-dynamodb-filter.js";
 import type { SimDynamoDbItem } from "../../item/sim-dynamodb-item.js";
+import type { SimDynamoDbReadView } from "../../table/sim-dynamodb-read-view.js";
 import type { SimDynamoDbAttributeValue } from "../item/item.types.js";
 import type { SimDynamoDbItemPage } from "../item/sim-dynamodb-item-page.js";
 import type { SimDynamoDbSelect } from "./sim-dynamodb-select.js";
@@ -20,6 +21,7 @@ interface SimDynamoDbReadAnswerProperties {
   readonly page: SimDynamoDbItemPage;
   readonly filter: SimDynamoDbFilter | undefined;
   readonly select: SimDynamoDbSelect;
+  readonly view: SimDynamoDbReadView;
 }
 
 /**
@@ -41,6 +43,7 @@ export class SimDynamoDbReadAnswer {
   private readonly lastEvaluatedKey:
     Record<string, SimDynamoDbAttributeValue> | undefined;
   private readonly select: SimDynamoDbSelect;
+  private readonly view: SimDynamoDbReadView;
 
   constructor(properties: SimDynamoDbReadAnswerProperties) {
     const evaluated = properties.page.items;
@@ -49,6 +52,7 @@ export class SimDynamoDbReadAnswer {
     this.kept = properties.filter?.applyTo(evaluated) ?? evaluated;
     this.lastEvaluatedKey = properties.page.lastEvaluatedKey;
     this.select = properties.select;
+    this.view = properties.view;
   }
 
   /**
@@ -65,12 +69,20 @@ export class SimDynamoDbReadAnswer {
 
   /**
    * The items answered with, which a counted read leaves out altogether.
+   *
+   * Each is cut to what the view carries, so a read of an index answers with
+   * the attributes that index projects rather than with the whole item. A read
+   * of the table cuts nothing.
    */
   private items(): Pick<SimDynamoDbReadFields, "Items"> {
     if (this.select.countsOnly) {
       return {};
     }
 
-    return { Items: this.kept.map((item) => item.toAttributeValues()) };
+    return {
+      Items: this.kept.map((item) =>
+        this.view.project(item).toAttributeValues(),
+      ),
+    };
   }
 }

@@ -1,12 +1,12 @@
 import { SimDynamoDbValidationException } from "../../error/dynamodb.error.js";
 import { SimDynamoDbItem } from "../../item/sim-dynamodb-item.js";
+import type { SimDynamoDbReadView } from "../../table/sim-dynamodb-read-view.js";
 import type { SimDynamoDbScanSegment } from "../../table/sim-dynamodb-scan-segment.js";
-import type { SimDynamoDbTable } from "../../table/sim-dynamodb-table.js";
 import type { SimDynamoDbTableScan } from "../../table/sim-dynamodb-table-scan.js";
 import type { SimDynamoDbAttributeValue } from "../item/item.types.js";
 
 interface SimDynamoDbScanStartKeyProperties {
-  readonly table: SimDynamoDbTable;
+  readonly view: SimDynamoDbReadView;
   readonly scan: SimDynamoDbTableScan;
   readonly segment: SimDynamoDbScanSegment;
   readonly exclusiveStartKey:
@@ -29,7 +29,7 @@ interface SimDynamoDbScanStartKeyProperties {
 export function readSimDynamoDbScanStartKey(
   properties: SimDynamoDbScanStartKeyProperties,
 ): SimDynamoDbItem | undefined {
-  const { table, scan, segment } = properties;
+  const { view, scan, segment } = properties;
   const attributeValues = properties.exclusiveStartKey;
 
   if (attributeValues === undefined) {
@@ -45,9 +45,9 @@ export function readSimDynamoDbScanStartKey(
 
   const startKey = SimDynamoDbItem.fromAttributeValues(attributeValues);
 
-  // Reading the key through the table checks it against the key schema, which
+  // Reading the key through the view checks it against the key schema, which
   // is what makes a token DynamoDB would refuse refused here too.
-  table.keyOfKey(startKey);
+  view.assertStartKey(startKey);
 
   if (!scan.positionOf(startKey).inSegment(segment)) {
     throw new SimDynamoDbValidationException(
