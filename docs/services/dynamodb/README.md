@@ -157,7 +157,8 @@ console.log(index?.IndexArn); // ".../table/OrdersTable/index/byStatus"
 
 await simAws.backgroundTasksComplete();
 
-// An item with no status is simply absent from the index, rather than refused.
+// This order carries neither index key attribute, so it is absent from
+// byStatus rather than refused. Missing either one is enough.
 await dynamoDb.putItem(
   new PutItemCommand({
     TableName: "OrdersTable",
@@ -180,6 +181,9 @@ index keys plus the table keys, and `INCLUDE` adds 1 to 20 `NonKeyAttributes` to
 with no attributes named is refused, since it would add nothing to `KEYS_ONLY`, and attributes named
 under either of the other two types are refused as well.
 
+A table projects at most 100 `NonKeyAttributes` across all of its indexes, as well as 20 in any one
+of them. An attribute projected into two indexes counts twice.
+
 A provisioned table needs a `ProvisionedThroughput` per index as well as its own. `PAY_PER_REQUEST`
 refuses one, since an on-demand index has no capacity to provision.
 
@@ -189,10 +193,10 @@ under it. An index status follows its table's, so it is `CREATING` on the `Creat
 `ACTIVE` once the table is. A table that declared no index leaves `GlobalSecondaryIndexes` out of its
 description altogether.
 
-An index is sparse, so an item missing an index key attribute is absent from the index rather than
-refused on the write. The one thing a write is held to on account of an index is the type: an item
-carrying an index key attribute as a type the index did not declare is a `ValidationException`, since
-the index could never hold it.
+An index is sparse, so an item missing any one of an index's key attributes is absent from that index
+rather than refused on the write. An index keyed on two attributes needs both. The one thing a write
+is held to on account of an index is the type: an item carrying an index key attribute as a type the
+index did not declare is a `ValidationException`, since the index could never hold it.
 
 ## Describing a table
 

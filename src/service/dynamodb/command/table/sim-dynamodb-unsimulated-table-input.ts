@@ -1,5 +1,6 @@
 import { SimDynamoDbUnsupportedOperation } from "../../error/dynamodb.error.js";
 import type { SimCreateTableCommandInput } from "./table.command.js";
+import type { SimDynamoDbSecondaryIndexInput } from "./table.types.js";
 
 /**
  * Refuse the CreateTable inputs this simulation does not model.
@@ -84,25 +85,67 @@ function refuseEncryption(input: SimCreateTableCommandInput): void {
  * with settings nothing applies.
  */
 function refuseThroughputExtras(input: SimCreateTableCommandInput): void {
-  const indexes = input.GlobalSecondaryIndexes ?? [];
-
-  if (
-    input.OnDemandThroughput !== undefined ||
-    indexes.some((index) => index.OnDemandThroughput !== undefined)
-  ) {
+  if (input.OnDemandThroughput !== undefined) {
     throw new SimDynamoDbUnsupportedOperation(
       "OnDemandThroughput maximums are not simulated, so CreateTable refuses " +
         "them rather than reporting limits nothing here applies",
     );
   }
 
-  if (
-    input.WarmThroughput !== undefined ||
-    indexes.some((index) => index.WarmThroughput !== undefined)
-  ) {
+  if (input.WarmThroughput !== undefined) {
     throw new SimDynamoDbUnsupportedOperation(
       "WarmThroughput is not simulated, so CreateTable refuses it rather " +
         "than reporting a pre-warmed capacity nothing here applies",
     );
+  }
+
+  refuseIndexThroughputExtras(input.GlobalSecondaryIndexes ?? []);
+}
+
+/**
+ * How a refusal names the index carrying a setting nothing here applies.
+ *
+ * The name is what a reader recognises an index by. A request that left it out
+ * is refused for that once the indexes are read, so until then the position in
+ * the list stands in for it.
+ */
+function indexDescription(
+  index: SimDynamoDbSecondaryIndexInput,
+  position: number,
+): string {
+  if (index.IndexName === undefined) {
+    return `GlobalSecondaryIndexes entry ${(position + 1).toString()}`;
+  }
+
+  return `index ${index.IndexName}`;
+}
+
+/**
+ * Refuse the throughput settings an index carries of its own.
+ *
+ * A request can declare twenty indexes, so the refusal says which one was
+ * carrying the setting rather than leaving the reader to find it.
+ */
+function refuseIndexThroughputExtras(
+  indexes: readonly SimDynamoDbSecondaryIndexInput[],
+): void {
+  for (const [position, index] of indexes.entries()) {
+    const described = indexDescription(index, position);
+
+    if (index.OnDemandThroughput !== undefined) {
+      throw new SimDynamoDbUnsupportedOperation(
+        `OnDemandThroughput maximums are not simulated, so CreateTable ` +
+          `refuses them on ${described} rather than reporting limits nothing ` +
+          `here applies`,
+      );
+    }
+
+    if (index.WarmThroughput !== undefined) {
+      throw new SimDynamoDbUnsupportedOperation(
+        `WarmThroughput is not simulated, so CreateTable refuses it on ` +
+          `${described} rather than reporting a pre-warmed capacity nothing ` +
+          `here applies`,
+      );
+    }
   }
 }

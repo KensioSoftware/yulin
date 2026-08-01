@@ -91,6 +91,41 @@ describe("DynamoDB CreateTableCommand index validation", () => {
     assertStringIncludes(error.message, "21 GlobalSecondaryIndexes were given");
   });
 
+  it("refuses more than a hundred projected attributes in total", async () => {
+    // Given six indexes, each keyed on an attribute of its own and each
+    // projecting seventeen attributes, which is inside the twenty per index.
+    const keyed = ["a", "b", "c", "d", "e", "f"];
+    const indexes = keyed.map((attributeName) => ({
+      IndexName: `by${attributeName}`,
+      KeySchema: [{ AttributeName: attributeName, KeyType: "HASH" }],
+      Projection: {
+        ProjectionType: "INCLUDE",
+        NonKeyAttributes: Array.from(
+          { length: 17 },
+          (_unused, position) => `${attributeName}${position.toString()}`,
+        ),
+      },
+    }));
+
+    // When the table is created with all six.
+    const error = await refusedIndexes(indexes, {
+      AttributeDefinitions: [
+        { AttributeName: "pk", AttributeType: "S" },
+        ...keyed.map((attributeName) => ({
+          AttributeName: attributeName,
+          AttributeType: "S",
+        })),
+      ],
+    });
+
+    // Then the total is reported rather than each index passing on its own.
+    assertInstanceOf(error, SimDynamoDbValidationException);
+    assertStringIncludes(
+      error.message,
+      "102 NonKeyAttributes are projected across the table's indexes",
+    );
+  });
+
   it("requires an index key schema", async () => {
     // When an index is declared with no key schema.
     const error = await refusedIndexes([{ ...byStatus, KeySchema: undefined }]);

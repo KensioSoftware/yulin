@@ -127,6 +127,16 @@ export class SimDynamoDbIndexProjection {
   }
 
   /**
+   * How many attributes this projection adds to the index keys.
+   *
+   * A table is capped on the total across all of its indexes as well as on each
+   * one, so the count is readable rather than only the projection being.
+   */
+  get nonKeyAttributeCount(): number {
+    return this.nonKeyAttributes.length;
+  }
+
+  /**
    * How an index reports its projection.
    *
    * `NonKeyAttributes` is left out altogether unless the projection is INCLUDE,

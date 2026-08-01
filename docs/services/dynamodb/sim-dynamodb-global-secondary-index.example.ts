@@ -40,7 +40,8 @@ console.log(index?.IndexArn); // ".../table/OrdersTable/index/byStatus"
 
 await simAws.backgroundTasksComplete();
 
-// An item with no status is simply absent from the index, rather than refused.
+// This order carries neither index key attribute, so it is absent from
+// byStatus rather than refused. Missing either one is enough.
 await dynamoDb.putItem(
   new PutItemCommand({
     TableName: "OrdersTable",

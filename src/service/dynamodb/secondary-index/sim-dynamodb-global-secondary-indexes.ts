@@ -18,6 +18,11 @@ import {
 const maxIndexes = 20;
 
 /**
+ * The most NonKeyAttributes one table projects across all of its indexes.
+ */
+const maxProjectedAttributes = 100;
+
+/**
  * Refuse a request declaring one index name twice.
  *
  * An index is reached by name, so two indexes sharing one leave a read with no
@@ -32,6 +37,32 @@ function assertDistinctNames(
     throw new SimDynamoDbValidationException(
       "GlobalSecondaryIndexes names an index more than once, and an index " +
         "name is unique within a table",
+    );
+  }
+}
+
+/**
+ * Refuse a table projecting more attributes than DynamoDB lets it.
+ *
+ * The 20 an index projects is not the whole rule: a table is capped at 100
+ * across all of its indexes too, which six fully projecting indexes reach. An
+ * attribute projected into two indexes counts twice, so this is a plain sum
+ * rather than a count of distinct names, as it is on AWS.
+ */
+function assertProjectedAttributeCount(
+  elements: readonly SimDynamoDbGlobalSecondaryIndex[],
+): void {
+  const projected = elements.reduce(
+    (total, index) => total + index.projection.nonKeyAttributeCount,
+    0,
+  );
+
+  if (projected > maxProjectedAttributes) {
+    const most = maxProjectedAttributes.toString();
+
+    throw new SimDynamoDbValidationException(
+      `${projected.toString()} NonKeyAttributes are projected across the ` +
+        `table's indexes, and a table projects at most ${most}`,
     );
   }
 }
@@ -79,6 +110,7 @@ export class SimDynamoDbGlobalSecondaryIndexes {
     );
 
     assertDistinctNames(elements);
+    assertProjectedAttributeCount(elements);
 
     return new this(elements);
   }
