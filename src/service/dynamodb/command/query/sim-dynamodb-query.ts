@@ -1,11 +1,13 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
-import { readSimDynamoDbKeyCondition } from "../../expression/key-condition/sim-dynamodb-key-condition-expression.js";
 import { SimDynamoDbItemPage } from "../item/sim-dynamodb-item-page.js";
+import { SimDynamoDbReadAnswer } from "../read/sim-dynamodb-read-answer.js";
+import { SimDynamoDbSelect } from "../read/sim-dynamodb-select.js";
 import type { SimDynamoDbTableAccess } from "../table/sim-dynamodb-table-access.js";
 import type {
   SimQueryCommand,
   SimQueryCommandOutput,
 } from "./query.command.js";
+import { readSimDynamoDbQueryExpressions } from "./sim-dynamodb-query-expressions.js";
 import { refuseSimDynamoDbQuerySegment } from "./sim-dynamodb-query-segment.js";
 import { readSimDynamoDbQueryStartKey } from "./sim-dynamodb-query-start-key.js";
 import { refuseUnsimulatedQueryInput } from "./sim-dynamodb-unsimulated-query-input.js";
@@ -41,20 +43,26 @@ export class SimDynamoDbQuery {
   ): SimQueryCommandOutput {
     const input = command.input;
 
+    // Which attributes the request asks for is read first, since it decides
+    // whether the projection the request carries is one it could have asked
+    // for at all.
+    const select = SimDynamoDbSelect.from(input);
+
     refuseUnsimulatedQueryInput(input);
     refuseSimDynamoDbQuerySegment(input);
 
-    // The key condition is read before the table is reached, so an expression
-    // DynamoDB would refuse is refused whether or not the table is there. What
-    // is left is the part that needs the key schema, which is read once the
-    // table has been found.
-    const terms = readSimDynamoDbKeyCondition(input);
+    const expressions = readSimDynamoDbQueryExpressions(input);
     const table = this.access.required(
       "dynamodb:Query",
       input.TableName,
       options?.caller,
     );
-    const keyCondition = terms.forTable(table);
+    const keyCondition = expressions.terms.forTable(table);
+
+    // A query has narrowed the read by its key condition already, so a filter
+    // naming a key attribute is refused. That needs the key schema, so it
+    // waits for the table the same way the key condition does.
+    expressions.filter?.assertNamesNoKeyAttribute(table.keySchema);
 
     // The token names an item of the collection being read, so it can only be
     // checked once that collection is known.
@@ -74,12 +82,11 @@ export class SimDynamoDbQuery {
     });
 
     return {
-      Items: page.items.map((item) => item.toAttributeValues()),
-      // Nothing filters a query yet, so every item the walk evaluated is an
-      // item the page carries.
-      Count: page.items.length,
-      ScannedCount: page.items.length,
-      LastEvaluatedKey: page.lastEvaluatedKey,
+      ...new SimDynamoDbReadAnswer({
+        page,
+        filter: expressions.filter,
+        select,
+      }).fields(),
       $metadata: {},
     };
   }

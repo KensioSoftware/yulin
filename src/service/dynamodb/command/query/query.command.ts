@@ -52,8 +52,11 @@ export interface SimQueryCommandInput {
 /**
  * Minimal structural sim DynamoDB Query output.
  *
- * `Count` and `ScannedCount` are the same number here, since nothing filters a
- * query yet: every item the walk evaluated is an item it answers with.
+ * `ScannedCount` is how many items the walk evaluated and `Count` how many of
+ * them the filter kept, so the two are the same number for a query carrying no
+ * `FilterExpression`.
+ *
+ * `Items` is absent altogether for a `Select` of `COUNT`, rather than empty.
  *
  * `LastEvaluatedKey` is absent only when the key range ran out inside the
  * `Limit`, so a caller loops until it is gone rather than until the page is

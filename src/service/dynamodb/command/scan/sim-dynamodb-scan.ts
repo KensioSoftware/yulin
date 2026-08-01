@@ -1,5 +1,8 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import { readSimDynamoDbFilter } from "../../expression/filter/sim-dynamodb-filter-expression.js";
 import { SimDynamoDbItemPage } from "../item/sim-dynamodb-item-page.js";
+import { SimDynamoDbReadAnswer } from "../read/sim-dynamodb-read-answer.js";
+import { SimDynamoDbSelect } from "../read/sim-dynamodb-select.js";
 import type { SimDynamoDbTableAccess } from "../table/sim-dynamodb-table-access.js";
 import type { SimScanCommand, SimScanCommandOutput } from "./scan.command.js";
 import { readSimDynamoDbScanSegment } from "./sim-dynamodb-scan-segment-input.js";
@@ -42,11 +45,19 @@ export class SimDynamoDbScan {
   ): SimScanCommandOutput {
     const input = command.input;
 
+    // Which attributes the request asks for is read first, since it decides
+    // whether the projection the request carries is one it could have asked
+    // for at all.
+    const select = SimDynamoDbSelect.from(input);
+
     refuseUnsimulatedScanInput(input);
 
-    // The segment is read before the table is reached, so a division DynamoDB
-    // would refuse is refused whether or not the table is there.
+    // The segment and the filter are read before the table is reached, so
+    // input DynamoDB would refuse is refused whether or not the table is
+    // there. A scan narrows nothing, so unlike a query its filter may name any
+    // attribute, including a key attribute, and needs no key schema to check.
     const segment = readSimDynamoDbScanSegment(input);
+    const filter = readSimDynamoDbFilter(input);
     const table = this.access.required(
       "dynamodb:Scan",
       input.TableName,
@@ -70,12 +81,7 @@ export class SimDynamoDbScan {
     });
 
     return {
-      Items: page.items.map((item) => item.toAttributeValues()),
-      // Nothing filters a scan yet, so every item the walk evaluated is an item
-      // the page carries.
-      Count: page.items.length,
-      ScannedCount: page.items.length,
-      LastEvaluatedKey: page.lastEvaluatedKey,
+      ...new SimDynamoDbReadAnswer({ page, filter, select }).fields(),
       $metadata: {},
     };
   }

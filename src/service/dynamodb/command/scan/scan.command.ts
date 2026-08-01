@@ -44,8 +44,11 @@ export interface SimScanCommandInput {
 /**
  * Minimal structural sim DynamoDB Scan output.
  *
- * `Count` and `ScannedCount` are the same number here, since nothing filters a
- * scan yet: every item the walk evaluated is an item it answers with.
+ * `ScannedCount` is how many items the walk evaluated and `Count` how many of
+ * them the filter kept, so the two are the same number for a scan carrying no
+ * `FilterExpression`.
+ *
+ * `Items` is absent altogether for a `Select` of `COUNT`, rather than empty.
  *
  * `LastEvaluatedKey` is absent only when the table, or the segment of it being
  * read, ran out inside the `Limit`, so a caller loops until it is gone rather

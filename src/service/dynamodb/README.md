@@ -394,14 +394,18 @@ lookup.
 
 The order it works in is the order the other commands follow, with one addition:
 
-1. `refuseUnsimulatedQueryInput` refuses the inputs this simulation does not model.
-2. `readSimDynamoDbKeyCondition` reads the `KeyConditionExpression`, before the table is reached, so
-   an expression DynamoDB would refuse is refused whether or not the table is there.
-3. The table is found and the caller authorized.
-4. `SimDynamoDbKeyConditionTerms.forTable` reads the terms against the table's key schema, which is
+1. `SimDynamoDbSelect.from` reads which attributes the request asks for. It comes first because it
+   decides whether the projection the request carries is one it could have asked for at all.
+2. `refuseUnsimulatedQueryInput` refuses the inputs this simulation does not model.
+3. `readSimDynamoDbQueryExpressions` reads the `KeyConditionExpression` and the `FilterExpression`,
+   before the table is reached, so an expression DynamoDB would refuse is refused whether or not the
+   table is there. Both draw on one `SimDynamoDbExpressionParameters`, the way UpdateItem's two
+   expressions do.
+4. The table is found and the caller authorized.
+5. `SimDynamoDbKeyConditionTerms.forTable` reads the terms against the table's key schema, which is
    the part that could not be checked without it: which attribute is the partition key, and what type
-   the sort key is.
-5. The collection is gathered, walked, and cut to a page.
+   the sort key is. `SimDynamoDbFilter.assertNamesNoKeyAttribute` is held to the same schema.
+6. The collection is gathered, walked, and cut to a page, which is then filtered.
 
 The parts a query is made of split by what they know:
 
@@ -414,6 +418,14 @@ The parts a query is made of split by what they know:
   item under a partition key, so every question about ordering has a trivial answer.
 - `SimDynamoDbItemPage` under `command/item/` is `Limit` and `LastEvaluatedKey`. It takes items and a
   key schema rather than a query, which is what lets `Scan` use it unchanged.
+- `command/read/` is what a query and a scan answer with, since both answer the same way.
+  `SimDynamoDbReadAnswer` holds the order the counts depend on: a page cut at the `Limit`, then
+  filtered, so `ScannedCount` is what was evaluated and `Count` what survived. `SimDynamoDbSelect` is
+  the `Select` matrix, and is what leaves `Items` out of a counted read.
+- `expression/filter/` reads the `FilterExpression`. It is the ordinary condition grammar rather than
+  one of its own, so it goes through `SimDynamoDbConditionParser` under a different expression name.
+  `SimDynamoDbFilter` is the condition plus the paths it named, which is what the key attribute rule
+  needs.
 - `readSimDynamoDbQueryStartKey` reads the `ExclusiveStartKey`. It goes through the table's own key
   reading, so a token that is not a whole primary key is refused the way any Key is, and then checks
   that it names the collection being read.
@@ -422,8 +434,12 @@ Important behavior:
 
 - `ScanIndexForward` defaults to true. Setting it to false reads the collection backwards, and
   resumes backwards too.
-- `Limit` counts the items a walk evaluated. Nothing filters a query yet, so that is also the number
-  it answers with, and `Count` and `ScannedCount` are the same.
+- `Limit` counts the items a walk evaluated rather than the items it answers with. The filter runs
+  over the page after the cut, so `ScannedCount` is the walk's own count and `Count` is what the
+  filter kept. A page can come back empty with a `LastEvaluatedKey` on it.
+- a filter naming a key attribute is refused, since a query has narrowed by its key condition
+  already. `SimDynamoDbDocumentPath.startsAt` is the check, so a path into a map named after a key
+  attribute is not caught by it.
 - `LastEvaluatedKey` is there whenever the walk stopped at the limit, including when it stopped on
   the last matching item. A caller looping until the token is absent therefore reads one empty page
   at the end, which is what real DynamoDB does: it cannot know the range is exhausted without looking
@@ -431,21 +447,22 @@ Important behavior:
 - `ExclusiveStartKey` resumes exclusively, by comparing sort keys rather than by looking the item up,
   so a token still works when the item it names has since been deleted. That is the same choice
   `ListTables` and `ListTagsOfResource` make.
-- `IndexName`, `FilterExpression`, `ProjectionExpression` and `Select` are refused by name, since each
-  changes which items a query answers with or which parts of them. `Select: ALL_ATTRIBUTES` is the
-  default a table query already behaves as, so it is let through.
+- `IndexName` and `ProjectionExpression` are refused by name, since each changes which items a query
+  answers with or which parts of them.
 
 ## Scan behavior
 
 `SimDynamoDbScan` reads a whole table rather than one item collection, so it needs no key condition
-and no key knowledge. It takes the same steps a query does, minus the expression:
+and no key knowledge. It takes the same steps a query does, minus the key condition:
 
-1. `refuseUnsimulatedScanInput` refuses the inputs this simulation does not model.
-2. `readSimDynamoDbScanSegment` reads `Segment` and `TotalSegments`, before the table is reached, so
-   a division DynamoDB would refuse is refused whether or not the table is there.
-3. The table is found and the caller authorized.
-4. The table is put in scan order, walked from the `ExclusiveStartKey`, and cut to a page by the same
-   `SimDynamoDbItemPage` a query uses.
+1. `SimDynamoDbSelect.from` reads which attributes the request asks for.
+2. `refuseUnsimulatedScanInput` refuses the inputs this simulation does not model.
+3. `readSimDynamoDbScanSegment` reads `Segment` and `TotalSegments`, and `readSimDynamoDbFilter` the
+   `FilterExpression`, before the table is reached, so input DynamoDB would refuse is refused whether
+   or not the table is there. A scan filter needs nothing from the table, unlike a query's.
+4. The table is found and the caller authorized.
+5. The table is put in scan order, walked from the `ExclusiveStartKey`, and cut to a page by the same
+   `SimDynamoDbItemPage` a query uses, then filtered by the same `SimDynamoDbReadAnswer`.
 
 The parts a scan is made of sit under `table/`, since the order and the segments belong to the table
 rather than to the command reading it:
@@ -479,6 +496,11 @@ Important behavior:
   parallel scan code makes, so it fails rather than reading that segment from the start.
 - `ConsistentRead` is accepted and changes nothing, since every simulated read is strongly
   consistent.
+- a scan filter may name any attribute, key attributes included, where a query's may not. A scan has
+  narrowed nothing, so there is no key condition for a filter to contradict.
+- `ExpressionAttributeNames` and `ExpressionAttributeValues` with no `FilterExpression` to use them
+  in are a `ValidationException` through `SimDynamoDbExpressionParameters.assertNoneWithout`, rather
+  than unsimulated input, because that is what real DynamoDB calls them.
 - `Segment` and `TotalSegments` are declared on the Query input as well, and refused there by
   `refuseSimDynamoDbQuerySegment`. They are not Query parameters on AWS, and a query carrying one is
   code that meant to scan.
@@ -629,10 +651,16 @@ precedence DynamoDB documents is the shape of the class rather than a table some
 and the function calls have parsers of their own, because deciding whether `size` is a call or an
 attribute named `size` is a different job from deciding whether an OR binds looser than an AND.
 
+`expression/filter/` is the same grammar under another name. A FilterExpression is a
+ConditionExpression evaluated against each item a read reached, so `parseSimDynamoDbFilter` builds
+the same parser through `SimDynamoDbConditionParser.of` and only the expression name a refusal
+carries differs. What it adds is `SimDynamoDbFilter`, which holds the paths the expression named
+alongside the condition. Nothing checking a write needs those, since the request already named the
+item; a query does, to be refused for naming a key attribute.
+
 The comparison rules live in `item/sim-dynamodb-value-comparison.ts` and
 `item/sim-dynamodb-value-order.ts` rather than inside the evaluator, because a sort key condition
-compares the same way a condition expression does, and a filter expression will when filters arrive.
-Strings compare by UTF-8 bytes rather than by UTF-16 code units, numbers compare through
+compares the same way a condition expression and a filter expression do. Strings compare by UTF-8 bytes rather than by UTF-16 code units, numbers compare through
 `SimDynamoDbNumber.compareTo` so digits past what a JavaScript number holds still order correctly,
 and binary compares as unsigned bytes. Two values of different types have no order at all, which is
 what makes a comparison between them false rather than an error. `simDynamoDbValueBeginsWith` in

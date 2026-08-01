@@ -57,6 +57,19 @@ export class SimDynamoDbDocumentPath {
   }
 
   /**
+   * Whether this path starts at one named attribute of the item.
+   *
+   * A path into a map or a list is still a path into the attribute it starts
+   * at, so `order.status` starts at `order`. That is what a rule about which
+   * attributes an expression may name is asking about.
+   */
+  startsAt(attributeName: string): boolean {
+    const first = this.segments.at(0);
+
+    return first?.kind === "attribute" && first.name === attributeName;
+  }
+
+  /**
    * The path written back out, for a refusal to name.
    *
    * Placeholders are gone by this point, so this is the path the request meant
