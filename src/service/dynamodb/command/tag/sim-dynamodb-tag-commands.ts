@@ -48,6 +48,9 @@ export class SimDynamoDbTagCommands {
     command: SimTagResourceCommand,
     options?: SimDynamoDbTagCommandsOptions,
   ): SimTagResourceCommandOutput {
+    // The request is read before the resource is reached, so a request
+    // DynamoDB would refuse is refused whether or not the table is there.
+    const tags = readSimDynamoDbTags(command.input.Tags);
     const table = reachSimDynamoDbTagResource({
       access: this.access,
       action: "dynamodb:TagResource",
@@ -55,7 +58,7 @@ export class SimDynamoDbTagCommands {
       caller: options?.caller,
     });
 
-    table.tags.apply(readSimDynamoDbTags(command.input.Tags));
+    table.tags.apply(tags);
 
     return { $metadata: {} };
   }
@@ -70,6 +73,7 @@ export class SimDynamoDbTagCommands {
     command: SimUntagResourceCommand,
     options?: SimDynamoDbTagCommandsOptions,
   ): SimUntagResourceCommandOutput {
+    const keys = readSimDynamoDbTagKeys(command.input.TagKeys);
     const table = reachSimDynamoDbTagResource({
       access: this.access,
       action: "dynamodb:UntagResource",
@@ -77,7 +81,7 @@ export class SimDynamoDbTagCommands {
       caller: options?.caller,
     });
 
-    table.tags.remove(readSimDynamoDbTagKeys(command.input.TagKeys));
+    table.tags.remove(keys);
 
     return { $metadata: {} };
   }

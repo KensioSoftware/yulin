@@ -1526,7 +1526,7 @@ console.log(stack.outputs.get("OrdersTableArn")?.value);
 ```
 
 The properties that are read are `TableName`, `KeySchema`, `AttributeDefinitions`, `BillingMode`,
-`ProvisionedThroughput`, `TableClass` and `DeletionProtectionEnabled`. Each one is passed to
+`ProvisionedThroughput`, `TableClass`, `DeletionProtectionEnabled` and `Tags`. Each one is passed to
 `CreateTable` rather than applied here, so a value the template gets wrong fails the same way it
 would for an SDK caller.
 
