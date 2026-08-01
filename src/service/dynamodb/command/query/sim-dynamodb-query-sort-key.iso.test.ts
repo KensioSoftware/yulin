@@ -262,24 +262,104 @@ describe("DynamoDB QueryCommand sort key conditions", () => {
     assertStringIncludes(error.message, "String or Binary sort key");
   });
 
-  it("answers with nothing for a sort key condition of another type", async () => {
+  it("refuses a sort key condition against another type", async () => {
     // Given a table whose sort key is a string.
     const simAws = new SimAws();
     const simDynamoDb = await stringSortKeyTable(simAws);
 
     // When the sort key is compared against a number.
-    const output = await simDynamoDb.query(
-      new QueryCommand({
-        TableName: "EventsTable",
-        KeyConditionExpression: "streamId = :stream AND eventId > :value",
-        ExpressionAttributeValues: {
-          ":stream": { S: "stream-1" },
-          ":value": { N: "1" },
-        },
-      }),
+    const error = await assertThrowsErrorAsync(async () =>
+      simDynamoDb.query(
+        new QueryCommand({
+          TableName: "EventsTable",
+          KeyConditionExpression: "streamId = :stream AND eventId > :value",
+          ExpressionAttributeValues: {
+            ":stream": { S: "stream-1" },
+            ":value": { N: "1" },
+          },
+        }),
+      ),
     );
 
-    // Then nothing matches, since two types have no order between them.
-    assertArrayEquals(eventIds(output), []);
+    // Then it is refused rather than answered with an empty page. A sort key
+    // has one type, so the condition could never hold, and an empty page would
+    // read as a collection that happens to hold nothing.
+    assertInstanceOf(error, SimDynamoDbValidationException);
+    assertStringIncludes(error.message, "does not match schema type");
+    assertStringIncludes(error.message, "eventId");
+  });
+
+  it("refuses a partition key compared against another type", async () => {
+    // Given a table whose partition key is a string.
+    const simAws = new SimAws();
+    const simDynamoDb = await stringSortKeyTable(simAws);
+
+    // When the partition key is named by a number.
+    const error = await assertThrowsErrorAsync(async () =>
+      simDynamoDb.query(
+        new QueryCommand({
+          TableName: "EventsTable",
+          KeyConditionExpression: "streamId = :stream",
+          ExpressionAttributeValues: { ":stream": { N: "1" } },
+        }),
+      ),
+    );
+
+    // Then it is refused too: it names an item collection that cannot exist.
+    assertInstanceOf(error, SimDynamoDbValidationException);
+    assertStringIncludes(error.message, "streamId");
+  });
+
+  it("refuses a BETWEEN whose bounds are not the sort key's type", async () => {
+    // Given a table whose sort key is a string.
+    const simAws = new SimAws();
+    const simDynamoDb = await stringSortKeyTable(simAws);
+
+    // When the range is written over numbers, which agree with each other but
+    // not with the table.
+    const error = await assertThrowsErrorAsync(async () =>
+      simDynamoDb.query(
+        new QueryCommand({
+          TableName: "EventsTable",
+          KeyConditionExpression:
+            "streamId = :stream AND eventId BETWEEN :lower AND :upper",
+          ExpressionAttributeValues: {
+            ":stream": { S: "stream-1" },
+            ":lower": { N: "1" },
+            ":upper": { N: "9" },
+          },
+        }),
+      ),
+    );
+
+    // Then it is refused.
+    assertInstanceOf(error, SimDynamoDbValidationException);
+    assertStringIncludes(error.message, "does not match schema type");
+  });
+
+  it("refuses a begins_with prefix that is not the sort key's type", async () => {
+    // Given a table whose sort key is a string.
+    const simAws = new SimAws();
+    const simDynamoDb = await stringSortKeyTable(simAws);
+
+    // When a binary prefix is asked for against it.
+    const error = await assertThrowsErrorAsync(async () =>
+      simDynamoDb.query(
+        new QueryCommand({
+          TableName: "EventsTable",
+          KeyConditionExpression:
+            "streamId = :stream AND begins_with(eventId, :prefix)",
+          ExpressionAttributeValues: {
+            ":stream": { S: "stream-1" },
+            ":prefix": { B: new Uint8Array([1, 2]) },
+          },
+        }),
+      ),
+    );
+
+    // Then it is refused: a string never begins with binary however the bytes
+    // line up.
+    assertInstanceOf(error, SimDynamoDbValidationException);
+    assertStringIncludes(error.message, "does not match schema type");
   });
 });

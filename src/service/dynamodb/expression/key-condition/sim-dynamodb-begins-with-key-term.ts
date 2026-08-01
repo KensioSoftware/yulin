@@ -3,6 +3,7 @@ import { simDynamoDbValueBeginsWith } from "../../item/sim-dynamodb-value-prefix
 import type { SimDynamoDbValue } from "../../item/sim-dynamodb-value.js";
 import type { SimDynamoDbExpressionTokens } from "../sim-dynamodb-expression-tokens.js";
 import { simDynamoDbKeyConditionError } from "./sim-dynamodb-key-condition-error.js";
+import { assertSimDynamoDbKeyValueType } from "./sim-dynamodb-key-condition-term.js";
 import type { SimDynamoDbKeyConditionOperands } from "./sim-dynamodb-key-condition-operands.js";
 import { simDynamoDbBeginsWithName } from "./sim-dynamodb-key-condition-refusals.js";
 import type { SimDynamoDbKeyConditionTerm } from "./sim-dynamodb-key-condition-term.js";
@@ -82,5 +83,7 @@ export class SimDynamoDbBeginsWithKeyTerm implements SimDynamoDbKeyConditionTerm
           `${this.attributeName} is a Number`,
       );
     }
+
+    assertSimDynamoDbKeyValueType(this.attributeName, this.prefix, type);
   }
 }

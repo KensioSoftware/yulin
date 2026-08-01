@@ -1,7 +1,12 @@
+import { assertDefined } from "../../../../util/type-guard/defined.js";
+import type { SimDynamoDbScalarAttributeType } from "../../command/table/table.types.js";
 import { compareSimDynamoDbValues } from "../../item/sim-dynamodb-value-order.js";
 import type { SimDynamoDbValue } from "../../item/sim-dynamodb-value.js";
 import { simDynamoDbKeyConditionError } from "./sim-dynamodb-key-condition-error.js";
-import type { SimDynamoDbKeyConditionTerm } from "./sim-dynamodb-key-condition-term.js";
+import {
+  assertSimDynamoDbKeyValueType,
+  type SimDynamoDbKeyConditionTerm,
+} from "./sim-dynamodb-key-condition-term.js";
 
 interface SimDynamoDbBetweenKeyTermProperties {
   readonly attributeName: string;
@@ -29,23 +34,35 @@ export class SimDynamoDbBetweenKeyTerm implements SimDynamoDbKeyConditionTerm {
 
   /**
    * Whether a key value is at or between the two bounds.
+   *
+   * All three always order. Every one of them is the type the table declared
+   * for the key attribute, which `assertUsableOn` checked before the query ran.
    */
   holdsFor(value: SimDynamoDbValue): boolean {
     const aboveLower = compareSimDynamoDbValues(value, this.lower);
     const belowUpper = compareSimDynamoDbValues(value, this.upper);
 
-    if (aboveLower === undefined || belowUpper === undefined) {
-      return false;
-    }
+    assertDefined(
+      aboveLower,
+      `order against the ${this.attributeName} lower bound`,
+    );
+    assertDefined(
+      belowUpper,
+      `order against the ${this.attributeName} upper bound`,
+    );
 
     return aboveLower >= 0 && belowUpper <= 0;
   }
 
   /**
-   * Both bounds are ordinary key values, so there is nothing to refuse.
+   * Refuse bounds of a type the key attribute was not declared as.
+   *
+   * The two bounds already agree with each other, which is checked when the
+   * term is built, so this is what ties them to the table.
    */
-  assertUsableOn(): void {
-    return;
+  assertUsableOn(type: SimDynamoDbScalarAttributeType): void {
+    assertSimDynamoDbKeyValueType(this.attributeName, this.lower, type);
+    assertSimDynamoDbKeyValueType(this.attributeName, this.upper, type);
   }
 
   /**

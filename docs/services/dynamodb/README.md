@@ -1008,6 +1008,9 @@ The grammar is closed, and deliberately narrower than a `ConditionExpression`. E
 - the same key attribute tested twice
 - a `BETWEEN` whose upper bound is below its lower bound, or whose bounds are different types
 - a value written into the expression rather than supplied through `ExpressionAttributeValues`
+- a value whose type is not the one the table declared for that key attribute, such as comparing an
+  `S` sort key against an `N`. A key attribute has one type, so the condition could never hold, and
+  an empty page would read as a collection that happens to hold nothing.
 
 An attribute name that is a DynamoDB reserved word is written as a `#name` placeholder and defined in
 `ExpressionAttributeNames`, as in any other expression.

@@ -606,7 +606,10 @@ The parts split by what they know:
 - The three terms are a class each, in `sim-dynamodb-comparison-key-term.ts`,
   `sim-dynamodb-between-key-term.ts` and `sim-dynamodb-begins-with-key-term.ts`. Each knows what it
   refuses: a BETWEEN whose bounds run backwards or are different types, and a `begins_with` against a
-  Number sort key.
+  Number sort key. `assertUsableOn` is where a term is held to the type the table declared for the
+  key attribute, through the shared `assertSimDynamoDbKeyValueType`. A value of another type is
+  refused rather than matching nothing, since an empty page would read as a collection that happens
+  to hold nothing.
 - `SimDynamoDbKeyConditionTerms` holds the terms to the key schema once the table has been reached,
   and answers with a `SimDynamoDbKeyCondition`: the partition key value whose collection is read, and
   the run of it the sort key condition asks for.

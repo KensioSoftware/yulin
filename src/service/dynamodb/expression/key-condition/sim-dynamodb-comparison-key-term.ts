@@ -3,8 +3,13 @@ import {
   compareSimDynamoDbValues,
   simDynamoDbOrderHolds,
 } from "../../item/sim-dynamodb-value-order.js";
+import { assertDefined } from "../../../../util/type-guard/defined.js";
+import type { SimDynamoDbScalarAttributeType } from "../../command/table/table.types.js";
 import type { SimDynamoDbValue } from "../../item/sim-dynamodb-value.js";
-import type { SimDynamoDbKeyConditionTerm } from "./sim-dynamodb-key-condition-term.js";
+import {
+  assertSimDynamoDbKeyValueType,
+  type SimDynamoDbKeyConditionTerm,
+} from "./sim-dynamodb-key-condition-term.js";
 
 interface SimDynamoDbComparisonKeyTermProperties {
   readonly attributeName: string;
@@ -33,6 +38,10 @@ export class SimDynamoDbComparisonKeyTerm implements SimDynamoDbKeyConditionTerm
 
   /**
    * Whether a key value stands in the relation the operator asked for.
+   *
+   * The two sides always order. Both are the type the table declared for the
+   * key attribute: the stored one because a write that broke that was refused,
+   * and the supplied one because `assertUsableOn` refused the query.
    */
   holdsFor(value: SimDynamoDbValue): boolean {
     if (this.operator === "=") {
@@ -41,17 +50,18 @@ export class SimDynamoDbComparisonKeyTerm implements SimDynamoDbKeyConditionTerm
 
     const order = compareSimDynamoDbValues(value, this.value);
 
-    if (order === undefined) {
-      return false;
-    }
+    assertDefined(order, `order of two ${this.attributeName} key values`);
 
     return simDynamoDbOrderHolds(this.operator, order);
   }
 
   /**
-   * Every scalar key type compares and orders, so there is nothing to refuse.
+   * Refuse a value of a type the key attribute was not declared as.
+   *
+   * Every scalar key type compares and orders, so the operator is always fine.
+   * What has to match is the value it compares against.
    */
-  assertUsableOn(): void {
-    return;
+  assertUsableOn(type: SimDynamoDbScalarAttributeType): void {
+    assertSimDynamoDbKeyValueType(this.attributeName, this.value, type);
   }
 }

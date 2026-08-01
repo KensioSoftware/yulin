@@ -1,4 +1,5 @@
 import type { SimDynamoDbScalarAttributeType } from "../../command/table/table.types.js";
+import { SimDynamoDbValidationException } from "../../error/dynamodb.error.js";
 import type { SimDynamoDbValue } from "../../item/sim-dynamodb-value.js";
 
 /**
@@ -23,4 +24,27 @@ export interface SimDynamoDbKeyConditionTerm {
    * Refuse a term that cannot be applied to the key attribute it names.
    */
   assertUsableOn(type: SimDynamoDbScalarAttributeType): void;
+}
+
+/**
+ * Refuse a value of a type the table did not declare for a key attribute.
+ *
+ * A key attribute has exactly one type, so a condition comparing it against
+ * another type can never hold for any item. Real DynamoDB refuses the request,
+ * and so does this: answering with nothing instead would read as an item
+ * collection that happens to be empty, which is a test passing here on a query
+ * that fails on deploy.
+ */
+export function assertSimDynamoDbKeyValueType(
+  attributeName: string,
+  value: SimDynamoDbValue,
+  type: SimDynamoDbScalarAttributeType,
+): void {
+  if (value.kind !== type) {
+    throw new SimDynamoDbValidationException(
+      `One or more parameter values were invalid: Condition parameter type ` +
+        `does not match schema type. The key attribute ${attributeName} is ` +
+        `${type}, and the key condition compares it against ${value.kind}.`,
+    );
+  }
 }

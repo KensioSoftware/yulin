@@ -38,7 +38,10 @@ export class SimDynamoDbKeyConditionTerms {
     this.assertNameKeyAttributes(keySchema);
 
     return new SimDynamoDbKeyCondition({
-      partitionKeyValue: this.partitionKeyValue(keySchema),
+      partitionKeyValue: this.partitionKeyValue(
+        keySchema,
+        attributeDefinitions,
+      ),
       sortKeyTerm: this.sortKeyTerm(keySchema, attributeDefinitions),
     });
   }
@@ -66,7 +69,10 @@ export class SimDynamoDbKeyConditionTerms {
   /**
    * The one partition key value this condition names an item collection by.
    */
-  private partitionKeyValue(keySchema: SimDynamoDbKeySchema): SimDynamoDbValue {
+  private partitionKeyValue(
+    keySchema: SimDynamoDbKeySchema,
+    attributeDefinitions: SimDynamoDbAttributeDefinitions,
+  ): SimDynamoDbValue {
     const attributeName = keySchema.hashKeyAttributeName;
     const term = this.single(attributeName);
 
@@ -84,6 +90,10 @@ export class SimDynamoDbKeyConditionTerms {
     if (term.operator !== "=") {
       throw this.partitionKeyOperatorError(attributeName, term.operator);
     }
+
+    // The partition key is held to its declared type the same way the sort key
+    // is. A value of another type names an item collection that cannot exist.
+    term.assertUsableOn(attributeDefinitions.typeOf(attributeName));
 
     return term.value;
   }
