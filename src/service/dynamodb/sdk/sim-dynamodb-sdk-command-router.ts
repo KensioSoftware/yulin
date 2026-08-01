@@ -19,6 +19,10 @@ import type {
   SimBatchGetItemCommand,
   SimBatchWriteItemCommand,
 } from "../command/batch/batch.command.js";
+import type {
+  SimTransactGetItemsCommand,
+  SimTransactWriteItemsCommand,
+} from "../command/transact/transact.command.js";
 import type { SimDynamoDb as SimDynamoDatabase } from "../sim-dynamodb.js";
 
 /**
@@ -106,6 +110,22 @@ export class SimDynamoDatabaseSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simDynamoDatabase.batchGetItem(
             command as SimBatchGetItemCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "TransactWriteItemsCommand",
+        async (command, context): Promise<unknown> =>
+          await simDynamoDatabase.transactWriteItems(
+            command as SimTransactWriteItemsCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "TransactGetItemsCommand",
+        async (command, context): Promise<unknown> =>
+          await simDynamoDatabase.transactGetItems(
+            command as SimTransactGetItemsCommand,
             simSdkCallerOptions(context),
           ),
       ],

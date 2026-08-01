@@ -11,6 +11,8 @@ import {
   ListTablesCommand,
   PutItemCommand,
   QueryCommand,
+  TransactGetItemsCommand,
+  TransactWriteItemsCommand,
   UpdateItemCommand,
 } from "@aws-sdk/client-dynamodb";
 import {
@@ -180,6 +182,60 @@ describe("simulated DynamoDB SDK Command routing", () => {
     assertArrayLength(items, 1);
     assertObjectEquals(items[0], { name: { S: "First item" } });
     assertObjectEquals(readOut.UnprocessedKeys, {});
+  });
+
+  it("round-trips transactional Item Commands through an intercepted client", async () => {
+    using simSdk = new SimSdk();
+    const client = new DynamoDBClient({ region: "eu-west-2" });
+    simSdk.intercept(client);
+
+    await client.send(
+      new CreateTableCommand({
+        TableName: "TransactTable",
+        KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+        AttributeDefinitions: [{ AttributeName: "id", AttributeType: "S" }],
+        BillingMode: "PAY_PER_REQUEST",
+      }),
+    );
+    await simSdk.simAws.backgroundTasksComplete();
+
+    await client.send(
+      new TransactWriteItemsCommand({
+        TransactItems: [
+          {
+            Put: {
+              TableName: "TransactTable",
+              Item: { id: { S: "item-1" }, name: { S: "First item" } },
+            },
+          },
+          {
+            Update: {
+              TableName: "TransactTable",
+              Key: { id: { S: "item-2" } },
+              UpdateExpression: "SET #n = :name",
+              ExpressionAttributeNames: { "#n": "name" },
+              ExpressionAttributeValues: { ":name": { S: "Second item" } },
+            },
+          },
+        ],
+      }),
+    );
+
+    const readOut = await client.send(
+      new TransactGetItemsCommand({
+        TransactItems: [
+          { Get: { TableName: "TransactTable", Key: { id: { S: "item-2" } } } },
+          {
+            Get: { TableName: "TransactTable", Key: { id: { S: "missing" } } },
+          },
+        ],
+      }),
+    );
+    const responses = readOut.Responses;
+    assertNonNullable(responses);
+    assertArrayLength(responses, 2);
+    assertIdentical(responses[0].Item?.["name"]?.S, "Second item");
+    assertObjectEquals(responses[1], {});
   });
 
   it("does not give a denied run-as caller root privileges", async () => {

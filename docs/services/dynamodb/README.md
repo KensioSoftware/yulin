@@ -1006,6 +1006,246 @@ while (Object.keys(unprocessed).length > 0) {
 }
 ```
 
+## Reading and writing items in transactions
+
+`TransactWriteItems` applies up to 100 actions in one step. Either all of them happen or none of
+them do, so two items that have to agree with each other can be written together.
+
+Each action carries exactly one of `Put`, `Update`, `Delete` and `ConditionCheck`, and names its own
+table. A `ConditionCheck` writes nothing: it is how a transaction says that an item it is not
+changing has to hold for the items it is changing to be written.
+
+What a test usually wants to show is the failure. A transaction that succeeds looks the same as two
+separate writes, so what is worth asserting is that a failed condition on the second action left the
+first one unwritten.
+
+```typescript sim-dynamodb-transact-write-items
+/**
+ * Writing a ledger entry and the balance it moves, or writing neither.
+ */
+
+import {
+  CreateTableCommand,
+  GetItemCommand,
+  PutItemCommand,
+  TransactWriteItemsCommand,
+} from "@aws-sdk/client-dynamodb";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const dynamoDb = simAws.dynamoDb();
+
+await dynamoDb.createTable(
+  new CreateTableCommand({
+    TableName: "AccountsTable",
+    KeySchema: [{ AttributeName: "accountId", KeyType: "HASH" }],
+    AttributeDefinitions: [{ AttributeName: "accountId", AttributeType: "S" }],
+    BillingMode: "PAY_PER_REQUEST",
+  }),
+);
+await dynamoDb.createTable(
+  new CreateTableCommand({
+    TableName: "LedgerTable",
+    KeySchema: [{ AttributeName: "entryId", KeyType: "HASH" }],
+    AttributeDefinitions: [{ AttributeName: "entryId", AttributeType: "S" }],
+    BillingMode: "PAY_PER_REQUEST",
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+// The account is closed, so the balance may not move.
+await dynamoDb.putItem(
+  new PutItemCommand({
+    TableName: "AccountsTable",
+    Item: {
+      accountId: { S: "account-1" },
+      balance: { N: "100" },
+      status: { S: "closed" },
+    },
+  }),
+);
+
+const ledgerEntry = {
+  Put: {
+    TableName: "LedgerTable",
+    Item: { entryId: { S: "entry-1" }, amount: { N: "25" } },
+  },
+};
+
+const balanceUpdate = {
+  Update: {
+    TableName: "AccountsTable",
+    Key: { accountId: { S: "account-1" } },
+    UpdateExpression: "SET balance = balance - :amount",
+    ConditionExpression: "#status = :open",
+    ExpressionAttributeNames: { "#status": "status" },
+    ExpressionAttributeValues: {
+      ":amount": { N: "25" },
+      ":open": { S: "open" },
+    },
+  },
+};
+
+try {
+  await dynamoDb.transactWriteItems(
+    new TransactWriteItemsCommand({
+      TransactItems: [ledgerEntry, balanceUpdate],
+    }),
+  );
+} catch (error) {
+  const cancelled = error as {
+    name: string;
+    CancellationReasons?: { Code: string; Message?: string }[];
+  };
+
+  console.log(cancelled.name); // "TransactionCanceledException"
+  console.log(cancelled.CancellationReasons);
+  // [
+  //   { Code: "None" },
+  //   {
+  //     Code: "ConditionalCheckFailed",
+  //     Message: "The conditional request failed.",
+  //   },
+  // ]
+}
+
+// The first action is reported even though nothing was wrong with it, and the
+// ledger entry it would have written is not there.
+const entry = await dynamoDb.getItem(
+  new GetItemCommand({
+    TableName: "LedgerTable",
+    Key: { entryId: { S: "entry-1" } },
+  }),
+);
+
+console.log(entry.Item); // undefined
+```
+
+`CancellationReasons` lines up with `TransactItems`. There is one entry per action, in the same
+order, including the actions that would have gone through, which carry the code `None`. The codes
+have no `Exception` suffix, so a failed condition reads as `ConditionalCheckFailed` rather than as
+the `ConditionalCheckFailedException` a single `PutItem` throws.
+
+An action that sets `ReturnValuesOnConditionCheckFailure` to `ALL_OLD` gets `Item` on its
+cancellation reason, holding the item as it was, so a retry needs no second read.
+
+Five things refuse the request outright rather than cancelling it, with nothing written either way:
+
+- more than 100 actions
+- an action carrying more than one of `Put`, `Update`, `Delete` and `ConditionCheck`, or none of them
+- two actions on the same item of one table
+- a table that is not there, or a key that does not match its key schema
+- an update that would move the item's primary key
+
+One table may be named as often as the transaction likes, which is the difference from a batch. What
+it may not do is touch one item twice.
+
+### Retrying a transaction
+
+`ClientRequestToken` makes a retry idempotent. Replaying a token with the same actions inside ten
+minutes succeeds without applying the writes again, and replaying it with different actions gives
+`IdempotentParameterMismatchException`. Only a transaction that was applied is remembered, so
+retrying one that was cancelled runs it again.
+
+The ten minutes are measured on the simulated clock, so a test moves past the window rather than
+waiting for it:
+
+```typescript
+const withdrawal = {
+  TransactItems: [
+    {
+      Update: {
+        TableName: "AccountsTable",
+        Key: { accountId: { S: "account-1" } },
+        UpdateExpression: "SET balance = balance - :amount",
+        ExpressionAttributeValues: { ":amount": { N: "25" } },
+      },
+    },
+  ],
+  ClientRequestToken: "6b6b1a1e-0e2d-4d3f-9f5a-1c0f2b3d4e5f",
+};
+
+// The balance moves once, however many times the call is retried.
+await dynamoDb.transactWriteItems(new TransactWriteItemsCommand(withdrawal));
+await dynamoDb.transactWriteItems(new TransactWriteItemsCommand(withdrawal));
+
+// Past the window, the same token is a new transaction, and it moves again.
+await simAws.clock().advanceBy({ minutes: 10 });
+await dynamoDb.transactWriteItems(new TransactWriteItemsCommand(withdrawal));
+```
+
+### Reading in a transaction
+
+`TransactGetItems` reads up to 100 items in one step, and is always strongly consistent, so there is
+no `ConsistentRead` to set. Each `Get` names its own table, and takes a `ProjectionExpression`.
+
+```typescript sim-dynamodb-transact-get-items
+/**
+ * Reading two items in one step, one of which is not there.
+ */
+
+import {
+  CreateTableCommand,
+  PutItemCommand,
+  TransactGetItemsCommand,
+} from "@aws-sdk/client-dynamodb";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const dynamoDb = simAws.dynamoDb();
+
+await dynamoDb.createTable(
+  new CreateTableCommand({
+    TableName: "AccountsTable",
+    KeySchema: [{ AttributeName: "accountId", KeyType: "HASH" }],
+    AttributeDefinitions: [{ AttributeName: "accountId", AttributeType: "S" }],
+    BillingMode: "PAY_PER_REQUEST",
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+await dynamoDb.putItem(
+  new PutItemCommand({
+    TableName: "AccountsTable",
+    Item: {
+      accountId: { S: "account-1" },
+      balance: { N: "100" },
+      status: { S: "open" },
+    },
+  }),
+);
+
+const output = await dynamoDb.transactGetItems(
+  new TransactGetItemsCommand({
+    TransactItems: [
+      {
+        Get: {
+          TableName: "AccountsTable",
+          Key: { accountId: { S: "account-1" } },
+          ProjectionExpression: "balance",
+        },
+      },
+      {
+        Get: {
+          TableName: "AccountsTable",
+          Key: { accountId: { S: "account-404" } },
+        },
+      },
+    ],
+  }),
+);
+
+// Responses is positional and is never compacted, so a missing item is an
+// entry with no Item rather than nothing at all.
+console.log(output.Responses[0]); // { Item: { balance: { N: "100" } } }
+console.log(output.Responses[1]); // {}
+```
+
+That is the difference from `BatchGetItem`, which leaves a missing item out of its answer
+altogether. Here the answers stay lined up with the Gets that asked for them.
+
 ## Numbers
 
 A DynamoDB number carries up to 38 significant digits, where a JavaScript number carries about 15.
@@ -1224,6 +1464,12 @@ unauthorized caller cannot find out which names are taken.
 in the same way, each against the `dynamodb:` action of its own name. `ListTables` names no table, so it
 authorizes against `*`.
 
+A transaction is authorized as the operations it is made of rather than as itself. Each action of a
+`TransactWriteItems` needs `dynamodb:PutItem`, `dynamodb:UpdateItem`, `dynamodb:DeleteItem` or
+`dynamodb:ConditionCheckItem` against the table it names, and each `Get` of a `TransactGetItems`
+needs `dynamodb:GetItem`. A caller refused any one of them is refused the whole transaction, so
+nothing is written.
+
 ## Available functionality
 
 - `CreateTable`, with table name, key schema, attribute definition, billing mode and throughput
@@ -1250,6 +1496,11 @@ authorizes against `*`.
   the whole batch refusals, and an empty `UnprocessedItems`.
 - `BatchGetItem`, reading items across tables in one call, with `ConsistentRead` and
   `ProjectionExpression` per table, the 100 key cap, and an empty `UnprocessedKeys`.
+- `TransactWriteItems`, applying up to 100 `Put`, `Update`, `Delete` and `ConditionCheck` actions in
+  one step, with `TransactionCanceledException` carrying a cancellation reason per action, and
+  `ClientRequestToken` making a retry idempotent for ten simulated minutes.
+- `TransactGetItems`, reading up to 100 items in one step, with a positional `Responses` array in
+  which a missing item is an entry with no `Item`.
 - `AWS::DynamoDB::Table` in CloudFormation, created through `CreateTable`, with `Ref` giving the
   table name and `Fn::GetAtt … Arn` the table ARN.
 - SDK interception, so an intercepted `DynamoDBClient` reaches the simulation.
@@ -1296,17 +1547,27 @@ authorizes against `*`.
   arrived as, which is larger than the items it carries, and that inflation is not modelled: a batch
   of 25 items under 400 KB each is under 10 MB by the sizes counted here, so nothing this simulation
   measures ever reaches 16 MB.
-- The transactional item commands, `TransactWriteItems` and `TransactGetItems`, are not implemented
-  yet, so a batch write is the only way to change several items in one call. A batch is not a
-  transaction: it is refused whole for the failures listed above, and applied whole otherwise, but
-  nothing rolls it back afterwards.
+- `TransactionConflictException` and `TransactionInProgressException` are not modelled. Every call
+  here is serialised in one process, so no transaction ever meets another one working on the same
+  item, and neither error is reachable.
+- Only `None` and `ConditionalCheckFailed` appear as cancellation codes. Nothing here is throttled
+  and no item collection is tracked, so `ProvisionedThroughputExceeded` and
+  `ItemCollectionSizeLimitExceeded` never happen, and input DynamoDB would report as a
+  `ValidationError` per action is refused up front as a `ValidationException` for the whole request.
+- The 4 MB limit on a transactional write is counted from the items and keys the actions carry,
+  rather than from the JSON the request arrived as, which is larger. A transaction near the limit
+  here is near the limit there, but the byte counts are not identical.
+- A `ClientRequestToken` is compared against the `TransactItems` as the JSON they arrived as, so a
+  retry that names the same actions in a different order reads as a different request and is refused
+  rather than replayed. A retry of the same call sends the same JSON, so this shows up only in a
+  test that rebuilds the request by hand.
 - A CloudFormation stack reaches `CREATE_COMPLETE` while the table it created is still `CREATING`.
   Real CloudFormation waits for the table to be `ACTIVE`, so a test reading the status after the
   stack deployed calls `simAws.backgroundTasksComplete()` first.
 - CloudFormation stack updates and deletes are not simulated, so neither is table replacement or the
   `DeletionPolicy` a template sets on a table.
-- `ProjectionExpression` is simulated on `GetItem` and `BatchGetItem`. `Query` and `Scan` are not
-  implemented yet, so they have nothing to project from.
+- `ProjectionExpression` is simulated on `GetItem`, `BatchGetItem` and `TransactGetItems`. `Query`
+  and `Scan` are not implemented yet, so they have nothing to project from.
 - The legacy `AttributesToGet` is refused rather than ignored, since an item that came back whole
   where part of it was asked for would hide an application reading an attribute it never requested.
   `ProjectionExpression` replaced it, and real DynamoDB has built nothing on it since.
@@ -1316,9 +1577,9 @@ authorizes against `*`.
 - Reads are always strongly consistent. `ConsistentRead` is accepted either way and changes nothing,
   whether a request sets it once for a read or per table for a batch read, so a test cannot observe a
   stale read here the way it might against a real table.
-- Condition expressions are simulated on `PutItem`, `DeleteItem` and `UpdateItem` only. The
-  transactional condition checks and the key condition and filter expressions of `Query` and `Scan`
-  are not implemented yet, so there is nothing else to guard.
+- Condition expressions are simulated on `PutItem`, `DeleteItem`, `UpdateItem` and the actions of
+  `TransactWriteItems`. The key condition and filter expressions of `Query` and `Scan` are not
+  implemented yet, so there is nothing else to guard.
 - Two update actions cannot write to overlapping paths, so `ADD tags :added DELETE tags :gone` in one
   expression is refused as it is on AWS. Taking members out of a set an expression also adds to is a
   second update.

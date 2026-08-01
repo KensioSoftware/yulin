@@ -1,4 +1,5 @@
 import type { SimDynamoDbAttributeValue } from "../command/item/item.types.js";
+import type { SimDynamoDbCancellationReason } from "../command/transact/transact.command.js";
 
 /**
  * Minimal metadata shape for simulated DynamoDB errors.
@@ -75,6 +76,52 @@ export class SimDynamoDbConditionalCheckFailedException extends SimDynamoDbError
   constructor(item?: Readonly<Record<string, SimDynamoDbAttributeValue>>) {
     super("The conditional request failed.", { httpStatusCode: 400 });
     this.Item = item;
+  }
+}
+
+/**
+ * Simulated DynamoDB TransactionCanceledException error.
+ *
+ * This is what a transactional write fails with when any of its actions could
+ * not be applied. Nothing was written: the actions are checked before the first
+ * of them changes anything.
+ *
+ * `CancellationReasons` lines up with the `TransactItems` of the request, one
+ * entry per action and in the same order, including the actions nothing was
+ * wrong with. Those carry the code `None`, which is how a caller reads which of
+ * its actions was the one that failed.
+ *
+ * The message lists the codes in the same order, as real DynamoDB does, so an
+ * application logging the message alone still records which action failed.
+ */
+export class SimDynamoDbTransactionCanceledException extends SimDynamoDbError {
+  public override readonly name = "TransactionCanceledException";
+
+  public readonly CancellationReasons: readonly SimDynamoDbCancellationReason[];
+
+  constructor(reasons: readonly SimDynamoDbCancellationReason[]) {
+    super(
+      `Transaction cancelled, please refer cancellation reasons for specific ` +
+        `reasons [${reasons.map((reason) => reason.Code).join(", ")}]`,
+      { httpStatusCode: 400 },
+    );
+    this.CancellationReasons = reasons;
+  }
+}
+
+/**
+ * Simulated DynamoDB IdempotentParameterMismatchException error.
+ *
+ * A ClientRequestToken makes a retry idempotent, so it stands for the request
+ * it was first used with. Replaying it with a different request inside the
+ * idempotency window is refused rather than applied, since either applying it
+ * or answering with the first request's result would be wrong.
+ */
+export class SimDynamoDbIdempotentParameterMismatchException extends SimDynamoDbError {
+  public override readonly name = "IdempotentParameterMismatchException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
   }
 }
 
