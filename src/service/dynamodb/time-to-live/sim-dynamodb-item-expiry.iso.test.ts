@@ -164,6 +164,21 @@ describe("DynamoDB item expiry", () => {
     assertNonNullable(await getSession(simAws, "abc"));
   });
 
+  it("never expires an item whose TTL is more than five years past", async () => {
+    // Given a session whose expiry is six years behind the write, which is what
+    // a value in the wrong unit tends to look like.
+    const simAws = await expiringSessions();
+    await putSession(simAws, "abc", { N: ttlSeconds(-6 * 365 * 24 * 60 * 60) });
+
+    // When the clock moves a long way on.
+    await simAws.clock().advanceBy({ days: 400 });
+
+    // Then the session is still there. Real DynamoDB leaves an item alone once
+    // its timestamp is that far in the past, treating it as malformed rather
+    // than as long overdue.
+    assertNonNullable(await getSession(simAws, "abc"));
+  });
+
   it("never expires an item whose TTL is too large to be an instant", async () => {
     // Given a session whose expiry holds a number far past any date.
     const simAws = await expiringSessions();

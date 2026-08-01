@@ -42,7 +42,7 @@ export class SimDynamoDbTimeToLive {
    * that state and the scheduled work settles it within the same turn.
    */
   enabledAttributeName(): string | undefined {
-    if (this.#status === "ENABLED" || this.#status === "ENABLING") {
+    if (this.isOn) {
       return this.#attributeName;
     }
 
@@ -50,9 +50,11 @@ export class SimDynamoDbTimeToLive {
   }
 
   /**
-   * Take an update, refusing one that comes too soon after the last.
+   * Take an update, refusing one that asks for the state it is already in or
+   * that comes too soon after the last.
    */
   update(specification: SimDynamoDbTimeToLiveSpecification, at: Date): void {
+    this.assertChanges(specification.enabled);
     this.assertUpdatable(at);
 
     this.#attributeName = specification.attributeName;
@@ -99,6 +101,34 @@ export class SimDynamoDbTimeToLive {
     }
 
     return "DISABLING";
+  }
+
+  /**
+   * Refuse an update asking for the state the table is already in.
+   *
+   * Real DynamoDB refuses this rather than treating it as a no-op, which is why
+   * code that has to be idempotent reads DescribeTimeToLive first. Changing the
+   * attribute an enabled table expires by means switching time to live off and
+   * on again, since an update that leaves it enabled is refused whatever
+   * attribute it names.
+   */
+  private assertChanges(enabled: boolean): void {
+    if (enabled !== this.isOn) {
+      return;
+    }
+
+    throw new SimDynamoDbValidationException(
+      `Time to live on Table ${this.tableName} is already ` +
+        `${this.#status}, and DynamoDB refuses an UpdateTimeToLive asking ` +
+        `for the state it is already in`,
+    );
+  }
+
+  /**
+   * Whether time to live is on, or on its way to being on.
+   */
+  private get isOn(): boolean {
+    return this.#status === "ENABLED" || this.#status === "ENABLING";
   }
 
   /**

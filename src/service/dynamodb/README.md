@@ -682,12 +682,14 @@ Time to live lives under `time-to-live/`, away from the commands that switch it 
 table state rather than request handling.
 
 - `SimDynamoDbTimeToLive` is one table's setting: the status, the attribute name, and when it was
-  last updated. It owns the one update per table per hour rule, measured on the simulated clock.
+  last updated. It owns the two rules an update has to pass: that it changes the state, and that it
+  is at least an hour after the last one. Both are measured on the simulated clock.
 - `SimDynamoDbTimeToLiveSpecification` is a checked `TimeToLiveSpecification`. Real DynamoDB
   requires both fields even when switching time to live off, so both are required here.
 - `simDynamoDbItemDeletionInstant` works out when an item should be deleted, which is 48 hours after
   its TTL timestamp rather than on it. That window is the deliberate divergence: AWS promises a
-  range and this picks the far end. The reasoning is in the constant's comment.
+  range and this picks the far end. The reasoning is in the constant's comment. It also applies the
+  five year eligibility rule, which is why it takes the instant to read the timestamp against.
 - `SimDynamoDbTableExpiry` schedules the removal and re-checks at fire time, the same shape as
   `SimSecretsManagerSecretExpiry`. The re-check recomputes the deletion instant from whatever is
   under the key now, so one check covers a deleted item, an overwrite with a later TTL, a TTL

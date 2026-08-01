@@ -1350,7 +1350,8 @@ altogether. Here the answers stay lined up with the Gets that asked for them.
 
 `UpdateTimeToLive` names the attribute a table expires items by, and `DescribeTimeToLive` reports
 it. The attribute holds epoch seconds in a Number. An item without it, or holding a String or
-anything else, never expires, and that is not an error.
+anything else, never expires, and that is not an error. Nor does an item whose timestamp is more
+than five years in the past, which DynamoDB treats as a malformed value rather than as long overdue.
 
 Expiry runs on [the simulated clock](../../time/). Moving the clock forward is what deletes items
 whose time to live has run out, so one `advanceBy` expires a table's sessions alongside whatever
@@ -1446,8 +1447,12 @@ console.log(collected.Item === undefined); // true
 work has run, which is the sequence a table's own status goes through. Switching it off goes through
 `DISABLING` to `DISABLED`, and a `DISABLED` table reports no attribute name.
 
-DynamoDB takes one `UpdateTimeToLive` per table per hour. That hour is measured on the simulated
-clock, so a second call inside it is a `ValidationException` and
+An `UpdateTimeToLive` asking for the state the table is already in is a `ValidationException`, as it
+is on AWS, so code that has to be idempotent reads `DescribeTimeToLive` first. Changing the
+attribute an enabled table expires by means switching time to live off and then on again.
+
+DynamoDB also takes one `UpdateTimeToLive` per table per hour. That hour is measured on the
+simulated clock, so a second call inside it is a `ValidationException` and
 `simAws.clock().advanceBy({ hours: 1 })` is what lets the next one through.
 
 Switching time to live on reaches the items already on the table, since their attributes were only
@@ -1757,9 +1762,9 @@ nothing is written.
 - Time to live deletions publish no stream records. Real DynamoDB writes one with a `userIdentity`
   of type `Service`, which is how an application tells a TTL deletion from an application's own, and
   streams are not simulated here.
-- `UpdateTimeToLive` does not refuse switching time to live to the state it is already in. Real
-  DynamoDB answers that with a `ValidationException`. The one update per hour rule catches a repeat
-  inside the hour, so what is accepted here is a repeat an hour or more later.
+- The five year time to live eligibility rule counts 1825 days rather than five calendar years, so
+  an item whose timestamp sits within a couple of days of the boundary may be treated differently
+  here to how AWS treats it.
 - DynamoDB streams are not simulated. A `StreamSpecification` with `StreamEnabled` set is refused,
   so a table whose changes nothing is publishing cannot be created by accident. One that switches
   streams off describes the table this simulation already makes, so it is accepted.

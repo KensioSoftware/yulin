@@ -18,6 +18,18 @@ import type { SimDynamoDbItem } from "../item/sim-dynamodb-item.js";
 const deletionWindowMilliseconds = 48 * 60 * 60 * 1000;
 
 /**
+ * How far back a TTL timestamp can be and still be acted on.
+ *
+ * Real DynamoDB leaves an item alone when its timestamp is more than five years
+ * in the past. The rule guards against a malformed value: epoch milliseconds
+ * written where epoch seconds belong lands far in the future, and the reverse
+ * mistake lands far in the past, and neither is what the application meant.
+ *
+ * Five calendar years vary in length, so this is 1825 days.
+ */
+const eligibilityWindowMilliseconds = 5 * 365 * 24 * 60 * 60 * 1000;
+
+/**
  * The furthest instant a JavaScript Date reaches.
  */
 const greatestInstantMilliseconds = 8_640_000_000_000_000;
@@ -28,11 +40,13 @@ const greatestInstantMilliseconds = 8_640_000_000_000_000;
  * The attribute holds epoch seconds in a Number. An item without the attribute,
  * or holding a String or anything else, never expires, and that is not an
  * error: real DynamoDB skips it rather than refusing it. A number too large to
- * stand for an instant is skipped the same way.
+ * stand for an instant is skipped the same way, and so is one more than five
+ * years before `at`.
  */
 export function simDynamoDbItemDeletionInstant(
   item: SimDynamoDbItem,
   attributeName: string,
+  at: Date,
 ): Date | undefined {
   const value = item.attribute(attributeName);
 
@@ -43,7 +57,13 @@ export function simDynamoDbItemDeletionInstant(
   // Always a finite number: DynamoDB refuses anything outside its own range on
   // the way in, which is far inside what a JavaScript number holds.
   const seconds = Number(value.number.text);
-  const instant = seconds * 1000 + deletionWindowMilliseconds;
+  const expiry = seconds * 1000;
+
+  if (at.getTime() - expiry > eligibilityWindowMilliseconds) {
+    return undefined;
+  }
+
+  const instant = expiry + deletionWindowMilliseconds;
 
   if (Math.abs(instant) > greatestInstantMilliseconds) {
     return undefined;

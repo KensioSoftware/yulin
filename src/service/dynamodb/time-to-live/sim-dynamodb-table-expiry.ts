@@ -37,6 +37,9 @@ export class SimDynamoDbTableExpiry {
    * the clock, which nothing dispatches until the clock next moves. So a read
    * straight after writing an already expired item still finds it, as it would
    * on AWS.
+   *
+   * The five year eligibility rule is read against the time of the write, which
+   * is when real DynamoDB would first look at the item.
    */
   scheduleFor(key: string, item: SimDynamoDbItem): void {
     const attributeName = this.timeToLive.enabledAttributeName();
@@ -45,7 +48,11 @@ export class SimDynamoDbTableExpiry {
       return;
     }
 
-    const at = simDynamoDbItemDeletionInstant(item, attributeName);
+    const at = simDynamoDbItemDeletionInstant(
+      item,
+      attributeName,
+      this.background.now(),
+    );
 
     if (at === undefined) {
       return;
@@ -92,9 +99,10 @@ export class SimDynamoDbTableExpiry {
       return;
     }
 
-    const at = simDynamoDbItemDeletionInstant(item, attributeName);
+    const now = this.background.now();
+    const at = simDynamoDbItemDeletionInstant(item, attributeName, now);
 
-    if (at === undefined || at.getTime() > this.background.now().getTime()) {
+    if (at === undefined || at.getTime() > now.getTime()) {
       return;
     }
 
