@@ -10,6 +10,10 @@ import type {
   SimDynamoDbTableStatus,
 } from "../command/table/table.types.js";
 import type { SimDynamoDbItem } from "../item/sim-dynamodb-item.js";
+import type { SimDynamoDbTimeToLiveDescription } from "../command/time-to-live/time-to-live.types.js";
+import { SimDynamoDbTableExpiry } from "../time-to-live/sim-dynamodb-table-expiry.js";
+import { SimDynamoDbTimeToLive } from "../time-to-live/sim-dynamodb-time-to-live.js";
+import type { SimDynamoDbTimeToLiveSpecification } from "../time-to-live/sim-dynamodb-time-to-live-specification.js";
 import { SimDynamoDbItemKey } from "./sim-dynamodb-item-key.js";
 import { describeSimDynamoDbTable } from "./sim-dynamodb-table-description.js";
 import { SimDynamoDbTableItems } from "./sim-dynamodb-table-items.js";
@@ -65,6 +69,8 @@ export class SimDynamoDbTable {
   private readonly items = new SimDynamoDbTableItems();
   private readonly itemKey: SimDynamoDbItemKey;
   private readonly lifecycle: SimDynamoDbTableLifecycle;
+  private readonly timeToLive: SimDynamoDbTimeToLive;
+  private readonly expiry: SimDynamoDbTableExpiry;
 
   constructor(properties: SimDynamoDbTableProperties) {
     const {
@@ -90,6 +96,12 @@ export class SimDynamoDbTable {
     this.lifecycle = new SimDynamoDbTableLifecycle({
       tableName: name.value,
       deletionProtectionEnabled,
+    });
+    this.timeToLive = new SimDynamoDbTimeToLive(name.value);
+    this.expiry = new SimDynamoDbTableExpiry({
+      items: this.items,
+      timeToLive: this.timeToLive,
+      background,
     });
     this.creationDateTime = background.now();
   }
@@ -140,7 +152,42 @@ export class SimDynamoDbTable {
    * write once it is durable, so a read that follows it finds it.
    */
   public putItem(item: SimDynamoDbItem): SimDynamoDbItem | undefined {
-    return this.items.put(this.itemKey.of(item), item);
+    const key = this.itemKey.of(item);
+    const replaced = this.items.put(key, item);
+
+    this.expiry.scheduleFor(key, item);
+
+    return replaced;
+  }
+
+  /**
+   * Take an UpdateTimeToLive on this table.
+   *
+   * Switching it on reaches the items already there as well as the ones written
+   * afterwards, since their TTL attributes were only inert while it was off.
+   */
+  updateTimeToLive(
+    specification: SimDynamoDbTimeToLiveSpecification,
+    at: Date,
+  ): void {
+    this.timeToLive.update(specification, at);
+    this.expiry.scheduleForAll();
+  }
+
+  /**
+   * Finish an UpdateTimeToLive, moving it off ENABLING or DISABLING.
+   */
+  settleTimeToLive(): Promise<void> {
+    this.timeToLive.settle();
+
+    return Promise.resolve();
+  }
+
+  /**
+   * Describe this table's time to live the way DynamoDB reports it.
+   */
+  timeToLiveDescription(): SimDynamoDbTimeToLiveDescription {
+    return this.timeToLive.description();
   }
 
   /**

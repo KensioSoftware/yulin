@@ -6,6 +6,7 @@ import {
   DeleteItemCommand,
   DeleteTableCommand,
   DescribeTableCommand,
+  DescribeTimeToLiveCommand,
   DynamoDBClient,
   GetItemCommand,
   ListTablesCommand,
@@ -17,6 +18,7 @@ import {
   TransactWriteItemsCommand,
   UntagResourceCommand,
   UpdateItemCommand,
+  UpdateTimeToLiveCommand,
 } from "@aws-sdk/client-dynamodb";
 import {
   assertArrayLength,
@@ -279,6 +281,39 @@ describe("simulated DynamoDB SDK Command routing", () => {
     assertNonNullable(listed.Tags);
     assertArrayLength(listed.Tags, 1);
     assertObjectEquals(listed.Tags[0], { Key: "Owner", Value: "platform" });
+  });
+
+  it("round-trips time to live Commands through an intercepted client", async () => {
+    using simSdk = new SimSdk();
+    const client = new DynamoDBClient({ region: "eu-west-2" });
+    simSdk.intercept(client);
+
+    await client.send(
+      new CreateTableCommand({
+        TableName: "SessionsTable",
+        KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+        AttributeDefinitions: [{ AttributeName: "id", AttributeType: "S" }],
+        BillingMode: "PAY_PER_REQUEST",
+      }),
+    );
+    await simSdk.simAws.backgroundTasksComplete();
+
+    const update = await client.send(
+      new UpdateTimeToLiveCommand({
+        TableName: "SessionsTable",
+        TimeToLiveSpecification: { Enabled: true, AttributeName: "expiresAt" },
+      }),
+    );
+    assertIdentical(update.TimeToLiveSpecification?.AttributeName, "expiresAt");
+    await simSdk.simAws.backgroundTasksComplete();
+
+    const described = await client.send(
+      new DescribeTimeToLiveCommand({ TableName: "SessionsTable" }),
+    );
+    assertIdentical(
+      described.TimeToLiveDescription?.TimeToLiveStatus,
+      "ENABLED",
+    );
   });
 
   it("does not give a denied run-as caller root privileges", async () => {

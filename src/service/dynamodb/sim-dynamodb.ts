@@ -4,47 +4,8 @@ import {
 } from "../../util/background/background.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { SimDynamoDbCommandHandlers } from "./command/sim-dynamodb-command-handlers.js";
+import type * as simDynamoDbCommands from "./command/sim-dynamodb-command.types.js";
 import { SimDynamoDbTableStore } from "./table/sim-dynamodb-table-store.js";
-import type {
-  SimCreateTableCommand,
-  SimCreateTableCommandOutput,
-  SimDeleteTableCommand,
-  SimDeleteTableCommandOutput,
-  SimDescribeTableCommand,
-  SimDescribeTableCommandOutput,
-  SimListTablesCommand,
-  SimListTablesCommandOutput,
-} from "./command/table/table.command.js";
-import type {
-  SimDeleteItemCommand,
-  SimDeleteItemCommandOutput,
-  SimGetItemCommand,
-  SimGetItemCommandOutput,
-  SimPutItemCommand,
-  SimPutItemCommandOutput,
-  SimUpdateItemCommand,
-  SimUpdateItemCommandOutput,
-} from "./command/item/item.command.js";
-import type {
-  SimBatchGetItemCommand,
-  SimBatchGetItemCommandOutput,
-  SimBatchWriteItemCommand,
-  SimBatchWriteItemCommandOutput,
-} from "./command/batch/batch.command.js";
-import type {
-  SimTransactGetItemsCommand,
-  SimTransactGetItemsCommandOutput,
-  SimTransactWriteItemsCommand,
-  SimTransactWriteItemsCommandOutput,
-} from "./command/transact/transact.command.js";
-import type {
-  SimListTagsOfResourceCommand,
-  SimListTagsOfResourceCommandOutput,
-  SimTagResourceCommand,
-  SimTagResourceCommandOutput,
-  SimUntagResourceCommand,
-  SimUntagResourceCommandOutput,
-} from "./command/tag/tag.command.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import type { SimAwsCaller } from "../aws/caller/sim-aws-caller.js";
 import {
@@ -98,9 +59,9 @@ export class SimDynamoDb {
    * Handle a Create Table Command from the SDK.
    */
   async createTable(
-    command: SimCreateTableCommand,
+    command: simDynamoDbCommands.SimCreateTableCommand,
     options?: SimDynamoDbRequestOptions,
-  ): Promise<SimCreateTableCommandOutput> {
+  ): Promise<simDynamoDbCommands.SimCreateTableCommandOutput> {
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
     return this.commands.tableCreation.handle(command, options);
@@ -110,9 +71,9 @@ export class SimDynamoDb {
    * Handle a Describe Table Command from the SDK.
    */
   async describeTable(
-    command: SimDescribeTableCommand,
+    command: simDynamoDbCommands.SimDescribeTableCommand,
     options?: SimDynamoDbRequestOptions,
-  ): Promise<SimDescribeTableCommandOutput> {
+  ): Promise<simDynamoDbCommands.SimDescribeTableCommandOutput> {
     await this.background.sequence();
     return this.commands.tables.describeTable(command, options);
   }
@@ -121,9 +82,9 @@ export class SimDynamoDb {
    * Handle a List Tables Command from the SDK.
    */
   async listTables(
-    command: SimListTablesCommand,
+    command: simDynamoDbCommands.SimListTablesCommand,
     options?: SimDynamoDbRequestOptions,
-  ): Promise<SimListTablesCommandOutput> {
+  ): Promise<simDynamoDbCommands.SimListTablesCommandOutput> {
     await this.background.sequence();
     return this.commands.tables.listTables(command, options);
   }
@@ -132,9 +93,9 @@ export class SimDynamoDb {
    * Handle a Delete Table Command from the SDK.
    */
   async deleteTable(
-    command: SimDeleteTableCommand,
+    command: simDynamoDbCommands.SimDeleteTableCommand,
     options?: SimDynamoDbRequestOptions,
-  ): Promise<SimDeleteTableCommandOutput> {
+  ): Promise<simDynamoDbCommands.SimDeleteTableCommandOutput> {
     await this.background.sequence();
     return this.commands.tables.deleteTable(command, options);
   }
@@ -143,9 +104,9 @@ export class SimDynamoDb {
    * Handle a Put Item Command from the SDK.
    */
   async putItem(
-    command: SimPutItemCommand,
+    command: simDynamoDbCommands.SimPutItemCommand,
     options?: SimDynamoDbRequestOptions,
-  ): Promise<SimPutItemCommandOutput> {
+  ): Promise<simDynamoDbCommands.SimPutItemCommandOutput> {
     await this.background.sequence();
     return this.commands.itemWrites.handle(command, options);
   }
@@ -154,9 +115,9 @@ export class SimDynamoDb {
    * Handle a Get Item Command from the SDK.
    */
   async getItem(
-    command: SimGetItemCommand,
+    command: simDynamoDbCommands.SimGetItemCommand,
     options?: SimDynamoDbRequestOptions,
-  ): Promise<SimGetItemCommandOutput> {
+  ): Promise<simDynamoDbCommands.SimGetItemCommandOutput> {
     await this.background.sequence();
     return this.commands.itemReads.handle(command, options);
   }
@@ -165,9 +126,9 @@ export class SimDynamoDb {
    * Handle a Delete Item Command from the SDK.
    */
   async deleteItem(
-    command: SimDeleteItemCommand,
+    command: simDynamoDbCommands.SimDeleteItemCommand,
     options?: SimDynamoDbRequestOptions,
-  ): Promise<SimDeleteItemCommandOutput> {
+  ): Promise<simDynamoDbCommands.SimDeleteItemCommandOutput> {
     await this.background.sequence();
     return this.commands.itemDeletions.handle(command, options);
   }
@@ -176,9 +137,9 @@ export class SimDynamoDb {
    * Handle an Update Item Command from the SDK.
    */
   async updateItem(
-    command: SimUpdateItemCommand,
+    command: simDynamoDbCommands.SimUpdateItemCommand,
     options?: SimDynamoDbRequestOptions,
-  ): Promise<SimUpdateItemCommandOutput> {
+  ): Promise<simDynamoDbCommands.SimUpdateItemCommandOutput> {
     await this.background.sequence();
     return this.commands.itemUpdates.handle(command, options);
   }
@@ -187,9 +148,9 @@ export class SimDynamoDb {
    * Handle a Batch Write Item Command from the SDK.
    */
   async batchWriteItem(
-    command: SimBatchWriteItemCommand,
+    command: simDynamoDbCommands.SimBatchWriteItemCommand,
     options?: SimDynamoDbRequestOptions,
-  ): Promise<SimBatchWriteItemCommandOutput> {
+  ): Promise<simDynamoDbCommands.SimBatchWriteItemCommandOutput> {
     await this.background.sequence();
     return this.commands.itemBatchWrites.handle(command, options);
   }
@@ -198,9 +159,9 @@ export class SimDynamoDb {
    * Handle a Batch Get Item Command from the SDK.
    */
   async batchGetItem(
-    command: SimBatchGetItemCommand,
+    command: simDynamoDbCommands.SimBatchGetItemCommand,
     options?: SimDynamoDbRequestOptions,
-  ): Promise<SimBatchGetItemCommandOutput> {
+  ): Promise<simDynamoDbCommands.SimBatchGetItemCommandOutput> {
     await this.background.sequence();
     return this.commands.itemBatchReads.handle(command, options);
   }
@@ -209,9 +170,9 @@ export class SimDynamoDb {
    * Handle a Transact Write Items Command from the SDK.
    */
   async transactWriteItems(
-    command: SimTransactWriteItemsCommand,
+    command: simDynamoDbCommands.SimTransactWriteItemsCommand,
     options?: SimDynamoDbRequestOptions,
-  ): Promise<SimTransactWriteItemsCommandOutput> {
+  ): Promise<simDynamoDbCommands.SimTransactWriteItemsCommandOutput> {
     await this.background.sequence();
     return this.commands.itemTransactWrites.handle(command, options);
   }
@@ -220,9 +181,9 @@ export class SimDynamoDb {
    * Handle a Transact Get Items Command from the SDK.
    */
   async transactGetItems(
-    command: SimTransactGetItemsCommand,
+    command: simDynamoDbCommands.SimTransactGetItemsCommand,
     options?: SimDynamoDbRequestOptions,
-  ): Promise<SimTransactGetItemsCommandOutput> {
+  ): Promise<simDynamoDbCommands.SimTransactGetItemsCommandOutput> {
     await this.background.sequence();
     return this.commands.itemTransactReads.handle(command, options);
   }
@@ -231,9 +192,9 @@ export class SimDynamoDb {
    * Handle a Tag Resource Command from the SDK.
    */
   async tagResource(
-    command: SimTagResourceCommand,
+    command: simDynamoDbCommands.SimTagResourceCommand,
     options?: SimDynamoDbRequestOptions,
-  ): Promise<SimTagResourceCommandOutput> {
+  ): Promise<simDynamoDbCommands.SimTagResourceCommandOutput> {
     await this.background.sequence();
     return this.commands.tags.tagResource(command, options);
   }
@@ -242,9 +203,9 @@ export class SimDynamoDb {
    * Handle an Untag Resource Command from the SDK.
    */
   async untagResource(
-    command: SimUntagResourceCommand,
+    command: simDynamoDbCommands.SimUntagResourceCommand,
     options?: SimDynamoDbRequestOptions,
-  ): Promise<SimUntagResourceCommandOutput> {
+  ): Promise<simDynamoDbCommands.SimUntagResourceCommandOutput> {
     await this.background.sequence();
     return this.commands.tags.untagResource(command, options);
   }
@@ -253,11 +214,33 @@ export class SimDynamoDb {
    * Handle a List Tags Of Resource Command from the SDK.
    */
   async listTagsOfResource(
-    command: SimListTagsOfResourceCommand,
+    command: simDynamoDbCommands.SimListTagsOfResourceCommand,
     options?: SimDynamoDbRequestOptions,
-  ): Promise<SimListTagsOfResourceCommandOutput> {
+  ): Promise<simDynamoDbCommands.SimListTagsOfResourceCommandOutput> {
     await this.background.sequence();
     return this.commands.tags.listTagsOfResource(command, options);
+  }
+
+  /**
+   * Handle an Update Time To Live Command from the SDK.
+   */
+  async updateTimeToLive(
+    command: simDynamoDbCommands.SimUpdateTimeToLiveCommand,
+    options?: SimDynamoDbRequestOptions,
+  ): Promise<simDynamoDbCommands.SimUpdateTimeToLiveCommandOutput> {
+    await this.background.sequence();
+    return this.commands.timeToLive.updateTimeToLive(command, options);
+  }
+
+  /**
+   * Handle a Describe Time To Live Command from the SDK.
+   */
+  async describeTimeToLive(
+    command: simDynamoDbCommands.SimDescribeTimeToLiveCommand,
+    options?: SimDynamoDbRequestOptions,
+  ): Promise<simDynamoDbCommands.SimDescribeTimeToLiveCommandOutput> {
+    await this.background.sequence();
+    return this.commands.timeToLive.describeTimeToLive(command, options);
   }
 
   /**

@@ -53,6 +53,8 @@ export class SimCfnDynamoDbTableCreator {
       },
     });
 
+    await this.applyTimeToLive(name, tableProperties);
+
     const table = this.dynamoDb.findTable(name);
     assertDefined(
       table,
@@ -60,5 +62,27 @@ export class SimCfnDynamoDbTableCreator {
     );
 
     return table;
+  }
+
+  /**
+   * Switch the table's time to live on, when the template asked for it.
+   *
+   * CreateTable has no TimeToLiveSpecification of its own on real DynamoDB
+   * either, so CloudFormation makes the table and then updates it, and this
+   * does the same through the ordinary UpdateTimeToLive command.
+   */
+  private async applyTimeToLive(
+    name: string,
+    tableProperties: SimCfnDynamoDbTableProperties,
+  ): Promise<void> {
+    const specification = tableProperties.timeToLiveSpecification();
+
+    if (specification === undefined) {
+      return;
+    }
+
+    await this.dynamoDb.updateTimeToLive({
+      input: { TableName: name, TimeToLiveSpecification: specification },
+    });
   }
 }

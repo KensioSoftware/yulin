@@ -253,8 +253,10 @@ runs on a clock a test can control: `await simSdk.simAws.clock().advanceBy({ hou
 
 ## Limitations
 
-- Nothing schedules work on the clock yet. There are no scheduled event sources such as EventBridge
-  rules, so advancing time currently affects timestamps and expiry rather than triggering anything.
+- There are no scheduled event sources such as EventBridge rules, so nothing here is driven by a
+  cron or rate expression. What the clock does drive is state that falls due: a Secrets Manager
+  recovery window running out, or a DynamoDB item passing its
+  [time to live](../services/dynamodb/#expiring-items-with-time-to-live) deletion window.
 - Only `SimAws` exposes time control. Services constructed standalone, such as `new SimS3()`, get
   their own real clock and no way to move it.
 - A `SimAws` constructed with a `background` scheduler of its own cannot control time, because that

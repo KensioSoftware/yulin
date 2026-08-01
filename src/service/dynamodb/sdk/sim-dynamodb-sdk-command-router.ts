@@ -28,6 +28,10 @@ import type {
   SimTransactGetItemsCommand,
   SimTransactWriteItemsCommand,
 } from "../command/transact/transact.command.js";
+import type {
+  SimDescribeTimeToLiveCommand,
+  SimUpdateTimeToLiveCommand,
+} from "../command/time-to-live/time-to-live.command.js";
 import type { SimDynamoDb as SimDynamoDatabase } from "../sim-dynamodb.js";
 
 /**
@@ -147,6 +151,22 @@ export class SimDynamoDatabaseSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simDynamoDatabase.listTagsOfResource(
             command as SimListTagsOfResourceCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "UpdateTimeToLiveCommand",
+        async (command, context): Promise<unknown> =>
+          await simDynamoDatabase.updateTimeToLive(
+            command as SimUpdateTimeToLiveCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DescribeTimeToLiveCommand",
+        async (command, context): Promise<unknown> =>
+          await simDynamoDatabase.describeTimeToLive(
+            command as SimDescribeTimeToLiveCommand,
             simSdkCallerOptions(context),
           ),
       ],

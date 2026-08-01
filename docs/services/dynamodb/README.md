@@ -1346,6 +1346,115 @@ console.log(output.Responses[1]); // {}
 That is the difference from `BatchGetItem`, which leaves a missing item out of its answer
 altogether. Here the answers stay lined up with the Gets that asked for them.
 
+## Expiring items with time to live
+
+`UpdateTimeToLive` names the attribute a table expires items by, and `DescribeTimeToLive` reports
+it. The attribute holds epoch seconds in a Number. An item without it, or holding a String or
+anything else, never expires, and that is not an error.
+
+Expiry runs on [the simulated clock](../../time/). Moving the clock forward is what deletes items
+whose time to live has run out, so one `advanceBy` expires a table's sessions alongside whatever
+else that advance causes elsewhere in the simulation. There is nothing else for a test to call.
+
+Deletion is not immediate. Real DynamoDB marks an item expired at its timestamp and deletes it
+typically within 48 hours, and reads keep returning it until then. That gap is simulated, so a test
+can advance an hour past a session's expiry, see the session come back from `GetItem`, and find out
+that the code under test needs to cope with it.
+
+```typescript sim-dynamodb-time-to-live
+/**
+ * Items expiring as the simulated clock moves past their time to live.
+ */
+
+import {
+  CreateTableCommand,
+  DescribeTimeToLiveCommand,
+  GetItemCommand,
+  PutItemCommand,
+  UpdateTimeToLiveCommand,
+} from "@aws-sdk/client-dynamodb";
+
+import { SimAws, SimFixedClock } from "@kensio/yulin";
+
+const simAws = new SimAws({
+  clock: new SimFixedClock(new Date("2026-08-01T09:00:00.000Z")),
+});
+const dynamoDb = simAws.dynamoDb();
+
+await dynamoDb.createTable(
+  new CreateTableCommand({
+    TableName: "SessionsTable",
+    KeySchema: [{ AttributeName: "sessionId", KeyType: "HASH" }],
+    AttributeDefinitions: [{ AttributeName: "sessionId", AttributeType: "S" }],
+    BillingMode: "PAY_PER_REQUEST",
+  }),
+);
+
+await dynamoDb.updateTimeToLive(
+  new UpdateTimeToLiveCommand({
+    TableName: "SessionsTable",
+    TimeToLiveSpecification: { Enabled: true, AttributeName: "expiresAt" },
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+const described = await dynamoDb.describeTimeToLive(
+  new DescribeTimeToLiveCommand({ TableName: "SessionsTable" }),
+);
+
+console.log(described.TimeToLiveDescription?.TimeToLiveStatus); // "ENABLED"
+
+// A session that expires in an hour.
+const nowSeconds = Math.floor(simAws.now().getTime() / 1000);
+
+await dynamoDb.putItem(
+  new PutItemCommand({
+    TableName: "SessionsTable",
+    Item: {
+      sessionId: { S: "abc" },
+      expiresAt: { N: String(nowSeconds + 3600) },
+    },
+  }),
+);
+
+await simAws.clock().advanceBy({ hours: 2 });
+
+const stale = await dynamoDb.getItem(
+  new GetItemCommand({
+    TableName: "SessionsTable",
+    Key: { sessionId: { S: "abc" } },
+  }),
+);
+
+// Expired an hour ago, and still there, as it would be on AWS.
+console.log(stale.Item === undefined); // false
+
+await simAws.clock().advanceBy({ days: 3 });
+
+const collected = await dynamoDb.getItem(
+  new GetItemCommand({
+    TableName: "SessionsTable",
+    Key: { sessionId: { S: "abc" } },
+  }),
+);
+
+// Past the deletion window, with nothing else asked of the simulation.
+console.log(collected.Item === undefined); // true
+```
+
+`UpdateTimeToLive` moves the status to `ENABLING` and it settles on `ENABLED` once the background
+work has run, which is the sequence a table's own status goes through. Switching it off goes through
+`DISABLING` to `DISABLED`, and a `DISABLED` table reports no attribute name.
+
+DynamoDB takes one `UpdateTimeToLive` per table per hour. That hour is measured on the simulated
+clock, so a second call inside it is a `ValidationException` and
+`simAws.clock().advanceBy({ hours: 1 })` is what lets the next one through.
+
+Switching time to live on reaches the items already on the table, since their attributes were only
+inert while it was off. A removal already scheduled is checked again when it comes due, so an item
+overwritten with a later timestamp, or one on a table whose time to live has since been switched
+off, stays where it is.
+
 ## Numbers
 
 A DynamoDB number carries up to 38 significant digits, where a JavaScript number carries about 15.
@@ -1603,8 +1712,12 @@ nothing is written.
   which a missing item is an entry with no `Item`.
 - `Tags` on `CreateTable`, with `TagResource`, `UntagResource` and `ListTagsOfResource` addressing
   the table by ARN, the key, value and count rules DynamoDB applies, and `NextToken` paging.
+- `UpdateTimeToLive` and `DescribeTimeToLive`, moving through `ENABLING` and `DISABLING` to settle,
+  with the one update per hour rule measured on the simulated clock. Items expire as the clock moves
+  past their deletion window, with no sweep for a test to call.
 - `AWS::DynamoDB::Table` in CloudFormation, created through `CreateTable`, with `Ref` giving the
-  table name, `Fn::GetAtt … Arn` the table ARN, and `Tags` deploying a tagged table.
+  table name, `Fn::GetAtt … Arn` the table ARN, `TimeToLiveSpecification` deploying a table that
+  expires items, and `Tags` deploying a tagged table.
 - SDK interception, so an intercepted `DynamoDBClient` reaches the simulation.
 
 ## Limitations
@@ -1631,8 +1744,22 @@ nothing is written.
 - Tables are the only taggable DynamoDB resource here. Backups and global table replicas are not
   simulated, so an ARN naming one of those names nothing. Real DynamoDB also copies a table's tags
   onto its secondary indexes, which have nothing to copy to yet.
-- Time to live is not simulated. There is no `UpdateTimeToLive` or `DescribeTimeToLive`, and no item
-  expires.
+- The time to live deletion window is a fixed 48 hours, where AWS promises only that an expired item
+  is typically deleted within 48 hours. A simulation has to pick a point in that range, and this
+  picks the far end, because that is the longest an expired item can still be readable and so is the
+  behaviour an application has to cope with. A test can rely on an item surviving its TTL timestamp,
+  and on it being gone once the window has passed. It should not assert that an expired item is
+  still there partway through the window, since real DynamoDB may well have collected it by then.
+- Time to live expiry is dispatched by moving the clock through `simAws.clock()`, not by real time
+  elapsing. An item whose window goes by while a running-mode clock tracks the host stays where it
+  is until something moves the clock. A simulated DynamoDB constructed standalone as
+  `new SimDynamoDb()` has no clock control at all, so nothing there ever expires.
+- Time to live deletions publish no stream records. Real DynamoDB writes one with a `userIdentity`
+  of type `Service`, which is how an application tells a TTL deletion from an application's own, and
+  streams are not simulated here.
+- `UpdateTimeToLive` does not refuse switching time to live to the state it is already in. Real
+  DynamoDB answers that with a `ValidationException`. The one update per hour rule catches a repeat
+  inside the hour, so what is accepted here is a repeat an hour or more later.
 - DynamoDB streams are not simulated. A `StreamSpecification` with `StreamEnabled` set is refused,
   so a table whose changes nothing is publishing cannot be created by accident. One that switches
   streams off describes the table this simulation already makes, so it is accepted.
