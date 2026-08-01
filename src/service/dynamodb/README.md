@@ -49,6 +49,7 @@ Current command areas include:
 - `authorize/` (shared IAM authorization for every DynamoDB command)
 - `table/` (CreateTable, DescribeTable, ListTables and DeleteTable)
 - `item/` (PutItem, GetItem, DeleteItem, UpdateItem, and the structural types for the item commands)
+- `batch/` (BatchWriteItem and BatchGetItem)
 
 `table/` is the layout newer commands follow: one directory per group of related commands, with the
 structural command types in `table.command.ts`, the value and description shapes they are made of in
@@ -341,6 +342,50 @@ c: 3 }` leaves `{ b: 1, c: 2 }`, which an implementation applying actions left t
   which item is reported, and whether the whole of it is. `UPDATED_OLD` and `UPDATED_NEW` report the
   parts the expression touched by applying a `SimDynamoDbProjection` of the action targets, which is
   the same machinery a ProjectionExpression uses.
+
+## BatchWriteItem and BatchGetItem behavior
+
+`SimDynamoDbBatchWriteItem` and `SimDynamoDbBatchGetItem` work on several items across several
+tables in one call. Both read a `RequestItems` map of table reference to what that table is asked
+for, through the shared `readSimDynamoDbBatchRequestItems`, which keeps the reference as it arrived
+so a batch read answers under the name or ARN the request used.
+
+The order both work in is the same, and it is what makes a batch all or nothing:
+
+1. Everything that can be read without a table is read: the request cap, the per entry shapes, the
+   items, the keys and the projections. Nothing here has reached the table store.
+2. Every table is reached and the caller authorized against it. The tables are then compared, since
+   a name and an ARN are two entries naming one table, which real DynamoDB refuses.
+3. Every key is marshalled through the table's key schema, which is both the key check and what
+   tells two operations on one item apart.
+4. Only then is the first item written.
+
+A batch write that fails any of those leaves nothing written, which is what real DynamoDB does: it
+rejects the whole request rather than reporting a failure per entry. That is the difference from the
+SQS batch collaborator in `src/service/sqs/command/message/sim-sqs-batch-entries.ts`, which reports
+per-entry failures in a `Failed` array while the rest of the batch goes through.
+
+The parts a batch is made of split by what they know:
+
+- `SimDynamoDbBatchWrite` is one put or delete, as the item or key it carries plus what it does to a
+  table. Both implementations answer with the key they work on, so the duplicate check and the write
+  read the same item.
+- `sim-dynamodb-batch-writes.ts` reads a whole `RequestItems` into those, applying the 25 request
+  cap across every table the request names.
+- `sim-dynamodb-batch-reads.ts` does the same for a batch read, applying the 100 key cap and reading
+  each table's `ProjectionExpression` through the same `readSimDynamoDbProjection` GetItem uses.
+- `assertDistinctBatchItems` is the duplicate item check both use, over marshalled keys.
+- `reachSimDynamoDbBatchTables` is how both reach their tables: it authorizes the caller against
+  each, and refuses a request naming one table twice, comparing the tables the references resolved
+  to rather than the references themselves.
+
+`UnprocessedItems` and `UnprocessedKeys` are always empty maps. Nothing here is throttled and no
+response stops at a size, so no request is ever left over, but the map is answered with rather than
+left out so a retry loop written around it terminates.
+
+A batch write takes no `ConditionExpression`, as a real one does not. `SimDynamoDbPutRequest` and
+`SimDynamoDbDeleteRequest` declare one anyway, so a request carrying it is refused by name rather
+than written unconditionally.
 
 Scans, queries, indexes and streams are not implemented. Billing mode and provisioned capacity are
 read and stored by CreateTable, but nothing enforces them: no write is ever throttled.

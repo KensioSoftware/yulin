@@ -1,5 +1,7 @@
 import { describe, it } from "vitest";
 import {
+  BatchGetItemCommand,
+  BatchWriteItemCommand,
   CreateTableCommand,
   DeleteItemCommand,
   DeleteTableCommand,
@@ -12,9 +14,11 @@ import {
   UpdateItemCommand,
 } from "@aws-sdk/client-dynamodb";
 import {
+  assertArrayLength,
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
+  assertObjectEquals,
   assertStringIncludes,
   assertThrowsErrorAsync,
   assertUndefined,
@@ -127,6 +131,55 @@ describe("simulated DynamoDB SDK Command routing", () => {
       }),
     );
     assertUndefined(missOut.Item);
+  });
+
+  it("round-trips batch Item Commands through an intercepted client", async () => {
+    using simSdk = new SimSdk();
+    const client = new DynamoDBClient({ region: "eu-west-2" });
+    simSdk.intercept(client);
+
+    await client.send(
+      new CreateTableCommand({
+        TableName: "BatchTable",
+        KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+        AttributeDefinitions: [{ AttributeName: "id", AttributeType: "S" }],
+        BillingMode: "PAY_PER_REQUEST",
+      }),
+    );
+    await simSdk.simAws.backgroundTasksComplete();
+
+    const writeOut = await client.send(
+      new BatchWriteItemCommand({
+        RequestItems: {
+          BatchTable: [
+            {
+              PutRequest: {
+                Item: { id: { S: "item-1" }, name: { S: "First item" } },
+              },
+            },
+            { PutRequest: { Item: { id: { S: "item-2" } } } },
+          ],
+        },
+      }),
+    );
+    assertObjectEquals(writeOut.UnprocessedItems, {});
+
+    const readOut = await client.send(
+      new BatchGetItemCommand({
+        RequestItems: {
+          BatchTable: {
+            Keys: [{ id: { S: "item-1" } }, { id: { S: "missing" } }],
+            ProjectionExpression: "#n",
+            ExpressionAttributeNames: { "#n": "name" },
+          },
+        },
+      }),
+    );
+    const items = readOut.Responses?.["BatchTable"];
+    assertNonNullable(items);
+    assertArrayLength(items, 1);
+    assertObjectEquals(items[0], { name: { S: "First item" } });
+    assertObjectEquals(readOut.UnprocessedKeys, {});
   });
 
   it("does not give a denied run-as caller root privileges", async () => {

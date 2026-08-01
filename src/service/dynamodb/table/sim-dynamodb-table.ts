@@ -144,6 +144,25 @@ export class SimDynamoDbTable {
   }
 
   /**
+   * The primary key an item is stored under, as this table marshals it.
+   *
+   * A batch write tells two operations on the same item apart by comparing
+   * these, which is why the key is readable rather than only usable. Reading it
+   * checks the item against the key schema, so a key a write would refuse is
+   * refused here too.
+   */
+  public keyOfItem(item: SimDynamoDbItem): string {
+    return this.itemKey.of(item);
+  }
+
+  /**
+   * The primary key a request's Key names, as this table marshals it.
+   */
+  public keyOfKey(key: SimDynamoDbItem): string {
+    return this.itemKey.ofKey(key);
+  }
+
+  /**
    * Read the item a primary key names, if the table holds one.
    *
    * Every write has landed by the time it returns, so this reads the latest

@@ -803,6 +803,209 @@ wanted. Naming one path twice counts the same way.
 A document path goes at most 32 levels deep, which is as far as an item nests. A negative index, a
 fractional index and a path past that depth are each a `ValidationException` naming the path.
 
+## Reading and writing items in batches
+
+`BatchWriteItem` puts and deletes items across tables in one call, and `BatchGetItem` reads them by
+primary key. Both take `RequestItems`, a map of table name or ARN to what that table is asked for.
+
+A batch write asks each table for a list of write requests, each carrying exactly one `PutRequest`
+or `DeleteRequest`.
+
+```typescript sim-dynamodb-batch-write-item
+/**
+ * Writing and deleting items across two tables in one call.
+ */
+
+import {
+  BatchWriteItemCommand,
+  CreateTableCommand,
+  GetItemCommand,
+} from "@aws-sdk/client-dynamodb";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const dynamoDb = simAws.dynamoDb();
+
+await dynamoDb.createTable(
+  new CreateTableCommand({
+    TableName: "OrdersTable",
+    KeySchema: [{ AttributeName: "orderId", KeyType: "HASH" }],
+    AttributeDefinitions: [{ AttributeName: "orderId", AttributeType: "S" }],
+    BillingMode: "PAY_PER_REQUEST",
+  }),
+);
+await dynamoDb.createTable(
+  new CreateTableCommand({
+    TableName: "CustomersTable",
+    KeySchema: [{ AttributeName: "customerId", KeyType: "HASH" }],
+    AttributeDefinitions: [{ AttributeName: "customerId", AttributeType: "S" }],
+    BillingMode: "PAY_PER_REQUEST",
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+const written = await dynamoDb.batchWriteItem(
+  new BatchWriteItemCommand({
+    RequestItems: {
+      OrdersTable: [
+        {
+          PutRequest: {
+            Item: { orderId: { S: "order-1" }, total: { N: "19.99" } },
+          },
+        },
+        {
+          PutRequest: {
+            Item: { orderId: { S: "order-2" }, total: { N: "24.99" } },
+          },
+        },
+        { DeleteRequest: { Key: { orderId: { S: "order-0" } } } },
+      ],
+      CustomersTable: [
+        { PutRequest: { Item: { customerId: { S: "customer-1" } } } },
+      ],
+    },
+  }),
+);
+
+// Nothing here is throttled, so nothing is ever left unprocessed.
+console.log(written.UnprocessedItems); // {}
+
+const output = await dynamoDb.getItem(
+  new GetItemCommand({
+    TableName: "OrdersTable",
+    Key: { orderId: { S: "order-2" } },
+  }),
+);
+
+console.log(output.Item?.["total"]?.N); // "24.99"
+```
+
+A put replaces the whole item under its key, exactly as `PutItem` does, and a delete names a key, so
+deleting a key that is already free succeeds. Neither answers with the item it wrote over: a batch
+has no `ReturnValues`, and no `ConditionExpression` either. A conditional write is what `PutItem`,
+`DeleteItem` and `UpdateItem` are for.
+
+Six things take the whole batch down rather than one entry of it, leaving nothing written:
+
+- a table that is not there
+- key attributes that do not match the table's key schema
+- more than one operation on the same item of one table
+- one table named twice, once by its name and once by its ARN
+- more than 25 write requests, counted across every table the request names
+- an item over the 400 KB an item holds
+
+Real DynamoDB also refuses a request over 16 MB. That one is not simulated, for the reason under
+Limitations.
+
+The same key in two different tables is two items rather than one, so a batch may write both.
+
+A batch read asks each table for `Keys`, and for how to read them. `ConsistentRead` and
+`ProjectionExpression` are settled per table rather than per call, so one call can read the whole of
+one table's items and part of another's.
+
+```typescript sim-dynamodb-batch-get-item
+/**
+ * Reading items from two tables in one call, projecting one of them.
+ */
+
+import {
+  BatchGetItemCommand,
+  CreateTableCommand,
+  PutItemCommand,
+} from "@aws-sdk/client-dynamodb";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const dynamoDb = simAws.dynamoDb();
+
+await dynamoDb.createTable(
+  new CreateTableCommand({
+    TableName: "OrdersTable",
+    KeySchema: [{ AttributeName: "orderId", KeyType: "HASH" }],
+    AttributeDefinitions: [{ AttributeName: "orderId", AttributeType: "S" }],
+    BillingMode: "PAY_PER_REQUEST",
+  }),
+);
+await dynamoDb.createTable(
+  new CreateTableCommand({
+    TableName: "CustomersTable",
+    KeySchema: [{ AttributeName: "customerId", KeyType: "HASH" }],
+    AttributeDefinitions: [{ AttributeName: "customerId", AttributeType: "S" }],
+    BillingMode: "PAY_PER_REQUEST",
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+await dynamoDb.putItem(
+  new PutItemCommand({
+    TableName: "OrdersTable",
+    Item: {
+      orderId: { S: "order-1" },
+      total: { N: "19.99" },
+      note: { S: "gift wrapped" },
+    },
+  }),
+);
+await dynamoDb.putItem(
+  new PutItemCommand({
+    TableName: "CustomersTable",
+    Item: { customerId: { S: "customer-1" }, name: { S: "Ada" } },
+  }),
+);
+
+const output = await dynamoDb.batchGetItem(
+  new BatchGetItemCommand({
+    RequestItems: {
+      OrdersTable: {
+        Keys: [{ orderId: { S: "order-1" } }, { orderId: { S: "order-404" } }],
+        ConsistentRead: true,
+        ProjectionExpression: "total",
+      },
+      CustomersTable: {
+        Keys: [{ customerId: { S: "customer-1" } }],
+      },
+    },
+  }),
+);
+
+// The key that holds nothing is left out rather than standing in the answer.
+console.log(output.Responses["OrdersTable"]?.length); // 1
+console.log(output.Responses["OrdersTable"]?.[0]); // { total: { N: "19.99" } }
+console.log(output.Responses["CustomersTable"]?.[0]?.["name"]?.S); // "Ada"
+console.log(output.UnprocessedKeys); // {}
+```
+
+An item that is not there is absent from `Responses`, with nothing standing in for it, so what came
+back is what was there. A table that held none of the keys it was asked for is still in `Responses`,
+with an empty list. DynamoDB reads a batch in parallel and answers in no particular order, so a
+caller that needs to tell its items apart reads the key attributes off them rather than counting on
+where they are in the list.
+
+More than 100 keys in one call, counted across every table the request names, is a
+`ValidationException`. So is the same key twice for one table, and so is one table named twice, once
+by its name and once by its ARN.
+
+Both commands answer with the map of what they could not get to, `UnprocessedItems` for a write and
+`UnprocessedKeys` for a read. Both are always empty here, since nothing is throttled, but they are
+there rather than absent, so the retry loop real code is written around still terminates:
+
+```typescript
+let unprocessed = {
+  OrdersTable: [{ PutRequest: { Item: { orderId: { S: "order-1" } } } }],
+};
+
+while (Object.keys(unprocessed).length > 0) {
+  const output = await dynamoDb.batchWriteItem(
+    new BatchWriteItemCommand({ RequestItems: unprocessed }),
+  );
+
+  // Always empty against the simulator, so the loop runs once.
+  unprocessed = output.UnprocessedItems;
+}
+```
+
 ## Numbers
 
 A DynamoDB number carries up to 38 significant digits, where a JavaScript number carries about 15.
@@ -1043,6 +1246,10 @@ authorizes against `*`.
 - `ConditionExpression` on `PutItem`, `DeleteItem` and `UpdateItem`, with the six comparators, `BETWEEN`, `IN`,
   `AND`, `OR`, `NOT`, brackets, and the `attribute_exists`, `attribute_not_exists`, `attribute_type`,
   `begins_with`, `contains` and `size` functions.
+- `BatchWriteItem`, putting and deleting items across tables in one call, with the 25 request cap,
+  the whole batch refusals, and an empty `UnprocessedItems`.
+- `BatchGetItem`, reading items across tables in one call, with `ConsistentRead` and
+  `ProjectionExpression` per table, the 100 key cap, and an empty `UnprocessedKeys`.
 - `AWS::DynamoDB::Table` in CloudFormation, created through `CreateTable`, with `Ref` giving the
   table name and `Fn::GetAtt … Arn` the table ARN.
 - SDK interception, so an intercepted `DynamoDBClient` reaches the simulation.
@@ -1081,13 +1288,24 @@ authorizes against `*`.
   refuses that status anyway, for when it can.
 - Nothing enforces capacity. A provisioned table's throughput is stored and reported, and no request
   is ever throttled with `ProvisionedThroughputExceededException`.
-- `UpdateTable`, `Query`, `Scan` and the batch item commands are not implemented yet.
+- `UpdateTable`, `Query` and `Scan` are not implemented yet.
+- `UnprocessedItems` and `UnprocessedKeys` are always empty. Nothing here is throttled and no
+  response stops at a size, so the branch of a batch retry loop that resends what did not go through
+  is never taken against the simulator.
+- The 16 MB limit on a batch request is not enforced. Real DynamoDB counts the request as the JSON it
+  arrived as, which is larger than the items it carries, and that inflation is not modelled: a batch
+  of 25 items under 400 KB each is under 10 MB by the sizes counted here, so nothing this simulation
+  measures ever reaches 16 MB.
+- The transactional item commands, `TransactWriteItems` and `TransactGetItems`, are not implemented
+  yet, so a batch write is the only way to change several items in one call. A batch is not a
+  transaction: it is refused whole for the failures listed above, and applied whole otherwise, but
+  nothing rolls it back afterwards.
 - A CloudFormation stack reaches `CREATE_COMPLETE` while the table it created is still `CREATING`.
   Real CloudFormation waits for the table to be `ACTIVE`, so a test reading the status after the
   stack deployed calls `simAws.backgroundTasksComplete()` first.
 - CloudFormation stack updates and deletes are not simulated, so neither is table replacement or the
   `DeletionPolicy` a template sets on a table.
-- `ProjectionExpression` is simulated on `GetItem` only. `BatchGetItem`, `Query` and `Scan` are not
+- `ProjectionExpression` is simulated on `GetItem` and `BatchGetItem`. `Query` and `Scan` are not
   implemented yet, so they have nothing to project from.
 - The legacy `AttributesToGet` is refused rather than ignored, since an item that came back whole
   where part of it was asked for would hide an application reading an attribute it never requested.
@@ -1096,7 +1314,8 @@ authorizes against `*`.
   here is slower for a long expression, so an expression real DynamoDB would refuse for its size is
   evaluated.
 - Reads are always strongly consistent. `ConsistentRead` is accepted either way and changes nothing,
-  so a test cannot observe a stale read here the way it might against a real table.
+  whether a request sets it once for a read or per table for a batch read, so a test cannot observe a
+  stale read here the way it might against a real table.
 - Condition expressions are simulated on `PutItem`, `DeleteItem` and `UpdateItem` only. The
   transactional condition checks and the key condition and filter expressions of `Query` and `Scan`
   are not implemented yet, so there is nothing else to guard.
