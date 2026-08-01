@@ -1225,7 +1225,9 @@ for (const customerId of ["c-1", "c-2", "c-3", "c-4"]) {
 }
 
 const totalSegments = 4;
-const read: string[] = [];
+
+// Which segment each of a customer's orders came back in.
+const segmentsByCustomer = new Map<string, number[]>();
 
 for (let segment = 0; segment < totalSegments; segment++) {
   const segmentPage = await dynamoDb.scan(
@@ -1236,16 +1238,29 @@ for (let segment = 0; segment < totalSegments; segment++) {
     }),
   );
 
-  read.push(
-    ...(segmentPage.Items ?? []).map((item) => item["customerId"]?.S ?? ""),
-  );
+  const items = segmentPage.Items ?? [];
+
+  for (const item of items) {
+    const customerId = item["customerId"]?.S ?? "";
+    const segments = segmentsByCustomer.get(customerId) ?? [];
+
+    segmentsByCustomer.set(customerId, [...segments, segment]);
+  }
 }
 
 // The segments together are the whole table, with nothing read twice.
-console.log(read.length); // 8
+console.log(segmentsByCustomer.values().toArray().flat().length); // 8
+console.log(segmentsByCustomer.size); // 4
 
-// And each customer's orders arrived in one segment, both of them together.
-console.log(new Set(read).size); // 4
+// And each customer's two orders came back in one segment rather than split
+// between two.
+console.log(
+  segmentsByCustomer
+    .values()
+    .map((segments) => new Set(segments).size)
+    .toArray(),
+);
+// [ 1, 1, 1, 1 ]
 ```
 
 An item belongs to a segment by its partition key value, so every item of one item collection lands
