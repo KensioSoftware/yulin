@@ -50,6 +50,7 @@ Current command areas include:
 - `table/` (CreateTable, DescribeTable, ListTables and DeleteTable)
 - `item/` (PutItem, GetItem, DeleteItem, UpdateItem, and the structural types for the item commands)
 - `query/` (Query)
+- `scan/` (Scan, including parallel scan segments)
 - `batch/` (BatchWriteItem and BatchGetItem)
 - `transact/` (TransactWriteItems and TransactGetItems)
 - `tag/` (TagResource, UntagResource and ListTagsOfResource)
@@ -412,7 +413,7 @@ The parts a query is made of split by what they know:
   order itself, and is where a table with no sort key stops mattering: such a table holds at most one
   item under a partition key, so every question about ordering has a trivial answer.
 - `SimDynamoDbItemPage` under `command/item/` is `Limit` and `LastEvaluatedKey`. It takes items and a
-  key schema rather than a query, so `Scan` can use it unchanged.
+  key schema rather than a query, which is what lets `Scan` use it unchanged.
 - `readSimDynamoDbQueryStartKey` reads the `ExclusiveStartKey`. It goes through the table's own key
   reading, so a token that is not a whole primary key is refused the way any Key is, and then checks
   that it names the collection being read.
@@ -433,6 +434,54 @@ Important behavior:
 - `IndexName`, `FilterExpression`, `ProjectionExpression` and `Select` are refused by name, since each
   changes which items a query answers with or which parts of them. `Select: ALL_ATTRIBUTES` is the
   default a table query already behaves as, so it is let through.
+
+## Scan behavior
+
+`SimDynamoDbScan` reads a whole table rather than one item collection, so it needs no key condition
+and no key knowledge. It takes the same steps a query does, minus the expression:
+
+1. `refuseUnsimulatedScanInput` refuses the inputs this simulation does not model.
+2. `readSimDynamoDbScanSegment` reads `Segment` and `TotalSegments`, before the table is reached, so
+   a division DynamoDB would refuse is refused whether or not the table is there.
+3. The table is found and the caller authorized.
+4. The table is put in scan order, walked from the `ExclusiveStartKey`, and cut to a page by the same
+   `SimDynamoDbItemPage` a query uses.
+
+The parts a scan is made of sit under `table/`, since the order and the segments belong to the table
+rather than to the command reading it:
+
+- `SimDynamoDbTableScan` is every item the table holds, in the order a scan reads them. As with an
+  item collection the order is worked out when the table is read, because the item map carries none.
+- `SimDynamoDbScanPosition` is where one item sits in that order: by the hash of its partition key
+  first, then by sort key through `SimDynamoDbSortKeyOrder`. Partition keys that hash alike are
+  separated by their marshalled bytes, which is what makes the order total rather than merely
+  arbitrary. A position is worked out for the `ExclusiveStartKey` too, so a token names a place
+  rather than an item and still resumes a scan after the item it named has been deleted.
+- `SimDynamoDbScanSegment` is one share of a parallel scan, and holds a partition key when its hash
+  modulo `TotalSegments` is the segment's own number. It validates the division it was built from, so
+  a segment that exists is one a request could ask for.
+- `simDynamoDbPartitionKeyHash` is the hash both of those read. It is FNV-1a rather than DynamoDB's
+  own, which is unpublished, so the segment an item lands in here is not the segment it lands in on
+  AWS. What is reproduced is the shape: whole item collections move together and segments come out
+  uneven.
+
+Important behavior:
+
+- Partition key values come back in hash order, which is deliberately not the sorted order. Real
+  DynamoDB sorts nothing across partitions, so a scan that came back sorted would let a test lean on
+  an ordering the service does not give. It is stable within a process all the same, since an
+  `ExclusiveStartKey` could not resume a scan otherwise.
+- Items under one partition key come back together and ascending by sort key.
+- `Segment` and `TotalSegments` are supplied together or not at all, and neither is defaulted from
+  the other. A request naming neither reads `SimDynamoDbScanSegment.whole()`, which is one segment out
+  of one.
+- An `ExclusiveStartKey` from another segment is refused. Resuming the wrong segment is the mistake
+  parallel scan code makes, so it fails rather than reading that segment from the start.
+- `ConsistentRead` is accepted and changes nothing, since every simulated read is strongly
+  consistent.
+- `Segment` and `TotalSegments` are declared on the Query input as well, and refused there by
+  `refuseSimDynamoDbQuerySegment`. They are not Query parameters on AWS, and a query carrying one is
+  code that meant to scan.
 
 ## BatchWriteItem and BatchGetItem behavior
 
@@ -478,7 +527,7 @@ A batch write takes no `ConditionExpression`, as a real one does not. `SimDynamo
 `SimDynamoDbDeleteRequest` declare one anyway, so a request carrying it is refused by name rather
 than written unconditionally.
 
-Scans, indexes and streams are not implemented. Billing mode and provisioned capacity are read and
+Indexes and streams are not implemented. Billing mode and provisioned capacity are read and
 stored by CreateTable, but nothing enforces them: no write is ever throttled.
 
 ## TransactWriteItems and TransactGetItems behavior
@@ -582,7 +631,7 @@ attribute named `size` is a different job from deciding whether an OR binds loos
 
 The comparison rules live in `item/sim-dynamodb-value-comparison.ts` and
 `item/sim-dynamodb-value-order.ts` rather than inside the evaluator, because a sort key condition
-compares the same way a condition expression does, and a filter expression will when `Scan` arrives.
+compares the same way a condition expression does, and a filter expression will when filters arrive.
 Strings compare by UTF-8 bytes rather than by UTF-16 code units, numbers compare through
 `SimDynamoDbNumber.compareTo` so digits past what a JavaScript number holds still order correctly,
 and binary compares as unsigned bytes. Two values of different types have no order at all, which is

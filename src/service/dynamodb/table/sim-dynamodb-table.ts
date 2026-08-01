@@ -20,6 +20,7 @@ import { SimDynamoDbItemKey } from "./sim-dynamodb-item-key.js";
 import { describeSimDynamoDbTable } from "./sim-dynamodb-table-description.js";
 import { SimDynamoDbTableItems } from "./sim-dynamodb-table-items.js";
 import { SimDynamoDbTableLifecycle } from "./sim-dynamodb-table-lifecycle.js";
+import { SimDynamoDbTableScan } from "./sim-dynamodb-table-scan.js";
 import { SimDynamoDbTableTags } from "./sim-dynamodb-table-tags.js";
 import type { SimDynamoDbAttributeDefinitions } from "./sim-dynamodb-attribute-definitions.js";
 import type { SimDynamoDbKeySchema } from "./sim-dynamodb-key-schema.js";
@@ -254,6 +255,21 @@ export class SimDynamoDbTable {
       items: this.items.entries().values(),
       keySchema: this.keySchema,
       keyCondition,
+    });
+  }
+
+  /**
+   * Every item this table holds, in the order a Scan reads them.
+   *
+   * A Scan needs no key knowledge, so unlike an item collection this is the
+   * whole table. The order and the parallel scan segments both belong to the
+   * scan rather than to the command that reads it.
+   */
+  public scan(): SimDynamoDbTableScan {
+    return new SimDynamoDbTableScan({
+      items: this.items.entries().values(),
+      keySchema: this.keySchema,
+      itemKey: this.itemKey,
     });
   }
 }

@@ -1092,6 +1092,203 @@ A token still works when the item it names has since been deleted: it says where
 than which position to return to. A token from a different partition key is refused, since it names
 a collection this query is not reading.
 
+## Scanning a table
+
+`Scan` reads every item in a table. It needs no key knowledge at all, which is what makes it the
+operation test setup and assertions reach for, and the wrong operation for most application access
+patterns: it reads the whole table however few items the caller wanted.
+
+```typescript sim-dynamodb-scan
+/**
+ * Reading a whole table back, whatever partition keys it holds.
+ */
+
+import {
+  CreateTableCommand,
+  PutItemCommand,
+  ScanCommand,
+} from "@aws-sdk/client-dynamodb";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const dynamoDb = simAws.dynamoDb();
+
+await dynamoDb.createTable(
+  new CreateTableCommand({
+    TableName: "OrdersTable",
+    KeySchema: [
+      { AttributeName: "customerId", KeyType: "HASH" },
+      { AttributeName: "orderId", KeyType: "RANGE" },
+    ],
+    AttributeDefinitions: [
+      { AttributeName: "customerId", AttributeType: "S" },
+      { AttributeName: "orderId", AttributeType: "S" },
+    ],
+    BillingMode: "PAY_PER_REQUEST",
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+const written = [
+  { customerId: "c-1", orderId: "2026-03" },
+  { customerId: "c-1", orderId: "2026-01" },
+  { customerId: "c-1", orderId: "2026-02" },
+  { customerId: "c-2", orderId: "2026-04" },
+  { customerId: "c-3", orderId: "2026-05" },
+];
+
+for (const order of written) {
+  await dynamoDb.putItem(
+    new PutItemCommand({
+      TableName: "OrdersTable",
+      Item: {
+        customerId: { S: order.customerId },
+        orderId: { S: order.orderId },
+      },
+    }),
+  );
+}
+
+const page = await dynamoDb.scan(new ScanCommand({ TableName: "OrdersTable" }));
+
+console.log(page.Count); // 5
+console.log(page.ScannedCount); // 5
+
+// The items under one partition key come back together, ascending by sort key.
+console.log(
+  page.Items?.filter((item) => item["customerId"]?.S === "c-1").map(
+    (item) => item["orderId"]?.S,
+  ),
+);
+// [ "2026-01", "2026-02", "2026-03" ]
+```
+
+The partition key values themselves come back in an arbitrary order. It is not the sorted order and
+not the order the items were written in. Real DynamoDB walks a table by the hash of the partition
+key, so a scan that came back globally sorted would be something no real table gives you, and a test
+leaning on one would pass here and fail against the service.
+
+The order is arbitrary rather than varying. Two scans of an unchanged table read it the same way,
+which is what lets a token resume one.
+
+`Limit`, `LastEvaluatedKey` and `ExclusiveStartKey` page a scan the way they page a query, and the
+loop is the same one. `ConsistentRead` is accepted and changes nothing, since every simulated read is
+already the strongly consistent one.
+
+### Scanning in parallel
+
+`Segment` and `TotalSegments` divide a table between workers. `TotalSegments` is how many shares the
+table is divided into, and `Segment` is the zero based number of the share this request reads.
+
+```typescript sim-dynamodb-parallel-scan
+/**
+ * Reading a table in four segments.
+ */
+
+import {
+  CreateTableCommand,
+  PutItemCommand,
+  ScanCommand,
+} from "@aws-sdk/client-dynamodb";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const dynamoDb = simAws.dynamoDb();
+
+await dynamoDb.createTable(
+  new CreateTableCommand({
+    TableName: "OrdersTable",
+    KeySchema: [
+      { AttributeName: "customerId", KeyType: "HASH" },
+      { AttributeName: "orderId", KeyType: "RANGE" },
+    ],
+    AttributeDefinitions: [
+      { AttributeName: "customerId", AttributeType: "S" },
+      { AttributeName: "orderId", AttributeType: "S" },
+    ],
+    BillingMode: "PAY_PER_REQUEST",
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+for (const customerId of ["c-1", "c-2", "c-3", "c-4"]) {
+  for (const orderId of ["2026-01", "2026-02"]) {
+    await dynamoDb.putItem(
+      new PutItemCommand({
+        TableName: "OrdersTable",
+        Item: { customerId: { S: customerId }, orderId: { S: orderId } },
+      }),
+    );
+  }
+}
+
+const totalSegments = 4;
+
+// Which segment each of a customer's orders came back in.
+const segmentsByCustomer = new Map<string, number[]>();
+
+for (let segment = 0; segment < totalSegments; segment++) {
+  const segmentPage = await dynamoDb.scan(
+    new ScanCommand({
+      TableName: "OrdersTable",
+      Segment: segment,
+      TotalSegments: totalSegments,
+    }),
+  );
+
+  const items = segmentPage.Items ?? [];
+
+  for (const item of items) {
+    const customerId = item["customerId"]?.S ?? "";
+    const segments = segmentsByCustomer.get(customerId) ?? [];
+
+    segmentsByCustomer.set(customerId, [...segments, segment]);
+  }
+}
+
+// The segments together are the whole table, with nothing read twice.
+console.log(segmentsByCustomer.values().toArray().flat().length); // 8
+console.log(segmentsByCustomer.size); // 4
+
+// And each customer's two orders came back in one segment rather than split
+// between two.
+console.log(
+  segmentsByCustomer
+    .values()
+    .map((segments) => new Set(segments).size)
+    .toArray(),
+);
+// [ 1, 1, 1, 1 ]
+```
+
+An item belongs to a segment by its partition key value, so every item of one item collection lands
+in the same segment. That is what makes a segment a share of the table's partition keys rather than
+a share of its items, and it is why segments come out uneven. A segment holding nothing is ordinary,
+and dividing a table into more segments than it has partition key values leaves most of them empty.
+
+There is nothing to gain in speed here, since a simulated scan walks a map in memory. What a parallel
+scan gives a test is the caller's side of one: code that divides a table between workers can be run
+without a real table.
+
+Each segment pages on its own. `Limit` and `LastEvaluatedKey` work per segment, and the next request
+passes that segment's token back with the same `Segment` and `TotalSegments`. A token from another
+segment is refused, since it names a place that segment's walk never reaches.
+
+These are the rules a request is held to, each a `ValidationException`:
+
+- `Segment` without `TotalSegments`, or `TotalSegments` without `Segment`. They are supplied together
+  or not at all, and a request naming neither reads the whole table.
+- a `Segment` at or above `TotalSegments`, or below zero. It is zero based, so the last segment of
+  four is `3`.
+- a `TotalSegments` outside 1 to 1000000. A `TotalSegments` of 1 is a sequential scan.
+- an `ExclusiveStartKey` belonging to another segment.
+
+`Segment` and `TotalSegments` are refused on `Query`, which is not a parallel operation and never had
+them. A query reads one item collection, which sits under one partition key and so inside one
+segment.
+
 ## Reading and writing items in batches
 
 `BatchWriteItem` puts and deletes items across tables in one call, and `BatchGetItem` reads them by
@@ -2013,6 +2210,8 @@ nothing is written.
   all five `ReturnValues` modes. Every action reads the item as it stood before the update.
 - `Query`, reading one item collection in sort key order, with the seven sort key conditions,
   `ScanIndexForward`, and `Limit`, `LastEvaluatedKey` and `ExclusiveStartKey` paging.
+- `Scan`, reading every item in a table with the same paging, and `Segment` and `TotalSegments`
+  dividing a table between parallel workers.
 - `ConditionExpression` on `PutItem`, `DeleteItem` and `UpdateItem`, with the six comparators, `BETWEEN`, `IN`,
   `AND`, `OR`, `NOT`, brackets, and the `attribute_exists`, `attribute_not_exists`, `attribute_type`,
   `begins_with`, `contains` and `size` functions.
@@ -2040,12 +2239,12 @@ nothing is written.
 
 ## Limitations
 
-- The document client's `Query`, `Scan`, transaction and PartiQL Commands are not converted. `Scan`
-  and PartiQL are operations this simulation does not have yet. `Query`, `TransactWriteCommand` and
-  `TransactGetCommand` are simulated as operations, so only the document form is missing: for the
-  transaction Commands that is simply not written yet, and for `Query` it is because
-  `@aws-sdk/lib-dynamodb` and `@aws-sdk/client-dynamodb` both name their Command `QueryCommand`,
-  which the interception routes by. All of them are refused by name rather than half converted.
+- The document client's `Query`, `Scan`, transaction and PartiQL Commands are not converted. PartiQL
+  is an operation this simulation does not have yet. The rest are simulated as operations, so only
+  the document form is missing: for the transaction Commands that is simply not written yet, and for
+  `Query` and `Scan` it is because `@aws-sdk/lib-dynamodb` and `@aws-sdk/client-dynamodb` both name
+  their Commands `QueryCommand` and `ScanCommand`, which the interception routes by. All of them are
+  refused by name rather than half converted.
 - A document client's translate config is not read, so the marshalling options it was built with do
   not apply. See [the SDK docs](../../sdk/README.md#limitations).
 - `Expected`, `ConditionalOperator` and `AttributeUpdates` are not converted for the document
@@ -2107,27 +2306,37 @@ nothing is written.
 - Deletion happens as soon as the background work runs, where real DynamoDB may take a while over a
   large table. Nothing waits for a `DELETING` table to go, so a test that needs it gone calls
   `simAws.backgroundTasksComplete()`.
+- The segment a parallel scan puts an item in is not the segment real DynamoDB would put it in.
+  DynamoDB's partition key hash is unpublished, so a different one is used here. What matches is the
+  shape: whole item collections move together, and the segments come out uneven. A test asserting
+  which segment a given key lands in is asserting something about this simulator rather than about
+  DynamoDB.
 - A table ARN naming another Account or Region is refused rather than resolved to the local table of
   that name. Cross-account table access needs a resource policy, which is not simulated.
 - `UpdateTable` is not implemented, so a table never reaches `UPDATING` on its own. `DeleteTable`
   refuses that status anyway, for when it can.
 - Nothing enforces capacity. A provisioned table's throughput is stored and reported, and no request
   is ever throttled with `ProvisionedThroughputExceededException`.
-- `UpdateTable` and `Scan` are not implemented yet.
-- A query page is never cut short by size. Real DynamoDB stops a page at 1 MB and hands out a
-  `LastEvaluatedKey`, which is not modelled here, so a page breaks only on a `Limit`. A test reading
-  a large collection with no `Limit` gets all of it in one page where a real one would page.
-- Nothing here throttles or measures a query, so `ReturnConsumedCapacity` is refused unless it names
-  `NONE`, and a `Limit` is the only thing that ends a page early.
+- A query or scan page is never cut short by size. Real DynamoDB stops a page at 1 MB and hands out
+  a `LastEvaluatedKey`, which is not modelled here, so a page breaks only on a `Limit`. A test
+  reading a large collection or a large table with no `Limit` gets all of it in one page where a real
+  one would page.
+- Nothing here throttles or measures a query or a scan, so `ReturnConsumedCapacity` is refused unless
+  it names `NONE`, and a `Limit` is the only thing that ends a page early.
 - A key condition takes no brackets. `(customerId = :c) AND orderId > :o` is refused here, where real
   DynamoDB accepts it. The shape of a key condition is fixed, so there is nothing for brackets to
   group, and being stricter is the direction that fails safely: it is a puzzling refusal here rather
   than a query that means something different on AWS.
-- `IndexName`, `FilterExpression`, `ProjectionExpression` and `Select` are refused on `Query`, since
-  each of them changes which items a query answers with or which parts of them. `Select` naming
-  `ALL_ATTRIBUTES` is the default a table query already behaves as, so it is accepted.
+- `IndexName`, `FilterExpression`, `ProjectionExpression` and `Select` are refused on `Query` and on
+  `Scan`, since each of them changes which items the operation answers with or which parts of them.
+  `Select` naming `ALL_ATTRIBUTES` is the default a table read already behaves as, so it is accepted.
+  Scanning a secondary index goes with the indexes themselves, which are not simulated.
+- `ExpressionAttributeNames` and `ExpressionAttributeValues` on a `Scan` are refused as unsimulated
+  input, where real DynamoDB calls placeholders with no expression to use them a
+  `ValidationException`. Every expression a scan can carry is refused already, so the request fails
+  either way, and naming the parameter is more use than matching the error class.
 - `Count` and `ScannedCount` are always the same number. They differ only when a `FilterExpression`
-  drops items a query evaluated, and filters are not simulated.
+  drops items a query or scan evaluated, and filters are not simulated.
 - `UnprocessedItems` and `UnprocessedKeys` are always empty. Nothing here is throttled and no
   response stops at a size, so the branch of a batch retry loop that resends what did not go through
   is never taken against the simulator.
@@ -2155,7 +2364,7 @@ nothing is written.
 - CloudFormation stack updates and deletes are not simulated, so neither is table replacement or the
   `DeletionPolicy` a template sets on a table.
 - `ProjectionExpression` is simulated on `GetItem`, `BatchGetItem` and `TransactGetItems`. On `Query`
-  it is refused rather than ignored, and `Scan` is not implemented yet.
+  and `Scan` it is refused rather than ignored.
 - The legacy `AttributesToGet` is refused rather than ignored, since an item that came back whole
   where part of it was asked for would hide an application reading an attribute it never requested.
   `ProjectionExpression` replaced it, and real DynamoDB has built nothing on it since.

@@ -6,6 +6,7 @@ import type {
   SimQueryCommand,
   SimQueryCommandOutput,
 } from "./query.command.js";
+import { refuseSimDynamoDbQuerySegment } from "./sim-dynamodb-query-segment.js";
 import { readSimDynamoDbQueryStartKey } from "./sim-dynamodb-query-start-key.js";
 import { refuseUnsimulatedQueryInput } from "./sim-dynamodb-unsimulated-query-input.js";
 
@@ -41,6 +42,7 @@ export class SimDynamoDbQuery {
     const input = command.input;
 
     refuseUnsimulatedQueryInput(input);
+    refuseSimDynamoDbQuerySegment(input);
 
     // The key condition is read before the table is reached, so an expression
     // DynamoDB would refuse is refused whether or not the table is there. What
