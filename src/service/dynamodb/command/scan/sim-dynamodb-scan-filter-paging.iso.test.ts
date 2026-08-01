@@ -2,7 +2,7 @@ import type {
   AttributeValue,
   ScanCommandInput,
 } from "@aws-sdk/client-dynamodb";
-import { PutItemCommand, ScanCommand } from "@aws-sdk/client-dynamodb";
+import { ScanCommand } from "@aws-sdk/client-dynamodb";
 import {
   assertArrayEquals,
   assertIdentical,
@@ -11,41 +11,8 @@ import {
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import type { SimDynamoDb } from "../../sim-dynamodb.js";
-import { simDynamoDbCollectionTableFactory } from "../../table/sim-dynamodb-collection-table.factory.js";
+import { simDynamoDbStockedTableFactory } from "../../table/sim-dynamodb-stocked-table.factory.js";
 import type { SimScanCommandOutput } from "./scan.command.js";
-
-/**
- * A table holding one order per customer, every other one of them open.
- */
-async function ordersTable(simAws: SimAws): Promise<SimDynamoDb> {
-  const simDynamoDb = simAws.dynamoDb();
-
-  await simDynamoDbCollectionTableFactory.make({}, simAws);
-
-  const orders = [
-    { customerId: "c-1", status: "OPEN" },
-    { customerId: "c-2", status: "SHIPPED" },
-    { customerId: "c-3", status: "OPEN" },
-    { customerId: "c-4", status: "SHIPPED" },
-  ];
-
-  await Promise.all(
-    orders.map(async (order) =>
-      simDynamoDb.putItem(
-        new PutItemCommand({
-          TableName: "OrdersTable",
-          Item: {
-            customerId: { S: order.customerId },
-            orderId: { S: "2026-01" },
-            status: { S: order.status },
-          },
-        }),
-      ),
-    ),
-  );
-
-  return simDynamoDb;
-}
 
 /**
  * The customers a page came back with.
@@ -86,7 +53,12 @@ describe("DynamoDB ScanCommand FilterExpression paging", () => {
   it("answers with an empty page it can still be resumed from", async () => {
     // Given a table holding open and shipped orders.
     const simAws = new SimAws();
-    const simDynamoDb = await ordersTable(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbStockedTableFactory.make(
+      { customerCount: 4, orderCount: 1 },
+      simAws,
+    );
 
     // When one item is read with a filter no item holds for.
     const page = await openOrders(simDynamoDb, {
@@ -106,7 +78,12 @@ describe("DynamoDB ScanCommand FilterExpression paging", () => {
   it("reads a whole table through a filtered paging loop", async () => {
     // Given a table holding open and shipped orders.
     const simAws = new SimAws();
-    const simDynamoDb = await ordersTable(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbStockedTableFactory.make(
+      { customerCount: 4, orderCount: 1 },
+      simAws,
+    );
 
     // When the table is read one item at a time until the token runs out.
     const read: string[] = [];
@@ -131,7 +108,12 @@ describe("DynamoDB ScanCommand FilterExpression paging", () => {
   it("filters a segment of a parallel scan", async () => {
     // Given a table holding open and shipped orders.
     const simAws = new SimAws();
-    const simDynamoDb = await ordersTable(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbStockedTableFactory.make(
+      { customerCount: 4, orderCount: 1 },
+      simAws,
+    );
 
     // When every segment of a parallel scan is read with a filter.
     const pages = await Promise.all(

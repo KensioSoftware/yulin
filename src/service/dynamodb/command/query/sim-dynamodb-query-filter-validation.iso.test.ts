@@ -8,29 +8,7 @@ import {
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimDynamoDbValidationException } from "../../error/dynamodb.error.js";
-import type { SimDynamoDb } from "../../sim-dynamodb.js";
 import { simDynamoDbCollectionTableFactory } from "../../table/sim-dynamodb-collection-table.factory.js";
-
-/**
- * A table keyed by customer and order, holding one order.
- */
-async function ordersTable(simAws: SimAws): Promise<SimDynamoDb> {
-  const simDynamoDb = simAws.dynamoDb();
-
-  await simDynamoDbCollectionTableFactory.make({}, simAws);
-  await simDynamoDb.putItem(
-    new PutItemCommand({
-      TableName: "OrdersTable",
-      Item: {
-        customerId: { S: "c-1" },
-        orderId: { S: "2026-01" },
-        details: { M: { customerId: { S: "c-1" } } },
-      },
-    }),
-  );
-
-  return simDynamoDb;
-}
 
 /**
  * The key condition every one of these queries carries.
@@ -75,7 +53,9 @@ describe("DynamoDB QueryCommand FilterExpression validation", () => {
   ])("refuses a query filter naming $name", async (example) => {
     // Given a table keyed by customer and order.
     const simAws = new SimAws();
-    const simDynamoDb = await ordersTable(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbCollectionTableFactory.make({}, simAws);
 
     // When a query filters by a key attribute.
     const error = await assertThrowsErrorAsync(async () =>
@@ -99,7 +79,19 @@ describe("DynamoDB QueryCommand FilterExpression validation", () => {
     // Given a table holding an order carrying a map with a key attribute name
     // inside it.
     const simAws = new SimAws();
-    const simDynamoDb = await ordersTable(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbCollectionTableFactory.make({}, simAws);
+    await simDynamoDb.putItem(
+      new PutItemCommand({
+        TableName: "OrdersTable",
+        Item: {
+          customerId: { S: "c-1" },
+          orderId: { S: "2026-01" },
+          details: { M: { customerId: { S: "c-1" } } },
+        },
+      }),
+    );
 
     // When a query filters by that nested path.
     const output = await simDynamoDb.query(
@@ -122,7 +114,9 @@ describe("DynamoDB QueryCommand FilterExpression validation", () => {
   ])("refuses $name in a query filter", async (example) => {
     // Given a table keyed by customer and order.
     const simAws = new SimAws();
-    const simDynamoDb = await ordersTable(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbCollectionTableFactory.make({}, simAws);
 
     // When a query carries a filter DynamoDB would not read.
     const error = await assertThrowsErrorAsync(async () =>

@@ -8,43 +8,8 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
-import type { SimDynamoDb } from "../../sim-dynamodb.js";
-import { simDynamoDbCollectionTableFactory } from "../../table/sim-dynamodb-collection-table.factory.js";
+import { simDynamoDbStockedTableFactory } from "../../table/sim-dynamodb-stocked-table.factory.js";
 import type { SimQueryCommandOutput } from "./query.command.js";
-
-/**
- * A table holding one customer's orders, every other one of them open.
- */
-async function ordersTable(simAws: SimAws): Promise<SimDynamoDb> {
-  const simDynamoDb = simAws.dynamoDb();
-
-  await simDynamoDbCollectionTableFactory.make({}, simAws);
-
-  const orders = [
-    { orderId: "2026-01", status: "OPEN", total: "1" },
-    { orderId: "2026-02", status: "SHIPPED", total: "2" },
-    { orderId: "2026-03", status: "OPEN", total: "3" },
-    { orderId: "2026-04", status: "SHIPPED", total: "4" },
-  ];
-
-  await Promise.all(
-    orders.map(async (order) =>
-      simDynamoDb.putItem(
-        new PutItemCommand({
-          TableName: "OrdersTable",
-          Item: {
-            customerId: { S: "c-1" },
-            orderId: { S: order.orderId },
-            status: { S: order.status },
-            total: { N: order.total },
-          },
-        }),
-      ),
-    ),
-  );
-
-  return simDynamoDb;
-}
 
 /**
  * The sort keys a page came back with, in the order they came back in.
@@ -57,7 +22,12 @@ describe("DynamoDB QueryCommand FilterExpression", () => {
   it("drops the items the filter does not hold for", async () => {
     // Given a table holding one customer's open and shipped orders.
     const simAws = new SimAws();
-    const simDynamoDb = await ordersTable(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbStockedTableFactory.make(
+      { customerCount: 1, orderCount: 4 },
+      simAws,
+    );
 
     // When the collection is read with a filter on an attribute outside the
     // key.
@@ -81,7 +51,12 @@ describe("DynamoDB QueryCommand FilterExpression", () => {
   it("counts what it evaluated apart from what it answered with", async () => {
     // Given a table holding one customer's open and shipped orders.
     const simAws = new SimAws();
-    const simDynamoDb = await ordersTable(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbStockedTableFactory.make(
+      { customerCount: 1, orderCount: 4 },
+      simAws,
+    );
 
     // When the collection is read with a filter.
     const output = await simDynamoDb.query(
@@ -106,7 +81,12 @@ describe("DynamoDB QueryCommand FilterExpression", () => {
   it("applies the filter after the Limit rather than before it", async () => {
     // Given a table holding one customer's open and shipped orders.
     const simAws = new SimAws();
-    const simDynamoDb = await ordersTable(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbStockedTableFactory.make(
+      { customerCount: 1, orderCount: 4 },
+      simAws,
+    );
 
     // When a page of two items is read with a filter.
     const output = await simDynamoDb.query(
@@ -135,7 +115,12 @@ describe("DynamoDB QueryCommand FilterExpression", () => {
   it("answers with an empty page it can still be resumed from", async () => {
     // Given a table holding one customer's open and shipped orders.
     const simAws = new SimAws();
-    const simDynamoDb = await ordersTable(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbStockedTableFactory.make(
+      { customerCount: 1, orderCount: 4 },
+      simAws,
+    );
 
     // When a page is read whose every item the filter drops.
     const output = await simDynamoDb.query(
@@ -164,7 +149,12 @@ describe("DynamoDB QueryCommand FilterExpression", () => {
   it("reads the whole condition grammar", async () => {
     // Given a table holding one customer's open and shipped orders.
     const simAws = new SimAws();
-    const simDynamoDb = await ordersTable(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbStockedTableFactory.make(
+      { customerCount: 1, orderCount: 4 },
+      simAws,
+    );
 
     // When the filter uses functions, comparisons and the words joining them.
     const output = await simDynamoDb.query(
@@ -188,10 +178,16 @@ describe("DynamoDB QueryCommand FilterExpression", () => {
   });
 
   it("drops an item that does not have what the filter points at", async () => {
-    // Given a table holding an order with no status at all.
+    // Given a table holding one customer's open and shipped orders.
     const simAws = new SimAws();
-    const simDynamoDb = await ordersTable(simAws);
+    const simDynamoDb = simAws.dynamoDb();
 
+    await simDynamoDbStockedTableFactory.make(
+      { customerCount: 1, orderCount: 4 },
+      simAws,
+    );
+
+    // And an order with no status at all.
     await simDynamoDb.putItem(
       new PutItemCommand({
         TableName: "OrdersTable",
@@ -221,7 +217,12 @@ describe("DynamoDB QueryCommand FilterExpression", () => {
   it("counts a placeholder the filter alone uses as used", async () => {
     // Given a table holding one customer's open and shipped orders.
     const simAws = new SimAws();
-    const simDynamoDb = await ordersTable(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbStockedTableFactory.make(
+      { customerCount: 1, orderCount: 4 },
+      simAws,
+    );
 
     // When a value only the filter names is supplied.
     const output = await simDynamoDb.query(
@@ -244,7 +245,12 @@ describe("DynamoDB QueryCommand FilterExpression", () => {
   it("refuses a placeholder neither expression uses", async () => {
     // Given a table holding one customer's open and shipped orders.
     const simAws = new SimAws();
-    const simDynamoDb = await ordersTable(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbStockedTableFactory.make(
+      { customerCount: 1, orderCount: 4 },
+      simAws,
+    );
 
     // When a value no expression names is supplied.
     const error = await assertThrowsErrorAsync(async () =>

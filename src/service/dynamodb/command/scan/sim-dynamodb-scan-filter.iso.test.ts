@@ -1,4 +1,4 @@
-import { PutItemCommand, ScanCommand } from "@aws-sdk/client-dynamodb";
+import { ScanCommand } from "@aws-sdk/client-dynamodb";
 import {
   assertArrayEquals,
   assertIdentical,
@@ -6,42 +6,8 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
-import type { SimDynamoDb } from "../../sim-dynamodb.js";
-import { simDynamoDbCollectionTableFactory } from "../../table/sim-dynamodb-collection-table.factory.js";
+import { simDynamoDbStockedTableFactory } from "../../table/sim-dynamodb-stocked-table.factory.js";
 import type { SimScanCommandOutput } from "./scan.command.js";
-
-/**
- * A table holding one order per customer, every other one of them open.
- */
-async function ordersTable(simAws: SimAws): Promise<SimDynamoDb> {
-  const simDynamoDb = simAws.dynamoDb();
-
-  await simDynamoDbCollectionTableFactory.make({}, simAws);
-
-  const orders = [
-    { customerId: "c-1", status: "OPEN" },
-    { customerId: "c-2", status: "SHIPPED" },
-    { customerId: "c-3", status: "OPEN" },
-    { customerId: "c-4", status: "SHIPPED" },
-  ];
-
-  await Promise.all(
-    orders.map(async (order) =>
-      simDynamoDb.putItem(
-        new PutItemCommand({
-          TableName: "OrdersTable",
-          Item: {
-            customerId: { S: order.customerId },
-            orderId: { S: "2026-01" },
-            status: { S: order.status },
-          },
-        }),
-      ),
-    ),
-  );
-
-  return simDynamoDb;
-}
 
 /**
  * The customers a page came back with, put in order.
@@ -59,7 +25,12 @@ describe("DynamoDB ScanCommand FilterExpression", () => {
   it("drops the items the filter does not hold for", async () => {
     // Given a table holding open and shipped orders.
     const simAws = new SimAws();
-    const simDynamoDb = await ordersTable(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbStockedTableFactory.make(
+      { customerCount: 4, orderCount: 1 },
+      simAws,
+    );
 
     // When the table is scanned with a filter.
     const output = await simDynamoDb.scan(
@@ -81,7 +52,12 @@ describe("DynamoDB ScanCommand FilterExpression", () => {
   it("takes a scan filter naming a key attribute", async () => {
     // Given a table holding open and shipped orders.
     const simAws = new SimAws();
-    const simDynamoDb = await ordersTable(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbStockedTableFactory.make(
+      { customerCount: 4, orderCount: 1 },
+      simAws,
+    );
 
     // When the table is scanned with a filter on the partition key, which the
     // same query would be refused for.
@@ -101,7 +77,12 @@ describe("DynamoDB ScanCommand FilterExpression", () => {
   it("applies the filter after the Limit rather than before it", async () => {
     // Given a table holding open and shipped orders.
     const simAws = new SimAws();
-    const simDynamoDb = await ordersTable(simAws);
+    const simDynamoDb = simAws.dynamoDb();
+
+    await simDynamoDbStockedTableFactory.make(
+      { customerCount: 4, orderCount: 1 },
+      simAws,
+    );
 
     // When a page of two items is scanned with a filter.
     const output = await simDynamoDb.scan(
