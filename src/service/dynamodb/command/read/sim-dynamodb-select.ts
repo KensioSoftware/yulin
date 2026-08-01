@@ -16,7 +16,7 @@ type SimDynamoDbSelectKind = (typeof selectKinds)[number];
  * What a table read defaults to when the request says nothing.
  *
  * A read of an index defaults to `ALL_PROJECTED_ATTRIBUTES` instead, which does
- * not arise here: indexes are not simulated, so `IndexName` is refused.
+ * not arise here: reading an index is not simulated, so `IndexName` is refused.
  */
 const tableDefault: SimDynamoDbSelectKind = "ALL_ATTRIBUTES";
 

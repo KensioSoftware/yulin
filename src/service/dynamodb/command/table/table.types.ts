@@ -106,9 +106,26 @@ export interface SimDynamoDbTag {
 
 /**
  * Minimal structural sim DynamoDB secondary index, global or local.
+ *
+ * The throughput settings this simulation does not model are declared as well
+ * as the ones it does, so an index asking for one of them is refused by name
+ * rather than created without it.
  */
 export interface SimDynamoDbSecondaryIndexInput {
   readonly IndexName?: string | undefined;
+  readonly KeySchema?: readonly SimDynamoDbKeySchemaElementInput[] | undefined;
+  readonly Projection?: SimDynamoDbProjectionInput | undefined;
+  readonly ProvisionedThroughput?: SimDynamoDbProvisionedThroughput | undefined;
+  readonly OnDemandThroughput?: SimDynamoDbOnDemandThroughput | undefined;
+  readonly WarmThroughput?: SimDynamoDbWarmThroughput | undefined;
+}
+
+/**
+ * Minimal structural sim DynamoDB projection, as a request carries it.
+ */
+export interface SimDynamoDbProjectionInput {
+  readonly ProjectionType?: string | undefined;
+  readonly NonKeyAttributes?: readonly string[] | undefined;
 }
 
 /**
@@ -185,6 +202,8 @@ export interface SimDynamoDbGlobalSecondaryIndexDescription {
   readonly Projection?: SimDynamoDbProjection | undefined;
   readonly IndexStatus?: SimDynamoDbIndexStatus | undefined;
   readonly IndexArn?: SimArn | undefined;
+  readonly ProvisionedThroughput?:
+    SimDynamoDbProvisionedThroughputDescription | undefined;
   readonly ItemCount?: number | undefined;
   readonly IndexSizeBytes?: number | undefined;
 }

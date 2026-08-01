@@ -32,16 +32,12 @@ export function refuseUnsimulatedTableInput(
 }
 
 /**
- * Refuse the secondary indexes a table would answer queries from.
+ * Refuse the local secondary indexes a table would answer queries from.
+ *
+ * Global secondary indexes are simulated, so they go through CreateTable's
+ * ordinary validation rather than being refused here.
  */
 function refuseSecondaryIndexes(input: SimCreateTableCommandInput): void {
-  if ((input.GlobalSecondaryIndexes ?? []).length > 0) {
-    throw new SimDynamoDbUnsupportedOperation(
-      "Global secondary indexes are not simulated, so CreateTable refuses " +
-        "them rather than creating a table that is missing them",
-    );
-  }
-
   if ((input.LocalSecondaryIndexes ?? []).length > 0) {
     throw new SimDynamoDbUnsupportedOperation(
       "Local secondary indexes are not simulated, so CreateTable refuses " +
@@ -82,16 +78,28 @@ function refuseEncryption(input: SimCreateTableCommandInput): void {
 
 /**
  * Refuse the throughput settings that go beyond provisioned capacity.
+ *
+ * A global secondary index carries its own copy of each of these, so the
+ * indexes are read alongside the table itself rather than being let through
+ * with settings nothing applies.
  */
 function refuseThroughputExtras(input: SimCreateTableCommandInput): void {
-  if (input.OnDemandThroughput !== undefined) {
+  const indexes = input.GlobalSecondaryIndexes ?? [];
+
+  if (
+    input.OnDemandThroughput !== undefined ||
+    indexes.some((index) => index.OnDemandThroughput !== undefined)
+  ) {
     throw new SimDynamoDbUnsupportedOperation(
       "OnDemandThroughput maximums are not simulated, so CreateTable refuses " +
         "them rather than reporting limits nothing here applies",
     );
   }
 
-  if (input.WarmThroughput !== undefined) {
+  if (
+    input.WarmThroughput !== undefined ||
+    indexes.some((index) => index.WarmThroughput !== undefined)
+  ) {
     throw new SimDynamoDbUnsupportedOperation(
       "WarmThroughput is not simulated, so CreateTable refuses it rather " +
         "than reporting a pre-warmed capacity nothing here applies",
