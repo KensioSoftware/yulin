@@ -1,8 +1,14 @@
 import { faker } from "@faker-js/faker";
 
 import type { Brand } from "../../../../util/brand.type.js";
+import type { SimHttpApiAuthorizerId } from "../authorizer/sim-http-api-authorizer.js";
 import type { SimHttpApiIntegrationId } from "../integration/sim-http-api-integration.js";
 import type { SimHttpApiRouteKey } from "./key/sim-http-api-route-key.js";
+import { SimHttpApiRouteScopes } from "./sim-http-api-route-scopes.js";
+import {
+  simHttpApiRouteView,
+  type SimHttpApiRouteView,
+} from "./sim-http-api-route-view.js";
 
 /**
  * The id API Gateway allocates for one route.
@@ -10,9 +16,12 @@ import type { SimHttpApiRouteKey } from "./key/sim-http-api-route-key.js";
 export type SimHttpApiRouteId = Brand<string, "SimHttpApiRouteId">;
 
 /**
- * The only authorization type simulated: none, so anyone may call the route.
+ * The authorization types simulated: none, so anyone may call the route, or a
+ * JWT the route's authorizer verifies.
+ *
+ * `AWS_IAM` and `CUSTOM` are refused at creation rather than created open.
  */
-export type SimHttpApiAuthorizationType = "NONE";
+export type SimHttpApiAuthorizationType = "NONE" | "JWT";
 
 /**
  * Allocate a route id, in the same opaque shape as an integration id.
@@ -26,20 +35,13 @@ interface SimHttpApiRouteProperties {
   readonly key: SimHttpApiRouteKey;
   readonly integrationId: SimHttpApiIntegrationId;
   readonly authorizationType: SimHttpApiAuthorizationType;
+  readonly authorizerId?: SimHttpApiAuthorizerId | undefined;
+  readonly authorizationScopes?: SimHttpApiRouteScopes | undefined;
 }
 
 /**
- * Minimal structural route view, as the Create and Get commands return.
- */
-export interface SimHttpApiRouteView {
-  RouteId: string;
-  RouteKey: string;
-  Target: string;
-  AuthorizationType: SimHttpApiAuthorizationType;
-}
-
-/**
- * A simulated HTTP API route: which requests reach which integration.
+ * A simulated HTTP API route: which requests reach which integration, and what
+ * a caller has to present to get there.
  */
 export class SimHttpApiRoute {
   public readonly routeId: SimHttpApiRouteId;
@@ -47,11 +49,22 @@ export class SimHttpApiRoute {
   public readonly integrationId: SimHttpApiIntegrationId;
   public readonly authorizationType: SimHttpApiAuthorizationType;
 
+  /**
+   * The authorizer this route sends requests through, which a `JWT` route
+   * always has and a `NONE` route never does.
+   */
+  public readonly authorizerId: SimHttpApiAuthorizerId | undefined;
+
+  public readonly authorizationScopes: SimHttpApiRouteScopes;
+
   constructor(properties: SimHttpApiRouteProperties) {
     this.routeId = properties.routeId;
     this.key = properties.key;
     this.integrationId = properties.integrationId;
     this.authorizationType = properties.authorizationType;
+    this.authorizerId = properties.authorizerId;
+    this.authorizationScopes =
+      properties.authorizationScopes ?? new SimHttpApiRouteScopes();
   }
 
   /**
@@ -74,11 +87,6 @@ export class SimHttpApiRoute {
    * Get the AWS-like view of this route.
    */
   view(): SimHttpApiRouteView {
-    return {
-      RouteId: this.routeId,
-      RouteKey: this.routeKey,
-      Target: this.target,
-      AuthorizationType: this.authorizationType,
-    };
+    return simHttpApiRouteView(this);
   }
 }

@@ -23,11 +23,27 @@ export {
 } from "./api/integration/sim-http-api-integration.js";
 export { SimHttpApiLambdaUri } from "./api/integration/sim-http-api-lambda-uri.js";
 export {
+  SimHttpApiAuthorizer,
+  type SimHttpApiAuthorizerId,
+  type SimHttpApiAuthorizerType,
+  type SimHttpApiAuthorizerView,
+} from "./api/authorizer/sim-http-api-authorizer.js";
+export { SimHttpApiIdentitySource } from "./api/authorizer/sim-http-api-identity-source.js";
+export {
+  SimHttpApiJwtConfiguration,
+  type SimHttpApiJwtConfigurationView,
+} from "./api/authorizer/sim-http-api-jwt-configuration.js";
+export {
+  type SimHttpApiJwtIssuerKeys,
+  SimHttpApiNoJwtIssuerKeys,
+} from "./api/authorizer/sim-http-api-jwt-issuer-keys.js";
+export {
   type SimHttpApiAuthorizationType,
   SimHttpApiRoute,
   type SimHttpApiRouteId,
-  type SimHttpApiRouteView,
 } from "./api/route/sim-http-api-route.js";
+export type { SimHttpApiRouteView } from "./api/route/sim-http-api-route-view.js";
+export { SimHttpApiRouteScopes } from "./api/route/sim-http-api-route-scopes.js";
 export type { SimHttpApiRouteKey } from "./api/route/key/sim-http-api-route-key.js";
 export {
   SimHttpApiDefaultRouteKey,

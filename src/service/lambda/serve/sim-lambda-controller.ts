@@ -101,7 +101,7 @@ export class SimLambdaServiceController implements SimAwsServiceController {
       const event = await this.eventBuilder.build(
         request,
         simLambdaUrlEndpoint(route.functionUrl),
-        authenticatedCaller,
+        { caller: authenticatedCaller },
       );
 
       return this.responseBuilder.build(await route.simFunction.invoke(event));

@@ -42,13 +42,27 @@ export class SimApiGatewayV2UnsimulatedInput {
     simulated: string,
     feature: string,
   ): void {
-    if (value === undefined || value === simulated) {
+    this.refuseUnlessOneOf(option, value, [simulated], feature);
+  }
+
+  /**
+   * Refuse an input set to anything but the values this simulation models.
+   */
+  refuseUnlessOneOf(
+    option: string,
+    value: string | undefined,
+    simulated: readonly string[],
+    feature: string,
+  ): void {
+    if (value === undefined || simulated.includes(value)) {
       return;
     }
 
+    const supported = this.supportedValues(simulated);
+
     throw new SimApiGatewayV2BadRequest(
-      `${this.operation} ${option} '${value}' is not simulated: ${feature}. ` +
-        `Only '${simulated}' is supported.`,
+      `${this.operation} ${option} '${value}' is not simulated: ` +
+        `${feature}. ${supported}`,
     );
   }
 
@@ -81,5 +95,18 @@ export class SimApiGatewayV2UnsimulatedInput {
     }
 
     return value;
+  }
+
+  /**
+   * How a refusal names what it would have accepted instead.
+   */
+  private supportedValues(simulated: readonly string[]): string {
+    const quoted = simulated.map((one) => `'${one}'`).join(" and ");
+
+    if (simulated.length > 1) {
+      return `Only ${quoted} are supported.`;
+    }
+
+    return `Only ${quoted} is supported.`;
   }
 }

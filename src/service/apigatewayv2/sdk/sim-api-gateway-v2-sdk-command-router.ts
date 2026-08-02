@@ -10,6 +10,11 @@ import type {
   SimGetApisCommand,
 } from "../command/api/api.command.js";
 import type {
+  SimCreateAuthorizerCommand,
+  SimDeleteAuthorizerCommand,
+  SimGetAuthorizersCommand,
+} from "../command/authorizer/authorizer.command.js";
+import type {
   SimCreateIntegrationCommand,
   SimGetIntegrationsCommand,
 } from "../command/integration/integration.command.js";
@@ -60,6 +65,30 @@ export class SimApiGatewayV2SdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simApiGatewayV2.deleteApi(
             command as SimDeleteApiCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "CreateAuthorizerCommand",
+        async (command, context): Promise<unknown> =>
+          await simApiGatewayV2.createAuthorizer(
+            command as SimCreateAuthorizerCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "GetAuthorizersCommand",
+        async (command, context): Promise<unknown> =>
+          await simApiGatewayV2.getAuthorizers(
+            command as SimGetAuthorizersCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteAuthorizerCommand",
+        async (command, context): Promise<unknown> =>
+          await simApiGatewayV2.deleteAuthorizer(
+            command as SimDeleteAuthorizerCommand,
             simSdkCallerOptions(context),
           ),
       ],

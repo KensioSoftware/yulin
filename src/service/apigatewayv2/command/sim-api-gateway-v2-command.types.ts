@@ -16,6 +16,18 @@ export type {
   SimGetApisCommandOutput,
 } from "./api/api.command.js";
 export type {
+  SimCreateAuthorizerCommand,
+  SimCreateAuthorizerCommandInput,
+  SimCreateAuthorizerCommandOutput,
+  SimDeleteAuthorizerCommand,
+  SimDeleteAuthorizerCommandInput,
+  SimDeleteAuthorizerCommandOutput,
+  SimGetAuthorizersCommand,
+  SimGetAuthorizersCommandInput,
+  SimGetAuthorizersCommandOutput,
+  SimHttpApiJwtConfigurationInput,
+} from "./authorizer/authorizer.command.js";
+export type {
   SimCreateIntegrationCommand,
   SimCreateIntegrationCommandInput,
   SimCreateIntegrationCommandOutput,

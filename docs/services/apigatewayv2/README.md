@@ -382,6 +382,259 @@ reaching an API with no stage for it, and no `$default` stage, is a 404.
 on a `$default` match. `StageVariables` set on the stage arrive as `event.stageVariables`, and are
 left out the same way when the stage has none.
 
+## Protecting a route with a Cognito user pool
+
+A JWT authorizer verifies a signed token before the integration is invoked. `CreateAuthorizerCommand`
+creates one, and a route asks for it with `AuthorizationType: "JWT"` and the authorizer's id.
+
+The issuer is a URL. Point it at a [simulated Cognito user pool](../cognito/ "Simulated Cognito docs")
+and the pool's own signing key verifies the token, so a token from
+`InitiateAuthCommand` or `AdminInitiateAuthCommand` reaches the route and nothing else does. The
+audience is the app client ids the authorizer admits.
+
+```typescript sim-apigatewayv2-jwt-authorizer
+/**
+ * Protecting a simulated HTTP API route with a Cognito user pool.
+ */
+
+import {
+  CreateApiCommand,
+  CreateAuthorizerCommand,
+  CreateIntegrationCommand,
+  CreateRouteCommand,
+  CreateStageCommand,
+} from "@aws-sdk/client-apigatewayv2";
+import {
+  AdminCreateUserCommand,
+  AdminInitiateAuthCommand,
+  AdminSetUserPasswordCommand,
+  CreateUserPoolClientCommand,
+  CreateUserPoolCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+import {
+  AddPermissionCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import type { SimPayload2Event } from "@kensio/yulin/apigatewayv2";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const cognito = simAws.cognitoIdentityProvider();
+
+const pool = await cognito.createUserPool(
+  new CreateUserPoolCommand({ PoolName: "myapp-users" }),
+);
+const UserPoolId = pool.UserPool!.Id!;
+
+const appClient = await cognito.createUserPoolClient(
+  new CreateUserPoolClientCommand({
+    UserPoolId,
+    ClientName: "web",
+    ExplicitAuthFlows: ["ALLOW_ADMIN_USER_PASSWORD_AUTH"],
+  }),
+);
+const ClientId = appClient.UserPoolClient!.ClientId!;
+
+await cognito.adminCreateUser(
+  new AdminCreateUserCommand({ UserPoolId, Username: "ada" }),
+);
+await cognito.adminSetUserPassword(
+  new AdminSetUserPasswordCommand({
+    UserPoolId,
+    Username: "ada",
+    Password: "Correct-horse-1",
+    Permanent: true,
+  }),
+);
+
+const { FunctionArn } = await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "orders",
+    Role: "arn:aws:iam::111111111111:role/OrdersRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput((event: SimPayload2Event) => ({
+        statusCode: 200,
+        headers: { "content-type": "text/plain" },
+        body: `orders for ${
+          event.requestContext.authorizer?.jwt?.claims["username"] ?? "nobody"
+        }`,
+      })),
+    },
+  }),
+);
+
+const apiGateway = simAws.apiGatewayV2();
+
+const { ApiId, ApiEndpoint } = await apiGateway.createApi(
+  new CreateApiCommand({ Name: "orders", ProtocolType: "HTTP" }),
+);
+
+const { IntegrationId } = await apiGateway.createIntegration(
+  new CreateIntegrationCommand({
+    ApiId,
+    IntegrationType: "AWS_PROXY",
+    IntegrationUri: FunctionArn,
+    PayloadFormatVersion: "2.0",
+  }),
+);
+
+const { AuthorizerId } = await apiGateway.createAuthorizer(
+  new CreateAuthorizerCommand({
+    ApiId,
+    Name: "pool-authorizer",
+    AuthorizerType: "JWT",
+    IdentitySource: ["$request.header.Authorization"],
+    JwtConfiguration: {
+      Issuer: `https://cognito-idp.us-east-1.amazonaws.com/${UserPoolId}`,
+      Audience: [ClientId],
+    },
+  }),
+);
+
+await apiGateway.createRoute(
+  new CreateRouteCommand({
+    ApiId,
+    RouteKey: "GET /orders",
+    Target: `integrations/${IntegrationId}`,
+    AuthorizationType: "JWT",
+    AuthorizerId,
+  }),
+);
+
+await apiGateway.createStage(
+  new CreateStageCommand({ ApiId, StageName: "$default", AutoDeploy: true }),
+);
+
+await simAws.lambda().addPermission(
+  new AddPermissionCommand({
+    FunctionName: "orders",
+    StatementId: "api-gateway-invoke",
+    Action: "lambda:InvokeFunction",
+    Principal: "apigateway.amazonaws.com",
+    SourceArn: `arn:aws:execute-api:us-east-1:888888888888:${ApiId}/*/*`,
+  }),
+);
+
+const signedIn = await cognito.adminInitiateAuth(
+  new AdminInitiateAuthCommand({
+    UserPoolId,
+    ClientId,
+    AuthFlow: "ADMIN_USER_PASSWORD_AUTH",
+    AuthParameters: { USERNAME: "ada", PASSWORD: "Correct-horse-1" },
+  }),
+);
+const accessToken = signedIn.AuthenticationResult!.AccessToken!;
+
+const srv = await serveSimAws({ simAws });
+const url = srv.localUrl(`${ApiEndpoint}/orders`);
+
+const anonymous = await fetch(url);
+
+console.log(anonymous.status); // 401
+console.log(anonymous.headers.get("www-authenticate")); // "Bearer"
+
+const authorized = await fetch(url, {
+  headers: { authorization: `Bearer ${accessToken}` },
+});
+
+console.log(await authorized.text()); // "orders for ada"
+
+// Advancing the simulation's clock past the token's expiry closes the route
+// to the same token, with nothing reissued.
+await simAws.clock().advanceBy({ hours: 2 });
+
+const expired = await fetch(url, {
+  headers: { authorization: `Bearer ${accessToken}` },
+});
+
+console.log(expired.status); // 401
+
+srv.close();
+```
+
+The verification is real. The token is parsed, its `alg` has to be `RS256`, its `kid` has to name a
+key the issuer publishes, and the signature is checked against that key with `node:crypto`. Nothing
+is fetched over the network, and no verification library is involved.
+
+### What a refused request gets back
+
+A token that is missing, unreadable, signed with an unsupported algorithm, signed by an unknown key,
+or carrying a claim that does not hold is answered with a 401, `{"message":"Unauthorized"}` and a
+`www-authenticate: Bearer` header. The integration is never invoked. The client is told nothing about
+which check failed, which is what real API Gateway does, except for an audience that does not match:
+that one carries `error_description="the token does not have a valid audience"`, the one description
+AWS publishes.
+
+The claims are checked in the order AWS documents: the issuer, then the audience, then `exp`, `nbf`
+and `iat`. There is no allowance for clock skew, and every timestamp comes from the simulation's
+clock, so `simAws.clock().advanceBy(...)` expires a token that was accepted a moment before.
+
+### Identity source
+
+`IdentitySource` takes one entry, either `$request.header.<name>` or `$request.querystring.<name>`. A
+`Bearer ` prefix on the value is stripped, case-insensitively, and is not required. Anything else is
+refused by `CreateAuthorizer`, because an authorizer looking for the token in a place nothing puts it
+refuses every request for a reason that reads like a signing problem.
+
+### Route scopes, and access tokens versus ID tokens
+
+`AuthorizationScopes` on a route is checked against the token's `scope` claim, split on whitespace.
+The check is any-of: one matching scope is enough. A verified token that matches none of them is
+answered with a 403 and `{"message":"Forbidden"}`.
+
+```typescript
+await apiGateway.createRoute(
+  new CreateRouteCommand({
+    ApiId,
+    RouteKey: "GET /orders",
+    Target: `integrations/${IntegrationId}`,
+    AuthorizationType: "JWT",
+    AuthorizerId,
+    AuthorizationScopes: ["aws.cognito.signin.user.admin"],
+  }),
+);
+```
+
+An ID token passes an authorizer that configures only an audience. Nothing checks `token_use`, which
+is what real API Gateway does, and an ID token's `aud` is the app client id, so it matches. AWS
+documents this and recommends route scopes as the way to tell the two apart. A Cognito ID token has no
+`scope` claim at all, so any route scope refuses it.
+
+Sign-in through the user pool API issues one scope, `aws.cognito.signin.user.admin`, and that is the
+only scope a simulated flow can put in a token. Resource servers, custom scopes and the client
+credentials grant are not simulated, so no other route scope is satisfiable.
+
+### The claims the handler receives
+
+An accepted token arrives as `event.requestContext.authorizer.jwt`:
+
+```json
+{
+  "claims": {
+    "sub": "0a1b2c3d-...",
+    "iss": "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_abc123",
+    "client_id": "1h57kf5cpparf3m47el34md5m9",
+    "token_use": "access",
+    "scope": "aws.cognito.signin.user.admin",
+    "username": "ada",
+    "cognito:groups": "[Admins Readers]",
+    "exp": "1785675600"
+  },
+  "scopes": ["aws.cognito.signin.user.admin"]
+}
+```
+
+Every claim value is a string, whatever type it was signed as. A list claim such as `cognito:groups`
+is rendered the way Go prints a slice, so two groups arrive as `[Admins Readers]` rather than as JSON
+or as a comma-separated list. `scopes` is `null`, not an empty list, when the token carries no `scope`
+claim. None of that is published by AWS; all of it is what the real endpoint was observed to send.
+
+A route with `AuthorizationType: "NONE"` has no caller to describe, so `requestContext.authorizer` is
+left out of its events entirely.
+
 ## The event the handler receives
 
 The handler is invoked with the API Gateway HTTP API payload format 2.0 event, exported as
@@ -499,15 +752,16 @@ what a disabled endpoint was observed to answer rather than something documented
 ## CloudFormation
 
 [Simulated CloudFormation](../cloudformation/ "Simulated CloudFormation docs") deploys
-`AWS::ApiGatewayV2::Api`, `AWS::ApiGatewayV2::Integration`, `AWS::ApiGatewayV2::Route` and
-`AWS::ApiGatewayV2::Stage`, so a synthesized or hand-written template produces an API that serves
-requests.
+`AWS::ApiGatewayV2::Api`, `AWS::ApiGatewayV2::Authorizer`, `AWS::ApiGatewayV2::Integration`,
+`AWS::ApiGatewayV2::Route` and `AWS::ApiGatewayV2::Stage`, so a synthesized or hand-written template
+produces an API that serves requests.
 
 `Ref` and `Fn::GetAtt` return what real CloudFormation returns for each type:
 
 | Resource type | `Ref`              | `Fn::GetAtt`                |
 | ------------- | ------------------ | --------------------------- |
 | `Api`         | the API id         | `ApiId`, `ApiEndpoint`      |
+| `Authorizer`  | the authorizer id  | `AuthorizerId`              |
 | `Integration` | the integration id | `IntegrationId`             |
 | `Route`       | the route id       | `RouteId`                   |
 | `Stage`       | the stage name     | none, as AWS documents none |
@@ -640,15 +894,25 @@ Every property outside the simulated set is refused by name, and the refusal fai
 simulated properties are:
 
 - `Api`: `Name`, `ProtocolType`, `Description`, `DisableExecuteApiEndpoint`
+- `Authorizer`: `ApiId`, `Name`, `AuthorizerType`, `IdentitySource`, `JwtConfiguration`
 - `Integration`: `ApiId`, `IntegrationType`, `IntegrationUri`, `PayloadFormatVersion`, `Description`
-- `Route`: `ApiId`, `RouteKey`, `Target`, `AuthorizationType`
+- `Route`: `ApiId`, `RouteKey`, `Target`, `AuthorizationType`, `AuthorizerId`, `AuthorizationScopes`
 - `Stage`: `ApiId`, `StageName`, `AutoDeploy`, `StageVariables`, `Description`
 
-`AWS::ApiGatewayV2::Authorizer`, `Deployment`, `DomainName`, `ApiMapping`, `VpcLink` and the
-WebSocket-only `Model`, `RouteResponse` and `IntegrationResponse` create nothing, so a template
-carrying one has that resource skipped rather than deployed. A route pointing at a skipped authorizer
-through `AuthorizerId` fails the stack instead, naming both the route and the authorizer, because
-that route would be open here and closed on AWS.
+CDK's `HttpJwtAuthorizer` and `HttpUserPoolAuthorizer` both deploy. `HttpUserPoolAuthorizer` builds
+its issuer from `Fn::GetAtt <UserPool>.ProviderURL`, which resolves to the same string the pool's
+tokens name as their issuer, so a CDK-declared authorizer and a CDK-deployed pool agree with nothing
+to configure. Pass the app client explicitly through `userPoolClients`, because otherwise the
+authorizer adds a client of its own with CDK's defaults, and those emit the OAuth properties
+[simulated Cognito refuses](../cognito/#limitations).
+
+A `Route` with `AuthorizationType: "JWT"` whose `AuthorizerId` does not resolve to an authorizer of
+that API fails the stack, naming both. That covers a `Ref` to a Resource this simulation skipped: a
+skipped Resource resolves to its own logical ID, and no authorizer has that id.
+
+`AWS::ApiGatewayV2::Deployment`, `DomainName`, `ApiMapping`, `VpcLink` and the WebSocket-only
+`Model`, `RouteResponse` and `IntegrationResponse` create nothing, so a template carrying one has
+that resource skipped rather than deployed.
 
 ## Authorization
 
@@ -677,6 +941,11 @@ the simulation without being given one. See the
   matched to a route by method, literal segment, `{name}` parameter, `{proxy+}` parameter and
   `$default`
 - Path parameters captured by the matched route, reaching the handler as `event.pathParameters`
+- `CreateAuthorizer`, `GetAuthorizers` and `DeleteAuthorizer` for a JWT authorizer, and routes
+  protected by one with `AuthorizationType: "JWT"` and `AuthorizationScopes`
+- Real RS256 verification of a token against the keys its issuer publishes, with the claims checked
+  against the simulation's clock, and the accepted claims reaching the handler as
+  `event.requestContext.authorizer.jwt`
 - `CreateStage` and `GetStages` for the `$default` stage and for named stages served under their own
   path segment, including stage variables
 - Serving the generated endpoint through `serveSimAws`, invoking the integrated function with a
@@ -684,8 +953,8 @@ the simulation without being given one. See the
 - The integration's invoke permission, evaluated against the function's resource policy with the
   matched route supplied as `AWS:SourceArn`
 - `DisableExecuteApiEndpoint`, refusing requests to the generated endpoint
-- Deployment of `AWS::ApiGatewayV2::Api`, `Integration`, `Route` and `Stage` from a CloudFormation
-  template, including one synthesized by CDK from an `HttpApi`
+- Deployment of `AWS::ApiGatewayV2::Api`, `Authorizer`, `Integration`, `Route` and `Stage` from a
+  CloudFormation template, including one synthesized by CDK from an `HttpApi`
 - Authorization of every command by simulated IAM, against the HTTP method and resource path real
   API Gateway uses
 - SDK interception of an `ApiGatewayV2Client`
@@ -709,9 +978,39 @@ Current documented limitations:
   integrations and AWS service integrations are not simulated.
 - Payload format 1.0 is refused. A handler written for 1.0 reads event fields a 2.0 event does not
   have, so treating one as the other would pass here and fail on AWS.
-- `AuthorizationType: "NONE"` only. JWT authorizers, `AWS_IAM` routes and Lambda authorizers are not
-  simulated, so a route is open here that would be closed on AWS if it asked for one. The route is
-  refused rather than created open.
+- `AuthorizationType` is `NONE` or `JWT`. `AWS_IAM` and `CUSTOM` routes are refused rather than
+  created open, since a route asking for either would admit anyone here and refuse them on AWS.
+- Lambda `REQUEST` authorizers are not simulated, of either payload version. `CreateAuthorizer`
+  refuses `AuthorizerType: "REQUEST"` by name, as does an `AWS::ApiGatewayV2::Authorizer` asking for
+  one, since nothing here runs the code that would make the decision.
+- Authorizer result caching is not simulated. `AuthorizerResultTtlInSeconds` configures it and is one
+  of the `REQUEST`-only options refused by name, so it cannot be asked for at all.
+- One `IdentitySource`, either `$request.header.<name>` or `$request.querystring.<name>`. Multiple
+  identity sources are refused rather than partly read.
+- `JwtConfiguration.Audience` is required. What real API Gateway does with an authorizer that has an
+  empty audience list is not documented, so this is stricter than AWS may be, in the direction that
+  cannot quietly admit an app client.
+- A token with no `exp` claim is refused. Real Cognito always sets one, and admitting a token that
+  nothing can expire is the divergence worth failing on.
+- `token_use` is not checked, which is what real API Gateway does, so an ID token passes an
+  authorizer that configures only an audience. See
+  [Route scopes, and access tokens versus ID tokens](#route-scopes-and-access-tokens-versus-id-tokens).
+- `aws.cognito.signin.user.admin` is the only scope any simulated Cognito flow issues, so it is the
+  only satisfiable route scope. Resource servers, custom scopes and the client credentials grant are
+  not simulated.
+- A token invalidated by `GlobalSignOut` still passes. Real API Gateway knows nothing about the pool's
+  issued tokens, so consulting them here would refuse a token AWS would accept.
+- The pool's JWKS is read in process rather than fetched. A pool's published OpenID configuration
+  names the localhost origin it is served from while its tokens name the real AWS URL, so a discovery
+  client would reject its own issuer's tokens.
+- One signing key per issuer, no key rotation and no JWKS caching. Real Cognito publishes two keys
+  and rotates between them, so code assuming a single entry passes here and is still wrong on AWS.
+- The 403 body for an unmet route scope, the string rendering of claim values, and `scopes` being
+  `null` rather than `[]` are all what the real endpoint was observed to send rather than anything
+  AWS publishes. Only the one `error_description` AWS documents is ever sent; every other refusal
+  names the scheme and nothing else.
+- Deleting an authorizer a route still points at leaves that route refusing every request. What real
+  API Gateway does with such a route is not established, so it stays closed rather than falling open.
 - The method and path segments of the source ARN are inferred rather than documented. See
   [Granting the API permission to invoke the function](#granting-the-api-permission-to-invoke-the-function).
 - An integration `CredentialsArn`, the IAM Role alternative to a resource policy grant, is refused

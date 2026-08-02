@@ -1,3 +1,4 @@
+import { SimHttpApiAuthorizer } from "../../../../apigatewayv2/api/authorizer/sim-http-api-authorizer.js";
 import { SimHttpApiIntegration } from "../../../../apigatewayv2/api/integration/sim-http-api-integration.js";
 import { SimHttpApiRoute } from "../../../../apigatewayv2/api/route/sim-http-api-route.js";
 import { SimHttpApi } from "../../../../apigatewayv2/api/sim-http-api.js";
@@ -6,6 +7,7 @@ import type {
   SimCfnResourceValueAdapterProperties,
   SimCfnServiceValueAdapter,
 } from "../sim-cfn-resource-value-adapter.js";
+import { SimHttpApiAuthorizerCfn } from "./sim-http-api-authorizer-cfn.js";
 import { SimHttpApiCfn } from "./sim-http-api-cfn.js";
 import { SimHttpApiIntegrationCfn } from "./sim-http-api-integration-cfn.js";
 import { SimHttpApiRouteCfn } from "./sim-http-api-route-cfn.js";
@@ -23,6 +25,13 @@ export function apiGatewayV2ValueAdapter(
     properties.simResource instanceof SimHttpApi
   ) {
     return new SimHttpApiCfn({ httpApi: properties.simResource });
+  }
+
+  if (
+    properties.type === "AWS::ApiGatewayV2::Authorizer" &&
+    properties.simResource instanceof SimHttpApiAuthorizer
+  ) {
+    return new SimHttpApiAuthorizerCfn({ authorizer: properties.simResource });
   }
 
   if (

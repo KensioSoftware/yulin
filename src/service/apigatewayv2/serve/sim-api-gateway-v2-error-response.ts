@@ -10,6 +10,21 @@
  */
 export class SimApiGatewayV2ErrorResponse {
   /**
+   * The route's authorizer did not accept the request.
+   *
+   * Everything from a missing token to a claim that does not hold answers this
+   * one status and body, so a client learns that its token was not accepted
+   * and nothing about which check it failed. The `www-authenticate` header
+   * names the scheme, and carries a description only for the one case AWS
+   * publishes one for.
+   */
+  unauthorized(errorDescription?: string): Response {
+    return this.jsonResponse(401, "Unauthorized", {
+      "www-authenticate": this.bearerChallenge(errorDescription),
+    });
+  }
+
+  /**
    * Nothing at this API serves the request: no such API, or no route, or no
    * stage to serve it from.
    */
@@ -18,11 +33,11 @@ export class SimApiGatewayV2ErrorResponse {
   }
 
   /**
-   * The API's generated endpoint is switched off.
+   * The API's generated endpoint is switched off, or the route asks for a
+   * scope the accepted token does not claim.
    *
-   * AWS publishes neither the status nor the body for this case, so both are
-   * what a disabled endpoint was observed to answer rather than something
-   * documented.
+   * AWS publishes neither the status nor the body for either case, so both are
+   * what the endpoint was observed to answer rather than something documented.
    */
   forbidden(): Response {
     return this.jsonResponse(403, "Forbidden");
@@ -35,12 +50,30 @@ export class SimApiGatewayV2ErrorResponse {
     return this.jsonResponse(500, "Internal Server Error");
   }
 
-  private jsonResponse(status: number, message: string): Response {
+  /**
+   * The `www-authenticate` value a refused token gets back.
+   *
+   * Only the description AWS publishes is ever sent, and every other refusal
+   * names the scheme and nothing else, rather than inventing wording.
+   */
+  private bearerChallenge(errorDescription?: string): string {
+    if (errorDescription === undefined) {
+      return "Bearer";
+    }
+
+    return `Bearer error="invalid_token", error_description="${errorDescription}"`;
+  }
+
+  private jsonResponse(
+    status: number,
+    message: string,
+    headers: Record<string, string> = {},
+  ): Response {
     return Response.json(
       { message },
       {
         status,
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", ...headers },
       },
     );
   }

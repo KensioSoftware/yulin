@@ -3,12 +3,29 @@ import { randomUUID } from "node:crypto";
 import type { SimAwsRequestCaller } from "../../service/iam/request/sim-aws-request-caller.js";
 import { simPayload2SourceIp } from "./sim-payload-2-connection.js";
 import type { SimPayload2Endpoint } from "./sim-payload-2-endpoint.js";
-import type { SimPayload2RequestContext } from "./sim-payload-2-event.type.js";
+import type {
+  SimPayload2JwtAuthorizer,
+  SimPayload2RequestContext,
+} from "./sim-payload-2-event.type.js";
 import { simPayload2EventTime } from "./sim-payload-2-event-time.js";
 import {
   simPayload2AnonymousAccountId,
   SimPayload2IamCaller,
 } from "./sim-payload-2-iam-caller.js";
+
+/**
+ * What the endpoint's authorizer knows about the caller, if it authorized one.
+ *
+ * The two members are the two kinds of authorizer a payload format 2.0
+ * endpoint has. Neither is present for an endpoint that admits anyone, which
+ * is what leaves the authorizer block out of the event.
+ */
+export interface SimPayload2Authorization {
+  /** The caller of a SigV4-signed request the endpoint authenticated. */
+  readonly caller?: SimAwsRequestCaller | undefined;
+  /** The token a JWT authorizer accepted. */
+  readonly jwt?: SimPayload2JwtAuthorizer | undefined;
+}
 
 interface SimPayload2RequestContextInput {
   readonly request: Request;
@@ -16,7 +33,7 @@ interface SimPayload2RequestContextInput {
   readonly endpoint: SimPayload2Endpoint;
   /** The simulated instant the request is stamped with. */
   readonly at: Date;
-  readonly authenticatedCaller?: SimAwsRequestCaller | undefined;
+  readonly authorization?: SimPayload2Authorization | undefined;
 }
 
 /**
@@ -33,7 +50,7 @@ export class SimPayload2RequestContextBuilder {
    */
   build(input: SimPayload2RequestContextInput): SimPayload2RequestContext {
     const { request, url, endpoint, at } = input;
-    const iamCaller = this.iamCaller(input.authenticatedCaller);
+    const iamCaller = this.iamCaller(input.authorization?.caller);
 
     const requestContext: SimPayload2RequestContext = {
       // An unauthenticated request has no Account behind it, and that is what
@@ -55,6 +72,11 @@ export class SimPayload2RequestContextBuilder {
       time: simPayload2EventTime(at),
       timeEpoch: at.getTime(),
     };
+
+    const jwt = input.authorization?.jwt;
+    if (jwt !== undefined) {
+      requestContext.authorizer = { jwt };
+    }
 
     const authorizer = iamCaller?.authorizerContext();
     if (authorizer !== undefined) {

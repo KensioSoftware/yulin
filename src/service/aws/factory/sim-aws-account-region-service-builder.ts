@@ -6,6 +6,7 @@ import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-sco
 import type { SimAws } from "../sim-aws.js";
 import { SimAcm } from "../../acm/sim-acm.js";
 import { SimApiGatewayV2 } from "../../apigatewayv2/index.js";
+import { SimCognitoHttpApiJwtIssuerKeys } from "../../apigatewayv2/api/authorizer/sim-cognito-http-api-jwt-issuer-keys.js";
 import { SimRoute53AcmDnsRecords } from "../../acm/validation/sim-route53-acm-dns-records.js";
 import { SimCloudFormation } from "../../cloudformation/index.js";
 import { SimCognitoIdentityProvider } from "../../cognito/index.js";
@@ -105,6 +106,11 @@ export class SimAwsAccountRegionServiceBuilder {
       // API ids are unique across the simulation, and an API is reachable by
       // id alone from the serving layer, whichever scope created it.
       registry: this.httpApiRegistry,
+      // A JWT authorizer verifies against user pools from any simulated
+      // Account, as a real one can name a pool in any Account.
+      jwtIssuerKeys: new SimCognitoHttpApiJwtIssuerKeys({
+        userPoolRegistry: this.registries.cognito,
+      }),
     });
   }
 

@@ -1,12 +1,15 @@
 import {
   ApiGatewayV2Client,
   CreateApiCommand,
+  CreateAuthorizerCommand,
   CreateIntegrationCommand,
   CreateRouteCommand,
   CreateStageCommand,
   DeleteApiCommand,
+  DeleteAuthorizerCommand,
   GetApiCommand,
   GetApisCommand,
+  GetAuthorizersCommand,
   GetIntegrationsCommand,
   GetRoutesCommand,
   GetStagesCommand,
@@ -41,11 +44,26 @@ describe("Intercepting an ApiGatewayV2 SDK client", () => {
         PayloadFormatVersion: "2.0",
       }),
     );
+    const authorizer = await client.send(
+      new CreateAuthorizerCommand({
+        ApiId: apiId,
+        Name: "pool-authorizer",
+        AuthorizerType: "JWT",
+        IdentitySource: ["$request.header.Authorization"],
+        JwtConfiguration: {
+          Issuer:
+            "https://cognito-idp.eu-west-2.amazonaws.com/eu-west-2_abc123",
+          Audience: ["client-1"],
+        },
+      }),
+    );
     await client.send(
       new CreateRouteCommand({
         ApiId: apiId,
         RouteKey: "$default",
         Target: `integrations/${integration.IntegrationId ?? ""}`,
+        AuthorizationType: "JWT",
+        AuthorizerId: authorizer.AuthorizerId,
       }),
     );
     await client.send(
@@ -73,10 +91,20 @@ describe("Intercepting an ApiGatewayV2 SDK client", () => {
     assertIdentical(integrations.Items?.length, 1);
     const routes = await client.send(new GetRoutesCommand({ ApiId: apiId }));
     assertIdentical(routes.Items?.[0]?.RouteKey, "$default");
+    const authorizers = await client.send(
+      new GetAuthorizersCommand({ ApiId: apiId }),
+    );
+    assertIdentical(authorizers.Items?.[0]?.Name, "pool-authorizer");
     const stages = await client.send(new GetStagesCommand({ ApiId: apiId }));
     assertIdentical(stages.Items?.[0]?.StageName, "$default");
 
-    // And deleting the API through the client leaves nothing behind
+    // And deleting through the client takes things away again
+    await client.send(
+      new DeleteAuthorizerCommand({
+        ApiId: apiId,
+        AuthorizerId: authorizer.AuthorizerId,
+      }),
+    );
     await client.send(new DeleteApiCommand({ ApiId: apiId }));
     const remaining = await client.send(new GetApisCommand({}));
     expect(remaining.Items).toStrictEqual([]);
