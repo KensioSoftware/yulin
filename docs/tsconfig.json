@@ -5,6 +5,7 @@
     "tsBuildInfoFile": "../tsconfig.docs.tsbuildinfo",
     "paths": {
       "@kensio/yulin": ["../src/index.ts"],
+      "@kensio/yulin/apigatewayv2": ["../src/service/apigatewayv2/index.ts"],
       "@kensio/yulin/cloudformation": [
         "../src/service/cloudformation/index.ts"
       ],

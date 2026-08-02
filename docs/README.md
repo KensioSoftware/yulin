@@ -6,6 +6,7 @@ behaviour and includes example code that can be copied into tests or local devel
 ## Service documentation
 
 - [ACM](./services/acm/ "Simulated ACM usage docs")
+- [API Gateway HTTP APIs](./services/apigatewayv2/ "Simulated API Gateway HTTP API usage docs")
 - [CloudFormation](./services/cloudformation/ "Simulated CloudFormation usage docs")
 - [CloudFront](./services/cloudfront/ "Simulated CloudFront usage docs")
 - [Cognito user pools](./services/cognito/ "Simulated Cognito user pools usage docs")

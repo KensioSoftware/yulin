@@ -25,7 +25,7 @@ const created = await simAws.lambda().createFunction(
     Code: {
       ZipFile: makeLambdaZipFileInput((event: SimLambdaFunctionUrlEvent) => ({
         statusCode: 200,
-        body: `called by ${event.requestContext.authorizer?.iam.userArn ?? "nobody"}`,
+        body: `called by ${event.requestContext.authorizer?.iam?.userArn ?? "nobody"}`,
       })),
     },
   }),

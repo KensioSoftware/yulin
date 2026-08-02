@@ -2,10 +2,11 @@ import type {
   SimAwsServiceController,
   SimAwsServiceRequest,
 } from "../../../serve/controller/sim-service-controller.js";
+import { SimPayload2EventBuilder } from "../../../serve/payload-2/sim-payload-2-event-builder.js";
+import { SimPayload2ResponseBuilder } from "../../../serve/payload-2/sim-payload-2-response-builder.js";
 import { SimAws } from "../../aws/sim-aws.js";
-import { SimLambdaUrlEventBuilder } from "./event/sim-lambda-url-event-builder.js";
+import { simLambdaUrlEndpoint } from "./event/sim-lambda-url-endpoint.js";
 import { SimLambdaUrlErrorResponse } from "./response/sim-lambda-url-error-response.js";
-import { SimLambdaUrlResponseBuilder } from "./response/sim-lambda-url-response-builder.js";
 import {
   type SimLambdaFunctionUrlRoute,
   SimLambdaUrlRouter,
@@ -32,8 +33,8 @@ interface SimLambdaServiceControllerProperties {
  */
 export class SimLambdaServiceController implements SimAwsServiceController {
   private readonly router: SimLambdaUrlRouter;
-  private readonly eventBuilder: SimLambdaUrlEventBuilder;
-  private readonly responseBuilder = new SimLambdaUrlResponseBuilder();
+  private readonly eventBuilder: SimPayload2EventBuilder;
+  private readonly responseBuilder = new SimPayload2ResponseBuilder();
   private readonly errorResponse = new SimLambdaUrlErrorResponse();
 
   constructor(properties: SimLambdaServiceControllerProperties = {}) {
@@ -41,7 +42,7 @@ export class SimLambdaServiceController implements SimAwsServiceController {
     this.router = properties.router ?? new SimLambdaUrlRouter({ simAws });
     // Taken from the router rather than from properties, so a supplied router
     // and the event timestamps always belong to the same simulation.
-    this.eventBuilder = new SimLambdaUrlEventBuilder({
+    this.eventBuilder = new SimPayload2EventBuilder({
       clock: this.router.simAws,
     });
   }
@@ -99,7 +100,7 @@ export class SimLambdaServiceController implements SimAwsServiceController {
     try {
       const event = await this.eventBuilder.build(
         request,
-        route.functionUrl,
+        simLambdaUrlEndpoint(route.functionUrl),
         authenticatedCaller,
       );
 

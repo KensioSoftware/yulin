@@ -42,6 +42,10 @@
       "import": "./dist/index.js",
       "types": "./dist/index.d.ts"
     },
+    "./apigatewayv2": {
+      "import": "./dist/service/apigatewayv2/index.js",
+      "types": "./dist/service/apigatewayv2/index.d.ts"
+    },
     "./cloudformation": {
       "import": "./dist/service/cloudformation/index.js",
       "types": "./dist/service/cloudformation/index.d.ts"
@@ -119,6 +123,7 @@
   "devDependencies": {
     "@aws-crypto/sha256-js": "^5.2.0",
     "@aws-sdk/client-acm": "^3.1095.0",
+    "@aws-sdk/client-apigatewayv2": "^3.1101.0",
     "@aws-sdk/client-cloudformation": "^3.1095.0",
     "@aws-sdk/client-cloudfront": "^3.1095.0",
     "@aws-sdk/client-cognito-identity-provider": "^3.1096.0",

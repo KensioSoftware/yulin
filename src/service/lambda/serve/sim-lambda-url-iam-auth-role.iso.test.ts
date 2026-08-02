@@ -14,10 +14,8 @@ import { simAwsCallerHeaderName } from "../../iam/request/sim-aws-caller-header.
 import { simIamPolicyDocumentFactory } from "../../iam/policy/sim-iam-policy-document.factory.js";
 import { SimAws } from "../../aws/sim-aws.js";
 import { makeLambdaZipFileInput } from "../function/code/lambda-zip-file-input.js";
-import type {
-  SimLambdaFunctionUrlEvent,
-  SimLambdaFunctionUrlRequestContext,
-} from "./event/sim-lambda-url-event.type.js";
+import type { SimPayload2RequestContext } from "../../../serve/payload-2/sim-payload-2-event.type.js";
+import type { SimLambdaFunctionUrlEvent } from "./event/sim-lambda-url-event.type.js";
 
 const accountId = "888888888888";
 
@@ -160,9 +158,8 @@ describe("Invoking an AWS_IAM Lambda Function URL as a Role", () => {
     // Then it is allowed: the session ARN owns no policies of its own, so the
     // permission has to come from the Role it was assumed from
     expect(response.status).toBe(200);
-    const context =
-      (await response.json()) as SimLambdaFunctionUrlRequestContext;
-    expect(context.authorizer?.iam.userArn).toBe(
+    const context = (await response.json()) as SimPayload2RequestContext;
+    expect(context.authorizer?.iam?.userArn).toBe(
       `arn:aws:sts::${accountId}:assumed-role/Deployer/deploy-session`,
     );
   });

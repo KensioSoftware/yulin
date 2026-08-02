@@ -15,10 +15,8 @@ import { SimAwsLocalUrl } from "../../../serve/http/url/sim-aws-local-url.js";
 import { simIamPolicyDocumentFactory } from "../../iam/policy/sim-iam-policy-document.factory.js";
 import { SimAws } from "../../aws/sim-aws.js";
 import { makeLambdaZipFileInput } from "../function/code/lambda-zip-file-input.js";
-import type {
-  SimLambdaFunctionUrlEvent,
-  SimLambdaFunctionUrlRequestContext,
-} from "./event/sim-lambda-url-event.type.js";
+import type { SimPayload2RequestContext } from "../../../serve/payload-2/sim-payload-2-event.type.js";
+import type { SimLambdaFunctionUrlEvent } from "./event/sim-lambda-url-event.type.js";
 
 const accountId = "888888888888";
 
@@ -244,15 +242,14 @@ describe("Invoking an AWS_IAM Lambda Function URL as a signed caller", () => {
     const response = await new SimAwsHttp({ simAws }).handleRequest(
       signed.request,
     );
-    const context =
-      (await response.json()) as SimLambdaFunctionUrlRequestContext;
+    const context = (await response.json()) as SimPayload2RequestContext;
 
     // Then it can tell who called it and from which Account, which is the
     // point of the auth type for handler code
-    expect(context.authorizer?.iam.userArn).toBe(
+    expect(context.authorizer?.iam?.userArn).toBe(
       `arn:aws:iam::${accountId}:user/Invoker`,
     );
-    expect(context.authorizer?.iam.accountId).toBe(accountId);
+    expect(context.authorizer?.iam?.accountId).toBe(accountId);
     expect(context.accountId).toBe(accountId);
   });
 
@@ -277,8 +274,7 @@ describe("Invoking an AWS_IAM Lambda Function URL as a signed caller", () => {
     const response = await new SimAwsHttp({ simAws }).fetch(
       localUrl(urlConfig.FunctionUrl),
     );
-    const context =
-      (await response.json()) as SimLambdaFunctionUrlRequestContext;
+    const context = (await response.json()) as SimPayload2RequestContext;
 
     // Then there is no caller to describe, as on real AWS, and the Account is
     // reported as anonymous

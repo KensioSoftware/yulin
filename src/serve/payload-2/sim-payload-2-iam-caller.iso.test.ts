@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { SimAwsRequestCaller } from "../../../iam/request/sim-aws-request-caller.js";
-import { SimLambdaUrlIamCaller } from "./sim-lambda-url-iam-authorizer.js";
+import { SimAwsRequestCaller } from "../../service/iam/request/sim-aws-request-caller.js";
+import { SimPayload2IamCaller } from "./sim-payload-2-iam-caller.js";
 
-function caller(arn: string): SimLambdaUrlIamCaller {
-  return new SimLambdaUrlIamCaller(
+function caller(arn: string): SimPayload2IamCaller {
+  return new SimPayload2IamCaller(
     new SimAwsRequestCaller({
       principal: { kind: "arn", arn },
       authMethod: "sigv4",
@@ -12,7 +12,7 @@ function caller(arn: string): SimLambdaUrlIamCaller {
   );
 }
 
-describe("The IAM caller of a Function URL invocation", () => {
+describe("The IAM caller of a payload format 2.0 invocation", () => {
   it("describes a principal by its ARN", () => {
     // Given a caller resolved to an IAM user
     const arn = "arn:aws:iam::111111111111:user/Invoker";
@@ -35,7 +35,7 @@ describe("The IAM caller of a Function URL invocation", () => {
 
   it("describes no caller for a principal without an ARN", () => {
     // Given a caller that is an AWS service rather than an IAM identity
-    const serviceCaller = new SimLambdaUrlIamCaller(
+    const serviceCaller = new SimPayload2IamCaller(
       new SimAwsRequestCaller({
         principal: { kind: "service", service: "s3.amazonaws.com" },
         authMethod: "caller-header",
@@ -43,8 +43,8 @@ describe("The IAM caller of a Function URL invocation", () => {
     );
 
     // When it is described for the invocation event
-    // Then there is nothing to describe, because real Lambda only ever
-    // authenticates an IAM principal at a Function URL
+    // Then there is nothing to describe, because only an IAM principal is ever
+    // authenticated by SigV4 at one of these endpoints
     expect(serviceCaller.authorizerContext()).toBeUndefined();
     expect(serviceCaller.accountId()).toBe("anonymous");
   });
@@ -54,8 +54,8 @@ describe("The IAM caller of a Function URL invocation", () => {
     const accountlessCaller = caller("arn:aws:s3:::reports-bucket");
 
     // When its Account is read
-    // Then it is anonymous rather than an empty string, which is what a
-    // Function URL reports when it has no Account behind a request
+    // Then it is anonymous rather than an empty string, which is what AWS
+    // reports when it has no Account behind a request
     expect(accountlessCaller.accountId()).toBe("anonymous");
   });
 });

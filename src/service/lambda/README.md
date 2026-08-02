@@ -322,13 +322,15 @@ http://<url-id>.lambda-url.<region>.sim-aws.localhost:<port>/
 ```
 
 `SimLambdaUrlRouter` turns that target back into a Function URL and function, then
-`SimLambdaServiceController` converts the request into a payload format 2.0 event
-(`serve/event/`) and the handler result back into a response (`serve/response/`). Payload format
-2.0 is the only format real Function URLs use, so there is no version to choose. Text bodies cross
-as strings and everything else as base64, in both directions, decided by content type in
-`SimLambdaUrlBodyEncoding`. A handler returning a structured result (one carrying `statusCode`)
-controls the response, including `cookies` becoming `set-cookie` headers; any other return value
-becomes a 200 JSON response, as on AWS.
+`SimLambdaServiceController` converts the request into a payload format 2.0 event and the handler
+result back into a response. That conversion lives in `src/serve/payload-2/`, shared with simulated
+API Gateway HTTP APIs, which speak the same format. `serve/event/sim-lambda-url-endpoint.ts` is this
+service's half of it: what a Function URL calls itself, which is the URL id as the API id and
+`$default` for both the route key and the stage. Payload format 2.0 is the only format real Function
+URLs use, so there is no version to choose. Text bodies cross as strings and everything else as
+base64, in both directions, decided by content type in `SimPayload2BodyEncoding`. A handler
+returning a structured result (one carrying `statusCode`) controls the response, including `cookies`
+becoming `set-cookie` headers; any other return value becomes a 200 JSON response, as on AWS.
 
 A `NONE` auth URL is invokable by anyone on AWS, so its requests are not attributed to a simulated
 principal and the controller invokes the function directly rather than through the Invoke command's
@@ -351,7 +353,7 @@ condition value, which is what a Function URL grant conditions on.
 
 Only an authorized `AWS_IAM` invocation is given a caller to describe in its event, which is what
 puts `requestContext.authorizer.iam` there and leaves it out for `NONE`
-(`serve/event/sim-lambda-url-iam-authorizer.ts`). Either way the function runs as its execution
+(`src/serve/payload-2/sim-payload-2-iam-caller.ts`). Either way the function runs as its execution
 Role: who invoked it and what it runs as are separate questions.
 
 The endpoint's own error responses (403 for a denied caller, 404 for an unknown or deleted URL, 502

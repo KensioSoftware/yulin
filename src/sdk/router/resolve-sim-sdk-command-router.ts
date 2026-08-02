@@ -26,6 +26,9 @@ export function resolveSimSdkCommandRouter(
     case "ACM": {
       return scoped.acm().sdkCommandRouter();
     }
+    case "ApiGatewayV2": {
+      return scoped.apiGatewayV2().sdkCommandRouter();
+    }
     case "CloudFormation": {
       return scoped.cloudFormation().sdkCommandRouter();
     }

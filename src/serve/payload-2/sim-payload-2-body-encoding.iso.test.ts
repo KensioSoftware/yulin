@@ -1,12 +1,12 @@
 import { assertFalse, assertIdentical, assertTrue } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
-import { SimLambdaUrlBodyEncoding } from "./sim-lambda-url-body-encoding.js";
+import { SimPayload2BodyEncoding } from "./sim-payload-2-body-encoding.js";
 
-describe("Sim Lambda Function URL body encoding", () => {
+describe("Payload format 2.0 body encoding", () => {
   it("treats text media types as text", () => {
     // Given the body encoding rules.
-    const encoding = new SimLambdaUrlBodyEncoding();
+    const encoding = new SimPayload2BodyEncoding();
 
     // When text-ish content types are checked.
     // Then each is treated as text the handler receives as a string.
@@ -19,7 +19,7 @@ describe("Sim Lambda Function URL body encoding", () => {
 
   it("treats other media types as binary", () => {
     // Given the body encoding rules.
-    const encoding = new SimLambdaUrlBodyEncoding();
+    const encoding = new SimPayload2BodyEncoding();
 
     // When binary content types are checked.
     // Then each is treated as binary, including a missing content type.
@@ -30,7 +30,7 @@ describe("Sim Lambda Function URL body encoding", () => {
 
   it("encodes binary request bodies as base64", () => {
     // Given some bytes that are not text.
-    const encoding = new SimLambdaUrlBodyEncoding();
+    const encoding = new SimPayload2BodyEncoding();
     const bytes = new Uint8Array([0, 1, 2]);
 
     // When they are encoded for the handler event.
@@ -42,7 +42,7 @@ describe("Sim Lambda Function URL body encoding", () => {
 
   it("passes text request bodies through as UTF-8", () => {
     // Given UTF-8 bytes with a text content type.
-    const encoding = new SimLambdaUrlBodyEncoding();
+    const encoding = new SimPayload2BodyEncoding();
     const bytes = new TextEncoder().encode("héllo");
 
     // When they are encoded for the handler event.
@@ -54,7 +54,7 @@ describe("Sim Lambda Function URL body encoding", () => {
 
   it("returns response bodies unchanged when not base64", () => {
     // Given a plain handler response body.
-    const encoding = new SimLambdaUrlBodyEncoding();
+    const encoding = new SimPayload2BodyEncoding();
 
     // When it is decoded for the client.
     const body = encoding.decode("hello", false);

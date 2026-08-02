@@ -9,6 +9,7 @@ import type { SimCloudFormation } from "../cloudformation/index.js";
 import type { SimCognitoIdentityProvider } from "../cognito/index.js";
 import type { SimRoute53 } from "../route53/index.js";
 import type { SimAcm } from "../acm/sim-acm.js";
+import type { SimApiGatewayV2 } from "../apigatewayv2/index.js";
 import type { SimIam } from "../iam/index.js";
 import type { SimKms } from "../kms/index.js";
 import type { SimLambda } from "../lambda/index.js";
@@ -60,6 +61,15 @@ export class SimAwsAccountRegionContainer {
   acm(): SimAcm {
     return this.memo.getOrCreate("acm", () =>
       this.simAws.serviceFactory.createAcm(this),
+    );
+  }
+
+  /**
+   * Get simulated API Gateway v2 for this account and region.
+   */
+  apiGatewayV2(): SimApiGatewayV2 {
+    return this.memo.getOrCreate("apiGatewayV2", () =>
+      this.simAws.serviceFactory.createApiGatewayV2(this),
     );
   }
 
