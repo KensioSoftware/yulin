@@ -20,6 +20,7 @@ npm i -D @kensio/yulin
 ## Service specific docs
 
 - [ACM](./docs/services/acm "Simulated ACM docs")
+- [API Gateway HTTP APIs](./docs/services/apigatewayv2 "Simulated API Gateway HTTP API docs")
 - [CloudFormation](./docs/services/cloudformation "Simulated CloudFormation docs")
 - [CloudFront](./docs/services/cloudfront "Simulated CloudFront docs")
 - [Cognito user pools](./docs/services/cognito "Simulated Cognito user pools docs")

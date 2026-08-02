@@ -22,6 +22,7 @@ import type { SimRoute53 } from "../route53/index.js";
 import { SimAwsServiceFactory } from "./factory/sim-aws-service-factory.js";
 import { SimAwsScopeRegistry } from "./scope/sim-aws-scope-registry.js";
 import type { SimAcm } from "../acm/sim-acm.js";
+import type { SimApiGatewayV2 } from "../apigatewayv2/index.js";
 import type { SimIam } from "../iam/index.js";
 import type { SimIamRegistry } from "../iam/registry/sim-iam-registry.js";
 import type { SimKms } from "../kms/index.js";
@@ -194,6 +195,11 @@ export class SimAws {
   /** Get simulated ACM in the default Account Region scope. */
   acm(): SimAcm {
     return this.accountRegionScope().acm();
+  }
+
+  /** Get simulated API Gateway v2 in the default Account Region scope. */
+  apiGatewayV2(): SimApiGatewayV2 {
+    return this.accountRegionScope().apiGatewayV2();
   }
 
   /** Get simulated CloudFormation in the default Account Region scope. */

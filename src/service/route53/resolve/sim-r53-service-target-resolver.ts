@@ -1,4 +1,5 @@
 import type { SimAwsServiceTarget } from "../../../serve/controller/sim-service-controller.js";
+import { executeApiHostLabel } from "../../apigatewayv2/api/sim-http-api-host.js";
 import type { AwsRegionName } from "../../aws/sim-aws-region.js";
 import { lambdaFunctionUrlHostLabel } from "../../lambda/function/url/sim-lambda-function-url-host.js";
 import { simRoute53LogicalName } from "../local-name/sim-route53-local-name.js";
@@ -43,6 +44,7 @@ export class SimRoute53ServiceTargetResolver {
       this.s3Targets.resolve(logicalName) ??
       this.cloudFrontServiceTarget(logicalName) ??
       this.lambdaFunctionUrlServiceTarget(logicalName) ??
+      this.httpApiServiceTarget(logicalName) ??
       this.cognitoIdpServiceTarget(logicalName)
     );
   }
@@ -137,6 +139,44 @@ export class SimRoute53ServiceTargetResolver {
     return {
       service: "lambda",
       resourceName: urlId,
+      regionName: regionName as AwsRegionName,
+    };
+  }
+
+  /**
+   * Resolve API Gateway HTTP API endpoint hostnames.
+   *
+   * Simulated HTTP API hostnames use:
+   *
+   *   <api-id>.execute-api.<region>
+   *
+   * The real AWS endpoint ends `.amazonaws.com`, which the local URL rewriting
+   * drops in the same way it drops it from S3 endpoints. The API id is one DNS
+   * label, so the label count here is exact.
+   */
+  private httpApiServiceTarget(
+    logicalName: string,
+  ): SimAwsServiceTarget | undefined {
+    const labels = logicalName.split(".");
+
+    if (labels.length !== 3) {
+      return undefined;
+    }
+
+    const [apiId, service, regionName] = labels;
+
+    if (service !== executeApiHostLabel || regionName === undefined) {
+      return undefined;
+    }
+
+    /* v8 ignore if -- defensive check */
+    if (apiId === undefined || apiId.length === 0) {
+      return undefined;
+    }
+
+    return {
+      service: "apiGatewayV2",
+      resourceName: apiId,
       regionName: regionName as AwsRegionName,
     };
   }

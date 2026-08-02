@@ -6,18 +6,18 @@ const textContentTypes: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Decides how a Function URL request or response body crosses the boundary
- * between HTTP bytes and the string a handler event carries.
+ * Decides how a request or response body crosses the boundary between HTTP
+ * bytes and the string a payload format 2.0 event carries.
  *
- * Real Lambda passes text bodies through as UTF-8 strings and base64-encodes
+ * Real AWS passes text bodies through as UTF-8 strings and base64-encodes
  * everything else, telling the handler which happened with isBase64Encoded.
  */
-export class SimLambdaUrlBodyEncoding {
+export class SimPayload2BodyEncoding {
   /**
    * Whether a content type's body is passed to the handler as text.
    *
-   * An absent content type is treated as binary, as Lambda does, because
-   * nothing says the bytes are decodable text.
+   * An absent content type is treated as binary, as AWS does, because nothing
+   * says the bytes are decodable text.
    */
   isText(contentType: string | null): boolean {
     if (contentType === null) {

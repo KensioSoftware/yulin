@@ -5,6 +5,8 @@ import type {
 import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-scope.js";
 import type { SimAws } from "../sim-aws.js";
 import type { SimAcm } from "../../acm/sim-acm.js";
+import type { SimApiGatewayV2 } from "../../apigatewayv2/index.js";
+import { SimHttpApiRegistry } from "../../apigatewayv2/registry/sim-http-api-registry.js";
 import type { SimCloudFormation } from "../../cloudformation/index.js";
 import type { SimCognitoIdentityProvider } from "../../cognito/index.js";
 import { SimCloudFrontRegistry } from "../../cloudfront/registry/sim-cloud-front-registry.js";
@@ -84,6 +86,16 @@ export class SimAwsServiceFactory {
   public readonly lambdaUrlRegistry = new SimLambdaUrlRegistry();
 
   /**
+   * Shared simulated API Gateway HTTP API registry.
+   *
+   * This maps API ids to the Accounts that own them, so the localhost serving
+   * layer can route a request to the right Account/Region scope from the
+   * request hostname alone.
+   * @internal
+   */
+  public readonly httpApiRegistry = new SimHttpApiRegistry();
+
+  /**
    * The registries this simulation's scoped services share between them.
    */
   private readonly registries = new SimAwsScopedServiceRegistries();
@@ -107,6 +119,7 @@ export class SimAwsServiceFactory {
       registries: this.registries,
       iamRegistry: this.iamRegistry,
       lambdaUrlRegistry: this.lambdaUrlRegistry,
+      httpApiRegistry: this.httpApiRegistry,
       accountServices: this.accountServices,
     });
   }
@@ -114,6 +127,11 @@ export class SimAwsServiceFactory {
   /** Create simulated ACM for an Account Region scope. */
   createAcm(scope: SimAwsAccountRegionContainer): SimAcm {
     return this.accountRegionServices.createAcm(scope);
+  }
+
+  /** Create simulated API Gateway v2 for an Account Region scope. */
+  createApiGatewayV2(scope: SimAwsAccountRegionContainer): SimApiGatewayV2 {
+    return this.accountRegionServices.createApiGatewayV2(scope);
   }
 
   /** Create simulated CloudFormation for an Account Region scope. */

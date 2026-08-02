@@ -5,12 +5,14 @@ import type {
 import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-scope.js";
 import type { SimAws } from "../sim-aws.js";
 import { SimAcm } from "../../acm/sim-acm.js";
+import { SimApiGatewayV2 } from "../../apigatewayv2/index.js";
 import { SimRoute53AcmDnsRecords } from "../../acm/validation/sim-route53-acm-dns-records.js";
 import { SimCloudFormation } from "../../cloudformation/index.js";
 import { SimCognitoIdentityProvider } from "../../cognito/index.js";
 import { SimDynamoDb as SimDynamoDatabase } from "../../dynamodb/index.js";
 import type { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
 import { SimKms } from "../../kms/index.js";
+import type { SimHttpApiRegistry } from "../../apigatewayv2/registry/sim-http-api-registry.js";
 import { SimLambda } from "../../lambda/index.js";
 import type { SimLambdaUrlRegistry } from "../../lambda/registry/sim-lambda-url-registry.js";
 import { SimSqsEventSourceQueues } from "../../lambda/event-source/queue/sim-sqs-event-source-queues.js";
@@ -30,6 +32,7 @@ interface SimAwsAccountRegionServiceBuilderProperties {
   readonly registries: SimAwsScopedServiceRegistries;
   readonly iamRegistry: SimIamRegistry;
   readonly lambdaUrlRegistry: SimLambdaUrlRegistry;
+  readonly httpApiRegistry: SimHttpApiRegistry;
   readonly accountServices: SimAwsAccountServiceCache;
 }
 
@@ -57,6 +60,7 @@ export class SimAwsAccountRegionServiceBuilder {
   private readonly registries: SimAwsScopedServiceRegistries;
   private readonly iamRegistry: SimIamRegistry;
   private readonly lambdaUrlRegistry: SimLambdaUrlRegistry;
+  private readonly httpApiRegistry: SimHttpApiRegistry;
   private readonly accountServices: SimAwsAccountServiceCache;
 
   constructor(properties: SimAwsAccountRegionServiceBuilderProperties) {
@@ -65,6 +69,7 @@ export class SimAwsAccountRegionServiceBuilder {
     this.registries = properties.registries;
     this.iamRegistry = properties.iamRegistry;
     this.lambdaUrlRegistry = properties.lambdaUrlRegistry;
+    this.httpApiRegistry = properties.httpApiRegistry;
     this.accountServices = properties.accountServices;
   }
 
@@ -84,6 +89,23 @@ export class SimAwsAccountRegionServiceBuilder {
     this.registries.acm.register(scope.accountRegionScope, acm);
 
     return acm;
+  }
+
+  /**
+   * Create simulated API Gateway v2 for an Account Region scope.
+   *
+   * HTTP APIs are Region-scoped on real AWS: the endpoint API Gateway
+   * generates names the Region, and an API cannot be reached from another one.
+   */
+  createApiGatewayV2(scope: SimAwsAccountRegionContainer): SimApiGatewayV2 {
+    return new SimApiGatewayV2({
+      accountRegionScope: scope.accountRegionScope,
+      iam: this.accountServices.createIam(scope),
+      background: this.background,
+      // API ids are unique across the simulation, and an API is reachable by
+      // id alone from the serving layer, whichever scope created it.
+      registry: this.httpApiRegistry,
+    });
   }
 
   /** Create simulated CloudFormation for an Account Region scope. */

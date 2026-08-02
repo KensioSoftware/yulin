@@ -706,9 +706,10 @@ is refused. See [callers of HTTP requests](../iam/#callers-of-http-requests) in 
 that resolution works and how to sign a served request.
 
 An `AWS_IAM` invocation carries its caller into the event as
-`requestContext.authorizer.iam`, which is the part a handler reads. It is absent for a `NONE`
-invocation, as it is on real AWS, and `requestContext.accountId` is the caller's Account rather
-than `anonymous`.
+`requestContext.authorizer.iam`, which is the part a handler reads. The `authorizer` block is absent
+for a `NONE` invocation, as it is on real AWS, and `requestContext.accountId` is the caller's Account
+rather than `anonymous`. The block is shared with simulated API Gateway HTTP APIs, whose JWT
+authorizers would fill a `jwt` member instead, so `iam` is optional on the type.
 
 ```typescript sim-lambda-function-url-iam-auth
 /**
@@ -738,7 +739,7 @@ const created = await simAws.lambda().createFunction(
     Code: {
       ZipFile: makeLambdaZipFileInput((event: SimLambdaFunctionUrlEvent) => ({
         statusCode: 200,
-        body: `called by ${event.requestContext.authorizer?.iam.userArn ?? "nobody"}`,
+        body: `called by ${event.requestContext.authorizer?.iam?.userArn ?? "nobody"}`,
       })),
     },
   }),

@@ -1,21 +1,20 @@
-import type { SimAwsRequestCaller } from "../../../iam/request/sim-aws-request-caller.js";
-import type { SimLambdaFunctionUrlAuthorizerContext } from "./sim-lambda-url-event.type.js";
+import type { SimAwsRequestCaller } from "../../service/iam/request/sim-aws-request-caller.js";
+import type { SimPayload2AuthorizerContext } from "./sim-payload-2-event.type.js";
 
 /**
- * What a Function URL reports as the Account of a caller it did not
- * authenticate, which is every caller of a `NONE` URL.
+ * What an endpoint reports as the Account of a caller it did not authenticate,
+ * which is every caller of an endpoint that admits anyone.
  */
-export const simLambdaUrlAnonymousAccountId = "anonymous";
+export const simPayload2AnonymousAccountId = "anonymous";
 
 /**
- * How the caller of a Function URL invocation appears in the event.
+ * How the IAM caller of an invocation appears in the event.
  *
- * Real Lambda only ever authenticates an IAM principal at a Function URL, so
- * everything here is derived from the caller's ARN. A caller without one is
+ * Everything here is derived from the caller's ARN. A caller without one is
  * described the way an unauthenticated caller is, rather than filled in with
  * something no real invocation would carry.
  */
-export class SimLambdaUrlIamCaller {
+export class SimPayload2IamCaller {
   private readonly caller: SimAwsRequestCaller;
 
   constructor(caller: SimAwsRequestCaller) {
@@ -29,7 +28,7 @@ export class SimLambdaUrlIamCaller {
     const arnAccountId = this.arn()?.split(":", 6)[4];
 
     if (arnAccountId === undefined || arnAccountId.length === 0) {
-      return simLambdaUrlAnonymousAccountId;
+      return simPayload2AnonymousAccountId;
     }
 
     return arnAccountId;
@@ -39,7 +38,7 @@ export class SimLambdaUrlIamCaller {
    * The `requestContext.authorizer` block describing this caller, or undefined
    * when there is no IAM principal to describe.
    */
-  authorizerContext(): SimLambdaFunctionUrlAuthorizerContext | undefined {
+  authorizerContext(): SimPayload2AuthorizerContext | undefined {
     const arn = this.arn();
 
     if (arn === undefined) {

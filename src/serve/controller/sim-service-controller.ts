@@ -17,7 +17,12 @@ export type SimAwsServiceEndpoint = "rest" | "website";
 
 export interface SimAwsServiceTarget {
   readonly service:
-    "s3" | "cloudFront" | "lambda" | "route53" | "cognitoIdentityProvider";
+    | "s3"
+    | "cloudFront"
+    | "lambda"
+    | "route53"
+    | "cognitoIdentityProvider"
+    | "apiGatewayV2";
   readonly resourceName: string;
   // regionName is used for validation, not look-up
   readonly regionName?: AwsRegionName;
