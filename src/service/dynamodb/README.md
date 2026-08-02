@@ -854,17 +854,31 @@ The parts under `cfn/table/` split by responsibility:
   on, a real property that is not simulated skips the resource with a reason naming it, and anything
   that is not an `AWS::DynamoDB::Table` property at all fails the resource, because that is a
   template real CloudFormation would refuse too.
+- `SimCfnDynamoDbTableIndexRules` applies the same rule a level down, to the entries of
+  `GlobalSecondaryIndexes` and `LocalSecondaryIndexes`. The two kinds have different property sets:
+  a local secondary index has no throughput or insights settings on AWS either, so anything of the
+  sort on one fails the resource rather than skipping it.
 - `SimCfnDynamoDbTableValues` reads the plain shapes a property can hold, naming the property path in
   each refusal. It takes a number from the string a template Parameter carries one as.
 - `SimCfnDynamoDbTableProperties` turns the template properties into `CreateTable` input, and
   generates a name for a table the template did not name, through the shared
-  `SimCfnGeneratedResourceName`.
+  `SimCfnGeneratedResourceName`. The parts several properties share are read by
+  `readSimCfnDynamoDbKeySchema`, `readSimCfnDynamoDbThroughput` and
+  `readSimCfnDynamoDbTableIndexes`, since a table and its indexes state their keys and their
+  capacity the same way.
 - `SimCfnDynamoDbTableCreator` calls `SimDynamoDb.createTable()` with that input and finds the
   created table through `SimDynamoDb.findTable()`.
 
-Nothing here decides what a key schema, a billing mode or a table class is allowed to be. Creating
-the table through the ordinary command is what keeps a template-created table the same thing an SDK
-caller would have got.
+Nothing here decides what a key schema, a billing mode, a table class or a secondary index is
+allowed to be. Creating the table through the ordinary command is what keeps a template-created
+table the same thing an SDK caller would have got.
+
+One divergence is deliberate, and commented where the indexes are read. AWS creates only one table
+with secondary indexes at a time in an account and region. Simulated CloudFormation creates each
+dependency-ready batch of resources at once, so a template with two indexed tables and no
+`DependsOn` between them deploys here and may not on AWS. It is documented under Limitations rather
+than serialised, since serialising would hold up stack timing over a template shape a test is
+unlikely to be about.
 
 `Ref` and `Fn::GetAtt` behaviour lives with the CloudFormation engine rather than on the table, in
 `SimDynamoDbTableCfn` under `cloudformation/resource/cfn/dynamodb/`. `Ref` answers with the table

@@ -1,4 +1,9 @@
-import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
+import { SimCfnDynamoDbTableIndexRules } from "./sim-cfn-dynamodb-table-index-rules.js";
+import {
+  dynamoDbTablePropertyError,
+  dynamoDbTableUnsimulatedPropertyError,
+} from "./sim-cfn-dynamodb-table-property-error.js";
+import type { SimCfnDynamoDbTableValues } from "./sim-cfn-dynamodb-table-values.js";
 
 /**
  * The AWS::DynamoDB::Table properties this simulation acts on.
@@ -11,7 +16,9 @@ const simulatedPropertyNames: ReadonlySet<string> = new Set([
   "AttributeDefinitions",
   "BillingMode",
   "DeletionProtectionEnabled",
+  "GlobalSecondaryIndexes",
   "KeySchema",
+  "LocalSecondaryIndexes",
   "ProvisionedThroughput",
   "TableClass",
   "TableName",
@@ -22,16 +29,14 @@ const simulatedPropertyNames: ReadonlySet<string> = new Set([
 /**
  * Real AWS::DynamoDB::Table properties this simulation does not model.
  *
- * Each one changes what the table does. A table deployed without its secondary
- * indexes would answer queries differently, so the Resource is skipped rather
- * than deployed as something else.
+ * Each one changes what the table does. A table deployed without the stream its
+ * changes were meant to be published to would leave whatever reads that stream
+ * waiting, so the Resource is skipped rather than deployed as something else.
  */
 const unsimulatedPropertyNames: ReadonlySet<string> = new Set([
   "ContributorInsightsSpecification",
-  "GlobalSecondaryIndexes",
   "ImportSourceSpecification",
   "KinesisStreamSpecification",
-  "LocalSecondaryIndexes",
   "OnDemandThroughput",
   "PointInTimeRecoverySpecification",
   "ResourcePolicy",
@@ -40,28 +45,9 @@ const unsimulatedPropertyNames: ReadonlySet<string> = new Set([
   "WarmThroughput",
 ]);
 
-/**
- * Build the error a property of an AWS::DynamoDB::Table Resource is refused
- * with.
- *
- * The wording matters. Sim CloudFormation skips a Resource whose error reads as
- * an unsupported Resource type, and skipping is the wrong answer for a table
- * the template described in a way it cannot be created: nothing is missing from
- * the simulation, the template is wrong, and the same template would fail on
- * real CloudFormation.
- */
-export function dynamoDbTablePropertyError(
-  logicalId: string,
-  reason: string,
-): Error {
-  return new Error(
-    `Invalid AWS::DynamoDB::Table Resource ${logicalId}: ${reason}`,
-  );
-}
-
 interface SimCfnDynamoDbTablePropertyRulesProperties {
   readonly logicalId: string;
-  readonly properties: SimCfnTemplateValueRecord;
+  readonly values: SimCfnDynamoDbTableValues;
 }
 
 /**
@@ -72,23 +58,28 @@ interface SimCfnDynamoDbTablePropertyRulesProperties {
  * was left out. Anything that is not an AWS::DynamoDB::Table property at all
  * fails the Resource instead, because that is a template real CloudFormation
  * would refuse too.
+ *
+ * The two index properties carry properties of their own, which are held to the
+ * same rule a level down.
  */
 export class SimCfnDynamoDbTablePropertyRules {
   private readonly logicalId: string;
-  private readonly properties: SimCfnTemplateValueRecord;
+  private readonly values: SimCfnDynamoDbTableValues;
 
   constructor(properties: SimCfnDynamoDbTablePropertyRulesProperties) {
     this.logicalId = properties.logicalId;
-    this.properties = properties.properties;
+    this.values = properties.values;
   }
 
   /**
    * Refuse everything about this Resource that is not simulated.
    */
   assertSimulated(): void {
-    for (const name of Object.keys(this.properties)) {
+    for (const name of this.values.names) {
       this.assertSimulatedProperty(name);
     }
+
+    this.assertSimulatedIndexes();
   }
 
   private assertSimulatedProperty(name: string): void {
@@ -97,7 +88,7 @@ export class SimCfnDynamoDbTablePropertyRules {
     }
 
     if (unsimulatedPropertyNames.has(name)) {
-      throw this.skipError(name);
+      throw dynamoDbTableUnsimulatedPropertyError(this.logicalId, name);
     }
 
     throw dynamoDbTablePropertyError(
@@ -107,18 +98,14 @@ export class SimCfnDynamoDbTablePropertyRules {
   }
 
   /**
-   * The error that skips this Resource over a property that is not simulated.
-   *
-   * The "Unsupported sim ... CloudFormation" wording is what marks the Resource
-   * as skipped rather than failing the stack, so the rest of the template still
-   * deploys and the skip reason names the property.
+   * Refuse what the entries of the two index properties ask for and cannot get.
    */
-  private skipError(name: string): Error {
-    return new Error(
-      `Unsupported sim DynamoDB CloudFormation Resource ${this.logicalId}: ` +
-        `${name} is a real AWS::DynamoDB::Table property that simulated ` +
-        `DynamoDB does not simulate, so the table is skipped rather than ` +
-        `created without it`,
+  private assertSimulatedIndexes(): void {
+    SimCfnDynamoDbTableIndexRules.global(this.logicalId).assertSimulated(
+      this.values.list("GlobalSecondaryIndexes"),
+    );
+    SimCfnDynamoDbTableIndexRules.local(this.logicalId).assertSimulated(
+      this.values.list("LocalSecondaryIndexes"),
     );
   }
 }

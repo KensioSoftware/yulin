@@ -2644,9 +2644,15 @@ console.log(stack.outputs.get("OrdersTableArn")?.value);
 ```
 
 The properties that are read are `TableName`, `KeySchema`, `AttributeDefinitions`, `BillingMode`,
-`ProvisionedThroughput`, `TableClass`, `DeletionProtectionEnabled` and `Tags`. Each one is passed to
-`CreateTable` rather than applied here, so a value the template gets wrong fails the same way it
-would for an SDK caller.
+`ProvisionedThroughput`, `TableClass`, `DeletionProtectionEnabled`, `Tags`,
+`GlobalSecondaryIndexes`, `LocalSecondaryIndexes` and `TimeToLiveSpecification`. All but the last are
+passed to `CreateTable` rather than applied here, so a value the template gets wrong fails the same
+way it would for an SDK caller.
+
+`TimeToLiveSpecification` is applied after the table is created, through `UpdateTimeToLive`. Real
+`CreateTable` has no parameter for it either, so real CloudFormation makes the table and then
+updates it. A specification the template got wrong is refused in the words `UpdateTimeToLive` refuses
+it in.
 
 A table with no `TableName` is named after the stack and its logical ID, so the table above with its
 name left out would be `orders-stack-OrdersTable`. Real CloudFormation adds random characters to
@@ -2658,15 +2664,11 @@ ending in a hash of the untrimmed name so two long names that start the same sta
 would read as a working stream to whatever the template handed it to.
 
 A property with behaviour that is not simulated skips the resource, with a reason naming the
-property, and the rest of the stack still deploys: `GlobalSecondaryIndexes`, `LocalSecondaryIndexes`,
-`TimeToLiveSpecification`, `StreamSpecification`, `KinesisStreamSpecification`,
-`SSESpecification`, `PointInTimeRecoverySpecification`, `ContributorInsightsSpecification`,
-`ImportSourceSpecification`, `ResourcePolicy`, `OnDemandThroughput` and `WarmThroughput`. A property
-`AWS::DynamoDB::Table` does not have fails the resource instead, since that is a template real
-CloudFormation would refuse too.
-
-`GlobalSecondaryIndexes` is among those, even though `CreateTable` takes it. The template property is
-not read yet, so a stack declaring one skips the table rather than deploying it without its index.
+property, and the rest of the stack still deploys: `StreamSpecification`,
+`KinesisStreamSpecification`, `SSESpecification`, `PointInTimeRecoverySpecification`,
+`ContributorInsightsSpecification`, `ImportSourceSpecification`, `ResourcePolicy`,
+`OnDemandThroughput` and `WarmThroughput`. A property `AWS::DynamoDB::Table` does not have fails the
+resource instead, since that is a template real CloudFormation would refuse too.
 
 `AWS::DynamoDB::GlobalTable` is skipped rather than deployed, since replication across regions is
 not simulated.
@@ -2674,6 +2676,120 @@ not simulated.
 CDK works without hand-editing. A `dynamodb.Table` synthesises a template that deploys here, with
 the table name reaching a function through its environment and a grant policy naming the table by
 the ARN `Fn::GetAtt` gives.
+
+## Deploying a table with secondary indexes
+
+`GlobalSecondaryIndexes` and `LocalSecondaryIndexes` are read off the resource and handed to
+`CreateTable` with the rest of the table. An index a template declared is the index an SDK caller
+would have got, so it is queried and scanned the same way.
+
+```typescript sim-dynamodb-cloudformation-indexes
+/**
+ * Deploying a table with secondary indexes from a CloudFormation template.
+ */
+
+import { PutItemCommand, QueryCommand } from "@aws-sdk/client-dynamodb";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "orders-stack",
+  template: {
+    Resources: {
+      OrdersTable: {
+        Type: "AWS::DynamoDB::Table",
+        Properties: {
+          TableName: "orders",
+          KeySchema: [
+            { AttributeName: "customerId", KeyType: "HASH" },
+            { AttributeName: "orderId", KeyType: "RANGE" },
+          ],
+          AttributeDefinitions: [
+            { AttributeName: "customerId", AttributeType: "S" },
+            { AttributeName: "orderId", AttributeType: "S" },
+            { AttributeName: "status", AttributeType: "S" },
+            { AttributeName: "total", AttributeType: "N" },
+          ],
+          BillingMode: "PAY_PER_REQUEST",
+          GlobalSecondaryIndexes: [
+            {
+              IndexName: "byStatus",
+              KeySchema: [{ AttributeName: "status", KeyType: "HASH" }],
+              Projection: { ProjectionType: "ALL" },
+            },
+          ],
+          LocalSecondaryIndexes: [
+            {
+              IndexName: "byTotal",
+              KeySchema: [
+                { AttributeName: "customerId", KeyType: "HASH" },
+                { AttributeName: "total", KeyType: "RANGE" },
+              ],
+              Projection: { ProjectionType: "ALL" },
+            },
+          ],
+        },
+      },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+await simAws.backgroundTasksComplete();
+
+await simAws.dynamoDb().putItem(
+  new PutItemCommand({
+    TableName: "orders",
+    Item: {
+      customerId: { S: "customer-1" },
+      orderId: { S: "order-1" },
+      status: { S: "OPEN" },
+      total: { N: "42" },
+    },
+  }),
+);
+
+// The global index is keyed by a partition key the table does not have.
+const open = await simAws.dynamoDb().query(
+  new QueryCommand({
+    TableName: "orders",
+    IndexName: "byStatus",
+    KeyConditionExpression: "#status = :status",
+    ExpressionAttributeNames: { "#status": "status" },
+    ExpressionAttributeValues: { ":status": { S: "OPEN" } },
+  }),
+);
+
+console.log(open.Items?.[0]?.["orderId"]?.S); // "order-1"
+
+// The local index sorts one customer's orders by total.
+const byTotal = await simAws.dynamoDb().query(
+  new QueryCommand({
+    TableName: "orders",
+    IndexName: "byTotal",
+    KeyConditionExpression: "customerId = :customerId",
+    ExpressionAttributeValues: { ":customerId": { S: "customer-1" } },
+  }),
+);
+
+console.log(byTotal.Count); // 1
+```
+
+Which properties an index entry may carry is decided here, and nothing else about an index is. A
+template declaring an index whose key attributes are missing from `AttributeDefinitions` fails that
+resource with the error the API gives for the same input. The same goes for the projection rules, the
+per-index throughput a provisioned table needs, and the rule that a local secondary index shares the
+table's partition key.
+
+`ContributorInsightsSpecification`, `OnDemandThroughput` and `WarmThroughput` on a global secondary
+index are not simulated, so a table declaring one is skipped with a reason naming the index it was
+on. `LocalSecondaryIndexes` entries have `IndexName`, `KeySchema` and `Projection` and nothing else,
+so anything further on one fails the resource, as it would on real CloudFormation.
+
+A CDK `Table` with `addGlobalSecondaryIndex` and `addLocalSecondaryIndex` synthesises a template that
+deploys here without hand-editing.
 
 ## IAM authorization
 
@@ -2747,7 +2863,8 @@ nothing is written.
   past their deletion window, with no sweep for a test to call.
 - `AWS::DynamoDB::Table` in CloudFormation, created through `CreateTable`, with `Ref` giving the
   table name, `Fn::GetAtt … Arn` the table ARN, `TimeToLiveSpecification` deploying a table that
-  expires items, and `Tags` deploying a tagged table.
+  expires items, `Tags` deploying a tagged table, and `GlobalSecondaryIndexes` and
+  `LocalSecondaryIndexes` deploying a table whose indexes are then queried and scanned.
 - SDK interception, so an intercepted `DynamoDBClient` reaches the simulation.
 - The `@aws-sdk/lib-dynamodb` document client, with `PutCommand`, `GetCommand`, `DeleteCommand`,
   `UpdateCommand`, `BatchWriteCommand` and `BatchGetCommand` converting native JavaScript values on
@@ -2881,6 +2998,11 @@ nothing is written.
   retry that names the same actions in a different order reads as a different request and is refused
   rather than replayed. A retry of the same call sends the same JSON, so this shows up only in a
   test that rebuilds the request by hand.
+- AWS creates one table with secondary indexes at a time in an account and region, and refuses a
+  `CreateTable` that overlaps another one. Simulated CloudFormation creates each batch of resources
+  whose dependencies are met at once, so a template holding two indexed tables with no `DependsOn`
+  between them deploys here and may not on AWS. That is the exact template shape that diverges: one
+  indexed table, or several with `DependsOn` ordering them, behaves the same either way.
 - A CloudFormation stack reaches `CREATE_COMPLETE` while the table it created is still `CREATING`.
   Real CloudFormation waits for the table to be `ACTIVE`, so a test reading the status after the
   stack deployed calls `simAws.backgroundTasksComplete()` first.

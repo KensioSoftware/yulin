@@ -47,6 +47,8 @@ export class SimCfnDynamoDbTableCreator {
         AttributeDefinitions: tableProperties.attributeDefinitions(),
         BillingMode: tableProperties.billingMode(),
         ProvisionedThroughput: tableProperties.provisionedThroughput(),
+        GlobalSecondaryIndexes: tableProperties.globalSecondaryIndexes(),
+        LocalSecondaryIndexes: tableProperties.localSecondaryIndexes(),
         TableClass: tableProperties.tableClass(),
         DeletionProtectionEnabled: tableProperties.deletionProtectionEnabled(),
         Tags: tableProperties.tags(),
