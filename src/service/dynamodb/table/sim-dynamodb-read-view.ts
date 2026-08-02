@@ -76,4 +76,13 @@ export interface SimDynamoDbReadView {
    * something else.
    */
   assertCarriesPaths(paths: readonly SimDynamoDbDocumentPath[]): void;
+
+  /**
+   * Refuse a strongly consistent read this view cannot answer.
+   *
+   * Only a global secondary index refuses one. It is maintained asynchronously
+   * on AWS, so it cannot answer a strongly consistent read whatever the
+   * simulation does. A table and a local secondary index both can.
+   */
+  assertConsistentRead(): void;
 }

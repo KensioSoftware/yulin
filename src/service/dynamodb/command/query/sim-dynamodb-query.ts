@@ -1,7 +1,7 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { SimDynamoDbItemPage } from "../item/sim-dynamodb-item-page.js";
 import { SimDynamoDbReadAnswer } from "../read/sim-dynamodb-read-answer.js";
-import { refuseSimDynamoDbConsistentIndexRead } from "../read/sim-dynamodb-consistent-read.js";
+import { assertSimDynamoDbConsistentReadAnswerable } from "../read/sim-dynamodb-consistent-read.js";
 import { SimDynamoDbSelect } from "../read/sim-dynamodb-select.js";
 import type { SimDynamoDbTableAccess } from "../table/sim-dynamodb-table-access.js";
 import type {
@@ -52,8 +52,6 @@ export class SimDynamoDbQuery {
     refuseUnsimulatedQueryInput(input);
     refuseSimDynamoDbQuerySegment(input);
 
-    refuseSimDynamoDbConsistentIndexRead(input);
-
     const expressions = readSimDynamoDbQueryExpressions(input);
     const table = this.access.required(
       "dynamodb:Query",
@@ -66,6 +64,11 @@ export class SimDynamoDbQuery {
     // table. Everything after this asks the view rather than the table, so a
     // query of an index is the same query against a narrower thing.
     const view = table.view(input.IndexName);
+
+    // Whether a strongly consistent read is answerable depends on which of the
+    // two index kinds is being read, so it waits for the view as well.
+    assertSimDynamoDbConsistentReadAnswerable(input, view);
+
     const keyCondition = expressions.terms.forTable(view);
 
     select.assertAnswerableBy(view);

@@ -75,6 +75,19 @@ export class SimDynamoDbSelect {
   }
 
   /**
+   * Whether the read answers with whole items rather than what the view holds.
+   *
+   * `ALL_ATTRIBUTES` is the one `Select` that can ask for more than an index
+   * carries. A view that cannot answer it has refused the read already in
+   * `assertAnswerableBy`, so by the time this is asked the whole item is there
+   * to answer with. On a local secondary index that is the base table fetch AWS
+   * charges the extra read capacity for; here the item was already to hand.
+   */
+  get wholeItems(): boolean {
+    return this.kind === "ALL_ATTRIBUTES";
+  }
+
+  /**
    * Whether the read answers with counts alone.
    *
    * `COUNT` leaves out `Items` rather than answering with an empty list, so a

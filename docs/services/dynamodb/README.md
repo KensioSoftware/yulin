@@ -198,6 +198,141 @@ rather than refused on the write. An index keyed on two attributes needs both. T
 is held to on account of an index is the type: an item carrying an index key attribute as a type the
 index did not declare is a `ValidationException`, since the index could never hold it.
 
+## Local secondary indexes
+
+`LocalSecondaryIndexes` on `CreateTable` gives an item collection a second sort key. The index shares
+the table's partition key, so an entry sits in the same partition as the item it indexes, and its
+sort key is some other attribute. That is what serves an access pattern such as "this customer's
+orders in date order" against a table keyed by customer and order id.
+
+`CreateTable` is the only place one can be declared. AWS has no call that adds, changes or removes a
+local secondary index afterwards, so a table created without one stays without it for the whole of
+its life.
+
+```typescript sim-dynamodb-local-secondary-index
+/**
+ * Declaring and querying a local secondary index.
+ */
+
+import {
+  CreateTableCommand,
+  PutItemCommand,
+  QueryCommand,
+} from "@aws-sdk/client-dynamodb";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const dynamoDb = simAws.dynamoDb();
+
+await dynamoDb.createTable(
+  new CreateTableCommand({
+    TableName: "Orders",
+    KeySchema: [
+      { AttributeName: "customerId", KeyType: "HASH" },
+      { AttributeName: "orderId", KeyType: "RANGE" },
+    ],
+    AttributeDefinitions: [
+      { AttributeName: "customerId", AttributeType: "S" },
+      { AttributeName: "orderId", AttributeType: "S" },
+      { AttributeName: "placedAt", AttributeType: "S" },
+    ],
+    BillingMode: "PAY_PER_REQUEST",
+    LocalSecondaryIndexes: [
+      {
+        IndexName: "OrdersByDate",
+        // The partition key is the table's own. The sort key is the whole of
+        // what the index adds.
+        KeySchema: [
+          { AttributeName: "customerId", KeyType: "HASH" },
+          { AttributeName: "placedAt", KeyType: "RANGE" },
+        ],
+        Projection: { ProjectionType: "KEYS_ONLY" },
+      },
+    ],
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+await dynamoDb.putItem(
+  new PutItemCommand({
+    TableName: "Orders",
+    Item: {
+      customerId: { S: "customer-1" },
+      orderId: { S: "order-1" },
+      placedAt: { S: "2026-03-19" },
+      total: { N: "7" },
+    },
+  }),
+);
+
+await dynamoDb.putItem(
+  new PutItemCommand({
+    TableName: "Orders",
+    Item: {
+      customerId: { S: "customer-1" },
+      orderId: { S: "order-2" },
+      placedAt: { S: "2026-01-08" },
+      total: { N: "42" },
+    },
+  }),
+);
+
+const byDate = await dynamoDb.query(
+  new QueryCommand({
+    TableName: "Orders",
+    IndexName: "OrdersByDate",
+    KeyConditionExpression: "customerId = :customerId",
+    ExpressionAttributeValues: { ":customerId": { S: "customer-1" } },
+    // The index sits in the same partition as the item it indexes, so it can
+    // answer a strongly consistent read.
+    ConsistentRead: true,
+  }),
+);
+
+// In date order, which is not the order the table's own sort key gives.
+console.log(byDate.Items?.[0]?.["orderId"]?.S); // "order-2"
+console.log(byDate.Items?.[1]?.["orderId"]?.S); // "order-1"
+
+// The index projects its keys alone, so `total` is not on what it answers with.
+console.log(byDate.Items?.[0]?.["total"]); // undefined
+
+const whole = await dynamoDb.query(
+  new QueryCommand({
+    TableName: "Orders",
+    IndexName: "OrdersByDate",
+    KeyConditionExpression: "customerId = :customerId",
+    ExpressionAttributeValues: { ":customerId": { S: "customer-1" } },
+    // Asking for whole items fetches what the index does not project from the
+    // base table, which is the read AWS charges the extra capacity for.
+    Select: "ALL_ATTRIBUTES",
+  }),
+);
+
+console.log(whole.Items?.[0]?.["total"]?.N); // "42"
+```
+
+The key schema is what a declaration is held to. The `HASH` element is the table's own partition key,
+and a `RANGE` element is required and names some other attribute. An index sorted by the attribute
+the table is already sorted by is refused, since it would repeat the order the table is in, and so is
+one keyed on a partition key of its own. A table with no sort key at all takes no local secondary
+index, because it holds one item per partition key and there is no collection for a second sort key
+to reorder.
+
+A table holds at most 5 local secondary indexes. Index names are unique within a table across both
+kinds, so a local secondary index cannot take the name of a global one. `Projection` follows the same
+`ALL`, `KEYS_ONLY` and `INCLUDE` rules a global secondary index does, and the 100 `NonKeyAttributes`
+a table projects is counted across every index of both kinds.
+
+A per-index `ProvisionedThroughput` is refused. A local secondary index is read and written out of
+the table's own capacity, so there is nothing to provision for it, and real DynamoDB has no
+throughput field on a `LocalSecondaryIndex` at all.
+
+The description reports each index with its `IndexName`, `IndexArn`, `KeySchema` and `Projection`.
+There is no `IndexStatus` and no `ProvisionedThroughput`, since the index is built with the table and
+shares its capacity. A table that declared none leaves `LocalSecondaryIndexes` out of its description
+altogether.
+
 ## Describing a table
 
 `DescribeTable` answers with the same description `CreateTable` did, read off the table itself. A
@@ -1285,6 +1420,25 @@ read at all.
 
 `Scan` takes `IndexName` the same way, including in parallel segments, which divide by the index
 partition key rather than the table's.
+
+## Reading a local secondary index
+
+`IndexName` reaches a local secondary index the same way, and the walk is the same walk: the index is
+sparse, the key condition is held to the index key schema, and `Scan` takes the index too. Two things
+differ, and both follow from the index sitting in the same partition as the item it indexes.
+
+`ConsistentRead: true` is answered rather than refused. The index is written with the item, in the
+same partition, so there is no window in which it lags behind the table.
+
+An attribute the index does not project is fetched from the base table rather than refused. So
+`Select: ALL_ATTRIBUTES` against a `KEYS_ONLY` index answers with whole items, and a
+`FilterExpression` may name any attribute of the item rather than only a projected one. Real DynamoDB
+charges the extra read capacity for that fetch. A read that asks for neither still answers with what
+the index projects, since `Select` defaults to `ALL_PROJECTED_ATTRIBUTES` on any index.
+
+`LastEvaluatedKey` carries three attributes: the table partition key, the index sort key and the
+table sort key. Two entries can share a whole index key, so the table sort key is what names one of
+them exactly enough to resume after. An `ExclusiveStartKey` missing any of the three is refused.
 
 ## Scanning a table
 
@@ -2544,9 +2698,13 @@ nothing is written.
 - `GlobalSecondaryIndexes` on `CreateTable`, with index name, key schema, projection and per-index
   throughput validation, `AttributeDefinitions` matched against every key schema in the request, and
   each index reported in the table description.
-- `IndexName` on `Query` and `Scan`, reading a sparse index by its own key schema, answering with the
-  attributes it projects, and paging with a `LastEvaluatedKey` carrying the index key and the table
-  key together.
+- `LocalSecondaryIndexes` on `CreateTable`, with the key schema rules that make an index local, the
+  5 index cap, index names unique across both kinds, and each index reported in the table
+  description.
+- `IndexName` on `Query` and `Scan`, reading a sparse index of either kind by its own key schema,
+  answering with the attributes it projects, and paging with a `LastEvaluatedKey` carrying the index
+  key and the table key together. A local secondary index also answers a strongly consistent read,
+  and fetches an unprojected attribute from the base table.
 - `DescribeTable`, answering with the full table description, by table name or ARN.
 - `ListTables`, ordered by UTF-8 bytes and paged with `Limit` and `ExclusiveStartTableName`.
 - `DeleteTable`, following the table status DynamoDB moves a deleted table through, and refusing a
@@ -2608,22 +2766,25 @@ nothing is written.
 - `Expected`, `ConditionalOperator` and `AttributeUpdates` are not converted for the document
   client, because simulated DynamoDB refuses all three anyway. A request carrying one is refused by
   the operation rather than by the conversion.
-- An index read answers with the attributes the index projects, and nothing fills in the rest. Real
-  DynamoDB does not either: a global secondary index never reads the base table for an attribute it
-  does not project, which is why `Select: ALL_ATTRIBUTES` against a partial projection is refused
-  rather than served. Fetching from the base table is a local secondary index behaviour, and those
-  are not simulated. `ProjectionExpression` is not simulated on `Query` or `Scan`, so naming a
-  non-projected attribute that way does not arise.
-- Local secondary indexes are not simulated. `LocalSecondaryIndexes` is refused rather than dropped,
-  since a table missing an index it was asked for would answer queries differently to the real one.
-  An empty list asks for no index, so it is accepted.
+- A read of a global secondary index answers with the attributes the index projects, and nothing
+  fills in the rest. Real DynamoDB does not either: it never reads the base table for an attribute a
+  global secondary index does not project, which is why `Select: ALL_ATTRIBUTES` against a partial
+  projection is refused rather than served. A local secondary index does fetch from the base table,
+  and that is simulated. `ProjectionExpression` is not simulated on `Query` or `Scan` either way, so
+  naming a non-projected attribute that way does not arise.
+- The 10 GB limit on one item collection is not modelled, and neither is
+  `ItemCollectionSizeLimitExceededException`. A table with a local secondary index can hold as much
+  under one partition key here as memory allows, so a write real DynamoDB would refuse for the size
+  of the collection it lands in goes through. `ReturnItemCollectionMetrics` is refused by name, so a
+  write cannot ask how large the collection it touched has grown either.
 - An index key is one attribute, or two. Real DynamoDB now takes more than that, and a key schema of
   more than two elements is refused here.
 - `ItemCount` and `IndexSizeBytes` are 0 for every index, the same way the table's own figures are.
 - Per-index `ProvisionedThroughput` is read, validated and reported, and enforces nothing. No read or
   write against an index is throttled, since none against the table is either.
-- `UpdateTable` is not simulated, so an index cannot be added to or removed from a table after it has
-  been created.
+- `UpdateTable` is not simulated, so a global secondary index cannot be added to or removed from a
+  table after it has been created. A local secondary index cannot be either, which is AWS behaviour
+  rather than a limitation here: `CreateTable` is the only call that declares one.
 - Tagging is immediate. AWS documents `TagResource` and `UntagResource` as eventually consistent, so
   a real `ListTagsOfResource` issued straight after one of them may answer with the previous tags or
   with none. Here the change is there by the time the call returns, so a test cannot observe the

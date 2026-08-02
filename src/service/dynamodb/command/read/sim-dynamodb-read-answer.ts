@@ -69,10 +69,6 @@ export class SimDynamoDbReadAnswer {
 
   /**
    * The items answered with, which a counted read leaves out altogether.
-   *
-   * Each is cut to what the view carries, so a read of an index answers with
-   * the attributes that index projects rather than with the whole item. A read
-   * of the table cuts nothing.
    */
   private items(): Pick<SimDynamoDbReadFields, "Items"> {
     if (this.select.countsOnly) {
@@ -80,9 +76,23 @@ export class SimDynamoDbReadAnswer {
     }
 
     return {
-      Items: this.kept.map((item) =>
-        this.view.project(item).toAttributeValues(),
-      ),
+      Items: this.kept.map((item) => this.answered(item).toAttributeValues()),
     };
+  }
+
+  /**
+   * One item as the read answers with it.
+   *
+   * A read asking for whole items answers with the whole item. Anything else is
+   * cut to what the view carries, so a read of an index answers with the
+   * attributes that index projects rather than with everything. A read of the
+   * table cuts nothing either way.
+   */
+  private answered(item: SimDynamoDbItem): SimDynamoDbItem {
+    if (this.select.wholeItems) {
+      return item;
+    }
+
+    return this.view.project(item);
   }
 }

@@ -91,7 +91,7 @@ Table state lives under `table/`.
 - creation time
 - current table status
 - key schema and attribute definitions
-- global secondary indexes
+- secondary indexes, global and local
 - billing mode, provisioned throughput, table class and deletion protection
 - tags
 - in-memory items
@@ -153,21 +153,36 @@ uses the key schema to overwrite items with the same primary key.
 
 Index state lives under `secondary-index/`.
 
-`SimDynamoDbGlobalSecondaryIndex` is one index, as the name, key schema, projection and throughput a
-read of it needs. `SimDynamoDbGlobalSecondaryIndexes` is the indexes one table carries, and owns what
-is about how many there are: the 20 index cap and the uniqueness of a name. That is the same split
-the table tags follow.
+`SimDynamoDbSecondaryIndex` is the interface a read reaches an index through, whichever kind it is.
+`SimDynamoDbGlobalSecondaryIndex` and `SimDynamoDbLocalSecondaryIndex` implement it, each as the name,
+key schema and projection a read of it needs, plus what only it has: a throughput on the global one.
+
+There is a collection per kind, since the two are declared apart and described apart.
+`SimDynamoDbGlobalSecondaryIndexes` owns the 20 index cap and `SimDynamoDbLocalSecondaryIndexes` owns
+the 5, along with the one rule about the table rather than an index: a table with no sort key has no
+collection for a local secondary index to reorder. `SimDynamoDbSecondaryIndexes` holds both and owns
+what they share, since neither collection can see the other:
+
+- one namespace for their names, so a local secondary index cannot take a global one's name
+- one cap of 100 `NonKeyAttributes` projected across every index of both kinds
+- one `IndexName` parameter reaching either of them, through `requiredSimDynamoDbIndex`
 
 The parts an index is made of are a file each, since each has rules of its own:
 
 - `sim-dynamodb-index-name.ts` is the name pattern and length, which is the table name rule.
 - `sim-dynamodb-index-projection.ts` is `SimDynamoDbIndexProjection`: the three projection types, and
-  the two directions `INCLUDE` and `NonKeyAttributes` have to agree in.
-- `sim-dynamodb-index-throughput.ts` is the capacity an index is provisioned with, which contradicts
-  the billing mode in both directions the way the table's own does.
+  the two directions `INCLUDE` and `NonKeyAttributes` have to agree in. Both kinds project the same
+  way, so both read it.
+- `sim-dynamodb-index-throughput.ts` is the capacity a global secondary index is provisioned with,
+  which contradicts the billing mode in both directions the way the table's own does.
+  `sim-dynamodb-local-index-throughput.ts` is the other half of that: a local secondary index shares
+  the table's throughput, so any capacity setting on one is refused.
+- `sim-dynamodb-local-index-key-schema.ts` is what makes an index local. The partition key is the
+  table's own, and the sort key is required and is anything the table is not already sorted by.
 - `sim-dynamodb-index-status.ts` maps a table status to the index status. Nothing here adds an index
   to an existing table, so the index status follows the table's rather than being tracked apart from
-  it: `CREATING` on the CreateTable response, `ACTIVE` once the table is.
+  it: `CREATING` on the CreateTable response, `ACTIVE` once the table is. A local secondary index
+  reports no status at all, since DynamoDB reports none for one.
 
 Which items an index holds is worked out when the index is read rather than maintained on every
 write, following the precedent `SimSqsQueue.applyLifecycle` sets. So PutItem, UpdateItem and
@@ -194,21 +209,39 @@ The two differ in four answers, which is the whole of what `IndexName` does:
   either of them, and paging would repeat one or skip one.
 
 `SimDynamoDbIndexView` splits those two ways, and what is left in the view is the walking, which is
-the same walking a table gets:
+the same walking a table gets and the same walking whichever kind of index it is:
 
 - `SimDynamoDbIndexKeys` is which items the index holds and how an entry is named: `holds` is the
   sparseness, `tokenKey` is both keys together, and `assertStartKey` refuses a token missing either
   of them or carrying anything else.
-- `SimDynamoDbIndexAttributes` is which parts of an item come back. `assertCarriesWholeItem` and
-  `assertCarriesPaths` are the two refusals only an index makes: a `Select` of `ALL_ATTRIBUTES`
-  against a projection that is not ALL, and a filter naming an attribute the index does not project.
-  Both fail closed. The alternative to the second is an empty page, which reads as a collection that
-  happens to hold nothing.
+- `SimDynamoDbIndexAttributes` is which parts of an item come back. It is an interface with an
+  implementation per index kind, since this is the only place a read of one kind differs from a read
+  of the other. The index builds its own through `attributesOf`, so the view asks rather than
+  decides.
 
-That check is `assertItemKeyTypes`, applied in `SimDynamoDbTable.putItem`, which every write in the
-service goes through. An item missing an index key attribute is fine, since a global secondary index
-is sparse and simply does not hold it. An item carrying one as a type the index did not declare is a
-`ValidationException`, since the index could never hold it.
+`SimDynamoDbProjectedIndexAttributes` is the global secondary index half. `assertCarriesWholeItem`
+and `assertCarriesPaths` refuse a `Select` of `ALL_ATTRIBUTES` against a projection that is not ALL,
+and a filter naming an attribute the index does not project. Both fail closed. The alternative to
+the second is an empty page, which reads as a collection that happens to hold nothing.
+
+`SimDynamoDbFetchedIndexAttributes` is the local secondary index half, and refuses neither. The index
+entry is in the same partition as the item, so DynamoDB reads the base table for what the index does
+not project and charges the extra capacity for it. Cutting an item down to the projection is still
+the same job, so it is delegated to the projected implementation rather than written twice. What the
+read then answers with is decided by `SimDynamoDbSelect.wholeItems` in `SimDynamoDbReadAnswer`: a
+read asking for whole items gets the item, and anything else gets the view's projection of it.
+
+The other place the kinds differ is `assertAnswersConsistentRead`, reached through
+`SimDynamoDbReadView.assertConsistentRead` and applied by
+`assertSimDynamoDbConsistentReadAnswerable`. A global secondary index is maintained asynchronously on
+AWS and refuses one; a local secondary index and the table both answer it. That is why the check runs
+after `IndexName` has been resolved to a view rather than off the request alone.
+
+The one thing a write is held to on account of an index is `assertItemKeyTypes`, applied in
+`SimDynamoDbTable.putItem`, which every write in the service goes through. An item missing an index
+key attribute is fine, since a secondary index of either kind is sparse and simply does not hold it.
+An item carrying one as a type the index did not declare is a `ValidationException`, since the index
+could never hold it.
 
 ## Tagging behavior
 
@@ -310,8 +343,8 @@ the same name cannot both get it. The second gets `SimDynamoDbResourceInUseExcep
 The returned `TableDescription` reports the table back: `TableName`, `TableArn`, `TableId`,
 `KeySchema`, `AttributeDefinitions`, `TableStatus`, `CreationDateTime`, `ProvisionedThroughput`,
 `DeletionProtectionEnabled`, and `BillingModeSummary` or `TableClassSummary` when the request named
-a billing mode or a table class. `GlobalSecondaryIndexes` is there when the table has any, and left
-out altogether when it has none. `ItemCount` and `TableSizeBytes` stay at 0.
+a billing mode or a table class. `GlobalSecondaryIndexes` and `LocalSecondaryIndexes` are each
+there when the table has any of that kind, and left out altogether when it has none. `ItemCount` and `TableSizeBytes` stay at 0.
 
 Unsimulated inputs are refused with `SimDynamoDbUnsupportedOperation` rather than dropped. Each one
 is listed in the Limitations section of
@@ -621,7 +654,7 @@ A batch write takes no `ConditionExpression`, as a real one does not. `SimDynamo
 `SimDynamoDbDeleteRequest` declare one anyway, so a request carrying it is refused by name rather
 than written unconditionally.
 
-Streams are not implemented, and neither is reading a secondary index. Billing mode and provisioned
+Streams are not implemented. Billing mode and provisioned
 capacity are read and stored by CreateTable, for the table and for each index, but nothing enforces
 them: no write is ever throttled.
 

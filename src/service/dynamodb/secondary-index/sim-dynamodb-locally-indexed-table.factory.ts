@@ -4,49 +4,47 @@ import type { SimAws } from "../../aws/sim-aws.js";
 import type { SimDynamoDbProjectionType } from "../command/table/table.types.js";
 import type { SimDynamoDbTable } from "../table/sim-dynamodb-table.js";
 import { simDynamoDbIndexProjectionInput } from "./sim-dynamodb-index-projection-input.js";
-import { simDynamoDbIndexedOrders } from "./sim-dynamodb-indexed-orders.js";
+import { simDynamoDbLocallyIndexedOrders } from "./sim-dynamodb-locally-indexed-orders.js";
 
 /**
- * What a test asks for when it wants a table with an index to read.
+ * What a test asks for when it wants a table with a local secondary index.
  *
- * The projection is the input because it is what makes reads of one index
- * differ from another: which attributes come back, and which `Select` values
- * and filters the index can answer.
+ * The projection is the input because it is what a read of a local secondary
+ * index turns on: which attributes come back by default, and which of them the
+ * read has to reach the base table for.
  */
-export interface SimDynamoDbIndexedTableInput {
+export interface SimDynamoDbLocallyIndexedTableInput {
   readonly tableName: string;
   readonly indexName: string;
   readonly projectionType: SimDynamoDbProjectionType;
   readonly nonKeyAttributes: readonly string[];
-  readonly orderCount: number;
 }
 
 /**
- * Creates a table with one global secondary index, holding orders to read.
+ * Creates a table with one local secondary index, holding orders to read.
  *
- * The table is keyed by `orderId` and the index by `status` and `shippedAt`, so
- * a read of the index walks a key the table does not have. Every third order is
- * written without a `status`, which is what makes the index sparse rather than
- * a second copy of the table.
+ * The table is keyed by `customerId` and `orderId`, and the index re-sorts each
+ * customer's orders by `placedAt`. One order per customer carries no
+ * `placedAt`, which is what makes the index sparse rather than a second copy of
+ * the table.
  *
  * ```typescript
- * const table = await simDynamoDbIndexedTableFactory.make(
+ * const table = await simDynamoDbLocallyIndexedTableFactory.make(
  *   { projectionType: "KEYS_ONLY" },
  *   simAws,
  * );
  * ```
  */
-export const simDynamoDbIndexedTableFactory = new AsyncMappedFactory<
-  SimDynamoDbIndexedTableInput,
+export const simDynamoDbLocallyIndexedTableFactory = new AsyncMappedFactory<
+  SimDynamoDbLocallyIndexedTableInput,
   SimDynamoDbTable,
   SimAws
 >(
   () => ({
     tableName: "OrdersTable",
-    indexName: "byStatus",
+    indexName: "byPlacedAt",
     projectionType: "ALL",
     nonKeyAttributes: [],
-    orderCount: 6,
   }),
   async (input, simAws) => {
     const simDynamoDb = simAws.dynamoDb();
@@ -54,19 +52,22 @@ export const simDynamoDbIndexedTableFactory = new AsyncMappedFactory<
     await simDynamoDb.createTable({
       input: {
         TableName: input.tableName,
-        KeySchema: [{ AttributeName: "orderId", KeyType: "HASH" }],
+        KeySchema: [
+          { AttributeName: "customerId", KeyType: "HASH" },
+          { AttributeName: "orderId", KeyType: "RANGE" },
+        ],
         AttributeDefinitions: [
+          { AttributeName: "customerId", AttributeType: "S" },
           { AttributeName: "orderId", AttributeType: "S" },
-          { AttributeName: "status", AttributeType: "S" },
-          { AttributeName: "shippedAt", AttributeType: "S" },
+          { AttributeName: "placedAt", AttributeType: "S" },
         ],
         BillingMode: "PAY_PER_REQUEST",
-        GlobalSecondaryIndexes: [
+        LocalSecondaryIndexes: [
           {
             IndexName: input.indexName,
             KeySchema: [
-              { AttributeName: "status", KeyType: "HASH" },
-              { AttributeName: "shippedAt", KeyType: "RANGE" },
+              { AttributeName: "customerId", KeyType: "HASH" },
+              { AttributeName: "placedAt", KeyType: "RANGE" },
             ],
             Projection: simDynamoDbIndexProjectionInput(input),
           },
@@ -76,7 +77,7 @@ export const simDynamoDbIndexedTableFactory = new AsyncMappedFactory<
     await simAws.backgroundTasksComplete();
 
     await Promise.all(
-      simDynamoDbIndexedOrders(input.orderCount).map(async (order) =>
+      simDynamoDbLocallyIndexedOrders().map(async (order) =>
         simDynamoDb.putItem({
           input: { TableName: input.tableName, Item: order },
         }),

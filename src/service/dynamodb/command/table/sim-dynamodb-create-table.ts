@@ -2,7 +2,7 @@ import type { BackgroundScheduler } from "../../../../util/background/background
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import { SimDynamoDbResourceInUseException } from "../../error/dynamodb.error.js";
-import { SimDynamoDbGlobalSecondaryIndexes } from "../../secondary-index/sim-dynamodb-global-secondary-indexes.js";
+import { SimDynamoDbSecondaryIndexes } from "../../secondary-index/sim-dynamodb-secondary-indexes.js";
 import { SimDynamoDbAttributeDefinitions } from "../../table/sim-dynamodb-attribute-definitions.js";
 import { SimDynamoDbKeySchema } from "../../table/sim-dynamodb-key-schema.js";
 import { SimDynamoDbTable } from "../../table/sim-dynamodb-table.js";
@@ -120,10 +120,11 @@ export class SimDynamoDbCreateTable {
     const arn = simDynamoDbTableArn(this.accountRegionScope, name.value);
     const keySchema = SimDynamoDbKeySchema.fromInput(input.KeySchema);
     const billing = SimDynamoDbTableBilling.fromInput(input);
-    const indexes = SimDynamoDbGlobalSecondaryIndexes.fromInput(
-      input.GlobalSecondaryIndexes,
-      { tableArn: arn, billing },
-    );
+    const indexes = SimDynamoDbSecondaryIndexes.fromInput(input, {
+      tableArn: arn,
+      keySchema,
+      billing,
+    });
     const attributeDefinitions = SimDynamoDbAttributeDefinitions.fromInput(
       input.AttributeDefinitions,
     );
