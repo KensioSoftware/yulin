@@ -1,5 +1,5 @@
 import { SimDynamoDbValidationException } from "../error/dynamodb.error.js";
-import type { SimDynamoDbGlobalSecondaryIndex } from "./sim-dynamodb-global-secondary-index.js";
+import type { SimDynamoDbSecondaryIndex } from "./sim-dynamodb-secondary-index.js";
 
 /**
  * The most global secondary indexes one table holds.
@@ -7,12 +7,20 @@ import type { SimDynamoDbGlobalSecondaryIndex } from "./sim-dynamodb-global-seco
 export const maxSimDynamoDbIndexes = 20;
 
 /**
+ * The most local secondary indexes one table holds.
+ *
+ * There are fewer of these because they share the table's partitions rather
+ * than living apart from them.
+ */
+export const maxSimDynamoDbLocalIndexes = 5;
+
+/**
  * The most NonKeyAttributes one table projects across all of its indexes.
  */
 const maxProjectedAttributes = 100;
 
 /**
- * Refuse a request declaring more indexes than a table holds.
+ * Refuse a request declaring more global secondary indexes than a table holds.
  *
  * This is checked before the indexes are read, so a request well over the cap
  * is refused for being over it rather than for whatever is wrong with its
@@ -28,20 +36,33 @@ export function assertSimDynamoDbIndexCount(count: number): void {
 }
 
 /**
+ * Refuse a request declaring more local secondary indexes than a table holds.
+ */
+export function assertSimDynamoDbLocalIndexCount(count: number): void {
+  if (count > maxSimDynamoDbLocalIndexes) {
+    throw new SimDynamoDbValidationException(
+      `${count.toString()} LocalSecondaryIndexes were given, and a table ` +
+        `holds at most ${maxSimDynamoDbLocalIndexes.toString()}`,
+    );
+  }
+}
+
+/**
  * Refuse a request declaring one index name twice.
  *
  * An index is reached by name, so two indexes sharing one leave a read with no
- * way of saying which it meant.
+ * way of saying which it meant. The two kinds share the one namespace, so a
+ * local secondary index cannot take the name of a global one either.
  */
 export function assertSimDynamoDbIndexNamesDistinct(
-  elements: readonly SimDynamoDbGlobalSecondaryIndex[],
+  elements: readonly SimDynamoDbSecondaryIndex[],
 ): void {
   const names = new Set(elements.map((index) => index.name));
 
   if (names.size !== elements.length) {
     throw new SimDynamoDbValidationException(
-      "GlobalSecondaryIndexes names an index more than once, and an index " +
-        "name is unique within a table",
+      "The request names an index more than once, and an index name is " +
+        "unique within a table across both kinds of secondary index",
     );
   }
 }
@@ -55,7 +76,7 @@ export function assertSimDynamoDbIndexNamesDistinct(
  * rather than a count of distinct names, as it is on AWS.
  */
 export function assertSimDynamoDbProjectedAttributeCount(
-  elements: readonly SimDynamoDbGlobalSecondaryIndex[],
+  elements: readonly SimDynamoDbSecondaryIndex[],
 ): void {
   const projected = elements.reduce(
     (total, index) => total + index.projection.nonKeyAttributeCount,

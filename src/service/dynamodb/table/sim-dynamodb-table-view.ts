@@ -107,4 +107,11 @@ export class SimDynamoDbTableView implements SimDynamoDbReadView {
   assertCarriesPaths(): void {
     return;
   }
+
+  /**
+   * Every simulated read of a table is strongly consistent already.
+   */
+  assertConsistentRead(): void {
+    return;
+  }
 }

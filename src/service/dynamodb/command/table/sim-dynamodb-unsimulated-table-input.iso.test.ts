@@ -48,18 +48,6 @@ async function refusedCreateTable(
 }
 
 describe("DynamoDB CreateTableCommand unsimulated input", () => {
-  it("refuses local secondary indexes", async () => {
-    // When a table is created with a local secondary index.
-    const error = await refusedCreateTable({
-      ...tableInput,
-      LocalSecondaryIndexes: [{ IndexName: "byCreatedAt" }],
-    });
-
-    // Then the index is refused rather than quietly left out.
-    assertInstanceOf(error, SimDynamoDbUnsupportedOperation);
-    assertStringIncludes(error.message, "Local secondary indexes");
-  });
-
   it("refuses a stream specification", async () => {
     // When a table is created with a stream.
     const error = await refusedCreateTable({

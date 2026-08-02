@@ -40,9 +40,10 @@ export function describeSimDynamoDbTable(
     BillingModeSummary: table.billing.summary(),
     ProvisionedThroughput: table.billing.throughputDescription(),
     TableClassSummary: tableClassSummary(table.tableClass),
-    GlobalSecondaryIndexes: table.indexes.descriptions(
+    GlobalSecondaryIndexes: table.indexes.global.descriptions(
       simDynamoDbIndexStatus(table.status),
     ),
+    LocalSecondaryIndexes: table.indexes.local.descriptions(),
     DeletionProtectionEnabled: table.deletionProtectionEnabled,
     // Neither figure is tracked yet. Real DynamoDB updates both about every
     // six hours, so they lag behind the items anyway.

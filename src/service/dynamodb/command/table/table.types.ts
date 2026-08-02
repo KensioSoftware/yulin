@@ -21,6 +21,8 @@ export interface SimDynamoDbTableDescription {
   readonly TableSizeBytes?: number | undefined;
   readonly GlobalSecondaryIndexes?:
     readonly SimDynamoDbGlobalSecondaryIndexDescription[] | undefined;
+  readonly LocalSecondaryIndexes?:
+    readonly SimDynamoDbLocalSecondaryIndexDescription[] | undefined;
 }
 
 /**
@@ -204,6 +206,23 @@ export interface SimDynamoDbGlobalSecondaryIndexDescription {
   readonly IndexArn?: SimArn | undefined;
   readonly ProvisionedThroughput?:
     SimDynamoDbProvisionedThroughputDescription | undefined;
+  readonly ItemCount?: number | undefined;
+  readonly IndexSizeBytes?: number | undefined;
+}
+
+/**
+ * Minimal structural sim DynamoDB local secondary index description.
+ *
+ * There is no `IndexStatus` and no `ProvisionedThroughput` here, unlike the
+ * global secondary index description. A local secondary index is built with the
+ * table that carries it and reads out of the table's own capacity, so DynamoDB
+ * reports neither.
+ */
+export interface SimDynamoDbLocalSecondaryIndexDescription {
+  readonly IndexName?: string | undefined;
+  readonly KeySchema?: readonly SimDynamoDbKeySchemaElement[] | undefined;
+  readonly Projection?: SimDynamoDbProjection | undefined;
+  readonly IndexArn?: SimArn | undefined;
   readonly ItemCount?: number | undefined;
   readonly IndexSizeBytes?: number | undefined;
 }

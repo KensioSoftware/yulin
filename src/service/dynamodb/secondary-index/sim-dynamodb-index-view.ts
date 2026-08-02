@@ -9,12 +9,12 @@ import type { SimDynamoDbKeySchema } from "../table/sim-dynamodb-key-schema.js";
 import type { SimDynamoDbReadView } from "../table/sim-dynamodb-read-view.js";
 import { SimDynamoDbTableScan } from "../table/sim-dynamodb-table-scan.js";
 import { SimDynamoDbSortKeyOrder } from "../table/sim-dynamodb-sort-key-order.js";
-import type { SimDynamoDbGlobalSecondaryIndex } from "./sim-dynamodb-global-secondary-index.js";
-import { SimDynamoDbIndexAttributes } from "./sim-dynamodb-index-attributes.js";
+import type { SimDynamoDbIndexAttributes } from "./sim-dynamodb-index-attributes.js";
 import { SimDynamoDbIndexKeys } from "./sim-dynamodb-index-keys.js";
+import type { SimDynamoDbSecondaryIndex } from "./sim-dynamodb-secondary-index.js";
 
 interface SimDynamoDbIndexViewProperties {
-  readonly index: SimDynamoDbGlobalSecondaryIndex;
+  readonly index: SimDynamoDbSecondaryIndex;
   readonly items: readonly SimDynamoDbItem[];
   readonly tableKeySchema: SimDynamoDbKeySchema;
   readonly attributeDefinitions: SimDynamoDbAttributeDefinitions;
@@ -22,7 +22,7 @@ interface SimDynamoDbIndexViewProperties {
 }
 
 /**
- * Reading one global secondary index.
+ * Reading one secondary index, of either kind.
  *
  * The index is worked out here rather than maintained on the write path, which
  * is what makes an index added to a table have nothing to backfill and every
@@ -32,13 +32,14 @@ interface SimDynamoDbIndexViewProperties {
  * collaborator each. `SimDynamoDbIndexKeys` is which items it holds and how
  * they are named, and `SimDynamoDbIndexAttributes` is which parts of them come
  * back. What is left here is the walking, which is the same walking a table
- * gets.
+ * gets, and the same walking whichever kind of index this is.
  */
 export class SimDynamoDbIndexView implements SimDynamoDbReadView {
   public readonly description: string;
   public readonly keySchema: SimDynamoDbKeySchema;
   public readonly attributeDefinitions: SimDynamoDbAttributeDefinitions;
 
+  private readonly index: SimDynamoDbSecondaryIndex;
   private readonly items: readonly SimDynamoDbItem[];
   private readonly keys: SimDynamoDbIndexKeys;
   private readonly attributes: SimDynamoDbIndexAttributes;
@@ -47,6 +48,7 @@ export class SimDynamoDbIndexView implements SimDynamoDbReadView {
   constructor(properties: SimDynamoDbIndexViewProperties) {
     const { index } = properties;
 
+    this.index = index;
     this.description = `index ${index.name}`;
     this.keySchema = index.keySchema;
     this.attributeDefinitions = properties.attributeDefinitions;
@@ -57,11 +59,7 @@ export class SimDynamoDbIndexView implements SimDynamoDbReadView {
       attributeDefinitions: properties.attributeDefinitions,
       tableItemKey: properties.tableItemKey,
     });
-    this.attributes = new SimDynamoDbIndexAttributes({
-      indexName: index.name,
-      projection: index.projection,
-      keyAttributeNames: this.keys.attributeNames,
-    });
+    this.attributes = index.attributesOf(this.keys.attributeNames);
 
     // Index key values are not unique, so the table key is what separates two
     // entries sharing one and lets a walk resume after either.
@@ -131,5 +129,12 @@ export class SimDynamoDbIndexView implements SimDynamoDbReadView {
    */
   assertCarriesPaths(paths: readonly SimDynamoDbDocumentPath[]): void {
     this.attributes.assertCarriesPaths(paths);
+  }
+
+  /**
+   * Refuse a strongly consistent read this index cannot answer.
+   */
+  assertConsistentRead(): void {
+    this.index.assertAnswersConsistentRead();
   }
 }

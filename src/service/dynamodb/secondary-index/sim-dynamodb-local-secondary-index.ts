@@ -1,62 +1,58 @@
 import type { SimArn } from "../../aws/arn.js";
 import type {
-  SimDynamoDbGlobalSecondaryIndexDescription,
-  SimDynamoDbIndexStatus,
+  SimDynamoDbLocalSecondaryIndexDescription,
   SimDynamoDbSecondaryIndexInput,
 } from "../command/table/table.types.js";
-import { SimDynamoDbValidationException } from "../error/dynamodb.error.js";
 import type { SimDynamoDbItem } from "../item/sim-dynamodb-item.js";
 import type { SimDynamoDbAttributeDefinitions } from "../table/sim-dynamodb-attribute-definitions.js";
-import { SimDynamoDbKeySchema } from "../table/sim-dynamodb-key-schema.js";
-import { SimDynamoDbKeySchemaSubject } from "../table/sim-dynamodb-key-schema-subject.js";
-import type { SimDynamoDbTableThroughput } from "../table/sim-dynamodb-table-throughput.js";
+import type { SimDynamoDbKeySchema } from "../table/sim-dynamodb-key-schema.js";
+import { SimDynamoDbFetchedIndexAttributes } from "./sim-dynamodb-fetched-index-attributes.js";
 import type { SimDynamoDbIndexAttributes } from "./sim-dynamodb-index-attributes.js";
 import { assertSimDynamoDbIndexKeyTypes } from "./sim-dynamodb-index-key-types.js";
-import { SimDynamoDbIndexProjection } from "./sim-dynamodb-index-projection.js";
 import { readSimDynamoDbIndexName } from "./sim-dynamodb-index-name.js";
-import { readSimDynamoDbIndexThroughput } from "./sim-dynamodb-index-throughput.js";
-import { SimDynamoDbProjectedIndexAttributes } from "./sim-dynamodb-projected-index-attributes.js";
+import { SimDynamoDbIndexProjection } from "./sim-dynamodb-index-projection.js";
+import { readSimDynamoDbLocalIndexKeySchema } from "./sim-dynamodb-local-index-key-schema.js";
+import { refuseSimDynamoDbLocalIndexThroughput } from "./sim-dynamodb-local-index-throughput.js";
 import type {
   SimDynamoDbSecondaryIndex,
   SimDynamoDbSecondaryIndexTable,
 } from "./sim-dynamodb-secondary-index.js";
 
-interface SimDynamoDbGlobalSecondaryIndexProperties {
+interface SimDynamoDbLocalSecondaryIndexProperties {
   readonly name: string;
   readonly tableArn: SimArn;
   readonly keySchema: SimDynamoDbKeySchema;
   readonly projection: SimDynamoDbIndexProjection;
-  readonly throughput: SimDynamoDbTableThroughput;
 }
 
 /**
- * One simulated global secondary index.
+ * One simulated local secondary index.
  *
- * An index is a key schema of its own over the same items, so it is held as
- * what a read of it needs to know rather than as a copy of anything. The items
- * it holds are worked out when it is read, which is why nothing here is
- * maintained on the write path.
+ * A local secondary index gives an item collection a second sort key. It shares
+ * the table's partition key, so an entry sits in the same partition as the item
+ * it indexes, which is what lets it answer a strongly consistent read and lets a
+ * read of it reach the base table for an attribute it does not project.
+ *
+ * `CreateTable` is the only place one can be declared. AWS has no call that
+ * adds, changes or removes one afterwards, so neither does this.
  */
-export class SimDynamoDbGlobalSecondaryIndex implements SimDynamoDbSecondaryIndex {
+export class SimDynamoDbLocalSecondaryIndex implements SimDynamoDbSecondaryIndex {
   public readonly name: string;
   public readonly arn: SimArn;
   public readonly keySchema: SimDynamoDbKeySchema;
   public readonly projection: SimDynamoDbIndexProjection;
 
-  private readonly throughput: SimDynamoDbTableThroughput;
-
-  private constructor(properties: SimDynamoDbGlobalSecondaryIndexProperties) {
+  private constructor(properties: SimDynamoDbLocalSecondaryIndexProperties) {
     this.name = properties.name;
     // An index ARN is the table's own with the index named under it, which is
     // the resource an IAM policy naming one index is written against.
     this.arn = `${properties.tableArn}/index/${properties.name}`;
     this.keySchema = properties.keySchema;
     this.projection = properties.projection;
-    this.throughput = properties.throughput;
   }
 
   /**
-   * Read one `GlobalSecondaryIndexes` entry a CreateTable request carries.
+   * Read one `LocalSecondaryIndexes` entry a CreateTable request carries.
    *
    * The name is read first, since every other refusal names the index it is
    * about.
@@ -64,31 +60,30 @@ export class SimDynamoDbGlobalSecondaryIndex implements SimDynamoDbSecondaryInde
   static fromInput(
     input: SimDynamoDbSecondaryIndexInput,
     table: SimDynamoDbSecondaryIndexTable,
-  ): SimDynamoDbGlobalSecondaryIndex {
+  ): SimDynamoDbLocalSecondaryIndex {
     const name = readSimDynamoDbIndexName(input.IndexName);
+
+    refuseSimDynamoDbLocalIndexThroughput(input, name);
 
     return new this({
       name,
       tableArn: table.tableArn,
-      keySchema: SimDynamoDbKeySchema.fromInput(
+      keySchema: readSimDynamoDbLocalIndexKeySchema(
         input.KeySchema,
-        SimDynamoDbKeySchemaSubject.index(name),
+        name,
+        table.keySchema,
       ),
       projection: SimDynamoDbIndexProjection.fromInput(input.Projection, name),
-      throughput: readSimDynamoDbIndexThroughput(input, name, table.billing),
     });
   }
 
   /**
    * Which attributes a read of this index answers with.
-   *
-   * A global secondary index is held apart from the table, so what it projects
-   * is the whole of what a read of it can answer with.
    */
   attributesOf(
     keyAttributeNames: ReadonlySet<string>,
   ): SimDynamoDbIndexAttributes {
-    return new SimDynamoDbProjectedIndexAttributes({
+    return new SimDynamoDbFetchedIndexAttributes({
       indexName: this.name,
       projection: this.projection,
       keyAttributeNames,
@@ -96,18 +91,15 @@ export class SimDynamoDbGlobalSecondaryIndex implements SimDynamoDbSecondaryInde
   }
 
   /**
-   * Refuse a strongly consistent read of this index.
+   * A local secondary index answers a strongly consistent read.
    *
-   * A global secondary index is maintained asynchronously on AWS, so it cannot
-   * answer one at all. Every read here is strongly consistent, so accepting the
-   * request and ignoring the flag would leave a test passing on something real
-   * DynamoDB refuses outright.
+   * It is written in the same partition as the item it indexes, in the same
+   * operation, so there is no window in which it lags behind the table. That is
+   * the difference from a global secondary index, which is maintained
+   * asynchronously and refuses one.
    */
   assertAnswersConsistentRead(): void {
-    throw new SimDynamoDbValidationException(
-      `Consistent reads are not supported on global secondary indexes, and ` +
-        `this request asks for one on ${this.name}`,
-    );
+    return;
   }
 
   /**
@@ -127,17 +119,16 @@ export class SimDynamoDbGlobalSecondaryIndex implements SimDynamoDbSecondaryInde
 
   /**
    * Describe this index the way DynamoDB reports it.
+   *
+   * There is no `IndexStatus` and no `ProvisionedThroughput`, since a local
+   * secondary index is built with the table and shares its capacity.
    */
-  toDescription(
-    status: SimDynamoDbIndexStatus,
-  ): SimDynamoDbGlobalSecondaryIndexDescription {
+  toDescription(): SimDynamoDbLocalSecondaryIndexDescription {
     return {
       IndexName: this.name,
       IndexArn: this.arn,
       KeySchema: this.keySchema.elements,
       Projection: this.projection.toDescription(),
-      IndexStatus: status,
-      ProvisionedThroughput: this.throughput.toDescription(),
       // Neither figure is tracked, the same way the table's are not.
       ItemCount: 0,
       IndexSizeBytes: 0,

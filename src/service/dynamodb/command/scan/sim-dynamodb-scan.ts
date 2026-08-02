@@ -2,7 +2,7 @@ import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { readSimDynamoDbFilter } from "../../expression/filter/sim-dynamodb-filter-expression.js";
 import { SimDynamoDbItemPage } from "../item/sim-dynamodb-item-page.js";
 import { SimDynamoDbReadAnswer } from "../read/sim-dynamodb-read-answer.js";
-import { refuseSimDynamoDbConsistentIndexRead } from "../read/sim-dynamodb-consistent-read.js";
+import { assertSimDynamoDbConsistentReadAnswerable } from "../read/sim-dynamodb-consistent-read.js";
 import { SimDynamoDbSelect } from "../read/sim-dynamodb-select.js";
 import type { SimDynamoDbTableAccess } from "../table/sim-dynamodb-table-access.js";
 import type { SimScanCommand, SimScanCommandOutput } from "./scan.command.js";
@@ -52,7 +52,6 @@ export class SimDynamoDbScan {
     const select = SimDynamoDbSelect.from(input);
 
     refuseUnsimulatedScanInput(input);
-    refuseSimDynamoDbConsistentIndexRead(input);
 
     // The segment and the filter are read before the table is reached, so
     // input DynamoDB would refuse is refused whether or not the table is
@@ -70,6 +69,9 @@ export class SimDynamoDbScan {
     const view = table.view(input.IndexName);
     const scan = view.scan();
 
+    // Whether a strongly consistent read is answerable depends on which of the
+    // two index kinds is being read, so it waits for the view.
+    assertSimDynamoDbConsistentReadAnswerable(input, view);
     select.assertAnswerableBy(view);
     filter?.assertNamesOnlyCarried(view);
 

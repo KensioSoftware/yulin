@@ -7,18 +7,17 @@ import type { SimDynamoDbSecondaryIndexInput } from "./table.types.js";
  *
  * Each of these changes what the table does, so accepting one and ignoring it
  * would leave a test passing against a table that is not the table the request
- * asked for: queries would run against indexes that were never built, and items
- * would outlive a time to live that was never applied. Refusing is the louder
- * failure, and the one that happens here rather than in a deployment.
+ * asked for: items would outlive a time to live that was never applied, and
+ * changes would be published to a stream that was never made. Refusing is the
+ * louder failure, and the one that happens here rather than in a deployment.
  *
- * Only input that asks for something is refused. An empty index list, and a
- * stream or encryption specification that is switched off, describe the table
- * this simulation already makes, so they are let through.
+ * Only input that asks for something is refused. A stream or encryption
+ * specification that is switched off describes the table this simulation
+ * already makes, so it is let through.
  */
 export function refuseUnsimulatedTableInput(
   input: SimCreateTableCommandInput,
 ): void {
-  refuseSecondaryIndexes(input);
   refuseStreams(input);
   refuseEncryption(input);
   refuseThroughputExtras(input);
@@ -28,21 +27,6 @@ export function refuseUnsimulatedTableInput(
       "A table ResourcePolicy is not simulated, so CreateTable refuses one " +
         "rather than leaving the table open to callers the policy would have " +
         "kept out",
-    );
-  }
-}
-
-/**
- * Refuse the local secondary indexes a table would answer queries from.
- *
- * Global secondary indexes are simulated, so they go through CreateTable's
- * ordinary validation rather than being refused here.
- */
-function refuseSecondaryIndexes(input: SimCreateTableCommandInput): void {
-  if ((input.LocalSecondaryIndexes ?? []).length > 0) {
-    throw new SimDynamoDbUnsupportedOperation(
-      "Local secondary indexes are not simulated, so CreateTable refuses " +
-        "them rather than creating a table that is missing them",
     );
   }
 }

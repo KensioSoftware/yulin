@@ -14,7 +14,7 @@ import type { SimDynamoDbTimeToLiveDescription } from "../command/time-to-live/t
 import { SimDynamoDbTableExpiry } from "../time-to-live/sim-dynamodb-table-expiry.js";
 import { SimDynamoDbTimeToLive } from "../time-to-live/sim-dynamodb-time-to-live.js";
 import type { SimDynamoDbTimeToLiveSpecification } from "../time-to-live/sim-dynamodb-time-to-live-specification.js";
-import { SimDynamoDbGlobalSecondaryIndexes } from "../secondary-index/sim-dynamodb-global-secondary-indexes.js";
+import { SimDynamoDbSecondaryIndexes } from "../secondary-index/sim-dynamodb-secondary-indexes.js";
 import { SimDynamoDbIndexView } from "../secondary-index/sim-dynamodb-index-view.js";
 import { SimDynamoDbItemKey } from "./sim-dynamodb-item-key.js";
 import type { SimDynamoDbReadView } from "./sim-dynamodb-read-view.js";
@@ -37,7 +37,7 @@ interface SimDynamoDbTableProperties {
   readonly keySchema: SimDynamoDbKeySchema;
   readonly attributeDefinitions: SimDynamoDbAttributeDefinitions;
   readonly billing: SimDynamoDbTableBilling;
-  readonly indexes?: SimDynamoDbGlobalSecondaryIndexes;
+  readonly indexes?: SimDynamoDbSecondaryIndexes;
   readonly tableClass?: SimDynamoDbTableClass | undefined;
   readonly deletionProtectionEnabled?: boolean | undefined;
   readonly tags?: SimDynamoDbTableTags;
@@ -62,13 +62,13 @@ export class SimDynamoDbTable {
   public readonly billing: SimDynamoDbTableBilling;
 
   /**
-   * The global secondary indexes this table carries.
+   * The secondary indexes this table carries, global and local.
    *
    * Which items an index holds is worked out when it is read rather than kept
    * up to date on every write, so nothing here is more than what the index was
    * declared as.
    */
-  public readonly indexes: SimDynamoDbGlobalSecondaryIndexes;
+  public readonly indexes: SimDynamoDbSecondaryIndexes;
 
   public readonly tableClass: SimDynamoDbTableClass | undefined;
   public readonly deletionProtectionEnabled: boolean;
@@ -93,7 +93,7 @@ export class SimDynamoDbTable {
       keySchema,
       attributeDefinitions,
       billing,
-      indexes = SimDynamoDbGlobalSecondaryIndexes.none(),
+      indexes = SimDynamoDbSecondaryIndexes.none(),
       deletionProtectionEnabled = false,
       tags = SimDynamoDbTableTags.fromInput([]),
       background = new BackgroundTasks(),
@@ -171,8 +171,8 @@ export class SimDynamoDbTable {
   public putItem(item: SimDynamoDbItem): SimDynamoDbItem | undefined {
     const key = this.itemKey.of(item);
 
-    // An item need not carry an index's key attributes, since a global
-    // secondary index is sparse. Carrying one as a type the index did not
+    // An item need not carry an index's key attributes, since a secondary
+    // index of either kind is sparse. Carrying one as a type the index did not
     // declare is refused, since the index could never hold it.
     this.indexes.assertItemKeyTypes(item, this.attributeDefinitions);
 
