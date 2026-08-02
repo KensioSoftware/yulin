@@ -4,7 +4,10 @@ import {
   CreateRouteCommand,
   CreateStageCommand,
 } from "@aws-sdk/client-apigatewayv2";
-import { CreateFunctionCommand } from "@aws-sdk/client-lambda";
+import {
+  AddPermissionCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-lambda";
 import { assertIdentical, assertStringIncludes } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -156,6 +159,17 @@ describe("Serving a request through a sim HTTP API", () => {
         ApiId: apiId,
         StageName: "$default",
         AutoDeploy: true,
+      }),
+    );
+
+    // And the function granting that API permission to invoke it
+    await scoped.lambda().addPermission(
+      new AddPermissionCommand({
+        FunctionName: "orders",
+        StatementId: "api-gateway-invoke",
+        Action: "lambda:InvokeFunction",
+        Principal: "apigateway.amazonaws.com",
+        SourceArn: `arn:aws:execute-api:us-east-1:222222222222:${apiId}/*/*`,
       }),
     );
 

@@ -8,7 +8,10 @@ import {
   CreateRouteCommand,
   CreateStageCommand,
 } from "@aws-sdk/client-apigatewayv2";
-import { CreateFunctionCommand } from "@aws-sdk/client-lambda";
+import {
+  AddPermissionCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-lambda";
 
 import { SimAws } from "@kensio/yulin";
 import type { SimPayload2Event } from "@kensio/yulin/apigatewayv2";
@@ -56,6 +59,16 @@ await apiGateway.createRoute(
 
 await apiGateway.createStage(
   new CreateStageCommand({ ApiId, StageName: "$default", AutoDeploy: true }),
+);
+
+await simAws.lambda().addPermission(
+  new AddPermissionCommand({
+    FunctionName: "orders",
+    StatementId: "api-gateway-invoke",
+    Action: "lambda:InvokeFunction",
+    Principal: "apigateway.amazonaws.com",
+    SourceArn: `arn:aws:execute-api:us-east-1:888888888888:${ApiId}/*/*`,
+  }),
 );
 
 const srv = await serveSimAws({ simAws });

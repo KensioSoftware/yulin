@@ -89,11 +89,12 @@ export class SimLambdaPermission {
   /**
    * The condition block the qualifying properties expand into.
    *
-   * Only `lambda:FunctionUrlAuthType` is given a value at request time, so it
-   * is the only one that can match. The rest are still written into the
-   * statement, because `GetPolicy` should report the permission that was
-   * granted; a statement carrying one of them simply never matches, which is
-   * the safe direction for a condition the simulator cannot evaluate.
+   * `lambda:FunctionUrlAuthType` is given a value when a Function URL is
+   * invoked, and `AWS:SourceArn` when an API Gateway HTTP API integration
+   * invokes the function. The rest are still written into the statement,
+   * because `GetPolicy` should report the permission that was granted; a
+   * statement carrying one of them simply never matches, which is the safe
+   * direction for a condition the simulator cannot evaluate.
    */
   private condition(): SimIamPolicyDocumentCondition | undefined {
     const stringEquals = this.stringEqualsConditions();

@@ -52,8 +52,11 @@ share a name, and only the id tells them apart.
 ## Routing requests to a Lambda function
 
 An API needs three more resources before it serves anything: an integration naming the function, a
-route pointing at that integration, and a stage to serve it from. Once they exist, `serveSimAws`
-answers requests to the generated endpoint by invoking the function.
+route pointing at that integration, and a stage to serve it from. The function also has to allow API
+Gateway to invoke it, which is a permission on the function rather than anything on the API. See
+[Granting the API permission to invoke the function](#granting-the-api-permission-to-invoke-the-function).
+Once all of that exists, `serveSimAws` answers requests to the generated endpoint by invoking the
+function.
 
 Pass the API endpoint through `srv.localUrl(...)`, which keeps the endpoint's hostname but sends the
 request to the local server, in the same way it adapts simulated S3 website and Lambda Function URL
@@ -70,7 +73,10 @@ import {
   CreateRouteCommand,
   CreateStageCommand,
 } from "@aws-sdk/client-apigatewayv2";
-import { CreateFunctionCommand } from "@aws-sdk/client-lambda";
+import {
+  AddPermissionCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-lambda";
 
 import { SimAws } from "@kensio/yulin";
 import type { SimPayload2Event } from "@kensio/yulin/apigatewayv2";
@@ -120,6 +126,16 @@ await apiGateway.createStage(
   new CreateStageCommand({ ApiId, StageName: "$default", AutoDeploy: true }),
 );
 
+await simAws.lambda().addPermission(
+  new AddPermissionCommand({
+    FunctionName: "orders",
+    StatementId: "api-gateway-invoke",
+    Action: "lambda:InvokeFunction",
+    Principal: "apigateway.amazonaws.com",
+    SourceArn: `arn:aws:execute-api:us-east-1:888888888888:${ApiId}/*/*`,
+  }),
+);
+
 const srv = await serveSimAws({ simAws });
 
 const response = await fetch(srv.localUrl(`${ApiEndpoint}/orders?limit=10`));
@@ -133,6 +149,45 @@ srv.close();
 The `$default` route matches any method and path, so every request to the endpoint reaches the
 function. The integration URI is the function's ARN, and the function may be in another Account or
 Region: it is looked up where its ARN says it is.
+
+## Granting the API permission to invoke the function
+
+A Lambda proxy integration does not work until the function's resource policy allows
+`apigateway.amazonaws.com` to invoke it. The console adds that permission for you; an integration
+created through CloudFormation, the CLI or an SDK does not, which is what `AddPermissionCommand` in
+the example above is for. Without it the request is answered with a 500 and
+`{"message":"Internal Server Error"}`, and the handler does not run. CDK's
+`HttpLambdaIntegration` emits the same grant as an `AWS::Lambda::Permission`.
+
+Each request is authorized as `lambda:InvokeFunction` on the function ARN, with the caller being the
+service principal `apigateway.amazonaws.com`. The function's own resource policy is what decides: a
+service principal has no identity policies of its own. The route that matched is supplied as
+`AWS:SourceArn`, so a permission may be granted for one route and not another:
+
+```text
+arn:aws:execute-api:<region>:<account>:<apiId>/<stage>/<METHOD>/<route path>
+```
+
+- The Account and Region are the API's, not the function's.
+- The stage is the one that served the request, so `$default` for the default stage.
+- The method is the request's own, so a `GET` reaching a route keyed `ANY /orders` gives `GET`.
+- The path is the matched route key's template with its parameter braces intact, so a request to
+  `/orders/42` on the route `GET /orders/{orderId}` gives `orders/{orderId}`. A `SourceArn` is
+  written against route keys rather than against paths, and IAM treats a brace as an ordinary
+  character.
+- The `$default` route has no method and no path of its own, so both collapse into one `$default`
+  segment: `<apiId>/<stage>/$default`.
+
+A `SourceArn` may wildcard any part of that, which is what the usual grant does:
+`<apiId>/*/*` allows every route of the API on every stage.
+
+`AWS:SourceArn` is the only condition key supplied here. A permission that also carries
+`SourceAccount`, `PrincipalOrgID` or `InvokedViaFunctionUrl` never matches, since nothing gives those
+keys a value at request time, so the request is refused with the same 500.
+
+Neither the method nor the path is documented by AWS as the value API Gateway supplies. Both are
+inferred from the permission patterns AWS and CDK write, which is recorded next to the code that
+builds the ARN.
 
 ## Route keys
 
@@ -217,7 +272,10 @@ import {
   CreateRouteCommand,
   CreateStageCommand,
 } from "@aws-sdk/client-apigatewayv2";
-import { CreateFunctionCommand } from "@aws-sdk/client-lambda";
+import {
+  AddPermissionCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-lambda";
 
 import { SimAws } from "@kensio/yulin";
 import type { SimPayload2Event } from "@kensio/yulin/apigatewayv2";
@@ -277,6 +335,16 @@ for (const RouteKey of [
 
 await apiGateway.createStage(
   new CreateStageCommand({ ApiId, StageName: "dev", AutoDeploy: true }),
+);
+
+await simAws.lambda().addPermission(
+  new AddPermissionCommand({
+    FunctionName: "pets",
+    StatementId: "api-gateway-invoke",
+    Action: "lambda:InvokeFunction",
+    Principal: "apigateway.amazonaws.com",
+    SourceArn: `arn:aws:execute-api:us-east-1:888888888888:${ApiId}/*/*`,
+  }),
 );
 
 const srv = await serveSimAws({ simAws });
@@ -459,6 +527,8 @@ the simulation without being given one. See the
   path segment, including stage variables
 - Serving the generated endpoint through `serveSimAws`, invoking the integrated function with a
   payload format 2.0 event and turning its result back into an HTTP response
+- The integration's invoke permission, evaluated against the function's resource policy with the
+  matched route supplied as `AWS:SourceArn`
 - `DisableExecuteApiEndpoint`, refusing requests to the generated endpoint
 - Authorization of every command by simulated IAM, against the HTTP method and resource path real
   API Gateway uses
@@ -486,9 +556,10 @@ Current documented limitations:
 - `AuthorizationType: "NONE"` only. JWT authorizers, `AWS_IAM` routes and Lambda authorizers are not
   simulated, so a route is open here that would be closed on AWS if it asked for one. The route is
   refused rather than created open.
-- The integrated function's resource policy is not evaluated. Real API Gateway needs
-  `lambda:InvokeFunction` granted to `apigateway.amazonaws.com`, and needs it explicitly for a
-  function in another Account, so an integration can work here that would return a 500 on AWS.
+- The method and path segments of the source ARN are inferred rather than documented. See
+  [Granting the API permission to invoke the function](#granting-the-api-permission-to-invoke-the-function).
+- An integration `CredentialsArn`, the IAM Role alternative to a resource policy grant, is refused
+  by `CreateIntegration`. A permission on the function is the only way to admit the invocation.
 - No `Update*` commands, and no per-resource `Delete*`. A route, integration or stage is changed by
   deleting its API and creating it again. `DeleteApi` deletes everything under the API, as it does on
   AWS.

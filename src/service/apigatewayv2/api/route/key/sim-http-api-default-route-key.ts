@@ -37,4 +37,15 @@ export class SimHttpApiDefaultRouteKey implements SimHttpApiRouteKey {
   match(): SimHttpApiPathParameters {
     return new SimHttpApiPathParameters();
   }
+
+  /**
+   * Name this route in an `execute-api` ARN.
+   *
+   * The catch-all has no method and no path of its own, and both collapse into
+   * the single literal `$default`, so the ARN ends `<apiId>/<stage>/$default`.
+   * AWS gives that form as a CLI example for granting a `$default` route.
+   */
+  methodAndPath(): string {
+    return simHttpApiDefaultRouteKey;
+  }
 }

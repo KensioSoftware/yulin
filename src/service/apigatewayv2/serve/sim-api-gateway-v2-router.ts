@@ -6,9 +6,22 @@ import type { SimLambdaFunction } from "../../lambda/function/sim-lambda-functio
 import type { SimHttpApiIntegration } from "../api/integration/sim-http-api-integration.js";
 import type { SimHttpApi } from "../api/sim-http-api.js";
 import type { SimHttpApiRegistry } from "../registry/sim-http-api-registry.js";
+import type { SimIamInterServiceAuthZ } from "../../iam/authorize/sim-iam-inter-service-auth-z.js";
 
 interface SimApiGatewayV2RouterProperties {
   readonly simAws?: SimAws;
+}
+
+/**
+ * What an integration invokes, and what decides whether it may.
+ */
+export interface SimHttpApiIntegrationTarget {
+  readonly simFunction: SimLambdaFunction;
+  /**
+   * IAM of the Account that owns the function, which is what the integration's
+   * invoke permission is evaluated against. It need not be the API's Account.
+   */
+  readonly iam: SimIamInterServiceAuthZ;
 }
 
 /**
@@ -54,22 +67,27 @@ export class SimApiGatewayV2Router {
   }
 
   /**
-   * Find the function an integration invokes.
+   * Find the function an integration invokes, and the IAM deciding whether it
+   * may be invoked.
    *
    * The function is looked up in the Account and Region its ARN names, not the
    * API's, because an integration ARN is free to name either.
    */
-  functionFor(
+  targetFor(
     integration: SimHttpApiIntegration,
-  ): SimLambdaFunction | undefined {
+  ): SimHttpApiIntegrationTarget | undefined {
     const { accountId, regionName, functionName } = integration.lambdaUri;
 
-    return this.simAws
-      .accountRegionScope(
-        accountId as SimAwsAccountId,
-        regionName as AwsRegionName,
-      )
-      .lambda()
-      .getSimFunctionByName(functionName);
+    const scope = this.simAws.accountRegionScope(
+      accountId as SimAwsAccountId,
+      regionName as AwsRegionName,
+    );
+    const simFunction = scope.lambda().getSimFunctionByName(functionName);
+
+    if (simFunction === undefined) {
+      return undefined;
+    }
+
+    return { simFunction, iam: scope.iam() };
   }
 }

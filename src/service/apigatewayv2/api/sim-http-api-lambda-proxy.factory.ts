@@ -2,8 +2,10 @@ import { AsyncMappedFactory } from "@kensio/part-factory";
 
 import type { SimPayload2Event } from "../../../serve/payload-2/sim-payload-2-event.type.js";
 import { assertDefined } from "../../../util/type-guard/defined.js";
+import { DEFAULT_SIM_AWS_ACCOUNT_ID } from "../../aws/sim-aws-account.js";
 import type { SimAws } from "../../aws/sim-aws.js";
 import { makeLambdaZipFileInput } from "../../lambda/function/code/lambda-zip-file-input.js";
+import { simApiGatewayServicePrincipal } from "../serve/auth/sim-http-api-integration-authorizer.js";
 import type { SimHttpApi } from "./sim-http-api.js";
 
 /**
@@ -12,6 +14,11 @@ import type { SimHttpApi } from "./sim-http-api.js";
 export interface SimHttpApiLambdaProxyInput {
   readonly apiName: string;
   readonly functionName: string;
+  /**
+   * The Account the function belongs to, which need not be the API's: an
+   * integration URI is free to name another one.
+   */
+  readonly functionAccountId: string;
   readonly roleArn: string;
   /** The function code every route of the API hands its requests to. */
   readonly handler: (event: SimPayload2Event) => unknown;
@@ -22,6 +29,15 @@ export interface SimHttpApiLambdaProxyInput {
   readonly stageNames: readonly string[];
   /** The variables every one of those stages carries. */
   readonly stageVariables: Readonly<Record<string, string>>;
+  /**
+   * Whether the function grants the API permission to invoke it, which it
+   * needs before any route serves anything.
+   *
+   * The grant is the one CDK writes: `apigateway.amazonaws.com` may
+   * `lambda:InvokeFunction` for any stage and route of this API. A test about
+   * the permission itself turns this off and grants what it means to test.
+   */
+  readonly invokePermission: boolean;
 }
 
 /**
@@ -42,8 +58,9 @@ export interface SimHttpApiLambdaProxyInput {
  * );
  * ```
  *
- * Everything is created in the default Account and Region of the simulated AWS
- * it is given. A test working in another scope sends the commands itself.
+ * The API is created in the default Account and Region of the simulated AWS it
+ * is given, and so is the function unless another Account is asked for. A test
+ * working in another scope sends the commands itself.
  */
 export const simHttpApiLambdaProxyFactory = new AsyncMappedFactory<
   SimHttpApiLambdaProxyInput,
@@ -53,15 +70,18 @@ export const simHttpApiLambdaProxyFactory = new AsyncMappedFactory<
   () => ({
     apiName: "orders",
     functionName: "orders",
+    functionAccountId: DEFAULT_SIM_AWS_ACCOUNT_ID,
     roleArn: "arn:aws:iam::111111111111:role/OrdersRole",
     handler: (): string => "hello",
     disableExecuteApiEndpoint: false,
     routeKeys: ["$default"],
     stageNames: ["$default"],
     stageVariables: {},
+    invokePermission: true,
   }),
   async (input, simAws) => {
-    const { FunctionArn: functionArn } = await simAws.lambda().createFunction({
+    const simLambda = simAws.account(input.functionAccountId).lambda();
+    const { FunctionArn: functionArn } = await simLambda.createFunction({
       input: {
         FunctionName: input.functionName,
         Role: input.roleArn,
@@ -99,6 +119,22 @@ export const simHttpApiLambdaProxyFactory = new AsyncMappedFactory<
         }),
       ),
     );
+
+    if (input.invokePermission) {
+      // The ARN names the API's own Account and Region, which is where the
+      // request arrives, whatever Account the function belongs to.
+      const { accountId, regionName } =
+        simAws.accountRegionScope().accountRegionScope;
+      await simLambda.addPermission({
+        input: {
+          FunctionName: input.functionName,
+          StatementId: "api-gateway-invoke",
+          Action: "lambda:InvokeFunction",
+          Principal: simApiGatewayServicePrincipal,
+          SourceArn: `arn:aws:execute-api:${regionName}:${accountId}:${apiId}/*/*`,
+        },
+      });
+    }
 
     await Promise.all(
       input.stageNames.map(async (stageName) =>
