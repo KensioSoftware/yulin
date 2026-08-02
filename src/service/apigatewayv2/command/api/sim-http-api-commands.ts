@@ -1,5 +1,6 @@
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
+import type { SimHttpApiJwtIssuerKeys } from "../../api/authorizer/sim-http-api-jwt-issuer-keys.js";
 import { SimHttpApi } from "../../api/sim-http-api.js";
 import type { SimHttpApiStore } from "../../api/sim-http-api-store.js";
 import type { SimHttpApiRegistry } from "../../registry/sim-http-api-registry.js";
@@ -30,6 +31,7 @@ interface SimHttpApiCommandsProperties {
   readonly access: SimHttpApiAccess;
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly clock: SimClock;
+  readonly jwtIssuerKeys: SimHttpApiJwtIssuerKeys;
 }
 
 /**
@@ -41,6 +43,7 @@ export class SimHttpApiCommands {
   private readonly access: SimHttpApiAccess;
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly clock: SimClock;
+  private readonly jwtIssuerKeys: SimHttpApiJwtIssuerKeys;
 
   constructor(properties: SimHttpApiCommandsProperties) {
     this.apis = properties.apis;
@@ -48,6 +51,7 @@ export class SimHttpApiCommands {
     this.access = properties.access;
     this.accountRegionScope = properties.accountRegionScope;
     this.clock = properties.clock;
+    this.jwtIssuerKeys = properties.jwtIssuerKeys;
   }
 
   /**
@@ -77,6 +81,7 @@ export class SimHttpApiCommands {
       protocolType: "HTTP",
       accountRegionScope: this.accountRegionScope,
       createdDate: this.clock.now(),
+      jwtIssuerKeys: this.jwtIssuerKeys,
       description: input.Description,
       disableExecuteApiEndpoint: input.DisableExecuteApiEndpoint,
     });

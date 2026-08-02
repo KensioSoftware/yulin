@@ -123,61 +123,97 @@ describe("API Gateway v2 CloudFormation validation", () => {
   });
 
   it("refuses a route authorization type that is not simulated", async () => {
-    // Given a route asking for a JWT authorizer
+    // Given a route asking for IAM authorization
     const simAws = simAwsInEuWest2();
 
     // When the template is deployed
     const error = await deployHttpApiFailure(
       simAws,
       simCfnHttpApiTemplateFactory.make({
-        routeProperties: { AuthorizationType: "JWT" },
+        routeProperties: { AuthorizationType: "AWS_IAM" },
       }),
     );
 
     // Then CreateRoute refuses it rather than deploying an open route
     assertStringIncludes(
       error.message,
-      "CreateRoute AuthorizationType 'JWT' is not simulated",
+      "CreateRoute AuthorizationType 'AWS_IAM' is not simulated",
     );
   });
 
-  it("refuses a route naming an authorizer that was skipped", async () => {
-    // Given a template with an authorizer Resource, which is not simulated,
-    // and a route pointing at it
+  it("refuses a JWT route naming an authorizer the template did not deploy", async () => {
+    // Given a route asking for JWT authorization with an authorizer id that
+    // is not one of this API's
     const simAws = simAwsInEuWest2();
 
     // When the template is deployed
     const error = await deployHttpApiFailure(
       simAws,
       simCfnHttpApiTemplateFactory.make({
-        routeProperties: { AuthorizerId: { Ref: "Authorizer" } },
+        routeProperties: { AuthorizationType: "JWT", AuthorizerId: "auth01" },
+      }),
+    );
+
+    // Then the stack fails rather than deploying a route that is open here and
+    // closed on AWS
+    assertStringIncludes(
+      error.message,
+      "AuthorizerId auth01 names no authorizer",
+    );
+  });
+
+  it("refuses a Lambda authorizer Resource", async () => {
+    // Given a template carrying a Lambda REQUEST authorizer
+    const simAws = simAwsInEuWest2();
+
+    // When the template is deployed
+    const error = await deployHttpApiFailure(
+      simAws,
+      simCfnHttpApiTemplateFactory.make({
         resources: {
           Authorizer: {
             Type: "AWS::ApiGatewayV2::Authorizer",
             Properties: {
               ApiId: { Ref: "Api" },
-              AuthorizerType: "JWT",
-              Name: "jwt",
+              AuthorizerType: "REQUEST",
+              Name: "lambda",
+              IdentitySource: ["$request.header.Authorization"],
             },
           },
         },
       }),
     );
 
-    // Then the stack fails naming both the route and the authorizer it would
-    // have pointed at, rather than deploying a route open here and closed on
-    // AWS
-    assertStringIncludes(error.message, "Route1");
+    // Then the stack fails rather than deploying an authorizer that would
+    // decide with code nothing here runs
     assertStringIncludes(
       error.message,
-      "property AuthorizerId is Authorizer, the logical ID of a Resource " +
-        "this simulation did not create",
+      "CreateAuthorizer AuthorizerType 'REQUEST' is not simulated",
     );
   });
 
-  it("refuses an authorizer id naming nothing in the template", async () => {
-    // Given a route carrying an authorizer id written out rather than
-    // referenced, so no skipped Resource explains it
+  it("refuses route scopes that are not a list of strings", async () => {
+    // Given a route whose AuthorizationScopes is a single string
+    const simAws = simAwsInEuWest2();
+
+    // When the template is deployed
+    const error = await deployHttpApiFailure(
+      simAws,
+      simCfnHttpApiTemplateFactory.make({
+        routeProperties: { AuthorizationScopes: "orders.read" },
+      }),
+    );
+
+    // Then the stack fails saying what the property has to be
+    assertStringIncludes(
+      error.message,
+      "AuthorizationScopes must be a list of strings",
+    );
+  });
+
+  it("refuses an authorizer id on a route that authorizes nobody", async () => {
+    // Given a route naming an authorizer while leaving its authorization type
+    // at NONE
     const simAws = simAwsInEuWest2();
 
     // When the template is deployed
@@ -188,11 +224,11 @@ describe("API Gateway v2 CloudFormation validation", () => {
       }),
     );
 
-    // Then the allow-list refuses the property, since authorizers are not
-    // simulated at all
+    // Then CreateRoute refuses it, since the authorizer would be ignored here
+    // and would leave the route open on AWS too
     assertStringIncludes(
       error.message,
-      "AWS::ApiGatewayV2::Route Route1 property AuthorizerId is not simulated",
+      "CreateRoute AuthorizerId is set on a route with AuthorizationType NONE",
     );
   });
 
@@ -264,7 +300,7 @@ describe("API Gateway v2 CloudFormation validation", () => {
   });
 
   it("skips a Resource type nothing creates yet", async () => {
-    // Given a template carrying an authorizer no route points at
+    // Given a template carrying a Deployment and a Model, neither simulated
     const simAws = simAwsInEuWest2();
 
     // When the template is deployed
@@ -273,9 +309,9 @@ describe("API Gateway v2 CloudFormation validation", () => {
       simCfnHttpApiTemplateFactory.make({
         routeKeys: ["GET /orders"],
         resources: {
-          Authorizer: {
-            Type: "AWS::ApiGatewayV2::Authorizer",
-            Properties: { ApiId: { Ref: "Api" }, AuthorizerType: "JWT" },
+          Deployment: {
+            Type: "AWS::ApiGatewayV2::Deployment",
+            Properties: { ApiId: { Ref: "Api" } },
           },
           Model: {
             Type: "AWS::ApiGatewayV2::Model",
@@ -287,15 +323,15 @@ describe("API Gateway v2 CloudFormation validation", () => {
 
     // Then the rest of the stack deployed, and each unsupported Resource was
     // skipped with a reason, the WebSocket-only one saying so
-    const authorizer = stack.getResource("Authorizer");
+    const deployment = stack.getResource("Deployment");
     const model = stack.getResource("Model");
-    assertNonNullable(authorizer);
+    assertNonNullable(deployment);
     assertNonNullable(model);
-    assertTrue(authorizer.skipped);
+    assertTrue(deployment.skipped);
     assertFalse(stack.getResource("Api")?.skipped ?? true);
     assertStringIncludes(
-      authorizer.skippedReason ?? "",
-      "Unsupported sim API Gateway v2 CloudFormation Resource Authorizer",
+      deployment.skippedReason ?? "",
+      "Unsupported sim API Gateway v2 CloudFormation Resource Deployment",
     );
     assertStringIncludes(
       model.skippedReason ?? "",

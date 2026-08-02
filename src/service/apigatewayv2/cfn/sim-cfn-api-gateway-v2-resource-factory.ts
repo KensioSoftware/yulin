@@ -5,6 +5,7 @@ import type {
 } from "../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimApiGatewayV2 } from "../sim-api-gateway-v2.js";
 import { SimCfnHttpApiCreator } from "./api/sim-cfn-http-api-creator.js";
+import { SimCfnHttpApiAuthorizerCreator } from "./authorizer/sim-cfn-http-api-authorizer-creator.js";
 import { SimCfnHttpApiIntegrationCreator } from "./integration/sim-cfn-http-api-integration-creator.js";
 import { SimCfnHttpApiRouteCreator } from "./route/sim-cfn-http-api-route-creator.js";
 import { SimCfnHttpApiStageCreator } from "./stage/sim-cfn-http-api-stage-creator.js";
@@ -28,6 +29,7 @@ interface SimApiGatewayV2CfnResourceFactoryProperties {
  */
 export class SimApiGatewayV2CfnResourceFactory implements SimCfnServiceResourceFactory {
   private readonly apiCreator: SimCfnHttpApiCreator;
+  private readonly authorizerCreator: SimCfnHttpApiAuthorizerCreator;
   private readonly integrationCreator: SimCfnHttpApiIntegrationCreator;
   private readonly routeCreator: SimCfnHttpApiRouteCreator;
   private readonly stageCreator: SimCfnHttpApiStageCreator;
@@ -36,6 +38,9 @@ export class SimApiGatewayV2CfnResourceFactory implements SimCfnServiceResourceF
     const { apiGatewayV2 } = properties;
 
     this.apiCreator = new SimCfnHttpApiCreator({ apiGatewayV2 });
+    this.authorizerCreator = new SimCfnHttpApiAuthorizerCreator({
+      apiGatewayV2,
+    });
     this.integrationCreator = new SimCfnHttpApiIntegrationCreator({
       apiGatewayV2,
     });
@@ -46,9 +51,9 @@ export class SimApiGatewayV2CfnResourceFactory implements SimCfnServiceResourceF
   /**
    * Create a simulated API Gateway v2 resource from a CloudFormation Resource.
    *
-   * Authorizers, deployments, custom domain names and the WebSocket-only
-   * Resource types are not simulated, so their Resource types are reported as
-   * unsupported rather than quietly treated as deployed.
+   * Deployments, custom domain names and the WebSocket-only Resource types are
+   * not simulated, so their Resource types are reported as unsupported rather
+   * than quietly treated as deployed.
    */
   async create(
     resourceTypeName: string,
@@ -61,11 +66,14 @@ export class SimApiGatewayV2CfnResourceFactory implements SimCfnServiceResourceF
       case "Api": {
         return await this.apiCreator.create(resource, properties);
       }
+      case "Authorizer": {
+        return await this.authorizerCreator.create(resource, properties);
+      }
       case "Integration": {
         return await this.integrationCreator.create(resource, properties);
       }
       case "Route": {
-        return await this.routeCreator.create(resource, properties, context);
+        return await this.routeCreator.create(resource, properties);
       }
       case "Stage": {
         return await this.stageCreator.create(resource, properties);

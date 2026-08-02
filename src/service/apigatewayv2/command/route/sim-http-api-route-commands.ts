@@ -9,6 +9,7 @@ import type {
   SimGetRoutesCommand,
   SimGetRoutesCommandOutput,
 } from "./route.command.js";
+import { SimHttpApiRouteAuthorizationInput } from "./sim-http-api-route-authorization.js";
 import { SimHttpApiRouteTarget } from "./sim-http-api-route-target.js";
 
 const routesPath = "/routes";
@@ -18,7 +19,17 @@ const acceptedCreateRouteOptions = [
   "RouteKey",
   "Target",
   "AuthorizationType",
+  "AuthorizerId",
+  "AuthorizationScopes",
 ];
+
+/**
+ * The authorization types a route may ask for.
+ *
+ * `AWS_IAM` and `CUSTOM` are refused rather than created open: a route asking
+ * for either would admit anyone here and refuse them on AWS.
+ */
+const simulatedAuthorizationTypes = ["NONE", "JWT"];
 
 interface SimHttpApiRouteCommandsProperties {
   readonly access: SimHttpApiAccess;
@@ -52,11 +63,11 @@ export class SimHttpApiRouteCommands {
     const routeKey = this.routeKeyParser.parse(
       unsimulated.require("RouteKey", input.RouteKey),
     );
-    unsimulated.refuseUnless(
+    unsimulated.refuseUnlessOneOf(
       "AuthorizationType",
       input.AuthorizationType,
-      "NONE",
-      "route authorizers are not simulated",
+      simulatedAuthorizationTypes,
+      "IAM and Lambda route authorization are not simulated",
     );
     const target = unsimulated.require("Target", input.Target);
 
@@ -67,12 +78,17 @@ export class SimHttpApiRouteCommands {
       caller: options?.caller,
     });
     this.routeTarget.requireUnusedRouteKey(httpApi, routeKey);
+    // Read before the target is resolved, so a route asking for an authorizer
+    // the API does not have is told that rather than told about its target.
+    const authorization = new SimHttpApiRouteAuthorizationInput(input).read(
+      httpApi,
+    );
 
     const route = new SimHttpApiRoute({
       routeId: httpApi.routes.allocateId(),
       key: routeKey,
       integrationId: this.routeTarget.integrationId(httpApi, target),
-      authorizationType: "NONE",
+      ...authorization,
     });
     httpApi.routes.add(route);
 

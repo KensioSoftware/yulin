@@ -1,4 +1,6 @@
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
+import { SimHttpApiAuthorizerStore } from "./authorizer/sim-http-api-authorizer-store.js";
+import type { SimHttpApiJwtIssuerKeys } from "./authorizer/sim-http-api-jwt-issuer-keys.js";
 import { SimHttpApiIntegrationStore } from "./integration/sim-http-api-integration-store.js";
 import { SimHttpApiRouteStore } from "./route/sim-http-api-route-store.js";
 import { SimHttpApiStageStore } from "./stage/sim-http-api-stage-store.js";
@@ -21,6 +23,7 @@ interface SimHttpApiProperties {
   readonly protocolType: SimHttpApiProtocolType;
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly createdDate: Date;
+  readonly jwtIssuerKeys: SimHttpApiJwtIssuerKeys;
   readonly description?: string | undefined;
   readonly disableExecuteApiEndpoint?: boolean | undefined;
 }
@@ -42,6 +45,17 @@ export class SimHttpApi {
   public readonly description?: string | undefined;
   public readonly disableExecuteApiEndpoint: boolean;
 
+  /**
+   * The issuers this API's JWT authorizers can reach.
+   *
+   * An authorizer names an issuer by URL and verifies against the keys that
+   * issuer publishes, so the API carries the one thing that turns a URL into
+   * keys. It is here rather than on the service because a served request finds
+   * the API and nothing else.
+   */
+  public readonly jwtIssuerKeys: SimHttpApiJwtIssuerKeys;
+
+  public readonly authorizers = new SimHttpApiAuthorizerStore();
   public readonly integrations = new SimHttpApiIntegrationStore();
   public readonly routes = new SimHttpApiRouteStore();
   public readonly stages = new SimHttpApiStageStore();
@@ -54,6 +68,7 @@ export class SimHttpApi {
     this.protocolType = properties.protocolType;
     this.accountRegionScope = properties.accountRegionScope;
     this.createdDate = properties.createdDate;
+    this.jwtIssuerKeys = properties.jwtIssuerKeys;
     this.description = properties.description;
     this.disableExecuteApiEndpoint =
       properties.disableExecuteApiEndpoint ?? false;

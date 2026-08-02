@@ -5,10 +5,12 @@ import type {
 import { SimPayload2EventBuilder } from "../../../serve/payload-2/sim-payload-2-event-builder.js";
 import { SimPayload2ResponseBuilder } from "../../../serve/payload-2/sim-payload-2-response-builder.js";
 import { SimAws } from "../../aws/sim-aws.js";
+import type { SimHttpApiRefused } from "../api/authorizer/sim-http-api-authorization.js";
 import { SimHttpApiExecuteApiArn } from "../api/sim-http-api-execute-api-arn.js";
 import { SimHttpApiRequest } from "../api/sim-http-api-request.js";
 import type { SimHttpApi } from "../api/sim-http-api.js";
 import { SimHttpApiIntegrationAuthorizer } from "./auth/sim-http-api-integration-authorizer.js";
+import { SimHttpApiRouteAuthorizer } from "./auth/sim-http-api-route-authorizer.js";
 import { SimApiGatewayV2ErrorResponse } from "./sim-api-gateway-v2-error-response.js";
 import { SimApiGatewayV2Router } from "./sim-api-gateway-v2-router.js";
 import { simHttpApiEndpoint } from "./sim-http-api-endpoint.js";
@@ -26,22 +28,28 @@ interface SimApiGatewayV2ServiceControllerProperties {
  * format 2.0 event. The function runs as its execution Role, as it does for
  * any other invocation.
  *
- * Every simulated route is `AuthorizationType: NONE`, so nothing here refuses
- * the client. The integration still has to be allowed to invoke the function,
- * which is a separate question and the API's own rather than the client's.
+ * A route with a JWT authorizer is checked before any of that: the client's
+ * token has to verify, and the route's scopes have to be met, or the request
+ * is refused and the function is never invoked. Whether the API may invoke the
+ * function is a separate question, and the API's own rather than the client's.
  */
 export class SimApiGatewayV2ServiceController implements SimAwsServiceController {
   private readonly router: SimApiGatewayV2Router;
   private readonly eventBuilder: SimPayload2EventBuilder;
+  private readonly routeAuthorizer: SimHttpApiRouteAuthorizer;
   private readonly responseBuilder = new SimPayload2ResponseBuilder();
   private readonly errorResponse = new SimApiGatewayV2ErrorResponse();
 
   constructor(properties: SimApiGatewayV2ServiceControllerProperties = {}) {
     const { simAws = new SimAws() } = properties;
     this.router = properties.router ?? new SimApiGatewayV2Router({ simAws });
-    // Taken from the router rather than from properties, so a supplied router
-    // and the event timestamps always belong to the same simulation.
+    // Taken from the router rather than from properties, so a supplied router,
+    // the event timestamps and the token expiry checks all belong to the same
+    // simulation.
     this.eventBuilder = new SimPayload2EventBuilder({
+      clock: this.router.simAws,
+    });
+    this.routeAuthorizer = new SimHttpApiRouteAuthorizer({
       clock: this.router.simAws,
     });
   }
@@ -79,6 +87,18 @@ export class SimApiGatewayV2ServiceController implements SimAwsServiceController
       return this.errorResponse.notFound();
     }
 
+    // The client's own authorization comes first: a request with no token is
+    // refused whether or not the integration behind the route would work.
+    const authorization = this.routeAuthorizer.authorize({
+      api,
+      route: match.route,
+      request,
+    });
+
+    if (!authorization.admitted) {
+      return this.refusalResponse(authorization);
+    }
+
     const target = this.router.targetFor(match.integration);
 
     if (target === undefined) {
@@ -109,6 +129,7 @@ export class SimApiGatewayV2ServiceController implements SimAwsServiceController
       const event = await this.eventBuilder.build(
         request,
         simHttpApiEndpoint(api, match),
+        { jwt: authorization.jwt },
       );
 
       return this.responseBuilder.build(await target.simFunction.invoke(event));
@@ -119,5 +140,19 @@ export class SimApiGatewayV2ServiceController implements SimAwsServiceController
       // this too.
       return this.errorResponse.internalServerError();
     }
+  }
+
+  /**
+   * The response a refused request gets back.
+   *
+   * An unmet route scope is the one refusal that is a 403: the token was
+   * accepted, and it does not allow this route. Everything else is one 401.
+   */
+  private refusalResponse(refused: SimHttpApiRefused): Response {
+    if (refused.kind === "forbidden") {
+      return this.errorResponse.forbidden();
+    }
+
+    return this.errorResponse.unauthorized(refused.errorDescription);
   }
 }

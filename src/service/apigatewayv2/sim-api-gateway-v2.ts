@@ -9,11 +9,16 @@ import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import {
+  type SimHttpApiJwtIssuerKeys,
+  SimHttpApiNoJwtIssuerKeys,
+} from "./api/authorizer/sim-http-api-jwt-issuer-keys.js";
 import { SimHttpApiStore } from "./api/sim-http-api-store.js";
 import { SimApiGatewayV2CfnResourceFactory } from "./cfn/sim-cfn-api-gateway-v2-resource-factory.js";
 import type { SimHttpApi } from "./api/sim-http-api.js";
 import { SimHttpApiCommands } from "./command/api/sim-http-api-commands.js";
 import { SimApiGatewayV2Authorizer } from "./command/authorize/sim-api-gateway-v2-authorizer.js";
+import { SimHttpApiAuthorizerCommands } from "./command/authorizer/sim-http-api-authorizer-commands.js";
 import { SimHttpApiIntegrationCommands } from "./command/integration/sim-http-api-integration-commands.js";
 import { SimHttpApiRouteCommands } from "./command/route/sim-http-api-route-commands.js";
 import type * as simApiGatewayV2Commands from "./command/sim-api-gateway-v2-command.types.js";
@@ -28,6 +33,12 @@ interface SimApiGatewayV2Properties {
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
   readonly registry?: SimHttpApiRegistry;
+  /**
+   * The issuers this API Gateway's JWT authorizers can verify against. A
+   * standalone simulated API Gateway has none, so a JWT route refuses every
+   * request rather than admitting one it could not check.
+   */
+  readonly jwtIssuerKeys?: SimHttpApiJwtIssuerKeys;
 }
 
 /**
@@ -45,6 +56,7 @@ interface SimApiGatewayV2Properties {
 export class SimApiGatewayV2 {
   private readonly apis = new SimHttpApiStore();
   private readonly apiCommands: SimHttpApiCommands;
+  private readonly authorizerCommands: SimHttpApiAuthorizerCommands;
   private readonly integrationCommands: SimHttpApiIntegrationCommands;
   private readonly routeCommands: SimHttpApiRouteCommands;
   private readonly stageCommands: SimHttpApiStageCommands;
@@ -60,6 +72,7 @@ export class SimApiGatewayV2 {
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
       registry = new SimHttpApiRegistry(),
+      jwtIssuerKeys = new SimHttpApiNoJwtIssuerKeys(),
     } = properties;
 
     const access = new SimHttpApiAccess({
@@ -74,7 +87,9 @@ export class SimApiGatewayV2 {
       access,
       accountRegionScope,
       clock: background,
+      jwtIssuerKeys,
     });
+    this.authorizerCommands = new SimHttpApiAuthorizerCommands({ access });
     this.integrationCommands = new SimHttpApiIntegrationCommands({ access });
     this.routeCommands = new SimHttpApiRouteCommands({ access });
     this.stageCommands = new SimHttpApiStageCommands({
@@ -135,6 +150,39 @@ export class SimApiGatewayV2 {
   ): Promise<simApiGatewayV2Commands.SimDeleteApiCommandOutput> {
     await this.background.sequence();
     return this.apiCommands.deleteApi(command, options);
+  }
+
+  /**
+   * Handle a CreateAuthorizer Command from the SDK.
+   */
+  async createAuthorizer(
+    command: simApiGatewayV2Commands.SimCreateAuthorizerCommand,
+    options?: SimApiGatewayV2RequestOptions,
+  ): Promise<simApiGatewayV2Commands.SimCreateAuthorizerCommandOutput> {
+    await this.background.sequence();
+    return this.authorizerCommands.createAuthorizer(command, options);
+  }
+
+  /**
+   * Handle a GetAuthorizers Command from the SDK.
+   */
+  async getAuthorizers(
+    command: simApiGatewayV2Commands.SimGetAuthorizersCommand,
+    options?: SimApiGatewayV2RequestOptions,
+  ): Promise<simApiGatewayV2Commands.SimGetAuthorizersCommandOutput> {
+    await this.background.sequence();
+    return this.authorizerCommands.getAuthorizers(command, options);
+  }
+
+  /**
+   * Handle a DeleteAuthorizer Command from the SDK.
+   */
+  async deleteAuthorizer(
+    command: simApiGatewayV2Commands.SimDeleteAuthorizerCommand,
+    options?: SimApiGatewayV2RequestOptions,
+  ): Promise<simApiGatewayV2Commands.SimDeleteAuthorizerCommandOutput> {
+    await this.background.sequence();
+    return this.authorizerCommands.deleteAuthorizer(command, options);
   }
 
   /**

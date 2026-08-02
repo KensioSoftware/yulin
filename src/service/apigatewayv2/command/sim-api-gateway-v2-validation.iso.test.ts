@@ -124,14 +124,35 @@ describe("What sim API Gateway v2 refuses rather than ignores", () => {
     ).rejects.toThrow(/IntegrationType 'HTTP_PROXY' is not simulated/);
   });
 
-  it("refuses a route with an authorizer", async () => {
+  it("refuses a route with an authorization type that is not simulated", async () => {
     // Given an API
     const simAws = new SimAws();
     const apiId = await createdApiId(simAws);
 
-    // When a route asks for JWT authorization
-    // Then it is refused, because nothing here would check a token and the
+    // When a route asks for IAM authorization
+    // Then it is refused, because nothing here would check a signature and the
     // route would be open where the real one is closed
+    await expect(
+      simAws.apiGatewayV2().createRoute(
+        new CreateRouteCommand({
+          ApiId: apiId,
+          RouteKey: "$default",
+          Target: "integrations/abcdefgh",
+          AuthorizationType: "AWS_IAM",
+        }),
+      ),
+    ).rejects.toThrow(/AuthorizationType 'AWS_IAM' is not simulated/);
+  });
+
+  it("refuses a JWT route naming no authorizer of its API", async () => {
+    // Given an API with no authorizers
+    const simAws = new SimAws();
+    const apiId = await createdApiId(simAws);
+
+    // When a route asks for JWT authorization without one, and with one the
+    // API does not have
+    // Then each is refused, because a route pointing at nothing would be open
+    // here and closed on AWS
     await expect(
       simAws.apiGatewayV2().createRoute(
         new CreateRouteCommand({
@@ -141,7 +162,39 @@ describe("What sim API Gateway v2 refuses rather than ignores", () => {
           AuthorizationType: "JWT",
         }),
       ),
-    ).rejects.toThrow(/AuthorizationType 'JWT' is not simulated/);
+    ).rejects.toThrow(/AuthorizationType JWT requires AuthorizerId/);
+
+    await expect(
+      simAws.apiGatewayV2().createRoute(
+        new CreateRouteCommand({
+          ApiId: apiId,
+          RouteKey: "$default",
+          Target: "integrations/abcdefgh",
+          AuthorizationType: "JWT",
+          AuthorizerId: "auth01",
+        }),
+      ),
+    ).rejects.toThrow(/AuthorizerId auth01 names no authorizer/);
+  });
+
+  it("refuses route scopes on a route that authorizes nobody", async () => {
+    // Given an API with no authorizers
+    const simAws = new SimAws();
+    const apiId = await createdApiId(simAws);
+
+    // When a route asks for a scope while leaving its authorization at NONE
+    // Then it is refused, since nothing checks a scope on a route that
+    // authorizes nobody
+    await expect(
+      simAws.apiGatewayV2().createRoute(
+        new CreateRouteCommand({
+          ApiId: apiId,
+          RouteKey: "$default",
+          Target: "integrations/abcdefgh",
+          AuthorizationScopes: ["orders.read"],
+        }),
+      ),
+    ).rejects.toThrow(/AuthorizationScopes is set on a route with/);
   });
 
   it("refuses a paged list request", async () => {

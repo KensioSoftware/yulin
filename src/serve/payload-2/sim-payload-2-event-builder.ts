@@ -1,4 +1,3 @@
-import type { SimAwsRequestCaller } from "../../service/iam/request/sim-aws-request-caller.js";
 import { type SimClock, SimRealClock } from "../../util/clock/sim-clock.js";
 import { SimPayload2BodyEncoding } from "./sim-payload-2-body-encoding.js";
 import {
@@ -7,7 +6,10 @@ import {
 } from "./sim-payload-2-connection.js";
 import type { SimPayload2Endpoint } from "./sim-payload-2-endpoint.js";
 import type { SimPayload2Event } from "./sim-payload-2-event.type.js";
-import { SimPayload2RequestContextBuilder } from "./sim-payload-2-request-context.js";
+import {
+  type SimPayload2Authorization,
+  SimPayload2RequestContextBuilder,
+} from "./sim-payload-2-request-context.js";
 import { SimPayload2RequestParts } from "./sim-payload-2-request-parts.js";
 
 interface SimPayload2EventBuilderProperties {
@@ -44,14 +46,14 @@ export class SimPayload2EventBuilder {
   /**
    * Build the invocation event for one request to an endpoint.
    *
-   * A caller is supplied only when the endpoint authenticated one, which is
-   * what makes the authorizer block present for an authorized invocation and
-   * absent for an open one.
+   * An authorization is supplied only when the endpoint authorized a caller,
+   * which is what makes the authorizer block present for an authorized
+   * invocation and absent for an open one.
    */
   async build(
     request: Request,
     endpoint: SimPayload2Endpoint,
-    authenticatedCaller?: SimAwsRequestCaller,
+    authorization?: SimPayload2Authorization,
   ): Promise<SimPayload2Event> {
     const url = new URL(request.url);
     const bytes = new Uint8Array(await request.arrayBuffer());
@@ -74,7 +76,7 @@ export class SimPayload2EventBuilder {
         url,
         endpoint,
         at,
-        ...(authenticatedCaller !== undefined && { authenticatedCaller }),
+        ...(authorization !== undefined && { authorization }),
       }),
       isBase64Encoded:
         bytes.length > 0 && !this.bodyEncoding.isText(contentType),

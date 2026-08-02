@@ -21,14 +21,19 @@ it:
 
 ```text
 SimHttpApi
+├── SimHttpApiAuthorizerStore    authorizers, keyed by allocated id
 ├── SimHttpApiIntegrationStore   integrations, keyed by allocated id
 ├── SimHttpApiRouteStore         routes, keyed by route key
 └── SimHttpApiStageStore         stages, keyed by stage name
 ```
 
-Routes, integrations and stages are all addressed by `ApiId` on real AWS and none of them outlives
-the API, so they live on the API rather than in service-level maps that would have to carry the
-`ApiId` alongside them. Deleting an API therefore deletes everything under it by construction.
+Authorizers, routes, integrations and stages are all addressed by `ApiId` on real AWS and none of
+them outlives the API, so they live on the API rather than in service-level maps that would have to
+carry the `ApiId` alongside them. Deleting an API therefore deletes everything under it by
+construction.
+
+The API also carries the `SimHttpApiJwtIssuerKeys` port its authorizers verify against, for the same
+reason: a served request finds the API and nothing else.
 
 ## Matching a request
 
@@ -69,6 +74,39 @@ A route is stored under its route key signature, which is the key with parameter
 is the identity real API Gateway gives a route: `GET /pets/{id}` and `GET /pets/{petId}` are one
 route, and creating the second is a conflict.
 
+## Authorizing a request
+
+`api/authorizer/` holds the JWT authorizer and everything the decision needs:
+
+```text
+SimHttpApiAuthorizer
+├── SimHttpApiIdentitySource     which header or query parameter carries the token
+├── SimHttpApiJwtConfiguration   the issuer trusted and the audiences accepted
+└── SimHttpApiJwtVerification    the ordered checks, answering an authorization
+    ├── SimHttpApiJwtClaimChecks the issuer, the audience, then the time claims
+    └── SimHttpApiJwtClaims      the claims as the handler receives them
+```
+
+The token parsing and RS256 verification itself is `src/util/jwt/`, which knows nothing about API
+Gateway. It is real verification against the issuer's published JWK, with `node:crypto`: nothing is
+stubbed, and no verification library is imported.
+
+An authorizer names its issuer by URL and nothing else, because a JWT authorizer accepts any OIDC
+issuer. `SimHttpApiJwtIssuerKeys` is the port that turns that URL into keys, and
+`SimCognitoHttpApiJwtIssuerKeys` is the adapter over `SimCognitoUserPoolRegistry`, in the same shape
+as `SimAcmDnsRecords` and `SimRoute53AcmDnsRecords`. A standalone `SimApiGatewayV2` gets
+`SimHttpApiNoJwtIssuerKeys`, where every issuer publishes nothing, so a JWT route stays closed rather
+than admitting a token it could not check.
+
+Nothing is fetched over HTTP, deliberately. `SimCognitoOpenIdConfiguration` publishes an `issuer`
+naming the localhost origin it is served from, while a token's `iss` names the real AWS URL, so an
+OIDC-conformant discovery client would reject its own pool's tokens. Resolving in process compares
+`pool.issuerUrl` against the token's `iss`, and both come from the same getter.
+
+`SimHttpApiAuthorization` is what a decision answers with: `SimHttpApiAdmitted`, carrying the `jwt`
+block for the event, or `SimHttpApiRefused`, which is a 401 for everything up to and including claim
+validation and a 403 only for an unmet route scope.
+
 `registry/sim-http-api-registry.ts` is the one thing outside that tree. A served request carries the
 API id and the region in its hostname, but not the Account, so the registry maps an id to the
 Account that owns it. Ids are allocated there, which is what makes them unique across every Account
@@ -103,34 +141,40 @@ lives.
    the integrated function from the integration's ARN. The function is looked up in the Account and
    Region its own ARN names, which need not be the API's, and the router hands back that Account's
    IAM alongside the function.
-2. `serve/auth/sim-http-api-integration-authorizer.ts` asks whether the API may invoke the function
+2. `serve/auth/sim-http-api-route-authorizer.ts` asks whether the client may have the matched route.
+   This comes first, before the integration is even looked up: a request presenting no token is
+   refused whether or not the integration behind the route would have worked. A route with
+   `AuthorizationType: NONE` admits everyone with no caller to describe.
+3. `serve/auth/sim-http-api-integration-authorizer.ts` asks whether the API may invoke the function
    at all. The caller is the service principal `apigateway.amazonaws.com`, the action is
    `lambda:InvokeFunction`, and the request supplies `AWS:SourceArn` from
    `api/sim-http-api-execute-api-arn.ts`. A function with no matching permission answers 500 and is
    never invoked, as it is on real AWS. That ARN builder carries the reasoning for what the method
    and path segments of the ARN hold, since neither is documented by AWS.
-3. `sim-http-api-endpoint.ts` describes the API, the matched route and the stage as a
+4. `sim-http-api-endpoint.ts` describes the API, the matched route and the stage as a
    `SimPayload2Endpoint`, including what the route captured from the path.
-4. `src/serve/payload-2/` builds the payload format 2.0 event and turns the handler's result back
+5. `src/serve/payload-2/` builds the payload format 2.0 event and turns the handler's result back
    into an HTTP response. That machinery is shared with Lambda Function URLs, which speak the same
    format.
-5. `sim-api-gateway-v2-error-response.ts` answers the cases where there is nothing to proxy to. The
+6. `sim-api-gateway-v2-error-response.ts` answers the cases where there is nothing to proxy to. The
    field is lower-case `message`, which is what an HTTP API uses; a Function URL uses `Message` for
    the same thing.
 
 ## CloudFormation
 
-`cfn/` creates the four `AWS::ApiGatewayV2::*` Resource types this simulation deploys, one directory
+`cfn/` creates the five `AWS::ApiGatewayV2::*` Resource types this simulation deploys, one directory
 per type, each with a creator and a properties reader:
 
 ```text
 cfn/
 ├── sim-cfn-api-gateway-v2-resource-factory.ts   switches on the bare type name
-├── sim-cfn-api-gateway-v2-property-parser.ts    the allow-list and the value shapes
+├── sim-cfn-api-gateway-v2-property-parser.ts    the allow-list of properties
+├── sim-cfn-api-gateway-v2-property-values.ts    the value shapes each may take
 ├── sim-cfn-http-api-template.factory.ts         the template tests deploy
 ├── api/         Api
+├── authorizer/  Authorizer
 ├── integration/ Integration, and the two IntegrationUri forms
-├── route/       Route, and the skipped-authorizer refusal
+├── route/       Route
 └── stage/       Stage
 ```
 
@@ -139,10 +183,9 @@ caller is, and the refusals above apply to a deployed Resource as well. Each pro
 the properties its type simulates and refuses every other one by name, which is what keeps a template
 from deploying an API that looks configured to the template and unconfigured to every request.
 
-`route/sim-cfn-http-api-skipped-authorizer.ts` is the one refusal that is not about a property shape.
-An `AWS::ApiGatewayV2::Authorizer` is skipped rather than failed, and a `Ref` to a skipped Resource
-resolves to its own logical ID, so a route would otherwise deploy holding a logical ID where an
-authorizer id belongs.
+A `Route` naming an `AuthorizerId` no authorizer of the API has is refused by `CreateRoute`, which is
+also what catches a `Ref` to a Resource this simulation skipped: a skipped Resource matches no value
+adapter, so the `Ref` resolves to its own logical ID, and no authorizer has that id.
 
 The CloudFormation-facing `Ref` and `Fn::GetAtt` values live in
 `src/service/cloudformation/resource/cfn/apigatewayv2/` instead, beside the other services' adapters,
@@ -160,7 +203,12 @@ simulation exists to avoid:
 - an integration type other than `AWS_PROXY`, and an integration URI that is not an unqualified
   Lambda function ARN
 - a malformed route key, refused at `CreateRoute`, which is where real API Gateway refuses it
-- an authorization type other than `NONE`
+- an authorization type other than `NONE` or `JWT`, and an `AuthorizerId` or `AuthorizationScopes` on
+  a route that authorizes nobody
+- an authorizer type other than `JWT`, and every option only a Lambda `REQUEST` authorizer takes,
+  including `AuthorizerResultTtlInSeconds`
+- more than one `IdentitySource`, and an identity source naming neither a header nor a query string
+  parameter
 - a stage name that is neither `$default` nor something a URL path segment could hold, and a stage
   without `AutoDeploy: true`, since Deployments are not simulated and such a stage serves nothing on
   real AWS

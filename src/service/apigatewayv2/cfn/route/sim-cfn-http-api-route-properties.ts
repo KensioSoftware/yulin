@@ -5,16 +5,14 @@ import { SimCfnApiGatewayV2PropertyParser } from "../sim-cfn-api-gateway-v2-prop
 
 /**
  * The AWS::ApiGatewayV2::Route properties this simulation deploys.
- *
- * `AuthorizerId` and `AuthorizationScopes` are left out along with the
- * authorizer Resource type itself, so a template carrying one is refused by
- * name rather than deploying a route that would be closed on AWS.
  */
 const simulatedProperties = [
   "ApiId",
   "RouteKey",
   "Target",
   "AuthorizationType",
+  "AuthorizerId",
+  "AuthorizationScopes",
 ];
 
 interface SimCfnHttpApiRoutePropertiesProperties {
@@ -58,9 +56,10 @@ export class SimCfnHttpApiRouteProperties {
    *
    * The target arrives as the `integrations/<integration-id>` string CDK
    * builds with `Fn::Join`, which is also the only form the command takes, so
-   * it is passed straight through. `AuthorizationType` is passed through too,
-   * so an authorization type that is not simulated is refused by CreateRoute
-   * with the reason it is refused.
+   * it is passed straight through. `AuthorizationType` and `AuthorizerId` are
+   * passed through too, so an authorization type that is not simulated, and an
+   * authorizer id naming nothing on the API, are both refused by CreateRoute
+   * with the reason it refuses them.
    */
   createRouteInput(): SimCreateRouteCommandInput {
     return {
@@ -79,6 +78,16 @@ export class SimCfnHttpApiRouteProperties {
         this.resource,
         this.properties["AuthorizationType"],
         "AuthorizationType",
+      ),
+      AuthorizerId: this.propertyParser.optionalString(
+        this.resource,
+        this.properties["AuthorizerId"],
+        "AuthorizerId",
+      ),
+      AuthorizationScopes: this.propertyParser.optionalStringList(
+        this.resource,
+        this.properties["AuthorizationScopes"],
+        "AuthorizationScopes",
       ),
     };
   }

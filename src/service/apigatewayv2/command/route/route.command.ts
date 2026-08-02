@@ -1,5 +1,5 @@
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
-import type { SimHttpApiRouteView } from "../../api/route/sim-http-api-route.js";
+import type { SimHttpApiRouteView } from "../../api/route/sim-http-api-route-view.js";
 
 /**
  * Minimal structural sim API Gateway v2 CreateRoute command.
@@ -15,6 +15,8 @@ export interface SimCreateRouteCommandInput {
   readonly RouteKey?: string | undefined;
   readonly Target?: string | undefined;
   readonly AuthorizationType?: string | undefined;
+  readonly AuthorizerId?: string | undefined;
+  readonly AuthorizationScopes?: readonly string[] | undefined;
 }
 
 export interface SimCreateRouteCommandOutput extends SimHttpApiRouteView {

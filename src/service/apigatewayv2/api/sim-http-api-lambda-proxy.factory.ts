@@ -7,6 +7,10 @@ import type { SimAws } from "../../aws/sim-aws.js";
 import { makeLambdaZipFileInput } from "../../lambda/function/code/lambda-zip-file-input.js";
 import { simApiGatewayServicePrincipal } from "../serve/auth/sim-http-api-integration-authorizer.js";
 import type { SimHttpApi } from "./sim-http-api.js";
+import {
+  simHttpApiProxyAuthorization,
+  type SimHttpApiProxyAuthorizer,
+} from "./sim-http-api-proxy-authorization.js";
 
 /**
  * What a test asks for when it wants an HTTP API that serves something.
@@ -25,6 +29,13 @@ export interface SimHttpApiLambdaProxyInput {
   readonly disableExecuteApiEndpoint: boolean;
   /** The route keys the API routes, all onto the one integration. */
   readonly routeKeys: readonly string[];
+  /**
+   * The JWT authorizer every route goes through, or undefined for an API
+   * whose routes admit anyone.
+   */
+  readonly jwtAuthorizer: SimHttpApiProxyAuthorizer | undefined;
+  /** The scopes every route asks a token for. */
+  readonly authorizationScopes: readonly string[];
   /** The stages the API serves from. */
   readonly stageNames: readonly string[];
   /** The variables every one of those stages carries. */
@@ -75,6 +86,8 @@ export const simHttpApiLambdaProxyFactory = new AsyncMappedFactory<
     handler: (): string => "hello",
     disableExecuteApiEndpoint: false,
     routeKeys: ["$default"],
+    jwtAuthorizer: undefined,
+    authorizationScopes: [],
     stageNames: ["$default"],
     stageVariables: {},
     invokePermission: true,
@@ -108,6 +121,12 @@ export const simHttpApiLambdaProxyFactory = new AsyncMappedFactory<
         },
       });
 
+    const authorization = await simHttpApiProxyAuthorization(simApiGatewayV2, {
+      apiId,
+      jwtAuthorizer: input.jwtAuthorizer,
+      authorizationScopes: input.authorizationScopes,
+    });
+
     await Promise.all(
       input.routeKeys.map(async (routeKey) =>
         simApiGatewayV2.createRoute({
@@ -115,6 +134,7 @@ export const simHttpApiLambdaProxyFactory = new AsyncMappedFactory<
             ApiId: apiId,
             RouteKey: routeKey,
             Target: `integrations/${integrationId}`,
+            ...authorization,
           },
         }),
       ),
