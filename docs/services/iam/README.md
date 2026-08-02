@@ -217,8 +217,13 @@ paths is allowed. Stored Policies can be inspected with `GetPolicyCommand` and
 ## Policy conditions
 
 Policy statements can carry `Condition` blocks. Sim IAM currently supports the `StringEquals`,
-`StringLike`, and `NumericLessThanEquals` operators, along with the `ForAllValues:` and
-`ForAnyValue:` set variants of `StringEquals` and `StringLike`.
+`StringLike`, `ArnLike`, `ArnEquals` and `NumericLessThanEquals` operators, along with the
+`ForAllValues:` and `ForAnyValue:` set variants of `StringEquals` and `StringLike`.
+
+`ArnLike` and `ArnEquals` behave identically, as AWS documents them doing. Both compare the six
+colon-delimited components of an ARN separately, and both accept `*` and `?` wildcards in any of
+them. A wildcard stays inside the component it is written in, so `arn:aws:s3:*` matches nothing: a
+pattern needs as many components as the ARN it is matched against.
 
 Condition context values are supplied by the service handling the simulated request, such as S3
 object tags. Sim IAM automatically derives global values it can work out itself, such as

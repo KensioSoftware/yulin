@@ -63,6 +63,17 @@ export class SimHttpApiMethodRouteKey implements SimHttpApiRouteKey {
     return this.path.match(request.segments);
   }
 
+  /**
+   * Name this route in an `execute-api` ARN, as `GET/pets/{petId}`.
+   *
+   * The path is the route key's template, braces and all, rather than the path
+   * the request asked for. The method is the request's, since a route key of
+   * `ANY /pets` serves a request of any method and the ARN names one method.
+   */
+  methodAndPath(requestMethod: string): string {
+    return `${requestMethod}${this.path.text}`;
+  }
+
   private get tier(): number {
     if (this.path.hasGreedySegment) {
       return greedyMatchTier;

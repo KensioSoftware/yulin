@@ -26,4 +26,13 @@ export interface SimHttpApiRouteKey {
    * nothing when it does not match.
    */
   match(request: SimHttpApiRouteRequest): SimHttpApiPathParameters | undefined;
+  /**
+   * How this route names itself in an `execute-api` ARN, given the method of
+   * the request that matched it.
+   *
+   * The method is the request's rather than the route's, because a route key
+   * of `ANY /pets` is matched by a `GET` request and API Gateway puts a
+   * concrete verb in the ARN. `SimHttpApiExecuteApiArn` has the reasoning.
+   */
+  methodAndPath(requestMethod: string): string;
 }

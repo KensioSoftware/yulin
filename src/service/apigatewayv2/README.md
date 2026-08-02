@@ -101,13 +101,20 @@ lives.
 
 1. `sim-api-gateway-v2-router.ts` finds the API from the request hostname, through the registry, and
    the integrated function from the integration's ARN. The function is looked up in the Account and
-   Region its own ARN names, which need not be the API's.
-2. `sim-http-api-endpoint.ts` describes the API, the matched route and the stage as a
+   Region its own ARN names, which need not be the API's, and the router hands back that Account's
+   IAM alongside the function.
+2. `serve/auth/sim-http-api-integration-authorizer.ts` asks whether the API may invoke the function
+   at all. The caller is the service principal `apigateway.amazonaws.com`, the action is
+   `lambda:InvokeFunction`, and the request supplies `AWS:SourceArn` from
+   `api/sim-http-api-execute-api-arn.ts`. A function with no matching permission answers 500 and is
+   never invoked, as it is on real AWS. That ARN builder carries the reasoning for what the method
+   and path segments of the ARN hold, since neither is documented by AWS.
+3. `sim-http-api-endpoint.ts` describes the API, the matched route and the stage as a
    `SimPayload2Endpoint`, including what the route captured from the path.
-3. `src/serve/payload-2/` builds the payload format 2.0 event and turns the handler's result back
+4. `src/serve/payload-2/` builds the payload format 2.0 event and turns the handler's result back
    into an HTTP response. That machinery is shared with Lambda Function URLs, which speak the same
    format.
-4. `sim-api-gateway-v2-error-response.ts` answers the cases where there is nothing to proxy to. The
+5. `sim-api-gateway-v2-error-response.ts` answers the cases where there is nothing to proxy to. The
    field is lower-case `message`, which is what an HTTP API uses; a Function URL uses `Message` for
    the same thing.
 
@@ -129,6 +136,5 @@ simulation exists to avoid:
   real AWS
 - `MaxResults`/`NextToken`, since every list command answers in full
 
-The function's resource policy is not evaluated when the integration invokes it. See
-[docs/services/apigatewayv2/README.md](../../../docs/services/apigatewayv2/README.md) for the
+See [docs/services/apigatewayv2/README.md](../../../docs/services/apigatewayv2/README.md) for the
 user-facing limitations.

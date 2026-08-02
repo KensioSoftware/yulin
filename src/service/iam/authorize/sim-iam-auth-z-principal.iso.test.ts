@@ -9,6 +9,29 @@ import {
 } from "@kensio/smartass";
 import { SimIamPolicyDecisionValue } from "./sim-iam-decision.js";
 import { makeSimAwsAccountId } from "../../aws/sim-aws-account.js";
+import type { SimIamResourcePolicyInput } from "./context/sim-iam-auth-z-context-builder.js";
+
+const functionArn = "arn:aws:lambda:us-east-1:888888888888:function:orders";
+
+/**
+ * A function resource policy granting one service principal the invoke action.
+ */
+function servicePolicy(service: string): SimIamResourcePolicyInput {
+  return {
+    document: {
+      Statement: [
+        {
+          Effect: "Allow",
+          Principal: { Service: service },
+          Action: "lambda:InvokeFunction",
+          Resource: functionArn,
+        },
+      ],
+    },
+    policyName: "FunctionPolicy",
+    resourceArn: functionArn,
+  };
+}
 
 describe("sim IAM authorization principal", () => {
   it("authorizes from caller context principal", async () => {
@@ -119,5 +142,48 @@ describe("sim IAM authorization principal", () => {
     assertFalse(decision.isExplicitDeny);
     assertArrayLength(decision.allowStatements, 1);
     assertArrayLength(decision.explicitDenyStatements, 0);
+  });
+
+  it("allows the service a resource policy names", () => {
+    // Given a resource policy granting one AWS service the action
+    const simIam = new SimAws().iam();
+
+    // When that service asks for it
+    const decision = simIam.authorize({
+      action: "lambda:InvokeFunction",
+      resource: functionArn,
+      caller: { kind: "service", service: "apigateway.amazonaws.com" },
+      resourcePolicies: [servicePolicy("apigateway.amazonaws.com")],
+    });
+
+    // Then the statement names the caller, which has no Account for it to
+    // delegate to
+    assertTrue(decision.isAllowed);
+  });
+
+  it("does not allow another service, or a principal that is not one", () => {
+    // Given the same resource policy
+    const simIam = new SimAws().iam();
+
+    // When another service asks, and when an ordinary Role principal does
+    const otherService = simIam.authorize({
+      action: "lambda:InvokeFunction",
+      resource: functionArn,
+      caller: { kind: "service", service: "s3.amazonaws.com" },
+      resourcePolicies: [servicePolicy("apigateway.amazonaws.com")],
+    });
+    const role = simIam.authorize({
+      action: "lambda:InvokeFunction",
+      resource: functionArn,
+      caller: {
+        kind: "arn",
+        arn: "arn:aws:iam::888888888888:role/Caller",
+      },
+      resourcePolicies: [servicePolicy("apigateway.amazonaws.com")],
+    });
+
+    // Then neither is the service the statement names
+    assertTrue(otherService.isImplicitDeny);
+    assertTrue(role.isImplicitDeny);
   });
 });

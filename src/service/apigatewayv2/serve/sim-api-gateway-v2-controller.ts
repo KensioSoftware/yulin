@@ -5,8 +5,10 @@ import type {
 import { SimPayload2EventBuilder } from "../../../serve/payload-2/sim-payload-2-event-builder.js";
 import { SimPayload2ResponseBuilder } from "../../../serve/payload-2/sim-payload-2-response-builder.js";
 import { SimAws } from "../../aws/sim-aws.js";
+import { SimHttpApiExecuteApiArn } from "../api/sim-http-api-execute-api-arn.js";
 import { SimHttpApiRequest } from "../api/sim-http-api-request.js";
 import type { SimHttpApi } from "../api/sim-http-api.js";
+import { SimHttpApiIntegrationAuthorizer } from "./auth/sim-http-api-integration-authorizer.js";
 import { SimApiGatewayV2ErrorResponse } from "./sim-api-gateway-v2-error-response.js";
 import { SimApiGatewayV2Router } from "./sim-api-gateway-v2-router.js";
 import { simHttpApiEndpoint } from "./sim-http-api-endpoint.js";
@@ -25,7 +27,8 @@ interface SimApiGatewayV2ServiceControllerProperties {
  * any other invocation.
  *
  * Every simulated route is `AuthorizationType: NONE`, so nothing here refuses
- * a caller. A request that reached the endpoint reaches the integration.
+ * the client. The integration still has to be allowed to invoke the function,
+ * which is a separate question and the API's own rather than the client's.
  */
 export class SimApiGatewayV2ServiceController implements SimAwsServiceController {
   private readonly router: SimApiGatewayV2Router;
@@ -76,11 +79,29 @@ export class SimApiGatewayV2ServiceController implements SimAwsServiceController
       return this.errorResponse.notFound();
     }
 
-    const simFunction = this.router.functionFor(match.integration);
+    const target = this.router.targetFor(match.integration);
 
-    if (simFunction === undefined) {
+    if (target === undefined) {
       // The integration names a function that is not there, which real API
       // Gateway discovers the same way: only when it tries to invoke it.
+      return this.errorResponse.internalServerError();
+    }
+
+    const decision = new SimHttpApiIntegrationAuthorizer({
+      iam: target.iam,
+    }).authorize({
+      simFunction: target.simFunction,
+      sourceArn: new SimHttpApiExecuteApiArn({
+        api,
+        stageName: match.stage.stageName,
+        methodAndPath: match.route.key.methodAndPath(request.method),
+      }),
+    });
+
+    if (decision.isDenied) {
+      // Real API Gateway answers a missing invoke permission with a 500 and
+      // never invokes the function, which is the same answer as an integration
+      // that failed. The refusal is only visible in the API's own logs.
       return this.errorResponse.internalServerError();
     }
 
@@ -90,7 +111,7 @@ export class SimApiGatewayV2ServiceController implements SimAwsServiceController
         simHttpApiEndpoint(api, match),
       );
 
-      return this.responseBuilder.build(await simFunction.invoke(event));
+      return this.responseBuilder.build(await target.simFunction.invoke(event));
     } catch {
       // Real API Gateway reports an unhandled integration error as a 500, with
       // the error itself only visible in the function's logs. Reading the

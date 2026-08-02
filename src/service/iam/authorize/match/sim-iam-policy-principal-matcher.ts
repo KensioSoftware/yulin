@@ -89,7 +89,6 @@ export class SimIamPolicyPrincipalMatcher {
         );
       }
 
-      /* v8 ignore if -- service principals not yet fully supported */
       if (type === "Service") {
         return this.firstMatch(patterns, (pattern) =>
           this.servicePatternMatches(pattern),
@@ -144,12 +143,14 @@ export class SimIamPolicyPrincipalMatcher {
 
   /**
    * Compare a service principal pattern with the resolved caller.
+   *
+   * A service principal has no ARN and no Account, so this is a direct grant
+   * or nothing: there is no Account for a statement to delegate to. It is what
+   * admits an API Gateway integration invoking a Lambda function.
    */
   private servicePatternMatches(pattern: string): SimIamPrincipalMatch {
-    /* v8 ignore next -- service principals not yet fully supported */
     const service = this.context.caller.service;
 
-    /* v8 ignore next -- service principals not yet fully supported */
     return SimIamPrincipalMatch.direct().when(
       service !== undefined &&
         simIamWildcardMatch(pattern, service, {
