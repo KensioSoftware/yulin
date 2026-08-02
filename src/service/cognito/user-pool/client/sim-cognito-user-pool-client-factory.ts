@@ -8,6 +8,10 @@ import {
   SimCognitoTokenValidity,
   type SimCognitoTokenValidityInput,
 } from "./sim-cognito-token-validity.js";
+import {
+  SimCognitoUnsimulatedClientSettings,
+  type SimCognitoUnsimulatedClientSettingsType,
+} from "./sim-cognito-unsimulated-client-settings.js";
 import { SimCognitoUserPoolClient } from "./sim-cognito-user-pool-client.js";
 import { makeSimCognitoUserPoolClientId } from "./sim-cognito-user-pool-client-id.js";
 
@@ -22,6 +26,13 @@ interface SimCognitoMakeUserPoolClientProperties {
   readonly explicitAuthFlows?: readonly string[] | undefined;
   readonly preventUserExistenceErrors?: string | undefined;
   readonly tokenValidity: SimCognitoTokenValidityInput;
+
+  /**
+   * The settings the request set that this simulation accepts without acting
+   * on, which a described client reports back.
+   */
+  readonly unsimulatedSettings?:
+    SimCognitoUnsimulatedClientSettingsType | undefined;
 }
 
 /**
@@ -61,6 +72,9 @@ export class SimCognitoUserPoolClientFactory {
         properties.preventUserExistenceErrors,
       ),
       tokenValidity: new SimCognitoTokenValidity(properties.tokenValidity),
+      unsimulatedSettings: new SimCognitoUnsimulatedClientSettings(
+        properties.unsimulatedSettings ?? {},
+      ),
       createdDate: this.clock.now(),
     });
   }

@@ -9,6 +9,10 @@ import {
 import { SimCognitoUserPool } from "./sim-cognito-user-pool.js";
 import { SimCognitoUserPoolArn } from "./sim-cognito-user-pool-arn.js";
 import { makeSimCognitoUserPoolId } from "./sim-cognito-user-pool-id.js";
+import {
+  SimCognitoUnsimulatedPoolSettings,
+  type SimCognitoUnsimulatedPoolSettingsType,
+} from "./sim-cognito-unsimulated-pool-settings.js";
 import type { SimCognitoUserPoolStore } from "./sim-cognito-user-pool-store.js";
 
 interface SimCognitoUserPoolFactoryProperties {
@@ -21,6 +25,13 @@ interface SimCognitoMakeUserPoolProperties {
   readonly name: string | undefined;
   readonly policies?: SimCognitoUserPoolPoliciesType | undefined;
   readonly deletionProtection?: string | undefined;
+
+  /**
+   * The settings the request set that this simulation accepts without acting
+   * on, which a described pool reports back.
+   */
+  readonly unsimulatedSettings?:
+    SimCognitoUnsimulatedPoolSettingsType | undefined;
 }
 
 /**
@@ -65,6 +76,9 @@ export class SimCognitoUserPoolFactory {
       ),
       deletionProtection: new SimCognitoDeletionProtection(
         properties.deletionProtection,
+      ),
+      unsimulatedSettings: new SimCognitoUnsimulatedPoolSettings(
+        properties.unsimulatedSettings ?? {},
       ),
       createdDate: this.clock.now(),
     });

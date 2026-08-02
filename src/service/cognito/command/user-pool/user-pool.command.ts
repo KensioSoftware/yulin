@@ -1,15 +1,17 @@
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
 import type { SimCognitoUserPoolPoliciesType } from "../../user-pool/sim-cognito-password-policy.js";
+import type { SimCognitoUnsimulatedPoolSettingsType } from "../../user-pool/sim-cognito-unsimulated-pool-settings.js";
 
 /**
  * A user pool as sim Cognito reports it.
  *
- * Only the properties this simulation models appear. Real Cognito reports
- * more, including the pool's schema attributes and its message templates.
+ * Only the properties this simulation models appear, alongside the ones it
+ * accepts without acting on and reports back so a request's intent stays
+ * visible. Real Cognito reports more, including the pool's schema attributes.
  *
  * https://docs.aws.amazon.com/cognito-user-identity-pools/latest/APIReference/API_UserPoolType.html
  */
-export interface SimCognitoUserPoolType {
+export interface SimCognitoUserPoolType extends SimCognitoUnsimulatedPoolSettingsType {
   readonly Id?: string | undefined;
   readonly Name?: string | undefined;
   readonly Arn?: string | undefined;

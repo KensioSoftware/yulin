@@ -12,6 +12,10 @@ export class SimCognitoUserPoolView {
   /**
    * A pool as `CreateUserPool` and `DescribeUserPool` report it.
    *
+   * The settings the pool accepted without acting on are reported back as
+   * the request set them, so a template's declaration stays visible. Nothing
+   * here reads any of them.
+   *
    * `MfaConfiguration` is always `OFF` because MFA is not simulated.
    * `EstimatedNumberOfUsers` is how many users the pool holds now. Real
    * Cognito refreshes that number periodically rather than on each write, so
@@ -28,6 +32,7 @@ export class SimCognitoUserPoolView {
       EstimatedNumberOfUsers: pool.userCount,
       CreationDate: pool.creationDate,
       LastModifiedDate: pool.lastModifiedDate,
+      ...pool.unsimulatedSettings.toOutput(),
     };
   }
 

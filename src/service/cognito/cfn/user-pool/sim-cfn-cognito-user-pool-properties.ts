@@ -4,6 +4,7 @@ import type {
   SimCfnTemplateValueRecord,
 } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimCreateUserPoolCommandInput } from "../../command/user-pool/user-pool.command.js";
+import { SimCfnCognitoGeneratedName } from "../sim-cfn-cognito-generated-name.js";
 import { SimCfnCognitoPropertyParser } from "../sim-cfn-cognito-property-parser.js";
 import { SimCfnCognitoPolicies } from "./sim-cfn-cognito-policies.js";
 
@@ -14,6 +15,13 @@ import { SimCfnCognitoPolicies } from "./sim-cfn-cognito-policies.js";
  * accepts each at its AWS default and refuses it otherwise, in words that say
  * why. A CDK stack states both routinely, so refusing them outright would
  * refuse templates that ask for nothing unsimulated.
+ *
+ * The six from `AccountRecoverySetting` down are here for the same reason,
+ * and are the six a CDK `UserPool` construct emits when it was asked for
+ * nothing in particular. Each configures message delivery, verification
+ * wording or account recovery, none of which is simulated, so CreateUserPool
+ * accepts each at the one value that asks for nothing this simulation does
+ * not already do and refuses it at every other.
  */
 const simulatedProperties = [
   "UserPoolName",
@@ -21,6 +29,12 @@ const simulatedProperties = [
   "DeletionProtection",
   "MfaConfiguration",
   "UserPoolTier",
+  "AccountRecoverySetting",
+  "AdminCreateUserConfig",
+  "EmailVerificationMessage",
+  "EmailVerificationSubject",
+  "SmsVerificationMessage",
+  "VerificationMessageTemplate",
 ];
 
 interface SimCfnCognitoUserPoolPropertiesProperties {
@@ -59,7 +73,7 @@ export class SimCfnCognitoUserPoolProperties {
    */
   createUserPoolInput(): SimCreateUserPoolCommandInput {
     return {
-      PoolName: this.string(this.properties["UserPoolName"], "UserPoolName"),
+      PoolName: this.poolName(),
       Policies: new SimCfnCognitoPolicies({
         resource: this.resource,
         propertyParser: this.propertyParser,
@@ -76,7 +90,62 @@ export class SimCfnCognitoUserPoolProperties {
         this.properties["UserPoolTier"],
         "UserPoolTier",
       ),
+      AccountRecoverySetting: this.record(
+        this.properties["AccountRecoverySetting"],
+        "AccountRecoverySetting",
+      ),
+      AdminCreateUserConfig: this.record(
+        this.properties["AdminCreateUserConfig"],
+        "AdminCreateUserConfig",
+      ),
+      VerificationMessageTemplate: this.record(
+        this.properties["VerificationMessageTemplate"],
+        "VerificationMessageTemplate",
+      ),
+      EmailVerificationMessage: this.string(
+        this.properties["EmailVerificationMessage"],
+        "EmailVerificationMessage",
+      ),
+      EmailVerificationSubject: this.string(
+        this.properties["EmailVerificationSubject"],
+        "EmailVerificationSubject",
+      ),
+      SmsVerificationMessage: this.string(
+        this.properties["SmsVerificationMessage"],
+        "SmsVerificationMessage",
+      ),
     };
+  }
+
+  /**
+   * The pool's name, generated from the stack and the logical ID when the
+   * template names none, as real CloudFormation generates one.
+   */
+  private poolName(): string {
+    const named = this.string(this.properties["UserPoolName"], "UserPoolName");
+
+    if (named !== undefined) {
+      return named;
+    }
+
+    return new SimCfnCognitoGeneratedName({
+      stackName: this.resource.stackName,
+      logicalId: this.resource.logicalId,
+    }).value;
+  }
+
+  /**
+   * A property carried as an object, passed on to CreateUserPool as written.
+   *
+   * The keys inside are not checked here. CreateUserPool compares the whole
+   * object against the one value it accepts, which refuses an unknown key
+   * along with everything else that differs.
+   */
+  private record(
+    value: SimCfnTemplateValue | undefined,
+    label: string,
+  ): object | undefined {
+    return this.propertyParser.optionalRecord(this.resource, value, label);
   }
 
   private string(

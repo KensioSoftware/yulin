@@ -3,6 +3,7 @@ import type { SimCognitoUserPoolId } from "../sim-cognito-user-pool-id.js";
 import type { SimCognitoExplicitAuthFlows } from "./sim-cognito-explicit-auth-flows.js";
 import type { SimCognitoPreventUserExistenceErrors } from "./sim-cognito-prevent-user-existence-errors.js";
 import type { SimCognitoTokenValidity } from "./sim-cognito-token-validity.js";
+import type { SimCognitoUnsimulatedClientSettings } from "./sim-cognito-unsimulated-client-settings.js";
 import type { SimCognitoUserPoolClientId } from "./sim-cognito-user-pool-client-id.js";
 
 interface SimCognitoUserPoolClientProperties {
@@ -13,6 +14,7 @@ interface SimCognitoUserPoolClientProperties {
   readonly explicitAuthFlows: SimCognitoExplicitAuthFlows;
   readonly preventUserExistenceErrors: SimCognitoPreventUserExistenceErrors;
   readonly tokenValidity: SimCognitoTokenValidity;
+  readonly unsimulatedSettings: SimCognitoUnsimulatedClientSettings;
   readonly createdDate: Date;
 }
 
@@ -31,6 +33,13 @@ export class SimCognitoUserPoolClient {
   public readonly explicitAuthFlows: SimCognitoExplicitAuthFlows;
   public readonly preventUserExistenceErrors: SimCognitoPreventUserExistenceErrors;
   public readonly tokenValidity: SimCognitoTokenValidity;
+
+  /**
+   * What the client was created with and nothing here acts on, kept so a
+   * described client reports it.
+   */
+  public readonly unsimulatedSettings: SimCognitoUnsimulatedClientSettings;
+
   public readonly creationDate: Date;
 
   /**
@@ -47,6 +56,7 @@ export class SimCognitoUserPoolClient {
     this.explicitAuthFlows = properties.explicitAuthFlows;
     this.preventUserExistenceErrors = properties.preventUserExistenceErrors;
     this.tokenValidity = properties.tokenValidity;
+    this.unsimulatedSettings = properties.unsimulatedSettings;
     this.creationDate = properties.createdDate;
   }
 

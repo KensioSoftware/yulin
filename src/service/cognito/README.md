@@ -161,6 +161,21 @@ to a Command that has nowhere to refuse them. Properties the API does know, such
 `MfaConfiguration`, are passed through instead, so the refusal that reaches the reader is the one
 that says why.
 
+A property whose only accepted value is one particular value counts as simulated at this layer and
+is judged by the Command that receives it, so the value is judged in one place rather than two.
+`SimCognitoUnsimulatedInput` compares a string or a boolean, and `SimCognitoUnsimulatedStructure`
+compares an object by its contents, through the canonical rendering in
+`SimCognitoCanonicalValue`. What each Command accepts and why is in the doc comments on
+`SimCognitoUnsimulatedUserPoolFeatures` and `SimCognitoUnsimulatedUserPoolMessaging`. The values
+each pool and client was created with are kept in `SimCognitoUnsimulatedPoolSettings` and
+`SimCognitoUnsimulatedClientSettings`, which exist only so a described resource reports back what
+its request set.
+
+`UserPoolName` and `ClientName` are both optional, and a CDK `UserPool` construct emits neither,
+while both creation Commands require a name. `SimCfnCognitoGeneratedName` generates one from the
+stack name and the logical ID. One class covers both because Cognito gives a pool and a client the
+same name rules.
+
 `Ref` and `Fn::GetAtt` live in `cloudformation/resource/cfn/cognito/`, one adapter per Resource
 type, rather than on the service objects.
 

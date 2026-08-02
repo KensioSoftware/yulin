@@ -10,6 +10,7 @@ import type { SimCognitoName } from "./sim-cognito-name.js";
 import type { SimCognitoPasswordPolicy } from "./sim-cognito-password-policy.js";
 import type { SimCognitoUserPoolArn } from "./sim-cognito-user-pool-arn.js";
 import type { SimCognitoUserPoolId } from "./sim-cognito-user-pool-id.js";
+import type { SimCognitoUnsimulatedPoolSettings } from "./sim-cognito-unsimulated-pool-settings.js";
 import {
   SimCognitoSigningKey,
   type SimCognitoJwks,
@@ -24,6 +25,7 @@ interface SimCognitoUserPoolProperties {
   readonly name: SimCognitoName;
   readonly passwordPolicy: SimCognitoPasswordPolicy;
   readonly deletionProtection: SimCognitoDeletionProtection;
+  readonly unsimulatedSettings: SimCognitoUnsimulatedPoolSettings;
   readonly createdDate: Date;
 }
 
@@ -40,6 +42,13 @@ export class SimCognitoUserPool {
   public readonly name: string;
   public readonly passwordPolicy: SimCognitoPasswordPolicy;
   public readonly deletionProtection: SimCognitoDeletionProtection;
+
+  /**
+   * What the pool was created with and nothing here acts on, kept so a
+   * described pool reports it.
+   */
+  public readonly unsimulatedSettings: SimCognitoUnsimulatedPoolSettings;
+
   public readonly creationDate: Date;
 
   /**
@@ -59,6 +68,7 @@ export class SimCognitoUserPool {
     this.name = properties.name.value;
     this.passwordPolicy = properties.passwordPolicy;
     this.deletionProtection = properties.deletionProtection;
+    this.unsimulatedSettings = properties.unsimulatedSettings;
     this.creationDate = properties.createdDate;
   }
 

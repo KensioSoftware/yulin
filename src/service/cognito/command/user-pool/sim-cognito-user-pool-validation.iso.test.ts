@@ -107,8 +107,8 @@ const refusedInputs: readonly RefusedInput[] = [
   },
   {
     label: "AdminCreateUserConfig",
-    input: { AdminCreateUserConfig: { AllowAdminCreateUserOnly: true } },
-    says: "the AdminCreateUser settings",
+    input: { AdminCreateUserConfig: { AllowAdminCreateUserOnly: false } },
+    says: "self-service sign-up",
   },
   {
     label: "UserPoolAddOns",
@@ -147,22 +147,22 @@ const refusedInputs: readonly RefusedInput[] = [
     input: {
       VerificationMessageTemplate: { DefaultEmailOption: "CONFIRM_WITH_CODE" },
     },
-    says: "verification messages",
+    says: "the wording of a verification message",
   },
   {
     label: "EmailVerificationMessage",
     input: { EmailVerificationMessage: "Your code is {####}" },
-    says: "verification messages",
+    says: "the wording of a verification message",
   },
   {
     label: "EmailVerificationSubject",
     input: { EmailVerificationSubject: "Verify your email" },
-    says: "verification messages",
+    says: "the wording of a verification message",
   },
   {
     label: "SmsVerificationMessage",
     input: { SmsVerificationMessage: "Your code is {####}" },
-    says: "verification messages",
+    says: "the wording of a verification message",
   },
   {
     label: "SmsAuthenticationMessage",
