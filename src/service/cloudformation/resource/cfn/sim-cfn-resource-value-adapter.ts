@@ -1,5 +1,6 @@
 import type { SimCfnTemplateValue } from "../../template/value/sim-cfn-template-value.js";
 import { acmValueAdapter } from "./acm/sim-acm-cfn-value-adapter.js";
+import { apiGatewayV2ValueAdapter } from "./apigatewayv2/sim-api-gateway-v2-cfn-value-adapter.js";
 import { cloudFrontValueAdapter } from "./cloudfront/sim-cloudfront-cfn-value-adapter.js";
 import { cognitoValueAdapter } from "./cognito/sim-cognito-cfn-value-adapter.js";
 import { dynamoDbValueAdapter } from "./dynamodb/sim-dynamodb-cfn-value-adapter.js";
@@ -48,6 +49,7 @@ export function simCfnResourceValueAdapter(
 ): SimCfnResourceValueAdapter {
   return (
     acmValueAdapter(properties) ??
+    apiGatewayV2ValueAdapter(properties) ??
     cloudFrontValueAdapter(properties) ??
     cognitoValueAdapter(properties) ??
     dynamoDbValueAdapter(properties) ??

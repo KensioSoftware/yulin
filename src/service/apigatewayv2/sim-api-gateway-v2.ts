@@ -10,6 +10,7 @@ import {
   type SimIamInterServiceAuthZ,
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimHttpApiStore } from "./api/sim-http-api-store.js";
+import { SimApiGatewayV2CfnResourceFactory } from "./cfn/sim-cfn-api-gateway-v2-resource-factory.js";
 import type { SimHttpApi } from "./api/sim-http-api.js";
 import { SimHttpApiCommands } from "./command/api/sim-http-api-commands.js";
 import { SimApiGatewayV2Authorizer } from "./command/authorize/sim-api-gateway-v2-authorizer.js";
@@ -49,6 +50,9 @@ export class SimApiGatewayV2 {
   private readonly stageCommands: SimHttpApiStageCommands;
   private readonly background: BackgroundScheduler;
   private readonly sdkRouter = new SimApiGatewayV2SdkCommandRouter(this);
+  private readonly cfnFactory = new SimApiGatewayV2CfnResourceFactory({
+    apiGatewayV2: this,
+  });
 
   constructor(properties: SimApiGatewayV2Properties = {}) {
     const {
@@ -197,6 +201,13 @@ export class SimApiGatewayV2 {
   ): Promise<simApiGatewayV2Commands.SimGetStagesCommandOutput> {
     await this.background.sequence();
     return this.stageCommands.getStages(command, options);
+  }
+
+  /**
+   * Get this service's CloudFormation Resource factory.
+   */
+  cfnResourceFactory(): SimApiGatewayV2CfnResourceFactory {
+    return this.cfnFactory;
   }
 
   /**

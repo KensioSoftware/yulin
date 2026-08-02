@@ -42,6 +42,19 @@ export class SimHttpApiRouteStore {
   }
 
   /**
+   * Find a route by the id the API allocated for it.
+   *
+   * Routes are stored by route key signature rather than by id, so this is a
+   * scan. It is how a route is addressed after creation, which an API has few
+   * enough routes for the scan not to matter.
+   */
+  find(routeId: string): SimHttpApiRoute | undefined {
+    return this.routes
+      .values()
+      .find((route) => route.routeId === (routeId as SimHttpApiRouteId));
+  }
+
+  /**
    * Find the route holding a route key signature, which is what tells whether
    * the API is already routing a route key.
    */

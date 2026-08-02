@@ -496,6 +496,160 @@ only through a custom domain is configured. A request to it is answered with a 4
 `{"message":"Forbidden"}`. AWS publishes neither the status nor the body for that case, so both are
 what a disabled endpoint was observed to answer rather than something documented.
 
+## CloudFormation
+
+[Simulated CloudFormation](../cloudformation/ "Simulated CloudFormation docs") deploys
+`AWS::ApiGatewayV2::Api`, `AWS::ApiGatewayV2::Integration`, `AWS::ApiGatewayV2::Route` and
+`AWS::ApiGatewayV2::Stage`, so a synthesized or hand-written template produces an API that serves
+requests.
+
+`Ref` and `Fn::GetAtt` return what real CloudFormation returns for each type:
+
+| Resource type | `Ref`              | `Fn::GetAtt`                |
+| ------------- | ------------------ | --------------------------- |
+| `Api`         | the API id         | `ApiId`, `ApiEndpoint`      |
+| `Integration` | the integration id | `IntegrationId`             |
+| `Route`       | the route id       | `RouteId`                   |
+| `Stage`       | the stage name     | none, as AWS documents none |
+
+`Fn::GetAtt: ["Api", "ApiEndpoint"]` is the generated endpoint with no trailing slash and no stage
+segment, on the real `amazonaws.com` hostname. CDK's `httpApi.url` is built from `AWS::URLSuffix`
+instead, which resolves to the local `sim-aws.localhost` form. Both reach the same served API.
+
+An integration's `IntegrationUri` is accepted as the bare Lambda function ARN CDK emits, and as the
+`arn:aws:apigateway:<region>:lambda:path/2015-03-31/functions/<function-arn>/invocations` form. A
+route's `Target` is the `integrations/<integration-id>` string, which CDK builds with `Fn::Join` over
+a `Ref` to the integration.
+
+```typescript sim-apigatewayv2-cloudformation
+/**
+ * Deploying a simulated HTTP API from a CloudFormation template.
+ */
+
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "orders-stack",
+  template: {
+    Resources: {
+      HandlerRole: {
+        Type: "AWS::IAM::Role",
+        Properties: {
+          RoleName: "orders-role",
+          AssumeRolePolicyDocument: {
+            Version: "2012-10-17",
+            Statement: [
+              {
+                Effect: "Allow",
+                Principal: { Service: "lambda.amazonaws.com" },
+                Action: "sts:AssumeRole",
+              },
+            ],
+          },
+        },
+      },
+      Handler: {
+        Type: "AWS::Lambda::Function",
+        Properties: {
+          FunctionName: "orders",
+          Role: { "Fn::GetAtt": ["HandlerRole", "Arn"] },
+          Handler: "index.handler",
+          Runtime: "nodejs20.x",
+          Code: {
+            ZipFile:
+              "exports.handler = async () => ({ statusCode: 200, body: 'orders' });",
+          },
+        },
+      },
+      HandlerPermission: {
+        Type: "AWS::Lambda::Permission",
+        Properties: {
+          Action: "lambda:InvokeFunction",
+          FunctionName: { "Fn::GetAtt": ["Handler", "Arn"] },
+          Principal: "apigateway.amazonaws.com",
+          SourceArn: {
+            "Fn::Join": [
+              "",
+              [
+                "arn:aws:execute-api:us-east-1:111111111111:",
+                { Ref: "Api" },
+                "/*/*",
+              ],
+            ],
+          },
+        },
+      },
+      Api: {
+        Type: "AWS::ApiGatewayV2::Api",
+        Properties: { Name: "orders", ProtocolType: "HTTP" },
+      },
+      Stage: {
+        Type: "AWS::ApiGatewayV2::Stage",
+        Properties: {
+          ApiId: { Ref: "Api" },
+          StageName: "$default",
+          AutoDeploy: true,
+        },
+      },
+      Integration: {
+        Type: "AWS::ApiGatewayV2::Integration",
+        Properties: {
+          ApiId: { Ref: "Api" },
+          IntegrationType: "AWS_PROXY",
+          IntegrationUri: { "Fn::GetAtt": ["Handler", "Arn"] },
+          PayloadFormatVersion: "2.0",
+        },
+      },
+      Route: {
+        Type: "AWS::ApiGatewayV2::Route",
+        Properties: {
+          ApiId: { Ref: "Api" },
+          RouteKey: "GET /orders",
+          AuthorizationType: "NONE",
+          Target: {
+            "Fn::Join": ["", ["integrations/", { Ref: "Integration" }]],
+          },
+        },
+      },
+    },
+    Outputs: {
+      ApiEndpoint: { Value: { "Fn::GetAtt": ["Api", "ApiEndpoint"] } },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+
+// https://<api-id>.execute-api.us-east-1.amazonaws.com
+const apiEndpoint = stack.outputs.get("ApiEndpoint")?.value as string;
+
+const srv = await serveSimAws({ simAws });
+
+const response = await fetch(srv.localUrl(`${apiEndpoint}/orders`));
+
+console.log(response.status);
+console.log(await response.text());
+
+srv.close();
+```
+
+Every property outside the simulated set is refused by name, and the refusal fails the stack. The
+simulated properties are:
+
+- `Api`: `Name`, `ProtocolType`, `Description`, `DisableExecuteApiEndpoint`
+- `Integration`: `ApiId`, `IntegrationType`, `IntegrationUri`, `PayloadFormatVersion`, `Description`
+- `Route`: `ApiId`, `RouteKey`, `Target`, `AuthorizationType`
+- `Stage`: `ApiId`, `StageName`, `AutoDeploy`, `StageVariables`, `Description`
+
+`AWS::ApiGatewayV2::Authorizer`, `Deployment`, `DomainName`, `ApiMapping`, `VpcLink` and the
+WebSocket-only `Model`, `RouteResponse` and `IntegrationResponse` create nothing, so a template
+carrying one has that resource skipped rather than deployed. A route pointing at a skipped authorizer
+through `AuthorizerId` fails the stack instead, naming both the route and the authorizer, because
+that route would be open here and closed on AWS.
+
 ## Authorization
 
 Every command is authorized by simulated IAM. API Gateway is unusual in what it asks for: the action
@@ -530,6 +684,8 @@ the simulation without being given one. See the
 - The integration's invoke permission, evaluated against the function's resource policy with the
   matched route supplied as `AWS:SourceArn`
 - `DisableExecuteApiEndpoint`, refusing requests to the generated endpoint
+- Deployment of `AWS::ApiGatewayV2::Api`, `Integration`, `Route` and `Stage` from a CloudFormation
+  template, including one synthesized by CDK from an `HttpApi`
 - Authorization of every command by simulated IAM, against the HTTP method and resource path real
   API Gateway uses
 - SDK interception of an `ApiGatewayV2Client`
@@ -570,8 +726,15 @@ Current documented limitations:
 - `CorsConfiguration` and `Tags` are refused, as is the `RouteKey`/`Target` quick-create shorthand on
   `CreateApi`. Anything else the real commands accept and this one does not is refused by name rather
   than dropped.
+- `AWS::ApiGatewayV2::Api` refuses `CorsConfiguration` by name rather than accepting it with no
+  effect. CORS request handling is not simulated, and a template that configured it would otherwise
+  get an API that answered preflight requests here differently from AWS. A CDK stack using
+  `corsPreflight` does not deploy.
+- `AWS::ApiGatewayV2::Api` refuses `Body` and `BodyS3Location` by name. Importing an OpenAPI document
+  is a second way to declare routes and integrations, and none of that translation is simulated.
+- Stack updates and deletes are not supported for these resource types, as they are not for any
+  others. See the [CloudFormation limitations](../cloudformation/#limitations).
 - Access logging, throttling, usage plans and API keys are not simulated.
-- No CloudFormation resource types yet, so an `AWS::ApiGatewayV2::Api` in a template is not created.
 - The response an API Gateway endpoint returns itself uses a lower-case `message` field, as a real
   HTTP API does. A Lambda Function URL uses `Message` for the same thing, so the two are not
   interchangeable.
