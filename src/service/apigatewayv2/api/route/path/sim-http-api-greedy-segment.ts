@@ -18,10 +18,10 @@ export class SimHttpApiGreedySegment implements SimHttpApiPathSegment {
    * Every greedy segment has the same signature, whatever the name is.
    */
   public readonly signature = "{+}";
-  public readonly name: string;
+  public readonly parameterName: string;
 
-  constructor(name: string) {
-    this.name = name;
+  constructor(parameterName: string) {
+    this.parameterName = parameterName;
   }
 
   /**
@@ -39,7 +39,7 @@ export class SimHttpApiGreedySegment implements SimHttpApiPathSegment {
 
     return new SimHttpApiSegmentMatch(
       remaining.length,
-      new SimHttpApiPathParameter(this.name, remaining.join("/")),
+      new SimHttpApiPathParameter(this.parameterName, remaining.join("/")),
     );
   }
 }

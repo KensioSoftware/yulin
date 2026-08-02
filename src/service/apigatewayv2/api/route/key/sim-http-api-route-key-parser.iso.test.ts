@@ -113,6 +113,19 @@ describe("Reading a sim HTTP API route key", () => {
     );
   });
 
+  it("refuses a path naming the same parameter twice", () => {
+    // Given a route key using one parameter name at two segments
+    // When it is read
+    // Then it is refused, because a handler reads path parameters off one
+    // object and only one of the two captures could arrive
+    expect(() => parser.parse("GET /pets/{id}/toys/{id}")).toThrow(
+      /names the path parameter 'id' more than once/,
+    );
+    expect(() => parser.parse("GET /pets/{id}/{id+}")).toThrow(
+      /names the path parameter 'id' more than once/,
+    );
+  });
+
   it("refuses an empty path segment", () => {
     // Given a route key with a doubled slash in its path
     // When it is read

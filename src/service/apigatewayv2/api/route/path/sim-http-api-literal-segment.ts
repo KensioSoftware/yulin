@@ -12,6 +12,8 @@ import {
  */
 export class SimHttpApiLiteralSegment implements SimHttpApiPathSegment {
   public readonly rank = literalSegmentRank;
+  /** A literal captures nothing, so it has no parameter to capture into. */
+  public readonly parameterName = undefined;
   public readonly text: string;
 
   constructor(text: string) {

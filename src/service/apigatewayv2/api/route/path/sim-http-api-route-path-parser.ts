@@ -26,8 +26,41 @@ export class SimHttpApiRoutePathParser {
       this.segmentParser.parse(text, routeKey),
     );
     this.requireGreedyLast(segments, routeKey);
+    this.requireDistinctParameterNames(segments, routeKey);
 
     return new SimHttpApiRoutePath({ text: path, segments });
+  }
+
+  /**
+   * Refuse a path naming the same parameter twice.
+   *
+   * A handler reads path parameters off one object, so `GET /pets/{id}/toys/{id}`
+   * has one `id` to put two captures in. Accepting it would silently keep one
+   * segment and lose the other, which is the kind of quietly wrong behaviour
+   * refusing exists to avoid. Whether real API Gateway refuses it is not
+   * established, so this is stricter than AWS rather than known to match it.
+   */
+  private requireDistinctParameterNames(
+    segments: readonly SimHttpApiPathSegment[],
+    routeKey: string,
+  ): void {
+    const named = new Set<string>();
+
+    for (const { parameterName } of segments) {
+      if (parameterName === undefined) {
+        continue;
+      }
+
+      if (named.has(parameterName)) {
+        throw new SimApiGatewayV2BadRequest(
+          `Route key '${routeKey}' names the path parameter ` +
+            `'${parameterName}' more than once: a handler reads path ` +
+            `parameters off one object, so only one of them could arrive`,
+        );
+      }
+
+      named.add(parameterName);
+    }
   }
 
   /**

@@ -32,8 +32,8 @@ export class SimHttpApiRouteSelection {
  * Picks the route that serves one request.
  *
  * Every route is asked whether it matches, and the most specific of the ones
- * that do wins. Two routes of an API cannot rank the same for one request,
- * because two route keys that would are the same route key and the second is
+ * that do wins. There is always one winner: two route keys that would rank the
+ * same for a request are the same route key, and the second of those is
  * refused as a conflict when it is created.
  */
 export class SimHttpApiRouteSelector {

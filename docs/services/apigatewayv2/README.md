@@ -164,6 +164,10 @@ greedy parameter anywhere but the end.
 A parameter name is not part of a route's identity, so `GET /pets/{id}` and `GET /pets/{petId}` are
 the same route key and creating the second gives a `ConflictException`.
 
+One path may not name the same parameter twice, so `GET /pets/{id}/toys/{id}` is refused. A handler
+reads path parameters off one object, so only one of the two captures could arrive. Whether real API
+Gateway refuses it is not established, so this is stricter than AWS rather than known to match it.
+
 ## Which route serves a request
 
 More than one route may match a request, and the most specific one takes it. In order:
@@ -284,8 +288,7 @@ console.log(await response.json());
 srv.close();
 ```
 
-The handler sees the route it matched, the parameter it captured, the path as the client sent it, and
-the stage that served it:
+That handler reports four fields of its event, so the response body it produces is:
 
 ```json
 {
@@ -468,6 +471,9 @@ Current documented limitations:
 - HTTP APIs only. `ProtocolType: "WEBSOCKET"` is refused.
 - Two of the route selection rules, and the place of the method comparison in the order, are observed
   rather than published by AWS. See [Which route serves a request](#which-route-serves-a-request).
+- A route path naming the same parameter twice, such as `GET /pets/{id}/toys/{id}`, is refused. This
+  is stricter than AWS is known to be: it was refused because only one of the two captures could
+  reach the handler, not because real API Gateway was seen to refuse it.
 - Deployments are not simulated, so `CreateStage` requires `AutoDeploy: true`. A stage without it
   serves whichever Deployment it was given, which on real AWS is nothing until one is created.
 - `RouteSettings`, `DefaultRouteSettings` and `AccessLogSettings` on a stage are refused, as is any

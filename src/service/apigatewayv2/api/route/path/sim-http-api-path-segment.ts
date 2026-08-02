@@ -35,6 +35,11 @@ export interface SimHttpApiPathSegment {
   /** How specific this kind of segment is. Lower is more specific. */
   readonly rank: number;
   /**
+   * The path parameter this segment captures into, or nothing for a literal,
+   * which captures into none.
+   */
+  readonly parameterName: string | undefined;
+  /**
    * The segment with any parameter name erased.
    *
    * Two route keys differing only in a parameter name are the same route to

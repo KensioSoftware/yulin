@@ -18,10 +18,10 @@ export class SimHttpApiVariableSegment implements SimHttpApiPathSegment {
    * `GET /pets/{id}` and `GET /pets/{petId}` are one route.
    */
   public readonly signature = "{}";
-  public readonly name: string;
+  public readonly parameterName: string;
 
-  constructor(name: string) {
-    this.name = name;
+  constructor(parameterName: string) {
+    this.parameterName = parameterName;
   }
 
   /**
@@ -37,7 +37,7 @@ export class SimHttpApiVariableSegment implements SimHttpApiPathSegment {
 
     return new SimHttpApiSegmentMatch(
       1,
-      new SimHttpApiPathParameter(this.name, value),
+      new SimHttpApiPathParameter(this.parameterName, value),
     );
   }
 }
