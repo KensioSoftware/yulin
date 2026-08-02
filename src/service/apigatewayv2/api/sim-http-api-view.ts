@@ -34,7 +34,9 @@ interface SimHttpApiViewParts {
  * Build the AWS-like view of one API.
  *
  * A description is left out rather than reported as empty, in the same way
- * real API Gateway leaves out the field for an API created without one.
+ * real API Gateway leaves out the field for an API created without one. The
+ * creation time is copied, since a Date is mutable and a caller holding the
+ * stored one could change when the API says it was created.
  */
 export function simHttpApiView(parts: SimHttpApiViewParts): SimHttpApiView {
   const view: SimHttpApiView = {
@@ -42,7 +44,7 @@ export function simHttpApiView(parts: SimHttpApiViewParts): SimHttpApiView {
     ApiEndpoint: parts.apiEndpoint,
     Name: parts.name,
     ProtocolType: parts.protocolType,
-    CreatedDate: parts.createdDate,
+    CreatedDate: new Date(parts.createdDate),
     DisableExecuteApiEndpoint: parts.disableExecuteApiEndpoint,
   };
 

@@ -47,12 +47,15 @@ export class SimHttpApiStage {
 
   /**
    * Get the AWS-like view of this stage.
+   *
+   * The creation time is copied, since a Date is mutable and a caller holding
+   * the stored one could change when the stage says it was created.
    */
   view(): SimHttpApiStageView {
     const view: SimHttpApiStageView = {
       StageName: this.stageName,
       AutoDeploy: this.autoDeploy,
-      CreatedDate: this.createdDate,
+      CreatedDate: new Date(this.createdDate),
     };
 
     if (Object.keys(this.stageVariables).length > 0) {
