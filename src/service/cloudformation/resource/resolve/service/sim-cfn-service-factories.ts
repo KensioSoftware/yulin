@@ -29,10 +29,10 @@ const acmResourceFactory: SimCfnScopedServiceFactory = (
  * A service name with no entry here is not created, which is what the resolver
  * turns into an unsupported-Resource error.
  */
-export const simCfnServiceResourceFactories = new Map<
+export const simCfnServiceResourceFactories: ReadonlyMap<
   string,
   SimCfnScopedServiceFactory
->([
+> = new Map([
   ["ACM", acmResourceFactory],
   ["CertificateManager", acmResourceFactory],
   [
