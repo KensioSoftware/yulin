@@ -2608,11 +2608,12 @@ nothing is written.
 - `Expected`, `ConditionalOperator` and `AttributeUpdates` are not converted for the document
   client, because simulated DynamoDB refuses all three anyway. A request carrying one is refused by
   the operation rather than by the conversion.
-- An index read answers with the attributes the index projects, and there is no way to ask for more.
-  Real DynamoDB fetches the rest from the table when a `ProjectionExpression` names an attribute an
-  index does not project, at the cost of a read per item. `ProjectionExpression` is not simulated on
-  `Query` or `Scan` at all, so the case does not arise, and `Select: ALL_ATTRIBUTES` is refused
-  rather than served that way.
+- An index read answers with the attributes the index projects, and nothing fills in the rest. Real
+  DynamoDB does not either: a global secondary index never reads the base table for an attribute it
+  does not project, which is why `Select: ALL_ATTRIBUTES` against a partial projection is refused
+  rather than served. Fetching from the base table is a local secondary index behaviour, and those
+  are not simulated. `ProjectionExpression` is not simulated on `Query` or `Scan`, so naming a
+  non-projected attribute that way does not arise.
 - Local secondary indexes are not simulated. `LocalSecondaryIndexes` is refused rather than dropped,
   since a table missing an index it was asked for would answer queries differently to the real one.
   An empty list asks for no index, so it is accepted.

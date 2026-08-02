@@ -38,12 +38,14 @@ export function simDynamoDbIndexedOrders(
       return order;
     }
 
-    const shippedMonth = (Math.floor(position / 4) + 1).toString();
+    const shippedMonth = (Math.floor(position / 4) + 1)
+      .toString()
+      .padStart(2, "0");
 
     return {
       ...order,
       status: { S: statusAt(position) },
-      shippedAt: { S: `2026-0${shippedMonth}` },
+      shippedAt: { S: `2026-${shippedMonth}` },
     };
   });
 }

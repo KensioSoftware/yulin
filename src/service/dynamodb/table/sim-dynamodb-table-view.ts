@@ -95,8 +95,7 @@ export class SimDynamoDbTableView implements SimDynamoDbReadView {
   }
 
   /**
-   * A table carries every attribute of every item, so neither of these refuses
-   * anything. They are questions only an index has a narrow answer to.
+   * A table read already answers with whole items, so nothing is refused.
    */
   assertCarriesWholeItem(): void {
     return;
