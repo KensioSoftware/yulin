@@ -30,19 +30,33 @@ export class SimCognitoUnsimulatedPoolSettings {
   private readonly settings: SimCognitoUnsimulatedPoolSettingsType;
 
   constructor(settings: SimCognitoUnsimulatedPoolSettingsType) {
-    this.settings = settings;
+    this.settings = this.accepted(settings);
   }
 
   /**
    * These settings as a described pool reports them.
-   *
-   * Each one appears only where the request set it, so a described pool
-   * carries what was asked for and nothing more.
    */
   toOutput(): SimCognitoUnsimulatedPoolSettingsType {
-    const settings = this.settings;
+    return structuredClone(this.settings);
+  }
 
-    return {
+  /**
+   * The settings this holds, copied out of the request rather than kept by
+   * reference.
+   *
+   * A caller passes its whole `CreateUserPool` input in, and may reuse or
+   * edit that object afterwards. Three of these are nested objects, so the
+   * copy goes all the way down. Copying means a described pool reports what
+   * the request said at the time it was made, as a real one does.
+   *
+   * Each setting is kept only where the request set it, so a pool created
+   * without one describes without it rather than describing it as the value
+   * the request would have needed to use.
+   */
+  private accepted(
+    settings: SimCognitoUnsimulatedPoolSettingsType,
+  ): SimCognitoUnsimulatedPoolSettingsType {
+    return structuredClone({
       ...(settings.AccountRecoverySetting !== undefined && {
         AccountRecoverySetting: settings.AccountRecoverySetting,
       }),
@@ -61,6 +75,6 @@ export class SimCognitoUnsimulatedPoolSettings {
       ...(settings.VerificationMessageTemplate !== undefined && {
         VerificationMessageTemplate: settings.VerificationMessageTemplate,
       }),
-    };
+    });
   }
 }

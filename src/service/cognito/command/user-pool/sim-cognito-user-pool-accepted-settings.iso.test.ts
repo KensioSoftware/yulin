@@ -189,6 +189,34 @@ describe("sim Cognito user pool settings accepted without being simulated", () =
     assertUndefined(described.UserPool.SmsVerificationMessage);
   });
 
+  it("keeps what the request said rather than the request object", async () => {
+    // Given a pool created from an input object the caller still holds.
+    const cognito = simCognito();
+    const input: Partial<CreateUserPoolCommandInput> =
+      structuredClone(cdkDefaultSettings);
+    const userPoolId = await createdPoolId(cognito, input);
+    assertNonNullable(input.AdminCreateUserConfig);
+
+    // When the caller edits that object afterwards, as it would to create a
+    // second pool from the same starting point.
+    input.AdminCreateUserConfig.AllowAdminCreateUserOnly = false;
+    input.EmailVerificationSubject = "Something else";
+
+    // Then the pool still reports what the request said when it was made,
+    // rather than following the object it was handed.
+    const described = await cognito.describeUserPool(
+      new DescribeUserPoolCommand({ UserPoolId: userPoolId }),
+    );
+    assertNonNullable(described.UserPool);
+    assertObjectEquals(described.UserPool.AdminCreateUserConfig, {
+      AllowAdminCreateUserOnly: true,
+    });
+    assertIdentical(
+      described.UserPool.EmailVerificationSubject,
+      "Verify your new account",
+    );
+  });
+
   it("refuses each of them at any other value", async () => {
     // Given simulated Cognito.
     const cognito = simCognito();

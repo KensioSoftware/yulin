@@ -23,19 +23,32 @@ export class SimCognitoUnsimulatedClientSettings {
   private readonly settings: SimCognitoUnsimulatedClientSettingsType;
 
   constructor(settings: SimCognitoUnsimulatedClientSettingsType) {
-    this.settings = settings;
+    this.settings = this.accepted(settings);
   }
 
   /**
    * These settings as a described app client reports them.
-   *
-   * Each one appears only where the request set it, so a described client
-   * carries what was asked for and nothing more.
    */
   toOutput(): SimCognitoUnsimulatedClientSettingsType {
-    const settings = this.settings;
+    return structuredClone(this.settings);
+  }
 
-    return {
+  /**
+   * The settings this holds, copied out of the request rather than kept by
+   * reference.
+   *
+   * A caller passes its whole `CreateUserPoolClient` input in, and may reuse
+   * or edit that object afterwards. Copying means a described client reports
+   * what the request said at the time it was made, as a real one does.
+   *
+   * Each setting is kept only where the request set it, so a client created
+   * without either reports neither rather than reporting the value it would
+   * have had to use.
+   */
+  private accepted(
+    settings: SimCognitoUnsimulatedClientSettingsType,
+  ): SimCognitoUnsimulatedClientSettingsType {
+    return structuredClone({
       ...(settings.AllowedOAuthFlowsUserPoolClient !== undefined && {
         AllowedOAuthFlowsUserPoolClient:
           settings.AllowedOAuthFlowsUserPoolClient,
@@ -43,6 +56,6 @@ export class SimCognitoUnsimulatedClientSettings {
       ...(settings.SupportedIdentityProviders !== undefined && {
         SupportedIdentityProviders: settings.SupportedIdentityProviders,
       }),
-    };
+    });
   }
 }
