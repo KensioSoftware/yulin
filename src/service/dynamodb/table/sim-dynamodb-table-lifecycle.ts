@@ -3,6 +3,7 @@ import {
   SimDynamoDbResourceInUseException,
   SimDynamoDbValidationException,
 } from "../error/dynamodb.error.js";
+import type { SimDynamoDbTableUpdate } from "./sim-dynamodb-table-update.js";
 
 interface SimDynamoDbTableLifecycleProperties {
   readonly tableName: string;
@@ -19,12 +20,12 @@ interface SimDynamoDbTableLifecycleProperties {
  */
 export class SimDynamoDbTableLifecycle {
   private readonly tableName: string;
-  private readonly deletionProtectionEnabled: boolean;
+  #deletionProtectionEnabled: boolean;
   #status: SimDynamoDbTableStatus = "CREATING";
 
   constructor(properties: SimDynamoDbTableLifecycleProperties) {
     this.tableName = properties.tableName;
-    this.deletionProtectionEnabled = properties.deletionProtectionEnabled;
+    this.#deletionProtectionEnabled = properties.deletionProtectionEnabled;
   }
 
   /**
@@ -35,10 +36,58 @@ export class SimDynamoDbTableLifecycle {
   }
 
   /**
-   * Finish creating the table.
+   * Whether the table is protected from deletion.
+   */
+  get deletionProtectionEnabled(): boolean {
+    return this.#deletionProtectionEnabled;
+  }
+
+  /**
+   * Finish creating or updating the table.
    */
   activate(): void {
     this.#status = "ACTIVE";
+  }
+
+  /**
+   * Start changing the table's definition.
+   *
+   * The table serves reads and writes throughout, since AWS does not take one
+   * offline to update it. What UPDATING says is that another UpdateTable will
+   * be refused until this one has finished.
+   */
+  beginUpdate(): void {
+    this.#status = "UPDATING";
+  }
+
+  /**
+   * Refuse an update the table is not in a state to take.
+   *
+   * Real DynamoDB takes one UpdateTable at a time: while a table is UPDATING,
+   * a second request is refused rather than queued. A table that is still
+   * being created has nothing to update yet.
+   */
+  assertUpdatable(): void {
+    if (this.#status !== "ACTIVE") {
+      throw new SimDynamoDbResourceInUseException(
+        `Table ${this.tableName} is ${this.#status} and cannot be updated ` +
+          `until it is ACTIVE`,
+      );
+    }
+  }
+
+  /**
+   * Take the part of an UpdateTable that moves the table's status.
+   *
+   * Deletion protection belongs here because it is what `assertDeletable`
+   * reads, so the two stay in one place rather than being kept in step.
+   */
+  applyUpdate(update: SimDynamoDbTableUpdate): void {
+    if (update.deletionProtectionEnabled !== undefined) {
+      this.#deletionProtectionEnabled = update.deletionProtectionEnabled;
+    }
+
+    this.beginUpdate();
   }
 
   /**
@@ -55,7 +104,7 @@ export class SimDynamoDbTableLifecycle {
    * protected table stays as it was rather than being taken part way through.
    */
   assertDeletable(): void {
-    if (this.deletionProtectionEnabled) {
+    if (this.#deletionProtectionEnabled) {
       throw new SimDynamoDbValidationException(
         `Table ${this.tableName} cannot be deleted while DeletionProtection ` +
           `is enabled`,

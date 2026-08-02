@@ -47,7 +47,7 @@ instances.
 Current command areas include:
 
 - `authorize/` (shared IAM authorization for every DynamoDB command)
-- `table/` (CreateTable, DescribeTable, ListTables and DeleteTable)
+- `table/` (CreateTable, UpdateTable, DescribeTable, ListTables and DeleteTable)
 - `item/` (PutItem, GetItem, DeleteItem, UpdateItem, and the structural types for the item commands)
 - `query/` (Query)
 - `scan/` (Scan, including parallel scan segments)
@@ -100,6 +100,13 @@ A table is built from values that have already been checked, not from a command 
 that can produce those values can make one, which is what will let CloudFormation create a table
 without a CreateTable command to hand it. `toDescription()` is how a table reports itself back, so
 the description lives with the table rather than in the command that made it.
+
+The parts of that state UpdateTable can change are held together in
+`SimDynamoDbTableDefinition`: the attribute definitions, the billing, the table class and the item
+key that is built from the definitions. The key schema is there too and never changes. Holding them
+together is what lets an update replace them in one step, while everything already holding the table
+goes on reading the table. `SimDynamoDbTableTimeToLive` holds the other mutable part, the time to
+live setting and the item removals it drives.
 
 Tables start in `CREATING` status. `SimDynamoDbCreateTable` schedules a background task that later
 activates the table by changing its status to `ACTIVE`.
@@ -179,9 +186,12 @@ The parts an index is made of are a file each, since each has rules of its own:
   the table's throughput, so any capacity setting on one is refused.
 - `sim-dynamodb-local-index-key-schema.ts` is what makes an index local. The partition key is the
   table's own, and the sort key is required and is anything the table is not already sorted by.
-- `sim-dynamodb-index-status.ts` maps a table status to the index status. Nothing here adds an index
-  to an existing table, so the index status follows the table's rather than being tracked apart from
-  it: `CREATING` on the CreateTable response, `ACTIVE` once the table is. A local secondary index
+- `sim-dynamodb-index-lifecycle.ts` is where one global secondary index is between being declared
+  and being read. Each index has a status of its own, because UpdateTable adds one to a table that
+  keeps serving the rest, so a table can carry an ACTIVE index and a CREATING one at once. It also
+  says whether the index backfills, which is what `Backfilling` reports and what an index declared on
+  CreateTable never does. `sim-dynamodb-index-status.ts` is the one case that is answered from the
+  table instead: a table being deleted reports every index as DELETING. A local secondary index
   reports no status at all, since DynamoDB reports none for one.
 
 Which items an index holds is worked out when the index is read rather than maintained on every
@@ -349,6 +359,38 @@ there when the table has any of that kind, and left out altogether when it has n
 Unsimulated inputs are refused with `SimDynamoDbUnsupportedOperation` rather than dropped. Each one
 is listed in the Limitations section of
 [the usage docs](../../../docs/services/dynamodb/ "Simulated DynamoDB usage docs").
+
+## UpdateTable behavior
+
+`SimDynamoDbUpdateTable` implements the one command that changes a table after it exists.
+
+The order it works in mirrors CreateTable's:
+
+1. `refuseUnsimulatedUpdateInput` refuses streams, encryption, replicas and the throughput settings
+   beyond provisioned capacity, before anything else looks at the request.
+2. `SimDynamoDbTableAccess` reads the table reference and authorizes `dynamodb:UpdateTable` against
+   it.
+3. `table.assertUpdatable()` refuses a table that is not ACTIVE, which is how a second update while
+   one is in flight gets `SimDynamoDbResourceInUseException`.
+4. `SimDynamoDbTableUpdate.fromInput` reads and checks the whole request against the table as it
+   stands, without changing anything.
+5. `table.applyUpdate` applies it and moves the table to UPDATING, and the background scheduler takes
+   it back to ACTIVE.
+
+Splitting steps 4 and 5 is what keeps a refused request from leaving a half-updated table behind.
+Nothing in `applyUpdate` throws: by the time it runs, the index has been built, the attribute
+definitions have been merged into a set of their own and the billing has been read. `SimDynamoDbTable`
+holds those three privately so they can be replaced, where the rest of a table is fixed at creation.
+
+`SimDynamoDbIndexUpdate` reads `GlobalSecondaryIndexUpdates` into at most one creation or one
+deletion, since that is AWS's limit. `SimDynamoDbTableUpdate` then enforces the wider rule: a billing
+and throughput change, an index creation and an index deletion are one thing at a time, while a
+table class or deletion protection change rides along with any of them.
+
+A new index has no backfill to run, because which items an index holds is worked out when it is read.
+The CREATING window is a status the scheduler advances rather than work being done, which is
+commented on `SimDynamoDbTable.activate` where the transition happens. The observable behaviour
+matches AWS while the mechanism does not.
 
 ## Table store
 
@@ -950,7 +992,7 @@ Current uses:
   `ClientRequestToken` window something `simAws.clock().advanceBy(...)` can move past.
 - UpdateTimeToLive schedules the settle that takes the status from ENABLING to ENABLED, or from
   DISABLING to DISABLED, the same way table activation is scheduled.
-- `SimDynamoDbTableExpiry` uses `scheduleAt` rather than `schedule`, so an item's removal is due at
+- `SimDynamoDbTableTimeToLive` uses `scheduleAt` rather than `schedule`, so an item's removal is due at
   a simulated instant rather than on the next drain. Only moving the clock through `simAws.clock()`
   dispatches it, which is why `backgroundTasksComplete()` does not expire anything.
 
@@ -1003,7 +1045,7 @@ table state rather than request handling.
   its TTL timestamp rather than on it. That window is the deliberate divergence: AWS promises a
   range and this picks the far end. The reasoning is in the constant's comment. It also applies the
   five year eligibility rule, which is why it takes the instant to read the timestamp against.
-- `SimDynamoDbTableExpiry` schedules the removal and re-checks at fire time, the same shape as
+- `SimDynamoDbTableTimeToLive` schedules the removal and re-checks at fire time, the same shape as
   `SimSecretsManagerSecretExpiry`. The re-check recomputes the deletion instant from whatever is
   under the key now, so one check covers a deleted item, an overwrite with a later TTL, a TTL
   attribute that has gone or changed type, and time to live having been switched off.

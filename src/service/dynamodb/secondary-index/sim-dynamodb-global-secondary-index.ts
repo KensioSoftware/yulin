@@ -1,8 +1,8 @@
 import type { SimArn } from "../../aws/arn.js";
 import type {
   SimDynamoDbGlobalSecondaryIndexDescription,
-  SimDynamoDbIndexStatus,
   SimDynamoDbSecondaryIndexInput,
+  SimDynamoDbTableStatus,
 } from "../command/table/table.types.js";
 import { SimDynamoDbValidationException } from "../error/dynamodb.error.js";
 import type { SimDynamoDbItem } from "../item/sim-dynamodb-item.js";
@@ -12,6 +12,8 @@ import { SimDynamoDbKeySchemaSubject } from "../table/sim-dynamodb-key-schema-su
 import type { SimDynamoDbTableThroughput } from "../table/sim-dynamodb-table-throughput.js";
 import type { SimDynamoDbIndexAttributes } from "./sim-dynamodb-index-attributes.js";
 import { assertSimDynamoDbIndexKeyTypes } from "./sim-dynamodb-index-key-types.js";
+import { SimDynamoDbIndexLifecycle } from "./sim-dynamodb-index-lifecycle.js";
+import { simDynamoDbIndexStatus } from "./sim-dynamodb-index-status.js";
 import { SimDynamoDbIndexProjection } from "./sim-dynamodb-index-projection.js";
 import { readSimDynamoDbIndexName } from "./sim-dynamodb-index-name.js";
 import { readSimDynamoDbIndexThroughput } from "./sim-dynamodb-index-throughput.js";
@@ -27,6 +29,7 @@ interface SimDynamoDbGlobalSecondaryIndexProperties {
   readonly keySchema: SimDynamoDbKeySchema;
   readonly projection: SimDynamoDbIndexProjection;
   readonly throughput: SimDynamoDbTableThroughput;
+  readonly lifecycle: SimDynamoDbIndexLifecycle;
 }
 
 /**
@@ -44,6 +47,7 @@ export class SimDynamoDbGlobalSecondaryIndex implements SimDynamoDbSecondaryInde
   public readonly projection: SimDynamoDbIndexProjection;
 
   private readonly throughput: SimDynamoDbTableThroughput;
+  private readonly lifecycle: SimDynamoDbIndexLifecycle;
 
   private constructor(properties: SimDynamoDbGlobalSecondaryIndexProperties) {
     this.name = properties.name;
@@ -53,6 +57,7 @@ export class SimDynamoDbGlobalSecondaryIndex implements SimDynamoDbSecondaryInde
     this.keySchema = properties.keySchema;
     this.projection = properties.projection;
     this.throughput = properties.throughput;
+    this.lifecycle = properties.lifecycle;
   }
 
   /**
@@ -67,6 +72,42 @@ export class SimDynamoDbGlobalSecondaryIndex implements SimDynamoDbSecondaryInde
   ): SimDynamoDbGlobalSecondaryIndex {
     const name = readSimDynamoDbIndexName(input.IndexName);
 
+    return this.declared(
+      input,
+      table,
+      name,
+      SimDynamoDbIndexLifecycle.withTable(name),
+    );
+  }
+
+  /**
+   * Read the `Create` of a `GlobalSecondaryIndexUpdates` entry.
+   *
+   * An index declared this way is added to a table that already holds items, so
+   * it backfills where one declared on CreateTable does not. Everything else
+   * about it is read the same way, since a template or an SDK caller declares
+   * an index in the same shape either way.
+   */
+  static added(
+    input: SimDynamoDbSecondaryIndexInput,
+    table: SimDynamoDbSecondaryIndexTable,
+  ): SimDynamoDbGlobalSecondaryIndex {
+    const name = readSimDynamoDbIndexName(input.IndexName);
+
+    return this.declared(
+      input,
+      table,
+      name,
+      SimDynamoDbIndexLifecycle.backfilling(name),
+    );
+  }
+
+  private static declared(
+    input: SimDynamoDbSecondaryIndexInput,
+    table: SimDynamoDbSecondaryIndexTable,
+    name: string,
+    lifecycle: SimDynamoDbIndexLifecycle,
+  ): SimDynamoDbGlobalSecondaryIndex {
     return new this({
       name,
       tableArn: table.tableArn,
@@ -76,7 +117,22 @@ export class SimDynamoDbGlobalSecondaryIndex implements SimDynamoDbSecondaryInde
       ),
       projection: SimDynamoDbIndexProjection.fromInput(input.Projection, name),
       throughput: readSimDynamoDbIndexThroughput(input, name, table.billing),
+      lifecycle,
     });
+  }
+
+  /**
+   * Finish building this index, so reads of it are answered.
+   */
+  activate(): void {
+    this.lifecycle.activate();
+  }
+
+  /**
+   * Refuse a read of this index while it is still being built.
+   */
+  assertReadable(): void {
+    this.lifecycle.assertReadable();
   }
 
   /**
@@ -127,16 +183,20 @@ export class SimDynamoDbGlobalSecondaryIndex implements SimDynamoDbSecondaryInde
 
   /**
    * Describe this index the way DynamoDB reports it.
+   *
+   * The table's status is taken rather than the index's own, since a table
+   * being deleted reports every index as DELETING whatever each one was doing.
    */
   toDescription(
-    status: SimDynamoDbIndexStatus,
+    tableStatus: SimDynamoDbTableStatus,
   ): SimDynamoDbGlobalSecondaryIndexDescription {
     return {
       IndexName: this.name,
       IndexArn: this.arn,
       KeySchema: this.keySchema.elements,
       Projection: this.projection.toDescription(),
-      IndexStatus: status,
+      IndexStatus: simDynamoDbIndexStatus(tableStatus, this.lifecycle.status),
+      Backfilling: this.lifecycle.backfilling,
       ProvisionedThroughput: this.throughput.toDescription(),
       // Neither figure is tracked, the same way the table's are not.
       ItemCount: 0,

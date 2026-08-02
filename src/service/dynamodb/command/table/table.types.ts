@@ -123,6 +123,46 @@ export interface SimDynamoDbSecondaryIndexInput {
 }
 
 /**
+ * Minimal structural sim DynamoDB global secondary index update, as one entry
+ * of the `GlobalSecondaryIndexUpdates` an UpdateTable request carries.
+ *
+ * One entry asks for one action. A `Create` declares an index the same way
+ * CreateTable does, and an `Update` names an existing one to change the
+ * capacity of.
+ */
+export interface SimDynamoDbGlobalSecondaryIndexUpdateInput {
+  readonly Create?: SimDynamoDbSecondaryIndexInput | undefined;
+  readonly Delete?: SimDynamoDbIndexDeletionInput | undefined;
+  readonly Update?: SimDynamoDbSecondaryIndexInput | undefined;
+}
+
+/**
+ * Minimal structural sim DynamoDB global secondary index deletion.
+ */
+export interface SimDynamoDbIndexDeletionInput {
+  readonly IndexName?: string | undefined;
+}
+
+/**
+ * Minimal structural sim DynamoDB replica update.
+ *
+ * Enough of the shape to recognise one and refuse it by name. Replication
+ * across regions is not simulated.
+ */
+export interface SimDynamoDbReplicaUpdateInput {
+  readonly Create?: SimDynamoDbReplicaRegionInput | undefined;
+  readonly Delete?: SimDynamoDbReplicaRegionInput | undefined;
+  readonly Update?: SimDynamoDbReplicaRegionInput | undefined;
+}
+
+/**
+ * Minimal structural sim DynamoDB replica, as a replica update names one.
+ */
+export interface SimDynamoDbReplicaRegionInput {
+  readonly RegionName?: string | undefined;
+}
+
+/**
  * Minimal structural sim DynamoDB projection, as a request carries it.
  */
 export interface SimDynamoDbProjectionInput {
@@ -203,6 +243,7 @@ export interface SimDynamoDbGlobalSecondaryIndexDescription {
   readonly KeySchema?: readonly SimDynamoDbKeySchemaElement[] | undefined;
   readonly Projection?: SimDynamoDbProjection | undefined;
   readonly IndexStatus?: SimDynamoDbIndexStatus | undefined;
+  readonly Backfilling?: boolean | undefined;
   readonly IndexArn?: SimArn | undefined;
   readonly ProvisionedThroughput?:
     SimDynamoDbProvisionedThroughputDescription | undefined;

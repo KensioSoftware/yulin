@@ -103,6 +103,26 @@ export class SimDynamoDbTableBilling {
   }
 
   /**
+   * This billing with the capacity an UpdateTable request names.
+   *
+   * A request carrying capacity and no `BillingMode` is asking to reprovision
+   * the table rather than to bill it another way, so the mode is kept. Whether
+   * the table reports a `BillingModeSummary` is kept too, since that says
+   * whether the request that made it named a mode, and this request did not.
+   */
+  withThroughput(
+    throughput: SimDynamoDbProvisionedThroughput | undefined,
+  ): SimDynamoDbTableBilling {
+    return new SimDynamoDbTableBilling({
+      mode: this.mode,
+      throughput: readThroughput(this.mode, {
+        ProvisionedThroughput: throughput,
+      }),
+      requestedMode: this.requestedMode,
+    });
+  }
+
+  /**
    * How the table reports its throughput.
    */
   throughputDescription(): SimDynamoDbProvisionedThroughputDescription {

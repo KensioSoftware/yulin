@@ -18,6 +18,7 @@ import {
   TransactWriteItemsCommand,
   UntagResourceCommand,
   UpdateItemCommand,
+  UpdateTableCommand,
   UpdateTimeToLiveCommand,
 } from "@aws-sdk/client-dynamodb";
 import {
@@ -57,6 +58,15 @@ describe("simulated DynamoDB SDK Command routing", () => {
       new DescribeTableCommand({ TableName: "InterceptTable" }),
     );
     assertIdentical(describeOut.Table?.TableStatus, "ACTIVE");
+
+    const updateOut = await client.send(
+      new UpdateTableCommand({
+        TableName: "InterceptTable",
+        DeletionProtectionEnabled: false,
+      }),
+    );
+    assertIdentical(updateOut.TableDescription?.TableStatus, "UPDATING");
+    await simSdk.simAws.backgroundTasksComplete();
 
     const listOut = await client.send(new ListTablesCommand({}));
     assertIdentical(listOut.TableNames?.[0], "InterceptTable");

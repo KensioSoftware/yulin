@@ -1,33 +1,65 @@
 import type { BackgroundScheduler } from "../../../util/background/background.js";
+import type { SimDynamoDbTimeToLiveDescription } from "../command/time-to-live/time-to-live.types.js";
 import type { SimDynamoDbItem } from "../item/sim-dynamodb-item.js";
 import type { SimDynamoDbTableItems } from "../table/sim-dynamodb-table-items.js";
 import { simDynamoDbItemDeletionInstant } from "./sim-dynamodb-item-expiry.js";
-import type { SimDynamoDbTimeToLive } from "./sim-dynamodb-time-to-live.js";
+import { SimDynamoDbTimeToLive } from "./sim-dynamodb-time-to-live.js";
+import type { SimDynamoDbTimeToLiveSpecification } from "./sim-dynamodb-time-to-live-specification.js";
 
-interface SimDynamoDbTableExpiryProperties {
+interface SimDynamoDbTableTimeToLiveProperties {
+  readonly tableName: string;
   readonly items: SimDynamoDbTableItems;
-  readonly timeToLive: SimDynamoDbTimeToLive;
   readonly background: BackgroundScheduler;
 }
 
 /**
- * Removes a table's items once their time to live has run out.
+ * One table's time to live, and the item removals it drives.
  *
- * The removal is scheduled on the simulation's clock rather than the host's, so
+ * The setting and what acts on it are held together, because switching the
+ * setting on is what gives the items already on the table a deletion window.
+ *
+ * A removal is scheduled on the simulation's clock rather than the host's, so
  * moving simulated time past an item's deletion window is what takes it away.
  * That is what lets one `advanceBy` expire a table's sessions alongside
  * whatever else the same advance causes elsewhere in the simulation, rather
  * than the test having to ask for the expiry separately.
  */
-export class SimDynamoDbTableExpiry {
+export class SimDynamoDbTableTimeToLive {
   private readonly items: SimDynamoDbTableItems;
   private readonly timeToLive: SimDynamoDbTimeToLive;
   private readonly background: BackgroundScheduler;
 
-  constructor(properties: SimDynamoDbTableExpiryProperties) {
+  constructor(properties: SimDynamoDbTableTimeToLiveProperties) {
     this.items = properties.items;
-    this.timeToLive = properties.timeToLive;
+    this.timeToLive = new SimDynamoDbTimeToLive(properties.tableName);
     this.background = properties.background;
+  }
+
+  /**
+   * Take an UpdateTimeToLive on this table.
+   *
+   * Switching it on reaches the items already there as well as the ones written
+   * afterwards, since their TTL attributes were only inert while it was off.
+   */
+  update(specification: SimDynamoDbTimeToLiveSpecification, at: Date): void {
+    this.timeToLive.update(specification, at);
+    this.scheduleForAll();
+  }
+
+  /**
+   * Finish an UpdateTimeToLive, moving it off ENABLING or DISABLING.
+   */
+  settle(): Promise<void> {
+    this.timeToLive.settle();
+
+    return Promise.resolve();
+  }
+
+  /**
+   * Describe this table's time to live the way DynamoDB reports it.
+   */
+  description(): SimDynamoDbTimeToLiveDescription {
+    return this.timeToLive.description();
   }
 
   /**
@@ -71,7 +103,7 @@ export class SimDynamoDbTableExpiry {
    * Switching time to live on gives meaning to TTL attributes that were inert
    * while it was off, so the items that already carry one are scheduled too.
    */
-  scheduleForAll(): void {
+  private scheduleForAll(): void {
     for (const [key, item] of this.items.entries()) {
       this.scheduleFor(key, item);
     }

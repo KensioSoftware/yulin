@@ -2,30 +2,19 @@ import {
   type BackgroundScheduler,
   BackgroundTasks,
 } from "../../util/background/background.js";
-import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { SimDynamoDbCommandHandlers } from "./command/sim-dynamodb-command-handlers.js";
 import type * as simDynamoDbCommands from "./command/sim-dynamodb-command.types.js";
 import { SimDynamoDbTableStore } from "./table/sim-dynamodb-table-store.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
-import type { SimAwsCaller } from "../aws/caller/sim-aws-caller.js";
-import {
-  SimIamAllowAllAuth,
-  type SimIamInterServiceAuthZ,
-} from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { SimIamAllowAllAuth } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimDynamoDatabaseSdkCommandRouter } from "./sdk/sim-dynamodb-sdk-command-router.js";
 import type { SimSdkCommandRouter } from "../../sdk/index.js";
 import { SimDynamoDbCfnResourceFactory } from "./cfn/sim-cfn-dynamodb-resource-factory.js";
 import type { SimDynamoDbTable } from "./table/sim-dynamodb-table.js";
-
-export interface SimDynamoDbRequestOptions {
-  readonly caller?: SimAwsCaller;
-}
-
-interface SimDynamoDatabaseProperties {
-  readonly accountRegionScope?: SimAwsAccountRegionScope;
-  readonly iam?: SimIamInterServiceAuthZ;
-  readonly background?: BackgroundScheduler;
-}
+import type {
+  SimDynamoDbProperties,
+  SimDynamoDbRequestOptions,
+} from "./sim-dynamodb.types.js";
 
 /**
  * Simulated DynamoDB. Handles SDK commands. Emulates AWS behaviour and state.
@@ -39,7 +28,7 @@ export class SimDynamoDb {
     dynamoDb: this,
   });
 
-  constructor(properties: SimDynamoDatabaseProperties = {}) {
+  constructor(properties: SimDynamoDbProperties = {}) {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       iam = new SimIamAllowAllAuth(),
@@ -76,6 +65,17 @@ export class SimDynamoDb {
   ): Promise<simDynamoDbCommands.SimDescribeTableCommandOutput> {
     await this.background.sequence();
     return this.commands.tables.describeTable(command, options);
+  }
+
+  /**
+   * Handle an Update Table Command from the SDK.
+   */
+  async updateTable(
+    command: simDynamoDbCommands.SimUpdateTableCommand,
+    options?: SimDynamoDbRequestOptions,
+  ): Promise<simDynamoDbCommands.SimUpdateTableCommandOutput> {
+    await this.background.sequence();
+    return this.commands.tableUpdates.handle(command, options);
   }
 
   /**

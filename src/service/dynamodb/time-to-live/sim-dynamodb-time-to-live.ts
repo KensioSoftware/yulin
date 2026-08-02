@@ -16,7 +16,8 @@ const updateWindowMilliseconds = 60 * 60 * 1000;
  * An update moves the status to ENABLING or DISABLING and the scheduled work
  * settles it on ENABLED or DISABLED, which is the same two-step the table's own
  * status goes through. Nothing here expires anything: this is what a table
- * expires items by, and `SimDynamoDbTableExpiry` is what acts on it.
+ * expires items by, and `SimDynamoDbTableTimeToLive` is what holds it and acts
+ * on it.
  */
 export class SimDynamoDbTimeToLive {
   private readonly tableName: string;

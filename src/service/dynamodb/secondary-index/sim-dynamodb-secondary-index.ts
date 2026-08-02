@@ -50,6 +50,11 @@ export interface SimDynamoDbSecondaryIndex {
   assertAnswersConsistentRead(): void;
 
   /**
+   * Refuse a read of this index while it is still being built.
+   */
+  assertReadable(): void;
+
+  /**
    * Refuse an item carrying one of this index's key attributes as another type.
    */
   assertItemKeyTypes(

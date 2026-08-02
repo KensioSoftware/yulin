@@ -75,6 +75,72 @@ export class SimDynamoDbAttributeDefinitions {
   }
 
   /**
+   * These definitions with the ones an UpdateTable request adds.
+   *
+   * UpdateTable is the only chance to declare the key attributes of an index it
+   * is adding, so what it carries is added to what the table already has rather
+   * than replacing it. Redeclaring an attribute as another type is refused,
+   * since the items already holding it would no longer be readable by an index
+   * keyed on it.
+   *
+   * The result is a set of its own rather than a change to this one, so a
+   * request that turns out to be invalid leaves the table's definitions alone.
+   */
+  with(
+    input: readonly SimDynamoDbAttributeDefinitionInput[] | undefined,
+  ): SimDynamoDbAttributeDefinitions {
+    if (input === undefined || input.length === 0) {
+      return this;
+    }
+
+    const added = input.map((definition) => attributeDefinition(definition));
+    const elements = [...this.elements];
+
+    for (const definition of added) {
+      const existing = elements.find(
+        (element) => element.AttributeName === definition.AttributeName,
+      );
+
+      if (existing === undefined) {
+        elements.push(definition);
+        continue;
+      }
+
+      if (existing.AttributeType !== definition.AttributeType) {
+        throw new SimDynamoDbValidationException(
+          `AttributeDefinitions redefines the attribute ` +
+            `${definition.AttributeName} as ${definition.AttributeType}, and ` +
+            `the table already defines it as ${existing.AttributeType}`,
+        );
+      }
+    }
+
+    return new SimDynamoDbAttributeDefinitions(elements);
+  }
+
+  /**
+   * Refuse a key schema naming an attribute these definitions do not define.
+   *
+   * This is one half of what CreateTable checks. UpdateTable checks only this
+   * half, since a definition the table already carries for an index that has
+   * since been deleted is not something the request did wrong.
+   */
+  assertDefines(keySchema: SimDynamoDbKeySchema): void {
+    const definedNames = new Set(
+      this.elements.map((element) => element.AttributeName),
+    );
+
+    for (const keyName of keySchema.attributeNames()) {
+      if (!definedNames.has(keyName)) {
+        throw new SimDynamoDbValidationException(
+          `The KeySchema${keySchema.subject.owner} names the attribute ` +
+            `${keyName}, which has no AttributeDefinition`,
+        );
+      }
+    }
+  }
+
+  /**
    * The type declared for an attribute.
    *
    * Every key attribute has a definition by the time a table exists, since
@@ -106,15 +172,10 @@ export class SimDynamoDbAttributeDefinitions {
     const keyNames = new Set<string>();
 
     for (const keySchema of keySchemas) {
+      this.assertDefines(keySchema);
+
       for (const keyName of keySchema.attributeNames()) {
         keyNames.add(keyName);
-
-        if (!definedNames.has(keyName)) {
-          throw new SimDynamoDbValidationException(
-            `The KeySchema${keySchema.subject.owner} names the attribute ` +
-              `${keyName}, which has no AttributeDefinition`,
-          );
-        }
       }
     }
 

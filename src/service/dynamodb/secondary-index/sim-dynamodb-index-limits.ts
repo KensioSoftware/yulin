@@ -68,6 +68,24 @@ export function assertSimDynamoDbIndexNamesDistinct(
 }
 
 /**
+ * Refuse an index a table has no room for, by count, name or projection.
+ *
+ * UpdateTable adds one index to a set that already passed these rules, so they
+ * are applied to the set the table would end up with rather than to the new
+ * index on its own.
+ */
+export function assertSimDynamoDbIndexAddable(
+  elements: readonly SimDynamoDbSecondaryIndex[],
+  added: SimDynamoDbSecondaryIndex,
+): void {
+  const all = [...elements, added];
+
+  assertSimDynamoDbIndexCount(all.length);
+  assertSimDynamoDbIndexNamesDistinct(all);
+  assertSimDynamoDbProjectedAttributeCount(all);
+}
+
+/**
  * Refuse a table projecting more attributes than DynamoDB lets it.
  *
  * The 20 an index projects is not the whole rule: a table is capped at 100

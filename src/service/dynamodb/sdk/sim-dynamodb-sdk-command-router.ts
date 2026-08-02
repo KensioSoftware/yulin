@@ -8,6 +8,7 @@ import type {
   SimDeleteTableCommand,
   SimDescribeTableCommand,
   SimListTablesCommand,
+  SimUpdateTableCommand,
 } from "../command/table/table.command.js";
 import type {
   SimDeleteItemCommand,
@@ -59,6 +60,14 @@ export class SimDynamoDatabaseSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simDynamoDatabase.describeTable(
             command as SimDescribeTableCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "UpdateTableCommand",
+        async (command, context): Promise<unknown> =>
+          await simDynamoDatabase.updateTable(
+            command as SimUpdateTableCommand,
             simSdkCallerOptions(context),
           ),
       ],

@@ -103,6 +103,16 @@ export class SimDynamoDbLocalSecondaryIndex implements SimDynamoDbSecondaryIndex
   }
 
   /**
+   * A local secondary index is always ready to be read.
+   *
+   * It is built with the table that carries it, and AWS has no call that adds
+   * one afterwards, so there is no window in which it exists and cannot answer.
+   */
+  assertReadable(): void {
+    return;
+  }
+
+  /**
    * Refuse an item carrying one of this index's key attributes as another type.
    */
   assertItemKeyTypes(
