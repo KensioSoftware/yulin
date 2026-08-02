@@ -1,13 +1,12 @@
 import type { SimDynamoDbItem } from "../item/sim-dynamodb-item.js";
 import type { SimDynamoDbItemKey } from "./sim-dynamodb-item-key.js";
-import type { SimDynamoDbKeySchema } from "./sim-dynamodb-key-schema.js";
 import { SimDynamoDbScanPosition } from "./sim-dynamodb-scan-position.js";
 import type { SimDynamoDbScanSegment } from "./sim-dynamodb-scan-segment.js";
-import { SimDynamoDbSortKeyOrder } from "./sim-dynamodb-sort-key-order.js";
+import type { SimDynamoDbSortKeyOrder } from "./sim-dynamodb-sort-key-order.js";
 
 interface SimDynamoDbTableScanProperties {
   readonly items: Iterable<SimDynamoDbItem>;
-  readonly keySchema: SimDynamoDbKeySchema;
+  readonly order: SimDynamoDbSortKeyOrder;
   readonly itemKey: SimDynamoDbItemKey;
 }
 
@@ -31,9 +30,7 @@ export class SimDynamoDbTableScan {
 
   constructor(properties: SimDynamoDbTableScanProperties) {
     this.itemKey = properties.itemKey;
-    this.sortKeyOrder = new SimDynamoDbSortKeyOrder(
-      properties.keySchema.rangeKeyAttributeName,
-    );
+    this.sortKeyOrder = properties.order;
     this.positions = [...properties.items]
       .map((item) => this.positionOf(item))
       .toSorted((first, second) => first.compareTo(second));

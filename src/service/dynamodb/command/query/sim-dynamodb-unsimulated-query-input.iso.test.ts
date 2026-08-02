@@ -36,7 +36,6 @@ const keyCondition = {
 
 describe("DynamoDB QueryCommand unsimulated input", () => {
   it.each([
-    { name: "IndexName", input: { IndexName: "ByStatus" } },
     {
       name: "ProjectionExpression",
       input: { ProjectionExpression: "orderId" },

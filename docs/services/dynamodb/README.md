@@ -1181,6 +1181,111 @@ A token still works when the item it names has since been deleted: it says where
 than which position to return to. A token from a different partition key is refused, since it names
 a collection this query is not reading.
 
+## Reading a global secondary index
+
+`IndexName` on `Query` and `Scan` reads an index instead of the table. The key condition is held to
+the index key schema rather than the table's, which is the point: the index is how an access pattern
+the table key cannot serve gets served.
+
+```typescript sim-dynamodb-query-index
+/**
+ * Querying a global secondary index.
+ */
+
+import {
+  CreateTableCommand,
+  PutItemCommand,
+  QueryCommand,
+} from "@aws-sdk/client-dynamodb";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const dynamoDb = simAws.dynamoDb();
+
+await dynamoDb.createTable(
+  new CreateTableCommand({
+    TableName: "OrdersTable",
+    KeySchema: [{ AttributeName: "orderId", KeyType: "HASH" }],
+    AttributeDefinitions: [
+      { AttributeName: "orderId", AttributeType: "S" },
+      { AttributeName: "status", AttributeType: "S" },
+    ],
+    BillingMode: "PAY_PER_REQUEST",
+    GlobalSecondaryIndexes: [
+      {
+        IndexName: "byStatus",
+        KeySchema: [{ AttributeName: "status", KeyType: "HASH" }],
+        Projection: { ProjectionType: "INCLUDE", NonKeyAttributes: ["total"] },
+      },
+    ],
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+await dynamoDb.putItem(
+  new PutItemCommand({
+    TableName: "OrdersTable",
+    Item: {
+      orderId: { S: "order-1" },
+      status: { S: "OPEN" },
+      total: { N: "42" },
+      note: { S: "Gift wrap" },
+    },
+  }),
+);
+
+// A draft carries no status, so the index does not hold it.
+await dynamoDb.putItem(
+  new PutItemCommand({
+    TableName: "OrdersTable",
+    Item: { orderId: { S: "order-2" }, total: { N: "7" } },
+  }),
+);
+
+const open = await dynamoDb.query(
+  new QueryCommand({
+    TableName: "OrdersTable",
+    IndexName: "byStatus",
+    KeyConditionExpression: "#status = :status",
+    ExpressionAttributeNames: { "#status": "status" },
+    ExpressionAttributeValues: { ":status": { S: "OPEN" } },
+  }),
+);
+
+console.log(open.Count); // 1
+console.log(open.Items?.[0]?.["orderId"]?.S); // "order-1"
+console.log(open.Items?.[0]?.["total"]?.N); // "42"
+
+// `note` is not projected, so it is not on the item the index answers with.
+console.log(open.Items?.[0]?.["note"]); // undefined
+```
+
+The index is sparse. An item missing any of the index key attributes is not in the index, so a read
+of it simply does not find that item. Nothing about the write said so at the time.
+
+An index key is not unique, so several items can share one. Items sharing an index key come back in
+no particular order, and `LastEvaluatedKey` carries the index key attributes together with the table
+key attributes, which is what names one of them exactly enough to resume after. An
+`ExclusiveStartKey` carrying only part of that is refused.
+
+A read answers with the attributes the index projects, so `Select` defaults to
+`ALL_PROJECTED_ATTRIBUTES` rather than `ALL_ATTRIBUTES`. Asking for more than the index carries is
+refused rather than quietly answered with less:
+
+- `Select: ALL_ATTRIBUTES` against an index whose projection is not `ALL` is a `ValidationException`.
+- A `FilterExpression` naming an attribute the index does not project is refused too. The attribute
+  is not on the items the index holds, so the filter would drop all of them and the empty page would
+  read as a collection that happens to hold nothing.
+
+An `IndexName` the table does not have gives `ResourceNotFoundException` rather than reading the
+table. `ConsistentRead: true` against a global secondary index is a `ValidationException`, because a
+global secondary index is maintained asynchronously on AWS and cannot answer a strongly consistent
+read at all.
+
+`Scan` takes `IndexName` the same way, including in parallel segments, which divide by the index
+partition key rather than the table's.
+
 ## Scanning a table
 
 `Scan` reads every item in a table. It needs no key knowledge at all, which is what makes it the
@@ -2439,6 +2544,9 @@ nothing is written.
 - `GlobalSecondaryIndexes` on `CreateTable`, with index name, key schema, projection and per-index
   throughput validation, `AttributeDefinitions` matched against every key schema in the request, and
   each index reported in the table description.
+- `IndexName` on `Query` and `Scan`, reading a sparse index by its own key schema, answering with the
+  attributes it projects, and paging with a `LastEvaluatedKey` carrying the index key and the table
+  key together.
 - `DescribeTable`, answering with the full table description, by table name or ARN.
 - `ListTables`, ordered by UTF-8 bytes and paged with `Limit` and `ExclusiveStartTableName`.
 - `DeleteTable`, following the table status DynamoDB moves a deleted table through, and refusing a
@@ -2500,9 +2608,12 @@ nothing is written.
 - `Expected`, `ConditionalOperator` and `AttributeUpdates` are not converted for the document
   client, because simulated DynamoDB refuses all three anyway. A request carrying one is refused by
   the operation rather than by the conversion.
-- Reading a global secondary index is not simulated yet. An index is declared, validated and
-  reported, and the write path is held to its key attribute types, but `IndexName` on `Query` and
-  `Scan` is still refused rather than reading the table instead.
+- An index read answers with the attributes the index projects, and nothing fills in the rest. Real
+  DynamoDB does not either: a global secondary index never reads the base table for an attribute it
+  does not project, which is why `Select: ALL_ATTRIBUTES` against a partial projection is refused
+  rather than served. Fetching from the base table is a local secondary index behaviour, and those
+  are not simulated. `ProjectionExpression` is not simulated on `Query` or `Scan`, so naming a
+  non-projected attribute that way does not arise.
 - Local secondary indexes are not simulated. `LocalSecondaryIndexes` is refused rather than dropped,
   since a table missing an index it was asked for would answer queries differently to the real one.
   An empty list asks for no index, so it is accepted.
@@ -2586,11 +2697,8 @@ nothing is written.
   DynamoDB accepts it. The shape of a key condition is fixed, so there is nothing for brackets to
   group, and being stricter is the direction that fails safely: it is a puzzling refusal here rather
   than a query that means something different on AWS.
-- `IndexName` and `ProjectionExpression` are refused on `Query` and on `Scan`, since each of them
-  changes which items the operation answers with or which parts of them. Reading a secondary index
-  goes with the indexes themselves, which are not simulated.
-- A `Query` filter is held to the table's key schema, since indexes are not simulated. Which
-  attributes a filter may name on an index read is settled when index reads land.
+- `ProjectionExpression` is refused on `Query` and on `Scan`, since it changes which parts of an item
+  the operation answers with. `Select` covers the counted and the projected read in the meantime.
 - `UnprocessedItems` and `UnprocessedKeys` are always empty. Nothing here is throttled and no
   response stops at a size, so the branch of a batch retry loop that resends what did not go through
   is never taken against the simulator.

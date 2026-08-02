@@ -14,15 +14,15 @@ import type { SimDynamoDbTimeToLiveDescription } from "../command/time-to-live/t
 import { SimDynamoDbTableExpiry } from "../time-to-live/sim-dynamodb-table-expiry.js";
 import { SimDynamoDbTimeToLive } from "../time-to-live/sim-dynamodb-time-to-live.js";
 import type { SimDynamoDbTimeToLiveSpecification } from "../time-to-live/sim-dynamodb-time-to-live-specification.js";
-import type { SimDynamoDbKeyCondition } from "../expression/key-condition/sim-dynamodb-key-condition.js";
 import { SimDynamoDbGlobalSecondaryIndexes } from "../secondary-index/sim-dynamodb-global-secondary-indexes.js";
-import { SimDynamoDbItemCollection } from "./sim-dynamodb-item-collection.js";
+import { SimDynamoDbIndexView } from "../secondary-index/sim-dynamodb-index-view.js";
 import { SimDynamoDbItemKey } from "./sim-dynamodb-item-key.js";
+import type { SimDynamoDbReadView } from "./sim-dynamodb-read-view.js";
 import { describeSimDynamoDbTable } from "./sim-dynamodb-table-description.js";
 import { SimDynamoDbTableItems } from "./sim-dynamodb-table-items.js";
 import { SimDynamoDbTableLifecycle } from "./sim-dynamodb-table-lifecycle.js";
-import { SimDynamoDbTableScan } from "./sim-dynamodb-table-scan.js";
 import { SimDynamoDbTableTags } from "./sim-dynamodb-table-tags.js";
+import { SimDynamoDbTableView } from "./sim-dynamodb-table-view.js";
 import type { SimDynamoDbAttributeDefinitions } from "./sim-dynamodb-attribute-definitions.js";
 import type { SimDynamoDbKeySchema } from "./sim-dynamodb-key-schema.js";
 import type { SimDynamoDbTableBilling } from "./sim-dynamodb-table-billing.js";
@@ -262,34 +262,31 @@ export class SimDynamoDbTable {
   }
 
   /**
-   * The items a key condition names, in sort key order.
+   * What a Query or a Scan reads: this table, or one of its indexes.
    *
-   * A Query reads a whole item collection rather than one key, so the items are
-   * reachable together as well as one at a time. The ordering belongs to the
-   * collection rather than to the command that reads it.
+   * An index is worked out here rather than kept up to date on the write path,
+   * so a view is built per read from the items as they stand. An `IndexName`
+   * this table does not have is refused rather than read as the table.
    */
-  public itemCollection(
-    keyCondition: SimDynamoDbKeyCondition,
-  ): SimDynamoDbItemCollection {
-    return new SimDynamoDbItemCollection({
-      items: this.items.entries().values(),
-      keySchema: this.keySchema,
-      keyCondition,
-    });
-  }
+  public view(indexName: string | undefined): SimDynamoDbReadView {
+    const items = this.items.entries().values().toArray();
 
-  /**
-   * Every item this table holds, in the order a Scan reads them.
-   *
-   * A Scan needs no key knowledge, so unlike an item collection this is the
-   * whole table. The order and the parallel scan segments both belong to the
-   * scan rather than to the command that reads it.
-   */
-  public scan(): SimDynamoDbTableScan {
-    return new SimDynamoDbTableScan({
-      items: this.items.entries().values(),
-      keySchema: this.keySchema,
-      itemKey: this.itemKey,
+    if (indexName === undefined) {
+      return new SimDynamoDbTableView({
+        tableName: this.tableName,
+        items,
+        keySchema: this.keySchema,
+        attributeDefinitions: this.attributeDefinitions,
+        itemKey: this.itemKey,
+      });
+    }
+
+    return new SimDynamoDbIndexView({
+      index: this.indexes.required(indexName, this.tableName),
+      items,
+      tableKeySchema: this.keySchema,
+      attributeDefinitions: this.attributeDefinitions,
+      tableItemKey: this.itemKey,
     });
   }
 }

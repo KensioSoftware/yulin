@@ -3,7 +3,7 @@ import type {
   SimDynamoDbIndexStatus,
   SimDynamoDbSecondaryIndexInput,
 } from "../command/table/table.types.js";
-import { SimDynamoDbValidationException } from "../error/dynamodb.error.js";
+import { SimDynamoDbResourceNotFoundException } from "../error/dynamodb.error.js";
 import type { SimDynamoDbItem } from "../item/sim-dynamodb-item.js";
 import type { SimDynamoDbAttributeDefinitions } from "../table/sim-dynamodb-attribute-definitions.js";
 import type { SimDynamoDbKeySchema } from "../table/sim-dynamodb-key-schema.js";
@@ -11,61 +11,11 @@ import {
   SimDynamoDbGlobalSecondaryIndex,
   type SimDynamoDbSecondaryIndexTable,
 } from "./sim-dynamodb-global-secondary-index.js";
-
-/**
- * The most global secondary indexes one table holds.
- */
-const maxIndexes = 20;
-
-/**
- * The most NonKeyAttributes one table projects across all of its indexes.
- */
-const maxProjectedAttributes = 100;
-
-/**
- * Refuse a request declaring one index name twice.
- *
- * An index is reached by name, so two indexes sharing one leave a read with no
- * way of saying which it meant.
- */
-function assertDistinctNames(
-  elements: readonly SimDynamoDbGlobalSecondaryIndex[],
-): void {
-  const names = new Set(elements.map((index) => index.name));
-
-  if (names.size !== elements.length) {
-    throw new SimDynamoDbValidationException(
-      "GlobalSecondaryIndexes names an index more than once, and an index " +
-        "name is unique within a table",
-    );
-  }
-}
-
-/**
- * Refuse a table projecting more attributes than DynamoDB lets it.
- *
- * The 20 an index projects is not the whole rule: a table is capped at 100
- * across all of its indexes too, which six fully projecting indexes reach. An
- * attribute projected into two indexes counts twice, so this is a plain sum
- * rather than a count of distinct names, as it is on AWS.
- */
-function assertProjectedAttributeCount(
-  elements: readonly SimDynamoDbGlobalSecondaryIndex[],
-): void {
-  const projected = elements.reduce(
-    (total, index) => total + index.projection.nonKeyAttributeCount,
-    0,
-  );
-
-  if (projected > maxProjectedAttributes) {
-    const most = maxProjectedAttributes.toString();
-
-    throw new SimDynamoDbValidationException(
-      `${projected.toString()} NonKeyAttributes are projected across the ` +
-        `table's indexes, and a table projects at most ${most}`,
-    );
-  }
-}
+import {
+  assertSimDynamoDbIndexCount,
+  assertSimDynamoDbIndexNamesDistinct,
+  assertSimDynamoDbProjectedAttributeCount,
+} from "./sim-dynamodb-index-limits.js";
 
 /**
  * The global secondary indexes one table carries.
@@ -98,21 +48,42 @@ export class SimDynamoDbGlobalSecondaryIndexes {
       return this.none();
     }
 
-    if (input.length > maxIndexes) {
-      throw new SimDynamoDbValidationException(
-        `${input.length.toString()} GlobalSecondaryIndexes were given, and a ` +
-          `table holds at most ${maxIndexes.toString()}`,
-      );
-    }
+    assertSimDynamoDbIndexCount(input.length);
 
     const elements = input.map((index) =>
       SimDynamoDbGlobalSecondaryIndex.fromInput(index, table),
     );
 
-    assertDistinctNames(elements);
-    assertProjectedAttributeCount(elements);
+    assertSimDynamoDbIndexNamesDistinct(elements);
+    assertSimDynamoDbProjectedAttributeCount(elements);
 
     return new this(elements);
+  }
+
+  /**
+   * The index a read names, refusing a name this table does not have.
+   *
+   * Real DynamoDB answers a name it does not have with
+   * `ResourceNotFoundException` rather than reading the table instead, since a
+   * read of an index that is not there is a read of nothing.
+   */
+  required(
+    indexName: string,
+    tableName: string,
+  ): SimDynamoDbGlobalSecondaryIndex {
+    const index = this.elements.find(
+      (candidate) => candidate.name === indexName,
+    );
+
+    if (index === undefined) {
+      throw new SimDynamoDbResourceNotFoundException(
+        `The table ${tableName} does not have the specified index: ${
+          indexName
+        }`,
+      );
+    }
+
+    return index;
   }
 
   /**

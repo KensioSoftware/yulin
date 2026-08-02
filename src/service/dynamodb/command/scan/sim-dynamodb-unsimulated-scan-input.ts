@@ -18,11 +18,6 @@ export function refuseUnsimulatedScanInput(input: SimScanCommandInput): void {
   const unsimulated = new SimDynamoDbUnsimulatedInput("Scan");
 
   unsimulated.refuse(
-    input.IndexName !== undefined,
-    "IndexName",
-    "reading the table where a secondary index was asked for",
-  );
-  unsimulated.refuse(
     input.ProjectionExpression !== undefined,
     "ProjectionExpression",
     "answering with whole items where part of them was asked for",

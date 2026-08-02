@@ -2,6 +2,7 @@ import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { readSimDynamoDbFilter } from "../../expression/filter/sim-dynamodb-filter-expression.js";
 import { SimDynamoDbItemPage } from "../item/sim-dynamodb-item-page.js";
 import { SimDynamoDbReadAnswer } from "../read/sim-dynamodb-read-answer.js";
+import { refuseSimDynamoDbConsistentIndexRead } from "../read/sim-dynamodb-consistent-read.js";
 import { SimDynamoDbSelect } from "../read/sim-dynamodb-select.js";
 import type { SimDynamoDbTableAccess } from "../table/sim-dynamodb-table-access.js";
 import type { SimScanCommand, SimScanCommandOutput } from "./scan.command.js";
@@ -51,6 +52,7 @@ export class SimDynamoDbScan {
     const select = SimDynamoDbSelect.from(input);
 
     refuseUnsimulatedScanInput(input);
+    refuseSimDynamoDbConsistentIndexRead(input);
 
     // The segment and the filter are read before the table is reached, so
     // input DynamoDB would refuse is refused whether or not the table is
@@ -63,12 +65,18 @@ export class SimDynamoDbScan {
       input.TableName,
       options?.caller,
     );
-    const scan = table.scan();
 
-    // The token names a place in this table's scan order, so it can only be
+    // What is being read is settled here: the table, or one of its indexes.
+    const view = table.view(input.IndexName);
+    const scan = view.scan();
+
+    select.assertAnswerableBy(view);
+    filter?.assertNamesOnlyCarried(view);
+
+    // The token names a place in this view's scan order, so it can only be
     // checked once that order is known.
     const after = readSimDynamoDbScanStartKey({
-      table,
+      view,
       scan,
       segment,
       exclusiveStartKey: input.ExclusiveStartKey,
@@ -77,11 +85,11 @@ export class SimDynamoDbScan {
     const page = new SimDynamoDbItemPage({
       items: scan.walk({ segment, after }),
       limit: input.Limit,
-      keySchema: table.keySchema,
+      view,
     });
 
     return {
-      ...new SimDynamoDbReadAnswer({ page, filter, select }).fields(),
+      ...new SimDynamoDbReadAnswer({ page, filter, select, view }).fields(),
       $metadata: {},
     };
   }

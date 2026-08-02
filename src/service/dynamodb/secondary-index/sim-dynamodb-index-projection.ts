@@ -127,6 +127,30 @@ export class SimDynamoDbIndexProjection {
   }
 
   /**
+   * Whether the index carries every attribute of an item.
+   *
+   * A read of an index that does is the same read as one of the table, as far
+   * as which attributes come back goes.
+   */
+  get carriesWholeItem(): boolean {
+    return this.type === "ALL";
+  }
+
+  /**
+   * The attributes this projection adds to the index keys.
+   */
+  get addedAttributeNames(): readonly string[] {
+    return this.nonKeyAttributes;
+  }
+
+  /**
+   * Whether this projection adds a named attribute to the index keys.
+   */
+  adds(attributeName: string): boolean {
+    return this.nonKeyAttributes.includes(attributeName);
+  }
+
+  /**
    * How many attributes this projection adds to the index keys.
    *
    * A table is capped on the total across all of its indexes as well as on each

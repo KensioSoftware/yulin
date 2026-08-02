@@ -27,7 +27,6 @@ async function ordersTable(simAws: SimAws): Promise<SimDynamoDb> {
 
 describe("DynamoDB ScanCommand unsimulated input", () => {
   it.each([
-    { name: "IndexName", input: { IndexName: "ByStatus" } },
     {
       name: "ProjectionExpression",
       input: { ProjectionExpression: "orderId" },

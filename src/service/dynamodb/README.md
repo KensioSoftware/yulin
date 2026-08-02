@@ -173,6 +173,38 @@ Which items an index holds is worked out when the index is read rather than main
 write, following the precedent `SimSqsQueue.applyLifecycle` sets. So PutItem, UpdateItem and
 DeleteItem stay unaware of indexes apart from one check.
 
+## Read views
+
+`SimDynamoDbReadView` under `table/` is what a Query or a Scan reads: `SimDynamoDbTableView` for the
+table itself, or `SimDynamoDbIndexView` for one of its indexes. `SimDynamoDbTable.view` is where the
+choice is made, and it is the only place `IndexName` is looked at. Everything after it asks the view,
+so a read of an index is the same read against a narrower thing rather than a second code path.
+
+The two differ in four answers, which is the whole of what `IndexName` does:
+
+- which items there are. An index is sparse, so the view keeps only the items carrying every index
+  key attribute. That filter is the derivation, and it happens per read.
+- which key a walk follows. The index key schema rather than the table's, so the key condition, the
+  sort order and the parallel scan segments all follow the index.
+- which attributes come back. `project` cuts an item to what the index carries, so a read of a
+  KEYS_ONLY index answers with keys. A table view cuts nothing.
+- what a token carries. An index key is not unique, so `tokenKey` carries the index key and the
+  table key together, and `SimDynamoDbSortKeyOrder` takes the table's `SimDynamoDbItemKey` as an
+  identity to separate two items sharing an index key. Without it a walk could not resume after
+  either of them, and paging would repeat one or skip one.
+
+`SimDynamoDbIndexView` splits those two ways, and what is left in the view is the walking, which is
+the same walking a table gets:
+
+- `SimDynamoDbIndexKeys` is which items the index holds and how an entry is named: `holds` is the
+  sparseness, `tokenKey` is both keys together, and `assertStartKey` refuses a token missing either
+  of them or carrying anything else.
+- `SimDynamoDbIndexAttributes` is which parts of an item come back. `assertCarriesWholeItem` and
+  `assertCarriesPaths` are the two refusals only an index makes: a `Select` of `ALL_ATTRIBUTES`
+  against a projection that is not ALL, and a filter naming an attribute the index does not project.
+  Both fail closed. The alternative to the second is an empty page, which reads as a collection that
+  happens to hold nothing.
+
 That check is `assertItemKeyTypes`, applied in `SimDynamoDbTable.putItem`, which every write in the
 service goes through. An item missing an index key attribute is fine, since a global secondary index
 is sparse and simply does not hold it. An item carrying one as a type the index did not declare is a
@@ -485,8 +517,10 @@ Important behavior:
 - `ExclusiveStartKey` resumes exclusively, by comparing sort keys rather than by looking the item up,
   so a token still works when the item it names has since been deleted. That is the same choice
   `ListTables` and `ListTagsOfResource` make.
-- `IndexName` and `ProjectionExpression` are refused by name, since each changes which items a query
-  answers with or which parts of them.
+- `ProjectionExpression` is refused by name, since it changes which parts of an item a query answers
+  with.
+- `IndexName` chooses what is read, through `SimDynamoDbTable.view`. Everything after that asks the
+  view rather than the table, so a query of an index is the same query against a narrower thing.
 
 ## Scan behavior
 

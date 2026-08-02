@@ -1,7 +1,6 @@
 import { SimDynamoDbValidationException } from "../../error/dynamodb.error.js";
 import type { SimDynamoDbItem } from "../../item/sim-dynamodb-item.js";
-import type { SimDynamoDbKeySchema } from "../../table/sim-dynamodb-key-schema.js";
-import { simDynamoDbPrimaryKeyAttributes } from "../../table/sim-dynamodb-primary-key.js";
+import type { SimDynamoDbReadView } from "../../table/sim-dynamodb-read-view.js";
 import type { SimDynamoDbAttributeValue } from "./item.types.js";
 
 /**
@@ -30,7 +29,7 @@ interface SimDynamoDbItemPageProperties {
   /** The items the walk reached, already in the order they are read in. */
   readonly items: readonly SimDynamoDbItem[];
   readonly limit: number | undefined;
-  readonly keySchema: SimDynamoDbKeySchema;
+  readonly view: SimDynamoDbReadView;
 }
 
 /**
@@ -46,8 +45,10 @@ interface SimDynamoDbItemPageProperties {
  * is absent therefore reads one empty page at the end. That is what real
  * DynamoDB does: it cannot know the range is exhausted without looking past it.
  *
- * Scan pages the same way, so this takes items and a key schema rather than a
- * query.
+ * Scan pages the same way, so this takes items and the view they came from
+ * rather than a query. The view is also what decides which key attributes the
+ * token carries: a read of an index names the item it stopped on by the index
+ * key and the table key together, since an index key is not unique.
  */
 export class SimDynamoDbItemPage {
   public readonly items: readonly SimDynamoDbItem[];
@@ -58,7 +59,7 @@ export class SimDynamoDbItemPage {
     const limit = readLimit(properties.limit);
 
     this.items = properties.items.slice(0, limit);
-    this.lastEvaluatedKey = this.tokenFor(properties.keySchema, limit);
+    this.lastEvaluatedKey = this.tokenFor(properties.view, limit);
   }
 
   /**
@@ -66,7 +67,7 @@ export class SimDynamoDbItemPage {
    * the end of the range.
    */
   private tokenFor(
-    keySchema: SimDynamoDbKeySchema,
+    view: SimDynamoDbReadView,
     limit: number,
   ): Record<string, SimDynamoDbAttributeValue> | undefined {
     const last = this.items.at(-1);
@@ -75,6 +76,6 @@ export class SimDynamoDbItemPage {
       return undefined;
     }
 
-    return simDynamoDbPrimaryKeyAttributes(last, keySchema);
+    return view.tokenKey(last);
   }
 }

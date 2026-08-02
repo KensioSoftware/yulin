@@ -1,4 +1,5 @@
 import { SimDynamoDbValidationException } from "../../error/dynamodb.error.js";
+import type { SimDynamoDbReadView } from "../../table/sim-dynamodb-read-view.js";
 
 /**
  * The four things `Select` can ask a read for.
@@ -15,8 +16,8 @@ type SimDynamoDbSelectKind = (typeof selectKinds)[number];
 /**
  * What a table read defaults to when the request says nothing.
  *
- * A read of an index defaults to `ALL_PROJECTED_ATTRIBUTES` instead, which does
- * not arise here: reading an index is not simulated, so `IndexName` is refused.
+ * A read of an index defaults to `ALL_PROJECTED_ATTRIBUTES` instead, since an
+ * index carries only what it projects and cannot answer with more.
  */
 const tableDefault: SimDynamoDbSelectKind = "ALL_ATTRIBUTES";
 
@@ -53,12 +54,24 @@ export class SimDynamoDbSelect {
    * rest of the request.
    */
   static from(input: SimDynamoDbSelectInput): SimDynamoDbSelect {
-    const kind = readSelectKind(input.Select);
+    const kind = readSelectKind(input);
 
     assertIndexToProjectFrom(kind, input);
     assertProjectionAgrees(kind, input);
 
     return new this(kind);
+  }
+
+  /**
+   * Refuse a `Select` the view being read cannot answer.
+   *
+   * Only the view knows which attributes it carries, so this waits for it where
+   * the rest of the `Select` rules are about the request on its own.
+   */
+  assertAnswerableBy(view: SimDynamoDbReadView): void {
+    if (this.kind === "ALL_ATTRIBUTES") {
+      view.assertCarriesWholeItem();
+    }
   }
 
   /**
@@ -74,10 +87,19 @@ export class SimDynamoDbSelect {
 
 /**
  * Read the `Select` a request wrote, refusing a word that is not one.
+ *
+ * A request that wrote none defaults by what it is reading: whole items from a
+ * table, and what the index projects from an index.
  */
-function readSelectKind(select: string | undefined): SimDynamoDbSelectKind {
+function readSelectKind(input: SimDynamoDbSelectInput): SimDynamoDbSelectKind {
+  const select = input.Select;
+
   if (select === undefined) {
-    return tableDefault;
+    if (input.IndexName === undefined) {
+      return tableDefault;
+    }
+
+    return "ALL_PROJECTED_ATTRIBUTES";
   }
 
   const kind = selectKinds.find((candidate) => candidate === select);
