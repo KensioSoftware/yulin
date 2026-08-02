@@ -3,7 +3,7 @@ import {
   type SimSdkCommandRoute,
 } from "../../../sdk/index.js";
 import type { SimDynamoDbAttributeValue } from "../command/item/item.types.js";
-import type { SimDynamoDbRequestOptions } from "../sim-dynamodb.js";
+import type { SimDynamoDbRequestOptions } from "../sim-dynamodb.types.js";
 import { simDynamoDbDocumentAttributeValue } from "./sim-dynamodb-document-marshall.js";
 import type { SimDynamoDbDocumentPath } from "./sim-dynamodb-document-path.js";
 import { simDynamoDbDocumentNativeValue } from "./sim-dynamodb-document-unmarshall.js";

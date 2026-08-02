@@ -1,9 +1,7 @@
 import type { SimSdkCommandRoute } from "../../../sdk/index.js";
 import type * as simDynamoDbCommands from "../command/sim-dynamodb-command.types.js";
-import type {
-  SimDynamoDb,
-  SimDynamoDbRequestOptions,
-} from "../sim-dynamodb.js";
+import type { SimDynamoDb } from "../sim-dynamodb.js";
+import type { SimDynamoDbRequestOptions } from "../sim-dynamodb.types.js";
 import {
   type SimDynamoDbDocumentCommandPaths,
   simDynamoDbDocumentCommandPaths as paths,

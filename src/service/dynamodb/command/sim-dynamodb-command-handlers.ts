@@ -16,6 +16,7 @@ import { SimDynamoDbTimeToLiveCommands } from "./time-to-live/sim-dynamodb-time-
 import { SimDynamoDbCreateTable } from "./table/sim-dynamodb-create-table.js";
 import { SimDynamoDbTableAccess } from "./table/sim-dynamodb-table-access.js";
 import { SimDynamoDbTableCommands } from "./table/sim-dynamodb-table-commands.js";
+import { SimDynamoDbUpdateTable } from "./table/sim-dynamodb-update-table.js";
 import { SimDynamoDbTransactGetItems } from "./transact/sim-dynamodb-transact-get-items.js";
 import { SimDynamoDbTransactWriteItems } from "./transact/sim-dynamodb-transact-write-items.js";
 
@@ -37,6 +38,7 @@ interface SimDynamoDbCommandHandlersProperties {
 export class SimDynamoDbCommandHandlers {
   public readonly access: SimDynamoDbTableAccess;
   public readonly tableCreation: SimDynamoDbCreateTable;
+  public readonly tableUpdates: SimDynamoDbUpdateTable;
   public readonly tables: SimDynamoDbTableCommands;
   public readonly itemWrites: SimDynamoDbPutItem;
   public readonly itemReads: SimDynamoDbGetItem;
@@ -70,6 +72,7 @@ export class SimDynamoDbCommandHandlers {
       accountRegionScope,
       background,
     });
+    this.tableUpdates = new SimDynamoDbUpdateTable({ access, background });
     this.tables = new SimDynamoDbTableCommands({ tables, access, background });
     this.itemWrites = new SimDynamoDbPutItem({ access });
     this.itemReads = new SimDynamoDbGetItem({ access });

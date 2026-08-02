@@ -393,6 +393,135 @@ await simAws.backgroundTasksComplete();
 A token naming a table that has since been deleted still works: a page resumes at the first name
 after the token rather than at a remembered position.
 
+## Updating a table
+
+`UpdateTable` changes a table after it exists. It does one of these per call, as AWS does:
+
+- change what the table is billed and provisioned as
+- add one global secondary index
+- remove one global secondary index
+
+A request combining two of them is a `ValidationException`. `TableClass` and
+`DeletionProtectionEnabled` are not one of the three and can ride along with any of them, or stand on
+their own.
+
+The table goes to `UPDATING` at once and settles back to `ACTIVE` once the scheduled background work
+has run. It serves reads and writes throughout, since AWS does not take a table offline to update it.
+A second `UpdateTable` while one is in flight is a `ResourceInUseException`.
+
+Adding an index is the change most likely to go wrong in a deployment, so it is worth writing a test
+against. The new index is on the table straight away with an `IndexStatus` of `CREATING` and
+`Backfilling` true, and cannot be read until it is `ACTIVE`. A `Query` or a `Scan` against it before
+then is refused with `Cannot read from backfilling global secondary index`, which is what real
+DynamoDB answers. The indexes the table already had stay `ACTIVE` and readable while the new one
+builds.
+
+The key attributes of the new index have to be in the `AttributeDefinitions` of the same call. That
+is the only chance to declare them, and a request that leaves them out fails the same way a
+`CreateTable` missing a definition does. Those definitions are added to the ones the table already
+has, so redeclaring an existing attribute as another type is refused.
+
+```typescript sim-dynamodb-update-table-index
+/**
+ * Adding a global secondary index to a table that is already live.
+ */
+
+import {
+  DescribeTableCommand,
+  QueryCommand,
+  UpdateTableCommand,
+} from "@aws-sdk/client-dynamodb";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const dynamoDb = simAws.dynamoDb();
+
+await dynamoDb.createTable({
+  input: {
+    TableName: "OrdersTable",
+    KeySchema: [{ AttributeName: "orderId", KeyType: "HASH" }],
+    AttributeDefinitions: [{ AttributeName: "orderId", AttributeType: "S" }],
+    BillingMode: "PAY_PER_REQUEST",
+  },
+});
+await simAws.backgroundTasksComplete();
+
+await dynamoDb.putItem({
+  input: {
+    TableName: "OrdersTable",
+    Item: { orderId: { S: "order-1" }, status: { S: "OPEN" } },
+  },
+});
+
+// The attributes the new index is keyed on are declared on the same call, which
+// is the only chance to declare them.
+await dynamoDb.updateTable(
+  new UpdateTableCommand({
+    TableName: "OrdersTable",
+    AttributeDefinitions: [{ AttributeName: "status", AttributeType: "S" }],
+    GlobalSecondaryIndexUpdates: [
+      {
+        Create: {
+          IndexName: "byStatus",
+          KeySchema: [{ AttributeName: "status", KeyType: "HASH" }],
+          Projection: { ProjectionType: "ALL" },
+        },
+      },
+    ],
+  }),
+);
+
+const building = await dynamoDb.describeTable(
+  new DescribeTableCommand({ TableName: "OrdersTable" }),
+);
+
+console.log(building.Table?.TableStatus); // "UPDATING"
+console.log(building.Table?.GlobalSecondaryIndexes?.[0]?.IndexStatus); // "CREATING"
+console.log(building.Table?.GlobalSecondaryIndexes?.[0]?.Backfilling); // true
+
+// A query against the index now would be refused with
+// "Cannot read from backfilling global secondary index: byStatus".
+await simAws.backgroundTasksComplete();
+
+// Once it is ACTIVE it answers for the order that was written before it existed.
+const open = await dynamoDb.query(
+  new QueryCommand({
+    TableName: "OrdersTable",
+    IndexName: "byStatus",
+    KeyConditionExpression: "#status = :status",
+    ExpressionAttributeNames: { "#status": "status" },
+    ExpressionAttributeValues: { ":status": { S: "OPEN" } },
+  }),
+);
+
+console.log(open.Items?.[0]?.["orderId"]?.S); // "order-1"
+
+// Removing it takes it back off the table.
+await dynamoDb.updateTable(
+  new UpdateTableCommand({
+    TableName: "OrdersTable",
+    GlobalSecondaryIndexUpdates: [{ Delete: { IndexName: "byStatus" } }],
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+const described = await dynamoDb.describeTable(
+  new DescribeTableCommand({ TableName: "OrdersTable" }),
+);
+
+console.log(described.Table?.GlobalSecondaryIndexes); // undefined
+```
+
+Removing an index takes it out of `DescribeTable`, after which a read naming it gives
+`ResourceNotFoundException`. Deleting one the table does not have gives the same, since there is no
+such index either way.
+
+A request carrying `ProvisionedThroughput` and no `BillingMode` reprovisions the table under the mode
+it already has, so setting capacity on an on-demand table is refused rather than quietly switching
+it. Switching to `PROVISIONED` has to state the capacity here, which real DynamoDB estimates instead;
+see Limitations.
+
 ## Deleting a table
 
 `DeleteTable` puts the table into `DELETING` and answers with its description. The table is still
@@ -2856,6 +2985,11 @@ nothing is written.
   `ClientRequestToken` making a retry idempotent for ten simulated minutes.
 - `TransactGetItems`, reading up to 100 items in one step, with a positional `Responses` array in
   which a missing item is an entry with no `Item`.
+- `UpdateTable`, doing one of a billing and throughput change, one global secondary index creation or
+  one global secondary index deletion per call, with `TableClass` and `DeletionProtectionEnabled`
+  riding along. The table moves through `UPDATING` while serving reads and writes, a new index
+  reports `Backfilling` and refuses reads until it is `ACTIVE`, and a second update in flight gives
+  `ResourceInUseException`.
 - `Tags` on `CreateTable`, with `TagResource`, `UntagResource` and `ListTagsOfResource` addressing
   the table by ARN, the key, value and count rules DynamoDB applies, and `NextToken` paging.
 - `UpdateTimeToLive` and `DescribeTimeToLive`, moving through `ENABLING` and `DISABLING` to settle,
@@ -2899,9 +3033,28 @@ nothing is written.
 - `ItemCount` and `IndexSizeBytes` are 0 for every index, the same way the table's own figures are.
 - Per-index `ProvisionedThroughput` is read, validated and reported, and enforces nothing. No read or
   write against an index is throttled, since none against the table is either.
-- `UpdateTable` is not simulated, so a global secondary index cannot be added to or removed from a
-  table after it has been created. A local secondary index cannot be either, which is AWS behaviour
-  rather than a limitation here: `CreateTable` is the only call that declares one.
+- A local secondary index cannot be added to or removed from a table after it has been created, which
+  is AWS behaviour rather than a limitation here: `CreateTable` is the only call that declares one.
+  `UpdateTable` refuses a `LocalSecondaryIndexes` change by having no such parameter at all, as AWS
+  does.
+- There is no backfill to run when `UpdateTable` adds an index, since which items an index holds is
+  worked out when the index is read. The `CREATING` window is a status the background scheduler
+  advances rather than work being done, so the index answers for the items already on the table the
+  moment it goes `ACTIVE`. What a test observes matches AWS while the mechanism does not: nothing
+  here takes longer to add an index to a large table than to an empty one.
+- `Backfilling` is reported as true while a new index is `CREATING` and left out once it is `ACTIVE`.
+  Real DynamoDB has a second phase in which the index is still `CREATING` with `Backfilling` false,
+  which is the point after which it can no longer be deleted mid-build. That phase is not modelled,
+  so an index here can be deleted at any point before it is `ACTIVE`.
+- Changing the provisioned capacity of an existing global secondary index is refused rather than
+  applied. A per-index capacity is read and reported but enforces nothing, so changing one would move
+  a number nothing acts on.
+- Switching a table to `PROVISIONED` with `UpdateTable` has to state the capacity. Real DynamoDB
+  estimates it from the table's consumption over the previous half hour, and nothing here measures
+  consumption, so an estimate would be an invented number that a deployment then reads back.
+- An `AttributeDefinition` for an index that has since been deleted stays on the table. Nothing
+  removes a definition, so a table can report one that no key now uses, which `CreateTable` would
+  have refused on the way in.
 - Tagging is immediate. AWS documents `TagResource` and `UntagResource` as eventually consistent, so
   a real `ListTagsOfResource` issued straight after one of them may answer with the previous tags or
   with none. Here the change is there by the time the call returns, so a test cannot observe the
@@ -2961,8 +3114,8 @@ nothing is written.
   DynamoDB.
 - A table ARN naming another Account or Region is refused rather than resolved to the local table of
   that name. Cross-account table access needs a resource policy, which is not simulated.
-- `UpdateTable` is not implemented, so a table never reaches `UPDATING` on its own. `DeleteTable`
-  refuses that status anyway, for when it can.
+- A table in `UPDATING` refuses `DeleteTable` as well as a second `UpdateTable`, which is AWS
+  behaviour: a table has to be `ACTIVE` before either.
 - Nothing enforces capacity. A provisioned table's throughput is stored and reported, and no request
   is ever throttled with `ProvisionedThroughputExceededException`.
 - A query or scan page is never cut short by size. Real DynamoDB stops a page at 1 MB and hands out

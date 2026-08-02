@@ -1,9 +1,11 @@
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
 import type {
   SimDynamoDbAttributeDefinitionInput,
+  SimDynamoDbGlobalSecondaryIndexUpdateInput,
   SimDynamoDbKeySchemaElementInput,
   SimDynamoDbOnDemandThroughput,
   SimDynamoDbProvisionedThroughput,
+  SimDynamoDbReplicaUpdateInput,
   SimDynamoDbSecondaryIndexInput,
   SimDynamoDbSseSpecification,
   SimDynamoDbStreamSpecification,
@@ -52,6 +54,47 @@ export interface SimCreateTableCommandInput {
  */
 export interface SimCreateTableCommandOutput {
   readonly TableDescription?: SimDynamoDbTableDescription;
+  readonly $metadata: SimResponseMetadata;
+}
+
+/**
+ * Minimal structural sim DynamoDB UpdateTable command.
+ */
+export interface SimUpdateTableCommand {
+  readonly input: SimUpdateTableCommandInput;
+}
+
+/**
+ * Minimal structural sim DynamoDB UpdateTable input.
+ *
+ * `TableName` takes the table's name or its ARN, as real DynamoDB does. The
+ * settings that are not simulated are declared as well as the ones that are, so
+ * a request asking for one of them is refused by name rather than accepted and
+ * ignored.
+ */
+export interface SimUpdateTableCommandInput {
+  readonly TableName?: string | undefined;
+  readonly AttributeDefinitions?:
+    readonly SimDynamoDbAttributeDefinitionInput[] | undefined;
+  readonly BillingMode?: string | undefined;
+  readonly ProvisionedThroughput?: SimDynamoDbProvisionedThroughput | undefined;
+  readonly GlobalSecondaryIndexUpdates?:
+    readonly SimDynamoDbGlobalSecondaryIndexUpdateInput[] | undefined;
+  readonly TableClass?: string | undefined;
+  readonly DeletionProtectionEnabled?: boolean | undefined;
+  readonly StreamSpecification?: SimDynamoDbStreamSpecification | undefined;
+  readonly SSESpecification?: SimDynamoDbSseSpecification | undefined;
+  readonly ReplicaUpdates?:
+    readonly SimDynamoDbReplicaUpdateInput[] | undefined;
+  readonly OnDemandThroughput?: SimDynamoDbOnDemandThroughput | undefined;
+  readonly WarmThroughput?: SimDynamoDbWarmThroughput | undefined;
+}
+
+/**
+ * Minimal structural sim DynamoDB UpdateTable output.
+ */
+export interface SimUpdateTableCommandOutput {
+  readonly TableDescription?: SimDynamoDbTableDescription | undefined;
   readonly $metadata: SimResponseMetadata;
 }
 

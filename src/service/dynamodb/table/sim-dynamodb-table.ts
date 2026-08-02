@@ -10,22 +10,19 @@ import type {
   SimDynamoDbTableStatus,
 } from "../command/table/table.types.js";
 import type { SimDynamoDbItem } from "../item/sim-dynamodb-item.js";
-import type { SimDynamoDbTimeToLiveDescription } from "../command/time-to-live/time-to-live.types.js";
-import { SimDynamoDbTableExpiry } from "../time-to-live/sim-dynamodb-table-expiry.js";
-import { SimDynamoDbTimeToLive } from "../time-to-live/sim-dynamodb-time-to-live.js";
-import type { SimDynamoDbTimeToLiveSpecification } from "../time-to-live/sim-dynamodb-time-to-live-specification.js";
+import { SimDynamoDbTableTimeToLive } from "../time-to-live/sim-dynamodb-table-time-to-live.js";
 import { SimDynamoDbSecondaryIndexes } from "../secondary-index/sim-dynamodb-secondary-indexes.js";
-import { SimDynamoDbIndexView } from "../secondary-index/sim-dynamodb-index-view.js";
-import { SimDynamoDbItemKey } from "./sim-dynamodb-item-key.js";
 import type { SimDynamoDbReadView } from "./sim-dynamodb-read-view.js";
 import { describeSimDynamoDbTable } from "./sim-dynamodb-table-description.js";
+import { SimDynamoDbTableDefinition } from "./sim-dynamodb-table-definition.js";
 import { SimDynamoDbTableItems } from "./sim-dynamodb-table-items.js";
 import { SimDynamoDbTableLifecycle } from "./sim-dynamodb-table-lifecycle.js";
+import { simDynamoDbTableReadView } from "./sim-dynamodb-table-read-view.js";
 import { SimDynamoDbTableTags } from "./sim-dynamodb-table-tags.js";
-import { SimDynamoDbTableView } from "./sim-dynamodb-table-view.js";
 import type { SimDynamoDbAttributeDefinitions } from "./sim-dynamodb-attribute-definitions.js";
 import type { SimDynamoDbKeySchema } from "./sim-dynamodb-key-schema.js";
 import type { SimDynamoDbTableBilling } from "./sim-dynamodb-table-billing.js";
+import type { SimDynamoDbTableUpdate } from "./sim-dynamodb-table-update.js";
 import type {
   DynamoDbTableName,
   SimDynamoDbTableName,
@@ -58,8 +55,6 @@ export class SimDynamoDbTable {
   public readonly arn: SimArn;
   public readonly tableId: string;
   public readonly keySchema: SimDynamoDbKeySchema;
-  public readonly attributeDefinitions: SimDynamoDbAttributeDefinitions;
-  public readonly billing: SimDynamoDbTableBilling;
 
   /**
    * The secondary indexes this table carries, global and local.
@@ -70,9 +65,6 @@ export class SimDynamoDbTable {
    */
   public readonly indexes: SimDynamoDbSecondaryIndexes;
 
-  public readonly tableClass: SimDynamoDbTableClass | undefined;
-  public readonly deletionProtectionEnabled: boolean;
-
   /**
    * The tags this table carries.
    *
@@ -81,11 +73,14 @@ export class SimDynamoDbTable {
    */
   public readonly tags: SimDynamoDbTableTags;
 
+  /**
+   * This table's time to live, and the item removals it drives.
+   */
+  public readonly timeToLive: SimDynamoDbTableTimeToLive;
+
   private readonly items = new SimDynamoDbTableItems();
-  private readonly itemKey: SimDynamoDbItemKey;
+  private readonly definition: SimDynamoDbTableDefinition;
   private readonly lifecycle: SimDynamoDbTableLifecycle;
-  private readonly timeToLive: SimDynamoDbTimeToLive;
-  private readonly expiry: SimDynamoDbTableExpiry;
 
   constructor(properties: SimDynamoDbTableProperties) {
     const {
@@ -103,21 +98,21 @@ export class SimDynamoDbTable {
     this.arn = properties.arn;
     this.tableId = randomUUID();
     this.keySchema = keySchema;
-    this.attributeDefinitions = attributeDefinitions;
-    this.billing = billing;
     this.indexes = indexes;
-    this.tableClass = properties.tableClass;
-    this.deletionProtectionEnabled = deletionProtectionEnabled;
     this.tags = tags;
-    this.itemKey = new SimDynamoDbItemKey(keySchema, attributeDefinitions);
+    this.definition = new SimDynamoDbTableDefinition({
+      keySchema,
+      attributeDefinitions,
+      billing,
+      tableClass: properties.tableClass,
+    });
     this.lifecycle = new SimDynamoDbTableLifecycle({
       tableName: name.value,
       deletionProtectionEnabled,
     });
-    this.timeToLive = new SimDynamoDbTimeToLive(name.value);
-    this.expiry = new SimDynamoDbTableExpiry({
+    this.timeToLive = new SimDynamoDbTableTimeToLive({
+      tableName: name.value,
       items: this.items,
-      timeToLive: this.timeToLive,
       background,
     });
     this.creationDateTime = background.now();
@@ -131,11 +126,67 @@ export class SimDynamoDbTable {
   }
 
   /**
-   * Simulate the table entering ACTIVE status.
+   * The attributes this table's keys are made of.
+   */
+  public get attributeDefinitions(): SimDynamoDbAttributeDefinitions {
+    return this.definition.attributeDefinitions;
+  }
+
+  /**
+   * How this table is billed, and what it is provisioned for.
+   */
+  public get billing(): SimDynamoDbTableBilling {
+    return this.definition.billing;
+  }
+
+  /**
+   * The class this table is stored under, when it was given one.
+   */
+  public get tableClass(): SimDynamoDbTableClass | undefined {
+    return this.definition.tableClass;
+  }
+
+  /**
+   * Whether this table is protected from deletion.
+   */
+  public get deletionProtectionEnabled(): boolean {
+    return this.lifecycle.deletionProtectionEnabled;
+  }
+
+  /**
+   * Simulate the table entering ACTIVE status, with its indexes.
+   *
+   * An index added by UpdateTable has no backfill to run here: which items an
+   * index holds is worked out when it is read, so the CREATING window is a
+   * status the scheduler advances rather than work being done. The index
+   * answers for the items already on the table the moment it goes ACTIVE,
+   * which is what AWS gets to by copying them into it.
    */
   activate(): Promise<void> {
     this.lifecycle.activate();
+    this.indexes.global.activate();
+
     return Promise.resolve();
+  }
+
+  /**
+   * Refuse an update this table is not in a state to take.
+   */
+  assertUpdatable(): void {
+    this.lifecycle.assertUpdatable();
+  }
+
+  /**
+   * Apply a change UpdateTable has already checked against this table.
+   *
+   * Nothing here refuses anything. Everything the request asked for was read
+   * and checked against the table as it stood, so by this point the change
+   * either applies whole or was never built.
+   */
+  applyUpdate(update: SimDynamoDbTableUpdate): void {
+    this.definition.apply(update);
+    this.indexes.global.applyUpdate(update);
+    this.lifecycle.applyUpdate(update);
   }
 
   /**
@@ -169,7 +220,7 @@ export class SimDynamoDbTable {
    * write once it is durable, so a read that follows it finds it.
    */
   public putItem(item: SimDynamoDbItem): SimDynamoDbItem | undefined {
-    const key = this.itemKey.of(item);
+    const key = this.definition.itemKey.of(item);
 
     // An item need not carry an index's key attributes, since a secondary
     // index of either kind is sparse. Carrying one as a type the index did not
@@ -178,39 +229,9 @@ export class SimDynamoDbTable {
 
     const replaced = this.items.put(key, item);
 
-    this.expiry.scheduleFor(key, item);
+    this.timeToLive.scheduleFor(key, item);
 
     return replaced;
-  }
-
-  /**
-   * Take an UpdateTimeToLive on this table.
-   *
-   * Switching it on reaches the items already there as well as the ones written
-   * afterwards, since their TTL attributes were only inert while it was off.
-   */
-  updateTimeToLive(
-    specification: SimDynamoDbTimeToLiveSpecification,
-    at: Date,
-  ): void {
-    this.timeToLive.update(specification, at);
-    this.expiry.scheduleForAll();
-  }
-
-  /**
-   * Finish an UpdateTimeToLive, moving it off ENABLING or DISABLING.
-   */
-  settleTimeToLive(): Promise<void> {
-    this.timeToLive.settle();
-
-    return Promise.resolve();
-  }
-
-  /**
-   * Describe this table's time to live the way DynamoDB reports it.
-   */
-  timeToLiveDescription(): SimDynamoDbTimeToLiveDescription {
-    return this.timeToLive.description();
   }
 
   /**
@@ -222,7 +243,7 @@ export class SimDynamoDbTable {
    * written does not quietly find nothing here either.
    */
   public itemUnder(item: SimDynamoDbItem): SimDynamoDbItem | undefined {
-    return this.items.get(this.itemKey.of(item));
+    return this.items.get(this.definition.itemKey.of(item));
   }
 
   /**
@@ -234,14 +255,14 @@ export class SimDynamoDbTable {
    * refused here too.
    */
   public keyOfItem(item: SimDynamoDbItem): string {
-    return this.itemKey.of(item);
+    return this.definition.itemKey.of(item);
   }
 
   /**
    * The primary key a request's Key names, as this table marshals it.
    */
   public keyOfKey(key: SimDynamoDbItem): string {
-    return this.itemKey.ofKey(key);
+    return this.definition.itemKey.ofKey(key);
   }
 
   /**
@@ -251,42 +272,28 @@ export class SimDynamoDbTable {
    * one. That is what real DynamoDB gives a strongly consistent read.
    */
   public getItem(key: SimDynamoDbItem): SimDynamoDbItem | undefined {
-    return this.items.get(this.itemKey.ofKey(key));
+    return this.items.get(this.definition.itemKey.ofKey(key));
   }
 
   /**
    * Remove the item a primary key names, and answer with whatever was removed.
    */
   public deleteItem(key: SimDynamoDbItem): SimDynamoDbItem | undefined {
-    return this.items.remove(this.itemKey.ofKey(key));
+    return this.items.remove(this.definition.itemKey.ofKey(key));
   }
 
   /**
    * What a Query or a Scan reads: this table, or one of its indexes.
-   *
-   * An index is worked out here rather than kept up to date on the write path,
-   * so a view is built per read from the items as they stand. An `IndexName`
-   * this table does not have is refused rather than read as the table.
    */
   public view(indexName: string | undefined): SimDynamoDbReadView {
-    const items = this.items.entries().values().toArray();
-
-    if (indexName === undefined) {
-      return new SimDynamoDbTableView({
-        tableName: this.tableName,
-        items,
-        keySchema: this.keySchema,
-        attributeDefinitions: this.attributeDefinitions,
-        itemKey: this.itemKey,
-      });
-    }
-
-    return new SimDynamoDbIndexView({
-      index: this.indexes.required(indexName, this.tableName),
-      items,
-      tableKeySchema: this.keySchema,
+    return simDynamoDbTableReadView({
+      tableName: this.tableName,
+      indexName,
+      items: this.items.entries().values().toArray(),
+      keySchema: this.keySchema,
       attributeDefinitions: this.attributeDefinitions,
-      tableItemKey: this.itemKey,
+      indexes: this.indexes,
+      itemKey: this.definition.itemKey,
     });
   }
 }

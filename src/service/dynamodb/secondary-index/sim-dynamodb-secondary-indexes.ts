@@ -89,10 +89,16 @@ export class SimDynamoDbSecondaryIndexes {
   }
 
   /**
-   * The index a read names, refusing a name this table does not have.
+   * The index a read names, refusing one this table cannot answer with.
+   *
+   * A name the table does not have is refused, and so is an index that is
+   * still being built, since real DynamoDB answers neither.
    */
   required(indexName: string, tableName: string): SimDynamoDbSecondaryIndex {
-    return requiredSimDynamoDbIndex(this.elements, indexName, tableName);
+    const index = requiredSimDynamoDbIndex(this.elements, indexName, tableName);
+    index.assertReadable();
+
+    return index;
   }
 
   /**

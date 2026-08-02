@@ -14,6 +14,9 @@ export type {
   SimListTablesCommand,
   SimListTablesCommandInput,
   SimListTablesCommandOutput,
+  SimUpdateTableCommand,
+  SimUpdateTableCommandInput,
+  SimUpdateTableCommandOutput,
 } from "./table/table.command.js";
 export type {
   SimDeleteItemCommand,

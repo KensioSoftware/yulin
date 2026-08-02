@@ -51,8 +51,8 @@ export class SimDynamoDbTimeToLiveCommands {
       command.input.TimeToLiveSpecification,
     );
 
-    table.updateTimeToLive(specification, this.background.now());
-    this.background.schedule(() => table.settleTimeToLive());
+    table.timeToLive.update(specification, this.background.now());
+    this.background.schedule(() => table.timeToLive.settle());
 
     return {
       TimeToLiveSpecification: {
@@ -77,7 +77,7 @@ export class SimDynamoDbTimeToLiveCommands {
     );
 
     return {
-      TimeToLiveDescription: table.timeToLiveDescription(),
+      TimeToLiveDescription: table.timeToLive.description(),
       $metadata: {},
     };
   }
