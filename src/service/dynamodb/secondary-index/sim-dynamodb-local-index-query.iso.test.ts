@@ -8,7 +8,10 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
-import { SimDynamoDbValidationException } from "../error/dynamodb.error.js";
+import {
+  SimDynamoDbResourceNotFoundException,
+  SimDynamoDbValidationException,
+} from "../error/dynamodb.error.js";
 import { simDynamoDbLocallyIndexedTableFactory } from "./sim-dynamodb-locally-indexed-table.factory.js";
 
 /**
@@ -173,6 +176,7 @@ describe("DynamoDB Query on a local secondary index", () => {
     );
 
     // Then it is refused rather than read as the table.
+    assertInstanceOf(error, SimDynamoDbResourceNotFoundException);
     assertStringIncludes(
       error.message,
       "The table OrdersTable does not have the specified index: byShippedAt",

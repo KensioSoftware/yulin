@@ -654,9 +654,10 @@ A batch write takes no `ConditionExpression`, as a real one does not. `SimDynamo
 `SimDynamoDbDeleteRequest` declare one anyway, so a request carrying it is refused by name rather
 than written unconditionally.
 
-Streams are not implemented. Billing mode and provisioned
-capacity are read and stored by CreateTable, for the table and for each index, but nothing enforces
-them: no write is ever throttled.
+Streams are not implemented. Billing mode and provisioned capacity are read and stored by
+CreateTable, for the table and for each global secondary index, but nothing enforces them: no write
+is ever throttled. A local secondary index has no capacity of its own to store, since it is read and
+written out of the table's.
 
 ## TransactWriteItems and TransactGetItems behavior
 
