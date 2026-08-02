@@ -61,6 +61,7 @@ export class SimCognitoUserPoolCommands {
       name: input.PoolName,
       policies: input.Policies,
       deletionProtection: input.DeletionProtection,
+      unsimulatedSettings: input,
     });
 
     this.pools.add(pool);

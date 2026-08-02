@@ -1051,12 +1051,15 @@ the secret with `DescribeUserPoolClient`, which reports it here as it does on re
 
 The properties each type reads are the ones this simulation models:
 
-- `AWS::Cognito::UserPool`: `UserPoolName`, `Policies`, `DeletionProtection`, `MfaConfiguration` and
-  `UserPoolTier`. The last two are accepted at their AWS defaults and refused otherwise, as
-  `CreateUserPool` refuses them.
+- `AWS::Cognito::UserPool`: `UserPoolName`, `Policies`, `DeletionProtection`, `MfaConfiguration`,
+  `UserPoolTier`, `AccountRecoverySetting`, `AdminCreateUserConfig`, `EmailVerificationMessage`,
+  `EmailVerificationSubject`, `SmsVerificationMessage` and `VerificationMessageTemplate`. All but
+  the first three are accepted at one value each and refused at any other, as `CreateUserPool`
+  refuses them.
 - `AWS::Cognito::UserPoolClient`: `UserPoolId`, `ClientName`, `GenerateSecret`, `ExplicitAuthFlows`,
-  `PreventUserExistenceErrors`, `AccessTokenValidity`, `IdTokenValidity`, `RefreshTokenValidity` and
-  `TokenValidityUnits`.
+  `PreventUserExistenceErrors`, `AccessTokenValidity`, `IdTokenValidity`, `RefreshTokenValidity`,
+  `TokenValidityUnits`, `AllowedOAuthFlowsUserPoolClient` and `SupportedIdentityProviders`. The last
+  two are accepted at the values that turn managed login off.
 - `AWS::Cognito::UserPoolGroup`: `UserPoolId`, `GroupName`, `Description`, `Precedence` and
   `RoleArn`.
 
@@ -1064,6 +1067,120 @@ Any other property is refused at deploy time, naming the logical id and the prop
 deploying a resource that would behave differently on AWS. A stack that forgets
 `ALLOW_ADMIN_USER_PASSWORD_AUTH` therefore fails at the sign-in here as it would in a deployment,
 which is the point of deploying the template rather than restating it.
+
+`UserPoolName` and `ClientName` are optional. A template that sets neither gets
+`<stack name>-<logical id>`, as real CloudFormation generates a name, trimmed to the 128 characters
+Cognito allows if the two are longer than that together. Real CloudFormation adds random characters
+on the end and this does not, so the name is the same on every deployment of the same template and a
+test can assert it.
+
+## Properties accepted without being simulated
+
+A CDK `UserPool` construct emits six properties on `AWS::Cognito::UserPool` before it has been asked
+for anything, and a client created with `disableOAuth` emits two on `AWS::Cognito::UserPoolClient`.
+None of the eight is simulated. They configure email and SMS delivery, verification message wording,
+account recovery, and whether users may sign themselves up, and none of those happens here.
+
+They are accepted anyway, at one value each and no other, so a CDK stack deploys as it stands.
+
+```typescript sim-cognito-cdk-defaults
+/**
+ * Deploying the Resources a CDK UserPool construct emits by default.
+ */
+
+import { DescribeUserPoolCommand } from "@aws-sdk/client-cognito-identity-provider";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
+
+const verificationMessage =
+  "The verification code to your new account is {####}";
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "app-stack",
+  template: {
+    Resources: {
+      // What `new cognito.UserPool(stack, "Pool")` synthesizes, with no
+      // UserPoolName among it.
+      Pool: {
+        Type: "AWS::Cognito::UserPool",
+        Properties: {
+          AccountRecoverySetting: {
+            RecoveryMechanisms: [
+              { Name: "verified_phone_number", Priority: 1 },
+              { Name: "verified_email", Priority: 2 },
+            ],
+          },
+          AdminCreateUserConfig: { AllowAdminCreateUserOnly: true },
+          EmailVerificationMessage: verificationMessage,
+          EmailVerificationSubject: "Verify your new account",
+          SmsVerificationMessage: verificationMessage,
+          VerificationMessageTemplate: {
+            DefaultEmailOption: "CONFIRM_WITH_CODE",
+            EmailMessage: verificationMessage,
+            EmailSubject: "Verify your new account",
+            SmsMessage: verificationMessage,
+          },
+        },
+      },
+      // What `pool.addClient("Client", { disableOAuth: true })` synthesizes.
+      PoolClient: {
+        Type: "AWS::Cognito::UserPoolClient",
+        Properties: {
+          UserPoolId: { Ref: "Pool" },
+          AllowedOAuthFlowsUserPoolClient: false,
+          SupportedIdentityProviders: ["COGNITO"],
+        },
+      },
+    },
+    Outputs: { PoolId: { Value: { Ref: "Pool" } } },
+  },
+});
+await stack.waitForDeployComplete();
+
+const userPoolId = stack.outputs.get("PoolId")?.value as string;
+
+// The pool is named after the stack and the logical id, as the template named
+// neither it nor the client.
+const described = await simAws
+  .cognitoIdentityProvider()
+  .describeUserPool(new DescribeUserPoolCommand({ UserPoolId: userPoolId }));
+
+console.log(described.UserPool?.Name); // "app-stack-Pool"
+
+// What the template declared is reported back, though nothing here reads it.
+console.log(described.UserPool?.AdminCreateUserConfig);
+// { AllowAdminCreateUserOnly: true }
+```
+
+The accepted value of each is below. A pool or a client created without one of these reports it not
+at all, rather than reporting the value it would have had to use.
+
+| Property                          | Accepted value                                                             |
+| --------------------------------- | -------------------------------------------------------------------------- |
+| `AccountRecoverySetting`          | `verified_phone_number` at priority 1, then `verified_email` at priority 2 |
+| `AdminCreateUserConfig`           | `{ AllowAdminCreateUserOnly: true }`                                       |
+| `EmailVerificationMessage`        | `The verification code to your new account is {####}`                      |
+| `EmailVerificationSubject`        | `Verify your new account`                                                  |
+| `SmsVerificationMessage`          | `The verification code to your new account is {####}`                      |
+| `VerificationMessageTemplate`     | `CONFIRM_WITH_CODE`, with the three strings above                          |
+| `AllowedOAuthFlowsUserPoolClient` | `false`                                                                    |
+| `SupportedIdentityProviders`      | `["COGNITO"]`                                                              |
+
+Every key is compared, so an object carrying one the accepted value does not have is refused along
+with everything else that differs. The refusal names the property, the value asked for and the value
+that is simulated.
+
+Two of these are worth reading twice. `AllowAdminCreateUserOnly` is accepted at `true` and refused
+at `false`, which is the opposite way round from the AWS default: `false` says users may sign
+themselves up, and there is no `SignUp` command here to do that with, so accepting it would promise
+something this simulation cannot do. And the verification wording is accepted only at the wording
+CDK emits, because a request writing its own is asking for a message a user would read, and no
+message is ever delivered.
+
+These values are what `aws-cdk-lib` 2.262.1 synthesizes. Whether real Cognito defaults a bare pool
+to the same wording has not been checked against a live account.
 
 ## Serving a pool's JWKS on localhost
 
@@ -1354,11 +1471,20 @@ Current documented limitations:
   protection needs `UpdateUserPool`.
 - Unsimulated `CreateUserPool` inputs are refused rather than ignored: `UsernameAttributes`,
   `AliasAttributes`, `AutoVerifiedAttributes`, `Schema`, `LambdaConfig`, `UsernameConfiguration`,
-  `UserAttributeUpdateSettings`, `DeviceConfiguration`, `AccountRecoverySetting`,
-  `AdminCreateUserConfig`, `UserPoolAddOns`, `KeyConfiguration`, `IssuerConfiguration`,
-  `UserPoolTags`, the email and SMS configurations, the message templates, an `MfaConfiguration`
-  other than `OFF`, a `UserPoolTier` other than `ESSENTIALS`, a `SignInPolicy`, and a
-  `PasswordHistorySize`.
+  `UserAttributeUpdateSettings`, `DeviceConfiguration`, `UserPoolAddOns`, `KeyConfiguration`,
+  `IssuerConfiguration`, `UserPoolTags`, the email and SMS configurations, an
+  `SmsAuthenticationMessage`, an `MfaConfiguration` other than `OFF`, a `UserPoolTier` other than
+  `ESSENTIALS`, a `SignInPolicy`, and a `PasswordHistorySize`.
+- `AccountRecoverySetting`, `AdminCreateUserConfig`, `EmailVerificationMessage`,
+  `EmailVerificationSubject`, `SmsVerificationMessage` and `VerificationMessageTemplate` are
+  accepted at one value each and refused at any other. Nothing here reads any of them. They are
+  accepted so a CDK stack deploys, and reported back by `DescribeUserPool` so what the template
+  declared stays visible. The accepted values are in "Properties accepted without being simulated"
+  above.
+- `AdminCreateUserConfig` is accepted at `{ AllowAdminCreateUserOnly: true }` and refused at
+  `AllowAdminCreateUserOnly: false`, though `false` is what AWS itself defaults to. `false` says
+  users may sign themselves up, and there is no `SignUp` command here, so accepting it would let a
+  pool be created that claims something this simulation cannot do. This is stricter than AWS.
 - `UsernameAttributes` is worth calling out among those. A pool that signs users in by email or phone
   number stores a generated UUID as the username, so a pool created here without that would answer
   with the wrong username and the right one on real AWS.
@@ -1369,6 +1495,9 @@ Current documented limitations:
   `AnalyticsConfiguration`, `AuthSessionValidity`, `EnablePropagateAdditionalUserContextData`,
   `RefreshTokenRotation`, `ReadAttributes`, `WriteAttributes`, and an `EnableTokenRevocation` of
   `false`.
+- An `AllowedOAuthFlowsUserPoolClient` of `false`, and a `SupportedIdentityProviders` of
+  `["COGNITO"]`, are accepted and change nothing, because both say the client wants the pool's own
+  users and nothing else, which is all there is here. `DescribeUserPoolClient` reports them back.
 - Unsimulated authentication inputs are refused the same way: `ClientMetadata` and
   `AnalyticsMetadata` on all four operations, `ContextData` on the admin ones, `UserContextData` on
   the client ones, and a `Session` on `InitiateAuth` or `AdminInitiateAuth`, which continues a flow

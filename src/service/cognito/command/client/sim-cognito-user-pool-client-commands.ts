@@ -69,6 +69,7 @@ export class SimCognitoUserPoolClientCommands {
       explicitAuthFlows: input.ExplicitAuthFlows,
       preventUserExistenceErrors: input.PreventUserExistenceErrors,
       tokenValidity: input,
+      unsimulatedSettings: input,
     });
 
     pool.addClient(client);

@@ -3,13 +3,17 @@ import {
   type PreventUserExistenceErrorTypes,
   CreateUserPoolClientCommand,
   CreateUserPoolCommand,
+  DescribeUserPoolClientCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 import {
+  assertArrayEquals,
+  assertFalse,
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
   assertStringIncludes,
   assertThrowsErrorAsync,
+  assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
@@ -170,6 +174,40 @@ describe("sim Cognito app client unsimulated options", () => {
 
     // Then it is created rather than refused.
     assertIdentical(created.UserPoolClient?.ClientName, "web");
+
+    // And the two managed login settings are reported back as the request set
+    // them, so what a template declared stays visible on the client.
+    const clientId = created.UserPoolClient.ClientId;
+    assertNonNullable(clientId);
+
+    const described = await withPool.cognito.describeUserPoolClient(
+      new DescribeUserPoolClientCommand({
+        UserPoolId: withPool.userPoolId,
+        ClientId: clientId,
+      }),
+    );
+    assertFalse(described.UserPoolClient?.AllowedOAuthFlowsUserPoolClient);
+    assertArrayEquals(described.UserPoolClient.SupportedIdentityProviders, [
+      "COGNITO",
+    ]);
+  });
+
+  it("reports neither of them for a client created without them", async () => {
+    // Given a user pool.
+    const withPool = await simCognitoWithPool();
+
+    // When a client is created without either managed login setting.
+    const created = await withPool.cognito.createUserPoolClient(
+      new CreateUserPoolClientCommand({
+        UserPoolId: withPool.userPoolId,
+        ClientName: "web",
+      }),
+    );
+
+    // Then neither appears, rather than the client reporting the value a
+    // request would have had to use to be accepted.
+    assertUndefined(created.UserPoolClient?.AllowedOAuthFlowsUserPoolClient);
+    assertUndefined(created.UserPoolClient?.SupportedIdentityProviders);
   });
 
   it("takes a PreventUserExistenceErrors of either value", async () => {

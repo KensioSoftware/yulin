@@ -4,15 +4,22 @@ import type {
   SimCfnTemplateValueRecord,
 } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimCreateUserPoolClientCommandInput } from "../../command/client/user-pool-client.command.js";
-import type { SimCognitoTokenValidityUnitsType } from "../../user-pool/client/sim-cognito-token-validity.js";
+import { SimCfnCognitoGeneratedName } from "../sim-cfn-cognito-generated-name.js";
 import { SimCfnCognitoPropertyParser } from "../sim-cfn-cognito-property-parser.js";
+import { SimCfnCognitoTokenValidityUnits } from "./sim-cfn-cognito-token-validity-units.js";
 
 /**
  * The AWS::Cognito::UserPoolClient properties this simulation deploys.
  *
- * The OAuth and managed login properties are absent because the hosted UI is
- * not simulated at all, so a client deployed with them would offer flows
- * nothing here can run.
+ * The OAuth and managed login properties that turn the hosted UI on are
+ * absent, because it is not simulated at all, so a client deployed with them
+ * would offer flows nothing here can run.
+ *
+ * The last two are the ones that turn it off, which is what a CDK client
+ * created with `disableOAuth` emits. CreateUserPoolClient accepts an
+ * `AllowedOAuthFlowsUserPoolClient` of `false`, and a
+ * `SupportedIdentityProviders` naming only `COGNITO`, because both ask for
+ * the pool's own users and nothing else. Any other value is refused there.
  */
 const simulatedProperties = [
   "UserPoolId",
@@ -24,12 +31,9 @@ const simulatedProperties = [
   "IdTokenValidity",
   "RefreshTokenValidity",
   "TokenValidityUnits",
+  "AllowedOAuthFlowsUserPoolClient",
+  "SupportedIdentityProviders",
 ];
-
-/**
- * The `TokenValidityUnits` fields, which are all of them.
- */
-const modelledValidityUnits = ["AccessToken", "IdToken", "RefreshToken"];
 
 interface SimCfnCognitoClientPropertiesProperties {
   readonly resource: SimCfnResource;
@@ -73,7 +77,7 @@ export class SimCfnCognitoClientProperties {
   createUserPoolClientInput(): SimCreateUserPoolClientCommandInput {
     return {
       UserPoolId: this.userPoolId(),
-      ClientName: this.string(this.properties["ClientName"], "ClientName"),
+      ClientName: this.clientName(),
       GenerateSecret: this.propertyParser.optionalBoolean(
         this.resource,
         this.properties["GenerateSecret"],
@@ -100,43 +104,38 @@ export class SimCfnCognitoClientProperties {
         this.properties["RefreshTokenValidity"],
         "RefreshTokenValidity",
       ),
-      TokenValidityUnits: this.tokenValidityUnits(),
+      TokenValidityUnits: new SimCfnCognitoTokenValidityUnits({
+        resource: this.resource,
+        propertyParser: this.propertyParser,
+      }).parse(this.properties["TokenValidityUnits"]),
+      AllowedOAuthFlowsUserPoolClient: this.propertyParser.optionalBoolean(
+        this.resource,
+        this.properties["AllowedOAuthFlowsUserPoolClient"],
+        "AllowedOAuthFlowsUserPoolClient",
+      ),
+      SupportedIdentityProviders: this.propertyParser.optionalStringArray(
+        this.resource,
+        this.properties["SupportedIdentityProviders"],
+        "SupportedIdentityProviders",
+      ),
     };
   }
 
   /**
-   * The units the three validity numbers are counted in.
+   * The client's name, generated from the stack and the logical ID when the
+   * template names none, as real CloudFormation generates one.
    */
-  private tokenValidityUnits(): SimCognitoTokenValidityUnitsType | undefined {
-    const units = this.propertyParser.optionalRecord(
-      this.resource,
-      this.properties["TokenValidityUnits"],
-      "TokenValidityUnits",
-    );
+  private clientName(): string {
+    const named = this.string(this.properties["ClientName"], "ClientName");
 
-    if (units === undefined) {
-      return undefined;
+    if (named !== undefined) {
+      return named;
     }
 
-    this.propertyParser.requireOnlyKeys(
-      this.resource,
-      units,
-      modelledValidityUnits,
-      "TokenValidityUnits ",
-    );
-
-    return {
-      AccessToken: this.unit(units["AccessToken"], "AccessToken"),
-      IdToken: this.unit(units["IdToken"], "IdToken"),
-      RefreshToken: this.unit(units["RefreshToken"], "RefreshToken"),
-    };
-  }
-
-  private unit(
-    value: SimCfnTemplateValue | undefined,
-    field: string,
-  ): string | undefined {
-    return this.string(value, `TokenValidityUnits ${field}`);
+    return new SimCfnCognitoGeneratedName({
+      stackName: this.resource.stackName,
+      logicalId: this.resource.logicalId,
+    }).value;
   }
 
   private string(
