@@ -1,4 +1,5 @@
 import type { SimHttpApiIntegrationId } from "../../api/integration/sim-http-api-integration.js";
+import type { SimHttpApiRouteKey } from "../../api/route/key/sim-http-api-route-key.js";
 import type { SimHttpApi } from "../../api/sim-http-api.js";
 import {
   SimApiGatewayV2BadRequest,
@@ -45,12 +46,24 @@ export class SimHttpApiRouteTarget {
   /**
    * Ensure the API is not already routing this route key, which real API
    * Gateway answers with a conflict.
+   *
+   * Two route keys differing only in a parameter name are one route key, so
+   * `GET /pets/{petId}` conflicts with an existing `GET /pets/{id}`. The
+   * existing key is named in the conflict rather than the new one, since that
+   * is the part the caller cannot see.
    */
-  requireUnusedRouteKey(httpApi: SimHttpApi, routeKey: string): void {
-    if (httpApi.routes.findByKey(routeKey) !== undefined) {
-      throw new SimApiGatewayV2Conflict(
-        `API ${httpApi.apiId} already has a route for ${routeKey}`,
-      );
+  requireUnusedRouteKey(
+    httpApi: SimHttpApi,
+    routeKey: SimHttpApiRouteKey,
+  ): void {
+    const existing = httpApi.routes.findBySignature(routeKey.signature);
+
+    if (existing === undefined) {
+      return;
     }
+
+    throw new SimApiGatewayV2Conflict(
+      `API ${httpApi.apiId} already has a route for ${existing.routeKey}`,
+    );
   }
 }

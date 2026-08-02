@@ -1,8 +1,5 @@
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
-import {
-  simHttpApiDefaultStageName,
-  SimHttpApiStage,
-} from "../../api/stage/sim-http-api-stage.js";
+import { SimHttpApiStage } from "../../api/stage/sim-http-api-stage.js";
 import type { SimApiGatewayV2RequestOptions } from "../sim-api-gateway-v2-request-options.js";
 import { SimApiGatewayV2UnsimulatedInput } from "../sim-api-gateway-v2-unsimulated-input.js";
 import type { SimHttpApiAccess } from "../sim-http-api-access.js";
@@ -53,13 +50,8 @@ export class SimHttpApiStageCommands {
     const unsimulated = new SimApiGatewayV2UnsimulatedInput("CreateStage");
     unsimulated.refuseUnaccepted(input, acceptedCreateStageOptions);
     const apiId = unsimulated.require("ApiId", input.ApiId);
-    unsimulated.require("StageName", input.StageName);
-    unsimulated.refuseUnless(
-      "StageName",
-      input.StageName,
-      simHttpApiDefaultStageName,
-      "a named stage is served under a stage path segment, and that is not " +
-        "simulated",
+    const stageName = this.rules.requireStageName(
+      unsimulated.require("StageName", input.StageName),
     );
     this.rules.requireAutoDeploy(input.AutoDeploy);
 
@@ -69,10 +61,10 @@ export class SimHttpApiStageCommands {
       childPath: stagesPath,
       caller: options?.caller,
     });
-    this.rules.requireUnusedStageName(httpApi, simHttpApiDefaultStageName);
+    this.rules.requireUnusedStageName(httpApi, stageName);
 
     const stage = new SimHttpApiStage({
-      stageName: simHttpApiDefaultStageName,
+      stageName,
       autoDeploy: true,
       stageVariables: input.StageVariables,
       description: input.Description,

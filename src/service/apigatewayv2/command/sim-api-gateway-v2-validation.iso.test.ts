@@ -124,25 +124,6 @@ describe("What sim API Gateway v2 refuses rather than ignores", () => {
     ).rejects.toThrow(/IntegrationType 'HTTP_PROXY' is not simulated/);
   });
 
-  it("refuses a route key that names a method and path", async () => {
-    // Given an API
-    const simAws = new SimAws();
-    const apiId = await createdApiId(simAws);
-
-    // When a route matches one method and path
-    // Then it is refused, because route matching is not simulated and every
-    // request reaches the catch-all route
-    await expect(
-      simAws.apiGatewayV2().createRoute(
-        new CreateRouteCommand({
-          ApiId: apiId,
-          RouteKey: "GET /orders",
-          Target: "integrations/abcdefgh",
-        }),
-      ),
-    ).rejects.toThrow(/RouteKey 'GET \/orders' is not simulated/);
-  });
-
   it("refuses a route with an authorizer", async () => {
     // Given an API
     const simAws = new SimAws();

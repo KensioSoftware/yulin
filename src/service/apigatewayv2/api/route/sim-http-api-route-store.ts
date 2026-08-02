@@ -7,11 +7,13 @@ import {
 /**
  * The routes of one API.
  *
- * Routes are keyed by route key rather than by id, because the route key is
- * what makes a route unique on real AWS: an API cannot have two routes for the
- * same method and path, and the id is only how a route is addressed
- * afterwards. The ids in use are tracked alongside, so allocating one can
- * avoid them.
+ * Routes are keyed by route key signature rather than by id, because the route
+ * key is what makes a route unique on real AWS: an API cannot have two routes
+ * for the same method and path, and the id is only how a route is addressed
+ * afterwards. The signature rather than the text, because a parameter name is
+ * not part of a route's identity, so `GET /pets/{id}` and `GET /pets/{petId}`
+ * are the same route. The ids in use are tracked alongside, so allocating one
+ * can avoid them.
  */
 export class SimHttpApiRouteStore {
   private readonly routes = new Map<string, SimHttpApiRoute>();
@@ -35,15 +37,16 @@ export class SimHttpApiRouteStore {
    * Add a route to this API.
    */
   add(route: SimHttpApiRoute): void {
-    this.routes.set(route.routeKey, route);
+    this.routes.set(route.key.signature, route);
     this.routeIds.add(route.routeId);
   }
 
   /**
-   * Find the route for a route key.
+   * Find the route holding a route key signature, which is what tells whether
+   * the API is already routing a route key.
    */
-  findByKey(routeKey: string): SimHttpApiRoute | undefined {
-    return this.routes.get(routeKey);
+  findBySignature(signature: string): SimHttpApiRoute | undefined {
+    return this.routes.get(signature);
   }
 
   /**
