@@ -3,8 +3,12 @@ import { SimHttpApiIntegrationStore } from "./integration/sim-http-api-integrati
 import { SimHttpApiRouteStore } from "./route/sim-http-api-route-store.js";
 import { SimHttpApiStageStore } from "./stage/sim-http-api-stage-store.js";
 import { simHttpApiHost } from "./sim-http-api-host.js";
-import { type SimHttpApiMatch, simHttpApiMatch } from "./sim-http-api-match.js";
+import {
+  type SimHttpApiMatch,
+  SimHttpApiMatcher,
+} from "./sim-http-api-match.js";
 import type { SimHttpApiId } from "./sim-http-api-id.js";
+import type { SimHttpApiRequest } from "./sim-http-api-request.js";
 import {
   type SimHttpApiProtocolType,
   simHttpApiView,
@@ -42,6 +46,8 @@ export class SimHttpApi {
   public readonly routes = new SimHttpApiRouteStore();
   public readonly stages = new SimHttpApiStageStore();
 
+  private readonly matcher = new SimHttpApiMatcher();
+
   constructor(properties: SimHttpApiProperties) {
     this.apiId = properties.apiId;
     this.name = properties.name;
@@ -76,8 +82,8 @@ export class SimHttpApi {
   /**
    * Find what should handle one request to this API.
    */
-  match(): SimHttpApiMatch | undefined {
-    return simHttpApiMatch(this);
+  match(request: SimHttpApiRequest): SimHttpApiMatch | undefined {
+    return this.matcher.match(this, request);
   }
 
   /**

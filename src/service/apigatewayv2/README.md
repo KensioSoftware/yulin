@@ -30,6 +30,45 @@ Routes, integrations and stages are all addressed by `ApiId` on real AWS and non
 the API, so they live on the API rather than in service-level maps that would have to carry the
 `ApiId` alongside them. Deleting an API therefore deletes everything under it by construction.
 
+## Matching a request
+
+`api/sim-http-api-match.ts` is the entry point: the stage first, then the route, then the integration
+behind that route.
+
+The stage goes first because a named stage is a path segment the routes know nothing about, so
+`/dev/pets/6` served from stage `dev` reaches route selection as the path `/pets/6`.
+`api/stage/sim-http-api-stage-selector.ts` takes that segment off, or falls back to the `$default`
+stage, which is served at the root and keeps the whole path.
+
+Routes are then matched by `api/route/`:
+
+```text
+SimHttpApiRouteKey            $default, or a method and a path
+├── SimHttpApiRouteMethod     GET, ANY and friends, and how specific each is
+├── SimHttpApiRoutePath       the segments, and matching a request path against them
+│   ├── SimHttpApiLiteralSegment    pets
+│   ├── SimHttpApiVariableSegment   {petId}
+│   └── SimHttpApiGreedySegment     {proxy+}
+└── SimHttpApiRouteRank       which of two matching routes wins
+```
+
+Three things are worth knowing here:
+
+- Segments are matched one at a time rather than compiled to a regex. Selection has to compare two
+  routes at the segment where they first differ, and a character count gives the wrong answer:
+  `GET /a/{b}/ccccc` has more literal characters than `GET /a/b/{c}` and is less specific where it
+  matters. `SimCloudFrontPathPattern` counts characters for the same reason CloudFront can, which is
+  that it has no segments and no captures.
+- Each kind of segment is its own small class answering the same questions, so matching is a loop
+  rather than a switch. This is also what keeps the code inside the repo's complexity and file-size
+  limits, and what absorbs `noUncheckedIndexedAccess` on the segment arrays.
+- The whole precedence rule is in `SimHttpApiRouteRank.compareTo`, in one place, with the parts AWS
+  documents and the parts that are only observed marked separately.
+
+A route is stored under its route key signature, which is the key with parameter names erased. That
+is the identity real API Gateway gives a route: `GET /pets/{id}` and `GET /pets/{petId}` are one
+route, and creating the second is a conflict.
+
 `registry/sim-http-api-registry.ts` is the one thing outside that tree. A served request carries the
 API id and the region in its hostname, but not the Account, so the registry maps an id to the
 Account that owns it. Ids are allocated there, which is what makes them unique across every Account
@@ -63,8 +102,8 @@ lives.
 1. `sim-api-gateway-v2-router.ts` finds the API from the request hostname, through the registry, and
    the integrated function from the integration's ARN. The function is looked up in the Account and
    Region its own ARN names, which need not be the API's.
-2. `sim-http-api-endpoint.ts` describes the API and the matched route as a
-   `SimPayload2Endpoint`.
+2. `sim-http-api-endpoint.ts` describes the API, the matched route and the stage as a
+   `SimPayload2Endpoint`, including what the route captured from the path.
 3. `src/serve/payload-2/` builds the payload format 2.0 event and turns the handler's result back
    into an HTTP response. That machinery is shared with Lambda Function URLs, which speak the same
    format.
@@ -83,9 +122,11 @@ simulation exists to avoid:
 - payload format `1.0`, which builds a different event
 - an integration type other than `AWS_PROXY`, and an integration URI that is not an unqualified
   Lambda function ARN
-- a route key other than `$default`, and an authorization type other than `NONE`
-- a stage name other than `$default`, and a stage without `AutoDeploy: true`, since Deployments are
-  not simulated and such a stage serves nothing on real AWS
+- a malformed route key, refused at `CreateRoute`, which is where real API Gateway refuses it
+- an authorization type other than `NONE`
+- a stage name that is neither `$default` nor something a URL path segment could hold, and a stage
+  without `AutoDeploy: true`, since Deployments are not simulated and such a stage serves nothing on
+  real AWS
 - `MaxResults`/`NextToken`, since every list command answers in full
 
 The function's resource policy is not evaluated when the integration invokes it. See

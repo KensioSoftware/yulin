@@ -2,17 +2,12 @@ import { faker } from "@faker-js/faker";
 
 import type { Brand } from "../../../../util/brand.type.js";
 import type { SimHttpApiIntegrationId } from "../integration/sim-http-api-integration.js";
+import type { SimHttpApiRouteKey } from "./key/sim-http-api-route-key.js";
 
 /**
  * The id API Gateway allocates for one route.
  */
 export type SimHttpApiRouteId = Brand<string, "SimHttpApiRouteId">;
-
-/**
- * The catch-all route key, which matches any method and path the API has no
- * more specific route for. It is the only route key simulated so far.
- */
-export const simHttpApiDefaultRouteKey = "$default";
 
 /**
  * The only authorization type simulated: none, so anyone may call the route.
@@ -28,7 +23,7 @@ export function makeSimHttpApiRouteId(): SimHttpApiRouteId {
 
 interface SimHttpApiRouteProperties {
   readonly routeId: SimHttpApiRouteId;
-  readonly routeKey: string;
+  readonly key: SimHttpApiRouteKey;
   readonly integrationId: SimHttpApiIntegrationId;
   readonly authorizationType: SimHttpApiAuthorizationType;
 }
@@ -48,15 +43,23 @@ export interface SimHttpApiRouteView {
  */
 export class SimHttpApiRoute {
   public readonly routeId: SimHttpApiRouteId;
-  public readonly routeKey: string;
+  public readonly key: SimHttpApiRouteKey;
   public readonly integrationId: SimHttpApiIntegrationId;
   public readonly authorizationType: SimHttpApiAuthorizationType;
 
   constructor(properties: SimHttpApiRouteProperties) {
     this.routeId = properties.routeId;
-    this.routeKey = properties.routeKey;
+    this.key = properties.key;
     this.integrationId = properties.integrationId;
     this.authorizationType = properties.authorizationType;
+  }
+
+  /**
+   * The route key as it was written, which is what the API reports back and
+   * what reaches the handler as `event.routeKey`.
+   */
+  get routeKey(): string {
+    return this.key.text;
   }
 
   /**

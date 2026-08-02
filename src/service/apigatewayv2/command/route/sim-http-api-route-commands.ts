@@ -1,7 +1,5 @@
-import {
-  simHttpApiDefaultRouteKey,
-  SimHttpApiRoute,
-} from "../../api/route/sim-http-api-route.js";
+import { SimHttpApiRouteKeyParser } from "../../api/route/key/sim-http-api-route-key-parser.js";
+import { SimHttpApiRoute } from "../../api/route/sim-http-api-route.js";
 import type { SimApiGatewayV2RequestOptions } from "../sim-api-gateway-v2-request-options.js";
 import { SimApiGatewayV2UnsimulatedInput } from "../sim-api-gateway-v2-unsimulated-input.js";
 import type { SimHttpApiAccess } from "../sim-http-api-access.js";
@@ -32,6 +30,7 @@ interface SimHttpApiRouteCommandsProperties {
 export class SimHttpApiRouteCommands {
   private readonly access: SimHttpApiAccess;
   private readonly routeTarget = new SimHttpApiRouteTarget();
+  private readonly routeKeyParser = new SimHttpApiRouteKeyParser();
 
   constructor(properties: SimHttpApiRouteCommandsProperties) {
     this.access = properties.access;
@@ -48,13 +47,10 @@ export class SimHttpApiRouteCommands {
     const unsimulated = new SimApiGatewayV2UnsimulatedInput("CreateRoute");
     unsimulated.refuseUnaccepted(input, acceptedCreateRouteOptions);
     const apiId = unsimulated.require("ApiId", input.ApiId);
-    unsimulated.require("RouteKey", input.RouteKey);
-    unsimulated.refuseUnless(
-      "RouteKey",
-      input.RouteKey,
-      simHttpApiDefaultRouteKey,
-      "matching a route by method and path is not simulated, so every " +
-        "request reaches the catch-all route",
+    // Parsed before the API is looked up, because a malformed route key is a
+    // bad request whether or not the API it names exists.
+    const routeKey = this.routeKeyParser.parse(
+      unsimulated.require("RouteKey", input.RouteKey),
     );
     unsimulated.refuseUnless(
       "AuthorizationType",
@@ -70,11 +66,11 @@ export class SimHttpApiRouteCommands {
       childPath: routesPath,
       caller: options?.caller,
     });
-    this.routeTarget.requireUnusedRouteKey(httpApi, simHttpApiDefaultRouteKey);
+    this.routeTarget.requireUnusedRouteKey(httpApi, routeKey);
 
     const route = new SimHttpApiRoute({
       routeId: httpApi.routes.allocateId(),
-      routeKey: simHttpApiDefaultRouteKey,
+      key: routeKey,
       integrationId: this.routeTarget.integrationId(httpApi, target),
       authorizationType: "NONE",
     });

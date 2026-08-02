@@ -13,9 +13,14 @@ export interface SimHttpApiLambdaProxyInput {
   readonly apiName: string;
   readonly functionName: string;
   readonly roleArn: string;
-  /** The function code the API's one route hands every request to. */
+  /** The function code every route of the API hands its requests to. */
   readonly handler: (event: SimPayload2Event) => unknown;
   readonly disableExecuteApiEndpoint: boolean;
+  /** The route keys the API routes, all onto the one integration. */
+  readonly routeKeys: readonly string[];
+  /** The stages the API serves from. */
+  readonly stageNames: readonly string[];
+  /** The variables every one of those stages carries. */
   readonly stageVariables: Readonly<Record<string, string>>;
 }
 
@@ -51,6 +56,8 @@ export const simHttpApiLambdaProxyFactory = new AsyncMappedFactory<
     roleArn: "arn:aws:iam::111111111111:role/OrdersRole",
     handler: (): string => "hello",
     disableExecuteApiEndpoint: false,
+    routeKeys: ["$default"],
+    stageNames: ["$default"],
     stageVariables: {},
   }),
   async (input, simAws) => {
@@ -81,22 +88,30 @@ export const simHttpApiLambdaProxyFactory = new AsyncMappedFactory<
         },
       });
 
-    await simApiGatewayV2.createRoute({
-      input: {
-        ApiId: apiId,
-        RouteKey: "$default",
-        Target: `integrations/${integrationId}`,
-      },
-    });
+    await Promise.all(
+      input.routeKeys.map(async (routeKey) =>
+        simApiGatewayV2.createRoute({
+          input: {
+            ApiId: apiId,
+            RouteKey: routeKey,
+            Target: `integrations/${integrationId}`,
+          },
+        }),
+      ),
+    );
 
-    await simApiGatewayV2.createStage({
-      input: {
-        ApiId: apiId,
-        StageName: "$default",
-        AutoDeploy: true,
-        StageVariables: input.stageVariables,
-      },
-    });
+    await Promise.all(
+      input.stageNames.map(async (stageName) =>
+        simApiGatewayV2.createStage({
+          input: {
+            ApiId: apiId,
+            StageName: stageName,
+            AutoDeploy: true,
+            StageVariables: input.stageVariables,
+          },
+        }),
+      ),
+    );
 
     // An id CreateApi allocated is an API the store holds, so this is only
     // missing if something is wrong with the simulator itself.

@@ -5,6 +5,7 @@ import type {
 import { SimPayload2EventBuilder } from "../../../serve/payload-2/sim-payload-2-event-builder.js";
 import { SimPayload2ResponseBuilder } from "../../../serve/payload-2/sim-payload-2-response-builder.js";
 import { SimAws } from "../../aws/sim-aws.js";
+import { SimHttpApiRequest } from "../api/sim-http-api-request.js";
 import type { SimHttpApi } from "../api/sim-http-api.js";
 import { SimApiGatewayV2ErrorResponse } from "./sim-api-gateway-v2-error-response.js";
 import { SimApiGatewayV2Router } from "./sim-api-gateway-v2-router.js";
@@ -62,7 +63,14 @@ export class SimApiGatewayV2ServiceController implements SimAwsServiceController
   }
 
   private async invoke(api: SimHttpApi, request: Request): Promise<Response> {
-    const match = api.match();
+    // The whole request path, stage segment and all: the stage takes its own
+    // segment off, and `rawPath` reports the path as the client sent it.
+    const match = api.match(
+      new SimHttpApiRequest({
+        method: request.method,
+        path: new URL(request.url).pathname,
+      }),
+    );
 
     if (match === undefined) {
       return this.errorResponse.notFound();

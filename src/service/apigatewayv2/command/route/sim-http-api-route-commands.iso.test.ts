@@ -81,6 +81,25 @@ describe("Sim API Gateway v2 route commands", () => {
     expect(items.map((route) => route.RouteId)).toStrictEqual([routeId]);
   });
 
+  it("creates a route for a method and a path", async () => {
+    // Given an API with an integration
+    const simAws = new SimAws();
+    const { apiId, target } = await apiWithIntegration(simAws);
+
+    // When a route names a method and a parameterised path
+    const created = await simAws.apiGatewayV2().createRoute(
+      new CreateRouteCommand({
+        ApiId: apiId,
+        RouteKey: "GET /pets/{petId}",
+        Target: target,
+      }),
+    );
+
+    // Then the route key comes back as it was written
+    assertIdentical(created.RouteKey, "GET /pets/{petId}");
+    assertIdentical(created.Target, target);
+  });
+
   it("refuses a second route for a route key the API already has", async () => {
     // Given an API that already routes $default
     const simAws = new SimAws();
@@ -104,6 +123,67 @@ describe("Sim API Gateway v2 route commands", () => {
         }),
       ),
     ).rejects.toThrow(SimApiGatewayV2Conflict);
+  });
+
+  it("refuses two route keys differing only in parameter name", async () => {
+    // Given an API already routing a parameterised path
+    const simAws = new SimAws();
+    const { apiId, target } = await apiWithIntegration(simAws);
+    await simAws.apiGatewayV2().createRoute(
+      new CreateRouteCommand({
+        ApiId: apiId,
+        RouteKey: "GET /pets/{id}",
+        Target: target,
+      }),
+    );
+
+    // When the same path is routed again under another parameter name
+    // Then it conflicts, because a parameter name is not part of a route's
+    // identity: both keys match exactly the same requests
+    await expect(
+      simAws.apiGatewayV2().createRoute(
+        new CreateRouteCommand({
+          ApiId: apiId,
+          RouteKey: "GET /pets/{petId}",
+          Target: target,
+        }),
+      ),
+    ).rejects.toThrow(/already has a route for GET \/pets\/\{id\}/);
+  });
+
+  it("refuses a malformed route key", async () => {
+    // Given an API with an integration
+    const simAws = new SimAws();
+    const { apiId, target } = await apiWithIntegration(simAws);
+
+    // When a route key cannot be read
+    // Then it is refused here, which is where real API Gateway refuses it too
+    await expect(
+      simAws.apiGatewayV2().createRoute(
+        new CreateRouteCommand({
+          ApiId: apiId,
+          RouteKey: "get /pets",
+          Target: target,
+        }),
+      ),
+    ).rejects.toThrow(SimApiGatewayV2BadRequest);
+  });
+
+  it("refuses a route on an API that does not exist", async () => {
+    // Given a simulated AWS with no APIs in it
+    const simAws = new SimAws();
+
+    // When a route is created on an API id nothing holds
+    // Then it is reported as not found
+    await expect(
+      simAws.apiGatewayV2().createRoute(
+        new CreateRouteCommand({
+          ApiId: "abcdefghij",
+          RouteKey: "$default",
+          Target: "integrations/abcdefgh",
+        }),
+      ),
+    ).rejects.toThrow(SimApiGatewayV2NotFound);
   });
 
   it("refuses a route targeting an integration the API does not have", async () => {

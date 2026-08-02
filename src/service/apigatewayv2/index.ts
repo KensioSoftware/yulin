@@ -2,6 +2,7 @@ export { SimApiGatewayV2 } from "./sim-api-gateway-v2.js";
 export type { SimApiGatewayV2RequestOptions } from "./command/sim-api-gateway-v2-request-options.js";
 export { SimHttpApi } from "./api/sim-http-api.js";
 export type { SimHttpApiMatch } from "./api/sim-http-api-match.js";
+export { SimHttpApiRequest } from "./api/sim-http-api-request.js";
 export type {
   SimHttpApiProtocolType,
   SimHttpApiView,
@@ -23,11 +24,27 @@ export {
 export { SimHttpApiLambdaUri } from "./api/integration/sim-http-api-lambda-uri.js";
 export {
   type SimHttpApiAuthorizationType,
-  simHttpApiDefaultRouteKey,
   SimHttpApiRoute,
   type SimHttpApiRouteId,
   type SimHttpApiRouteView,
 } from "./api/route/sim-http-api-route.js";
+export type { SimHttpApiRouteKey } from "./api/route/key/sim-http-api-route-key.js";
+export {
+  SimHttpApiDefaultRouteKey,
+  simHttpApiDefaultRouteKey,
+} from "./api/route/key/sim-http-api-default-route-key.js";
+export { SimHttpApiMethodRouteKey } from "./api/route/key/sim-http-api-method-route-key.js";
+export {
+  simHttpApiAnyMethod,
+  SimHttpApiRouteMethod,
+} from "./api/route/key/sim-http-api-route-method.js";
+export { SimHttpApiRouteKeyParser } from "./api/route/key/sim-http-api-route-key-parser.js";
+export {
+  SimHttpApiPathParameter,
+  SimHttpApiPathParameters,
+} from "./api/route/path/sim-http-api-path-parameters.js";
+export { SimHttpApiRoutePath } from "./api/route/path/sim-http-api-route-path.js";
+export { SimHttpApiRouteRank } from "./api/route/sim-http-api-route-rank.js";
 export {
   simHttpApiDefaultStageName,
   SimHttpApiStage,
