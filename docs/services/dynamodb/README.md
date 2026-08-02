@@ -2644,9 +2644,15 @@ console.log(stack.outputs.get("OrdersTableArn")?.value);
 ```
 
 The properties that are read are `TableName`, `KeySchema`, `AttributeDefinitions`, `BillingMode`,
-`ProvisionedThroughput`, `TableClass`, `DeletionProtectionEnabled`, `Tags`, `TimeToLiveSpecification`,
-`GlobalSecondaryIndexes` and `LocalSecondaryIndexes`. Each one is passed to `CreateTable` rather than
-applied here, so a value the template gets wrong fails the same way it would for an SDK caller.
+`ProvisionedThroughput`, `TableClass`, `DeletionProtectionEnabled`, `Tags`,
+`GlobalSecondaryIndexes`, `LocalSecondaryIndexes` and `TimeToLiveSpecification`. All but the last are
+passed to `CreateTable` rather than applied here, so a value the template gets wrong fails the same
+way it would for an SDK caller.
+
+`TimeToLiveSpecification` is applied after the table is created, through `UpdateTimeToLive`. Real
+`CreateTable` has no parameter for it either, so real CloudFormation makes the table and then
+updates it. A specification the template got wrong is refused in the words `UpdateTimeToLive` refuses
+it in.
 
 A table with no `TableName` is named after the stack and its logical ID, so the table above with its
 name left out would be `orders-stack-OrdersTable`. Real CloudFormation adds random characters to
@@ -2771,10 +2777,11 @@ const byTotal = await simAws.dynamoDb().query(
 console.log(byTotal.Count); // 1
 ```
 
-Nothing about an index is checked in the CloudFormation layer, so a template declaring an index whose
-key attributes are missing from `AttributeDefinitions` fails that resource with the error the API
-gives for the same input. The same goes for the projection rules, the per-index throughput a
-provisioned table needs, and the rule that a local secondary index shares the table's partition key.
+Which properties an index entry may carry is decided here, and nothing else about an index is. A
+template declaring an index whose key attributes are missing from `AttributeDefinitions` fails that
+resource with the error the API gives for the same input. The same goes for the projection rules, the
+per-index throughput a provisioned table needs, and the rule that a local secondary index shares the
+table's partition key.
 
 `ContributorInsightsSpecification`, `OnDemandThroughput` and `WarmThroughput` on a global secondary
 index are not simulated, so a table declaring one is skipped with a reason naming the index it was
