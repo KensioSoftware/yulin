@@ -4,8 +4,8 @@ import type {
   SimCloudFormationParsedResourceType,
   SimCfnServiceResourceFactory,
 } from "../../factory/sim-cfn-resource-factory.type.js";
-import { SimCfnCfnResourceFactory } from "../../factory/sim-cfn-cfn-resource-factory.js";
 import { SimCdkBucketDeploymentResourceFactory } from "../../../cdk/s3/bucket-deployment/sim-cdk-bucket-deployment.js";
+import { simCfnServiceResourceFactories } from "./sim-cfn-service-factories.js";
 
 /**
  * Resolve a scoped simulated service CloudFormation Resource factory.
@@ -35,56 +35,20 @@ export function resolveSimCloudFormationServiceResourceFactory(
     );
   }
 
-  const scopedAws = simAws.accountRegionScope(
-    accountRegionScope.accountId,
-    accountRegionScope.regionName,
+  const serviceFactory = simCfnServiceResourceFactories.get(
+    resourceType.serviceName,
   );
 
-  switch (resourceType.serviceName) {
-    case "ACM":
-    case "CertificateManager": {
-      return scopedAws.acm().cfnResourceFactory();
-    }
-    case "CloudFormation": {
-      return new SimCfnCfnResourceFactory();
-    }
-    case "CloudFront": {
-      return scopedAws.cloudFront().cfnResourceFactory();
-    }
-    case "Cognito": {
-      return scopedAws.cognitoIdentityProvider().cfnResourceFactory();
-    }
-    case "DynamoDB": {
-      return scopedAws.dynamoDb().cfnResourceFactory();
-    }
-    case "IAM": {
-      return scopedAws.iam().cfnResourceFactory();
-    }
-    case "KMS": {
-      return scopedAws.kms().cfnResourceFactory();
-    }
-    case "Lambda": {
-      return scopedAws.lambda().cfnResourceFactory();
-    }
-    case "Route53": {
-      return scopedAws.route53().cfnResourceFactory();
-    }
-    case "S3": {
-      return scopedAws.s3().cfnResourceFactory();
-    }
-    case "SecretsManager": {
-      return scopedAws.secretsManager().cfnResourceFactory();
-    }
-    case "SQS": {
-      return scopedAws.sqs().cfnResourceFactory();
-    }
-    case "SSM": {
-      return scopedAws.ssm().cfnResourceFactory();
-    }
-    default: {
-      throw new Error(
-        `Unsupported sim CloudFormation Resource service ${resourceType.serviceName}`,
-      );
-    }
+  if (serviceFactory === undefined) {
+    throw new Error(
+      `Unsupported sim CloudFormation Resource service ${resourceType.serviceName}`,
+    );
   }
+
+  return serviceFactory(
+    simAws.accountRegionScope(
+      accountRegionScope.accountId,
+      accountRegionScope.regionName,
+    ),
+  );
 }

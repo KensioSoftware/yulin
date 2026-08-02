@@ -118,6 +118,36 @@ lives.
    field is lower-case `message`, which is what an HTTP API uses; a Function URL uses `Message` for
    the same thing.
 
+## CloudFormation
+
+`cfn/` creates the four `AWS::ApiGatewayV2::*` Resource types this simulation deploys, one directory
+per type, each with a creator and a properties reader:
+
+```text
+cfn/
+├── sim-cfn-api-gateway-v2-resource-factory.ts   switches on the bare type name
+├── sim-cfn-api-gateway-v2-property-parser.ts    the allow-list and the value shapes
+├── sim-cfn-http-api-template.factory.ts         the template tests deploy
+├── api/         Api
+├── integration/ Integration, and the two IntegrationUri forms
+├── route/       Route, and the skipped-authorizer refusal
+└── stage/       Stage
+```
+
+Every creator goes through the ordinary command, so a template is held to the same rules an SDK
+caller is, and the refusals above apply to a deployed Resource as well. Each properties reader states
+the properties its type simulates and refuses every other one by name, which is what keeps a template
+from deploying an API that looks configured to the template and unconfigured to every request.
+
+`route/sim-cfn-http-api-skipped-authorizer.ts` is the one refusal that is not about a property shape.
+An `AWS::ApiGatewayV2::Authorizer` is skipped rather than failed, and a `Ref` to a skipped Resource
+resolves to its own logical ID, so a route would otherwise deploy holding a logical ID where an
+authorizer id belongs.
+
+The CloudFormation-facing `Ref` and `Fn::GetAtt` values live in
+`src/service/cloudformation/resource/cfn/apigatewayv2/` instead, beside the other services' adapters,
+so the simulated API, route, integration and stage objects stay service-focused.
+
 ## What is deliberately refused
 
 Each of these is refused by name rather than accepted and ignored, because an API that looked

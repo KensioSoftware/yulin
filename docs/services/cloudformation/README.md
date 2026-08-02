@@ -967,6 +967,8 @@ Sim CloudFormation currently supports:
 
 The resource types it creates are:
 
+- `AWS::ApiGatewayV2::Api`, `AWS::ApiGatewayV2::Integration`, `AWS::ApiGatewayV2::Route` and
+  `AWS::ApiGatewayV2::Stage`
 - `AWS::CertificateManager::Certificate`
 - `AWS::CloudFormation::WaitConditionHandle`
 - `AWS::CloudFront::Distribution` and `AWS::CloudFront::Function`
