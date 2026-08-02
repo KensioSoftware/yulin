@@ -5,10 +5,14 @@ import type {
   SimDynamoDbAttributeDefinitionInput,
   SimDynamoDbKeySchemaElementInput,
   SimDynamoDbProvisionedThroughput,
+  SimDynamoDbSecondaryIndexInput,
   SimDynamoDbTagInput,
 } from "../../command/table/table.types.js";
 import type { SimDynamoDbTimeToLiveSpecificationInput } from "../../command/time-to-live/time-to-live.types.js";
+import { readSimCfnDynamoDbTableIndexes } from "./sim-cfn-dynamodb-table-indexes.js";
+import { readSimCfnDynamoDbKeySchema } from "./sim-cfn-dynamodb-table-key-schema.js";
 import { SimCfnDynamoDbTablePropertyRules } from "./sim-cfn-dynamodb-table-property-rules.js";
+import { readSimCfnDynamoDbThroughput } from "./sim-cfn-dynamodb-table-throughput.js";
 import { readSimCfnDynamoDbTableTimeToLive } from "./sim-cfn-dynamodb-table-time-to-live.js";
 import { SimCfnDynamoDbTableValues } from "./sim-cfn-dynamodb-table-values.js";
 
@@ -38,13 +42,13 @@ export class SimCfnDynamoDbTableProperties {
 
   constructor(properties: SimCfnDynamoDbTablePropertiesProperties) {
     this.resource = properties.resource;
-    this.rules = new SimCfnDynamoDbTablePropertyRules({
-      logicalId: properties.resource.logicalId,
-      properties: properties.properties,
-    });
     this.values = new SimCfnDynamoDbTableValues({
       logicalId: properties.resource.logicalId,
       properties: properties.properties,
+    });
+    this.rules = new SimCfnDynamoDbTablePropertyRules({
+      logicalId: properties.resource.logicalId,
+      values: this.values,
     });
   }
 
@@ -71,12 +75,7 @@ export class SimCfnDynamoDbTableProperties {
    * The table's primary key elements, in the order the template lists them.
    */
   keySchema(): readonly SimDynamoDbKeySchemaElementInput[] {
-    return this.values.list("KeySchema").map((element) => {
-      return {
-        AttributeName: element.string("AttributeName"),
-        KeyType: element.string("KeyType"),
-      };
-    });
+    return readSimCfnDynamoDbKeySchema(this.values);
   }
 
   /**
@@ -102,16 +101,24 @@ export class SimCfnDynamoDbTableProperties {
    * The capacity a provisioned table is created with.
    */
   provisionedThroughput(): SimDynamoDbProvisionedThroughput | undefined {
-    const throughput = this.values.object("ProvisionedThroughput");
+    return readSimCfnDynamoDbThroughput(this.values);
+  }
 
-    if (throughput === undefined) {
-      return undefined;
-    }
+  /**
+   * The global secondary indexes the template declares on the table.
+   */
+  globalSecondaryIndexes(): readonly SimDynamoDbSecondaryIndexInput[] {
+    return readSimCfnDynamoDbTableIndexes(
+      this.values,
+      "GlobalSecondaryIndexes",
+    );
+  }
 
-    return {
-      ReadCapacityUnits: throughput.number("ReadCapacityUnits"),
-      WriteCapacityUnits: throughput.number("WriteCapacityUnits"),
-    };
+  /**
+   * The local secondary indexes the template declares on the table.
+   */
+  localSecondaryIndexes(): readonly SimDynamoDbSecondaryIndexInput[] {
+    return readSimCfnDynamoDbTableIndexes(this.values, "LocalSecondaryIndexes");
   }
 
   /**

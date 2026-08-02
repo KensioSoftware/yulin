@@ -2,7 +2,7 @@ import type {
   SimCfnTemplateValue,
   SimCfnTemplateValueRecord,
 } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
-import { dynamoDbTablePropertyError } from "./sim-cfn-dynamodb-table-property-rules.js";
+import { dynamoDbTablePropertyError } from "./sim-cfn-dynamodb-table-property-error.js";
 
 interface SimCfnDynamoDbTableValuesProperties {
   readonly logicalId: string;
@@ -33,6 +33,13 @@ export class SimCfnDynamoDbTableValues {
   }
 
   /**
+   * The names of the properties this object holds.
+   */
+  get names(): readonly string[] {
+    return this.entries.keys().toArray();
+  }
+
+  /**
    * Read a property holding a list of objects, such as a key schema.
    *
    * A property the template leaves out reads as no entries, which is what
@@ -46,11 +53,41 @@ export class SimCfnDynamoDbTableValues {
     }
 
     if (!Array.isArray(value)) {
-      throw this.error(`${this.at(name)} must be a list`);
+      throw this.error(`${this.pathTo(name)} must be a list`);
     }
 
     return value.map((element, index) => {
-      return this.reader(element, `${this.at(name)}.${index.toString()}`);
+      return this.reader(element, `${this.pathTo(name)}.${index.toString()}`);
+    });
+  }
+
+  /**
+   * Read a property holding a list of strings, such as the attributes an index
+   * projection names.
+   *
+   * A property the template leaves out reads as nothing rather than as an empty
+   * list, since the two say different things: an index projecting no named
+   * attributes is not the same as one that named none.
+   */
+  strings(name: string): readonly string[] | undefined {
+    const value = this.entries.get(name);
+
+    if (value === undefined) {
+      return undefined;
+    }
+
+    if (!Array.isArray(value)) {
+      throw this.error(`${this.pathTo(name)} must be a list`);
+    }
+
+    return value.map((element, index) => {
+      if (typeof element !== "string") {
+        throw this.error(
+          `${this.pathTo(name)}.${index.toString()} must be a string`,
+        );
+      }
+
+      return element;
     });
   }
 
@@ -64,7 +101,7 @@ export class SimCfnDynamoDbTableValues {
       return undefined;
     }
 
-    return this.reader(value, this.at(name));
+    return this.reader(value, this.pathTo(name));
   }
 
   /**
@@ -78,7 +115,7 @@ export class SimCfnDynamoDbTableValues {
     }
 
     if (typeof value !== "string") {
-      throw this.error(`${this.at(name)} must be a string`);
+      throw this.error(`${this.pathTo(name)} must be a string`);
     }
 
     return value;
@@ -109,7 +146,7 @@ export class SimCfnDynamoDbTableValues {
       }
     }
 
-    throw this.error(`${this.at(name)} must be a number`);
+    throw this.error(`${this.pathTo(name)} must be a number`);
   }
 
   /**
@@ -134,7 +171,7 @@ export class SimCfnDynamoDbTableValues {
       return false;
     }
 
-    throw this.error(`${this.at(name)} must be true or false`);
+    throw this.error(`${this.pathTo(name)} must be true or false`);
   }
 
   /**
@@ -142,6 +179,17 @@ export class SimCfnDynamoDbTableValues {
    */
   error(reason: string): Error {
     return dynamoDbTablePropertyError(this.logicalId, reason);
+  }
+
+  /**
+   * The whole path a property sits at, for a refusal to name.
+   */
+  pathTo(name: string): string {
+    if (this.path === "") {
+      return name;
+    }
+
+    return `${this.path}.${name}`;
   }
 
   /**
@@ -160,16 +208,5 @@ export class SimCfnDynamoDbTableValues {
       properties: value,
       path,
     });
-  }
-
-  /**
-   * The whole path a property sits at, for a refusal to name.
-   */
-  private at(name: string): string {
-    if (this.path === "") {
-      return name;
-    }
-
-    return `${this.path}.${name}`;
   }
 }
