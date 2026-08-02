@@ -31,7 +31,10 @@ export async function simHttpApiProxyAuthorization(
   const { apiId, jwtAuthorizer } = input;
 
   if (jwtAuthorizer === undefined) {
-    return {};
+    // The scopes are passed on rather than dropped, so a test asking for one
+    // without an authorizer is refused by CreateRoute rather than quietly
+    // getting an open route.
+    return { AuthorizationScopes: input.authorizationScopes };
   }
 
   const authorizer = await simApiGatewayV2.createAuthorizer({

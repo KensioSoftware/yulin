@@ -54,7 +54,9 @@ export class SimApiGatewayV2ErrorResponse {
    * The `www-authenticate` value a refused token gets back.
    *
    * Only the description AWS publishes is ever sent, and every other refusal
-   * names the scheme and nothing else, rather than inventing wording.
+   * names the scheme and nothing else, rather than inventing wording. AWS does
+   * not publish how it lays the parameters out around that description, so
+   * they are comma-separated as RFC 6750 writes them.
    */
   private bearerChallenge(errorDescription?: string): string {
     if (errorDescription === undefined) {

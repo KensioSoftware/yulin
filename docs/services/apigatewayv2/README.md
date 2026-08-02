@@ -575,7 +575,8 @@ clock, so `simAws.clock().advanceBy(...)` expires a token that was accepted a mo
 ### Identity source
 
 `IdentitySource` takes one entry, either `$request.header.<name>` or `$request.querystring.<name>`. A
-`Bearer ` prefix on the value is stripped, case-insensitively, and is not required. Anything else is
+`Bearer` prefix on the value, followed by whitespace, is stripped case-insensitively and is not
+required. Anything else is
 refused by `CreateAuthorizer`, because an authorizer looking for the token in a place nothing puts it
 refuses every request for a reason that reads like a signing problem.
 
@@ -1008,7 +1009,8 @@ Current documented limitations:
 - The 403 body for an unmet route scope, the string rendering of claim values, and `scopes` being
   `null` rather than `[]` are all what the real endpoint was observed to send rather than anything
   AWS publishes. Only the one `error_description` AWS documents is ever sent; every other refusal
-  names the scheme and nothing else.
+  names the scheme and nothing else. How AWS lays out the `www-authenticate` parameters around that
+  description is not published either, so they are comma-separated as RFC 6750 writes them.
 - Deleting an authorizer a route still points at leaves that route refusing every request. What real
   API Gateway does with such a route is not established, so it stays closed rather than falling open.
 - The method and path segments of the source ARN are inferred rather than documented. See

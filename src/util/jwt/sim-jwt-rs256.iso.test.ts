@@ -78,19 +78,28 @@ describe("Verifying the RS256 signature of a JWT", () => {
   });
 
   it("refuses a published key that cannot be read", () => {
-    // Given a JWK whose parameters are not an RSA key
+    // Given a JWK of the wrong key type, and an RSA one whose modulus is not a
+    // modulus
     const jwt = SimJwt.parse(
       `${Buffer.from('{"alg":"RS256"}', "utf8").toString("base64url")}.` +
         `${Buffer.from('{"sub":"u1"}', "utf8").toString("base64url")}.c2ln`,
     );
 
-    // Then nothing verifies against it, rather than the failure reaching the
-    // caller as an error about a document it did not write
+    // Then nothing verifies against either, rather than the failure reaching
+    // the caller as an error about a document it did not write
     assertFalse(
       new SimJwtRs256().verify(jwt, {
         kty: "oct",
         kid: "key-1",
         n: "not-a-modulus",
+        e: "AQAB",
+      }),
+    );
+    assertFalse(
+      new SimJwtRs256().verify(jwt, {
+        kty: "RSA",
+        kid: "key-2",
+        n: "!",
         e: "AQAB",
       }),
     );

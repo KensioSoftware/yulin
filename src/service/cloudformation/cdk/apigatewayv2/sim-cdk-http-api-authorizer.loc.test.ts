@@ -134,7 +134,10 @@ describe("Sim CDK HTTP API JWT authorizer local integration", () => {
         AuthParameters: { USERNAME: "ada", PASSWORD: "Correct-horse-1" },
       }),
     );
-    const accessToken = signedIn.AuthenticationResult?.AccessToken ?? "";
+    // Asserted rather than defaulted, so a sign-in that answered a challenge
+    // instead of a token fails here rather than as a puzzling 401 below.
+    const accessToken = signedIn.AuthenticationResult?.AccessToken;
+    assertTypeString(accessToken);
 
     const srv = await serveSimAws({ simAws });
 
