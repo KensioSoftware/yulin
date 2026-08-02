@@ -5,36 +5,11 @@ import type {
 } from "../command/table/table.types.js";
 import { assertDefined } from "../../../util/type-guard/defined.js";
 import { SimDynamoDbValidationException } from "../error/dynamodb.error.js";
+import {
+  assertSimDynamoDbDistinctAttributeNames,
+  readSimDynamoDbAttributeDefinition,
+} from "./sim-dynamodb-attribute-definition.js";
 import type { SimDynamoDbKeySchema } from "./sim-dynamodb-key-schema.js";
-
-const scalarAttributeTypes: ReadonlySet<string> = new Set(["S", "N", "B"]);
-
-/**
- * Read one attribute definition a request carries.
- */
-function attributeDefinition(
-  definition: SimDynamoDbAttributeDefinitionInput,
-): SimDynamoDbAttributeDefinition {
-  const { AttributeName: name, AttributeType: type } = definition;
-
-  if (name === undefined || name === "") {
-    throw new SimDynamoDbValidationException(
-      "An AttributeDefinition has no AttributeName",
-    );
-  }
-
-  if (type === undefined || !scalarAttributeTypes.has(type)) {
-    throw new SimDynamoDbValidationException(
-      `AttributeDefinition for ${name} has AttributeType '${type ?? ""}'. A ` +
-        `key attribute is one of S, N or B.`,
-    );
-  }
-
-  return {
-    AttributeName: name,
-    AttributeType: type as SimDynamoDbScalarAttributeType,
-  };
-}
 
 /**
  * The attributes a simulated table's keys are made of.
@@ -62,14 +37,10 @@ export class SimDynamoDbAttributeDefinitions {
       );
     }
 
-    const elements = input.map((definition) => attributeDefinition(definition));
-    const names = new Set(elements.map((element) => element.AttributeName));
-
-    if (names.size !== elements.length) {
-      throw new SimDynamoDbValidationException(
-        "AttributeDefinitions names an attribute more than once",
-      );
-    }
+    const elements = input.map((definition) =>
+      readSimDynamoDbAttributeDefinition(definition),
+    );
+    assertSimDynamoDbDistinctAttributeNames(elements);
 
     return new this(elements);
   }
@@ -93,7 +64,11 @@ export class SimDynamoDbAttributeDefinitions {
       return this;
     }
 
-    const added = input.map((definition) => attributeDefinition(definition));
+    const added = input.map((definition) =>
+      readSimDynamoDbAttributeDefinition(definition),
+    );
+    assertSimDynamoDbDistinctAttributeNames(added);
+
     const elements = [...this.elements];
 
     for (const definition of added) {

@@ -196,6 +196,34 @@ describe("DynamoDB UpdateTableCommand validation", () => {
     );
   });
 
+  it("refuses an update defining one attribute twice", async () => {
+    // Given a table.
+    const simAws = new SimAws();
+    await simDynamoDbCreatedTableFactory.make({ tableName: "orders" }, simAws);
+
+    // When an update names one attribute twice, then it is refused in the same
+    // words CreateTable refuses the same thing in, whether or not the two
+    // definitions agree.
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws.dynamoDb().updateTable(
+        new UpdateTableCommand({
+          TableName: "orders",
+          AttributeDefinitions: [
+            { AttributeName: "status", AttributeType: "S" },
+            { AttributeName: "status", AttributeType: "S" },
+          ],
+          GlobalSecondaryIndexUpdates: [{ Create: byStatusIndex }],
+        }),
+      );
+    });
+
+    assertInstanceOf(error, SimDynamoDbValidationException);
+    assertStringIncludes(
+      error.message,
+      "AttributeDefinitions names an attribute more than once",
+    );
+  });
+
   it("refuses an index whose name the table already uses", async () => {
     // Given a table already carrying an index of that name.
     const simAws = new SimAws();
