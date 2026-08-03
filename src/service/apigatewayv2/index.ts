@@ -28,7 +28,13 @@ export {
   type SimHttpApiAuthorizerType,
   type SimHttpApiAuthorizerView,
 } from "./api/authorizer/sim-http-api-authorizer.js";
+export { SimHttpApiJwtAuthorizer } from "./api/authorizer/sim-http-api-jwt-authorizer.js";
+export {
+  simHttpApiAuthorizerPayloadFormatVersion,
+  SimHttpApiRequestAuthorizer,
+} from "./api/authorizer/sim-http-api-request-authorizer.js";
 export { SimHttpApiIdentitySource } from "./api/authorizer/sim-http-api-identity-source.js";
+export { SimHttpApiIdentitySources } from "./api/authorizer/sim-http-api-identity-sources.js";
 export {
   SimHttpApiJwtConfiguration,
   type SimHttpApiJwtConfigurationView,
@@ -72,12 +78,14 @@ export {
   SimApiGatewayV2Error,
   SimApiGatewayV2NotFound,
 } from "./error/sim-api-gateway-v2.error.js";
+export type { SimHttpApiAuthorizerEvent } from "./serve/auth/sim-http-api-authorizer-event.js";
 export type {
   SimPayload2AuthorizerContext,
   SimPayload2Event,
   SimPayload2HttpContext,
   SimPayload2IamAuthorizer,
   SimPayload2JwtAuthorizer,
+  SimPayload2LambdaAuthorizer,
   SimPayload2RequestContext,
   SimPayload2Result,
 } from "../../serve/payload-2/sim-payload-2-event.type.js";

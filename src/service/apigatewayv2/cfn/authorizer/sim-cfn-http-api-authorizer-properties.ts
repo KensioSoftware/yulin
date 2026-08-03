@@ -2,13 +2,16 @@ import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-re
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimCreateAuthorizerCommandInput } from "../../command/authorizer/authorizer.command.js";
 import { SimCfnApiGatewayV2PropertyParser } from "../sim-cfn-api-gateway-v2-property-parser.js";
+import { SimCfnHttpApiJwtConfigurationProperties } from "./sim-cfn-http-api-jwt-configuration-properties.js";
 
 /**
  * The AWS::ApiGatewayV2::Authorizer properties this simulation deploys.
  *
  * Everything a Lambda `REQUEST` authorizer is configured with is left out, so
  * a template carrying one is refused by name rather than deploying an
- * authorizer that would decide differently here.
+ * authorizer that would decide differently here. `CreateAuthorizer` does
+ * create a `REQUEST` authorizer for an SDK caller; declaring one in a template
+ * is the part that is not simulated yet.
  */
 const simulatedProperties = [
   "ApiId",
@@ -57,10 +60,8 @@ export class SimCfnHttpApiAuthorizerProperties {
   /**
    * The CreateAuthorizer input this Resource asks for.
    *
-   * `AuthorizerType` is passed through, so a type that is not simulated is
-   * refused by CreateAuthorizer with the reason it refuses it. The issuer
-   * arrives as the string CDK builds from `Fn::GetAtt <UserPool>.ProviderURL`,
-   * which is the same string the pool's tokens name as their issuer.
+   * Everything but the type is passed through, so what an authorizer requires
+   * is refused by CreateAuthorizer with the reason it refuses it.
    */
   createAuthorizerInput(): SimCreateAuthorizerCommandInput {
     return {
@@ -70,11 +71,7 @@ export class SimCfnHttpApiAuthorizerProperties {
         this.properties["Name"],
         "Name",
       ),
-      AuthorizerType: this.propertyParser.optionalString(
-        this.resource,
-        this.properties["AuthorizerType"],
-        "AuthorizerType",
-      ),
+      AuthorizerType: this.authorizerType(),
       IdentitySource: this.propertyParser.optionalStringList(
         this.resource,
         this.properties["IdentitySource"],
@@ -84,28 +81,37 @@ export class SimCfnHttpApiAuthorizerProperties {
     };
   }
 
-  private jwtConfiguration(): SimCreateAuthorizerCommandInput["JwtConfiguration"] {
-    const configuration = this.propertyParser.optionalRecord(
+  /**
+   * The type this Resource declares, refusing `REQUEST` by name.
+   *
+   * A `REQUEST` authorizer needs the properties naming its function, and those
+   * are not deployed from a template yet, so a Resource declaring one would
+   * fail further down for a reason that reads as a missing property rather
+   * than as the feature it is.
+   */
+  private authorizerType(): string | undefined {
+    const authorizerType = this.propertyParser.optionalString(
       this.resource,
-      this.properties["JwtConfiguration"],
-      "JwtConfiguration",
+      this.properties["AuthorizerType"],
+      "AuthorizerType",
     );
 
-    if (configuration === undefined) {
-      return undefined;
+    if (authorizerType === "REQUEST") {
+      throw new Error(
+        `AWS::ApiGatewayV2::Authorizer ${this.resource.logicalId} declares a ` +
+          `Lambda REQUEST authorizer, which is not deployed from a template ` +
+          `yet. Create it with CreateAuthorizer instead.`,
+      );
     }
 
-    return {
-      Issuer: this.propertyParser.optionalString(
-        this.resource,
-        configuration["Issuer"],
-        "JwtConfiguration.Issuer",
-      ),
-      Audience: this.propertyParser.optionalStringList(
-        this.resource,
-        configuration["Audience"],
-        "JwtConfiguration.Audience",
-      ),
-    };
+    return authorizerType;
+  }
+
+  private jwtConfiguration(): SimCreateAuthorizerCommandInput["JwtConfiguration"] {
+    return new SimCfnHttpApiJwtConfigurationProperties({
+      resource: this.resource,
+      properties: this.properties,
+      propertyParser: this.propertyParser,
+    }).read();
   }
 }

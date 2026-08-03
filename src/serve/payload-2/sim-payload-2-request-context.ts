@@ -5,6 +5,7 @@ import { simPayload2SourceIp } from "./sim-payload-2-connection.js";
 import type { SimPayload2Endpoint } from "./sim-payload-2-endpoint.js";
 import type {
   SimPayload2JwtAuthorizer,
+  SimPayload2LambdaAuthorizer,
   SimPayload2RequestContext,
 } from "./sim-payload-2-event.type.js";
 import { simPayload2EventTime } from "./sim-payload-2-event-time.js";
@@ -25,6 +26,11 @@ export interface SimPayload2Authorization {
   readonly caller?: SimAwsRequestCaller | undefined;
   /** The token a JWT authorizer accepted. */
   readonly jwt?: SimPayload2JwtAuthorizer | undefined;
+  /**
+   * The context a Lambda `REQUEST` authorizer returned, which is `null` when
+   * it allowed the request and returned none.
+   */
+  readonly lambda?: SimPayload2LambdaAuthorizer | null | undefined;
 }
 
 interface SimPayload2RequestContextInput {
@@ -76,6 +82,11 @@ export class SimPayload2RequestContextBuilder {
     const jwt = input.authorization?.jwt;
     if (jwt !== undefined) {
       requestContext.authorizer = { jwt };
+    }
+
+    const lambda = input.authorization?.lambda;
+    if (lambda !== undefined) {
+      requestContext.authorizer = { lambda };
     }
 
     const authorizer = iamCaller?.authorizerContext();

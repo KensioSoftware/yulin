@@ -18,8 +18,9 @@ const apiGatewayLambdaPathUri =
   /^arn:[^:]+:apigateway:[^:]+:lambda:path\/2015-03-31\/functions\/(?<functionArn>arn:[^/]+)\/invocations$/;
 
 /**
- * The `IntegrationUri` of an `AWS_PROXY` integration: the ARN of the Lambda
- * function the integration invokes.
+ * A URI naming the Lambda function something on an API invokes: the
+ * `IntegrationUri` of an `AWS_PROXY` integration, or the `AuthorizerUri` of a
+ * `REQUEST` authorizer. Both are written the same way.
  *
  * Only an unqualified function ARN is accepted. A version or alias qualifier
  * on the end names a published function version, and simulated Lambda has no
@@ -50,14 +51,38 @@ export class SimHttpApiLambdaUri {
    * ARN.
    */
   static parse(uri: string): SimHttpApiLambdaUri {
+    return this.read(
+      "IntegrationUri",
+      uri,
+      "an AWS_PROXY integration is simulated only for an unqualified Lambda " +
+        "function ARN",
+    );
+  }
+
+  /**
+   * Read a `REQUEST` authorizer's URI, which names its function the same way.
+   */
+  static parseAuthorizerUri(uri: string): SimHttpApiLambdaUri {
+    return this.read(
+      "AuthorizerUri",
+      uri,
+      "a REQUEST authorizer is simulated only for an unqualified Lambda " +
+        "function ARN",
+    );
+  }
+
+  private static read(
+    option: string,
+    uri: string,
+    refusal: string,
+  ): SimHttpApiLambdaUri {
     const functionArn = this.functionArn(uri);
     const groups = lambdaFunctionArn.exec(functionArn)?.groups;
 
     if (groups === undefined) {
       throw new SimApiGatewayV2BadRequest(
-        `IntegrationUri '${uri}' is not a simulated integration target: an ` +
-          `AWS_PROXY integration is simulated only for an unqualified Lambda ` +
-          `function ARN, such as ` +
+        `${option} '${uri}' is not a simulated invocation target: ` +
+          `${refusal}, such as ` +
           `arn:aws:lambda:eu-west-2:111111111111:function:orders`,
       );
     }

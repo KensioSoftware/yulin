@@ -76,16 +76,29 @@ route, and creating the second is a conflict.
 
 ## Authorizing a request
 
-`api/authorizer/` holds the JWT authorizer and everything the decision needs:
+`api/authorizer/` holds the two kinds of authorizer an API stores, and everything the JWT one's
+decision needs:
 
 ```text
-SimHttpApiAuthorizer
-├── SimHttpApiIdentitySource     which header or query parameter carries the token
-├── SimHttpApiJwtConfiguration   the issuer trusted and the audiences accepted
-└── SimHttpApiJwtVerification    the ordered checks, answering an authorization
-    ├── SimHttpApiJwtClaimChecks the issuer, the audience, then the time claims
-    └── SimHttpApiJwtClaims      the claims as the handler receives them
+SimHttpApiAuthorizer             an id, a name, and which kind it is
+├── SimHttpApiJwtAuthorizer      which token a route asks for, and who signed it
+│   ├── SimHttpApiIdentitySource which header or query parameter carries the token
+│   ├── SimHttpApiJwtConfiguration  the issuer trusted and the audiences accepted
+│   └── SimHttpApiJwtVerification   the ordered checks, answering an authorization
+│       ├── SimHttpApiJwtClaimChecks the issuer, the audience, then the time claims
+│       └── SimHttpApiJwtClaims      the claims as the handler receives them
+└── SimHttpApiRequestAuthorizer  which function decides, and what it needs first
+    └── SimHttpApiIdentitySources   the sources a request has to carry, as a list
 ```
+
+The two share an id, a name and nothing else, which is why the base is abstract rather than a class
+with optional members: a JWT authorizer holds configuration and no function, a `REQUEST` authorizer
+holds a function and no configuration, and neither reads the other's half. A route names one by id,
+and `CreateRoute` refuses a route whose authorization type and authorizer disagree, since such a
+route is refused by AWS and could only be served here by guessing which half applied.
+
+`SimHttpApiIdentitySources` is a list because a `REQUEST` authorizer takes one, while a JWT
+authorizer takes a single source and `SimHttpApiJwtAuthorizerInput` is where that rule lives.
 
 The token parsing and RS256 verification itself is `src/util/jwt/`, which knows nothing about API
 Gateway. It is real verification against the issuer's published JWK, with `node:crypto`: nothing is
@@ -105,7 +118,8 @@ OIDC-conformant discovery client would reject its own pool's tokens. Resolving i
 
 `SimHttpApiAuthorization` is what a decision answers with: `SimHttpApiAdmitted`, carrying whatever the
 event needs to describe the caller, or `SimHttpApiRefused`, which is a 401 for everything up to and
-including claim validation and a 403 for an unmet route scope or an IAM refusal.
+including claim validation, a 403 for an unmet route scope, an IAM refusal or a Lambda authorizer
+that said no, and a 500 for a Lambda authorizer that could not answer at all.
 
 The other kind of route authorization is `AWS_IAM`, which has nothing under `api/authorizer/` at all:
 it configures nothing on the API, so there is nothing to store. It lives entirely in `serve/auth/`,
@@ -132,6 +146,11 @@ which is the error category AWS describes.
 `command/sim-api-gateway-v2-unsimulated-input.ts` refuses the inputs this simulation does not model.
 It works from an allow-list of the options each command accepts, so an option nobody thought about
 is refused rather than silently dropped.
+
+`command/authorizer/` is the one area whose input reading is split by kind. `CreateAuthorizer` takes
+one input describing either kind of authorizer, so `simHttpApiAuthorizerInput` picks the reader for
+the type asked for, and each reader states what its own kind requires and refuses what belongs to
+the other. The command handler itself then knows only that an authorizer came back.
 
 ### IAM
 
@@ -201,8 +220,16 @@ fails the stack rather than deploying a template written two ways at once.
    SimHttpApiRouteAuthorizer
    ├── NONE     admits everyone, with no caller to describe
    ├── JWT      SimHttpApiJwtRouteAuthorizer, over the API's own authorizers
-   └── AWS_IAM  SimHttpApiIamRouteAuthorizer, evaluating execute-api:Invoke
+   ├── AWS_IAM  SimHttpApiIamRouteAuthorizer, evaluating execute-api:Invoke
+   └── CUSTOM   SimHttpApiRequestRouteAuthorizer, invoking a Lambda function
    ```
+
+   The `CUSTOM` one is the reason this step is asynchronous: it invokes a function and waits for it.
+   Its three collaborators split what that involves, since none of them is small:
+   `SimHttpApiAuthorizerEventBuilder` builds the event, over the shared payload 2.0 builder;
+   `SimHttpApiAuthorizerResponse` reads whichever of the two answer shapes came back; and
+   `SimHttpApiAuthorizerPolicy` puts a returned policy document to IAM, evaluating it as the only
+   policy in the decision, since there is no IAM principal behind it to gather policies for.
 
    The IAM one asks the API's own Account, which the router resolves, and supplies no resource
    policies, because an HTTP API has none. That is also what makes a caller from another Account
@@ -210,20 +237,24 @@ fails the stack rather than deploying a template written two ways at once.
    `execute-api` ARN of the request, built by `api/sim-http-api-execute-api-arn.ts` from the concrete
    method and path rather than from the route key.
 
-3. `serve/auth/sim-http-api-integration-authorizer.ts` asks whether the API may invoke the function
-   at all. The caller is the service principal `apigateway.amazonaws.com`, the action is
+3. `serve/auth/sim-http-api-invoke-authorizer.ts` asks whether the API may invoke a function at all.
+   The caller is the service principal `apigateway.amazonaws.com`, the action is
    `lambda:InvokeFunction`, and the request supplies `AWS:SourceArn` from
    `api/sim-http-api-execute-api-arn.ts`. A function with no matching permission answers 500 and is
-   never invoked, as it is on real AWS. That ARN builder carries the reasoning for what the method
-   and path segments of the ARN hold, since neither is documented by AWS.
-4. `sim-http-api-endpoint.ts` describes the API, the matched route and the stage as a
+   never invoked, as it is on real AWS. Both an integration's function and an authorizer's go
+   through this, under different ARNs: the route for one, `<apiId>/authorizers/<authorizerId>` for
+   the other. That ARN builder carries the reasoning for what the method and path segments of the
+   ARN hold, since neither is documented by AWS.
+4. `sim-http-api-integration-invocation.ts` invokes the integrated function and turns its result into
+   the response. `sim-http-api-endpoint.ts` describes the API, the matched route and the stage as a
    `SimPayload2Endpoint`, including what the route captured from the path.
 5. `src/serve/payload-2/` builds the payload format 2.0 event and turns the handler's result back
    into an HTTP response. That machinery is shared with Lambda Function URLs, which speak the same
    format.
-6. `sim-api-gateway-v2-error-response.ts` answers the cases where there is nothing to proxy to. The
-   field is lower-case `message`, which is what an HTTP API uses; a Function URL uses `Message` for
-   the same thing.
+6. `sim-api-gateway-v2-error-response.ts` answers the cases where there is nothing to proxy to, and
+   `sim-http-api-refusal-response.ts` maps a route authorization refusal onto one of them. The field
+   is lower-case `message`, which is what an HTTP API uses; a Function URL uses `Message` for the
+   same thing.
 
 ## CloudFormation
 
@@ -269,14 +300,20 @@ simulation exists to avoid:
 - an integration type other than `AWS_PROXY`, and an integration URI that is not an unqualified
   Lambda function ARN
 - a malformed route key, refused at `CreateRoute`, which is where real API Gateway refuses it
-- an authorization type other than `NONE`, `JWT` or `AWS_IAM`, and an `AuthorizerId` or
-  `AuthorizationScopes` on a route that has no use for either
+- an `AuthorizerId` or `AuthorizationScopes` on a route that has no use for either, and an
+  `AuthorizerId` naming an authorizer of the kind the route's authorization type does not take
 - a `Policy` on `AWS::ApiGatewayV2::Api`, with a message of its own: AWS has no such property, since
   an HTTP API has no resource policy
-- an authorizer type other than `JWT`, and every option only a Lambda `REQUEST` authorizer takes,
-  including `AuthorizerResultTtlInSeconds`
-- more than one `IdentitySource`, and an identity source naming neither a header nor a query string
-  parameter
+- an option belonging to the other kind of authorizer, such as an `AuthorizerUri` on a `JWT`
+  authorizer or a `JwtConfiguration` on a `REQUEST` one
+- an `AuthorizerPayloadFormatVersion` that is not `2.0`, including an unstated one, which AWS reads
+  as `1.0`
+- a non-zero `AuthorizerResultTtlInSeconds`, since nothing here reuses a decision, and an
+  `AuthorizerCredentialsArn`, since the function's own resource policy is the whole decision
+- a `REQUEST` authorizer declared by `AWS::ApiGatewayV2::Authorizer` or by an OpenAPI security
+  scheme, which `CreateAuthorizer` does create
+- more than one `IdentitySource` on a `JWT` authorizer, no `IdentitySource` at all on a `REQUEST`
+  one, and an identity source naming neither a header nor a query string parameter
 - a stage name that is neither `$default` nor something a URL path segment could hold, and a stage
   without `AutoDeploy: true`, since Deployments are not simulated and such a stage serves nothing on
   real AWS

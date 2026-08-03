@@ -5,12 +5,13 @@ import { assertDefined } from "../../../util/type-guard/defined.js";
 import { DEFAULT_SIM_AWS_ACCOUNT_ID } from "../../aws/sim-aws-account.js";
 import type { SimAws } from "../../aws/sim-aws.js";
 import { makeLambdaZipFileInput } from "../../lambda/function/code/lambda-zip-file-input.js";
-import { simApiGatewayServicePrincipal } from "../serve/auth/sim-http-api-integration-authorizer.js";
+import { simApiGatewayServicePrincipal } from "../serve/auth/sim-http-api-invoke-authorizer.js";
 import type { SimHttpApi } from "./sim-http-api.js";
 import {
   simHttpApiProxyAuthorization,
   type SimHttpApiProxyAuthorizer,
 } from "./sim-http-api-proxy-authorization.js";
+import type { SimHttpApiProxyRequestAuthorizer } from "./sim-http-api-proxy-request-authorizer.js";
 
 /**
  * What a test asks for when it wants an HTTP API that serves something.
@@ -34,6 +35,11 @@ export interface SimHttpApiLambdaProxyInput {
    * whose routes admit anyone.
    */
   readonly jwtAuthorizer: SimHttpApiProxyAuthorizer | undefined;
+  /**
+   * The Lambda `REQUEST` authorizer every route goes through, or undefined for
+   * an API whose routes do not send requests through a function.
+   */
+  readonly requestAuthorizer: SimHttpApiProxyRequestAuthorizer | undefined;
   /**
    * Whether every route is authorized by IAM instead, which is what an
    * `AWS_IAM` route asks for.
@@ -92,6 +98,7 @@ export const simHttpApiLambdaProxyFactory = new AsyncMappedFactory<
     disableExecuteApiEndpoint: false,
     routeKeys: ["$default"],
     jwtAuthorizer: undefined,
+    requestAuthorizer: undefined,
     iamAuthorization: false,
     authorizationScopes: [],
     stageNames: ["$default"],
@@ -129,7 +136,10 @@ export const simHttpApiLambdaProxyFactory = new AsyncMappedFactory<
 
     const authorization = await simHttpApiProxyAuthorization(simApiGatewayV2, {
       apiId,
+      simAws,
+      roleArn: input.roleArn,
       jwtAuthorizer: input.jwtAuthorizer,
+      requestAuthorizer: input.requestAuthorizer,
       iamAuthorization: input.iamAuthorization,
       authorizationScopes: input.authorizationScopes,
     });

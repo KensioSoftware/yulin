@@ -72,7 +72,7 @@ describe("Importing a sim HTTP API's JWT authorizers", () => {
     expect(authorizer.IdentitySource).toStrictEqual([
       "$request.header.Authorization",
     ]);
-    assertIdentical(authorizer.JwtConfiguration.Issuer, issuer);
+    assertIdentical(authorizer.JwtConfiguration?.Issuer, issuer);
 
     // And the operation's route is the one pointed at that authorizer, asking
     // a token for the scopes the requirement named

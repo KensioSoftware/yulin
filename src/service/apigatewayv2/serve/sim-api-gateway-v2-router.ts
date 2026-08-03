@@ -4,6 +4,7 @@ import { SimAws } from "../../aws/sim-aws.js";
 import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
 import type { SimLambdaFunction } from "../../lambda/function/sim-lambda-function.js";
 import type { SimHttpApiIntegration } from "../api/integration/sim-http-api-integration.js";
+import type { SimHttpApiLambdaUri } from "../api/integration/sim-http-api-lambda-uri.js";
 import type { SimHttpApi } from "../api/sim-http-api.js";
 import type { SimHttpApiRegistry } from "../registry/sim-http-api-registry.js";
 import type { SimIamInterServiceAuthZ } from "../../iam/authorize/sim-iam-inter-service-auth-z.js";
@@ -13,13 +14,13 @@ interface SimApiGatewayV2RouterProperties {
 }
 
 /**
- * What an integration invokes, and what decides whether it may.
+ * A function the API invokes, and what decides whether it may.
  */
-export interface SimHttpApiIntegrationTarget {
+export interface SimHttpApiFunctionTarget {
   readonly simFunction: SimLambdaFunction;
   /**
-   * IAM of the Account that owns the function, which is what the integration's
-   * invoke permission is evaluated against. It need not be the API's Account.
+   * IAM of the Account that owns the function, which is what the API's invoke
+   * permission is evaluated against. It need not be the API's Account.
    */
   readonly iam: SimIamInterServiceAuthZ;
 }
@@ -83,14 +84,25 @@ export class SimApiGatewayV2Router {
   /**
    * Find the function an integration invokes, and the IAM deciding whether it
    * may be invoked.
-   *
-   * The function is looked up in the Account and Region its ARN names, not the
-   * API's, because an integration ARN is free to name either.
    */
   targetFor(
     integration: SimHttpApiIntegration,
-  ): SimHttpApiIntegrationTarget | undefined {
-    const { accountId, regionName, functionName } = integration.lambdaUri;
+  ): SimHttpApiFunctionTarget | undefined {
+    return this.functionFor(integration.lambdaUri);
+  }
+
+  /**
+   * Find the function a URI names, and the IAM deciding whether API Gateway
+   * may invoke it.
+   *
+   * The function is looked up in the Account and Region its own ARN names, not
+   * the API's, because an integration URI and an authorizer URI are each free
+   * to name either.
+   */
+  functionFor(
+    lambdaUri: SimHttpApiLambdaUri,
+  ): SimHttpApiFunctionTarget | undefined {
+    const { accountId, regionName, functionName } = lambdaUri;
 
     const scope = this.simAws.accountRegionScope(
       accountId as SimAwsAccountId,

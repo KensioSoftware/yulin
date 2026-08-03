@@ -1,4 +1,3 @@
-import { SimHttpApiAuthorizer } from "../../api/authorizer/sim-http-api-authorizer.js";
 import { SimApiGatewayV2NotFound } from "../../error/sim-api-gateway-v2.error.js";
 import type { SimApiGatewayV2RequestOptions } from "../sim-api-gateway-v2-request-options.js";
 import { SimApiGatewayV2UnsimulatedInput } from "../sim-api-gateway-v2-unsimulated-input.js";
@@ -11,7 +10,7 @@ import type {
   SimGetAuthorizersCommand,
   SimGetAuthorizersCommandOutput,
 } from "./authorizer.command.js";
-import { SimHttpApiJwtAuthorizerInput } from "./sim-http-api-jwt-authorizer-input.js";
+import { simHttpApiAuthorizerInput } from "./sim-http-api-authorizer-input.js";
 
 const authorizersPath = "/authorizers";
 
@@ -21,7 +20,16 @@ const acceptedCreateAuthorizerOptions = [
   "AuthorizerType",
   "IdentitySource",
   "JwtConfiguration",
+  "AuthorizerUri",
+  "AuthorizerPayloadFormatVersion",
+  "EnableSimpleResponses",
+  "AuthorizerResultTtlInSeconds",
 ];
+
+/**
+ * The authorizer types simulated.
+ */
+const simulatedAuthorizerTypes = ["JWT", "REQUEST"];
 
 /**
  * The commands addressing the authorizers of an API.
@@ -36,11 +44,10 @@ export class SimHttpApiAuthorizerCommands {
   /**
    * Handle a CreateAuthorizer command.
    *
-   * Everything a Lambda `REQUEST` authorizer is configured with, including
-   * `AuthorizerResultTtlInSeconds`, is outside the accepted set and refused by
-   * name. Nothing here runs authorizer code or caches a decision, so an
-   * authorizer that looked configured for either would behave differently on
-   * every request.
+   * The two kinds of authorizer are configured by different halves of this
+   * input, and which half applies is settled by the reader for the type asked
+   * for, so an option written against the other kind is refused by name rather
+   * than accepted and never applied.
    */
   createAuthorizer(
     command: SimCreateAuthorizerCommand,
@@ -50,19 +57,16 @@ export class SimHttpApiAuthorizerCommands {
     const unsimulated = new SimApiGatewayV2UnsimulatedInput("CreateAuthorizer");
     unsimulated.refuseUnaccepted(input, acceptedCreateAuthorizerOptions);
     const apiId = unsimulated.require("ApiId", input.ApiId);
-    const name = unsimulated.require("Name", input.Name);
+    unsimulated.require("Name", input.Name);
     unsimulated.require("AuthorizerType", input.AuthorizerType);
-    unsimulated.refuseUnless(
+    unsimulated.refuseUnlessOneOf(
       "AuthorizerType",
       input.AuthorizerType,
-      "JWT",
-      "a Lambda authorizer runs code of its own to decide, and none of that " +
-        "is simulated",
+      simulatedAuthorizerTypes,
+      "an HTTP API has these two kinds of authorizer and no others",
     );
 
-    const authorizerInput = new SimHttpApiJwtAuthorizerInput(input);
-    const identitySource = authorizerInput.identitySource();
-    const jwtConfiguration = authorizerInput.jwtConfiguration();
+    const authorizerInput = simHttpApiAuthorizerInput(input);
 
     const api = this.access.api({
       method: "POST",
@@ -71,12 +75,7 @@ export class SimHttpApiAuthorizerCommands {
       caller: options?.caller,
     });
 
-    const authorizer = new SimHttpApiAuthorizer({
-      authorizerId: api.authorizers.allocateId(),
-      name,
-      identitySource,
-      jwtConfiguration,
-    });
+    const authorizer = authorizerInput.read(api.authorizers.allocateId());
     api.authorizers.add(authorizer);
 
     return { ...authorizer.view(), $metadata: {} };
@@ -110,11 +109,11 @@ export class SimHttpApiAuthorizerCommands {
   /**
    * Handle a DeleteAuthorizer command.
    *
-   * A route still pointing at the deleted authorizer keeps its
-   * `AuthorizationType: JWT` and refuses every request, since there is no
-   * longer anything to verify a token against. What real API Gateway does with
-   * such a route is not established, so the route stays closed rather than
-   * being opened or repointed.
+   * A route still pointing at the deleted authorizer keeps its authorization
+   * type and refuses every request, since there is no longer anything to send
+   * the request through. What real API Gateway does with such a route is not
+   * established, so the route stays closed rather than being opened or
+   * repointed.
    */
   deleteAuthorizer(
     command: SimDeleteAuthorizerCommand,

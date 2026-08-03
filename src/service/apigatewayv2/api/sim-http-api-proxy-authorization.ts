@@ -1,5 +1,10 @@
+import type { SimAws } from "../../aws/sim-aws.js";
 import type { SimCreateRouteCommandInput } from "../command/route/route.command.js";
 import type { SimApiGatewayV2 } from "../sim-api-gateway-v2.js";
+import {
+  simHttpApiProxyRequestAuthorizer,
+  type SimHttpApiProxyRequestAuthorizer,
+} from "./sim-http-api-proxy-request-authorizer.js";
 
 /**
  * A JWT authorizer every route of a test's API goes through.
@@ -14,9 +19,14 @@ interface SimHttpApiProxyAuthorizationInput {
   readonly apiId: string;
   /** Undefined for an API whose routes admit anyone. */
   readonly jwtAuthorizer: SimHttpApiProxyAuthorizer | undefined;
+  /** Undefined unless every route goes through a Lambda authorizer. */
+  readonly requestAuthorizer: SimHttpApiProxyRequestAuthorizer | undefined;
   /** Whether every route is authorized by IAM instead. */
   readonly iamAuthorization: boolean;
   readonly authorizationScopes: readonly string[];
+  /** The Role the authorizer's own function runs as. */
+  readonly roleArn: string;
+  readonly simAws: SimAws;
 }
 
 /**
@@ -30,7 +40,16 @@ export async function simHttpApiProxyAuthorization(
   simApiGatewayV2: SimApiGatewayV2,
   input: SimHttpApiProxyAuthorizationInput,
 ): Promise<SimCreateRouteCommandInput> {
-  const { apiId, jwtAuthorizer } = input;
+  const { apiId, jwtAuthorizer, requestAuthorizer } = input;
+
+  if (requestAuthorizer !== undefined) {
+    return await simHttpApiProxyRequestAuthorizer(input.simAws, {
+      apiId,
+      roleArn: input.roleArn,
+      authorizer: requestAuthorizer,
+      authorizationScopes: input.authorizationScopes,
+    });
+  }
 
   if (input.iamAuthorization) {
     // An AWS_IAM route takes no authorizer at all, so there is nothing to

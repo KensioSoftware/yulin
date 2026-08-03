@@ -16,13 +16,14 @@ const queryStringPrefix = "$request.querystring.";
 const bearerPrefix = /^bearer\s+/i;
 
 /**
- * Where a JWT authorizer takes the token from.
+ * Where an authorizer takes what it identifies the caller by.
  *
  * An identity source is a request mapping expression naming one header or one
  * query string parameter. Anything else is refused rather than accepted and
- * looked for nowhere, since a route whose authorizer never finds a token
- * refuses every request, which looks like a signing problem rather than a
- * configuration one.
+ * looked for nowhere, since a route whose authorizer never finds what it looks
+ * for refuses every request, which looks like a signing problem rather than a
+ * configuration one. That leaves out `$context.*` and `$stagevariables.*`,
+ * which a Lambda `REQUEST` authorizer may also name.
  */
 export class SimHttpApiIdentitySource {
   /**
@@ -68,21 +69,43 @@ export class SimHttpApiIdentitySource {
   }
 
   /**
+   * What this request carries at this identity source, if it carries anything.
+   *
+   * An empty value is the same as no value here: real API Gateway treats a
+   * source it finds nothing at as one the request did not supply, and refuses
+   * the request without asking the authorizer anything.
+   */
+  value(request: Request): string | undefined {
+    return this.present(this.rawValue(request)?.trim());
+  }
+
+  /**
    * The token this request carries, if it carries one at all.
    *
-   * An empty value is the same as no value here: real API Gateway has nothing
-   * to decode either way, and both answer the same 401.
+   * The bearer scheme is stripped when it is there, which is what a JWT
+   * authorizer does with it. A `REQUEST` authorizer is handed the value as it
+   * arrived instead, since it may be a cookie or an API key rather than a
+   * bearer token.
    */
   token(request: Request): string | undefined {
-    const value = this.rawValue(request);
+    const value = this.value(request);
 
     if (value === undefined) {
       return undefined;
     }
 
-    const token = value.replace(bearerPrefix, "").trim();
+    return this.present(value.replace(bearerPrefix, "").trim());
+  }
 
-    return token.length === 0 ? undefined : token;
+  /**
+   * A value the request actually supplied, rather than an empty one.
+   */
+  private present(value: string | undefined): string | undefined {
+    if (value === undefined || value.length === 0) {
+      return undefined;
+    }
+
+    return value;
   }
 
   private rawValue(request: Request): string | undefined {

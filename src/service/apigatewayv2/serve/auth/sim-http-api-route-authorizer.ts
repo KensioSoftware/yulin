@@ -5,14 +5,24 @@ import {
 } from "../../api/authorizer/sim-http-api-authorization.js";
 import { SimHttpApiIamRouteAuthorizer } from "./sim-http-api-iam-route-authorizer.js";
 import { SimHttpApiJwtRouteAuthorizer } from "./sim-http-api-jwt-route-authorizer.js";
+import {
+  type SimHttpApiAuthorizerFunctions,
+  SimHttpApiRequestRouteAuthorizer,
+} from "./sim-http-api-request-route-authorizer.js";
 import type { SimHttpApiRouteAuthorizeInput } from "./sim-http-api-route-authorize-input.js";
 
 interface SimHttpApiRouteAuthorizerProperties {
   /**
    * Clock a JWT route's time claims are checked against, so advancing
-   * simulated time expires a token that was accepted before it.
+   * simulated time expires a token that was accepted before it, and the one a
+   * Lambda authorizer's own invocation event is stamped with.
    */
   readonly clock: SimClock;
+  /**
+   * Where a Lambda authorizer's function is found, which is the same router
+   * that finds an integration's.
+   */
+  readonly functions: SimHttpApiAuthorizerFunctions;
 }
 
 /**
@@ -28,18 +38,25 @@ interface SimHttpApiRouteAuthorizerProperties {
  */
 export class SimHttpApiRouteAuthorizer {
   private readonly jwtAuthorizer: SimHttpApiJwtRouteAuthorizer;
+  private readonly requestAuthorizer: SimHttpApiRequestRouteAuthorizer;
   private readonly iamAuthorizer = new SimHttpApiIamRouteAuthorizer();
 
   constructor(properties: SimHttpApiRouteAuthorizerProperties) {
     this.jwtAuthorizer = new SimHttpApiJwtRouteAuthorizer({
       clock: properties.clock,
     });
+    this.requestAuthorizer = new SimHttpApiRequestRouteAuthorizer({
+      clock: properties.clock,
+      functions: properties.functions,
+    });
   }
 
   /**
    * Authorize one request against the route that matched it.
    */
-  authorize(input: SimHttpApiRouteAuthorizeInput): SimHttpApiAuthorization {
+  async authorize(
+    input: SimHttpApiRouteAuthorizeInput,
+  ): Promise<SimHttpApiAuthorization> {
     switch (input.match.route.authorizationType) {
       case "NONE": {
         // Nobody was authorized, so there is no caller to describe, which is
@@ -51,6 +68,9 @@ export class SimHttpApiRouteAuthorizer {
       }
       case "AWS_IAM": {
         return this.iamAuthorizer.authorize(input);
+      }
+      case "CUSTOM": {
+        return await this.requestAuthorizer.authorize(input);
       }
     }
   }
