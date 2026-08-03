@@ -1,5 +1,6 @@
 import { SimDynamoDbValidationException } from "../../error/dynamodb.error.js";
 import type { SimDynamoDbTable } from "../../table/sim-dynamodb-table.js";
+import type { SimDynamoDbTableWrite } from "../../table/sim-dynamodb-table-writes.js";
 import {
   readSimDynamoDbTransactConditionCheck,
   readSimDynamoDbTransactDelete,
@@ -53,9 +54,12 @@ export interface SimDynamoDbTransactWrite {
   assertApplicableTo(table: SimDynamoDbTable): void;
 
   /**
-   * Apply this action to the table.
+   * Work out the write this action makes, without making it.
+   *
+   * Anything the table would refuse the write for is refused here, so the
+   * transaction can prepare every action before committing any of them.
    */
-  applyTo(table: SimDynamoDbTable): void;
+  prepareFor(table: SimDynamoDbTable): SimDynamoDbTableWrite;
 }
 
 /**

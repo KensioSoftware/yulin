@@ -2244,13 +2244,15 @@ the `ConditionalCheckFailedException` a single `PutItem` throws.
 An action that sets `ReturnValuesOnConditionCheckFailure` to `ALL_OLD` gets `Item` on its
 cancellation reason, holding the item as it was, so a retry needs no second read.
 
-Five things refuse the request outright rather than cancelling it, with nothing written either way:
+These refuse the request outright rather than cancelling it, with nothing written either way:
 
 - more than 100 actions
 - an action carrying more than one of `Put`, `Update`, `Delete` and `ConditionCheck`, or none of them
 - two actions on the same item of one table
 - a table that is not there, or a key that does not match its key schema
 - an update that would move the item's primary key
+- an item carrying a secondary index key attribute as a type the index did not declare
+- an update that would take the item past the 400 KB one item holds
 
 One table may be named as often as the transaction likes, which is the difference from a batch. What
 it may not do is touch one item twice.
