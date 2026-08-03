@@ -392,6 +392,58 @@ const configurations = read.LambdaFunctionConfigurations ?? [];
 The two commands are authorized as `s3:PutBucketNotification` and `s3:GetBucketNotification`. Those
 are the real IAM action names, and they do not match the API names.
 
+### From a CDK app
+
+`bucket.addEventNotification(...)` deploys through simulated CloudFormation. CDK does not write the
+`AWS::S3::Bucket` `NotificationConfiguration` property for it. It writes a
+`Custom::S3BucketNotifications` resource carrying the same request
+`PutBucketNotificationConfigurationCommand` takes, alongside the `AWS::Lambda::Permission` that lets
+S3 invoke the function. Yulin applies that request through the same command path an SDK caller
+reaches, so a configuration is validated the same way whichever it arrives by.
+
+Deploy into an Account and Region matching the ones the CDK app synthesized for. The `SourceAccount`
+on the permission CDK writes beside the notification is a synth-time literal, so a stack deployed
+into another Account leaves S3 unable to validate the destination, and the stack fails.
+
+```typescript sim-s3-cdk-event-notification
+/**
+ * Deploying a CDK Bucket event notification into simulated AWS.
+ */
+
+import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+// The Account and Region the CDK app synthesized for.
+const scope = simAws.account("111111111111").region("eu-west-2");
+
+await scope
+  .cloudFormation()
+  .deployTemplateFile("cdk.out/TestStack.template.json");
+
+await scope.s3().putObject(
+  new PutObjectCommand({
+    Bucket: "uploads",
+    Key: "raw/cat.jpg",
+    Body: "cat picture",
+  }),
+);
+
+// Delivery happens in the background, so wait for the simulation to settle.
+await simAws.backgroundTasksComplete();
+```
+
+CDK's own provider function for this resource is written in Python, so simulated CloudFormation skips
+it on its runtime and Yulin does the work the function would have done. The `ServiceToken` naming it
+is read and ignored.
+
+A resource carrying `Managed: false` is refused, and the stack fails. CDK writes it for a Bucket the
+app imported rather than declared. It asks S3 to merge the configuration with the configurations
+already on the Bucket instead of replacing them, and simulated S3 only replaces, so applying it as
+written would drop configurations that survive on real AWS. Declare the Bucket in the same stack to
+get a managed notification configuration.
+
 ### What arrives at the handler
 
 The handler is invoked with the `Records` document real S3 sends. One event produces one record.
@@ -446,9 +498,14 @@ writes do not match it. Without that, the simulation stops after a thousand deli
 - A notification cannot be configured on a standalone `SimS3`. It has no other simulated services to
   notify, and no shared background scheduler for `backgroundTasksComplete()` to drain. Reach
   simulated S3 through `SimAws` instead.
-- CloudFormation and CDK cannot configure notifications. A CDK `BucketDeployment` and
-  `mountBucketFilesystem(...)` both replace the whole storage backend rather than putting Objects, so
-  neither raises anything, where real CDK `BucketDeployment` fires one `ObjectCreated:Put` per file.
+- A CloudFormation template cannot configure notifications through the `AWS::S3::Bucket`
+  `NotificationConfiguration` property. That property is ignored. CDK never writes it, and reaches
+  notifications through the `Custom::S3BucketNotifications` resource described above.
+- `Managed: false` on a `Custom::S3BucketNotifications` resource is refused rather than approximated,
+  and a queue, topic or EventBridge destination in one is refused by name as it is for an SDK caller.
+- A CDK `BucketDeployment` and `mountBucketFilesystem(...)` both replace the whole storage backend
+  rather than putting Objects, so neither raises anything, where real CDK `BucketDeployment` fires one
+  `ObjectCreated:Put` per file.
 - A function ARN naming a version or an alias is refused, since simulated Lambda has neither.
 - `s3:TestEvent` is not sent. It is an SQS and SNS mechanism.
 

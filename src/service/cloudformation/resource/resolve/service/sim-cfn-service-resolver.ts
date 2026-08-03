@@ -4,7 +4,7 @@ import type {
   SimCloudFormationParsedResourceType,
   SimCfnServiceResourceFactory,
 } from "../../factory/sim-cfn-resource-factory.type.js";
-import { SimCdkBucketDeploymentResourceFactory } from "../../../cdk/s3/bucket-deployment/sim-cdk-bucket-deployment.js";
+import { simCdkCustomResourceFactories } from "./sim-cfn-custom-resource-factories.js";
 import { simCfnServiceResourceFactories } from "./sim-cfn-service-factories.js";
 
 /**
@@ -15,18 +15,8 @@ export function resolveSimCloudFormationServiceResourceFactory(
   accountRegionScope: SimAwsAccountRegionScope,
   resourceType: SimCloudFormationParsedResourceType,
 ): SimCfnServiceResourceFactory {
-  if (
-    resourceType.providerName === "Custom" &&
-    resourceType.serviceName === "Custom" &&
-    resourceType.resourceTypeName === "CDKBucketDeployment"
-  ) {
-    return new SimCdkBucketDeploymentResourceFactory();
-  }
-
   if (resourceType.providerName === "Custom") {
-    throw new Error(
-      `Unsupported sim CloudFormation Custom Resource ${resourceType.resourceTypeName}`,
-    );
+    return resolveSimCdkCustomResourceFactory(resourceType);
   }
 
   if (resourceType.providerName !== "AWS") {
@@ -50,5 +40,30 @@ export function resolveSimCloudFormationServiceResourceFactory(
       accountRegionScope.accountId,
       accountRegionScope.regionName,
     ),
+  );
+}
+
+/**
+ * Resolve the factory for a CDK custom Resource type.
+ *
+ * A custom Resource type is two parts, `Custom::<name>`, which the parser reads
+ * as a service name of `Custom`. Anything carrying a service name of its own is
+ * a type this simulator has not been told about, whatever it ends with.
+ */
+function resolveSimCdkCustomResourceFactory(
+  resourceType: SimCloudFormationParsedResourceType,
+): SimCfnServiceResourceFactory {
+  if (resourceType.serviceName === "Custom") {
+    const customResourceFactory = simCdkCustomResourceFactories.get(
+      resourceType.resourceTypeName,
+    );
+
+    if (customResourceFactory !== undefined) {
+      return customResourceFactory();
+    }
+  }
+
+  throw new Error(
+    `Unsupported sim CloudFormation Custom Resource ${resourceType.resourceTypeName}`,
   );
 }
