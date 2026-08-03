@@ -38,6 +38,7 @@ export class SimHttpApiRequestAuthorizerInput implements SimHttpApiAuthorizerInp
       "and a REQUEST authorizer verifies no token: its function decides",
     );
     this.refuseResultCache();
+    this.requirePayloadFormatVersion();
 
     return new SimHttpApiRequestAuthorizer({
       authorizerId,
@@ -62,8 +63,6 @@ export class SimHttpApiRequestAuthorizerInput implements SimHttpApiAuthorizerInp
         "CreateAuthorizer with AuthorizerType REQUEST requires AuthorizerUri",
       );
     }
-
-    this.requirePayloadFormatVersion();
 
     return SimHttpApiLambdaUri.parseAuthorizerUri(uri);
   }

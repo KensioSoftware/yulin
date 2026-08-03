@@ -1584,10 +1584,10 @@ the simulation without being given one. See the
 - Routes protected with `AuthorizationType: "AWS_IAM"`, evaluating `execute-api:Invoke` against the
   `execute-api` ARN of the route being called, for a caller resolved from a SigV4 signature or an
   `x-sim-aws-caller` header, and reaching the handler as `event.requestContext.authorizer.iam`
-- `CreateAuthorizer` for a Lambda `REQUEST` authorizer, and routes protected by one with
-  `AuthorizationType: "CUSTOM"`, invoking the authorizer's function with the payload format 2.0
-  authorizer event, reading a simple response or an IAM policy response, and passing the returned
-  context to the handler as `event.requestContext.authorizer.lambda`
+- `CreateAuthorizer`, `GetAuthorizers` and `DeleteAuthorizer` for a Lambda `REQUEST` authorizer, and
+  routes protected by one with `AuthorizationType: "CUSTOM"`, invoking the authorizer's function with
+  the payload format 2.0 authorizer event, reading a simple response or an IAM policy response, and
+  passing the returned context to the handler as `event.requestContext.authorizer.lambda`
 - `CreateStage` and `GetStages` for the `$default` stage and for named stages served under their own
   path segment, including stage variables
 - Serving the generated endpoint through `serveSimAws`, invoking the integrated function with a

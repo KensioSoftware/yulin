@@ -97,8 +97,9 @@ holds a function and no configuration, and neither reads the other's half. A rou
 and `CreateRoute` refuses a route whose authorization type and authorizer disagree, since such a
 route is refused by AWS and could only be served here by guessing which half applied.
 
-`SimHttpApiIdentitySources` is a list because a `REQUEST` authorizer takes one, while a JWT
-authorizer takes a single source and `SimHttpApiJwtAuthorizerInput` is where that rule lives.
+`SimHttpApiIdentitySources` is a list because a `REQUEST` authorizer takes several, while a JWT
+authorizer takes exactly one and `SimHttpApiJwtAuthorizerInput` is where that single-source rule
+lives.
 
 The token parsing and RS256 verification itself is `src/util/jwt/`, which knows nothing about API
 Gateway. It is real verification against the issuer's published JWK, with `node:crypto`: nothing is

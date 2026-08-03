@@ -90,6 +90,30 @@ describe("When a sim HTTP API Lambda authorizer cannot answer", () => {
     assertIdentical(response.status, 500);
   });
 
+  it("answers 500 for a policy response from a simple-response authorizer", async () => {
+    // Given an authorizer configured for simple responses whose function
+    // answers a well-formed policy instead
+    const simAws = new SimAws();
+    const { api } = await protectedApi(simAws, {
+      handler: (): unknown => ({
+        principalId: "user-1",
+        policyDocument: {
+          Version: "2012-10-17",
+          Statement: [
+            { Effect: "Allow", Action: "execute-api:Invoke", Resource: "*" },
+          ],
+        },
+      }),
+    });
+
+    // When the route is called
+    const response = await get(simAws, api);
+
+    // Then the configured shape is the only one read: an authorizer answering
+    // the other one is a 500 rather than quietly allowing the request
+    assertIdentical(response.status, 500);
+  });
+
   it("answers 500 for a policy response missing its policy", async () => {
     // Given an authorizer answering policies that returns only a principal
     const simAws = new SimAws();

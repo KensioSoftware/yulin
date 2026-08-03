@@ -1,4 +1,8 @@
-import { assertIdentical, assertObjectMatches } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertNonNullable,
+  assertObjectMatches,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
@@ -256,8 +260,9 @@ describe("Authorizing a sim HTTP API route with a Lambda REQUEST authorizer", ()
     const simAws = new SimAws();
     const api = await protectedApi(simAws, {});
     const [authorizer] = api.authorizers.list();
+    assertNonNullable(authorizer);
     await simAws.apiGatewayV2().deleteAuthorizer({
-      input: { ApiId: api.apiId, AuthorizerId: authorizer?.authorizerId },
+      input: { ApiId: api.apiId, AuthorizerId: authorizer.authorizerId },
     });
 
     // When a cookie that worked before is presented
