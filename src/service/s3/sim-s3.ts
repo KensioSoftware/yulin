@@ -1,31 +1,5 @@
 import type { SimS3Bucket, SimS3BucketName } from "./bucket/sim-s3-bucket.js";
-import { SimS3CommandHandlers } from "./command/sim-s3-command-handlers.js";
-import type {
-  SimCreateBucketCommand,
-  SimCreateBucketCommandOutput,
-  SimDeleteBucketPolicyCommand,
-  SimDeleteBucketPolicyCommandOutput,
-  SimDeletePublicAccessBlockCommand,
-  SimDeletePublicAccessBlockCommandOutput,
-  SimGetBucketPolicyCommand,
-  SimGetBucketPolicyCommandOutput,
-  SimGetObjectCommand,
-  SimGetObjectCommandOutput,
-  SimGetPublicAccessBlockCommand,
-  SimGetPublicAccessBlockCommandOutput,
-  SimListBucketsCommand,
-  SimListBucketsCommandOutput,
-  SimListObjectsCommand,
-  SimListObjectsCommandOutput,
-  SimPutBucketPolicyCommand,
-  SimPutBucketPolicyCommandOutput,
-  SimPutBucketWebsiteCommand,
-  SimPutBucketWebsiteCommandOutput,
-  SimPutObjectCommand,
-  SimPutObjectCommandOutput,
-  SimPutPublicAccessBlockCommand,
-  SimPutPublicAccessBlockCommandOutput,
-} from "./command/sim-s3-command.types.js";
+import type * as simS3Commands from "./command/sim-s3-command.types.js";
 import { SimS3GlobalRegistry } from "./sim-s3-global-registry.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { assertDefined } from "../../util/type-guard/defined.js";
@@ -34,31 +8,13 @@ import {
   simS3BucketUrl,
   simS3ServiceUrl,
 } from "./bucket/sim-s3-endpoint-url.js";
-import {
-  type BackgroundScheduler,
-  BackgroundTasks,
-} from "../../util/background/background.js";
 import { SimS3CloudFormationResourceFactory } from "./cfn/sim-cfn-s3-resource-factory.js";
 import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
-import type { SimAwsCaller } from "../aws/caller/sim-aws-caller.js";
-import {
-  SimIamAllowAllAuth,
-  type SimIamInterServiceAuthZ,
-} from "../iam/authorize/sim-iam-inter-service-auth-z.js";
+import { SimS3Commands, type SimS3Properties } from "./sim-s3-commands.js";
 import { SimS3SdkCommandRouter } from "./sdk/sim-s3-sdk-command-router.js";
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
-
-export interface SimS3RequestOptions {
-  readonly caller?: SimAwsCaller;
-}
-
-interface SimS3Properties {
-  readonly accountRegionScope?: SimAwsAccountRegionScope;
-  readonly s3GlobalRegistry?: SimS3GlobalRegistry;
-  readonly iam?: SimIamInterServiceAuthZ;
-  readonly background?: BackgroundScheduler;
-}
+import type { SimS3RequestOptions } from "./command/sim-s3-request-options.js";
 
 /**
  * Simulated S3. Handles SDK commands. Emulates AWS behaviour and state.
@@ -70,7 +26,7 @@ export class SimS3 {
 
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly s3GlobalRegistry: SimS3GlobalRegistry;
-  private readonly commands: SimS3CommandHandlers;
+  private readonly commands: SimS3Commands;
   private readonly cfnFactory = new SimS3CloudFormationResourceFactory(this);
   private readonly sdkRouter = new SimS3SdkCommandRouter(this);
 
@@ -78,18 +34,15 @@ export class SimS3 {
     const {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       s3GlobalRegistry = new SimS3GlobalRegistry(),
-      iam = new SimIamAllowAllAuth(),
-      background = new BackgroundTasks(),
     } = properties;
 
     this.accountRegionScope = accountRegionScope;
     this.s3GlobalRegistry = s3GlobalRegistry;
-    this.commands = new SimS3CommandHandlers({
+    this.commands = new SimS3Commands({
+      ...properties,
       accountRegionScope,
-      buckets: this.buckets,
       s3GlobalRegistry,
-      iam,
-      background,
+      buckets: this.buckets,
     });
   }
 
@@ -97,120 +50,120 @@ export class SimS3 {
    * Handle a Create Bucket Command from the SDK.
    */
   async createBucket(
-    command: SimCreateBucketCommand,
+    command: simS3Commands.SimCreateBucketCommand,
     options?: SimS3RequestOptions,
-  ): Promise<SimCreateBucketCommandOutput> {
-    return await this.commands.createBucket(command, options);
+  ): Promise<simS3Commands.SimCreateBucketCommandOutput> {
+    return await this.commands.buckets.create(command, options);
   }
 
   /**
    * Handle a Put Bucket Policy Command from the SDK.
    */
   async putBucketPolicy(
-    command: SimPutBucketPolicyCommand,
+    command: simS3Commands.SimPutBucketPolicyCommand,
     options?: SimS3RequestOptions,
-  ): Promise<SimPutBucketPolicyCommandOutput> {
-    return await this.commands.putBucketPolicy(command, options);
+  ): Promise<simS3Commands.SimPutBucketPolicyCommandOutput> {
+    return await this.commands.bucketPolicies.put(command, options);
   }
 
   /**
    * Handle a Get Bucket Policy Command from the SDK.
    */
   async getBucketPolicy(
-    command: SimGetBucketPolicyCommand,
+    command: simS3Commands.SimGetBucketPolicyCommand,
     options?: SimS3RequestOptions,
-  ): Promise<SimGetBucketPolicyCommandOutput> {
-    return await this.commands.getBucketPolicy(command, options);
+  ): Promise<simS3Commands.SimGetBucketPolicyCommandOutput> {
+    return await this.commands.bucketPolicies.get(command, options);
   }
 
   /**
    * Handle a Delete Bucket Policy Command from the SDK.
    */
   async deleteBucketPolicy(
-    command: SimDeleteBucketPolicyCommand,
+    command: simS3Commands.SimDeleteBucketPolicyCommand,
     options?: SimS3RequestOptions,
-  ): Promise<SimDeleteBucketPolicyCommandOutput> {
-    return await this.commands.deleteBucketPolicy(command, options);
+  ): Promise<simS3Commands.SimDeleteBucketPolicyCommandOutput> {
+    return await this.commands.bucketPolicies.delete(command, options);
   }
 
   /**
    * Handle a Put Public Access Block Command from the SDK.
    */
   async putPublicAccessBlock(
-    command: SimPutPublicAccessBlockCommand,
+    command: simS3Commands.SimPutPublicAccessBlockCommand,
     options?: SimS3RequestOptions,
-  ): Promise<SimPutPublicAccessBlockCommandOutput> {
-    return await this.commands.putPublicAccessBlock(command, options);
+  ): Promise<simS3Commands.SimPutPublicAccessBlockCommandOutput> {
+    return await this.commands.publicAccessBlocks.put(command, options);
   }
 
   /**
    * Handle a Get Public Access Block Command from the SDK.
    */
   async getPublicAccessBlock(
-    command: SimGetPublicAccessBlockCommand,
+    command: simS3Commands.SimGetPublicAccessBlockCommand,
     options?: SimS3RequestOptions,
-  ): Promise<SimGetPublicAccessBlockCommandOutput> {
-    return await this.commands.getPublicAccessBlock(command, options);
+  ): Promise<simS3Commands.SimGetPublicAccessBlockCommandOutput> {
+    return await this.commands.publicAccessBlocks.get(command, options);
   }
 
   /**
    * Handle a Delete Public Access Block Command from the SDK.
    */
   async deletePublicAccessBlock(
-    command: SimDeletePublicAccessBlockCommand,
+    command: simS3Commands.SimDeletePublicAccessBlockCommand,
     options?: SimS3RequestOptions,
-  ): Promise<SimDeletePublicAccessBlockCommandOutput> {
-    return await this.commands.deletePublicAccessBlock(command, options);
+  ): Promise<simS3Commands.SimDeletePublicAccessBlockCommandOutput> {
+    return await this.commands.publicAccessBlocks.delete(command, options);
   }
 
   /**
    * Handle a Put Bucket Website Command from the SDK.
    */
   async putBucketWebsite(
-    command: SimPutBucketWebsiteCommand,
+    command: simS3Commands.SimPutBucketWebsiteCommand,
     options?: SimS3RequestOptions,
-  ): Promise<SimPutBucketWebsiteCommandOutput> {
-    return await this.commands.putBucketWebsite(command, options);
+  ): Promise<simS3Commands.SimPutBucketWebsiteCommandOutput> {
+    return await this.commands.buckets.putWebsite(command, options);
   }
 
   /**
    * Handle a List Buckets Command from the SDK.
    */
   async listBuckets(
-    command: SimListBucketsCommand,
+    command: simS3Commands.SimListBucketsCommand,
     options?: SimS3RequestOptions,
-  ): Promise<SimListBucketsCommandOutput> {
-    return await this.commands.listBuckets(command, options);
+  ): Promise<simS3Commands.SimListBucketsCommandOutput> {
+    return await this.commands.buckets.list(command, options);
   }
 
   /**
    * Handle a Put Object Command from the SDK.
    */
   async putObject(
-    command: SimPutObjectCommand,
+    command: simS3Commands.SimPutObjectCommand,
     options?: SimS3RequestOptions,
-  ): Promise<SimPutObjectCommandOutput> {
-    return await this.commands.putObject(command, options);
+  ): Promise<simS3Commands.SimPutObjectCommandOutput> {
+    return await this.commands.objects.put(command, options);
   }
 
   /**
    * Handle a Get Object Command from the SDK.
    */
   async getObject(
-    command: SimGetObjectCommand,
+    command: simS3Commands.SimGetObjectCommand,
     options?: SimS3RequestOptions,
-  ): Promise<SimGetObjectCommandOutput> {
-    return await this.commands.getObject(command, options);
+  ): Promise<simS3Commands.SimGetObjectCommandOutput> {
+    return await this.commands.objects.get(command, options);
   }
 
   /**
    * Handle a List Objects Command from the SDK.
    */
   async listObjects(
-    command: SimListObjectsCommand,
+    command: simS3Commands.SimListObjectsCommand,
     options?: SimS3RequestOptions,
-  ): Promise<SimListObjectsCommandOutput> {
-    return await this.commands.listObjects(command, options);
+  ): Promise<simS3Commands.SimListObjectsCommandOutput> {
+    return await this.commands.objects.list(command, options);
   }
 
   /**
@@ -293,3 +246,5 @@ export class SimS3 {
     return this.sdkRouter;
   }
 }
+
+export { type SimS3RequestOptions } from "./command/sim-s3-request-options.js";

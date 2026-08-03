@@ -60,8 +60,8 @@ Each supported command has its own directory containing:
 - tests for expected simulator behaviour
 
 The main `SimS3` class delegates command execution to handlers rather than keeping command logic
-inline. For example, `SimS3.putObject()` creates a `PutObjectCommandHandler` with the Bucket map and
-background scheduler, then calls `handle()`.
+inline. For example, `SimS3.putObject()` calls `commands.objects.put()`, which creates a
+`PutObjectCommandHandler` with the Bucket map and background scheduler, then calls `handle()`.
 
 Supported command areas currently include:
 
@@ -78,9 +78,17 @@ Supported command areas currently include:
 - `get-object/`
 - `list-objects/`
 
-`SimS3CommandHandlers` in `command/` owns the wiring: every handler is built from the same Bucket
-map, IAM and background scheduler, so that construction lives in one place rather than being
-repeated once per command on the service facade. `requireSimS3Bucket` is the shared Bucket lookup
+`SimS3Commands` owns the wiring: every handler is built from the same Bucket map, IAM and background
+scheduler, so that construction lives in one place rather than being repeated once per command on
+the service facade. It groups the commands into areas, each a small class under `command/`:
+
+- `SimS3BucketCommands` in `command/bucket/`
+- `SimS3BucketPolicyCommands` in `command/bucket-policy/`
+- `SimS3PublicAccessBlockCommands` in `command/public-access-block/`
+- `SimS3ObjectCommands` in `command/object/`
+
+An area holds the shared `SimS3BucketCommandState` and hands it to the handler it runs, so adding a
+command means adding one method to the area it belongs to. `requireSimS3Bucket` is the shared Bucket lookup
 that raises `SimS3NoSuchBucket`, which is what real S3 answers before considering anything else
 about a Bucket-scoped request.
 
