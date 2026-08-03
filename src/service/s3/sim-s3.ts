@@ -157,6 +157,26 @@ export class SimS3 {
   }
 
   /**
+   * Handle a Delete Object Command from the SDK.
+   */
+  async deleteObject(
+    command: simS3Commands.SimDeleteObjectCommand,
+    options?: SimS3RequestOptions,
+  ): Promise<simS3Commands.SimDeleteObjectCommandOutput> {
+    return await this.commands.objects.delete(command, options);
+  }
+
+  /**
+   * Handle a Delete Objects Command from the SDK.
+   */
+  async deleteObjects(
+    command: simS3Commands.SimDeleteObjectsCommand,
+    options?: SimS3RequestOptions,
+  ): Promise<simS3Commands.SimDeleteObjectsCommandOutput> {
+    return await this.commands.objects.deleteMany(command, options);
+  }
+
+  /**
    * Handle a List Objects Command from the SDK.
    */
   async listObjects(

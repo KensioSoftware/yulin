@@ -75,6 +75,16 @@ export class SimS3Bucket {
   }
 
   /**
+   * Remove a simulated S3 Object from storage.
+   *
+   * Real S3 DeleteObject is idempotent, so this reports nothing about whether
+   * there was an Object to remove.
+   */
+  async deleteObject(key: string): Promise<void> {
+    await this.storage.deleteObject(key);
+  }
+
+  /**
    * Change the storage implementation for this simulated S3 Bucket.
    */
   configureSimStorage(storage: SimS3BucketStorage): void {

@@ -195,6 +195,89 @@ for (const object of objectContentItems) {
 
 Object listings are sorted by key.
 
+## Deleting Objects
+
+Use `DeleteObjectCommand` to remove one Object, and `DeleteObjectsCommand` to remove several in one
+request. Both are authorized against `s3:DeleteObject` on the Object ARN, so a caller allowed to read
+a Bucket cannot empty it.
+
+```typescript sim-s3-delete-object
+/**
+ * Deleting Objects from a simulated S3 Bucket.
+ */
+
+import {
+  CreateBucketCommand,
+  DeleteObjectCommand,
+  DeleteObjectsCommand,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const simS3 = simAws.s3();
+
+await simS3.createBucket(
+  new CreateBucketCommand({
+    Bucket: "uploads-bucket",
+  }),
+);
+
+for (const key of ["receipt.pdf", "invoice.pdf", "notes.txt"]) {
+  await simS3.putObject(
+    new PutObjectCommand({
+      Bucket: "uploads-bucket",
+      Key: key,
+      Body: "file contents",
+    }),
+  );
+}
+
+await simS3.deleteObject(
+  new DeleteObjectCommand({
+    Bucket: "uploads-bucket",
+    Key: "receipt.pdf",
+  }),
+);
+
+const batchOutput = await simS3.deleteObjects(
+  new DeleteObjectsCommand({
+    Bucket: "uploads-bucket",
+    Delete: {
+      Objects: [{ Key: "invoice.pdf" }, { Key: "notes.txt" }],
+    },
+  }),
+);
+
+const removedObjects = batchOutput.Deleted ?? [];
+for (const removed of removedObjects) {
+  console.log(removed.Key);
+}
+
+const refusedObjects = batchOutput.Errors ?? [];
+for (const refused of refusedObjects) {
+  console.log(refused.Key, refused.Code);
+}
+```
+
+Deletion is idempotent, as it is in real S3. Deleting a key that is not in the Bucket succeeds, and
+`DeleteObjects` reports it among the keys it deleted. Deleting from a Bucket that does not exist
+raises `NoSuchBucket`.
+
+`DeleteObjects` authorizes each key on its own and carries on through the batch. A key the caller may
+not delete appears in `Errors` with the code `AccessDenied`, while the rest are still removed and
+reported in `Deleted`. Setting `Quiet: true` leaves `Deleted` out of the response, so only the
+failures come back.
+
+### Limitations
+
+- Object versioning is not simulated, so deletion removes the Object rather than writing a delete
+  marker, and neither `VersionId` nor `MFA` is read from the request.
+- A request naming no Objects, or more than the thousand S3 accepts, is refused with `MalformedXML`
+  before anything is deleted.
+- A Bucket using filesystem-backed storage refuses deletion. See
+  [Filesystem-backed Bucket storage](#filesystem-backed-bucket-storage).
+
 ## Bucket policies
 
 A Bucket policy is a resource policy stored on the Bucket. Sim IAM evaluates it alongside the
@@ -686,8 +769,9 @@ const s3Client = new S3Client({
 
 ### Limitations
 
-- `GET`, `HEAD` and `PUT` of an Object are served over the REST endpoint. Bucket operations, `DELETE`
-  and multipart uploads are not, and are refused with `501` rather than answered.
+- `GET`, `HEAD`, `PUT` and `DELETE` of an Object are served over the REST endpoint. Bucket operations
+  and multipart uploads are not, and are refused with `501` rather than answered. `DeleteObjects` is
+  a `POST` to the Bucket, so it is available through the SDK but not over HTTP.
 - `createPresignedPost` and SigV4A presigning are not simulated.
 - Checksums are verified for CRC32, SHA1 and SHA256. An upload stating a CRC32C or CRC64NVME checksum
   is refused rather than stored unchecked.
@@ -881,6 +965,13 @@ Filesystem storage is somewhat restrictive to make it slightly safer:
 - Object keys must not be absolute paths or contain `..`
 - Unsupported file extensions are rejected or ignored
 - Symlinks are ignored when listing Objects
+- Deletion is refused rather than unlinking a real file
+
+`DeleteObject` against a filesystem-backed Bucket raises `NotImplemented`, and `DeleteObjects`
+reports the same code for every key. This is stricter than real S3, deliberately: the directory a
+Bucket is mounted on is an ordinary directory of yours, and removing files from it because a test
+called `DeleteObject` is not a reasonable default. Leave a Bucket on the default in-memory storage
+when a test needs deletion to work.
 
 When reading files from filesystem-backed storage, Yulin infers common `content-type` metadata from
 file extensions such as `.html`, `.css`, `.js`, `.json`, `.png`, `.svg`, `.txt`, `.xml`, and common
@@ -924,6 +1015,7 @@ Sim S3 currently supports:
 
 - `CreateBucketCommand` and `ListBucketsCommand`
 - `PutObjectCommand`, `GetObjectCommand` and `ListObjectsCommand`
+- `DeleteObjectCommand` and `DeleteObjectsCommand`, authorized per Object by sim IAM
 - `PutBucketWebsiteCommand`, for static website hosting
 - `PutBucketPolicyCommand`, `GetBucketPolicyCommand` and `DeleteBucketPolicyCommand`, evaluated by
   sim IAM alongside identity policies
@@ -931,7 +1023,7 @@ Sim S3 currently supports:
 - Block Public Access, on by default as in real S3, refusing a public Bucket policy unless the Bucket
   opts out with `PutPublicAccessBlockCommand` or `PublicAccessBlockConfiguration`
 - Serving static website requests on localhost with `serveSimAws`
-- Serving Object `GET`, `HEAD` and `PUT` over the S3 REST endpoint, authorized by sim IAM
+- Serving Object `GET`, `HEAD`, `PUT` and `DELETE` over the S3 REST endpoint, authorized by sim IAM
 - Presigned URLs built by the real `@aws-sdk/s3-request-presigner`, with expiry in simulated time
 - Bucket website index documents, error documents, trailing-slash redirects, redirect-all
   configuration, and routing-rule redirects

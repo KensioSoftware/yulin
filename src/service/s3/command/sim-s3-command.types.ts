@@ -14,6 +14,14 @@ export type {
   SimDeleteBucketPolicyCommandOutput,
 } from "./delete-bucket-policy/delete-bucket-policy.command.js";
 export type {
+  SimDeleteObjectCommand,
+  SimDeleteObjectCommandOutput,
+} from "./delete-object/delete-object.command.js";
+export type {
+  SimDeleteObjectsCommand,
+  SimDeleteObjectsCommandOutput,
+} from "./delete-objects/delete-objects.command.js";
+export type {
   SimDeletePublicAccessBlockCommand,
   SimDeletePublicAccessBlockCommandOutput,
 } from "./delete-public-access-block/delete-public-access-block.command.js";

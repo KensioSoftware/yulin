@@ -1,4 +1,5 @@
 import {
+  DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
   PutObjectCommand,
@@ -92,16 +93,72 @@ describe("The simulated S3 REST endpoint", () => {
     assertIdentical(await response.text(), "");
   });
 
+  it("deletes an Object over a presigned DELETE", async () => {
+    // Given a user allowed to delete Objects, and a URL they presigned
+    const { client, http } = await presignSimulation({
+      allowedActions: ["s3:GetObject", "s3:DeleteObject"],
+    });
+    const url = await getSignedUrl(
+      client,
+      new DeleteObjectCommand({
+        Bucket: presignBucketName,
+        Key: presignObjectKey,
+      }),
+      { expiresIn: 900 },
+    );
+
+    // When the URL is used
+    const response = await http.fetch(url, { method: "DELETE" });
+
+    // Then S3 answers with no content, and the Object has gone
+    assertIdentical(response.status, 204);
+    assertIdentical(await response.text(), "");
+
+    const readBack = await http.fetch(
+      await getSignedUrl(
+        client,
+        new GetObjectCommand({
+          Bucket: presignBucketName,
+          Key: presignObjectKey,
+        }),
+        { expiresIn: 900 },
+      ),
+    );
+    assertIdentical(readBack.status, 404);
+  });
+
+  it("refuses a DELETE its signer cannot perform", async () => {
+    // Given a user allowed to read Objects but not to delete them
+    const { client, http } = await presignSimulation({
+      allowedActions: ["s3:GetObject"],
+    });
+    const url = await getSignedUrl(
+      client,
+      new DeleteObjectCommand({
+        Bucket: presignBucketName,
+        Key: presignObjectKey,
+      }),
+      { expiresIn: 900 },
+    );
+
+    // When they presign a deletion and it is used
+    const response = await http.fetch(url, { method: "DELETE" });
+
+    // Then IAM refuses it, and the Object is still there
+    assertIdentical(response.status, 403);
+    expect(await response.text()).toMatch(/s3:DeleteObject/);
+  });
+
   it("refuses a method it does not simulate", async () => {
-    // Given a DELETE, which simulated S3 has no command for
+    // Given a POST, which simulated S3 has no REST command for
     const { http } = await presignSimulation();
 
     // When it reaches the REST endpoint
-    const response = await http.fetch(objectUrl, { method: "DELETE" });
+    const response = await http.fetch(objectUrl, { method: "POST" });
 
     // Then the gap is reported rather than answered with something plausible
     assertIdentical(response.status, 501);
-    expect(await response.text()).toMatch(/does not serve DELETE/);
+    expect(await response.text()).toMatch(/does not serve POST/);
   });
 
   it("refuses a request naming a Bucket and no Object", async () => {

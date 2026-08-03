@@ -12,6 +12,8 @@ import type {
 import type { SimListBucketsCommand } from "../command/list-buckets/list-buckets.command.js";
 import type { SimListObjectsCommand } from "../command/list-objects/list-objects.command.js";
 import type { SimDeleteBucketPolicyCommand } from "../command/delete-bucket-policy/delete-bucket-policy.command.js";
+import type { SimDeleteObjectCommand } from "../command/delete-object/delete-object.command.js";
+import type { SimDeleteObjectsCommand } from "../command/delete-objects/delete-objects.command.js";
 import type { SimGetBucketPolicyCommand } from "../command/get-bucket-policy/get-bucket-policy.command.js";
 import type { SimPutBucketPolicyCommand } from "../command/put-bucket-policy/put-bucket-policy.command.js";
 import type { SimPutBucketWebsiteCommand } from "../command/put-bucket-website/put-bucket-website.command.js";
@@ -42,6 +44,22 @@ export class SimS3SdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simS3.deleteBucketPolicy(
             command as SimDeleteBucketPolicyCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteObjectCommand",
+        async (command, context): Promise<unknown> =>
+          await simS3.deleteObject(
+            command as SimDeleteObjectCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteObjectsCommand",
+        async (command, context): Promise<unknown> =>
+          await simS3.deleteObjects(
+            command as SimDeleteObjectsCommand,
             simSdkCallerOptions(context),
           ),
       ],

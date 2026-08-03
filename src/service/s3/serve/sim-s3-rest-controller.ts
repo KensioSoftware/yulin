@@ -2,6 +2,7 @@ import type { SimAws } from "../../aws/sim-aws.js";
 import type { SimAwsServiceRequest } from "../../../serve/controller/sim-service-controller.js";
 import type { SimS3RestObjectRoute } from "./sim-s3-route.js";
 import { SimS3RestErrorResponse } from "./sim-s3-rest-error-response.js";
+import { SimS3RestObjectReader } from "./sim-s3-rest-object-reader.js";
 import { SimS3UploadChecksum } from "./sim-s3-upload-checksum.js";
 import type { SimS3 } from "../sim-s3.js";
 
@@ -20,6 +21,7 @@ interface SimS3RestControllerProperties {
  */
 export class SimS3RestController {
   private readonly simAws: SimAws;
+  private readonly reader = new SimS3RestObjectReader();
 
   constructor(properties: SimS3RestControllerProperties) {
     this.simAws = properties.simAws;
@@ -52,30 +54,29 @@ export class SimS3RestController {
       return await this.putObject(route, serviceRequest);
     }
 
-    return await this.getObject(route, serviceRequest);
+    if (serviceRequest.request.method === "DELETE") {
+      return await this.deleteObject(route, serviceRequest);
+    }
+
+    return await this.reader.read(this.s3For(route), route, serviceRequest);
   }
 
-  private async getObject(
+  /**
+   * Remove an Object.
+   *
+   * Real S3 answers a deletion with `204 No Content` whether or not the Object
+   * was there, so a client cannot tell the two apart.
+   */
+  private async deleteObject(
     route: SimS3RestObjectRoute,
     serviceRequest: SimAwsServiceRequest,
   ): Promise<Response> {
-    const output = await this.s3For(route).getObject(
+    await this.s3For(route).deleteObject(
       { input: { Bucket: route.bucket.bucketName, Key: route.objectKey } },
       { caller: serviceRequest.caller.toCaller() },
     );
 
-    const body = await bodyBytes(output.Body);
-    const contentType = output.Metadata?.["content-type"];
-    const headers = {
-      "content-length": String(body.length),
-      ...(contentType !== undefined && { "content-type": contentType }),
-    };
-
-    if (serviceRequest.request.method === "HEAD") {
-      return new Response(undefined, { status: 200, headers });
-    }
-
-    return new Response(body, { status: 200, headers });
+    return new Response(undefined, { status: 204 });
   }
 
   /**
@@ -120,24 +121,4 @@ export class SimS3RestController {
       )
       .s3();
   }
-}
-
-/**
- * Read a GetObject response body into the bytes an HTTP response carries.
- */
-async function bodyBytes(
-  body: { [Symbol.asyncIterator](): AsyncIterator<unknown> } | undefined,
-): Promise<Buffer> {
-  /* v8 ignore if -- the loader always answers with a body */
-  if (body === undefined) {
-    return Buffer.alloc(0);
-  }
-
-  const chunks: Buffer[] = [];
-
-  for await (const chunk of body) {
-    chunks.push(Buffer.from(chunk as Uint8Array));
-  }
-
-  return Buffer.concat(chunks);
 }
