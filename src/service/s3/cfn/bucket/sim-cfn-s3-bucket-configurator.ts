@@ -47,6 +47,7 @@ export class SimCfnS3BucketConfigurator {
 
   private async configureWebsite(): Promise<void> {
     const config = new SimCfnS3BucketWebsiteConfiguration(
+      this.resource.logicalId,
       this.properties,
     ).read();
 
@@ -61,6 +62,7 @@ export class SimCfnS3BucketConfigurator {
 
   private async configurePublicAccess(): Promise<void> {
     const config = new SimCfnS3BucketPublicAccessConfiguration(
+      this.resource.logicalId,
       this.properties,
     ).read();
 

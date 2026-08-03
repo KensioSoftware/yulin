@@ -1,5 +1,4 @@
 import {
-  assertFalse,
   assertIdentical,
   assertNonNullable,
   assertThrowsErrorAsync,
@@ -111,41 +110,5 @@ describe("SimS3CloudFormationResourceFactory", () => {
       error.message,
       "Unsupported sim S3 CloudFormation Resource UnsupportedResource",
     );
-  });
-
-  it("ignores WebsiteConfiguration when RoutingRules is not an array", async () => {
-    // Given a CloudFormation template declaring an S3 Bucket with invalid website
-    // routing rules.
-    const simAws = new SimAws();
-
-    // When the template is deployed through sim CloudFormation.
-    await simAws.cloudFormation().deployTemplate({
-      stackName: "invalid-routing-rules-website-stack",
-      template: {
-        Resources: {
-          WebsiteBucket: {
-            Type: "AWS::S3::Bucket",
-            Properties: {
-              BucketName: "invalid-routing-rules-website-config-bucket",
-              WebsiteConfiguration: {
-                RoutingRules: {
-                  Redirect: {
-                    ReplaceKeyWith: "not-found.html",
-                  },
-                },
-              },
-            },
-          },
-        },
-      },
-    });
-
-    // Then the invalid website configuration is ignored safely.
-    const bucket = simAws
-      .s3()
-      .getSimBucketByName("invalid-routing-rules-website-config-bucket");
-
-    assertNonNullable(bucket);
-    assertFalse(bucket.getWebsite().websiteEnabled());
   });
 });

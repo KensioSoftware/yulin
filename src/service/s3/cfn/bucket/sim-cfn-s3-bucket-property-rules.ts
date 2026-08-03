@@ -83,9 +83,32 @@ export class SimCfnS3BucketPropertyRules {
    * Refuse everything about this Resource that is not simulated.
    */
   assertSimulated(): void {
+    this.refuseUnusableBucketName();
+
     for (const name of Object.keys(this.properties)) {
       this.assertSimulatedProperty(name);
     }
+  }
+
+  /**
+   * Refuse a BucketName that is not a name.
+   *
+   * A Resource stating none is named after its logical id. One stating
+   * something that is not a string is a template error, and falling back to
+   * the logical id would deploy a Bucket under a name nothing else in the
+   * template refers to.
+   */
+  private refuseUnusableBucketName(): void {
+    const bucketName = this.properties["BucketName"];
+
+    if (bucketName === undefined || typeof bucketName === "string") {
+      return;
+    }
+
+    throw s3BucketResourceError(
+      this.logicalId,
+      "BucketName must be a Bucket name string",
+    );
   }
 
   private assertSimulatedProperty(name: string): void {

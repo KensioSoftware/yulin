@@ -622,7 +622,8 @@ generated name real CloudFormation invents.
 
 Any other property fails the stack by name. A Bucket deployed without the lifecycle rules,
 versioning or CORS configuration its template asked for would look configured and behave as though it
-were not, and the failure that causes turns up somewhere else entirely.
+were not, and the failure that causes turns up somewhere else entirely. One of the four that is there
+but is not the shape it should be fails the stack too, rather than being read as absent.
 
 `BucketEncryption` and `Tags` are the two exceptions. They are read and ignored, because nothing this
 simulator models can tell the difference: there is no simulated KMS, Object bytes are stored as they

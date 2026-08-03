@@ -66,6 +66,76 @@ describe("AWS::S3::Bucket property rules", () => {
     );
   });
 
+  it("refuses a BucketName that is not a name", async () => {
+    // Given a template whose BucketName is a number rather than a string.
+    const simAws = new SimAws();
+
+    // When the template is deployed.
+    const error = await deployFailing(simAws, { BucketName: 42 });
+
+    // Then the Stack fails, rather than deploying a Bucket named after the
+    // logical id that nothing else in the template refers to.
+    assertStringIncludes(
+      error.message,
+      "Invalid AWS::S3::Bucket Resource Bucket: BucketName must be a Bucket " +
+        "name string",
+    );
+  });
+
+  it("refuses a WebsiteConfiguration that is not the shape it should be", async () => {
+    // Given a template stating the website configuration as a string.
+    const simAws = new SimAws();
+
+    // When the template is deployed.
+    const error = await deployFailing(simAws, {
+      WebsiteConfiguration: "index.html",
+    });
+
+    // Then the Stack fails, rather than deploying a Bucket that serves no
+    // website.
+    assertStringIncludes(
+      error.message,
+      "Invalid AWS::S3::Bucket Resource Bucket: WebsiteConfiguration must be " +
+        "an object",
+    );
+  });
+
+  it("refuses RoutingRules that are not a list", async () => {
+    // Given a template stating one routing rule rather than a list of them.
+    const simAws = new SimAws();
+
+    // When the template is deployed.
+    const error = await deployFailing(simAws, {
+      WebsiteConfiguration: {
+        IndexDocument: "index.html",
+        RoutingRules: { RedirectRule: { HostName: "example.test" } },
+      },
+    });
+
+    // Then the Stack fails naming the level that was wrong.
+    assertStringIncludes(
+      error.message,
+      "WebsiteConfiguration RoutingRules must be a list",
+    );
+  });
+
+  it("refuses a PublicAccessBlockConfiguration that is not the shape it should be", async () => {
+    // Given a template stating the block settings as a boolean.
+    const simAws = new SimAws();
+
+    // When the template is deployed.
+    const error = await deployFailing(simAws, {
+      PublicAccessBlockConfiguration: false,
+    });
+
+    // Then the Stack fails, rather than leaving the Bucket fully blocked and
+    // refusing the public policy the template goes on to attach.
+    assertStringIncludes(
+      error.message,
+      "PublicAccessBlockConfiguration must be an object",
+    );
+  });
+
   it("refuses the property before creating the Bucket", async () => {
     // Given a template asking for object locking alongside a valid Bucket name.
     const simAws = new SimAws();
