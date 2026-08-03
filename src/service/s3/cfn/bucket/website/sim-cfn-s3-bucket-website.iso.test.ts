@@ -207,4 +207,37 @@ describe("S3 CloudFormation Bucket WebsiteConfiguration", () => {
       "docs/index.html",
     );
   });
+
+  it("configures a CloudFormation string error document from AWS::S3::Bucket WebsiteConfiguration", async () => {
+    // Given a CloudFormation template stating the error document as the plain
+    // string CloudFormation carries, rather than the object the SDK takes.
+    const simAws = new SimAws();
+
+    // When the template is deployed through sim CloudFormation.
+    await simAws.cloudFormation().deployTemplate({
+      stackName: "website-string-error-stack",
+      template: {
+        Resources: {
+          WebsiteBucket: {
+            Type: "AWS::S3::Bucket",
+            Properties: {
+              BucketName: "website-string-error-config-bucket",
+              WebsiteConfiguration: {
+                IndexDocument: "index.html",
+                ErrorDocument: "error.html",
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Then the error document is configured on the simulated S3 Bucket.
+    const bucket = simAws
+      .s3()
+      .getSimBucketByName("website-string-error-config-bucket");
+
+    assertNonNullable(bucket);
+    assertIdentical(bucket.getWebsite().errorDocumentKey(), "error.html");
+  });
 });

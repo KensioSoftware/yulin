@@ -392,6 +392,111 @@ const configurations = read.LambdaFunctionConfigurations ?? [];
 The two commands are authorized as `s3:PutBucketNotification` and `s3:GetBucketNotification`. Those
 are the real IAM action names, and they do not match the API names.
 
+### From a CloudFormation template
+
+The `NotificationConfiguration` property of `AWS::S3::Bucket` deploys through the same
+`PutBucketNotificationConfiguration` path, so a template and an SDK caller get identical validation.
+CloudFormation names the same configuration differently in four places: `LambdaConfigurations` rather
+than `LambdaFunctionConfigurations`, a single `Event` string rather than an `Events` list, `Function`
+rather than `LambdaFunctionArn`, and `Filter.S3Key.Rules` rather than `Filter.Key.FilterRules`. Yulin
+reads the CloudFormation names and refuses the others, so a template using the SDK spelling fails the
+stack rather than deploying an unfiltered configuration.
+
+```typescript sim-s3-cfn-event-notification
+/**
+ * Configuring Bucket event notifications from a CloudFormation template.
+ */
+
+import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "uploads-stack",
+  template: {
+    Resources: {
+      Thumbnailer: {
+        Type: "AWS::Lambda::Function",
+        Properties: {
+          FunctionName: "thumbnailer",
+          Role: { "Fn::GetAtt": ["ThumbnailerRole", "Arn"] },
+          Handler: "index.handler",
+          Runtime: "nodejs20.x",
+          Code: { ZipFile: "exports.handler = async () => 'thumbnailed';" },
+        },
+      },
+      ThumbnailerRole: {
+        Type: "AWS::IAM::Role",
+        Properties: {
+          RoleName: "thumbnailer-role",
+          AssumeRolePolicyDocument: {
+            Version: "2012-10-17",
+            Statement: [
+              {
+                Effect: "Allow",
+                Principal: { Service: "lambda.amazonaws.com" },
+                Action: "sts:AssumeRole",
+              },
+            ],
+          },
+        },
+      },
+      ThumbnailerPermission: {
+        Type: "AWS::Lambda::Permission",
+        Properties: {
+          Action: "lambda:InvokeFunction",
+          FunctionName: { "Fn::GetAtt": ["Thumbnailer", "Arn"] },
+          Principal: "s3.amazonaws.com",
+          SourceAccount: { Ref: "AWS::AccountId" },
+          SourceArn: "arn:aws:s3:::uploads",
+        },
+      },
+      UploadsBucket: {
+        Type: "AWS::S3::Bucket",
+        DependsOn: ["ThumbnailerPermission"],
+        Properties: {
+          BucketName: "uploads",
+          NotificationConfiguration: {
+            LambdaConfigurations: [
+              {
+                Event: "s3:ObjectCreated:*",
+                Function: { "Fn::GetAtt": ["Thumbnailer", "Arn"] },
+                Filter: {
+                  S3Key: { Rules: [{ Name: "prefix", Value: "raw/" }] },
+                },
+              },
+            ],
+          },
+        },
+      },
+    },
+  },
+});
+await stack.waitForDeployComplete();
+
+await simAws.s3().putObject(
+  new PutObjectCommand({
+    Bucket: "uploads",
+    Key: "raw/cat.jpg",
+    Body: "cat picture",
+  }),
+);
+
+// Delivery happens in the background, so wait for the simulation to settle.
+await simAws.backgroundTasksComplete();
+```
+
+Two things in that template are there because real CloudFormation needs them, and simulated
+CloudFormation needs them for the same reasons. The Bucket names itself rather than letting
+CloudFormation name it, and the permission names the Bucket by ARN literal rather than by
+`Fn::GetAtt`. Written the other way round, the Bucket needs the function's ARN and the permission
+needs the Bucket's, which is a circular dependency. The `DependsOn` then puts the permission in place
+before S3 validates the destination the notification names.
+
+S3 generates the configuration id, because CloudFormation has no property for stating one. Read it
+back with `GetBucketNotificationConfigurationCommand` if a test needs it.
+
 ### From a CDK app
 
 `bucket.addEventNotification(...)` deploys through simulated CloudFormation. CDK does not write the
@@ -498,9 +603,8 @@ writes do not match it. Without that, the simulation stops after a thousand deli
 - A notification cannot be configured on a standalone `SimS3`. It has no other simulated services to
   notify, and no shared background scheduler for `backgroundTasksComplete()` to drain. Reach
   simulated S3 through `SimAws` instead.
-- A CloudFormation template cannot configure notifications through the `AWS::S3::Bucket`
-  `NotificationConfiguration` property. That property is ignored. CDK never writes it, and reaches
-  notifications through the `Custom::S3BucketNotifications` resource described above.
+- A queue or topic destination in an `AWS::S3::Bucket` `NotificationConfiguration` is refused by
+  name, as it is for an SDK caller, and so is an `EventBridgeConfiguration`.
 - `Managed: false` on a `Custom::S3BucketNotifications` resource is refused rather than approximated,
   and a queue, topic or EventBridge destination in one is refused by name as it is for an SDK caller.
 - A CDK `BucketDeployment` and `mountBucketFilesystem(...)` both replace the whole storage backend
@@ -508,6 +612,23 @@ writes do not match it. Without that, the simulation stops after a thousand deli
   one `ObjectCreated:Put` per file.
 - A function ARN naming a version or an alias is refused, since simulated Lambda has neither.
 - `s3:TestEvent` is not sent. It is an SQS and SNS mechanism.
+
+## Buckets from CloudFormation
+
+An `AWS::S3::Bucket` resource carries four properties simulated S3 acts on: `BucketName`,
+`NotificationConfiguration`, `PublicAccessBlockConfiguration` and `WebsiteConfiguration`. Without
+`BucketName` the Bucket is named after the resource's logical id, lowercased, rather than the
+generated name real CloudFormation invents.
+
+Any other property fails the stack by name. A Bucket deployed without the lifecycle rules,
+versioning or CORS configuration its template asked for would look configured and behave as though it
+were not, and the failure that causes turns up somewhere else entirely.
+
+`BucketEncryption` and `Tags` are the two exceptions. They are read and ignored, because nothing this
+simulator models can tell the difference: there is no simulated KMS, Object bytes are stored as they
+arrive, and no simulated service reads a Bucket tag. CDK puts both on almost every Bucket it
+synthesizes, so refusing them would leave a CDK app unable to deploy over a difference no test could
+observe.
 
 ## Bucket policies
 

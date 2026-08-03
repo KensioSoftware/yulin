@@ -4,7 +4,7 @@ import type {
   SimS3NotificationKeyFilterInput,
 } from "../../../../../s3/command/put-bucket-notification-configuration/put-bucket-notification-configuration.command.js";
 import type { SimCfnTemplateValue } from "../../../../template/value/sim-cfn-template-value.js";
-import type { SimCdkBucketNotificationShape } from "./sim-cdk-bucket-notification-shape.js";
+import type { SimCfnValueShape } from "../../../../template/value/sim-cfn-value-shape.js";
 
 /**
  * Reads the object key filter of one notification configuration.
@@ -14,9 +14,9 @@ import type { SimCdkBucketNotificationShape } from "./sim-cdk-bucket-notificatio
  * shape puts around the rules.
  */
 export class SimCdkBucketNotificationFilter {
-  private readonly shape: SimCdkBucketNotificationShape;
+  private readonly shape: SimCfnValueShape;
 
-  constructor(shape: SimCdkBucketNotificationShape) {
+  constructor(shape: SimCfnValueShape) {
     this.shape = shape;
   }
 

@@ -2,10 +2,10 @@ import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-re
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimS3 } from "../../sim-s3.js";
 import type { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
-import type { SimS3PublicAccessBlockConfiguration } from "../../bucket/public-access/sim-s3-public-access-block.js";
-import type { SimS3WebsiteConfiguration as SimS3WebsiteConfig } from "../../command/put-bucket-website/put-bucket-website.command.js";
 import { validateS3BucketName } from "../../bucket/validate/validate-s3-bucket-name.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
+import { SimCfnS3BucketConfigurator } from "./sim-cfn-s3-bucket-configurator.js";
+import { SimCfnS3BucketPropertyRules } from "./sim-cfn-s3-bucket-property-rules.js";
 
 interface SimCfnS3BucketCreatorProperties {
   readonly simS3: SimS3;
@@ -22,20 +22,25 @@ export class SimCfnS3BucketCreator {
   }
 
   /**
-   * Create a simulated Bucket, with its website configuration when declared.
+   * Create a simulated Bucket, with the configurations it declares.
+   *
+   * Every property is checked before anything is created, so a Resource asking
+   * for something this simulation does not model fails the Stack rather than
+   * leaving a Bucket behind that is configured differently from the template.
    */
   async create(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
   ): Promise<SimS3Bucket> {
+    new SimCfnS3BucketPropertyRules({
+      logicalId: resource.logicalId,
+      properties,
+    }).assertSimulated();
+
     const bucketName = this.bucketNameForResource(resource, properties);
     validateS3BucketName(bucketName);
 
-    await this.simS3.createBucket({
-      input: {
-        Bucket: bucketName,
-      },
-    });
+    await this.simS3.createBucket({ input: { Bucket: bucketName } });
 
     const bucket = this.simS3.getSimBucketByName(bucketName);
     assertDefined(
@@ -43,53 +48,20 @@ export class SimCfnS3BucketCreator {
       `sim S3 Bucket ${bucketName} after CloudFormation creation`,
     );
 
-    const websiteConfig = this.websiteConfigurationForResource(properties);
-
-    if (websiteConfig !== undefined) {
-      await this.simS3.putBucketWebsite({
-        input: {
-          Bucket: bucketName,
-          WebsiteConfiguration: websiteConfig,
-        },
-      });
-    }
-
-    const publicAccessConfig =
-      this.publicAccessConfigurationForResource(properties);
-
-    if (publicAccessConfig !== undefined) {
-      await this.simS3.putPublicAccessBlock({
-        input: {
-          Bucket: bucketName,
-          PublicAccessBlockConfiguration: publicAccessConfig,
-        },
-      });
-    }
+    await new SimCfnS3BucketConfigurator({
+      simS3: this.simS3,
+      resource,
+      properties,
+      bucketName,
+    }).configure();
 
     return bucket;
   }
 
   /**
-   * Read PublicAccessBlockConfiguration, which a template uses to open a
-   * Bucket up from the all-blocked state a new Bucket starts in.
+   * A Resource without a BucketName is named after its logical id, rather than
+   * the generated name real CloudFormation invents.
    */
-  private publicAccessConfigurationForResource(
-    properties: SimCfnTemplateValueRecord,
-  ): SimS3PublicAccessBlockConfiguration | undefined {
-    const publicAccessConfig = properties["PublicAccessBlockConfiguration"];
-
-    if (
-      publicAccessConfig === undefined ||
-      publicAccessConfig === null ||
-      typeof publicAccessConfig !== "object" ||
-      Array.isArray(publicAccessConfig)
-    ) {
-      return undefined;
-    }
-
-    return publicAccessConfig;
-  }
-
   private bucketNameForResource(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
@@ -101,43 +73,5 @@ export class SimCfnS3BucketCreator {
     }
 
     return resource.logicalId.toLowerCase();
-  }
-
-  private websiteConfigurationForResource(
-    properties: SimCfnTemplateValueRecord,
-  ): SimS3WebsiteConfig | undefined {
-    const websiteConfig = properties["WebsiteConfiguration"];
-
-    if (
-      websiteConfig === undefined ||
-      websiteConfig === null ||
-      typeof websiteConfig !== "object" ||
-      Array.isArray(websiteConfig)
-    ) {
-      return undefined;
-    }
-
-    if (
-      "RoutingRules" in websiteConfig &&
-      !Array.isArray(websiteConfig["RoutingRules"])
-    ) {
-      return undefined;
-    }
-
-    return {
-      ...websiteConfig,
-      IndexDocument:
-        typeof websiteConfig["IndexDocument"] === "string"
-          ? {
-              Suffix: websiteConfig["IndexDocument"],
-            }
-          : websiteConfig["IndexDocument"],
-      ErrorDocument:
-        typeof websiteConfig["ErrorDocument"] === "string"
-          ? {
-              Key: websiteConfig["ErrorDocument"],
-            }
-          : websiteConfig["ErrorDocument"],
-    } as SimS3WebsiteConfig;
   }
 }
