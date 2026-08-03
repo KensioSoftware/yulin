@@ -8,6 +8,7 @@ import { SimCfnHttpApiCreator } from "./api/sim-cfn-http-api-creator.js";
 import { SimCfnHttpApiAuthorizerCreator } from "./authorizer/sim-cfn-http-api-authorizer-creator.js";
 import { SimCfnHttpApiIntegrationCreator } from "./integration/sim-cfn-http-api-integration-creator.js";
 import { SimCfnHttpApiRouteCreator } from "./route/sim-cfn-http-api-route-creator.js";
+import { SimCfnHttpApiImports } from "./sim-cfn-http-api-imports.js";
 import { SimCfnHttpApiStageCreator } from "./stage/sim-cfn-http-api-stage-creator.js";
 
 /**
@@ -36,15 +37,21 @@ export class SimApiGatewayV2CfnResourceFactory implements SimCfnServiceResourceF
 
   constructor(properties: SimApiGatewayV2CfnResourceFactoryProperties) {
     const { apiGatewayV2 } = properties;
+    const imports = new SimCfnHttpApiImports();
 
-    this.apiCreator = new SimCfnHttpApiCreator({ apiGatewayV2 });
+    this.apiCreator = new SimCfnHttpApiCreator({ apiGatewayV2, imports });
     this.authorizerCreator = new SimCfnHttpApiAuthorizerCreator({
       apiGatewayV2,
+      imports,
     });
     this.integrationCreator = new SimCfnHttpApiIntegrationCreator({
       apiGatewayV2,
+      imports,
     });
-    this.routeCreator = new SimCfnHttpApiRouteCreator({ apiGatewayV2 });
+    this.routeCreator = new SimCfnHttpApiRouteCreator({
+      apiGatewayV2,
+      imports,
+    });
     this.stageCreator = new SimCfnHttpApiStageCreator({ apiGatewayV2 });
   }
 

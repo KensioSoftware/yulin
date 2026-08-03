@@ -22,6 +22,28 @@ export interface SimCreateApiCommandOutput extends SimHttpApiView {
 }
 
 /**
+ * Minimal structural sim API Gateway v2 ImportApi command.
+ *
+ * `Basepath` is declared so a caller asking for one is refused by name rather
+ * than turned away by the type system with nothing to read.
+ *
+ * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/apigatewayv2/command/ImportApiCommand/
+ */
+export interface SimImportApiCommand {
+  readonly input: SimImportApiCommandInput;
+}
+
+export interface SimImportApiCommandInput {
+  readonly Body?: string | undefined;
+  readonly FailOnWarnings?: boolean | undefined;
+  readonly Basepath?: string | undefined;
+}
+
+export interface SimImportApiCommandOutput extends SimHttpApiView {
+  readonly $metadata: SimResponseMetadata;
+}
+
+/**
  * Minimal structural sim API Gateway v2 GetApi command.
  *
  * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/apigatewayv2/command/GetApiCommand/

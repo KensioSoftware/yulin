@@ -2,7 +2,6 @@ import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-re
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimCreateIntegrationCommandInput } from "../../command/integration/integration.command.js";
 import { SimCfnApiGatewayV2PropertyParser } from "../sim-cfn-api-gateway-v2-property-parser.js";
-import { simCfnHttpApiIntegrationUri } from "./sim-cfn-http-api-integration-uri.js";
 
 /**
  * The AWS::ApiGatewayV2::Integration properties this simulation deploys.
@@ -60,9 +59,10 @@ export class SimCfnHttpApiIntegrationProperties {
    * The CreateIntegration input this Resource asks for.
    *
    * Everything but the API id is passed through as the template wrote it, so
-   * an absent, unsimulated integration type or payload format is refused by
-   * CreateIntegration with the reason it is refused rather than as a shape
-   * complaint here.
+   * an absent, unsimulated integration type, payload format or integration URI
+   * is refused by CreateIntegration with the reason it is refused rather than
+   * as a shape complaint here. That includes the two URI forms a template may
+   * write, which the integration model reads.
    */
   createIntegrationInput(): SimCreateIntegrationCommandInput {
     return {
@@ -72,7 +72,11 @@ export class SimCfnHttpApiIntegrationProperties {
         this.properties["IntegrationType"],
         "IntegrationType",
       ),
-      IntegrationUri: this.integrationUri(),
+      IntegrationUri: this.propertyParser.optionalString(
+        this.resource,
+        this.properties["IntegrationUri"],
+        "IntegrationUri",
+      ),
       PayloadFormatVersion: this.propertyParser.optionalString(
         this.resource,
         this.properties["PayloadFormatVersion"],
@@ -84,23 +88,5 @@ export class SimCfnHttpApiIntegrationProperties {
         "Description",
       ),
     };
-  }
-
-  /**
-   * The Lambda function ARN this integration invokes, read from either URI
-   * form a template may write.
-   */
-  private integrationUri(): string | undefined {
-    const uri = this.propertyParser.optionalString(
-      this.resource,
-      this.properties["IntegrationUri"],
-      "IntegrationUri",
-    );
-
-    if (uri === undefined) {
-      return undefined;
-    }
-
-    return simCfnHttpApiIntegrationUri(uri);
   }
 }

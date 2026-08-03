@@ -123,6 +123,12 @@ and Region of one simulated AWS.
 step every command naming an API goes through: authorize first, then look the API up, so a caller
 with no permission is told so rather than told the API does not exist.
 
+`command/api/sim-http-api-import-commands.ts` is the odd one out: `ImportApi` creates an API and then
+everything under it, so it drives the other command classes rather than the stores. It authorizes
+once, against the API collection `CreateApi` addresses, because an import is one request and there is
+no API id to name anything under yet. A document it refuses part way through leaves no API behind,
+which is the error category AWS describes.
+
 `command/sim-api-gateway-v2-unsimulated-input.ts` refuses the inputs this simulation does not model.
 It works from an allow-list of the options each command accepts, so an option nobody thought about
 is refused rather than silently dropped.
@@ -136,6 +142,47 @@ whether the caller may `apigateway:POST` on `arn:aws:apigateway:<region>::/apis/
 Those ARNs carry no Account id, which is not an omission: API Gateway control-plane ARNs leave the
 Account segment empty. `command/authorize/sim-api-gateway-v2-authorizer.ts` is where that mapping
 lives.
+
+## Importing an OpenAPI document
+
+`openapi/` turns an OpenAPI 3.0 document into the routes, integrations and authorizers of an API that
+already exists. Two entry points reach it, `ImportApi` and an `AWS::ApiGatewayV2::Api` `Body`, and
+they differ only in how the document arrives: CloudFormation serialises the inline JSON object it
+resolved and calls `importApi`, so there is one translator and one set of refusals.
+
+Nothing here restates a rule a command already states. Route key grammar, payload format, integration
+URIs and issuer validation are all met by going through `CreateRoute`, `CreateIntegration` and
+`CreateAuthorizer`, and `SimHttpApiOpenApiCommand` gives whatever one of them refuses the pointer of
+the member that produced the input. A conflict, such as the one two paths whose parameters differ
+only by name produce, is passed on as it is.
+
+```text
+SimHttpApiOpenApiDocument         the root, and the version check
+├── SimHttpApiOpenApiValue        one value at a pointer, and the shapes it can be
+│   └── SimHttpApiOpenApiObject   the members under one object
+├── SimHttpApiOpenApiPointer      RFC 6901 pointers, built up as the readers descend
+├── SimHttpApiOpenApiPaths        the path map
+│   └── SimHttpApiOpenApiPathItem the keys within one path
+│       └── SimHttpApiOpenApiOperation  one operation's integration and security
+├── SimHttpApiOpenApiIntegrations       the integration behind each operation
+│   ├── SimHttpApiOpenApiIntegrationReferences  the one $ref form, created once
+│   └── SimHttpApiOpenApiIntegration            the extension object
+└── SimHttpApiOpenApiSecuritySchemes    scheme to authorizer, created once
+    └── SimHttpApiOpenApiSecurityScheme one scheme
+```
+
+The decomposition is not decoration. The refusal surface is most of the work here, and a single
+document reader would not survive `max-lines`, `complexity` or `scripts/sh/fta.sh`.
+
+Most of an OpenAPI document is ignored, which is what AWS does with it. `requestBody`, the content
+schemas under `responses` and `components.schemas` are valid OpenAPI that HTTP APIs do not support,
+so there is no JSON Schema to understand and no `$ref` to resolve across schema trees. The one
+reference form that must resolve is the single-level local one into
+`components.x-amazon-apigateway-integrations`.
+
+`cfn/sim-cfn-http-api-imports.ts` is the CloudFormation side of the same rule: an `Api` declaring the
+API as a document creates its own routes, so a sibling Resource creating another one on that API
+fails the stack rather than deploying a template written two ways at once.
 
 ## Serving
 
@@ -189,7 +236,8 @@ cfn/
 ├── sim-cfn-api-gateway-v2-property-parser.ts    the allow-list of properties
 ├── sim-cfn-api-gateway-v2-property-values.ts    the value shapes each may take
 ├── sim-cfn-http-api-template.factory.ts         the template tests deploy
-├── api/         Api
+├── sim-cfn-http-api-imports.ts                 which APIs a Body declared
+├── api/         Api, and the Body an imported one carries
 ├── authorizer/  Authorizer
 ├── integration/ Integration, and the two IntegrationUri forms
 ├── route/       Route
@@ -233,6 +281,10 @@ simulation exists to avoid:
   without `AutoDeploy: true`, since Deployments are not simulated and such a stage serves nothing on
   real AWS
 - `MaxResults`/`NextToken`, since every list command answers in full
+- an OpenAPI document that is not 3.0.x, and every member of one this simulation cannot apply, each
+  refused with the JSON pointer of the member rather than dropped
+- `FailOnWarnings: false`, since everything an import cannot apply is refused rather than warned
+  about, which is what `true` asks for
 
 See [docs/services/apigatewayv2/README.md](../../../docs/services/apigatewayv2/README.md) for the
 user-facing limitations.

@@ -8,6 +8,7 @@ import type {
   SimDeleteApiCommand,
   SimGetApiCommand,
   SimGetApisCommand,
+  SimImportApiCommand,
 } from "../command/api/api.command.js";
 import type {
   SimCreateAuthorizerCommand,
@@ -41,6 +42,14 @@ export class SimApiGatewayV2SdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simApiGatewayV2.createApi(
             command as SimCreateApiCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ImportApiCommand",
+        async (command, context): Promise<unknown> =>
+          await simApiGatewayV2.importApi(
+            command as SimImportApiCommand,
             simSdkCallerOptions(context),
           ),
       ],
