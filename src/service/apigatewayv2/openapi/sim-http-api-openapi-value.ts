@@ -106,6 +106,38 @@ export class SimHttpApiOpenApiValue {
   }
 
   /**
+   * This value as a boolean when the document carries one, which is the shape
+   * an authorizer's `enableSimpleResponses` takes.
+   */
+  optionalBoolean(): boolean | undefined {
+    if (this.value === undefined) {
+      return undefined;
+    }
+
+    if (typeof this.value !== "boolean") {
+      throw this.refusal("has to be a boolean");
+    }
+
+    return this.value;
+  }
+
+  /**
+   * This value as a number when the document carries one, which is the shape
+   * an authorizer's `authorizerResultTtlInSeconds` takes.
+   */
+  optionalNumber(): number | undefined {
+    if (this.value === undefined) {
+      return undefined;
+    }
+
+    if (typeof this.value !== "number") {
+      throw this.refusal("has to be a number");
+    }
+
+    return this.value;
+  }
+
+  /**
    * The entries of this value as an array, when the document carries one.
    */
   optionalArray(): readonly SimHttpApiOpenApiValue[] | undefined {
