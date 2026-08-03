@@ -1,7 +1,7 @@
 import { SimSqsInvalidAttributeValue } from "../error/sim-sqs.error.js";
 import { SimSqsQueueAttributeNames } from "./sim-sqs-queue-attribute-names.js";
 import {
-  simSqsRedrivePolicyAttributeName,
+  simSqsJsonQueueAttributeNames,
   type SimSqsQueueAttributeSpec,
 } from "./sim-sqs-queue-attribute-specs.js";
 import type { SimSqsQueueAttributeInput } from "./sim-sqs-queue-attributes.js";
@@ -38,16 +38,16 @@ function attributeNumber(
  * The numeric attribute entries a request actually carries.
  *
  * An SDK attribute map is a partial record, so an explicitly undefined value is
- * the absence of an attribute rather than a request to set one. The redrive
- * policy is left out because it is a JSON object with no numeric range to be
- * checked against.
+ * the absence of an attribute rather than a request to set one. The JSON
+ * attributes are left out because they are documents with no numeric range to
+ * be checked against.
  */
 function numberEntries(
   requested: SimSqsQueueAttributeInput,
 ): readonly [string, string][] {
   return Object.entries(requested).filter(
     (entry): entry is [string, string] =>
-      entry[1] !== undefined && entry[0] !== simSqsRedrivePolicyAttributeName,
+      entry[1] !== undefined && !simSqsJsonQueueAttributeNames.has(entry[0]),
   );
 }
 
@@ -77,6 +77,26 @@ export class SimSqsQueueAttributeNumbers {
         ]),
       ),
     );
+  }
+
+  /** The delay a new message with no delay of its own waits out. */
+  get delaySeconds(): number {
+    return this.get("DelaySeconds");
+  }
+
+  /** The longest message body the queue accepts, in bytes. */
+  get maximumMessageSizeBytes(): number {
+    return this.get("MaximumMessageSize");
+  }
+
+  /** How long a message stays on the queue before SQS drops it. */
+  get messageRetentionSeconds(): number {
+    return this.get("MessageRetentionPeriod");
+  }
+
+  /** How long a received message is hidden from other consumers. */
+  get visibilityTimeoutSeconds(): number {
+    return this.get("VisibilityTimeout");
   }
 
   /**

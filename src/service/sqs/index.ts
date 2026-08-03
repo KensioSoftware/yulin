@@ -1,4 +1,8 @@
-export { SimSqs, type SimSqsRequestOptions } from "./sim-sqs.js";
+export { SimSqs } from "./sim-sqs.js";
+export {
+  simSqsSourceArnConditionKey,
+  type SimSqsRequestOptions,
+} from "./command/sim-sqs-request-options.js";
 export { SimSqsQueue } from "./queue/sim-sqs-queue.js";
 export {
   SimSqsQueueActivity,
@@ -15,6 +19,7 @@ export {
   SimSqsQueueAttributes,
 } from "./queue/sim-sqs-queue-attributes.js";
 export { SimSqsQueueName } from "./queue/sim-sqs-queue-name.js";
+export { SimSqsQueuePolicy } from "./queue/sim-sqs-queue-policy.js";
 export { SimSqsRedrivePolicy } from "./queue/sim-sqs-redrive-policy.js";
 export {
   SimSqsQueueUrl,

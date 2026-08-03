@@ -1,5 +1,4 @@
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import {
   SimSqsInvalidAddress,
@@ -11,6 +10,7 @@ import { sqsQueueArnPrefix } from "../../queue/sim-sqs-queue-arn.js";
 import type { SimSqsQueueStore } from "../../queue/sim-sqs-queue-store.js";
 import { SimSqsQueueUrl } from "../../queue/sim-sqs-queue-url.js";
 import type { SimSqsAuthorizer } from "../authorize/sim-sqs-authorizer.js";
+import type { SimSqsRequestOptions } from "../sim-sqs-request-options.js";
 
 /**
  * The operation an IAM action names, for a message about a missing request
@@ -31,10 +31,14 @@ interface SimSqsQueueAccessProperties {
  * How a request reaches the queue it names.
  *
  * Every operation but ListQueues and CreateQueue starts the same way: read the
- * queue URL, authorize the action against the ARN that URL implies, then look the
- * queue up. Authorization comes first because real IAM decides before the
- * service does anything, so a caller with no permission is refused whether or not
- * the queue exists.
+ * queue URL, find the queue that URL implies, authorize the action against it,
+ * then require it to be there.
+ *
+ * Finding the queue comes before authorizing because the queue's own policy is
+ * part of the decision, and nothing can supply a policy without first having the
+ * queue. A caller with no permission is still refused for a queue that does not
+ * exist rather than told the queue is missing, because a queue that is not there
+ * contributes no policy and cannot admit anyone.
  */
 export class SimSqsQueueAccess {
   private readonly queues: SimSqsQueueStore;
@@ -51,20 +55,29 @@ export class SimSqsQueueAccess {
 
   /**
    * Ensure the caller may perform an action on the queue of a given name.
+   *
+   * The queue need not exist, which is what CreateQueue needs: it authorizes
+   * against the ARN the queue is about to have. A queue that is there brings its
+   * policy into the decision.
    */
-  authorizeName(action: string, name: string, caller?: SimAwsCaller): void {
-    this.authorizer.authorizeQueue(
+  authorizeName(
+    action: string,
+    name: string,
+    options?: SimSqsRequestOptions,
+  ): void {
+    this.authorizer.authorizeQueue({
       action,
-      sqsQueueArnPrefix(this.accountRegionScope) + name,
-      caller,
-    );
+      queueArn: sqsQueueArnPrefix(this.accountRegionScope) + name,
+      queue: this.queues.find(name),
+      options,
+    });
   }
 
   /**
    * Ensure the caller may perform an action naming no particular queue.
    */
-  authorizeAnyQueue(action: string, caller?: SimAwsCaller): void {
-    this.authorizer.authorizeAnyQueue(action, caller);
+  authorizeAnyQueue(action: string, options?: SimSqsRequestOptions): void {
+    this.authorizer.authorizeAnyQueue(action, options);
   }
 
   /**
@@ -73,7 +86,7 @@ export class SimSqsQueueAccess {
   requireByName(
     action: string,
     name: string | undefined,
-    caller?: SimAwsCaller,
+    options?: SimSqsRequestOptions,
   ): SimSqsQueue {
     if (name === undefined || name === "") {
       throw new SimSqsValidationException(
@@ -81,9 +94,7 @@ export class SimSqsQueueAccess {
       );
     }
 
-    this.authorizeName(action, name, caller);
-
-    return this.upToDate(name);
+    return this.authorized(action, name, options);
   }
 
   /**
@@ -92,24 +103,25 @@ export class SimSqsQueueAccess {
   requireByUrl(
     action: string,
     queueUrl: string | undefined,
-    caller?: SimAwsCaller,
+    options?: SimSqsRequestOptions,
   ): SimSqsQueue {
-    const name = this.nameFromUrl(action, queueUrl);
-
-    this.authorizeName(action, name, caller);
-
-    return this.upToDate(name);
+    return this.authorized(action, this.nameFromUrl(action, queueUrl), options);
   }
 
   /**
-   * The queue of a name, with every queue brought up to date first.
+   * The queue of a name, once the caller is allowed to reach it.
    *
-   * Every queue and not just this one, because a message moves to a dead-letter
-   * queue when its source queue notices, and a request may be about the
-   * dead-letter queue rather than the source.
+   * Every queue is brought up to date first and not just this one, because a
+   * message moves to a dead-letter queue when its source queue notices, and a
+   * request may be about the dead-letter queue rather than the source.
    */
-  private upToDate(name: string): SimSqsQueue {
+  private authorized(
+    action: string,
+    name: string,
+    options: SimSqsRequestOptions | undefined,
+  ): SimSqsQueue {
     this.queues.applyLifecycle(this.clock.now());
+    this.authorizeName(action, name, options);
 
     return this.queues.require(name);
   }

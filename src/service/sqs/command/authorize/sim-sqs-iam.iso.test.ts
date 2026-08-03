@@ -282,8 +282,9 @@ describe("SQS IAM authorization", () => {
       );
     });
 
-    // Then IAM decides first, as real IAM decides before the service looks
-    // anything up.
+    // Then it is denied rather than told the queue is missing. Finding the
+    // queue comes first now that its policy is part of the decision, and a
+    // queue that is not there contributes no policy to admit anyone.
     assertIdentical(error.name, "AccessDenied");
   });
 });

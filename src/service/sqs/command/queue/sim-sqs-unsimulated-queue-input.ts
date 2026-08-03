@@ -24,7 +24,10 @@ export function refuseUnsimulatedQueueInput(
 /**
  * Refuse a request for a queue owned by another Account.
  *
- * Cross-account access needs a queue policy, which is not simulated.
+ * One simulated SQS holds one Account's queues, so it has nothing of another
+ * Account's to answer with. A queue policy admits another Account's principal
+ * to a queue here; it does not make another Account's queues reachable through
+ * this one.
  */
 export function refuseForeignQueueOwner(
   owner: string | undefined,

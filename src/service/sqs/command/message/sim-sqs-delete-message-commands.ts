@@ -1,5 +1,5 @@
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimSqsRequestOptions } from "../sim-sqs-request-options.js";
 import type { SimSqsQueue } from "../../queue/sim-sqs-queue.js";
 import type { SimSqsQueueAccess } from "../queue/sim-sqs-queue-access.js";
 import { requireBatchEntries, runBatch } from "./sim-sqs-batch-entries.js";
@@ -24,10 +24,6 @@ interface SimSqsDeleteMessageCommandsProperties {
   readonly clock: BackgroundScheduler;
 }
 
-interface SimSqsDeleteMessageCommandsOptions {
-  readonly caller?: SimAwsCaller;
-}
-
 /**
  * The commands a consumer finishes a message with.
  */
@@ -45,12 +41,12 @@ export class SimSqsDeleteMessageCommands {
    */
   deleteMessage(
     command: SimDeleteMessageCommand,
-    options?: SimSqsDeleteMessageCommandsOptions,
+    options?: SimSqsRequestOptions,
   ): SimDeleteMessageCommandOutput {
     const queue = this.access.requireByUrl(
       messageDeletionAction,
       command.input.QueueUrl,
-      options?.caller,
+      options,
     );
 
     this.delete(queue, command.input.ReceiptHandle);
@@ -63,12 +59,12 @@ export class SimSqsDeleteMessageCommands {
    */
   deleteMessageBatch(
     command: SimDeleteMessageBatchCommand,
-    options?: SimSqsDeleteMessageCommandsOptions,
+    options?: SimSqsRequestOptions,
   ): SimDeleteMessageBatchCommandOutput {
     const queue = this.access.requireByUrl(
       messageDeletionAction,
       command.input.QueueUrl,
-      options?.caller,
+      options,
     );
     const entries = requireBatchEntries(command.input.Entries, "DeleteMessage");
 

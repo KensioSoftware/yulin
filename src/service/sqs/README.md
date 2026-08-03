@@ -41,9 +41,12 @@ splits reading an attribute from setting one: an attribute real SQS has and this
 is left out of a response, as real SQS leaves out an attribute a queue has no value for, but setting
 one is refused rather than ignored.
 
-`SimSqsRedrivePolicy` is held apart from the numeric attributes, because it is a JSON object and
-because a queue has none until one is set. It keeps the string it was parsed from, so
-`GetQueueAttributes` reports back what was set rather than a re-serialised version of it.
+`SimSqsRedrivePolicy` and `SimSqsQueuePolicy` are held apart from the numeric attributes, because they
+are JSON documents and because a queue has neither until one is set. Both keep the string they were
+parsed from, so `GetQueueAttributes` reports back what was set rather than a re-serialised version of
+it. `SimSqsQueuePolicy` validates through sim IAM's own `SimIamPolicyDocumentValidator`, so a queue
+policy is held to the same rules as any other policy document, and it is held to them when the
+attribute is set rather than when the policy is first evaluated.
 `SimSqsDeadLetterTargets` resolves the queue a policy names, matching whole ARNs rather than reading
 the name out of one: that keeps the account and region in the comparison, which is what makes an ARN
 naming another scope find nothing. The target is checked when the policy is set, because a policy
@@ -117,9 +120,10 @@ rather than one class per command, so the `SimSqs` facade stays a delegation:
 - `command/sim-sqs-command.types.ts` — the command types gathered for the facade
 
 `SimSqsQueueAccess` is how every operation but `ListQueues` reaches its queue: read the queue URL,
-authorize the action against the ARN that URL implies, then look the queue up. Authorization comes
-first because real IAM decides before the service does anything, so a caller with no permission is
-refused whether or not the queue exists.
+find the queue that URL implies, authorize the action against it, then require it to be there.
+Finding the queue comes before authorizing because the queue's own policy is part of the decision.
+A caller with no permission is still refused for a queue that does not exist rather than told the
+queue is missing, because a queue that is not there contributes no policy and cannot admit anyone.
 
 `SimSqsMessageWriter` is shared by `SendMessage` and every entry of `SendMessageBatch`, so the two
 cannot drift apart on what a delay means or how large a body may be. `SimSqsReceiveRequest` is the
@@ -137,10 +141,16 @@ command instances.
 
 ## CloudFormation
 
-`cfn/` holds the `AWS::SQS::Queue` resource factory. `SimCfnSqsQueueProperties` reads the template
-properties into the shape `CreateQueue` takes, and `SimCfnSqsQueueCreator` sends that command, so a
-queue a template deployed is the same thing an SDK caller would have got. Nothing about the attribute
-ranges or the name rules is repeated here.
+`cfn/` holds the `AWS::SQS::Queue` and `AWS::SQS::QueuePolicy` resource factories.
+`SimCfnSqsQueueProperties` reads the template properties into the shape `CreateQueue` takes, and
+`SimCfnSqsQueueCreator` sends that command, so a queue a template deployed is the same thing an SDK
+caller would have got. Nothing about the attribute ranges or the name rules is repeated here.
+
+`SimCfnSqsQueuePolicyCreator` goes through `SetQueueAttributes` for the same reason, so a policy
+declared in a template is validated and enforced exactly as one set through the SDK. A queue policy
+has no existence of its own in SQS: it is the `Policy` attribute of the queues it names, so the
+resource's simulated object is the first queue it named. `Ref` on an `AWS::SQS::Queue` gives its URL,
+which is what `Queues` carries and what `SetQueueAttributes` takes.
 
 The properties this simulation has no behaviour for fail the resource rather than being dropped,
 including `FifoQueue: true`. A queue deployed without its redrive policy would look to the template
@@ -169,9 +179,21 @@ Two details are real SQS behaviour worth keeping:
   `sqs:DeleteMessageBatch` or `sqs:ChangeMessageVisibilityBatch` action, so a policy naming one grants
   nothing.
 
-There is no queue policy support, so this service passes no resource policies into the IAM decision.
-Cross-account access to a queue therefore cannot be granted, and a request naming another owner is
-refused rather than quietly answered with a local queue of the same name.
+The queue's `Policy` attribute goes into the decision as its resource policy, through
+`simSqsQueueResourcePolicies`. That is what admits a caller with no identity policy of its own: a
+principal from another Account, or a service principal such as `s3.amazonaws.com`, which owns no
+identity policies anywhere. A queue with no policy contributes nothing and the decision is left to
+the caller's identity policies, as it is on real AWS.
+
+`SimSqsRequestOptions` carries a `sourceArn` alongside the caller, supplied to IAM as
+`aws:SourceArn`. A simulated service reaching a queue on a resource's behalf sets it, which is how a
+queue policy granting a service principal under an `ArnLike aws:SourceArn` condition tells one
+Bucket from another. A request that does not carry one leaves the key out rather than supplying an
+empty string, so a statement conditioned on it fails to match.
+
+A request naming another Account as the queue owner is still refused rather than quietly answered
+with a local queue of the same name: a queue policy admits another Account's principal to a queue
+here, it does not make another Account's queues reachable through this one.
 
 ## Divergences worth knowing
 
@@ -185,9 +207,13 @@ refused rather than quietly answered with a local queue of the same name.
   The 60 second hold on a deleted queue's name is simulated.
 - A queue name ending in `.fifo` is refused, as are the FIFO-only request fields.
 - `SenderId` is not reported, because a simulated principal has no user or role id to report it as.
-- Tags, `RedriveAllowPolicy`, queue policies and the encryption attributes are refused rather than
-  ignored, whether a request or a CloudFormation template asks for them. So is `RedrivePolicy` on a
-  CloudFormation resource, where it is not simulated, unlike the queue attribute of the same name.
+- Tags, `RedriveAllowPolicy` and the encryption attributes are refused rather than ignored, whether a
+  request or a CloudFormation template asks for them. So is `RedrivePolicy` on a CloudFormation
+  resource, where it is not simulated, unlike the queue attribute of the same name.
+- A queue policy is set through the `Policy` attribute only. `AddPermission` and `RemovePermission`,
+  which are shorthands for writing one statement of it, are not implemented.
+- `GetQueueAttributes` reports the `Policy` string that was set. Real SQS re-serialises the document
+  and adds an `Id` and a `Sid`, so what comes back there is not byte for byte what went in.
 - A message moved to a dead-letter queue keeps its sent timestamp, which is documented AWS behaviour,
   and starts its receive count again, which is not documented either way.
 - A Lambda event source mapping polls one batch at a time, where real Lambda runs several pollers and
