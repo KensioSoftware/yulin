@@ -1,5 +1,5 @@
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimSqsRequestOptions } from "../sim-sqs-request-options.js";
 import { SimSqsValidationException } from "../../error/sim-sqs.error.js";
 import type { SimSqsQueue } from "../../queue/sim-sqs-queue.js";
 import { SimSqsQueueAttributeNames } from "../../queue/sim-sqs-queue-attribute-names.js";
@@ -16,10 +16,6 @@ import type {
 interface SimSqsQueueAttributeCommandsProperties {
   readonly access: SimSqsQueueAccess;
   readonly clock: BackgroundScheduler;
-}
-
-interface SimSqsQueueAttributeCommandsOptions {
-  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -45,12 +41,12 @@ export class SimSqsQueueAttributeCommands {
    */
   getQueueAttributes(
     command: SimGetQueueAttributesCommand,
-    options?: SimSqsQueueAttributeCommandsOptions,
+    options?: SimSqsRequestOptions,
   ): SimGetQueueAttributesCommandOutput {
     const queue = this.access.requireByUrl(
       "sqs:GetQueueAttributes",
       command.input.QueueUrl,
-      options?.caller,
+      options,
     );
     const requested = command.input.AttributeNames ?? [];
 
@@ -72,12 +68,12 @@ export class SimSqsQueueAttributeCommands {
    */
   setQueueAttributes(
     command: SimSetQueueAttributesCommand,
-    options?: SimSqsQueueAttributeCommandsOptions,
+    options?: SimSqsRequestOptions,
   ): SimSetQueueAttributesCommandOutput {
     const queue = this.access.requireByUrl(
       "sqs:SetQueueAttributes",
       command.input.QueueUrl,
-      options?.caller,
+      options,
     );
     const requested = command.input.Attributes;
 
@@ -102,12 +98,12 @@ export class SimSqsQueueAttributeCommands {
    */
   purgeQueue(
     command: SimPurgeQueueCommand,
-    options?: SimSqsQueueAttributeCommandsOptions,
+    options?: SimSqsRequestOptions,
   ): SimPurgeQueueCommandOutput {
     const queue = this.access.requireByUrl(
       "sqs:PurgeQueue",
       command.input.QueueUrl,
-      options?.caller,
+      options,
     );
 
     queue.purge(this.clock.now());

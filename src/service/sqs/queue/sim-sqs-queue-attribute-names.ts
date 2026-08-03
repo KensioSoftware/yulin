@@ -3,7 +3,7 @@ import {
   SimSqsUnsupportedOperation,
 } from "../error/sim-sqs.error.js";
 import {
-  simSqsRedrivePolicyAttributeName,
+  simSqsJsonQueueAttributeNames,
   type SimSqsQueueAttributeSpec,
   simSqsSettableQueueAttributes,
 } from "./sim-sqs-queue-attribute-specs.js";
@@ -24,7 +24,8 @@ const readOnlyNames: ReadonlySet<string> = new Set([
 /**
  * Real SQS attributes this simulation does not model. A request setting one is
  * refused rather than quietly ignored, since a queue behaving as though it had
- * a queue policy it does not have is worse than being told it cannot have one.
+ * an encryption key it does not have is worse than being told it cannot have
+ * one.
  */
 const unsimulatedNames: ReadonlySet<string> = new Set([
   "ContentBasedDeduplication",
@@ -33,7 +34,6 @@ const unsimulatedNames: ReadonlySet<string> = new Set([
   "FifoThroughputLimit",
   "KmsDataKeyReusePeriodSeconds",
   "KmsMasterKeyId",
-  "Policy",
   "RedriveAllowPolicy",
   "SqsManagedSseEnabled",
 ]);
@@ -42,7 +42,7 @@ const knownNames = new Set<string>([
   ...simSqsSettableQueueAttributes.map((spec) => spec.name),
   ...readOnlyNames,
   ...unsimulatedNames,
-  simSqsRedrivePolicyAttributeName,
+  ...simSqsJsonQueueAttributeNames,
 ]);
 
 const settableSpecsByName = new Map<string, SimSqsQueueAttributeSpec>(

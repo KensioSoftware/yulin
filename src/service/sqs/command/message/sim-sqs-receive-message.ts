@@ -1,5 +1,5 @@
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimSqsRequestOptions } from "../sim-sqs-request-options.js";
 import type { SimSqsQueueAccess } from "../queue/sim-sqs-queue-access.js";
 import type {
   SimReceiveMessageCommand,
@@ -10,10 +10,6 @@ import { SimSqsReceiveRequest } from "./sim-sqs-receive-request.js";
 interface SimSqsReceiveMessageProperties {
   readonly access: SimSqsQueueAccess;
   readonly clock: BackgroundScheduler;
-}
-
-interface SimSqsReceiveMessageOptions {
-  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -40,12 +36,12 @@ export class SimSqsReceiveMessage {
    */
   handle(
     command: SimReceiveMessageCommand,
-    options?: SimSqsReceiveMessageOptions,
+    options?: SimSqsRequestOptions,
   ): SimReceiveMessageCommandOutput {
     const queue = this.access.requireByUrl(
       "sqs:ReceiveMessage",
       command.input.QueueUrl,
-      options?.caller,
+      options,
     );
     const request = SimSqsReceiveRequest.of(command.input, queue);
     const receivedAt = this.clock.now();

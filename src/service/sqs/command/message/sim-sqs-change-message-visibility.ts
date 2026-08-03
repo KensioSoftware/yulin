@@ -1,5 +1,5 @@
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimSqsRequestOptions } from "../sim-sqs-request-options.js";
 import {
   SimSqsInvalidParameterValue,
   SimSqsMessageNotInflight,
@@ -16,10 +16,6 @@ const maximumVisibilityTimeoutSeconds = 43_200;
 interface SimSqsChangeMessageVisibilityProperties {
   readonly access: SimSqsQueueAccess;
   readonly clock: BackgroundScheduler;
-}
-
-interface SimSqsChangeMessageVisibilityOptions {
-  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -46,12 +42,12 @@ export class SimSqsChangeMessageVisibility {
    */
   handle(
     command: SimChangeMessageVisibilityCommand,
-    options?: SimSqsChangeMessageVisibilityOptions,
+    options?: SimSqsRequestOptions,
   ): SimChangeMessageVisibilityCommandOutput {
     const queue = this.access.requireByUrl(
       "sqs:ChangeMessageVisibility",
       command.input.QueueUrl,
-      options?.caller,
+      options,
     );
     const timeout = visibilityTimeout(command.input.VisibilityTimeout);
     const changedAt = this.clock.now();

@@ -1,5 +1,5 @@
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimSqsRequestOptions } from "../sim-sqs-request-options.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimSqsDeadLetterTargets } from "../../queue/sim-sqs-dead-letter-targets.js";
 import { SimSqsQueue } from "../../queue/sim-sqs-queue.js";
@@ -24,10 +24,6 @@ interface SimSqsCreateQueueProperties {
   readonly clock: BackgroundScheduler;
   readonly deadLetterTargets: SimSqsDeadLetterTargets;
   readonly activity: SimSqsQueueActivity;
-}
-
-interface SimSqsCreateQueueOptions {
-  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -60,7 +56,7 @@ export class SimSqsCreateQueue {
    */
   handle(
     command: SimCreateQueueCommand,
-    options?: SimSqsCreateQueueOptions,
+    options?: SimSqsRequestOptions,
   ): SimCreateQueueCommandOutput {
     const input = command.input;
 
@@ -69,7 +65,7 @@ export class SimSqsCreateQueue {
     const name = SimSqsQueueName.required(input.QueueName);
     const requested = input.Attributes ?? {};
 
-    this.access.authorizeName("sqs:CreateQueue", name.value, options?.caller);
+    this.access.authorizeName("sqs:CreateQueue", name.value, options);
 
     const existing = this.queues.find(name.value);
 

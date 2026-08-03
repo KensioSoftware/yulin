@@ -5,6 +5,7 @@ import type {
 } from "../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimSqs } from "../sim-sqs.js";
 import { SimCfnSqsQueueCreator } from "./queue/sim-cfn-sqs-queue-creator.js";
+import { SimCfnSqsQueuePolicyCreator } from "./queue-policy/sim-cfn-sqs-queue-policy-creator.js";
 
 interface SimSqsCfnResourceFactoryProperties {
   readonly sqs: SimSqs;
@@ -15,17 +16,20 @@ interface SimSqsCfnResourceFactoryProperties {
  */
 export class SimSqsCfnResourceFactory implements SimCfnServiceResourceFactory {
   private readonly queueCreator: SimCfnSqsQueueCreator;
+  private readonly queuePolicyCreator: SimCfnSqsQueuePolicyCreator;
 
   constructor(properties: SimSqsCfnResourceFactoryProperties) {
     this.queueCreator = new SimCfnSqsQueueCreator({ sqs: properties.sqs });
+    this.queuePolicyCreator = new SimCfnSqsQueuePolicyCreator({
+      sqs: properties.sqs,
+    });
   }
 
   /**
    * Create a simulated SQS resource from a CloudFormation Resource.
    *
-   * The queue is the only AWS::SQS::* Resource type this simulation models. A
-   * queue policy grants cross-account access, which is not simulated, so
-   * AWS::SQS::QueuePolicy is reported as unsupported and skipped rather than
+   * The queue and its policy are the AWS::SQS::* Resource types this simulation
+   * models. Anything else is reported as unsupported and skipped rather than
    * quietly treated as deployed.
    */
   async create(
@@ -36,6 +40,12 @@ export class SimSqsCfnResourceFactory implements SimCfnServiceResourceFactory {
     switch (resourceTypeName) {
       case "Queue": {
         return await this.queueCreator.create(
+          resource,
+          context.resolvedProperties ?? resource.properties,
+        );
+      }
+      case "QueuePolicy": {
+        return await this.queuePolicyCreator.create(
           resource,
           context.resolvedProperties ?? resource.properties,
         );

@@ -440,8 +440,9 @@ console.log(read.Attributes?.["ApproximateNumberOfMessagesNotVisible"]); // "1"
 console.log(read.Attributes?.["QueueArn"]); // "arn:aws:sqs:us-east-1:888888888888:orders"
 ```
 
-`RedrivePolicy` is the one other settable attribute, covered under
-[dead-letter queues](#dead-letter-queues) above.
+The other two settable attributes are JSON documents: `RedrivePolicy`, covered under
+[dead-letter queues](#dead-letter-queues) above, and `Policy`, covered under
+[queue policies](#queue-policies) below. Both are reported back as the string they were set with.
 
 An attribute real SQS reports and this simulation does not model, `RedriveAllowPolicy` for one, is
 left out of a response rather than refused, since that is what real SQS does with an attribute a queue
@@ -460,6 +461,10 @@ can get wrong:
   `arn:aws:sqs:<region>:<account-id>:*`. A policy naming one queue grants no listing.
 - The batch operations are authorized as their singular action. There is no `sqs:SendMessageBatch`,
   `sqs:DeleteMessageBatch` or `sqs:ChangeMessageVisibilityBatch` action for a policy to name.
+
+The queue's own policy is part of the decision too, covered under [queue policies](#queue-policies)
+below. A caller with no permission is refused whether or not the queue exists, since a queue that is
+not there has no policy to admit anyone with.
 
 ```typescript sim-sqs-iam-policy
 /**
@@ -536,6 +541,93 @@ try {
   console.log((error as Error).name); // "AccessDenied"
 }
 ```
+
+## Queue policies
+
+A queue's `Policy` attribute is its resource policy, and simulated IAM evaluates it as one. It is
+what admits a caller that has no identity policy of its own: a principal from another account, or a
+service principal such as `s3.amazonaws.com`, which owns no identity policies anywhere.
+
+The policy is set with `CreateQueue` or `SetQueueAttributes` and read back with
+`GetQueueAttributes`.
+
+```typescript sim-sqs-queue-policy
+/**
+ * A queue policy admitting S3 to send to a queue, for one Bucket only.
+ */
+
+import {
+  CreateQueueCommand,
+  SendMessageCommand,
+  SetQueueAttributesCommand,
+} from "@aws-sdk/client-sqs";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const sqs = simAws.sqs();
+const queueArn = `arn:aws:sqs:${simAws.defaultRegionName}:${simAws.defaultAccountId}:orders`;
+
+const { QueueUrl } = await sqs.createQueue(
+  new CreateQueueCommand({ QueueName: "orders" }),
+);
+
+await sqs.setQueueAttributes(
+  new SetQueueAttributesCommand({
+    QueueUrl,
+    Attributes: {
+      Policy: JSON.stringify({
+        Version: "2012-10-17",
+        Statement: [
+          {
+            Effect: "Allow",
+            Principal: { Service: "s3.amazonaws.com" },
+            Action: "sqs:SendMessage",
+            Resource: queueArn,
+            Condition: { ArnLike: { "aws:SourceArn": "arn:aws:s3:::uploads" } },
+          },
+        ],
+      }),
+    },
+  }),
+);
+
+// S3 has no identity policies anywhere, so the queue policy is the whole
+// decision. What it is sending for goes in as aws:SourceArn.
+const s3 = { kind: "service", service: "s3.amazonaws.com" } as const;
+
+const sent = await sqs.sendMessage(
+  new SendMessageCommand({ QueueUrl, MessageBody: "uploads/order-1.json" }),
+  { caller: s3, sourceArn: "arn:aws:s3:::uploads" },
+);
+
+console.log(sent.MessageId !== undefined); // true
+
+// A Bucket the condition does not cover is refused.
+try {
+  await sqs.sendMessage(
+    new SendMessageCommand({ QueueUrl, MessageBody: "reports/order-1.json" }),
+    { caller: s3, sourceArn: "arn:aws:s3:::reports" },
+  );
+} catch (error) {
+  console.log((error as Error).name); // "AccessDenied"
+}
+```
+
+`sourceArn` is what a request says it is being made on behalf of. A request that does not carry one
+leaves the key out rather than supplying an empty string, so a statement conditioned on
+`aws:SourceArn` does not match it at all.
+
+A caller from another account needs both sides to allow the request, as it does on real AWS: the
+queue policy naming the principal, and that principal's own account allowing the action. Either one
+on its own is a denial.
+
+The policy is validated when it is set, by `CreateQueue` or `SetQueueAttributes`, so a malformed
+document fails there rather than the first time something is authorized against it. It has to be a
+JSON policy document whose statements each carry an `Effect` of `Allow` or `Deny`, an `Action` or
+`NotAction`, and a `Resource` or `NotResource`. Anything else fails with `InvalidAttributeValue`.
+
+`GetQueueAttributes` reports `Policy` back as the string it was set with.
 
 ## Batches
 
@@ -969,12 +1061,35 @@ dropped: `RedrivePolicy`, `RedriveAllowPolicy`, `KmsMasterKeyId`, `KmsDataKeyReu
 `SqsManagedSseEnabled`, `ContentBasedDeduplication`, `DeduplicationScope`, `FifoThroughputLimit` and
 `Tags`. So does a property `AWS::SQS::Queue` does not have.
 
-`AWS::SQS::QueuePolicy` is skipped rather than deployed, since queue policies are not simulated. The
-rest of the stack still deploys.
+`AWS::SQS::QueuePolicy` deploys the policy it names onto each queue in its `Queues` list, through
+`SetQueueAttributes`. A policy declared in a template is therefore validated and enforced exactly as
+one set through the SDK, and a document SQS would refuse fails the resource. `Queues` carries queue
+URLs, which is what `Ref` on an `AWS::SQS::Queue` gives.
+
+```typescript
+{
+  Type: "AWS::SQS::QueuePolicy",
+  Properties: {
+    Queues: [{ Ref: "OrdersQueue" }],
+    PolicyDocument: {
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Allow",
+          Principal: { Service: "s3.amazonaws.com" },
+          Action: "sqs:SendMessage",
+          Resource: { "Fn::GetAtt": ["OrdersQueue", "Arn"] },
+        },
+      ],
+    },
+  },
+}
+```
 
 CDK works without hand-editing. An `sqs.Queue` with `grantSendMessages(fn)` synthesises a template
 that deploys here, with the queue URL reaching the function through its environment and the grant
-policy naming the queue by the ARN `Fn::GetAtt` gives.
+policy naming the queue by the ARN `Fn::GetAtt` gives. A grant to a service principal synthesises an
+`AWS::SQS::QueuePolicy` alongside it, which deploys too.
 
 ## Available functionality
 
@@ -992,11 +1107,13 @@ Sim SQS currently supports:
 - The `SentTimestamp`, `ApproximateReceiveCount`, `ApproximateFirstReceiveTimestamp` and
   `DeadLetterQueueSourceArn` system attributes
 - Authorization of every operation by simulated IAM, against the real IAM action and queue ARN
+- The `Policy` attribute as the queue's resource policy, admitting another account's principal or a
+  service principal, with `aws:SourceArn` conditions honoured
 - Calls made from inside a simulated Lambda handler, authorized as the function's execution role
 - Lambda event source mappings, delivering messages to a simulated function and deleting the batches
   it handles
-- `AWS::SQS::Queue` in a CloudFormation or CDK template, with `Ref` giving the queue URL and
-  `Fn::GetAtt` giving `Arn`, `QueueName` and `QueueUrl`
+- `AWS::SQS::Queue` and `AWS::SQS::QueuePolicy` in a CloudFormation or CDK template, with `Ref`
+  giving the queue URL and `Fn::GetAtt` giving `Arn`, `QueueName` and `QueueUrl`
 
 ## Limitations
 
@@ -1027,9 +1144,13 @@ Current documented limitations:
 - The `RedrivePolicy` property on `AWS::SQS::Queue` is not simulated, so a dead-letter queue is
   configured by an SDK call rather than by a template. The property fails the resource rather than
   being dropped.
-- Queue policies are not simulated (`AddPermission`, `RemovePermission` and the `Policy` attribute),
-  so cross-account access to a queue cannot be granted. A request naming a
-  `QueueOwnerAWSAccountId` other than the scope's own Account is refused.
+- A queue policy is set through the `Policy` attribute only. `AddPermission` and `RemovePermission`,
+  which are shorthands for writing one statement of it, are not supported.
+- `GetQueueAttributes` reports the `Policy` string that was set. Real SQS re-serialises the document
+  and adds an `Id` and a `Sid` to it, so what comes back there is not byte for byte what went in.
+- A request naming a `QueueOwnerAWSAccountId` other than the scope's own account is refused. A queue
+  policy admits another account's principal to a queue here; it does not make another account's
+  queues reachable through this one.
 - Encryption is not simulated. `KmsMasterKeyId`, `KmsDataKeyReusePeriodSeconds` and
   `SqsManagedSseEnabled` are refused, and message bodies are held in process memory as they were
   sent. That is not a security boundary: anything sharing the process can reach them.
@@ -1046,7 +1167,7 @@ Current documented limitations:
   and scales them with the queue, so nothing here shows what that concurrency does to ordering. See
   [simulated Lambda](../lambda/#triggering-a-function-from-an-sqs-queue "Simulated Lambda event
 source mapping docs") for the rest of the mapping limitations.
-- `AWS::SQS::Queue` is the only SQS resource type CloudFormation creates. `AWS::SQS::QueuePolicy` is
-  skipped, and the queue properties this simulation has no behaviour for fail the resource rather
-  than being dropped.
+- `AWS::SQS::Queue` and `AWS::SQS::QueuePolicy` are the SQS resource types CloudFormation creates.
+  Any other is skipped, and the queue properties this simulation has no behaviour for fail the
+  resource rather than being dropped.
 - SQS is not served as an HTTP API by `serveSimAws`.
