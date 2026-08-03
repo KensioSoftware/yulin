@@ -153,8 +153,16 @@ For a table with partition key `pk` and sort key `sk`, the internal key includes
 { "pk": "user-123", "sk": "profile" }
 ```
 
-This is an implementation detail, but it is important when changing item storage because `putItem()`
+This is an implementation detail, but it is important when changing item storage because a write
 uses the key schema to overwrite items with the same primary key.
+
+`SimDynamoDbTableWrites` is how a table takes a write, in two steps. `prepareItem` and
+`prepareRemoval` do everything a write can be refused for: reading the primary key, and checking the
+item against the secondary indexes. Committing the `SimDynamoDbTableWrite` they answer with stores
+what was prepared and nothing else, so it cannot throw. `SimDynamoDbTable.putItem` and
+`SimDynamoDbTable.deleteItem` are the two steps run together, which is what an ordinary write wants.
+TransactWriteItems runs them apart, so a check added on the preparing side holds a whole transaction
+back rather than stopping it half applied.
 
 ## Secondary index model
 
@@ -248,7 +256,7 @@ AWS and refuses one; a local secondary index and the table both answer it. That 
 after `IndexName` has been resolved to a view rather than off the request alone.
 
 The one thing a write is held to on account of an index is `assertItemKeyTypes`, applied in
-`SimDynamoDbTable.putItem`, which every write in the service goes through. An item missing an index
+`SimDynamoDbTableWrites.prepareItem`, which every write in the service goes through. An item missing an index
 key attribute is fine, since a secondary index of either kind is sparse and simply does not hold it.
 An item carrying one as a type the index did not declare is a `ValidationException`, since the index
 could never hold it.
@@ -717,12 +725,27 @@ write:
 3. Every key is marshalled through its table's key schema, which is both the key check and what
    tells two actions on one item apart. Unlike a batch, one table may be named as often as the
    request likes.
-4. Every action is checked against what is stored, and only then does the first of them write.
+4. Every action is checked against what is stored, which is where a `ConditionExpression` is
+   applied.
+5. Every action's write is prepared, which is where everything else the table would refuse the
+   write for is applied: the updated item is worked out and held to the 400 KB one item holds, and
+   the item is checked against the table's secondary index key types.
+6. Only once every write is prepared is the first of them committed.
+
+Steps 4 and 5 are apart because they answer differently. A condition that did not hold cancels the
+transaction and is reported as that action's cancellation reason, so every action is asked before
+any is prepared. Anything else is the request being wrong rather than the transaction being
+cancelled, and it only comes out of preparing the write.
+
+Preparing every write before committing any of them is staging rather than moving the remaining
+checks up into `assertApplicableTo`. Moving them would work today and would quietly stop working the
+moment a check was added anywhere else on the write path. Staging holds whatever the write path
+refuses, wherever the check lives.
 
 The parts a transaction is made of split by what they know:
 
 - `SimDynamoDbTransactWrite` is one action, as the item or key it carries, the condition guarding
-  it, the IAM action it needs and what it does to a table. The four implementations are in
+  it, the IAM action it needs and the write it prepares against a table. The four implementations are in
   `sim-dynamodb-transact-put-action.ts`, `sim-dynamodb-transact-update-action.ts` and
   `sim-dynamodb-transact-key-actions.ts`, which holds the delete and the condition check together
   since both are a key and a condition against what is stored under it. Each file reads its own
@@ -735,11 +758,12 @@ The parts a transaction is made of split by what they know:
   `ProjectionExpression` through the same `readSimDynamoDbProjection` GetItem uses.
 - `reachSimDynamoDbTransactTables` is how both reach their tables, and where the one-action-per-item
   rule is applied.
-- `sim-dynamodb-transact-cancellation.ts` is the check and the writing, in that order. It asks every
-  action whether it applies, turning a `SimDynamoDbConditionalCheckFailedException` into that
-  action's cancellation reason and leaving anything else to throw, since a request DynamoDB would
-  refuse is refused rather than cancelled. Only once every action has answered does the first of
-  them write.
+- `sim-dynamodb-transact-cancellation.ts` is the checking, the preparing and the committing, in that
+  order. It asks every action whether it applies, turning a
+  `SimDynamoDbConditionalCheckFailedException` into that action's cancellation reason and leaving
+  anything else to throw, since a request DynamoDB would refuse is refused rather than cancelled.
+  It then asks every action for its `SimDynamoDbTableWrite` through `prepareFor`, and only once it
+  holds all of them does it commit the first.
 
 Every action is checked rather than stopping at the first failure, because a caller reads which of
 its actions failed out of `CancellationReasons`. The reasons line up with the request positionally,
@@ -987,7 +1011,9 @@ Current uses:
 - DeleteTable schedules the removal of the table from the store, which is what takes a table from
   DELETING to gone.
 - `SimDynamoDbTable.putItem()` writes the item at once. A write a caller has been told about is a
-  write that is there, so nothing about it waits on the scheduler.
+  write that is there, so nothing about it waits on the scheduler. The TTL removal a write schedules
+  is scheduled by `SimDynamoDbTableWrite.commit()`, so a prepared write that is never committed
+  schedules nothing.
 - `SimDynamoDbTransactionTokens` reads the scheduler's clock, which is what makes the ten minute
   `ClientRequestToken` window something `simAws.clock().advanceBy(...)` can move past.
 - UpdateTimeToLive schedules the settle that takes the status from ENABLING to ENABLED, or from
@@ -1050,7 +1076,7 @@ table state rather than request handling.
   under the key now, so one check covers a deleted item, an overwrite with a later TTL, a TTL
   attribute that has gone or changed type, and time to live having been switched off.
 
-`SimDynamoDbTable.putItem()` is the single hook. Every write in the service goes through it,
+`SimDynamoDbTableWrite.commit()` is the single hook. Every write in the service goes through it,
 including batch and transactional ones, so nothing needs a scheduling call of its own.
 
 Tests that need eventual state should call the broader sim AWS background-drain helper, for example:

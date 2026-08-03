@@ -19,6 +19,7 @@ import { SimDynamoDbTableItems } from "./sim-dynamodb-table-items.js";
 import { SimDynamoDbTableLifecycle } from "./sim-dynamodb-table-lifecycle.js";
 import { simDynamoDbTableReadView } from "./sim-dynamodb-table-read-view.js";
 import { SimDynamoDbTableTags } from "./sim-dynamodb-table-tags.js";
+import { SimDynamoDbTableWrites } from "./sim-dynamodb-table-writes.js";
 import type { SimDynamoDbAttributeDefinitions } from "./sim-dynamodb-attribute-definitions.js";
 import type { SimDynamoDbKeySchema } from "./sim-dynamodb-key-schema.js";
 import type { SimDynamoDbTableBilling } from "./sim-dynamodb-table-billing.js";
@@ -78,6 +79,12 @@ export class SimDynamoDbTable {
    */
   public readonly timeToLive: SimDynamoDbTableTimeToLive;
 
+  /**
+   * How this table takes a write, as a check and then a commit, which is what
+   * lets a transaction prepare all of its writes before committing any.
+   */
+  public readonly writes: SimDynamoDbTableWrites;
+
   private readonly items = new SimDynamoDbTableItems();
   private readonly definition: SimDynamoDbTableDefinition;
   private readonly lifecycle: SimDynamoDbTableLifecycle;
@@ -114,6 +121,12 @@ export class SimDynamoDbTable {
       tableName: name.value,
       items: this.items,
       background,
+    });
+    this.writes = new SimDynamoDbTableWrites({
+      items: this.items,
+      timeToLive: this.timeToLive,
+      definition: this.definition,
+      indexes: this.indexes,
     });
     this.creationDateTime = background.now();
   }
@@ -214,24 +227,12 @@ export class SimDynamoDbTable {
   }
 
   /**
-   * Put an item into the table, and answer with whatever it replaced.
-   *
-   * The item is there by the time this returns. Real DynamoDB acknowledges a
-   * write once it is durable, so a read that follows it finds it.
+   * Put an item into the table, and answer with whatever it replaced. The item
+   * is there by the time this returns, since real DynamoDB acknowledges a write
+   * once it is durable.
    */
   public putItem(item: SimDynamoDbItem): SimDynamoDbItem | undefined {
-    const key = this.definition.itemKey.of(item);
-
-    // An item need not carry an index's key attributes, since a secondary
-    // index of either kind is sparse. Carrying one as a type the index did not
-    // declare is refused, since the index could never hold it.
-    this.indexes.assertItemKeyTypes(item, this.attributeDefinitions);
-
-    const replaced = this.items.put(key, item);
-
-    this.timeToLive.scheduleFor(key, item);
-
-    return replaced;
+    return this.writes.prepareItem(item).commit();
   }
 
   /**
@@ -279,7 +280,7 @@ export class SimDynamoDbTable {
    * Remove the item a primary key names, and answer with whatever was removed.
    */
   public deleteItem(key: SimDynamoDbItem): SimDynamoDbItem | undefined {
-    return this.items.remove(this.definition.itemKey.ofKey(key));
+    return this.writes.prepareRemoval(key).commit();
   }
 
   /**

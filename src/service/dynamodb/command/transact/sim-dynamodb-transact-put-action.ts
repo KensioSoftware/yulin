@@ -1,6 +1,7 @@
 import { SimDynamoDbValidationException } from "../../error/dynamodb.error.js";
 import { SimDynamoDbItem } from "../../item/sim-dynamodb-item.js";
 import type { SimDynamoDbTable } from "../../table/sim-dynamodb-table.js";
+import type { SimDynamoDbTableWrite } from "../../table/sim-dynamodb-table-writes.js";
 import { SimDynamoDbConditionCheck } from "../item/sim-dynamodb-condition-check.js";
 import type { SimDynamoDbTransactWrite } from "./sim-dynamodb-transact-write.js";
 import type { SimDynamoDbTransactPut } from "./transact.command.js";
@@ -37,8 +38,8 @@ class SimDynamoDbTransactPutAction implements SimDynamoDbTransactWrite {
     this.check.assertHoldsFor(table.itemUnder(this.item));
   }
 
-  applyTo(table: SimDynamoDbTable): void {
-    table.putItem(this.item);
+  prepareFor(table: SimDynamoDbTable): SimDynamoDbTableWrite {
+    return table.writes.prepareItem(this.item);
   }
 }
 

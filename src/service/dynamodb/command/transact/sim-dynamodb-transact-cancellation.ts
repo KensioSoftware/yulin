@@ -29,14 +29,28 @@ const conditionalCheckFailed = "ConditionalCheckFailed";
  * Nothing is written until every action has been checked against what is
  * stored, which is what makes a transaction one step rather than a run of
  * writes that might stop part way.
+ *
+ * The checking is in two parts, because they answer differently. A condition
+ * that did not hold cancels the transaction and is reported as that action's
+ * reason, so every action is asked before any of them is prepared. Anything
+ * else the table would refuse the write for is the request being wrong, and it
+ * only comes out of preparing the write itself.
+ *
+ * So every write is prepared before any of them is committed, rather than the
+ * checks a prepared write makes being moved up into `assertApplicableTo`.
+ * Moving them would work today and would quietly stop working the moment a
+ * check was added anywhere else on the write path. Staging holds whatever the
+ * write path refuses, wherever the check lives.
  */
 export function applySimDynamoDbTransaction(
   targets: readonly SimDynamoDbTransactTarget<SimDynamoDbTransactWrite>[],
 ): void {
   assertApplies(targets);
 
-  for (const { item, table } of targets) {
-    item.applyTo(table);
+  const writes = targets.map(({ item, table }) => item.prepareFor(table));
+
+  for (const write of writes) {
+    write.commit();
   }
 }
 

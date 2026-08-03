@@ -1,6 +1,7 @@
 import { SimDynamoDbValidationException } from "../../error/dynamodb.error.js";
 import type { SimDynamoDbItem } from "../../item/sim-dynamodb-item.js";
 import type { SimDynamoDbTable } from "../../table/sim-dynamodb-table.js";
+import type { SimDynamoDbTableWrite } from "../../table/sim-dynamodb-table-writes.js";
 import { SimDynamoDbConditionCheck } from "../item/sim-dynamodb-condition-check.js";
 import { readSimDynamoDbKey } from "../item/sim-dynamodb-key-input.js";
 import type { SimDynamoDbTransactWrite } from "./sim-dynamodb-transact-write.js";
@@ -45,7 +46,7 @@ abstract class SimDynamoDbTransactKeyAction implements SimDynamoDbTransactWrite 
     this.check.assertHoldsFor(table.getItem(this.key));
   }
 
-  abstract applyTo(table: SimDynamoDbTable): void;
+  abstract prepareFor(table: SimDynamoDbTable): SimDynamoDbTableWrite;
 }
 
 /**
@@ -55,8 +56,20 @@ abstract class SimDynamoDbTransactKeyAction implements SimDynamoDbTransactWrite 
 class SimDynamoDbTransactDeleteAction extends SimDynamoDbTransactKeyAction {
   public readonly action = "dynamodb:DeleteItem";
 
-  applyTo(table: SimDynamoDbTable): void {
-    table.deleteItem(this.key);
+  prepareFor(table: SimDynamoDbTable): SimDynamoDbTableWrite {
+    return table.writes.prepareRemoval(this.key);
+  }
+}
+
+/**
+ * The write a condition check makes, which is none.
+ *
+ * A condition check is prepared and committed like the actions that do write,
+ * so a transaction has one shape to apply rather than two.
+ */
+class SimDynamoDbTransactNoWrite implements SimDynamoDbTableWrite {
+  commit(): undefined {
+    return;
   }
 }
 
@@ -69,9 +82,10 @@ class SimDynamoDbTransactDeleteAction extends SimDynamoDbTransactKeyAction {
 class SimDynamoDbTransactConditionCheckAction extends SimDynamoDbTransactKeyAction {
   public readonly action = "dynamodb:ConditionCheckItem";
 
-  applyTo(): void {
+  prepareFor(): SimDynamoDbTableWrite {
     // A condition check changes nothing. What it does happened when its
     // condition was checked against the item it names.
+    return new SimDynamoDbTransactNoWrite();
   }
 }
 

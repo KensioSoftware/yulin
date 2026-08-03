@@ -1,6 +1,7 @@
 import { SimDynamoDbValidationException } from "../../error/dynamodb.error.js";
 import type { SimDynamoDbItem } from "../../item/sim-dynamodb-item.js";
 import type { SimDynamoDbTable } from "../../table/sim-dynamodb-table.js";
+import type { SimDynamoDbTableWrite } from "../../table/sim-dynamodb-table-writes.js";
 import { readSimDynamoDbKey } from "../item/sim-dynamodb-key-input.js";
 import { SimDynamoDbUpdatePlan } from "../item/sim-dynamodb-update-plan.js";
 import type { SimDynamoDbTransactWrite } from "./sim-dynamodb-transact-write.js";
@@ -39,8 +40,14 @@ class SimDynamoDbTransactUpdateAction implements SimDynamoDbTransactWrite {
     this.plan.assertLeavesKeyAlone(table.keySchema.attributeNames());
   }
 
-  applyTo(table: SimDynamoDbTable): void {
-    table.putItem(this.plan.applyTo(table.getItem(this.key), this.key));
+  prepareFor(table: SimDynamoDbTable): SimDynamoDbTableWrite {
+    // Working the updated item out is itself refusable, since an update can
+    // take an item past the 400 KB one item holds. Doing it here rather than
+    // on the way to the table store is what keeps that failure ahead of the
+    // first write of the transaction.
+    return table.writes.prepareItem(
+      this.plan.applyTo(table.getItem(this.key), this.key),
+    );
   }
 }
 
