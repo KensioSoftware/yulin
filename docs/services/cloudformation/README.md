@@ -316,6 +316,71 @@ await stack.waitForDeployComplete();
 For `AWS::CloudFront::Distribution`, `Fn::GetAtt: ["Distribution", "DomainName"]` returns the
 simulated CloudFront hostname, such as `e123example.cloudfront.net`.
 
+#### Values from a skipped Resource
+
+A Resource that was skipped, because its type is not simulated or because it sets a property whose
+behaviour is not simulated, still answers both intrinsics. `Ref` returns the logical ID, and
+`Fn::GetAtt` returns the string `<logical ID>.<attribute name>`.
+
+```typescript sim-cloudformation-skipped-resource-values
+/**
+ * The stand-in values a skipped CloudFormation Resource answers with.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "stand-in-stack",
+  template: {
+    Resources: {
+      AlarmTopic: {
+        Type: "AWS::SNS::Topic",
+      },
+    },
+    Outputs: {
+      TopicRef: { Value: { Ref: "AlarmTopic" } },
+      TopicArn: { Value: { "Fn::GetAtt": ["AlarmTopic", "TopicArn"] } },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+
+console.log(stack.outputs.get("TopicRef")?.value);
+// "AlarmTopic"
+
+console.log(stack.outputs.get("TopicArn")?.value);
+// "AlarmTopic.TopicArn"
+
+for (const skipped of stack.skippedResources) {
+  console.log(skipped.logicalId, skipped.skippedReason);
+  // "AlarmTopic Unsupported sim CloudFormation Resource service SNS"
+}
+```
+
+The stand-ins are what lets a template with unsimulated Resources in it deploy at all. Without them,
+every Resource holding a `Ref` or `Fn::GetAtt` to a skipped Resource would fail too, and so would
+every Resource depending on those, until one SNS topic took the whole stack down with it. The skip
+stays where it happened.
+
+A stand-in is deliberately not ARN-shaped, so it fails closed wherever the simulator reads it.
+
+- In an IAM policy `Resource` it matches no ARN, so a caller relying on that statement is denied.
+- In a property that is parsed as an ARN it is refused as malformed, and that Resource fails.
+  Handing `Fn::GetAtt: ["Orders", "StreamArn"]` from a skipped DynamoDB table to an
+  `AWS::Lambda::EventSourceMapping` fails with
+  `EventSourceArn Orders.StreamArn is not an SQS queue ARN`.
+- Handed to a Lambda function through its environment, it names something that is not there, so the
+  function's own SDK call fails as a call for a missing resource does. A `PutItem` naming the
+  skipped table gets `ResourceNotFoundException: No DynamoDB Table named Orders`.
+
+A stand-in stands in for something absent, so it is not a value to rely on. A test asserting against
+one is asserting on a Resource that was never created. `stack.skippedResources` is where to find out
+which Resources those are and why, under
+[Inspecting stacks and resources](#inspecting-stacks-and-resources).
+
 ### `Fn::Join`
 
 ```typescript sim-cloudformation-fn-join
@@ -885,6 +950,48 @@ console.log(bucketResource?.simResource);
 This is useful in tests when you want to assert that a specific template resource created the
 expected simulated service resource.
 
+`stack.skippedResources` lists the Resources the deployment did not create. Each one carries a
+`skippedReason` naming the type or the property that is not simulated, so a test that expected a
+resource to exist can find out why it does not.
+
+```typescript sim-cloudformation-inspect-skipped
+/**
+ * Finding out which Resources a simulated CloudFormation Stack skipped.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "skipped-stack",
+  template: {
+    Resources: {
+      SiteBucket: {
+        Type: "AWS::S3::Bucket",
+        Properties: {
+          BucketName: "skipped-site-bucket",
+        },
+      },
+      AlarmTopic: {
+        Type: "AWS::SNS::Topic",
+      },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+
+console.log(stack.skippedResources.map((resource) => resource.logicalId));
+// ["AlarmTopic"]
+
+console.log(stack.getResource("AlarmTopic")?.skippedReason);
+// "Unsupported sim CloudFormation Resource service SNS"
+```
+
+A skipped Resource is still in `stack.resources`, and still answers `Ref` and `Fn::GetAtt` with
+[stand-in values](#values-from-a-skipped-resource).
+
 ## Handling deployment failures
 
 Some deployment failures happen asynchronously after stack creation has started. To observe those
@@ -992,7 +1099,10 @@ Each service's own docs describe what its resource types support.
 - `TemplateBody` must be JSON when using `CreateStackCommand`. YAML parsing is not currently provided
   by the CloudFormation service.
 - Only supported resource types create simulated service resources. An unsupported resource may be
-  skipped or may fail the stack, depending on how safely the simulator can model it.
+  skipped or may fail the stack, depending on how safely the simulator can model it. A skipped
+  resource answers `Ref` and `Fn::GetAtt` with
+  [stand-in values](#values-from-a-skipped-resource) rather than the value a created resource would
+  have given.
 - Unsupported resource properties may be ignored or rejected depending on the resource simulator.
 - Stack updates and deletes are not supported.
 - Mappings, conditions, and many advanced CloudFormation features are not supported.

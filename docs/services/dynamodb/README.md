@@ -2789,8 +2789,14 @@ that, which a template cannot predict either way. Two stacks deploying the same 
 differently named tables. The generated name is trimmed to the 255 characters a table name allows,
 ending in a hash of the untrimmed name so two long names that start the same stay apart.
 
-`Fn::GetAtt … StreamArn` is refused by name. Streams are not simulated, and an invented stream ARN
-would read as a working stream to whatever the template handed it to.
+`Fn::GetAtt … StreamArn` on a table that was created is refused by name. Streams are not simulated,
+and an invented stream ARN would read as a working stream to whatever the template handed it to.
+
+A table declaring `StreamSpecification` is skipped rather than created, though, and a skipped
+Resource never reaches that refusal. `Fn::GetAtt … StreamArn` on it resolves to the CloudFormation
+stand-in `OrdersTable.StreamArn` instead, which is not an ARN and fails wherever the simulator reads
+it as one. See
+[values from a skipped Resource](../cloudformation/README.md#values-from-a-skipped-resource).
 
 A property with behaviour that is not simulated skips the resource, with a reason naming the
 property, and the rest of the stack still deploys: `StreamSpecification`,
