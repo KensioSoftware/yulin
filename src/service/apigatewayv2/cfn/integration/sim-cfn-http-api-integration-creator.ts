@@ -3,10 +3,12 @@ import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-re
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimHttpApiIntegration } from "../../api/integration/sim-http-api-integration.js";
 import type { SimApiGatewayV2 } from "../../sim-api-gateway-v2.js";
+import type { SimCfnHttpApiImports } from "../sim-cfn-http-api-imports.js";
 import { SimCfnHttpApiIntegrationProperties } from "./sim-cfn-http-api-integration-properties.js";
 
 interface SimCfnHttpApiIntegrationCreatorProperties {
   readonly apiGatewayV2: SimApiGatewayV2;
+  readonly imports: SimCfnHttpApiImports;
 }
 
 /**
@@ -18,9 +20,11 @@ interface SimCfnHttpApiIntegrationCreatorProperties {
  */
 export class SimCfnHttpApiIntegrationCreator {
   private readonly apiGatewayV2: SimApiGatewayV2;
+  private readonly imports: SimCfnHttpApiImports;
 
   constructor(properties: SimCfnHttpApiIntegrationCreatorProperties) {
     this.apiGatewayV2 = properties.apiGatewayV2;
+    this.imports = properties.imports;
   }
 
   /**
@@ -35,6 +39,11 @@ export class SimCfnHttpApiIntegrationCreator {
       properties,
     });
     const apiId = integrationProperties.apiId();
+    this.imports.requireNotImported(
+      "AWS::ApiGatewayV2::Integration",
+      resource,
+      apiId,
+    );
 
     const created = await this.apiGatewayV2.createIntegration({
       input: integrationProperties.createIntegrationInput(),

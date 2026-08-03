@@ -13,6 +13,7 @@ import {
   GetIntegrationsCommand,
   GetRoutesCommand,
   GetStagesCommand,
+  ImportApiCommand,
   UpdateApiCommand,
 } from "@aws-sdk/client-apigatewayv2";
 import { assertIdentical } from "@kensio/smartass";
@@ -20,6 +21,8 @@ import { describe, expect, it } from "vitest";
 
 import { SimSdk } from "../../../sdk/index.js";
 import { SimAws } from "../../aws/sim-aws.js";
+import { simHttpApiOpenApiDocumentFactory } from "../openapi/sim-http-api-openapi-document.factory.js";
+import { simHttpApiOpenApiIntegrationFactory } from "../openapi/sim-http-api-openapi-integration.factory.js";
 
 const functionArn = "arn:aws:lambda:eu-west-2:111111111111:function:orders";
 
@@ -108,6 +111,37 @@ describe("Intercepting an ApiGatewayV2 SDK client", () => {
     await client.send(new DeleteApiCommand({ ApiId: apiId }));
     const remaining = await client.send(new GetApisCommand({}));
     expect(remaining.Items).toStrictEqual([]);
+  });
+
+  it("routes an ImportApi Command through the client", async () => {
+    // Given a real SDK client intercepted into a simulated AWS
+    const simAws = new SimAws();
+    using simSdk = new SimSdk({ simAws });
+    const client = new ApiGatewayV2Client({ region: "eu-west-2" });
+    simSdk.intercept(client);
+
+    // When an OpenAPI document is imported through it
+    const integration = simHttpApiOpenApiIntegrationFactory.make({
+      functionArn,
+      regionName: "eu-west-2",
+    });
+    const body = JSON.stringify(
+      simHttpApiOpenApiDocumentFactory.make({
+        paths: {
+          "/orders": {
+            get: { "x-amazon-apigateway-integration": integration },
+          },
+        },
+      }),
+    );
+    const imported = await client.send(new ImportApiCommand({ Body: body }));
+
+    // Then the simulation answered, with the route the document declared
+    assertIdentical(imported.Name, "orders");
+    const routes = await client.send(
+      new GetRoutesCommand({ ApiId: imported.ApiId }),
+    );
+    assertIdentical(routes.Items?.[0]?.RouteKey, "GET /orders");
   });
 
   it("says which Commands it supports when sent one it does not", async () => {

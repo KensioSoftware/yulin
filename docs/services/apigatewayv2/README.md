@@ -949,6 +949,171 @@ only through a custom domain is configured. A request to it is answered with a 4
 `{"message":"Forbidden"}`. AWS publishes neither the status nor the body for that case, so both are
 what a disabled endpoint was observed to answer rather than something documented.
 
+## Importing an OpenAPI definition
+
+`ImportApiCommand` takes a serialised OpenAPI 3.0 document and creates the API, one route and one
+integration per operation, and one JWT authorizer per security scheme an operation names. The route
+key is the operation key uppercased and the path taken verbatim, since OpenAPI path templating is
+already API Gateway's path parameter syntax.
+
+An import creates no stage. `CreateStageCommand` or an `AWS::ApiGatewayV2::Stage` is still declared
+separately, and an imported API with no stage answers 404.
+
+```typescript sim-apigatewayv2-openapi
+/**
+ * Creating a simulated HTTP API from an OpenAPI 3 definition.
+ */
+
+import {
+  CreateStageCommand,
+  GetRoutesCommand,
+  ImportApiCommand,
+} from "@aws-sdk/client-apigatewayv2";
+import {
+  AddPermissionCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import type { SimPayload2Event } from "@kensio/yulin/apigatewayv2";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+
+const { FunctionArn } = await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "orders",
+    Role: "arn:aws:iam::111111111111:role/OrdersRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput((event: SimPayload2Event) => ({
+        statusCode: 200,
+        headers: { "content-type": "text/plain" },
+        body: `order ${event.pathParameters?.["orderId"] ?? "none"}`,
+      })),
+    },
+  }),
+);
+
+const openApi = {
+  openapi: "3.0.1",
+  info: { title: "orders", version: "1.0" },
+  paths: {
+    "/orders/{orderId}": {
+      get: {
+        // Ignored, as on AWS: HTTP APIs do no request validation.
+        responses: { "200": { description: "200 response" } },
+        "x-amazon-apigateway-integration": {
+          type: "aws_proxy",
+          httpMethod: "POST",
+          uri:
+            `arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/` +
+            `${FunctionArn}/invocations`,
+          payloadFormatVersion: "2.0",
+        },
+      },
+    },
+  },
+};
+
+const apiGateway = simAws.apiGatewayV2();
+
+const { ApiId, ApiEndpoint } = await apiGateway.importApi(
+  new ImportApiCommand({ Body: JSON.stringify(openApi) }),
+);
+
+const routes = await apiGateway.getRoutes(new GetRoutesCommand({ ApiId }));
+
+console.log(routes.Items[0]?.RouteKey); // "GET /orders/{orderId}"
+
+// An import creates no stage, so the API answers 404 until one is created.
+await apiGateway.createStage(
+  new CreateStageCommand({ ApiId, StageName: "$default", AutoDeploy: true }),
+);
+
+await simAws.lambda().addPermission(
+  new AddPermissionCommand({
+    FunctionName: "orders",
+    StatementId: "api-gateway-invoke",
+    Action: "lambda:InvokeFunction",
+    Principal: "apigateway.amazonaws.com",
+    SourceArn: `arn:aws:execute-api:us-east-1:888888888888:${ApiId}/*/*`,
+  }),
+);
+
+const srv = await serveSimAws({ simAws });
+
+const response = await fetch(srv.localUrl(`${ApiEndpoint}/orders/42`));
+
+console.log(await response.text()); // "order 42"
+
+srv.close();
+```
+
+The API is named by `info.title`. `uri` is read as either the long
+`arn:aws:apigateway:<region>:lambda:path/2015-03-31/functions/<function-arn>/invocations` form above
+or as the bare function ARN.
+
+### Members that are ignored
+
+AWS sorts what an import finds into three categories, and the third is valid OpenAPI that HTTP APIs
+do not support. It is ignored silently, and so is it here: `requestBody`, the content schemas under
+`responses`, `components.schemas`, and an operation's `parameters`, `summary`, `description` and
+`tags`. HTTP APIs perform no request validation, so a request whose body contradicts a declared
+schema still reaches the handler.
+
+Everything else the document carries and this simulation cannot apply is refused, naming the JSON
+pointer of the member, such as
+`#/paths/~1orders~1{orderId}/get/x-amazon-apigateway-integration/payloadFormatVersion`.
+
+### A shared integration or authorizer
+
+An operation's `x-amazon-apigateway-integration` may be a reference into
+`components.x-amazon-apigateway-integrations`:
+
+```json
+{
+  "get": {
+    "x-amazon-apigateway-integration": {
+      "$ref": "#/components/x-amazon-apigateway-integrations/orders"
+    }
+  }
+}
+```
+
+The referenced definition is created once and shared by every operation naming it. A `$ref` anywhere
+else is refused, naming the pointer it holds.
+
+### Protecting an imported route
+
+A security scheme of type `oauth2` carrying an `x-amazon-apigateway-authorizer` with `type: "jwt"`
+becomes a JWT authorizer. The scheme key is the authorizer's name, one authorizer is created per
+scheme, and an operation naming it gets `AuthorizationType: "JWT"` with the requirement's scope list
+as its `AuthorizationScopes`. An operation with no `security` is open.
+
+```json
+{
+  "components": {
+    "securitySchemes": {
+      "pool-authorizer": {
+        "type": "oauth2",
+        "x-amazon-apigateway-authorizer": {
+          "type": "jwt",
+          "identitySource": "$request.header.Authorization",
+          "jwtConfiguration": {
+            "issuer": "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_abc",
+            "audience": ["3n4b5..."]
+          }
+        }
+      }
+    }
+  }
+}
+```
+
+`identitySource` is the comma-separated string a document writes, and a value carrying more than one
+entry is refused, as more than one `IdentitySource` is on `CreateAuthorizer`.
+
 ## CloudFormation
 
 [Simulated CloudFormation](../cloudformation/ "Simulated CloudFormation docs") deploys
@@ -1093,7 +1258,8 @@ srv.close();
 Every property outside the simulated set is refused by name, and the refusal fails the stack. The
 simulated properties are:
 
-- `Api`: `Name`, `ProtocolType`, `Description`, `DisableExecuteApiEndpoint`
+- `Api`: `Name`, `ProtocolType`, `Description`, `DisableExecuteApiEndpoint`, `Body`,
+  `FailOnWarnings`
 - `Authorizer`: `ApiId`, `Name`, `AuthorizerType`, `IdentitySource`, `JwtConfiguration`
 - `Integration`: `ApiId`, `IntegrationType`, `IntegrationUri`, `PayloadFormatVersion`, `Description`
 - `Route`: `ApiId`, `RouteKey`, `Target`, `AuthorizationType`, `AuthorizerId`, `AuthorizationScopes`
@@ -1113,6 +1279,37 @@ authorizer adds a client of its own with CDK's defaults, and those emit the OAut
 A `Route` with `AuthorizationType: "JWT"` whose `AuthorizerId` does not resolve to an authorizer of
 that API fails the stack, naming both. That covers a `Ref` to a Resource this simulation skipped: a
 skipped Resource resolves to its own logical ID, and no authorizer has that id.
+
+`Api.Body` carries an OpenAPI document as an inline JSON object, which CloudFormation resolves
+`Ref` and `Fn::GetAtt` inside as it does anywhere else, so an operation's integration URI can be an
+`Fn::GetAtt` on a function the same stack deploys. The document goes through the same `ImportApi`
+translator an SDK caller reaches, so the two produce the same API.
+
+```yaml
+Api:
+  Type: AWS::ApiGatewayV2::Api
+  Properties:
+    Body:
+      openapi: "3.0.1"
+      info: { title: orders, version: "1.0" }
+      paths:
+        /orders/{orderId}:
+          get:
+            x-amazon-apigateway-integration:
+              type: aws_proxy
+              httpMethod: POST
+              uri: !GetAtt Handler.Arn
+              payloadFormatVersion: "2.0"
+```
+
+`Name` and `ProtocolType` are both optional alongside a `Body`, which is what AWS documents. A
+`ProtocolType` that is present has to be `HTTP`, and a `Name` that is present names the API instead
+of the document's `info.title`. `Description` and `DisableExecuteApiEndpoint` are refused alongside a
+`Body`, because `ImportApi` does not take them and nothing here changes an API after it is created.
+
+A template combining an `Api` with a `Body` and a separate `Route`, `Integration` or `Authorizer`
+Resource for that same API fails the stack, naming both logical IDs. The document already declares
+the API's parts, and which of the two AWS would keep is not established.
 
 An `Api` carrying a `Policy` property is refused with its own message rather than the generic one. AWS
 has no such property on this Resource type, because an HTTP API has no resource policy, so a template
@@ -1164,8 +1361,11 @@ the simulation without being given one. See the
 - The integration's invoke permission, evaluated against the function's resource policy with the
   matched route supplied as `AWS:SourceArn`
 - `DisableExecuteApiEndpoint`, refusing requests to the generated endpoint
+- `ImportApi` for an OpenAPI 3.0 document, creating one route and one integration per operation and
+  one JWT authorizer per security scheme an operation names
 - Deployment of `AWS::ApiGatewayV2::Api`, `Authorizer`, `Integration`, `Route` and `Stage` from a
-  CloudFormation template, including one synthesized by CDK from an `HttpApi`
+  CloudFormation template, including one synthesized by CDK from an `HttpApi`, and an `Api` declared
+  as an OpenAPI document through `Body`
 - Authorization of every command by simulated IAM, against the HTTP method and resource path real
   API Gateway uses
 - SDK interception of an `ApiGatewayV2Client`
@@ -1184,9 +1384,12 @@ Current documented limitations:
   serves whichever Deployment it was given, which on real AWS is nothing until one is created.
 - `RouteSettings`, `DefaultRouteSettings` and `AccessLogSettings` on a stage are refused, as is any
   other option `CreateStage` takes and this one does not.
-- `AWS_PROXY` is the only integration type, and its URI must be an unqualified Lambda function ARN.
-  A version or alias qualifier is refused, since simulated Lambda has no versions. HTTP proxy
-  integrations and AWS service integrations are not simulated.
+- `AWS_PROXY` is the only integration type, and its URI must name an unqualified Lambda function
+  ARN, written either as that ARN or as the
+  `arn:aws:apigateway:<region>:lambda:path/2015-03-31/functions/<function-arn>/invocations` form.
+  Both reach the same function, and `GetIntegrations` answers with the function ARN whichever was
+  written. A version or alias qualifier is refused, since simulated Lambda has no versions. HTTP
+  proxy integrations and AWS service integrations are not simulated.
 - Payload format 1.0 is refused. A handler written for 1.0 reads event fields a 2.0 event does not
   have, so treating one as the other would pass here and fail on AWS.
 - `AuthorizationType` is `NONE`, `JWT` or `AWS_IAM`. A `CUSTOM` route is refused rather than created
@@ -1267,8 +1470,41 @@ Current documented limitations:
   effect. CORS request handling is not simulated, and a template that configured it would otherwise
   get an API that answered preflight requests here differently from AWS. A CDK stack using
   `corsPreflight` does not deploy.
-- `AWS::ApiGatewayV2::Api` refuses `Body` and `BodyS3Location` by name. Importing an OpenAPI document
-  is a second way to declare routes and integrations, and none of that translation is simulated.
+- Only OpenAPI 3.0.x is imported. A `swagger: "2.0"` document and an `openapi: "3.1.0"` one are both
+  refused by version, and only JSON is parsed, not YAML.
+- `FailOnWarnings` is honoured only in its strict sense. Everything an import cannot apply is refused
+  rather than warned about, so `true` is accepted and has no further effect and `false` is refused by
+  name. What AWS defaults the property to is not established, so nothing here relies on a default.
+- `Basepath` on `ImportApi`, `BasePath` on `AWS::ApiGatewayV2::Api` and `servers` in the document are
+  all refused. A base path changes the path every route matches on, which belongs with custom domain
+  names.
+- `ReimportApi` is not simulated, as no `Update*` command is. Delete the API and import again.
+- An imported `operationId` is dropped rather than stored. AWS maps it to the route's
+  `OperationName`, and no command here takes one.
+- A `trace` operation, a path item `$ref`, `x-amazon-apigateway-any-method` and a document-level
+  `security` are each refused by name. None of the four is established for HTTP APIs by the research
+  behind this, so each is refused rather than turned into a route the API may not have on AWS.
+- An operation carrying more than one security requirement is refused, as is a requirement naming
+  more than one scheme. A route has one authorizer.
+- A security scheme that is not `oauth2` with an explicit `jwtConfiguration.issuer` is refused. That
+  includes `openIdConnect`, where AWS reads the issuer out of the discovery document at
+  `openIdConnectUrl`: nothing here is fetched over HTTP, and taking the URL as the issuer would
+  mismatch every token's `iss` and answer a silent 401.
+- `http_proxy` integrations, `integrationMethod`, `integrationSubtype`, `requestParameters`,
+  `credentials`, `tlsConfig`, `responseTransferMode`, `connectionId` and `connectionType` in an
+  imported integration are all refused by name, as their `AWS::ApiGatewayV2::Integration`
+  counterparts are.
+- `x-amazon-apigateway-cors` is refused, alongside the `CorsConfiguration` refusal above.
+- A referenced `x-amazon-apigateway-integrations` definition becomes one shared integration, so two
+  operations naming it produce one entry in `GetIntegrations`. Whether AWS shares one or creates one
+  per use is not established; this is what a reusable definition reads as.
+- A `Name` on an `AWS::ApiGatewayV2::Api` with a `Body` names the API rather than the document's
+  `info.title`. Which of the two AWS takes when both are present is not established, and it affects
+  only the name `GetApi` reports.
+- A terminal `{proxy+}` in an imported path reaches `CreateRoute` unchanged. Greedy segments are
+  established for route keys rather than for OpenAPI path templating.
+- `AWS::ApiGatewayV2::Api` refuses `BodyS3Location` by name. Reading a document out of a simulated S3
+  bucket adds a fetch path and nothing about OpenAPI.
 - `AWS::ApiGatewayV2::Api` refuses `Policy` with a message of its own saying an HTTP API has no
   resource policy. There is no such property on the real Resource type, so a template carrying one
   was written for a REST API rather than hitting a gap here.

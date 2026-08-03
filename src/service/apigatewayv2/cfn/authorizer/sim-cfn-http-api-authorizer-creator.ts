@@ -3,10 +3,12 @@ import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-re
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimHttpApiAuthorizer } from "../../api/authorizer/sim-http-api-authorizer.js";
 import type { SimApiGatewayV2 } from "../../sim-api-gateway-v2.js";
+import type { SimCfnHttpApiImports } from "../sim-cfn-http-api-imports.js";
 import { SimCfnHttpApiAuthorizerProperties } from "./sim-cfn-http-api-authorizer-properties.js";
 
 interface SimCfnHttpApiAuthorizerCreatorProperties {
   readonly apiGatewayV2: SimApiGatewayV2;
+  readonly imports: SimCfnHttpApiImports;
 }
 
 /**
@@ -20,9 +22,11 @@ interface SimCfnHttpApiAuthorizerCreatorProperties {
  */
 export class SimCfnHttpApiAuthorizerCreator {
   private readonly apiGatewayV2: SimApiGatewayV2;
+  private readonly imports: SimCfnHttpApiImports;
 
   constructor(properties: SimCfnHttpApiAuthorizerCreatorProperties) {
     this.apiGatewayV2 = properties.apiGatewayV2;
+    this.imports = properties.imports;
   }
 
   /**
@@ -37,6 +41,11 @@ export class SimCfnHttpApiAuthorizerCreator {
       properties,
     });
     const apiId = authorizerProperties.apiId();
+    this.imports.requireNotImported(
+      "AWS::ApiGatewayV2::Authorizer",
+      resource,
+      apiId,
+    );
 
     const created = await this.apiGatewayV2.createAuthorizer({
       input: authorizerProperties.createAuthorizerInput(),

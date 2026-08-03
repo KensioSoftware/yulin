@@ -1,21 +1,28 @@
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
-import type { SimCreateApiCommandInput } from "../../command/api/api.command.js";
+import type {
+  SimCreateApiCommandInput,
+  SimImportApiCommandInput,
+} from "../../command/api/api.command.js";
 import { SimCfnApiGatewayV2PropertyParser } from "../sim-cfn-api-gateway-v2-property-parser.js";
+import { SimCfnHttpApiImportProperties } from "./sim-cfn-http-api-import-properties.js";
+import { SimCfnHttpApiPropertyRules } from "./sim-cfn-http-api-property-rules.js";
 
 /**
  * The AWS::ApiGatewayV2::Api properties this simulation deploys.
  *
- * `Body`, `BodyS3Location`, `CorsConfiguration`, `Tags`, and the
- * `Target`/`RouteKey` quick-create shorthand are all left out, so a template
- * carrying one is refused by name. Each of them changes what the API serves,
- * and none of them is modelled.
+ * `BodyS3Location`, `CorsConfiguration`, `Tags`, and the `Target`/`RouteKey`
+ * quick-create shorthand are all left out, so a template carrying one is
+ * refused by name. Each of them changes what the API serves, and none of them
+ * is modelled.
  */
 const simulatedProperties = [
   "Name",
   "ProtocolType",
   "Description",
   "DisableExecuteApiEndpoint",
+  "Body",
+  "FailOnWarnings",
 ];
 
 interface SimCfnHttpApiPropertiesProperties {
@@ -24,8 +31,12 @@ interface SimCfnHttpApiPropertiesProperties {
 }
 
 /**
- * Reads AWS::ApiGatewayV2::Api CloudFormation properties into the CreateApi
- * input the API creator needs.
+ * Reads AWS::ApiGatewayV2::Api CloudFormation properties into the CreateApi or
+ * ImportApi input the API creator needs.
+ *
+ * A `Body` is the whole declaration of an API: its routes, its integrations
+ * and its authorizers all come out of the document rather than out of sibling
+ * Resources, so that half is read by SimCfnHttpApiImportProperties.
  */
 export class SimCfnHttpApiProperties {
   private readonly resource: SimCfnResource;
@@ -34,13 +45,37 @@ export class SimCfnHttpApiProperties {
     resourceType: "AWS::ApiGatewayV2::Api",
     simulated: simulatedProperties,
   });
+  private readonly rules: SimCfnHttpApiPropertyRules;
 
   constructor(properties: SimCfnHttpApiPropertiesProperties) {
     this.resource = properties.resource;
     this.properties = properties.properties;
+    this.rules = new SimCfnHttpApiPropertyRules({
+      resource: this.resource,
+      properties: this.properties,
+    });
 
-    this.requireNoResourcePolicy();
+    this.rules.requireNoResourcePolicy();
     this.propertyParser.requireOnlySimulated(this.resource, this.properties);
+  }
+
+  /**
+   * Whether this Resource declares the API as an OpenAPI document.
+   */
+  imported(): boolean {
+    return this.properties["Body"] !== undefined;
+  }
+
+  /**
+   * The ImportApi input this Resource asks for.
+   */
+  importApiInput(): SimImportApiCommandInput {
+    return new SimCfnHttpApiImportProperties({
+      resource: this.resource,
+      properties: this.properties,
+      propertyParser: this.propertyParser,
+      rules: this.rules,
+    }).importApiInput();
   }
 
   /**
@@ -50,6 +85,8 @@ export class SimCfnHttpApiProperties {
    * WebSocket API is refused by CreateApi with the reason it is refused.
    */
   createApiInput(): SimCreateApiCommandInput {
+    this.rules.requireBodyForFailOnWarnings();
+
     return {
       Name: this.propertyParser.requiredString(
         this.resource,
@@ -72,27 +109,5 @@ export class SimCfnHttpApiProperties {
         "DisableExecuteApiEndpoint",
       ),
     };
-  }
-
-  /**
-   * Refuse a `Policy` property with the reason it cannot be deployed.
-   *
-   * The generic refusal reports a property as not simulated, which reads as a
-   * gap that will be filled later. There is no such property on this Resource
-   * type: HTTP APIs have no resource policies at all, so the only template
-   * carrying one was written for a REST API.
-   */
-  private requireNoResourcePolicy(): void {
-    if (this.properties["Policy"] === undefined) {
-      return;
-    }
-
-    throw new Error(
-      `AWS::ApiGatewayV2::Api ${this.resource.logicalId} property Policy ` +
-        `cannot be deployed: an HTTP API has no resource policy, and AWS ` +
-        `has no such property on this Resource type. A resource policy is a ` +
-        `REST API feature, declared on AWS::ApiGateway::RestApi. Authorize ` +
-        `the API's routes with AuthorizationType AWS_IAM instead.`,
-    );
   }
 }

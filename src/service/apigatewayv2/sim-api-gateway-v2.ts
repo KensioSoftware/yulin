@@ -17,6 +17,7 @@ import { SimHttpApiStore } from "./api/sim-http-api-store.js";
 import { SimApiGatewayV2CfnResourceFactory } from "./cfn/sim-cfn-api-gateway-v2-resource-factory.js";
 import type { SimHttpApi } from "./api/sim-http-api.js";
 import { SimHttpApiCommands } from "./command/api/sim-http-api-commands.js";
+import { SimHttpApiImportCommands } from "./command/api/sim-http-api-import-commands.js";
 import { SimApiGatewayV2Authorizer } from "./command/authorize/sim-api-gateway-v2-authorizer.js";
 import { SimHttpApiAuthorizerCommands } from "./command/authorizer/sim-http-api-authorizer-commands.js";
 import { SimHttpApiIntegrationCommands } from "./command/integration/sim-http-api-integration-commands.js";
@@ -56,6 +57,7 @@ interface SimApiGatewayV2Properties {
 export class SimApiGatewayV2 {
   private readonly apis = new SimHttpApiStore();
   private readonly apiCommands: SimHttpApiCommands;
+  private readonly importCommands: SimHttpApiImportCommands;
   private readonly authorizerCommands: SimHttpApiAuthorizerCommands;
   private readonly integrationCommands: SimHttpApiIntegrationCommands;
   private readonly routeCommands: SimHttpApiRouteCommands;
@@ -96,6 +98,14 @@ export class SimApiGatewayV2 {
       access,
       clock: background,
     });
+    this.importCommands = new SimHttpApiImportCommands({
+      apis: this.apis,
+      registry,
+      apiCommands: this.apiCommands,
+      authorizerCommands: this.authorizerCommands,
+      integrationCommands: this.integrationCommands,
+      routeCommands: this.routeCommands,
+    });
   }
 
   /**
@@ -117,6 +127,22 @@ export class SimApiGatewayV2 {
   ): Promise<simApiGatewayV2Commands.SimCreateApiCommandOutput> {
     await this.background.sequence();
     return this.apiCommands.createApi(command, options);
+  }
+
+  /**
+   * Handle an ImportApi Command from the SDK.
+   *
+   * The API, its routes, its integrations and its JWT authorizers all come
+   * from one OpenAPI 3.0 document. No stage is created, so an imported API
+   * answers 404 until a stage is created separately, which is what an import
+   * does on AWS.
+   */
+  async importApi(
+    command: simApiGatewayV2Commands.SimImportApiCommand,
+    options?: SimApiGatewayV2RequestOptions,
+  ): Promise<simApiGatewayV2Commands.SimImportApiCommandOutput> {
+    await this.background.sequence();
+    return this.importCommands.importApi(command, options);
   }
 
   /**

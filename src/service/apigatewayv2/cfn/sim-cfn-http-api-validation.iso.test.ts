@@ -38,26 +38,7 @@ describe("API Gateway v2 CloudFormation validation", () => {
     assertStringIncludes(
       error.message,
       "The simulated properties are Name, ProtocolType, Description, " +
-        "DisableExecuteApiEndpoint.",
-    );
-  });
-
-  it("refuses an OpenAPI document body on an API", async () => {
-    // Given an API declared as an OpenAPI document rather than as Resources
-    const simAws = simAwsInEuWest2();
-
-    // When the template is deployed
-    const error = await deployHttpApiFailure(
-      simAws,
-      simCfnHttpApiTemplateFactory.make({
-        apiProperties: { Body: { openapi: "3.0.1" } },
-      }),
-    );
-
-    // Then the stack fails rather than deploying an API with no routes
-    assertStringIncludes(
-      error.message,
-      "AWS::ApiGatewayV2::Api Api property Body is not simulated",
+        "DisableExecuteApiEndpoint, Body, FailOnWarnings.",
     );
   });
 

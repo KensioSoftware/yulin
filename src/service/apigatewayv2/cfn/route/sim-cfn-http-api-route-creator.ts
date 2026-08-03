@@ -3,10 +3,12 @@ import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-re
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 import type { SimHttpApiRoute } from "../../api/route/sim-http-api-route.js";
 import type { SimApiGatewayV2 } from "../../sim-api-gateway-v2.js";
+import type { SimCfnHttpApiImports } from "../sim-cfn-http-api-imports.js";
 import { SimCfnHttpApiRouteProperties } from "./sim-cfn-http-api-route-properties.js";
 
 interface SimCfnHttpApiRouteCreatorProperties {
   readonly apiGatewayV2: SimApiGatewayV2;
+  readonly imports: SimCfnHttpApiImports;
 }
 
 /**
@@ -23,9 +25,11 @@ interface SimCfnHttpApiRouteCreatorProperties {
  */
 export class SimCfnHttpApiRouteCreator {
   private readonly apiGatewayV2: SimApiGatewayV2;
+  private readonly imports: SimCfnHttpApiImports;
 
   constructor(properties: SimCfnHttpApiRouteCreatorProperties) {
     this.apiGatewayV2 = properties.apiGatewayV2;
+    this.imports = properties.imports;
   }
 
   /**
@@ -40,6 +44,11 @@ export class SimCfnHttpApiRouteCreator {
       properties,
     });
     const apiId = routeProperties.apiId();
+    this.imports.requireNotImported(
+      "AWS::ApiGatewayV2::Route",
+      resource,
+      apiId,
+    );
 
     const created = await this.apiGatewayV2.createRoute({
       input: routeProperties.createRouteInput(),

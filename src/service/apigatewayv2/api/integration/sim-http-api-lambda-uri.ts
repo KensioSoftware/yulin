@@ -4,6 +4,20 @@ const lambdaFunctionArn =
   /^arn:aws:lambda:(?<regionName>[a-z0-9-]+):(?<accountId>\d{12}):function:(?<functionName>[a-zA-Z0-9-_]+)$/;
 
 /**
+ * The other form an integration URI is written in, wrapping a Lambda function
+ * ARN in an API Gateway path:
+ *
+ *   arn:aws:apigateway:eu-west-2:lambda:path/2015-03-31/functions/<function-arn>/invocations
+ *
+ * The date is the Lambda invoke API version and is part of the literal rather
+ * than something a caller chooses. An OpenAPI document being imported writes
+ * this form, and so does a hand-written CloudFormation template, while CDK
+ * emits the bare function ARN.
+ */
+const apiGatewayLambdaPathUri =
+  /^arn:[^:]+:apigateway:[^:]+:lambda:path\/2015-03-31\/functions\/(?<functionArn>arn:[^/]+)\/invocations$/;
+
+/**
  * The `IntegrationUri` of an `AWS_PROXY` integration: the ARN of the Lambda
  * function the integration invokes.
  *
@@ -11,6 +25,11 @@ const lambdaFunctionArn =
  * on the end names a published function version, and simulated Lambda has no
  * versions, so one is refused rather than invoked as the unpublished function
  * it is not.
+ *
+ * Both URI forms reach the same function, and both are held as the function
+ * ARN, which is what the API hands back. Reading them here rather than in each
+ * caller is what lets an SDK caller, a template and an imported document write
+ * whichever form they write.
  */
 export class SimHttpApiLambdaUri {
   public readonly uri: string;
@@ -31,7 +50,8 @@ export class SimHttpApiLambdaUri {
    * ARN.
    */
   static parse(uri: string): SimHttpApiLambdaUri {
-    const groups = lambdaFunctionArn.exec(uri)?.groups;
+    const functionArn = this.functionArn(uri);
+    const groups = lambdaFunctionArn.exec(functionArn)?.groups;
 
     if (groups === undefined) {
       throw new SimApiGatewayV2BadRequest(
@@ -42,6 +62,13 @@ export class SimHttpApiLambdaUri {
       );
     }
 
-    return new SimHttpApiLambdaUri(uri, groups);
+    return new SimHttpApiLambdaUri(functionArn, groups);
+  }
+
+  /**
+   * The function ARN a URI names, in either form it is written in.
+   */
+  private static functionArn(uri: string): string {
+    return apiGatewayLambdaPathUri.exec(uri)?.groups?.["functionArn"] ?? uri;
   }
 }
