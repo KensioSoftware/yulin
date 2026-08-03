@@ -1,3 +1,5 @@
+import type { JSONValue } from "../../util/type-guard/json.js";
+
 /**
  * A Lambda proxy invocation event in API Gateway HTTP API payload format 2.0.
  *
@@ -50,12 +52,25 @@ export interface SimPayload2RequestContext {
  * An endpoint that admits anyone has no caller to describe, so real AWS leaves
  * this out entirely rather than filling it with blanks. Which member is
  * present says which kind of authorizer admitted the request: `iam` for a
- * SigV4-signed request, `jwt` for a JWT authorizer.
+ * SigV4-signed request, `jwt` for a JWT authorizer, `lambda` for a Lambda
+ * `REQUEST` authorizer.
  */
 export interface SimPayload2AuthorizerContext {
   iam?: SimPayload2IamAuthorizer;
   jwt?: SimPayload2JwtAuthorizer;
+  lambda?: SimPayload2LambdaAuthorizer | null;
 }
+
+/**
+ * The context a Lambda `REQUEST` authorizer passed on to the integration.
+ *
+ * The values arrive as the authorizer returned them rather than stringified,
+ * which is what payload format 2.0 does with them: a REST API's `$context`
+ * variables are strings, and this is not one of those. An authorizer that
+ * allowed the request and returned no context at all leaves `null` here, so
+ * the authorizer block is still there to say which kind of authorizer ran.
+ */
+export type SimPayload2LambdaAuthorizer = Readonly<Record<string, JSONValue>>;
 
 /**
  * The IAM caller of a SigV4-authorized invocation.

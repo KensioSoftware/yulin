@@ -835,6 +835,236 @@ The way through, here and on AWS, is for that principal to assume a Role in the 
 STS and sign with the session credentials. The request is then made by a principal of the API's own
 Account.
 
+## Protecting a route with a Lambda authorizer
+
+A Lambda `REQUEST` authorizer runs a function of its own before the integration is invoked, and that
+function decides. `CreateAuthorizerCommand` with `AuthorizerType: "REQUEST"` creates one, and a route
+asks for it with `AuthorizationType: "CUSTOM"` and the authorizer's id.
+
+`IdentitySource` is what the request has to carry before the function is invoked at all. Each entry
+is `$request.header.<name>` or `$request.querystring.<name>`, and a request missing any one of them is
+refused without the function running.
+
+`EnableSimpleResponses: true` asks the function for `{ isAuthorized, context }`. With it off, the
+function answers a `principalId` and an IAM `policyDocument` instead. Either way, the `context` it
+returns reaches the integration handler as `event.requestContext.authorizer.lambda`.
+
+```typescript sim-apigatewayv2-lambda-authorizer
+/**
+ * Protecting a simulated HTTP API route with a Lambda REQUEST authorizer.
+ */
+
+import {
+  CreateApiCommand,
+  CreateAuthorizerCommand,
+  CreateIntegrationCommand,
+  CreateRouteCommand,
+  CreateStageCommand,
+} from "@aws-sdk/client-apigatewayv2";
+import {
+  AddPermissionCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import type {
+  SimHttpApiAuthorizerEvent,
+  SimPayload2Event,
+} from "@kensio/yulin/apigatewayv2";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const lambda = simAws.lambda();
+
+const { FunctionArn: AuthorizerFunctionArn } = await lambda.createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "session-authorizer",
+    Role: "arn:aws:iam::888888888888:role/AuthorizerRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput((event: SimHttpApiAuthorizerEvent) => ({
+        isAuthorized: event.identitySource[0] === "session=valid",
+        context: { tenant: "acme" },
+      })),
+    },
+  }),
+);
+
+const { FunctionArn } = await lambda.createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "account",
+    Role: "arn:aws:iam::888888888888:role/AccountRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput((event: SimPayload2Event) => ({
+        statusCode: 200,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(event.requestContext.authorizer?.lambda),
+      })),
+    },
+  }),
+);
+
+const apiGateway = simAws.apiGatewayV2();
+
+const { ApiId, ApiEndpoint } = await apiGateway.createApi(
+  new CreateApiCommand({ Name: "account", ProtocolType: "HTTP" }),
+);
+
+const { IntegrationId } = await apiGateway.createIntegration(
+  new CreateIntegrationCommand({
+    ApiId,
+    IntegrationType: "AWS_PROXY",
+    IntegrationUri: FunctionArn,
+    PayloadFormatVersion: "2.0",
+  }),
+);
+
+const { AuthorizerId } = await apiGateway.createAuthorizer(
+  new CreateAuthorizerCommand({
+    ApiId,
+    Name: "session-cookie",
+    AuthorizerType: "REQUEST",
+    AuthorizerUri: AuthorizerFunctionArn,
+    AuthorizerPayloadFormatVersion: "2.0",
+    EnableSimpleResponses: true,
+    IdentitySource: ["$request.header.cookie"],
+  }),
+);
+
+await apiGateway.createRoute(
+  new CreateRouteCommand({
+    ApiId,
+    RouteKey: "GET /account",
+    Target: `integrations/${IntegrationId}`,
+    AuthorizationType: "CUSTOM",
+    AuthorizerId,
+  }),
+);
+
+await apiGateway.createStage(
+  new CreateStageCommand({ ApiId, StageName: "$default", AutoDeploy: true }),
+);
+
+// Each function needs its own grant: the integration is invoked under the ARN
+// of the route, and the authorizer under an ARN naming the authorizer.
+await lambda.addPermission(
+  new AddPermissionCommand({
+    FunctionName: "account",
+    StatementId: "api-gateway-invoke",
+    Action: "lambda:InvokeFunction",
+    Principal: "apigateway.amazonaws.com",
+    SourceArn: `arn:aws:execute-api:us-east-1:888888888888:${ApiId}/*/*`,
+  }),
+);
+
+await lambda.addPermission(
+  new AddPermissionCommand({
+    FunctionName: "session-authorizer",
+    StatementId: "api-gateway-invoke-authorizer",
+    Action: "lambda:InvokeFunction",
+    Principal: "apigateway.amazonaws.com",
+    SourceArn: `arn:aws:execute-api:us-east-1:888888888888:${ApiId}/authorizers/${AuthorizerId}`,
+  }),
+);
+
+const srv = await serveSimAws({ simAws });
+const url = srv.localUrl(`${ApiEndpoint}/account`);
+
+const refused = await fetch(url, { headers: { cookie: "session=expired" } });
+
+console.log(refused.status); // 403
+
+const admitted = await fetch(url, { headers: { cookie: "session=valid" } });
+
+console.log(await admitted.text()); // '{"tenant":"acme"}'
+
+srv.close();
+```
+
+The authorizer function is invoked once per request reaching the route. Nothing is cached between
+requests.
+
+### The event the authorizer receives
+
+The function is invoked with the payload format 2.0 request event, plus three members of its own,
+exported as `SimHttpApiAuthorizerEvent`:
+
+```json
+{
+  "version": "2.0",
+  "type": "REQUEST",
+  "routeArn": "arn:aws:execute-api:us-east-1:888888888888:a1b2c3d4e5/$default/GET/account",
+  "identitySource": ["session=valid"],
+  "routeKey": "GET /account",
+  "rawPath": "/account",
+  "rawQueryString": "",
+  "headers": { "cookie": "session=valid" },
+  "requestContext": { "...": "as the integration receives it" }
+}
+```
+
+`identitySource` carries the values found at the authorizer's identity sources, in the order they were
+configured, rather than the expressions that found them. `routeArn` names the route the request
+matched, with the route key's path template rather than the path asked for, so `GET /orders/{orderId}`
+is `<apiId>/<stage>/GET/orders/{orderId}` whichever order was asked for.
+
+There is no `body` and no `isBase64Encoded`. AWS's published example of this event carries neither, so
+an authorizer cannot read the request body here, as it cannot on AWS.
+
+### Answering with a policy
+
+With `EnableSimpleResponses` left off, the function answers a `principalId` and an IAM policy
+document, and simulated IAM evaluates it for `execute-api:Invoke` against the route ARN. That is the
+same evaluation an [`AWS_IAM` route](#protecting-a-route-with-iam) goes through, with one difference:
+the returned document is the whole decision, since there is no IAM principal behind it. `principalId`
+is a name the function chose for the caller and grants nothing.
+
+```typescript
+makeLambdaZipFileInput((event: SimHttpApiAuthorizerEvent) => ({
+  principalId: "user-1",
+  policyDocument: {
+    Version: "2012-10-17",
+    Statement: [
+      {
+        Effect: event.identitySource[0] === "session=valid" ? "Allow" : "Deny",
+        Action: "execute-api:Invoke",
+        Resource: event.routeArn,
+      },
+    ],
+  },
+  context: { tenant: "acme" },
+}));
+```
+
+An explicit `Deny` beats an `Allow`, and a document allowing nothing relevant refuses the request.
+
+### What a refused request gets back
+
+- A request missing any configured identity source is a 401 and `{"message":"Unauthorized"}`, and the
+  authorizer function is never invoked.
+- `isAuthorized: false`, or a policy that does not allow `execute-api:Invoke` on the route ARN, is a
+  403 and `{"message":"Forbidden"}`.
+- Returning `{ "errorMessage": "Unauthorized" }` is a 401. That is the only way an authorizer produces
+  one, and it is read whichever response format the authorizer is configured for.
+- A function that throws, returns a shape neither response format matches, returns a policy document
+  IAM cannot read, or has no invoke permission, is a 500 and `{"message":"Internal Server Error"}`.
+  The caller is told nothing further, as it is told nothing about a failed integration.
+
+The integration is never invoked in any of these cases.
+
+### The authorizer's invoke permission
+
+The authorizer's function is invoked under
+`arn:aws:execute-api:<region>:<account>:<apiId>/authorizers/<authorizerId>`, which is the `SourceArn`
+AWS documents for granting API Gateway permission to invoke one. That ARN names no stage and no
+route, so it is a different grant from the integration's, and a function used for both needs both.
+
+### The context the handler receives
+
+The `context` the authorizer returned arrives as `event.requestContext.authorizer.lambda`, with its
+values as the function returned them rather than stringified. An authorizer that allowed the request
+and returned no context leaves `null` there, so the block still says which kind of authorizer ran.
+
 ## The event the handler receives
 
 The handler is invoked with the API Gateway HTTP API payload format 2.0 event, exported as
@@ -1354,12 +1584,16 @@ the simulation without being given one. See the
 - Routes protected with `AuthorizationType: "AWS_IAM"`, evaluating `execute-api:Invoke` against the
   `execute-api` ARN of the route being called, for a caller resolved from a SigV4 signature or an
   `x-sim-aws-caller` header, and reaching the handler as `event.requestContext.authorizer.iam`
+- `CreateAuthorizer`, `GetAuthorizers` and `DeleteAuthorizer` for a Lambda `REQUEST` authorizer, and
+  routes protected by one with `AuthorizationType: "CUSTOM"`, invoking the authorizer's function with
+  the payload format 2.0 authorizer event, reading a simple response or an IAM policy response, and
+  passing the returned context to the handler as `event.requestContext.authorizer.lambda`
 - `CreateStage` and `GetStages` for the `$default` stage and for named stages served under their own
   path segment, including stage variables
 - Serving the generated endpoint through `serveSimAws`, invoking the integrated function with a
   payload format 2.0 event and turning its result back into an HTTP response
-- The integration's invoke permission, evaluated against the function's resource policy with the
-  matched route supplied as `AWS:SourceArn`
+- The invoke permission of an integration's function and of an authorizer's, each evaluated against
+  that function's resource policy with its own `AWS:SourceArn`
 - `DisableExecuteApiEndpoint`, refusing requests to the generated endpoint
 - `ImportApi` for an OpenAPI 3.0 document, creating one route and one integration per operation and
   one JWT authorizer per security scheme an operation names
@@ -1392,11 +1626,9 @@ Current documented limitations:
   proxy integrations and AWS service integrations are not simulated.
 - Payload format 1.0 is refused. A handler written for 1.0 reads event fields a 2.0 event does not
   have, so treating one as the other would pass here and fail on AWS.
-- `AuthorizationType` is `NONE`, `JWT` or `AWS_IAM`. A `CUSTOM` route is refused rather than created
-  open, since a route asking for it would admit anyone here and refuse them on AWS.
-- `AuthorizationScopes` on an `AWS_IAM` route is refused. This is stricter than AWS, which documents
-  route scopes as meaningful only for `JWT` and ignores them here. Accepting one would let a test
-  assert on a scope restriction that nothing applies.
+- `AuthorizationScopes` on an `AWS_IAM` or `CUSTOM` route is refused. This is stricter than AWS, which
+  documents route scopes as meaningful only for `JWT` and ignores them here. Accepting one would let a
+  test assert on a scope restriction that nothing applies.
 - The method and path segments of the ARN an `AWS_IAM` route is authorized against are inferred
   rather than documented, and the two callers of that ARN builder fill them differently: this one
   names the request's own method and path, while the integration's invoke permission names the route
@@ -1420,13 +1652,29 @@ Current documented limitations:
 - HTTP API resource policies are not simulated, because AWS does not have them. A caller from another
   Account is therefore always refused, since a cross-Account request needs an Allow from the resource
   side. Assume a Role in the API's Account instead, which is the route through on AWS as well.
-- Lambda `REQUEST` authorizers are not simulated, of either payload version. `CreateAuthorizer`
-  refuses `AuthorizerType: "REQUEST"` by name, as does an `AWS::ApiGatewayV2::Authorizer` asking for
-  one, since nothing here runs the code that would make the decision.
-- Authorizer result caching is not simulated. `AuthorizerResultTtlInSeconds` configures it and is one
-  of the `REQUEST`-only options refused by name, so it cannot be asked for at all.
-- One `IdentitySource`, either `$request.header.<name>` or `$request.querystring.<name>`. Multiple
-  identity sources are refused rather than partly read.
+- A Lambda `REQUEST` authorizer is created by `CreateAuthorizer` only.
+  `AWS::ApiGatewayV2::Authorizer` refuses `AuthorizerType: "REQUEST"` by name, and so does an
+  OpenAPI security scheme declaring one, so a `CUSTOM` route deployed from a template or an imported
+  document is not available yet.
+- `AuthorizerPayloadFormatVersion: "2.0"` is required on a `REQUEST` authorizer, and stating nothing
+  is refused too. AWS defaults it to `1.0`, which builds a different event and answers a policy
+  against a method ARN, and none of that is built here.
+- A `REQUEST` authorizer's event carries no `body` and no `isBase64Encoded`. AWS's published example
+  of that event carries neither, so an authorizer cannot read the request body.
+- An authorizer function that throws is a 500 rather than a 401. Real Lambda turns a thrown error
+  into a payload carrying `errorMessage`, and simulated Lambda rejects with the error itself, so
+  returning `{ "errorMessage": "Unauthorized" }` is how an authorizer asks for a 401 here.
+- `AuthorizerCredentialsArn` is refused. It names a Role API Gateway assumes to invoke the authorizer,
+  and the function's own resource policy is the whole decision here.
+- Authorizer result caching is not simulated. `AuthorizerResultTtlInSeconds` configures it, and only
+  `0`, the value that switches it off, is accepted. Every request reaching a `CUSTOM` route invokes
+  the authorizer's function.
+- A `REQUEST` authorizer requires at least one `IdentitySource`. An authorizer with none is invoked
+  for every request on AWS, including one carrying nothing, and that is not simulated.
+- An identity source is `$request.header.<name>` or `$request.querystring.<name>`. `$context.*` and
+  `$stagevariables.*`, which a `REQUEST` authorizer may also name on AWS, are refused rather than
+  read from nowhere. A JWT authorizer takes one identity source, and a second is refused rather than
+  partly read.
 - `JwtConfiguration.Audience` is required. What real API Gateway does with an authorizer that has an
   empty audience list is not documented, so this is stricter than AWS may be, in the direction that
   cannot quietly admit an app client.

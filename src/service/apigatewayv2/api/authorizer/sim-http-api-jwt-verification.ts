@@ -1,7 +1,7 @@
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import { SimJwtRs256 } from "../../../../util/jwt/sim-jwt-rs256.js";
 import { SimJwt } from "../../../../util/jwt/sim-jwt.js";
-import type { SimHttpApiAuthorizer } from "./sim-http-api-authorizer.js";
+import type { SimHttpApiJwtAuthorizer } from "./sim-http-api-jwt-authorizer.js";
 import {
   SimHttpApiAdmitted,
   type SimHttpApiAuthorization,
@@ -48,7 +48,7 @@ export class SimHttpApiJwtVerification {
    * that carried it.
    */
   verify(
-    authorizer: SimHttpApiAuthorizer,
+    authorizer: SimHttpApiJwtAuthorizer,
     token: string,
   ): SimHttpApiAuthorization {
     const jwt = this.decode(token);

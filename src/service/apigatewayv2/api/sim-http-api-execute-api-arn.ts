@@ -17,13 +17,17 @@ interface SimHttpApiExecuteApiArnProperties {
  * arn:aws:execute-api:<region>:<account>:<apiId>/<stage>/<METHOD>/<path>
  * ```
  *
- * Two things want this ARN and they fill the last part differently:
+ * Three things want this ARN and they fill the last part differently:
  *
  * - the invoke permission a Lambda integration is authorized against, where
  *   the path is the matched route key's template with its braces intact,
  *   because that is the form a permission's `SourceArn` is written in;
  * - `AWS_IAM` route authorization, where the path is the path the request
- *   asked for, because that is the resource the caller is acting on.
+ *   asked for, because that is the resource the caller is acting on;
+ * - the `routeArn` a Lambda `REQUEST` authorizer is given, and the resource
+ *   the policy it answers with is evaluated against, which is the route key
+ *   form: AWS's own example of that event names a `$default` route as
+ *   `<apiId>/<stage>/$default`.
  *
  * Neither part is documented by AWS as the value API Gateway supplies. The
  * path is the better supported of the two: CDK synthesises a `SourceArn`
@@ -48,6 +52,30 @@ export class SimHttpApiExecuteApiArn {
     this.api = properties.api;
     this.stageName = properties.stageName;
     this.methodAndPath = properties.methodAndPath;
+  }
+
+  /**
+   * The ARN API Gateway invokes one of an API's authorizers under.
+   *
+   * ```text
+   * arn:aws:execute-api:<region>:<account>:<apiId>/authorizers/<authorizerId>
+   * ```
+   *
+   * This is the `SourceArn` AWS documents for granting API Gateway permission
+   * to invoke a Lambda authorizer's function, and it names no stage: an
+   * authorizer belongs to the API rather than to anything serving a request.
+   * A function integrated behind a route and used as that route's authorizer
+   * therefore needs two permissions, as it does on AWS.
+   */
+  static forAuthorizer(
+    api: SimHttpApi,
+    authorizerId: string,
+  ): SimHttpApiExecuteApiArn {
+    return new SimHttpApiExecuteApiArn({
+      api,
+      stageName: "authorizers",
+      methodAndPath: authorizerId,
+    });
   }
 
   /**

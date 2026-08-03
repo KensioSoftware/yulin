@@ -13,16 +13,14 @@ import { SimAws } from "../../../aws/sim-aws.js";
 import { SimCognitoUserPoolRegistry } from "../../../cognito/registry/sim-cognito-user-pool-registry.js";
 import { simCognitoSignedInFactory } from "../../../cognito/user-pool/auth/sim-cognito-signed-in.factory.js";
 import { SimCognitoHttpApiJwtIssuerKeys } from "./sim-cognito-http-api-jwt-issuer-keys.js";
-import {
-  makeSimHttpApiAuthorizerId,
-  SimHttpApiAuthorizer,
-} from "./sim-http-api-authorizer.js";
+import { makeSimHttpApiAuthorizerId } from "./sim-http-api-authorizer.js";
 import {
   SimHttpApiAdmitted,
   type SimHttpApiAuthorization,
   type SimHttpApiRefused,
 } from "./sim-http-api-authorization.js";
 import { SimHttpApiIdentitySource } from "./sim-http-api-identity-source.js";
+import { SimHttpApiJwtAuthorizer } from "./sim-http-api-jwt-authorizer.js";
 import { SimHttpApiJwtConfiguration } from "./sim-http-api-jwt-configuration.js";
 import { SimHttpApiNoJwtIssuerKeys } from "./sim-http-api-jwt-issuer-keys.js";
 import { SimHttpApiJwtVerification } from "./sim-http-api-jwt-verification.js";
@@ -73,8 +71,11 @@ function refusalOf(authorization: SimHttpApiAuthorization): SimHttpApiRefused {
   return authorization;
 }
 
-function authorizerFor(issuer: string, audience: string): SimHttpApiAuthorizer {
-  return new SimHttpApiAuthorizer({
+function authorizerFor(
+  issuer: string,
+  audience: string,
+): SimHttpApiJwtAuthorizer {
+  return new SimHttpApiJwtAuthorizer({
     authorizerId: makeSimHttpApiAuthorizerId(),
     name: "pool-authorizer",
     identitySource: SimHttpApiIdentitySource.parse(

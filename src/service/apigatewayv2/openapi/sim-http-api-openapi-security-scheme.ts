@@ -79,8 +79,9 @@ export class SimHttpApiOpenApiSecurityScheme {
       throw authorizer
         .member("type")
         .refusal(
-          "is not jwt, and a JWT authorizer is the only kind simulated: a " +
-            "Lambda authorizer runs code of its own to decide",
+          "is not jwt, and a JWT authorizer is the only kind an imported " +
+            "document creates. Create a Lambda REQUEST authorizer with " +
+            "CreateAuthorizer instead",
         );
     }
 

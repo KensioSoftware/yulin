@@ -155,31 +155,33 @@ describe("The authorizers of a sim HTTP API", () => {
 });
 
 describe("What CreateAuthorizer refuses rather than ignores", () => {
-  it("refuses a Lambda authorizer", async () => {
+  it("refuses an authorizer type an HTTP API does not have", async () => {
     // Given an API
     const simAws = new SimAws();
     const apiId = await createdApiId(simAws);
 
-    // When a REQUEST authorizer is created
-    // Then it is refused, because nothing here runs the code that would decide
+    // When an authorizer of a REST API's token kind is created. The command is
+    // sent structurally rather than through the SDK, since the SDK types allow
+    // only the two values an HTTP API has.
+    // Then it is refused rather than created as something else
     await expect(
-      simAws.apiGatewayV2().createAuthorizer(
-        new CreateAuthorizerCommand({
+      simAws.apiGatewayV2().createAuthorizer({
+        input: {
           ApiId: apiId,
-          Name: "lambda",
-          AuthorizerType: "REQUEST",
+          Name: "token",
+          AuthorizerType: "TOKEN",
           IdentitySource: ["$request.header.Authorization"],
-        }),
-      ),
-    ).rejects.toThrow(/AuthorizerType 'REQUEST' is not simulated/);
+        },
+      }),
+    ).rejects.toThrow(/AuthorizerType 'TOKEN' is not simulated/);
   });
 
-  it("refuses the options only a Lambda authorizer takes", async () => {
+  it("refuses the options only a Lambda authorizer takes on a JWT one", async () => {
     // Given an API
     const simAws = new SimAws();
     const apiId = await createdApiId(simAws);
 
-    // When an authorizer asks for a result cache, or for the function to call
+    // When a JWT authorizer asks for a result cache, or for a function to call
     // Then each is refused by name rather than dropped
     await expect(
       simAws.apiGatewayV2().createAuthorizer(
@@ -192,7 +194,7 @@ describe("What CreateAuthorizer refuses rather than ignores", () => {
           AuthorizerResultTtlInSeconds: 300,
         }),
       ),
-    ).rejects.toThrow(/AuthorizerResultTtlInSeconds is not simulated/);
+    ).rejects.toThrow(/AuthorizerResultTtlInSeconds is set on a JWT/);
 
     await expect(
       simAws.apiGatewayV2().createAuthorizer(
@@ -205,7 +207,7 @@ describe("What CreateAuthorizer refuses rather than ignores", () => {
           AuthorizerUri: functionArn,
         }),
       ),
-    ).rejects.toThrow(/AuthorizerUri is not simulated/);
+    ).rejects.toThrow(/AuthorizerUri is set on a JWT authorizer/);
   });
 
   it("requires an issuer and an audience", async () => {
@@ -286,7 +288,7 @@ describe("What CreateAuthorizer refuses rather than ignores", () => {
           JwtConfiguration: { Issuer: issuer, Audience: ["client-1"] },
         }),
       ),
-    ).rejects.toThrow(/more than one identity source is not simulated/);
+    ).rejects.toThrow(/a JWT authorizer takes one/);
 
     await expect(
       simAws.apiGatewayV2().createAuthorizer(

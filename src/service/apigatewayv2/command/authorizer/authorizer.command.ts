@@ -12,8 +12,9 @@ export interface SimHttpApiJwtConfigurationInput {
 /**
  * Minimal structural sim API Gateway v2 CreateAuthorizer command.
  *
- * The `REQUEST`-only options are absent here on purpose, so a Lambda
- * authorizer is refused by name rather than created as something else.
+ * `AuthorizerCredentialsArn` is absent here on purpose. It names a Role API
+ * Gateway assumes to invoke the authorizer function, and nothing here assumes
+ * one, so it is refused by name rather than accepted and ignored.
  *
  * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/apigatewayv2/command/CreateAuthorizerCommand/
  */
@@ -27,6 +28,10 @@ export interface SimCreateAuthorizerCommandInput {
   readonly AuthorizerType?: string | undefined;
   readonly IdentitySource?: readonly string[] | undefined;
   readonly JwtConfiguration?: SimHttpApiJwtConfigurationInput | undefined;
+  readonly AuthorizerUri?: string | undefined;
+  readonly AuthorizerPayloadFormatVersion?: string | undefined;
+  readonly EnableSimpleResponses?: boolean | undefined;
+  readonly AuthorizerResultTtlInSeconds?: number | undefined;
 }
 
 export interface SimCreateAuthorizerCommandOutput extends SimHttpApiAuthorizerView {

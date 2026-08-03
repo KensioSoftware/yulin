@@ -1,9 +1,13 @@
-import type { SimHttpApiAuthorizerId } from "../../api/authorizer/sim-http-api-authorizer.js";
+import type {
+  SimHttpApiAuthorizerId,
+  SimHttpApiAuthorizerType,
+} from "../../api/authorizer/sim-http-api-authorizer.js";
 import type { SimHttpApiAuthorizationType } from "../../api/route/sim-http-api-route.js";
 import { SimHttpApiRouteScopes } from "../../api/route/sim-http-api-route-scopes.js";
 import type { SimHttpApi } from "../../api/sim-http-api.js";
-import { SimApiGatewayV2BadRequest } from "../../error/sim-api-gateway-v2.error.js";
 import type { SimCreateRouteCommandInput } from "./route.command.js";
+import { SimHttpApiRouteAuthorizationOptions } from "./sim-http-api-route-authorization-options.js";
+import { SimHttpApiRouteAuthorizerInput } from "./sim-http-api-route-authorizer-input.js";
 
 /**
  * How a route says who may call it.
@@ -18,16 +22,19 @@ export interface SimHttpApiRouteAuthorization {
  * Reads the authorization a CreateRoute input asks for, against the API it is
  * being created on.
  *
- * A `JWT` route has to name an authorizer the API has. A route deploying with
- * an `AuthorizerId` that resolved to nothing would be open here and closed on
- * AWS, which is the failure this whole area exists to avoid, so it is refused
- * rather than created.
+ * A `JWT` and a `CUSTOM` route each name an authorizer, and the other two name
+ * none. Which options each type has a use for is
+ * `SimHttpApiRouteAuthorizationOptions`, and finding the authorizer named is
+ * `SimHttpApiRouteAuthorizerInput`, so what is left here is which of the four
+ * a route asked for.
  */
 export class SimHttpApiRouteAuthorizationInput {
   private readonly input: SimCreateRouteCommandInput;
+  private readonly options: SimHttpApiRouteAuthorizationOptions;
 
   constructor(input: SimCreateRouteCommandInput) {
     this.input = input;
+    this.options = new SimHttpApiRouteAuthorizationOptions(input);
   }
 
   /**
@@ -44,13 +51,11 @@ export class SimHttpApiRouteAuthorizationInput {
       return this.iam();
     }
 
-    return {
-      authorizationType: "JWT",
-      authorizerId: this.authorizer(api),
-      authorizationScopes: new SimHttpApiRouteScopes(
-        this.input.AuthorizationScopes ?? [],
-      ),
-    };
+    if (authorizationType === "CUSTOM") {
+      return this.custom(api);
+    }
+
+    return this.jwt(api);
   }
 
   /**
@@ -58,14 +63,7 @@ export class SimHttpApiRouteAuthorizationInput {
    * `AuthorizationType` out.
    */
   private open(): SimHttpApiRouteAuthorization {
-    this.refuseAuthorizerId(
-      "NONE",
-      "which would be ignored here and would leave the route open on AWS too",
-    );
-    this.refuseAuthorizationScopes(
-      "NONE",
-      "and nothing checks a scope on a route that authorizes nobody",
-    );
+    this.options.refuseOnOpenRoute();
 
     return {
       authorizationType: "NONE",
@@ -75,22 +73,9 @@ export class SimHttpApiRouteAuthorizationInput {
 
   /**
    * A route IAM decides, which takes neither an authorizer nor scopes.
-   *
-   * Refusing scopes is stricter than AWS, which documents route scopes as
-   * meaningful only for `JWT` and ignores them for `AWS_IAM`. Accepting them
-   * here would let a test assert on a scope restriction that nothing applies.
    */
   private iam(): SimHttpApiRouteAuthorization {
-    this.refuseAuthorizerId(
-      "AWS_IAM",
-      "and IAM itself decides an AWS_IAM route, so there is no authorizer to " +
-        "send the request through",
-    );
-    this.refuseAuthorizationScopes(
-      "AWS_IAM",
-      "and AWS applies route scopes to a JWT route only, so a scope written " +
-        "here would restrict nothing",
-    );
+    this.options.refuseOnIamRoute();
 
     return {
       authorizationType: "AWS_IAM",
@@ -99,54 +84,39 @@ export class SimHttpApiRouteAuthorizationInput {
   }
 
   /**
-   * Refuse an `AuthorizerId` on an authorization type that takes none.
+   * A route a Lambda `REQUEST` authorizer decides, which takes no scopes.
    */
-  private refuseAuthorizerId(authorizationType: string, reason: string): void {
-    if (this.input.AuthorizerId === undefined) {
-      return;
-    }
+  private custom(api: SimHttpApi): SimHttpApiRouteAuthorization {
+    this.options.refuseOnCustomRoute();
 
-    throw new SimApiGatewayV2BadRequest(
-      `CreateRoute AuthorizerId is set on a route with AuthorizationType ` +
-        `${authorizationType}, ${reason}`,
-    );
+    return {
+      authorizationType: "CUSTOM",
+      authorizerId: this.authorizer(api, "REQUEST"),
+      authorizationScopes: new SimHttpApiRouteScopes(),
+    };
   }
 
   /**
-   * Refuse `AuthorizationScopes` on an authorization type that checks none.
+   * A route a JWT authorizer decides, which is the one kind route scopes
+   * apply to.
    */
-  private refuseAuthorizationScopes(
-    authorizationType: string,
-    reason: string,
-  ): void {
-    if ((this.input.AuthorizationScopes ?? []).length === 0) {
-      return;
-    }
-
-    throw new SimApiGatewayV2BadRequest(
-      `CreateRoute AuthorizationScopes is set on a route with ` +
-        `AuthorizationType ${authorizationType}, ${reason}`,
-    );
+  private jwt(api: SimHttpApi): SimHttpApiRouteAuthorization {
+    return {
+      authorizationType: "JWT",
+      authorizerId: this.authorizer(api, "JWT"),
+      authorizationScopes: new SimHttpApiRouteScopes(
+        this.input.AuthorizationScopes ?? [],
+      ),
+    };
   }
 
-  private authorizer(api: SimHttpApi): SimHttpApiAuthorizerId {
-    const authorizerId = this.input.AuthorizerId;
-
-    if (authorizerId === undefined || authorizerId.length === 0) {
-      throw new SimApiGatewayV2BadRequest(
-        "CreateRoute with AuthorizationType JWT requires AuthorizerId",
-      );
-    }
-
-    const authorizer = api.authorizers.find(authorizerId);
-
-    if (authorizer === undefined) {
-      throw new SimApiGatewayV2BadRequest(
-        `CreateRoute AuthorizerId ${authorizerId} names no authorizer on ` +
-          `API ${api.apiId}. The route would be open here and closed on AWS.`,
-      );
-    }
-
-    return authorizer.authorizerId;
+  private authorizer(
+    api: SimHttpApi,
+    authorizerType: SimHttpApiAuthorizerType,
+  ): SimHttpApiAuthorizerId {
+    return new SimHttpApiRouteAuthorizerInput({
+      authorizationType: this.input.AuthorizationType ?? "",
+      authorizerId: this.input.AuthorizerId,
+    }).read(api, authorizerType);
   }
 }

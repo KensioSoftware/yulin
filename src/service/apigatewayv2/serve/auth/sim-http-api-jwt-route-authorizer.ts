@@ -3,6 +3,7 @@ import {
   type SimHttpApiAuthorization,
   SimHttpApiRefused,
 } from "../../api/authorizer/sim-http-api-authorization.js";
+import { SimHttpApiJwtAuthorizer } from "../../api/authorizer/sim-http-api-jwt-authorizer.js";
 import { SimHttpApiJwtVerification } from "../../api/authorizer/sim-http-api-jwt-verification.js";
 import type { SimHttpApiRouteAuthorizeInput } from "./sim-http-api-route-authorize-input.js";
 
@@ -35,12 +36,12 @@ export class SimHttpApiJwtRouteAuthorizer {
     const { api, match, request } = input;
     const { route } = match;
 
-    // A JWT route always names an authorizer, and that authorizer can still be
-    // deleted out from under it, so the two come to the same thing here: with
-    // no authorizer to ask, the route stays closed.
+    // A JWT route always names a JWT authorizer, and that authorizer can still
+    // be deleted out from under it, so the two come to the same thing here:
+    // with no authorizer to ask, the route stays closed.
     const authorizer = api.authorizers.find(route.authorizerId ?? "");
 
-    if (authorizer === undefined) {
+    if (!(authorizer instanceof SimHttpApiJwtAuthorizer)) {
       return SimHttpApiRefused.unauthorized();
     }
 

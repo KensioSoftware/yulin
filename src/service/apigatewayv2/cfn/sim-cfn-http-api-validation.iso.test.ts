@@ -103,25 +103,6 @@ describe("API Gateway v2 CloudFormation validation", () => {
     );
   });
 
-  it("refuses a route authorization type that is not simulated", async () => {
-    // Given a route asking for a Lambda authorizer
-    const simAws = simAwsInEuWest2();
-
-    // When the template is deployed
-    const error = await deployHttpApiFailure(
-      simAws,
-      simCfnHttpApiTemplateFactory.make({
-        routeProperties: { AuthorizationType: "CUSTOM" },
-      }),
-    );
-
-    // Then CreateRoute refuses it rather than deploying an open route
-    assertStringIncludes(
-      error.message,
-      "CreateRoute AuthorizationType 'CUSTOM' is not simulated",
-    );
-  });
-
   it("refuses an Api declaring a resource policy", async () => {
     // Given a template carrying the Policy property a REST API takes
     const simAws = simAwsInEuWest2();
@@ -150,57 +131,6 @@ describe("API Gateway v2 CloudFormation validation", () => {
     );
   });
 
-  it("refuses a JWT route naming an authorizer the template did not deploy", async () => {
-    // Given a route asking for JWT authorization with an authorizer id that
-    // is not one of this API's
-    const simAws = simAwsInEuWest2();
-
-    // When the template is deployed
-    const error = await deployHttpApiFailure(
-      simAws,
-      simCfnHttpApiTemplateFactory.make({
-        routeProperties: { AuthorizationType: "JWT", AuthorizerId: "auth01" },
-      }),
-    );
-
-    // Then the stack fails rather than deploying a route that is open here and
-    // closed on AWS
-    assertStringIncludes(
-      error.message,
-      "AuthorizerId auth01 names no authorizer",
-    );
-  });
-
-  it("refuses a Lambda authorizer Resource", async () => {
-    // Given a template carrying a Lambda REQUEST authorizer
-    const simAws = simAwsInEuWest2();
-
-    // When the template is deployed
-    const error = await deployHttpApiFailure(
-      simAws,
-      simCfnHttpApiTemplateFactory.make({
-        resources: {
-          Authorizer: {
-            Type: "AWS::ApiGatewayV2::Authorizer",
-            Properties: {
-              ApiId: { Ref: "Api" },
-              AuthorizerType: "REQUEST",
-              Name: "lambda",
-              IdentitySource: ["$request.header.Authorization"],
-            },
-          },
-        },
-      }),
-    );
-
-    // Then the stack fails rather than deploying an authorizer that would
-    // decide with code nothing here runs
-    assertStringIncludes(
-      error.message,
-      "CreateAuthorizer AuthorizerType 'REQUEST' is not simulated",
-    );
-  });
-
   it("refuses route scopes that are not a list of strings", async () => {
     // Given a route whose AuthorizationScopes is a single string
     const simAws = simAwsInEuWest2();
@@ -217,27 +147,6 @@ describe("API Gateway v2 CloudFormation validation", () => {
     assertStringIncludes(
       error.message,
       "AuthorizationScopes must be a list of strings",
-    );
-  });
-
-  it("refuses an authorizer id on a route that authorizes nobody", async () => {
-    // Given a route naming an authorizer while leaving its authorization type
-    // at NONE
-    const simAws = simAwsInEuWest2();
-
-    // When the template is deployed
-    const error = await deployHttpApiFailure(
-      simAws,
-      simCfnHttpApiTemplateFactory.make({
-        routeProperties: { AuthorizerId: "abc123" },
-      }),
-    );
-
-    // Then CreateRoute refuses it, since the authorizer would be ignored here
-    // and would leave the route open on AWS too
-    assertStringIncludes(
-      error.message,
-      "CreateRoute AuthorizerId is set on a route with AuthorizationType NONE",
     );
   });
 

@@ -1,11 +1,7 @@
 import { faker } from "@faker-js/faker";
 
 import type { Brand } from "../../../../util/brand.type.js";
-import type { SimHttpApiIdentitySource } from "./sim-http-api-identity-source.js";
-import type {
-  SimHttpApiJwtConfiguration,
-  SimHttpApiJwtConfigurationView,
-} from "./sim-http-api-jwt-configuration.js";
+import type { SimHttpApiJwtConfigurationView } from "./sim-http-api-jwt-configuration.js";
 
 /**
  * The id API Gateway allocates for one authorizer.
@@ -13,13 +9,13 @@ import type {
 export type SimHttpApiAuthorizerId = Brand<string, "SimHttpApiAuthorizerId">;
 
 /**
- * The only authorizer type simulated.
+ * The two kinds of authorizer an HTTP API has.
  *
- * A Lambda `REQUEST` authorizer runs code of its own to make the decision, and
- * none of that is simulated, so it is refused at creation rather than created
- * and ignored.
+ * A `JWT` authorizer verifies a token against the keys its issuer publishes. A
+ * `REQUEST` authorizer invokes a Lambda function of its own and does whatever
+ * that function decides.
  */
-export type SimHttpApiAuthorizerType = "JWT";
+export type SimHttpApiAuthorizerType = "JWT" | "REQUEST";
 
 /**
  * Allocate an authorizer id, in the same opaque shape as a route id.
@@ -31,56 +27,52 @@ export function makeSimHttpApiAuthorizerId(): SimHttpApiAuthorizerId {
 interface SimHttpApiAuthorizerProperties {
   readonly authorizerId: SimHttpApiAuthorizerId;
   readonly name: string;
-  readonly identitySource: SimHttpApiIdentitySource;
-  readonly jwtConfiguration: SimHttpApiJwtConfiguration;
 }
 
 /**
  * Minimal structural authorizer view, as the Create and Get commands return.
+ *
+ * The members below the identity sources belong to one kind of authorizer
+ * each, and only the kind that has them reports them, which is what real API
+ * Gateway answers with.
  */
 export interface SimHttpApiAuthorizerView {
   AuthorizerId: string;
   Name: string;
   AuthorizerType: SimHttpApiAuthorizerType;
   IdentitySource: string[];
-  JwtConfiguration: SimHttpApiJwtConfigurationView;
+  JwtConfiguration?: SimHttpApiJwtConfigurationView;
+  AuthorizerUri?: string;
+  AuthorizerPayloadFormatVersion?: string;
+  EnableSimpleResponses?: boolean;
 }
 
 /**
- * A simulated HTTP API JWT authorizer: which token a route asks for, and which
- * issuer signed it.
+ * A simulated HTTP API authorizer: what a route sends a request through before
+ * it reaches an integration.
  *
  * An authorizer belongs to an API and is attached to routes by id, so one
- * authorizer covers as many routes of the API as name it.
+ * authorizer covers as many routes of the API as name it. What it does with a
+ * request is the subclass's business: the two kinds share an id, a name and
+ * nothing else.
  */
-export class SimHttpApiAuthorizer {
-  /**
-   * The type of authorizer this is, which is the only one simulated.
-   */
-  public readonly authorizerType: SimHttpApiAuthorizerType = "JWT";
-
+export abstract class SimHttpApiAuthorizer {
   public readonly authorizerId: SimHttpApiAuthorizerId;
   public readonly name: string;
-  public readonly identitySource: SimHttpApiIdentitySource;
-  public readonly jwtConfiguration: SimHttpApiJwtConfiguration;
+
+  /**
+   * The kind of authorizer this is, which is what a route's own authorization
+   * type has to agree with.
+   */
+  abstract readonly authorizerType: SimHttpApiAuthorizerType;
 
   constructor(properties: SimHttpApiAuthorizerProperties) {
     this.authorizerId = properties.authorizerId;
     this.name = properties.name;
-    this.identitySource = properties.identitySource;
-    this.jwtConfiguration = properties.jwtConfiguration;
   }
 
   /**
    * Get the AWS-like view of this authorizer.
    */
-  view(): SimHttpApiAuthorizerView {
-    return {
-      AuthorizerId: this.authorizerId,
-      Name: this.name,
-      AuthorizerType: this.authorizerType,
-      IdentitySource: [this.identitySource.expression],
-      JwtConfiguration: this.jwtConfiguration.view(),
-    };
-  }
+  abstract view(): SimHttpApiAuthorizerView;
 }

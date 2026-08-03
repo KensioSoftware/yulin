@@ -124,24 +124,26 @@ describe("What sim API Gateway v2 refuses rather than ignores", () => {
     ).rejects.toThrow(/IntegrationType 'HTTP_PROXY' is not simulated/);
   });
 
-  it("refuses a route with an authorization type that is not simulated", async () => {
+  it("refuses a route with an authorization type AWS does not have", async () => {
     // Given an API
     const simAws = new SimAws();
     const apiId = await createdApiId(simAws);
 
-    // When a route asks for a Lambda authorizer
-    // Then it is refused, because nothing here runs the code that would make
-    // the decision and the route would be open where the real one is closed
+    // When a route asks for something that is not an authorization type. The
+    // command is sent structurally rather than through the SDK, since the SDK
+    // types allow only the four values AWS has.
+    // Then it is refused, rather than created open because nothing recognised
+    // what it asked for
     await expect(
-      simAws.apiGatewayV2().createRoute(
-        new CreateRouteCommand({
+      simAws.apiGatewayV2().createRoute({
+        input: {
           ApiId: apiId,
           RouteKey: "$default",
           Target: "integrations/abcdefgh",
-          AuthorizationType: "CUSTOM",
-        }),
-      ),
-    ).rejects.toThrow(/AuthorizationType 'CUSTOM' is not simulated/);
+          AuthorizationType: "LAMBDA",
+        },
+      }),
+    ).rejects.toThrow(/AuthorizationType 'LAMBDA' is not simulated/);
   });
 
   it("refuses a JWT route naming no authorizer of its API", async () => {
