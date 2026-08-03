@@ -73,9 +73,9 @@ export class ListRolesCommandHandler implements CommandHandler<
       .toSorted((a, b) => a.arn.localeCompare(b.arn));
 
     return roles.filter((role) => {
-      return !(
-        command.input.PathPrefix !== undefined &&
-        !role.path.startsWith(command.input.PathPrefix)
+      return (
+        command.input.PathPrefix === undefined ||
+        role.path.startsWith(command.input.PathPrefix)
       );
     });
   }

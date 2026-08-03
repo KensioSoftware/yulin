@@ -84,9 +84,9 @@ export class S3BucketWebsiteRedirects {
       return false;
     }
 
-    return !(
-      condition.KeyPrefixEquals !== undefined &&
-      !this.requestKey(request).startsWith(condition.KeyPrefixEquals)
+    return (
+      condition.KeyPrefixEquals === undefined ||
+      this.requestKey(request).startsWith(condition.KeyPrefixEquals)
     );
   }
 

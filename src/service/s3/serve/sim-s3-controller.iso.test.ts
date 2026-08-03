@@ -5,7 +5,7 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimS3ServiceController } from "./sim-s3-controller.js";
-import { SimAwsServiceRequest } from "../../../serve/controller/sim-service-controller.js";
+import { SimAwsServiceRequest } from "../../../serve/index.js";
 
 describe("Simulated S3 local HTTP controller", () => {
   const simS3ServiceController = new SimS3ServiceController();
@@ -20,9 +20,6 @@ describe("Simulated S3 local HTTP controller", () => {
         },
         request: new Request(
           "http://s3-website.eu-west-2.localhost/index.html",
-          {
-            method: "GET",
-          },
         ),
       }),
     );
@@ -40,9 +37,7 @@ describe("Simulated S3 local HTTP controller", () => {
           resourceName: "foo-site",
           regionName: "eu-west-2",
         },
-        request: new Request("http://foo-site.s3-website.localhost/%zz", {
-          method: "GET",
-        }),
+        request: new Request("http://foo-site.s3-website.localhost/%zz"),
       }),
     );
 
@@ -59,12 +54,7 @@ describe("Simulated S3 local HTTP controller", () => {
           service: "s3",
           resourceName: "foo-site",
         },
-        request: new Request(
-          "http://foo-site.s3-website.localhost/index.html",
-          {
-            method: "GET",
-          },
-        ),
+        request: new Request("http://foo-site.s3-website.localhost/index.html"),
       }),
     );
 
