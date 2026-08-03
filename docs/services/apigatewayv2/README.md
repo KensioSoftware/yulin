@@ -636,6 +636,205 @@ claim. None of that is published by AWS; all of it is what the real endpoint was
 A route with `AuthorizationType: "NONE"` has no caller to describe, so `requestContext.authorizer` is
 left out of its events entirely.
 
+## Protecting a route with IAM
+
+A route declared `AuthorizationType: "AWS_IAM"` reaches its integration only when the caller is
+allowed `execute-api:Invoke` on the ARN of the route being called. The route takes no authorizer, and
+naming one is refused: IAM itself is what decides.
+
+The caller comes from the request, through either a SigV4 signature or an `x-sim-aws-caller` header
+naming a principal directly. A request that offers neither is anonymous, owns no policies, and is
+refused. See [callers of HTTP requests](../iam/#callers-of-http-requests) in the IAM docs for how that
+resolution works and how to sign a served request.
+
+The ARN a request is authorized against is:
+
+```text
+arn:aws:execute-api:<region>:<account>:<apiId>/<stage>/<METHOD>/<path>
+```
+
+- The Account and Region are the API's own, not the caller's.
+- The stage is the one that served the request, so `$default` for the default stage.
+- The method is the one the client sent, upper case, so a `GET` reaching a route keyed `ANY /orders`
+  gives `GET`.
+- The path is the request path with the stage segment and the leading slash taken off, so `/dev/orders/42`
+  served from stage `dev` gives `orders/42`. It is the path asked for rather than the route key, because
+  this is the resource a policy is written against by hand. A request to the API root gives an ARN
+  ending `/GET/`.
+
+An identity policy may wildcard any part of that. `<apiId>/*`, `<apiId>/$default/*` and
+`<apiId>/*/GET/orders/*` all allow a `GET` of `/orders/42` on the default stage.
+
+```typescript sim-apigatewayv2-iam-authorizer
+/**
+ * Protecting a simulated HTTP API route with IAM.
+ */
+
+import {
+  CreateApiCommand,
+  CreateIntegrationCommand,
+  CreateRouteCommand,
+  CreateStageCommand,
+} from "@aws-sdk/client-apigatewayv2";
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import {
+  AddPermissionCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import type { SimPayload2Event } from "@kensio/yulin/apigatewayv2";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+
+const { FunctionArn } = await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "orders",
+    Role: "arn:aws:iam::888888888888:role/OrdersRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput((event: SimPayload2Event) => ({
+        statusCode: 200,
+        headers: { "content-type": "text/plain" },
+        body: `orders for ${
+          event.requestContext.authorizer?.iam?.userArn ?? "nobody"
+        }`,
+      })),
+    },
+  }),
+);
+
+const apiGateway = simAws.apiGatewayV2();
+
+const { ApiId, ApiEndpoint } = await apiGateway.createApi(
+  new CreateApiCommand({ Name: "orders", ProtocolType: "HTTP" }),
+);
+
+const { IntegrationId } = await apiGateway.createIntegration(
+  new CreateIntegrationCommand({
+    ApiId,
+    IntegrationType: "AWS_PROXY",
+    IntegrationUri: FunctionArn,
+    PayloadFormatVersion: "2.0",
+  }),
+);
+
+await apiGateway.createRoute(
+  new CreateRouteCommand({
+    ApiId,
+    RouteKey: "GET /orders/{orderId}",
+    Target: `integrations/${IntegrationId}`,
+    AuthorizationType: "AWS_IAM",
+  }),
+);
+
+await apiGateway.createStage(
+  new CreateStageCommand({ ApiId, StageName: "$default", AutoDeploy: true }),
+);
+
+await simAws.lambda().addPermission(
+  new AddPermissionCommand({
+    FunctionName: "orders",
+    StatementId: "api-gateway-invoke",
+    Action: "lambda:InvokeFunction",
+    Principal: "apigateway.amazonaws.com",
+    SourceArn: `arn:aws:execute-api:us-east-1:888888888888:${ApiId}/*/*`,
+  }),
+);
+
+// A Role of the API's own Account, allowed to call the orders routes of this
+// API on the default stage.
+await simAws.iam().createRole(
+  new CreateRoleCommand({
+    RoleName: "Reporter",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Allow",
+          Principal: { AWS: "arn:aws:iam::888888888888:root" },
+          Action: "sts:AssumeRole",
+        },
+      ],
+    }),
+  }),
+);
+
+await simAws.iam().putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "Reporter",
+    PolicyName: "InvokeOrders",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Allow",
+          Action: "execute-api:Invoke",
+          Resource: `arn:aws:execute-api:us-east-1:888888888888:${ApiId}/$default/GET/orders/*`,
+        },
+      ],
+    }),
+  }),
+);
+
+const srv = await serveSimAws({ simAws });
+const url = srv.localUrl(`${ApiEndpoint}/orders/42`);
+
+const anonymous = await fetch(url);
+
+console.log(anonymous.status); // 403
+console.log(await anonymous.text()); // '{"message":"Forbidden"}'
+
+const reporter = await fetch(url, {
+  headers: { "x-sim-aws-caller": "arn:aws:iam::888888888888:role/Reporter" },
+});
+
+console.log(await reporter.text()); // "orders for arn:aws:iam::888888888888:role/Reporter"
+
+srv.close();
+```
+
+### What a refused request gets back
+
+A caller IAM does not allow is answered with a 403 and `{"message":"Forbidden"}`, and the integration
+is never invoked. That is the answer for an unsigned request too: the serving boundary resolves it to
+an anonymous caller, and nothing allows an anonymous caller anything. An explicit `Deny` beats an
+`Allow`, as it does in any IAM evaluation.
+
+A request whose signature is malformed, or is scoped to another service, does not reach the route at
+all. The serving boundary refuses it first, with `{"Message":"Forbidden"}` and a capital `M`.
+
+### The caller the handler receives
+
+An admitted request carries its caller into the event as `requestContext.authorizer.iam`:
+
+```json
+{
+  "accessKey": "",
+  "accountId": "888888888888",
+  "callerId": "arn:aws:iam::888888888888:role/Reporter",
+  "cognitoIdentity": null,
+  "principalOrgId": null,
+  "userArn": "arn:aws:iam::888888888888:role/Reporter",
+  "userId": "arn:aws:iam::888888888888:role/Reporter"
+}
+```
+
+`accountId` and `userArn` come from the resolved principal's ARN. `requestContext.accountId` is that
+Account too, rather than `anonymous`. The block is the same one a Lambda Function URL produces, so
+handler code reading it behaves the same behind either.
+
+### Callers from another Account
+
+A principal of another Account is refused, whatever its own Account allows it. A cross-Account request
+needs an Allow from the resource side as well, and an HTTP API has nowhere to put one: unlike a REST
+API, it has no resource policy at all. Real AWS behaves the same way.
+
+The way through, here and on AWS, is for that principal to assume a Role in the API's Account through
+STS and sign with the session credentials. The request is then made by a principal of the API's own
+Account.
+
 ## The event the handler receives
 
 The handler is invoked with the API Gateway HTTP API payload format 2.0 event, exported as
@@ -900,6 +1099,10 @@ simulated properties are:
 - `Route`: `ApiId`, `RouteKey`, `Target`, `AuthorizationType`, `AuthorizerId`, `AuthorizationScopes`
 - `Stage`: `ApiId`, `StageName`, `AutoDeploy`, `StageVariables`, `Description`
 
+CDK's `HttpIamAuthorizer` deploys too. It emits no `AWS::ApiGatewayV2::Authorizer` and no
+`AuthorizerId`, only `AuthorizationType: "AWS_IAM"` on the `Route`, and the deployed route then
+requires IAM authorization when it is served.
+
 CDK's `HttpJwtAuthorizer` and `HttpUserPoolAuthorizer` both deploy. `HttpUserPoolAuthorizer` builds
 its issuer from `Fn::GetAtt <UserPool>.ProviderURL`, which resolves to the same string the pool's
 tokens name as their issuer, so a CDK-declared authorizer and a CDK-deployed pool agree with nothing
@@ -910,6 +1113,10 @@ authorizer adds a client of its own with CDK's defaults, and those emit the OAut
 A `Route` with `AuthorizationType: "JWT"` whose `AuthorizerId` does not resolve to an authorizer of
 that API fails the stack, naming both. That covers a `Ref` to a Resource this simulation skipped: a
 skipped Resource resolves to its own logical ID, and no authorizer has that id.
+
+An `Api` carrying a `Policy` property is refused with its own message rather than the generic one. AWS
+has no such property on this Resource type, because an HTTP API has no resource policy, so a template
+carrying one was written for a REST API.
 
 `AWS::ApiGatewayV2::Deployment`, `DomainName`, `ApiMapping`, `VpcLink` and the WebSocket-only
 `Model`, `RouteResponse` and `IntegrationResponse` create nothing, so a template carrying one has
@@ -947,6 +1154,9 @@ the simulation without being given one. See the
 - Real RS256 verification of a token against the keys its issuer publishes, with the claims checked
   against the simulation's clock, and the accepted claims reaching the handler as
   `event.requestContext.authorizer.jwt`
+- Routes protected with `AuthorizationType: "AWS_IAM"`, evaluating `execute-api:Invoke` against the
+  `execute-api` ARN of the route being called, for a caller resolved from a SigV4 signature or an
+  `x-sim-aws-caller` header, and reaching the handler as `event.requestContext.authorizer.iam`
 - `CreateStage` and `GetStages` for the `$default` stage and for named stages served under their own
   path segment, including stage variables
 - Serving the generated endpoint through `serveSimAws`, invoking the integrated function with a
@@ -979,8 +1189,34 @@ Current documented limitations:
   integrations and AWS service integrations are not simulated.
 - Payload format 1.0 is refused. A handler written for 1.0 reads event fields a 2.0 event does not
   have, so treating one as the other would pass here and fail on AWS.
-- `AuthorizationType` is `NONE` or `JWT`. `AWS_IAM` and `CUSTOM` routes are refused rather than
-  created open, since a route asking for either would admit anyone here and refuse them on AWS.
+- `AuthorizationType` is `NONE`, `JWT` or `AWS_IAM`. A `CUSTOM` route is refused rather than created
+  open, since a route asking for it would admit anyone here and refuse them on AWS.
+- `AuthorizationScopes` on an `AWS_IAM` route is refused. This is stricter than AWS, which documents
+  route scopes as meaningful only for `JWT` and ignores them here. Accepting one would let a test
+  assert on a scope restriction that nothing applies.
+- The method and path segments of the ARN an `AWS_IAM` route is authorized against are inferred
+  rather than documented, and the two callers of that ARN builder fill them differently: this one
+  names the request's own method and path, while the integration's invoke permission names the route
+  key template. AWS documents one format for both. See
+  [Protecting a route with IAM](#protecting-a-route-with-iam).
+- A `*` in a policy resource is uniformly greedy here, so it crosses `/` boundaries. AWS distinguishes
+  `*` from `*/*` in some ARN path positions, which makes the simulator more permissive than AWS for a
+  policy relying on that distinction.
+- Only `execute-api:Invoke` is evaluated. Nothing constrains the action string a policy may name, so
+  a policy can be written with `execute-api:ManageConnections` or `execute-api:InvalidateCache` and
+  nothing will ever ask about it.
+- `accessKey` in the `iam` block is empty, `callerId` and `userId` carry the caller ARN rather than
+  the `AIDA`/`AROA` unique id real AWS puts there, and `cognitoIdentity` and `principalOrgId` are
+  always null. None of those is available at the simulator's request boundary.
+- A request signed for another service is refused by the serving boundary before route matching, even
+  on a `NONE` route, where real API Gateway would ignore the signature. That boundary answers
+  `{"Message":"Forbidden"}` with a capital `M`, unlike the API's own refusals.
+- An unsigned request to an `AWS_IAM` route is a 403 rather than the 403 with an
+  `x-amzn-ErrorType` of `IncompleteSignatureException` real API Gateway was observed to send. The
+  simulator resolves such a request to an anonymous caller and refuses it by ordinary IAM evaluation.
+- HTTP API resource policies are not simulated, because AWS does not have them. A caller from another
+  Account is therefore always refused, since a cross-Account request needs an Allow from the resource
+  side. Assume a Role in the API's Account instead, which is the route through on AWS as well.
 - Lambda `REQUEST` authorizers are not simulated, of either payload version. `CreateAuthorizer`
   refuses `AuthorizerType: "REQUEST"` by name, as does an `AWS::ApiGatewayV2::Authorizer` asking for
   one, since nothing here runs the code that would make the decision.
@@ -1033,6 +1269,9 @@ Current documented limitations:
   `corsPreflight` does not deploy.
 - `AWS::ApiGatewayV2::Api` refuses `Body` and `BodyS3Location` by name. Importing an OpenAPI document
   is a second way to declare routes and integrations, and none of that translation is simulated.
+- `AWS::ApiGatewayV2::Api` refuses `Policy` with a message of its own saying an HTTP API has no
+  resource policy. There is no such property on the real Resource type, so a template carrying one
+  was written for a REST API rather than hitting a gap here.
 - Stack updates and deletes are not supported for these resource types, as they are not for any
   others. See the [CloudFormation limitations](../cloudformation/#limitations).
 - Access logging, throttling, usage plans and API keys are not simulated.

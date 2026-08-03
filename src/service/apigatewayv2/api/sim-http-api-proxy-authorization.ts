@@ -14,6 +14,8 @@ interface SimHttpApiProxyAuthorizationInput {
   readonly apiId: string;
   /** Undefined for an API whose routes admit anyone. */
   readonly jwtAuthorizer: SimHttpApiProxyAuthorizer | undefined;
+  /** Whether every route is authorized by IAM instead. */
+  readonly iamAuthorization: boolean;
   readonly authorizationScopes: readonly string[];
 }
 
@@ -29,6 +31,16 @@ export async function simHttpApiProxyAuthorization(
   input: SimHttpApiProxyAuthorizationInput,
 ): Promise<SimCreateRouteCommandInput> {
   const { apiId, jwtAuthorizer } = input;
+
+  if (input.iamAuthorization) {
+    // An AWS_IAM route takes no authorizer at all, so there is nothing to
+    // create. The scopes are still passed on, so a test asking for one is
+    // refused by CreateRoute rather than quietly getting an unchecked scope.
+    return {
+      AuthorizationType: "AWS_IAM",
+      AuthorizationScopes: input.authorizationScopes,
+    };
+  }
 
   if (jwtAuthorizer === undefined) {
     // The scopes are passed on rather than dropped, so a test asking for one

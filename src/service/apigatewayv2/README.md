@@ -103,9 +103,13 @@ naming the localhost origin it is served from, while a token's `iss` names the r
 OIDC-conformant discovery client would reject its own pool's tokens. Resolving in process compares
 `pool.issuerUrl` against the token's `iss`, and both come from the same getter.
 
-`SimHttpApiAuthorization` is what a decision answers with: `SimHttpApiAdmitted`, carrying the `jwt`
-block for the event, or `SimHttpApiRefused`, which is a 401 for everything up to and including claim
-validation and a 403 only for an unmet route scope.
+`SimHttpApiAuthorization` is what a decision answers with: `SimHttpApiAdmitted`, carrying whatever the
+event needs to describe the caller, or `SimHttpApiRefused`, which is a 401 for everything up to and
+including claim validation and a 403 for an unmet route scope or an IAM refusal.
+
+The other kind of route authorization is `AWS_IAM`, which has nothing under `api/authorizer/` at all:
+it configures nothing on the API, so there is nothing to store. It lives entirely in `serve/auth/`,
+because it is decided from the request rather than from anything the API holds.
 
 `registry/sim-http-api-registry.ts` is the one thing outside that tree. A served request carries the
 API id and the region in its hostname, but not the Account, so the registry maps an id to the
@@ -142,9 +146,23 @@ lives.
    Region its own ARN names, which need not be the API's, and the router hands back that Account's
    IAM alongside the function.
 2. `serve/auth/sim-http-api-route-authorizer.ts` asks whether the client may have the matched route.
-   This comes first, before the integration is even looked up: a request presenting no token is
-   refused whether or not the integration behind the route would have worked. A route with
-   `AuthorizationType: NONE` admits everyone with no caller to describe.
+   This comes first, before the integration is even looked up: a request presenting no credentials is
+   refused whether or not the integration behind the route would have worked. It settles which kind
+   of authorization the route asks for and hands the decision to the one that makes it:
+
+   ```text
+   SimHttpApiRouteAuthorizer
+   ├── NONE     admits everyone, with no caller to describe
+   ├── JWT      SimHttpApiJwtRouteAuthorizer, over the API's own authorizers
+   └── AWS_IAM  SimHttpApiIamRouteAuthorizer, evaluating execute-api:Invoke
+   ```
+
+   The IAM one asks the API's own Account, which the router resolves, and supplies no resource
+   policies, because an HTTP API has none. That is also what makes a caller from another Account
+   always refused: a cross-Account request needs an Allow from the resource side. The resource is the
+   `execute-api` ARN of the request, built by `api/sim-http-api-execute-api-arn.ts` from the concrete
+   method and path rather than from the route key.
+
 3. `serve/auth/sim-http-api-integration-authorizer.ts` asks whether the API may invoke the function
    at all. The caller is the service principal `apigateway.amazonaws.com`, the action is
    `lambda:InvokeFunction`, and the request supplies `AWS:SourceArn` from
@@ -203,8 +221,10 @@ simulation exists to avoid:
 - an integration type other than `AWS_PROXY`, and an integration URI that is not an unqualified
   Lambda function ARN
 - a malformed route key, refused at `CreateRoute`, which is where real API Gateway refuses it
-- an authorization type other than `NONE` or `JWT`, and an `AuthorizerId` or `AuthorizationScopes` on
-  a route that authorizes nobody
+- an authorization type other than `NONE`, `JWT` or `AWS_IAM`, and an `AuthorizerId` or
+  `AuthorizationScopes` on a route that has no use for either
+- a `Policy` on `AWS::ApiGatewayV2::Api`, with a message of its own: AWS has no such property, since
+  an HTTP API has no resource policy
 - an authorizer type other than `JWT`, and every option only a Lambda `REQUEST` authorizer takes,
   including `AuthorizerResultTtlInSeconds`
 - more than one `IdentitySource`, and an identity source naming neither a header nor a query string

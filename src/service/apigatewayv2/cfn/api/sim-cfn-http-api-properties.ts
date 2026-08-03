@@ -39,6 +39,7 @@ export class SimCfnHttpApiProperties {
     this.resource = properties.resource;
     this.properties = properties.properties;
 
+    this.requireNoResourcePolicy();
     this.propertyParser.requireOnlySimulated(this.resource, this.properties);
   }
 
@@ -71,5 +72,27 @@ export class SimCfnHttpApiProperties {
         "DisableExecuteApiEndpoint",
       ),
     };
+  }
+
+  /**
+   * Refuse a `Policy` property with the reason it cannot be deployed.
+   *
+   * The generic refusal reports a property as not simulated, which reads as a
+   * gap that will be filled later. There is no such property on this Resource
+   * type: HTTP APIs have no resource policies at all, so the only template
+   * carrying one was written for a REST API.
+   */
+  private requireNoResourcePolicy(): void {
+    if (this.properties["Policy"] === undefined) {
+      return;
+    }
+
+    throw new Error(
+      `AWS::ApiGatewayV2::Api ${this.resource.logicalId} property Policy ` +
+        `cannot be deployed: an HTTP API has no resource policy, and AWS ` +
+        `has no such property on this Resource type. A resource policy is a ` +
+        `REST API feature, declared on AWS::ApiGateway::RestApi. Authorize ` +
+        `the API's routes with AuthorizationType AWS_IAM instead.`,
+    );
   }
 }

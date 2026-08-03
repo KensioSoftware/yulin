@@ -26,10 +26,10 @@ const acceptedCreateRouteOptions = [
 /**
  * The authorization types a route may ask for.
  *
- * `AWS_IAM` and `CUSTOM` are refused rather than created open: a route asking
- * for either would admit anyone here and refuse them on AWS.
+ * `CUSTOM`, a Lambda authorizer, is refused rather than created open: a route
+ * asking for it would admit anyone here and refuse them on AWS.
  */
-const simulatedAuthorizationTypes = ["NONE", "JWT"];
+const simulatedAuthorizationTypes = ["NONE", "JWT", "AWS_IAM"];
 
 interface SimHttpApiRouteCommandsProperties {
   readonly access: SimHttpApiAccess;
@@ -67,7 +67,7 @@ export class SimHttpApiRouteCommands {
       "AuthorizationType",
       input.AuthorizationType,
       simulatedAuthorizationTypes,
-      "IAM and Lambda route authorization are not simulated",
+      "Lambda route authorization is not simulated",
     );
     const target = unsimulated.require("Target", input.Target);
 
