@@ -20,11 +20,13 @@ import {
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { PutObjectAuthorizer } from "./put-object-authorizer.js";
 import { PutObjectBuilder } from "./put-object-builder.js";
+import type { SimS3ObjectNotifier } from "../../notification/sim-s3-object-notifier.js";
 
 interface PutObjectCommandHandlerProperties {
   readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
+  readonly notifications: SimS3ObjectNotifier;
 }
 
 interface PutObjectCommandHandlerOptions {
@@ -44,6 +46,7 @@ export class PutObjectCommandHandler implements CommandHandler<
   private readonly authorizer: PutObjectAuthorizer;
   private readonly objectBuilder = new PutObjectBuilder();
   private readonly background: BackgroundScheduler;
+  private readonly notifications: SimS3ObjectNotifier;
 
   constructor(properties: PutObjectCommandHandlerProperties) {
     const {
@@ -54,6 +57,7 @@ export class PutObjectCommandHandler implements CommandHandler<
     this.buckets = buckets;
     this.authorizer = new PutObjectAuthorizer({ iam });
     this.background = background;
+    this.notifications = properties.notifications;
   }
 
   /**
@@ -84,10 +88,18 @@ export class PutObjectCommandHandler implements CommandHandler<
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    this.authorizer.authorize(bucket, command.input.Key, options?.caller);
+    const caller = this.authorizer.authorize(
+      bucket,
+      command.input.Key,
+      options?.caller,
+    );
 
     const object = this.objectBuilder.build(command);
     await bucket.putObject(object);
+
+    // Every write path funnels through here, so this one call covers the SDK,
+    // an intercepted SDK client and the REST endpoint alike.
+    this.notifications.objectCreated({ bucket, object, caller });
 
     return {
       $metadata: {},

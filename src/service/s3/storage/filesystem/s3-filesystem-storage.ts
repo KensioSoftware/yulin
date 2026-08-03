@@ -110,7 +110,7 @@ export class FilesystemS3BucketStorage implements SimS3BucketStorage {
    * someone's files because a test called DeleteObject is the wrong default, so
    * filesystem-backed Buckets are read and written but never emptied.
    */
-  deleteObject(key: string): Promise<void> {
+  deleteObject(key: string): Promise<boolean> {
     return Promise.reject(
       new SimS3NotImplemented(
         `Simulated S3 will not delete ${key} from filesystem-backed storage ` +

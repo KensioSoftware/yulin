@@ -1,4 +1,5 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimAwsResolvedCaller } from "../../../aws/caller/sim-aws-caller-resolver.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import type { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
@@ -25,8 +26,16 @@ export class PutObjectAuthorizer {
 
   /**
    * Ensure the caller may create or replace the requested S3 Object.
+   *
+   * The resolved caller is returned rather than discarded, because it is the
+   * only place in the request where the principal has been worked out, and an
+   * Object event notification has to say who caused it.
    */
-  authorize(bucket: SimS3Bucket, key: string, caller?: SimAwsCaller): void {
+  authorize(
+    bucket: SimS3Bucket,
+    key: string,
+    caller?: SimAwsCaller,
+  ): SimAwsResolvedCaller {
     const resource = `arn:aws:s3:::${bucket.bucketName}/${key}`;
     const policy = bucket.getPolicy();
     const decision = this.iam.authorize({
@@ -52,5 +61,7 @@ export class PutObjectAuthorizer {
         resource,
       });
     }
+
+    return decision.caller;
   }
 }

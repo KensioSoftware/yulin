@@ -278,6 +278,180 @@ failures come back.
 - A Bucket using filesystem-backed storage refuses deletion. See
   [Filesystem-backed Bucket storage](#filesystem-backed-bucket-storage).
 
+## Event notifications
+
+A simulated S3 Bucket can notify a simulated Lambda function when an Object is created or removed.
+The configuration is applied with `PutBucketNotificationConfigurationCommand` and read back with
+`GetBucketNotificationConfigurationCommand`.
+
+The function's resource policy decides whether S3 may invoke it. That is checked when the
+configuration is applied, and again for every event, as real S3 does.
+
+```typescript sim-s3-event-notifications
+/**
+ * Notifying a simulated Lambda function when an Object is created.
+ */
+
+import {
+  AddPermissionCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-lambda";
+import {
+  CreateBucketCommand,
+  PutBucketNotificationConfigurationCommand,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+interface S3EventDocument {
+  Records: [{ eventName: string; s3: { object: { key: string } } }];
+}
+
+const simAws = new SimAws();
+const thumbnailerArn = `arn:aws:lambda:${simAws.defaultRegionName}:${simAws.defaultAccountId}:function:thumbnailer`;
+
+await simAws.s3().createBucket(new CreateBucketCommand({ Bucket: "uploads" }));
+
+await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "thumbnailer",
+    Role: `arn:aws:iam::${simAws.defaultAccountId}:role/ThumbnailerRole`,
+    Code: {
+      ZipFile: makeLambdaZipFileInput((event: S3EventDocument) => {
+        console.log(event.Records[0].eventName, event.Records[0].s3.object.key);
+
+        return "thumbnailed";
+      }),
+    },
+  }),
+);
+
+await simAws.lambda().addPermission(
+  new AddPermissionCommand({
+    FunctionName: "thumbnailer",
+    StatementId: "AllowS3",
+    Action: "lambda:InvokeFunction",
+    Principal: "s3.amazonaws.com",
+    SourceArn: "arn:aws:s3:::uploads",
+    SourceAccount: simAws.defaultAccountId,
+  }),
+);
+
+await simAws.s3().putBucketNotificationConfiguration(
+  new PutBucketNotificationConfigurationCommand({
+    Bucket: "uploads",
+    NotificationConfiguration: {
+      LambdaFunctionConfigurations: [
+        {
+          Id: "thumbnail-raw-uploads",
+          Events: ["s3:ObjectCreated:*"],
+          LambdaFunctionArn: thumbnailerArn,
+          Filter: { Key: { FilterRules: [{ Name: "prefix", Value: "raw/" }] } },
+        },
+      ],
+    },
+  }),
+);
+
+await simAws.s3().putObject(
+  new PutObjectCommand({
+    Bucket: "uploads",
+    Key: "raw/cat.jpg",
+    Body: "cat picture",
+  }),
+);
+
+// Delivery happens in the background, so wait for the simulation to settle.
+await simAws.backgroundTasksComplete();
+```
+
+The event types a configuration can name are `s3:ObjectCreated:*`, `s3:ObjectCreated:Put`,
+`s3:ObjectRemoved:*` and `s3:ObjectRemoved:Delete`. Any other S3 event type is refused by name rather
+than stored and never raised.
+
+A configuration can filter on an object key prefix, a suffix, or both. Two configurations that share
+an event type and whose filters could both match the same key are refused with `InvalidArgument`, as
+real S3 refuses them. Overlapping prefixes are fine when the suffixes do not overlap, so one function
+can take the `.jpg` files under a prefix while another takes the `.png` files under the same one.
+
+`PutBucketNotificationConfigurationCommand` replaces the whole configuration rather than adding to
+it. `GetBucketNotificationConfigurationCommand` answers an empty configuration for a Bucket that has
+none. Note that the response carries the destination groups at the top level, while the request nests
+them under `NotificationConfiguration`:
+
+```typescript
+const read = await simAws
+  .s3()
+  .getBucketNotificationConfiguration(
+    new GetBucketNotificationConfigurationCommand({ Bucket: "uploads" }),
+  );
+const configurations = read.LambdaFunctionConfigurations ?? [];
+```
+
+The two commands are authorized as `s3:PutBucketNotification` and `s3:GetBucketNotification`. Those
+are the real IAM action names, and they do not match the API names.
+
+### What arrives at the handler
+
+The handler is invoked with the `Records` document real S3 sends. One event produces one record.
+
+Creation records carry the Object's `size` and its `eTag`, which is the MD5 of the bytes as it is for
+an Object real S3 stored in one part. Removal records carry neither, because the Object they describe
+is gone. Both carry a `sequencer`, which orders the events for one object key. The object key is
+form-URL-encoded, so `red flower.jpg` arrives as `red+flower.jpg`.
+
+`eventTime` comes from the simulation's clock, so a frozen clock produces a fixed timestamp.
+
+### When delivery fails
+
+Real S3 tells the caller who wrote the Object nothing about a delivery, and neither does the
+simulator: a handler that throws does not fail the `PutObject` and does not reject
+`backgroundTasksComplete()`. The outcome is still readable:
+
+```typescript
+for (const failure of simAws.s3().getNotificationDeliveryFailures()) {
+  console.log(failure.destinationArn, failure.reason, failure.wasRefused);
+}
+```
+
+A handler that threw is also warned about on the console, once per destination and cause. A
+destination that refused the event, because its resource policy no longer admits the Bucket, is
+recorded without a warning.
+
+A handler that writes back into the Bucket that triggered it notifies itself forever, and in process
+there is nothing to slow it down. Filter the configuration by prefix or suffix so the handler's own
+writes do not match it. Without that, the simulation stops after a thousand deliveries and
+`backgroundTasksComplete()` raises an error naming the Bucket.
+
+### Limitations
+
+- Lambda is the only destination. An SQS queue, an SNS topic and EventBridge are each refused by
+  name.
+- Only `s3:ObjectCreated:Put` and `s3:ObjectRemoved:Delete` are raised. `Copy`, `Post`,
+  `CompleteMultipartUpload`, `DeleteMarkerCreated`, the `ObjectRestore:*`, `Replication:*`,
+  `LifecycleExpiration:*` and `ObjectTagging:*` families, `LifecycleTransition`,
+  `IntelligentTiering`, `ObjectAcl:Put` and `ReducedRedundancyLostObject` are refused by name.
+  `s3:ObjectCreated:*` and `s3:ObjectRemoved:*` therefore expand to one member each.
+- `userIdentity.principalId` carries the caller's ARN rather than the `AIDA...` unique id real S3
+  puts there. Simulated IAM has no unique-id namespace to draw one from, and an ARN is what a test
+  would assert on. `requestParameters.sourceIPAddress` is the loopback address, because the request
+  was made in this process, and the `responseElements` request ids are generated per event and match
+  nothing.
+- `eventVersion` is the version the S3 event message structure page documents now. AWS increments the
+  minor version whenever it adds a field, so compare the major for equality rather than asserting on
+  the whole string.
+- `versionId` is absent from every record, which is what real S3 does for a Bucket without
+  versioning. Versioning is not simulated.
+- A notification cannot be configured on a standalone `SimS3`. It has no other simulated services to
+  notify, and no shared background scheduler for `backgroundTasksComplete()` to drain. Reach
+  simulated S3 through `SimAws` instead.
+- CloudFormation and CDK cannot configure notifications. A CDK `BucketDeployment` and
+  `mountBucketFilesystem(...)` both replace the whole storage backend rather than putting Objects, so
+  neither raises anything, where real CDK `BucketDeployment` fires one `ObjectCreated:Put` per file.
+- A function ARN naming a version or an alias is refused, since simulated Lambda has neither.
+- `s3:TestEvent` is not sent. It is an SQS and SNS mechanism.
+
 ## Bucket policies
 
 A Bucket policy is a resource policy stored on the Bucket. Sim IAM evaluates it alongside the
@@ -1016,6 +1190,8 @@ Sim S3 currently supports:
 - `CreateBucketCommand` and `ListBucketsCommand`
 - `PutObjectCommand`, `GetObjectCommand` and `ListObjectsCommand`
 - `DeleteObjectCommand` and `DeleteObjectsCommand`, authorized per Object by sim IAM
+- `PutBucketNotificationConfigurationCommand` and `GetBucketNotificationConfigurationCommand`, with
+  Object events delivered to a simulated Lambda function
 - `PutBucketWebsiteCommand`, for static website hosting
 - `PutBucketPolicyCommand`, `GetBucketPolicyCommand` and `DeleteBucketPolicyCommand`, evaluated by
   sim IAM alongside identity policies
@@ -1034,3 +1210,18 @@ Sim S3 currently supports:
 The simulator focuses on useful behaviour for tests and local development rather than full S3 feature
 parity. Unsupported S3 options may be ignored or may throw errors depending on whether the simulator
 needs them to model the requested behaviour.
+
+## Limitations
+
+These apply across the page. The sections above each list what is specific to them.
+
+- Object versioning is not simulated. There are no version ids, no delete markers and no
+  `VersionId` on any request or response.
+- Multipart uploads are not simulated. An Object is stored by one `PutObject`, so an ETag is always
+  the MD5 of the whole body.
+- `GetObject` and `ListObjects` do not report an ETag or a last-modified time. Object event
+  notifications do carry an ETag, since they compute it at the moment the Object is written.
+- Object tags, ACLs, storage classes, lifecycle rules, replication and server-side encryption are
+  not simulated.
+- A Bucket using filesystem-backed storage cannot delete Objects, and raises no event
+  notifications, because it swaps the whole storage backend rather than putting Objects.

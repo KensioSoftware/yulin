@@ -20,6 +20,9 @@ import { SimSqsEventSourceQueues } from "../../lambda/event-source/queue/sim-sqs
 import { SimS3LambdaCodeStore } from "../../lambda/function/code/store/sim-s3-lambda-code-store.js";
 import { SimSdkLambdaVmModuleProvider } from "../../lambda/function/code/vm/sdk/sim-sdk-lambda-vm-module-provider.js";
 import { SimS3 } from "../../s3/sim-s3.js";
+import { SimAwsS3NotificationFunctions } from "../../s3/notification/destination/lambda/sim-aws-s3-notification-functions.js";
+import { SimS3LambdaNotificationDestination } from "../../s3/notification/destination/lambda/sim-s3-lambda-notification-destination.js";
+import { SimS3ServiceNotificationDestinations } from "../../s3/notification/destination/sim-s3-service-notification-destinations.js";
 import { SimSecretsManager } from "../../secretsmanager/index.js";
 import { SimSqs } from "../../sqs/index.js";
 import { SimSsm } from "../../ssm/index.js";
@@ -194,13 +197,24 @@ export class SimAwsAccountRegionServiceBuilder {
     });
   }
 
-  /** Create simulated S3 for an Account Region scope. */
+  /**
+   * Create simulated S3 for an Account Region scope.
+   *
+   * Bucket event notification destinations are resolved when a configuration
+   * is applied or an event is delivered, never here. Simulated Lambda already
+   * reaches this scope's simulated S3 as it is built, for function code in a
+   * Bucket, so building S3 by reaching for Lambda would be a cycle: the memo
+   * only records a service once its factory has returned, and has no
+   * re-entrancy guard. That holds for a service that would not close the cycle
+   * today as well, since a later one could.
+   */
   createS3(scope: SimAwsAccountRegionContainer): SimS3 {
     return new SimS3({
       accountRegionScope: scope.accountRegionScope,
       s3GlobalRegistry: this.registries.s3,
       iam: this.accountServices.createIam(scope),
       background: this.background,
+      notificationDestinations: this.s3NotificationDestinations(),
     });
   }
 
@@ -255,6 +269,23 @@ export class SimAwsAccountRegionServiceBuilder {
       accountRegionScope: scope.accountRegionScope,
       background: this.background,
       iamResolver: this.iamRegistry,
+    });
+  }
+
+  /**
+   * Where a simulated S3 Bucket can send its event notifications.
+   *
+   * A notification configuration names a function by ARN, and that ARN can
+   * name any Account and Region, so the functions come from the whole
+   * simulation rather than from one scope.
+   */
+  private s3NotificationDestinations(): SimS3ServiceNotificationDestinations {
+    const functions = new SimAwsS3NotificationFunctions({
+      simAws: this.simAws,
+    });
+
+    return new SimS3ServiceNotificationDestinations({
+      lambda: new SimS3LambdaNotificationDestination({ functions }),
     });
   }
 }
