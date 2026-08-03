@@ -1,5 +1,7 @@
 import type { SimCreateAuthorizerCommandInput } from "../command/authorizer/authorizer.command.js";
+import { SimHttpApiOpenApiJwtAuthorizerScheme } from "./sim-http-api-openapi-jwt-authorizer-scheme.js";
 import type { SimHttpApiOpenApiObject } from "./sim-http-api-openapi-object.js";
+import { SimHttpApiOpenApiRequestAuthorizerScheme } from "./sim-http-api-openapi-request-authorizer-scheme.js";
 
 /**
  * The security scheme types that are not a JWT authorizer.
@@ -15,13 +17,22 @@ const openIdConnect =
   "scheme as oauth2 with an explicit jwtConfiguration.issuer instead.";
 
 /**
+ * The `x-amazon-apigateway-authorizer` type each security scheme type carries,
+ * which is what AWS documents for an HTTP API: a JWT authorizer under `oauth2`,
+ * and a Lambda `REQUEST` authorizer under `apiKey`.
+ */
+const authorizerTypes = new Map([
+  ["oauth2", "jwt"],
+  ["apiKey", "request"],
+]);
+
+/**
  * One `components.securitySchemes` member, read into the CreateAuthorizer
  * input the operations naming it ask for.
  *
- * The issuer and the audiences are handed to CreateAuthorizer as the document
- * wrote them, so what an authorizer requires is stated where every other
- * caller reads it. Only the translation is here: a document writes the
- * identity sources as one comma-separated string, and the command takes a list.
+ * Which of the two kinds of authorizer a scheme carries is decided here, and
+ * reading each kind is the class named after it. A scheme whose type and
+ * whose extension disagree is refused rather than resolved either way.
  */
 export class SimHttpApiOpenApiSecurityScheme {
   private readonly scheme: SimHttpApiOpenApiObject;
@@ -37,75 +48,63 @@ export class SimHttpApiOpenApiSecurityScheme {
     apiId: string,
     name: string,
   ): SimCreateAuthorizerCommandInput {
-    const authorizer = this.jwtAuthorizer();
-    const configuration = authorizer.member("jwtConfiguration").object();
+    const authorizerType = this.authorizerType();
+    const authorizer = this.authorizer(authorizerType);
 
-    return {
-      ApiId: apiId,
-      Name: name,
-      AuthorizerType: "JWT",
-      IdentitySource: this.identitySource(authorizer),
-      JwtConfiguration: {
-        Issuer: configuration.member("issuer").optionalString(),
-        Audience: configuration.member("audience").optionalStringList(),
-      },
-    };
+    if (authorizerType === "request") {
+      return new SimHttpApiOpenApiRequestAuthorizerScheme(
+        authorizer,
+      ).createAuthorizerInput(apiId, name);
+    }
+
+    return new SimHttpApiOpenApiJwtAuthorizerScheme(
+      authorizer,
+    ).createAuthorizerInput(apiId, name);
   }
 
   /**
-   * The `x-amazon-apigateway-authorizer` this scheme carries, refusing every
-   * other kind of scheme and every other kind of authorizer.
+   * The kind of authorizer this scheme's own type declares, refusing every
+   * scheme type an HTTP API route cannot use.
    */
-  private jwtAuthorizer(): SimHttpApiOpenApiObject {
+  private authorizerType(): string {
     const declared = this.scheme.member("type");
-    const type = declared.requiredString();
+    const schemeType = declared.requiredString();
 
-    if (type === "openIdConnect") {
+    if (schemeType === "openIdConnect") {
       throw declared.refusal(openIdConnect);
     }
 
-    if (type !== "oauth2") {
+    const authorizerType = authorizerTypes.get(schemeType);
+
+    if (authorizerType === undefined) {
       throw declared.refusal(
-        `is '${type}', and only an oauth2 scheme carrying a JWT ` +
-          `x-amazon-apigateway-authorizer is simulated`,
+        `is '${schemeType}', and an HTTP API declares a JWT authorizer under ` +
+          `oauth2 and a Lambda REQUEST authorizer under apiKey`,
       );
     }
 
-    const authorizer = this.scheme
-      .member("x-amazon-apigateway-authorizer")
-      .object();
-
-    if (authorizer.member("type").requiredString() !== "jwt") {
-      throw authorizer
-        .member("type")
-        .refusal(
-          "is not jwt, and a JWT authorizer is the only kind an imported " +
-            "document creates. Create a Lambda REQUEST authorizer with " +
-            "CreateAuthorizer instead",
-        );
-    }
-
-    return authorizer;
+    return authorizerType;
   }
 
   /**
-   * The one header or query string parameter the token is read from.
+   * The `x-amazon-apigateway-authorizer` this scheme carries, refusing one of a
+   * kind the scheme's own type does not declare.
    */
-  private identitySource(authorizer: SimHttpApiOpenApiObject): string[] {
-    const declared = authorizer.member("identitySource");
-    const sources = declared
-      .requiredString()
-      .split(",")
-      .map((source) => source.trim())
-      .filter((source) => source.length > 0);
+  private authorizer(authorizerType: string): SimHttpApiOpenApiObject {
+    const authorizer = this.scheme
+      .member("x-amazon-apigateway-authorizer")
+      .object();
+    const declared = authorizer.member("type");
+    const declaredType = declared.requiredString();
 
-    if (sources.length > 1) {
+    if (declaredType !== authorizerType) {
       throw declared.refusal(
-        `carries ${String(sources.length)} identity sources, and only the ` +
-          `first would be read here`,
+        `is '${declaredType}', and the security scheme carrying it declares a ` +
+          `'${authorizerType}' authorizer. A JWT authorizer and a Lambda ` +
+          `REQUEST authorizer are the two an HTTP API has.`,
       );
     }
 
-    return sources;
+    return authorizer;
   }
 }

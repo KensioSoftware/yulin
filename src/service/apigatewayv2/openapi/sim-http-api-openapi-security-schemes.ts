@@ -1,3 +1,4 @@
+import type { SimHttpApiAuthorizerView } from "../api/authorizer/sim-http-api-authorizer.js";
 import type { SimCreateAuthorizerCommandInput } from "../command/authorizer/authorizer.command.js";
 import type { SimHttpApiOpenApiObject } from "./sim-http-api-openapi-object.js";
 import type { SimHttpApiOpenApiSecurityRequirement } from "./sim-http-api-openapi-operation.js";
@@ -18,7 +19,7 @@ interface SimHttpApiOpenApiSecuritySchemesProperties {
  */
 export class SimHttpApiOpenApiSecuritySchemes {
   private readonly schemes: SimHttpApiOpenApiValue;
-  private readonly created = new Map<string, string>();
+  private readonly created = new Map<string, SimHttpApiAuthorizerView>();
 
   constructor(properties: SimHttpApiOpenApiSecuritySchemesProperties) {
     this.schemes = properties.schemes;
@@ -41,7 +42,7 @@ export class SimHttpApiOpenApiSecuritySchemes {
   /**
    * The authorizer already created for a scheme, if one was.
    */
-  createdId(schemeName: string): string | undefined {
+  createdAuthorizer(schemeName: string): SimHttpApiAuthorizerView | undefined {
     return this.created.get(schemeName);
   }
 
@@ -49,8 +50,8 @@ export class SimHttpApiOpenApiSecuritySchemes {
    * Remember the authorizer created for a scheme, so the next operation naming
    * it shares that one.
    */
-  remember(schemeName: string, authorizerId: string): void {
-    this.created.set(schemeName, authorizerId);
+  remember(schemeName: string, authorizer: SimHttpApiAuthorizerView): void {
+    this.created.set(schemeName, authorizer);
   }
 
   /**

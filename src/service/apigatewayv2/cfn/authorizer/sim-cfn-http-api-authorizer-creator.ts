@@ -12,13 +12,12 @@ interface SimCfnHttpApiAuthorizerCreatorProperties {
 }
 
 /**
- * Creates simulated JWT authorizers from AWS::ApiGatewayV2::Authorizer
- * Resources.
+ * Creates simulated authorizers from AWS::ApiGatewayV2::Authorizer Resources.
  *
  * The authorizer goes through the ordinary CreateAuthorizer command, so a
- * Lambda authorizer, a missing issuer or audience, and an identity source that
- * is not a header or query string are all refused here with the reason the
- * command gives.
+ * missing issuer or audience, an identity source that is not a header or query
+ * string, and a `REQUEST` authorizer asking for payload format `1.0` are all
+ * refused here with the reason the command gives.
  */
 export class SimCfnHttpApiAuthorizerCreator {
   private readonly apiGatewayV2: SimApiGatewayV2;

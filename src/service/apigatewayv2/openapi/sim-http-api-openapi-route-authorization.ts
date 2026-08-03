@@ -1,7 +1,11 @@
+import type { SimHttpApiAuthorizerView } from "../api/authorizer/sim-http-api-authorizer.js";
 import type { SimHttpApiAuthorizerCommands } from "../command/authorizer/sim-http-api-authorizer-commands.js";
 import type { SimCreateRouteCommandInput } from "../command/route/route.command.js";
 import type { SimHttpApiOpenApiCommand } from "./sim-http-api-openapi-command.js";
-import type { SimHttpApiOpenApiOperation } from "./sim-http-api-openapi-operation.js";
+import type {
+  SimHttpApiOpenApiOperation,
+  SimHttpApiOpenApiSecurityRequirement,
+} from "./sim-http-api-openapi-operation.js";
 import type { SimHttpApiOpenApiSecuritySchemes } from "./sim-http-api-openapi-security-schemes.js";
 
 /**
@@ -47,31 +51,57 @@ export class SimHttpApiOpenApiAuthorization {
       return { AuthorizationType: "NONE" };
     }
 
-    const shared = schemes.createdId(requirement.schemeName);
+    const shared = schemes.createdAuthorizer(requirement.schemeName);
 
     if (shared !== undefined) {
-      return this.jwt(shared, requirement.scopes);
+      return this.authorization(shared, requirement.scopes);
     }
 
+    const created = this.create(apiId, requirement, schemes);
+
+    return this.authorization(created, requirement.scopes);
+  }
+
+  /**
+   * Create the authorizer a requirement's scheme declares, remembering it for
+   * the next operation naming the same scheme.
+   */
+  private create(
+    apiId: string,
+    requirement: SimHttpApiOpenApiSecurityRequirement,
+    schemes: SimHttpApiOpenApiSecuritySchemes,
+  ): SimHttpApiAuthorizerView {
     const input = schemes.authorizerInput(apiId, requirement);
     const created = this.command.run(requirement.value.pointer, () =>
       this.authorizerCommands.createAuthorizer({ input }),
     );
-    schemes.remember(requirement.schemeName, created.AuthorizerId);
+    schemes.remember(requirement.schemeName, created);
 
-    return this.jwt(created.AuthorizerId, requirement.scopes);
+    return created;
   }
 
   /**
-   * A route the named authorizer decides, asking for the requirement's scopes.
+   * A route the named authorizer decides, of the type that authorizer is.
+   *
+   * A Lambda `REQUEST` authorizer makes a `CUSTOM` route, and the requirement's
+   * scopes go with it rather than being dropped: AWS applies route scopes to a
+   * `JWT` route only, so CreateRoute refuses them here.
    */
-  private jwt(
-    authorizerId: string,
+  private authorization(
+    authorizer: SimHttpApiAuthorizerView,
     scopes: readonly string[],
   ): SimHttpApiOpenApiRouteAuthorization {
+    if (authorizer.AuthorizerType === "REQUEST") {
+      return {
+        AuthorizationType: "CUSTOM",
+        AuthorizerId: authorizer.AuthorizerId,
+        AuthorizationScopes: scopes,
+      };
+    }
+
     return {
       AuthorizationType: "JWT",
-      AuthorizerId: authorizerId,
+      AuthorizerId: authorizer.AuthorizerId,
       AuthorizationScopes: scopes,
     };
   }

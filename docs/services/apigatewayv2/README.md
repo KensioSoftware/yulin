@@ -982,7 +982,8 @@ srv.close();
 ```
 
 The authorizer function is invoked once per request reaching the route. Nothing is cached between
-requests.
+requests until the authorizer is given an `AuthorizerResultTtlInSeconds`, which is what AWS defaults
+to as well. See [Caching the authorizer's decision](#caching-the-authorizers-decision).
 
 ### The event the authorizer receives
 
@@ -1335,7 +1336,7 @@ what a disabled endpoint was observed to answer rather than something documented
 ## Importing an OpenAPI definition
 
 `ImportApiCommand` takes a serialised OpenAPI 3.0 document and creates the API, one route and one
-integration per operation, and one JWT authorizer per security scheme an operation names. The route
+integration per operation, and one authorizer per security scheme an operation names. The route
 key is the operation key uppercased and the path taken verbatim, since OpenAPI path templating is
 already API Gateway's path parameter syntax.
 
@@ -1494,8 +1495,39 @@ as its `AuthorizationScopes`. An operation with no `security` is open.
 }
 ```
 
-`identitySource` is the comma-separated string a document writes, and a value carrying more than one
-entry is refused, as more than one `IdentitySource` is on `CreateAuthorizer`.
+A security scheme of type `apiKey` carrying an `x-amazon-apigateway-authorizer` with
+`type: "request"` becomes a Lambda `REQUEST` authorizer, and an operation naming it gets
+`AuthorizationType: "CUSTOM"`. The scheme's own `name` and `in` are read by AWS for the OpenAPI
+document to be valid, and `identitySource` is what decides where the values come from, here as there.
+
+```json
+{
+  "components": {
+    "securitySchemes": {
+      "session-authorizer": {
+        "type": "apiKey",
+        "name": "cookie",
+        "in": "header",
+        "x-amazon-apigateway-authorizer": {
+          "type": "request",
+          "identitySource": "$request.header.cookie",
+          "authorizerUri": "arn:aws:lambda:us-east-1:111111111111:function:session-authorizer",
+          "authorizerPayloadFormatVersion": "2.0",
+          "enableSimpleResponses": true,
+          "authorizerResultTtlInSeconds": 300
+        }
+      }
+    }
+  }
+}
+```
+
+A scheme whose type and whose authorizer disagree, such as a `jwt` authorizer under `apiKey`, is
+refused naming the extension's own `type`.
+
+`identitySource` is the comma-separated string a document writes. A JWT authorizer takes one entry
+and a value carrying more is refused, as more than one `IdentitySource` is on `CreateAuthorizer`. A
+`REQUEST` authorizer takes every entry the string names, and requires a request to carry all of them.
 
 ## CloudFormation
 
@@ -1643,7 +1675,9 @@ simulated properties are:
 
 - `Api`: `Name`, `ProtocolType`, `Description`, `DisableExecuteApiEndpoint`, `Body`,
   `FailOnWarnings`
-- `Authorizer`: `ApiId`, `Name`, `AuthorizerType`, `IdentitySource`, `JwtConfiguration`
+- `Authorizer`: `ApiId`, `Name`, `AuthorizerType`, `IdentitySource`, `JwtConfiguration`,
+  `AuthorizerUri`, `AuthorizerPayloadFormatVersion`, `EnableSimpleResponses`,
+  `AuthorizerResultTtlInSeconds`
 - `Integration`: `ApiId`, `IntegrationType`, `IntegrationUri`, `PayloadFormatVersion`, `Description`
 - `Route`: `ApiId`, `RouteKey`, `Target`, `AuthorizationType`, `AuthorizerId`, `AuthorizationScopes`
 - `Stage`: `ApiId`, `StageName`, `AutoDeploy`, `StageVariables`, `Description`
@@ -1659,9 +1693,37 @@ to configure. Pass the app client explicitly through `userPoolClients`, because 
 authorizer adds a client of its own with CDK's defaults, and those emit the OAuth properties
 [simulated Cognito refuses](../cognito/#limitations).
 
-A `Route` with `AuthorizationType: "JWT"` whose `AuthorizerId` does not resolve to an authorizer of
-that API fails the stack, naming both. That covers a `Ref` to a Resource this simulation skipped: a
-skipped Resource resolves to its own logical ID, and no authorizer has that id.
+An `Authorizer` with `AuthorizerType: "REQUEST"` deploys as a Lambda authorizer, and a `Route` with
+`AuthorizationType: "CUSTOM"` and a `Ref` to it is decided by that authorizer's function.
+`AuthorizerUri` is read the same way an integration's URI is, so the bare function ARN and the
+`arn:aws:apigateway:<region>:lambda:path/2015-03-31/functions/<function-arn>/invocations` form both
+work. The `AWS::Lambda::Permission` alongside it needs a `SourceArn` of
+`arn:aws:execute-api:<region>:<account>:<api-id>/authorizers/<authorizer-id>`, which is what CDK
+writes and what the authorizer is invoked under. A function used both as an integration and as an
+authorizer needs two permissions, as it does on AWS.
+
+CDK's `HttpLambdaAuthorizer` deploys when it is given `responseTypes: [HttpLambdaResponseType.SIMPLE]`.
+Its default is `IAM`, which sets `AuthorizerPayloadFormatVersion` to `1.0`, and that authorizer event
+is [not simulated](#limitations).
+
+```typescript
+const authorizer = new HttpLambdaAuthorizer("SessionAuthorizer", authorizerFn, {
+  responseTypes: [HttpLambdaResponseType.SIMPLE],
+  identitySource: ["$request.header.cookie"],
+});
+
+httpApi.addRoutes({
+  path: "/account",
+  methods: [HttpMethod.GET],
+  integration: new HttpLambdaIntegration("Account", accountFn),
+  authorizer,
+});
+```
+
+A `Route` with `AuthorizationType: "JWT"` or `"CUSTOM"` whose `AuthorizerId` does not resolve to an
+authorizer of that API, or resolves to one of the other kind, fails the stack, naming both. That
+covers a `Ref` to a Resource this simulation skipped: a skipped Resource resolves to its own logical
+ID, and no authorizer has that id.
 
 `Api.Body` carries an OpenAPI document as an inline JSON object, which CloudFormation resolves
 `Ref` and `Fn::GetAtt` inside as it does anywhere else, so an operation's integration URI can be an
@@ -1752,7 +1814,7 @@ the simulation without being given one. See the
   that function's resource policy with its own `AWS:SourceArn`
 - `DisableExecuteApiEndpoint`, refusing requests to the generated endpoint
 - `ImportApi` for an OpenAPI 3.0 document, creating one route and one integration per operation and
-  one JWT authorizer per security scheme an operation names
+  one JWT or Lambda `REQUEST` authorizer per security scheme an operation names
 - Deployment of `AWS::ApiGatewayV2::Api`, `Authorizer`, `Integration`, `Route` and `Stage` from a
   CloudFormation template, including one synthesized by CDK from an `HttpApi`, and an `Api` declared
   as an OpenAPI document through `Body`
@@ -1808,20 +1870,21 @@ Current documented limitations:
 - HTTP API resource policies are not simulated, because AWS does not have them. A caller from another
   Account is therefore always refused, since a cross-Account request needs an Allow from the resource
   side. Assume a Role in the API's Account instead, which is the route through on AWS as well.
-- A Lambda `REQUEST` authorizer is created by `CreateAuthorizer` only.
-  `AWS::ApiGatewayV2::Authorizer` refuses `AuthorizerType: "REQUEST"` by name, and so does an
-  OpenAPI security scheme declaring one, so a `CUSTOM` route deployed from a template or an imported
-  document is not available yet.
 - `AuthorizerPayloadFormatVersion: "2.0"` is required on a `REQUEST` authorizer, and stating nothing
   is refused too. AWS defaults it to `1.0`, which builds a different event and answers a policy
-  against a method ARN, and none of that is built here.
+  against a method ARN, and none of that is built here. CDK defaults `HttpLambdaAuthorizer` to
+  `responseTypes: [HttpLambdaResponseType.IAM]`, which sets the format to `1.0`, so a default
+  `new HttpLambdaAuthorizer(...)` fails the stack. Pass
+  `responseTypes: [HttpLambdaResponseType.SIMPLE]` to get an authorizer that deploys.
 - A `REQUEST` authorizer's event carries no `body` and no `isBase64Encoded`. AWS's published example
   of that event carries neither, so an authorizer cannot read the request body.
 - An authorizer function that throws is a 500 rather than a 401. Real Lambda turns a thrown error
   into a payload carrying `errorMessage`, and simulated Lambda rejects with the error itself, so
   returning `{ "errorMessage": "Unauthorized" }` is how an authorizer asks for a 401 here.
-- `AuthorizerCredentialsArn` is refused. It names a Role API Gateway assumes to invoke the authorizer,
-  and the function's own resource policy is the whole decision here.
+- `AuthorizerCredentialsArn` is refused, as is `AuthorizerCredentialsArn` on an
+  `AWS::ApiGatewayV2::Authorizer` and `authorizerCredentials` in an imported document. It names a
+  Role API Gateway assumes to invoke the authorizer, and the function's own resource policy is the
+  whole decision here.
 - `AuthorizerResultTtlInSeconds` is accepted between 0 and 3600, which is the range AWS accepts, and
   is refused on an authorizer with no `IdentitySource`, since there would be nothing to key the held
   decision on.

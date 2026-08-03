@@ -98,8 +98,33 @@ describe("API Gateway v2 CloudFormation authorization validation", () => {
     );
   });
 
-  it("refuses a Lambda authorizer declared as a Resource", async () => {
-    // Given a template carrying a Lambda REQUEST authorizer
+  it("refuses a CUSTOM route naming an authorizer the template did not deploy", async () => {
+    // Given a route asking for a Lambda authorizer with an authorizer id that
+    // is not one of this API's
+    const simAws = simAwsInEuWest2();
+
+    // When the template is deployed
+    const error = await deployHttpApiFailure(
+      simAws,
+      simCfnHttpApiTemplateFactory.make({
+        routeProperties: {
+          AuthorizationType: "CUSTOM",
+          AuthorizerId: "auth01",
+        },
+      }),
+    );
+
+    // Then the stack fails, as it does for a JWT route, rather than deploying
+    // a route that is open here and closed on AWS
+    assertStringIncludes(
+      error.message,
+      "AuthorizerId auth01 names no authorizer",
+    );
+  });
+
+  it("refuses a REQUEST authorizer Resource asking for payload format 1.0", async () => {
+    // Given a template carrying a Lambda authorizer with CDK's default payload
+    // format, which is the one this simulation builds no event in
     const simAws = simAwsInEuWest2();
 
     // When the template is deployed
@@ -113,19 +138,51 @@ describe("API Gateway v2 CloudFormation authorization validation", () => {
               ApiId: { Ref: "Api" },
               AuthorizerType: "REQUEST",
               Name: "lambda",
-              IdentitySource: ["$request.header.Authorization"],
+              IdentitySource: ["$request.header.cookie"],
+              AuthorizerUri: { "Fn::GetAtt": ["Handler", "Arn"] },
+              AuthorizerPayloadFormatVersion: "1.0",
             },
           },
         },
       }),
     );
 
-    // Then the stack fails, saying where a REQUEST authorizer can be created
-    // instead, rather than deploying one the template did not fully describe
+    // Then the stack fails, naming the Resource and the format it declared
     assertStringIncludes(
       error.message,
-      "declares a Lambda REQUEST authorizer, which is not deployed from a " +
-        "template yet",
+      "Sim CloudFormation Resource Authorizer creation failed: " +
+        "CreateAuthorizer AuthorizerPayloadFormatVersion '1.0' is not " +
+        "simulated",
+    );
+  });
+
+  it("refuses an authorizer Resource naming a Role to assume", async () => {
+    // Given a template whose Lambda authorizer names credentials for API
+    // Gateway to assume rather than relying on the function's own policy
+    const simAws = simAwsInEuWest2();
+
+    // When the template is deployed
+    const error = await deployHttpApiFailure(
+      simAws,
+      simCfnHttpApiTemplateFactory.make({
+        resources: {
+          Authorizer: {
+            Type: "AWS::ApiGatewayV2::Authorizer",
+            Properties: {
+              ApiId: { Ref: "Api" },
+              AuthorizerType: "REQUEST",
+              Name: "lambda",
+              AuthorizerCredentialsArn: "arn:aws:iam::111111111111:role/Auth",
+            },
+          },
+        },
+      }),
+    );
+
+    // Then it is refused by name, since nothing here assumes that Role
+    assertStringIncludes(
+      error.message,
+      "property AuthorizerCredentialsArn is not simulated",
     );
   });
 
