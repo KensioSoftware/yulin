@@ -260,13 +260,16 @@ fails the stack rather than deploying a template written two ways at once.
    method and path rather than from the route key.
 
 3. `serve/auth/sim-http-api-invoke-authorizer.ts` asks whether the API may invoke a function at all.
-   The caller is the service principal `apigateway.amazonaws.com`, the action is
-   `lambda:InvokeFunction`, and the request supplies `AWS:SourceArn` from
-   `api/sim-http-api-execute-api-arn.ts`. A function with no matching permission answers 500 and is
-   never invoked, as it is on real AWS. Both an integration's function and an authorizer's go
-   through this, under different ARNs: the route for one, `<apiId>/authorizers/<authorizerId>` for
-   the other. That ARN builder carries the reasoning for what the method and path segments of the
-   ARN hold, since neither is documented by AWS.
+   The decision itself belongs to Lambda and is made by
+   `src/service/lambda/command/authorize/sim-lambda-service-invoke-authorizer.ts`, which every
+   simulated service invoking a function goes through. This supplies the part API Gateway knows: the
+   service principal `apigateway.amazonaws.com`, `AWS:SourceArn` from
+   `api/sim-http-api-execute-api-arn.ts`, and the API's own Account as `AWS:SourceAccount`, which is
+   the Account the source ARN names rather than the one owning the function. A function with no
+   matching permission answers 500 and is never invoked, as it is on real AWS. Both an integration's
+   function and an authorizer's go through this, under different ARNs: the route for one,
+   `<apiId>/authorizers/<authorizerId>` for the other. That ARN builder carries the reasoning for
+   what the method and path segments of the ARN hold, since neither is documented by AWS.
 4. `sim-http-api-integration-invocation.ts` invokes the integrated function and turns its result into
    the response. `sim-http-api-endpoint.ts` describes the API, the matched route and the stage as a
    `SimPayload2Endpoint`, including what the route captured from the path.

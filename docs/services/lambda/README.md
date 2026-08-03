@@ -868,17 +868,18 @@ else is read as a service principal, and `*` stays `*`.
 Function URL is invoked. That is what a Function URL grant conditions on in practice: a permission
 granted for `AWS_IAM` does not also open a URL later switched to `NONE`.
 
-`SourceArn` becomes an `ArnLike` condition on `AWS:SourceArn`, which is evaluated when a simulated
-API Gateway HTTP API invokes the function through a Lambda proxy integration. That is the one
-request-time value supplied for the key, so a grant naming an API's routes decides whether those
-requests are served. See
+`SourceArn` becomes an `ArnLike` condition on `AWS:SourceArn`, and `SourceAccount` a `StringEquals`
+condition on `AWS:SourceAccount`. Both are evaluated when another simulated service invokes the
+function, which today means a simulated API Gateway HTTP API invoking it through a Lambda proxy
+integration or as a `REQUEST` authorizer. The source ARN is what the API is invoking the function
+for, and the source Account is the API's own. See
 [Granting the API permission to invoke the function](../apigatewayv2/README.md#granting-the-api-permission-to-invoke-the-function).
-A direct `Invoke`, a Function URL request and an SQS event source mapping supply no source ARN, so a
+A direct `Invoke`, a Function URL request and an SQS event source mapping supply neither, so a
 statement carrying one does not match them.
 
-`SourceAccount`, `PrincipalOrgID` and `InvokedViaFunctionUrl` are written into the statement so
-`GetPolicy` reports the grant that was made, but nothing supplies a value for them at request time,
-so a statement carrying one of those never matches.
+`PrincipalOrgID` and `InvokedViaFunctionUrl` are written into the statement so `GetPolicy` reports
+the grant that was made, but nothing supplies a value for them at request time, so a statement
+carrying one of those never matches.
 
 A function that has been granted nothing has no policy at all, which `GetPolicy` reports as a
 `ResourceNotFoundException` rather than as an empty document. Granting a `StatementId` that is
@@ -1341,12 +1342,12 @@ Current documented limitations:
 - A cross-account grant is only half of what admits a call: the caller's own Account has to allow
   the action too, and its IAM has to be part of the same `SimAws` instance for its policies to be
   found. A caller from an Account the simulation knows nothing about is denied.
-- `lambda:FunctionUrlAuthType` and `AWS:SourceArn` are the only condition keys given a value at
-  request time, the first when a Function URL is invoked and the second when a simulated API Gateway
-  HTTP API invokes the function. `SourceAccount`, `PrincipalOrgID` and `InvokedViaFunctionUrl` are
-  written into the statement so `GetPolicy` reports the grant that was made, but nothing supplies a
-  value for them, so a statement carrying one never matches. Neither does a `SourceArn` statement on
-  a request from anything but an HTTP API integration.
+- `lambda:FunctionUrlAuthType`, `AWS:SourceArn` and `AWS:SourceAccount` are the only condition keys
+  given a value at request time, the first when a Function URL is invoked and the other two when a
+  simulated API Gateway HTTP API invokes the function. `PrincipalOrgID` and `InvokedViaFunctionUrl`
+  are written into the statement so `GetPolicy` reports the grant that was made, but nothing supplies
+  a value for them, so a statement carrying one never matches. Neither does a `SourceArn` or
+  `SourceAccount` statement on a request from anything but an HTTP API.
 - `Qualifier`, `RevisionId` and `EventSourceToken` on the permission commands are not simulated,
   as versions and aliases are not.
 - `requestContext.authorizer.iam` reports `accessKey` as empty, and `callerId` and `userId` as the

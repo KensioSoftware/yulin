@@ -376,6 +376,16 @@ account-scoped simulated IAM implementation when constructed through `SimAws`
 direct standalone construction. The Function URL commands share one `FunctionUrlAuthorizer` taking
 the action as a constructor value, since only the action name varies between them.
 
+`command/authorize/sim-lambda-service-invoke-authorizer.ts` answers the other question: whether
+another simulated service may invoke a function. The caller is a service principal, which owns no
+identity policies, so the function's resource policy is the whole decision. The calling service
+supplies what it knows about the invocation as condition values, `AWS:SourceArn` for what it is
+invoking the function for and `AWS:SourceAccount` for the Account its own resource belongs to, and
+gets a decision back rather than a thrown error, since what a refusal means is the calling service's
+business. Simulated API Gateway calls it through `SimHttpApiInvokeAuthorizer`, which fills in the
+`execute-api` ARN and the API's Account. This lives here rather than in the calling service because
+who may invoke a function is Lambda's rule, and a second copy of it would drift.
+
 ## CloudFormation
 
 `cfn/` owns `AWS::Lambda::*` resource creation, following the shared per-service factory pattern

@@ -181,8 +181,13 @@ arn:aws:execute-api:<region>:<account>:<apiId>/<stage>/<METHOD>/<route path>
 A `SourceArn` may wildcard any part of that, which is what the usual grant does:
 `<apiId>/*/*` allows every route of the API on every stage.
 
-`AWS:SourceArn` is the only condition key supplied here. A permission that also carries
-`SourceAccount`, `PrincipalOrgID` or `InvokedViaFunctionUrl` never matches, since nothing gives those
+The API's own Account is supplied as `AWS:SourceAccount`, so a permission carrying a `SourceAccount`
+matches when it names the Account the API belongs to. That is the Account the source ARN names, not
+the one owning the function, which matters for an integration reaching across Accounts. CDK writes
+both keys for some grants, and a permission carrying either or both is evaluated on what it says.
+
+`AWS:SourceArn` and `AWS:SourceAccount` are the only condition keys supplied here. A permission that
+also carries `PrincipalOrgID` or `InvokedViaFunctionUrl` never matches, since nothing gives those
 keys a value at request time, so the request is refused with the same 500.
 
 Neither the method nor the path is documented by AWS as the value API Gateway supplies. Both are
