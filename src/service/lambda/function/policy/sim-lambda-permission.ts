@@ -25,6 +25,18 @@ export const simLambdaFunctionUrlAuthTypeConditionKey =
 export const simLambdaInvokedViaFunctionUrlConditionKey =
   "lambda:InvokedViaFunctionUrl";
 
+/**
+ * The condition key naming what a simulated service is invoking the function
+ * for, such as the API Gateway route a request matched.
+ */
+export const simLambdaSourceArnConditionKey = "AWS:SourceArn";
+
+/**
+ * The condition key naming the Account the invoking simulated service resource
+ * belongs to.
+ */
+export const simLambdaSourceAccountConditionKey = "AWS:SourceAccount";
+
 interface SimLambdaPermissionProperties {
   readonly statementId: string;
   readonly action: string;
@@ -90,8 +102,9 @@ export class SimLambdaPermission {
    * The condition block the qualifying properties expand into.
    *
    * `lambda:FunctionUrlAuthType` is given a value when a Function URL is
-   * invoked, and `AWS:SourceArn` when an API Gateway HTTP API integration
-   * invokes the function. The rest are still written into the statement,
+   * invoked, and `AWS:SourceArn` and `AWS:SourceAccount` when a simulated
+   * service invokes the function. `aws:PrincipalOrgID` and
+   * `lambda:InvokedViaFunctionUrl` are still written into the statement,
    * because `GetPolicy` should report the permission that was granted; a
    * statement carrying one of them simply never matches, which is the safe
    * direction for a condition the simulator cannot evaluate.
@@ -105,7 +118,9 @@ export class SimLambdaPermission {
     }
 
     if (this.sourceArn !== undefined) {
-      condition["ArnLike"] = { "AWS:SourceArn": this.sourceArn };
+      condition["ArnLike"] = {
+        [simLambdaSourceArnConditionKey]: this.sourceArn,
+      };
     }
 
     if (this.invokedViaFunctionUrl !== undefined) {
@@ -124,7 +139,7 @@ export class SimLambdaPermission {
         [simLambdaFunctionUrlAuthTypeConditionKey]: this.functionUrlAuthType,
       }),
       ...(this.sourceAccount !== undefined && {
-        "AWS:SourceAccount": this.sourceAccount,
+        [simLambdaSourceAccountConditionKey]: this.sourceAccount,
       }),
       ...(this.principalOrgId !== undefined && {
         "aws:PrincipalOrgID": this.principalOrgId,

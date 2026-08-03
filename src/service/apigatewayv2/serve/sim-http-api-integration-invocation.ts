@@ -97,6 +97,7 @@ export class SimHttpApiIntegrationInvocation {
     const { api, match, request } = input;
 
     return new SimHttpApiInvokeAuthorizer({ iam: target.iam }).authorize({
+      api,
       simFunction: target.simFunction,
       sourceArn: SimHttpApiExecuteApiArn.forMatchedRoute(
         api,
