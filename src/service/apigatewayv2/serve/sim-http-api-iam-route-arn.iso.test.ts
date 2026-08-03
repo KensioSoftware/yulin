@@ -62,6 +62,8 @@ async function allowResource(
   api: SimHttpApi,
   suffix: string,
 ): Promise<void> {
+  const { accountId: apiAccountId, regionName } = api.accountRegionScope;
+
   await simAws.iam().putRolePolicy(
     new PutRolePolicyCommand({
       RoleName: "Reporter",
@@ -70,7 +72,7 @@ async function allowResource(
         Statement: {
           Action: "execute-api:Invoke",
           Resource:
-            `arn:aws:execute-api:us-east-1:${accountId}:` +
+            `arn:aws:execute-api:${regionName}:${apiAccountId}:` +
             `${api.apiId}/${suffix}`,
         },
       }),

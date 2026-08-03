@@ -1,6 +1,7 @@
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
   assertIdentical,
+  assertNonNullable,
   assertObjectMatches,
   assertUndefined,
 } from "@kensio/smartass";
@@ -214,11 +215,12 @@ describe("Authorizing a sim HTTP API route with AWS_IAM", () => {
 
     // And an open route alongside it, on the same integration
     const [integration] = api.integrations.list();
+    assertNonNullable(integration);
     await simAws.apiGatewayV2().createRoute({
       input: {
         ApiId: api.apiId,
         RouteKey: "GET /health",
-        Target: `integrations/${integration?.integrationId ?? ""}`,
+        Target: `integrations/${integration.integrationId}`,
         AuthorizationType: "NONE",
       },
     });
