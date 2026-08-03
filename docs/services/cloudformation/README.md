@@ -575,7 +575,24 @@ A CDK BucketDeployment can copy files from synthesized asset output into the sim
 the Bucket is configured for website hosting, those files can be served through Yulin's local
 server.
 
-## CDK S3 Bucket notifications
+## S3 Bucket notifications
+
+The `NotificationConfiguration` property of `AWS::S3::Bucket` deploys through the ordinary
+`PutBucketNotificationConfiguration` path, so an Object put into the deployed Bucket reaches the
+deployed function. CloudFormation spells the configuration differently from the SDK in four places,
+and Yulin reads the CloudFormation spelling and refuses the others rather than deploying a
+configuration that quietly lost its filter.
+
+Real CloudFormation has a circular dependency here. The Bucket needs the function's ARN and the
+function's permission needs the Bucket's ARN, so a template hardcodes `BucketName`, names the Bucket
+by ARN literal on the permission, and adds a `DependsOn` so the permission is in place before S3
+validates the destination. Simulated CloudFormation needs the same, and surfaces the alternative as a
+dependency resolution failure.
+
+Note that every other `AWS::S3::Bucket` property the simulator has no behaviour for fails the stack
+by name. See [Buckets from CloudFormation](../s3/README.md#buckets-from-cloudformation).
+
+### From a CDK app
 
 `bucket.addEventNotification(...)` synthesizes a `Custom::S3BucketNotifications` resource rather than
 a Bucket property. Sim CloudFormation applies the configuration it carries through the ordinary

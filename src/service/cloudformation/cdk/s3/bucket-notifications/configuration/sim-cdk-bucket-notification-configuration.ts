@@ -3,8 +3,9 @@ import type {
   SimS3NotificationConfigurationInput,
 } from "../../../../../s3/command/put-bucket-notification-configuration/put-bucket-notification-configuration.command.js";
 import type { SimCfnTemplateValue } from "../../../../template/value/sim-cfn-template-value.js";
+import { SimCfnValueShape } from "../../../../template/value/sim-cfn-value-shape.js";
+import { bucketNotificationsError } from "../error/sim-cdk-bucket-notification-error.js";
 import { SimCdkBucketNotificationFilter } from "./sim-cdk-bucket-notification-filter.js";
-import { SimCdkBucketNotificationShape } from "./sim-cdk-bucket-notification-shape.js";
 
 /**
  * Reads the `NotificationConfiguration` property of a
@@ -18,11 +19,13 @@ import { SimCdkBucketNotificationShape } from "./sim-cdk-bucket-notification-sha
  * answered by the same validation.
  */
 export class SimCdkBucketNotificationConfiguration {
-  private readonly shape: SimCdkBucketNotificationShape;
+  private readonly shape: SimCfnValueShape;
   private readonly filter: SimCdkBucketNotificationFilter;
 
   constructor(logicalId: string) {
-    this.shape = new SimCdkBucketNotificationShape(logicalId);
+    this.shape = new SimCfnValueShape((reason) =>
+      bucketNotificationsError(logicalId, reason),
+    );
     this.filter = new SimCdkBucketNotificationFilter(this.shape);
   }
 
