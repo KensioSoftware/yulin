@@ -230,6 +230,7 @@ describe("CDK Bucket notifications CloudFormation Custom Resource", () => {
       );
     const configurations = output.LambdaFunctionConfigurations;
     assertNonNullable(configurations);
-    assertUndefined(configurations[0]?.Filter);
+    assertArrayLength(configurations, 1);
+    assertUndefined(configurations[0].Filter);
   });
 });

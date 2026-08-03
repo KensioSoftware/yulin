@@ -504,8 +504,8 @@ writes do not match it. Without that, the simulation stops after a thousand deli
 - `Managed: false` on a `Custom::S3BucketNotifications` resource is refused rather than approximated,
   and a queue, topic or EventBridge destination in one is refused by name as it is for an SDK caller.
 - A CDK `BucketDeployment` and `mountBucketFilesystem(...)` both replace the whole storage backend
-  rather than putting Objects, so neither raises anything, where real CDK `BucketDeployment` fires one
-  `ObjectCreated:Put` per file.
+  rather than putting Objects, so neither raises anything, whereas real CDK `BucketDeployment` fires
+  one `ObjectCreated:Put` per file.
 - A function ARN naming a version or an alias is refused, since simulated Lambda has neither.
 - `s3:TestEvent` is not sent. It is an SQS and SNS mechanism.
 
