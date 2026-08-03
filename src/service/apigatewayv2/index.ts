@@ -33,8 +33,16 @@ export {
   simHttpApiAuthorizerPayloadFormatVersion,
   SimHttpApiRequestAuthorizer,
 } from "./api/authorizer/sim-http-api-request-authorizer.js";
-export { SimHttpApiIdentitySource } from "./api/authorizer/sim-http-api-identity-source.js";
-export { SimHttpApiIdentitySources } from "./api/authorizer/sim-http-api-identity-sources.js";
+export type {
+  SimHttpApiIdentityInput,
+  SimHttpApiIdentitySource,
+} from "./api/authorizer/identity/sim-http-api-identity-source.js";
+export { SimHttpApiIdentitySourceParser } from "./api/authorizer/identity/sim-http-api-identity-source-parser.js";
+export { SimHttpApiIdentitySources } from "./api/authorizer/identity/sim-http-api-identity-sources.js";
+export { SimHttpApiHeaderIdentitySource } from "./api/authorizer/identity/sim-http-api-header-identity-source.js";
+export { SimHttpApiQueryStringIdentitySource } from "./api/authorizer/identity/sim-http-api-query-string-identity-source.js";
+export { SimHttpApiRouteKeyIdentitySource } from "./api/authorizer/identity/sim-http-api-route-key-identity-source.js";
+export { SimHttpApiAuthorizerResultCache } from "./api/authorizer/sim-http-api-authorizer-result-cache.js";
 export {
   SimHttpApiJwtConfiguration,
   type SimHttpApiJwtConfigurationView,

@@ -3,6 +3,7 @@ import {
   CreateAuthorizerCommand,
   type CreateAuthorizerCommandInput,
 } from "@aws-sdk/client-apigatewayv2";
+import { assertIdentical } from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
@@ -68,28 +69,57 @@ describe("What a Lambda REQUEST authorizer refuses rather than ignores", () => {
     ).rejects.toThrow(/AWS defaults it to '1.0'/);
   });
 
-  it("refuses a result cache, and accepts the value that switches it off", async () => {
+  it("refuses a result cache AWS would refuse the length of", async () => {
     // Given an API
     const simAws = new SimAws();
     const apiId = await createdApiId(simAws);
 
-    // When an authorizer asks for its decision to be cached
-    // Then it is refused, because every request here invokes the function
+    // When an authorizer asks to hold a decision for longer than AWS does,
+    // and when it asks for a negative period
+    // Then each is refused, rather than held for a period no deployed
+    // authorizer could be configured with
     await expect(
       simAws
         .apiGatewayV2()
         .createAuthorizer(
-          requestAuthorizer(apiId, { AuthorizerResultTtlInSeconds: 300 }),
+          requestAuthorizer(apiId, { AuthorizerResultTtlInSeconds: 7200 }),
         ),
-    ).rejects.toThrow(/caching an authorizer's decision is not simulated/);
+    ).rejects.toThrow(/holds an authorizer's decision for between 0 and 3600/);
 
-    // And when it asks for no caching at all, that is what this one does
+    await expect(
+      simAws
+        .apiGatewayV2()
+        .createAuthorizer(
+          requestAuthorizer(apiId, { AuthorizerResultTtlInSeconds: -1 }),
+        ),
+    ).rejects.toThrow(/holds an authorizer's decision for between 0 and 3600/);
+
+    // And when it asks for the longest AWS allows, that is accepted
     const created = await simAws
       .apiGatewayV2()
       .createAuthorizer(
-        requestAuthorizer(apiId, { AuthorizerResultTtlInSeconds: 0 }),
+        requestAuthorizer(apiId, { AuthorizerResultTtlInSeconds: 3600 }),
       );
-    expect(created.AuthorizerId).toHaveLength(6);
+    assertIdentical(created.AuthorizerResultTtlInSeconds, 3600);
+  });
+
+  it("refuses a result cache it could not key", async () => {
+    // Given an API
+    const simAws = new SimAws();
+    const apiId = await createdApiId(simAws);
+
+    // When an authorizer asks to cache a decision without naming anything to
+    // identify the caller by
+    // Then it is refused naming the cache, since AWS keys it on the identity
+    // source values and has nothing to key it on either
+    await expect(
+      simAws.apiGatewayV2().createAuthorizer(
+        requestAuthorizer(apiId, {
+          IdentitySource: [],
+          AuthorizerResultTtlInSeconds: 300,
+        }),
+      ),
+    ).rejects.toThrow(/AWS has nothing to key it on/);
   });
 
   it("refuses the Role API Gateway would assume to invoke the function", async () => {

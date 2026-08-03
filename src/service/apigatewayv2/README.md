@@ -88,7 +88,11 @@ SimHttpApiAuthorizer             an id, a name, and which kind it is
 │       ├── SimHttpApiJwtClaimChecks the issuer, the audience, then the time claims
 │       └── SimHttpApiJwtClaims      the claims as the handler receives them
 └── SimHttpApiRequestAuthorizer  which function decides, and what it needs first
-    └── SimHttpApiIdentitySources   the sources a request has to carry, as a list
+    ├── SimHttpApiIdentitySources   the sources a request has to carry, as a list
+    │   ├── SimHttpApiHeaderIdentitySource       one request header
+    │   ├── SimHttpApiQueryStringIdentitySource  one query string parameter
+    │   └── SimHttpApiRouteKeyIdentitySource     the route that matched
+    └── SimHttpApiAuthorizerResultCache  the decisions already made
 ```
 
 The two share an id, a name and nothing else, which is why the base is abstract rather than a class
@@ -99,7 +103,19 @@ route is refused by AWS and could only be served here by guessing which half app
 
 `SimHttpApiIdentitySources` is a list because a `REQUEST` authorizer takes several, while a JWT
 authorizer takes exactly one and `SimHttpApiJwtAuthorizerInput` is where that single-source rule
-lives.
+lives. Each kind of source is its own small class answering the same question, in `identity/`, for
+the reason the route path segments are: `$context.routeKey` reads the matched route rather than the
+request, so a single class would carry a flag per form and a branch per flag.
+`SimHttpApiIdentitySourceParser` reads an expression into one of them, and has two entry points: a
+JWT authorizer parses with `requestSource`, since it reads the token the client sent and a route key
+is not one.
+
+`SimHttpApiAuthorizerResultCache` is what `AuthorizerResultTtlInSeconds` configures, and it belongs
+to the authorizer because it outlives one request and one server the way the authorizer does. It
+holds no clock: the caller passes the instant it is asking about, so expiry follows the simulation's
+clock and a test advances time rather than waiting. Its key is the identity source values and
+nothing else, which is why one decision covers every route of the API using the authorizer until
+`$context.routeKey` is added as a source.
 
 The token parsing and RS256 verification itself is `src/util/jwt/`, which knows nothing about API
 Gateway. It is real verification against the issuer's published JWK, with `node:crypto`: nothing is
@@ -226,7 +242,12 @@ fails the stack rather than deploying a template written two ways at once.
    ```
 
    The `CUSTOM` one is the reason this step is asynchronous: it invokes a function and waits for it.
-   Its three collaborators split what that involves, since none of them is small:
+   `SimHttpApiRequestRouteAuthorizer` itself only settles what the request carries and hands the
+   rest to two collaborators: `SimHttpApiAuthorizerDecisions` reuses a decision already made for
+   those identity source values, and `SimHttpApiAuthorizerInvocation` asks the function when there
+   is none to reuse. Which answers are held is the whole of the first: a refusal is held the way an
+   admission is, and an authorizer that could not answer at all is not held, since there is no
+   answer to hold. Three more collaborators split the invocation, since none of them is small:
    `SimHttpApiAuthorizerEventBuilder` builds the event, over the shared payload 2.0 builder;
    `SimHttpApiAuthorizerResponse` reads whichever of the two answer shapes came back; and
    `SimHttpApiAuthorizerPolicy` puts a returned policy document to IAM, evaluating it as the only
@@ -309,12 +330,14 @@ simulation exists to avoid:
   authorizer or a `JwtConfiguration` on a `REQUEST` one
 - an `AuthorizerPayloadFormatVersion` that is not `2.0`, including an unstated one, which AWS reads
   as `1.0`
-- a non-zero `AuthorizerResultTtlInSeconds`, since nothing here reuses a decision, and an
-  `AuthorizerCredentialsArn`, since the function's own resource policy is the whole decision
+- an `AuthorizerResultTtlInSeconds` outside the range AWS accepts, and one set on an authorizer
+  with no `IdentitySource`, since there would be nothing to key the held decision on
+- an `AuthorizerCredentialsArn`, since the function's own resource policy is the whole decision
 - a `REQUEST` authorizer declared by `AWS::ApiGatewayV2::Authorizer` or by an OpenAPI security
   scheme, which `CreateAuthorizer` does create
 - more than one `IdentitySource` on a `JWT` authorizer, no `IdentitySource` at all on a `REQUEST`
-  one, and an identity source naming neither a header nor a query string parameter
+  one, `$context.routeKey` on a `JWT` one, and an identity source naming none of the three forms
+  read here
 - a stage name that is neither `$default` nor something a URL path segment could hold, and a stage
   without `AutoDeploy: true`, since Deployments are not simulated and such a stage serves nothing on
   real AWS

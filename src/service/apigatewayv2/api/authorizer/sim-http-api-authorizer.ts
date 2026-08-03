@@ -45,6 +45,7 @@ export interface SimHttpApiAuthorizerView {
   AuthorizerUri?: string;
   AuthorizerPayloadFormatVersion?: string;
   EnableSimpleResponses?: boolean;
+  AuthorizerResultTtlInSeconds?: number;
 }
 
 /**

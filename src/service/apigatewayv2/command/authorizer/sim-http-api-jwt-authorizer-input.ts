@@ -1,5 +1,6 @@
 import type { SimHttpApiAuthorizerId } from "../../api/authorizer/sim-http-api-authorizer.js";
-import { SimHttpApiIdentitySource } from "../../api/authorizer/sim-http-api-identity-source.js";
+import { SimHttpApiIdentitySourceParser } from "../../api/authorizer/identity/sim-http-api-identity-source-parser.js";
+import type { SimHttpApiIdentitySource } from "../../api/authorizer/identity/sim-http-api-identity-source.js";
 import { SimHttpApiJwtAuthorizer } from "../../api/authorizer/sim-http-api-jwt-authorizer.js";
 import { SimHttpApiJwtConfiguration } from "../../api/authorizer/sim-http-api-jwt-configuration.js";
 import { SimApiGatewayV2BadRequest } from "../../error/sim-api-gateway-v2.error.js";
@@ -18,6 +19,7 @@ import { SimHttpApiAuthorizerOptions } from "./sim-http-api-authorizer-options.j
 export class SimHttpApiJwtAuthorizerInput implements SimHttpApiAuthorizerInput {
   private readonly input: SimCreateAuthorizerCommandInput;
   private readonly options = new SimHttpApiAuthorizerOptions("JWT");
+  private readonly identitySourceParser = new SimHttpApiIdentitySourceParser();
 
   constructor(input: SimCreateAuthorizerCommandInput) {
     this.input = input;
@@ -93,7 +95,9 @@ export class SimHttpApiJwtAuthorizerInput implements SimHttpApiAuthorizerInput {
       );
     }
 
-    return SimHttpApiIdentitySource.parse(sources[0] ?? "");
+    // The request-only forms: a JWT authorizer reads the token the client
+    // sent, so `$context.routeKey` is refused for it as it is on AWS.
+    return this.identitySourceParser.requestSource(sources[0] ?? "");
   }
 
   /**

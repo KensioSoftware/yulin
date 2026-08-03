@@ -19,7 +19,7 @@ import {
   type SimHttpApiAuthorization,
   type SimHttpApiRefused,
 } from "./sim-http-api-authorization.js";
-import { SimHttpApiIdentitySource } from "./sim-http-api-identity-source.js";
+import { SimHttpApiIdentitySourceParser } from "./identity/sim-http-api-identity-source-parser.js";
 import { SimHttpApiJwtAuthorizer } from "./sim-http-api-jwt-authorizer.js";
 import { SimHttpApiJwtConfiguration } from "./sim-http-api-jwt-configuration.js";
 import { SimHttpApiNoJwtIssuerKeys } from "./sim-http-api-jwt-issuer-keys.js";
@@ -78,7 +78,7 @@ function authorizerFor(
   return new SimHttpApiJwtAuthorizer({
     authorizerId: makeSimHttpApiAuthorizerId(),
     name: "pool-authorizer",
-    identitySource: SimHttpApiIdentitySource.parse(
+    identitySource: new SimHttpApiIdentitySourceParser().requestSource(
       "$request.header.Authorization",
     ),
     jwtConfiguration: new SimHttpApiJwtConfiguration({

@@ -1,6 +1,6 @@
 import type { SimHttpApiAuthorizerId } from "../../api/authorizer/sim-http-api-authorizer.js";
-import { SimHttpApiIdentitySource } from "../../api/authorizer/sim-http-api-identity-source.js";
-import { SimHttpApiIdentitySources } from "../../api/authorizer/sim-http-api-identity-sources.js";
+import { SimHttpApiIdentitySourceParser } from "../../api/authorizer/identity/sim-http-api-identity-source-parser.js";
+import { SimHttpApiIdentitySources } from "../../api/authorizer/identity/sim-http-api-identity-sources.js";
 import {
   simHttpApiAuthorizerPayloadFormatVersion,
   SimHttpApiRequestAuthorizer,
@@ -13,6 +13,11 @@ import type { SimHttpApiAuthorizerInput } from "./sim-http-api-authorizer-input.
 import { SimHttpApiAuthorizerOptions } from "./sim-http-api-authorizer-options.js";
 
 /**
+ * The longest AWS holds a Lambda authorizer's decision for.
+ */
+const maximumResultTtlSeconds = 3600;
+
+/**
  * Reads the inputs a Lambda `REQUEST` authorizer is created from.
  *
  * The function and the payload format are both required rather than defaulted.
@@ -23,6 +28,7 @@ import { SimHttpApiAuthorizerOptions } from "./sim-http-api-authorizer-options.j
 export class SimHttpApiRequestAuthorizerInput implements SimHttpApiAuthorizerInput {
   private readonly input: SimCreateAuthorizerCommandInput;
   private readonly options = new SimHttpApiAuthorizerOptions("REQUEST");
+  private readonly identitySourceParser = new SimHttpApiIdentitySourceParser();
 
   constructor(input: SimCreateAuthorizerCommandInput) {
     this.input = input;
@@ -37,8 +43,11 @@ export class SimHttpApiRequestAuthorizerInput implements SimHttpApiAuthorizerInp
       this.input.JwtConfiguration,
       "and a REQUEST authorizer verifies no token: its function decides",
     );
-    this.refuseResultCache();
     this.requirePayloadFormatVersion();
+    // Read before the sources are parsed, so an authorizer asking to cache a
+    // decision it could not key is told that rather than told it needs a
+    // source for the reason an uncached authorizer needs one.
+    const resultTtlSeconds = this.resultTtlSeconds();
 
     return new SimHttpApiRequestAuthorizer({
       authorizerId,
@@ -46,6 +55,7 @@ export class SimHttpApiRequestAuthorizerInput implements SimHttpApiAuthorizerInp
       lambdaUri: this.lambdaUri(),
       identitySources: this.identitySources(),
       enableSimpleResponses: this.input.EnableSimpleResponses ?? false,
+      resultTtlSeconds,
     });
   }
 
@@ -95,24 +105,33 @@ export class SimHttpApiRequestAuthorizerInput implements SimHttpApiAuthorizerInp
   }
 
   /**
-   * Refuse a result cache, which is a decision this simulation never reuses.
+   * How long this authorizer's decisions are held for.
    *
-   * Zero is the value that switches caching off, so it is what an authorizer
-   * behaving as this one does is configured with, and is accepted.
+   * Zero, and saying nothing, both mean no caching, which is what AWS defaults
+   * an authorizer to. AWS accepts up to an hour and refuses more, so anything
+   * outside that range is refused here rather than held for a period no
+   * deployed authorizer could be configured with.
    */
-  private refuseResultCache(): void {
-    const ttl = this.input.AuthorizerResultTtlInSeconds;
+  private resultTtlSeconds(): number {
+    const ttl = this.input.AuthorizerResultTtlInSeconds ?? 0;
 
-    if (ttl === undefined || ttl === 0) {
-      return;
+    if (ttl < 0 || ttl > maximumResultTtlSeconds) {
+      throw new SimApiGatewayV2BadRequest(
+        `CreateAuthorizer AuthorizerResultTtlInSeconds is ${String(ttl)}: AWS ` +
+          `holds an authorizer's decision for between 0 and ` +
+          `${String(maximumResultTtlSeconds)} seconds`,
+      );
     }
 
-    throw new SimApiGatewayV2BadRequest(
-      `CreateAuthorizer AuthorizerResultTtlInSeconds is ${String(ttl)}: ` +
-        `caching an authorizer's decision is not simulated, so every request ` +
-        `would invoke the function here and one in ${String(ttl)} would on ` +
-        `real AWS`,
-    );
+    if (ttl > 0 && (this.input.IdentitySource ?? []).length === 0) {
+      throw new SimApiGatewayV2BadRequest(
+        "CreateAuthorizer AuthorizerResultTtlInSeconds is set on an " +
+          "authorizer with no IdentitySource: a cached decision is keyed on " +
+          "the identity source values, so AWS has nothing to key it on",
+      );
+    }
+
+    return ttl;
   }
 
   /**
@@ -136,7 +155,7 @@ export class SimHttpApiRequestAuthorizerInput implements SimHttpApiAuthorizerInp
     }
 
     return new SimHttpApiIdentitySources(
-      sources.map((source) => SimHttpApiIdentitySource.parse(source)),
+      sources.map((source) => this.identitySourceParser.parse(source)),
     );
   }
 }

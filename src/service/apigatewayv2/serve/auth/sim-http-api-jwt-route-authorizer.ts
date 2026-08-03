@@ -3,6 +3,7 @@ import {
   type SimHttpApiAuthorization,
   SimHttpApiRefused,
 } from "../../api/authorizer/sim-http-api-authorization.js";
+import { simHttpApiBearerToken } from "../../api/authorizer/sim-http-api-bearer-token.js";
 import { SimHttpApiJwtAuthorizer } from "../../api/authorizer/sim-http-api-jwt-authorizer.js";
 import { SimHttpApiJwtVerification } from "../../api/authorizer/sim-http-api-jwt-verification.js";
 import type { SimHttpApiRouteAuthorizeInput } from "./sim-http-api-route-authorize-input.js";
@@ -45,7 +46,12 @@ export class SimHttpApiJwtRouteAuthorizer {
       return SimHttpApiRefused.unauthorized();
     }
 
-    const presented = authorizer.identitySource.token(request);
+    const presented = simHttpApiBearerToken(
+      authorizer.identitySource.value({
+        request,
+        routeKey: route.routeKey,
+      }),
+    );
 
     if (presented === undefined) {
       return SimHttpApiRefused.unauthorized();

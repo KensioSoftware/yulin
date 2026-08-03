@@ -98,11 +98,11 @@ export class SimHttpApiIntegrationInvocation {
 
     return new SimHttpApiInvokeAuthorizer({ iam: target.iam }).authorize({
       simFunction: target.simFunction,
-      sourceArn: new SimHttpApiExecuteApiArn({
+      sourceArn: SimHttpApiExecuteApiArn.forMatchedRoute(
         api,
-        stageName: match.stage.stageName,
-        methodAndPath: match.route.key.methodAndPath(request.method),
-      }),
+        match,
+        request.method,
+      ),
     }).isDenied;
   }
 }

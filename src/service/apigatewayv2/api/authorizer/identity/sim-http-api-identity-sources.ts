@@ -1,4 +1,7 @@
-import type { SimHttpApiIdentitySource } from "./sim-http-api-identity-source.js";
+import type {
+  SimHttpApiIdentityInput,
+  SimHttpApiIdentitySource,
+} from "./sim-http-api-identity-source.js";
 
 /**
  * The identity sources a Lambda `REQUEST` authorizer is configured with.
@@ -7,6 +10,9 @@ import type { SimHttpApiIdentitySource } from "./sim-http-api-identity-source.js
  * authorizer takes, and API Gateway checks the whole list before it invokes
  * anything: a request missing any one of them is refused with a 401 and the
  * authorizer function never runs.
+ *
+ * The values found are also what a cached decision is keyed on, which is why
+ * the order they were configured in is kept.
  */
 export class SimHttpApiIdentitySources {
   private readonly sources: readonly SimHttpApiIdentitySource[];
@@ -29,11 +35,11 @@ export class SimHttpApiIdentitySources {
    * This is what reaches the authorizer as the event's `identitySource`: the
    * values rather than the expressions that found them.
    */
-  values(request: Request): string[] | undefined {
+  values(input: SimHttpApiIdentityInput): string[] | undefined {
     const values: string[] = [];
 
     for (const source of this.sources) {
-      const value = source.value(request);
+      const value = source.value(input);
 
       if (value === undefined) {
         return undefined;

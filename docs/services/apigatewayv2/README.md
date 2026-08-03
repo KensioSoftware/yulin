@@ -1059,6 +1059,159 @@ The authorizer's function is invoked under
 AWS documents for granting API Gateway permission to invoke one. That ARN names no stage and no
 route, so it is a different grant from the integration's, and a function used for both needs both.
 
+### Caching the authorizer's decision
+
+`AuthorizerResultTtlInSeconds` holds a decision for that many seconds, and a request presenting the
+same identity source values within it is served from that decision without the function running
+again. AWS accepts up to 3600, and 0, which is the default, holds nothing.
+
+The key is the identity source values and nothing else, so one decision covers every route of the API
+that uses the authorizer. Adding `$context.routeKey` as an identity source puts the route in the key,
+which is what AWS documents for caching per route.
+
+```typescript sim-apigatewayv2-lambda-authorizer-cache
+/**
+ * Caching a simulated HTTP API Lambda authorizer's decision.
+ */
+
+import {
+  CreateApiCommand,
+  CreateAuthorizerCommand,
+  CreateIntegrationCommand,
+  CreateRouteCommand,
+  CreateStageCommand,
+} from "@aws-sdk/client-apigatewayv2";
+import {
+  AddPermissionCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import type { SimPayload2Event } from "@kensio/yulin/apigatewayv2";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const lambda = simAws.lambda();
+
+// An authorizer counting its own invocations, so the caller can see which
+// decision served each request.
+const counter = { invocations: 0 };
+
+const { FunctionArn: AuthorizerFunctionArn } = await lambda.createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "session-authorizer",
+    Role: "arn:aws:iam::888888888888:role/AuthorizerRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput(() => {
+        counter.invocations += 1;
+
+        return { isAuthorized: true, context: { ...counter } };
+      }),
+    },
+  }),
+);
+
+const { FunctionArn } = await lambda.createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "account",
+    Role: "arn:aws:iam::888888888888:role/AccountRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput((event: SimPayload2Event) => ({
+        statusCode: 200,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(event.requestContext.authorizer?.lambda),
+      })),
+    },
+  }),
+);
+
+const apiGateway = simAws.apiGatewayV2();
+
+const { ApiId, ApiEndpoint } = await apiGateway.createApi(
+  new CreateApiCommand({ Name: "account", ProtocolType: "HTTP" }),
+);
+
+const { IntegrationId } = await apiGateway.createIntegration(
+  new CreateIntegrationCommand({
+    ApiId,
+    IntegrationType: "AWS_PROXY",
+    IntegrationUri: FunctionArn,
+    PayloadFormatVersion: "2.0",
+  }),
+);
+
+const { AuthorizerId } = await apiGateway.createAuthorizer(
+  new CreateAuthorizerCommand({
+    ApiId,
+    Name: "session-cookie",
+    AuthorizerType: "REQUEST",
+    AuthorizerUri: AuthorizerFunctionArn,
+    AuthorizerPayloadFormatVersion: "2.0",
+    EnableSimpleResponses: true,
+    IdentitySource: ["$request.header.cookie"],
+    AuthorizerResultTtlInSeconds: 300,
+  }),
+);
+
+await apiGateway.createRoute(
+  new CreateRouteCommand({
+    ApiId,
+    RouteKey: "GET /account",
+    Target: `integrations/${IntegrationId}`,
+    AuthorizationType: "CUSTOM",
+    AuthorizerId,
+  }),
+);
+
+await apiGateway.createStage(
+  new CreateStageCommand({ ApiId, StageName: "$default", AutoDeploy: true }),
+);
+
+for (const [FunctionName, SourceArn] of [
+  ["account", `arn:aws:execute-api:us-east-1:888888888888:${ApiId}/*/*`],
+  [
+    "session-authorizer",
+    `arn:aws:execute-api:us-east-1:888888888888:${ApiId}/authorizers/${AuthorizerId}`,
+  ],
+]) {
+  await lambda.addPermission(
+    new AddPermissionCommand({
+      FunctionName,
+      StatementId: "api-gateway-invoke",
+      Action: "lambda:InvokeFunction",
+      Principal: "apigateway.amazonaws.com",
+      SourceArn,
+    }),
+  );
+}
+
+const srv = await serveSimAws({ simAws });
+const url = srv.localUrl(`${ApiEndpoint}/account`);
+const call = async (): Promise<unknown> => {
+  const response = await fetch(url, { headers: { cookie: "session=valid" } });
+
+  return await response.json();
+};
+
+console.log(await call()); // { invocations: 1 }
+console.log(await call()); // { invocations: 1 }, held rather than asked again
+
+// Simulated time passing the TTL drops the decision.
+await simAws.clock().advanceBy({ minutes: 6 });
+
+console.log(await call()); // { invocations: 2 }
+
+srv.close();
+```
+
+A refusal is held the same way an admission is, so a session the authorizer rejected stays rejected
+until the TTL expires. What is not held is an authorizer that could not answer at all: a function that
+threw, or replied in neither format, is asked again on the next request.
+
+Expiry is checked against the simulation's clock, so `simAws.clock().advanceBy(...)` expires a
+decision that was being reused a moment before, and no test has to wait.
+
 ### The context the handler receives
 
 The `context` the authorizer returned arrives as `event.requestContext.authorizer.lambda`, with its
@@ -1588,6 +1741,9 @@ the simulation without being given one. See the
   routes protected by one with `AuthorizationType: "CUSTOM"`, invoking the authorizer's function with
   the payload format 2.0 authorizer event, reading a simple response or an IAM policy response, and
   passing the returned context to the handler as `event.requestContext.authorizer.lambda`
+- `AuthorizerResultTtlInSeconds`, holding a decision against the identity source values it was made
+  for and expiring it against the simulation's clock, with `$context.routeKey` as an identity source
+  to hold one per route
 - `CreateStage` and `GetStages` for the `$default` stage and for named stages served under their own
   path segment, including stage variables
 - Serving the generated endpoint through `serveSimAws`, invoking the integrated function with a
@@ -1666,15 +1822,21 @@ Current documented limitations:
   returning `{ "errorMessage": "Unauthorized" }` is how an authorizer asks for a 401 here.
 - `AuthorizerCredentialsArn` is refused. It names a Role API Gateway assumes to invoke the authorizer,
   and the function's own resource policy is the whole decision here.
-- Authorizer result caching is not simulated. `AuthorizerResultTtlInSeconds` configures it, and only
-  `0`, the value that switches it off, is accepted. Every request reaching a `CUSTOM` route invokes
-  the authorizer's function.
+- `AuthorizerResultTtlInSeconds` is accepted between 0 and 3600, which is the range AWS accepts, and
+  is refused on an authorizer with no `IdentitySource`, since there would be nothing to key the held
+  decision on.
+- A held decision is the whole answer, so a policy response is not re-evaluated per route on a cache
+  hit. That is what AWS's own warning about caching describes, and `$context.routeKey` as an identity
+  source is the documented way to separate routes.
+- An authorizer that could not answer at all, by throwing or by replying in neither format, is not
+  held. There is no answer to hold, and the next request asks the function again.
 - A `REQUEST` authorizer requires at least one `IdentitySource`. An authorizer with none is invoked
   for every request on AWS, including one carrying nothing, and that is not simulated.
-- An identity source is `$request.header.<name>` or `$request.querystring.<name>`. `$context.*` and
-  `$stagevariables.*`, which a `REQUEST` authorizer may also name on AWS, are refused rather than
-  read from nowhere. A JWT authorizer takes one identity source, and a second is refused rather than
-  partly read.
+- A `REQUEST` authorizer's identity source is `$request.header.<name>`,
+  `$request.querystring.<name>` or `$context.routeKey`. The rest of `$context` and all of
+  `$stagevariables`, which a `REQUEST` authorizer may also name on AWS, are refused rather than read
+  from nowhere. A JWT authorizer takes one identity source naming something the client sent, so
+  `$context.routeKey` is refused for it, and a second source is refused rather than partly read.
 - `JwtConfiguration.Audience` is required. What real API Gateway does with an authorizer that has an
   empty audience list is not documented, so this is stricter than AWS may be, in the direction that
   cannot quietly admit an app client.

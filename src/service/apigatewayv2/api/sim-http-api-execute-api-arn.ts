@@ -1,3 +1,4 @@
+import type { SimHttpApiMatch } from "./sim-http-api-match.js";
 import type { SimHttpApi } from "./sim-http-api.js";
 
 interface SimHttpApiExecuteApiArnProperties {
@@ -52,6 +53,25 @@ export class SimHttpApiExecuteApiArn {
     this.api = properties.api;
     this.stageName = properties.stageName;
     this.methodAndPath = properties.methodAndPath;
+  }
+
+  /**
+   * The ARN of the route a request matched, in the route key form.
+   *
+   * This is the one two callers share: the invoke permission of the route's
+   * integration, and the `routeArn` a Lambda `REQUEST` authorizer is given and
+   * answers a policy against.
+   */
+  static forMatchedRoute(
+    api: SimHttpApi,
+    match: SimHttpApiMatch,
+    requestMethod: string,
+  ): SimHttpApiExecuteApiArn {
+    return new SimHttpApiExecuteApiArn({
+      api,
+      stageName: match.stage.stageName,
+      methodAndPath: match.route.key.methodAndPath(requestMethod),
+    });
   }
 
   /**
