@@ -4,7 +4,10 @@ import type {
 } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { simLambdaResourcePolicies } from "../../../lambda/command/authorize/sim-lambda-resource-policies.js";
 import type { SimLambdaFunction } from "../../../lambda/function/sim-lambda-function.js";
-import type { SimHttpApiExecuteApiArn } from "../../api/sim-http-api-execute-api-arn.js";
+import type { SimHttpApiRequestAuthorizer } from "../../api/authorizer/sim-http-api-request-authorizer.js";
+import { SimHttpApiExecuteApiArn } from "../../api/sim-http-api-execute-api-arn.js";
+import type { SimHttpApi } from "../../api/sim-http-api.js";
+import type { SimHttpApiFunctionTarget } from "../sim-api-gateway-v2-router.js";
 
 /**
  * The service principal API Gateway invokes a Lambda function as, whether that
@@ -72,4 +75,25 @@ export class SimHttpApiInvokeAuthorizer {
       },
     });
   }
+}
+
+/**
+ * Whether the API may not invoke a function as one of its authorizers.
+ *
+ * The source ARN names the authorizer rather than the route, so a function
+ * granted the invoke action for the API's routes is not thereby usable as its
+ * authorizer, as on real AWS.
+ */
+export function simHttpApiMayNotInvokeAuthorizer(
+  api: SimHttpApi,
+  authorizer: SimHttpApiRequestAuthorizer,
+  target: SimHttpApiFunctionTarget,
+): boolean {
+  return new SimHttpApiInvokeAuthorizer({ iam: target.iam }).authorize({
+    simFunction: target.simFunction,
+    sourceArn: SimHttpApiExecuteApiArn.forAuthorizer(
+      api,
+      authorizer.authorizerId,
+    ),
+  }).isDenied;
 }

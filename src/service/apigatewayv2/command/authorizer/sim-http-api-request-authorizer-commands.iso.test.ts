@@ -108,6 +108,46 @@ describe("Creating a sim HTTP API Lambda REQUEST authorizer", () => {
     ]);
   });
 
+  it("takes the route as an identity source, and a result cache", async () => {
+    // Given an API
+    const simAws = new SimAws();
+    const apiId = await createdApiId(simAws);
+
+    // When an authorizer holds its decisions and keys them per route
+    const created = await simAws.apiGatewayV2().createAuthorizer(
+      new CreateAuthorizerCommand({
+        ApiId: apiId,
+        Name: "per-route",
+        AuthorizerType: "REQUEST",
+        AuthorizerUri: functionArn,
+        AuthorizerPayloadFormatVersion: "2.0",
+        IdentitySource: ["$request.header.cookie", "$context.routeKey"],
+        AuthorizerResultTtlInSeconds: 300,
+      }),
+    );
+
+    // Then both are reported back, since a decision cached against the wrong
+    // key is the thing this pair exists to get right
+    assertObjectMatches(created, {
+      IdentitySource: ["$request.header.cookie", "$context.routeKey"],
+      AuthorizerResultTtlInSeconds: 300,
+    });
+  });
+
+  it("holds nothing by default, which is what AWS defaults to", async () => {
+    // Given an API
+    const simAws = new SimAws();
+    const apiId = await createdApiId(simAws);
+
+    // When an authorizer says nothing about caching
+    const created = await simAws
+      .apiGatewayV2()
+      .createAuthorizer(createRequestAuthorizer(apiId));
+
+    // Then it holds nothing, and reports so rather than leaving it unstated
+    assertIdentical(created.AuthorizerResultTtlInSeconds, 0);
+  });
+
   it("takes the wrapped URI form a template writes", async () => {
     // Given an API
     const simAws = new SimAws();

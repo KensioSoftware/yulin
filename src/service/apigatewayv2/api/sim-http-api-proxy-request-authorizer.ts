@@ -13,6 +13,8 @@ export interface SimHttpApiProxyRequestAuthorizer {
   readonly functionName: string;
   readonly identitySource: readonly string[];
   readonly enableSimpleResponses: boolean;
+  /** How long a decision is held for, with zero meaning none. */
+  readonly resultTtlSeconds: number;
   /**
    * The `AuthorizerUri`, which defaults to the function just created. A test
    * about an authorizer whose function is not there names one nothing created.
@@ -65,6 +67,7 @@ export async function simHttpApiProxyRequestAuthorizer(
       AuthorizerUri: authorizer.uri ?? functionArn,
       AuthorizerPayloadFormatVersion: "2.0",
       EnableSimpleResponses: authorizer.enableSimpleResponses,
+      AuthorizerResultTtlInSeconds: authorizer.resultTtlSeconds,
       IdentitySource: [...authorizer.identitySource],
     },
   });

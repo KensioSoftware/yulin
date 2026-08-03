@@ -3,7 +3,7 @@ import {
   type SimHttpApiAuthorizerId,
   type SimHttpApiAuthorizerView,
 } from "./sim-http-api-authorizer.js";
-import type { SimHttpApiIdentitySource } from "./sim-http-api-identity-source.js";
+import type { SimHttpApiIdentitySource } from "./identity/sim-http-api-identity-source.js";
 import type { SimHttpApiJwtConfiguration } from "./sim-http-api-jwt-configuration.js";
 
 interface SimHttpApiJwtAuthorizerProperties {

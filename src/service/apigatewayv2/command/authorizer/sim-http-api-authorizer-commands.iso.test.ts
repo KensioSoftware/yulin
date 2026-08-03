@@ -303,6 +303,29 @@ describe("What CreateAuthorizer refuses rather than ignores", () => {
     ).rejects.toThrow(/IdentitySource '\$context.authorizer.token'/);
   });
 
+  it("refuses the route as a JWT authorizer's identity source", async () => {
+    // Given an API
+    const simAws = new SimAws();
+    const apiId = await createdApiId(simAws);
+
+    // When a JWT authorizer looks for its token in the route key
+    // Then it is refused, since a JWT authorizer reads the token the client
+    // sent and a route key is not one, and the refusal does not offer it
+    await expect(
+      simAws.apiGatewayV2().createAuthorizer(
+        new CreateAuthorizerCommand({
+          ApiId: apiId,
+          Name: "pool",
+          AuthorizerType: "JWT",
+          IdentitySource: ["$context.routeKey"],
+          JwtConfiguration: { Issuer: issuer, Audience: ["client-1"] },
+        }),
+      ),
+    ).rejects.toThrow(
+      /IdentitySource '\$context.routeKey' is not simulated: an identity source is '\$request.header.<name>' or '\$request.querystring.<name>'/,
+    );
+  });
+
   it("refuses an authorizer with no name, and a paged list", async () => {
     // Given an API
     const simAws = new SimAws();

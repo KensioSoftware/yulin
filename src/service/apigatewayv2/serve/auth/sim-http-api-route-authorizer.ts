@@ -5,10 +5,8 @@ import {
 } from "../../api/authorizer/sim-http-api-authorization.js";
 import { SimHttpApiIamRouteAuthorizer } from "./sim-http-api-iam-route-authorizer.js";
 import { SimHttpApiJwtRouteAuthorizer } from "./sim-http-api-jwt-route-authorizer.js";
-import {
-  type SimHttpApiAuthorizerFunctions,
-  SimHttpApiRequestRouteAuthorizer,
-} from "./sim-http-api-request-route-authorizer.js";
+import type { SimHttpApiAuthorizerFunctions } from "./sim-http-api-authorizer-invocation.js";
+import { SimHttpApiRequestRouteAuthorizer } from "./sim-http-api-request-route-authorizer.js";
 import type { SimHttpApiRouteAuthorizeInput } from "./sim-http-api-route-authorize-input.js";
 
 interface SimHttpApiRouteAuthorizerProperties {
