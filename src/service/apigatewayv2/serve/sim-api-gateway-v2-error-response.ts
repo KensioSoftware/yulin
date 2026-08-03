@@ -34,8 +34,8 @@ export class SimApiGatewayV2ErrorResponse {
 
   /**
    * The API's generated endpoint is switched off, the route asks for a scope
-   * the accepted token does not claim, or IAM did not allow the caller the
-   * `AWS_IAM` route being called.
+   * the accepted token does not claim, or IAM denied the caller
+   * `execute-api:Invoke` on the `AWS_IAM` route being called.
    *
    * AWS publishes neither the status nor the body for any of these, so both
    * are what the endpoint was observed to answer rather than something
