@@ -39,15 +39,19 @@ export interface SimHttpApiIdentitySource {
 
 /**
  * A value the request actually supplied, rather than an empty one.
+ *
+ * The value is answered as it arrived, and trimmed only to decide whether the
+ * request supplied anything at all. What is around a value is part of it: an
+ * authorizer is handed what the client sent, and two values differing only in
+ * their whitespace are two different callers as far as a held decision is
+ * concerned.
  */
 export function simHttpApiIdentityValue(
   value: string | null | undefined,
 ): string | undefined {
-  const present = value?.trim();
-
-  if (present === undefined || present.length === 0) {
+  if (value === undefined || value === null || value.trim().length === 0) {
     return undefined;
   }
 
-  return present;
+  return value;
 }

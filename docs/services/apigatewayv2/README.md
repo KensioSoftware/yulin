@@ -1834,9 +1834,12 @@ Current documented limitations:
   for every request on AWS, including one carrying nothing, and that is not simulated.
 - A `REQUEST` authorizer's identity source is `$request.header.<name>`,
   `$request.querystring.<name>` or `$context.routeKey`. The rest of `$context` and all of
-  `$stagevariables`, which a `REQUEST` authorizer may also name on AWS, are refused rather than read
+  `$stageVariables`, which a `REQUEST` authorizer may also name on AWS, are refused rather than read
   from nowhere. A JWT authorizer takes one identity source naming something the client sent, so
   `$context.routeKey` is refused for it, and a second source is refused rather than partly read.
+- An identity source naming nothing after its prefix is refused, and so is one naming a header that
+  is not an HTTP field name. Either would find nothing on every request, and an invalid header name
+  would fail at request time rather than at the command that configured it.
 - `JwtConfiguration.Audience` is required. What real API Gateway does with an authorizer that has an
   empty audience list is not documented, so this is stricter than AWS may be, in the direction that
   cannot quietly admit an app client.

@@ -24,7 +24,7 @@ function countingAuthorizer(): (event: {
     invocations += 1;
 
     return {
-      isAuthorized: event.identitySource[0]?.startsWith("session=") ?? false,
+      isAuthorized: (event.identitySource[0]?.length ?? 0) > 0,
       context: { invocations },
     };
   };
@@ -110,6 +110,53 @@ describe("Caching a sim HTTP API Lambda authorizer's decision", () => {
     // the identity sources found
     assertObjectMatches(await ada.json(), { invocations: 1 });
     assertObjectMatches(await grace.json(), { invocations: 2 });
+  });
+
+  it("tells two values apart by the whitespace around them", async () => {
+    // Given an authorizer reading the query string, which is where a value
+    // keeps its whitespace: HTTP strips the space around a header value
+    // before anything here sees it
+    const simAws = new SimAws();
+    const api = await cachingApi(simAws, {
+      identitySource: ["$request.querystring.token"],
+    });
+    const call = async (token: string): Promise<Response> =>
+      await new SimAwsHttp({ simAws }).fetch(
+        new SimAwsLocalUrl({
+          input: `${api.apiEndpoint}/account?token=${token}`,
+        }).toString(),
+      );
+
+    // When two callers present values differing only in their whitespace
+    const bare = await call("ada");
+    const padded = await call("%20ada%20");
+
+    // Then each got a decision of its own: the value reaches the authorizer as
+    // the client sent it, so what is around it is part of it
+    assertObjectMatches(await bare.json(), { invocations: 1 });
+    assertObjectMatches(await padded.json(), { invocations: 2 });
+  });
+
+  it("holds nothing for an authorizer that could not answer", async () => {
+    // Given an authorizer whose function fails
+    const simAws = new SimAws();
+    let invocations = 0;
+    const api = await cachingApi(simAws, {
+      handler: (): unknown => {
+        invocations += 1;
+        throw new Error("no session store");
+      },
+    });
+
+    // When the same cookie is presented twice
+    const first = await get(simAws, api, "/account");
+    const second = await get(simAws, api, "/account");
+
+    // Then both answer 500 and the function was asked each time: there is no
+    // answer to hold, and the next request may find it working
+    assertIdentical(first.status, 500);
+    assertIdentical(second.status, 500);
+    assertIdentical(invocations, 2);
   });
 
   it("invokes the authorizer again once the decision expires", async () => {

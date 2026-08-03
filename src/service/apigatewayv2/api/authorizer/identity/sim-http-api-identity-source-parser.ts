@@ -14,13 +14,18 @@ import {
 } from "./sim-http-api-route-key-identity-source.js";
 
 /**
+ * The characters an HTTP field name holds, which is the RFC 9110 token.
+ */
+const httpFieldName = /^[!#$%&'*+.^_`|~\w-]+$/u;
+
+/**
  * Reads the identity source expressions an authorizer is configured with.
  *
  * An expression naming somewhere this simulation does not read from is refused
  * rather than accepted and looked for nowhere, since an authorizer that never
  * finds what it looks for refuses every request, which looks like a signing
  * problem rather than a configuration one. That leaves out the rest of
- * `$context` and all of `$stagevariables`, which a Lambda `REQUEST` authorizer
+ * `$context` and all of `$stageVariables`, which a Lambda `REQUEST` authorizer
  * may also name on AWS.
  *
  * A JWT authorizer reads something the client sent and nothing else, so it
@@ -50,13 +55,20 @@ export class SimHttpApiIdentitySourceParser {
   ): SimHttpApiIdentitySource {
     if (expression.startsWith(simHttpApiHeaderIdentityPrefix)) {
       return new SimHttpApiHeaderIdentitySource(
-        expression.slice(simHttpApiHeaderIdentityPrefix.length),
+        this.headerName(
+          expression,
+          expression.slice(simHttpApiHeaderIdentityPrefix.length),
+        ),
       );
     }
 
     if (expression.startsWith(simHttpApiQueryStringIdentityPrefix)) {
       return new SimHttpApiQueryStringIdentitySource(
-        expression.slice(simHttpApiQueryStringIdentityPrefix.length),
+        this.named(
+          expression,
+          expression.slice(simHttpApiQueryStringIdentityPrefix.length),
+          "query string parameter",
+        ),
       );
     }
 
@@ -64,6 +76,46 @@ export class SimHttpApiIdentitySourceParser {
       `IdentitySource '${expression}' is not simulated: an identity source ` +
         `is ${this.simulatedForms(alsoSimulated)}`,
     );
+  }
+
+  /**
+   * The header an expression names, refusing one no request could carry.
+   *
+   * A header name is an HTTP field name, and anything else is refused here
+   * rather than at request time: reading a header by an invalid name throws,
+   * and it would throw on every request to the route rather than on the
+   * command that configured it.
+   */
+  private headerName(expression: string, name: string): string {
+    const headerName = this.named(expression, name, "header");
+
+    if (!httpFieldName.test(headerName)) {
+      throw new SimApiGatewayV2BadRequest(
+        `IdentitySource '${expression}' names the header '${headerName}', ` +
+          `which is not a header name: an HTTP field name holds letters, ` +
+          `digits and the characters !#$%&'*+-.^_\`|~`,
+      );
+    }
+
+    return headerName;
+  }
+
+  /**
+   * The name an expression carries after its prefix, refusing an empty one.
+   *
+   * An expression naming nothing finds nothing on every request, so the
+   * authorizer refuses everyone for a reason that reads like a signing problem
+   * rather than the configuration one it is.
+   */
+  private named(expression: string, name: string, what: string): string {
+    if (name.length === 0) {
+      throw new SimApiGatewayV2BadRequest(
+        `IdentitySource '${expression}' names no ${what}, so it would find ` +
+          `nothing on every request`,
+      );
+    }
+
+    return name;
   }
 
   /**

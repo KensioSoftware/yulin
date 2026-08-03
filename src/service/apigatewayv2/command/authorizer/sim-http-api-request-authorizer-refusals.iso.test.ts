@@ -73,26 +73,25 @@ describe("What a Lambda REQUEST authorizer refuses rather than ignores", () => {
     // Given an API
     const simAws = new SimAws();
     const apiId = await createdApiId(simAws);
+    const refusal = /decision for a whole number of seconds between 0 and 3600/;
 
-    // When an authorizer asks to hold a decision for longer than AWS does,
-    // and when it asks for a negative period
+    // When an authorizer asks to hold a decision for longer than AWS does, for
+    // a negative period, for part of a second, and for a period that is not a
+    // number at all
     // Then each is refused, rather than held for a period no deployed
-    // authorizer could be configured with
-    await expect(
-      simAws
-        .apiGatewayV2()
-        .createAuthorizer(
-          requestAuthorizer(apiId, { AuthorizerResultTtlInSeconds: 7200 }),
-        ),
-    ).rejects.toThrow(/holds an authorizer's decision for between 0 and 3600/);
-
-    await expect(
-      simAws
-        .apiGatewayV2()
-        .createAuthorizer(
-          requestAuthorizer(apiId, { AuthorizerResultTtlInSeconds: -1 }),
-        ),
-    ).rejects.toThrow(/holds an authorizer's decision for between 0 and 3600/);
+    // authorizer could be configured with. NaN matters most of the four: no
+    // comparison refuses it, and an expiry built from it never passes.
+    await Promise.all(
+      [7200, -1, 0.5, NaN].map(async (ttl) =>
+        expect(
+          simAws.apiGatewayV2().createAuthorizer(
+            requestAuthorizer(apiId, {
+              AuthorizerResultTtlInSeconds: ttl,
+            }),
+          ),
+        ).rejects.toThrow(refusal),
+      ),
+    );
 
     // And when it asks for the longest AWS allows, that is accepted
     const created = await simAws
@@ -165,6 +164,41 @@ describe("What a Lambda REQUEST authorizer refuses rather than ignores", () => {
         }),
       ),
     ).rejects.toThrow(/AuthorizerUri .+ is not a simulated invocation target/);
+  });
+
+  it("refuses an identity source naming a header no request could carry", async () => {
+    // Given an API
+    const simAws = new SimAws();
+    const apiId = await createdApiId(simAws);
+
+    // When an authorizer names no header, no query string parameter, and a
+    // header name that is not an HTTP field name
+    // Then each is refused at creation. Reading a header by an invalid name
+    // throws, and it would throw on every request to the route rather than on
+    // the command that configured it.
+    await expect(
+      simAws.apiGatewayV2().createAuthorizer(
+        requestAuthorizer(apiId, {
+          IdentitySource: ["$request.header."],
+        }),
+      ),
+    ).rejects.toThrow(/names no header/);
+
+    await expect(
+      simAws.apiGatewayV2().createAuthorizer(
+        requestAuthorizer(apiId, {
+          IdentitySource: ["$request.querystring."],
+        }),
+      ),
+    ).rejects.toThrow(/names no query string parameter/);
+
+    await expect(
+      simAws.apiGatewayV2().createAuthorizer(
+        requestAuthorizer(apiId, {
+          IdentitySource: ["$request.header.session cookie"],
+        }),
+      ),
+    ).rejects.toThrow(/which is not a header name/);
   });
 
   it("requires an identity source, and one it would read", async () => {
