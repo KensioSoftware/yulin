@@ -1,6 +1,7 @@
 import { SimSqsQueueAttributeNumbers } from "./sim-sqs-queue-attribute-numbers.js";
-import { simSqsRedrivePolicyAttributeName } from "./sim-sqs-queue-attribute-specs.js";
-import { SimSqsRedrivePolicy } from "./sim-sqs-redrive-policy.js";
+import { SimSqsQueueJsonAttributes } from "./sim-sqs-queue-json-attributes.js";
+import type { SimSqsQueuePolicy } from "./sim-sqs-queue-policy.js";
+import type { SimSqsRedrivePolicy } from "./sim-sqs-redrive-policy.js";
 
 /**
  * Queue attributes as a request carries them: SQS passes every attribute value
@@ -14,52 +15,60 @@ export type SimSqsQueueAttributeInput = Readonly<
  * The attribute values held by one simulated queue.
  *
  * They come in two kinds. Most are amounts, held as numbers because that is
- * what the queue's behaviour is expressed in. The redrive policy is a JSON
- * object, and a queue has none until one is set, so it is held apart from the
- * rest rather than squeezed into the same map.
+ * what the queue's behaviour is expressed in. The redrive policy and the queue
+ * policy are JSON documents, and a queue has neither until one is set, so they
+ * are held apart from the rest rather than squeezed into the same map.
  */
 export class SimSqsQueueAttributes {
   private readonly numbers: SimSqsQueueAttributeNumbers;
-  private readonly redrive: SimSqsRedrivePolicy | undefined;
+  private readonly documents: SimSqsQueueJsonAttributes;
 
   private constructor(
     numbers: SimSqsQueueAttributeNumbers,
-    redrive: SimSqsRedrivePolicy | undefined,
+    documents: SimSqsQueueJsonAttributes,
   ) {
     this.numbers = numbers;
-    this.redrive = redrive;
+    this.documents = documents;
   }
 
   /**
    * The attribute values a queue created with no attributes has.
    */
   static defaults(): SimSqsQueueAttributes {
-    return new this(SimSqsQueueAttributeNumbers.defaults(), undefined);
+    return new this(
+      SimSqsQueueAttributeNumbers.defaults(),
+      SimSqsQueueJsonAttributes.defaults(),
+    );
   }
 
   /** The delay a new message with no delay of its own waits out. */
   get delaySeconds(): number {
-    return this.numbers.get("DelaySeconds");
+    return this.numbers.delaySeconds;
   }
 
   /** The longest message body the queue accepts, in bytes. */
   get maximumMessageSizeBytes(): number {
-    return this.numbers.get("MaximumMessageSize");
+    return this.numbers.maximumMessageSizeBytes;
   }
 
   /** How long a message stays on the queue before SQS drops it. */
   get messageRetentionSeconds(): number {
-    return this.numbers.get("MessageRetentionPeriod");
+    return this.numbers.messageRetentionSeconds;
   }
 
   /** How long a received message is hidden from other consumers. */
   get visibilityTimeoutSeconds(): number {
-    return this.numbers.get("VisibilityTimeout");
+    return this.numbers.visibilityTimeoutSeconds;
   }
 
   /** Where failed messages go, and after how many receives, if anywhere. */
   get redrivePolicy(): SimSqsRedrivePolicy | undefined {
-    return this.redrive;
+    return this.documents.redrivePolicy;
+  }
+
+  /** Who the queue itself admits, if anyone. */
+  get queuePolicy(): SimSqsQueuePolicy | undefined {
+    return this.documents.queuePolicy;
   }
 
   /**
@@ -68,7 +77,7 @@ export class SimSqsQueueAttributes {
   with(requested: SimSqsQueueAttributeInput): SimSqsQueueAttributes {
     return new SimSqsQueueAttributes(
       this.numbers.with(requested),
-      this.redriveIn(requested),
+      this.documents.with(requested),
     );
   }
 
@@ -80,51 +89,22 @@ export class SimSqsQueueAttributes {
    * request carrying none matches any existing queue.
    */
   matches(requested: SimSqsQueueAttributeInput): boolean {
-    return this.redriveMatches(requested) && this.numbers.matches(requested);
+    return this.documents.matches(requested) && this.numbers.matches(requested);
   }
 
   /**
    * The attributes as SQS reports them, back in their string form.
    *
-   * The redrive policy is reported as the string it was set with, since that is
-   * the string SQS holds the attribute as. A queue with no redrive policy
-   * reports none, as real SQS leaves out an attribute a queue has no value for.
+   * The JSON documents are reported as the strings they were set with, since
+   * those are the strings SQS holds the attributes as. A queue with no redrive
+   * policy or no queue policy reports neither, as real SQS leaves out an
+   * attribute a queue has no value for.
    */
   reported(): ReadonlyMap<string, string> {
     const reported = new Map(this.numbers.reported());
 
-    if (this.redrive !== undefined) {
-      reported.set(simSqsRedrivePolicyAttributeName, this.redrive.value);
-    }
+    this.documents.reportInto(reported);
 
     return reported;
-  }
-
-  /**
-   * The redrive policy after a request, which is the one it sets or the one
-   * already there.
-   */
-  private redriveIn(
-    requested: SimSqsQueueAttributeInput,
-  ): SimSqsRedrivePolicy | undefined {
-    // eslint-disable-next-line security/detect-object-injection -- a fixed key.
-    const value = requested[simSqsRedrivePolicyAttributeName];
-
-    if (value === undefined) {
-      return this.redrive;
-    }
-
-    return SimSqsRedrivePolicy.parse(value);
-  }
-
-  private redriveMatches(requested: SimSqsQueueAttributeInput): boolean {
-    // eslint-disable-next-line security/detect-object-injection -- a fixed key.
-    const value = requested[simSqsRedrivePolicyAttributeName];
-
-    if (value === undefined) {
-      return true;
-    }
-
-    return this.redrive?.matches(SimSqsRedrivePolicy.parse(value)) === true;
   }
 }

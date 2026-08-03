@@ -1,4 +1,4 @@
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimSqsRequestOptions } from "../sim-sqs-request-options.js";
 import type { SimSqsMessageWriter } from "../../message/sim-sqs-message-writer.js";
 import type { SimSqsQueueAccess } from "../queue/sim-sqs-queue-access.js";
 import { requireBatchEntries, runBatch } from "./sim-sqs-batch-entries.js";
@@ -25,10 +25,6 @@ interface SimSqsSendMessageCommandsProperties {
   readonly writer: SimSqsMessageWriter;
 }
 
-interface SimSqsSendMessageCommandsOptions {
-  readonly caller?: SimAwsCaller;
-}
-
 /**
  * The commands that put messages on a queue.
  */
@@ -46,12 +42,12 @@ export class SimSqsSendMessageCommands {
    */
   send(
     command: SimSendMessageCommand,
-    options?: SimSqsSendMessageCommandsOptions,
+    options?: SimSqsRequestOptions,
   ): SimSendMessageCommandOutput {
     const queue = this.access.requireByUrl(
       messageSendAction,
       command.input.QueueUrl,
-      options?.caller,
+      options,
     );
     const message = this.writer.write(queue, sentMessageWrite(command.input));
 
@@ -71,12 +67,12 @@ export class SimSqsSendMessageCommands {
    */
   sendBatch(
     command: SimSendMessageBatchCommand,
-    options?: SimSqsSendMessageCommandsOptions,
+    options?: SimSqsRequestOptions,
   ): SimSendMessageBatchCommandOutput {
     const queue = this.access.requireByUrl(
       messageSendAction,
       command.input.QueueUrl,
-      options?.caller,
+      options,
     );
     const entries = requireBatchEntries(command.input.Entries, "SendMessage");
 

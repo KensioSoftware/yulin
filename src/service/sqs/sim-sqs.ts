@@ -3,7 +3,6 @@ import {
   BackgroundTasks,
 } from "../../util/background/background.js";
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
-import type { SimAwsCaller } from "../aws/caller/sim-aws-caller.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import {
@@ -20,6 +19,7 @@ import { SimSqsCreateQueue } from "./command/queue/sim-sqs-create-queue.js";
 import { SimSqsQueueAttributeCommands } from "./command/queue/sim-sqs-queue-attribute-commands.js";
 import { SimSqsQueueCommands } from "./command/queue/sim-sqs-queue-commands.js";
 import type * as simSqsCommands from "./command/sim-sqs-command.types.js";
+import type { SimSqsRequestOptions } from "./command/sim-sqs-request-options.js";
 import { SimSqsCfnResourceFactory } from "./cfn/sim-sqs-cfn-resource-factory.js";
 import { SimSqsMessageWriter } from "./message/sim-sqs-message-writer.js";
 import { SimSqsDeadLetterTargets } from "./queue/sim-sqs-dead-letter-targets.js";
@@ -27,10 +27,6 @@ import type { SimSqsQueue } from "./queue/sim-sqs-queue.js";
 import { SimSqsQueueActivity } from "./queue/sim-sqs-queue-activity.js";
 import { SimSqsQueueStore } from "./queue/sim-sqs-queue-store.js";
 import { SimSqsSdkCommandRouter } from "./sdk/sim-sqs-sdk-command-router.js";
-
-export interface SimSqsRequestOptions {
-  readonly caller?: SimAwsCaller;
-}
 
 interface SimSqsProperties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;

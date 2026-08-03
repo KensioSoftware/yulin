@@ -1,8 +1,25 @@
 /**
- * The one settable attribute that is a JSON object rather than a number, so it
- * has no numeric range to be checked against.
+ * The attribute naming the dead-letter queue a message goes to once a consumer
+ * has had enough attempts at it.
  */
 export const simSqsRedrivePolicyAttributeName = "RedrivePolicy";
+
+/**
+ * The attribute holding the queue's resource policy.
+ */
+export const simSqsQueuePolicyAttributeName = "Policy";
+
+/**
+ * The settable attributes that are JSON documents rather than numbers, so they
+ * have no numeric range to be checked against.
+ *
+ * Both are held apart from the numeric attributes, and both are read back as
+ * the string they were set with rather than as a re-serialised version of it.
+ */
+export const simSqsJsonQueueAttributeNames: ReadonlySet<string> = new Set([
+  simSqsRedrivePolicyAttributeName,
+  simSqsQueuePolicyAttributeName,
+]);
 
 /**
  * One queue attribute a request may set, and the range real SQS accepts for it.

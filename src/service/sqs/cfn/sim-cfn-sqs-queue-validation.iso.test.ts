@@ -263,9 +263,9 @@ describe("SQS CloudFormation Queue validation", () => {
     );
   });
 
-  it("records a queue policy as skipped", async () => {
-    // Given a template declaring an SQS Resource type that is not a queue.
-    // Queue policies grant cross-account access, which is not simulated.
+  it("records an SQS Resource type it cannot create as skipped", async () => {
+    // Given a template declaring an SQS Resource type this simulation has no
+    // behaviour for.
     const simAws = new SimAws();
 
     // When the template is deployed.
@@ -277,9 +277,9 @@ describe("SQS CloudFormation Queue validation", () => {
             Type: "AWS::SQS::Queue",
             Properties: { QueueName: "orders" },
           },
-          OrdersQueuePolicy: {
-            Type: "AWS::SQS::QueuePolicy",
-            Properties: { Queues: [{ Ref: "OrdersQueue" }] },
+          OrdersQueueInboundPermission: {
+            Type: "AWS::SQS::QueueInboundPermission",
+            Properties: { QueueUrl: { Ref: "OrdersQueue" } },
           },
         },
       },
@@ -294,7 +294,7 @@ describe("SQS CloudFormation Queue validation", () => {
     assertTrue(skipped.skipped);
     assertIdentical(
       skipped.skippedReason,
-      "Unsupported sim SQS CloudFormation Resource QueuePolicy",
+      "Unsupported sim SQS CloudFormation Resource QueueInboundPermission",
     );
   });
 });

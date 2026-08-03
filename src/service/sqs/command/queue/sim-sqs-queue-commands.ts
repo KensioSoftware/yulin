@@ -1,5 +1,5 @@
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimSqsRequestOptions } from "../sim-sqs-request-options.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimSqsQueueStore } from "../../queue/sim-sqs-queue-store.js";
 import type { SimSqsQueueAccess } from "./sim-sqs-queue-access.js";
@@ -19,10 +19,6 @@ interface SimSqsQueueCommandsProperties {
   readonly access: SimSqsQueueAccess;
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly clock: BackgroundScheduler;
-}
-
-interface SimSqsQueueCommandsOptions {
-  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -46,7 +42,7 @@ export class SimSqsQueueCommands {
    */
   getQueueUrl(
     command: SimGetQueueUrlCommand,
-    options?: SimSqsQueueCommandsOptions,
+    options?: SimSqsRequestOptions,
   ): SimGetQueueUrlCommandOutput {
     refuseForeignQueueOwner(
       command.input.QueueOwnerAWSAccountId,
@@ -56,7 +52,7 @@ export class SimSqsQueueCommands {
     const queue = this.access.requireByName(
       "sqs:GetQueueUrl",
       command.input.QueueName,
-      options?.caller,
+      options,
     );
 
     return { $metadata: {}, QueueUrl: queue.url };
@@ -71,11 +67,11 @@ export class SimSqsQueueCommands {
    */
   listQueues(
     command: SimListQueuesCommand,
-    options?: SimSqsQueueCommandsOptions,
+    options?: SimSqsRequestOptions,
   ): SimListQueuesCommandOutput {
     const input = command.input;
 
-    this.access.authorizeAnyQueue("sqs:ListQueues", options?.caller);
+    this.access.authorizeAnyQueue("sqs:ListQueues", options);
 
     const page = new SimSqsQueuePage(
       this.queues.withNamePrefix(input.QueueNamePrefix),
@@ -98,12 +94,12 @@ export class SimSqsQueueCommands {
    */
   deleteQueue(
     command: SimDeleteQueueCommand,
-    options?: SimSqsQueueCommandsOptions,
+    options?: SimSqsRequestOptions,
   ): SimDeleteQueueCommandOutput {
     const queue = this.access.requireByUrl(
       "sqs:DeleteQueue",
       command.input.QueueUrl,
-      options?.caller,
+      options,
     );
 
     this.queues.remove(queue, this.clock.now());
