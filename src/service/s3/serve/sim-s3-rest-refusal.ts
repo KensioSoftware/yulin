@@ -4,7 +4,7 @@ import {
   simS3RouteFailure as failure,
 } from "./sim-s3-route.js";
 
-const restMethods = new Set(["GET", "HEAD", "PUT"]);
+const restMethods = new Set(["GET", "HEAD", "PUT", "DELETE"]);
 
 /**
  * Whether a REST request asks for something simulated S3 does not serve.
@@ -17,7 +17,7 @@ export function simS3RestRefusal(
     return failure(
       501,
       `Simulated S3 does not serve ${method} over its REST endpoint. ` +
-        `GET, HEAD and PUT of an Object are simulated.\n`,
+        `GET, HEAD, PUT and DELETE of an Object are simulated.\n`,
     );
   }
 

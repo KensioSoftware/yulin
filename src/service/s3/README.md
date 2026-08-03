@@ -77,6 +77,8 @@ Supported command areas currently include:
 - `put-object/`
 - `get-object/`
 - `list-objects/`
+- `delete-object/`
+- `delete-objects/`
 
 `SimS3Commands` owns the wiring: every handler is built from the same Bucket map, IAM and background
 scheduler, so that construction lives in one place rather than being repeated once per command on
@@ -231,6 +233,7 @@ It keeps objects in a `Map<string, SimS3Object>` keyed by object key. It support
 - exact key lookup
 - prefix filtering for list operations
 - replacing objects by putting another object with the same key
+- removing an object by key, which is a no-op when the key is not stored
 
 This storage is fast, isolated, and appropriate for most tests.
 
@@ -252,9 +255,13 @@ Filesystem storage behaviour:
 - missing files are treated as missing S3 objects
 - file extensions are filtered through filesystem safety rules
 - path traversal and unsafe directory/object paths are rejected
+- `deleteObject` refuses with `SimS3NotImplemented` rather than unlinking the file
 
 The filesystem implementation includes safety checks to reduce accidental unsafe file access, but it
-should still be treated as local-development tooling rather than a sandbox boundary.
+should still be treated as local-development tooling rather than a sandbox boundary. That is why
+deletion is refused: a mounted directory belongs to the user, and unlinking files out of it because
+a test called `DeleteObject` is not a safe default. This is a deliberate divergence from real S3 and
+is recorded in the [usage docs](../../../docs/services/s3/README.md#filesystem-backed-bucket-storage).
 
 ## PutObject, GetObject, and ListObjects
 
@@ -298,6 +305,37 @@ should still be treated as local-development tooling rather than a sandbox bound
 
 `MaxKeys` defaults to `1000`. `NextMarker` is set to the last returned key only when the result is
 truncated.
+
+### DeleteObject
+
+`DeleteObjectCommandHandler`:
+
+1. requires `Bucket` and `Key`
+2. looks up the Bucket locally, throwing `SimS3NoSuchBucket` if absent
+3. sequences background work
+4. authorizes `s3:DeleteObject` against the Object ARN through `DeleteObjectAuthorizer`
+5. removes the object through the Bucket storage abstraction
+6. returns AWS-like `$metadata`
+
+A key that is not stored is not an error. Real S3 deletion is idempotent, so the handler answers the
+same way whether or not there was an object to remove.
+
+### DeleteObjects
+
+`DeleteObjectsCommandHandler` handles the batch form:
+
+1. requires `Bucket` and `Delete`
+2. reads the request through `DeleteObjectsRequest`, which refuses an empty list or more than 1000
+   keys with `SimS3MalformedXml`
+3. looks up the Bucket locally, throwing `SimS3NoSuchBucket` if absent
+4. sequences background work
+5. authorizes and deletes each key on its own, collecting the result in `DeleteObjectsOutcome`
+6. returns `Deleted` and `Errors`, omitting `Deleted` when the request asked to be `Quiet`
+
+A batch deletion is not all or nothing. `DeleteObjectsOutcome` turns a `SimIamAccessDenied` into an
+`AccessDenied` entry and any other `SimS3Error` into an entry carrying its error name, while the rest
+of the batch is still deleted. Anything else is re-raised, so a bug in the simulation cannot arrive
+as a per-key AWS error.
 
 ## Static website configuration
 
@@ -355,7 +393,7 @@ The main classes are:
 
 `SimS3RequestRouter` validates that the service target names a region, then routes by endpoint. The
 website endpoint accepts only `GET` and `HEAD` and takes the Bucket from the target's
-`resourceName`. The REST endpoint accepts `GET`, `HEAD` and `PUT`, and `SimS3ObjectAddress` reads
+`resourceName`. The REST endpoint accepts `GET`, `HEAD`, `PUT` and `DELETE`, and `SimS3ObjectAddress` reads
 the Bucket and key from either addressing style: virtual-hosted, where the hostname names the
 Bucket, or path style, where the first path segment does. `SimS3BucketLocator` then:
 
@@ -366,9 +404,12 @@ Bucket, or path style, where the first path segment does. `SimS3BucketLocator` t
 
 `SimS3RestController` serves the API rather than a website:
 
-- it calls `SimS3.getObject(...)` and `SimS3.putObject(...)` with the caller the authentication
-  boundary resolved, so an HTTP request is authorized by the same IAM code path an in-process SDK
-  call goes through, and a presigned URL grants no more than its signer holds
+- it calls `SimS3.getObject(...)`, `SimS3.putObject(...)` and `SimS3.deleteObject(...)` with the
+  caller the authentication boundary resolved, so an HTTP request is authorized by the same IAM code
+  path an in-process SDK call goes through, and a presigned URL grants no more than its signer holds
+- a `DELETE` answers `204 No Content` whether or not the Object was there, as real S3 does
+- `DeleteObjects` is a `POST` to the Bucket rather than an Object request, so it is reachable through
+  the SDK but not over this endpoint
 - it checks any `x-amz-checksum-*` an upload states before storing anything, through
   `SimS3UploadChecksum`
 - failures become the XML error document real S3 answers with, through `SimS3RestErrorResponse`,
@@ -456,6 +497,9 @@ Handlers throw AWS-like errors for supported failure cases, including:
 - access denied, for S3's own refusals such as Block Public Access
 - Bucket already exists
 - Bucket already owned by you
+- malformed XML, for a `DeleteObjects` request naming no Objects or more than 1000 of them
+- not implemented, for something the simulator refuses rather than approximates, such as deleting an
+  Object out of filesystem-backed storage
 
 These errors carry AWS-style names and HTTP status metadata where implemented. Tests should assert
 the specific simulator error when behaviour depends on AWS-compatible failure semantics.

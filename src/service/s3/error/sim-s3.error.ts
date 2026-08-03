@@ -90,6 +90,35 @@ export class SimS3BucketAlreadyOwnedByYou extends SimS3Error {
 }
 
 /**
+ * Simulated S3 MalformedXML error.
+ *
+ * Real S3 answers this when the request document is not one it accepts, which
+ * is how a DeleteObjects request naming no Objects, or more than a thousand of
+ * them, is refused.
+ */
+export class SimS3MalformedXml extends SimS3Error {
+  public override readonly name = "MalformedXML";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
+ * Simulated S3 NotImplemented error.
+ *
+ * Something real S3 does that the simulator refuses rather than approximates.
+ * Real S3 uses the same code for a request it will not carry out.
+ */
+export class SimS3NotImplemented extends SimS3Error {
+  public override readonly name = "NotImplemented";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 501 });
+  }
+}
+
+/**
  * Simulated S3 InvalidBucketName error.
  */
 export class SimS3InvalidBucketName extends SimS3Error {

@@ -2,6 +2,8 @@ import { describe, it } from "vitest";
 import {
   CreateBucketCommand,
   DeleteBucketPolicyCommand,
+  DeleteObjectCommand,
+  DeleteObjectsCommand,
   DeletePublicAccessBlockCommand,
   GetBucketPolicyCommand,
   GetPublicAccessBlockCommand,
@@ -166,13 +168,54 @@ describe("simulated S3 SDK Command routing", () => {
     assertTrue(restoredOut.PublicAccessBlockConfiguration?.BlockPublicPolicy);
   });
 
+  it("routes the Object deletion Commands through an intercepted client", async () => {
+    using simSdk = new SimSdk();
+    const client = new S3Client({ region: "us-east-1" });
+    simSdk.intercept(client);
+
+    await client.send(new CreateBucketCommand({ Bucket: "bucket-delete" }));
+    await Promise.all(
+      ["a.txt", "b.txt", "c.txt"].map(
+        async (key) =>
+          await client.send(
+            new PutObjectCommand({
+              Bucket: "bucket-delete",
+              Key: key,
+              Body: key,
+            }),
+          ),
+      ),
+    );
+
+    await client.send(
+      new DeleteObjectCommand({ Bucket: "bucket-delete", Key: "a.txt" }),
+    );
+
+    const batchOut = await client.send(
+      new DeleteObjectsCommand({
+        Bucket: "bucket-delete",
+        Delete: { Objects: [{ Key: "b.txt" }] },
+      }),
+    );
+    assertIdentical(batchOut.Deleted?.length, 1);
+
+    const listOut = await client.send(
+      new ListObjectsCommand({ Bucket: "bucket-delete" }),
+    );
+    const remaining = listOut.Contents ?? [];
+    assertArrayLength(remaining, 1);
+    assertIdentical(remaining[0].Key, "c.txt");
+  });
+
   it("lists its supported SDK Command names", () => {
     const router = new SimS3SdkCommandRouter({} as SimS3);
 
     const supported = router.supportedCommandNames();
 
-    assertArrayLength(supported, 12);
+    assertArrayLength(supported, 14);
     assertArrayIncludes(supported, "GetObjectCommand");
+    assertArrayIncludes(supported, "DeleteObjectCommand");
+    assertArrayIncludes(supported, "DeleteObjectsCommand");
     assertArrayIncludes(supported, "GetBucketPolicyCommand");
     assertArrayIncludes(supported, "DeleteBucketPolicyCommand");
     assertArrayIncludes(supported, "PutPublicAccessBlockCommand");

@@ -4,9 +4,13 @@ import {
   assertArrayLength,
   assertBufferEqual,
   assertIdentical,
+  assertInstanceOf,
   assertNonNullable,
+  assertStringIncludes,
+  assertThrowsErrorAsync,
   assertUndefined,
 } from "@kensio/smartass";
+import { SimS3NotImplemented } from "../../error/sim-s3.error.js";
 import { FilesystemS3BucketStorage } from "./s3-filesystem-storage.js";
 import { SimS3Object } from "../../object/s3-object.js";
 import { TemporaryDirectory as TemporaryDirectory } from "../../../../util/filesystem/temporary-directory.js";
@@ -178,5 +182,25 @@ describe("Filesystem simulated S3 storage", () => {
 
     assertArrayLength(objects, 1);
     assertIdentical(objects[0].key, "safe.txt");
+  });
+
+  it("refuses to delete an Object rather than unlinking the file", async () => {
+    // Given a file backing a simulated Object
+    const testDirectory = new TemporaryDirectory();
+    await testDirectory.writeFile(["public", "keep.txt"], "keep");
+
+    const storage = new FilesystemS3BucketStorage({
+      directoryPath: testDirectory.join("public"),
+    });
+
+    // When the Object is deleted
+    const error = await assertThrowsErrorAsync(async () => {
+      await storage.deleteObject("keep.txt");
+    });
+
+    // Then the refusal is reported, and the file is still there
+    assertInstanceOf(error, SimS3NotImplemented);
+    assertStringIncludes(error.message, "will not delete keep.txt");
+    assertNonNullable(await storage.getObject("keep.txt"));
   });
 });

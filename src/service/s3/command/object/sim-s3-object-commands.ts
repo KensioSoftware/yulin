@@ -1,3 +1,5 @@
+import { DeleteObjectCommandHandler } from "../delete-object/delete-object.handler.js";
+import { DeleteObjectsCommandHandler } from "../delete-objects/delete-objects.handler.js";
 import { GetObjectCommandHandler } from "../get-object/get-object.handler.js";
 import { ListObjectsCommandHandler } from "../list-objects/list-objects.handler.js";
 import { PutObjectCommandHandler } from "../put-object/put-object.handler.js";
@@ -36,6 +38,32 @@ export class SimS3ObjectCommands {
     options?: SimS3RequestOptions,
   ): Promise<simS3Commands.SimGetObjectCommandOutput> {
     return await new GetObjectCommandHandler(this.state).handle(
+      command,
+      options,
+    );
+  }
+
+  /**
+   * Remove an Object from a Bucket.
+   */
+  async delete(
+    command: simS3Commands.SimDeleteObjectCommand,
+    options?: SimS3RequestOptions,
+  ): Promise<simS3Commands.SimDeleteObjectCommandOutput> {
+    return await new DeleteObjectCommandHandler(this.state).handle(
+      command,
+      options,
+    );
+  }
+
+  /**
+   * Remove several Objects from a Bucket in one request.
+   */
+  async deleteMany(
+    command: simS3Commands.SimDeleteObjectsCommand,
+    options?: SimS3RequestOptions,
+  ): Promise<simS3Commands.SimDeleteObjectsCommandOutput> {
+    return await new DeleteObjectsCommandHandler(this.state).handle(
       command,
       options,
     );

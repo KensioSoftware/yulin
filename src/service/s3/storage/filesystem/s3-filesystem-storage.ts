@@ -1,11 +1,12 @@
 import type { SimS3BucketStorage } from "../s3-bucket-storage.js";
 import { SimS3Object } from "../../object/s3-object.js";
 import path from "node:path";
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { FilesystemS3StorageSafety } from "./s3-filesystem-safety.js";
 import { metadataForFilesystemS3ObjectKey } from "./s3-filesystem-object-metadata.js";
-import { filesystemPathExists } from "./filesystem-path-exists.js";
+import { FilesystemS3ObjectKeys } from "./s3-filesystem-object-keys.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
+import { SimS3NotImplemented } from "../../error/sim-s3.error.js";
 
 interface FilesystemS3BucketStorageProperties {
   readonly directoryPath: string;
@@ -23,6 +24,7 @@ interface FilesystemS3BucketStorageProperties {
 export class FilesystemS3BucketStorage implements SimS3BucketStorage {
   private readonly directoryPath: string;
   private readonly safety: FilesystemS3StorageSafety;
+  private readonly objectKeys: FilesystemS3ObjectKeys;
 
   constructor(properties: FilesystemS3BucketStorageProperties) {
     this.safety = new FilesystemS3StorageSafety({
@@ -30,6 +32,10 @@ export class FilesystemS3BucketStorage implements SimS3BucketStorage {
     });
     this.safety.assertSafeDirectoryPath(properties.directoryPath);
     this.directoryPath = path.resolve(properties.directoryPath);
+    this.objectKeys = new FilesystemS3ObjectKeys({
+      directoryPath: this.directoryPath,
+      safety: this.safety,
+    });
   }
 
   /**
@@ -69,7 +75,7 @@ export class FilesystemS3BucketStorage implements SimS3BucketStorage {
    * List simulated Objects based on files in the directory.
    */
   async listObjects(prefix?: string): Promise<SimS3Object[]> {
-    const objectKeys = await this.listObjectKeys();
+    const objectKeys = await this.objectKeys.list();
 
     return await Promise.all(
       objectKeys
@@ -95,6 +101,25 @@ export class FilesystemS3BucketStorage implements SimS3BucketStorage {
     await writeFile(filePath, object.body);
   }
 
+  /**
+   * Refuse to remove the file backing a simulated Object.
+   *
+   * This is stricter than real S3, deliberately. `mountBucketFilesystem` points
+   * a Bucket at an ordinary directory of the user's, and the safety checks here
+   * are local-development tooling rather than a sandbox boundary. Unlinking
+   * someone's files because a test called DeleteObject is the wrong default, so
+   * filesystem-backed Buckets are read and written but never emptied.
+   */
+  deleteObject(key: string): Promise<void> {
+    return Promise.reject(
+      new SimS3NotImplemented(
+        `Simulated S3 will not delete ${key} from filesystem-backed storage ` +
+          `at ${this.directoryPath}, because it would remove a real file. ` +
+          `Use the default in-memory Bucket storage to simulate deletion.`,
+      ),
+    );
+  }
+
   private filePathForObjectKey(key: string): string {
     this.safety.assertSafeObjectKey(key);
 
@@ -111,46 +136,5 @@ export class FilesystemS3BucketStorage implements SimS3BucketStorage {
     }
 
     return filePath;
-  }
-
-  private async listObjectKeys(): Promise<string[]> {
-    if (!(await filesystemPathExists(this.directoryPath))) {
-      return [];
-    }
-
-    return await this.listObjectKeysInDirectory(this.directoryPath);
-  }
-
-  private async listObjectKeysInDirectory(
-    directoryPath: string,
-  ): Promise<string[]> {
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
-    const entries = await readdir(directoryPath, { withFileTypes: true });
-    const keys: string[] = [];
-    const nestedKeyPromises: Promise<string[]>[] = [];
-
-    for (const entry of entries) {
-      const entryPath = path.join(directoryPath, entry.name);
-
-      if (entry.isDirectory()) {
-        nestedKeyPromises.push(this.listObjectKeysInDirectory(entryPath));
-        continue;
-      }
-
-      if (entry.isFile()) {
-        const key = path
-          .relative(this.directoryPath, entryPath)
-          .split(path.sep)
-          .join("/");
-
-        if (this.safety.isAllowedObjectKeyExtension(key)) {
-          keys.push(key);
-        }
-      }
-    }
-
-    const nestedKeys = await Promise.all(nestedKeyPromises);
-
-    return [...keys, ...nestedKeys.flat()];
   }
 }
