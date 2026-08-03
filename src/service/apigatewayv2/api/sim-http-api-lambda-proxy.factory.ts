@@ -34,6 +34,11 @@ export interface SimHttpApiLambdaProxyInput {
    * whose routes admit anyone.
    */
   readonly jwtAuthorizer: SimHttpApiProxyAuthorizer | undefined;
+  /**
+   * Whether every route is authorized by IAM instead, which is what an
+   * `AWS_IAM` route asks for.
+   */
+  readonly iamAuthorization: boolean;
   /** The scopes every route asks a token for. */
   readonly authorizationScopes: readonly string[];
   /** The stages the API serves from. */
@@ -87,6 +92,7 @@ export const simHttpApiLambdaProxyFactory = new AsyncMappedFactory<
     disableExecuteApiEndpoint: false,
     routeKeys: ["$default"],
     jwtAuthorizer: undefined,
+    iamAuthorization: false,
     authorizationScopes: [],
     stageNames: ["$default"],
     stageVariables: {},
@@ -124,6 +130,7 @@ export const simHttpApiLambdaProxyFactory = new AsyncMappedFactory<
     const authorization = await simHttpApiProxyAuthorization(simApiGatewayV2, {
       apiId,
       jwtAuthorizer: input.jwtAuthorizer,
+      iamAuthorization: input.iamAuthorization,
       authorizationScopes: input.authorizationScopes,
     });
 

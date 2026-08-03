@@ -16,12 +16,14 @@ import {
 export type SimHttpApiRouteId = Brand<string, "SimHttpApiRouteId">;
 
 /**
- * The authorization types simulated: none, so anyone may call the route, or a
- * JWT the route's authorizer verifies.
+ * The authorization types simulated: none, so anyone may call the route, a JWT
+ * the route's authorizer verifies, or a SigV4-signed caller IAM allows
+ * `execute-api:Invoke` on the route being called.
  *
- * `AWS_IAM` and `CUSTOM` are refused at creation rather than created open.
+ * `CUSTOM`, which is a Lambda authorizer, is refused at creation rather than
+ * created open.
  */
-export type SimHttpApiAuthorizationType = "NONE" | "JWT";
+export type SimHttpApiAuthorizationType = "NONE" | "JWT" | "AWS_IAM";
 
 /**
  * Allocate a route id, in the same opaque shape as an integration id.
@@ -50,8 +52,9 @@ export class SimHttpApiRoute {
   public readonly authorizationType: SimHttpApiAuthorizationType;
 
   /**
-   * The authorizer this route sends requests through, which a `JWT` route
-   * always has and a `NONE` route never does.
+   * The authorizer this route sends requests through, which only a `JWT` route
+   * has. An `AWS_IAM` route takes no authorizer, since IAM itself is what
+   * decides, and a `NONE` route authorizes nobody.
    */
   public readonly authorizerId: SimHttpApiAuthorizerId | undefined;
 

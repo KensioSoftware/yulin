@@ -20,6 +20,15 @@ export interface SimHttpApiMatch {
   readonly integration: SimHttpApiIntegration;
   readonly stage: SimHttpApiStage;
   readonly pathParameters: SimHttpApiPathParameters;
+  /**
+   * The request path the stage left for the routes, with the stage segment and
+   * the leading slash taken off: `/dev/pets/6` served from stage `dev` is
+   * `pets/6`, and a request to the root is the empty string.
+   *
+   * This is the form an `execute-api` ARN names a request by, which is what
+   * an `AWS_IAM` route is authorized against.
+   */
+  readonly pathAfterStage: string;
 }
 
 /**
@@ -82,6 +91,7 @@ export class SimHttpApiMatcher {
       integration,
       stage: stage.stage,
       pathParameters: selected.pathParameters,
+      pathAfterStage: stage.segments.join("/"),
     };
   }
 }

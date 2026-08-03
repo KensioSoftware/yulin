@@ -34,8 +34,14 @@ export class SimHttpApiRouteAuthorizationInput {
    * The authorization this route is created with.
    */
   read(api: SimHttpApi): SimHttpApiRouteAuthorization {
-    if ((this.input.AuthorizationType ?? "NONE") === "NONE") {
+    const authorizationType = this.input.AuthorizationType ?? "NONE";
+
+    if (authorizationType === "NONE") {
       return this.open();
+    }
+
+    if (authorizationType === "AWS_IAM") {
+      return this.iam();
     }
 
     return {
@@ -52,26 +58,75 @@ export class SimHttpApiRouteAuthorizationInput {
    * `AuthorizationType` out.
    */
   private open(): SimHttpApiRouteAuthorization {
-    if (this.input.AuthorizerId !== undefined) {
-      throw new SimApiGatewayV2BadRequest(
-        `CreateRoute AuthorizerId is set on a route with ` +
-          `AuthorizationType NONE, which would be ignored here and would ` +
-          `leave the route open on AWS too`,
-      );
-    }
-
-    if ((this.input.AuthorizationScopes ?? []).length > 0) {
-      throw new SimApiGatewayV2BadRequest(
-        `CreateRoute AuthorizationScopes is set on a route with ` +
-          `AuthorizationType NONE, and nothing checks a scope on a route ` +
-          `that authorizes nobody`,
-      );
-    }
+    this.refuseAuthorizerId(
+      "NONE",
+      "which would be ignored here and would leave the route open on AWS too",
+    );
+    this.refuseAuthorizationScopes(
+      "NONE",
+      "and nothing checks a scope on a route that authorizes nobody",
+    );
 
     return {
       authorizationType: "NONE",
       authorizationScopes: new SimHttpApiRouteScopes(),
     };
+  }
+
+  /**
+   * A route IAM decides, which takes neither an authorizer nor scopes.
+   *
+   * Refusing scopes is stricter than AWS, which documents route scopes as
+   * meaningful only for `JWT` and ignores them for `AWS_IAM`. Accepting them
+   * here would let a test assert on a scope restriction that nothing applies.
+   */
+  private iam(): SimHttpApiRouteAuthorization {
+    this.refuseAuthorizerId(
+      "AWS_IAM",
+      "and IAM itself decides an AWS_IAM route, so there is no authorizer to " +
+        "send the request through",
+    );
+    this.refuseAuthorizationScopes(
+      "AWS_IAM",
+      "and AWS applies route scopes to a JWT route only, so a scope written " +
+        "here would restrict nothing",
+    );
+
+    return {
+      authorizationType: "AWS_IAM",
+      authorizationScopes: new SimHttpApiRouteScopes(),
+    };
+  }
+
+  /**
+   * Refuse an `AuthorizerId` on an authorization type that takes none.
+   */
+  private refuseAuthorizerId(authorizationType: string, reason: string): void {
+    if (this.input.AuthorizerId === undefined) {
+      return;
+    }
+
+    throw new SimApiGatewayV2BadRequest(
+      `CreateRoute AuthorizerId is set on a route with AuthorizationType ` +
+        `${authorizationType}, ${reason}`,
+    );
+  }
+
+  /**
+   * Refuse `AuthorizationScopes` on an authorization type that checks none.
+   */
+  private refuseAuthorizationScopes(
+    authorizationType: string,
+    reason: string,
+  ): void {
+    if ((this.input.AuthorizationScopes ?? []).length === 0) {
+      return;
+    }
+
+    throw new SimApiGatewayV2BadRequest(
+      `CreateRoute AuthorizationScopes is set on a route with ` +
+        `AuthorizationType ${authorizationType}, ${reason}`,
+    );
   }
 
   private authorizer(api: SimHttpApi): SimHttpApiAuthorizerId {

@@ -4,7 +4,7 @@ import {
   CreateRouteCommand,
   GetRoutesCommand,
 } from "@aws-sdk/client-apigatewayv2";
-import { assertIdentical } from "@kensio/smartass";
+import { assertIdentical, assertUndefined } from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
@@ -202,6 +202,84 @@ describe("Sim API Gateway v2 route commands", () => {
         }),
       ),
     ).rejects.toThrow(SimApiGatewayV2NotFound);
+  });
+
+  it("creates an IAM-authorized route and reports it back", async () => {
+    // Given an API with an integration
+    const simAws = new SimAws();
+    const { apiId, target } = await apiWithIntegration(simAws);
+
+    // When a route asks for AWS_IAM
+    await simAws.apiGatewayV2().createRoute(
+      new CreateRouteCommand({
+        ApiId: apiId,
+        RouteKey: "GET /orders/{orderId}",
+        Target: target,
+        AuthorizationType: "AWS_IAM",
+      }),
+    );
+
+    // Then it is created with no authorizer and no scopes, which is what an
+    // AWS_IAM route has, and GetRoutes reports the type back
+    const { Items: routes } = await simAws
+      .apiGatewayV2()
+      .getRoutes(new GetRoutesCommand({ ApiId: apiId }));
+    expect(routes).toStrictEqual([
+      expect.objectContaining({
+        RouteKey: "GET /orders/{orderId}",
+        Target: target,
+        AuthorizationType: "AWS_IAM",
+      }),
+    ]);
+    assertUndefined(routes[0]?.AuthorizerId);
+    assertUndefined(routes[0]?.AuthorizationScopes);
+  });
+
+  it("refuses an AuthorizerId on an IAM-authorized route", async () => {
+    // Given an API with an integration
+    const simAws = new SimAws();
+    const { apiId, target } = await apiWithIntegration(simAws);
+
+    // When an AWS_IAM route also names an authorizer
+    // Then it is refused: IAM itself decides such a route, so there is no
+    // authorizer to send the request through
+    await expect(
+      simAws.apiGatewayV2().createRoute(
+        new CreateRouteCommand({
+          ApiId: apiId,
+          RouteKey: "GET /orders",
+          Target: target,
+          AuthorizationType: "AWS_IAM",
+          AuthorizerId: "abcdefgh",
+        }),
+      ),
+    ).rejects.toThrow(
+      /AuthorizerId is set on a route with AuthorizationType AWS_IAM/,
+    );
+  });
+
+  it("refuses AuthorizationScopes on an IAM-authorized route", async () => {
+    // Given an API with an integration
+    const simAws = new SimAws();
+    const { apiId, target } = await apiWithIntegration(simAws);
+
+    // When an AWS_IAM route asks for a scope
+    // Then it is refused. This is stricter than AWS, which ignores route
+    // scopes outside a JWT route: accepting one would let a test assert on a
+    // restriction nothing applies.
+    await expect(
+      simAws.apiGatewayV2().createRoute(
+        new CreateRouteCommand({
+          ApiId: apiId,
+          RouteKey: "GET /orders",
+          Target: target,
+          AuthorizationType: "AWS_IAM",
+          AuthorizationScopes: ["orders.read"],
+        }),
+      ),
+    ).rejects.toThrow(
+      /AuthorizationScopes is set on a route with AuthorizationType AWS_IAM/,
+    );
   });
 
   it("refuses a target that is not an integration", async () => {

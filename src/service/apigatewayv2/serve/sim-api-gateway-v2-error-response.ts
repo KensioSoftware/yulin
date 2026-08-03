@@ -33,11 +33,13 @@ export class SimApiGatewayV2ErrorResponse {
   }
 
   /**
-   * The API's generated endpoint is switched off, or the route asks for a
-   * scope the accepted token does not claim.
+   * The API's generated endpoint is switched off, the route asks for a scope
+   * the accepted token does not claim, or IAM denied the caller
+   * `execute-api:Invoke` on the `AWS_IAM` route being called.
    *
-   * AWS publishes neither the status nor the body for either case, so both are
-   * what the endpoint was observed to answer rather than something documented.
+   * AWS publishes neither the status nor the body for any of these, so both
+   * are what the endpoint was observed to answer rather than something
+   * documented.
    */
   forbidden(): Response {
     return this.jsonResponse(403, "Forbidden");

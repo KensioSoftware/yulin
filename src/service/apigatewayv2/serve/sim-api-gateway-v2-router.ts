@@ -67,6 +67,20 @@ export class SimApiGatewayV2Router {
   }
 
   /**
+   * IAM of the Account that owns an API, which is what an `AWS_IAM` route's
+   * authorization is evaluated against.
+   *
+   * It is the API's own Account rather than the caller's, so a caller from
+   * elsewhere is decided by the API's Account the way any cross-Account
+   * request is.
+   */
+  iamFor(api: SimHttpApi): SimIamInterServiceAuthZ {
+    const { accountId, regionName } = api.accountRegionScope;
+
+    return this.simAws.accountRegionScope(accountId, regionName).iam();
+  }
+
+  /**
    * Find the function an integration invokes, and the IAM deciding whether it
    * may be invoked.
    *
