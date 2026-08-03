@@ -123,21 +123,49 @@ describe("API Gateway v2 CloudFormation validation", () => {
   });
 
   it("refuses a route authorization type that is not simulated", async () => {
-    // Given a route asking for IAM authorization
+    // Given a route asking for a Lambda authorizer
     const simAws = simAwsInEuWest2();
 
     // When the template is deployed
     const error = await deployHttpApiFailure(
       simAws,
       simCfnHttpApiTemplateFactory.make({
-        routeProperties: { AuthorizationType: "AWS_IAM" },
+        routeProperties: { AuthorizationType: "CUSTOM" },
       }),
     );
 
     // Then CreateRoute refuses it rather than deploying an open route
     assertStringIncludes(
       error.message,
-      "CreateRoute AuthorizationType 'AWS_IAM' is not simulated",
+      "CreateRoute AuthorizationType 'CUSTOM' is not simulated",
+    );
+  });
+
+  it("refuses an Api declaring a resource policy", async () => {
+    // Given a template carrying the Policy property a REST API takes
+    const simAws = simAwsInEuWest2();
+
+    // When it is deployed
+    const error = await deployHttpApiFailure(
+      simAws,
+      simCfnHttpApiTemplateFactory.make({
+        apiProperties: {
+          Policy: {
+            Version: "2012-10-17",
+            Statement: [
+              { Effect: "Allow", Action: "execute-api:Invoke", Resource: "*" },
+            ],
+          },
+        },
+      }),
+    );
+
+    // Then it is refused by name, saying an HTTP API has no such property
+    // rather than reporting a gap that will be filled later
+    assertStringIncludes(
+      error.message,
+      "an HTTP API has no resource policy, and AWS has no such property on " +
+        "this Resource type",
     );
   });
 

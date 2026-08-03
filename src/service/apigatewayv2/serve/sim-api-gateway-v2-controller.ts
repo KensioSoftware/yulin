@@ -28,9 +28,10 @@ interface SimApiGatewayV2ServiceControllerProperties {
  * format 2.0 event. The function runs as its execution Role, as it does for
  * any other invocation.
  *
- * A route with a JWT authorizer is checked before any of that: the client's
- * token has to verify, and the route's scopes have to be met, or the request
- * is refused and the function is never invoked. Whether the API may invoke the
+ * A route that authorizes anybody is checked before any of that: a JWT route's
+ * token has to verify and meet the route's scopes, and an `AWS_IAM` route's
+ * caller has to be allowed `execute-api:Invoke` on the route, or the request is
+ * refused and the function is never invoked. Whether the API may invoke the
  * function is a separate question, and the API's own rather than the client's.
  */
 export class SimApiGatewayV2ServiceController implements SimAwsServiceController {
@@ -70,10 +71,14 @@ export class SimApiGatewayV2ServiceController implements SimAwsServiceController
       return this.errorResponse.forbidden();
     }
 
-    return await this.invoke(httpApi, serviceRequest.request);
+    return await this.invoke(httpApi, serviceRequest);
   }
 
-  private async invoke(api: SimHttpApi, request: Request): Promise<Response> {
+  private async invoke(
+    api: SimHttpApi,
+    serviceRequest: SimAwsServiceRequest,
+  ): Promise<Response> {
+    const { request } = serviceRequest;
     // The whole request path, stage segment and all: the stage takes its own
     // segment off, and `rawPath` reports the path as the client sent it.
     const match = api.match(
@@ -87,12 +92,15 @@ export class SimApiGatewayV2ServiceController implements SimAwsServiceController
       return this.errorResponse.notFound();
     }
 
-    // The client's own authorization comes first: a request with no token is
-    // refused whether or not the integration behind the route would work.
+    // The client's own authorization comes first: a request with no
+    // credentials is refused whether or not the integration behind the route
+    // would work.
     const authorization = this.routeAuthorizer.authorize({
       api,
-      route: match.route,
+      match,
       request,
+      caller: serviceRequest.caller,
+      iam: this.router.iamFor(api),
     });
 
     if (!authorization.admitted) {
@@ -129,7 +137,7 @@ export class SimApiGatewayV2ServiceController implements SimAwsServiceController
       const event = await this.eventBuilder.build(
         request,
         simHttpApiEndpoint(api, match),
-        { jwt: authorization.jwt },
+        { jwt: authorization.jwt, caller: authorization.caller },
       );
 
       return this.responseBuilder.build(await target.simFunction.invoke(event));
@@ -145,8 +153,9 @@ export class SimApiGatewayV2ServiceController implements SimAwsServiceController
   /**
    * The response a refused request gets back.
    *
-   * An unmet route scope is the one refusal that is a 403: the token was
-   * accepted, and it does not allow this route. Everything else is one 401.
+   * A 403 is an unmet route scope, where the token was accepted and does not
+   * allow this route, or an `AWS_IAM` route IAM did not allow the caller.
+   * Everything else is one 401.
    */
   private refusalResponse(refused: SimHttpApiRefused): Response {
     if (refused.kind === "forbidden") {

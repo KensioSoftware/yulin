@@ -72,9 +72,9 @@ export class SimHttpApiJwtVerification {
 
     return (
       this.claimChecks.check(jwt.claims, jwtConfiguration) ??
-      new SimHttpApiAdmitted(
-        new SimHttpApiJwtClaims(jwt.claims).toAuthorizerContext(),
-      )
+      new SimHttpApiAdmitted({
+        jwt: new SimHttpApiJwtClaims(jwt.claims).toAuthorizerContext(),
+      })
     );
   }
 
