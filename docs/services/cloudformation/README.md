@@ -575,6 +575,21 @@ A CDK BucketDeployment can copy files from synthesized asset output into the sim
 the Bucket is configured for website hosting, those files can be served through Yulin's local
 server.
 
+## CDK S3 Bucket notifications
+
+`bucket.addEventNotification(...)` synthesizes a `Custom::S3BucketNotifications` resource rather than
+a Bucket property. Sim CloudFormation applies the configuration it carries through the ordinary
+`PutBucketNotificationConfiguration` path, so an Object put into the deployed Bucket reaches the
+deployed function.
+
+Deploy into an Account and Region matching the ones the CDK app synthesized for. The `SourceAccount`
+on the `AWS::Lambda::Permission` CDK writes beside the notification is a synth-time literal, so a
+stack deployed into another Account leaves S3 unable to validate the destination, and the stack
+fails.
+
+See [Event notifications](../s3/README.md#event-notifications) in the S3 docs for the configuration
+itself and what it refuses.
+
 ## CloudFront resources from CDK
 
 Sim CloudFormation can create CloudFront Distributions from CloudFormation or CDK templates.
@@ -1090,7 +1105,7 @@ The resource types it creates are:
 - `AWS::SecretsManager::Secret`
 - `AWS::SQS::Queue`
 - `AWS::SSM::Parameter`
-- selected CDK custom resources, including CDK S3 BucketDeployment
+- selected CDK custom resources: `Custom::CDKBucketDeployment` and `Custom::S3BucketNotifications`
 
 Each service's own docs describe what its resource types support.
 
