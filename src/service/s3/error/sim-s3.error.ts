@@ -105,6 +105,21 @@ export class SimS3MalformedXml extends SimS3Error {
 }
 
 /**
+ * Simulated S3 InvalidArgument error.
+ *
+ * Real S3 answers this when a request argument is not one it accepts, which is
+ * how a notification configuration with overlapping filters, a repeated
+ * configuration id or an unusable destination is refused.
+ */
+export class SimS3InvalidArgument extends SimS3Error {
+  public override readonly name = "InvalidArgument";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
  * Simulated S3 NotImplemented error.
  *
  * Something real S3 does that the simulator refuses rather than approximates.

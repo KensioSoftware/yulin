@@ -16,7 +16,9 @@ familiar AWS SDK command shapes, CloudFormation resources, and local HTTP reques
 - `sim-s3-global-registry.ts` records Bucket ownership across account/region scopes inside one
   simulated AWS instance.
 - `Bucket/` contains the simulated Bucket model, Bucket-name validation, name-availability checks,
-  and static website configuration.
+  static website configuration, and the event notification configuration.
+- `notification/` contains event notification delivery: the event, its `Records` serialisation, and
+  the destinations S3 pushes to.
 - `object/` contains the simulated S3 Object model.
 - `storage/` contains pluggable Bucket storage implementations.
 - `command/` contains AWS SDK-style command handlers.
@@ -79,6 +81,8 @@ Supported command areas currently include:
 - `list-objects/`
 - `delete-object/`
 - `delete-objects/`
+- `put-bucket-notification-configuration/`
+- `get-bucket-notification-configuration/`
 
 `SimS3Commands` owns the wiring: every handler is built from the same Bucket map, IAM and background
 scheduler, so that construction lives in one place rather than being repeated once per command on
@@ -88,6 +92,7 @@ the service facade. It groups the commands into areas, each a small class under 
 - `SimS3BucketPolicyCommands` in `command/bucket-policy/`
 - `SimS3PublicAccessBlockCommands` in `command/public-access-block/`
 - `SimS3ObjectCommands` in `command/object/`
+- `SimS3NotificationCommands` in `command/notification/`
 
 An area holds the shared `SimS3BucketCommandState` and hands it to the handler it runs, so adding a
 command means adding one method to the area it belongs to. `requireSimS3Bucket` is the shared Bucket lookup
@@ -160,6 +165,8 @@ Its public methods are small:
 - `configurePublicAccessBlock(publicAccessBlock)`
 - `getPublicAccessBlock()`
 - `deletePublicAccessBlock()`
+- `configureNotifications(notifications)`
+- `getNotifications()`
 
 The Bucket resource policy is stored parsed rather than as a JSON string, because that is the shape
 sim IAM evaluates. `GetBucketPolicy` serializes it back on the way out, so the string a caller reads
@@ -337,6 +344,65 @@ A batch deletion is not all or nothing. `DeleteObjectsOutcome` turns a `SimIamAc
 of the batch is still deleted. Anything else is re-raised, so a bug in the simulation cannot arrive
 as a per-key AWS error.
 
+## Event notifications
+
+Sim S3 usage docs:
+[`../../../docs/services/s3/README.md#event-notifications`](../../../docs/services/s3/README.md#event-notifications)
+
+Notifications are split between the configuration, which is Bucket state, and delivery, which is not.
+
+`bucket/notification/` holds the configuration. `SimS3NotificationConfiguration` is what a Bucket
+stores, `SimS3LambdaNotification` is one destination in it, and `SimS3NotificationFilter` is the
+object key filter. `SimS3NotificationConfigurationReader` turns a
+`PutBucketNotificationConfiguration` request into one, refusing everything it cannot honour before
+anything is stored, so a refused request leaves the previous configuration alone.
+
+Two rules in there are worth knowing about:
+
+- `simS3ExpandNotificationEvent` expands a configured event type into the concrete events the
+  simulator can raise. Everything works on expanded sets rather than on the configured strings,
+  because the overlap rule is about event sets: real S3 refuses `s3:ObjectCreated:*` alongside
+  `s3:ObjectCreated:Put` on the same filter, and comparing the two as strings would accept it.
+- `simS3AssertNoNotificationOverlap` applies that rule. Two configurations conflict when their event
+  sets intersect and their filters could both match a key, which needs both the prefixes and the
+  suffixes to overlap. That is why `images` with `.jpg` alongside `images` with `.png` is accepted,
+  as it is on real S3.
+
+`notification/` holds delivery. The pieces are small on purpose:
+
+- `SimS3ObjectNotifier` is what the Object commands call. It is held in `SimS3BucketCommandState`, so
+  one notifier is shared across the commands of a scope and the sequence numbers and delivery ceiling
+  see every event.
+- `SimS3ObjectEventBuilder` turns something that happened to an Object into a `SimS3ObjectEvent`,
+  which is destination-agnostic. `simS3EventRecordsDocument` is the separate serialisation into the
+  `Records` document, so a later SNS or EventBridge destination can shape it differently.
+- `SimS3NotificationSchedule` consults the Bucket's configuration and schedules delivery on the
+  background scheduler. The event is built only once something wants it, because building one hashes
+  the Object's bytes.
+- `SimS3NotificationDispatcher` offers one event to one destination and records what came of it.
+  Everything a destination raises is caught, because a rejected background task would fail an
+  unrelated `backgroundTasksComplete()` and real S3 never reports a delivery failure to the caller
+  who wrote the Object. `SimS3NotificationCeiling` is the exception: it is counted outside the guard
+  so a notification loop surfaces as a named error rather than as a hung test.
+
+`notification/destination/` is the port. `SimS3NotificationDestination` owns both `validate` and
+`deliver`, because configuration-time validation and delivery-time re-check are the same
+per-destination question asked twice, as real S3 asks it.
+`SimS3ServiceNotificationDestinations` resolves a destination ARN through a `ReadonlyMap` keyed on
+the ARN's service segment. `SimS3NoNotificationDestinations` is what a standalone `SimS3` gets, and
+it refuses by name.
+
+`SimAwsS3NotificationFunctions` resolves and invokes the function. It resolves lazily from the
+`SimAws` it was built with, never at construction time: `createLambda` already reaches
+`scope.s3()` for function code, so an eager `scope.lambda()` in `createS3` would recurse, because the
+scope memo records a service only once its factory has returned. Whether S3 may invoke a function is
+Lambda's own rule, so the decision comes from `SimLambdaServiceInvokeAuthorizer` with the Bucket ARN
+and Account supplied as the source.
+
+The raise point is one call in `PutObjectCommandHandler` and one in each of the two deletion
+handlers, after the write and with the caller the authorizer resolved. Every write path funnels
+through those, so the SDK, an intercepted SDK client and the REST endpoint are all covered.
+
 ## Static website configuration
 
 Static website support is represented by `SimS3BucketWebsite`.
@@ -497,6 +563,8 @@ Handlers throw AWS-like errors for supported failure cases, including:
 - access denied, for S3's own refusals such as Block Public Access
 - Bucket already exists
 - Bucket already owned by you
+- invalid argument, for a notification configuration with overlapping filters, a repeated
+  configuration id, or a destination that could not be validated
 - malformed XML, for a `DeleteObjects` request naming no Objects or more than 1000 of them
 - not implemented, for something the simulator refuses rather than approximates, such as deleting an
   Object out of filesystem-backed storage

@@ -5,9 +5,11 @@ import {
   DeleteObjectCommand,
   DeleteObjectsCommand,
   DeletePublicAccessBlockCommand,
+  GetBucketNotificationConfigurationCommand,
   GetBucketPolicyCommand,
   GetPublicAccessBlockCommand,
   ListObjectsCommand,
+  PutBucketNotificationConfigurationCommand,
   PutBucketPolicyCommand,
   PutBucketWebsiteCommand,
   PutObjectCommand,
@@ -207,13 +209,37 @@ describe("simulated S3 SDK Command routing", () => {
     assertIdentical(remaining[0].Key, "c.txt");
   });
 
+  it("routes the Bucket notification configuration Commands", async () => {
+    using simSdk = new SimSdk();
+    const client = new S3Client({ region: "us-east-1" });
+    simSdk.intercept(client);
+
+    await client.send(new CreateBucketCommand({ Bucket: "bucket-n" }));
+    await client.send(
+      new PutBucketNotificationConfigurationCommand({
+        Bucket: "bucket-n",
+        // Nothing is configured, so nothing has to exist to be notified. What
+        // this is about is that both Commands reach simulated S3 at all.
+        NotificationConfiguration: {},
+      }),
+    );
+
+    const read = await client.send(
+      new GetBucketNotificationConfigurationCommand({ Bucket: "bucket-n" }),
+    );
+
+    assertUndefined(read.LambdaFunctionConfigurations);
+  });
+
   it("lists its supported SDK Command names", () => {
     const router = new SimS3SdkCommandRouter({} as SimS3);
 
     const supported = router.supportedCommandNames();
 
-    assertArrayLength(supported, 14);
+    assertArrayLength(supported, 16);
     assertArrayIncludes(supported, "GetObjectCommand");
+    assertArrayIncludes(supported, "PutBucketNotificationConfigurationCommand");
+    assertArrayIncludes(supported, "GetBucketNotificationConfigurationCommand");
     assertArrayIncludes(supported, "DeleteObjectCommand");
     assertArrayIncludes(supported, "DeleteObjectsCommand");
     assertArrayIncludes(supported, "GetBucketPolicyCommand");

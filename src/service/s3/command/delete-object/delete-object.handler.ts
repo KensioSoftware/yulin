@@ -13,6 +13,7 @@ import type {
   SimS3Bucket,
   SimS3BucketName,
 } from "../../bucket/sim-s3-bucket.js";
+import type { SimS3ObjectNotifier } from "../../notification/sim-s3-object-notifier.js";
 import { requireSimS3Bucket } from "../require-sim-s3-bucket.js";
 import { DeleteObjectAuthorizer } from "./delete-object-authorizer.js";
 import type {
@@ -24,6 +25,7 @@ interface DeleteObjectCommandHandlerProperties {
   readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
+  readonly notifications: SimS3ObjectNotifier;
 }
 
 interface DeleteObjectCommandHandlerOptions {
@@ -42,6 +44,7 @@ export class DeleteObjectCommandHandler implements CommandHandler<
   private readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
   private readonly authorizer: DeleteObjectAuthorizer;
   private readonly background: BackgroundScheduler;
+  private readonly notifications: SimS3ObjectNotifier;
 
   constructor(properties: DeleteObjectCommandHandlerProperties) {
     const {
@@ -53,6 +56,7 @@ export class DeleteObjectCommandHandler implements CommandHandler<
     this.buckets = buckets;
     this.authorizer = new DeleteObjectAuthorizer({ iam });
     this.background = background;
+    this.notifications = properties.notifications;
   }
 
   /**
@@ -74,9 +78,24 @@ export class DeleteObjectCommandHandler implements CommandHandler<
 
     await this.background.sequence();
 
-    this.authorizer.authorize(bucket, command.input.Key, options?.caller);
+    const caller = this.authorizer.authorize(
+      bucket,
+      command.input.Key,
+      options?.caller,
+    );
 
-    await bucket.deleteObject(command.input.Key);
+    const removed = await bucket.deleteObject(command.input.Key);
+
+    // A deletion that removed nothing is not an event: real S3 raises
+    // ObjectRemoved for an Object that was deleted, not for a request to
+    // delete one.
+    if (removed) {
+      this.notifications.objectRemoved({
+        bucket,
+        key: command.input.Key,
+        caller,
+      });
+    }
 
     return {
       $metadata: {},

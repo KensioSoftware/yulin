@@ -15,6 +15,7 @@ import { SimS3Commands, type SimS3Properties } from "./sim-s3-commands.js";
 import { SimS3SdkCommandRouter } from "./sdk/sim-s3-sdk-command-router.js";
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
 import type { SimS3RequestOptions } from "./command/sim-s3-request-options.js";
+import type { SimS3NotificationDeliveryFailure } from "./notification/sim-s3-notification-failures.js";
 
 /**
  * Simulated S3. Handles SDK commands. Emulates AWS behaviour and state.
@@ -127,6 +128,26 @@ export class SimS3 {
   }
 
   /**
+   * Handle a Put Bucket Notification Configuration Command from the SDK.
+   */
+  async putBucketNotificationConfiguration(
+    command: simS3Commands.SimPutBucketNotificationConfigurationCommand,
+    options?: SimS3RequestOptions,
+  ): Promise<simS3Commands.SimPutBucketNotificationConfigurationCommandOutput> {
+    return await this.commands.notifications.put(command, options);
+  }
+
+  /**
+   * Handle a Get Bucket Notification Configuration Command from the SDK.
+   */
+  async getBucketNotificationConfiguration(
+    command: simS3Commands.SimGetBucketNotificationConfigurationCommand,
+    options?: SimS3RequestOptions,
+  ): Promise<simS3Commands.SimGetBucketNotificationConfigurationCommandOutput> {
+    return await this.commands.notifications.get(command, options);
+  }
+
+  /**
    * Handle a List Buckets Command from the SDK.
    */
   async listBuckets(
@@ -193,6 +214,15 @@ export class SimS3 {
     bucketName: SimS3BucketName | string,
   ): SimS3Bucket | undefined {
     return this.buckets.get(bucketName as SimS3BucketName);
+  }
+
+  /**
+   * Get the Bucket event notifications this S3 could not deliver, which is the
+   * only place a handler that threw or a destination that refused shows up:
+   * real S3 tells the caller who wrote the Object nothing about a delivery.
+   */
+  getNotificationDeliveryFailures(): readonly SimS3NotificationDeliveryFailure[] {
+    return this.commands.objectNotifier.deliveryFailures;
   }
 
   /**

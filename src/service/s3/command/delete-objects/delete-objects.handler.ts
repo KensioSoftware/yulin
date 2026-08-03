@@ -13,9 +13,9 @@ import type {
   SimS3Bucket,
   SimS3BucketName,
 } from "../../bucket/sim-s3-bucket.js";
-import { DeleteObjectAuthorizer } from "../delete-object/delete-object-authorizer.js";
+import type { SimS3ObjectNotifier } from "../../notification/sim-s3-object-notifier.js";
 import { requireSimS3Bucket } from "../require-sim-s3-bucket.js";
-import { DeleteObjectAttempt } from "./delete-object-attempt.js";
+import { DeleteObjectsKeyRemoval } from "./delete-objects-key-removal.js";
 import { DeleteObjectsOutcome } from "./delete-objects-outcome.js";
 import { DeleteObjectsRequest } from "./delete-objects-request.js";
 import type {
@@ -27,6 +27,7 @@ interface DeleteObjectsCommandHandlerProperties {
   readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
+  readonly notifications: SimS3ObjectNotifier;
 }
 
 interface DeleteObjectsCommandHandlerOptions {
@@ -43,8 +44,8 @@ export class DeleteObjectsCommandHandler implements CommandHandler<
   SimDeleteObjectsCommandOutput
 > {
   private readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
-  private readonly authorizer: DeleteObjectAuthorizer;
   private readonly background: BackgroundScheduler;
+  private readonly removal: DeleteObjectsKeyRemoval;
 
   constructor(properties: DeleteObjectsCommandHandlerProperties) {
     const {
@@ -54,16 +55,18 @@ export class DeleteObjectsCommandHandler implements CommandHandler<
     } = properties;
 
     this.buckets = buckets;
-    this.authorizer = new DeleteObjectAuthorizer({ iam });
     this.background = background;
+    this.removal = new DeleteObjectsKeyRemoval({
+      iam,
+      notifications: properties.notifications,
+    });
   }
 
   /**
    * Authorize and remove each Object the request names.
    *
-   * Each key is authorized on its own against `s3:DeleteObject`, as real S3
-   * does, and a key the caller may not remove is reported in the response while
-   * the rest of the batch is still deleted.
+   * A key the caller may not remove is reported in the response while the rest
+   * of the batch is still deleted.
    */
   async handle(
     command: SimDeleteObjectsCommand,
@@ -80,25 +83,10 @@ export class DeleteObjectsCommandHandler implements CommandHandler<
 
     const attempts = await Promise.all(
       request.keys.map(
-        async (key) => await this.deleteKey(bucket, key, options?.caller),
+        async (key) => await this.removal.remove(bucket, key, options?.caller),
       ),
     );
 
     return new DeleteObjectsOutcome(attempts).toOutput(request.quiet);
-  }
-
-  private async deleteKey(
-    bucket: SimS3Bucket,
-    key: string,
-    caller?: SimAwsCaller,
-  ): Promise<DeleteObjectAttempt> {
-    try {
-      this.authorizer.authorize(bucket, key, caller);
-      await bucket.deleteObject(key);
-
-      return new DeleteObjectAttempt(key);
-    } catch (error) {
-      return new DeleteObjectAttempt(key, error);
-    }
   }
 }

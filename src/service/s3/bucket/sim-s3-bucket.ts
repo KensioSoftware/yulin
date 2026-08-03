@@ -4,6 +4,7 @@ import type { SimS3Object } from "../object/s3-object.js";
 import { MemoryS3BucketStorage } from "../storage/s3-memory-storage.js";
 import { SimS3BucketWebsite } from "./website/sim-s3-bucket-website.js";
 import { SimS3PublicAccessBlock } from "./public-access/sim-s3-public-access-block.js";
+import { SimS3NotificationConfiguration } from "./notification/sim-s3-notification-configuration.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimIamPolicyDocument } from "../../iam/policy/sim-iam-policy.js";
 import { simS3BucketWebsiteUrl } from "./website/sim-s3-bucket-website-url.js";
@@ -19,6 +20,7 @@ interface SimS3BucketProperties {
   readonly website?: SimS3BucketWebsite;
   readonly policy?: SimIamPolicyDocument | undefined;
   readonly publicAccessBlock?: SimS3PublicAccessBlock;
+  readonly notifications?: SimS3NotificationConfiguration;
 }
 
 /**
@@ -32,6 +34,7 @@ export class SimS3Bucket {
   private website: SimS3BucketWebsite;
   private policy: SimIamPolicyDocument | undefined;
   private publicAccessBlock: SimS3PublicAccessBlock;
+  private notifications: SimS3NotificationConfiguration;
 
   constructor(properties: SimS3BucketProperties) {
     const {
@@ -41,6 +44,7 @@ export class SimS3Bucket {
       website = new SimS3BucketWebsite(),
       policy,
       publicAccessBlock = SimS3PublicAccessBlock.blockingAll(),
+      notifications = SimS3NotificationConfiguration.empty(),
     } = properties;
 
     validateS3BucketName(bucketName);
@@ -51,6 +55,7 @@ export class SimS3Bucket {
     this.website = website;
     this.policy = policy;
     this.publicAccessBlock = publicAccessBlock;
+    this.notifications = notifications;
   }
 
   /**
@@ -77,11 +82,14 @@ export class SimS3Bucket {
   /**
    * Remove a simulated S3 Object from storage.
    *
-   * Real S3 DeleteObject is idempotent, so this reports nothing about whether
-   * there was an Object to remove.
+   * Real S3 DeleteObject is idempotent, so a key that was not there is not an
+   * error. Whether there was an Object to remove is still reported, because a
+   * deletion that removed nothing is not an event: real S3 raises
+   * `s3:ObjectRemoved:Delete` when an Object was deleted, not when a deletion
+   * was requested.
    */
-  async deleteObject(key: string): Promise<void> {
-    await this.storage.deleteObject(key);
+  async deleteObject(key: string): Promise<boolean> {
+    return await this.storage.deleteObject(key);
   }
 
   /**
@@ -151,6 +159,23 @@ export class SimS3Bucket {
    */
   deletePublicAccessBlock(): void {
     this.publicAccessBlock = SimS3PublicAccessBlock.blockingAll();
+  }
+
+  /**
+   * Replace this Bucket's event notification configuration.
+   *
+   * Real S3 holds one configuration per Bucket rather than a list of them, so
+   * this replaces what was there instead of adding to it.
+   */
+  configureNotifications(notifications: SimS3NotificationConfiguration): void {
+    this.notifications = notifications;
+  }
+
+  /**
+   * Get this Bucket's event notification configuration.
+   */
+  getNotifications(): SimS3NotificationConfiguration {
+    return this.notifications;
   }
 
   /**
