@@ -78,18 +78,20 @@ describe("What a sim HTTP API import refuses in a document", () => {
       },
     });
 
-    // When each is imported
+    // When the first is imported
     const versionRefusal = simAws
       .apiGatewayV2()
       .importApi(new ImportApiCommand({ Body: JSON.stringify(numbered) }));
-    const securityRefusal = simAws
-      .apiGatewayV2()
-      .importApi(new ImportApiCommand({ Body: JSON.stringify(document) }));
 
-    // Then each is refused as the shape it is, naming where it is
+    // Then it is refused as the shape it is, naming where it is
     await expect(versionRefusal).rejects.toThrow(
       "ImportApi refused #/openapi: has to be a string",
     );
+
+    // And so is the second
+    const securityRefusal = simAws
+      .apiGatewayV2()
+      .importApi(new ImportApiCommand({ Body: JSON.stringify(document) }));
     await expect(securityRefusal).rejects.toThrow(
       "ImportApi refused #/paths/~1orders/get/security: has to be an array",
     );

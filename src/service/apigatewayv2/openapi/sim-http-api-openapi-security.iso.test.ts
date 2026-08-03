@@ -1,5 +1,6 @@
 import {
   GetAuthorizersCommand,
+  GetRoutesCommand,
   ImportApiCommand,
 } from "@aws-sdk/client-apigatewayv2";
 import { assertIdentical, assertNonNullable } from "@kensio/smartass";
@@ -72,6 +73,17 @@ describe("Importing a sim HTTP API's JWT authorizers", () => {
       "$request.header.Authorization",
     ]);
     assertIdentical(authorizer.JwtConfiguration.Issuer, issuer);
+
+    // And the operation's route is the one pointed at that authorizer, asking
+    // a token for the scopes the requirement named
+    const routes = await simAws
+      .apiGatewayV2()
+      .getRoutes(new GetRoutesCommand({ ApiId: apiId }));
+    const [route] = routes.Items;
+    assertNonNullable(route);
+    assertIdentical(route.AuthorizationType, "JWT");
+    assertIdentical(route.AuthorizerId, authorizer.AuthorizerId);
+    expect(route.AuthorizationScopes).toStrictEqual(["orders.read"]);
   });
 
   it("shares one authorizer between every operation naming the scheme", async () => {

@@ -1384,9 +1384,12 @@ Current documented limitations:
   serves whichever Deployment it was given, which on real AWS is nothing until one is created.
 - `RouteSettings`, `DefaultRouteSettings` and `AccessLogSettings` on a stage are refused, as is any
   other option `CreateStage` takes and this one does not.
-- `AWS_PROXY` is the only integration type, and its URI must be an unqualified Lambda function ARN.
-  A version or alias qualifier is refused, since simulated Lambda has no versions. HTTP proxy
-  integrations and AWS service integrations are not simulated.
+- `AWS_PROXY` is the only integration type, and its URI must name an unqualified Lambda function
+  ARN, written either as that ARN or as the
+  `arn:aws:apigateway:<region>:lambda:path/2015-03-31/functions/<function-arn>/invocations` form.
+  Both reach the same function, and `GetIntegrations` answers with the function ARN whichever was
+  written. A version or alias qualifier is refused, since simulated Lambda has no versions. HTTP
+  proxy integrations and AWS service integrations are not simulated.
 - Payload format 1.0 is refused. A handler written for 1.0 reads event fields a 2.0 event does not
   have, so treating one as the other would pass here and fail on AWS.
 - `AuthorizationType` is `NONE`, `JWT` or `AWS_IAM`. A `CUSTOM` route is refused rather than created
