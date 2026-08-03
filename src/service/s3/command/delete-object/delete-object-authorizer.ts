@@ -1,4 +1,5 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimAwsResolvedCaller } from "../../../aws/caller/sim-aws-caller-resolver.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import { simS3BucketArn } from "../../bucket/sim-s3-bucket-arn.js";
@@ -31,8 +32,16 @@ export class DeleteObjectAuthorizer {
 
   /**
    * Ensure the caller may remove the requested S3 Object.
+   *
+   * The resolved caller is returned rather than discarded, because it is the
+   * only place in the request where the principal has been worked out, and an
+   * Object event notification has to say who caused it.
    */
-  authorize(bucket: SimS3Bucket, key: string, caller?: SimAwsCaller): void {
+  authorize(
+    bucket: SimS3Bucket,
+    key: string,
+    caller?: SimAwsCaller,
+  ): SimAwsResolvedCaller {
     const resource = `${simS3BucketArn(bucket.bucketName)}/${key}`;
     const decision = this.iam.authorize({
       action: DeleteObjectAuthorizer.action,
@@ -48,5 +57,7 @@ export class DeleteObjectAuthorizer {
         resource,
       });
     }
+
+    return decision.caller;
   }
 }

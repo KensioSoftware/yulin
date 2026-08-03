@@ -39,8 +39,7 @@ export class MemoryS3BucketStorage implements SimS3BucketStorage {
    * A key that is not stored is not an error, as real S3 answers a deletion the
    * same way whether or not there was anything there.
    */
-  deleteObject(key: string): Promise<void> {
-    this.objects.delete(key);
-    return Promise.resolve();
+  deleteObject(key: string): Promise<boolean> {
+    return Promise.resolve(this.objects.delete(key));
   }
 }

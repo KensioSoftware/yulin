@@ -30,6 +30,10 @@ export type {
   SimGetBucketPolicyCommandOutput,
 } from "./get-bucket-policy/get-bucket-policy.command.js";
 export type {
+  SimGetBucketNotificationConfigurationCommand,
+  SimGetBucketNotificationConfigurationCommandOutput,
+} from "./get-bucket-notification-configuration/get-bucket-notification-configuration.command.js";
+export type {
   SimGetObjectCommand,
   SimGetObjectCommandOutput,
 } from "./get-object/get-object.command.js";
@@ -45,6 +49,10 @@ export type {
   SimListObjectsCommand,
   SimListObjectsCommandOutput,
 } from "./list-objects/list-objects.command.js";
+export type {
+  SimPutBucketNotificationConfigurationCommand,
+  SimPutBucketNotificationConfigurationCommandOutput,
+} from "./put-bucket-notification-configuration/put-bucket-notification-configuration.command.js";
 export type {
   SimPutBucketPolicyCommand,
   SimPutBucketPolicyCommandOutput,

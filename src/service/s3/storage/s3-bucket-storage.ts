@@ -17,9 +17,11 @@ export interface SimS3BucketStorage {
   listObjects(prefix?: string): Promise<SimS3Object[]>;
 
   /**
-   * Remove a simulated Object from storage.
+   * Remove a simulated Object from storage, reporting whether there was one.
    *
    * S3 deletion is idempotent, so a key that is not stored is not an error.
+   * Whether anything was removed is still worth answering, because an Object
+   * event notification describes a deletion that happened.
    */
-  deleteObject(key: string): Promise<void>;
+  deleteObject(key: string): Promise<boolean>;
 }
