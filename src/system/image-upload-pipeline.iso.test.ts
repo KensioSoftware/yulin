@@ -1,5 +1,4 @@
 import { GetObjectCommand, ListObjectsCommand } from "@aws-sdk/client-s3";
-import { PutParameterCommand } from "@aws-sdk/client-ssm";
 import {
   assertArrayEquals,
   assertArrayLength,
@@ -17,11 +16,10 @@ import {
   publishedKey,
   renditionKey,
   renditionWidths,
-  renditionWidthsParameterName,
   screenedPrefix,
 } from "../../test/media-pipeline/media-pipeline-names.js";
-import { deployMediaPipeline } from "../../test/media-pipeline/media-pipeline.fixture.js";
-import type { SimAws } from "../service/aws/sim-aws.js";
+import { mediaPipelineFactory } from "../../test/media-pipeline/media-pipeline.factory.js";
+import { SimAws } from "../service/aws/sim-aws.js";
 import { simS3BodyToBuffer } from "../service/s3/storage/s3-body-buffer.js";
 import { simRekognitionSampleImages } from "../service/rekognition/index.js";
 
@@ -68,7 +66,8 @@ async function objectBytes(simAws: SimAws, key: string): Promise<Buffer> {
 describe("An image upload pipeline spanning several simulated AWS services", () => {
   it("turns an accepted upload into renditions the user can publish", async () => {
     // Given a deployed pipeline with one user signed in to it
-    const { simAws, client } = await deployMediaPipeline();
+    const simAws = new SimAws();
+    const { client } = await mediaPipelineFactory.make({}, simAws);
     const image = Buffer.from(simRekognitionSampleImages.passesModeration());
 
     // When they ask the API for somewhere to put an image
@@ -119,7 +118,8 @@ describe("An image upload pipeline spanning several simulated AWS services", () 
 
   it("stops an upload that fails screening before anything is built from it", async () => {
     // Given a deployed pipeline with one user signed in to it
-    const { simAws, client } = await deployMediaPipeline();
+    const simAws = new SimAws();
+    const { client } = await mediaPipelineFactory.make({}, simAws);
 
     // When they put an image that fails screening where the API said to
     const requested = await client.requestUpload();
@@ -150,7 +150,8 @@ describe("An image upload pipeline spanning several simulated AWS services", () 
 
   it("refuses a request that carries no token", async () => {
     // Given a deployed pipeline
-    const { client } = await deployMediaPipeline();
+    const simAws = new SimAws();
+    const { client } = await mediaPipelineFactory.make({}, simAws);
 
     // When an upload is asked for without signing in
     const response = await client.request({
@@ -165,16 +166,11 @@ describe("An image upload pipeline spanning several simulated AWS services", () 
   });
 
   it("builds what Parameter Store says to build, not what the code says", async () => {
-    // Given a deployed pipeline whose rendition widths have been changed
-    const { simAws, client } = await deployMediaPipeline();
-
-    await simAws.ssm().putParameter(
-      new PutParameterCommand({
-        Name: renditionWidthsParameterName,
-        Type: "StringList",
-        Value: "128",
-        Overwrite: true,
-      }),
+    // Given a deployed pipeline configured to build one rendition width
+    const simAws = new SimAws();
+    const { client } = await mediaPipelineFactory.make(
+      { renditionWidths: "128" },
+      simAws,
     );
 
     // When an image that passes screening goes through it

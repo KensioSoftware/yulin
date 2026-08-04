@@ -9,10 +9,15 @@ The rest of the suite is colocated with the code it covers, in `src/service/<nam
 because there is no one service they belong to. What they cover is the joins between services, which
 is where a simulator earns its keep and where a mock has nothing to say.
 
-Each test file drives a system built by a fixture under `test/`. The fixture creates the resources
-with ordinary SDK commands, so it reads like the deployment it stands in for, and the test drives
-the result from the outside: HTTP requests to the API, Objects put in a Bucket, and assertions on
-what the system did about them.
+Each test file drives a system built by `@kensio/part-factory` factories under `test/`, one per part
+of it, composed by a factory for the whole thing. Each factory sends the ordinary SDK commands, so
+it reads like the deployment it stands in for, and the test drives the result from the outside: HTTP
+requests to the API, Objects put in a Bucket, and assertions on what the system did about them.
+
+The factories live under `test/` rather than beside the code they build, because what they build is
+a fictional application rather than a simulated AWS resource. The reusable ones for the latter, such
+as `simIamPolicyDocumentFactory` and `simCognitoSignedInFactory`, live in `src/` and ship with the
+package, and these use them.
 
 ## The image upload pipeline
 
@@ -38,4 +43,12 @@ One upload passes through eight simulated services:
 
 Every function runs as its own execution role, so each step is allowed only what it does. Taking a
 permission away from a role breaks the step that needed it, which is the point: the test says the
-system works with the permissions it was actually given.
+system works with the permissions it was actually given. What each step is allowed is in
+[media-pipeline-permissions.ts](../../test/media-pipeline/media-pipeline-permissions.ts).
+
+A test stands the whole thing up in one call:
+
+```typescript
+const simAws = new SimAws();
+const { client } = await mediaPipelineFactory.make({}, simAws);
+```

@@ -14,6 +14,24 @@ export const mediaUserPoolName = "image-app-users";
 export const mediaAppClientName = "web";
 export const mediaApiName = "images";
 
+export const requestUploadFunctionName = "request-upload";
+export const screenUploadFunctionName = "screen-upload";
+export const buildRenditionsFunctionName = "build-renditions";
+export const uploadStatusFunctionName = "upload-status";
+export const publishRenditionFunctionName = "publish-rendition";
+
+/**
+ * The environment variable names the function code reads its configuration
+ * from.
+ *
+ * They are constants rather than object keys because the AWS-shaped upper case
+ * names are not the shape this project's own identifiers take.
+ */
+export const uploadsTableVariable = "UPLOADS_TABLE_NAME";
+export const mediaBucketVariable = "MEDIA_BUCKET_NAME";
+export const renditionWidthsVariable = "RENDITION_WIDTHS_PARAMETER_NAME";
+export const deliveryDomainVariable = "DELIVERY_DOMAIN_NAME";
+
 /**
  * The Parameter Store name the rendition widths are configured under.
  */

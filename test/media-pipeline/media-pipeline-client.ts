@@ -7,14 +7,11 @@
  * by the simulated services in this process, with no port and no socket.
  */
 
-import { InitiateAuthCommand } from "@aws-sdk/client-cognito-identity-provider";
 import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { assertNonNullable } from "@kensio/smartass";
 
 import type { SimAws } from "../../src/service/aws/sim-aws.js";
 import { SimAwsHttp } from "../../src/serve/http/sim-aws-http.js";
 import { SimAwsLocalUrl } from "../../src/serve/http/url/sim-aws-local-url.js";
-import type { MediaPipelineApi } from "./media-pipeline-api.js";
 import { mediaBucketName } from "./media-pipeline-names.js";
 
 /**
@@ -50,43 +47,28 @@ interface MediaPipelineRequest {
 }
 
 /**
+ * What a client needs before it can call the pipeline.
+ */
+export interface MediaPipelineClientProperties {
+  readonly simAws: SimAws;
+  readonly apiEndpoint: string;
+  readonly accessToken: string;
+}
+
+/**
  * A signed-in client of the pipeline's API.
  */
 export class MediaPipelineClient {
   private readonly simAws: SimAws;
-  private readonly api: MediaPipelineApi;
+  private readonly apiEndpoint: string;
   private readonly http: SimAwsHttp;
   private readonly accessToken: string;
 
-  constructor(simAws: SimAws, api: MediaPipelineApi, accessToken: string) {
-    this.simAws = simAws;
-    this.api = api;
-    this.http = new SimAwsHttp({ simAws });
-    this.accessToken = accessToken;
-  }
-
-  /**
-   * Sign a user in to the pipeline's user pool and answer with a client
-   * holding their access token.
-   */
-  static async signIn(
-    simAws: SimAws,
-    api: MediaPipelineApi,
-    username: string,
-    password: string,
-  ): Promise<MediaPipelineClient> {
-    const signedIn = await simAws.cognitoIdentityProvider().initiateAuth(
-      new InitiateAuthCommand({
-        ClientId: api.clientId,
-        AuthFlow: "USER_PASSWORD_AUTH",
-        AuthParameters: { USERNAME: username, PASSWORD: password },
-      }),
-    );
-
-    const accessToken = signedIn.AuthenticationResult?.AccessToken;
-    assertNonNullable(accessToken, "Signing in answered with an access token");
-
-    return new MediaPipelineClient(simAws, api, accessToken);
+  constructor(properties: MediaPipelineClientProperties) {
+    this.simAws = properties.simAws;
+    this.apiEndpoint = properties.apiEndpoint;
+    this.http = new SimAwsHttp({ simAws: properties.simAws });
+    this.accessToken = properties.accessToken;
   }
 
   /**
@@ -154,7 +136,7 @@ export class MediaPipelineClient {
 
     return this.http.fetch(
       new SimAwsLocalUrl({
-        input: `${this.api.apiEndpoint}${path}`,
+        input: `${this.apiEndpoint}${path}`,
       }).toString(),
       {
         method,
