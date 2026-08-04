@@ -1,5 +1,6 @@
 import type { SimIamConditionValue } from "../../../iam/policy/sim-iam-policy.js";
 import {
+  simSqsSourceAccountConditionKey,
   simSqsSourceArnConditionKey,
   type SimSqsRequestOptions,
 } from "../sim-sqs-request-options.js";
@@ -16,9 +17,12 @@ import {
 export function simSqsConditionContext(
   options: SimSqsRequestOptions | undefined,
 ): Readonly<Record<string, SimIamConditionValue>> {
-  if (options?.sourceArn === undefined) {
-    return {};
-  }
-
-  return { [simSqsSourceArnConditionKey]: options.sourceArn };
+  return {
+    ...(options?.sourceArn !== undefined && {
+      [simSqsSourceArnConditionKey]: options.sourceArn,
+    }),
+    ...(options?.sourceAccount !== undefined && {
+      [simSqsSourceAccountConditionKey]: options.sourceAccount,
+    }),
+  };
 }

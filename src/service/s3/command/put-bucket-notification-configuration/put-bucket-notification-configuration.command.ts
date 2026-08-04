@@ -35,7 +35,8 @@ export interface SimPutBucketNotificationConfigurationCommandOutput {
 export interface SimS3NotificationConfigurationInput {
   readonly LambdaFunctionConfigurations?:
     readonly SimS3LambdaFunctionConfigurationInput[] | undefined;
-  readonly QueueConfigurations?: readonly unknown[] | undefined;
+  readonly QueueConfigurations?:
+    readonly SimS3QueueConfigurationInput[] | undefined;
   readonly TopicConfigurations?: readonly unknown[] | undefined;
   readonly EventBridgeConfiguration?: object | undefined;
 }
@@ -46,6 +47,16 @@ export interface SimS3NotificationConfigurationInput {
 export interface SimS3LambdaFunctionConfigurationInput {
   readonly Id?: string | undefined;
   readonly LambdaFunctionArn?: string | undefined;
+  readonly Events?: readonly string[] | undefined;
+  readonly Filter?: SimS3NotificationFilterInput | undefined;
+}
+
+/**
+ * Minimal structural sim S3 SQS queue notification configuration.
+ */
+export interface SimS3QueueConfigurationInput {
+  readonly Id?: string | undefined;
+  readonly QueueArn?: string | undefined;
   readonly Events?: readonly string[] | undefined;
   readonly Filter?: SimS3NotificationFilterInput | undefined;
 }

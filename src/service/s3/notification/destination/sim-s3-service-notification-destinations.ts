@@ -2,44 +2,45 @@ import { SimS3NotImplemented } from "../../error/sim-s3.error.js";
 import type {
   SimS3NotificationDestination,
   SimS3NotificationDestinations,
+  SimS3NotificationDestinationService,
 } from "./sim-s3-notification-destination.js";
 
 interface SimS3ServiceNotificationDestinationsProperties {
   readonly lambda: SimS3NotificationDestination;
+  readonly sqs: SimS3NotificationDestination;
 }
 
 /**
- * The destinations of one simulated S3 scope, keyed on the service an ARN
- * names.
+ * The destinations of one simulated S3 scope, one per kind of destination.
  *
- * An ARN's service segment is the only thing that decides which destination
- * takes it, so the lookup is a map rather than a chain of checks, and a service
- * this simulator has no destination for is refused by name.
+ * A configuration says which kind it wants by the destination group it was
+ * declared in, so nothing here reads an ARN. The ARN is the destination's own
+ * business, and each of them refuses one that does not name a resource of the
+ * kind it delivers to.
  */
 export class SimS3ServiceNotificationDestinations implements SimS3NotificationDestinations {
-  private readonly byService: ReadonlyMap<string, SimS3NotificationDestination>;
+  private readonly lambda: SimS3NotificationDestination;
+  private readonly sqs: SimS3NotificationDestination;
 
   constructor(properties: SimS3ServiceNotificationDestinationsProperties) {
-    this.byService = new Map([["lambda", properties.lambda]]);
+    this.lambda = properties.lambda;
+    this.sqs = properties.sqs;
   }
 
   /**
-   * The destination an ARN names.
+   * The destination of a kind.
    */
-  resolve(destinationArn: string): SimS3NotificationDestination {
-    const service = destinationArn.split(":", 3)[2];
-    const destination =
-      service === undefined ? undefined : this.byService.get(service);
-
-    if (destination === undefined) {
-      throw new SimS3NotImplemented(
-        `Simulated S3 cannot notify ${destinationArn}. It notifies a Lambda ` +
-          "function; SQS queue, SNS topic and EventBridge destinations are " +
-          "not simulated.",
-      );
+  resolve(
+    service: SimS3NotificationDestinationService,
+  ): SimS3NotificationDestination {
+    switch (service) {
+      case "lambda": {
+        return this.lambda;
+      }
+      case "sqs": {
+        return this.sqs;
+      }
     }
-
-    return destination;
   }
 }
 
@@ -55,7 +56,10 @@ export class SimS3NoNotificationDestinations implements SimS3NotificationDestina
   /**
    * Refuse every destination, explaining how to get one.
    */
-  resolve(destinationArn: string): never {
+  resolve(
+    _service: SimS3NotificationDestinationService,
+    destinationArn: string,
+  ): never {
     throw new SimS3NotImplemented(
       `Cannot notify ${destinationArn}: this SimS3 was constructed on its ` +
         "own, so it has no other simulated services to notify and no shared " +

@@ -1,4 +1,4 @@
-import type { SimS3LambdaNotification } from "../bucket/notification/sim-s3-lambda-notification.js";
+import type { SimS3Notification } from "../bucket/notification/sim-s3-notification.js";
 import type { SimS3NotificationDestinations } from "./destination/sim-s3-notification-destination.js";
 import type { SimS3ObjectEvent } from "./event/sim-s3-object-event.js";
 import { SimS3NotificationCeiling } from "./sim-s3-notification-ceiling.js";
@@ -42,24 +42,27 @@ export class SimS3NotificationDispatcher {
    * Deliver one event to the destination one configuration names.
    */
   async deliver(
-    notification: SimS3LambdaNotification,
+    notification: SimS3Notification,
     event: SimS3ObjectEvent,
   ): Promise<void> {
     this.ceiling.take(event.bucketName);
 
     try {
-      await this.destinations.resolve(notification.functionArn).deliver({
-        destinationArn: notification.functionArn,
-        bucketArn: event.bucketArn,
-        bucketOwnerAccountId: event.ownerAccountId,
-        configurationId: notification.id,
-        event,
-      });
+      await this.destinations
+        .resolve(notification.destinationService, notification.destinationArn)
+        .deliver({
+          destinationArn: notification.destinationArn,
+          bucketArn: event.bucketArn,
+          bucketOwnerAccountId: event.ownerAccountId,
+          bucketRegionName: event.regionName,
+          configurationId: notification.id,
+          event,
+        });
     } catch (error) {
       this.failures.record(
         new SimS3NotificationDeliveryFailure({
           event,
-          destinationArn: notification.functionArn,
+          destinationArn: notification.destinationArn,
           configurationId: notification.id,
           error,
         }),

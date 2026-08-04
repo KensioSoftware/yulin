@@ -3,6 +3,8 @@ import { SimCfnValueShape } from "../../../../cloudformation/template/value/sim-
 import type {
   SimS3LambdaFunctionConfigurationInput,
   SimS3NotificationConfigurationInput,
+  SimS3NotificationFilterInput,
+  SimS3QueueConfigurationInput,
 } from "../../../command/put-bucket-notification-configuration/put-bucket-notification-configuration.command.js";
 import { s3BucketNotificationError } from "../error/sim-cfn-s3-bucket-error.js";
 import { SimCfnS3BucketNotificationFilter } from "./sim-cfn-s3-bucket-notification-filter.js";
@@ -28,6 +30,27 @@ const lambdaConfigurationNames: ReadonlySet<string> = new Set([
   "Filter",
   "Function",
 ]);
+
+/**
+ * The names one CloudFormation QueueConfiguration carries.
+ *
+ * `Queue` is the queue's ARN, despite the name, which is the third place
+ * CloudFormation calls the same thing something else.
+ */
+const queueConfigurationNames: ReadonlySet<string> = new Set([
+  "Event",
+  "Filter",
+  "Queue",
+]);
+
+/**
+ * The parts of one CloudFormation destination configuration that are the same
+ * whichever destination it names.
+ */
+interface SimCfnS3BucketNotificationParts {
+  readonly Events?: readonly string[] | undefined;
+  readonly Filter?: SimS3NotificationFilterInput | undefined;
+}
 
 /**
  * Reads the `NotificationConfiguration` property of an AWS::S3::Bucket Resource
@@ -77,8 +100,7 @@ export class SimCfnS3BucketNotificationConfiguration {
       ),
       QueueConfigurations: this.shape.present(
         record["QueueConfigurations"],
-        (configurations) =>
-          this.shape.list(configurations, "QueueConfigurations"),
+        (configurations) => this.queueConfigurations(configurations),
       ),
       TopicConfigurations: this.shape.present(
         record["TopicConfigurations"],
@@ -112,9 +134,43 @@ export class SimCfnS3BucketNotificationConfiguration {
     );
 
     return {
+      ...this.notificationParts(record),
       LambdaFunctionArn: this.shape.present(record["Function"], (arn) =>
         this.shape.string(arn, "Function"),
       ),
+    };
+  }
+
+  private queueConfigurations(
+    value: SimCfnTemplateValue,
+  ): readonly SimS3QueueConfigurationInput[] {
+    return this.shape
+      .list(value, "QueueConfigurations")
+      .map((configuration) => this.queueConfiguration(configuration));
+  }
+
+  private queueConfiguration(
+    value: SimCfnTemplateValue,
+  ): SimS3QueueConfigurationInput {
+    const record = this.shape.record(value, "QueueConfigurations entry");
+    this.shape.knownKeys(
+      record,
+      queueConfigurationNames,
+      "QueueConfigurations entry",
+    );
+
+    return {
+      ...this.notificationParts(record),
+      QueueArn: this.shape.present(record["Queue"], (arn) =>
+        this.shape.string(arn, "Queue"),
+      ),
+    };
+  }
+
+  private notificationParts(
+    record: Readonly<Record<string, SimCfnTemplateValue>>,
+  ): SimCfnS3BucketNotificationParts {
+    return {
       // CloudFormation states one event per configuration, where the request
       // takes a list, so one configuration becomes a one-element Events list.
       Events: this.shape.present(record["Event"], (event) => [

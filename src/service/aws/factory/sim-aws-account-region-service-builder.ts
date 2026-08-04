@@ -23,6 +23,8 @@ import { SimS3 } from "../../s3/sim-s3.js";
 import { SimAwsS3NotificationFunctions } from "../../s3/notification/destination/lambda/sim-aws-s3-notification-functions.js";
 import { SimS3LambdaNotificationDestination } from "../../s3/notification/destination/lambda/sim-s3-lambda-notification-destination.js";
 import { SimS3ServiceNotificationDestinations } from "../../s3/notification/destination/sim-s3-service-notification-destinations.js";
+import { SimAwsS3NotificationQueues } from "../../s3/notification/destination/sqs/sim-aws-s3-notification-queues.js";
+import { SimS3SqsNotificationDestination } from "../../s3/notification/destination/sqs/sim-s3-sqs-notification-destination.js";
 import { SimSecretsManager } from "../../secretsmanager/index.js";
 import { SimSqs } from "../../sqs/index.js";
 import { SimSsm } from "../../ssm/index.js";
@@ -275,17 +277,18 @@ export class SimAwsAccountRegionServiceBuilder {
   /**
    * Where a simulated S3 Bucket can send its event notifications.
    *
-   * A notification configuration names a function by ARN, and that ARN can
-   * name any Account and Region, so the functions come from the whole
+   * A notification configuration names a destination by ARN, and that ARN can
+   * name any Account and Region, so the destinations come from the whole
    * simulation rather than from one scope.
    */
   private s3NotificationDestinations(): SimS3ServiceNotificationDestinations {
-    const functions = new SimAwsS3NotificationFunctions({
-      simAws: this.simAws,
-    });
-
     return new SimS3ServiceNotificationDestinations({
-      lambda: new SimS3LambdaNotificationDestination({ functions }),
+      lambda: new SimS3LambdaNotificationDestination({
+        functions: new SimAwsS3NotificationFunctions({ simAws: this.simAws }),
+      }),
+      sqs: new SimS3SqsNotificationDestination({
+        queues: new SimAwsS3NotificationQueues({ simAws: this.simAws }),
+      }),
     });
   }
 }

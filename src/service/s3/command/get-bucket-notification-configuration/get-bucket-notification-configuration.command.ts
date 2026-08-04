@@ -1,5 +1,8 @@
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
-import type { SimS3LambdaFunctionConfigurationInput } from "../put-bucket-notification-configuration/put-bucket-notification-configuration.command.js";
+import type {
+  SimS3LambdaFunctionConfigurationInput,
+  SimS3QueueConfigurationInput,
+} from "../put-bucket-notification-configuration/put-bucket-notification-configuration.command.js";
 
 /**
  * Minimal structural sim S3 GetBucketNotificationConfiguration command.
@@ -28,6 +31,8 @@ export interface SimGetBucketNotificationConfigurationCommandInput {
 export interface SimS3NotificationConfigurationOutput {
   readonly LambdaFunctionConfigurations?:
     readonly SimS3LambdaFunctionConfigurationInput[] | undefined;
+  readonly QueueConfigurations?:
+    readonly SimS3QueueConfigurationInput[] | undefined;
 }
 
 /**

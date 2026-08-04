@@ -1,4 +1,5 @@
 import { SimLambdaInvalidParameterValueException } from "../../error/sim-lambda.error.js";
+import { sqsQueueUrl } from "../../../sqs/queue/sim-sqs-queue-arn.js";
 
 const queueArnPattern =
   /^arn:aws:sqs:(?<region>[a-z0-9-]+):(?<account>\d{12}):(?<name>[\w-]{1,80})$/u;
@@ -49,10 +50,11 @@ export class SimLambdaSqsEventSourceArn {
    * The URL SQS requests name this queue by.
    */
   get queueUrl(): string {
-    return (
-      `https://sqs.${this.regionName}.amazonaws.com/` +
-      `${this.accountId}/${this.queueName}`
-    );
+    return sqsQueueUrl({
+      regionName: this.regionName,
+      accountId: this.accountId,
+      name: this.queueName,
+    });
   }
 
   /**

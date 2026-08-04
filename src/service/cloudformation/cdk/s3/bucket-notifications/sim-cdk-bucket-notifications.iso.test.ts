@@ -1,7 +1,13 @@
 import {
+  DeleteObjectCommand,
   GetBucketNotificationConfigurationCommand,
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
+import {
+  CreateQueueCommand,
+  ReceiveMessageCommand,
+  SetQueueAttributesCommand,
+} from "@aws-sdk/client-sqs";
 import {
   assertArrayLength,
   assertIdentical,
@@ -11,6 +17,7 @@ import {
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../../../aws/sim-aws.js";
+import { simIamPolicyDocumentFactory } from "../../../../iam/policy/sim-iam-policy-document.factory.js";
 import { simCdkBucketNotificationsTemplateFactory } from "./sim-cdk-bucket-notifications-template.factory.js";
 
 /**
@@ -110,6 +117,93 @@ describe("CDK Bucket notifications CloudFormation Custom Resource", () => {
       configurations[0].LambdaFunctionArn,
       `arn:aws:lambda:${simAws.defaultRegionName}:${simAws.defaultAccountId}:function:thumbnailer`,
     );
+    assertIdentical(
+      configurations[0].Filter?.Key?.FilterRules?.[0]?.Value,
+      "raw/",
+    );
+  });
+
+  it("notifies a queue the way CDK's SqsDestination configures one", async () => {
+    // Given a queue whose policy carries the ArnLike source ARN condition
+    // CDK's SqsDestination writes, and no source Account guard.
+    const simAws = new SimAws();
+    const queueArn = `arn:aws:sqs:${simAws.defaultRegionName}:${simAws.defaultAccountId}:uploads`;
+    const created = await simAws
+      .sqs()
+      .createQueue(new CreateQueueCommand({ QueueName: "uploads" }));
+    await simAws.sqs().setQueueAttributes(
+      new SetQueueAttributesCommand({
+        QueueUrl: created.QueueUrl,
+        Attributes: {
+          Policy: simIamPolicyDocumentFactory.make({
+            Statement: {
+              Principal: { Service: "s3.amazonaws.com" },
+              Action: "sqs:SendMessage",
+              Resource: queueArn,
+              Condition: {
+                ArnLike: { "aws:SourceArn": "arn:aws:s3:::uploads" },
+              },
+            },
+          }),
+        },
+      }),
+    );
+
+    // When a template naming that queue alongside the function is deployed,
+    // which is what a CDK app adding two destinations for two event types
+    // synthesizes.
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "uploads-stack",
+      template: simCdkBucketNotificationsTemplateFactory.make({
+        notificationConfiguration: {
+          QueueConfigurations: [
+            {
+              Id: "removals",
+              Events: ["s3:ObjectRemoved:*"],
+              QueueArn: queueArn,
+              Filter: {
+                Key: { FilterRules: [{ Name: "prefix", Value: "raw/" }] },
+              },
+            },
+          ],
+        },
+      }),
+    });
+    await stack.waitForDeployComplete();
+
+    // Then an Object removed from under the filtered prefix reaches the queue.
+    await simAws.s3().putObject(
+      new PutObjectCommand({
+        Bucket: "uploads",
+        Key: "raw/cat.jpg",
+        Body: "cat picture",
+      }),
+    );
+    await simAws
+      .s3()
+      .deleteObject(
+        new DeleteObjectCommand({ Bucket: "uploads", Key: "raw/cat.jpg" }),
+      );
+    await simAws.backgroundTasksComplete();
+
+    const received = await simAws
+      .sqs()
+      .receiveMessage(
+        new ReceiveMessageCommand({ QueueUrl: created.QueueUrl }),
+      );
+    assertArrayLength(received.Messages ?? [], 1);
+
+    // And the Bucket reports the configuration back under QueueConfigurations.
+    const output = await simAws
+      .s3()
+      .getBucketNotificationConfiguration(
+        new GetBucketNotificationConfigurationCommand({ Bucket: "uploads" }),
+      );
+    const configurations = output.QueueConfigurations;
+    assertNonNullable(configurations);
+    assertArrayLength(configurations, 1);
+    assertIdentical(configurations[0].Id, "removals");
+    assertIdentical(configurations[0].QueueArn, queueArn);
     assertIdentical(
       configurations[0].Filter?.Key?.FilterRules?.[0]?.Value,
       "raw/",

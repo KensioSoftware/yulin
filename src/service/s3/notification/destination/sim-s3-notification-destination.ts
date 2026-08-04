@@ -11,6 +11,14 @@ export interface SimS3NotificationDestinationRequest {
   readonly destinationArn: string;
   readonly bucketArn: string;
   readonly bucketOwnerAccountId: string;
+
+  /**
+   * The Region the Bucket is in, which a queue destination has to be in too.
+   *
+   * A Bucket ARN carries no Region, so it is passed alongside rather than read
+   * out of one.
+   */
+  readonly bucketRegionName: string;
 }
 
 /**
@@ -44,11 +52,26 @@ export interface SimS3NotificationDestination {
 }
 
 /**
+ * The kinds of destination a notification configuration can name.
+ *
+ * Which one a configuration wants comes from the destination group it was
+ * declared in rather than from the service segment of its ARN, so a queue ARN
+ * under `LambdaFunctionConfigurations` is refused for not being a function
+ * rather than quietly delivered to as a queue.
+ */
+export type SimS3NotificationDestinationService = "lambda" | "sqs";
+
+/**
  * The destinations one simulated S3 scope can reach.
  */
 export interface SimS3NotificationDestinations {
   /**
-   * The destination an ARN names, refusing an ARN S3 cannot notify.
+   * The destination of a kind, refusing one this simulated S3 cannot reach.
+   *
+   * The ARN is carried for the refusal to name rather than to be read.
    */
-  resolve(destinationArn: string): SimS3NotificationDestination;
+  resolve(
+    service: SimS3NotificationDestinationService,
+    destinationArn: string,
+  ): SimS3NotificationDestination;
 }

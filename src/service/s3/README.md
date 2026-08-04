@@ -352,10 +352,20 @@ Sim S3 usage docs:
 Notifications are split between the configuration, which is Bucket state, and delivery, which is not.
 
 `bucket/notification/` holds the configuration. `SimS3NotificationConfiguration` is what a Bucket
-stores, `SimS3LambdaNotification` is one destination in it, and `SimS3NotificationFilter` is the
-object key filter. `SimS3NotificationConfigurationReader` turns a
-`PutBucketNotificationConfiguration` request into one, refusing everything it cannot honour before
-anything is stored, so a refused request leaves the previous configuration alone.
+stores, and `SimS3NotificationFilter` is the object key filter. `SimS3Notification` is one
+destination in it, with `SimS3LambdaNotification` and `SimS3QueueNotification` as the two kinds.
+Everything a configuration is asked, which events reach a destination and whether two of them
+conflict, is the same question whatever the destination is, so only the ARN's property name and the
+kind of destination it wants differ between the subclasses. Each reads its own entries through
+`simS3NotificationProperties`, since the ARN is the only part the destination groups spell
+differently.
+
+`SimS3NotificationConfigurationReader` turns a `PutBucketNotificationConfiguration` request into a
+configuration, refusing everything it cannot honour before anything is stored, so a refused request
+leaves the previous configuration alone. What is left in the reader is the two rules that are about
+the configuration as a whole, `simS3AssertNotificationIdsAreUnique` and
+`simS3AssertNoNotificationOverlap`, and both look across the destination groups rather than within
+one, as real S3 does.
 
 Two rules in there are worth knowing about:
 
@@ -388,20 +398,39 @@ Two rules in there are worth knowing about:
 `notification/destination/` is the port. `SimS3NotificationDestination` owns both `validate` and
 `deliver`, because configuration-time validation and delivery-time re-check are the same
 per-destination question asked twice, as real S3 asks it.
-`SimS3ServiceNotificationDestinations` resolves a destination ARN through a `ReadonlyMap` keyed on
-the ARN's service segment. `SimS3NoNotificationDestinations` is what a standalone `SimS3` gets, and
-it refuses by name.
+`SimS3ServiceNotificationDestinations` answers with the destination of the kind a configuration was
+declared for, rather than reading the ARN to decide: a queue ARN under `LambdaFunctionConfigurations`
+then reaches the Lambda destination and is refused for not being a function, instead of quietly
+being delivered to as a queue. Each destination refuses an ARN that does not name what it delivers
+to. `SimS3NoNotificationDestinations` is what a standalone `SimS3` gets, and it refuses by name.
 
-`SimAwsS3NotificationFunctions` resolves and invokes the function. It resolves lazily from the
-`SimAws` it was built with, never at construction time: `createLambda` already reaches
-`scope.s3()` for function code, so an eager `scope.lambda()` in `createS3` would recurse, because the
-scope memo records a service only once its factory has returned. Whether S3 may invoke a function is
-Lambda's own rule, so the decision comes from `SimLambdaServiceInvokeAuthorizer` with the Bucket ARN
-and Account supplied as the source.
+Both destinations resolve lazily from the `SimAws` they were built with, never at construction time:
+`createLambda` already reaches `scope.s3()` for function code, so an eager `scope.lambda()` in
+`createS3` would recurse, because the scope memo records a service only once its factory has
+returned.
+
+`SimAwsS3NotificationFunctions` resolves and invokes the function. Whether S3 may invoke a function
+is Lambda's own rule, so the decision comes from `SimLambdaServiceInvokeAuthorizer` with the Bucket
+ARN and Account supplied as the source.
+
+`SimAwsS3NotificationQueues` does the same for a queue, and splits in two: it applies the one rule
+that is S3's, that the queue is in the Bucket's Region, and hands the rest to
+`SimS3NotificationQueue`, which is one queue in the Account and Region its ARN names. Everything
+there is asked of that Account, which is what makes a cross-Account queue work: its policy is the
+grant and its own IAM evaluates it, through `SimSqsServiceSendAuthorizer`. Delivery goes through the
+ordinary `SendMessage` path, so the message is the same thing an SDK caller would have sent and is
+authorized again on the way in. The refusal is asked for first all the same, so a queue policy saying
+no is recorded as a refusal rather than as a fault.
 
 The raise point is one call in `PutObjectCommandHandler` and one in each of the two deletion
 handlers, after the write and with the caller the authorizer resolved. Every write path funnels
 through those, so the SDK, an intercepted SDK client and the REST endpoint are all covered.
+
+`s3:TestEvent` is deliberately not sent. Real S3 puts one on a queue or topic when a configuration
+naming it is applied, carrying a flat document with no `Records` in it. Sending it would make the
+simplest possible test two messages long and hand a consumer a first body it cannot parse as an
+event, and what it exists to prove, that S3 can reach the destination, is what the destination check
+already does directly.
 
 ## Static website configuration
 

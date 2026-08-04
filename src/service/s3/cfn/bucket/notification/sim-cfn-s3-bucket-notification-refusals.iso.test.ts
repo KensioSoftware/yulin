@@ -35,23 +35,23 @@ async function deployFailing(
 
 describe("AWS::S3::Bucket NotificationConfiguration refusals", () => {
   it("refuses a queue destination the command would refuse from an SDK caller", async () => {
-    // Given a template naming an SQS queue destination.
+    // Given a template naming a queue no stack ever created.
     const simAws = new SimAws();
 
     // When the template is deployed.
     const error = await deployFailing(simAws, {
       QueueConfigurations: [
-        { Event: "s3:ObjectCreated:*", Queue: "arn:aws:sqs:::uploads" },
+        {
+          Event: "s3:ObjectCreated:*",
+          Queue: "arn:aws:sqs:us-east-1:888888888888:uploads",
+        },
       ],
     });
 
     // Then the Stack fails with the refusal
     // PutBucketNotificationConfiguration gives, rather than deploying a Bucket
     // that notifies nothing.
-    assertStringIncludes(
-      error.message,
-      "Simulated S3 cannot notify a SQS queue",
-    );
+    assertStringIncludes(error.message, "is not a simulated SQS queue");
   });
 
   it("refuses an event type the command would refuse from an SDK caller", async () => {

@@ -25,15 +25,17 @@ export class SimS3NotificationDestinationCheck {
     bucket: SimS3Bucket,
     configuration: SimS3NotificationConfiguration,
   ): void {
+    const scope = bucket.getAccountRegionScope();
     const request = {
       bucketArn: simS3BucketArn(bucket.bucketName),
-      bucketOwnerAccountId: bucket.getAccountRegionScope().accountId,
+      bucketOwnerAccountId: scope.accountId,
+      bucketRegionName: scope.regionName,
     };
 
-    for (const notification of configuration.lambdaNotifications) {
+    for (const notification of configuration.all) {
       this.destinations
-        .resolve(notification.functionArn)
-        .validate({ ...request, destinationArn: notification.functionArn });
+        .resolve(notification.destinationService, notification.destinationArn)
+        .validate({ ...request, destinationArn: notification.destinationArn });
     }
   }
 }
