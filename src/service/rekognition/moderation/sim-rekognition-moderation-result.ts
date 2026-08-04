@@ -1,5 +1,5 @@
 import type { SimRekognitionModerationLabelOutput } from "../command/detect-moderation-labels/detect-moderation-labels.command.js";
-import { SimRekognitionDeclarationError } from "../error/sim-rekognition.error.js";
+import { SimRekognitionDeclaredConfidence } from "../rule/sim-rekognition-declared-confidence.js";
 import {
   type SimRekognitionModerationLabelNode,
   simRekognitionModerationTaxonomy,
@@ -13,7 +13,7 @@ import {
  * one of them rather than a round number. A test that asserts on the exact
  * value is asserting on something the shape of what AWS returns.
  */
-const defaultModerationConfidence = 96.68;
+const moderationConfidence = new SimRekognitionDeclaredConfidence(96.68);
 
 /**
  * A moderation label declared against an image, with the confidence
@@ -55,7 +55,10 @@ class SimRekognitionModerationChain {
   constructor(declaration: SimRekognitionModerationLabelDeclaration) {
     const declared = SimRekognitionModerationChain.declared(declaration);
 
-    this.confidence = SimRekognitionModerationChain.confidenceOf(declared);
+    this.confidence = moderationConfidence.of(
+      declared.name,
+      declared.confidence,
+    );
     this.nodes = simRekognitionModerationTaxonomy.chain(declared.name);
   }
 
@@ -67,25 +70,6 @@ class SimRekognitionModerationChain {
     }
 
     return declaration;
-  }
-
-  private static confidenceOf(
-    declared: SimRekognitionDeclaredModerationLabel,
-  ): number {
-    const confidence = declared.confidence ?? defaultModerationConfidence;
-
-    // A NaN is refused with everything else out of range. Every comparison
-    // with one is false, so a label declared at NaN would never survive
-    // MinConfidence filtering and would look like a rule that never matched.
-    if (!Number.isFinite(confidence) || confidence < 0 || confidence > 100) {
-      throw new SimRekognitionDeclarationError(
-        `A confidence of ${String(confidence)} declared for ` +
-          `'${declared.name}' is not a Rekognition confidence, which is a ` +
-          `percentage from 0 to 100.`,
-      );
-    }
-
-    return Math.fround(confidence);
   }
 }
 

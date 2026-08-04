@@ -1,13 +1,13 @@
-import type {
-  SimRekognitionImageInput,
-  SimRekognitionS3ObjectInput,
-} from "../command/detect-moderation-labels/detect-moderation-labels.command.js";
 import type { SimRekognitionRequestOptions } from "../command/sim-rekognition-request-options.js";
 import {
   SimRekognitionInvalidParameterException,
   SimRekognitionUnsimulatedInputException,
 } from "../error/sim-rekognition.error.js";
 import { SimRekognitionImage } from "./sim-rekognition-image.js";
+import type {
+  SimRekognitionImageInput,
+  SimRekognitionS3ObjectInput,
+} from "./sim-rekognition-image-input.js";
 import type { SimRekognitionImageObjects } from "./sim-rekognition-image-objects.js";
 
 /**
@@ -67,58 +67,68 @@ export class SimRekognitionImageS3Request implements SimRekognitionImageRequest 
   }
 }
 
-function parseS3Object(
-  s3Object: SimRekognitionS3ObjectInput,
-): SimRekognitionImageRequest {
-  if (s3Object.Version !== undefined) {
-    throw new SimRekognitionUnsimulatedInputException(
-      "DetectModerationLabels S3Object Version is not simulated: simulated " +
-        "S3 has no object versions, so the version would be ignored here and " +
-        "applied on real AWS",
-    );
-  }
-
-  if (s3Object.Bucket === undefined || s3Object.Name === undefined) {
-    throw new SimRekognitionInvalidParameterException(
-      "Request has invalid parameters: Image S3Object needs both Bucket " +
-        "and Name",
-    );
-  }
-
-  return new SimRekognitionImageS3Request(s3Object.Bucket, s3Object.Name);
-}
-
 /**
- * Read the `Image` member of a detection request.
+ * Reads the `Image` member of one operation's detection requests.
  *
- * Real Rekognition takes exactly one of bytes or an S3 object, so neither and
- * both are equally invalid requests.
+ * The operation is carried here so a refusal names the command the caller
+ * sent, since every detection operation shares this member.
  */
-export function parseSimRekognitionImageRequest(
-  image: SimRekognitionImageInput | undefined,
-): SimRekognitionImageRequest {
-  if (image === undefined) {
+export class SimRekognitionImageRequests {
+  constructor(private readonly operation: string) {}
+
+  /**
+   * Read the `Image` member of a detection request.
+   *
+   * Real Rekognition takes exactly one of bytes or an S3 object, so neither
+   * and both are equally invalid requests.
+   */
+  parse(
+    image: SimRekognitionImageInput | undefined,
+  ): SimRekognitionImageRequest {
+    if (image === undefined) {
+      throw new SimRekognitionInvalidParameterException(
+        "Request has invalid parameters: Image is required",
+      );
+    }
+
+    if (image.Bytes !== undefined && image.S3Object !== undefined) {
+      throw new SimRekognitionInvalidParameterException(
+        "Request has invalid parameters: Image takes either Bytes or " +
+          "S3Object, not both",
+      );
+    }
+
+    if (image.Bytes !== undefined) {
+      return new SimRekognitionImageBytesRequest(image.Bytes);
+    }
+
+    if (image.S3Object !== undefined) {
+      return this.parseS3Object(image.S3Object);
+    }
+
     throw new SimRekognitionInvalidParameterException(
-      "Request has invalid parameters: Image is required",
+      "Request has invalid parameters: Image needs either Bytes or S3Object",
     );
   }
 
-  if (image.Bytes !== undefined && image.S3Object !== undefined) {
-    throw new SimRekognitionInvalidParameterException(
-      "Request has invalid parameters: Image takes either Bytes or " +
-        "S3Object, not both",
-    );
-  }
+  private parseS3Object(
+    s3Object: SimRekognitionS3ObjectInput,
+  ): SimRekognitionImageRequest {
+    if (s3Object.Version !== undefined) {
+      throw new SimRekognitionUnsimulatedInputException(
+        `${this.operation} S3Object Version is not simulated: simulated S3 ` +
+          `has no object versions, so the version would be ignored here and ` +
+          `applied on real AWS`,
+      );
+    }
 
-  if (image.Bytes !== undefined) {
-    return new SimRekognitionImageBytesRequest(image.Bytes);
-  }
+    if (s3Object.Bucket === undefined || s3Object.Name === undefined) {
+      throw new SimRekognitionInvalidParameterException(
+        "Request has invalid parameters: Image S3Object needs both Bucket " +
+          "and Name",
+      );
+    }
 
-  if (image.S3Object !== undefined) {
-    return parseS3Object(image.S3Object);
+    return new SimRekognitionImageS3Request(s3Object.Bucket, s3Object.Name);
   }
-
-  throw new SimRekognitionInvalidParameterException(
-    "Request has invalid parameters: Image needs either Bytes or S3Object",
-  );
 }

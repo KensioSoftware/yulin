@@ -8,6 +8,11 @@ import {
   type SimIamInterServiceAuthZ,
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimRekognitionAuthorizer } from "./command/authorize/sim-rekognition-authorizer.js";
+import { DetectLabelsHandler } from "./command/detect-labels/detect-labels.handler.js";
+import type {
+  SimDetectLabelsCommand,
+  SimDetectLabelsCommandOutput,
+} from "./command/detect-labels/detect-labels.command.js";
 import { DetectModerationLabelsHandler } from "./command/detect-moderation-labels/detect-moderation-labels.handler.js";
 import type {
   SimDetectModerationLabelsCommand,
@@ -18,6 +23,7 @@ import {
   type SimRekognitionImageObjects,
   SimRekognitionUnreachableImageObjects,
 } from "./image/sim-rekognition-image-objects.js";
+import { SimRekognitionLabels } from "./label/sim-rekognition-labels.js";
 import { SimRekognitionModeration } from "./moderation/sim-rekognition-moderation.js";
 import { SimRekognitionSdkCommandRouter } from "./sdk/sim-rekognition-sdk-command-router.js";
 
@@ -42,7 +48,9 @@ interface SimRekognitionProperties {
  */
 export class SimRekognition {
   private readonly moderationRules = new SimRekognitionModeration();
+  private readonly labelRules = new SimRekognitionLabels();
   private readonly detectModerationLabelsCommand: DetectModerationLabelsHandler;
+  private readonly detectLabelsCommand: DetectLabelsHandler;
   private readonly sdkRouter = new SimRekognitionSdkCommandRouter(this);
 
   constructor(properties: SimRekognitionProperties = {}) {
@@ -51,10 +59,18 @@ export class SimRekognition {
       background = new BackgroundTasks(),
       images = new SimRekognitionUnreachableImageObjects(),
     } = properties;
+    const authorizer = new SimRekognitionAuthorizer({ iam });
 
     this.detectModerationLabelsCommand = new DetectModerationLabelsHandler({
       moderation: this.moderationRules,
-      authorizer: new SimRekognitionAuthorizer({ iam }),
+      authorizer,
+      images,
+      background,
+    });
+
+    this.detectLabelsCommand = new DetectLabelsHandler({
+      labels: this.labelRules,
+      authorizer,
       images,
       background,
     });
@@ -76,6 +92,21 @@ export class SimRekognition {
   }
 
   /**
+   * The label results this simulated Rekognition answers with.
+   *
+   * Every image gets the built-in default result until a rule says otherwise:
+   *
+   * ```typescript
+   * simAws.rekognition().labels().onName("dog.jpg", {
+   *   labels: [{ name: "Dog", parents: ["Animal", "Pet"] }],
+   * });
+   * ```
+   */
+  labels(): SimRekognitionLabels {
+    return this.labelRules;
+  }
+
+  /**
    * Handle a DetectModerationLabels Command from the SDK.
    *
    * Background sequencing happens inside the command rather than here,
@@ -87,6 +118,16 @@ export class SimRekognition {
     options?: SimRekognitionRequestOptions,
   ): Promise<SimDetectModerationLabelsCommandOutput> {
     return await this.detectModerationLabelsCommand.handle(command, options);
+  }
+
+  /**
+   * Handle a DetectLabels Command from the SDK.
+   */
+  async detectLabels(
+    command: SimDetectLabelsCommand,
+    options?: SimRekognitionRequestOptions,
+  ): Promise<SimDetectLabelsCommandOutput> {
+    return await this.detectLabelsCommand.handle(command, options);
   }
 
   /**

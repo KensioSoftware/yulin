@@ -14,8 +14,11 @@ describe("SimRekognitionSdkCommandRouter", () => {
       .sdkCommandRouter()
       .supportedCommandNames();
 
-    // Then the simulated operation is routable by SDK Command name.
-    assertArrayIncludesAll(names, ["DetectModerationLabelsCommand"]);
+    // Then every simulated operation is routable by SDK Command name.
+    assertArrayIncludesAll(names, [
+      "DetectModerationLabelsCommand",
+      "DetectLabelsCommand",
+    ]);
   });
 
   it("has no route for a Command simulated Rekognition does not handle", () => {

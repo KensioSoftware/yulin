@@ -1,7 +1,8 @@
 # Simulated Rekognition implementation
 
-This directory contains the simulated Rekognition implementation. Only image content moderation is
-simulated: `DetectModerationLabels`, for an image supplied as bytes or as an S3 object.
+This directory contains the simulated Rekognition implementation. Two image detections are
+simulated, `DetectModerationLabels` and `DetectLabels`, each for an image supplied as bytes or as an
+S3 object.
 
 The guiding decision here is that no image recognition happens. Rekognition is a service where the
 interesting behaviour is not the call but what the call returns, so the simulation maintains no
@@ -15,9 +16,10 @@ IAM decision, and the taxonomy a returned label belongs to.
 - `sim-rekognition.ts` is the service facade for one account/region scope.
 - `index.ts` exports the public Rekognition simulator API for `@kensio/yulin/rekognition`.
 
-`SimRekognition` owns a `SimRekognitionModeration`, which owns the rules `DetectModerationLabels`
-answers from. Rules are grouped per operation rather than hung off the facade, so `labels()` and
-`faces()` can be added beside `moderation()` without the facade growing a result shape for each.
+`SimRekognition` owns a `SimRekognitionModeration` and a `SimRekognitionLabels`, which own the rules
+`DetectModerationLabels` and `DetectLabels` answer from. Rules are grouped per operation rather than
+hung off the facade, so `faces()` can be added beside `moderation()` and `labels()` without the
+facade growing a result shape for each.
 
 The service is scoped to an account and region because its rules are: a detection made in one Region
 is answered by the rules registered in that Region, as a real Rekognition endpoint answers for the
@@ -64,8 +66,31 @@ Two rules there are worth keeping:
 - a label two chains share is reported once, at the highest confidence any chain declared for it,
   because real Rekognition reports a parent at least as confidently as the child that implies it.
 
-Confidences pass through `Math.fround`. Real confidences are float32 values with a long tail, such
-as `99.44782257080078`, and a value rounded to four decimals is identifiable as fake.
+Confidences pass through `Math.fround`, in `rule/sim-rekognition-declared-confidence.ts`, which both
+operation groups declare their confidences through. Real confidences are float32 values with a long
+tail, such as `99.44782257080078`, and a value rounded to four decimals is identifiable as fake.
+
+## The label model
+
+`label/` is much less than the moderation model, because there is nothing to resolve a declared
+label against. Yulin ships no general label ontology: AWS's is thousands of entries with no
+published enumerable table, so any subset here would be a Yulin invention that could never be
+regenerated from an upstream source. A declared label name is therefore accepted as it stands, and
+its parents, aliases, categories and instances are whatever the declaration said and empty
+otherwise.
+
+`label/sim-rekognition-label-detection.ts` is the resolution, which is validation and ordering. It
+refuses a nameless label, a nameless parent and a bounding box that is not a ratio of the image
+size, all where the declaration was written. Labels are sorted by descending confidence when the
+rule is registered, which is the order real Rekognition reports them in and what makes `MaxLabels`
+the most confident labels rather than the first ones declared.
+
+`label/sim-rekognition-label-defaults.ts` holds the built-in default result and
+`simRekognitionLabelModelVersion` beside it. The default is the AWS documentation's own example
+response, label for label, so an unconfigured detection answers with something real Rekognition has
+returned. The two belong in one file because the labels are what that version of the model reported.
+Labels have no equivalent of a clean image to default to: an empty result would look like a broken
+detection rather than a useful starting point.
 
 ## Images
 
@@ -74,7 +99,9 @@ as `99.44782257080078`, and a value rounded to four decimals is identifiable as 
 `SimRekognitionImageRequests.parse` reads the `Image` member and answers with a request for bytes or
 a request for an S3 object. Parsing and reading are separate steps because they happen at different
 points: the request is checked before anything else, and the image is read only once the caller has
-been authorized for the detection.
+been authorized for the detection. It is made with the name of the operation that is parsing, so a
+refusal names the command the caller sent rather than whichever operation happened to be written
+first.
 
 `SimRekognitionImage` is the image itself. Its format is decided when it is made, from PNG and JPEG
 magic bytes, so bytes that are not an image are refused before any rule is consulted. The stored
@@ -113,7 +140,10 @@ so an option nobody thought about is refused rather than dropped.
 
 `ProjectVersion` is the one that matters. A request naming a custom moderation adapter would
 otherwise be answered by the built-in model, which is the failure that looks like a pass: the
-adapter would appear applied here and be applied for real in production.
+adapter would appear applied here and be applied for real in production. `DetectLabels` has two of
+its own with the same shape: `Settings`, whose filters decide which labels a response carries, and a
+`Features` naming `IMAGE_PROPERTIES`, whose sharpness and dominant colours would have to be invented
+by a simulation that looks at no images.
 
 ## Testing
 
