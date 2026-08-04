@@ -253,15 +253,17 @@ owner, keeping its ambient callers isolated.
 
 ## Event source mappings
 
-`event-source/` owns delivery from a simulated SQS queue to a function.
+`event-source/` owns delivery from a simulated SQS queue or DynamoDB stream to a function.
 
-SQS is the only source there is so far, but the machinery around it is split by event source kind
-rather than assuming one. `sim-lambda-event-source-arn.ts` reads the ARN a mapping names into a
-union discriminated by `kind`, and that value carries what the rest of the machinery would otherwise
-have had to assume: the service label a refusal names, the `{action, resource}` permissions the
-execution role is checked for, and the batch size rules the request is measured against
-(`SimLambdaEventSourceBatchRules`). It is also the one place that decides which sources a mapping
-may name, so a refusal anywhere lists the same supported set.
+The machinery is split by event source kind rather than assuming one.
+`sim-lambda-event-source-arn.ts` reads the ARN a mapping names into a union discriminated by `kind`,
+and that value carries what the rest of the machinery would otherwise have had to assume: the
+service label a refusal names, the `{action, resource}` permissions the execution role is checked
+for, the batch size rules the request is measured against (`SimLambdaEventSourceBatchRules`), and
+whether the source has a starting position at all
+(`SimLambdaEventSourceStartingPositionRules` — required for a stream, refused for a queue). It is
+also the one place that decides which sources a mapping may name, so a refusal anywhere lists the
+same supported set.
 
 Real Lambda polls a queue continuously, and nothing in this simulation runs continuously, so the
 queue says when there is something to poll for. `SimSqsQueueActivity` (in sim SQS) holds the
@@ -309,6 +311,45 @@ a report it cannot trust. Reading the report itself is shared in `SimLambdaBatch
 is also where a malformed entry becomes an id no message has. `SimLambdaSqsEventBuilder` turns a
 batch into the event's own shape, which is the lower-case record naming and the base64 binary
 attribute values real AWS uses.
+
+### DynamoDB streams
+
+`stream/` is the port onto simulated DynamoDB, and `SimLambdaDynamoDbStreamEventSourcePoller` is a
+sibling of the queue poller rather than a generalisation of it. Every step differs and the last one
+inverts: a queue mapping polls again when a batch came back, because the batch is on the queue
+waiting; a stream mapping polls again when a batch went through, because the records stay on the
+stream either way and it is the checkpoint that moved.
+
+`SimLambdaStreamProgress` holds that checkpoint (`SimLambdaStreamCheckpoint`, the shard iterator the
+last read handed back) alongside the retry backoff and the poll schedule, because they are one
+decision. A batch the function took moves the checkpoint and the mapping reads on. A batch it threw
+on leaves the checkpoint where it is, so the same records are read again and nothing behind them is
+delivered until they are through: that is a stream mapping blocking its shard.
+`SimLambdaStreamRetryBackoff` is why the wait is strictly positive and why the attempts are counted.
+A retry scheduled at the instant the clock already reads falls due inside every interval
+`advanceBy` walks, so a handler that always throws would never let it return, and both that trap and
+its guard tests are in
+[issue 341](https://github.com/KensioSoftware/yulin/issues/341).
+
+Two polls must never overlap, which a queue mapping does not have to care about: a received message
+is hidden and a read record is not, so a second poll from the same checkpoint would deliver the same
+records twice. `SimLambdaEventSourcePollTurn` is the one-at-a-time guard, and it reschedules from
+its `finally` block rather than dropping a poll that was asked for mid-turn, because
+`SimLambdaEventSourcePollSchedule` clears its own flag when the task starts.
+
+`SimLambdaStreamCascadeGuard` is what stops a function writing back into the table whose stream
+invoked it. The delivery runs inside an asynchronous context
+(`sim-lambda-event-source-delivery-context.ts`), so a record written by the handler is told apart
+from one written by anything else that happened to be running at the same time. Several items
+written in one `Promise.all` are an ordinary batch; a handler feeding its own source is a loop, and
+is refused with `SimLambdaStreamCascadeError` once the delivery is over rather than left to spin.
+
+`SimDynamoDbEventSourceStreams` implements the port over the DynamoDB Streams commands, as the
+execution role, and `SimDynamoDbEventSourceStreamShard` is the part that finds the table and the
+shard and reads records off it. The port is SDK-shaped for the same reason the Streams API exists at
+all: a bespoke read interface would be `GetRecords` under another name, and would not authorize.
+The `SimLambdaEventSourceStreamService` and `SimLambdaEventSourceStreamActivity` interfaces are
+declared here and satisfied structurally by `SimDynamoDb`, so neither service imports the other.
 
 ## Function URLs
 
@@ -459,8 +500,8 @@ the CloudFormation engine with an "Unsupported" diagnostic.
 
 - `AWS::Lambda::*` CloudFormation resource types other than `AWS::Lambda::Function`,
   `AWS::Lambda::Url`, `AWS::Lambda::Permission` and `AWS::Lambda::EventSourceMapping`
-- event sources other than SQS queues, `FilterCriteria`, `UpdateEventSourceMapping`, and polling
-  concurrency
+- event sources other than SQS queues and DynamoDB streams, `FilterCriteria`,
+  `UpdateEventSourceMapping`, `ReportBatchItemFailures` for a stream, and polling concurrency
 - Function URL `Cors` configuration and OPTIONS preflight handling
 - `InvokeMode: RESPONSE_STREAM`, which is accepted and reported but always served buffered
 - ES module function code (`.mjs` / `export` syntax) in the vm runtime

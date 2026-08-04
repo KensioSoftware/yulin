@@ -23,3 +23,14 @@ export type {
   SimLambdaSqsEventMessageAttribute,
   SimLambdaSqsEventRecord,
 } from "./event-source/poll/sim-lambda-sqs-event.js";
+export type {
+  SimLambdaDynamoDbStreamEvent,
+  SimLambdaDynamoDbStreamEventRecord,
+  SimLambdaDynamoDbStreamEventRecordBody,
+  SimLambdaDynamoDbStreamEventUserIdentity,
+} from "./event-source/poll/sim-lambda-dynamodb-stream-event.js";
+export type {
+  SimLambdaDynamoDbAttributeValue,
+  SimLambdaDynamoDbImage,
+} from "./event-source/stream/sim-lambda-dynamodb-attribute-value.js";
+export { SimLambdaStreamCascadeError } from "./event-source/stream/sim-lambda-stream-cascade.error.js";

@@ -99,7 +99,7 @@ describe("sim Lambda CreateEventSourceMapping validation", () => {
     );
     assertStringIncludes(
       error.message,
-      "SQS queues are the only simulated event source",
+      "SQS queues and DynamoDB streams are the simulated event sources",
     );
     assertStringIncludes(
       error.message,
@@ -111,17 +111,31 @@ describe("sim Lambda CreateEventSourceMapping validation", () => {
     // Given a queue and a function.
     const ready = await simAwsReadyToMap();
 
-    // When a mapping asks for a starting position, which only a stream has.
-    const error = await refusedMapping(ready, {
-      StartingPosition: "LATEST",
-    });
+    // When a mapping names Kafka topics, which no simulated source has.
+    const error = await refusedMapping(ready, { Topics: ["orders"] });
 
     // Then it is refused, naming the sources there are instead.
     assertIdentical(error.name, "InvalidParameterValueException");
-    assertStringIncludes(error.message, "StartingPosition");
+    assertStringIncludes(error.message, "Topics");
     assertStringIncludes(
       error.message,
-      "SQS queues are the only simulated event source",
+      "SQS queues and DynamoDB streams are the simulated event sources",
+    );
+  });
+
+  it("refuses a starting position on a queue mapping", async () => {
+    // Given a queue and a function.
+    const ready = await simAwsReadyToMap();
+
+    // When a mapping asks a queue where to start reading.
+    const error = await refusedMapping(ready, { StartingPosition: "LATEST" });
+
+    // Then it is refused: a queue only has a front, so where to start is not
+    // something a mapping on one can say.
+    assertIdentical(error.name, "InvalidParameterValueException");
+    assertStringIncludes(
+      error.message,
+      "StartingPosition is not valid for a queue",
     );
   });
 

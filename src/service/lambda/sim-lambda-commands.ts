@@ -18,6 +18,10 @@ import {
   type SimLambdaEventSourceQueues,
   SimLambdaNoEventSourceQueues,
 } from "./event-source/queue/sim-lambda-event-source-queues.js";
+import {
+  type SimLambdaEventSourceStreams,
+  SimLambdaNoEventSourceStreams,
+} from "./event-source/stream/sim-lambda-event-source-streams.js";
 import type { SimLambdaCodeStore } from "./function/code/store/sim-lambda-code-store.js";
 import type { SimLambdaVmSdkModuleProvider } from "./function/code/vm/sdk/sim-lambda-vm-sdk-module-provider.js";
 import { SimLambdaEnvironmentConflicts } from "./function/environment/sim-lambda-environment-conflicts.js";
@@ -38,6 +42,7 @@ export interface SimLambdaProperties {
   readonly vmSdkModuleProvider?: SimLambdaVmSdkModuleProvider;
   readonly urlRegistry?: SimLambdaUrlRegistry;
   readonly eventSourceQueues?: SimLambdaEventSourceQueues;
+  readonly eventSourceStreams?: SimLambdaEventSourceStreams;
 }
 
 interface SimLambdaCommandsProperties extends SimLambdaProperties {
@@ -72,9 +77,11 @@ export class SimLambdaCommands {
       // is enough; a SimAws-created one shares the environment-wide registry
       // the serving layer routes with.
       urlRegistry = new SimLambdaUrlRegistry(),
-      // A standalone SimLambda has no simulated SQS to poll, so an event source
-      // mapping made on one is refused rather than never delivering.
+      // A standalone SimLambda has no simulated SQS or DynamoDB to poll, so an
+      // event source mapping made on one is refused rather than never
+      // delivering.
       eventSourceQueues = new SimLambdaNoEventSourceQueues(),
+      eventSourceStreams = new SimLambdaNoEventSourceStreams(),
     } = properties;
 
     this.functionLookup = new SimLambdaFunctionLookup({
@@ -102,9 +109,11 @@ export class SimLambdaCommands {
       pollers: new SimLambdaEventSourcePollers({
         functions: this.functionLookup,
         queues: eventSourceQueues,
+        streams: eventSourceStreams,
         background,
       }),
       queues: eventSourceQueues,
+      streams: eventSourceStreams,
       functions: this.functionLookup,
       iam,
       background,
