@@ -523,12 +523,12 @@ the CloudFormation engine with an "Unsupported" diagnostic.
 - `AWS::Lambda::*` CloudFormation resource types other than `AWS::Lambda::Function`,
   `AWS::Lambda::Url`, `AWS::Lambda::Permission` and `AWS::Lambda::EventSourceMapping`
 - event sources other than SQS queues and DynamoDB streams, `FilterCriteria`,
-  `UpdateEventSourceMapping`, `ReportBatchItemFailures` for a stream, and polling concurrency
+  `UpdateEventSourceMapping`, and polling concurrency
 - Function URL `Cors` configuration and OPTIONS preflight handling
 - `InvokeMode: RESPONSE_STREAM`, which is accepted and reported but always served buffered
 - ES module function code (`.mjs` / `export` syntax) in the vm runtime
 - container image functions (`Code.ImageUri`) — the simulator stays Docker-free
-- `UpdateFunctionCode`, versions, aliases and qualifiers
+- `UpdateFunctionCode`, `DeleteFunction`, function listing, versions, aliases and qualifiers
 - Lambda Layers
 - environment variables reaching a real in-process handler's module scope (see "Environment
   variables" above), and the same limitation for a time read there
