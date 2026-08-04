@@ -198,18 +198,22 @@ Supported intrinsic-function areas currently include:
 - `Fn::GetAtt`
 - `Fn::Join`
 - `Fn::Sub`
+- `Fn::FindInMap`
 
 Resolution happens in two phases:
 
 1. **Template/resource-template phase**
 
 - Parameters and parameter-only expressions can be resolved.
+- The template `Mappings` section is available here, so `Fn::FindInMap` lookups resolve.
 - Resource references are preserved if the referenced resource does not exist yet.
 
 2. **Resource creation phase**
 
 - Resource properties are resolved again with access to the stack resource map.
 - `Ref` and `Fn::GetAtt` can read values from resources whose dependencies have completed.
+- `Mappings` are not in this context, so a `Fn::FindInMap` left unresolved by the first phase fails
+  here.
 
 This two-phase design is one of the most important simulated CloudFormation implementation details.
 It allows the stack to build a complete runtime resource graph before any service resources exist,
@@ -543,6 +547,7 @@ Useful areas:
   - `Fn::GetAtt`
   - `Fn::Join`
   - `Fn::Sub`
+  - `Fn::FindInMap`
   - literal/list/object node resolution
 
 - `parameters/*.iso.test.ts`
