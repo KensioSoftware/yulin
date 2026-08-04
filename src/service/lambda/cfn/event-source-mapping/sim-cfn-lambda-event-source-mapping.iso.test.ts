@@ -39,6 +39,20 @@ const mappingProperties: SimCfnTemplateValueRecord = {
 };
 
 /**
+ * The same mapping as a Resource created on its own is given it, with the
+ * intrinsics already resolved.
+ *
+ * The event source ARN is read before anything else about the Resource is
+ * judged, since what a mapping may ask for depends on the kind of source it
+ * names, so a test about another property has to state a real ARN.
+ */
+const resolvedMappingProperties: SimCfnTemplateValueRecord = {
+  ...mappingProperties,
+  EventSourceArn: "arn:aws:sqs:eu-west-2:111111111111:orders",
+  FunctionName: "order-consumer",
+};
+
+/**
  * A template with a queue, a consumer function whose role may poll it, and a
  * mapping between them, as CDK's `fn.addEventSource(new SqsEventSource(queue))`
  * synthesises one.
@@ -222,7 +236,7 @@ describe("Lambda CloudFormation event source mapping deployment", () => {
   it("refuses a property this simulation does not model", async () => {
     // Given a template asking a mapping to filter events.
     const error = await mappingCreationError({
-      ...mappingProperties,
+      ...resolvedMappingProperties,
       FilterCriteria: { Filters: [{ Pattern: "{}" }] },
     });
 
@@ -237,7 +251,7 @@ describe("Lambda CloudFormation event source mapping deployment", () => {
   it("refuses a property AWS::Lambda::EventSourceMapping does not have", async () => {
     // Given a template with a made-up property.
     const error = await mappingCreationError({
-      ...mappingProperties,
+      ...resolvedMappingProperties,
       Nonsense: "true",
     });
 

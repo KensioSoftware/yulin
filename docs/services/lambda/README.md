@@ -570,7 +570,9 @@ or an empty `batchItemFailures` list, has handled the whole batch.
 `AWS::Lambda::EventSourceMapping` deploys the same thing, which is what CDK's
 `fn.addEventSource(new SqsEventSource(queue))` emits. `EventSourceArn` and `FunctionName` accept the
 `Fn::GetAtt` and `Ref` values a template gives them, `Ref` on the mapping returns its UUID, and
-`Fn::GetAtt` exposes `Id` and `EventSourceMappingArn`.
+`Fn::GetAtt` exposes `Id` and `EventSourceMappingArn`. A queue mapping has no `StartingPosition`, and
+a template naming one is refused. The same Resource deploys a
+[stream mapping](#stream-mappings-in-templates), which has to have one.
 
 ## Triggering a function from a DynamoDB stream
 
@@ -845,6 +847,140 @@ apart by where the write came from rather than by when it landed.
 
 Writing the projection into a second table is what the guard is asking for, and is what a real
 aggregation or search index does anyway.
+
+### Stream mappings in templates
+
+`AWS::Lambda::EventSourceMapping` deploys a stream mapping too. `EventSourceArn` takes the
+`Fn::GetAtt … StreamArn` of a
+[streamed table](../dynamodb/#deploying-a-table-with-a-stream "Simulated DynamoDB table stream in CloudFormation docs")
+in the same template, which is also what makes the mapping wait for the table. `StartingPosition` is
+required, as it is for an SDK caller, and the properties go to `CreateEventSourceMapping` unjudged,
+so a template that gets one wrong is refused in the words the command refuses it in.
+
+```typescript sim-lambda-cloudformation-dynamodb-event-source
+/**
+ * Deploying a table's stream, a function, and the mapping between them.
+ */
+
+import { PutItemCommand } from "@aws-sdk/client-dynamodb";
+
+import { SimAws } from "@kensio/yulin";
+import type { SimLambdaDynamoDbStreamEvent } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+const projected: string[] = [];
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "orders-stack",
+  template: {
+    Resources: {
+      OrdersTable: {
+        Type: "AWS::DynamoDB::Table",
+        Properties: {
+          TableName: "orders",
+          KeySchema: [{ AttributeName: "orderId", KeyType: "HASH" }],
+          AttributeDefinitions: [
+            { AttributeName: "orderId", AttributeType: "S" },
+          ],
+          BillingMode: "PAY_PER_REQUEST",
+          StreamSpecification: { StreamViewType: "NEW_AND_OLD_IMAGES" },
+        },
+      },
+      ProjectorRole: {
+        Type: "AWS::IAM::Role",
+        Properties: {
+          RoleName: "OrderProjectorRole",
+          AssumeRolePolicyDocument: {
+            Version: "2012-10-17",
+            Statement: [
+              {
+                Effect: "Allow",
+                Principal: { Service: "lambda.amazonaws.com" },
+                Action: "sts:AssumeRole",
+              },
+            ],
+          },
+          Policies: [
+            {
+              PolicyName: "ReadOrdersStream",
+              PolicyDocument: {
+                Version: "2012-10-17",
+                Statement: [
+                  {
+                    Effect: "Allow",
+                    Action: [
+                      "dynamodb:DescribeStream",
+                      "dynamodb:GetRecords",
+                      "dynamodb:GetShardIterator",
+                    ],
+                    Resource: { "Fn::GetAtt": ["OrdersTable", "StreamArn"] },
+                  },
+                  {
+                    Effect: "Allow",
+                    Action: "dynamodb:ListStreams",
+                    Resource: "*",
+                  },
+                ],
+              },
+            },
+          ],
+        },
+      },
+      ProjectorFunction: {
+        Type: "AWS::Lambda::Function",
+        Properties: {
+          FunctionName: "order-projector",
+          Role: { "Fn::GetAtt": ["ProjectorRole", "Arn"] },
+        },
+      },
+      OrderProjectorMapping: {
+        Type: "AWS::Lambda::EventSourceMapping",
+        Properties: {
+          EventSourceArn: { "Fn::GetAtt": ["OrdersTable", "StreamArn"] },
+          FunctionName: { Ref: "ProjectorFunction" },
+          BatchSize: 100,
+          StartingPosition: "TRIM_HORIZON",
+        },
+      },
+    },
+  },
+  bindings: [
+    {
+      logicalId: "ProjectorFunction",
+      handler: (event: SimLambdaDynamoDbStreamEvent): void => {
+        for (const record of event.Records) {
+          projected.push(record.dynamodb.Keys?.["orderId"]?.S ?? "");
+        }
+      },
+    },
+  ],
+});
+await stack.waitForDeployComplete();
+
+await simAws.dynamoDb().putItem(
+  new PutItemCommand({
+    TableName: "orders",
+    Item: { orderId: { S: "order-1" }, total: { N: "101" } },
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+console.log(projected); // ["order-1"]
+```
+
+CDK's `fn.addEventSource(new DynamoEventSource(table, { startingPosition }))` synthesises exactly
+this, and deploys without hand-editing. The grant CDK writes alongside it is an inline policy with
+the three stream actions on the stream ARN and `dynamodb:ListStreams` on every stream, which is what
+the mapping's execution-role check is looking for.
+
+The properties a non-default `DynamoEventSource` adds are refused by name: `FilterCriteria`,
+`ParallelizationFactor`, `BisectBatchOnFunctionError`, `TumblingWindowInSeconds` and
+`DestinationConfig`.
+
+A hand-written template or a SAM application usually gives the function the AWS managed policy
+`AWSLambdaDynamoDBExecutionRole` instead. Simulated IAM does not model managed policy ARNs, so that
+role reaches the mapping with no stream permissions and the mapping is refused when it is created.
+Write the grant as an inline policy, as the example above and CDK both do.
 
 ## Function URLs
 
@@ -1609,6 +1745,9 @@ Sim Lambda currently supports:
 - The `AWS::Lambda::Function`, `AWS::Lambda::Url`, `AWS::Lambda::Permission` and
   `AWS::Lambda::EventSourceMapping` CloudFormation resources, with `Ref`/`Fn::GetAtt` support and
   deploy-time executable bindings
+- `AWS::Lambda::EventSourceMapping` on a queue or on a table's stream, including the
+  `StartingPosition` a stream mapping needs, so a CDK `SqsEventSource` or `DynamoEventSource`
+  deploys as it is synthesised
 
 ## Limitations
 
@@ -1674,6 +1813,11 @@ Current documented limitations:
   `BatchSize` above 10 needs a batching window is not enforced, because the same AWS documentation
   gives a stream mapping `BatchSize` 100 and window 0 as simultaneous defaults, and CDK emits
   exactly that.
+- An execution role that gets its stream permissions from the AWS managed policy
+  `AWSLambdaDynamoDBExecutionRole` has none here, since simulated IAM does not model managed policy
+  ARNs, so the mapping is refused when it is created. A hand-written template and a SAM application
+  usually attach that policy where CDK writes an inline one, so the two declaration paths differ.
+  Write the grant inline to deploy either.
 - `UpdateEventSourceMapping` is not supported, so a mapping's batch size or enabled state is fixed
   once it is created. `Enabled: false` at creation is simulated.
 - One poll delivers one batch. Real Lambda runs several pollers at once and scales them with the
