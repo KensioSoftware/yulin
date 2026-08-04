@@ -6,6 +6,8 @@ import type { SimCfnValueParser } from "../value/sim-cfn-value-parser.type.js";
 import { SimCfnFnSubParser as SimCfnFunctionSubParser } from "./sub/sim-cfn-fn-sub-parser.js";
 import { SimCfnFnFindInMapParser as SimCfnFunctionFindInMapParser } from "./find-in-map/sim-cfn-fn-find-in-map-parser.js";
 import { SimCfnFnIfParser as SimCfnFunctionIfParser } from "./if/sim-cfn-fn-if-parser.js";
+import { SimCfnFnSplitParser as SimCfnFunctionSplitParser } from "./split/sim-cfn-fn-split-parser.js";
+import { SimCfnFnSelectParser as SimCfnFunctionSelectParser } from "./select/sim-cfn-fn-select-parser.js";
 import { assertDefined } from "../../../../../util/type-guard/defined.js";
 
 /**
@@ -28,6 +30,8 @@ export class SimCfnFunctionParser {
   private readonly fnJoinParser: SimCfnFunctionJoinParser;
   private readonly fnSubParser: SimCfnFunctionSubParser;
   private readonly fnIfParser: SimCfnFunctionIfParser;
+  private readonly fnSplitParser: SimCfnFunctionSplitParser;
+  private readonly fnSelectParser: SimCfnFunctionSelectParser;
 
   constructor(valueParser: SimCfnValueParser) {
     this.fnGetAttParser = new SimCfnFunctionGetAttParser();
@@ -35,6 +39,8 @@ export class SimCfnFunctionParser {
     this.fnJoinParser = new SimCfnFunctionJoinParser(valueParser);
     this.fnSubParser = new SimCfnFunctionSubParser(valueParser);
     this.fnIfParser = new SimCfnFunctionIfParser(valueParser);
+    this.fnSplitParser = new SimCfnFunctionSplitParser(valueParser);
+    this.fnSelectParser = new SimCfnFunctionSelectParser(valueParser);
   }
 
   /**
@@ -86,6 +92,14 @@ export class SimCfnFunctionParser {
 
     if (functionName === "Fn::If") {
       return this.fnIfParser.parse(value);
+    }
+
+    if (functionName === "Fn::Split") {
+      return this.fnSplitParser.parse(value);
+    }
+
+    if (functionName === "Fn::Select") {
+      return this.fnSelectParser.parse(value);
     }
 
     throw new Error(

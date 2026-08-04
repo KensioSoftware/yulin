@@ -201,6 +201,8 @@ Supported intrinsic-function areas currently include:
 - `Fn::Sub`
 - `Fn::FindInMap`
 - `Fn::If`
+- `Fn::Split`
+- `Fn::Select`
 
 Resolution happens in two phases:
 
@@ -219,6 +221,30 @@ Resolution happens in two phases:
   here.
 - `Conditions` are not in this context either. The first phase always resolves `Fn::If` away, so
   nothing reaching this phase needs them.
+
+A function whose arguments have not all resolved re-emits itself in template form rather than
+failing, so the second phase parses it again and finishes it. `Fn::Split` over an `Fn::GetAtt` is
+the common case: the first phase leaves `{ "Fn::Split": ["/", { "Fn::GetAtt": [...] }] }` in the
+resource template, which also keeps the logical ID visible to implicit dependency discovery.
+
+Most intrinsic functions resolve to a string. `Fn::Split` resolves to a list, and `Fn::Select`
+resolves to whatever the list entry it picks holds, which may be a list or an object.
+
+### Naming the value that failed
+
+A resolution failure says what was wrong with the expression but not where it sat.
+`template/value/sim-cfn-value-path.ts` fills that in: `SimCfnObject` and `SimCfnList` catch what a
+child throws and add their own key or list position to a path held beside the error, and
+`SimCfnTemplateValueResolver.resolveRecordFor` adds the resource or output name at the top. The
+error object itself is kept, so its type and stack survive, and only its message changes:
+
+```
+Sim CloudFormation Resource LogsBucket value at Properties.BucketName: Sim CloudFormation Fn::Select
+index 9 is out of range for a list of 4 values
+```
+
+Only resolution goes through this. A value that does not parse is left alone, because its message
+already quotes the expression at fault.
 
 ## Conditions
 
@@ -578,6 +604,8 @@ Useful areas:
   - `Fn::Sub`
   - `Fn::FindInMap`
   - `Fn::If`
+  - `Fn::Split`
+  - `Fn::Select`
   - literal/list/object node resolution
 
 - `template/condition/*.iso.test.ts`

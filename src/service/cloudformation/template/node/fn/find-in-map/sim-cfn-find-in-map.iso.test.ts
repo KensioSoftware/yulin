@@ -197,7 +197,8 @@ describe("SimCfnTemplate Fn::FindInMap Resources", () => {
     // Then a clear missing Mapping value error is thrown.
     assertIdentical(
       error.message,
-      "Sim CloudFormation Fn::FindInMap could not find map RegionMap.us-east-1.MissingAMI",
+      "Sim CloudFormation Resource TestInstance value at Properties.ImageId: " +
+        "Sim CloudFormation Fn::FindInMap could not find map RegionMap.us-east-1.MissingAMI",
     );
   });
 });

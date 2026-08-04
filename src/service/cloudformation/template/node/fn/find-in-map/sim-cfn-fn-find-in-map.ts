@@ -3,6 +3,7 @@ import type { SimCfnResolveContext } from "../../../resolve/sim-cfn-resolve-cont
 import type { SimCfnTemplateValue } from "../../../value/sim-cfn-template-value.js";
 import { isRecord } from "../../../../../../util/type-guard/record.js";
 import { assertDefined } from "../../../../../../util/type-guard/defined.js";
+import { isSimCfnUnresolvedExpression } from "../../../value/sim-cfn-unresolved-expression.js";
 
 /**
  * Simulated CloudFormation `Fn::FindInMap` intrinsic function.
@@ -76,7 +77,7 @@ export class SimCfnFnFindInMap extends SimCfnNode {
       return value;
     }
 
-    if (this.isUnresolvedIntrinsicExpression(value)) {
+    if (isSimCfnUnresolvedExpression(value)) {
       return value;
     }
 
@@ -84,26 +85,6 @@ export class SimCfnFnFindInMap extends SimCfnNode {
     throw new TypeError(
       `Sim CloudFormation Fn::FindInMap keys must each resolve to a string, got ${typeof value}`,
     );
-  }
-
-  private isUnresolvedIntrinsicExpression(
-    value: SimCfnTemplateValue,
-  ): value is Record<string, SimCfnTemplateValue> {
-    /* v8 ignore if */
-    if (!isRecord(value) || Array.isArray(value)) {
-      return false;
-    }
-
-    const entries = Object.entries(value);
-
-    /* v8 ignore if */
-    if (entries.length !== 1) {
-      return false;
-    }
-
-    const functionName = entries[0]?.[0];
-
-    return functionName === "Ref" || functionName?.startsWith("Fn::") === true;
   }
 
   private isResolvedKey(value: SimCfnTemplateValue): value is string {

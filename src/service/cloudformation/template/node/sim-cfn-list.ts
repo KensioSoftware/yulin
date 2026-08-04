@@ -1,6 +1,7 @@
 import { SimCfnNode } from "./sim-cfn-node.js";
 import type { SimCfnTemplateValue } from "../value/sim-cfn-template-value.js";
 import type { SimCfnResolveContext } from "../resolve/sim-cfn-resolve-context.js";
+import { resolveSimCfnValueAt } from "../value/sim-cfn-value-path.js";
 
 /**
  * A CloudFormation template array of nodes.
@@ -11,10 +12,12 @@ export class SimCfnList extends SimCfnNode {
   }
 
   /**
-   * Resolve each item in the list.
+   * Resolve each item in the list, naming the position of one that fails.
    */
   resolve(context: SimCfnResolveContext): SimCfnTemplateValue[] {
-    return this.items.map((item) => item.resolve(context));
+    return this.items.map((item, position) =>
+      resolveSimCfnValueAt(position, () => item.resolve(context)),
+    );
   }
 
   /**
