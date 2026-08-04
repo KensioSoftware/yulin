@@ -34,6 +34,17 @@ export interface SimRekognitionModerationLabelOutput {
 }
 
 /**
+ * A kind of content an image was identified as, such as animated or
+ * illustrated.
+ *
+ * https://docs.aws.amazon.com/rekognition/latest/APIReference/API_ContentType.html
+ */
+export interface SimRekognitionContentTypeOutput {
+  readonly Confidence?: number | undefined;
+  readonly Name?: string | undefined;
+}
+
+/**
  * Minimal structural sim Rekognition DetectModerationLabels command.
  *
  * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/rekognition/command/DetectModerationLabelsCommand/
@@ -50,6 +61,6 @@ export interface SimDetectModerationLabelsCommandInput {
 export interface SimDetectModerationLabelsCommandOutput {
   readonly ModerationLabels: readonly SimRekognitionModerationLabelOutput[];
   readonly ModerationModelVersion: string;
-  readonly ContentTypes: readonly string[];
+  readonly ContentTypes: readonly SimRekognitionContentTypeOutput[];
   readonly $metadata: SimResponseMetadata;
 }

@@ -135,6 +135,31 @@ describe("Rejecting a malformed DetectModerationLabels request", () => {
     assertStringIncludes(error.message, "percentage from 0 to 100");
   });
 
+  it("refuses a MinConfidence that is not a number at all", async () => {
+    // Given a request asking to filter at NaN.
+    const simAws = new SimAws();
+    simAws
+      .rekognition()
+      .moderation()
+      .byDefault({ labels: ["Violence"] });
+
+    // When it is moderated.
+    const error = await assertThrowsErrorAsync(
+      async () =>
+        await simAws.rekognition().detectModerationLabels(
+          new DetectModerationLabelsCommand({
+            Image: { Bytes: redPngBytes },
+            MinConfidence: NaN,
+          }),
+        ),
+    );
+
+    // Then it is refused. Every comparison with NaN is false, so filtering at
+    // it would answer with no labels and read as a clean image.
+    assertInstanceOf(error, SimRekognitionInvalidParameterException);
+    assertStringIncludes(error.message, "percentage from 0 to 100");
+  });
+
   it("refuses a request naming a custom moderation adapter", async () => {
     // Given a request naming a ProjectVersion, which is a trained adapter.
     const simAws = new SimAws();

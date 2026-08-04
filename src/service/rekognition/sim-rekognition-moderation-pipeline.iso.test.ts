@@ -75,17 +75,22 @@ async function simAwsWithModerationPipeline(): Promise<SimAws> {
     new PutRolePolicyCommand({
       RoleName: "ModeratorRole",
       PolicyName: "ModeratePolicy",
+      // The policy the docs show: a detection has no resource to name, so it
+      // has to be `*`, while reading and writing the image does.
       PolicyDocument: JSON.stringify({
         Version: "2012-10-17",
-        Statement: {
-          Effect: "Allow",
-          Action: [
-            "rekognition:DetectModerationLabels",
-            "s3:GetObject",
-            "s3:PutObject",
-          ],
-          Resource: "*",
-        },
+        Statement: [
+          {
+            Effect: "Allow",
+            Action: "rekognition:DetectModerationLabels",
+            Resource: "*",
+          },
+          {
+            Effect: "Allow",
+            Action: ["s3:GetObject", "s3:PutObject"],
+            Resource: "arn:aws:s3:::uploads/*",
+          },
+        ],
       }),
     }),
   );

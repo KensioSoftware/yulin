@@ -39,11 +39,20 @@ await simAws.iam().putRolePolicy(
     PolicyName: "ModeratePolicy",
     PolicyDocument: JSON.stringify({
       Version: "2012-10-17",
-      Statement: {
-        Effect: "Allow",
-        Action: ["rekognition:DetectModerationLabels", "s3:GetObject"],
-        Resource: "*",
-      },
+      Statement: [
+        // A detection has no resource to name, so this one has to be `*`.
+        {
+          Effect: "Allow",
+          Action: "rekognition:DetectModerationLabels",
+          Resource: "*",
+        },
+        // Reading the image does, so this one names the Bucket.
+        {
+          Effect: "Allow",
+          Action: "s3:GetObject",
+          Resource: "arn:aws:s3:::uploads/*",
+        },
+      ],
     }),
   }),
 );

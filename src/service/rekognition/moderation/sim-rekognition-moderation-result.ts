@@ -74,7 +74,10 @@ class SimRekognitionModerationChain {
   ): number {
     const confidence = declared.confidence ?? defaultModerationConfidence;
 
-    if (confidence < 0 || confidence > 100) {
+    // A NaN is refused with everything else out of range. Every comparison
+    // with one is false, so a label declared at NaN would never survive
+    // MinConfidence filtering and would look like a rule that never matched.
+    if (!Number.isFinite(confidence) || confidence < 0 || confidence > 100) {
       throw new SimRekognitionDeclarationError(
         `A confidence of ${String(confidence)} declared for ` +
           `'${declared.name}' is not a Rekognition confidence, which is a ` +

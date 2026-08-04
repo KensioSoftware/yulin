@@ -44,6 +44,41 @@ describe("Declaring a simulated moderation result", () => {
     assertStringIncludes(error.message, "percentage from 0 to 100");
   });
 
+  it("refuses a negative confidence", () => {
+    // Given a simulated Rekognition.
+    const simAws = new SimAws();
+
+    // When a rule declares a confidence below the range AWS reports in.
+    const error = assertThrowsError(() => {
+      simAws
+        .rekognition()
+        .moderation()
+        .byDefault({ labels: [{ name: "Violence", confidence: -1 }] });
+    });
+
+    // Then it is refused.
+    assertInstanceOf(error, SimRekognitionDeclarationError);
+    assertStringIncludes(error.message, "percentage from 0 to 100");
+  });
+
+  it("refuses a confidence that is not a number at all", () => {
+    // Given a simulated Rekognition.
+    const simAws = new SimAws();
+
+    // When a rule declares a confidence of NaN.
+    const error = assertThrowsError(() => {
+      simAws
+        .rekognition()
+        .moderation()
+        .byDefault({ labels: [{ name: "Violence", confidence: NaN }] });
+    });
+
+    // Then it is refused where it was written, rather than being stored as a
+    // label that silently never survives MinConfidence filtering.
+    assertInstanceOf(error, SimRekognitionDeclarationError);
+    assertStringIncludes(error.message, "percentage from 0 to 100");
+  });
+
   it("refuses a hash rule that is not a sha256 digest", () => {
     // Given a simulated Rekognition.
     const simAws = new SimAws();

@@ -75,8 +75,6 @@ from, and each rule matches an exact S3 object name, an exact content hash, or a
  * The three kinds of rule, and which one wins.
  */
 
-import { readFileSync } from "node:fs";
-
 import { SimAws } from "@kensio/yulin";
 import { simRekognitionImageHash } from "@kensio/yulin/rekognition";
 
@@ -90,8 +88,12 @@ moderation.byDefault({ labels: [] });
 moderation.onName("raw/nsfw.png", { labels: ["Explicit Nudity"] });
 
 // One image, by the hash of its bytes, for a system that generates its own
-// object keys.
-const fixture = readFileSync("test/fixtures/violent.jpg");
+// object keys. These bytes would usually come from a fixture file, read with
+// readFileSync, and the hash is of the exact bytes the test uploads.
+const fixture = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGOQs7kDAAGyATf/cv8XAAAAAElFTkSuQmCC",
+  "base64",
+);
 moderation.onHash(simRekognitionImageHash(fixture), {
   labels: [{ name: "Weapon Violence", confidence: 88.4 }],
 });
@@ -156,8 +158,10 @@ so a surviving label never names a parent that is not in the response. A label t
 reported once, at the higher of the two confidences.
 
 A label the taxonomy does not have is refused where it is declared rather than at detection time.
-That includes the version 6.1 names: `Graphic Male Nudity` became `Exposed Male Genitalia`, and
-`Explicit Nudity` moved from being a top-level category to sitting under `Explicit`.
+That includes a version 6.1 name that version 7.0 dropped, such as `Graphic Male Nudity`, which
+became `Exposed Male Genitalia`. Some names survived the move with a different place in the
+taxonomy: `Explicit Nudity` is still a label, but it now sits under `Explicit` rather than being a
+top-level category itself.
 
 ## Filtering by confidence
 
@@ -251,11 +255,20 @@ await simAws.iam().putRolePolicy(
     PolicyName: "ModeratePolicy",
     PolicyDocument: JSON.stringify({
       Version: "2012-10-17",
-      Statement: {
-        Effect: "Allow",
-        Action: ["rekognition:DetectModerationLabels", "s3:GetObject"],
-        Resource: "*",
-      },
+      Statement: [
+        // A detection has no resource to name, so this one has to be `*`.
+        {
+          Effect: "Allow",
+          Action: "rekognition:DetectModerationLabels",
+          Resource: "*",
+        },
+        // Reading the image does, so this one names the Bucket.
+        {
+          Effect: "Allow",
+          Action: "s3:GetObject",
+          Resource: "arn:aws:s3:::uploads/*",
+        },
+      ],
     }),
   }),
 );

@@ -12,15 +12,6 @@ import type {
 
 const action = "rekognition:DetectModerationLabels";
 
-/**
- * The content types real Rekognition reports an image as.
- *
- * A photograph is neither animated nor illustrated, and comes back with an
- * empty list. Simulated Rekognition does not look at the image, so it has
- * nothing to say here and says nothing, which is what a photograph would get.
- */
-const contentTypes: readonly string[] = [];
-
 interface DetectModerationLabelsHandlerProperties {
   readonly moderation: SimRekognitionModeration;
   readonly authorizer: SimRekognitionAuthorizer;
@@ -71,7 +62,11 @@ export class DetectModerationLabelsHandler {
     return {
       ModerationLabels: detection.labelsAbove(request.minConfidence),
       ModerationModelVersion: simRekognitionModerationModelVersion,
-      ContentTypes: contentTypes,
+      // A photograph is neither animated nor illustrated, and comes back with
+      // an empty list. Simulated Rekognition does not look at the image, so it
+      // has nothing to say here and says nothing, which is what a photograph
+      // would get. Each response gets its own array rather than sharing one.
+      ContentTypes: [],
       $metadata: {},
     };
   }

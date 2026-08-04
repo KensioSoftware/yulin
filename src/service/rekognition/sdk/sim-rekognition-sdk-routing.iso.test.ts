@@ -12,7 +12,7 @@ describe("Rekognition SDK interception", () => {
   it("routes an intercepted RekognitionClient to simulated Rekognition", async () => {
     // Given an intercepted Rekognition SDK client, with an image declared to
     // fail moderation.
-    const simSdk = new SimSdk();
+    using simSdk = new SimSdk();
     simSdk.intercept(RekognitionClient);
     simSdk.simAws
       .rekognition()
@@ -32,7 +32,5 @@ describe("Rekognition SDK interception", () => {
       (detected.ModerationLabels ?? []).map((label) => label.Name).join(","),
       "Explicit Nudity",
     );
-
-    simSdk.restoreAll();
   });
 });

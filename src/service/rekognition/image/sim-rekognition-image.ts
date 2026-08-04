@@ -29,9 +29,12 @@ export class SimRekognitionImage {
   private hashDigest: string | undefined;
 
   constructor(properties: SimRekognitionImageProperties) {
-    this.bytes = properties.bytes;
+    // The bytes are copied rather than kept, so an image is the bytes as they
+    // were received. A caller reading into a reused buffer would otherwise
+    // change the hash of an image that has already been detected on.
+    this.bytes = new Uint8Array(properties.bytes);
     this.name = properties.name;
-    this.format = simRekognitionImageFormat(properties.bytes);
+    this.format = simRekognitionImageFormat(this.bytes);
   }
 
   /**

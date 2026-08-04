@@ -52,7 +52,14 @@ export class DetectModerationLabelsRequest {
       return defaultMinConfidence;
     }
 
-    if (input.MinConfidence < 0 || input.MinConfidence > 100) {
+    // A NaN is refused here rather than compared against. Every comparison
+    // with one is false, so it would filter every label out and look like an
+    // image with nothing to report.
+    if (
+      !Number.isFinite(input.MinConfidence) ||
+      input.MinConfidence < 0 ||
+      input.MinConfidence > 100
+    ) {
       throw new SimRekognitionInvalidParameterException(
         `Request has invalid parameters: MinConfidence of ` +
           `${String(input.MinConfidence)} is not a percentage from 0 to 100`,
