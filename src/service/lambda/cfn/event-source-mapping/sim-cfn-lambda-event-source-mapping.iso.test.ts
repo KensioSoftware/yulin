@@ -207,6 +207,7 @@ describe("Lambda CloudFormation event source mapping deployment", () => {
         functionName: "order-consumer",
         functionArn:
           "arn:aws:lambda:eu-west-2:111111111111:function:order-consumer",
+        batchSize: 10,
         createdAt: new Date(0),
       }),
     });

@@ -255,10 +255,18 @@ owner, keeping its ambient callers isolated.
 
 `event-source/` owns delivery from a simulated SQS queue to a function.
 
+SQS is the only source there is so far, but the machinery around it is split by event source kind
+rather than assuming one. `sim-lambda-event-source-arn.ts` reads the ARN a mapping names into a
+union discriminated by `kind`, and that value carries what the rest of the machinery would otherwise
+have had to assume: the service label a refusal names, the `{action, resource}` permissions the
+execution role is checked for, and the batch size rules the request is measured against
+(`SimLambdaEventSourceBatchRules`). It is also the one place that decides which sources a mapping
+may name, so a refusal anywhere lists the same supported set.
+
 Real Lambda polls a queue continuously, and nothing in this simulation runs continuously, so the
 queue says when there is something to poll for. `SimSqsQueueActivity` (in sim SQS) holds the
 watchers on a queue, `SimSqsQueue.add` tells them a message has arrived, and
-`SimLambdaEventSourcePoller` schedules a poll in response. A message moved to a dead-letter queue
+`SimLambdaSqsEventSourcePoller` schedules a poll in response. A message moved to a dead-letter queue
 arrives the same way, so a mapping on a dead-letter queue is polled too.
 
 `SimLambdaEventSourcePollSchedule` decides when that poll happens. A message that is receivable now
@@ -277,21 +285,30 @@ were all in flight when the mapping was made.
 `SimSqsEventSourceQueues` implements it over the ordinary SQS commands, as the function's execution
 role, so simulated IAM authorizes each poll the way real IAM does. A standalone `SimLambda` has no
 sim SQS, and `SimLambdaNoEventSourceQueues` refuses with guidance rather than silently delivering
-nothing. `SimLambdaSqsEventSourceArn` reads a queue ARN into the URL requests name it by and the
-Region event records report.
+nothing. `SimLambdaSqsEventSourceArn` is the SQS member of the event source ARN union: it reads a
+queue ARN into the URL requests name it by and the Region event records report, and carries the
+queue's own polling permissions and batch size rules.
 
-Creating a mapping checks what real Lambda checks before it will make one: that the queue exists,
-and that the execution role may call `ReceiveMessage`, `DeleteMessage` and `GetQueueAttributes` on
-it (`SimLambdaEventSourceRolePermissions`). Both failures are the mapping's, not the poller's: a
-mapping that cannot poll looks like a working subscription and delivers nothing.
+Creating a mapping checks what real Lambda checks before it will make one: that the event source
+exists, and that the execution role may perform the operations polling it takes
+(`SimLambdaEventSourceRolePermissions`, which reads those operations off the ARN — for a queue,
+`ReceiveMessage`, `DeleteMessage` and `GetQueueAttributes`). Both failures are the mapping's, not
+the poller's: a mapping that cannot poll looks like a working subscription and delivers nothing.
 
-`poll/` holds what one poll does. `SimLambdaEventSourceDelivery` invokes the function directly
-rather than through the Invoke command, because the handler error has to be seen: the asynchronous
-invoke path drops it, and this is what decides whether the batch goes back on the queue.
-`SimLambdaSqsBatchResponse` reads what the function said about the batch, including a
+`poll/` holds what one poll does. `SimLambdaEventSourcePoller` is the three-method interface
+(`watch`, `pollNow`, `stop`) the mapping's pollers are held behind, and
+`makeSimLambdaEventSourcePoller` picks the one for the kind of source the ARN names.
+`SimLambdaEventSourceDelivery` invokes the function directly rather than through the Invoke command,
+because the handler error has to be seen: the asynchronous invoke path drops it, and this is what
+decides whether the batch goes back on the source. It is handed the event builder and the batch
+response rather than building them, since both are the source's own.
+
+`SimLambdaSqsBatchResponse` reads what the function said about a batch of messages, including a
 `batchItemFailures` report when the mapping was told to expect one, and returns the whole batch for
-a report it cannot trust. `SimLambdaSqsEventBuilder` turns a batch into the event's own shape,
-which is the lower-case record naming and the base64 binary attribute values real AWS uses.
+a report it cannot trust. Reading the report itself is shared in `SimLambdaBatchItemFailures`, which
+is also where a malformed entry becomes an id no message has. `SimLambdaSqsEventBuilder` turns a
+batch into the event's own shape, which is the lower-case record naming and the base64 binary
+attribute values real AWS uses.
 
 ## Function URLs
 

@@ -1,8 +1,10 @@
+import { simulatedEventSourcesDescription } from "../../event-source/sim-lambda-event-source-arn.js";
 import { SimLambdaInvalidParameterValueException } from "../../error/sim-lambda.error.js";
 import type { SimCreateEventSourceMappingCommandInput } from "./event-source-mapping.command.js";
 
 /**
- * The inputs a mapping cannot be created with here, and why each is refused.
+ * The inputs no simulated event source has behaviour for, and why each is
+ * refused.
  *
  * Every one of them changes what a function sees or when it sees it, so
  * accepting and ignoring one would let a test pass on behaviour the deployment
@@ -18,26 +20,6 @@ const unsimulatedInputs: ReadonlyMap<string, string> = new Map([
   ["BisectBatchOnFunctionError", "batch bisection is not simulated"],
   ["ParallelizationFactor", "polling concurrency is not simulated"],
   ["TumblingWindowInSeconds", "tumbling windows are not simulated"],
-  ["StartingPosition", "SQS queues are the only simulated event source"],
-  [
-    "StartingPositionTimestamp",
-    "SQS queues are the only simulated event source",
-  ],
-  ["Topics", "SQS queues are the only simulated event source"],
-  ["Queues", "SQS queues are the only simulated event source"],
-  ["SelfManagedEventSource", "SQS queues are the only simulated event source"],
-  [
-    "SelfManagedKafkaEventSourceConfig",
-    "SQS queues are the only simulated event source",
-  ],
-  [
-    "AmazonManagedKafkaEventSourceConfig",
-    "SQS queues are the only simulated event source",
-  ],
-  [
-    "DocumentDBEventSourceConfig",
-    "SQS queues are the only simulated event source",
-  ],
   [
     "SourceAccessConfigurations",
     "event source authentication is not simulated",
@@ -45,6 +27,25 @@ const unsimulatedInputs: ReadonlyMap<string, string> = new Map([
   ["MetricsConfig", "event source metrics are not simulated"],
   ["KMSKeyArn", "filter criteria encryption is not simulated"],
   ["Tags", "tags are not simulated"],
+]);
+
+/**
+ * The inputs that only mean something for an event source this simulation does
+ * not have.
+ *
+ * None of them is a thing that is missing from the sources here. Each one
+ * configures a source the ARN dispatcher refuses outright, so naming one is a
+ * request for a different kind of mapping rather than for a feature.
+ */
+const unsupportedEventSourceInputs: ReadonlySet<string> = new Set([
+  "StartingPosition",
+  "StartingPositionTimestamp",
+  "Topics",
+  "Queues",
+  "SelfManagedEventSource",
+  "SelfManagedKafkaEventSourceConfig",
+  "AmazonManagedKafkaEventSourceConfig",
+  "DocumentDBEventSourceConfig",
 ]);
 
 /**
@@ -72,5 +73,21 @@ export function refuseUnsimulatedInput(
         "simulated as 0: a partial batch is delivered as soon as anything is " +
         "on the queue, so a batching window would have nothing to wait for",
     );
+  }
+}
+
+/**
+ * Refuse an input belonging to an event source this simulation does not have.
+ */
+export function refuseUnsupportedEventSourceInput(
+  input: SimCreateEventSourceMappingCommandInput,
+): void {
+  for (const [name, value] of Object.entries(input)) {
+    if (value !== undefined && unsupportedEventSourceInputs.has(name)) {
+      throw new SimLambdaInvalidParameterValueException(
+        `${name} on an event source mapping is for an event source this ` +
+          `simulation does not have: ${simulatedEventSourcesDescription}`,
+      );
+    }
   }
 }

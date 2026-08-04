@@ -4,7 +4,7 @@ import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import type { SimLambdaEventSourceQueues } from "../../event-source/queue/sim-lambda-event-source-queues.js";
-import type { SimLambdaSqsEventSourceArn } from "../../event-source/queue/sim-lambda-sqs-event-source-arn.js";
+import type { SimLambdaEventSourceArn } from "../../event-source/sim-lambda-event-source-arn.js";
 import { SimLambdaEventSourceMapping } from "../../event-source/sim-lambda-event-source-mapping.js";
 import type { SimLambdaEventSourceMappingStore } from "../../event-source/sim-lambda-event-source-mapping-store.js";
 import type { SimLambdaEventSourcePollers } from "../../event-source/sim-lambda-event-source-pollers.js";
@@ -94,7 +94,8 @@ export class CreateEventSourceMappingCommandHandler implements CommandHandler<
   }
 
   /**
-   * Refuse a mapping whose queue cannot be polled as the execution role.
+   * Refuse a mapping whose event source cannot be polled as the execution
+   * role.
    *
    * The role's permission is checked before the queue is read, so a role with
    * no access is told what it is missing rather than being told the queue does
@@ -102,12 +103,9 @@ export class CreateEventSourceMappingCommandHandler implements CommandHandler<
    */
   private async assertPollable(
     simFunction: SimLambdaFunction,
-    eventSourceArn: SimLambdaSqsEventSourceArn,
+    eventSourceArn: SimLambdaEventSourceArn,
   ): Promise<void> {
-    this.rolePermissions.assertMayPoll(
-      simFunction.roleArn,
-      eventSourceArn.value,
-    );
+    this.rolePermissions.assertMayPoll(simFunction.roleArn, eventSourceArn);
 
     // Reading the queue's attributes as the role is how the mapping finds out
     // the queue is there at all, exactly as the poller will.
