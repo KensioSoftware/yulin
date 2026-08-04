@@ -140,6 +140,42 @@ describe("SimCfnStack Resource Condition", () => {
     );
   });
 
+  it("refuses a DependsOn to a Resource the Stack does not create", async () => {
+    // Given a Resource that waits on a conditioned-out Resource.
+    const simAws = new SimAws();
+
+    // When the Stack is deployed as dev.
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws.cloudFormation().deployTemplate({
+        stackName: "resource-condition-stack",
+        template: {
+          Parameters: { EnvName: { Type: "String" } },
+          Conditions: {
+            IsProd: { "Fn::Equals": [{ Ref: "EnvName" }, "prod"] },
+          },
+          Resources: {
+            Backups: { Type: "AWS::S3::Bucket", Condition: "IsProd" },
+            Site: {
+              Type: "AWS::S3::Bucket",
+              DependsOn: ["Backups"],
+              Properties: { BucketName: "site-dev" },
+            },
+          },
+        },
+        parameters: { EnvName: "dev" },
+      });
+    });
+
+    // Then the Condition is named, rather than the deployment waiting on a
+    // Resource that is never coming and failing as an unresolvable dependency.
+    assertIdentical(
+      error.message,
+      "Sim CloudFormation Stack resource-condition-stack Resource Site names " +
+        "Resource Backups, which the Stack does not create because its " +
+        "Condition IsProd is false",
+    );
+  });
+
   it("refuses a Ref to a Resource the Stack does not create", async () => {
     // Given a Resource property naming a conditioned-out Resource outright,
     // rather than inside the branch of an Fn::If.

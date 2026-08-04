@@ -1,3 +1,4 @@
+import { parseSimCfnResourceDependencies } from "../../resource/dependency/sim-cfn-resource-dependencies.js";
 import { isCfnTemplateValueRecord } from "../../resource/template/sim-cfn-templ-value-record.js";
 import { parseSimCfnNode } from "../parse/node/sim-cfn-node-parser.js";
 import type { SimCfnResourceTemplateRecord } from "../sim-cfn-template.js";
@@ -42,6 +43,11 @@ export class SimCfnResourceConditions {
   /**
    * Refuse a template where a Resource that is created names one that is not.
    *
+   * Both the intrinsic expressions and `DependsOn` count. A `DependsOn` on a
+   * Resource the Stack never creates would otherwise leave the deployment
+   * waiting on it and fail as an unresolvable dependency, which says nothing
+   * about the Condition that caused it.
+   *
    * The templates given here are already resolved, so an `Fn::If` has picked
    * its branch: a name only the branch that was not taken carries never gets
    * this far.
@@ -56,7 +62,10 @@ export class SimCfnResourceConditions {
     for (const { logicalId, template } of resourceTemplates) {
       this.assertNamesOnlyCreated(
         logicalId,
-        new Set(parseSimCfnNode(template).referencedNames()),
+        new Set([
+          ...parseSimCfnNode(template).referencedNames(),
+          ...parseSimCfnResourceDependencies(template["DependsOn"]),
+        ]),
       );
     }
   }

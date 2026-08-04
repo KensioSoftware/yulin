@@ -572,7 +572,7 @@ console.log(stack.resources.has("Backups"));
 ### Writing a condition
 
 A condition is built from `Fn::Equals`, `Fn::And`, `Fn::Or` and `Fn::Not`. `Fn::And` and `Fn::Or`
-take a list of at least two conditions, and `Fn::Not` takes a list of exactly one. A condition can
+take a list of two to ten conditions, and `Fn::Not` takes a list of exactly one. A condition can
 name another condition with `{ "Condition": "OtherCondition" }`, in any order, so a condition may
 name one written below it in the section.
 
@@ -608,9 +608,12 @@ absent from `stack.resources`, which is different from a resource sim CloudForma
 skipped resource stays in the stack and answers `Ref` and `Fn::GetAtt` with
 [stand-in values](#values-from-a-skipped-resource).
 
-Because the resource does not exist, another resource naming it with `Ref` or `Fn::GetAtt` fails the
-deployment, with an error naming both resources and the condition. A `Condition` attribute naming a
-condition the template does not define fails the same way.
+Because the resource does not exist, another resource naming it fails the deployment, with an error
+naming both resources and the condition. That covers a `Ref` or `Fn::GetAtt` that is actually
+reached, and a `DependsOn`. A name carried only by the branch of an `Fn::If` the condition did not
+select is not reached, so it does not fail.
+
+A `Condition` attribute naming a condition the template does not define fails the same way.
 
 ## Resource dependencies
 

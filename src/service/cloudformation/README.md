@@ -238,8 +238,11 @@ condition that reads false when it should read true silently deploys the wrong s
 resource is dropped before the resource map is built, so it never becomes a `SimCfnResource`. This
 is deliberately not the skipped-resource path used for unsupported resource types: a skipped
 resource stays in `stack.resources` and answers `Ref` and `Fn::GetAtt` with stand-in values, where a
-conditioned-out resource does not exist at all, and naming it from another resource fails the
-deployment.
+conditioned-out resource does not exist at all.
+
+Naming a conditioned-out resource from another resource fails the deployment. The names that count
+are those left in the resolved resource template, plus `DependsOn`. Because `Fn::If` has already
+picked its branch by then, a name carried only by the branch that was not selected does not count.
 
 This two-phase design is one of the most important simulated CloudFormation implementation details.
 It allows the stack to build a complete runtime resource graph before any service resources exist,

@@ -138,7 +138,26 @@ describe("SimCfnTemplate Conditions refusals", () => {
     assertIdentical(
       error.message,
       "Sim CloudFormation Stack conditions-stack Condition IsProd Fn::And " +
-        "must be a list of at least two conditions",
+        "must be a list of two to ten conditions",
+    );
+  });
+
+  it("refuses an Fn::Or with more than ten conditions", () => {
+    // Given an Fn::Or over eleven conditions, one past what CloudFormation
+    // accepts.
+    const conditions = { IsProd: { "Fn::Or": equalsConditions(11) } };
+
+    // When the Conditions are evaluated.
+    const error = assertThrowsError(() => {
+      evaluateWith(conditions);
+    });
+
+    // Then the shape is refused rather than deploying a template real
+    // CloudFormation would reject.
+    assertIdentical(
+      error.message,
+      "Sim CloudFormation Stack conditions-stack Condition IsProd Fn::Or " +
+        "must be a list of two to ten conditions",
     );
   });
 
@@ -276,4 +295,13 @@ function evaluateWith(conditions: Record<string, SimCfnTemplateValue>): void {
     },
     parameters: SimCfnParameters.fromValues({ EnvName: "prod" }),
   }).conditions();
+}
+
+/**
+ * A list of the given number of distinct Fn::Equals conditions.
+ */
+function equalsConditions(count: number): SimCfnTemplateValue[] {
+  return Array.from({ length: count }, (_, index) => ({
+    "Fn::Equals": [{ Ref: "EnvName" }, `env-${String(index)}`],
+  }));
 }

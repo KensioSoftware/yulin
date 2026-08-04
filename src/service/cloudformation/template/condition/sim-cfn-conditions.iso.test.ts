@@ -131,6 +131,24 @@ describe("SimCfnTemplate Conditions", () => {
     assertFalse(evaluateWith(conditions, "dev").value("IsDeployed"));
   });
 
+  it("composes the ten conditions Fn::Or accepts", () => {
+    // Given an Fn::Or over the most conditions CloudFormation allows, the last
+    // of which matches.
+    const conditions = {
+      IsKnownEnv: {
+        "Fn::Or": Array.from({ length: 10 }, (_, index) => ({
+          "Fn::Equals": [{ Ref: "EnvName" }, `env-${String(index)}`],
+        })),
+      },
+    };
+
+    // When the Stack is deployed with that value.
+    const evaluated = evaluateWith(conditions, "env-9");
+
+    // Then the Condition is true.
+    assertTrue(evaluated.value("IsKnownEnv"));
+  });
+
   it("evaluates a Condition named before the one it depends on", () => {
     // Given a Condition named ahead of the Condition it reads, as a template
     // section carries no ordering.

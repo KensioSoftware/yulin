@@ -28,7 +28,10 @@ interface SimCfnConditionExpressionProperties {
  * here.
  *
  * A function name this simulation has no behaviour for is refused rather than
- * read as false, which would deploy a Stack the template did not describe.
+ * read as false, which would deploy a Stack the template did not describe. The
+ * two to ten operands CloudFormation allows `Fn::And` and `Fn::Or` are held to
+ * for the same reason: a template this accepted and CloudFormation did not is a
+ * test that passes and a deployment that fails.
  */
 export class SimCfnConditionExpression {
   private readonly label: string;
@@ -99,9 +102,9 @@ export class SimCfnConditionExpression {
   ): boolean[] {
     const listed = this.shape.list(value, `${this.label} ${functionName}`);
 
-    if (listed.length < 2) {
+    if (listed.length < 2 || listed.length > 10) {
       throw this.error(
-        `${this.label} ${functionName} must be a list of at least two conditions`,
+        `${this.label} ${functionName} must be a list of two to ten conditions`,
       );
     }
 
