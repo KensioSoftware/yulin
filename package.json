@@ -13,7 +13,7 @@
     "build:check": "tsc -p tsconfig.json --noEmit",
     "prepack": "pnpm build",
     "verify:pack": "pnpm tsx scripts/mts/verify-pack.mts",
-    "fmt": "eslint --cache --cache-location node_modules/.cache/eslint/main --fix . && prettier --cache --write .",
+    "fmt": "eslint --cache --cache-location node_modules/.cache/eslint/main --fix . && prettier --cache --write . && prettier --cache --cache-location node_modules/.cache/prettier/settled --check .",
     "lint": "eslint --cache --cache-location node_modules/.cache/eslint/main . && prettier --cache --check .",
     "test": "vitest run",
     "test:coverage": "rm -rf './.tmp/' && vitest run --coverage",
