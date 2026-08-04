@@ -1,5 +1,6 @@
 export { SimSqs } from "./sim-sqs.js";
 export {
+  simSqsSourceAccountConditionKey,
   simSqsSourceArnConditionKey,
   type SimSqsRequestOptions,
 } from "./command/sim-sqs-request-options.js";
@@ -11,8 +12,9 @@ export {
 export {
   sqsAnyQueueArn,
   SimSqsQueueArn,
+  type SimSqsQueueLocation,
   sqsQueueArnPrefix,
-  sqsQueueUrlPrefix,
+  sqsQueueUrl,
 } from "./queue/sim-sqs-queue-arn.js";
 export {
   type SimSqsQueueAttributeInput,

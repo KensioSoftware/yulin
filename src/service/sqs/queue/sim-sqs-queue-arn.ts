@@ -30,14 +30,28 @@ export function sqsAnyQueueArn(
 }
 
 /**
- * The part of a queue URL that comes before the queue's own name.
+ * Where one queue is, in the three facts both its ARN and its URL carry.
+ *
+ * The strings are unbranded because the callers that have only read an ARN,
+ * rather than been handed a scope, have nothing but strings to offer.
  */
-export function sqsQueueUrlPrefix(
-  accountRegionScope: SimAwsAccountRegionScope,
-): string {
-  const { regionName, accountId } = accountRegionScope;
+export interface SimSqsQueueLocation {
+  readonly regionName: string;
+  readonly accountId: string;
+  readonly name: string;
+}
 
-  return `https://sqs.${regionName}.amazonaws.com/${accountId}/`;
+/**
+ * The URL SQS requests name a queue by.
+ *
+ * Anything holding a queue ARN builds the URL here rather than writing the
+ * format out again: a simulated service reaching a queue by ARN, an event
+ * source mapping polling one, and the queue itself all mean the same URL.
+ */
+export function sqsQueueUrl(location: SimSqsQueueLocation): string {
+  const { regionName, accountId, name } = location;
+
+  return `https://sqs.${regionName}.amazonaws.com/${accountId}/${name}`;
 }
 
 interface SimSqsQueueArnProperties {
@@ -62,6 +76,6 @@ export class SimSqsQueueArn {
 
     this.name = name.value;
     this.value = sqsQueueArnPrefix(accountRegionScope) + name.value;
-    this.url = sqsQueueUrlPrefix(accountRegionScope) + name.value;
+    this.url = sqsQueueUrl({ ...accountRegionScope, name: name.value });
   }
 }

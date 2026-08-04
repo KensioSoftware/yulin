@@ -27,6 +27,7 @@ describe("Simulated Lambda functions as S3 notification destinations", () => {
           destinationArn: thumbnailerArn,
           bucketArn: "arn:aws:s3:::uploads",
           bucketOwnerAccountId: simAws.defaultAccountId,
+          bucketRegionName: simAws.defaultRegionName,
         },
         { Records: [] },
       ),
@@ -48,6 +49,7 @@ describe("Simulated Lambda functions as S3 notification destinations", () => {
         destinationArn: "arn:aws:lambda:us-east-1:888888888888:layer:shared",
         bucketArn: "arn:aws:s3:::uploads",
         bucketOwnerAccountId: simAws.defaultAccountId,
+        bucketRegionName: simAws.defaultRegionName,
       });
     } catch (error) {
       raised = error;
@@ -87,6 +89,7 @@ describe("Simulated Lambda functions as S3 notification destinations", () => {
         destinationArn: thumbnailerArn,
         bucketArn: "arn:aws:s3:::uploads",
         bucketOwnerAccountId: simAws.defaultAccountId,
+        bucketRegionName: simAws.defaultRegionName,
       },
     );
 

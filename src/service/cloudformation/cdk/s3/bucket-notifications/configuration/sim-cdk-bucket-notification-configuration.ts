@@ -1,6 +1,7 @@
 import type {
   SimS3LambdaFunctionConfigurationInput,
   SimS3NotificationConfigurationInput,
+  SimS3QueueConfigurationInput,
 } from "../../../../../s3/command/put-bucket-notification-configuration/put-bucket-notification-configuration.command.js";
 import type { SimCfnTemplateValue } from "../../../../template/value/sim-cfn-template-value.js";
 import { SimCfnValueShape } from "../../../../template/value/sim-cfn-value-shape.js";
@@ -47,8 +48,7 @@ export class SimCdkBucketNotificationConfiguration {
       ),
       QueueConfigurations: this.shape.present(
         record["QueueConfigurations"],
-        (configurations) =>
-          this.shape.list(configurations, "QueueConfigurations"),
+        (configurations) => this.queueConfigurations(configurations),
       ),
       TopicConfigurations: this.shape.present(
         record["TopicConfigurations"],
@@ -84,6 +84,33 @@ export class SimCdkBucketNotificationConfiguration {
       LambdaFunctionArn: this.shape.present(
         record["LambdaFunctionArn"],
         (arn) => this.shape.string(arn, "LambdaFunctionArn"),
+      ),
+      Events: this.shape.present(record["Events"], (events) =>
+        this.events(events),
+      ),
+      Filter: this.shape.present(record["Filter"], (filter) =>
+        this.filter.read(filter),
+      ),
+    };
+  }
+
+  private queueConfigurations(
+    value: SimCfnTemplateValue,
+  ): readonly SimS3QueueConfigurationInput[] {
+    return this.shape
+      .list(value, "QueueConfigurations")
+      .map((configuration) => this.queueConfiguration(configuration));
+  }
+
+  private queueConfiguration(
+    value: SimCfnTemplateValue,
+  ): SimS3QueueConfigurationInput {
+    const record = this.shape.record(value, "QueueConfigurations entry");
+
+    return {
+      Id: this.shape.present(record["Id"], (id) => this.shape.string(id, "Id")),
+      QueueArn: this.shape.present(record["QueueArn"], (arn) =>
+        this.shape.string(arn, "QueueArn"),
       ),
       Events: this.shape.present(record["Events"], (events) =>
         this.events(events),

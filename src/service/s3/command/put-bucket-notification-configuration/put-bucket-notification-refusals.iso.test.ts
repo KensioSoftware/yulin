@@ -202,8 +202,8 @@ describe("What a simulated S3 notification configuration refuses", () => {
       ),
     );
 
-    // Then there is no service segment to route it by, so it is refused
-    assertStringIncludes(error.message, "cannot notify");
+    // Then it is refused for not being a function ARN
+    assertStringIncludes(error.message, "is not a Lambda function ARN");
   });
 
   it("refuses a configuration carrying no events at all", async () => {

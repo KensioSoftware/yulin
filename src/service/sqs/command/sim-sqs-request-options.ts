@@ -11,6 +11,16 @@ import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
 export const simSqsSourceArnConditionKey = "aws:SourceArn";
 
 /**
+ * The condition key naming the Account owning the resource a simulated service
+ * is reaching the queue for.
+ *
+ * It only has a job when that resource and the queue are in different Accounts,
+ * which is why AWS's own documented destination queue policies carry it
+ * alongside the source ARN.
+ */
+export const simSqsSourceAccountConditionKey = "aws:SourceAccount";
+
+/**
  * What an SQS request carries besides its command input.
  */
 export interface SimSqsRequestOptions {
@@ -30,4 +40,12 @@ export interface SimSqsRequestOptions {
    * match instead of matching an empty string.
    */
   readonly sourceArn?: string;
+
+  /**
+   * The Account owning the resource the caller is reaching the queue for,
+   * supplied to IAM as `aws:SourceAccount`.
+   *
+   * Left out the same way when the caller has no value for it.
+   */
+  readonly sourceAccount?: string;
 }

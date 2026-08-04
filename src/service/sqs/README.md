@@ -29,7 +29,10 @@ received, how long it is kept, and how large it is allowed to be.
 `SimSqsQueueArn` builds both the ARN and the URL, since they carry the same three facts in two
 formats. A queue ARN has no resource type separator, so it is `arn:aws:sqs:region:account:name`
 rather than anything with a `queue/` in it. That is also why `parseSimArn` returns undefined for one,
-and why `SimSqsQueueUrl` does the URL parsing this service needs.
+and why `SimSqsQueueUrl` does the URL parsing this service needs. The URL format itself is
+`sqsQueueUrl`, which anything holding a queue ARN builds through rather than writing the format out
+again: an event source mapping polling a queue and a simulated service notifying one both mean the
+same URL.
 
 `SimSqsQueueUrl` reads a queue URL into its region, account and name. All three matter: a URL naming
 another account or region reaches nothing here rather than having its name read out and looked up
@@ -185,11 +188,17 @@ principal from another Account, or a service principal such as `s3.amazonaws.com
 identity policies anywhere. A queue with no policy contributes nothing and the decision is left to
 the caller's identity policies, as it is on real AWS.
 
-`SimSqsRequestOptions` carries a `sourceArn` alongside the caller, supplied to IAM as
-`aws:SourceArn`. A simulated service reaching a queue on a resource's behalf sets it, which is how a
-queue policy granting a service principal under an `ArnLike aws:SourceArn` condition tells one
-Bucket from another. A request that does not carry one leaves the key out rather than supplying an
-empty string, so a statement conditioned on it fails to match.
+`SimSqsRequestOptions` carries a `sourceArn` and a `sourceAccount` alongside the caller, supplied to
+IAM as `aws:SourceArn` and `aws:SourceAccount`. A simulated service reaching a queue on a resource's
+behalf sets both, which is how a queue policy granting a service principal tells one Bucket from
+another, and one Account's Buckets from another's. A request that does not carry one leaves the key
+out rather than supplying an empty string, so a statement conditioned on it fails to match.
+
+`SimSqsServiceSendAuthorizer` answers whether a service principal may send to a queue, as a decision
+rather than a thrown error. A service asks it before it has a message to send: simulated S3
+validates a notification destination when the configuration naming it is applied, and has to report
+the refusal as part of refusing the configuration. Sending later goes through `SendMessage` as
+usual, which authorizes the same way, so nothing is remembered from the earlier question.
 
 A request naming another Account as the queue owner is still refused rather than quietly answered
 with a local queue of the same name: a queue policy admits another Account's principal to a queue
@@ -218,5 +227,8 @@ here, it does not make another Account's queues reachable through this one.
   and starts its receive count again, which is not documented either way.
 - A Lambda event source mapping polls one batch at a time, where real Lambda runs several pollers and
   scales them with the queue.
+- An S3 event notification arrives as one ordinary message with no message attributes. The
+  `s3:TestEvent` real S3 puts on a queue when a configuration naming it is applied is not sent; see
+  the S3 service README for why.
 
 The full list is in [docs/services/sqs](../../../docs/services/sqs/).

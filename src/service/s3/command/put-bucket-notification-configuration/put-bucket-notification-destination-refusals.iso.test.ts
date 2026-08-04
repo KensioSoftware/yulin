@@ -16,14 +16,14 @@ const thumbnailerArn =
   "arn:aws:lambda:us-east-1:888888888888:function:thumbnailer";
 
 describe("What a simulated S3 notification destination refuses", () => {
-  it("refuses an SQS queue destination by name", async () => {
+  it("refuses a FIFO queue destination by name", async () => {
     // Given a Bucket
     const simAws = new SimAws();
     await simAws
       .s3()
       .createBucket(new CreateBucketCommand({ Bucket: "uploads" }));
 
-    // When a configuration names a queue
+    // When a configuration names a FIFO queue
     const error = await assertThrowsErrorAsync(async () =>
       simAws.s3().putBucketNotificationConfiguration(
         new PutBucketNotificationConfigurationCommand({
@@ -32,7 +32,7 @@ describe("What a simulated S3 notification destination refuses", () => {
             QueueConfigurations: [
               {
                 Events: ["s3:ObjectCreated:*"],
-                QueueArn: "arn:aws:sqs:us-east-1:888888888888:uploads",
+                QueueArn: "arn:aws:sqs:us-east-1:888888888888:uploads.fifo",
               },
             ],
           },
@@ -40,9 +40,10 @@ describe("What a simulated S3 notification destination refuses", () => {
       ),
     );
 
-    // Then the destination it cannot deliver to is named
+    // Then the queue real S3 will not deliver to is named for what it is,
+    // rather than being reported as a queue that is not there.
     assertIdentical(error.name, "NotImplemented");
-    assertStringIncludes(error.message, "SQS queue");
+    assertStringIncludes(error.message, "FIFO queue");
   });
 
   it("refuses an SNS topic destination by name", async () => {

@@ -163,9 +163,9 @@ describe("CDK Bucket notifications configuration shape", () => {
     );
   });
 
-  it("refuses a queue destination by name", async () => {
-    // Given the configuration CDK synthesizes for an SQS destination, which
-    // simulated S3 cannot deliver to.
+  it("refuses a queue destination that is not there", async () => {
+    // Given the configuration CDK synthesizes for an SQS destination, naming a
+    // queue no stack ever created.
     // When the template is deployed.
     const error = await deployConfiguration({
       QueueConfigurations: [
@@ -178,10 +178,7 @@ describe("CDK Bucket notifications configuration shape", () => {
 
     // Then the Stack fails, because a configuration that is accepted and never
     // delivered is worse than one that is refused.
-    assertStringIncludes(
-      error.message,
-      "Simulated S3 cannot notify a SQS queue",
-    );
+    assertStringIncludes(error.message, "is not a simulated SQS queue");
   });
 
   it("refuses a topic destination by name", async () => {

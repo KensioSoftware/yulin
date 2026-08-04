@@ -3,13 +3,9 @@ import { SimLambdaServiceInvokeAuthorizer } from "../../../../lambda/command/aut
 import type { SimLambdaFunction } from "../../../../lambda/function/sim-lambda-function.js";
 import type { SimIamInterServiceAuthZ } from "../../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import type { SimS3NotificationDestinationRequest } from "../sim-s3-notification-destination.js";
+import { simS3ServicePrincipal } from "../sim-s3-service-principal.js";
 import { SimS3NotificationFunctionArn } from "./sim-s3-notification-function-arn.js";
 import type { SimS3NotificationFunctions } from "./sim-s3-notification-functions.js";
-
-/**
- * The service principal S3 invokes a Lambda function as.
- */
-export const simS3ServicePrincipal = "s3.amazonaws.com";
 
 interface SimAwsS3NotificationFunctionsProperties {
   readonly simAws: SimAws;

@@ -3,6 +3,11 @@ import {
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
 import {
+  CreateQueueCommand,
+  ReceiveMessageCommand,
+  SetQueueAttributesCommand,
+} from "@aws-sdk/client-sqs";
+import {
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -10,6 +15,7 @@ import {
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../../../aws/sim-aws.js";
+import { simIamPolicyDocumentFactory } from "../../../../iam/policy/sim-iam-policy-document.factory.js";
 import { simCfnS3BucketNotificationTemplateFactory } from "./sim-cfn-s3-bucket-notification-template.factory.js";
 
 /**
@@ -176,6 +182,75 @@ describe("AWS::S3::Bucket NotificationConfiguration", () => {
 
     assertArrayLength(received, 1);
     assertIdentical(received[0].Records[0].s3.object.key, "raw/cat.jpg");
+  });
+
+  it("notifies a queue a QueueConfigurations entry names", async () => {
+    // Given a queue admitting the Bucket the template deploys.
+    const simAws = new SimAws();
+    const queueArn = `arn:aws:sqs:${simAws.defaultRegionName}:${simAws.defaultAccountId}:uploads`;
+    const created = await simAws
+      .sqs()
+      .createQueue(new CreateQueueCommand({ QueueName: "uploads" }));
+    await simAws.sqs().setQueueAttributes(
+      new SetQueueAttributesCommand({
+        QueueUrl: created.QueueUrl,
+        Attributes: {
+          Policy: simIamPolicyDocumentFactory.make({
+            Statement: {
+              Principal: { Service: "s3.amazonaws.com" },
+              Action: "sqs:SendMessage",
+              Resource: queueArn,
+              Condition: {
+                ArnLike: { "aws:SourceArn": "arn:aws:s3:::uploads" },
+              },
+            },
+          }),
+        },
+      }),
+    );
+
+    // When a template naming it under CloudFormation's own property names is
+    // deployed: `Queue` rather than `QueueArn`, and one `Event` rather than an
+    // `Events` list.
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "uploads-stack",
+      template: simCfnS3BucketNotificationTemplateFactory.make({
+        notificationConfiguration: {
+          QueueConfigurations: [
+            { Event: "s3:ObjectCreated:*", Queue: queueArn },
+          ],
+        },
+      }),
+    });
+    await stack.waitForDeployComplete();
+
+    // Then an Object put into the deployed Bucket reaches the queue.
+    await simAws.s3().putObject(
+      new PutObjectCommand({
+        Bucket: "uploads",
+        Key: "cat.jpg",
+        Body: "cat picture",
+      }),
+    );
+    await simAws.backgroundTasksComplete();
+
+    const received = await simAws
+      .sqs()
+      .receiveMessage(
+        new ReceiveMessageCommand({ QueueUrl: created.QueueUrl }),
+      );
+    assertArrayLength(received.Messages ?? [], 1);
+
+    // And the Bucket reports it back in the SDK's names.
+    const output = await simAws
+      .s3()
+      .getBucketNotificationConfiguration(
+        new GetBucketNotificationConfigurationCommand({ Bucket: "uploads" }),
+      );
+    const configurations = output.QueueConfigurations ?? [];
+    assertArrayLength(configurations, 1);
+    assertIdentical(configurations[0].QueueArn, queueArn);
+    assertIdentical(configurations[0].Events?.[0], "s3:ObjectCreated:*");
   });
 
   it("leaves a Bucket declaring no notifications unconfigured", async () => {

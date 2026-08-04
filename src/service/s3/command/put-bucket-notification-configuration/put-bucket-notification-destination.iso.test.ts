@@ -170,7 +170,7 @@ describe("The destination a simulated S3 notification configuration names", () =
     assertStringIncludes(error.message, "versions or aliases");
   });
 
-  it("refuses a destination ARN naming another service", async () => {
+  it("refuses a Lambda destination ARN naming another service", async () => {
     // Given a Bucket
     const simAws = new SimAws();
     await simAws
@@ -194,8 +194,10 @@ describe("The destination a simulated S3 notification configuration names", () =
       ),
     );
 
-    // Then the destination it cannot notify is named
-    assertStringIncludes(error.message, "cannot notify");
+    // Then it is refused for not being a function, rather than delivered to as
+    // the queue it names: the destination group a configuration was declared
+    // in is what decides where it goes.
+    assertStringIncludes(error.message, "is not a Lambda function ARN");
   });
 
   it("stores without checking when the request asks it to", async () => {

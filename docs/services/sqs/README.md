@@ -614,9 +614,14 @@ try {
 }
 ```
 
-`sourceArn` is what a request says it is being made on behalf of. A request that does not carry one
-leaves the key out rather than supplying an empty string, so a statement conditioned on
-`aws:SourceArn` does not match it at all.
+`sourceArn` is what a request says it is being made on behalf of, and `sourceAccount` is the Account
+owning that resource, supplied as `aws:SourceAccount`. A request that does not carry one leaves the
+key out rather than supplying an empty string, so a statement conditioned on it does not match at
+all.
+
+A simulated S3 Bucket notifying a queue supplies both, so the `ArnLike aws:SourceArn` condition CDK
+writes and the `StringEquals aws:SourceAccount` guard AWS documents are each enough on their own.
+See [Event notifications](../s3/#event-notifications) on the S3 page for the whole chain.
 
 A caller from another account needs both sides to allow the request, as it does on real AWS: the
 queue policy naming the principal, and that principal's own account allowing the action. Either one
@@ -1108,7 +1113,8 @@ Sim SQS currently supports:
   `DeadLetterQueueSourceArn` system attributes
 - Authorization of every operation by simulated IAM, against the real IAM action and queue ARN
 - The `Policy` attribute as the queue's resource policy, admitting another account's principal or a
-  service principal, with `aws:SourceArn` conditions honoured
+  service principal, with `aws:SourceArn` and `aws:SourceAccount` conditions honoured
+- S3 event notifications sent to a queue, with the event document as the message body
 - Calls made from inside a simulated Lambda handler, authorized as the function's execution role
 - Lambda event source mappings, delivering messages to a simulated function and deleting the batches
   it handles
