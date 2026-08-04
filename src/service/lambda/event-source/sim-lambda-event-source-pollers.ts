@@ -1,8 +1,9 @@
 import type { BackgroundScheduler } from "../../../util/background/background.js";
 import type { SimLambdaFunctionLookup } from "../function/url/sim-lambda-function-lookup.js";
-import { SimLambdaEventSourcePoller } from "./poll/sim-lambda-event-source-poller.js";
+import { makeSimLambdaEventSourcePoller } from "./poll/sim-lambda-event-source-poller-factory.js";
+import type { SimLambdaEventSourcePoller } from "./poll/sim-lambda-event-source-poller.js";
 import type { SimLambdaEventSourceQueues } from "./queue/sim-lambda-event-source-queues.js";
-import type { SimLambdaSqsEventSourceArn } from "./queue/sim-lambda-sqs-event-source-arn.js";
+import type { SimLambdaEventSourceArn } from "./sim-lambda-event-source-arn.js";
 import type { SimLambdaEventSourceMapping } from "./sim-lambda-event-source-mapping.js";
 
 interface SimLambdaEventSourcePollersProperties {
@@ -30,15 +31,15 @@ export class SimLambdaEventSourcePollers {
    * Start polling for a newly created mapping.
    *
    * The mapping finishes creating in the background, as it does on real Lambda,
-   * and starts polling once it does. Whatever is already on the queue is polled
-   * for then, because real Lambda does not only deliver what arrives after the
-   * mapping was made.
+   * and starts polling once it does. Whatever is already waiting on the event
+   * source is polled for then, because real Lambda does not only deliver what
+   * arrives after the mapping was made.
    */
   start(
     mapping: SimLambdaEventSourceMapping,
-    eventSourceArn: SimLambdaSqsEventSourceArn,
+    eventSourceArn: SimLambdaEventSourceArn,
   ): void {
-    const poller = new SimLambdaEventSourcePoller({
+    const poller = makeSimLambdaEventSourcePoller({
       ...this.properties,
       mapping,
       eventSourceArn,

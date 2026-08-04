@@ -1,16 +1,43 @@
 import type { SimLambdaFunction } from "../../function/sim-lambda-function.js";
 import type { SimLambdaEventSourceMessage } from "../queue/sim-lambda-event-source-queues.js";
-import type { SimLambdaSqsEventSourceArn } from "../queue/sim-lambda-sqs-event-source-arn.js";
-import type { SimLambdaEventSourceMapping } from "../sim-lambda-event-source-mapping.js";
-import {
-  type SimLambdaSqsBatchOutcome,
-  SimLambdaSqsBatchResponse,
-} from "./sim-lambda-sqs-batch-response.js";
-import { SimLambdaSqsEventBuilder } from "./sim-lambda-sqs-event.js";
+import type {
+  SimLambdaEventSourceBatchOutcome,
+  SimLambdaEventSourceBatchResponse,
+} from "./sim-lambda-event-source-batch-response.js";
+
+/**
+ * One record of an event source event.
+ *
+ * Every source's records name where they came from, whatever else they carry,
+ * which is as much as delivery needs to know about the shape.
+ */
+export interface SimLambdaEventSourceEventRecord {
+  readonly eventSource: string;
+  readonly eventSourceARN: string;
+}
+
+/**
+ * The event one batch is delivered as.
+ */
+export interface SimLambdaEventSourceEvent {
+  readonly Records: readonly SimLambdaEventSourceEventRecord[];
+}
+
+/**
+ * Builds the event a batch is handed to the function as.
+ *
+ * The shape is the event source's own, so the poller that made the delivery
+ * decides which builder it gets.
+ */
+export interface SimLambdaEventSourceEventBuilder {
+  of(
+    messages: readonly SimLambdaEventSourceMessage[],
+  ): SimLambdaEventSourceEvent;
+}
 
 interface SimLambdaEventSourceDeliveryProperties {
-  readonly mapping: SimLambdaEventSourceMapping;
-  readonly eventSourceArn: SimLambdaSqsEventSourceArn;
+  readonly eventBuilder: SimLambdaEventSourceEventBuilder;
+  readonly batchResponse: SimLambdaEventSourceBatchResponse;
 }
 
 /**
@@ -18,17 +45,18 @@ interface SimLambdaEventSourceDeliveryProperties {
  *
  * The batch is invoked directly rather than through the Invoke command because
  * the handler's error has to be seen: an asynchronous invocation drops it, and
- * this is what decides whether the messages go back on the queue.
+ * this is what decides whether the messages go back on the source.
+ *
+ * What the event looks like and what a return value means are the source's
+ * business, so both are handed in rather than built here.
  */
 export class SimLambdaEventSourceDelivery {
-  private readonly eventBuilder: SimLambdaSqsEventBuilder;
-  private readonly batchResponse: SimLambdaSqsBatchResponse;
+  private readonly eventBuilder: SimLambdaEventSourceEventBuilder;
+  private readonly batchResponse: SimLambdaEventSourceBatchResponse;
 
   constructor(properties: SimLambdaEventSourceDeliveryProperties) {
-    this.eventBuilder = new SimLambdaSqsEventBuilder(properties.eventSourceArn);
-    this.batchResponse = new SimLambdaSqsBatchResponse(
-      properties.mapping.reportsBatchItemFailures,
-    );
+    this.eventBuilder = properties.eventBuilder;
+    this.batchResponse = properties.batchResponse;
   }
 
   /**
@@ -37,7 +65,7 @@ export class SimLambdaEventSourceDelivery {
   async to(
     simFunction: SimLambdaFunction,
     messages: readonly SimLambdaEventSourceMessage[],
-  ): Promise<SimLambdaSqsBatchOutcome> {
+  ): Promise<SimLambdaEventSourceBatchOutcome> {
     try {
       return this.batchResponse.handled(
         messages,
@@ -46,7 +74,7 @@ export class SimLambdaEventSourceDelivery {
     } catch {
       // As on real Lambda, the handler error goes to the function's logs and
       // not to whoever sent the message. What the sender sees is the batch
-      // coming back to the queue.
+      // coming back to the source.
       return this.batchResponse.failed(messages);
     }
   }

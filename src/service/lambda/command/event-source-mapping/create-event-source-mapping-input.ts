@@ -1,18 +1,23 @@
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
-import { SimLambdaSqsEventSourceArn } from "../../event-source/queue/sim-lambda-sqs-event-source-arn.js";
+import {
+  type SimLambdaEventSourceArn,
+  simLambdaEventSourceArnOf,
+} from "../../event-source/sim-lambda-event-source-arn.js";
 import type { SimLambdaFunctionResponseType } from "../../event-source/sim-lambda-event-source-mapping.js";
 import { SimLambdaInvalidParameterValueException } from "../../error/sim-lambda.error.js";
 import { simLambdaFunctionNameOf } from "../../function/sim-lambda-function-name.js";
 import {
-  batchSizeIn,
   functionResponseTypesIn,
   requiredString,
 } from "./create-event-source-mapping-values.js";
-import { refuseUnsimulatedInput } from "./create-event-source-mapping-refusals.js";
+import {
+  refuseUnsimulatedInput,
+  refuseUnsupportedEventSourceInput,
+} from "./create-event-source-mapping-refusals.js";
 import type { SimCreateEventSourceMappingCommandInput } from "./event-source-mapping.command.js";
 
 interface SimLambdaEventSourceMappingInputProperties {
-  readonly eventSourceArn: SimLambdaSqsEventSourceArn;
+  readonly eventSourceArn: SimLambdaEventSourceArn;
   readonly functionName: string;
   readonly batchSize: number;
   readonly enabled: boolean;
@@ -25,9 +30,12 @@ interface SimLambdaEventSourceMappingInputProperties {
  * Everything the request is refused for is decided here, before a mapping
  * exists: a mapping that cannot poll the way it was asked to would look like a
  * working subscription and deliver nothing.
+ *
+ * The event source ARN is read first, because what a mapping may ask for
+ * depends on the kind of source it names.
  */
 export class SimLambdaEventSourceMappingInput {
-  public readonly eventSourceArn: SimLambdaSqsEventSourceArn;
+  public readonly eventSourceArn: SimLambdaEventSourceArn;
   public readonly functionName: string;
   public readonly batchSize: number;
   public readonly enabled: boolean;
@@ -49,14 +57,17 @@ export class SimLambdaEventSourceMappingInput {
     input: SimCreateEventSourceMappingCommandInput,
     scope: SimAwsAccountRegionScope,
   ): SimLambdaEventSourceMappingInput {
+    const eventSourceArn = eventSourceArnIn(input, scope);
+
+    refuseUnsupportedEventSourceInput(input);
     refuseUnsimulatedInput(input);
 
     return new this({
-      eventSourceArn: eventSourceArnIn(input, scope),
+      eventSourceArn,
       functionName: simLambdaFunctionNameOf(
         requiredString(input.FunctionName, "functionName"),
       ),
-      batchSize: batchSizeIn(input),
+      batchSize: eventSourceArn.batchRules.sizeIn(input.BatchSize),
       enabled: input.Enabled ?? true,
       functionResponseTypes: functionResponseTypesIn(input),
     });
@@ -64,14 +75,14 @@ export class SimLambdaEventSourceMappingInput {
 }
 
 /**
- * The queue an event source ARN names, refusing one this simulated Lambda
- * cannot poll.
+ * The event source an ARN names, refusing one this simulated Lambda cannot
+ * poll.
  */
 function eventSourceArnIn(
   input: SimCreateEventSourceMappingCommandInput,
   scope: SimAwsAccountRegionScope,
-): SimLambdaSqsEventSourceArn {
-  const eventSourceArn = SimLambdaSqsEventSourceArn.of(
+): SimLambdaEventSourceArn {
+  const eventSourceArn = simLambdaEventSourceArnOf(
     requiredString(input.EventSourceArn, "eventSourceArn"),
   );
 
