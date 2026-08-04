@@ -37,9 +37,9 @@ function tableAttributeTemplate(attributeName: string): CfnTemplateBodyRecord {
 }
 
 describe("AWS::DynamoDB::Table CloudFormation values", () => {
-  it("refuses Fn::GetAtt StreamArn by name", async () => {
-    // Given a template asking for the table's stream ARN, which is not
-    // simulated because streams are not.
+  it("refuses Fn::GetAtt StreamArn on a table with no stream", async () => {
+    // Given a template asking for the stream ARN of a table it declared no
+    // StreamSpecification on, so the table has no stream.
     const simAws = new SimAws({
       defaultAccountId: accountIdOneOnes,
       defaultRegionName: "eu-west-2",
@@ -56,9 +56,11 @@ describe("AWS::DynamoDB::Table CloudFormation values", () => {
       await stack.waitForDeployComplete();
     });
 
+    // And the refusal names the table it was asked of.
     assertStringIncludes(
       error.message,
-      "Unsupported AWS::DynamoDB::Table attribute StreamArn",
+      "Unsupported AWS::DynamoDB::Table attribute StreamArn: table orders " +
+        "has no StreamSpecification",
     );
   });
 

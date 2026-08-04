@@ -3012,9 +3012,9 @@ console.log(stack.outputs.get("OrdersTableArn")?.value);
 
 The properties that are read are `TableName`, `KeySchema`, `AttributeDefinitions`, `BillingMode`,
 `ProvisionedThroughput`, `TableClass`, `DeletionProtectionEnabled`, `Tags`,
-`GlobalSecondaryIndexes`, `LocalSecondaryIndexes` and `TimeToLiveSpecification`. All but the last are
-passed to `CreateTable` rather than applied here, so a value the template gets wrong fails the same
-way it would for an SDK caller.
+`GlobalSecondaryIndexes`, `LocalSecondaryIndexes`, `StreamSpecification` and
+`TimeToLiveSpecification`. All but the last are passed to `CreateTable` rather than applied here, so
+a value the template gets wrong fails the same way it would for an SDK caller.
 
 `TimeToLiveSpecification` is applied after the table is created, through `UpdateTimeToLive`. Real
 `CreateTable` has no parameter for it either, so real CloudFormation makes the table and then
@@ -3027,22 +3027,16 @@ that, which a template cannot predict either way. Two stacks deploying the same 
 differently named tables. The generated name is trimmed to the 255 characters a table name allows,
 ending in a hash of the untrimmed name so two long names that start the same stay apart.
 
-`Fn::GetAtt … StreamArn` on a table that was created is refused by name. A template cannot declare a
-streamed table yet, so a table CloudFormation created never has a stream, and an invented stream ARN
-would read as a working stream to whatever the template handed it to.
-
-A table declaring `StreamSpecification` is skipped rather than created, though, and a skipped
-Resource never reaches that refusal. `Fn::GetAtt … StreamArn` on it resolves to the CloudFormation
-stand-in `OrdersTable.StreamArn` instead, which is not an ARN and fails wherever the simulator reads
-it as one. See
-[values from a skipped Resource](../cloudformation/README.md#values-from-a-skipped-resource).
+`Fn::GetAtt … StreamArn` gives the ARN of the stream the table's `StreamSpecification` gave it. On a
+table with no `StreamSpecification` it is refused by name, naming the table, since an invented stream
+ARN would read as a working stream to whatever the template handed it to. Real CloudFormation refuses
+the same template while validating it, where this refuses when the attribute is asked for.
 
 A property with behaviour that is not simulated skips the resource, with a reason naming the
-property, and the rest of the stack still deploys: `StreamSpecification`,
-`KinesisStreamSpecification`, `SSESpecification`, `PointInTimeRecoverySpecification`,
-`ContributorInsightsSpecification`, `ImportSourceSpecification`, `ResourcePolicy`,
-`OnDemandThroughput` and `WarmThroughput`. A property `AWS::DynamoDB::Table` does not have fails the
-resource instead, since that is a template real CloudFormation would refuse too.
+property, and the rest of the stack still deploys: `KinesisStreamSpecification`, `SSESpecification`,
+`PointInTimeRecoverySpecification`, `ContributorInsightsSpecification`, `ImportSourceSpecification`,
+`ResourcePolicy`, `OnDemandThroughput` and `WarmThroughput`. A property `AWS::DynamoDB::Table` does
+not have fails the resource instead, since that is a template real CloudFormation would refuse too.
 
 `AWS::DynamoDB::GlobalTable` is skipped rather than deployed, since replication across regions is
 not simulated.
@@ -3165,6 +3159,101 @@ so anything further on one fails the resource, as it would on real CloudFormatio
 A CDK `Table` with `addGlobalSecondaryIndex` and `addLocalSecondaryIndex` synthesises a template that
 deploys here without hand-editing.
 
+## Deploying a table with a stream
+
+A `StreamSpecification` on the resource deploys a table with a stream, and `Fn::GetAtt … StreamArn`
+gives the stream's ARN. CloudFormation's `StreamSpecification` has no `StreamEnabled` field, unlike
+the SDK's: declaring the property is what asks for the stream, and `StreamViewType` is required.
+
+```typescript sim-dynamodb-cloudformation-stream
+/**
+ * Deploying a table with a stream from a CloudFormation template.
+ */
+
+import { PutItemCommand } from "@aws-sdk/client-dynamodb";
+import {
+  DescribeStreamCommand,
+  GetRecordsCommand,
+  GetShardIteratorCommand,
+} from "@aws-sdk/client-dynamodb-streams";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "orders-stack",
+  template: {
+    Resources: {
+      OrdersTable: {
+        Type: "AWS::DynamoDB::Table",
+        Properties: {
+          TableName: "orders",
+          KeySchema: [{ AttributeName: "orderId", KeyType: "HASH" }],
+          AttributeDefinitions: [
+            { AttributeName: "orderId", AttributeType: "S" },
+          ],
+          BillingMode: "PAY_PER_REQUEST",
+          StreamSpecification: { StreamViewType: "NEW_AND_OLD_IMAGES" },
+        },
+      },
+    },
+    Outputs: {
+      OrdersStreamArn: {
+        Value: { "Fn::GetAtt": ["OrdersTable", "StreamArn"] },
+      },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+await simAws.backgroundTasksComplete();
+
+// The Output holds the ARN of the stream the deployed table captures on.
+const streamArn = stack.outputs.get("OrdersStreamArn")?.value as string;
+
+console.log(streamArn.includes("/stream/")); // true
+
+await simAws.dynamoDb().putItem(
+  new PutItemCommand({
+    TableName: "orders",
+    Item: { orderId: { S: "order-1" }, total: { N: "101" } },
+  }),
+);
+
+// The write is on the stream, read the way any consumer reads it.
+const dynamoDbStreams = simAws.dynamoDbStreams();
+
+const described = await dynamoDbStreams.describeStream(
+  new DescribeStreamCommand({ StreamArn: streamArn }),
+);
+
+const iterator = await dynamoDbStreams.getShardIterator(
+  new GetShardIteratorCommand({
+    StreamArn: streamArn,
+    ShardId: described.StreamDescription?.Shards?.[0]?.ShardId,
+    ShardIteratorType: "TRIM_HORIZON",
+  }),
+);
+
+const read = await dynamoDbStreams.getRecords(
+  new GetRecordsCommand({ ShardIterator: iterator.ShardIterator }),
+);
+
+console.log(read.Records?.[0]?.eventName); // "INSERT"
+```
+
+The specification goes to `CreateTable` with the rest of the table, so a template naming a view type
+that does not exist, or naming none at all, is refused in the words `CreateTable` refuses an SDK
+caller in.
+
+`StreamSpecification.ResourcePolicy` is a policy on the stream rather than on the table. It is not
+simulated, so a template declaring one skips the table, naming the whole property path.
+
+Changing `StreamViewType` in a deployed template is a different thing here to what it is on real
+CloudFormation, which replaces the table. `UpdateTable` refuses the change in place, so switching the
+stream off and on again is what gives a table a stream with a different view type.
+
 ## IAM authorization
 
 `CreateTable` authorizes `dynamodb:CreateTable` against the ARN the table is about to have, before
@@ -3250,8 +3339,9 @@ nothing is written.
   `TrimmedDataAccessException` past the trim point.
 - `AWS::DynamoDB::Table` in CloudFormation, created through `CreateTable`, with `Ref` giving the
   table name, `Fn::GetAtt … Arn` the table ARN, `TimeToLiveSpecification` deploying a table that
-  expires items, `Tags` deploying a tagged table, and `GlobalSecondaryIndexes` and
-  `LocalSecondaryIndexes` deploying a table whose indexes are then queried and scanned.
+  expires items, `Tags` deploying a tagged table, `GlobalSecondaryIndexes` and
+  `LocalSecondaryIndexes` deploying a table whose indexes are then queried and scanned, and
+  `StreamSpecification` deploying a table with a stream that `Fn::GetAtt … StreamArn` names.
 - SDK interception, so an intercepted `DynamoDBClient` or `DynamoDBStreamsClient` reaches the
   simulation.
 - The `@aws-sdk/lib-dynamodb` document client, with `PutCommand`, `GetCommand`, `DeleteCommand`,
@@ -3340,8 +3430,11 @@ nothing is written.
 - A Lambda event source mapping is the only simulated service integration that consumes a stream.
   Anything else reads one through the Streams API itself. A
   Kinesis Data Streams destination is not simulated.
-- A `StreamSpecification` in a CloudFormation template still skips the table, so a streamed table
-  has to be created through `CreateTable`.
+- `Fn::GetAtt … StreamArn` on a table with no `StreamSpecification` is refused when the attribute is
+  asked for, where real CloudFormation refuses the template while validating it. The timing differs,
+  the outcome does not.
+- Changing a deployed table's `StreamViewType` is not the table replacement real CloudFormation
+  performs. The change goes through `UpdateTable`, which refuses a view type change in place.
 - A shard iterator never expires. Real DynamoDB gives one 15 minutes and then answers
   `ExpiredIteratorException`, which a consumer handles by asking for another from the sequence
   number it last checkpointed. Nothing here refuses an iterator for being old.

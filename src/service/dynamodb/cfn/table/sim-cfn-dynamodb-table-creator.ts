@@ -51,6 +51,7 @@ export class SimCfnDynamoDbTableCreator {
         LocalSecondaryIndexes: tableProperties.localSecondaryIndexes(),
         TableClass: tableProperties.tableClass(),
         DeletionProtectionEnabled: tableProperties.deletionProtectionEnabled(),
+        StreamSpecification: tableProperties.streamSpecification(),
         Tags: tableProperties.tags(),
       },
     });

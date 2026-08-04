@@ -3,6 +3,7 @@ import {
   dynamoDbTablePropertyError,
   dynamoDbTableUnsimulatedPropertyError,
 } from "./sim-cfn-dynamodb-table-property-error.js";
+import { SimCfnDynamoDbTableStreamRules } from "./sim-cfn-dynamodb-table-stream-rules.js";
 import type { SimCfnDynamoDbTableValues } from "./sim-cfn-dynamodb-table-values.js";
 
 /**
@@ -20,6 +21,7 @@ const simulatedPropertyNames: ReadonlySet<string> = new Set([
   "KeySchema",
   "LocalSecondaryIndexes",
   "ProvisionedThroughput",
+  "StreamSpecification",
   "TableClass",
   "TableName",
   "Tags",
@@ -29,9 +31,10 @@ const simulatedPropertyNames: ReadonlySet<string> = new Set([
 /**
  * Real AWS::DynamoDB::Table properties this simulation does not model.
  *
- * Each one changes what the table does. A table deployed without the stream its
- * changes were meant to be published to would leave whatever reads that stream
- * waiting, so the Resource is skipped rather than deployed as something else.
+ * Each one changes what the table does. A table deployed without the Kinesis
+ * stream its changes were meant to be published to would leave whatever reads
+ * that stream waiting, so the Resource is skipped rather than deployed as
+ * something else.
  */
 const unsimulatedPropertyNames: ReadonlySet<string> = new Set([
   "ContributorInsightsSpecification",
@@ -41,7 +44,6 @@ const unsimulatedPropertyNames: ReadonlySet<string> = new Set([
   "PointInTimeRecoverySpecification",
   "ResourcePolicy",
   "SSESpecification",
-  "StreamSpecification",
   "WarmThroughput",
 ]);
 
@@ -59,8 +61,8 @@ interface SimCfnDynamoDbTablePropertyRulesProperties {
  * fails the Resource instead, because that is a template real CloudFormation
  * would refuse too.
  *
- * The two index properties carry properties of their own, which are held to the
- * same rule a level down.
+ * The two index properties and the stream specification carry properties of
+ * their own, which are held to the same rule a level down.
  */
 export class SimCfnDynamoDbTablePropertyRules {
   private readonly logicalId: string;
@@ -79,7 +81,7 @@ export class SimCfnDynamoDbTablePropertyRules {
       this.assertSimulatedProperty(name);
     }
 
-    this.assertSimulatedIndexes();
+    this.assertSimulatedMembers();
   }
 
   private assertSimulatedProperty(name: string): void {
@@ -98,14 +100,18 @@ export class SimCfnDynamoDbTablePropertyRules {
   }
 
   /**
-   * Refuse what the entries of the two index properties ask for and cannot get.
+   * Refuse what the properties carrying properties of their own ask for and
+   * cannot get: the two index lists, and the stream specification.
    */
-  private assertSimulatedIndexes(): void {
-    SimCfnDynamoDbTableIndexRules.global(this.logicalId).assertSimulated(
+  private assertSimulatedMembers(): void {
+    const logicalId = this.logicalId;
+
+    SimCfnDynamoDbTableIndexRules.global(logicalId).assertSimulated(
       this.values.list("GlobalSecondaryIndexes"),
     );
-    SimCfnDynamoDbTableIndexRules.local(this.logicalId).assertSimulated(
+    SimCfnDynamoDbTableIndexRules.local(logicalId).assertSimulated(
       this.values.list("LocalSecondaryIndexes"),
     );
+    new SimCfnDynamoDbTableStreamRules(logicalId).assertSimulated(this.values);
   }
 }

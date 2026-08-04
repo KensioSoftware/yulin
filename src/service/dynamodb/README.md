@@ -946,6 +946,8 @@ The parts under `cfn/table/` split by responsibility:
   `GlobalSecondaryIndexes` and `LocalSecondaryIndexes`. The two kinds have different property sets:
   a local secondary index has no throughput or insights settings on AWS either, so anything of the
   sort on one fails the resource rather than skipping it.
+- `SimCfnDynamoDbTableStreamRules` applies the same rule to the `StreamSpecification`, whose nested
+  `ResourcePolicy` is a policy on the stream rather than the table's own.
 - `SimCfnDynamoDbTableValues` reads the plain shapes a property can hold, naming the property path in
   each refusal. It takes a number from the string a template Parameter carries one as.
 - `SimCfnDynamoDbTableProperties` turns the template properties into `CreateTable` input, and
@@ -953,7 +955,9 @@ The parts under `cfn/table/` split by responsibility:
   `SimCfnGeneratedResourceName`. The parts several properties share are read by
   `readSimCfnDynamoDbKeySchema`, `readSimCfnDynamoDbThroughput` and
   `readSimCfnDynamoDbTableIndexes`, since a table and its indexes state their keys and their
-  capacity the same way.
+  capacity the same way. `readSimCfnDynamoDbTableStream` synthesizes the `StreamEnabled` that
+  `CreateTable` requires and CloudFormation's `StreamSpecification` has no field for, from the
+  property being declared at all.
 - `SimCfnDynamoDbTableCreator` calls `SimDynamoDb.createTable()` with that input and finds the
   created table through `SimDynamoDb.findTable()`.
 
@@ -970,8 +974,9 @@ unlikely to be about.
 
 `Ref` and `Fn::GetAtt` behaviour lives with the CloudFormation engine rather than on the table, in
 `SimDynamoDbTableCfn` under `cloudformation/resource/cfn/dynamodb/`. `Ref` answers with the table
-name and `Fn::GetAtt Arn` with the table ARN. `StreamArn` is refused by name, since an invented
-stream ARN would read as a working stream.
+name and `Fn::GetAtt Arn` with the table ARN. `StreamArn` answers with the ARN of the stream the
+table's `StreamSpecification` gave it, and is refused by name on a table with no stream, since an
+invented stream ARN would read as a working stream.
 
 ## Error model
 
