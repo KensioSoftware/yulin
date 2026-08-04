@@ -4,6 +4,7 @@ import {
   simLambdaEventSourceArnOf,
 } from "../../event-source/sim-lambda-event-source-arn.js";
 import type { SimLambdaFunctionResponseType } from "../../event-source/sim-lambda-event-source-mapping.js";
+import type { SimLambdaEventSourceStartingPosition } from "../../event-source/sim-lambda-event-source-starting-position.js";
 import { SimLambdaInvalidParameterValueException } from "../../error/sim-lambda.error.js";
 import { simLambdaFunctionNameOf } from "../../function/sim-lambda-function-name.js";
 import {
@@ -20,6 +21,7 @@ interface SimLambdaEventSourceMappingInputProperties {
   readonly eventSourceArn: SimLambdaEventSourceArn;
   readonly functionName: string;
   readonly batchSize: number;
+  readonly startingPosition: SimLambdaEventSourceStartingPosition | undefined;
   readonly enabled: boolean;
   readonly functionResponseTypes: readonly SimLambdaFunctionResponseType[];
 }
@@ -38,6 +40,8 @@ export class SimLambdaEventSourceMappingInput {
   public readonly eventSourceArn: SimLambdaEventSourceArn;
   public readonly functionName: string;
   public readonly batchSize: number;
+  public readonly startingPosition:
+    SimLambdaEventSourceStartingPosition | undefined;
   public readonly enabled: boolean;
   public readonly functionResponseTypes: readonly SimLambdaFunctionResponseType[];
 
@@ -45,6 +49,7 @@ export class SimLambdaEventSourceMappingInput {
     this.eventSourceArn = properties.eventSourceArn;
     this.functionName = properties.functionName;
     this.batchSize = properties.batchSize;
+    this.startingPosition = properties.startingPosition;
     this.enabled = properties.enabled;
     this.functionResponseTypes = properties.functionResponseTypes;
   }
@@ -68,8 +73,12 @@ export class SimLambdaEventSourceMappingInput {
         requiredString(input.FunctionName, "functionName"),
       ),
       batchSize: eventSourceArn.batchRules.sizeIn(input.BatchSize),
+      startingPosition: eventSourceArn.startingPositionRules.positionIn({
+        startingPosition: input.StartingPosition,
+        startingPositionTimestamp: input.StartingPositionTimestamp,
+      }),
       enabled: input.Enabled ?? true,
-      functionResponseTypes: functionResponseTypesIn(input),
+      functionResponseTypes: functionResponseTypesIn(input, eventSourceArn),
     });
   }
 }
@@ -91,7 +100,7 @@ function eventSourceArnIn(
       `EventSourceArn ${eventSourceArn.value} names Account ` +
         `${eventSourceArn.accountId} in ${eventSourceArn.regionName}, and a ` +
         `function in Account ${scope.accountId} in ${scope.regionName} can ` +
-        "only be mapped to a queue in its own Account and Region",
+        "only be mapped to an event source in its own Account and Region",
     );
   }
 

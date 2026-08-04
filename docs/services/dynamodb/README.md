@@ -2704,6 +2704,14 @@ it means the oldest record still there, whatever has gone.
 A stream stays listable and readable after its table switches it off, and after everything on it has
 been trimmed. A trimmed stream reads as empty rather than as missing.
 
+### Delivering a stream to a Lambda function
+
+Most applications consume a stream by having a Lambda function run on it rather than by polling it
+themselves, which is a
+[Lambda event source mapping](../lambda/#triggering-a-function-from-a-dynamodb-stream "Simulated Lambda event source mapping docs"):
+create the mapping, write to the table, and the function is invoked with the changes. The
+`GetRecords` loop above is still there for a consumer that wants to read a stream directly.
+
 ## Numbers
 
 A DynamoDB number carries up to 38 significant digits, where a JavaScript number carries about 15.
@@ -3329,7 +3337,9 @@ nothing is written.
   elapsing. An item whose window goes by while a running-mode clock tracks the host stays where it
   is until something moves the clock. A simulated DynamoDB constructed standalone as
   `new SimDynamoDb()` has no clock control at all, so nothing there ever expires.
-- A Lambda event source mapping cannot read a stream yet. A test polls one with `GetRecords` itself.
+- A Lambda event source mapping is the only simulated service integration that consumes a stream.
+  Anything else reads one through the Streams API itself. A
+  Kinesis Data Streams destination is not simulated.
 - A `StreamSpecification` in a CloudFormation template still skips the table, so a streamed table
   has to be created through `CreateTable`.
 - A shard iterator never expires. Real DynamoDB gives one 15 minutes and then answers

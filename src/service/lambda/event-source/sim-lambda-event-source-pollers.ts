@@ -5,10 +5,12 @@ import type { SimLambdaEventSourcePoller } from "./poll/sim-lambda-event-source-
 import type { SimLambdaEventSourceQueues } from "./queue/sim-lambda-event-source-queues.js";
 import type { SimLambdaEventSourceArn } from "./sim-lambda-event-source-arn.js";
 import type { SimLambdaEventSourceMapping } from "./sim-lambda-event-source-mapping.js";
+import type { SimLambdaEventSourceStreams } from "./stream/sim-lambda-event-source-streams.js";
 
 interface SimLambdaEventSourcePollersProperties {
   readonly functions: SimLambdaFunctionLookup;
   readonly queues: SimLambdaEventSourceQueues;
+  readonly streams: SimLambdaEventSourceStreams;
   readonly background: BackgroundScheduler;
 }
 

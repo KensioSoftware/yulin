@@ -571,6 +571,240 @@ or an empty `batchItemFailures` list, has handled the whole batch.
 `Fn::GetAtt` and `Ref` values a template gives them, `Ref` on the mapping returns its UUID, and
 `Fn::GetAtt` exposes `Id` and `EventSourceMappingArn`.
 
+## Triggering a function from a DynamoDB stream
+
+An event source mapping also connects a [simulated table's stream](../dynamodb/#capturing-changes-with-a-stream "Simulated DynamoDB streams docs")
+to a function. Changes to the table are delivered to the handler as a DynamoDB stream event, with
+the `Records` shape real Lambda uses.
+
+`StartingPosition` is required for a stream and is `TRIM_HORIZON` or `LATEST`. `TRIM_HORIZON` reads
+what the stream still holds, so changes made before the mapping existed are delivered too. `LATEST`
+reads only what the table changes from the moment the mapping starts reading. `AT_TIMESTAMP` is for
+a Kinesis stream and is refused by name.
+
+`BatchSize` says how many records one invocation may be given, and defaults to 100, which is what
+CDK's `DynamoEventSource` also asks for. The table and the function have to be in the same account
+and region, as they do on real AWS.
+
+```typescript sim-lambda-dynamodb-stream-event-source
+/**
+ * Delivering a simulated table's changes to a simulated function.
+ */
+
+import {
+  CreateTableCommand,
+  GetItemCommand,
+  PutItemCommand,
+} from "@aws-sdk/client-dynamodb";
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import {
+  CreateEventSourceMappingCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import {
+  makeLambdaZipFileInput,
+  type SimLambdaDynamoDbStreamEvent,
+} from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+
+const { TableDescription } = await simAws.dynamoDb().createTable(
+  new CreateTableCommand({
+    TableName: "orders",
+    KeySchema: [{ AttributeName: "orderId", KeyType: "HASH" }],
+    AttributeDefinitions: [{ AttributeName: "orderId", AttributeType: "S" }],
+    BillingMode: "PAY_PER_REQUEST",
+    StreamSpecification: {
+      StreamEnabled: true,
+      StreamViewType: "NEW_AND_OLD_IMAGES",
+    },
+  }),
+);
+
+const streamArn = TableDescription?.LatestStreamArn;
+
+// The projection goes into a second table. A function writing back into the
+// table whose stream invoked it would be delivered its own writes, which the
+// simulator refuses rather than looping on.
+await simAws.dynamoDb().createTable(
+  new CreateTableCommand({
+    TableName: "order-totals",
+    KeySchema: [{ AttributeName: "orderId", KeyType: "HASH" }],
+    AttributeDefinitions: [{ AttributeName: "orderId", AttributeType: "S" }],
+    BillingMode: "PAY_PER_REQUEST",
+  }),
+);
+
+// The execution role needs the three stream actions Lambda reads a stream
+// with, plus ListStreams, which is on every stream rather than on one, and
+// whatever the function itself does.
+const role = await simAws.iam().createRole(
+  new CreateRoleCommand({
+    RoleName: "OrderProjectorRole",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { Service: "lambda.amazonaws.com" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+
+await simAws.iam().putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "OrderProjectorRole",
+    PolicyName: "ProjectOrders",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Allow",
+          Action: [
+            "dynamodb:DescribeStream",
+            "dynamodb:GetRecords",
+            "dynamodb:GetShardIterator",
+          ],
+          Resource: streamArn,
+        },
+        { Effect: "Allow", Action: "dynamodb:ListStreams", Resource: "*" },
+        {
+          Effect: "Allow",
+          Action: "dynamodb:PutItem",
+          Resource: `arn:aws:dynamodb:${simAws.defaultRegionName}:${simAws.defaultAccountId}:table/order-totals`,
+        },
+      ],
+    }),
+  }),
+);
+
+await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "order-projector",
+    Role: role.Role.Arn,
+    Code: {
+      ZipFile: makeLambdaZipFileInput(
+        async (event: SimLambdaDynamoDbStreamEvent) => {
+          await Promise.all(
+            event.Records.map(async (record) =>
+              simAws.dynamoDb().putItem(
+                new PutItemCommand({
+                  TableName: "order-totals",
+                  Item: {
+                    orderId: { S: record.dynamodb.Keys?.["orderId"]?.S ?? "" },
+                    total: { N: record.dynamodb.NewImage?.["total"]?.N ?? "0" },
+                  },
+                }),
+              ),
+            ),
+          );
+        },
+      ),
+    },
+  }),
+);
+
+await simAws.lambda().createEventSourceMapping(
+  new CreateEventSourceMappingCommand({
+    EventSourceArn: streamArn,
+    FunctionName: "order-projector",
+    StartingPosition: "TRIM_HORIZON",
+  }),
+);
+
+await simAws.dynamoDb().putItem(
+  new PutItemCommand({
+    TableName: "orders",
+    Item: { orderId: { S: "order-1" }, total: { N: "42" } },
+  }),
+);
+
+// Delivery happens in the background, so wait for the simulation to settle.
+await simAws.backgroundTasksComplete();
+
+const projected = await simAws.dynamoDb().getItem(
+  new GetItemCommand({
+    TableName: "order-totals",
+    Key: { orderId: { S: "order-1" } },
+  }),
+);
+
+console.log(projected.Item?.["total"]?.N); // "42"
+```
+
+Each record carries `eventID`, `eventName`, `eventVersion`, `eventSource`, `awsRegion`,
+`eventSourceARN` and a `dynamodb` body holding `Keys`, the images the stream's view type selects,
+`SequenceNumber`, `SizeBytes`, `StreamViewType` and `ApproximateCreationDateTime` as whole seconds
+since the epoch. A time to live removal also carries
+`userIdentity: { type: "Service", principalId: "dynamodb.amazonaws.com" }`, which is how a handler
+tells an expiry from a deletion the application asked for. The event lower-cases those two fields
+where [the Streams API capitalizes them](../dynamodb/#reading-a-streams-records "Simulated DynamoDB Streams docs").
+
+`SimLambdaDynamoDbStreamEvent` and `SimLambdaDynamoDbStreamEventRecord` are exported from
+`@kensio/yulin/lambda` for typing a handler, and are minimal structural equivalents of the
+`DynamoDBStreamEvent` and `DynamoDBRecord` types from the `aws-lambda` typings package.
+
+A binary attribute reaches the handler as a base64 string rather than as bytes, which is what the
+event carries on AWS: it arrives as JSON, and JSON has no bytes. `Buffer.from(value.B, "base64")`
+therefore reads the same here as it does deployed. The
+[Streams API](../dynamodb/#reading-a-streams-records "Simulated DynamoDB Streams docs") hands out
+bytes for the same attribute, because its client decodes them. Nesting makes no difference: binary
+inside a list or a map is encoded too.
+
+Creating the mapping checks what real Lambda checks: that the stream exists, and that the function's
+execution role is allowed `dynamodb:DescribeStream`, `dynamodb:GetRecords` and
+`dynamodb:GetShardIterator` on it, plus `dynamodb:ListStreams` on `*`. Those four are what both the
+AWS managed policy and CDK's own grant give a stream consumer. A role missing one of them fails with
+`InvalidParameterValueException` naming the operation.
+
+### When the handler fails
+
+A stream is not a queue, and the difference shows here. A queue hands a message out and hides it, so
+a batch the handler threw on is the queue's problem afterwards. A stream hands out a place, and the
+mapping is the only thing that remembers it, so a batch the handler threw on is read again from
+exactly where it was and nothing behind it is delivered until it is through. That is what blocking a
+shard means.
+
+Advancing the simulation's clock is what hands the batch over again:
+
+```typescript
+await simAws.clock().advanceBy({ seconds: 30 });
+```
+
+The batch is delivered again five times, after 1, 2, 4, 8 and 16 seconds, so six deliveries in all.
+Then it is discarded and the mapping carries on with the stream, which is what AWS does once a
+stream mapping's error handling has run out.
+
+Both the cadence and the number of attempts are simulator constraints rather than AWS behaviour. AWS
+documents no delay between attempts and retries until the records age out of the stream, a day
+later. A delay of zero here would fall due at the instant the clock already reads, so a handler that
+always throws would leave `advanceBy` with work falling due forever, and waiting out a simulated day
+is the same problem with more steps.
+
+### Writing back to the source table
+
+A handler that writes into the table whose stream invoked it is delivered its own write, which
+writes again. Real Lambda runs that loop for as long as the account is willing to pay for it. The
+simulation refuses instead, with an error naming the function, the stream and the table, rather than
+going round until the test times out.
+
+The write itself succeeds; the refusal comes afterwards, from whatever is waiting for the simulation
+to settle:
+
+```typescript
+await simAws.backgroundTasksComplete(); // throws SimLambdaStreamCascadeError
+```
+
+Only the handler's own writes count. Items written at the same time by the test, or by anything else
+in the simulation, are an ordinary batch however many of them there are, because the guard tells them
+apart by where the write came from rather than by when it landed.
+
+Writing the projection into a second table is what the guard is asking for, and is what a real
+aggregation or search index does anyway.
+
 ## Function URLs
 
 A Function URL is an HTTP endpoint for one function. Creating one with
@@ -1310,11 +1544,14 @@ Sim Lambda currently supports:
   resolved from the request
 - `AddPermissionCommand`, `RemovePermissionCommand` and `GetPolicyCommand`, for resource-based
   policies evaluated alongside identity policies
-- SQS event source mappings, created with `CreateEventSourceMappingCommand` and read with
-  `GetEventSourceMappingCommand`, `ListEventSourceMappingsCommand` and
-  `DeleteEventSourceMappingCommand`, delivering real-shaped SQS events and honouring `BatchSize`
-- `FunctionResponseTypes: ["ReportBatchItemFailures"]`, returning only the message ids the handler
-  reported
+- SQS and DynamoDB stream event source mappings, created with `CreateEventSourceMappingCommand` and
+  read with `GetEventSourceMappingCommand`, `ListEventSourceMappingsCommand` and
+  `DeleteEventSourceMappingCommand`, delivering real-shaped SQS and DynamoDB stream events and
+  honouring `BatchSize`
+- `StartingPosition: "TRIM_HORIZON"` and `"LATEST"` on a stream mapping, with a failing batch
+  blocking its shard until it is through or discarded
+- `FunctionResponseTypes: ["ReportBatchItemFailures"]` on a queue mapping, returning only the
+  message ids the handler reported
 - Function code from three sources:
   - an in-process handler function passed via `makeLambdaZipFileInput(...)`
   - zip archive bytes on `Code.ZipFile` (build them with `makeLambdaCodeZip(...)`)
@@ -1373,17 +1610,36 @@ Current documented limitations:
   invocation and sees the host clock. See [The time inside a handler](#the-time-inside-a-handler).
 - `Event` invocations do not simulate retries or failure destinations; handler errors are dropped.
 - `Code.S3ObjectVersion` is accepted but ignored, as sim S3 has no object versioning yet.
-- SQS queues are the only event source. DynamoDB streams, Kinesis, Kafka and DocumentDB sources are
-  refused rather than accepted and never delivered from, and so are `FilterCriteria`, `ScalingConfig`,
-  `DestinationConfig`, `MaximumRetryAttempts` and the other mapping inputs this simulation has no
-  behaviour for.
+- SQS queues and DynamoDB streams are the only event sources. Kinesis, Kafka and DocumentDB sources
+  are refused rather than accepted and never delivered from, and so are `FilterCriteria`,
+  `ScalingConfig`, `DestinationConfig`, `MaximumRetryAttempts`, `BisectBatchOnFunctionError`,
+  `ParallelizationFactor`, `TumblingWindowInSeconds` and the other mapping inputs this simulation
+  has no behaviour for.
+- `FunctionResponseTypes: ["ReportBatchItemFailures"]` is refused on a stream mapping rather than
+  accepted and ignored. A stream retries a batch from the record a report names onward, where a
+  queue takes back the messages it names, and a failing stream batch is retried whole here. That
+  rule is [issue 342](https://github.com/KensioSoftware/yulin/issues/342).
+- A stream batch is delivered again five times, after 1, 2, 4, 8 and 16 seconds, and then
+  discarded. AWS
+  documents no delay between attempts and retries until the records age out. Both differences are
+  deliberate: a delay of zero falls due at the instant the clock already reads, so a handler that
+  always throws would leave `advanceBy` with work falling due forever.
+- A handler writing into the table whose stream invoked it is refused with
+  `SimLambdaStreamCascadeError` rather than being delivered its own writes forever. Real Lambda runs
+  that loop.
+- A shard iterator never expires, where a real one is good for 15 minutes.
 - `MaximumBatchingWindowInSeconds` is only simulated as 0: a partial batch is delivered as soon as
-  anything is on the queue, so a batching window would have nothing to wait for. A non-zero value is
-  refused, which also caps `BatchSize` at 10.
+  anything is on the event source, so a batching window would have nothing to wait for. A non-zero
+  value is refused, which also caps a queue mapping's `BatchSize` at 10. The documented rule that a
+  `BatchSize` above 10 needs a batching window is not enforced, because the same AWS documentation
+  gives a stream mapping `BatchSize` 100 and window 0 as simultaneous defaults, and CDK emits
+  exactly that.
 - `UpdateEventSourceMapping` is not supported, so a mapping's batch size or enabled state is fixed
   once it is created. `Enabled: false` at creation is simulated.
 - One poll delivers one batch. Real Lambda runs several pollers at once and scales them with the
-  queue, so nothing here shows what concurrency does to ordering or to a downstream service.
+  event source, so nothing here shows what concurrency does to ordering or to a downstream service.
+  A simulated stream has one shard and never splits, so a stream mapping has one thing to read
+  either way.
 - CloudFormation resource types other than `AWS::Lambda::Function`, `AWS::Lambda::Url`,
   `AWS::Lambda::Permission` and `AWS::Lambda::EventSourceMapping` (`Version`, `Alias`, ...) are
   skipped with an "Unsupported" diagnostic.

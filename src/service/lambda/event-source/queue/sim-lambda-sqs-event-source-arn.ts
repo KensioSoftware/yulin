@@ -1,36 +1,16 @@
 import { SimLambdaInvalidParameterValueException } from "../../error/sim-lambda.error.js";
 import { sqsQueueUrl } from "../../../sqs/queue/sim-sqs-queue-arn.js";
-import { SimLambdaEventSourceBatchRules } from "../sim-lambda-event-source-batch-rules.js";
+import type { SimLambdaEventSourceBatchRules } from "../sim-lambda-event-source-batch-rules.js";
 import { SimLambdaEventSourcePollingPermission } from "../sim-lambda-event-source-polling-permission.js";
+import type { SimLambdaEventSourceStartingPositionRules } from "../sim-lambda-event-source-starting-position.js";
+import {
+  sqsBatchRules,
+  sqsPollingOperations,
+  sqsStartingPositionRules,
+} from "./sim-lambda-sqs-event-source-rules.js";
 
 const queueArnPattern =
   /^arn:aws:sqs:(?<region>[a-z0-9-]+):(?<account>\d{12}):(?<name>[\w-]{1,80})$/u;
-
-/**
- * What a function's execution role has to be allowed to do on a queue for
- * Lambda to poll it.
- *
- * These are the three operations real Lambda checks when an SQS event source
- * mapping is created, and the three its poller performs afterwards.
- */
-const queuePollingOperations = [
-  "ReceiveMessage",
-  "DeleteMessage",
-  "GetQueueAttributes",
-] as const;
-
-/**
- * The batch sizes an SQS event source delivers with.
- *
- * Ten is both the batch real Lambda uses when the mapping names none, and the
- * largest batch it delivers from a standard queue without a batching window to
- * fill a bigger one.
- */
-const queueBatchRules = new SimLambdaEventSourceBatchRules({
-  defaultSize: 10,
-  maximumSize: 10,
-  sourceDescription: "a queue with no batching window",
-});
 
 /**
  * The queue ARN an event source mapping is created for.
@@ -61,7 +41,7 @@ export class SimLambdaSqsEventSourceArn {
     this.regionName = parts["region"] ?? "";
     this.accountId = parts["account"] ?? "";
     this.queueName = parts["name"] ?? "";
-    this.pollingPermissions = queuePollingOperations.map(
+    this.pollingPermissions = sqsPollingOperations.map(
       (operation) =>
         new SimLambdaEventSourcePollingPermission(`sqs:${operation}`, value),
     );
@@ -103,7 +83,15 @@ export class SimLambdaSqsEventSourceArn {
    * The batch sizes a mapping on this queue may deliver with.
    */
   get batchRules(): SimLambdaEventSourceBatchRules {
-    return queueBatchRules;
+    return sqsBatchRules;
+  }
+
+  /**
+   * The starting positions a mapping on this queue may be created with, which
+   * is none of them.
+   */
+  get startingPositionRules(): SimLambdaEventSourceStartingPositionRules {
+    return sqsStartingPositionRules;
   }
 
   /**

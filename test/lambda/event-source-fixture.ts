@@ -121,28 +121,32 @@ export async function makeConsumerFunction(
 
 /**
  * A handler that records the events it is given.
+ *
+ * The event type is the parameter, because what a mapping delivers depends on
+ * the event source it polls: a queue mapping hands over an SQS event and a
+ * stream mapping hands over a DynamoDB stream event.
  */
-export interface RecordingHandler {
+export interface RecordingHandler<Event> {
   readonly handler: SimLambdaHandler;
-  readonly events: SimLambdaSqsEvent[];
+  readonly events: Event[];
 }
 
 /**
  * Make a handler recording every event it receives, and returning a result.
  */
-export function recordingHandler(
-  result: (event: SimLambdaSqsEvent) => unknown = (): undefined => undefined,
-): RecordingHandler {
-  const events: SimLambdaSqsEvent[] = [];
+export function recordingHandler<Event = SimLambdaSqsEvent>(
+  result: (event: Event) => unknown = (): undefined => undefined,
+): RecordingHandler<Event> {
+  const events: Event[] = [];
 
   return {
     events,
     handler: (event: unknown): unknown => {
-      const sqsEvent = event as SimLambdaSqsEvent;
+      const received = event as Event;
 
-      events.push(sqsEvent);
+      events.push(received);
 
-      return result(sqsEvent);
+      return result(received);
     },
   };
 }

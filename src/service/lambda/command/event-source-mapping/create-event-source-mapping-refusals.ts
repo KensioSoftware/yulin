@@ -14,11 +14,26 @@ const unsimulatedInputs: ReadonlyMap<string, string> = new Map([
   ["FilterCriteria", "event filtering is not simulated"],
   ["ScalingConfig", "polling concurrency is not simulated"],
   ["ProvisionedPollerConfig", "polling concurrency is not simulated"],
-  ["DestinationConfig", "failure destinations are not simulated"],
-  ["MaximumRetryAttempts", "retry limits are not simulated"],
+  [
+    "DestinationConfig",
+    "failure destinations are not simulated, so a stream batch that runs out " +
+      "of attempts is discarded rather than sent anywhere",
+  ],
+  [
+    "MaximumRetryAttempts",
+    "the number of times a stream batch is delivered again is fixed",
+  ],
   ["MaximumRecordAgeInSeconds", "record ages are not simulated"],
-  ["BisectBatchOnFunctionError", "batch bisection is not simulated"],
-  ["ParallelizationFactor", "polling concurrency is not simulated"],
+  [
+    "BisectBatchOnFunctionError",
+    "batch bisection is not simulated, so a failing stream batch is retried " +
+      "whole",
+  ],
+  [
+    "ParallelizationFactor",
+    "polling concurrency is not simulated, and a simulated stream has one " +
+      "shard",
+  ],
   ["TumblingWindowInSeconds", "tumbling windows are not simulated"],
   [
     "SourceAccessConfigurations",
@@ -36,10 +51,12 @@ const unsimulatedInputs: ReadonlyMap<string, string> = new Map([
  * None of them is a thing that is missing from the sources here. Each one
  * configures a source the ARN dispatcher refuses outright, so naming one is a
  * request for a different kind of mapping rather than for a feature.
+ *
+ * `StartingPosition` is not among them, because whether a source has one is the
+ * source's own rule: a stream is refused without it and a queue is refused with
+ * it.
  */
 const unsupportedEventSourceInputs: ReadonlySet<string> = new Set([
-  "StartingPosition",
-  "StartingPositionTimestamp",
   "Topics",
   "Queues",
   "SelfManagedEventSource",
@@ -71,7 +88,8 @@ export function refuseUnsimulatedInput(
     throw new SimLambdaInvalidParameterValueException(
       "MaximumBatchingWindowInSeconds on an event source mapping is only " +
         "simulated as 0: a partial batch is delivered as soon as anything is " +
-        "on the queue, so a batching window would have nothing to wait for",
+        "on the event source, so a batching window would have nothing to " +
+        "wait for",
     );
   }
 }

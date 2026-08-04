@@ -8,7 +8,9 @@ import type { SimLambdaEventSourceArn } from "../../event-source/sim-lambda-even
 import { SimLambdaEventSourceMapping } from "../../event-source/sim-lambda-event-source-mapping.js";
 import type { SimLambdaEventSourceMappingStore } from "../../event-source/sim-lambda-event-source-mapping-store.js";
 import type { SimLambdaEventSourcePollers } from "../../event-source/sim-lambda-event-source-pollers.js";
+import { SimLambdaEventSourceReachable } from "../../event-source/sim-lambda-event-source-reachable.js";
 import { SimLambdaEventSourceRolePermissions } from "../../event-source/sim-lambda-event-source-role-permissions.js";
+import type { SimLambdaEventSourceStreams } from "../../event-source/stream/sim-lambda-event-source-streams.js";
 import type { SimLambdaFunction } from "../../function/sim-lambda-function.js";
 import type { SimLambdaFunctionLookup } from "../../function/url/sim-lambda-function-lookup.js";
 import { FunctionUrlAuthorizer } from "../function-url/function-url-authorizer.js";
@@ -23,6 +25,7 @@ interface CreateEventSourceMappingCommandHandlerProperties {
   readonly mappings: SimLambdaEventSourceMappingStore;
   readonly pollers: SimLambdaEventSourcePollers;
   readonly queues: SimLambdaEventSourceQueues;
+  readonly streams: SimLambdaEventSourceStreams;
   readonly functions: SimLambdaFunctionLookup;
   readonly iam: SimIamInterServiceAuthZ;
   readonly background: BackgroundScheduler;
@@ -49,6 +52,7 @@ export class CreateEventSourceMappingCommandHandler implements CommandHandler<
   private readonly properties: CreateEventSourceMappingCommandHandlerProperties;
   private readonly authorizer: FunctionUrlAuthorizer;
   private readonly rolePermissions: SimLambdaEventSourceRolePermissions;
+  private readonly reachable: SimLambdaEventSourceReachable;
 
   constructor(properties: CreateEventSourceMappingCommandHandlerProperties) {
     this.properties = properties;
@@ -58,6 +62,10 @@ export class CreateEventSourceMappingCommandHandler implements CommandHandler<
     });
     this.rolePermissions = new SimLambdaEventSourceRolePermissions({
       iam: properties.iam,
+    });
+    this.reachable = new SimLambdaEventSourceReachable({
+      queues: properties.queues,
+      streams: properties.streams,
     });
   }
 
@@ -97,8 +105,8 @@ export class CreateEventSourceMappingCommandHandler implements CommandHandler<
    * Refuse a mapping whose event source cannot be polled as the execution
    * role.
    *
-   * The role's permission is checked before the queue is read, so a role with
-   * no access is told what it is missing rather than being told the queue does
+   * The role's permission is checked before the source is read, so a role with
+   * no access is told what it is missing rather than being told the source does
    * not exist.
    */
   private async assertPollable(
@@ -107,12 +115,9 @@ export class CreateEventSourceMappingCommandHandler implements CommandHandler<
   ): Promise<void> {
     this.rolePermissions.assertMayPoll(simFunction.roleArn, eventSourceArn);
 
-    // Reading the queue's attributes as the role is how the mapping finds out
-    // the queue is there at all, exactly as the poller will.
-    await this.properties.queues.visibilityTimeoutSeconds({
-      queueArn: eventSourceArn.value,
-      caller: { kind: "arn", arn: simFunction.roleArn },
-    });
+    // Reading the source as the role is how the mapping finds out it is there
+    // at all, exactly as the poller will.
+    await this.reachable.assertReachable(simFunction.roleArn, eventSourceArn);
   }
 
   private created(
@@ -125,6 +130,7 @@ export class CreateEventSourceMappingCommandHandler implements CommandHandler<
       functionName: input.functionName,
       functionArn: simFunction.arn,
       batchSize: input.batchSize,
+      startingPosition: input.startingPosition,
       enabled: input.enabled,
       functionResponseTypes: input.functionResponseTypes,
       createdAt: this.properties.background.now(),

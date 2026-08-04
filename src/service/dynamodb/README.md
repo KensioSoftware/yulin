@@ -1116,7 +1116,10 @@ state rather than request handling.
   the name after it has built the table.
 - `SimDynamoDbStreamActivity` is the twin of `SimSqsQueueActivity`: it is how a consumer that cannot
   poll continuously finds out there is something to read. There is no instant on the notification,
-  unlike the queue's, because a stream record is readable the moment it is written.
+  unlike the queue's, because a stream record is readable the moment it is written. A simulated
+  Lambda event source mapping is the consumer it exists for, and it reaches this through
+  `SimDynamoDb.streamActivity()` and the Streams commands, matching interfaces simulated Lambda
+  declares for itself, so neither service imports the other.
 
 The read path is the other half of `stream/`, and none of it is state:
 
