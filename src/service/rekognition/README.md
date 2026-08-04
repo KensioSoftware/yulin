@@ -1,8 +1,8 @@
 # Simulated Rekognition implementation
 
-This directory contains the simulated Rekognition implementation. Two image detections are
-simulated, `DetectModerationLabels` and `DetectLabels`, each for an image supplied as bytes or as an
-S3 object.
+This directory contains the simulated Rekognition implementation. Three image detections are
+simulated, `DetectModerationLabels`, `DetectLabels` and `DetectFaces`, each for an image supplied as
+bytes or as an S3 object.
 
 The guiding decision here is that no image recognition happens. Rekognition is a service where the
 interesting behaviour is not the call but what the call returns, so the simulation maintains no
@@ -16,10 +16,10 @@ IAM decision, and the taxonomy a returned label belongs to.
 - `sim-rekognition.ts` is the service facade for one account/region scope.
 - `index.ts` exports the public Rekognition simulator API for `@kensio/yulin/rekognition`.
 
-`SimRekognition` owns a `SimRekognitionModeration` and a `SimRekognitionLabels`, which own the rules
-`DetectModerationLabels` and `DetectLabels` answer from. Rules are grouped per operation rather than
-hung off the facade, so `faces()` can be added beside `moderation()` and `labels()` without the
-facade growing a result shape for each.
+`SimRekognition` owns a `SimRekognitionModeration`, a `SimRekognitionLabels` and a
+`SimRekognitionFaces`, which own the rules the three detections answer from. Rules are grouped per
+operation rather than hung off the facade, so an operation group is added beside the others without
+the facade growing a result shape for each.
 
 The service is scoped to an account and region because its rules are: a detection made in one Region
 is answered by the rules registered in that Region, as a real Rekognition endpoint answers for the
@@ -92,6 +92,54 @@ returned. The two belong in one file because the labels are what that version of
 Labels have no equivalent of a clean image to default to: an empty result would look like a broken
 detection rather than a useful starting point.
 
+## The face model
+
+`face/` is the largest of the three models, because a `FaceDetail` is seventeen members and a
+request decides which of them come back.
+
+`face/sim-rekognition-face-declaration.ts` is the declared shape and nothing else. The readers that
+go with it are in `sim-rekognition-declared-value.ts`, which reads the attributes that can be
+written as a bare value or as a value with a confidence, in the way a label can be written as a bare
+name.
+
+`face/sim-rekognition-detected-face.ts` is one resolved face. It holds six small pieces, each
+owning the attributes it can check as a group:
+
+- `sim-rekognition-face-frame.ts`, the default subset bar the landmarks: bounding box, confidence,
+  pose and quality;
+- `sim-rekognition-face-landmarks.ts`, which reports the landmarks that
+  `sim-rekognition-face-landmark-points.ts` resolved;
+- `sim-rekognition-face-features.ts`, the eight attributes Rekognition answers yes or no to;
+- `sim-rekognition-face-emotions.ts`;
+- `sim-rekognition-face-age-and-gender.ts`;
+- `sim-rekognition-face-eye-direction.ts`.
+
+The split is not decoration. One renderer covering the optional attributes, written to this repo's
+conventions, scores over the FTA threshold on its own. `sim-rekognition-face-feature-members.ts` is
+split out for the same reason the moderation label list is: it is a table of names, and holding it
+beside the code that reads it pushes that file over.
+
+Each piece adds its members through `sim-rekognition-face-detail-builder.ts`, which carries a member
+only when the request asked for the attribute it belongs to and the face declared a value for it. A
+member with no declared value is left out of the response rather than carried as `undefined`, so a
+test can ask which attributes came back. The attribute a member belongs to is passed in beside it
+because the two do not share a name: `EyesOpen` is asked for as `EYES_OPEN`.
+
+`sim-rekognition-face-attributes.ts` is the requested set. The default subset is always wanted, so
+`["FACE_OCCLUDED"]` is that subset with face occlusion added, and `["ALL", "DEFAULT"]` is the union
+the two describe together. It also decides the landmark set: real Rekognition reports five landmarks
+unless `ALL` was asked for, and the whole set when it was.
+
+`sim-rekognition-face-defaults.ts` holds the built-in result, which is the AWS documentation's own
+example response attribute for attribute, along with `simRekognitionNoFaces` and
+`simRekognitionSeveralFaces` for the two results a test that only counts faces needs.
+
+The declaration checks are in the pieces that own the values, and two are worth knowing about.
+Landmarks are not required to sit inside the bounding box, because a real Rekognition face box
+routinely excludes the chin. Landmark pairs that run across the face, such as `eyeLeft` and
+`eyeRight`, are required to be in the order Rekognition reports them in, so a declaration with the
+two swapped is refused where it was written.
+
 ## Images
 
 `image/` is the path from a request to the bytes a rule is matched against.
@@ -119,6 +167,12 @@ missing.
 Every S3 failure becomes `InvalidS3ObjectException`, as it does on real Rekognition, with the
 underlying simulator error kept as the `cause`. A missing `s3:GetObject` grant would otherwise be
 indistinguishable from a missing object.
+
+`image/sim-rekognition-bounding-box.ts` is shared by the label and face models, because a bounding
+box is the same four ratios in both. It refuses a box that does not sit inside the image, which is
+stricter than AWS: a real response can put a box outside the image bounds for a face at the edge
+that is only partly visible. The check is kept because it catches a box written in pixels, which is
+the mistake worth catching.
 
 ## Authorization
 

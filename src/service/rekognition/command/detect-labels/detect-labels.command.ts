@@ -1,4 +1,5 @@
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
+import type { SimRekognitionBoundingBoxOutput } from "../../image/sim-rekognition-bounding-box.js";
 import type { SimRekognitionImageInput } from "../../image/sim-rekognition-image-input.js";
 
 /**
@@ -12,19 +13,6 @@ import type { SimRekognitionImageInput } from "../../image/sim-rekognition-image
  */
 export interface SimRekognitionLabelNameOutput {
   readonly Name: string;
-}
-
-/**
- * Where in an image one instance of a detected label is, as ratios of the
- * image's own width and height.
- *
- * https://docs.aws.amazon.com/rekognition/latest/APIReference/API_BoundingBox.html
- */
-export interface SimRekognitionBoundingBoxOutput {
-  readonly Left: number;
-  readonly Top: number;
-  readonly Width: number;
-  readonly Height: number;
 }
 
 /**

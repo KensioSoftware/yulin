@@ -1,30 +1,24 @@
-import type {
-  SimRekognitionBoundingBoxOutput,
-  SimRekognitionLabelInstanceOutput,
-} from "../command/detect-labels/detect-labels.command.js";
-import { SimRekognitionDeclarationError } from "../error/sim-rekognition.error.js";
+import type { SimRekognitionLabelInstanceOutput } from "../command/detect-labels/detect-labels.command.js";
+import { SimRekognitionBoundingBoxes } from "../image/sim-rekognition-bounding-box.js";
 import { SimRekognitionDeclaredConfidence } from "../rule/sim-rekognition-declared-confidence.js";
-import type {
-  SimRekognitionDeclaredBoundingBox,
-  SimRekognitionDeclaredLabelInstance,
-} from "./sim-rekognition-label-declaration.js";
+import type { SimRekognitionDeclaredLabelInstance } from "./sim-rekognition-label-declaration.js";
 
 /**
  * The instances of one declared label, resolved into what a response carries.
  *
  * An instance takes its label's confidence when none is declared for it, since
- * a label detected at 98 is not usually located at 40. Bounding box values go
- * through `Math.fround` for the same reason confidences do: real ones are
- * float32 values such as `0.26779675483703613`.
+ * a label detected at 98 is not usually located at 40.
  */
 export class SimRekognitionLabelInstances {
   private readonly confidence: SimRekognitionDeclaredConfidence;
+  private readonly boundingBoxes: SimRekognitionBoundingBoxes;
 
   constructor(
     private readonly labelName: string,
     labelConfidence: number,
   ) {
     this.confidence = new SimRekognitionDeclaredConfidence(labelConfidence);
+    this.boundingBoxes = new SimRekognitionBoundingBoxes(labelName);
   }
 
   /**
@@ -34,31 +28,8 @@ export class SimRekognitionLabelInstances {
     declared: readonly SimRekognitionDeclaredLabelInstance[],
   ): readonly SimRekognitionLabelInstanceOutput[] {
     return declared.map((instance) => ({
-      BoundingBox: this.boundingBox(instance.boundingBox),
+      BoundingBox: this.boundingBoxes.of(instance.boundingBox),
       Confidence: this.confidence.of(this.labelName, instance.confidence),
     }));
-  }
-
-  private boundingBox(
-    box: SimRekognitionDeclaredBoundingBox,
-  ): SimRekognitionBoundingBoxOutput {
-    return {
-      Left: this.ratio("left", box.left),
-      Top: this.ratio("top", box.top),
-      Width: this.ratio("width", box.width),
-      Height: this.ratio("height", box.height),
-    };
-  }
-
-  private ratio(part: string, value: number): number {
-    if (!Number.isFinite(value) || value < 0 || value > 1) {
-      throw new SimRekognitionDeclarationError(
-        `A bounding box declared for '${this.labelName}' has a ${part} of ` +
-          `${String(value)}, which is not a ratio of the image size from 0 ` +
-          `to 1.`,
-      );
-    }
-
-    return Math.fround(value);
   }
 }

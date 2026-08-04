@@ -8,6 +8,11 @@ import {
   type SimIamInterServiceAuthZ,
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimRekognitionAuthorizer } from "./command/authorize/sim-rekognition-authorizer.js";
+import { DetectFacesHandler } from "./command/detect-faces/detect-faces.handler.js";
+import type {
+  SimDetectFacesCommand,
+  SimDetectFacesCommandOutput,
+} from "./command/detect-faces/detect-faces.command.js";
 import { DetectLabelsHandler } from "./command/detect-labels/detect-labels.handler.js";
 import type {
   SimDetectLabelsCommand,
@@ -19,6 +24,7 @@ import type {
   SimDetectModerationLabelsCommandOutput,
 } from "./command/detect-moderation-labels/detect-moderation-labels.command.js";
 import type { SimRekognitionRequestOptions } from "./command/sim-rekognition-request-options.js";
+import { SimRekognitionFaces } from "./face/sim-rekognition-faces.js";
 import {
   type SimRekognitionImageObjects,
   SimRekognitionUnreachableImageObjects,
@@ -49,8 +55,10 @@ interface SimRekognitionProperties {
 export class SimRekognition {
   private readonly moderationRules = new SimRekognitionModeration();
   private readonly labelRules = new SimRekognitionLabels();
+  private readonly faceRules = new SimRekognitionFaces();
   private readonly detectModerationLabelsCommand: DetectModerationLabelsHandler;
   private readonly detectLabelsCommand: DetectLabelsHandler;
+  private readonly detectFacesCommand: DetectFacesHandler;
   private readonly sdkRouter = new SimRekognitionSdkCommandRouter(this);
 
   constructor(properties: SimRekognitionProperties = {}) {
@@ -70,6 +78,13 @@ export class SimRekognition {
 
     this.detectLabelsCommand = new DetectLabelsHandler({
       labels: this.labelRules,
+      authorizer,
+      images,
+      background,
+    });
+
+    this.detectFacesCommand = new DetectFacesHandler({
+      faces: this.faceRules,
       authorizer,
       images,
       background,
@@ -107,6 +122,19 @@ export class SimRekognition {
   }
 
   /**
+   * The face results this simulated Rekognition answers with.
+   *
+   * Every image holds the built-in default face until a rule says otherwise:
+   *
+   * ```typescript
+   * simAws.rekognition().faces().onName("landscape.jpg", { faces: [] });
+   * ```
+   */
+  faces(): SimRekognitionFaces {
+    return this.faceRules;
+  }
+
+  /**
    * Handle a DetectModerationLabels Command from the SDK.
    *
    * Background sequencing happens inside the command rather than here,
@@ -128,6 +156,16 @@ export class SimRekognition {
     options?: SimRekognitionRequestOptions,
   ): Promise<SimDetectLabelsCommandOutput> {
     return await this.detectLabelsCommand.handle(command, options);
+  }
+
+  /**
+   * Handle a DetectFaces Command from the SDK.
+   */
+  async detectFaces(
+    command: SimDetectFacesCommand,
+    options?: SimRekognitionRequestOptions,
+  ): Promise<SimDetectFacesCommandOutput> {
+    return await this.detectFacesCommand.handle(command, options);
   }
 
   /**

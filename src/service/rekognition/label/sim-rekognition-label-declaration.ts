@@ -1,17 +1,4 @@
-/**
- * Where one instance of a declared label sits in the image, as ratios of the
- * image's own width and height.
- *
- * The four numbers are the `BoundingBox` real Rekognition reports, in the same
- * units: `left` and `top` are the corner nearest the image origin, and `width`
- * and `height` are the size, each from 0 to 1.
- */
-export interface SimRekognitionDeclaredBoundingBox {
-  readonly left: number;
-  readonly top: number;
-  readonly width: number;
-  readonly height: number;
-}
+import type { SimRekognitionDeclaredBoundingBox } from "../image/sim-rekognition-bounding-box.js";
 
 /**
  * One instance of a declared label, at a place in the image.

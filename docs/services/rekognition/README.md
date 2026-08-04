@@ -140,11 +140,175 @@ Nothing is filled in from a label name. Declaring `Dog` with no parents reports 
 parents, and declaring a `Pizza` nobody has heard of reports `Pizza`, because Yulin ships no general
 label ontology to check a name against or to expand one from.
 
+## Detecting faces in an image
+
+`DetectFaces` answers with the faces an image is declared to hold. A face says where it is and what
+it looks like, and the response carries the attributes the request asked for.
+
+```typescript sim-rekognition-detect-faces
+/**
+ * Declaring the faces in one S3 object and detecting them.
+ */
+
+import { DetectFacesCommand } from "@aws-sdk/client-rekognition";
+import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+await simAws.s3().createBucket(new CreateBucketCommand({ Bucket: "uploads" }));
+await simAws.s3().putObject(
+  new PutObjectCommand({
+    Bucket: "uploads",
+    Key: "raw/selfie.png",
+    Body: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGO4I2IDAAL8AS3VzMq8AAAAAElFTkSuQmCC",
+      "base64",
+    ),
+  }),
+);
+
+simAws
+  .rekognition()
+  .faces()
+  .onName("raw/selfie.png", {
+    faces: [
+      {
+        // A bounding box is in ratios of the image size, as AWS reports it.
+        boundingBox: { left: 0.3, top: 0.2, width: 0.3, height: 0.4 },
+        confidence: 99.4,
+        ageRange: { low: 18, high: 26 },
+        gender: "Female",
+        smile: true,
+        sunglasses: { value: false, confidence: 99.9 },
+        emotions: ["CALM"],
+      },
+    ],
+  });
+
+const detected = await simAws.rekognition().detectFaces(
+  new DetectFacesCommand({
+    Image: { S3Object: { Bucket: "uploads", Name: "raw/selfie.png" } },
+    Attributes: ["ALL"],
+  }),
+);
+
+console.log(detected.FaceDetails.length); // 1
+console.log(detected.FaceDetails[0]?.AgeRange); // { Low: 18, High: 26 }
+console.log(detected.FaceDetails[0]?.Smile);
+// { Value: true, Confidence: 99.4000015258789 }
+```
+
+Faces come back in the order they were declared. An attribute with no confidence of its own takes
+the face's, so a face detected at 99.4 is reported as smiling at 99.4. A face declared with no
+confidence at all is detected at the built-in one.
+
+An image with nobody in it is `{ faces: [] }`. Two built-in results cover the counting a test
+usually does:
+
+```typescript
+import {
+  simRekognitionNoFaces,
+  simRekognitionSeveralFaces,
+} from "@kensio/yulin/rekognition";
+
+const faces = simAws.rekognition().faces();
+
+faces.onName("raw/landscape.png", simRekognitionNoFaces);
+faces.onName("raw/crowd.png", simRekognitionSeveralFaces);
+```
+
+An image no rule matches gets the built-in default result: the one face from the example response in
+the AWS `DetectFaces` documentation, with the attributes and all thirty landmarks AWS documents it
+with. That is a real Rekognition response, but which face an unconfigured image gets is a simulator
+convention rather than what AWS would return for it.
+
+## Choosing the facial attributes
+
+`BoundingBox`, `Confidence`, `Pose`, `Quality` and `Landmarks` come back whatever a request asked
+for, which is the default subset AWS always returns. `ALL` adds the rest, and naming one attribute
+adds that one, so `["FACE_OCCLUDED"]` is the default subset with face occlusion on top.
+`["ALL", "DEFAULT"]` is the union the two describe together.
+
+Landmarks follow AWS too: five come back unless `ALL` was asked for, and every declared landmark
+when it was.
+
+```typescript sim-rekognition-face-attributes
+/**
+ * One face detected twice, with the default attributes and with ALL.
+ */
+
+import { DetectFacesCommand } from "@aws-sdk/client-rekognition";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const imageBytes = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGO4I2IDAAL8AS3VzMq8AAAAAElFTkSuQmCC",
+  "base64",
+);
+
+simAws
+  .rekognition()
+  .faces()
+  .byDefault({
+    faces: [
+      {
+        boundingBox: { left: 0.3, top: 0.2, width: 0.3, height: 0.4 },
+        confidence: 99.4,
+        landmarks: {
+          eyeLeft: { x: 0.35, y: 0.3 },
+          eyeRight: { x: 0.5, y: 0.3 },
+          chinBottom: { x: 0.43, y: 0.62 },
+        },
+        smile: true,
+      },
+    ],
+  });
+
+const byDefault = await simAws
+  .rekognition()
+  .detectFaces(new DetectFacesCommand({ Image: { Bytes: imageBytes } }));
+
+console.log(Object.keys(byDefault.FaceDetails[0] ?? {}));
+// [ "BoundingBox", "Confidence", "Landmarks" ]
+console.log(
+  byDefault.FaceDetails[0]?.Landmarks?.map((landmark) => landmark.Type),
+);
+// [ "eyeLeft", "eyeRight" ]
+
+const everything = await simAws.rekognition().detectFaces(
+  new DetectFacesCommand({
+    Image: { Bytes: imageBytes },
+    Attributes: ["ALL"],
+  }),
+);
+
+console.log(everything.FaceDetails[0]?.Smile?.Value); // true
+console.log(
+  everything.FaceDetails[0]?.Landmarks?.map((landmark) => landmark.Type),
+);
+// [ "eyeLeft", "eyeRight", "chinBottom" ]
+```
+
+An attribute nothing was declared for is left out of the response rather than carried as an empty
+one, so a face declared with a bounding box and nothing else comes back as a bounding box and a
+confidence however many attributes the request asked for.
+
+A declaration is checked where it is written. A bounding box or a landmark outside the image is
+refused, as is an age range that ends before it begins, an emotion Rekognition does not report, and
+a pair of landmarks that runs the wrong way across the face, such as an `eyeLeft` to the right of
+`eyeRight`. So is a result declaring more than a hundred faces, which is the most real Rekognition
+detects in one image. Landmarks are not required to sit inside the bounding box, because a real
+Rekognition face box routinely excludes the chin.
+
 ## Declaring results
 
 Results are declared per operation. `moderation()` holds the rules `DetectModerationLabels` answers
-from and `labels()` holds the rules `DetectLabels` answers from. Both take the same three kinds of
-rule: an exact S3 object name, an exact content hash, or anything at all.
+from, `labels()` holds the rules `DetectLabels` answers from, and `faces()` holds the rules
+`DetectFaces` answers from. All three take the same three kinds of rule: an exact S3 object name, an
+exact content hash, or anything at all.
 
 ```typescript sim-rekognition-moderation-rules
 /**
@@ -479,8 +643,9 @@ ever, so filter the notification configuration by prefix or suffix as this one d
 
 ## Permissions and errors
 
-Each detection is authorized as its own action against `*`: `rekognition:DetectModerationLabels` and
-`rekognition:DetectLabels`. Real Rekognition gives the detection operations no resource-level
+Each detection is authorized as its own action against `*`: `rekognition:DetectModerationLabels`,
+`rekognition:DetectLabels` and `rekognition:DetectFaces`. Real Rekognition gives the detection
+operations no resource-level
 permissions, so a policy naming an ARN reaches nothing, here as on AWS. A denial throws
 `AccessDeniedException` with a 400 status, which is what real Rekognition answers with rather than
 the 403 several other services use.
@@ -522,8 +687,8 @@ reads only Buckets in its own Region.
 
 Simulated Rekognition currently supports:
 
-- `DetectModerationLabelsCommand` and `DetectLabelsCommand`, for an image supplied as `Image.Bytes`
-  or as `Image.S3Object`
+- `DetectModerationLabelsCommand`, `DetectLabelsCommand` and `DetectFacesCommand`, for an image
+  supplied as `Image.Bytes` or as `Image.S3Object`
 - Results declared by exact S3 object name, by exact image content hash, or as a default, with the
   hash rule winning, then the name rule, then the default
 - The complete version 7.0 content moderation taxonomy, with a declared label expanding to its
@@ -532,16 +697,32 @@ Simulated Rekognition currently supports:
   descending confidence
 - `MinConfidence` filtering, defaulting to 50 for moderation and 55 for label detection, and
   `MaxLabels` after it
+- Detected faces carrying the declared bounding box, confidence, pose, quality, landmarks, age
+  range, gender, emotions, eye direction and the eight yes or no attributes
+- `Attributes` handling for face detection, with the default subset always returned, `ALL` adding
+  the rest, and five landmarks reported unless `ALL` was asked for
+- `simRekognitionNoFaces` and `simRekognitionSeveralFaces`, for a test that counts faces
 - `simRekognitionImageHash`, for hashing a fixture to declare a rule against
 - PNG and JPEG format detection from the image bytes
-- IAM authorization on `rekognition:DetectModerationLabels` and `rekognition:DetectLabels`, with the
-  image read from S3 as the caller
+- IAM authorization on `rekognition:DetectModerationLabels`, `rekognition:DetectLabels` and
+  `rekognition:DetectFaces`, with the image read from S3 as the caller
 - SDK interception of `RekognitionClient`, including from inside a simulated Lambda function
 
 ## Limitations
 
-- `DetectFaces`, `DetectText`, face collections and the video operations are not simulated. An
-  intercepted client sending one of those Commands is refused by name.
+- `DetectText`, `CompareFaces`, the face collection operations and the video operations are not
+  simulated. An intercepted client sending one of those Commands is refused by name.
+- A face detection reports the emotions that were declared and no others. Real `DetectFaces` returns
+  all eight emotion types every time, the ones it did not see at a low confidence. Declare the
+  emotions the code under test reads.
+- `OrientationCorrection` is not carried on a `DetectFaces` response, because AWS documents its
+  value as always null.
+- A declared bounding box has to sit inside the image. Real Rekognition can report a box that does
+  not, for a face at the image edge that is only partly visible. The check is kept because it
+  catches a box written in pixels.
+- Landmark pairs that run across the face, such as `eyeLeft` and `eyeRight`, have to be declared in
+  the order Rekognition reports them in. A face rolled past upright is the one case where that
+  ordering does not hold on AWS, and it cannot be declared here.
 - Yulin ships no general label ontology, because AWS's is thousands of entries with no published
   enumerable table.
 - A declared label's `Parents` appear on that label alone. Real `DetectLabels` also returns each
