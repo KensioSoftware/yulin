@@ -103,4 +103,34 @@ describe("SQS queue policy source Account conditions", () => {
     // admit another's.
     assertInstanceOf(error, SimIamAccessDenied);
   });
+
+  it("refuses a conditioned request that carries no source Account", async () => {
+    // Given a queue admitting S3 only for one Account's resources.
+    const simAws = new SimAws();
+    const simSqs = simAws.account(ownerAccountId).region(regionName).sqs();
+    const created = await simSqs.createQueue(
+      new CreateQueueCommand({ QueueName: "orders" }),
+    );
+    await simSqs.setQueueAttributes(
+      new SetQueueAttributesCommand({
+        QueueUrl: created.QueueUrl,
+        Attributes: { Policy: sourceAccountPolicy },
+      }),
+    );
+
+    // When S3 sends without saying which Account it is sending for.
+    const error = await assertThrowsErrorAsync(async () => {
+      await simSqs.sendMessage(
+        new SendMessageCommand({
+          QueueUrl: created.QueueUrl,
+          MessageBody: "order-1",
+        }),
+        { caller: s3ServicePrincipal, sourceArn: bucketArn },
+      );
+    });
+
+    // Then the condition has nothing to match, so the statement does not
+    // apply, which is the safe direction for a key the request left out.
+    assertInstanceOf(error, SimIamAccessDenied);
+  });
 });

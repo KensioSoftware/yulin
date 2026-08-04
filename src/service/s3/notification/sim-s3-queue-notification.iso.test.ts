@@ -94,13 +94,16 @@ describe("Notifying a simulated SQS queue of an Object event", () => {
     );
     await simAws.backgroundTasksComplete();
 
-    // Then the whole Records document is on the queue as one message body
-    const received = await simAws
-      .sqs()
-      .receiveMessage(
-        new ReceiveMessageCommand({ QueueUrl: created.QueueUrl }),
-      );
+    // Then the whole Records document is on the queue as one message body,
+    // with no message attributes beside it, as real S3 sends none
+    const received = await simAws.sqs().receiveMessage(
+      new ReceiveMessageCommand({
+        QueueUrl: created.QueueUrl,
+        MessageAttributeNames: ["All"],
+      }),
+    );
     assertArrayLength(received.Messages ?? [], 1);
+    assertUndefined(received.Messages?.[0]?.MessageAttributes);
     const body = received.Messages?.[0]?.Body;
     assertNonNullable(body);
     const document = JSON.parse(body) as S3EventDocument;
