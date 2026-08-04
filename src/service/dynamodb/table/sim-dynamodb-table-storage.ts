@@ -1,6 +1,7 @@
 import type { BackgroundScheduler } from "../../../util/background/background.js";
 import type { SimDynamoDbItem } from "../item/sim-dynamodb-item.js";
 import type { SimDynamoDbSecondaryIndexes } from "../secondary-index/sim-dynamodb-secondary-indexes.js";
+import type { SimDynamoDbTableStream } from "../stream/sim-dynamodb-table-stream.js";
 import { SimDynamoDbTableTimeToLive } from "../time-to-live/sim-dynamodb-table-time-to-live.js";
 import type { SimDynamoDbReadView } from "./sim-dynamodb-read-view.js";
 import type { SimDynamoDbTableDefinition } from "./sim-dynamodb-table-definition.js";
@@ -13,6 +14,7 @@ interface SimDynamoDbTableStorageProperties {
   readonly tableName: DynamoDbTableName;
   readonly definition: SimDynamoDbTableDefinition;
   readonly indexes: SimDynamoDbSecondaryIndexes;
+  readonly stream: SimDynamoDbTableStream;
   readonly background: BackgroundScheduler;
 }
 
@@ -29,6 +31,10 @@ interface SimDynamoDbTableStorageProperties {
  * This is built from a definition rather than from a key schema, so the key an
  * item is stored under follows an UpdateTable that changed which attributes the
  * table declares, without the storage having to be told about the update.
+ *
+ * The stream is handed in rather than made here, because it outlives the
+ * items: a table's stream is switched on and off by UpdateTable and keeps what
+ * it captured, where the storage is only ever what the table holds now.
  */
 export class SimDynamoDbTableStorage {
   /**
@@ -45,9 +51,10 @@ export class SimDynamoDbTableStorage {
   private readonly tableName: DynamoDbTableName;
   private readonly definition: SimDynamoDbTableDefinition;
   private readonly indexes: SimDynamoDbSecondaryIndexes;
-  private readonly items = new SimDynamoDbTableItems();
+  private readonly items: SimDynamoDbTableItems;
 
   constructor(properties: SimDynamoDbTableStorageProperties) {
+    this.items = new SimDynamoDbTableItems({ changes: properties.stream });
     this.tableName = properties.tableName;
     this.definition = properties.definition;
     this.indexes = properties.indexes;

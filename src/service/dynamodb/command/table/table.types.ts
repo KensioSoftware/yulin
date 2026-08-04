@@ -1,4 +1,5 @@
 import type { SimArn } from "../../../aws/arn.js";
+import type { SimDynamoDbStreamSpecificationDescription } from "../../stream/sim-dynamodb-stream.types.js";
 
 /**
  * Minimal structural sim DynamoDB table description.
@@ -23,6 +24,10 @@ export interface SimDynamoDbTableDescription {
     readonly SimDynamoDbGlobalSecondaryIndexDescription[] | undefined;
   readonly LocalSecondaryIndexes?:
     readonly SimDynamoDbLocalSecondaryIndexDescription[] | undefined;
+  readonly StreamSpecification?:
+    SimDynamoDbStreamSpecificationDescription | undefined;
+  readonly LatestStreamArn?: SimArn | undefined;
+  readonly LatestStreamLabel?: string | undefined;
 }
 
 /**
@@ -168,14 +173,6 @@ export interface SimDynamoDbReplicaRegionInput {
 export interface SimDynamoDbProjectionInput {
   readonly ProjectionType?: string | undefined;
   readonly NonKeyAttributes?: readonly string[] | undefined;
-}
-
-/**
- * Minimal structural sim DynamoDB stream specification.
- */
-export interface SimDynamoDbStreamSpecification {
-  readonly StreamEnabled?: boolean | undefined;
-  readonly StreamViewType?: string | undefined;
 }
 
 /**

@@ -3,6 +3,9 @@ import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import { SimDynamoDbResourceInUseException } from "../../error/dynamodb.error.js";
 import { SimDynamoDbSecondaryIndexes } from "../../secondary-index/sim-dynamodb-secondary-indexes.js";
+import type { SimDynamoDbStreamActivity } from "../../stream/sim-dynamodb-stream-activity.js";
+import { readSimDynamoDbStreamSpecification } from "../../stream/sim-dynamodb-stream-specification.js";
+import type { SimDynamoDbStreamStore } from "../../stream/sim-dynamodb-stream-store.js";
 import { SimDynamoDbAttributeDefinitions } from "../../table/sim-dynamodb-attribute-definitions.js";
 import { SimDynamoDbKeySchema } from "../../table/sim-dynamodb-key-schema.js";
 import { SimDynamoDbTable } from "../../table/sim-dynamodb-table.js";
@@ -22,6 +25,8 @@ import { refuseUnsimulatedTableInput } from "./sim-dynamodb-unsimulated-table-in
 
 interface SimDynamoDbCreateTableProperties {
   readonly tables: SimDynamoDbTableStore;
+  readonly streams: SimDynamoDbStreamStore;
+  readonly streamActivity: SimDynamoDbStreamActivity;
   readonly authorizer: SimDynamoDbAuthorizer;
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly background: BackgroundScheduler;
@@ -46,12 +51,16 @@ interface SimDynamoDbCreateTableOptions {
  */
 export class SimDynamoDbCreateTable {
   private readonly tables: SimDynamoDbTableStore;
+  private readonly streams: SimDynamoDbStreamStore;
+  private readonly streamActivity: SimDynamoDbStreamActivity;
   private readonly authorizer: SimDynamoDbAuthorizer;
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly background: BackgroundScheduler;
 
   constructor(properties: SimDynamoDbCreateTableProperties) {
     this.tables = properties.tables;
+    this.streams = properties.streams;
+    this.streamActivity = properties.streamActivity;
     this.authorizer = properties.authorizer;
     this.accountRegionScope = properties.accountRegionScope;
     this.background = properties.background;
@@ -140,6 +149,9 @@ export class SimDynamoDbCreateTable {
       tableClass: readSimDynamoDbTableClass(input.TableClass),
       deletionProtectionEnabled: input.DeletionProtectionEnabled,
       tags: SimDynamoDbTableTags.fromInput(input.Tags),
+      stream: readSimDynamoDbStreamSpecification(input.StreamSpecification),
+      streams: this.streams,
+      streamActivity: this.streamActivity,
       background: this.background,
     });
   }

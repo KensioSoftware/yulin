@@ -8,17 +8,17 @@ import type { SimDynamoDbSecondaryIndexInput } from "./table.types.js";
  * Each of these changes what the table does, so accepting one and ignoring it
  * would leave a test passing against a table that is not the table the request
  * asked for: items would outlive a time to live that was never applied, and
- * changes would be published to a stream that was never made. Refusing is the
- * louder failure, and the one that happens here rather than in a deployment.
+ * reads would be served from a table left open to callers a resource policy
+ * would have kept out. Refusing is the louder failure, and the one that happens
+ * here rather than in a deployment.
  *
- * Only input that asks for something is refused. A stream or encryption
- * specification that is switched off describes the table this simulation
- * already makes, so it is let through.
+ * Only input that asks for something is refused. An encryption specification
+ * that is switched off describes the table this simulation already makes, so it
+ * is let through.
  */
 export function refuseUnsimulatedTableInput(
   input: SimCreateTableCommandInput,
 ): void {
-  refuseStreams(input);
   refuseEncryption(input);
   refuseThroughputExtras(input);
 
@@ -27,19 +27,6 @@ export function refuseUnsimulatedTableInput(
       "A table ResourcePolicy is not simulated, so CreateTable refuses one " +
         "rather than leaving the table open to callers the policy would have " +
         "kept out",
-    );
-  }
-}
-
-/**
- * Refuse the stream a table's changes would be published to.
- */
-function refuseStreams(input: SimCreateTableCommandInput): void {
-  if (input.StreamSpecification?.StreamEnabled === true) {
-    throw new SimDynamoDbUnsupportedOperation(
-      "DynamoDB streams are not simulated, so CreateTable refuses a " +
-        "StreamSpecification rather than creating a table whose changes are " +
-        "published nowhere",
     );
   }
 }
