@@ -92,10 +92,13 @@ describe("SimCfnNodeParser", () => {
     const parameters = SimCfnParameters.fromValues({});
     assertIdentical(
       node.resolve(
-        new SimCfnResolveContext(parameters, undefined, undefined, {
-          RegionMap: {
-            "us-east-1": {
-              AMI: "ami-1234567890abcdef0",
+        new SimCfnResolveContext({
+          parameters,
+          mappings: {
+            RegionMap: {
+              "us-east-1": {
+                AMI: "ami-1234567890abcdef0",
+              },
             },
           },
         }),
@@ -280,5 +283,5 @@ describe("SimCfnNodeParser", () => {
 });
 
 function emptyContext(): SimCfnResolveContext {
-  return new SimCfnResolveContext(new SimCfnParameters());
+  return new SimCfnResolveContext({ parameters: new SimCfnParameters() });
 }

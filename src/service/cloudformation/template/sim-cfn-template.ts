@@ -11,6 +11,12 @@ import { jsonParse, type JSONString } from "../../../util/type-guard/json.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import { SimCfnPseudoParameters } from "../parameters/pseudo/sim-cfn-pseudo-parameters.js";
 import type { SimCfnMappings } from "./mapping/sim-cfn-mappings.js";
+import { SimCfnConditionEvaluator } from "./condition/sim-cfn-condition-evaluator.js";
+import type {
+  SimCfnConditions,
+  SimCfnConditionsSection,
+} from "./condition/sim-cfn-conditions.js";
+import { SimCfnResourceConditions } from "./condition/sim-cfn-resource-conditions.js";
 
 /**
  * Parsed CloudFormation template body accepted by the simulator.
@@ -20,6 +26,7 @@ import type { SimCfnMappings } from "./mapping/sim-cfn-mappings.js";
 export interface CfnTemplateBodyRecord {
   readonly Parameters?: Record<string, SimCfnParameterDefinition> | undefined;
   readonly Mappings?: SimCfnMappings | undefined;
+  readonly Conditions?: SimCfnConditionsSection | undefined;
   readonly Resources: Record<string, SimCfnTemplateValue>;
   readonly Outputs?: Record<string, SimCfnTemplateValue> | undefined;
   readonly [sectionName: string]:
@@ -62,6 +69,7 @@ export class SimCfnTemplate {
   public readonly stackName: string | undefined;
   public readonly parameters: SimCfnParameters;
   private readonly accountRegionScope: SimAwsAccountRegionScope | undefined;
+  private evaluatedConditions: SimCfnConditions | undefined;
 
   constructor(properties: SimCfnTemplateProperties) {
     const { template, parameters, stackName, accountRegionScope } = properties;
@@ -111,22 +119,31 @@ export class SimCfnTemplate {
    *
    * Parameters and parameter-only intrinsic functions are resolved here.
    * Refs to other Resources are left unresolved because the referenced Resources do not exist yet; they are resolved at Resource creation time.
+   *
+   * A Resource whose `Condition` attribute is false is left out entirely, so
+   * the Stack never has a Resource the template conditioned out.
    */
   resourceTemplates(): SimCfnResourceTemplateRecord[] {
-    const valueResolver = new SimCfnTemplateValueResolver({
-      parameters: this.parameters,
-      pseudoParameters: this.pseudoParameters(),
-      mappings: this.template.Mappings,
+    const valueResolver = this.valueResolver();
+    const resourceConditions = new SimCfnResourceConditions({
+      resources: this.template.Resources,
+      conditions: this.conditions(),
+      stackName: this.stackName,
     });
 
-    return Object.entries(this.template.Resources)
+    const resourceTemplates = Object.entries(this.template.Resources)
       .filter((entry): entry is [string, SimCfnTemplateValueRecord] => {
         return isRecord(entry[1]);
       })
+      .filter(([logicalId]) => !resourceConditions.excludes(logicalId))
       .map(([logicalId, resourceTemplate]) => ({
         logicalId,
         template: valueResolver.resolveRecord(resourceTemplate),
       }));
+
+    resourceConditions.assertNotReferenced(resourceTemplates);
+
+    return resourceTemplates;
   }
 
   /**
@@ -136,11 +153,7 @@ export class SimCfnTemplate {
    * Outputs are resolved after Resource creation.
    */
   outputTemplates(): SimCfnOutputTemplateRecord[] {
-    const valueResolver = new SimCfnTemplateValueResolver({
-      parameters: this.parameters,
-      pseudoParameters: this.pseudoParameters(),
-      mappings: this.template.Mappings,
-    });
+    const valueResolver = this.valueResolver();
 
     return Object.entries(this.template.Outputs ?? {})
       .filter((entry): entry is [string, SimCfnTemplateValueRecord] => {
@@ -161,6 +174,35 @@ export class SimCfnTemplate {
     return new SimCfnPseudoParameters({
       accountRegionScope: this.accountRegionScope,
       stackName: this.stackName,
+    });
+  }
+
+  /**
+   * Get the template Conditions, evaluated against this Stack's Parameters.
+   *
+   * A Condition reads only Parameters and pseudo parameters, so the section is
+   * evaluated once and the answers reused by every Resource and Output.
+   */
+  conditions(): SimCfnConditions {
+    this.evaluatedConditions ??= new SimCfnConditionEvaluator({
+      conditions: this.template.Conditions,
+      stackName: this.stackName,
+      valueResolver: new SimCfnTemplateValueResolver({
+        parameters: this.parameters,
+        pseudoParameters: this.pseudoParameters(),
+        mappings: this.template.Mappings,
+      }),
+    }).evaluate();
+
+    return this.evaluatedConditions;
+  }
+
+  private valueResolver(): SimCfnTemplateValueResolver {
+    return new SimCfnTemplateValueResolver({
+      parameters: this.parameters,
+      pseudoParameters: this.pseudoParameters(),
+      mappings: this.template.Mappings,
+      conditions: this.conditions(),
     });
   }
 }
