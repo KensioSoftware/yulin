@@ -243,8 +243,8 @@ which descriptors is in
 ## Supported services and Commands
 
 All simulated services support SDK interception: ACM, API Gateway v2, CloudFormation, CloudFront,
-Cognito, DynamoDB, DynamoDB Streams, IAM, KMS, Lambda, Route53, S3, Secrets Manager, SQS, SSM and
-STS. Each service's own docs under
+Cognito, DynamoDB, DynamoDB Streams, IAM, KMS, Lambda, Rekognition, Route53, S3, Secrets Manager,
+SQS, SSM and STS. Each service's own docs under
 [docs/services](../services/) list the Commands it simulates.
 
 Both kinds of gap are refused on send rather than misbehaving silently, with a different error each:

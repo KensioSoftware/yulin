@@ -53,6 +53,9 @@ export function resolveSimSdkCommandRouter(
     case "Lambda": {
       return scoped.lambda().sdkCommandRouter();
     }
+    case "Rekognition": {
+      return scoped.rekognition().sdkCommandRouter();
+    }
     case "Route 53": {
       return scoped.route53().sdkCommandRouter();
     }

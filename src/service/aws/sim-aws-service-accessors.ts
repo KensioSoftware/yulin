@@ -11,6 +11,7 @@ import type {
 import type { SimIam } from "../iam/index.js";
 import type { SimKms } from "../kms/index.js";
 import type { SimLambda } from "../lambda/index.js";
+import type { SimRekognition } from "../rekognition/index.js";
 import type { SimRoute53 } from "../route53/index.js";
 import type { SimS3 } from "../s3/sim-s3.js";
 import type { SimSecretsManager } from "../secretsmanager/index.js";
@@ -80,6 +81,11 @@ export abstract class SimAwsServiceAccessors {
   /** Get simulated Lambda in the default Account Region scope. */
   lambda(): SimLambda {
     return this.defaultAccountRegionScope().lambda();
+  }
+
+  /** Get simulated Rekognition in the default Account Region scope. */
+  rekognition(): SimRekognition {
+    return this.defaultAccountRegionScope().rekognition();
   }
 
   /** Get simulated Route53 in the default Account scope. */

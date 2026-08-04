@@ -1,0 +1,130 @@
+/**
+ * An upload moderated by the Lambda function its Bucket notifies.
+ */
+
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import {
+  AddPermissionCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-lambda";
+import {
+  CreateBucketCommand,
+  PutBucketNotificationConfigurationCommand,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaCodeZip } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+const moderatorArn = `arn:aws:lambda:${simAws.defaultRegionName}:${simAws.defaultAccountId}:function:moderator`;
+
+const role = await simAws.iam().createRole(
+  new CreateRoleCommand({
+    RoleName: "ModeratorRole",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { Service: "lambda.amazonaws.com" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+
+await simAws.iam().putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "ModeratorRole",
+    PolicyName: "ModeratePolicy",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: ["rekognition:DetectModerationLabels", "s3:GetObject"],
+        Resource: "*",
+      },
+    }),
+  }),
+);
+
+await simAws.s3().createBucket(new CreateBucketCommand({ Bucket: "uploads" }));
+
+await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "moderator",
+    Role: role.Role.Arn,
+    Handler: "index.handler",
+    Code: {
+      ZipFile: makeLambdaCodeZip({
+        "index.js": `
+const {
+  RekognitionClient,
+  DetectModerationLabelsCommand,
+} = require("@aws-sdk/client-rekognition");
+
+exports.handler = async (event) => {
+  const record = event.Records[0].s3;
+  const detected = await new RekognitionClient({}).send(
+    new DetectModerationLabelsCommand({
+      Image: {
+        S3Object: { Bucket: record.bucket.name, Name: record.object.key },
+      },
+    }),
+  );
+
+  console.log(record.object.key, detected.ModerationLabels.length);
+
+  return detected.ModerationLabels.length === 0 ? "clean" : "flagged";
+};
+`,
+      }),
+    },
+  }),
+);
+
+await simAws.lambda().addPermission(
+  new AddPermissionCommand({
+    FunctionName: "moderator",
+    StatementId: "AllowS3",
+    Action: "lambda:InvokeFunction",
+    Principal: "s3.amazonaws.com",
+    SourceArn: "arn:aws:s3:::uploads",
+    SourceAccount: simAws.defaultAccountId,
+  }),
+);
+
+await simAws.s3().putBucketNotificationConfiguration(
+  new PutBucketNotificationConfigurationCommand({
+    Bucket: "uploads",
+    NotificationConfiguration: {
+      LambdaFunctionConfigurations: [
+        {
+          Id: "moderate-uploads",
+          Events: ["s3:ObjectCreated:*"],
+          LambdaFunctionArn: moderatorArn,
+          Filter: { Key: { FilterRules: [{ Name: "prefix", Value: "raw/" }] } },
+        },
+      ],
+    },
+  }),
+);
+
+simAws
+  .rekognition()
+  .moderation()
+  .onName("raw/nsfw.png", { labels: ["Explicit Nudity"] });
+
+await simAws.s3().putObject(
+  new PutObjectCommand({
+    Bucket: "uploads",
+    Key: "raw/nsfw.png",
+    Body: Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGO4I2IDAAL8AS3VzMq8AAAAAElFTkSuQmCC",
+      "base64",
+    ),
+  }),
+);
+
+// Delivery and the detection it triggers both happen in the background.
+await simAws.backgroundTasksComplete();

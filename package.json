@@ -83,6 +83,10 @@
       "types": "./dist/service/lambda/index.d.ts"
     },
     "./package.json": "./package.json",
+    "./rekognition": {
+      "import": "./dist/service/rekognition/index.js",
+      "types": "./dist/service/rekognition/index.d.ts"
+    },
     "./s3": {
       "import": "./dist/service/s3/index.js",
       "types": "./dist/service/s3/index.d.ts"
@@ -132,6 +136,7 @@
     "@aws-sdk/client-iam": "^3.1101.0",
     "@aws-sdk/client-kms": "^3.1101.0",
     "@aws-sdk/client-lambda": "^3.1101.0",
+    "@aws-sdk/client-rekognition": "^3.1101.0",
     "@aws-sdk/client-route-53": "^3.1101.0",
     "@aws-sdk/client-s3": "^3.1101.0",
     "@aws-sdk/client-secrets-manager": "^3.1101.0",

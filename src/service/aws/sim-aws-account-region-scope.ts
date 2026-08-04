@@ -10,6 +10,7 @@ import type {
 } from "../dynamodb/index.js";
 import type { SimCloudFormation } from "../cloudformation/index.js";
 import type { SimCognitoIdentityProvider } from "../cognito/index.js";
+import type { SimRekognition } from "../rekognition/index.js";
 import type { SimRoute53 } from "../route53/index.js";
 import type { SimAcm } from "../acm/sim-acm.js";
 import type { SimApiGatewayV2 } from "../apigatewayv2/index.js";
@@ -147,6 +148,15 @@ export class SimAwsAccountRegionContainer {
   lambda(): SimLambda {
     return this.memo.getOrCreate("lambda", () =>
       this.simAws.serviceFactory.createLambda(this),
+    );
+  }
+
+  /**
+   * Get simulated Rekognition for this account and region.
+   */
+  rekognition(): SimRekognition {
+    return this.memo.getOrCreate("rekognition", () =>
+      this.simAws.serviceFactory.createRekognition(this),
     );
   }
 
