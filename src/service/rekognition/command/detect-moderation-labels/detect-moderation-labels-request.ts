@@ -1,8 +1,8 @@
-import { SimRekognitionInvalidParameterException } from "../../error/sim-rekognition.error.js";
 import {
-  parseSimRekognitionImageRequest,
   type SimRekognitionImageRequest,
+  SimRekognitionImageRequests,
 } from "../../image/sim-rekognition-image-request.js";
+import { SimRekognitionMinConfidence } from "../sim-rekognition-min-confidence.js";
 import { SimRekognitionUnsimulatedInput } from "../sim-rekognition-unsimulated-input.js";
 import type { SimDetectModerationLabelsCommandInput } from "./detect-moderation-labels.command.js";
 
@@ -11,7 +11,7 @@ import type { SimDetectModerationLabelsCommandInput } from "./detect-moderation-
  * does not say. Content moderation uses 50 here, which is not the 55 label
  * detection uses.
  */
-const defaultMinConfidence = 50;
+const minConfidence = new SimRekognitionMinConfidence(50);
 
 const operation = "DetectModerationLabels";
 const acceptedInput = ["Image", "MinConfidence"];
@@ -35,37 +35,7 @@ export class DetectModerationLabelsRequest {
       acceptedInput,
     );
 
-    this.image = parseSimRekognitionImageRequest(input.Image);
-    this.minConfidence = DetectModerationLabelsRequest.confidenceOf(input);
-  }
-
-  /**
-   * The minimum confidence this request filters at.
-   *
-   * The default is applied only when the request left it out, so an explicit
-   * `0` asks for every label rather than being promoted to 50.
-   */
-  private static confidenceOf(
-    input: SimDetectModerationLabelsCommandInput,
-  ): number {
-    if (input.MinConfidence === undefined) {
-      return defaultMinConfidence;
-    }
-
-    // A NaN is refused here rather than compared against. Every comparison
-    // with one is false, so it would filter every label out and look like an
-    // image with nothing to report.
-    if (
-      !Number.isFinite(input.MinConfidence) ||
-      input.MinConfidence < 0 ||
-      input.MinConfidence > 100
-    ) {
-      throw new SimRekognitionInvalidParameterException(
-        `Request has invalid parameters: MinConfidence of ` +
-          `${String(input.MinConfidence)} is not a percentage from 0 to 100`,
-      );
-    }
-
-    return input.MinConfidence;
+    this.image = new SimRekognitionImageRequests(operation).parse(input.Image);
+    this.minConfidence = minConfidence.of(input.MinConfidence);
   }
 }

@@ -3,6 +3,7 @@ import {
   type SimSdkCommandRoute,
   type SimSdkCommandRouter,
 } from "../../../sdk/index.js";
+import type { SimDetectLabelsCommand } from "../command/detect-labels/detect-labels.command.js";
 import type { SimDetectModerationLabelsCommand } from "../command/detect-moderation-labels/detect-moderation-labels.command.js";
 import type { SimRekognition } from "../sim-rekognition.js";
 
@@ -20,6 +21,14 @@ export class SimRekognitionSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simRekognition.detectModerationLabels(
             command as SimDetectModerationLabelsCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DetectLabelsCommand",
+        async (command, context): Promise<unknown> =>
+          await simRekognition.detectLabels(
+            command as SimDetectLabelsCommand,
             simSdkCallerOptions(context),
           ),
       ],
