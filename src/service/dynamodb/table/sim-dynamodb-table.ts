@@ -12,7 +12,6 @@ import type {
 import type { SimDynamoDbItem } from "../item/sim-dynamodb-item.js";
 import type { SimDynamoDbStreamActivity } from "../stream/sim-dynamodb-stream-activity.js";
 import type { SimDynamoDbStreamRequest } from "../stream/sim-dynamodb-stream-specification.js";
-import type { SimDynamoDbStreamStore } from "../stream/sim-dynamodb-stream-store.js";
 import { SimDynamoDbTableStream } from "../stream/sim-dynamodb-table-stream.js";
 import type { SimDynamoDbTableTimeToLive } from "../time-to-live/sim-dynamodb-table-time-to-live.js";
 import { SimDynamoDbSecondaryIndexes } from "../secondary-index/sim-dynamodb-secondary-indexes.js";
@@ -43,7 +42,6 @@ interface SimDynamoDbTableProperties {
   readonly deletionProtectionEnabled?: boolean | undefined;
   readonly tags?: SimDynamoDbTableTags;
   readonly stream?: SimDynamoDbStreamRequest | undefined;
-  readonly streams?: SimDynamoDbStreamStore;
   readonly streamActivity?: SimDynamoDbStreamActivity;
   readonly background?: BackgroundScheduler;
 }
@@ -126,7 +124,6 @@ export class SimDynamoDbTable {
       tableArn: this.arn,
       keySchema,
       clock: background,
-      streams: properties.streams,
       activity: properties.streamActivity,
     });
     this.stream.apply(properties.stream);

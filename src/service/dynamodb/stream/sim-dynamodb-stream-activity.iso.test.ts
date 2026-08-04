@@ -1,7 +1,12 @@
 import { PutItemCommand } from "@aws-sdk/client-dynamodb";
-import { assertIdentical, assertUndefined } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertThrowsErrorAsync,
+  assertUndefined,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
+import { SimFixedClock } from "../../../util/clock/sim-clock.js";
 import { assertDefined } from "../../../util/type-guard/defined.js";
 import type { SimDynamoDbStreamWatcher } from "./sim-dynamodb-stream-activity.js";
 import { simDynamoDbStreamedTableFactory } from "./sim-dynamodb-streamed-table.factory.js";
@@ -65,6 +70,27 @@ describe("DynamoDB stream activity", () => {
 
     // Then it hears nothing more.
     assertIdentical(watcher.count, 1);
+  });
+
+  it("holds no stream for a table that was refused", async () => {
+    // Given a streamed table, and an hour later a second create for the same
+    // name, which is built and checked before the name is found to be taken.
+    const simAws = new SimAws({
+      clock: new SimFixedClock(new Date("2026-08-04T09:00:00.000Z")),
+    });
+    const table = await simDynamoDbStreamedTableFactory.make({}, simAws);
+    await simAws.clock().advanceBy({ hours: 1 });
+    await assertThrowsErrorAsync(async () =>
+      simDynamoDbStreamedTableFactory.make({}, simAws),
+    );
+
+    // Then the stream the refused table made while it was being checked is not
+    // resolvable, since its ARN names a table that was never created.
+    assertUndefined(
+      simAws
+        .dynamoDb()
+        .findStream(`${table.arn}/stream/2026-08-04T10:00:00.000`),
+    );
   });
 
   it("finds a stream by the ARN a table reports", async () => {

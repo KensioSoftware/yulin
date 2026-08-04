@@ -192,6 +192,7 @@ describe("DynamoDB stream lifecycle", () => {
     await simDynamoDbStreamedTableFactory.make({}, simAws);
     const before = await describeOrders(simAws);
     const first = before.LatestStreamArn;
+    const firstLabel = before.LatestStreamLabel;
     await simAws.dynamoDb().updateTable(
       new UpdateTableCommand({
         TableName: "orders",
@@ -222,6 +223,12 @@ describe("DynamoDB stream lifecycle", () => {
     assertDefined(first, "first stream ARN");
     assertDefined(description.LatestStreamArn, "second stream ARN");
     assertFalse(description.LatestStreamArn === first);
+
+    // The label is what tells them apart inside the ARN, and it is the instant
+    // the stream was enabled, which the clock has not moved past.
+    assertDefined(firstLabel, "first stream label");
+    assertDefined(description.LatestStreamLabel, "second stream label");
+    assertFalse(description.LatestStreamLabel === firstLabel);
   });
 
   it("refuses switching on a stream the table already has", async () => {

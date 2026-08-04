@@ -110,6 +110,11 @@ export class SimDynamoDbCreateTable {
     }
 
     this.tables.add(table);
+
+    // Only now is the table real, so only now can its stream be resolved by
+    // ARN. A table refused above made its stream while it was being checked,
+    // and that stream goes nowhere with it.
+    table.stream.publishTo(this.streams);
     this.background.schedule(() => table.activate());
 
     return table;
@@ -150,7 +155,6 @@ export class SimDynamoDbCreateTable {
       deletionProtectionEnabled: input.DeletionProtectionEnabled,
       tags: SimDynamoDbTableTags.fromInput(input.Tags),
       stream: readSimDynamoDbStreamSpecification(input.StreamSpecification),
-      streams: this.streams,
       streamActivity: this.streamActivity,
       background: this.background,
     });

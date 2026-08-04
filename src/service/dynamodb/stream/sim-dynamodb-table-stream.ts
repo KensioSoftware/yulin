@@ -20,7 +20,6 @@ interface SimDynamoDbTableStreamProperties {
   readonly tableArn: SimArn;
   readonly keySchema: SimDynamoDbKeySchema;
   readonly clock: SimClock;
-  readonly streams?: SimDynamoDbStreamStore | undefined;
   readonly activity?: SimDynamoDbStreamActivity | undefined;
 }
 
@@ -42,8 +41,8 @@ export class SimDynamoDbTableStream implements SimDynamoDbItemChanges {
   private readonly tableArn: SimArn;
   private readonly keySchema: SimDynamoDbKeySchema;
   private readonly clock: SimClock;
-  private readonly streams: SimDynamoDbStreamStore;
   private readonly activity: SimDynamoDbStreamActivity;
+  private streams = new SimDynamoDbStreamStore();
   private enabled: SimDynamoDbStream | undefined;
   private newest: SimDynamoDbStream | undefined;
 
@@ -52,7 +51,6 @@ export class SimDynamoDbTableStream implements SimDynamoDbItemChanges {
     this.tableArn = properties.tableArn;
     this.keySchema = properties.keySchema;
     this.clock = properties.clock;
-    this.streams = properties.streams ?? new SimDynamoDbStreamStore();
     this.activity = properties.activity ?? new SimDynamoDbStreamActivity();
   }
 
@@ -83,6 +81,24 @@ export class SimDynamoDbTableStream implements SimDynamoDbItemChanges {
     }
 
     return this.newest === undefined ? undefined : { StreamEnabled: false };
+  }
+
+  /**
+   * Hand this table's streams to the store that resolves one by ARN.
+   *
+   * A table is built before the name it is taking has been checked, so a table
+   * that is refused for a name already in use has still made its stream by
+   * then. Registering when the table becomes real rather than when it is built
+   * is what keeps that stream from being resolvable by an ARN nobody was ever
+   * given. Until this is called a table keeps its streams to itself, which is
+   * what a table built with no simulated DynamoDB holding it does for good.
+   */
+  publishTo(streams: SimDynamoDbStreamStore): void {
+    this.streams = streams;
+
+    if (this.enabled !== undefined) {
+      streams.add(this.enabled);
+    }
   }
 
   /**

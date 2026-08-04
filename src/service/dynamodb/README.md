@@ -1107,7 +1107,11 @@ state rather than request handling.
   leading zero, so comparing them as text gives the same answer as comparing them as numbers. Real
   AWS varies the width between 21 and 40 digits, which is under Limitations.
 - `SimDynamoDbStreamStore` holds every stream one simulated DynamoDB has made, keyed by ARN, since a
-  stream outlives being switched off and the table has already moved on from naming it.
+  stream outlives being switched off and the table has already moved on from naming it. A table
+  reaches it through `SimDynamoDbTableStream.publishTo`, which `SimDynamoDbCreateTable` calls once
+  the table is in the table store. Registering when the table is built instead would leave a
+  resolvable stream behind for a table refused for a name already in use, since CreateTable checks
+  the name after it has built the table.
 - `SimDynamoDbStreamActivity` is the twin of `SimSqsQueueActivity`: it is how a consumer that cannot
   poll continuously finds out there is something to read. There is no instant on the notification,
   unlike the queue's, because a stream record is readable the moment it is written.
