@@ -10,12 +10,6 @@ export type SimLambdaEventSourceMappingArn =
   `arn:aws:lambda:${string}:${string}:event-source-mapping:${string}`;
 
 /**
- * The batch size real Lambda uses for an SQS event source when the mapping
- * does not name one.
- */
-export const DEFAULT_SIM_LAMBDA_EVENT_SOURCE_BATCH_SIZE = 10;
-
-/**
  * The response types a mapping can be told the function reports.
  *
  * Only the batch item failure one exists on real Lambda.
@@ -37,7 +31,7 @@ interface SimLambdaEventSourceMappingProperties {
   readonly eventSourceArn: string;
   readonly functionName: string;
   readonly functionArn: SimLambdaFunctionArn;
-  readonly batchSize?: number | undefined;
+  readonly batchSize: number;
   readonly enabled?: boolean | undefined;
   readonly functionResponseTypes?:
     readonly SimLambdaFunctionResponseType[] | undefined;
@@ -63,11 +57,14 @@ export interface SimLambdaEventSourceMappingConfiguration {
 }
 
 /**
- * One simulated Lambda event source mapping, from an SQS queue to a function.
+ * One simulated Lambda event source mapping, from an event source to a
+ * function.
  *
  * The mapping holds what polling is done with rather than doing the polling: a
  * poller reads the batch size and the response types from here, and the mapping
- * stays the piece of state a Get or List reports.
+ * stays the piece of state a Get or List reports. What a batch size may be is
+ * the event source's rule, so the mapping is given one rather than defaulting
+ * it.
  */
 export class SimLambdaEventSourceMapping {
   public readonly uuid: string = randomUUID();
@@ -87,8 +84,7 @@ export class SimLambdaEventSourceMapping {
     this.eventSourceArn = properties.eventSourceArn;
     this.functionName = properties.functionName;
     this.functionArn = properties.functionArn;
-    this.batchSize =
-      properties.batchSize ?? DEFAULT_SIM_LAMBDA_EVENT_SOURCE_BATCH_SIZE;
+    this.batchSize = properties.batchSize;
     // Copied rather than held, so a caller keeping the list it passed in
     // cannot change what this mapping does with a batch afterwards.
     this.functionResponseTypes = [...(properties.functionResponseTypes ?? [])];

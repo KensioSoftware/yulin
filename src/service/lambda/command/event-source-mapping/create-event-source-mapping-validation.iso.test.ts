@@ -81,19 +81,48 @@ describe("sim Lambda CreateEventSourceMapping validation", () => {
     assertStringIncludes(error.message, "functionName");
   });
 
-  it("refuses an event source that is not an SQS queue", async () => {
+  it("refuses an event source this simulation does not poll", async () => {
     // Given a queue and a function.
     const ready = await simAwsReadyToMap();
 
-    // When a mapping names a DynamoDB stream.
+    // When a mapping names a Kinesis stream.
     const error = await refusedMapping(ready, {
-      EventSourceArn:
-        "arn:aws:dynamodb:eu-west-2:111111111111:table/orders/stream/2026-07-30T00:00:00.000",
+      EventSourceArn: "arn:aws:kinesis:eu-west-2:111111111111:stream/orders",
     });
 
-    // Then it is refused rather than accepted and never delivered from.
+    // Then it is refused rather than accepted and never delivered from, and
+    // the refusal says what a mapping may name instead.
     assertIdentical(error.name, "InvalidParameterValueException");
-    assertStringIncludes(error.message, "is not an SQS queue ARN");
+    assertStringIncludes(
+      error.message,
+      "names no simulated Lambda event source",
+    );
+    assertStringIncludes(
+      error.message,
+      "SQS queues are the only simulated event source",
+    );
+    assertStringIncludes(
+      error.message,
+      "arn:aws:sqs:<region>:<account-id>:<queue-name>",
+    );
+  });
+
+  it("refuses an input belonging to an event source this simulation does not have", async () => {
+    // Given a queue and a function.
+    const ready = await simAwsReadyToMap();
+
+    // When a mapping asks for a starting position, which only a stream has.
+    const error = await refusedMapping(ready, {
+      StartingPosition: "LATEST",
+    });
+
+    // Then it is refused, naming the sources there are instead.
+    assertIdentical(error.name, "InvalidParameterValueException");
+    assertStringIncludes(error.message, "StartingPosition");
+    assertStringIncludes(
+      error.message,
+      "SQS queues are the only simulated event source",
+    );
   });
 
   it("refuses a queue in another Account or Region", async () => {

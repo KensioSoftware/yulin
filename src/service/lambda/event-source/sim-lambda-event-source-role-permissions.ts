@@ -1,31 +1,22 @@
 import type { SimIamInterServiceAuthZ } from "../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimLambdaInvalidParameterValueException } from "../error/sim-lambda.error.js";
-
-/**
- * What a function's execution role has to be allowed to do on a queue for
- * Lambda to poll it.
- *
- * These are the three operations real Lambda checks when an SQS event source
- * mapping is created, and the three its poller performs afterwards.
- */
-const requiredQueueOperations = [
-  "ReceiveMessage",
-  "DeleteMessage",
-  "GetQueueAttributes",
-] as const;
+import type { SimLambdaEventSourceArn } from "./sim-lambda-event-source-arn.js";
 
 interface SimLambdaEventSourceRolePermissionsProperties {
   readonly iam: SimIamInterServiceAuthZ;
 }
 
 /**
- * Checks that a function's execution role may poll the queue a mapping names.
+ * Checks that a function's execution role may poll the source a mapping names.
  *
  * Real Lambda refuses to create the mapping at all when the role cannot poll,
  * rather than creating one that silently delivers nothing, so this is checked
  * up front here too. The poller's own calls go through simulated IAM again
  * afterwards, as they do on AWS: this check is about failing early, not about
  * standing in for authorization.
+ *
+ * What has to be allowed comes from the event source, since the operations a
+ * poller performs are the source's own.
  */
 export class SimLambdaEventSourceRolePermissions {
   private readonly iam: SimIamInterServiceAuthZ;
@@ -35,21 +26,25 @@ export class SimLambdaEventSourceRolePermissions {
   }
 
   /**
-   * Refuse a mapping whose execution role cannot poll the queue.
+   * Refuse a mapping whose execution role cannot poll the event source.
    */
-  assertMayPoll(roleArn: string, queueArn: string): void {
-    for (const operation of requiredQueueOperations) {
+  assertMayPoll(
+    roleArn: string,
+    eventSourceArn: SimLambdaEventSourceArn,
+  ): void {
+    for (const permission of eventSourceArn.pollingPermissions) {
       const decision = this.iam.authorize({
-        action: `sqs:${operation}`,
-        resource: queueArn,
+        action: permission.action,
+        resource: permission.resource,
         caller: { kind: "arn", arn: roleArn },
       });
 
       if (decision.isDenied) {
         throw new SimLambdaInvalidParameterValueException(
-          `The provided execution role does not have permissions to call ` +
-            `${operation} on SQS. Role ${roleArn} has no policy allowing ` +
-            `sqs:${operation} on ${queueArn}`,
+          "The provided execution role does not have permissions to call " +
+            `${permission.operationName} on ${eventSourceArn.serviceLabel}. ` +
+            `Role ${roleArn} has no policy allowing ` +
+            `${permission.action} on ${permission.resource}`,
         );
       }
     }

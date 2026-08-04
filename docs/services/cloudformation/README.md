@@ -371,7 +371,7 @@ A stand-in is deliberately not ARN-shaped, so it fails closed wherever the simul
 - In a property that is parsed as an ARN it is refused as malformed, and that Resource fails.
   Handing `Fn::GetAtt: ["Orders", "StreamArn"]` from a skipped DynamoDB table to an
   `AWS::Lambda::EventSourceMapping` fails with
-  `EventSourceArn Orders.StreamArn is not an SQS queue ARN`.
+  `EventSourceArn Orders.StreamArn names no simulated Lambda event source`.
 - Handed to a Lambda function through its environment, it names something that is not there, so the
   function's own SDK call fails as a call for a missing resource does. A `PutItem` naming the
   skipped table gets `ResourceNotFoundException: No DynamoDB Table named Orders`.
