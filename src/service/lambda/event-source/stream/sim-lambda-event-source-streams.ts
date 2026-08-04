@@ -47,13 +47,19 @@ export interface SimLambdaEventSourceStreamRecord {
  * A mapping that has read nothing yet has only the starting position it was
  * created with. One that has read something holds the shard iterator the last
  * read handed back, which is the place itself rather than a description of it.
+ *
+ * A sequence number is the third, and it is a place the mapping has already
+ * been: a function that reported failing partway through a batch sends the
+ * mapping back to the record it named, and reading starts at that record rather
+ * than after it.
  */
 export type SimLambdaEventSourceStreamPosition =
   | {
       readonly kind: "starting";
       readonly startingPosition: SimLambdaEventSourceStartingPosition;
     }
-  | { readonly kind: "iterator"; readonly shardIterator: string };
+  | { readonly kind: "iterator"; readonly shardIterator: string }
+  | { readonly kind: "sequence"; readonly sequenceNumber: string };
 
 /**
  * A poller's request to the stream it polls, made as the function's execution

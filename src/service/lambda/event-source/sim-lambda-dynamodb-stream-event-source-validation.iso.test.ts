@@ -18,7 +18,6 @@ interface StreamMappingRequest {
   readonly StartingPosition?: EventSourcePosition;
   readonly StartingPositionTimestamp?: Date;
   readonly BatchSize?: number;
-  readonly FunctionResponseTypes?: "ReportBatchItemFailures"[];
 }
 
 /**
@@ -102,24 +101,6 @@ describe("sim Lambda DynamoDB stream event source mapping validation", () => {
 
     // Then it is refused, saying what a stream does deliver.
     assertStringIncludes(error.message, "a DynamoDB stream delivers");
-  });
-
-  it("refuses a batch item failure report from a stream mapping", async () => {
-    // Given a stream and a function.
-    // When a mapping says the function reports its own batch item failures.
-    const error = await createStreamMapping({
-      StartingPosition: "TRIM_HORIZON",
-      FunctionResponseTypes: ["ReportBatchItemFailures"],
-    });
-
-    // Then it is refused rather than accepted and ignored: a stream retries
-    // from the record a report names, which is not what a failing batch does
-    // here.
-    assertStringIncludes(
-      error.message,
-      "FunctionResponseTypes on a DynamoDB stream event source mapping is " +
-        "not simulated",
-    );
   });
 
   it("refuses a mapping whose execution role cannot read the stream", async () => {

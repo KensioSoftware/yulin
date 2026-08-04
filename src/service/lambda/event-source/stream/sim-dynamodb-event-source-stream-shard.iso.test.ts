@@ -81,9 +81,13 @@ describe("sim DynamoDB event source stream shard", () => {
       }),
     );
 
-    // When a place to start reading is asked for.
+    // When a mapping with only its starting position asks for a place to read
+    // from.
     const error = await assertThrowsErrorAsync(async () => {
-      await shard.iteratorFor(request, "TRIM_HORIZON");
+      await shard.iteratorFor(request, {
+        kind: "starting",
+        startingPosition: "TRIM_HORIZON",
+      });
     });
 
     // Then the mapping is told.
@@ -108,9 +112,13 @@ describe("sim DynamoDB event source stream shard", () => {
       }),
     );
 
-    // When a place to start reading is asked for.
+    // When a mapping sent back to a record by a failure report asks for a
+    // place to read from.
     const error = await assertThrowsErrorAsync(async () => {
-      await shard.iteratorFor(request, "LATEST");
+      await shard.iteratorFor(request, {
+        kind: "sequence",
+        sequenceNumber: "100000000000000000001",
+      });
     });
 
     // Then the mapping is told.

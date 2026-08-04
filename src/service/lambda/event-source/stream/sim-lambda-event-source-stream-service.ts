@@ -51,7 +51,12 @@ export interface SimLambdaEventSourceStreamCommands {
 
   getShardIterator(
     command: {
-      input: { StreamArn: string; ShardId: string; ShardIteratorType: string };
+      input: {
+        StreamArn: string;
+        ShardId: string;
+        ShardIteratorType: string;
+        SequenceNumber?: string | undefined;
+      };
     },
     options?: StreamCommandOptions,
   ): Promise<{ ShardIterator?: string | undefined }>;

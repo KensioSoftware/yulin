@@ -539,9 +539,10 @@ the sender sees is the message coming back.
 
 ### Reporting individual message failures
 
-A mapping created with `FunctionResponseTypes: ["ReportBatchItemFailures"]` takes the
+A queue mapping created with `FunctionResponseTypes: ["ReportBatchItemFailures"]` takes the
 `batchItemFailures` list the handler returns: the message ids named in it go back to the queue, and
-the rest of the batch is deleted.
+the rest of the batch is deleted. A stream mapping takes the same list and does something else with
+it, which is [reporting individual record failures](#reporting-individual-record-failures).
 
 ```typescript
 await simAws.lambda().createEventSourceMapping(
@@ -783,6 +784,46 @@ documents no delay between attempts and retries until the records age out of the
 later. A delay of zero here would fall due at the instant the clock already reads, so a handler that
 always throws would leave `advanceBy` with work falling due forever, and waiting out a simulated day
 is the same problem with more steps.
+
+### Reporting individual record failures
+
+A stream mapping created with `FunctionResponseTypes: ["ReportBatchItemFailures"]` takes the
+`batchItemFailures` list the handler returns. For a stream the identifier is the record's
+`SequenceNumber`:
+
+```typescript
+await simAws.lambda().createEventSourceMapping(
+  new CreateEventSourceMappingCommand({
+    EventSourceArn: streamArn,
+    FunctionName: "order-projector",
+    StartingPosition: "TRIM_HORIZON",
+    FunctionResponseTypes: ["ReportBatchItemFailures"],
+  }),
+);
+
+// The handler reports the sequence numbers it could not handle.
+const handler = (event: SimLambdaDynamoDbStreamEvent) => ({
+  batchItemFailures: event.Records.filter((record) => !canHandle(record)).map(
+    (record) => ({ itemIdentifier: record.dynamodb.SequenceNumber }),
+  ),
+});
+```
+
+What a stream does with that report is not what a queue does with it. A queue takes back the
+messages the report names and deletes the rest. A stream moves its checkpoint to the lowest sequence
+number the report names and delivers everything from there again, including the records after it
+that the handler did handle. That is real AWS behaviour rather than a simulation artifact, and it is
+why a stream consumer has to be idempotent.
+
+So a report naming only the last record of a batch delivers that record again. A report naming the
+first record delivers the whole batch again. The redelivery is a retry like any other: it waits out
+the same backoff, counts against the same five attempts, and what is left is discarded when they run
+out.
+
+A report naming a sequence number that was not in the batch delivers the whole batch again, as real
+Lambda does with a report it cannot trust. So does an entry with no `itemIdentifier`. A handler that
+returns nothing, or an empty `batchItemFailures` list, has handled the whole batch. A mapping
+created without `FunctionResponseTypes` ignores a report entirely.
 
 ### Writing back to the source table
 
@@ -1551,7 +1592,8 @@ Sim Lambda currently supports:
 - `StartingPosition: "TRIM_HORIZON"` and `"LATEST"` on a stream mapping, with a failing batch
   blocking its shard until it is through or discarded
 - `FunctionResponseTypes: ["ReportBatchItemFailures"]` on a queue mapping, returning only the
-  message ids the handler reported
+  message ids the handler reported, and on a stream mapping, rewinding to the lowest sequence number
+  the handler reported
 - Function code from three sources:
   - an in-process handler function passed via `makeLambdaZipFileInput(...)`
   - zip archive bytes on `Code.ZipFile` (build them with `makeLambdaCodeZip(...)`)
@@ -1615,15 +1657,13 @@ Current documented limitations:
   `ScalingConfig`, `DestinationConfig`, `MaximumRetryAttempts`, `BisectBatchOnFunctionError`,
   `ParallelizationFactor`, `TumblingWindowInSeconds` and the other mapping inputs this simulation
   has no behaviour for.
-- `FunctionResponseTypes: ["ReportBatchItemFailures"]` is refused on a stream mapping rather than
-  accepted and ignored. A stream retries a batch from the record a report names onward, where a
-  queue takes back the messages it names, and a failing stream batch is retried whole here. That
-  rule is [issue 342](https://github.com/KensioSoftware/yulin/issues/342).
 - A stream batch is delivered again five times, after 1, 2, 4, 8 and 16 seconds, and then
   discarded. AWS
   documents no delay between attempts and retries until the records age out. Both differences are
   deliberate: a delay of zero falls due at the instant the clock already reads, so a handler that
-  always throws would leave `advanceBy` with work falling due forever.
+  always throws would leave `advanceBy` with work falling due forever. A batch item failure report
+  counts against the same five attempts, rather than starting them again for the records it rewound
+  to.
 - A handler writing into the table whose stream invoked it is refused with
   `SimLambdaStreamCascadeError` rather than being delivered its own writes forever. Real Lambda runs
   that loop.

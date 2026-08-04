@@ -1,25 +1,16 @@
-import type { SimLambdaEventSourceArn } from "../../event-source/sim-lambda-event-source-arn.js";
 import type { SimLambdaFunctionResponseType } from "../../event-source/sim-lambda-event-source-mapping.js";
-import {
-  SimLambdaInvalidParameterValueException,
-  SimLambdaValidationException,
-} from "../../error/sim-lambda.error.js";
+import { SimLambdaValidationException } from "../../error/sim-lambda.error.js";
 import type { SimCreateEventSourceMappingCommandInput } from "./event-source-mapping.command.js";
 
 /**
- * The response types the function reports, refusing one Lambda does not have
- * and one the event source has no simulated rule for.
+ * The response types the function reports, refusing one Lambda does not have.
  *
- * A batch item failure report means different things to the two sources. A
- * queue takes back the messages a report names; a stream retries the batch from
- * the record it names onward, and a failing stream batch is retried whole here.
- * Accepting the flag on a stream mapping would be a mapping that says it does
- * one thing and does another, which is
- * https://github.com/KensioSoftware/yulin/issues/342.
+ * Both event sources take a batch item failure report, and each does its own
+ * thing with it: a queue takes back the messages a report names, and a stream
+ * goes back to the record it names and delivers everything from there again.
  */
 export function functionResponseTypesIn(
   input: SimCreateEventSourceMappingCommandInput,
-  eventSourceArn: SimLambdaEventSourceArn,
 ): readonly SimLambdaFunctionResponseType[] {
   const responseTypes = input.FunctionResponseTypes ?? [];
 
@@ -30,15 +21,6 @@ export function functionResponseTypesIn(
           "function response type. ReportBatchItemFailures is the only one",
       );
     }
-  }
-
-  if (responseTypes.length > 0 && eventSourceArn.kind === "dynamodb-stream") {
-    throw new SimLambdaInvalidParameterValueException(
-      "FunctionResponseTypes on a DynamoDB stream event source mapping is " +
-        "not simulated: a stream retries a batch from the record a report " +
-        "names onward, rather than taking back the records it names, and a " +
-        "failing batch is retried whole here",
-    );
   }
 
   return responseTypes as readonly SimLambdaFunctionResponseType[];
