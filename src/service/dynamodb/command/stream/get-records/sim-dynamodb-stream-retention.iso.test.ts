@@ -1,4 +1,6 @@
+import { UpdateTableCommand } from "@aws-sdk/client-dynamodb";
 import {
+  DescribeStreamCommand,
   GetRecordsCommand,
   GetShardIteratorCommand,
   ListStreamsCommand,
@@ -123,6 +125,34 @@ describe("DynamoDB Streams 24 hour retention", () => {
     assertIdentical(listed.Streams[0].StreamArn, aged.stream.arn);
     assertArrayLength(output.Records, 0);
     assertNonNullable(output.NextShardIterator);
+  });
+
+  it("goes on reporting the range of a shard whose records have gone", async () => {
+    // Given a closed shard whose records have all aged out.
+    const aged = await agedStream();
+    await aged.simAws.dynamoDb().updateTable(
+      new UpdateTableCommand({
+        TableName: "orders",
+        StreamSpecification: { StreamEnabled: false },
+      }),
+    );
+    await aged.simAws.backgroundTasksComplete();
+    await aged.simAws.clock().advanceBy({ hours: 25 });
+
+    // When the stream is described.
+    const output = await aged.simAws
+      .dynamoDbStreams()
+      .describeStream(
+        new DescribeStreamCommand({ StreamArn: aged.stream.arn }),
+      );
+
+    // Then the shard still says where it began and where it ended. A shard's
+    // range is fixed as its records go on, and trimming takes records away
+    // rather than moving it.
+    const range = output.StreamDescription?.Shards?.[0]?.SequenceNumberRange;
+    assertNonNullable(range);
+    assertIdentical(range.StartingSequenceNumber, sequenceNumberAt(0));
+    assertIdentical(range.EndingSequenceNumber, sequenceNumberAt(1));
   });
 
   it("keeps records that are still inside the retention window", async () => {

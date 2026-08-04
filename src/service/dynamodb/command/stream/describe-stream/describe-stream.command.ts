@@ -27,8 +27,9 @@ export interface SimDescribeStreamCommand {
  * Minimal structural sim DynamoDB Streams DescribeStream input.
  *
  * `Limit` and `ExclusiveStartShardId` page through a stream's shards. A
- * simulated stream has exactly one, so a page of them is never cut short and
- * neither parameter can change what comes back.
+ * simulated stream has exactly one, so a `Limit` of at least one never cuts a
+ * page short, and `ExclusiveStartShardId` naming that shard leaves a page with
+ * nothing on it.
  */
 export interface SimDescribeStreamCommandInput {
   readonly StreamArn?: string | undefined;

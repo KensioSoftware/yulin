@@ -37,6 +37,8 @@ export class SimDynamoDbStreamShard {
   private readonly written: SimDynamoDbStreamRecord[] = [];
   private open = true;
   private trimmed: string | undefined;
+  private first: string | undefined;
+  private last: string | undefined;
 
   constructor(at: Date) {
     this.shardId = shardId(at);
@@ -65,10 +67,15 @@ export class SimDynamoDbStreamShard {
   }
 
   /**
-   * The sequence number of the oldest record still on this shard.
+   * The sequence number this shard starts at.
+   *
+   * This is the first record ever written to it rather than the oldest one it
+   * still holds. A shard's range is fixed as the records go on: trimming takes
+   * records away without moving where the shard began, and TRIM_HORIZON is what
+   * a reader uses to find the oldest record it can still reach.
    */
   get startingSequenceNumber(): string | undefined {
-    return this.written.at(0)?.sequenceNumber;
+    return this.first;
   }
 
   /**
@@ -79,7 +86,7 @@ export class SimDynamoDbStreamShard {
    * taking changes from one it can finish with.
    */
   get endingSequenceNumber(): string | undefined {
-    return this.open ? undefined : this.written.at(-1)?.sequenceNumber;
+    return this.open ? undefined : this.last;
   }
 
   /**
@@ -87,6 +94,8 @@ export class SimDynamoDbStreamShard {
    */
   append(record: SimDynamoDbStreamRecord): void {
     this.written.push(record);
+    this.first ??= record.sequenceNumber;
+    this.last = record.sequenceNumber;
   }
 
   /**
@@ -97,16 +106,18 @@ export class SimDynamoDbStreamShard {
    * reached and one that asked for a position it has already dropped.
    */
   trim(before: Date): void {
-    let oldest = this.written.at(0);
+    const surviving = this.written.findIndex(
+      (record) =>
+        record.approximateCreationDateTime.getTime() >= before.getTime(),
+    );
+    const outlived = surviving === -1 ? this.written.length : surviving;
 
-    while (
-      oldest !== undefined &&
-      oldest.approximateCreationDateTime.getTime() < before.getTime()
-    ) {
-      this.trimmed = oldest.sequenceNumber;
-      this.written.shift();
-      oldest = this.written.at(0);
+    if (outlived === 0) {
+      return;
     }
+
+    this.trimmed = this.written[outlived - 1]?.sequenceNumber ?? this.trimmed;
+    this.written.splice(0, outlived);
   }
 
   /**

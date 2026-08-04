@@ -2684,6 +2684,10 @@ to start.
 `GetRecords` answers with the iterator to use for the next call. Reading a stream to the end and
 polling it is the same loop either way: pass each `NextShardIterator` to the following `GetRecords`.
 
+One `GetRecords` hands back at most 1000 records, so a reader with more than that behind it stays
+behind until it polls again. `Limit` asks for fewer, and a `Limit` above 1000 is a
+`ValidationException` rather than being quietly reduced.
+
 An empty `Records` array alongside a `NextShardIterator` is the ordinary answer for a reader that
 has caught up, and means to look again rather than that anything is wrong. `NextShardIterator` is
 absent only when the shard is closed and the reader has reached the end of it, which happens once
@@ -3331,9 +3335,9 @@ nothing is written.
 - A shard iterator never expires. Real DynamoDB gives one 15 minutes and then answers
   `ExpiredIteratorException`, which a consumer handles by asking for another from the sequence
   number it last checkpointed. Nothing here refuses an iterator for being old.
-- `DescribeStream` takes `Limit` and `ExclusiveStartShardId` and neither changes the answer, since a
-  simulated stream has one shard and a page of shards is always all of them. `ShardFilter` is
-  refused by name rather than ignored, since there is no shard lineage for it to walk.
+- `DescribeStream` never reports a `LastEvaluatedShardId`, since a simulated stream has one shard
+  and a page of shards is always all of them. `ShardFilter` is refused by name rather than ignored,
+  since there is no shard lineage for it to walk.
 - A stream is never dropped once everything on it has been trimmed. Real DynamoDB eventually stops
   listing a disabled stream whose records have all aged out, where the ARN a test is holding goes on
   resolving here and reads as empty.

@@ -121,20 +121,26 @@ describe("DynamoDB Streams ListStreams", () => {
     assertUndefined(second.LastEvaluatedStreamArn);
   });
 
-  it("refuses a Limit above the page size cap", async () => {
+  it("refuses a Limit outside the page size DynamoDB takes", async () => {
     // Given a table with a stream.
     const simAws = new SimAws();
     await simDynamoDbStreamedTableFactory.make({}, simAws);
 
-    // When more streams than one page holds are asked for at once.
-    const error = await assertThrowsErrorAsync(async () =>
+    // When a page of no streams, and one of more than a page, are asked for.
+    const tooFew = await assertThrowsErrorAsync(async () =>
       simAws
         .dynamoDbStreams()
         .listStreams(new ListStreamsCommand({ Limit: 0 })),
     );
+    const tooMany = await assertThrowsErrorAsync(async () =>
+      simAws
+        .dynamoDbStreams()
+        .listStreams(new ListStreamsCommand({ Limit: 101 })),
+    );
 
-    // Then the request is refused.
-    assertInstanceOf(error, SimDynamoDbValidationException);
+    // Then both are refused.
+    assertInstanceOf(tooFew, SimDynamoDbValidationException);
+    assertInstanceOf(tooMany, SimDynamoDbValidationException);
   });
 
   it("denies a caller without dynamodb:ListStreams", async () => {

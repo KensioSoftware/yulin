@@ -1,5 +1,8 @@
 import type { SimAwsCaller } from "../../../../aws/caller/sim-aws-caller.js";
-import { SimDynamoDbUnsupportedOperation } from "../../../error/dynamodb.error.js";
+import {
+  SimDynamoDbUnsupportedOperation,
+  SimDynamoDbValidationException,
+} from "../../../error/dynamodb.error.js";
 import type { SimDynamoDbStream } from "../../../stream/sim-dynamodb-stream.js";
 import type { SimDynamoDbStreamShardDescription } from "../stream.types.js";
 import type { SimDynamoDbStreamAccess } from "../sim-dynamodb-stream-access.js";
@@ -17,16 +20,51 @@ interface SimDynamoDbDescribeStreamOptions {
 }
 
 /**
- * The one shard of a stream, as DescribeStream reports it.
+ * The greatest number of shards one DescribeStream reports.
  */
-function shardOf(stream: SimDynamoDbStream): SimDynamoDbStreamShardDescription {
-  return {
-    ShardId: stream.shard.shardId,
-    SequenceNumberRange: {
-      StartingSequenceNumber: stream.shard.startingSequenceNumber,
-      EndingSequenceNumber: stream.shard.endingSequenceNumber,
+const greatestLimit = 100;
+
+/**
+ * Refuse a page size DynamoDB would not take.
+ */
+function assertLimit(limit: number | undefined): void {
+  if (limit === undefined) {
+    return;
+  }
+
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > greatestLimit) {
+    throw new SimDynamoDbValidationException(
+      `Limit ${limit.toString()} is invalid. It is a whole number between 1 ` +
+        `and ${greatestLimit.toString()}.`,
+    );
+  }
+}
+
+/**
+ * The shards of a stream a request asks for, which is its one shard or none.
+ *
+ * A simulated stream has one shard, so a `Limit` of at least one never cuts the
+ * page short. `ExclusiveStartShardId` naming that shard does leave nothing to
+ * report, which is what a caller resuming from it means, so it is honoured
+ * rather than ignored.
+ */
+function shardsOf(
+  stream: SimDynamoDbStream,
+  exclusiveStartShardId: string | undefined,
+): readonly SimDynamoDbStreamShardDescription[] {
+  if (exclusiveStartShardId === stream.shard.shardId) {
+    return [];
+  }
+
+  return [
+    {
+      ShardId: stream.shard.shardId,
+      SequenceNumberRange: {
+        StartingSequenceNumber: stream.shard.startingSequenceNumber,
+        EndingSequenceNumber: stream.shard.endingSequenceNumber,
+      },
     },
-  };
+  ];
 }
 
 /**
@@ -50,6 +88,12 @@ export class SimDynamoDbDescribeStream {
     command: SimDescribeStreamCommand,
     options?: SimDynamoDbDescribeStreamOptions,
   ): SimDescribeStreamCommandOutput {
+    const stream = this.access.required(
+      "dynamodb:DescribeStream",
+      command.input.StreamArn,
+      options?.caller,
+    );
+
     if (command.input.ShardFilter !== undefined) {
       throw new SimDynamoDbUnsupportedOperation(
         "DescribeStream ShardFilter is not simulated: a simulated stream has " +
@@ -57,11 +101,7 @@ export class SimDynamoDbDescribeStream {
       );
     }
 
-    const stream = this.access.required(
-      "dynamodb:DescribeStream",
-      command.input.StreamArn,
-      options?.caller,
-    );
+    assertLimit(command.input.Limit);
 
     return {
       StreamDescription: {
@@ -72,7 +112,7 @@ export class SimDynamoDbDescribeStream {
         CreationRequestDateTime: stream.enabledAt,
         TableName: stream.tableName,
         KeySchema: stream.keySchemaElements,
-        Shards: [shardOf(stream)],
+        Shards: shardsOf(stream, command.input.ExclusiveStartShardId),
       },
       $metadata: {},
     };

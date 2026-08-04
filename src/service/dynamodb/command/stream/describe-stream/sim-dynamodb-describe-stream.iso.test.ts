@@ -16,6 +16,7 @@ import { SimIamAccessDenied } from "../../../../iam/error/sim-iam.error.js";
 import {
   SimDynamoDbResourceNotFoundException,
   SimDynamoDbUnsupportedOperation,
+  SimDynamoDbValidationException,
 } from "../../../error/dynamodb.error.js";
 import { simDynamoDbStreamedTableFactory } from "../../../stream/sim-dynamodb-streamed-table.factory.js";
 
@@ -139,6 +140,39 @@ describe("DynamoDB Streams DescribeStream", () => {
     assertInstanceOf(error, SimDynamoDbUnsupportedOperation);
   });
 
+  it("pages the one shard a stream has", async () => {
+    // Given a stream.
+    const simAws = new SimAws();
+    const streamArn = await streamArnOf(simAws);
+    const first = await simAws
+      .dynamoDbStreams()
+      .describeStream(new DescribeStreamCommand({ StreamArn: streamArn }));
+    const shardId = first.StreamDescription?.Shards?.[0]?.ShardId;
+
+    // When the shards are asked for again from after the one that came back.
+    const second = await simAws.dynamoDbStreams().describeStream(
+      new DescribeStreamCommand({
+        StreamArn: streamArn,
+        ExclusiveStartShardId: shardId,
+      }),
+    );
+
+    // Then there is nothing left to report, rather than the same shard over
+    // again.
+    assertArrayLength(second.StreamDescription?.Shards, 0);
+
+    // And a page size DynamoDB would not take is refused.
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws.dynamoDbStreams().describeStream(
+        new DescribeStreamCommand({
+          StreamArn: streamArn,
+          Limit: 0,
+        }),
+      ),
+    );
+    assertInstanceOf(error, SimDynamoDbValidationException);
+  });
+
   it("denies a caller without dynamodb:DescribeStream on the stream ARN", async () => {
     // Given a Role with no DynamoDB permissions.
     const simAws = new SimAws();
@@ -171,5 +205,18 @@ describe("DynamoDB Streams DescribeStream", () => {
     assertInstanceOf(error, SimIamAccessDenied);
     assertIdentical(error.action, "dynamodb:DescribeStream");
     assertIdentical(error.resource, streamArn);
+
+    // And a request the simulation would refuse anyway is still refused for
+    // the caller first, so what is and is not simulated stays behind IAM.
+    const filtered = await assertThrowsErrorAsync(async () =>
+      simAws.dynamoDbStreams().describeStream(
+        new DescribeStreamCommand({
+          StreamArn: streamArn,
+          ShardFilter: { Type: "CHILD_SHARDS" },
+        }),
+        { caller: { kind: "arn", arn: roleCreation.Role.Arn } },
+      ),
+    );
+    assertInstanceOf(filtered, SimIamAccessDenied);
   });
 });
