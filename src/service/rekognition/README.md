@@ -140,6 +140,29 @@ routinely excludes the chin. Landmark pairs that run across the face, such as `e
 `eyeRight`, are required to be in the order Rekognition reports them in, so a declaration with the
 two swapped is refused where it was written.
 
+## Sample images
+
+`sample/` is the five images that ship with the service, for the case the hash rules exist for: an
+application that generates its own object keys, where the name a detection sees is not something a
+test can match on.
+
+`sample/sim-rekognition-sample-image-files.ts` holds them as base64, so a sample image is the same
+bytes in the published package as it is here and reading one needs no filesystem. They are real 16
+by 16 PNG and JPEG files, 1,909 bytes in total, which is what keeps the format check applying to
+them as it does to any other image. Re-encoding one would change its hash and leave its rule
+matching nothing, so they are checked in rather than generated.
+
+`sample/sim-rekognition-sample-rules.ts` is what each one is declared as.
+`SimRekognitionModeration` and `SimRekognitionFaces` register those as ordinary hash rules in their
+constructors, which is the whole of the mechanism: a rule a test registers for the same image
+replaces the built-in one through the usual precedence, and nothing anywhere special-cases a sample
+image. It also means a sample image beats a name rule for the key it was uploaded under, since a
+hash rule wins.
+
+Each image is declared for the one operation it is named for. Declaring the face images as clean for
+moderation as well would decide something the image is not named for, and the moderation default
+already reports a clean image.
+
 ## Images
 
 `image/` is the path from a request to the bytes a rule is matched against.

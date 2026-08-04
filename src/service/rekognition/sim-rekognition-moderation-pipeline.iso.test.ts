@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { text } from "node:stream/consumers";
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
@@ -23,6 +24,7 @@ import {
 } from "../../../test/rekognition/image-fixture.js";
 import { SimAws } from "../aws/sim-aws.js";
 import { makeLambdaCodeZip } from "../lambda/function/code/make-lambda-code-zip.js";
+import { simRekognitionSampleImages } from "./sample/sim-rekognition-sample-images.js";
 
 /**
  * A moderation handler as an application would write one: it reads the object
@@ -175,6 +177,36 @@ describe("Moderating an uploaded image through a simulated pipeline", () => {
     );
     assertNonNullable(flagged.Body);
     assertStringIncludes(await text(flagged.Body), "Explicit,Explicit Nudity");
+  });
+
+  it("flags a sample image uploaded under a key nothing was declared for", async () => {
+    // Given the same pipeline, with no rules registered by this test, and a
+    // key the application generated rather than the test.
+    const simAws = await simAwsWithModerationPipeline();
+    const key = `raw/${randomUUID()}.jpg`;
+
+    // When the flagged sample image is uploaded under it.
+    await simAws.s3().putObject(
+      new PutObjectCommand({
+        Bucket: "uploads",
+        Key: key,
+        Body: simRekognitionSampleImages.flaggedByModeration(),
+      }),
+    );
+    await simAws.backgroundTasksComplete();
+
+    // Then the sample image's own hash rule decided the result, so a test of
+    // an application that names its own objects needs no rule of its own.
+    const flagged = await simAws
+      .s3()
+      .getObject(
+        new GetObjectCommand({ Bucket: "uploads", Key: `flagged/${key}` }),
+      );
+    assertNonNullable(flagged.Body);
+    assertStringIncludes(
+      await text(flagged.Body),
+      "Violence,Graphic Violence,Weapon Violence",
+    );
   });
 
   it("leaves a clean upload alone", async () => {

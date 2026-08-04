@@ -2,6 +2,8 @@
  * An upload moderated by the Lambda function its Bucket notifies.
  */
 
+import { randomUUID } from "node:crypto";
+
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
   AddPermissionCommand,
@@ -15,6 +17,7 @@ import {
 
 import { SimAws } from "@kensio/yulin";
 import { makeLambdaCodeZip } from "@kensio/yulin/lambda";
+import { simRekognitionSampleImages } from "@kensio/yulin/rekognition";
 
 const simAws = new SimAws();
 const moderatorArn = `arn:aws:lambda:${simAws.defaultRegionName}:${simAws.defaultAccountId}:function:moderator`;
@@ -119,19 +122,13 @@ await simAws.s3().putBucketNotificationConfiguration(
   }),
 );
 
-simAws
-  .rekognition()
-  .moderation()
-  .onName("raw/nsfw.png", { labels: ["Explicit Nudity"] });
-
+// The sample image is already declared as failing moderation, so the key it
+// goes in under is the application's business rather than the test's.
 await simAws.s3().putObject(
   new PutObjectCommand({
     Bucket: "uploads",
-    Key: "raw/nsfw.png",
-    Body: Buffer.from(
-      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGO4I2IDAAL8AS3VzMq8AAAAAElFTkSuQmCC",
-      "base64",
-    ),
+    Key: `raw/${randomUUID()}.jpg`,
+    Body: simRekognitionSampleImages.flaggedByModeration(),
   }),
 );
 

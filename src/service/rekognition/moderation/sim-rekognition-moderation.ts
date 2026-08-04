@@ -1,5 +1,6 @@
 import type { SimRekognitionImage } from "../image/sim-rekognition-image.js";
 import { SimRekognitionResultRules } from "../rule/sim-rekognition-result-rules.js";
+import { simRekognitionSampleModerationRules } from "../sample/sim-rekognition-sample-rules.js";
 import {
   SimRekognitionModerationDetection,
   type SimRekognitionModerationResult,
@@ -27,6 +28,17 @@ export class SimRekognitionModeration {
     new SimRekognitionResultRules<SimRekognitionModerationDetection>(
       new SimRekognitionModerationDetection(cleanImage),
     );
+
+  /**
+   * The sample images are declared as ordinary hash rules, so a rule a test
+   * registers for the same image replaces the built-in one through the usual
+   * precedence rather than through anything special-cased here.
+   */
+  constructor() {
+    for (const sample of simRekognitionSampleModerationRules) {
+      this.onHash(sample.image.hash, sample.result);
+    }
+  }
 
   /**
    * Answer with this result for any image no other rule matches.

@@ -354,6 +354,77 @@ A label can be declared as a name on its own, or as a name with what is to be re
 A moderation label declared as a name reports at a confidence of `96.68000030517578`, and a
 detection label at `97.53010559082031`.
 
+## Sample images
+
+Simulated Rekognition ships with five images whose hashes are already declared. A test uploads one
+through its own code and gets a known answer without registering anything, which is what makes an
+application that generates its own object keys testable: nothing in the test has to know the key.
+
+| Image                                              | Format | Detected as                                       |
+| -------------------------------------------------- | ------ | ------------------------------------------------- |
+| `simRekognitionSampleImages.passesModeration()`    | PNG    | no moderation labels                              |
+| `simRekognitionSampleImages.flaggedByModeration()` | JPEG   | `Violence`, `Graphic Violence`, `Weapon Violence` |
+| `simRekognitionSampleImages.noFaces()`             | PNG    | no faces                                          |
+| `simRekognitionSampleImages.oneFace()`             | JPEG   | one face, the built-in default face               |
+| `simRekognitionSampleImages.severalFaces()`        | PNG    | three faces                                       |
+
+```typescript sim-rekognition-sample-images
+/**
+ * A sample image uploaded under a key the application invented.
+ */
+
+import { randomUUID } from "node:crypto";
+
+import { DetectModerationLabelsCommand } from "@aws-sdk/client-rekognition";
+import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+
+import { SimAws } from "@kensio/yulin";
+import { simRekognitionSampleImages } from "@kensio/yulin/rekognition";
+
+const simAws = new SimAws();
+await simAws.s3().createBucket(new CreateBucketCommand({ Bucket: "uploads" }));
+
+const key = `raw/${randomUUID()}.jpg`;
+
+await simAws.s3().putObject(
+  new PutObjectCommand({
+    Bucket: "uploads",
+    Key: key,
+    Body: simRekognitionSampleImages.flaggedByModeration(),
+  }),
+);
+
+const detected = await simAws.rekognition().detectModerationLabels(
+  new DetectModerationLabelsCommand({
+    Image: { S3Object: { Bucket: "uploads", Name: key } },
+  }),
+);
+
+console.log(detected.ModerationLabels.map((label) => label.Name));
+// [ "Violence", "Graphic Violence", "Weapon Violence" ]
+```
+
+Each image is declared for the one operation it is named for. The moderation images say nothing
+about faces and the face images say nothing about moderation, so those detections answer from their
+own rules as they would for any other image.
+
+The built-in rules are ordinary hash rules registered when the service is made, so declaring a rule
+for the same image replaces it. Note the precedence: a hash rule beats a name rule, so a sample
+image is overridden by hash rather than by the key it was uploaded under.
+
+```typescript
+const sample = simRekognitionSampleImages.flaggedByModeration();
+
+simAws
+  .rekognition()
+  .moderation()
+  .onHash(simRekognitionImageHash(sample), { labels: [] });
+```
+
+The images are real 16 by 16 PNG and JPEG files, 1,909 bytes in total, so the format check reads
+their magic bytes as it does for any other image. What they are pictures of decides nothing, since
+no image is looked at.
+
 ## Moderation labels come back with their parents
 
 A declared label expands to its whole chain in the version 7.0 moderation taxonomy, so handler code
@@ -496,10 +567,16 @@ An upload can moderate itself: a Bucket notification invokes a function, and the
 the object the event names. The function calls Rekognition in the Account and Region it runs in, so
 the rules a test registers on `simAws.rekognition()` are the ones it finds.
 
+This is the flow the sample images exist for. The object goes in under a key the application
+generated, and the sample image's own hash rule decides the result, so nothing in the test names the
+key.
+
 ```typescript sim-rekognition-upload-pipeline
 /**
  * An upload moderated by the Lambda function its Bucket notifies.
  */
+
+import { randomUUID } from "node:crypto";
 
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
@@ -514,6 +591,7 @@ import {
 
 import { SimAws } from "@kensio/yulin";
 import { makeLambdaCodeZip } from "@kensio/yulin/lambda";
+import { simRekognitionSampleImages } from "@kensio/yulin/rekognition";
 
 const simAws = new SimAws();
 const moderatorArn = `arn:aws:lambda:${simAws.defaultRegionName}:${simAws.defaultAccountId}:function:moderator`;
@@ -618,19 +696,13 @@ await simAws.s3().putBucketNotificationConfiguration(
   }),
 );
 
-simAws
-  .rekognition()
-  .moderation()
-  .onName("raw/nsfw.png", { labels: ["Explicit Nudity"] });
-
+// The sample image is already declared as failing moderation, so the key it
+// goes in under is the application's business rather than the test's.
 await simAws.s3().putObject(
   new PutObjectCommand({
     Bucket: "uploads",
-    Key: "raw/nsfw.png",
-    Body: Buffer.from(
-      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGO4I2IDAAL8AS3VzMq8AAAAAElFTkSuQmCC",
-      "base64",
-    ),
+    Key: `raw/${randomUUID()}.jpg`,
+    Body: simRekognitionSampleImages.flaggedByModeration(),
   }),
 );
 
@@ -702,6 +774,8 @@ Simulated Rekognition currently supports:
 - `Attributes` handling for face detection, with the default subset always returned, `ALL` adding
   the rest, and five landmarks reported unless `ALL` was asked for
 - `simRekognitionNoFaces` and `simRekognitionSeveralFaces`, for a test that counts faces
+- Five built-in sample images, real PNG and JPEG files with their hashes already declared, for a
+  clean and a flagged moderation result and for zero, one and three faces
 - `simRekognitionImageHash`, for hashing a fixture to declare a rule against
 - PNG and JPEG format detection from the image bytes
 - IAM authorization on `rekognition:DetectModerationLabels`, `rekognition:DetectLabels` and
@@ -740,6 +814,8 @@ Simulated Rekognition currently supports:
   content it identifies as such, which needs an image to look at.
 - Nothing looks at the image beyond its first few bytes. A PNG of a kitten declared as `Violence`
   comes back as `Violence`, and an image no rule matches gets the built-in `Mobile Phone` result.
+- The sample images are 16 by 16 pictures of coloured shapes, small enough to ship in the package.
+  They are not photographs of the things they are named for, because nothing decodes them.
 - The format comes from the image bytes and never from a stored content type. Simulated S3 keeps a
   `ContentType` given to `PutObject` as a metadata key, and has none at all when the uploader did
   not set one, so trusting it would make the same bytes detectable or not depending on how they were
