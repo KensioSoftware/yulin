@@ -57,12 +57,10 @@ async function writeOrder(
   tableName: string,
   orderId: string,
 ): Promise<void> {
-  await simAws
-    .dynamoDb()
-    .putItem(
-      new PutItemCommand({
-        TableName: tableName,
-        Item: { orderId: { S: orderId } },
-      }),
-    );
+  await simAws.dynamoDb().putItem(
+    new PutItemCommand({
+      TableName: tableName,
+      Item: { orderId: { S: orderId } },
+    }),
+  );
 }
