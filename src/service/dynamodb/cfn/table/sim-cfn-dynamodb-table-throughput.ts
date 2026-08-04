@@ -1,5 +1,5 @@
 import type { SimDynamoDbProvisionedThroughput } from "../../command/table/table.types.js";
-import type { SimCfnDynamoDbTableValues } from "./sim-cfn-dynamodb-table-values.js";
+import type { SimCfnDynamoDbPropertyValues } from "../property/sim-cfn-dynamodb-property-values.js";
 
 /**
  * Read the capacity a `ProvisionedThroughput` property asks for.
@@ -9,7 +9,7 @@ import type { SimCfnDynamoDbTableValues } from "./sim-cfn-dynamodb-table-values.
  * copy of the shape.
  */
 export function readSimCfnDynamoDbThroughput(
-  values: SimCfnDynamoDbTableValues,
+  values: SimCfnDynamoDbPropertyValues,
 ): SimDynamoDbProvisionedThroughput | undefined {
   const throughput = values.object("ProvisionedThroughput");
 

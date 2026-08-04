@@ -90,9 +90,9 @@ describe("DynamoDB CloudFormation Table validation", () => {
     assertTrue(stack.getResource("OrdersBucket")?.deployed);
   });
 
-  it("skips a global table rather than creating an ordinary one", async () => {
-    // Given a template with an AWS::DynamoDB::GlobalTable in it, which
-    // replicates across regions.
+  it("skips a DynamoDB Resource type this simulation does not create", async () => {
+    // Given a template with an AWS::DynamoDB:: Resource that is neither of the
+    // two that make a table.
     const simAws = new SimAws();
 
     // When the template is deployed.
@@ -100,26 +100,23 @@ describe("DynamoDB CloudFormation Table validation", () => {
       stackName: "orders-stack",
       template: {
         Resources: {
-          OrdersTable: {
-            ...simCfnDynamoDbTableResourceFactory.make({
-              tableName: "orders",
-            }),
-            Type: "AWS::DynamoDB::GlobalTable",
-          },
+          OrdersBackup: { Type: "AWS::DynamoDB::Backup" },
+          OrdersBucket: { Type: "AWS::S3::Bucket" },
         },
       },
     });
     await stack.waitForDeployComplete();
 
-    // Then it is skipped, naming the Resource type, and no table is created.
-    const resource = stack.getResource("OrdersTable");
+    // Then it is skipped, naming the Resource type, and the rest of the stack
+    // still deploys.
+    const resource = stack.getResource("OrdersBackup");
     assertNonNullable(resource);
     assertTrue(resource.skipped);
     assertStringIncludes(
       resource.skippedReason ?? "",
-      "Unsupported sim DynamoDB CloudFormation Resource GlobalTable",
+      "Unsupported sim DynamoDB CloudFormation Resource Backup",
     );
-    assertUndefined(simAws.dynamoDb().findTable("orders"));
+    assertTrue(stack.getResource("OrdersBucket")?.deployed);
   });
 
   it("leaves a table unprotected when a Parameter says so", async () => {

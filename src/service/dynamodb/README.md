@@ -932,24 +932,30 @@ answers with a one element list.
 orchestrates and services create.
 
 `SimDynamoDbCfnResourceFactory` is the entry point, resolved into the CloudFormation engine by
-`sim-cfn-service-resolver.ts`. `Table` is the only resource type it creates. Anything else, including
-`GlobalTable`, throws an `Unsupported sim DynamoDB CloudFormation Resource` error, which is the
-wording that marks a resource as skipped rather than failing the stack.
+`sim-cfn-service-resolver.ts`. `Table` and `GlobalTable` are the resource types it creates, and both
+make a table. Anything else throws an `Unsupported sim DynamoDB CloudFormation Resource` error,
+which is the wording that marks a resource as skipped rather than failing the stack.
+
+The parts under `cfn/property/` are what the two resource types share:
+
+- `SimCfnDynamoDbPropertyValues` reads the plain shapes a property can hold, naming the property path
+  in each refusal. It takes a number from the string a template Parameter carries one as. It carries
+  the resource type it is reading for, since the two types name the same table differently and a
+  refusal that named the wrong one would send whoever reads it to the wrong documentation.
+- `SimCfnDynamoDbPropertyRules` decides what a property means, at whatever level a template nests. A
+  simulated property is passed on, a real property that is not simulated skips the resource with a
+  reason naming it, and anything that is not a property of that object at all fails the resource,
+  because that is a template real CloudFormation would refuse too. Each level differs only in which
+  names belong to it, so a level is a pair of name sets rather than a rule of its own.
 
 The parts under `cfn/table/` split by responsibility:
 
-- `SimCfnDynamoDbTablePropertyRules` decides what a property means. A simulated property is passed
-  on, a real property that is not simulated skips the resource with a reason naming it, and anything
-  that is not an `AWS::DynamoDB::Table` property at all fails the resource, because that is a
-  template real CloudFormation would refuse too.
-- `SimCfnDynamoDbTableIndexRules` applies the same rule a level down, to the entries of
-  `GlobalSecondaryIndexes` and `LocalSecondaryIndexes`. The two kinds have different property sets:
-  a local secondary index has no throughput or insights settings on AWS either, so anything of the
-  sort on one fails the resource rather than skipping it.
-- `SimCfnDynamoDbTableStreamRules` applies the same rule to the `StreamSpecification`, whose nested
+- `SimCfnDynamoDbTablePropertyRules` holds the `AWS::DynamoDB::Table` name sets, and applies them to
+  the resource's own properties and then a level down to the entries of `GlobalSecondaryIndexes` and
+  `LocalSecondaryIndexes` and to the `StreamSpecification`. The two index kinds have different
+  property sets: a local secondary index has no throughput or insights settings on AWS either, so
+  anything of the sort on one fails the resource rather than skipping it. The stream's nested
   `ResourcePolicy` is a policy on the stream rather than the table's own.
-- `SimCfnDynamoDbTableValues` reads the plain shapes a property can hold, naming the property path in
-  each refusal. It takes a number from the string a template Parameter carries one as.
 - `SimCfnDynamoDbTableProperties` turns the template properties into `CreateTable` input, and
   generates a name for a table the template did not name, through the shared
   `SimCfnGeneratedResourceName`. The parts several properties share are read by
@@ -972,11 +978,34 @@ dependency-ready batch of resources at once, so a template with two indexed tabl
 than serialised, since serialising would hold up stack timing over a template shape a test is
 unlikely to be about.
 
+The parts under `cfn/global-table/` are the difference between the two resource types, and nothing
+else. `SimCfnDynamoDbGlobalTableProperties` reads an `AWS::DynamoDB::GlobalTable` into the
+`AWS::DynamoDB::Table` properties it is, and `SimCfnDynamoDbGlobalTableCreator` hands those to
+`SimCfnDynamoDbTableCreator`, so a global table is created by the path an ordinary table already
+takes rather than by a second one:
+
+- `SimCfnDynamoDbGlobalTableReplicas` settles the replica before anything else is read. One replica
+  is an ordinary table in that region, which is what CDK's `TableV2` synthesises for every table it
+  makes. Two or more is a table that replicates, which is not simulated, so it skips the resource
+  with a reason naming the regions. None fails it, as does one naming a region the stack is not
+  deploying into, since real CloudFormation refuses both templates too. The line is at the replica
+  count rather than at the resource type because that is where the behaviour actually differs.
+- The property name sets are in `sim-cfn-dynamodb-global-table-property-rules.ts` and
+  `sim-cfn-dynamodb-global-table-replica-rules.ts`, one pair per level a global table nests.
+- `simCfnDynamoDbGlobalTableProperty` hands on the properties a global table states exactly as an
+  ordinary table does, in the shape the template wrote them, which is what keeps the rules deciding
+  what they are allowed to be in one place.
+- `simCfnDynamoDbGlobalTableCapacity` puts back together the capacity a global table splits between
+  the table's writes and the replica's reads. `simCfnDynamoDbGlobalTableIndexes` does the same for
+  each global secondary index, matching the replica's per-index entry to the index it names.
+
 `Ref` and `Fn::GetAtt` behaviour lives with the CloudFormation engine rather than on the table, in
-`SimDynamoDbTableCfn` under `cloudformation/resource/cfn/dynamodb/`. `Ref` answers with the table
-name and `Fn::GetAtt Arn` with the table ARN. `StreamArn` answers with the ARN of the stream the
-table's `StreamSpecification` gave it, and is refused by name on a table with no stream, since an
-invented stream ARN would read as a working stream.
+`SimDynamoDbTableCfn` under `cloudformation/resource/cfn/dynamodb/`, which answers for both resource
+types and is told which of them it is speaking for. `Ref` answers with the table name and
+`Fn::GetAtt Arn` with the table ARN. `StreamArn` answers with the ARN of the stream the table's
+`StreamSpecification` gave it, and is refused by name on a table with no stream, since an invented
+stream ARN would read as a working stream. `TableId` answers only for a global table, since that is
+the only one of the two with an attribute for it.
 
 ## Error model
 

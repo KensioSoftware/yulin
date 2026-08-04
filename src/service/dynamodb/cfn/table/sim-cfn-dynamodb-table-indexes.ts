@@ -4,7 +4,7 @@ import type {
 } from "../../command/table/table.types.js";
 import { readSimCfnDynamoDbKeySchema } from "./sim-cfn-dynamodb-table-key-schema.js";
 import { readSimCfnDynamoDbThroughput } from "./sim-cfn-dynamodb-table-throughput.js";
-import type { SimCfnDynamoDbTableValues } from "./sim-cfn-dynamodb-table-values.js";
+import type { SimCfnDynamoDbPropertyValues } from "../property/sim-cfn-dynamodb-property-values.js";
 
 /**
  * Read the `GlobalSecondaryIndexes` or `LocalSecondaryIndexes` an
@@ -25,7 +25,7 @@ import type { SimCfnDynamoDbTableValues } from "./sim-cfn-dynamodb-table-values.
  * be about, so the divergence is documented under Limitations instead.
  */
 export function readSimCfnDynamoDbTableIndexes(
-  values: SimCfnDynamoDbTableValues,
+  values: SimCfnDynamoDbPropertyValues,
   propertyName: string,
 ): readonly SimDynamoDbSecondaryIndexInput[] {
   return values.list(propertyName).map((index) => readIndex(index));
@@ -38,7 +38,7 @@ export function readSimCfnDynamoDbTableIndexes(
  * so reading one that is not there leaves it out rather than inventing it.
  */
 function readIndex(
-  index: SimCfnDynamoDbTableValues,
+  index: SimCfnDynamoDbPropertyValues,
 ): SimDynamoDbSecondaryIndexInput {
   return {
     IndexName: index.string("IndexName"),
@@ -56,7 +56,7 @@ function readIndex(
  * one that does not.
  */
 function readProjection(
-  index: SimCfnDynamoDbTableValues,
+  index: SimCfnDynamoDbPropertyValues,
 ): SimDynamoDbProjectionInput | undefined {
   const projection = index.object("Projection");
 

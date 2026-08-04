@@ -88,6 +88,31 @@ describe("AWS::DynamoDB::Table CloudFormation values", () => {
     );
   });
 
+  it("refuses Fn::GetAtt TableId, which only a global table has", async () => {
+    // Given a template asking an ordinary table for the attribute
+    // AWS::DynamoDB::GlobalTable documents and AWS::DynamoDB::Table does not.
+    const simAws = new SimAws({
+      defaultAccountId: accountIdOneOnes,
+      defaultRegionName: "eu-west-2",
+    });
+
+    // When the template is deployed, then it is refused as the unknown
+    // attribute it is on this Resource type.
+    const error = await assertThrowsErrorAsync(async () => {
+      const stack = await simAws.cloudFormation().deployTemplate({
+        stackName: "orders-stack",
+        template: tableAttributeTemplate("TableId"),
+      });
+
+      await stack.waitForDeployComplete();
+    });
+
+    assertStringIncludes(
+      error.message,
+      "Unsupported AWS::DynamoDB::Table attribute TableId",
+    );
+  });
+
   it("answers a Ref for a table another Resource depends on", async () => {
     // Given a template handing the table name to a Lambda function through its
     // environment, which is what a Ref is for.

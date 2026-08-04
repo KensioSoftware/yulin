@@ -62,7 +62,7 @@ export const simCfnDynamoDbTableResourceFactory = new MappedFactory<
   (input) => ({
     Type: "AWS::DynamoDB::Table",
     Properties: {
-      ...namedBy(input.tableName),
+      ...simCfnDynamoDbTableNameProperty(input.tableName),
       ...simCfnDynamoDbTableKeyProperties(input),
       BillingMode: input.billingMode,
       ...input.properties,
@@ -72,8 +72,13 @@ export const simCfnDynamoDbTableResourceFactory = new MappedFactory<
 
 /**
  * The `TableName` property, for a template that names its table.
+ *
+ * Both Resource types that make a table name it the same way, so both build
+ * the property here.
  */
-function namedBy(tableName: string | undefined): SimCfnTemplateValueRecord {
+export function simCfnDynamoDbTableNameProperty(
+  tableName: string | undefined,
+): SimCfnTemplateValueRecord {
   if (tableName === undefined) {
     return {};
   }

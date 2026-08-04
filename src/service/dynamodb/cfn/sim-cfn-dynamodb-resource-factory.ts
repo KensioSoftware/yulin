@@ -4,6 +4,7 @@ import type {
   SimCloudFormationResourceCreateContext,
 } from "../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimDynamoDb } from "../sim-dynamodb.js";
+import { SimCfnDynamoDbGlobalTableCreator } from "./global-table/sim-cfn-dynamodb-global-table-creator.js";
 import { SimCfnDynamoDbTableCreator } from "./table/sim-cfn-dynamodb-table-creator.js";
 
 interface SimDynamoDbCfnResourceFactoryProperties {
@@ -15,32 +16,39 @@ interface SimDynamoDbCfnResourceFactoryProperties {
  */
 export class SimDynamoDbCfnResourceFactory implements SimCfnServiceResourceFactory {
   private readonly tableCreator: SimCfnDynamoDbTableCreator;
+  private readonly globalTableCreator: SimCfnDynamoDbGlobalTableCreator;
 
   constructor(properties: SimDynamoDbCfnResourceFactoryProperties) {
     this.tableCreator = new SimCfnDynamoDbTableCreator({
       dynamoDb: properties.dynamoDb,
+    });
+    this.globalTableCreator = new SimCfnDynamoDbGlobalTableCreator({
+      tableCreator: this.tableCreator,
     });
   }
 
   /**
    * Create a simulated DynamoDB resource from a CloudFormation Resource.
    *
-   * The table is the only AWS::DynamoDB::* Resource type this simulation
-   * models. A global table replicates across regions, which is not simulated,
-   * so AWS::DynamoDB::GlobalTable is reported as unsupported and skipped rather
-   * than quietly created as an ordinary table in one region.
+   * Both Resource types make a table. A global table naming one replica is an
+   * ordinary table in that region, which is what CDK's `TableV2` synthesises
+   * for every table it makes, so it is created rather than skipped. One naming
+   * two or more regions genuinely replicates, which is not simulated, and is
+   * skipped where it is read rather than here.
    */
   async create(
     resourceTypeName: string,
     resource: SimCfnResource,
     context: SimCloudFormationResourceCreateContext,
   ): Promise<object | undefined> {
+    const properties = context.resolvedProperties ?? resource.properties;
+
     switch (resourceTypeName) {
       case "Table": {
-        return await this.tableCreator.create(
-          resource,
-          context.resolvedProperties ?? resource.properties,
-        );
+        return await this.tableCreator.create(resource, properties);
+      }
+      case "GlobalTable": {
+        return await this.globalTableCreator.create(resource, properties);
       }
       default: {
         throw new Error(
