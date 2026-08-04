@@ -19,6 +19,7 @@
       "@kensio/yulin/iam": ["../src/service/iam/index.ts"],
       "@kensio/yulin/kms": ["../src/service/kms/index.ts"],
       "@kensio/yulin/lambda": ["../src/service/lambda/index.ts"],
+      "@kensio/yulin/rekognition": ["../src/service/rekognition/index.ts"],
       "@kensio/yulin/route53": ["../src/service/route53/index.ts"],
       "@kensio/yulin/s3": ["../src/service/s3/index.ts"],
       "@kensio/yulin/sdk": ["../src/sdk/index.ts"],

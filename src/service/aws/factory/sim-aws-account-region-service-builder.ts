@@ -20,12 +20,10 @@ import { SimSqsEventSourceQueues } from "../../lambda/event-source/queue/sim-sqs
 import { SimDynamoDbEventSourceStreams } from "../../lambda/event-source/stream/sim-dynamodb-event-source-streams.js";
 import { SimS3LambdaCodeStore } from "../../lambda/function/code/store/sim-s3-lambda-code-store.js";
 import { SimSdkLambdaVmModuleProvider } from "../../lambda/function/code/vm/sdk/sim-sdk-lambda-vm-module-provider.js";
+import { SimRekognition } from "../../rekognition/index.js";
+import { SimAwsRekognitionImageObjects } from "../../rekognition/image/s3/sim-aws-rekognition-image-objects.js";
 import { SimS3 } from "../../s3/sim-s3.js";
-import { SimAwsS3NotificationFunctions } from "../../s3/notification/destination/lambda/sim-aws-s3-notification-functions.js";
-import { SimS3LambdaNotificationDestination } from "../../s3/notification/destination/lambda/sim-s3-lambda-notification-destination.js";
-import { SimS3ServiceNotificationDestinations } from "../../s3/notification/destination/sim-s3-service-notification-destinations.js";
-import { SimAwsS3NotificationQueues } from "../../s3/notification/destination/sqs/sim-aws-s3-notification-queues.js";
-import { SimS3SqsNotificationDestination } from "../../s3/notification/destination/sqs/sim-s3-sqs-notification-destination.js";
+import { simAwsS3NotificationDestinations } from "./sim-aws-s3-notification-destinations.js";
 import { SimSecretsManager } from "../../secretsmanager/index.js";
 import { SimSqs } from "../../sqs/index.js";
 import { SimSsm } from "../../ssm/index.js";
@@ -205,6 +203,25 @@ export class SimAwsAccountRegionServiceBuilder {
   }
 
   /**
+   * Create simulated Rekognition for an Account Region scope.
+   *
+   * Rekognition is Region-scoped because the results declared against it are:
+   * a detection made in one Region is answered by that Region's rules. Image
+   * objects come from the whole simulation rather than this scope's S3, since
+   * real Rekognition reads a Bucket another Account's policy admits it to.
+   */
+  createRekognition(scope: SimAwsAccountRegionContainer): SimRekognition {
+    return new SimRekognition({
+      iam: this.accountServices.createIam(scope),
+      background: this.background,
+      images: new SimAwsRekognitionImageObjects({
+        simAws: this.simAws,
+        accountRegionScope: scope.accountRegionScope,
+      }),
+    });
+  }
+
+  /**
    * Create simulated S3 for an Account Region scope.
    *
    * Bucket event notification destinations are resolved when a configuration
@@ -221,7 +238,7 @@ export class SimAwsAccountRegionServiceBuilder {
       s3GlobalRegistry: this.registries.s3,
       iam: this.accountServices.createIam(scope),
       background: this.background,
-      notificationDestinations: this.s3NotificationDestinations(),
+      notificationDestinations: simAwsS3NotificationDestinations(this.simAws),
     });
   }
 
@@ -276,24 +293,6 @@ export class SimAwsAccountRegionServiceBuilder {
       accountRegionScope: scope.accountRegionScope,
       background: this.background,
       iamResolver: this.iamRegistry,
-    });
-  }
-
-  /**
-   * Where a simulated S3 Bucket can send its event notifications.
-   *
-   * A notification configuration names a destination by ARN, and that ARN can
-   * name any Account and Region, so the destinations come from the whole
-   * simulation rather than from one scope.
-   */
-  private s3NotificationDestinations(): SimS3ServiceNotificationDestinations {
-    return new SimS3ServiceNotificationDestinations({
-      lambda: new SimS3LambdaNotificationDestination({
-        functions: new SimAwsS3NotificationFunctions({ simAws: this.simAws }),
-      }),
-      sqs: new SimS3SqsNotificationDestination({
-        queues: new SimAwsS3NotificationQueues({ simAws: this.simAws }),
-      }),
     });
   }
 }

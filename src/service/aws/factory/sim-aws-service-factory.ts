@@ -12,6 +12,7 @@ import type { SimCognitoIdentityProvider } from "../../cognito/index.js";
 import { SimCloudFrontRegistry } from "../../cloudfront/registry/sim-cloud-front-registry.js";
 import type { SimCloudFront } from "../../cloudfront/sim-cloudfront.js";
 import type { SimDynamoDb as SimDynamoDatabase } from "../../dynamodb/index.js";
+import type { SimRekognition } from "../../rekognition/index.js";
 import type { SimRoute53 } from "../../route53/index.js";
 import type { SimS3 } from "../../s3/sim-s3.js";
 import type { SimIam } from "../../iam/index.js";
@@ -169,6 +170,11 @@ export class SimAwsServiceFactory {
   /** Create simulated Lambda for an Account Region scope. */
   createLambda(scope: SimAwsAccountRegionContainer): SimLambda {
     return this.accountRegionServices.createLambda(scope);
+  }
+
+  /** Create simulated Rekognition for an Account Region scope. */
+  createRekognition(scope: SimAwsAccountRegionContainer): SimRekognition {
+    return this.accountRegionServices.createRekognition(scope);
   }
 
   /** Create or get simulated Route53 for an Account scope. */
