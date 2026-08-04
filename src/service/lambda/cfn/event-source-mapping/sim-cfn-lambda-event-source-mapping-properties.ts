@@ -6,6 +6,12 @@ import { SimCfnLambdaPropertyParser } from "../function/sim-cfn-lambda-property-
 import { assertSimulatedEventSourceMappingProperties } from "./sim-cfn-lambda-event-source-mapping-property-rules.js";
 import { simCfnLambdaTargetFunctionName } from "../function/sim-cfn-lambda-target-function.js";
 
+/**
+ * What a CloudFormation Unix time seconds value is multiplied by to reach the
+ * milliseconds a Date takes.
+ */
+const millisecondsPerSecond = 1000;
+
 interface SimCfnLambdaEventSourceMappingPropertiesProperties {
   readonly resource: SimCfnResource;
   readonly properties: SimCfnTemplateValueRecord;
@@ -31,19 +37,25 @@ export class SimCfnLambdaEventSourceMappingProperties {
 
   /**
    * The create input this Resource asks for, refusing what is not simulated.
+   *
+   * The event source ARN is read before anything else is judged, as the command
+   * reads it first for the same reason: what a mapping may ask for depends on
+   * the kind of source it names.
    */
   createInput(): SimCreateEventSourceMappingCommandInput {
+    const eventSourceArn = this.parser.requiredString(
+      this.resource,
+      this.properties["EventSourceArn"],
+      "EventSourceArn",
+    );
+
     assertSimulatedEventSourceMappingProperties(
       this.resource.logicalId,
       this.properties,
     );
 
     return {
-      EventSourceArn: this.parser.requiredString(
-        this.resource,
-        this.properties["EventSourceArn"],
-        "EventSourceArn",
-      ),
+      EventSourceArn: eventSourceArn,
       FunctionName: simCfnLambdaTargetFunctionName(
         this.parser.requiredString(
           this.resource,
@@ -66,8 +78,37 @@ export class SimCfnLambdaEventSourceMappingProperties {
         this.properties["MaximumBatchingWindowInSeconds"],
         "MaximumBatchingWindowInSeconds",
       ),
+      StartingPosition: this.parser.optionalString(
+        this.resource,
+        this.properties["StartingPosition"],
+        "StartingPosition",
+      ),
+      StartingPositionTimestamp: this.startingPositionTimestamp(),
       FunctionResponseTypes: this.functionResponseTypes(),
     };
+  }
+
+  /**
+   * The instant a mapping asked to start reading from.
+   *
+   * CloudFormation carries it as Unix time seconds where the command takes a
+   * Date. Nothing judges it here: every source this simulation has refuses the
+   * property, a queue because it has no starting position at all and a stream
+   * because a timestamp only goes with the Kinesis-only `AT_TIMESTAMP`, so the
+   * refusal comes from the command and names the property.
+   */
+  private startingPositionTimestamp(): Date | undefined {
+    const seconds = this.parser.optionalNumber(
+      this.resource,
+      this.properties["StartingPositionTimestamp"],
+      "StartingPositionTimestamp",
+    );
+
+    if (seconds === undefined) {
+      return undefined;
+    }
+
+    return new Date(seconds * millisecondsPerSecond);
   }
 
   private functionResponseTypes():

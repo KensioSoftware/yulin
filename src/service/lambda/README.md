@@ -504,10 +504,16 @@ omit template `Code` and `Handler`. Unbound functions keep their template code o
 CloudFormation concerns.
 
 `cfn/event-source-mapping/` creates `AWS::Lambda::EventSourceMapping`, which is what CDK's
-`fn.addEventSource(new SqsEventSource(queue))` emits. The properties this simulation has no
-behaviour for fail the resource rather than being dropped, worded as an invalid resource so the
-engine does not skip it: a stack that deployed the queue and the function and nothing between them
-would look like a working subscription.
+`fn.addEventSource(new SqsEventSource(queue))` and `fn.addEventSource(new DynamoEventSource(table))`
+emit. The properties this simulation has no behaviour for fail the resource rather than being
+dropped, worded as an invalid resource so the engine does not skip it: a stack that deployed the
+queue and the function and nothing between them would look like a working subscription.
+
+The event source ARN is read before anything else about the Resource is judged, for the reason
+`SimLambdaEventSourceMappingInput` reads it first: what a mapping may ask for is the source's own
+rule. `StartingPosition` and `StartingPositionTimestamp` are read and passed on rather than judged
+here, since a stream mapping has to have a position and a queue mapping is refused for naming one,
+and only `CreateEventSourceMapping` knows which source the ARN names.
 
 Other `AWS::Lambda::*` resource types (`Version`, `Alias`, ...) are not supported and are skipped by
 the CloudFormation engine with an "Unsupported" diagnostic.
