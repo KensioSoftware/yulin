@@ -1,0 +1,140 @@
+import {
+  DescribeTableCommand,
+  GetItemCommand,
+  ListTagsOfResourceCommand,
+  PutItemCommand,
+} from "@aws-sdk/client-dynamodb";
+import {
+  assertArrayLength,
+  assertIdentical,
+  assertNonNullable,
+  assertObjectEquals,
+  assertStringStartsWith,
+  assertTypeString,
+} from "@kensio/smartass";
+import path from "node:path";
+import { describe, it } from "vitest";
+
+/**
+ * Slower local integration test. Calls the real CDK CLI to synth the output
+ * template file to pass to sim CloudFormation, so the template under test is
+ * one CDK actually produced rather than one written by hand.
+ */
+import { SimAws } from "../../../aws/sim-aws.js";
+import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
+import { TestCdkProject } from "../../../../util/filesystem/test-cdk-project.js";
+
+const accountIdOneOnes = "111111111111" as SimAwsAccountId;
+
+describe("Sim CDK DynamoDB TableV2 deployment local integration", () => {
+  it("deploys a CDK TableV2 an SDK caller then writes to and reads from", async () => {
+    // Given a CDK stack with an unnamed on-demand TableV2 with a partition and
+    // a sort key, no replicas asked for, and a tag applied to everything in
+    // the stack. TableV2 synthesises AWS::DynamoDB::GlobalTable whatever it is
+    // given, with the stack's own region as its one replica.
+    const cdkProject = new TestCdkProject();
+    await cdkProject.writeCdkAppFile(
+      `
+import * as cdk from "aws-cdk-lib/core";
+import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
+
+const app = new cdk.App();
+const stack = new cdk.Stack(app, "TestStack", {
+  env: { account: "111111111111", region: "eu-west-2" },
+});
+
+const ordersTable = new dynamodb.TableV2(stack, "OrdersTable", {
+  partitionKey: { name: "customerId", type: dynamodb.AttributeType.STRING },
+  sortKey: { name: "orderId", type: dynamodb.AttributeType.STRING },
+});
+
+cdk.Tags.of(stack).add("Environment", "test");
+
+new cdk.CfnOutput(stack, "OrdersTableName", {
+  value: ordersTable.tableName,
+});
+
+new cdk.CfnOutput(stack, "OrdersTableArn", {
+  value: ordersTable.tableArn,
+});
+
+app.synth();
+      `,
+    );
+
+    // And we synth the CDK template.
+    const cdkOutDirectory = await cdkProject.synth();
+
+    // When we deploy the synthesized template into the account and region the
+    // CDK app declares, with no hand-editing of the
+    // AWS::DynamoDB::GlobalTable Resource CDK emits.
+    const simAws = new SimAws();
+    const scoped = simAws.account(accountIdOneOnes).region("eu-west-2");
+    const stack = await scoped
+      .cloudFormation()
+      .deployTemplateFile(
+        path.join(cdkOutDirectory, "TestStack.template.json"),
+      );
+    await simAws.backgroundTasksComplete();
+
+    // Then the table name the CDK output carries is the deployed table, named
+    // after the stack and the logical ID because the template did not name it.
+    const tableName = stack.outputs.get("OrdersTableName")?.value;
+    assertTypeString(tableName);
+    assertStringStartsWith(tableName, "TestStack-OrdersTable");
+
+    const described = await scoped
+      .dynamoDb()
+      .describeTable(new DescribeTableCommand({ TableName: tableName }));
+
+    assertNonNullable(described.Table);
+    assertNonNullable(described.Table.KeySchema);
+    assertIdentical(described.Table.TableStatus, "ACTIVE");
+    assertIdentical(
+      described.Table.BillingModeSummary?.BillingMode,
+      "PAY_PER_REQUEST",
+    );
+    assertIdentical(
+      described.Table.KeySchema.at(0)?.AttributeName,
+      "customerId",
+    );
+    assertIdentical(described.Table.KeySchema.at(1)?.AttributeName, "orderId");
+    assertIdentical(
+      stack.outputs.get("OrdersTableArn")?.value,
+      described.Table.TableArn,
+    );
+
+    // And the tag the stack applied is on the table, which CDK puts on the
+    // replica rather than on the table itself for a TableV2.
+    const tags = await scoped.dynamoDb().listTagsOfResource(
+      new ListTagsOfResourceCommand({
+        ResourceArn: described.Table.TableArn,
+      }),
+    );
+    assertArrayLength(tags.Tags, 1);
+    assertObjectEquals(tags.Tags[0], { Key: "Environment", Value: "test" });
+
+    // And an item written to it reads back off it.
+    await scoped.dynamoDb().putItem(
+      new PutItemCommand({
+        TableName: tableName,
+        Item: {
+          customerId: { S: "customer-1" },
+          orderId: { S: "order-1" },
+          total: { N: "42.5" },
+        },
+      }),
+    );
+
+    const read = await scoped.dynamoDb().getItem(
+      new GetItemCommand({
+        TableName: tableName,
+        Key: { customerId: { S: "customer-1" }, orderId: { S: "order-1" } },
+      }),
+    );
+
+    assertIdentical(read.Item?.["total"]?.N, "42.5");
+
+    await simAws.backgroundTasksComplete();
+  });
+});

@@ -2,16 +2,21 @@ import type {
   SimCfnTemplateValue,
   SimCfnTemplateValueRecord,
 } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
-import { dynamoDbTablePropertyError } from "./sim-cfn-dynamodb-table-property-error.js";
+import { dynamoDbPropertyError } from "./sim-cfn-dynamodb-property-error.js";
+import {
+  readSimCfnDynamoDbBoolean,
+  readSimCfnDynamoDbNumber,
+} from "./sim-cfn-dynamodb-property-scalars.js";
 
-interface SimCfnDynamoDbTableValuesProperties {
+interface SimCfnDynamoDbPropertyValuesProperties {
+  readonly resourceTypeName: string;
   readonly logicalId: string;
   readonly properties: SimCfnTemplateValueRecord;
   readonly path?: string;
 }
 
 /**
- * Reads the plain shapes an AWS::DynamoDB::Table property can hold.
+ * Reads the plain shapes a simulated DynamoDB Resource property can hold.
  *
  * Only the template's own shape is checked here: a list where a list belongs, a
  * number where a number belongs. What a value is allowed to mean is left to
@@ -21,12 +26,14 @@ interface SimCfnDynamoDbTableValuesProperties {
  * the path it sits at, so a refusal names the whole property path it came from
  * rather than just the field.
  */
-export class SimCfnDynamoDbTableValues {
+export class SimCfnDynamoDbPropertyValues {
+  private readonly resourceTypeName: string;
   private readonly logicalId: string;
   private readonly entries: ReadonlyMap<string, SimCfnTemplateValue>;
   private readonly path: string;
 
-  constructor(properties: SimCfnDynamoDbTableValuesProperties) {
+  constructor(properties: SimCfnDynamoDbPropertyValuesProperties) {
+    this.resourceTypeName = properties.resourceTypeName;
     this.logicalId = properties.logicalId;
     this.entries = new Map(Object.entries(properties.properties));
     this.path = properties.path ?? "";
@@ -40,12 +47,24 @@ export class SimCfnDynamoDbTableValues {
   }
 
   /**
+   * A property as the template wrote it, for one that is handed on rather than
+   * read.
+   *
+   * A global table carries several properties an ordinary table states the same
+   * way, and passing those through untouched is what keeps the rules that
+   * decide what they are allowed to be in one place.
+   */
+  value(name: string): SimCfnTemplateValue | undefined {
+    return this.entries.get(name);
+  }
+
+  /**
    * Read a property holding a list of objects, such as a key schema.
    *
    * A property the template leaves out reads as no entries, which is what
    * CreateTable then refuses in its own words.
    */
-  list(name: string): readonly SimCfnDynamoDbTableValues[] {
+  list(name: string): readonly SimCfnDynamoDbPropertyValues[] {
     const value = this.entries.get(name);
 
     if (value === undefined) {
@@ -94,7 +113,7 @@ export class SimCfnDynamoDbTableValues {
   /**
    * Read a property holding an object, where the template may leave it out.
    */
-  object(name: string): SimCfnDynamoDbTableValues | undefined {
+  object(name: string): SimCfnDynamoDbPropertyValues | undefined {
     const value = this.entries.get(name);
 
     if (value === undefined) {
@@ -122,10 +141,8 @@ export class SimCfnDynamoDbTableValues {
   }
 
   /**
-   * Read a property holding a number.
-   *
-   * CloudFormation carries a number as a string when it came from a template
-   * Parameter, so both are read.
+   * Read a property holding a number, including one a template Parameter
+   * carried as a string.
    */
   number(name: string): number | undefined {
     const value = this.entries.get(name);
@@ -134,27 +151,18 @@ export class SimCfnDynamoDbTableValues {
       return undefined;
     }
 
-    if (typeof value === "number") {
-      return value;
+    const parsed = readSimCfnDynamoDbNumber(value);
+
+    if (parsed === undefined) {
+      throw this.error(`${this.pathTo(name)} must be a number`);
     }
 
-    if (typeof value === "string" && value.trim() !== "") {
-      const parsed = Number(value);
-
-      if (!Number.isNaN(parsed)) {
-        return parsed;
-      }
-    }
-
-    throw this.error(`${this.pathTo(name)} must be a number`);
+    return parsed;
   }
 
   /**
-   * Read a property holding a boolean.
-   *
-   * CloudFormation carries a boolean as a string when it came from a template
-   * Parameter, so both are read. Anything else is refused rather than read as
-   * false, since what the template asked for is not knowable.
+   * Read a property holding a boolean, including one a template Parameter
+   * carried as a string.
    */
   boolean(name: string): boolean | undefined {
     const value = this.entries.get(name);
@@ -163,22 +171,20 @@ export class SimCfnDynamoDbTableValues {
       return undefined;
     }
 
-    if (value === true || value === "true") {
-      return true;
+    const parsed = readSimCfnDynamoDbBoolean(value);
+
+    if (parsed === undefined) {
+      throw this.error(`${this.pathTo(name)} must be true or false`);
     }
 
-    if (value === false || value === "false") {
-      return false;
-    }
-
-    throw this.error(`${this.pathTo(name)} must be true or false`);
+    return parsed;
   }
 
   /**
    * Build the error this Resource is refused with.
    */
   error(reason: string): Error {
-    return dynamoDbTablePropertyError(this.logicalId, reason);
+    return dynamoDbPropertyError(this.resourceTypeName, this.logicalId, reason);
   }
 
   /**
@@ -198,12 +204,13 @@ export class SimCfnDynamoDbTableValues {
   private reader(
     value: SimCfnTemplateValue,
     path: string,
-  ): SimCfnDynamoDbTableValues {
+  ): SimCfnDynamoDbPropertyValues {
     if (typeof value !== "object" || value === null || Array.isArray(value)) {
       throw this.error(`${path} must be an object`);
     }
 
-    return new SimCfnDynamoDbTableValues({
+    return new SimCfnDynamoDbPropertyValues({
+      resourceTypeName: this.resourceTypeName,
       logicalId: this.logicalId,
       properties: value,
       path,

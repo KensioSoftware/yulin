@@ -1,5 +1,5 @@
 import type { SimDynamoDbStreamSpecification } from "../../stream/sim-dynamodb-stream.types.js";
-import type { SimCfnDynamoDbTableValues } from "./sim-cfn-dynamodb-table-values.js";
+import type { SimCfnDynamoDbPropertyValues } from "../property/sim-cfn-dynamodb-property-values.js";
 
 /**
  * Read the stream an AWS::DynamoDB::Table Resource asks for.
@@ -15,7 +15,7 @@ import type { SimCfnDynamoDbTableValues } from "./sim-cfn-dynamodb-table-values.
  * in.
  */
 export function readSimCfnDynamoDbTableStream(
-  values: SimCfnDynamoDbTableValues,
+  values: SimCfnDynamoDbPropertyValues,
 ): SimDynamoDbStreamSpecification | undefined {
   const specification = values.object("StreamSpecification");
 

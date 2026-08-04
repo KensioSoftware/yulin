@@ -1,5 +1,5 @@
 import type { SimDynamoDbKeySchemaElementInput } from "../../command/table/table.types.js";
-import type { SimCfnDynamoDbTableValues } from "./sim-cfn-dynamodb-table-values.js";
+import type { SimCfnDynamoDbPropertyValues } from "../property/sim-cfn-dynamodb-property-values.js";
 
 /**
  * Read the `KeySchema` property of a table or one of its secondary indexes.
@@ -9,7 +9,7 @@ import type { SimCfnDynamoDbTableValues } from "./sim-cfn-dynamodb-table-values.
  * what says which is the partition key.
  */
 export function readSimCfnDynamoDbKeySchema(
-  values: SimCfnDynamoDbTableValues,
+  values: SimCfnDynamoDbPropertyValues,
 ): readonly SimDynamoDbKeySchemaElementInput[] {
   return values.list("KeySchema").map((element) => {
     return {

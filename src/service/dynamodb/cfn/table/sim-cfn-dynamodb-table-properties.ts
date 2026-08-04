@@ -10,13 +10,14 @@ import type {
 } from "../../command/table/table.types.js";
 import type { SimDynamoDbTimeToLiveSpecificationInput } from "../../command/time-to-live/time-to-live.types.js";
 import type { SimDynamoDbStreamSpecification } from "../../stream/sim-dynamodb-stream.types.js";
+import { dynamoDbTableResourceTypeName } from "../sim-cfn-dynamodb-resource-type.js";
 import { readSimCfnDynamoDbTableIndexes } from "./sim-cfn-dynamodb-table-indexes.js";
 import { readSimCfnDynamoDbKeySchema } from "./sim-cfn-dynamodb-table-key-schema.js";
 import { SimCfnDynamoDbTablePropertyRules } from "./sim-cfn-dynamodb-table-property-rules.js";
 import { readSimCfnDynamoDbTableStream } from "./sim-cfn-dynamodb-table-stream.js";
 import { readSimCfnDynamoDbThroughput } from "./sim-cfn-dynamodb-table-throughput.js";
 import { readSimCfnDynamoDbTableTimeToLive } from "./sim-cfn-dynamodb-table-time-to-live.js";
-import { SimCfnDynamoDbTableValues } from "./sim-cfn-dynamodb-table-values.js";
+import { SimCfnDynamoDbPropertyValues } from "../property/sim-cfn-dynamodb-property-values.js";
 
 /**
  * A table name is at most 255 characters, so a generated one is trimmed to fit.
@@ -40,11 +41,12 @@ interface SimCfnDynamoDbTablePropertiesProperties {
 export class SimCfnDynamoDbTableProperties {
   private readonly resource: SimCfnResource;
   private readonly rules: SimCfnDynamoDbTablePropertyRules;
-  private readonly values: SimCfnDynamoDbTableValues;
+  private readonly values: SimCfnDynamoDbPropertyValues;
 
   constructor(properties: SimCfnDynamoDbTablePropertiesProperties) {
     this.resource = properties.resource;
-    this.values = new SimCfnDynamoDbTableValues({
+    this.values = new SimCfnDynamoDbPropertyValues({
+      resourceTypeName: dynamoDbTableResourceTypeName,
       logicalId: properties.resource.logicalId,
       properties: properties.properties,
     });

@@ -1,10 +1,11 @@
-import { SimCfnDynamoDbTableIndexRules } from "./sim-cfn-dynamodb-table-index-rules.js";
+import { SimCfnDynamoDbPropertyRules } from "../property/sim-cfn-dynamodb-property-rules.js";
+import type { SimCfnDynamoDbPropertyValues } from "../property/sim-cfn-dynamodb-property-values.js";
+import { dynamoDbTableResourceTypeName } from "../sim-cfn-dynamodb-resource-type.js";
 import {
-  dynamoDbTablePropertyError,
-  dynamoDbTableUnsimulatedPropertyError,
-} from "./sim-cfn-dynamodb-table-property-error.js";
-import { SimCfnDynamoDbTableStreamRules } from "./sim-cfn-dynamodb-table-stream-rules.js";
-import type { SimCfnDynamoDbTableValues } from "./sim-cfn-dynamodb-table-values.js";
+  simCfnDynamoDbTableGlobalIndexRules,
+  simCfnDynamoDbTableLocalIndexRules,
+} from "./sim-cfn-dynamodb-table-index-rules.js";
+import { simCfnDynamoDbTableStreamRules } from "./sim-cfn-dynamodb-table-stream-rules.js";
 
 /**
  * The AWS::DynamoDB::Table properties this simulation acts on.
@@ -49,7 +50,7 @@ const unsimulatedPropertyNames: ReadonlySet<string> = new Set([
 
 interface SimCfnDynamoDbTablePropertyRulesProperties {
   readonly logicalId: string;
-  readonly values: SimCfnDynamoDbTableValues;
+  readonly values: SimCfnDynamoDbPropertyValues;
 }
 
 /**
@@ -66,7 +67,7 @@ interface SimCfnDynamoDbTablePropertyRulesProperties {
  */
 export class SimCfnDynamoDbTablePropertyRules {
   private readonly logicalId: string;
-  private readonly values: SimCfnDynamoDbTableValues;
+  private readonly values: SimCfnDynamoDbPropertyValues;
 
   constructor(properties: SimCfnDynamoDbTablePropertyRulesProperties) {
     this.logicalId = properties.logicalId;
@@ -77,26 +78,14 @@ export class SimCfnDynamoDbTablePropertyRules {
    * Refuse everything about this Resource that is not simulated.
    */
   assertSimulated(): void {
-    for (const name of this.values.names) {
-      this.assertSimulatedProperty(name);
-    }
+    new SimCfnDynamoDbPropertyRules({
+      resourceTypeName: dynamoDbTableResourceTypeName,
+      logicalId: this.logicalId,
+      simulated: simulatedPropertyNames,
+      unsimulated: unsimulatedPropertyNames,
+    }).assertSimulated(this.values);
 
     this.assertSimulatedMembers();
-  }
-
-  private assertSimulatedProperty(name: string): void {
-    if (simulatedPropertyNames.has(name)) {
-      return;
-    }
-
-    if (unsimulatedPropertyNames.has(name)) {
-      throw dynamoDbTableUnsimulatedPropertyError(this.logicalId, name);
-    }
-
-    throw dynamoDbTablePropertyError(
-      this.logicalId,
-      `${name} is not an AWS::DynamoDB::Table property`,
-    );
   }
 
   /**
@@ -106,12 +95,14 @@ export class SimCfnDynamoDbTablePropertyRules {
   private assertSimulatedMembers(): void {
     const logicalId = this.logicalId;
 
-    SimCfnDynamoDbTableIndexRules.global(logicalId).assertSimulated(
+    simCfnDynamoDbTableGlobalIndexRules(logicalId).assertEachSimulated(
       this.values.list("GlobalSecondaryIndexes"),
     );
-    SimCfnDynamoDbTableIndexRules.local(logicalId).assertSimulated(
+    simCfnDynamoDbTableLocalIndexRules(logicalId).assertEachSimulated(
       this.values.list("LocalSecondaryIndexes"),
     );
-    new SimCfnDynamoDbTableStreamRules(logicalId).assertSimulated(this.values);
+    simCfnDynamoDbTableStreamRules(logicalId).assertSimulated(
+      this.values.object("StreamSpecification"),
+    );
   }
 }

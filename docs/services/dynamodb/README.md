@@ -3038,8 +3038,8 @@ property, and the rest of the stack still deploys: `KinesisStreamSpecification`,
 `ResourcePolicy`, `OnDemandThroughput` and `WarmThroughput`. A property `AWS::DynamoDB::Table` does
 not have fails the resource instead, since that is a template real CloudFormation would refuse too.
 
-`AWS::DynamoDB::GlobalTable` is skipped rather than deployed, since replication across regions is
-not simulated.
+`AWS::DynamoDB::GlobalTable` deploys a table as well, under
+[deploying a global table](#deploying-a-global-table-from-cloudformation).
 
 CDK works without hand-editing. A `dynamodb.Table` synthesises a template that deploys here, with
 the table name reaching a function through its environment and a grant policy naming the table by
@@ -3254,6 +3254,104 @@ Changing `StreamViewType` in a deployed template is a different thing here to wh
 CloudFormation, which replaces the table. `UpdateTable` refuses the change in place, so switching the
 stream off and on again is what gives a table a stream with a different view type.
 
+## Deploying a global table from CloudFormation
+
+An `AWS::DynamoDB::GlobalTable` naming one replica deploys an ordinary simulated table in that
+region, because with one replica that is what it is. It is turned into the `AWS::DynamoDB::Table` it
+is and created down the path above, so it is the same table with the same rules behind it.
+
+That is the resource CDK's `TableV2` synthesises for every table it makes, whether or not any
+replica regions were asked for, since it always appends the stack's own region. So a `TableV2` stack
+deploys here without hand-editing, the same way a `dynamodb.Table` one does.
+
+```typescript sim-dynamodb-cloudformation-global-table
+/**
+ * Deploying a global table with one replica from a CloudFormation template.
+ */
+
+import { PutItemCommand } from "@aws-sdk/client-dynamodb";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "orders-stack",
+  template: {
+    Resources: {
+      OrdersTable: {
+        Type: "AWS::DynamoDB::GlobalTable",
+        Properties: {
+          TableName: "orders",
+          KeySchema: [{ AttributeName: "id", KeyType: "HASH" }],
+          AttributeDefinitions: [{ AttributeName: "id", AttributeType: "S" }],
+          BillingMode: "PAY_PER_REQUEST",
+          // The replica carries what an ordinary table says about itself.
+          Replicas: [
+            {
+              Region: "us-east-1",
+              Tags: [{ Key: "Environment", Value: "test" }],
+            },
+          ],
+        },
+      },
+    },
+    Outputs: {
+      OrdersTableName: { Value: { Ref: "OrdersTable" } },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+await simAws.backgroundTasksComplete();
+
+const tableName = stack.outputs.get("OrdersTableName")?.value as string;
+
+console.log(tableName);
+// "orders"
+
+await simAws
+  .dynamoDb()
+  .putItem(
+    new PutItemCommand({ TableName: tableName, Item: { id: { S: "1" } } }),
+  );
+```
+
+`Ref` gives the table name, as it does for `AWS::DynamoDB::Table`. `Fn::GetAtt` answers for `Arn`,
+`StreamArn` and `TableId`, which are the attributes the resource type documents. `TableId` is the
+one an ordinary table has no attribute for at all.
+
+The replica carries the settings an ordinary table carries itself: `TableClass`,
+`DeletionProtectionEnabled` and `Tags` are read off it rather than off the table. Everything else a
+global table states the same way an ordinary one does — `TableName`, `KeySchema`,
+`AttributeDefinitions`, `BillingMode`, `LocalSecondaryIndexes`, `StreamSpecification` and
+`TimeToLiveSpecification` — is handed on as it was written.
+
+Capacity is the one thing a global table splits in two. Writes are the table's, in
+`WriteProvisionedThroughputSettings`, since every replica takes the same writes, and reads belong to
+the replica, in `ReadProvisionedThroughputSettings`. With one replica there is one of each, and they
+go back together into the `ProvisionedThroughput` `CreateTable` takes. A global secondary index is
+split the same way: the table declares the index and provisions its writes, and the replica's
+`GlobalSecondaryIndexes` entry names that index and provisions its reads.
+
+A global table naming two or more replica regions is skipped, with a reason naming the regions, and
+the rest of the stack still deploys. Replication genuinely is not simulated, so drawing the line at
+the replica count puts it where the behaviour actually differs.
+
+A global table with no `Replicas` at all fails the resource, since `Replicas` is required and real
+CloudFormation refuses that template too. So does one whose single replica names a region the stack
+is not deploying into, since the replica list has to include the region the table would be created
+in.
+
+A property with behaviour that is not simulated skips the resource, in the same terms an
+`AWS::DynamoDB::Table` one does: `MultiRegionConsistency`, `SSESpecification`, `WarmThroughput` and
+`WriteOnDemandThroughputSettings` on the table, and `PointInTimeRecoverySpecification`,
+`KinesisStreamSpecification`, `ContributorInsightsSpecification`, `ResourcePolicy`,
+`SSESpecification` and `ReadOnDemandThroughputSettings` on the replica. Capacity that scales with
+load — `WriteCapacityAutoScalingSettings` and `ReadCapacityAutoScalingSettings` — skips the resource
+too, since nothing here scales it. A property `AWS::DynamoDB::GlobalTable` does not have fails the
+resource instead.
+
 ## IAM authorization
 
 `CreateTable` authorizes `dynamodb:CreateTable` against the ARN the table is about to have, before
@@ -3342,6 +3440,12 @@ nothing is written.
   expires items, `Tags` deploying a tagged table, `GlobalSecondaryIndexes` and
   `LocalSecondaryIndexes` deploying a table whose indexes are then queried and scanned, and
   `StreamSpecification` deploying a table with a stream that `Fn::GetAtt … StreamArn` names.
+- `AWS::DynamoDB::GlobalTable` in CloudFormation, where one replica deploys the same table the
+  `AWS::DynamoDB::Table` path does, with the replica's `TableClass`, `DeletionProtectionEnabled` and
+  `Tags` read off it, the table's writes and the replica's reads put back together into one
+  provisioned capacity for the table and for each global secondary index, and `Ref`, `Fn::GetAtt …
+Arn`, `Fn::GetAtt … StreamArn` and `Fn::GetAtt … TableId` answering. A CDK `TableV2` stack deploys
+  through it without hand-editing.
 - SDK interception, so an intercepted `DynamoDBClient` or `DynamoDBStreamsClient` reaches the
   simulation.
 - The `@aws-sdk/lib-dynamodb` document client, with `PutCommand`, `GetCommand`, `DeleteCommand`,
@@ -3435,6 +3539,15 @@ nothing is written.
   the outcome does not.
 - Changing a deployed table's `StreamViewType` is not the table replacement real CloudFormation
   performs. The change goes through `UpdateTable`, which refuses a view type change in place.
+- An `AWS::DynamoDB::GlobalTable` naming two or more replica regions is skipped rather than
+  deployed. Replication between regions is not simulated at all, so there is no half of it to give:
+  a table in one of the regions would answer reads the other regions were meant to serve, and
+  nothing would carry a write from one to the other.
+- A global table's per-replica settings cannot differ from the primary's, because there is only ever
+  one replica. Anything a second replica would have said differently is not reachable.
+- `WriteCapacityAutoScalingSettings` and `ReadCapacityAutoScalingSettings` skip the resource rather
+  than being read as the capacity the table would start at. Nothing here scales capacity, and a
+  capacity nothing enforces would still be a number a template asked for and did not get.
 - A shard iterator never expires. Real DynamoDB gives one 15 minutes and then answers
   `ExpiredIteratorException`, which a consumer handles by asking for another from the sequence
   number it last checkpointed. Nothing here refuses an iterator for being old.

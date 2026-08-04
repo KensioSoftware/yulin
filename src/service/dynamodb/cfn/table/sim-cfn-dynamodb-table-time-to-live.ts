@@ -1,5 +1,5 @@
 import type { SimDynamoDbTimeToLiveSpecificationInput } from "../../command/time-to-live/time-to-live.types.js";
-import type { SimCfnDynamoDbTableValues } from "./sim-cfn-dynamodb-table-values.js";
+import type { SimCfnDynamoDbPropertyValues } from "../property/sim-cfn-dynamodb-property-values.js";
 
 /**
  * Read the time to live an AWS::DynamoDB::Table Resource asks for.
@@ -10,7 +10,7 @@ import type { SimCfnDynamoDbTableValues } from "./sim-cfn-dynamodb-table-values.
  * attribute is refused in the same words an SDK caller would get.
  */
 export function readSimCfnDynamoDbTableTimeToLive(
-  values: SimCfnDynamoDbTableValues,
+  values: SimCfnDynamoDbPropertyValues,
 ): SimDynamoDbTimeToLiveSpecificationInput | undefined {
   const specification = values.object("TimeToLiveSpecification");
 
