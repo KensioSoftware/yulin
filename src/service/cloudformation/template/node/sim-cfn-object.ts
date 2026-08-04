@@ -1,6 +1,7 @@
 import { SimCfnNode } from "./sim-cfn-node.js";
 import type { SimCfnTemplateValueRecord } from "../value/sim-cfn-template-value.js";
 import type { SimCfnResolveContext } from "../resolve/sim-cfn-resolve-context.js";
+import { resolveSimCfnValueAt } from "../value/sim-cfn-value-path.js";
 
 /**
  * A plain CloudFormation template object (one that is not an intrinsic function).
@@ -15,7 +16,10 @@ export class SimCfnObject extends SimCfnNode {
    */
   resolve(context: SimCfnResolveContext): SimCfnTemplateValueRecord {
     return Object.fromEntries(
-      [...this.entries].map(([key, node]) => [key, node.resolve(context)]),
+      [...this.entries].map(([key, node]) => [
+        key,
+        resolveSimCfnValueAt(key, () => node.resolve(context)),
+      ]),
     );
   }
 

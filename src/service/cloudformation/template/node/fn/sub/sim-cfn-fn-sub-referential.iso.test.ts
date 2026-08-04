@@ -257,7 +257,8 @@ describe("CloudFormation Fn::Sub Resource referential", () => {
     assertInstanceOf(error, Error);
     assertIdentical(
       error.message,
-      "Sim CloudFormation Fn::Sub variable UnusedName was not resolved",
+      "Sim CloudFormation Resource DerivedBucket value at Properties.BucketName: " +
+        "Sim CloudFormation Fn::Sub variable UnusedName was not resolved",
     );
   });
 
@@ -286,7 +287,8 @@ describe("CloudFormation Fn::Sub Resource referential", () => {
     assertInstanceOf(error, Error);
     assertIdentical(
       error.message,
-      "Logical ID in CFN Fn::Sub variable .AttributeName must be non-empty",
+      "Sim CloudFormation Resource DerivedBucket value at Properties.BucketName: " +
+        "Logical ID in CFN Fn::Sub variable .AttributeName must be non-empty",
     );
   });
 });

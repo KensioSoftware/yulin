@@ -138,7 +138,8 @@ describe("CloudFormation Fn::Sub literals", () => {
     assertInstanceOf(error, TypeError);
     assertIdentical(
       error.message,
-      "Sim CloudFormation Fn::Sub variable Name must resolve to a string, got number",
+      "Sim CloudFormation Resource TestBucket value at Properties.BucketName: " +
+        "Sim CloudFormation Fn::Sub variable Name must resolve to a string, got number",
     );
   });
 });

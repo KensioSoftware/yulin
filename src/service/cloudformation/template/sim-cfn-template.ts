@@ -138,7 +138,10 @@ export class SimCfnTemplate {
       .filter(([logicalId]) => !resourceConditions.excludes(logicalId))
       .map(([logicalId, resourceTemplate]) => ({
         logicalId,
-        template: valueResolver.resolveRecord(resourceTemplate),
+        template: valueResolver.resolveRecordFor(
+          `Sim CloudFormation Resource ${logicalId}`,
+          resourceTemplate,
+        ),
       }));
 
     resourceConditions.assertNotReferenced(resourceTemplates);
@@ -161,7 +164,10 @@ export class SimCfnTemplate {
       })
       .map(([outputKey, outputTemplate]) => ({
         outputKey,
-        template: valueResolver.resolveRecord(outputTemplate),
+        template: valueResolver.resolveRecordFor(
+          `Sim CloudFormation Output ${outputKey}`,
+          outputTemplate,
+        ),
       }));
   }
 

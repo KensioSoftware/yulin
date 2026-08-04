@@ -110,7 +110,8 @@ describe("SimCfnTemplate Fn::If", () => {
     // Then the Condition is named rather than read as false.
     assertIdentical(
       error.message,
-      "Sim CloudFormation Fn::If names Condition IsStaging, which the " +
+      "Sim CloudFormation Resource Site value at Properties.BucketName: " +
+        "Sim CloudFormation Fn::If names Condition IsStaging, which the " +
         "template does not define",
     );
   });

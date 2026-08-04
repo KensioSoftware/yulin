@@ -516,6 +516,94 @@ The value a lookup returns does not have to be a string. A list value is returne
 used in resource properties and in `Outputs`. A map name or key that is not in `Mappings` fails the
 deployment with an error naming the path that could not be found.
 
+### `Fn::Split` and `Fn::Select`
+
+`Fn::Split` cuts a string into a list on a delimiter. `Fn::Select` reads one value out of a list by
+its zero-based index. They are usually written together, to pull one part out of a string another
+resource gave.
+
+```typescript sim-cloudformation-fn-select-split
+/**
+ * Naming a bucket after part of another bucket's domain name.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "select-split-stack",
+  template: {
+    Resources: {
+      SiteBucket: {
+        Type: "AWS::S3::Bucket",
+        Properties: { BucketName: "site-bucket" },
+      },
+      LogsBucket: {
+        Type: "AWS::S3::Bucket",
+        Properties: {
+          BucketName: {
+            "Fn::Join": [
+              "-",
+              [
+                {
+                  "Fn::Select": [
+                    0,
+                    {
+                      "Fn::Split": [
+                        ".",
+                        { "Fn::GetAtt": ["SiteBucket", "DomainName"] },
+                      ],
+                    },
+                  ],
+                },
+                "logs",
+              ],
+            ],
+          },
+        },
+      },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+
+// site-bucket-logs, from the first part of site-bucket.s3.amazonaws.com
+console.log(simAws.s3().getSimBucketByName("site-bucket-logs")?.bucketName);
+```
+
+The delimiter is a literal string. The string being split can be any expression that resolves to a
+string, including a `Ref`, an `Fn::GetAtt` or another function. A delimiter the string does not
+contain gives a one-element list, and a delimiter at the start or end of the string gives an empty
+element there, as CloudFormation does.
+
+`Fn::Select` takes its list from a literal list, from `Fn::Split`, or from anything else that
+resolves to a list, such as an `Fn::FindInMap` of a list value. The index is a number or a string of
+digits, so a `Ref` to a parameter can supply it.
+
+That pair is how a host is read out of a URL. CDK writes this shape when a CloudFront origin points
+at a Lambda function URL:
+
+```json
+{
+  "DomainName": {
+    "Fn::Select": [
+      2,
+      { "Fn::Split": ["/", { "Fn::GetAtt": ["Url", "FunctionUrl"] }] }
+    ]
+  }
+}
+```
+
+`https://abc123.lambda-url.eu-west-2.on.aws/` splits into
+`["https:", "", "abc123.lambda-url.eu-west-2.on.aws", ""]`, so index 2 is the host.
+
+An index past the end of the list, a negative or fractional index, and a second argument that is not
+a list all fail the deployment, as they are all templates AWS rejects. The error names the resource
+and the property path the value sat at, for example
+`Sim CloudFormation Resource LogsBucket value at Properties.BucketName`.
+
 ## Conditions
 
 A template `Conditions` section names boolean expressions over the stack's parameter values. A
@@ -1264,7 +1352,8 @@ Sim CloudFormation currently supports:
 - Template `Mappings`, read with `Fn::FindInMap`
 - Template `Conditions`, built from `Fn::Equals`, `Fn::And`, `Fn::Or` and `Fn::Not`
 - The resource `Condition` attribute, which decides whether a resource is created
-- The `Ref`, `Fn::GetAtt`, `Fn::Join`, `Fn::Sub`, `Fn::FindInMap` and `Fn::If` intrinsic functions
+- The `Ref`, `Fn::GetAtt`, `Fn::Join`, `Fn::Sub`, `Fn::FindInMap`, `Fn::If`, `Fn::Split` and
+  `Fn::Select` intrinsic functions
 - Explicit resource dependencies with `DependsOn`
 - Implicit dependencies from resource `Ref` expressions
 
@@ -1310,6 +1399,9 @@ Each service's own docs describe what its resource types support.
   CloudFormation would reject as well, but the simulator does not reject them up front.
 - `Fn::If` is not supported inside the `Conditions` section itself. It is rejected there rather than
   read against a half-evaluated section.
+- `Fn::Split` and `Fn::Select` accept any argument that resolves to the type they need. Real
+  CloudFormation allows only a named set of functions inside each of them, so a template the
+  simulator resolves may still be one CloudFormation rejects.
 - The `Condition` attribute is read on resources but not on outputs. An output carrying one is
   resolved and present in `stack.outputs` whichever way its condition falls, where real
   CloudFormation would leave it out.

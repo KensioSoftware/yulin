@@ -240,7 +240,8 @@ describe("CloudFormation Fn::Join Resource value", () => {
     assertInstanceOf(error, TypeError);
     assertIdentical(
       error.message,
-      "Sim CloudFormation Fn::Join values must each resolve to a string, got number",
+      "Sim CloudFormation Resource TestBucket value at Properties.BucketName: " +
+        "Sim CloudFormation Fn::Join values must each resolve to a string, got number",
     );
   });
 });

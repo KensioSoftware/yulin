@@ -242,7 +242,8 @@ describe("SimCfnTemplate params", () => {
 
     assertIdentical(
       error.message,
-      "Sim CloudFormation Stack TestStack parameter BucketName is missing a value",
+      "Sim CloudFormation Resource TestBucket value at Properties.BucketName: " +
+        "Sim CloudFormation Stack TestStack parameter BucketName is missing a value",
     );
   });
 
