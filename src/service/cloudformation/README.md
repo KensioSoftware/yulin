@@ -26,7 +26,7 @@ familiar CloudFormation/CDK outputs.
 - `deploy/` contains convenience helpers for deploying already-parsed templates or synthesized
   template files.
 - `template/` contains template body validation, template value parsing, intrinsic-function nodes,
-  and value resolution.
+  condition evaluation, and value resolution.
 - `parameters/` contains parameter input/default handling.
 - `resource/` contains the runtime CloudFormation resource model, resource type parsing, dependency
   extraction, property resolution, and service factory resolution.
@@ -163,7 +163,8 @@ Template responsibilities are limited:
 
 - validate broad template body shape
 - attach parameter definitions
-- expose resource template entries
+- evaluate the `Conditions` section
+- expose resource template entries, leaving out those a false `Condition` excludes
 - resolve parameters and parameter-only intrinsic functions before resources are created
 
 Resource-to-resource references are not fully resolved during initial template processing. Those
@@ -199,6 +200,7 @@ Supported intrinsic-function areas currently include:
 - `Fn::Join`
 - `Fn::Sub`
 - `Fn::FindInMap`
+- `Fn::If`
 
 Resolution happens in two phases:
 
@@ -206,6 +208,7 @@ Resolution happens in two phases:
 
 - Parameters and parameter-only expressions can be resolved.
 - The template `Mappings` section is available here, so `Fn::FindInMap` lookups resolve.
+- The evaluated `Conditions` are available here, so `Fn::If` picks its branch.
 - Resource references are preserved if the referenced resource does not exist yet.
 
 2. **Resource creation phase**
@@ -214,6 +217,32 @@ Resolution happens in two phases:
 - `Ref` and `Fn::GetAtt` can read values from resources whose dependencies have completed.
 - `Mappings` are not in this context, so a `Fn::FindInMap` left unresolved by the first phase fails
   here.
+- `Conditions` are not in this context either. The first phase always resolves `Fn::If` away, so
+  nothing reaching this phase needs them.
+
+## Conditions
+
+`SimCfnConditionEvaluator` turns the template `Conditions` section into a `SimCfnConditions` map of
+plain booleans, held under `template/condition/`.
+
+A condition can only read parameters and pseudo parameters, so the whole section is evaluated once
+per deployment, before any resource is created. `SimCfnTemplate` memoizes the result and passes it
+into every resolve context it builds, the same way it passes `Mappings`.
+
+Conditions are not written in dependency order, so each name is evaluated on demand and remembered,
+carrying the chain of names being evaluated to catch a condition that refers back to itself. A
+comparison that would need a created resource fails rather than reading as false, because a
+condition that reads false when it should read true silently deploys the wrong stack.
+
+`SimCfnResourceConditions` applies the resource-level `Condition` attribute. A conditioned-out
+resource is dropped before the resource map is built, so it never becomes a `SimCfnResource`. This
+is deliberately not the skipped-resource path used for unsupported resource types: a skipped
+resource stays in `stack.resources` and answers `Ref` and `Fn::GetAtt` with stand-in values, where a
+conditioned-out resource does not exist at all.
+
+Naming a conditioned-out resource from another resource fails the deployment. The names that count
+are those left in the resolved resource template, plus `DependsOn`. Because `Fn::If` has already
+picked its branch by then, a name carried only by the branch that was not selected does not count.
 
 This two-phase design is one of the most important simulated CloudFormation implementation details.
 It allows the stack to build a complete runtime resource graph before any service resources exist,
@@ -548,7 +577,12 @@ Useful areas:
   - `Fn::Join`
   - `Fn::Sub`
   - `Fn::FindInMap`
+  - `Fn::If`
   - literal/list/object node resolution
+
+- `template/condition/*.iso.test.ts`
+  - condition evaluation and the condition functions it refuses
+  - the resource `Condition` attribute
 
 - `parameters/*.iso.test.ts`
   - parameter input/default behaviour

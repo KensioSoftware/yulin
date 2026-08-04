@@ -5,6 +5,7 @@ import { SimCfnFnJoinParser as SimCfnFunctionJoinParser } from "./join/sim-cfn-f
 import type { SimCfnValueParser } from "../value/sim-cfn-value-parser.type.js";
 import { SimCfnFnSubParser as SimCfnFunctionSubParser } from "./sub/sim-cfn-fn-sub-parser.js";
 import { SimCfnFnFindInMapParser as SimCfnFunctionFindInMapParser } from "./find-in-map/sim-cfn-fn-find-in-map-parser.js";
+import { SimCfnFnIfParser as SimCfnFunctionIfParser } from "./if/sim-cfn-fn-if-parser.js";
 import { assertDefined } from "../../../../../util/type-guard/defined.js";
 
 /**
@@ -26,12 +27,14 @@ export class SimCfnFunctionParser {
   private readonly fnFindInMapParser: SimCfnFunctionFindInMapParser;
   private readonly fnJoinParser: SimCfnFunctionJoinParser;
   private readonly fnSubParser: SimCfnFunctionSubParser;
+  private readonly fnIfParser: SimCfnFunctionIfParser;
 
   constructor(valueParser: SimCfnValueParser) {
     this.fnGetAttParser = new SimCfnFunctionGetAttParser();
     this.fnFindInMapParser = new SimCfnFunctionFindInMapParser(valueParser);
     this.fnJoinParser = new SimCfnFunctionJoinParser(valueParser);
     this.fnSubParser = new SimCfnFunctionSubParser(valueParser);
+    this.fnIfParser = new SimCfnFunctionIfParser(valueParser);
   }
 
   /**
@@ -79,6 +82,10 @@ export class SimCfnFunctionParser {
 
     if (functionName === "Fn::FindInMap") {
       return this.fnFindInMapParser.parse(value);
+    }
+
+    if (functionName === "Fn::If") {
+      return this.fnIfParser.parse(value);
     }
 
     throw new Error(

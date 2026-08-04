@@ -8,12 +8,14 @@ import type { SimCfnResourceRefResolver as SimCfnResourceReferenceResolver } fro
 import type { SimCfnPseudoParameters } from "../../parameters/pseudo/sim-cfn-pseudo-parameters.js";
 import { SimCfnResolveContext } from "../resolve/sim-cfn-resolve-context.js";
 import type { SimCfnMappings } from "../mapping/sim-cfn-mappings.js";
+import type { SimCfnConditions } from "../condition/sim-cfn-conditions.js";
 
 interface SimCfnTemplateValueResolverProperties {
   readonly parameters: SimCfnParameters;
   readonly resources?: SimCfnResourceReferenceResolver | undefined;
   readonly pseudoParameters?: SimCfnPseudoParameters | undefined;
   readonly mappings?: SimCfnMappings | undefined;
+  readonly conditions?: SimCfnConditions | undefined;
 }
 
 /**
@@ -23,12 +25,13 @@ export class SimCfnTemplateValueResolver {
   private readonly context: SimCfnResolveContext;
 
   constructor(properties: SimCfnTemplateValueResolverProperties) {
-    this.context = new SimCfnResolveContext(
-      properties.parameters,
-      properties.resources,
-      properties.pseudoParameters,
-      properties.mappings,
-    );
+    this.context = new SimCfnResolveContext({
+      parameters: properties.parameters,
+      resources: properties.resources,
+      pseudoParameters: properties.pseudoParameters,
+      mappings: properties.mappings,
+      conditions: properties.conditions,
+    });
   }
 
   /**

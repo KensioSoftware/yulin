@@ -516,6 +516,105 @@ The value a lookup returns does not have to be a string. A list value is returne
 used in resource properties and in `Outputs`. A map name or key that is not in `Mappings` fails the
 deployment with an error naming the path that could not be found.
 
+## Conditions
+
+A template `Conditions` section names boolean expressions over the stack's parameter values. A
+condition decides whether a resource is created, and which value `Fn::If` gives a property or an
+output.
+
+```typescript sim-cloudformation-conditions
+/**
+ * Choosing resources and property values by condition in a simulated CFN template.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "conditions-stack",
+  template: {
+    Parameters: {
+      EnvName: { Type: "String" },
+    },
+    Conditions: {
+      IsProd: { "Fn::Equals": [{ Ref: "EnvName" }, "prod"] },
+    },
+    Resources: {
+      Backups: {
+        Type: "AWS::S3::Bucket",
+        Condition: "IsProd",
+        Properties: { BucketName: "site-backups" },
+      },
+      Site: {
+        Type: "AWS::S3::Bucket",
+        Properties: {
+          BucketName: {
+            // eslint-disable-next-line no-template-curly-in-string
+            "Fn::If": ["IsProd", "site", { "Fn::Sub": "site-${EnvName}" }],
+          },
+        },
+      },
+    },
+  },
+  parameters: { EnvName: "dev" },
+});
+
+await stack.waitForDeployComplete();
+
+// site-dev
+console.log(simAws.s3().getSimBucketByName("site-dev")?.bucketName);
+
+// false, because IsProd is false
+console.log(stack.resources.has("Backups"));
+```
+
+### Writing a condition
+
+A condition is built from `Fn::Equals`, `Fn::And`, `Fn::Or` and `Fn::Not`. `Fn::And` and `Fn::Or`
+take a list of two to ten conditions, and `Fn::Not` takes a list of exactly one. A condition can
+name another condition with `{ "Condition": "OtherCondition" }`, in any order, so a condition may
+name one written below it in the section.
+
+```json
+{
+  "IsProd": { "Fn::Equals": [{ "Ref": "EnvName" }, "prod"] },
+  "IsStaging": { "Fn::Equals": [{ "Ref": "EnvName" }, "staging"] },
+  "IsDeployed": {
+    "Fn::Or": [{ "Condition": "IsProd" }, { "Condition": "IsStaging" }]
+  }
+}
+```
+
+`Fn::Equals` compares its two values as strings, as CloudFormation does, so a JSON number in the
+template matches the string a parameter carries.
+
+The whole section is evaluated once per deployment, before any resource is created, so a condition
+can read parameters and pseudo parameters and nothing else. A comparison that would need a created
+resource, such as an `Fn::GetAtt`, fails the deployment rather than reading as false.
+
+### `Fn::If`
+
+`Fn::If` takes a condition name, a value to use when it is true, and a value to use when it is
+false. It works anywhere a resource property or an output value is read.
+
+Only the branch the condition selects is resolved. The other branch is left alone, so it can name a
+resource this deployment does not create.
+
+### The resource `Condition` attribute
+
+A resource carrying a `Condition` attribute whose condition is false is not created at all. It is
+absent from `stack.resources`, which is different from a resource sim CloudFormation skips: a
+skipped resource stays in the stack and answers `Ref` and `Fn::GetAtt` with
+[stand-in values](#values-from-a-skipped-resource).
+
+Because the resource does not exist, another resource naming it fails the deployment, with an error
+naming both resources and the condition. That covers a `Ref` or `Fn::GetAtt` that is actually
+reached, and a `DependsOn`. A name carried only by the branch of an `Fn::If` the condition did not
+select is not reached, so it does not fail.
+
+A `Condition` attribute naming a condition the template does not define fails the same way.
+
 ## Resource dependencies
 
 Resources can depend on each other explicitly with `DependsOn`.
@@ -1163,7 +1262,9 @@ Sim CloudFormation currently supports:
 - Template `Parameters` with supplied values and defaults
 - Template `Outputs`, resolved after resource creation and read from `stack.outputs`
 - Template `Mappings`, read with `Fn::FindInMap`
-- The `Ref`, `Fn::GetAtt`, `Fn::Join`, `Fn::Sub` and `Fn::FindInMap` intrinsic functions
+- Template `Conditions`, built from `Fn::Equals`, `Fn::And`, `Fn::Or` and `Fn::Not`
+- The resource `Condition` attribute, which decides whether a resource is created
+- The `Ref`, `Fn::GetAtt`, `Fn::Join`, `Fn::Sub`, `Fn::FindInMap` and `Fn::If` intrinsic functions
 - Explicit resource dependencies with `DependsOn`
 - Implicit dependencies from resource `Ref` expressions
 
@@ -1207,4 +1308,9 @@ Each service's own docs describe what its resource types support.
   resource with a "could not find map" error rather than being resolved. Real CloudFormation allows
   only `Ref` and a nested `Fn::FindInMap` inside `Fn::FindInMap`, so this only affects templates real
   CloudFormation would reject as well, but the simulator does not reject them up front.
-- Conditions and many advanced CloudFormation features are not supported.
+- `Fn::If` is not supported inside the `Conditions` section itself. It is rejected there rather than
+  read against a half-evaluated section.
+- The `Condition` attribute is read on resources but not on outputs. An output carrying one is
+  resolved and present in `stack.outputs` whichever way its condition falls, where real
+  CloudFormation would leave it out.
+- Many advanced CloudFormation features are not supported.

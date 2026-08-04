@@ -43,6 +43,13 @@ export class SimCfnTemplateBodyValidator {
     ) {
       throw this.error("Parameters must be an object");
     }
+
+    if (
+      this.template.Conditions !== undefined &&
+      !isRecord(this.template.Conditions)
+    ) {
+      throw this.error("Conditions must be an object");
+    }
   }
 
   private error(detail: string): Error {
