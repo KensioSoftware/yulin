@@ -2476,6 +2476,109 @@ inert while it was off. A removal already scheduled is checked again when it com
 overwritten with a later timestamp, or one on a table whose time to live has since been switched
 off, stays where it is.
 
+## Capturing changes with a stream
+
+A `StreamSpecification` on `CreateTable` gives a table a stream, and every change to an item is
+captured on it as a record: an `INSERT` for the first write of an item, a `MODIFY` for a write over
+one that was there, and a `REMOVE` for a deletion. `DescribeTable` reports the specification back
+along with `LatestStreamArn` and `LatestStreamLabel`.
+
+Which images a record carries is what `StreamViewType` chooses, and every record carries the keys of
+the item that changed whichever one it is:
+
+| `StreamViewType`     | `INSERT`        | `MODIFY`          | `REMOVE`        |
+| -------------------- | --------------- | ----------------- | --------------- |
+| `KEYS_ONLY`          | keys            | keys              | keys            |
+| `NEW_IMAGE`          | keys, new image | keys, new image   | keys            |
+| `OLD_IMAGE`          | keys            | keys, old image   | keys, old image |
+| `NEW_AND_OLD_IMAGES` | keys, new image | keys, both images | keys, old image |
+
+A `REMOVE` under `NEW_IMAGE` and an `INSERT` under `OLD_IMAGE` are keys and nothing else, because
+neither has the image the view type asks for. The record is still written: it is how a reader learns
+that the change happened at all.
+
+```typescript sim-dynamodb-stream-specification
+/**
+ * A table capturing its item changes on a stream.
+ */
+
+import {
+  CreateTableCommand,
+  DescribeTableCommand,
+  PutItemCommand,
+  UpdateTableCommand,
+} from "@aws-sdk/client-dynamodb";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const dynamoDb = simAws.dynamoDb();
+
+await dynamoDb.createTable(
+  new CreateTableCommand({
+    TableName: "OrdersTable",
+    KeySchema: [{ AttributeName: "orderId", KeyType: "HASH" }],
+    AttributeDefinitions: [{ AttributeName: "orderId", AttributeType: "S" }],
+    BillingMode: "PAY_PER_REQUEST",
+    StreamSpecification: {
+      StreamEnabled: true,
+      StreamViewType: "NEW_AND_OLD_IMAGES",
+    },
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+const described = await dynamoDb.describeTable(
+  new DescribeTableCommand({ TableName: "OrdersTable" }),
+);
+
+console.log(described.Table?.StreamSpecification?.StreamViewType); // "NEW_AND_OLD_IMAGES"
+console.log(described.Table?.LatestStreamArn?.includes("/stream/")); // true
+
+// Every write from here is captured on the stream.
+await dynamoDb.putItem(
+  new PutItemCommand({
+    TableName: "OrdersTable",
+    Item: { orderId: { S: "order-1" }, total: { N: "101" } },
+  }),
+);
+
+// Switching the stream off keeps what it captured, and keeps naming it.
+await dynamoDb.updateTable(
+  new UpdateTableCommand({
+    TableName: "OrdersTable",
+    StreamSpecification: { StreamEnabled: false },
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+const withoutStream = await dynamoDb.describeTable(
+  new DescribeTableCommand({ TableName: "OrdersTable" }),
+);
+
+console.log(withoutStream.Table?.StreamSpecification?.StreamEnabled); // false
+console.log(withoutStream.Table?.LatestStreamArn !== undefined); // true
+```
+
+`UpdateTable` switches a stream on for a table that has none and off for one that has one. A
+`StreamViewType` belongs to the stream rather than to the table, so there is no changing it in
+place: switching the stream off and on again is what AWS makes an application do, and gives the
+table a stream with a fresh label and ARN. Asking to switch on a stream that is already on, or off
+one that is not there, is a `ValidationException` either way.
+
+A time to live expiry is captured as a `REMOVE` carrying
+`userIdentity: { type: "Service", principalId: "dynamodb.amazonaws.com" }`, where a deletion the
+application asked for carries none. That is how a stream consumer tells an item it deleted from one
+DynamoDB collected.
+
+Nothing is captured for a write that never reached the item: a refused conditional write, a
+cancelled transaction, a delete of a key holding nothing, or a request the table refused. Deleting
+the table takes its items with it rather than removing them one at a time, so nothing is captured
+for that either.
+
+Reading the records back is the DynamoDB Streams API, which is not simulated yet, so for now a
+stream is captured rather than consumed.
+
 ## Numbers
 
 A DynamoDB number carries up to 38 significant digits, where a JavaScript number carries about 15.
@@ -2791,8 +2894,9 @@ that, which a template cannot predict either way. Two stacks deploying the same 
 differently named tables. The generated name is trimmed to the 255 characters a table name allows,
 ending in a hash of the untrimmed name so two long names that start the same stay apart.
 
-`Fn::GetAtt … StreamArn` on a table that was created is refused by name. Streams are not simulated,
-and an invented stream ARN would read as a working stream to whatever the template handed it to.
+`Fn::GetAtt … StreamArn` on a table that was created is refused by name. A template cannot declare a
+streamed table yet, so a table CloudFormation created never has a stream, and an invented stream ARN
+would read as a working stream to whatever the template handed it to.
 
 A table declaring `StreamSpecification` is skipped rather than created, though, and a skipped
 Resource never reaches that refusal. `Fn::GetAtt … StreamArn` on it resolves to the CloudFormation
@@ -3003,6 +3107,10 @@ nothing is written.
 - `UpdateTimeToLive` and `DescribeTimeToLive`, moving through `ENABLING` and `DISABLING` to settle,
   with the one update per hour rule measured on the simulated clock. Items expire as the clock moves
   past their deletion window, with no sweep for a test to call.
+- `StreamSpecification` on `CreateTable` and `UpdateTable`, capturing every item change as a stream
+  record with the images its `StreamViewType` selects, a time to live expiry carrying a `Service`
+  `userIdentity`, and `StreamSpecification`, `LatestStreamArn` and `LatestStreamLabel` reported by
+  `DescribeTable`.
 - `AWS::DynamoDB::Table` in CloudFormation, created through `CreateTable`, with `Ref` giving the
   table name, `Fn::GetAtt … Arn` the table ARN, `TimeToLiveSpecification` deploying a table that
   expires items, `Tags` deploying a tagged table, and `GlobalSecondaryIndexes` and
@@ -3091,15 +3199,29 @@ nothing is written.
   elapsing. An item whose window goes by while a running-mode clock tracks the host stays where it
   is until something moves the clock. A simulated DynamoDB constructed standalone as
   `new SimDynamoDb()` has no clock control at all, so nothing there ever expires.
-- Time to live deletions publish no stream records. Real DynamoDB writes one with a `userIdentity`
-  of type `Service`, which is how an application tells a TTL deletion from an application's own, and
-  streams are not simulated here.
+- A stream's records cannot be read back. `ListStreams`, `DescribeStream`, `GetShardIterator` and
+  `GetRecords` are not simulated yet, so a table with a `StreamSpecification` captures its changes
+  and nothing can consume them. Nor can a Lambda event source mapping read one.
+- A `StreamSpecification` in a CloudFormation template still skips the table, so a streamed table
+  has to be created through `CreateTable`.
+- Records are kept for as long as the simulation runs. Real DynamoDB trims a stream at 24 hours,
+  which arrives with the read path.
 - The five year time to live eligibility rule counts 1825 days rather than five calendar years, so
   an item whose timestamp sits within a couple of days of the boundary may be treated differently
   here to how AWS treats it.
-- DynamoDB streams are not simulated. A `StreamSpecification` with `StreamEnabled` set is refused,
-  so a table whose changes nothing is publishing cannot be created by accident. One that switches
-  streams off describes the table this simulation already makes, so it is accepted.
+- A stream has one shard, which never splits. AWS documents an open shard as corresponding to one
+  table partition, and a simulated table is always one partition, so this is accurate rather than a
+  shortcut. It does mean the records come out in one total order across every key, which is stronger
+  than the per-key order AWS guarantees. A consumer relying on it here would be relying on something
+  real DynamoDB does not promise.
+- Stream sequence numbers are a counter rendered at a fixed 21 digits, where real AWS varies the
+  width between 21 and 40. That makes comparing them as text always agree with comparing them as
+  numbers, which is a divergence in a reader's favour. They are not derived from the clock, because
+  several items commonly change inside one millisecond and a clock cannot tell those apart.
+- A stream record's `SizeBytes` counts the text of each value, summed over the keys and every image
+  the record carries. That is the rule AWS's own published sample records follow, and it is not the
+  rule the 400 KB item limit uses, where a number costs about half its digits.
+- `KinesisStreamSpecification` is not simulated. A table's changes go to its own stream or nowhere.
 - Encryption at rest is not simulated. An `SSESpecification` with `Enabled` set is refused rather
   than reported back against items held in the clear. `Enabled: false` asks for the AWS owned key
   real DynamoDB uses by default, so it is accepted.
@@ -3211,5 +3333,5 @@ nothing is written.
 - Item sizes follow the figures AWS documents for its 400 KB limit, which AWS itself describes as
   approximate. An item near the limit here is near the limit there, but the byte counts are not
   identical.
-- DynamoDB Streams and PartiQL are not simulated, and are not on the roadmap for this service.
+- PartiQL is not simulated, and is not on the roadmap for this service.
 - DynamoDB is not served as an HTTP API by `serveSimAws`.

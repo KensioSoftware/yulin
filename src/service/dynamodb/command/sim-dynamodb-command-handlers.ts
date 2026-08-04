@@ -1,6 +1,8 @@
 import type { BackgroundScheduler } from "../../../util/background/background.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimIamInterServiceAuthZ } from "../../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimDynamoDbStreamActivity } from "../stream/sim-dynamodb-stream-activity.js";
+import type { SimDynamoDbStreamStore } from "../stream/sim-dynamodb-stream-store.js";
 import type { SimDynamoDbTableStore } from "../table/sim-dynamodb-table-store.js";
 import { SimDynamoDbAuthorizer } from "./authorize/sim-dynamodb-authorizer.js";
 import { SimDynamoDbBatchGetItem } from "./batch/sim-dynamodb-batch-get-item.js";
@@ -22,6 +24,8 @@ import { SimDynamoDbTransactWriteItems } from "./transact/sim-dynamodb-transact-
 
 interface SimDynamoDbCommandHandlersProperties {
   readonly tables: SimDynamoDbTableStore;
+  readonly streams: SimDynamoDbStreamStore;
+  readonly streamActivity: SimDynamoDbStreamActivity;
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly iam: SimIamInterServiceAuthZ;
   readonly background: BackgroundScheduler;
@@ -68,6 +72,8 @@ export class SimDynamoDbCommandHandlers {
     this.access = access;
     this.tableCreation = new SimDynamoDbCreateTable({
       tables,
+      streams: properties.streams,
+      streamActivity: properties.streamActivity,
       authorizer,
       accountRegionScope,
       background,

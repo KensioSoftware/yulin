@@ -48,21 +48,6 @@ async function refusedCreateTable(
 }
 
 describe("DynamoDB CreateTableCommand unsimulated input", () => {
-  it("refuses a stream specification", async () => {
-    // When a table is created with a stream.
-    const error = await refusedCreateTable({
-      ...tableInput,
-      StreamSpecification: {
-        StreamEnabled: true,
-        StreamViewType: "NEW_AND_OLD_IMAGES",
-      },
-    });
-
-    // Then the stream is refused.
-    assertInstanceOf(error, SimDynamoDbUnsupportedOperation);
-    assertStringIncludes(error.message, "DynamoDB streams");
-  });
-
   it("refuses an encryption specification", async () => {
     // When a table is created with encryption at rest.
     const error = await refusedCreateTable({

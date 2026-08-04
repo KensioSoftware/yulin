@@ -8,11 +8,11 @@ import type {
   SimDynamoDbReplicaUpdateInput,
   SimDynamoDbSecondaryIndexInput,
   SimDynamoDbSseSpecification,
-  SimDynamoDbStreamSpecification,
   SimDynamoDbTableDescription,
   SimDynamoDbTagInput,
   SimDynamoDbWarmThroughput,
 } from "./table.types.js";
+import type { SimDynamoDbStreamSpecification } from "../../stream/sim-dynamodb-stream.types.js";
 
 /**
  * Minimal structural sim DynamoDB CreateTable command.

@@ -28,16 +28,6 @@ async function refusedUpdate(
 }
 
 describe("DynamoDB UpdateTableCommand unsimulated settings", () => {
-  it("refuses switching a stream on", async () => {
-    // Given a table, when a stream is switched on, then it is refused rather
-    // than reported as a stream whose changes go nowhere.
-    const error = await refusedUpdate({
-      StreamSpecification: { StreamEnabled: true, StreamViewType: "NEW_IMAGE" },
-    });
-
-    assertInstanceOf(error, SimDynamoDbUnsupportedOperation);
-  });
-
   it("refuses a customer managed encryption key", async () => {
     // Given a table, when encryption at rest is asked for, then it is refused.
     const error = await refusedUpdate({

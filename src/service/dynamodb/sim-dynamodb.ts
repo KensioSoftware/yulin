@@ -4,6 +4,9 @@ import {
 } from "../../util/background/background.js";
 import { SimDynamoDbCommandHandlers } from "./command/sim-dynamodb-command-handlers.js";
 import type * as simDynamoDbCommands from "./command/sim-dynamodb-command.types.js";
+import { SimDynamoDbStreamActivity } from "./stream/sim-dynamodb-stream-activity.js";
+import { SimDynamoDbStreamStore } from "./stream/sim-dynamodb-stream-store.js";
+import type { SimDynamoDbStream } from "./stream/sim-dynamodb-stream.js";
 import { SimDynamoDbTableStore } from "./table/sim-dynamodb-table-store.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import { SimIamAllowAllAuth } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
@@ -18,9 +21,16 @@ import type {
 
 /**
  * Simulated DynamoDB. Handles SDK commands. Emulates AWS behaviour and state.
+ *
+ * Each command below carries a one line doc comment rather than a block. This
+ * file grows by one delegating method per simulated operation and is close to
+ * the max-lines limit, which is the same reason `SimAwsServiceAccessors` reads
+ * that way.
  */
 export class SimDynamoDb {
   private readonly tables = new SimDynamoDbTableStore();
+  private readonly streams = new SimDynamoDbStreamStore();
+  private readonly activity = new SimDynamoDbStreamActivity();
   private readonly background: BackgroundScheduler;
   private readonly commands: SimDynamoDbCommandHandlers;
   private readonly sdkRouter = new SimDynamoDatabaseSdkCommandRouter(this);
@@ -38,15 +48,15 @@ export class SimDynamoDb {
     this.background = background;
     this.commands = new SimDynamoDbCommandHandlers({
       tables: this.tables,
+      streams: this.streams,
+      streamActivity: this.activity,
       accountRegionScope,
       iam,
       background,
     });
   }
 
-  /**
-   * Handle a Create Table Command from the SDK.
-   */
+  /** Handle a Create Table Command from the SDK. */
   async createTable(
     command: simDynamoDbCommands.SimCreateTableCommand,
     options?: SimDynamoDbRequestOptions,
@@ -56,9 +66,7 @@ export class SimDynamoDb {
     return this.commands.tableCreation.handle(command, options);
   }
 
-  /**
-   * Handle a Describe Table Command from the SDK.
-   */
+  /** Handle a Describe Table Command from the SDK. */
   async describeTable(
     command: simDynamoDbCommands.SimDescribeTableCommand,
     options?: SimDynamoDbRequestOptions,
@@ -67,9 +75,7 @@ export class SimDynamoDb {
     return this.commands.tables.describeTable(command, options);
   }
 
-  /**
-   * Handle an Update Table Command from the SDK.
-   */
+  /** Handle an Update Table Command from the SDK. */
   async updateTable(
     command: simDynamoDbCommands.SimUpdateTableCommand,
     options?: SimDynamoDbRequestOptions,
@@ -78,9 +84,7 @@ export class SimDynamoDb {
     return this.commands.tableUpdates.handle(command, options);
   }
 
-  /**
-   * Handle a List Tables Command from the SDK.
-   */
+  /** Handle a List Tables Command from the SDK. */
   async listTables(
     command: simDynamoDbCommands.SimListTablesCommand,
     options?: SimDynamoDbRequestOptions,
@@ -89,9 +93,7 @@ export class SimDynamoDb {
     return this.commands.tables.listTables(command, options);
   }
 
-  /**
-   * Handle a Delete Table Command from the SDK.
-   */
+  /** Handle a Delete Table Command from the SDK. */
   async deleteTable(
     command: simDynamoDbCommands.SimDeleteTableCommand,
     options?: SimDynamoDbRequestOptions,
@@ -100,9 +102,7 @@ export class SimDynamoDb {
     return this.commands.tables.deleteTable(command, options);
   }
 
-  /**
-   * Handle a Put Item Command from the SDK.
-   */
+  /** Handle a Put Item Command from the SDK. */
   async putItem(
     command: simDynamoDbCommands.SimPutItemCommand,
     options?: SimDynamoDbRequestOptions,
@@ -111,9 +111,7 @@ export class SimDynamoDb {
     return this.commands.itemWrites.handle(command, options);
   }
 
-  /**
-   * Handle a Get Item Command from the SDK.
-   */
+  /** Handle a Get Item Command from the SDK. */
   async getItem(
     command: simDynamoDbCommands.SimGetItemCommand,
     options?: SimDynamoDbRequestOptions,
@@ -122,9 +120,7 @@ export class SimDynamoDb {
     return this.commands.itemReads.handle(command, options);
   }
 
-  /**
-   * Handle a Delete Item Command from the SDK.
-   */
+  /** Handle a Delete Item Command from the SDK. */
   async deleteItem(
     command: simDynamoDbCommands.SimDeleteItemCommand,
     options?: SimDynamoDbRequestOptions,
@@ -133,9 +129,7 @@ export class SimDynamoDb {
     return this.commands.itemDeletions.handle(command, options);
   }
 
-  /**
-   * Handle an Update Item Command from the SDK.
-   */
+  /** Handle an Update Item Command from the SDK. */
   async updateItem(
     command: simDynamoDbCommands.SimUpdateItemCommand,
     options?: SimDynamoDbRequestOptions,
@@ -144,9 +138,7 @@ export class SimDynamoDb {
     return this.commands.itemUpdates.handle(command, options);
   }
 
-  /**
-   * Handle a Query Command from the SDK.
-   */
+  /** Handle a Query Command from the SDK. */
   async query(
     command: simDynamoDbCommands.SimQueryCommand,
     options?: SimDynamoDbRequestOptions,
@@ -155,9 +147,7 @@ export class SimDynamoDb {
     return this.commands.itemQueries.handle(command, options);
   }
 
-  /**
-   * Handle a Scan Command from the SDK.
-   */
+  /** Handle a Scan Command from the SDK. */
   async scan(
     command: simDynamoDbCommands.SimScanCommand,
     options?: SimDynamoDbRequestOptions,
@@ -166,9 +156,7 @@ export class SimDynamoDb {
     return this.commands.itemScans.handle(command, options);
   }
 
-  /**
-   * Handle a Batch Write Item Command from the SDK.
-   */
+  /** Handle a Batch Write Item Command from the SDK. */
   async batchWriteItem(
     command: simDynamoDbCommands.SimBatchWriteItemCommand,
     options?: SimDynamoDbRequestOptions,
@@ -177,9 +165,7 @@ export class SimDynamoDb {
     return this.commands.itemBatchWrites.handle(command, options);
   }
 
-  /**
-   * Handle a Batch Get Item Command from the SDK.
-   */
+  /** Handle a Batch Get Item Command from the SDK. */
   async batchGetItem(
     command: simDynamoDbCommands.SimBatchGetItemCommand,
     options?: SimDynamoDbRequestOptions,
@@ -188,9 +174,7 @@ export class SimDynamoDb {
     return this.commands.itemBatchReads.handle(command, options);
   }
 
-  /**
-   * Handle a Transact Write Items Command from the SDK.
-   */
+  /** Handle a Transact Write Items Command from the SDK. */
   async transactWriteItems(
     command: simDynamoDbCommands.SimTransactWriteItemsCommand,
     options?: SimDynamoDbRequestOptions,
@@ -199,9 +183,7 @@ export class SimDynamoDb {
     return this.commands.itemTransactWrites.handle(command, options);
   }
 
-  /**
-   * Handle a Transact Get Items Command from the SDK.
-   */
+  /** Handle a Transact Get Items Command from the SDK. */
   async transactGetItems(
     command: simDynamoDbCommands.SimTransactGetItemsCommand,
     options?: SimDynamoDbRequestOptions,
@@ -210,9 +192,7 @@ export class SimDynamoDb {
     return this.commands.itemTransactReads.handle(command, options);
   }
 
-  /**
-   * Handle a Tag Resource Command from the SDK.
-   */
+  /** Handle a Tag Resource Command from the SDK. */
   async tagResource(
     command: simDynamoDbCommands.SimTagResourceCommand,
     options?: SimDynamoDbRequestOptions,
@@ -221,9 +201,7 @@ export class SimDynamoDb {
     return this.commands.tags.tagResource(command, options);
   }
 
-  /**
-   * Handle an Untag Resource Command from the SDK.
-   */
+  /** Handle an Untag Resource Command from the SDK. */
   async untagResource(
     command: simDynamoDbCommands.SimUntagResourceCommand,
     options?: SimDynamoDbRequestOptions,
@@ -232,9 +210,7 @@ export class SimDynamoDb {
     return this.commands.tags.untagResource(command, options);
   }
 
-  /**
-   * Handle a List Tags Of Resource Command from the SDK.
-   */
+  /** Handle a List Tags Of Resource Command from the SDK. */
   async listTagsOfResource(
     command: simDynamoDbCommands.SimListTagsOfResourceCommand,
     options?: SimDynamoDbRequestOptions,
@@ -243,9 +219,7 @@ export class SimDynamoDb {
     return this.commands.tags.listTagsOfResource(command, options);
   }
 
-  /**
-   * Handle an Update Time To Live Command from the SDK.
-   */
+  /** Handle an Update Time To Live Command from the SDK. */
   async updateTimeToLive(
     command: simDynamoDbCommands.SimUpdateTimeToLiveCommand,
     options?: SimDynamoDbRequestOptions,
@@ -254,9 +228,7 @@ export class SimDynamoDb {
     return this.commands.timeToLive.updateTimeToLive(command, options);
   }
 
-  /**
-   * Handle a Describe Time To Live Command from the SDK.
-   */
+  /** Handle a Describe Time To Live Command from the SDK. */
   async describeTimeToLive(
     command: simDynamoDbCommands.SimDescribeTimeToLiveCommand,
     options?: SimDynamoDbRequestOptions,
@@ -275,6 +247,25 @@ export class SimDynamoDb {
    */
   findTable(name: string): SimDynamoDbTable | undefined {
     return this.tables.findByName(name);
+  }
+
+  /**
+   * Find a stream by ARN, if there is one here.
+   *
+   * Not a DynamoDB API operation. A stream outlives being enabled, so this
+   * finds one whose table has since switched it off, which is what reading a
+   * disabled stream within its retention window needs.
+   */
+  findStream(streamArn: string): SimDynamoDbStream | undefined {
+    return this.streams.findByArn(streamArn);
+  }
+
+  /**
+   * Get the streams of this service, for a consumer that cannot poll them
+   * continuously.
+   */
+  streamActivity(): SimDynamoDbStreamActivity {
+    return this.activity;
   }
 
   /**

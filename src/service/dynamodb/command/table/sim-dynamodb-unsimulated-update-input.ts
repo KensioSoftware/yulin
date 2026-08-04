@@ -6,24 +6,16 @@ import type { SimUpdateTableCommandInput } from "./table.command.js";
  *
  * Each of these changes what the table does or where it lives, so accepting one
  * and ignoring it would leave a test passing against a table that is not the
- * table the request asked for: changes published to a stream that was never
- * made, or reads served from a region the table was never replicated to.
+ * table the request asked for: items held under an encryption key nothing is
+ * using, or reads served from a region the table was never replicated to.
  *
- * As with CreateTable, only input that asks for something is refused. A stream
- * or encryption specification that is switched off describes the table this
+ * As with CreateTable, only input that asks for something is refused. An
+ * encryption specification that is switched off describes the table this
  * simulation already has.
  */
 export function refuseUnsimulatedUpdateInput(
   input: SimUpdateTableCommandInput,
 ): void {
-  if (input.StreamSpecification?.StreamEnabled === true) {
-    throw new SimDynamoDbUnsupportedOperation(
-      "DynamoDB streams are not simulated, so UpdateTable refuses a " +
-        "StreamSpecification rather than reporting a stream whose changes go " +
-        "nowhere",
-    );
-  }
-
   if (input.SSESpecification?.Enabled === true) {
     throw new SimDynamoDbUnsupportedOperation(
       "Table encryption at rest is not simulated, so UpdateTable refuses an " +

@@ -10,6 +10,9 @@ import type {
   SimDynamoDbTableStatus,
 } from "../command/table/table.types.js";
 import type { SimDynamoDbItem } from "../item/sim-dynamodb-item.js";
+import type { SimDynamoDbStreamActivity } from "../stream/sim-dynamodb-stream-activity.js";
+import type { SimDynamoDbStreamRequest } from "../stream/sim-dynamodb-stream-specification.js";
+import { SimDynamoDbTableStream } from "../stream/sim-dynamodb-table-stream.js";
 import type { SimDynamoDbTableTimeToLive } from "../time-to-live/sim-dynamodb-table-time-to-live.js";
 import { SimDynamoDbSecondaryIndexes } from "../secondary-index/sim-dynamodb-secondary-indexes.js";
 import type { SimDynamoDbReadView } from "./sim-dynamodb-read-view.js";
@@ -38,6 +41,8 @@ interface SimDynamoDbTableProperties {
   readonly tableClass?: SimDynamoDbTableClass | undefined;
   readonly deletionProtectionEnabled?: boolean | undefined;
   readonly tags?: SimDynamoDbTableTags;
+  readonly stream?: SimDynamoDbStreamRequest | undefined;
+  readonly streamActivity?: SimDynamoDbStreamActivity;
   readonly background?: BackgroundScheduler;
 }
 
@@ -73,6 +78,15 @@ export class SimDynamoDbTable {
    */
   public readonly tags: SimDynamoDbTableTags;
 
+  /**
+   * This table's stream, and the item changes captured on it.
+   *
+   * A table always has one of these, and it holds no stream until one is
+   * enabled. That is what lets the item store report every change to the same
+   * place whether or not anything is listening.
+   */
+  public readonly stream: SimDynamoDbTableStream;
+
   private readonly definition: SimDynamoDbTableDefinition;
   private readonly lifecycle: SimDynamoDbTableLifecycle;
   private readonly storage: SimDynamoDbTableStorage;
@@ -105,10 +119,19 @@ export class SimDynamoDbTable {
       tableName: name.value,
       deletionProtectionEnabled,
     });
+    this.stream = new SimDynamoDbTableStream({
+      tableName: name.value,
+      tableArn: this.arn,
+      keySchema,
+      clock: background,
+      activity: properties.streamActivity,
+    });
+    this.stream.apply(properties.stream);
     this.storage = new SimDynamoDbTableStorage({
       tableName: name.value,
       definition: this.definition,
       indexes: this.indexes,
+      stream: this.stream,
       background,
     });
     this.creationDateTime = background.now();
@@ -181,6 +204,7 @@ export class SimDynamoDbTable {
     this.definition.apply(update);
     this.indexes.global.applyUpdate(update);
     this.lifecycle.applyUpdate(update);
+    this.stream.apply(update.stream);
   }
 
   /** Refuse a delete this table is not in a state to take. */

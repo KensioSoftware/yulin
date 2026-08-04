@@ -138,6 +138,10 @@ export class SimDynamoDbTableTimeToLive {
       return;
     }
 
-    this.items.remove(key);
+    // Expiring an item is not the same as deleting one. A stream record for a
+    // removal DynamoDB made itself carries a `userIdentity`, which is how an
+    // application tells it from one it asked for, so the item store is told
+    // which of the two this is.
+    this.items.expire(key);
   }
 }

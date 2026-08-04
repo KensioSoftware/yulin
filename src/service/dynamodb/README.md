@@ -95,6 +95,7 @@ Table state lives under `table/`.
 - billing mode, provisioned throughput, table class and deletion protection
 - tags
 - in-memory items
+- its stream, and the item changes captured on it
 
 A table is built from values that have already been checked, not from a command object. Anything
 that can produce those values can make one, which is what will let CloudFormation create a table
@@ -106,7 +107,8 @@ The parts of that state UpdateTable can change are held together in
 key that is built from the definitions. The key schema is there too and never changes. Holding them
 together is what lets an update replace them in one step, while everything already holding the table
 goes on reading the table. `SimDynamoDbTableTimeToLive` holds the other mutable part, the time to
-live setting and the item removals it drives.
+live setting and the item removals it drives, and `SimDynamoDbTableStream` holds the third, the
+stream setting and what is captured onto it.
 
 Tables start in `CREATING` status. `SimDynamoDbCreateTable` schedules a background task that later
 activates the table by changing its status to `ACTIVE`.
@@ -205,6 +207,15 @@ The parts an index is made of are a file each, since each has rules of its own:
 Which items an index holds is worked out when the index is read rather than maintained on every
 write, following the precedent `SimSqsQueue.applyLifecycle` sets. So PutItem, UpdateItem and
 DeleteItem stay unaware of indexes apart from one check.
+
+Stream capture is the deliberate exception, and the reason it is one is worth keeping in view when
+reaching for the lazy pattern again. An index is a function of the table's current state, so
+deriving it on read is free. A stream is a log of transitions, and the transitions are not
+recoverable from the state they left behind: putting A, then B, then A leaves state A while owing
+two `MODIFY` records, and an insert followed by a delete leaves the table empty while owing an
+`INSERT` and a `REMOVE`. So a change is written to the stream as it happens, commented at the choke
+point in `SimDynamoDbStream.capture`. The one part of a stream that is genuinely a function of the
+current time, the 24 hour retention trim, will be lazy when it arrives with the reader.
 
 ## Read views
 
@@ -362,7 +373,9 @@ The returned `TableDescription` reports the table back: `TableName`, `TableArn`,
 `KeySchema`, `AttributeDefinitions`, `TableStatus`, `CreationDateTime`, `ProvisionedThroughput`,
 `DeletionProtectionEnabled`, and `BillingModeSummary` or `TableClassSummary` when the request named
 a billing mode or a table class. `GlobalSecondaryIndexes` and `LocalSecondaryIndexes` are each
-there when the table has any of that kind, and left out altogether when it has none. `ItemCount` and `TableSizeBytes` stay at 0.
+there when the table has any of that kind, and left out altogether when it has none.
+`StreamSpecification`, `LatestStreamArn` and `LatestStreamLabel` are there once the table has ever
+had a stream. `ItemCount` and `TableSizeBytes` stay at 0.
 
 Unsimulated inputs are refused with `SimDynamoDbUnsupportedOperation` rather than dropped. Each one
 is listed in the Limitations section of
@@ -374,8 +387,8 @@ is listed in the Limitations section of
 
 The order it works in mirrors CreateTable's:
 
-1. `refuseUnsimulatedUpdateInput` refuses streams, encryption, replicas and the throughput settings
-   beyond provisioned capacity, before anything else looks at the request.
+1. `refuseUnsimulatedUpdateInput` refuses encryption, replicas and the throughput settings beyond
+   provisioned capacity, before anything else looks at the request.
 2. `SimDynamoDbTableAccess` reads the table reference and authorizes `dynamodb:UpdateTable` against
    it.
 3. `table.assertUpdatable()` refuses a table that is not ACTIVE, which is how a second update while
@@ -393,7 +406,14 @@ holds those three privately so they can be replaced, where the rest of a table i
 `SimDynamoDbIndexUpdate` reads `GlobalSecondaryIndexUpdates` into at most one creation or one
 deletion, since that is AWS's limit. `SimDynamoDbTableUpdate` then enforces the wider rule: a billing
 and throughput change, an index creation and an index deletion are one thing at a time, while a
-table class or deletion protection change rides along with any of them.
+table class, deletion protection or stream change rides along with any of them.
+
+`readSimDynamoDbStreamUpdate` is where a `StreamSpecification` is read against the stream the table
+already has, in step 4 with the rest. Switching on a stream that is already on, switching off one
+that is not there, and asking for a different `StreamViewType` on a live stream are all refused with
+a `ValidationException`, as they are on AWS. The third is the same request shape as the first, and
+gets a refusal of its own saying what to do instead: a view type belongs to the stream rather than
+to the table, so a different one means switching the stream off and on again.
 
 A new index has no backfill to run, because which items an index holds is worked out when it is read.
 The CREATING window is a status the scheduler advances rather than work being done, which is
@@ -704,7 +724,7 @@ A batch write takes no `ConditionExpression`, as a real one does not. `SimDynamo
 `SimDynamoDbDeleteRequest` declare one anyway, so a request carrying it is refused by name rather
 than written unconditionally.
 
-Streams are not implemented. Billing mode and provisioned capacity are read and stored by
+Billing mode and provisioned capacity are read and stored by
 CreateTable, for the table and for each global secondary index, but nothing enforces them: no write
 is ever throttled. A local secondary index has no capacity of its own to store, since it is read and
 written out of the table's.
@@ -1057,6 +1077,52 @@ Which object a user intercepts is settled: the document client itself.
 reach it. It does share the base client's `config`, so `serviceId` and `region` resolve the same way
 for both.
 
+## Stream model
+
+Streams live under `stream/`, away from the commands that switch one on, because a stream is table
+state rather than request handling.
+
+- `SimDynamoDbTableStream` is the table's one public field, alongside `timeToLive`. It holds the
+  stream that is on, if any, and the last one the table had, which is what `LatestStreamArn` and
+  `LatestStreamLabel` keep reporting after a stream has been switched off. It is also what the item
+  store reports changes to, so the store never learns whether the table has a stream at all.
+- `SimDynamoDbStream` is one stream: its label, ARN, view type, status, sequence numbers and its
+  shard. Switching a stream off and on again makes a second stream rather than reusing this one,
+  because the label and the ARN are the instant it was enabled.
+- `SimDynamoDbStreamShard` is the one shard a stream has. AWS documents an open shard as one table
+  partition, and a simulated table is always one partition, so this is accurate rather than a
+  shortcut. Nothing splits. The total order it gives across every key is stronger than the per-key
+  order AWS guarantees, which is under Limitations.
+- `SimDynamoDbStreamRecord` is one change as the stream carries it, built from the images, the key
+  schema, the view type and a sequence number. `simDynamoDbStreamImages` is the view type matrix,
+  including the degenerate shapes: a `REMOVE` on a `NEW_IMAGE` stream and an `INSERT` on an
+  `OLD_IMAGE` stream are keys only, and are still written.
+- `simDynamoDbStreamRecordSize` is `SizeBytes`, which is **not** `SimDynamoDbItem.sizeInBytes()`.
+  That one implements the 400 KB item rule, where a number costs about half its digits. The stream
+  rule is the text length of each value, summed over `Keys` and every image the record carries
+  together. The two agree on AWS's published samples only because `101` is three characters either
+  way, and a test reproduces those samples exactly.
+- `SimDynamoDbStreamSequenceNumbers` is a counter, not a clock. Tests write several items inside one
+  millisecond, which a clock cannot tell apart. The numbers are rendered at 21 digits with no
+  leading zero, so comparing them as text gives the same answer as comparing them as numbers. Real
+  AWS varies the width between 21 and 40 digits, which is under Limitations.
+- `SimDynamoDbStreamStore` holds every stream one simulated DynamoDB has made, keyed by ARN, since a
+  stream outlives being switched off and the table has already moved on from naming it. A table
+  reaches it through `SimDynamoDbTableStream.publishTo`, which `SimDynamoDbCreateTable` calls once
+  the table is in the table store. Registering when the table is built instead would leave a
+  resolvable stream behind for a table refused for a name already in use, since CreateTable checks
+  the name after it has built the table.
+- `SimDynamoDbStreamActivity` is the twin of `SimSqsQueueActivity`: it is how a consumer that cannot
+  poll continuously finds out there is something to read. There is no instant on the notification,
+  unlike the queue's, because a stream record is readable the moment it is written.
+
+Capture happens in `SimDynamoDbTableItems`, on `put`, `remove` and `expire`. That pair of writes and
+removals is the only place every item mutation passes through exactly once, and both already read
+the old value to answer with, so the old image costs nothing. It is deliberately not
+`SimDynamoDbTable.putItem` and `deleteItem`: a time to live removal calls `items.expire` directly,
+and that is the one record carrying a `userIdentity`. `expire` is a separate call rather than a flag
+on `remove` so a caller has to decide which of the two it is making.
+
 ## Time to live
 
 Time to live lives under `time-to-live/`, away from the commands that switch it on, because it is
@@ -1076,8 +1142,11 @@ table state rather than request handling.
   under the key now, so one check covers a deleted item, an overwrite with a later TTL, a TTL
   attribute that has gone or changed type, and time to live having been switched off.
 
-`SimDynamoDbTableWrite.commit()` is the single hook. Every write in the service goes through it,
-including batch and transactional ones, so nothing needs a scheduling call of its own.
+`SimDynamoDbTableWrite.commit()` is the single hook for scheduling a removal. Every write in the
+service goes through it, including batch and transactional ones, so nothing needs a scheduling call
+of its own. It is not the hook a stream capture hangs off, because a time to live removal does not
+go through it: that reaches `SimDynamoDbTableItems.expire` directly, which is why capture lives one
+level further in.
 
 Tests that need eventual state should call the broader sim AWS background-drain helper, for example:
 

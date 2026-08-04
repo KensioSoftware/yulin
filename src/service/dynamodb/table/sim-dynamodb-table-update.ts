@@ -2,6 +2,8 @@ import type { SimUpdateTableCommandInput } from "../command/table/table.command.
 import type { SimDynamoDbTableClass } from "../command/table/table.types.js";
 import { SimDynamoDbValidationException } from "../error/dynamodb.error.js";
 import type { SimDynamoDbGlobalSecondaryIndex } from "../secondary-index/sim-dynamodb-global-secondary-index.js";
+import type { SimDynamoDbStreamRequest } from "../stream/sim-dynamodb-stream-specification.js";
+import { readSimDynamoDbStreamUpdate } from "../stream/sim-dynamodb-stream-update.js";
 import type { SimDynamoDbAttributeDefinitions } from "./sim-dynamodb-attribute-definitions.js";
 import { SimDynamoDbIndexUpdate } from "./sim-dynamodb-index-update.js";
 import type { SimDynamoDbTableBilling } from "./sim-dynamodb-table-billing.js";
@@ -20,15 +22,16 @@ interface SimDynamoDbTableUpdateProperties {
   readonly indexDeleted: string | undefined;
   readonly tableClass: SimDynamoDbTableClass | undefined;
   readonly deletionProtectionEnabled: boolean | undefined;
+  readonly stream: SimDynamoDbStreamRequest | undefined;
 }
 
 /**
  * Refuse a request asking for more than one thing at a time.
  *
  * AWS takes one of these per call: change what the table is billed and
- * provisioned as, add one global secondary index, or remove one. A table class
- * or deletion protection change is not one of them and rides along with any of
- * them.
+ * provisioned as, add one global secondary index, or remove one. A table class,
+ * a deletion protection or a stream change is not one of them and rides along
+ * with any of them.
  */
 function assertOneOperation(
   billing: SimDynamoDbTableBilling | undefined,
@@ -54,13 +57,14 @@ function assertAsksForSomething(
     properties.indexCreated !== undefined ||
     properties.indexDeleted !== undefined ||
     properties.tableClass !== undefined ||
-    properties.deletionProtectionEnabled !== undefined;
+    properties.deletionProtectionEnabled !== undefined ||
+    properties.stream !== undefined;
 
   if (!asks) {
     throw new SimDynamoDbValidationException(
       "An UpdateTable request changes the table's billing and throughput, " +
-        "its global secondary indexes, its table class or its deletion " +
-        "protection, and this one changes none of them",
+        "its global secondary indexes, its stream, its table class or its " +
+        "deletion protection, and this one changes none of them",
     );
   }
 }
@@ -79,6 +83,7 @@ export class SimDynamoDbTableUpdate {
   public readonly indexDeleted: string | undefined;
   public readonly tableClass: SimDynamoDbTableClass | undefined;
   public readonly deletionProtectionEnabled: boolean | undefined;
+  public readonly stream: SimDynamoDbStreamRequest | undefined;
 
   private constructor(properties: SimDynamoDbTableUpdateProperties) {
     assertAsksForSomething(properties);
@@ -89,6 +94,7 @@ export class SimDynamoDbTableUpdate {
     this.indexDeleted = properties.indexDeleted;
     this.tableClass = properties.tableClass;
     this.deletionProtectionEnabled = properties.deletionProtectionEnabled;
+    this.stream = properties.stream;
   }
 
   /**
@@ -121,6 +127,7 @@ export class SimDynamoDbTableUpdate {
       indexDeleted: simDynamoDbDeletedIndexName(indexUpdate, table),
       tableClass: readSimDynamoDbTableClass(input.TableClass),
       deletionProtectionEnabled: input.DeletionProtectionEnabled,
+      stream: readSimDynamoDbStreamUpdate(input, table.stream),
     });
   }
 }

@@ -42,6 +42,12 @@ export function describeSimDynamoDbTable(
     GlobalSecondaryIndexes: table.indexes.global.descriptions(table.status),
     LocalSecondaryIndexes: table.indexes.local.descriptions(),
     DeletionProtectionEnabled: table.deletionProtectionEnabled,
+    StreamSpecification: table.stream.specification(),
+    // These stay set once the table has had a stream, whether or not it still
+    // has one, since they name the last stream rather than the current
+    // setting. A table that has never had one reports neither.
+    LatestStreamArn: table.stream.latest?.arn,
+    LatestStreamLabel: table.stream.latest?.label,
     // Neither figure is tracked yet. Real DynamoDB updates both about every
     // six hours, so they lag behind the items anyway.
     ItemCount: 0,
