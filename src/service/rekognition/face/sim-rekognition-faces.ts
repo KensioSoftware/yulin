@@ -1,5 +1,6 @@
 import type { SimRekognitionImage } from "../image/sim-rekognition-image.js";
 import { SimRekognitionResultRules } from "../rule/sim-rekognition-result-rules.js";
+import { simRekognitionSampleFaceRules } from "../sample/sim-rekognition-sample-rules.js";
 import type { SimRekognitionFacesResult } from "./sim-rekognition-face-declaration.js";
 import { SimRekognitionFaceDetection } from "./sim-rekognition-face-detection.js";
 import { simRekognitionDefaultFaces } from "./sim-rekognition-face-defaults.js";
@@ -16,6 +17,17 @@ export class SimRekognitionFaces {
     new SimRekognitionResultRules<SimRekognitionFaceDetection>(
       new SimRekognitionFaceDetection(simRekognitionDefaultFaces),
     );
+
+  /**
+   * The sample images are declared as ordinary hash rules, so a rule a test
+   * registers for the same image replaces the built-in one through the usual
+   * precedence rather than through anything special-cased here.
+   */
+  constructor() {
+    for (const sample of simRekognitionSampleFaceRules) {
+      this.onHash(sample.image.hash, sample.result);
+    }
+  }
 
   /**
    * Answer with this result for any image no other rule matches.

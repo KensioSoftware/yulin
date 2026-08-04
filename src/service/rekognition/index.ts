@@ -52,6 +52,10 @@ export {
 } from "./moderation/sim-rekognition-moderation-taxonomy.js";
 export { simRekognitionImageHash } from "./image/sim-rekognition-image-hash.js";
 export {
+  simRekognitionSampleImages,
+  SimRekognitionSampleImages,
+} from "./sample/sim-rekognition-sample-images.js";
+export {
   SimRekognitionAccessDeniedException,
   SimRekognitionDeclarationError,
   SimRekognitionError,
