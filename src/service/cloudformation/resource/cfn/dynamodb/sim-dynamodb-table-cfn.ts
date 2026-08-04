@@ -28,9 +28,8 @@ export class SimDynamoDbTableCfn implements SimCfnResourceValueAdapter {
   /**
    * AWS::DynamoDB::Table attributes.
    *
-   * `Arn` is what an IAM policy names the table by. `StreamArn` is refused by
-   * name: DynamoDB streams are not simulated, and an invented stream ARN would
-   * read as a working stream to whatever the template handed it to.
+   * `Arn` is what an IAM policy names the table by. `StreamArn` is the ARN of
+   * the stream the table's `StreamSpecification` gave it.
    */
   attributeValue(attributeName: string): SimCfnTemplateValue {
     switch (attributeName) {
@@ -38,11 +37,7 @@ export class SimDynamoDbTableCfn implements SimCfnResourceValueAdapter {
         return this.table.arn;
       }
       case "StreamArn": {
-        throw new Error(
-          `Unsupported AWS::DynamoDB::Table attribute StreamArn: DynamoDB ` +
-            `streams are not simulated, so there is no stream ARN to give ` +
-            `rather than one nothing is publishing to`,
-        );
+        return this.streamArn();
       }
       default: {
         throw new Error(
@@ -50,5 +45,27 @@ export class SimDynamoDbTableCfn implements SimCfnResourceValueAdapter {
         );
       }
     }
+  }
+
+  /**
+   * The ARN of the table's stream, which it only has if it was asked for.
+   *
+   * A table with no `StreamSpecification` has no stream ARN to give, and an
+   * invented one would read as a working stream to whatever the template handed
+   * it to. Real CloudFormation refuses the same template while validating it,
+   * where this refuses when the attribute is asked for.
+   */
+  private streamArn(): SimCfnTemplateValue {
+    const arn = this.table.stream.latest?.arn;
+
+    if (arn === undefined) {
+      throw new Error(
+        `Unsupported AWS::DynamoDB::Table attribute StreamArn: table ` +
+          `${this.table.tableName} has no StreamSpecification, so it has no ` +
+          `stream and no stream ARN`,
+      );
+    }
+
+    return arn;
   }
 }
