@@ -29,4 +29,31 @@ export class SimDynamoDbStreamStore {
   findByArn(streamArn: string): SimDynamoDbStream | undefined {
     return this.streams.get(streamArn);
   }
+
+  /**
+   * Every stream here, in ARN order.
+   *
+   * ListStreams pages by ARN, so the order a page is cut out of has to be the
+   * order the paging parameter walks. A stream's ARN is its table's ARN and
+   * then the instant it was enabled, so this also groups a table's streams
+   * together, oldest first.
+   */
+  inArnOrder(): readonly SimDynamoDbStream[] {
+    return this.streams
+      .values()
+      .toArray()
+      .toSorted((left, right) => left.arn.localeCompare(right.arn));
+  }
+
+  /**
+   * Bring every stream here up to date at an instant.
+   *
+   * All of them rather than the one being read, so that what a test sees of one
+   * stream does not depend on which other streams it happened to read first.
+   */
+  applyRetention(instant: Date): void {
+    for (const stream of this.streams.values()) {
+      stream.applyRetention(instant);
+    }
+  }
 }

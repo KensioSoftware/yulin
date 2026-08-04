@@ -4,7 +4,10 @@ import type { SimAwsAccountRegionContainer } from "./sim-aws-account-region-scop
 import { faker } from "@faker-js/faker";
 import type { SimS3 } from "../s3/sim-s3.js";
 import type { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
-import type { SimDynamoDb as SimDynamoDatabase } from "../dynamodb/index.js";
+import type {
+  SimDynamoDb as SimDynamoDatabase,
+  SimDynamoDbStreams,
+} from "../dynamodb/index.js";
 import { SimAws } from "./sim-aws.js";
 import type { SimCloudFormation } from "../cloudformation/index.js";
 import type { SimAcm } from "../acm/sim-acm.js";
@@ -84,6 +87,13 @@ export class SimAwsAccount {
    */
   dynamoDb(): SimDynamoDatabase {
     return this.region().dynamoDb();
+  }
+
+  /**
+   * Get simulated DynamoDB Streams for this Account's default Region.
+   */
+  dynamoDbStreams(): SimDynamoDbStreams {
+    return this.region().dynamoDbStreams();
   }
 
   /**

@@ -144,6 +144,27 @@ export class SimDynamoDbDocumentValueError extends SimDynamoDbError {
 }
 
 /**
+ * Simulated DynamoDB Streams TrimmedDataAccessException error.
+ *
+ * A stream keeps its records for 24 hours and then drops them. This is what a
+ * read of a position the stream no longer holds fails with, whether the caller
+ * named the position itself or is holding a shard iterator that was still good
+ * when it was handed out.
+ *
+ * It is not a ResourceNotFoundException: the stream and the shard are both
+ * still there, and everything after the trim point is still readable, so a
+ * consumer that catches this knows to start again from TRIM_HORIZON rather
+ * than that its stream has gone.
+ */
+export class SimDynamoDbTrimmedDataAccessException extends SimDynamoDbError {
+  public override readonly name = "TrimmedDataAccessException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
  * Simulated DynamoDB UnsupportedOperation error.
  *
  * Real DynamoDB has no error of this name. It is what simulated DynamoDB

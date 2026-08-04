@@ -1,12 +1,14 @@
 import type { SimArn } from "../../aws/arn.js";
 import type { SimDynamoDbStreamViewType } from "./sim-dynamodb-stream.types.js";
 import type { SimDynamoDbKeySchema } from "../table/sim-dynamodb-key-schema.js";
+import type { SimDynamoDbKeySchemaElement } from "../command/table/table.types.js";
 import type { SimDynamoDbItemChange } from "./sim-dynamodb-item-change.js";
 import {
   simDynamoDbStreamArn,
   simDynamoDbStreamLabel,
 } from "./sim-dynamodb-stream-arn.js";
 import { SimDynamoDbStreamRecord } from "./sim-dynamodb-stream-record.js";
+import { simDynamoDbStreamTrimPoint } from "./sim-dynamodb-stream-retention.js";
 import { SimDynamoDbStreamSequenceNumbers } from "./sim-dynamodb-stream-sequence-numbers.js";
 import { SimDynamoDbStreamShard } from "./sim-dynamodb-stream-shard.js";
 
@@ -73,6 +75,25 @@ export class SimDynamoDbStream {
    */
   get records(): readonly SimDynamoDbStreamRecord[] {
     return this.shard.records;
+  }
+
+  /**
+   * The key schema of the table this stream belongs to, as DescribeStream
+   * reports it.
+   */
+  get keySchemaElements(): readonly SimDynamoDbKeySchemaElement[] {
+    return this.keySchema.elements;
+  }
+
+  /**
+   * Drop whatever the 24 hour retention window has outlived.
+   *
+   * This is applied when the stream is read rather than scheduled, which is
+   * what `simDynamoDbStreamTrimPoint` explains. Running it twice at one instant
+   * does nothing the second time.
+   */
+  applyRetention(instant: Date): void {
+    this.shard.trim(simDynamoDbStreamTrimPoint(instant));
   }
 
   /**

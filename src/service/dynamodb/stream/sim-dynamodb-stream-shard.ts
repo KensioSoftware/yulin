@@ -36,6 +36,9 @@ export class SimDynamoDbStreamShard {
 
   private readonly written: SimDynamoDbStreamRecord[] = [];
   private open = true;
+  private trimmed: string | undefined;
+  private first: string | undefined;
+  private last: string | undefined;
 
   constructor(at: Date) {
     this.shardId = shardId(at);
@@ -56,10 +59,65 @@ export class SimDynamoDbStreamShard {
   }
 
   /**
+   * The sequence number of the last record trimmed off this shard, when the
+   * retention window has outlived one.
+   */
+  get trimmedThrough(): string | undefined {
+    return this.trimmed;
+  }
+
+  /**
+   * The sequence number this shard starts at.
+   *
+   * This is the first record ever written to it rather than the oldest one it
+   * still holds. A shard's range is fixed as the records go on: trimming takes
+   * records away without moving where the shard began, and TRIM_HORIZON is what
+   * a reader uses to find the oldest record it can still reach.
+   */
+  get startingSequenceNumber(): string | undefined {
+    return this.first;
+  }
+
+  /**
+   * The sequence number this shard ends at, which only a closed one has.
+   *
+   * An open shard has no ending sequence number, since the next record written
+   * would move it. That absence is how a reader tells a shard that is still
+   * taking changes from one it can finish with.
+   */
+  get endingSequenceNumber(): string | undefined {
+    return this.open ? undefined : this.last;
+  }
+
+  /**
    * Write a record to this shard.
    */
   append(record: SimDynamoDbStreamRecord): void {
     this.written.push(record);
+    this.first ??= record.sequenceNumber;
+    this.last = record.sequenceNumber;
+  }
+
+  /**
+   * Drop the records written before an instant, remembering how far that got.
+   *
+   * The trim point is kept once the records themselves are gone, because it is
+   * the difference between a reader that asked for a position this shard never
+   * reached and one that asked for a position it has already dropped.
+   */
+  trim(before: Date): void {
+    const surviving = this.written.findIndex(
+      (record) =>
+        record.approximateCreationDateTime.getTime() >= before.getTime(),
+    );
+    const outlived = surviving === -1 ? this.written.length : surviving;
+
+    if (outlived === 0) {
+      return;
+    }
+
+    this.trimmed = this.written[outlived - 1]?.sequenceNumber ?? this.trimmed;
+    this.written.splice(0, outlived);
   }
 
   /**
