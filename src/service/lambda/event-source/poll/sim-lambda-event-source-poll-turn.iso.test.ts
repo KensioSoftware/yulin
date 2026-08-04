@@ -22,6 +22,8 @@ class RecordingPoller implements SimLambdaEventSourcePolls {
     await new Promise<void>((resolve) => {
       this.finish = resolve;
     });
+
+    this.steps.push("finished");
   }
 
   pollNow(): void {
@@ -47,12 +49,14 @@ describe("sim Lambda event source poll turns", () => {
 
     // Then only one poll ran, and the second was remembered rather than
     // dropped: records that arrived mid-poll would otherwise sit until an
-    // unrelated later write happened to wake the mapping.
+    // unrelated later write happened to wake the mapping. The wake-up it was
+    // remembered as comes after the poll it arrived during, so the two never
+    // overlap.
     await second;
     poller.finishPoll();
     await inFlight;
 
-    assertArrayEquals(poller.steps, ["polled", "asked again"]);
+    assertArrayEquals(poller.steps, ["polled", "finished", "asked again"]);
   });
 
   it("asks for nothing more when nothing arrived during a poll", async () => {
@@ -65,6 +69,6 @@ describe("sim Lambda event source poll turns", () => {
     await inFlight;
 
     // Then the mapping waits to be woken rather than polling round again.
-    assertArrayEquals(poller.steps, ["polled"]);
+    assertArrayEquals(poller.steps, ["polled", "finished"]);
   });
 });

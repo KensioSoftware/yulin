@@ -1,9 +1,5 @@
 import { PutItemCommand } from "@aws-sdk/client-dynamodb";
-import {
-  assertArrayLength,
-  assertArrayMinLength,
-  assertTrue,
-} from "@kensio/smartass";
+import { assertArrayLength } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { simAwsWithStreamEventSource } from "../../../../test/lambda/stream-event-source-fixture.js";
@@ -42,10 +38,10 @@ describe("sim Lambda DynamoDB stream event source mapping failures", () => {
     // When an hour of simulated time passes.
     await simAws.clock().advanceBy({ hours: 1 });
 
-    // Then the mapping tried a bounded number of times and stopped, rather
-    // than leaving the clock with work falling due forever.
-    assertArrayMinLength(events, 2);
-    assertTrue(events.length <= 6, "the batch was not delivered forever");
+    // Then the batch was delivered again five times, after 1, 2, 4, 8 and 16
+    // seconds, and then given up on, rather than leaving the clock with work
+    // falling due forever.
+    assertArrayLength(events, 6);
   });
 });
 

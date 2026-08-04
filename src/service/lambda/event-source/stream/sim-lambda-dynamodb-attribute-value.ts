@@ -139,6 +139,7 @@ export type SimLambdaDynamoDbAttributeValue =
       readonly NS?: never;
       readonly NULL?: never;
       readonly S?: never;
+      readonly $unknown?: never;
     }
   | {
       readonly $unknown: [string, unknown];

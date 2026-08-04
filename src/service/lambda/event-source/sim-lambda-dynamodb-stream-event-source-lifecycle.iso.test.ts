@@ -5,7 +5,7 @@ import { describe, it } from "vitest";
 
 import { simAwsWithStreamEventSource } from "../../../../test/lambda/stream-event-source-fixture.js";
 import type { SimAws } from "../../aws/sim-aws.js";
-import type { SimLambdaDynamoDbStreamEvent } from "./poll/sim-lambda-dynamodb-stream-event.js";
+import type { SimLambdaDynamoDbStreamEvent } from "./poll/sim-lambda-dynamodb-stream-event.types.js";
 
 /**
  * A stream mapping delivers one record at a time here, so a record that follows

@@ -2,7 +2,11 @@
  * Delivering a simulated table's changes to a simulated function.
  */
 
-import { CreateTableCommand, PutItemCommand } from "@aws-sdk/client-dynamodb";
+import {
+  CreateTableCommand,
+  GetItemCommand,
+  PutItemCommand,
+} from "@aws-sdk/client-dynamodb";
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
   CreateEventSourceMappingCommand,
@@ -33,7 +37,8 @@ const { TableDescription } = await simAws.dynamoDb().createTable(
 const streamArn = TableDescription?.LatestStreamArn;
 
 // The projection goes into a second table. A function writing back into the
-// table whose stream invoked it would be delivered its own writes forever.
+// table whose stream invoked it would be delivered its own writes, which the
+// simulator refuses rather than looping on.
 await simAws.dynamoDb().createTable(
   new CreateTableCommand({
     TableName: "order-totals",
@@ -44,7 +49,8 @@ await simAws.dynamoDb().createTable(
 );
 
 // The execution role needs the three stream actions Lambda reads a stream
-// with, plus ListStreams, which is on every stream rather than on one.
+// with, plus ListStreams, which is on every stream rather than on one, and
+// whatever the function itself does.
 const role = await simAws.iam().createRole(
   new CreateRoleCommand({
     RoleName: "OrderProjectorRole",
@@ -76,25 +82,38 @@ await simAws.iam().putRolePolicy(
           Resource: streamArn,
         },
         { Effect: "Allow", Action: "dynamodb:ListStreams", Resource: "*" },
+        {
+          Effect: "Allow",
+          Action: "dynamodb:PutItem",
+          Resource: `arn:aws:dynamodb:${simAws.defaultRegionName}:${simAws.defaultAccountId}:table/order-totals`,
+        },
       ],
     }),
   }),
 );
-
-const projected: string[] = [];
 
 await simAws.lambda().createFunction(
   new CreateFunctionCommand({
     FunctionName: "order-projector",
     Role: role.Role.Arn,
     Code: {
-      ZipFile: makeLambdaZipFileInput((event: SimLambdaDynamoDbStreamEvent) => {
-        for (const record of event.Records) {
-          projected.push(
-            `${record.eventName}:${record.dynamodb.Keys?.["orderId"]?.S ?? ""}`,
+      ZipFile: makeLambdaZipFileInput(
+        async (event: SimLambdaDynamoDbStreamEvent) => {
+          await Promise.all(
+            event.Records.map(async (record) =>
+              simAws.dynamoDb().putItem(
+                new PutItemCommand({
+                  TableName: "order-totals",
+                  Item: {
+                    orderId: { S: record.dynamodb.Keys?.["orderId"]?.S ?? "" },
+                    total: { N: record.dynamodb.NewImage?.["total"]?.N ?? "0" },
+                  },
+                }),
+              ),
+            ),
           );
-        }
-      }),
+        },
+      ),
     },
   }),
 );
@@ -117,4 +136,11 @@ await simAws.dynamoDb().putItem(
 // Delivery happens in the background, so wait for the simulation to settle.
 await simAws.backgroundTasksComplete();
 
-console.log(projected); // ["INSERT:order-1"]
+const projected = await simAws.dynamoDb().getItem(
+  new GetItemCommand({
+    TableName: "order-totals",
+    Key: { orderId: { S: "order-1" } },
+  }),
+);
+
+console.log(projected.Item?.["total"]?.N); // "42"

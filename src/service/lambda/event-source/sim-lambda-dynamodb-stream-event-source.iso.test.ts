@@ -18,7 +18,7 @@ import { SimAws } from "../../aws/sim-aws.js";
 import type {
   SimLambdaDynamoDbStreamEvent,
   SimLambdaDynamoDbStreamEventRecord,
-} from "./poll/sim-lambda-dynamodb-stream-event.js";
+} from "./poll/sim-lambda-dynamodb-stream-event.types.js";
 
 /**
  * The orders a batch test writes at once.
@@ -159,6 +159,31 @@ describe("sim Lambda DynamoDB stream event source mappings", () => {
 
     // Then both are delivered, oldest first.
     assertArrayEquals(deliveredOrderIds(events), ["order-1", "order-2"]);
+  });
+
+  it("delivers a binary attribute as the base64 the event carries", async () => {
+    // Given a table's stream mapped to a function.
+    const { simAws, tableName, events } = await simAwsWithStreamEventSource();
+
+    // When an item with bytes in it is written.
+    await simAws.dynamoDb().putItem(
+      new PutItemCommand({
+        TableName: tableName,
+        Item: {
+          orderId: { S: "order-1" },
+          receipt: { B: Uint8Array.from([1, 2, 3]) },
+        },
+      }),
+    );
+    await simAws.backgroundTasksComplete();
+
+    // Then the handler was given base64 rather than bytes, because the event
+    // reaches a function as JSON, so decoding it reads the same here as it
+    // does on AWS.
+    const receipt = events[0]?.Records[0]?.dynamodb.NewImage?.["receipt"]?.B;
+
+    assertIdentical(receipt, "AQID");
+    assertIdentical(Buffer.from(receipt, "base64").toString("hex"), "010203");
   });
 
   it("delivers only what happens next to a LATEST mapping", async () => {

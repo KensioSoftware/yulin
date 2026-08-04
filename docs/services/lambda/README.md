@@ -591,7 +591,11 @@ and region, as they do on real AWS.
  * Delivering a simulated table's changes to a simulated function.
  */
 
-import { CreateTableCommand, PutItemCommand } from "@aws-sdk/client-dynamodb";
+import {
+  CreateTableCommand,
+  GetItemCommand,
+  PutItemCommand,
+} from "@aws-sdk/client-dynamodb";
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
   CreateEventSourceMappingCommand,
@@ -622,7 +626,8 @@ const { TableDescription } = await simAws.dynamoDb().createTable(
 const streamArn = TableDescription?.LatestStreamArn;
 
 // The projection goes into a second table. A function writing back into the
-// table whose stream invoked it would be delivered its own writes forever.
+// table whose stream invoked it would be delivered its own writes, which the
+// simulator refuses rather than looping on.
 await simAws.dynamoDb().createTable(
   new CreateTableCommand({
     TableName: "order-totals",
@@ -633,7 +638,8 @@ await simAws.dynamoDb().createTable(
 );
 
 // The execution role needs the three stream actions Lambda reads a stream
-// with, plus ListStreams, which is on every stream rather than on one.
+// with, plus ListStreams, which is on every stream rather than on one, and
+// whatever the function itself does.
 const role = await simAws.iam().createRole(
   new CreateRoleCommand({
     RoleName: "OrderProjectorRole",
@@ -665,25 +671,38 @@ await simAws.iam().putRolePolicy(
           Resource: streamArn,
         },
         { Effect: "Allow", Action: "dynamodb:ListStreams", Resource: "*" },
+        {
+          Effect: "Allow",
+          Action: "dynamodb:PutItem",
+          Resource: `arn:aws:dynamodb:${simAws.defaultRegionName}:${simAws.defaultAccountId}:table/order-totals`,
+        },
       ],
     }),
   }),
 );
-
-const projected: string[] = [];
 
 await simAws.lambda().createFunction(
   new CreateFunctionCommand({
     FunctionName: "order-projector",
     Role: role.Role.Arn,
     Code: {
-      ZipFile: makeLambdaZipFileInput((event: SimLambdaDynamoDbStreamEvent) => {
-        for (const record of event.Records) {
-          projected.push(
-            `${record.eventName}:${record.dynamodb.Keys?.["orderId"]?.S ?? ""}`,
+      ZipFile: makeLambdaZipFileInput(
+        async (event: SimLambdaDynamoDbStreamEvent) => {
+          await Promise.all(
+            event.Records.map(async (record) =>
+              simAws.dynamoDb().putItem(
+                new PutItemCommand({
+                  TableName: "order-totals",
+                  Item: {
+                    orderId: { S: record.dynamodb.Keys?.["orderId"]?.S ?? "" },
+                    total: { N: record.dynamodb.NewImage?.["total"]?.N ?? "0" },
+                  },
+                }),
+              ),
+            ),
           );
-        }
-      }),
+        },
+      ),
     },
   }),
 );
@@ -706,7 +725,14 @@ await simAws.dynamoDb().putItem(
 // Delivery happens in the background, so wait for the simulation to settle.
 await simAws.backgroundTasksComplete();
 
-console.log(projected); // ["INSERT:order-1"]
+const projected = await simAws.dynamoDb().getItem(
+  new GetItemCommand({
+    TableName: "order-totals",
+    Key: { orderId: { S: "order-1" } },
+  }),
+);
+
+console.log(projected.Item?.["total"]?.N); // "42"
 ```
 
 Each record carries `eventID`, `eventName`, `eventVersion`, `eventSource`, `awsRegion`,
@@ -719,8 +745,14 @@ where [the Streams API capitalizes them](../dynamodb/#reading-a-streams-records 
 
 `SimLambdaDynamoDbStreamEvent` and `SimLambdaDynamoDbStreamEventRecord` are exported from
 `@kensio/yulin/lambda` for typing a handler, and are minimal structural equivalents of the
-`DynamoDBStreamEvent` and `DynamoDBRecord` types from the `aws-lambda` typings package. The images
-are attribute value maps, so `unmarshall` from `@aws-sdk/util-dynamodb` takes one unchanged.
+`DynamoDBStreamEvent` and `DynamoDBRecord` types from the `aws-lambda` typings package.
+
+A binary attribute reaches the handler as a base64 string rather than as bytes, which is what the
+event carries on AWS: it arrives as JSON, and JSON has no bytes. `Buffer.from(value.B, "base64")`
+therefore reads the same here as it does deployed. The
+[Streams API](../dynamodb/#reading-a-streams-records "Simulated DynamoDB Streams docs") hands out
+bytes for the same attribute, because its client decodes them. Nesting makes no difference: binary
+inside a list or a map is encoded too.
 
 Creating the mapping checks what real Lambda checks: that the stream exists, and that the function's
 execution role is allowed `dynamodb:DescribeStream`, `dynamodb:GetRecords` and
@@ -742,9 +774,9 @@ Advancing the simulation's clock is what hands the batch over again:
 await simAws.clock().advanceBy({ seconds: 30 });
 ```
 
-The batch is delivered five times in all, after 1, 2, 4, 8 and 16 seconds. Then it is discarded and
-the mapping carries on with the stream, which is what AWS does once a stream mapping's error
-handling has run out.
+The batch is delivered again five times, after 1, 2, 4, 8 and 16 seconds, so six deliveries in all.
+Then it is discarded and the mapping carries on with the stream, which is what AWS does once a
+stream mapping's error handling has run out.
 
 Both the cadence and the number of attempts are simulator constraints rather than AWS behaviour. AWS
 documents no delay between attempts and retries until the records age out of the stream, a day
@@ -765,6 +797,10 @@ to settle:
 ```typescript
 await simAws.backgroundTasksComplete(); // throws SimLambdaStreamCascadeError
 ```
+
+Only the handler's own writes count. Items written at the same time by the test, or by anything else
+in the simulation, are an ordinary batch however many of them there are, because the guard tells them
+apart by where the write came from rather than by when it landed.
 
 Writing the projection into a second table is what the guard is asking for, and is what a real
 aggregation or search index does anyway.
@@ -1583,7 +1619,8 @@ Current documented limitations:
   accepted and ignored. A stream retries a batch from the record a report names onward, where a
   queue takes back the messages it names, and a failing stream batch is retried whole here. That
   rule is [issue 342](https://github.com/KensioSoftware/yulin/issues/342).
-- A stream batch is delivered again after 1, 2, 4, 8 and 16 seconds and then discarded. AWS
+- A stream batch is delivered again five times, after 1, 2, 4, 8 and 16 seconds, and then
+  discarded. AWS
   documents no delay between attempts and retries until the records age out. Both differences are
   deliberate: a delay of zero falls due at the instant the clock already reads, so a handler that
   always throws would leave `advanceBy` with work falling due forever.

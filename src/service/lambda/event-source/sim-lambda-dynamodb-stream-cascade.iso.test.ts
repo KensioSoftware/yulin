@@ -7,7 +7,7 @@ import {
   makeSourceStream,
   simAwsWithStreamEventSource,
 } from "../../../../test/lambda/stream-event-source-fixture.js";
-import type { SimLambdaDynamoDbStreamEvent } from "./poll/sim-lambda-dynamodb-stream-event.js";
+import type { SimLambdaDynamoDbStreamEvent } from "./poll/sim-lambda-dynamodb-stream-event.types.js";
 
 describe("sim Lambda DynamoDB stream event source write cascades", () => {
   it("refuses a function that writes back into its own source table", async () => {

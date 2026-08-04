@@ -24,11 +24,13 @@ export type {
   SimLambdaSqsEventRecord,
 } from "./event-source/poll/sim-lambda-sqs-event.js";
 export type {
+  SimLambdaDynamoDbEventAttributeValue,
+  SimLambdaDynamoDbEventImage,
   SimLambdaDynamoDbStreamEvent,
   SimLambdaDynamoDbStreamEventRecord,
   SimLambdaDynamoDbStreamEventRecordBody,
   SimLambdaDynamoDbStreamEventUserIdentity,
-} from "./event-source/poll/sim-lambda-dynamodb-stream-event.js";
+} from "./event-source/poll/sim-lambda-dynamodb-stream-event.types.js";
 export type {
   SimLambdaDynamoDbAttributeValue,
   SimLambdaDynamoDbImage,

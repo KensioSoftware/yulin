@@ -18,7 +18,7 @@ import { assertNonNullable } from "@kensio/smartass";
 import { SimAws } from "../../src/service/aws/sim-aws.js";
 import { simDynamoDbStreamedTableFactory } from "../../src/service/dynamodb/stream/sim-dynamodb-streamed-table.factory.js";
 import type { SimDynamoDbStreamViewType } from "../../src/service/dynamodb/stream/sim-dynamodb-stream.types.js";
-import type { SimLambdaDynamoDbStreamEvent } from "../../src/service/lambda/event-source/poll/sim-lambda-dynamodb-stream-event.js";
+import type { SimLambdaDynamoDbStreamEvent } from "../../src/service/lambda/event-source/poll/sim-lambda-dynamodb-stream-event.types.js";
 import { makeLambdaZipFileInput } from "../../src/service/lambda/function/code/lambda-zip-file-input.js";
 import type { SimLambdaHandler } from "../../src/service/lambda/function/sim-lambda-handler.type.js";
 import { recordingHandler } from "./event-source-fixture.js";

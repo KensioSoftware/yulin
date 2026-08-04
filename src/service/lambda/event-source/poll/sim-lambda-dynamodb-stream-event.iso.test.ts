@@ -1,4 +1,5 @@
 import {
+  assertArrayEquals,
   assertIdentical,
   assertNonNullable,
   assertObjectEquals,
@@ -63,6 +64,41 @@ describe("sim Lambda DynamoDB stream event builder", () => {
     assertIdentical(built.dynamodb.SizeBytes, 0);
     assertIdentical(built.dynamodb.StreamViewType, "");
     assertUndefined(built.userIdentity);
+  });
+
+  it("base64 encodes binary, however deeply it is nested", () => {
+    // Given a record carrying bytes at the top level, in a set, and inside a
+    // list and a map, as the Streams API hands them out.
+    const record = {
+      dynamodb: {
+        NewImage: {
+          thumbnail: { B: Uint8Array.from([1, 2, 3]) },
+          fingerprints: { BS: [Uint8Array.from([4, 5]), Uint8Array.from([6])] },
+          history: { L: [{ B: Uint8Array.from([7]) }, { N: "1" }] },
+          meta: { M: { signature: { B: Uint8Array.from([8, 9]) } } },
+        },
+      },
+    };
+
+    // When it is built into an event.
+    const [built] = builder.of([record]).Records;
+
+    assertNonNullable(built);
+
+    // Then every one of them is the base64 the event is written with, so a
+    // handler decoding with `Buffer.from(value, "base64")` reads what it does
+    // on AWS.
+    const image = built.dynamodb.NewImage;
+
+    assertNonNullable(image);
+
+    const [nested, alongside] = image["history"]?.L ?? [];
+
+    assertIdentical(image["thumbnail"]?.B, "AQID");
+    assertArrayEquals([...(image["fingerprints"]?.BS ?? [])], ["BAU=", "Bg=="]);
+    assertIdentical(nested?.B, "Bw==");
+    assertIdentical(alongside?.N, "1");
+    assertIdentical(image["meta"]?.M?.["signature"]?.B, "CAk=");
   });
 
   it("lower-cases an identity the Streams API capitalizes", () => {

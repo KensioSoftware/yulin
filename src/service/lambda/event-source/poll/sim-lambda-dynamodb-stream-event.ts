@@ -1,62 +1,16 @@
 import type { SimLambdaDynamoDbStreamEventSourceArn } from "../stream/sim-lambda-dynamodb-stream-event-source-arn.js";
-import type { SimLambdaDynamoDbImage } from "../stream/sim-lambda-dynamodb-attribute-value.js";
+import { simLambdaDynamoDbEventImages } from "./sim-lambda-dynamodb-event-image.js";
+import type {
+  SimLambdaDynamoDbStreamEvent,
+  SimLambdaDynamoDbStreamEventRecord,
+  SimLambdaDynamoDbStreamEventRecordBody,
+} from "./sim-lambda-dynamodb-stream-event.types.js";
 import type {
   SimLambdaEventSourceStreamRecord,
   SimLambdaEventSourceStreamRecordBody,
 } from "../stream/sim-lambda-event-source-streams.js";
 
 const millisecondsPerSecond = 1000;
-
-/**
- * The change one record reports, as a DynamoDB stream event record carries it.
- *
- * The field names are the Streams API's, capital and all, because that is what
- * the event carries. `ApproximateCreationDateTime` is the exception: the API
- * gives an instant and the event gives whole seconds since the epoch.
- */
-export interface SimLambdaDynamoDbStreamEventRecordBody {
-  readonly ApproximateCreationDateTime?: number | undefined;
-  readonly Keys?: SimLambdaDynamoDbImage | undefined;
-  readonly NewImage?: SimLambdaDynamoDbImage | undefined;
-  readonly OldImage?: SimLambdaDynamoDbImage | undefined;
-  readonly SequenceNumber: string;
-  readonly SizeBytes: number;
-  readonly StreamViewType: string;
-}
-
-/**
- * Who made the change a record reports, when it was not the application.
- *
- * A time to live deletion is the one that carries this. The Streams API
- * capitalizes the same two fields; the event does not.
- */
-export interface SimLambdaDynamoDbStreamEventUserIdentity {
-  readonly type: string;
-  readonly principalId: string;
-}
-
-/**
- * One stream record as a DynamoDB stream event record.
- *
- * https://docs.aws.amazon.com/lambda/latest/dg/with-ddb.html
- */
-export interface SimLambdaDynamoDbStreamEventRecord {
-  readonly eventID: string;
-  readonly eventName: string;
-  readonly eventVersion: string;
-  readonly eventSource: "aws:dynamodb";
-  readonly awsRegion: string;
-  readonly dynamodb: SimLambdaDynamoDbStreamEventRecordBody;
-  readonly eventSourceARN: string;
-  readonly userIdentity?: SimLambdaDynamoDbStreamEventUserIdentity | undefined;
-}
-
-/**
- * The event a DynamoDB stream event source mapping invokes a function with.
- */
-export interface SimLambdaDynamoDbStreamEvent {
-  readonly Records: readonly SimLambdaDynamoDbStreamEventRecord[];
-}
 
 /**
  * Builds the DynamoDB stream event for one batch of polled records.
@@ -106,8 +60,7 @@ export class SimLambdaDynamoDbStreamEventBuilder {
 }
 
 /**
- * The change block of an event record, with only the images the stream's view
- * type gave it.
+ * The change block of an event record.
  */
 function eventRecordBody(
   body: SimLambdaEventSourceStreamRecordBody | undefined,
@@ -120,9 +73,7 @@ function eventRecordBody(
         createdAt.getTime() / millisecondsPerSecond,
       ),
     }),
-    ...(body?.Keys !== undefined && { Keys: body.Keys }),
-    ...(body?.NewImage !== undefined && { NewImage: body.NewImage }),
-    ...(body?.OldImage !== undefined && { OldImage: body.OldImage }),
+    ...simLambdaDynamoDbEventImages(body),
     SequenceNumber: body?.SequenceNumber ?? "",
     SizeBytes: body?.SizeBytes ?? 0,
     StreamViewType: body?.StreamViewType ?? "",

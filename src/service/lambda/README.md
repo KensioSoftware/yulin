@@ -341,8 +341,10 @@ its `finally` block rather than dropping a poll that was asked for mid-turn, bec
 invoked it. The delivery runs inside an asynchronous context
 (`sim-lambda-event-source-delivery-context.ts`), so a record written by the handler is told apart
 from one written by anything else that happened to be running at the same time. Several items
-written in one `Promise.all` are an ordinary batch; a handler feeding its own source is a loop, and
-is refused with `SimLambdaStreamCascadeError` once the delivery is over rather than left to spin.
+written in one `Promise.all` by a test, or by anything other than this mapping's own handler, are an
+ordinary batch. Writes the handler itself makes to its own source are the loop, however many of them
+it makes and however it makes them, and are refused with `SimLambdaStreamCascadeError` once the
+delivery is over rather than left to spin.
 
 `SimDynamoDbEventSourceStreams` implements the port over the DynamoDB Streams commands, as the
 execution role, and `SimDynamoDbEventSourceStreamShard` is the part that finds the table and the
