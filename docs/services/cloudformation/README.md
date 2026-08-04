@@ -454,6 +454,68 @@ await stack.waitForDeployComplete();
 console.log(simAws.s3().getSimBucketByName("docs-site-bucket")?.bucketName);
 ```
 
+### `Fn::FindInMap`
+
+A template `Mappings` section holds two levels of keys against a value. `Fn::FindInMap` reads one of
+those values, given the map name, the top-level key and the second-level key.
+
+```typescript sim-cloudformation-fn-find-in-map
+/**
+ * Reading a value from template Mappings in a simulated CFN template.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "find-in-map-stack",
+  template: {
+    Parameters: {
+      Environment: {
+        Type: "String",
+        Default: "staging",
+      },
+    },
+    Mappings: {
+      EnvironmentMap: {
+        staging: { BucketName: "staging-site-bucket" },
+        production: { BucketName: "production-site-bucket" },
+      },
+    },
+    Resources: {
+      SiteBucket: {
+        Type: "AWS::S3::Bucket",
+        Properties: {
+          BucketName: {
+            "Fn::FindInMap": [
+              "EnvironmentMap",
+              { Ref: "Environment" },
+              "BucketName",
+            ],
+          },
+        },
+      },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+
+console.log(simAws.s3().getSimBucketByName("staging-site-bucket")?.bucketName);
+```
+
+Each of the three arguments can be a nested expression rather than a literal string, as long as it
+resolves to a string. The example above uses a `Ref` to a parameter for the top-level key. A `Ref` to
+the `AWS::Region` pseudo parameter works the same way, for the per-region maps that `Fn::FindInMap`
+is most often used for, and a nested `Fn::FindInMap` can supply any of the three arguments.
+
+The value a lookup returns does not have to be a string. A list value is returned as a list.
+
+`Fn::FindInMap` is resolved when the template is read, before any resource is created, so it can be
+used in resource properties and in `Outputs`. A map name or key that is not in `Mappings` fails the
+deployment with an error naming the path that could not be found.
+
 ## Resource dependencies
 
 Resources can depend on each other explicitly with `DependsOn`.
@@ -1100,7 +1162,8 @@ Sim CloudFormation currently supports:
 - `deployTemplateFile(...)` for synthesized JSON template files
 - Template `Parameters` with supplied values and defaults
 - Template `Outputs`, resolved after resource creation and read from `stack.outputs`
-- The `Ref`, `Fn::GetAtt`, `Fn::Join` and `Fn::Sub` intrinsic functions
+- Template `Mappings`, read with `Fn::FindInMap`
+- The `Ref`, `Fn::GetAtt`, `Fn::Join`, `Fn::Sub` and `Fn::FindInMap` intrinsic functions
 - Explicit resource dependencies with `DependsOn`
 - Implicit dependencies from resource `Ref` expressions
 
@@ -1137,4 +1200,11 @@ Each service's own docs describe what its resource types support.
   have given.
 - Unsupported resource properties may be ignored or rejected depending on the resource simulator.
 - Stack updates and deletes are not supported.
-- Mappings, conditions, and many advanced CloudFormation features are not supported.
+- `Fn::FindInMap` accepts only the three-argument form. The four-argument form, where the fourth
+  argument is `{ "DefaultValue": ... }`, is rejected.
+- `Fn::FindInMap` arguments are resolved from literals, `Parameters` and pseudo parameters. An
+  argument that depends on a created resource, such as a `Ref` to a resource logical ID, fails the
+  resource with a "could not find map" error rather than being resolved. Real CloudFormation allows
+  only `Ref` and a nested `Fn::FindInMap` inside `Fn::FindInMap`, so this only affects templates real
+  CloudFormation would reject as well, but the simulator does not reject them up front.
+- Conditions and many advanced CloudFormation features are not supported.
