@@ -39,7 +39,8 @@ export class SimLambdaStreamCheckpoint {
    * A batch that failed whole is read again from where it was. One the function
    * reported failing partway through moves the checkpoint to the record it
    * named, so that record and everything after it goes over again, including
-   * the records before it in the batch that the function did handle.
+   * the records after it that the function did handle. The records before it
+   * are finished with.
    */
   retry(outcome: SimLambdaStreamBatchOutcome): void {
     this.#position = outcome.retryPosition(this.#position);
