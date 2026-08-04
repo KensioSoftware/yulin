@@ -9,6 +9,7 @@ import type {
   SimLambdaEventSourceStreamPosition,
 } from "../stream/sim-lambda-event-source-streams.js";
 import { SimLambdaEventSourcePollSchedule } from "./sim-lambda-event-source-poll-schedule.js";
+import type { SimLambdaStreamBatchOutcome } from "./sim-lambda-stream-batch-outcome.js";
 import { SimLambdaStreamCheckpoint } from "./sim-lambda-stream-checkpoint.js";
 import { SimLambdaStreamRetryBackoff } from "./sim-lambda-stream-retry-backoff.js";
 
@@ -24,8 +25,10 @@ interface SimLambdaStreamProgressProperties {
  * The two belong together because they are the same decision. A batch the
  * function took moves the checkpoint and the mapping reads on; a batch it threw
  * on leaves the checkpoint where it is and the mapping tries the same records
- * again after a wait. Nothing behind a failing batch is read until it is
- * through, which is what it means for a stream mapping to block its shard.
+ * again after a wait; a batch it reported failing partway through moves the
+ * checkpoint back to the record it named. Nothing behind a failing batch is
+ * read until it is through, which is what it means for a stream mapping to
+ * block its shard.
  */
 export class SimLambdaStreamProgress {
   private readonly checkpoint: SimLambdaStreamCheckpoint;
@@ -71,14 +74,17 @@ export class SimLambdaStreamProgress {
   /**
    * Take what became of a batch: move past it, or wait and try it again.
    */
-  after(handled: boolean, batch: SimLambdaEventSourceStreamBatch): void {
-    if (handled) {
+  after(
+    outcome: SimLambdaStreamBatchOutcome,
+    batch: SimLambdaEventSourceStreamBatch,
+  ): void {
+    if (outcome.isHandled) {
       this.handled(batch);
 
       return;
     }
 
-    this.failed(batch);
+    this.failed(outcome, batch);
   }
 
   /**
@@ -99,14 +105,23 @@ export class SimLambdaStreamProgress {
    * Giving up discards the records and carries on with the stream, which is
    * what AWS does when a stream mapping's error handling runs out. Parking the
    * shard instead would be a simulator invention.
+   *
+   * A report naming a record moves the checkpoint before the wait, so what goes
+   * over again is the batch from that record on. The attempts are still counted
+   * against the same limit: a batch that keeps failing partway through has as
+   * many tries as one that keeps failing whole.
    */
-  failed(batch: SimLambdaEventSourceStreamBatch): void {
+  failed(
+    outcome: SimLambdaStreamBatchOutcome,
+    batch: SimLambdaEventSourceStreamBatch,
+  ): void {
     if (this.backoff.isExhausted) {
       this.handled(batch);
 
       return;
     }
 
+    this.checkpoint.retry(outcome);
     this.schedule.afterSeconds(this.backoff.nextSeconds());
   }
 }

@@ -325,6 +325,16 @@ last read handed back) alongside the retry backoff and the poll schedule, becaus
 decision. A batch the function took moves the checkpoint and the mapping reads on. A batch it threw
 on leaves the checkpoint where it is, so the same records are read again and nothing behind them is
 delivered until they are through: that is a stream mapping blocking its shard.
+
+`SimLambdaStreamBatchResponse` is what a report from the function does to that checkpoint, and it is
+a sibling of `SimLambdaSqsBatchResponse` rather than a reuse of it. A queue partitions the batch,
+because each message is deleted or returned on its own. A stream holds one place, so the answer is
+one place: `SimLambdaStreamBatchOutcome` is either the batch finished with or the sequence number to
+go back to, which is the lowest one the report named. Everything from there is delivered again,
+including the records after it that the function handled. Partitioning a stream batch the way a
+queue batch is partitioned would checkpoint past records the function never reached and lose them
+with no error. Reading the report itself is shared with the queue in `SimLambdaBatchItemFailures`,
+and so is the defence that a report naming something outside the batch fails the whole batch.
 `SimLambdaStreamRetryBackoff` is why the wait is strictly positive and why the attempts are counted.
 A retry scheduled at the instant the clock already reads falls due inside every interval
 `advanceBy` walks, so a handler that always throws would never let it return, and both that trap and
@@ -347,8 +357,12 @@ it makes and however it makes them, and are refused with `SimLambdaStreamCascade
 delivery is over rather than left to spin.
 
 `SimDynamoDbEventSourceStreams` implements the port over the DynamoDB Streams commands, as the
-execution role, and `SimDynamoDbEventSourceStreamShard` is the part that finds the table and the
-shard and reads records off it. The port is SDK-shaped for the same reason the Streams API exists at
+execution role. `SimDynamoDbEventSourceStreamShard` is the part that finds the table and the shard,
+including the shard iterator a place is read from, and `SimDynamoDbEventSourceStreamReader` reads
+the records. `sim-dynamodb-event-source-stream-positions.ts` translates between the places a mapping
+holds and what `GetShardIterator` is asked for: a mapping sent back by a failure report asks with
+`AT_SEQUENCE_NUMBER`, since the record it named is one the function is to be given again rather than
+one it is finished with. The port is SDK-shaped for the same reason the Streams API exists at
 all: a bespoke read interface would be `GetRecords` under another name, and would not authorize.
 The `SimLambdaEventSourceStreamService` and `SimLambdaEventSourceStreamActivity` interfaces are
 declared here and satisfied structurally by `SimDynamoDb`, so neither service imports the other.

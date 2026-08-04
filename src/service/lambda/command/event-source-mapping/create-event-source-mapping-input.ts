@@ -78,7 +78,7 @@ export class SimLambdaEventSourceMappingInput {
         startingPositionTimestamp: input.StartingPositionTimestamp,
       }),
       enabled: input.Enabled ?? true,
-      functionResponseTypes: functionResponseTypesIn(input, eventSourceArn),
+      functionResponseTypes: functionResponseTypesIn(input),
     });
   }
 }

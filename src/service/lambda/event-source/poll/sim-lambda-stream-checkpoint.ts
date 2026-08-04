@@ -1,5 +1,6 @@
 import type { SimLambdaEventSourceStartingPosition } from "../sim-lambda-event-source-starting-position.js";
 import type { SimLambdaEventSourceStreamPosition } from "../stream/sim-lambda-event-source-streams.js";
+import type { SimLambdaStreamBatchOutcome } from "./sim-lambda-stream-batch-outcome.js";
 
 /**
  * How far along its stream one mapping has got.
@@ -30,5 +31,18 @@ export class SimLambdaStreamCheckpoint {
    */
   advanceTo(position: SimLambdaEventSourceStreamPosition): void {
     this.#position = position;
+  }
+
+  /**
+   * Take a batch the function did not finish.
+   *
+   * A batch that failed whole is read again from where it was. One the function
+   * reported failing partway through moves the checkpoint to the record it
+   * named, so that record and everything after it goes over again, including
+   * the records after it that the function did handle. The records before it
+   * are finished with.
+   */
+  retry(outcome: SimLambdaStreamBatchOutcome): void {
+    this.#position = outcome.retryPosition(this.#position);
   }
 }

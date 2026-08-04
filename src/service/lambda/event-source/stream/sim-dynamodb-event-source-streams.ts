@@ -1,3 +1,4 @@
+import { SimDynamoDbEventSourceStreamReader } from "./sim-dynamodb-event-source-stream-reader.js";
 import { SimDynamoDbEventSourceStreamShard } from "./sim-dynamodb-event-source-stream-shard.js";
 import type {
   SimLambdaEventSourceStreamActivity,
@@ -27,12 +28,18 @@ interface SimDynamoDbEventSourceStreamsProperties {
 export class SimDynamoDbEventSourceStreams implements SimLambdaEventSourceStreams {
   private readonly activity: SimLambdaEventSourceStreamActivity;
   private readonly shard: SimDynamoDbEventSourceStreamShard;
+  private readonly reader: SimDynamoDbEventSourceStreamReader;
 
   constructor(properties: SimDynamoDbEventSourceStreamsProperties) {
     const { dynamoDb } = properties;
+    const commands = dynamoDb.streams();
 
     this.activity = dynamoDb.streamActivity();
-    this.shard = new SimDynamoDbEventSourceStreamShard(dynamoDb.streams());
+    this.shard = new SimDynamoDbEventSourceStreamShard(commands);
+    this.reader = new SimDynamoDbEventSourceStreamReader({
+      commands,
+      shard: this.shard,
+    });
   }
 
   /**
@@ -52,7 +59,7 @@ export class SimDynamoDbEventSourceStreams implements SimLambdaEventSourceStream
   async read(
     request: SimLambdaEventSourceStreamReadRequest,
   ): Promise<SimLambdaEventSourceStreamBatch> {
-    return await this.shard.read(request);
+    return await this.reader.read(request);
   }
 
   /**
@@ -68,9 +75,4 @@ export class SimDynamoDbEventSourceStreams implements SimLambdaEventSourceStream
   unwatch(streamArn: string, watcher: SimLambdaEventSourceStreamWatcher): void {
     this.activity.unwatch(streamArn, watcher);
   }
-
-  /**
-   * The iterator a read starts from, asking the stream for one when the
-   * mapping has only the starting position it was created with.
-   */
 }

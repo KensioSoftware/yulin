@@ -137,6 +137,7 @@ interface StreamEventSourceOptions {
   readonly handlerResult?: (event: SimLambdaDynamoDbStreamEvent) => unknown;
   readonly batchSize?: number;
   readonly startingPosition?: EventSourcePosition;
+  readonly functionResponseTypes?: readonly "ReportBatchItemFailures"[];
 }
 
 /**
@@ -167,6 +168,9 @@ export async function simAwsWithStreamEventSource(
       FunctionName: functionName,
       StartingPosition: options.startingPosition ?? "TRIM_HORIZON",
       ...(options.batchSize !== undefined && { BatchSize: options.batchSize }),
+      ...(options.functionResponseTypes !== undefined && {
+        FunctionResponseTypes: [...options.functionResponseTypes],
+      }),
     }),
   );
 

@@ -3,12 +3,11 @@ import type {
   SimLambdaEventSourceStreamCommands,
   SimLambdaEventSourceStreamDescription,
 } from "./sim-lambda-event-source-stream-service.js";
-import type { SimLambdaEventSourceStartingPosition } from "../sim-lambda-event-source-starting-position.js";
-import type {
-  SimLambdaEventSourceStreamBatch,
-  SimLambdaEventSourceStreamReadRequest,
-  SimLambdaEventSourceStreamRequest,
-} from "./sim-lambda-event-source-streams.js";
+import {
+  type SimLambdaEventSourceStreamNamedPosition,
+  simDynamoDbEventSourceIteratorTypeOf,
+} from "./sim-dynamodb-event-source-stream-positions.js";
+import type { SimLambdaEventSourceStreamRequest } from "./sim-lambda-event-source-streams.js";
 
 /**
  * What DescribeStream tells a poller about the stream it is about to read.
@@ -40,14 +39,14 @@ export class SimDynamoDbEventSourceStreamShard {
   }
 
   /**
-   * A place on the shard to start reading from.
+   * A place on the shard to read from.
    *
    * A simulated stream has one shard, so the first shard DescribeStream reports
    * is the shard.
    */
   async iteratorFor(
     request: SimLambdaEventSourceStreamRequest,
-    startingPosition: SimLambdaEventSourceStartingPosition,
+    position: SimLambdaEventSourceStreamNamedPosition,
   ): Promise<string> {
     const { caller, streamArn } = request;
     const description = await this.describe(request);
@@ -62,7 +61,7 @@ export class SimDynamoDbEventSourceStreamShard {
         input: {
           StreamArn: streamArn,
           ShardId: shardId,
-          ShardIteratorType: startingPosition,
+          ...simDynamoDbEventSourceIteratorTypeOf(position),
         },
       },
       { caller },
@@ -73,52 +72,6 @@ export class SimDynamoDbEventSourceStreamShard {
     }
 
     return iterator.ShardIterator;
-  }
-
-  /**
-   * Read up to a batch of records from where a position left off.
-   *
-   * The iterator the read hands back is the place to carry on from, and a
-   * caller that does not take it reads the same records again. That is what
-   * makes a failed batch retry from where it was rather than being skipped.
-   */
-  async read(
-    request: SimLambdaEventSourceStreamReadRequest,
-  ): Promise<SimLambdaEventSourceStreamBatch> {
-    const { batchSize, caller, position } = request;
-    const shardIterator = await this.iteratorOf(request);
-    const output = await this.commands.getRecords(
-      { input: { ShardIterator: shardIterator, Limit: batchSize } },
-      { caller },
-    );
-    const next = output.NextShardIterator;
-
-    return {
-      records: output.Records ?? [],
-      // A shard with no next iterator is finished with, so there is nowhere to
-      // carry on from and the position handed in stands.
-      next:
-        next === undefined
-          ? position
-          : { kind: "iterator", shardIterator: next },
-      drained: next === undefined,
-    };
-  }
-
-  /**
-   * The place a read starts from: the one the caller already has, or a new one
-   * for a mapping that has only its starting position.
-   */
-  private async iteratorOf(
-    request: SimLambdaEventSourceStreamReadRequest,
-  ): Promise<string> {
-    const { position } = request;
-
-    if (position.kind === "iterator") {
-      return position.shardIterator;
-    }
-
-    return await this.iteratorFor(request, position.startingPosition);
   }
 
   private async describe(
