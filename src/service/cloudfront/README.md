@@ -88,7 +88,9 @@ HTTP request behaviour is split across a few directories:
 - `router/` resolves an incoming `Request` to a simulated Distribution by CloudFront hostname or
   alternate domain name.
 - `resolver/` chooses the matching Cache Behavior for a request path.
-- `origin/` adapts CloudFront Origin requests/responses, including S3 Origins.
+- `origin/` adapts CloudFront Origin requests/responses. `origin/s3/` reaches a sim S3 Bucket
+  directly, while `origin/custom/` turns the Origin request back into an HTTP request and sends it
+  into the wider simulated environment.
 
 When a sim AWS is served on localhost, CloudFront requests are routed through this layer to find the
 right sim Distribution, Origin and Behavior.
@@ -117,6 +119,11 @@ The key integration points are:
   information across the broader simulated AWS instance.
 - S3 Origin resolution, which lets CloudFront Distributions fetch from simulated S3 buckets and S3
   website Origins.
+- `SimCfCustomOriginDispatcher`, which resolves a custom Origin domain through simulated Route53 and
+  serves the request over the same in-process HTTP entry point as a request arriving on localhost.
+  CloudFront therefore needs no per-service knowledge: an HTTP API endpoint, a Lambda Function URL
+  and a hosted-zone record pointing at either all reach their service the same way. A standalone
+  `SimCloudFront` has no dispatcher, and refuses a custom Origin rather than reaching the network.
 - `SimAcmRegistry`, which resolves the ACM Certificate a Distribution's viewer certificate ARN
   names, wherever in the simulated AWS instance it lives.
 

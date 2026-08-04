@@ -13,6 +13,7 @@ import {
   emptyCloudFrontS3OriginResolver,
   type SimCloudFrontS3OriginResolver,
 } from "./origin/s3/sim-cloudfront-s3-origin.js";
+import type { SimCfCustomOriginDispatcher } from "./origin/custom/sim-cf-custom-origin-dispatcher.js";
 import {
   type BackgroundScheduler,
   BackgroundTasks,
@@ -53,6 +54,7 @@ interface SimCloudFrontProperties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
   readonly cloudFrontRegistry?: SimCloudFrontRegistry;
   readonly s3OriginResolver?: SimCloudFrontS3OriginResolver;
+  readonly customOriginDispatcher?: SimCfCustomOriginDispatcher | undefined;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly acmRegistry?: SimAcmRegistry | undefined;
   readonly background?: BackgroundScheduler;
@@ -74,6 +76,8 @@ export class SimCloudFront {
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly cloudFrontRegistry: SimCloudFrontRegistry;
   private readonly s3OriginResolver: SimCloudFrontS3OriginResolver;
+  private readonly customOriginDispatcher:
+    SimCfCustomOriginDispatcher | undefined;
   private readonly iam: SimIamInterServiceAuthZ;
   private readonly acmRegistry: SimAcmRegistry | undefined;
   private readonly background: BackgroundScheduler;
@@ -87,6 +91,7 @@ export class SimCloudFront {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       cloudFrontRegistry = new SimCloudFrontRegistry(),
       s3OriginResolver = emptyCloudFrontS3OriginResolver,
+      customOriginDispatcher,
       iam = new SimIamAllowAllAuth(),
       acmRegistry,
       background = new BackgroundTasks(),
@@ -95,6 +100,7 @@ export class SimCloudFront {
     this.accountRegionScope = accountRegionScope;
     this.cloudFrontRegistry = cloudFrontRegistry;
     this.s3OriginResolver = s3OriginResolver;
+    this.customOriginDispatcher = customOriginDispatcher;
     this.iam = iam;
     this.acmRegistry = acmRegistry;
     this.background = background;
@@ -133,6 +139,7 @@ export class SimCloudFront {
       distributions: this.distributions,
       cloudFrontRegistry: this.cloudFrontRegistry,
       s3OriginResolver: this.s3OriginResolver,
+      customOriginDispatcher: this.customOriginDispatcher,
       iam: this.iam,
       acmRegistry: this.acmRegistry,
       background: this.background,

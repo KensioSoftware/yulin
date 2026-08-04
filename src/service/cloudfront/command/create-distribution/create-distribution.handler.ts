@@ -11,6 +11,7 @@ import {
 import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type { SimCloudFrontS3OriginResolver } from "../../origin/s3/sim-cloudfront-s3-origin.js";
+import type { SimCfCustomOriginDispatcher } from "../../origin/custom/sim-cf-custom-origin-dispatcher.js";
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import { SimCloudFrontOriginConfigurator } from "../../distribution/configurator/sim-cloud-front-origin-configurator.js";
 import { SimCloudFrontBehaviorConfigurator } from "../../distribution/configurator/sim-cloud-front-behavior-configurator.js";
@@ -33,6 +34,7 @@ interface CreateDistributionCommandHandlerProperties {
   >;
   readonly cloudFrontRegistry: SimCloudFrontRegistry;
   readonly s3OriginResolver: SimCloudFrontS3OriginResolver;
+  readonly customOriginDispatcher?: SimCfCustomOriginDispatcher | undefined;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly acmRegistry?: SimAcmRegistry | undefined;
   readonly background: BackgroundScheduler;
@@ -67,7 +69,10 @@ export class CreateDistributionCommandHandler implements CommandHandler<
     this.distributions = properties.distributions;
     this.cloudFrontRegistry = properties.cloudFrontRegistry;
     this.distributionConfigurator = new SimCloudFrontDistributionConfigurator(
-      new SimCloudFrontOriginConfigurator(properties.s3OriginResolver),
+      new SimCloudFrontOriginConfigurator(
+        properties.s3OriginResolver,
+        properties.customOriginDispatcher,
+      ),
       new SimCloudFrontBehaviorConfigurator(),
     );
     this.authorizer = new CreateDistributionAuthorizer({

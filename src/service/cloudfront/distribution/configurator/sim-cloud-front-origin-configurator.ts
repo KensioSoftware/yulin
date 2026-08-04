@@ -5,13 +5,23 @@ import {
   SimCloudFrontS3Origin,
   type SimCloudFrontS3OriginResolver,
 } from "../../origin/s3/sim-cloudfront-s3-origin.js";
+import type { SimCfCustomOriginDispatcher } from "../../origin/custom/sim-cf-custom-origin-dispatcher.js";
+import { SimCloudFrontCustomOrigin } from "../../origin/custom/sim-cloudfront-custom-origin.js";
 
 /**
  * Applies Origin configuration to a sim CloudFront Distribution.
+ *
+ * An Origin is an S3 Origin or a custom Origin, as it is in CloudFront, and
+ * which one it is decides how the simulator reaches it. A custom Origin domain
+ * is not resolved here, because a Distribution and the service behind its
+ * Origin are routinely created in either order, and a CloudFormation template
+ * says nothing about which comes first. Resolution happens when a request is
+ * served, by which time both exist.
  */
 export class SimCloudFrontOriginConfigurator {
   constructor(
     private readonly s3OriginResolver: SimCloudFrontS3OriginResolver,
+    private readonly customOriginDispatcher?: SimCfCustomOriginDispatcher,
   ) {}
 
   /**
@@ -35,6 +45,24 @@ export class SimCloudFrontOriginConfigurator {
       distribution.addOrigin(
         origin.Id,
         new SimCloudFrontS3Origin({ bucket, originPath: origin.OriginPath }),
+      );
+      return;
+    }
+
+    if (origin.CustomOriginConfig !== undefined) {
+      assertDefined(
+        this.customOriginDispatcher,
+        `Simulated AWS environment for sim CloudFront custom Origin ${origin.Id}, which a standalone SimCloudFront has no way to reach`,
+      );
+
+      distribution.addOrigin(
+        origin.Id,
+        new SimCloudFrontCustomOrigin({
+          originId: origin.Id,
+          domainName: origin.DomainName,
+          originPath: origin.OriginPath,
+          dispatcher: this.customOriginDispatcher,
+        }),
       );
       return;
     }

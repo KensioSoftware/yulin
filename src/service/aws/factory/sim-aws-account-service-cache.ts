@@ -7,6 +7,7 @@ import type { SimAws } from "../sim-aws.js";
 import type { SimAcmRegistry } from "../../acm/registry/sim-acm-registry.js";
 import type { SimCloudFrontRegistry } from "../../cloudfront/registry/sim-cloud-front-registry.js";
 import { makeSimCfS3OriginResolver } from "../../cloudfront/origin/s3/sim-cf-s3-origin-resolver-factory.js";
+import { makeSimCfCustomOriginDispatcher } from "../../cloudfront/origin/custom/sim-cf-custom-origin-dispatcher.factory.js";
 import { SimCloudFront } from "../../cloudfront/sim-cloudfront.js";
 import { SimRoute53 } from "../../route53/index.js";
 import type { SimRoute53Registry } from "../../route53/registry/sim-route53-registry.js";
@@ -92,6 +93,7 @@ export class SimAwsAccountServiceCache {
           accountRegionScope: scope.accountRegionScope,
           cloudFrontRegistry: this.cloudFrontRegistry,
           s3OriginResolver: makeSimCfS3OriginResolver(this.simAws, scope),
+          customOriginDispatcher: makeSimCfCustomOriginDispatcher(this.simAws),
           iam,
           acmRegistry: this.acmRegistry,
           background: this.background,

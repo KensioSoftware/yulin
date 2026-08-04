@@ -140,6 +140,174 @@ try {
 The Distribution domain is adapted through `server.localUrl(...)` so that the request is sent to the
 local Yulin server while preserving the simulated CloudFront hostname.
 
+## Custom Origins
+
+An Origin with a `CustomOriginConfig` is one CloudFront reaches over HTTP rather than as an S3
+Bucket. Sim CloudFront resolves its `DomainName` in the simulated environment and serves the request
+in process, so a Distribution can front a simulated HTTP API endpoint
+(`<api-id>.execute-api.<region>.amazonaws.com`), a simulated Lambda Function URL
+(`<url-id>.lambda-url.<region>.on.aws`), or anything a simulated Route53 record points at one of
+those.
+
+That covers the common arrangement of one Distribution serving static assets from a Bucket and
+sending `/api/*` to an API:
+
+```typescript sim-cloudfront-distribution-custom-origin
+/**
+ * A simulated CloudFront Distribution fronting a simulated HTTP API.
+ */
+
+import {
+  CreateApiCommand,
+  CreateIntegrationCommand,
+  CreateRouteCommand,
+  CreateStageCommand,
+} from "@aws-sdk/client-apigatewayv2";
+import { CreateDistributionCommand } from "@aws-sdk/client-cloudfront";
+import {
+  AddPermissionCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-lambda";
+import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+
+// A Bucket holding the site.
+await simAws.s3().createBucket(new CreateBucketCommand({ Bucket: "site" }));
+await simAws.s3().putObject(
+  new PutObjectCommand({
+    Bucket: "site",
+    Key: "index.html",
+    Body: "<h1>Site</h1>",
+  }),
+);
+
+// An HTTP API serving /api/things from a function.
+const { FunctionArn } = await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "things",
+    Role: "arn:aws:iam::111111111111:role/ThingsRole",
+    Code: { ZipFile: makeLambdaZipFileInput(() => ({ things: ["kettle"] })) },
+  }),
+);
+
+const apiGateway = simAws.apiGatewayV2();
+
+const { ApiId, ApiEndpoint } = await apiGateway.createApi(
+  new CreateApiCommand({ Name: "things", ProtocolType: "HTTP" }),
+);
+
+const { IntegrationId } = await apiGateway.createIntegration(
+  new CreateIntegrationCommand({
+    ApiId,
+    IntegrationType: "AWS_PROXY",
+    IntegrationUri: FunctionArn,
+    PayloadFormatVersion: "2.0",
+  }),
+);
+
+await apiGateway.createRoute(
+  new CreateRouteCommand({
+    ApiId,
+    RouteKey: "GET /api/things",
+    Target: `integrations/${IntegrationId}`,
+  }),
+);
+
+await apiGateway.createStage(
+  new CreateStageCommand({ ApiId, StageName: "$default", AutoDeploy: true }),
+);
+
+await simAws.lambda().addPermission(
+  new AddPermissionCommand({
+    FunctionName: "things",
+    StatementId: "api-gateway-invoke",
+    Action: "lambda:InvokeFunction",
+    Principal: "apigateway.amazonaws.com",
+    SourceArn: `arn:aws:execute-api:us-east-1:888888888888:${ApiId}/*/*`,
+  }),
+);
+
+// One Distribution serving the site, with /api/* going to the API.
+const distributionCreation = await simAws.cloudFront().createDistribution(
+  new CreateDistributionCommand({
+    DistributionConfig: {
+      CallerReference: "site-and-api",
+      Comment: "Site and API CDN",
+      Enabled: true,
+      Origins: {
+        Quantity: 2,
+        Items: [
+          {
+            Id: "site-origin",
+            DomainName: "site.s3.amazonaws.com",
+            S3OriginConfig: { OriginAccessIdentity: "" },
+          },
+          {
+            Id: "api-origin",
+            DomainName: new URL(ApiEndpoint).hostname,
+            CustomOriginConfig: {
+              HTTPPort: 80,
+              HTTPSPort: 443,
+              OriginProtocolPolicy: "https-only",
+            },
+          },
+        ],
+      },
+      DefaultCacheBehavior: {
+        TargetOriginId: "site-origin",
+        ViewerProtocolPolicy: "allow-all",
+      },
+      CacheBehaviors: {
+        Quantity: 1,
+        Items: [
+          {
+            PathPattern: "/api/*",
+            TargetOriginId: "api-origin",
+            ViewerProtocolPolicy: "allow-all",
+          },
+        ],
+      },
+    },
+  }),
+);
+
+const distroHostname = distributionCreation.Distribution!.DomainName!;
+const srv = await serveSimAws({ simAws });
+
+try {
+  const page = await fetch(srv.localUrl(`http://${distroHostname}/index.html`));
+  const things = await fetch(
+    srv.localUrl(`http://${distroHostname}/api/things`),
+  );
+
+  console.log(await page.text());
+  console.log(await things.text());
+} finally {
+  srv.close();
+}
+```
+
+The Origin domain is resolved when a request is served rather than when the Distribution is created,
+so the Distribution and the service behind its Origin can be created in either order, whichever way
+round a CloudFormation template happens to declare them.
+
+`OriginPath` is prefixed to the request path, as it is for an S3 Origin, so an Origin path of `/v1`
+sends a request for `/things` on to `/v1/things`.
+
+A few things follow from the request never leaving the process:
+
+- A domain that names nothing in the simulation fails with an error naming the Origin and the
+  domain, rather than a real request being made to it. External HTTP Origins are not supported.
+- The settings inside `CustomOriginConfig` describe how CloudFront connects over the network, so
+  the protocol policy, ports, SSL protocols and timeouts are accepted and ignored.
+- The Origin is reached anonymously, as CloudFront reaches an Origin with no Origin Access Control.
+  A Function URL or an HTTP API route authorizing with `AWS_IAM` therefore refuses the request.
+
 ## Viewer certificates
 
 A Distribution with alternate domain names needs an ACM certificate, and CloudFront accepts only
@@ -392,6 +560,7 @@ Sim CloudFront currently supports:
 
 - `CreateDistributionCommand` and `GetDistributionCommand`
 - S3 Origins backed by sim S3 Buckets
+- Custom Origins reaching sim HTTP APIs and sim Lambda Function URLs in process
 - CloudFront Distribution hostnames such as `distro123.cloudfront.net`
 - Default cache Behavior and path-based cache Behaviors
 - `viewer-request` and `viewer-response` CloudFront Functions

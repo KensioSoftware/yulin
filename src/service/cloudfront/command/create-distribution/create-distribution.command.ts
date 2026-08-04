@@ -82,12 +82,19 @@ export interface SimCloudFrontViewerCertificate {
 
 /**
  * Minimal structural sim CloudFront Origin config.
+ *
+ * An Origin is an S3 Origin or a custom Origin, as it is in CloudFront, and
+ * which one it is decides how the simulator reaches it. The settings inside
+ * `CustomOriginConfig` describe how CloudFront connects to the Origin over the
+ * network, which an in-process fetch has no use for, so they are accepted and
+ * ignored.
  */
 export interface SimCloudFrontOriginConfig {
   readonly Id?: string | undefined;
   readonly DomainName?: string | undefined;
   readonly OriginPath?: string | undefined;
   readonly S3OriginConfig?: object | undefined;
+  readonly CustomOriginConfig?: object | undefined;
 }
 
 /**
