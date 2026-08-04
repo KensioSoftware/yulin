@@ -18,6 +18,7 @@ describe("SimRekognitionSdkCommandRouter", () => {
     assertArrayIncludesAll(names, [
       "DetectModerationLabelsCommand",
       "DetectLabelsCommand",
+      "DetectFacesCommand",
     ]);
   });
 
@@ -29,7 +30,7 @@ describe("SimRekognitionSdkCommandRouter", () => {
     const route = simAws
       .rekognition()
       .sdkCommandRouter()
-      .route("DetectFacesCommand");
+      .route("DetectTextCommand");
 
     // Then there is no route for it, so an intercepted client is told the
     // Command is unsupported rather than being answered with nothing.

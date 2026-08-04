@@ -1,8 +1,36 @@
 export { SimRekognition } from "./sim-rekognition.js";
 export type { SimRekognitionRequestOptions } from "./command/sim-rekognition-request-options.js";
+export { SimRekognitionFaces } from "./face/sim-rekognition-faces.js";
+export type {
+  SimRekognitionDeclaredAgeRange,
+  SimRekognitionDeclaredEmotion,
+  SimRekognitionDeclaredEyeDirection,
+  SimRekognitionDeclaredFace,
+  SimRekognitionDeclaredFaceFeature,
+  SimRekognitionDeclaredFaceQuality,
+  SimRekognitionDeclaredGender,
+  SimRekognitionDeclaredLandmarks,
+  SimRekognitionDeclaredPoint,
+  SimRekognitionDeclaredPose,
+  SimRekognitionFacesResult,
+} from "./face/sim-rekognition-face-declaration.js";
+export {
+  simRekognitionDefaultFaces,
+  simRekognitionNoFaces,
+  simRekognitionSeveralFaces,
+} from "./face/sim-rekognition-face-defaults.js";
+export {
+  simRekognitionEmotionNames,
+  type SimRekognitionEmotionName,
+} from "./face/sim-rekognition-emotion-name.js";
+export {
+  simRekognitionDefaultLandmarkNames,
+  simRekognitionLandmarkNames,
+  type SimRekognitionLandmarkName,
+} from "./face/sim-rekognition-landmark-name.js";
+export type { SimRekognitionDeclaredBoundingBox } from "./image/sim-rekognition-bounding-box.js";
 export { SimRekognitionLabels } from "./label/sim-rekognition-labels.js";
 export type {
-  SimRekognitionDeclaredBoundingBox,
   SimRekognitionDeclaredLabel,
   SimRekognitionDeclaredLabelInstance,
   SimRekognitionLabelDeclaration,
