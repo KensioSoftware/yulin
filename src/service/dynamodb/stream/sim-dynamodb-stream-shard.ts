@@ -36,6 +36,7 @@ export class SimDynamoDbStreamShard {
 
   private readonly written: SimDynamoDbStreamRecord[] = [];
   private open = true;
+  private trimmed: string | undefined;
 
   constructor(at: Date) {
     this.shardId = shardId(at);
@@ -56,10 +57,56 @@ export class SimDynamoDbStreamShard {
   }
 
   /**
+   * The sequence number of the last record trimmed off this shard, when the
+   * retention window has outlived one.
+   */
+  get trimmedThrough(): string | undefined {
+    return this.trimmed;
+  }
+
+  /**
+   * The sequence number of the oldest record still on this shard.
+   */
+  get startingSequenceNumber(): string | undefined {
+    return this.written.at(0)?.sequenceNumber;
+  }
+
+  /**
+   * The sequence number this shard ends at, which only a closed one has.
+   *
+   * An open shard has no ending sequence number, since the next record written
+   * would move it. That absence is how a reader tells a shard that is still
+   * taking changes from one it can finish with.
+   */
+  get endingSequenceNumber(): string | undefined {
+    return this.open ? undefined : this.written.at(-1)?.sequenceNumber;
+  }
+
+  /**
    * Write a record to this shard.
    */
   append(record: SimDynamoDbStreamRecord): void {
     this.written.push(record);
+  }
+
+  /**
+   * Drop the records written before an instant, remembering how far that got.
+   *
+   * The trim point is kept once the records themselves are gone, because it is
+   * the difference between a reader that asked for a position this shard never
+   * reached and one that asked for a position it has already dropped.
+   */
+  trim(before: Date): void {
+    let oldest = this.written.at(0);
+
+    while (
+      oldest !== undefined &&
+      oldest.approximateCreationDateTime.getTime() < before.getTime()
+    ) {
+      this.trimmed = oldest.sequenceNumber;
+      this.written.shift();
+      oldest = this.written.at(0);
+    }
   }
 
   /**

@@ -2576,8 +2576,129 @@ cancelled transaction, a delete of a key holding nothing, or a request the table
 the table takes its items with it rather than removing them one at a time, so nothing is captured
 for that either.
 
-Reading the records back is the DynamoDB Streams API, which is not simulated yet, so for now a
-stream is captured rather than consumed.
+## Reading a stream's records
+
+Reading the records back is the DynamoDB Streams API, which AWS puts behind a client of its own.
+`simAws.dynamoDbStreams()` is that API here, with `ListStreams`, `DescribeStream`,
+`GetShardIterator` and `GetRecords`.
+
+Reading a stream takes four calls the first time. `ListStreams` finds the stream ARN for a table,
+`DescribeStream` reports the shard, `GetShardIterator` says where on that shard to start, and
+`GetRecords` reads from there and hands back the iterator to carry on with.
+
+```typescript sim-dynamodb-stream-records
+/**
+ * Reading a table's captured changes back off its stream.
+ */
+
+import { CreateTableCommand, PutItemCommand } from "@aws-sdk/client-dynamodb";
+import {
+  DescribeStreamCommand,
+  GetRecordsCommand,
+  GetShardIteratorCommand,
+  ListStreamsCommand,
+} from "@aws-sdk/client-dynamodb-streams";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const dynamoDb = simAws.dynamoDb();
+const dynamoDbStreams = simAws.dynamoDbStreams();
+
+await dynamoDb.createTable(
+  new CreateTableCommand({
+    TableName: "OrdersTable",
+    KeySchema: [{ AttributeName: "orderId", KeyType: "HASH" }],
+    AttributeDefinitions: [{ AttributeName: "orderId", AttributeType: "S" }],
+    BillingMode: "PAY_PER_REQUEST",
+    StreamSpecification: {
+      StreamEnabled: true,
+      StreamViewType: "NEW_AND_OLD_IMAGES",
+    },
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+await dynamoDb.putItem(
+  new PutItemCommand({
+    TableName: "OrdersTable",
+    Item: { orderId: { S: "order-1" }, total: { N: "101" } },
+  }),
+);
+
+const listed = await dynamoDbStreams.listStreams(
+  new ListStreamsCommand({ TableName: "OrdersTable" }),
+);
+const streamArn = listed.Streams?.[0]?.StreamArn;
+
+const described = await dynamoDbStreams.describeStream(
+  new DescribeStreamCommand({ StreamArn: streamArn }),
+);
+const shardId = described.StreamDescription?.Shards?.[0]?.ShardId;
+
+console.log(described.StreamDescription?.StreamStatus); // "ENABLED"
+
+const iterator = await dynamoDbStreams.getShardIterator(
+  new GetShardIteratorCommand({
+    StreamArn: streamArn,
+    ShardId: shardId,
+    ShardIteratorType: "TRIM_HORIZON",
+  }),
+);
+
+const read = await dynamoDbStreams.getRecords(
+  new GetRecordsCommand({ ShardIterator: iterator.ShardIterator }),
+);
+
+console.log(read.Records?.[0]?.eventName); // "INSERT"
+console.log(read.Records?.[0]?.dynamodb?.NewImage?.["total"]?.N); // "101"
+
+// The iterator to poll with next, which is there while the stream is open.
+console.log(read.NextShardIterator !== undefined); // true
+```
+
+A record carries `eventID`, `eventName`, `eventSource`, `awsRegion` and a `dynamodb` body holding
+`Keys`, the images the view type selects, `SequenceNumber`, `SizeBytes` and
+`ApproximateCreationDateTime`. A time to live removal carries
+`userIdentity: { PrincipalId: "dynamodb.amazonaws.com", Type: "Service" }`. The Streams API
+capitalizes those two fields where the Lambda event carries the same values as `principalId` and
+`type`, so a consumer written against one shape does not read the other.
+
+### Where to start reading
+
+`ShardIteratorType` picks the place on the shard an iterator starts at.
+
+| `ShardIteratorType`     | Starts at                                |
+| ----------------------- | ---------------------------------------- |
+| `TRIM_HORIZON`          | the oldest record the stream still holds |
+| `LATEST`                | just after the newest record on it       |
+| `AT_SEQUENCE_NUMBER`    | the record the `SequenceNumber` names    |
+| `AFTER_SEQUENCE_NUMBER` | the record following the one it names    |
+
+`AT_SEQUENCE_NUMBER` and `AFTER_SEQUENCE_NUMBER` need a `SequenceNumber`, and the other two are
+refused if given one, since an iterator asking for both is saying two different things about where
+to start.
+
+### Polling with NextShardIterator
+
+`GetRecords` answers with the iterator to use for the next call. Reading a stream to the end and
+polling it is the same loop either way: pass each `NextShardIterator` to the following `GetRecords`.
+
+An empty `Records` array alongside a `NextShardIterator` is the ordinary answer for a reader that
+has caught up, and means to look again rather than that anything is wrong. `NextShardIterator` is
+absent only when the shard is closed and the reader has reached the end of it, which happens once
+the table has switched the stream off and everything on it has been read.
+
+### The 24 hour retention window
+
+A stream keeps its records for 24 hours on the simulated clock, and the trim is applied when the
+stream is read. Reading from a position the stream no longer holds raises a
+`TrimmedDataAccessException`, whether the sequence number was named in a `GetShardIterator` call or
+carried in an iterator that was still good when it was handed out. `TRIM_HORIZON` never raises it:
+it means the oldest record still there, whatever has gone.
+
+A stream stays listable and readable after its table switches it off, and after everything on it has
+been trimmed. A trimmed stream reads as empty rather than as missing.
 
 ## Numbers
 
@@ -3111,11 +3232,16 @@ nothing is written.
   record with the images its `StreamViewType` selects, a time to live expiry carrying a `Service`
   `userIdentity`, and `StreamSpecification`, `LatestStreamArn` and `LatestStreamLabel` reported by
   `DescribeTable`.
+- The DynamoDB Streams API through `simAws.dynamoDbStreams()`, with `ListStreams`, `DescribeStream`,
+  `GetShardIterator` and `GetRecords`, all four shard iterator types, a `NextShardIterator` that is
+  absent only for a closed and drained shard, and the 24 hour retention window with
+  `TrimmedDataAccessException` past the trim point.
 - `AWS::DynamoDB::Table` in CloudFormation, created through `CreateTable`, with `Ref` giving the
   table name, `Fn::GetAtt … Arn` the table ARN, `TimeToLiveSpecification` deploying a table that
   expires items, `Tags` deploying a tagged table, and `GlobalSecondaryIndexes` and
   `LocalSecondaryIndexes` deploying a table whose indexes are then queried and scanned.
-- SDK interception, so an intercepted `DynamoDBClient` reaches the simulation.
+- SDK interception, so an intercepted `DynamoDBClient` or `DynamoDBStreamsClient` reaches the
+  simulation.
 - The `@aws-sdk/lib-dynamodb` document client, with `PutCommand`, `GetCommand`, `DeleteCommand`,
   `UpdateCommand`, `BatchWriteCommand` and `BatchGetCommand` converting native JavaScript values on
   the way in and out.
@@ -3199,13 +3325,20 @@ nothing is written.
   elapsing. An item whose window goes by while a running-mode clock tracks the host stays where it
   is until something moves the clock. A simulated DynamoDB constructed standalone as
   `new SimDynamoDb()` has no clock control at all, so nothing there ever expires.
-- A stream's records cannot be read back. `ListStreams`, `DescribeStream`, `GetShardIterator` and
-  `GetRecords` are not simulated yet, so a table with a `StreamSpecification` captures its changes
-  and nothing can consume them. Nor can a Lambda event source mapping read one.
+- A Lambda event source mapping cannot read a stream yet. A test polls one with `GetRecords` itself.
 - A `StreamSpecification` in a CloudFormation template still skips the table, so a streamed table
   has to be created through `CreateTable`.
-- Records are kept for as long as the simulation runs. Real DynamoDB trims a stream at 24 hours,
-  which arrives with the read path.
+- A shard iterator never expires. Real DynamoDB gives one 15 minutes and then answers
+  `ExpiredIteratorException`, which a consumer handles by asking for another from the sequence
+  number it last checkpointed. Nothing here refuses an iterator for being old.
+- `DescribeStream` takes `Limit` and `ExclusiveStartShardId` and neither changes the answer, since a
+  simulated stream has one shard and a page of shards is always all of them. `ShardFilter` is
+  refused by name rather than ignored, since there is no shard lineage for it to walk.
+- A stream is never dropped once everything on it has been trimmed. Real DynamoDB eventually stops
+  listing a disabled stream whose records have all aged out, where the ARN a test is holding goes on
+  resolving here and reads as empty.
+- The two readers per shard throughput limit and the `DescribeStream` rate limit are not applied.
+  Both are throughput protections a single-process simulation cannot produce honestly.
 - The five year time to live eligibility rule counts 1825 days rather than five calendar years, so
   an item whose timestamp sits within a couple of days of the boundary may be treated differently
   here to how AWS treats it.

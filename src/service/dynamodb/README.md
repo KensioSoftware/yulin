@@ -55,6 +55,8 @@ Current command areas include:
 - `transact/` (TransactWriteItems and TransactGetItems)
 - `tag/` (TagResource, UntagResource and ListTagsOfResource)
 - `time-to-live/` (UpdateTimeToLive and DescribeTimeToLive)
+- `stream/` (the DynamoDB Streams API: ListStreams, DescribeStream, GetShardIterator and GetRecords,
+  one directory per operation)
 
 The `@aws-sdk/lib-dynamodb` document client's Commands are handled under `document/` rather than
 here, since they are the same operations with a conversion around them.
@@ -1115,6 +1117,53 @@ state rather than request handling.
 - `SimDynamoDbStreamActivity` is the twin of `SimSqsQueueActivity`: it is how a consumer that cannot
   poll continuously finds out there is something to read. There is no instant on the notification,
   unlike the queue's, because a stream record is readable the moment it is written.
+
+The read path is the other half of `stream/`, and none of it is state:
+
+- `SimDynamoDbStreamPosition` is where a reader is on a shard: the start of it, at a sequence
+  number, or after one. The four shard iterator types come down to those three, and a position is a
+  place rather than an index so it survives the shard being trimmed underneath it.
+- `simDynamoDbShardIteratorToken` and `readSimDynamoDbShardIteratorToken` encode a stream ARN, a
+  shard identifier and a position into the opaque string a caller passes back. Nothing remembers an
+  iterator, which is also why there is no 15 minute expiry: an iterator is a value rather than a
+  handle. That is under Limitations.
+- `simDynamoDbStreamRead` is one `GetRecords` against a shard, and `drained` is what
+  `NextShardIterator` being absent means. An open shard is never drained however empty it is.
+- `simDynamoDbStreamTrimPoint` and `SimDynamoDbStreamShard.trim` are the 24 hour retention window.
+  Trimming is applied on read rather than scheduled, following `SimSqsQueue.applyLifecycle`, and it
+  is the one place in this service where that pattern genuinely fits: what a read finds is a
+  function of the instant of that read alone. The shard remembers the sequence number it trimmed
+  through once the records are gone, which is the difference between a position the shard never
+  reached and one it has already dropped.
+
+## Streams API commands
+
+The four DynamoDB Streams operations are under `command/stream/`, one directory per operation, and
+`SimDynamoDbStreams` is the facade over them. It is a second API over one simulated DynamoDB's
+state rather than a service of its own: `SimDynamoDb` builds it and hands it the same
+`SimDynamoDbStreamStore` its tables capture onto, and `simAws.dynamoDbStreams()` reaches it through
+`simAws.dynamoDb()` rather than through the service factory.
+
+`SimDynamoDbStreamAccess` is the stream side of `SimDynamoDbTableAccess`: apply retention, authorize
+against the ARN the request carries, then look the stream up, always in that order.
+`SimDynamoDbAuthorizer.authorizeStream` is what it authorizes with, and the resource is the stream's
+own ARN rather than its table's, so a statement naming `table/Orders` does not reach
+`table/Orders/stream/<label>`. Nothing in simulated IAM needed changing for that: statement matching
+is wildcard matching on the raw ARN, and the matcher already treats everything past the fifth colon
+as one segment. `ListStreams` names no stream, so it goes through `authorizeAnyTable` the way
+`ListTables` does.
+
+`simDynamoDbStreamsApiRecord` renders a captured record the way the Streams API carries it, and is
+deliberately a renderer over the stored domain object rather than the stored shape itself. The
+Streams API declares `Identity` as `PrincipalId`/`Type` and `ApproximateCreationDateTime` as a
+timestamp, where the Lambda event uses `principalId`/`type` and epoch seconds. Sharing one payload
+between the two surfaces would leave one of them quietly wrong, so the Lambda event builder gets a
+projection of its own rather than reshaping this one.
+
+`@aws-sdk/client-dynamodb-streams` is a client with a service identity of its own, so
+`SimDynamoDbStreamsSdkCommandRouter` is a second router registered under `DynamoDB Streams` in
+`resolveSimSdkCommandRouter`. A DynamoDB client cannot reach it and a Streams client cannot reach
+the table commands, which is what AWS does too.
 
 Capture happens in `SimDynamoDbTableItems`, on `put`, `remove` and `expire`. That pair of writes and
 removals is the only place every item mutation passes through exactly once, and both already read

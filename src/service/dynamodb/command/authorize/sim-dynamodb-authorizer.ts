@@ -51,6 +51,24 @@ export class SimDynamoDbAuthorizer {
   }
 
   /**
+   * Ensure the caller may perform an action on a table's stream.
+   *
+   * The resource is the stream's own ARN, which is the table's ARN and then
+   * the stream's label, so a statement naming only the table does not reach it.
+   * The ARN comes from the request rather than being built here: a stream is
+   * named by an ARN a caller was handed, and one naming no stream is refused
+   * before anything looks it up, as real IAM refuses a request before the
+   * service sees it.
+   */
+  authorizeStream(
+    action: string,
+    streamArn: string,
+    caller?: SimAwsCaller,
+  ): SimAwsResolvedCaller {
+    return this.authorizeResource(action, streamArn, caller);
+  }
+
+  /**
    * Ensure the caller may perform an action that names no particular table.
    *
    * Authorization applies to the whole operation. A denied caller receives

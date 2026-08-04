@@ -41,6 +41,9 @@ export function resolveSimSdkCommandRouter(
     case "DynamoDB": {
       return scoped.dynamoDb().sdkCommandRouter();
     }
+    case "DynamoDB Streams": {
+      return scoped.dynamoDbStreams().sdkCommandRouter();
+    }
     case "IAM": {
       return scoped.iam().sdkCommandRouter();
     }

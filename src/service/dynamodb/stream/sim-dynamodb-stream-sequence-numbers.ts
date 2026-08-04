@@ -1,3 +1,5 @@
+import { SimDynamoDbValidationException } from "../error/dynamodb.error.js";
+
 /**
  * The number the first record on a stream is given.
  *
@@ -31,4 +33,49 @@ export class SimDynamoDbStreamSequenceNumbers {
 
     return taken.toString();
   }
+}
+
+/**
+ * A sequence number is digits and nothing else.
+ */
+const digitsOnly = /^\d+$/u;
+
+/**
+ * Read a sequence number a request carries.
+ *
+ * Real DynamoDB refuses anything that is not a run of digits, so a caller that
+ * passes a shard identifier or a truncated value here finds out at the request
+ * rather than reading from a position nothing could ever be at.
+ */
+export function readSimDynamoDbSequenceNumber(
+  value: string | undefined,
+  operationName: string,
+): string {
+  if (value === undefined || !digitsOnly.test(value)) {
+    throw new SimDynamoDbValidationException(
+      `${operationName} needs a numeric SequenceNumber`,
+    );
+  }
+
+  return value;
+}
+
+/**
+ * Order two sequence numbers, as a comparator does.
+ *
+ * These are compared as numbers rather than as text. The ones a simulated
+ * stream hands out are a fixed width, where the two orders agree, but one a
+ * request carries came from outside and need not be.
+ */
+export function compareSimDynamoDbSequenceNumbers(
+  left: string,
+  right: string,
+): number {
+  const difference = BigInt(left) - BigInt(right);
+
+  if (difference === 0n) {
+    return 0;
+  }
+
+  return difference > 0n ? 1 : -1;
 }

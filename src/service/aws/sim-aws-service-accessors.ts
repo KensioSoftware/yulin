@@ -4,7 +4,10 @@ import type { SimApiGatewayV2 } from "../apigatewayv2/index.js";
 import type { SimCloudFormation } from "../cloudformation/index.js";
 import type { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
 import type { SimCognitoIdentityProvider } from "../cognito/index.js";
-import type { SimDynamoDb as SimDynamoDatabase } from "../dynamodb/index.js";
+import type {
+  SimDynamoDb as SimDynamoDatabase,
+  SimDynamoDbStreams,
+} from "../dynamodb/index.js";
 import type { SimIam } from "../iam/index.js";
 import type { SimKms } from "../kms/index.js";
 import type { SimLambda } from "../lambda/index.js";
@@ -57,6 +60,11 @@ export abstract class SimAwsServiceAccessors {
   /** Get simulated DynamoDB in the default Account Region scope. */
   dynamoDb(): SimDynamoDatabase {
     return this.defaultAccountRegionScope().dynamoDb();
+  }
+
+  /** Get simulated DynamoDB Streams in the default Account Region scope. */
+  dynamoDbStreams(): SimDynamoDbStreams {
+    return this.defaultAccountRegionScope().dynamoDbStreams();
   }
 
   /** Get simulated IAM in the default Account scope. */

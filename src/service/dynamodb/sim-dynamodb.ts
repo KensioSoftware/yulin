@@ -7,6 +7,7 @@ import type * as simDynamoDbCommands from "./command/sim-dynamodb-command.types.
 import { SimDynamoDbStreamActivity } from "./stream/sim-dynamodb-stream-activity.js";
 import { SimDynamoDbStreamStore } from "./stream/sim-dynamodb-stream-store.js";
 import type { SimDynamoDbStream } from "./stream/sim-dynamodb-stream.js";
+import { SimDynamoDbStreams } from "./sim-dynamodb-streams.js";
 import { SimDynamoDbTableStore } from "./table/sim-dynamodb-table-store.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import { SimIamAllowAllAuth } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
@@ -29,10 +30,11 @@ import type {
  */
 export class SimDynamoDb {
   private readonly tables = new SimDynamoDbTableStore();
-  private readonly streams = new SimDynamoDbStreamStore();
+  private readonly streamStore = new SimDynamoDbStreamStore();
   private readonly activity = new SimDynamoDbStreamActivity();
   private readonly background: BackgroundScheduler;
   private readonly commands: SimDynamoDbCommandHandlers;
+  private readonly streamsApi: SimDynamoDbStreams;
   private readonly sdkRouter = new SimDynamoDatabaseSdkCommandRouter(this);
   private readonly cfnFactory = new SimDynamoDbCfnResourceFactory({
     dynamoDb: this,
@@ -48,8 +50,14 @@ export class SimDynamoDb {
     this.background = background;
     this.commands = new SimDynamoDbCommandHandlers({
       tables: this.tables,
-      streams: this.streams,
+      streams: this.streamStore,
       streamActivity: this.activity,
+      accountRegionScope,
+      iam,
+      background,
+    });
+    this.streamsApi = new SimDynamoDbStreams({
+      streams: this.streamStore,
       accountRegionScope,
       iam,
       background,
@@ -253,11 +261,15 @@ export class SimDynamoDb {
    * Find a stream by ARN, if there is one here.
    *
    * Not a DynamoDB API operation. A stream outlives being enabled, so this
-   * finds one whose table has since switched it off, which is what reading a
-   * disabled stream within its retention window needs.
+   * finds one whose table has since switched it off.
    */
   findStream(streamArn: string): SimDynamoDbStream | undefined {
-    return this.streams.findByArn(streamArn);
+    return this.streamStore.findByArn(streamArn);
+  }
+
+  /** Get the DynamoDB Streams API over this service's streams. */
+  streams(): SimDynamoDbStreams {
+    return this.streamsApi;
   }
 
   /**

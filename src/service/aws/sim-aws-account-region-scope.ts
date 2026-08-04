@@ -4,7 +4,10 @@ import { Memo } from "../../util/memo/memo.js";
 import { SimAws } from "./sim-aws.js";
 import type { SimS3 } from "../s3/sim-s3.js";
 import type { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
-import type { SimDynamoDb as SimDynamoDatabase } from "../dynamodb/index.js";
+import type {
+  SimDynamoDb as SimDynamoDatabase,
+  SimDynamoDbStreams,
+} from "../dynamodb/index.js";
 import type { SimCloudFormation } from "../cloudformation/index.js";
 import type { SimCognitoIdentityProvider } from "../cognito/index.js";
 import type { SimRoute53 } from "../route53/index.js";
@@ -107,6 +110,17 @@ export class SimAwsAccountRegionContainer {
     return this.memo.getOrCreate("dynamoDb", () =>
       this.simAws.serviceFactory.createDynamoDb(this),
     );
+  }
+
+  /**
+   * Get simulated DynamoDB Streams for this account and region.
+   *
+   * It is not made here, unlike the services around it. The streams it reads
+   * are the ones this scope's DynamoDB tables captured onto, so it belongs to
+   * that service and is reached through it.
+   */
+  dynamoDbStreams(): SimDynamoDbStreams {
+    return this.dynamoDb().streams();
   }
 
   /**

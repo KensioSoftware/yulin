@@ -71,6 +71,15 @@ describe("SimAws", () => {
     assertIdentical(simAws.dynamoDb(), simAws.region().account().dynamoDb());
   });
 
+  it("returns the Streams API of the DynamoDB in the same scope", () => {
+    const simAws = new SimAws();
+    const streams = simAws.dynamoDb().streams();
+
+    assertIdentical(simAws.dynamoDbStreams(), streams);
+    assertIdentical(simAws.account().dynamoDbStreams(), streams);
+    assertIdentical(simAws.region().dynamoDbStreams(), streams);
+  });
+
   describe("simulated time", () => {
     const instant = new Date("2026-07-26T09:30:00.000Z");
 
