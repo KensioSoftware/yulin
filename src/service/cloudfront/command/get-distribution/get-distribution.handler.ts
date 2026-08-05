@@ -8,7 +8,7 @@ import type {
   SimCloudFrontDistributionId,
 } from "../../distribution/sim-cloudfront-distribution.js";
 import { simCloudFrontDistributionView } from "../../distribution/sim-cf-distribution-view.js";
-import { SimCloudFrontResourceNotFoundException } from "../../error/sim-cloudfront.error.js";
+import { SimCloudFrontNoSuchDistribution } from "../../error/sim-cloudfront.error.js";
 import {
   type BackgroundScheduler,
   BackgroundTasks,
@@ -84,7 +84,7 @@ export class GetDistributionCommandHandler implements CommandHandler<
 
     const distribution = this.distributions.get(distributionId);
     if (distribution === undefined) {
-      throw new SimCloudFrontResourceNotFoundException(
+      throw new SimCloudFrontNoSuchDistribution(
         `No sim CloudFront Distribution with ID ${distributionId}`,
       );
     }
