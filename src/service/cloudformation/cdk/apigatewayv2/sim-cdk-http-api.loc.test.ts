@@ -15,7 +15,6 @@ import { describe, it } from "vitest";
  */
 import { serveSimAws } from "../../../../serve/index.js";
 import { SimAws } from "../../../aws/sim-aws.js";
-import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import { TemporaryDirectory } from "../../../../util/filesystem/temporary-directory.js";
 import { TestCdkProject } from "../../../../util/filesystem/test-cdk-project.js";
 
@@ -80,7 +79,7 @@ describe("Sim CDK HTTP API deployment local integration", () => {
     // simulated AWS scoped to the Account and Region the stack names, which
     // is what CDK baked into the endpoint it publishes.
     const simAws = new SimAws({
-      defaultAccountId: "111111111111" as SimAwsAccountId,
+      defaultAccountId: "111111111111",
       defaultRegionName: "eu-west-2",
     });
     const projectDirectory = new TemporaryDirectory();

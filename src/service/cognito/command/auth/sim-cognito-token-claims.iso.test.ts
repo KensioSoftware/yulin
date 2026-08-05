@@ -18,7 +18,6 @@ import {
 import { describe, it } from "vitest";
 import type { JSONObject } from "../../../../util/type-guard/json.js";
 import { SimAws } from "../../../aws/sim-aws.js";
-import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import type { SimCognitoIdentityProvider } from "../../sim-cognito-identity-provider.js";
 
 const password = "Sup3rSecret!";
@@ -57,7 +56,7 @@ function tokenClaims(token: string): JSONObject {
  */
 async function simCognitoTokens(): Promise<SimCognitoTokens> {
   const cognito = new SimAws({
-    defaultAccountId: "111111111111" as SimAwsAccountId,
+    defaultAccountId: "111111111111",
     defaultRegionName: "eu-west-2",
   }).cognitoIdentityProvider();
 

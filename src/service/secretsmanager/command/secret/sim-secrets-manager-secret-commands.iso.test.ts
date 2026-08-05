@@ -20,9 +20,8 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
-import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 
-const accountIdOneOnes = "111111111111" as SimAwsAccountId;
+const accountIdOneOnes = "111111111111";
 
 describe("Secrets Manager CreateSecret", () => {
   it("gives the secret an ARN carrying six random characters", async () => {

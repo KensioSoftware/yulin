@@ -15,10 +15,9 @@ import {
 import { describe, it } from "vitest";
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { SimAws } from "../../../aws/sim-aws.js";
-import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 
-const accountId = "111111111111" as SimAwsAccountId;
+const accountId = "111111111111";
 const regionName = "eu-west-2";
 
 interface SimCognitoWithRole {

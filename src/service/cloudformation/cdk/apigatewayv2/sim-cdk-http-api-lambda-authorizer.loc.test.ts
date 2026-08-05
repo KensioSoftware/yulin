@@ -9,7 +9,6 @@ import { describe, it } from "vitest";
  */
 import { serveSimAws } from "../../../../serve/index.js";
 import { SimAws } from "../../../aws/sim-aws.js";
-import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import { TemporaryDirectory } from "../../../../util/filesystem/temporary-directory.js";
 import { TestCdkProject } from "../../../../util/filesystem/test-cdk-project.js";
 
@@ -94,7 +93,7 @@ describe("Sim CDK HTTP API Lambda authorizer local integration", () => {
     // Given a CDK stack whose one route goes through an HttpLambdaAuthorizer
     // answering the simple response format.
     const simAws = new SimAws({
-      defaultAccountId: "111111111111" as SimAwsAccountId,
+      defaultAccountId: "111111111111",
       defaultRegionName: "eu-west-2",
     });
     const projectDirectory = new TemporaryDirectory();
