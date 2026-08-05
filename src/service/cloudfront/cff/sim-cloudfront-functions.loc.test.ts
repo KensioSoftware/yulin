@@ -105,6 +105,82 @@ describe("Serve sim CloudFront Functions on localhost", () => {
     );
   });
 
+  it("gives a viewer-request CFF the Distribution domain name as its host", async () => {
+    const simCloudFront = simAws.cloudFront();
+
+    // Given a CFF that redirects to the host it was given.
+    function hostRedirectHandlerFunction(
+      event: CloudFrontFunction.ViewerRequestEvent,
+    ) {
+      const host = event.request.headers["host"]?.value ?? "no-host";
+      return {
+        statusCode: 302,
+        statusDescription: "Found",
+        headers: {
+          location: { value: `https://${host}/redirected.html` },
+        },
+      };
+    }
+    const hostCffCreation = await simCloudFront.createFunction(
+      new CreateFunctionCommand({
+        Name: "host-viewer-request-cff",
+        FunctionConfig: {
+          Comment: "Host Viewer Request CloudFront Function",
+          Runtime: "cloudfront-js-2.0",
+        },
+        FunctionCode: makeCffFunctionCodeInput(hostRedirectHandlerFunction),
+      }),
+    );
+
+    const distributionCreation = await simCloudFront.createDistribution(
+      new CreateDistributionCommand({
+        DistributionConfig: {
+          CallerReference: "host-header-cff",
+          Comment: "Host header CDN",
+          Enabled: true,
+          Origins: {
+            Quantity: 1,
+            Items: [
+              {
+                Id: "foo-origin",
+                DomainName: "foo-bucket.s3.amazonaws.com",
+                S3OriginConfig: { OriginAccessIdentity: "" },
+              },
+            ],
+          },
+          DefaultCacheBehavior: {
+            TargetOriginId: "foo-origin",
+            ViewerProtocolPolicy: "allow-all",
+            FunctionAssociations: {
+              Quantity: 1,
+              Items: [
+                {
+                  EventType: "viewer-request",
+                  FunctionARN: hostCffCreation.FunctionMetadata.FunctionARN,
+                },
+              ],
+            },
+          },
+        },
+      }),
+    );
+    const distroId = distributionCreation.Distribution?.Id;
+    assertNonNullable(distroId);
+
+    // When the Distribution is requested by its CloudFront domain name.
+    const distroHostResponse = await fetch(
+      `http://${distroId.toLowerCase()}.cloudfront.net.sim-aws.localhost:${srv.port}/index.html`,
+      { redirect: "manual" },
+    );
+
+    // Then the CFF saw the CloudFront domain name, without the local suffix
+    // and without the local server port.
+    assertIdentical(
+      distroHostResponse.headers.get("location"),
+      `https://${distroId.toLowerCase()}.cloudfront.net/redirected.html`,
+    );
+  });
+
   it("applies viewer-response CFF", async () => {
     const simS3 = simAws.s3();
     const simCloudFront = simAws.cloudFront();

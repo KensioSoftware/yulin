@@ -1,4 +1,5 @@
 import type { CloudFrontFunction } from "../../typings/cloudfront-functions.namespace.js";
+import { simAwsRequestHostname } from "../../../../serve/http/url/sim-aws-request-hostname.js";
 import { SimCffRequestMetadataAdapter } from "./sim-cff-request-metadata-adapter.js";
 
 /**
@@ -17,7 +18,7 @@ export class SimCffRequestResponseAdapter {
     return {
       method: request.method,
       uri: url.pathname,
-      headers: this.metadataAdapter.toCffHeaders(request.headers),
+      headers: this.viewerCffHeaders(request),
       querystring: this.metadataAdapter.toCffQueryString(url.searchParams),
       cookies: this.metadataAdapter.toCffCookies(request.headers),
     };
@@ -48,12 +49,15 @@ export class SimCffRequestResponseAdapter {
     );
     const isAllowsBody = !/^(get|head)$/i.test(cffRequest.method);
 
+    const headers = this.metadataAdapter.fromCffHeaders(
+      cffRequest.headers,
+      cffRequest.cookies,
+    );
+    this.restoreViewerHost(headers, originalRequest);
+
     return new Request(url, {
       method: cffRequest.method,
-      headers: this.metadataAdapter.fromCffHeaders(
-        cffRequest.headers,
-        cffRequest.cookies,
-      ),
+      headers,
       body: isAllowsBody ? originalRequest.clone().body : null,
       duplex: "half",
       redirect: originalRequest.redirect,
@@ -91,6 +95,41 @@ export class SimCffRequestResponseAdapter {
       statusText: cffResponse.statusDescription ?? "",
       headers: this.metadataAdapter.fromCffHeaders(cffResponse.headers, {}),
     });
+  }
+
+  /**
+   * Convert request headers to CFF Headers, with the host CloudFront presents.
+   *
+   * A CloudFront Function sees the hostname the viewer used to reach
+   * CloudFront: the Distribution domain name or one of its alternate domain
+   * names. A request served on localhost arrives with the Yulin-local host
+   * instead, which is the same hostname the Distribution router already
+   * resolves the request by, so it is normalised here as well.
+   */
+  private viewerCffHeaders(request: Request): CloudFrontFunction.Headers {
+    const cffHeaders = this.metadataAdapter.toCffHeaders(request.headers);
+    cffHeaders["host"] = { value: simAwsRequestHostname(request) };
+
+    return cffHeaders;
+  }
+
+  /**
+   * Restore the host the request arrived with.
+   *
+   * The host header is read-only for CloudFront Functions, so a host a
+   * function returns is discarded rather than sent on. That also keeps the
+   * Yulin-local host on the request continuing to the Origin, which is what
+   * the rest of the simulated environment resolves.
+   */
+  private restoreViewerHost(headers: Headers, originalRequest: Request): void {
+    const viewerHost = originalRequest.headers.get("host");
+
+    if (viewerHost === null) {
+      headers.delete("host");
+      return;
+    }
+
+    headers.set("host", viewerHost);
   }
 
   private cffResponseBody(
