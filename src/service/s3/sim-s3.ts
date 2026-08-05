@@ -2,12 +2,8 @@ import type { SimS3Bucket, SimS3BucketName } from "./bucket/sim-s3-bucket.js";
 import type * as simS3Commands from "./command/sim-s3-command.types.js";
 import { SimS3GlobalRegistry } from "./sim-s3-global-registry.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
-import { assertDefined } from "../../util/type-guard/defined.js";
-import { FilesystemS3BucketStorage } from "./storage/filesystem/s3-filesystem-storage.js";
-import {
-  simS3BucketUrl,
-  simS3ServiceUrl,
-} from "./bucket/sim-s3-endpoint-url.js";
+import { SimS3BucketAccess } from "./bucket/sim-s3-bucket-access.js";
+import { simS3ServiceUrl } from "./bucket/sim-s3-endpoint-url.js";
 import { SimS3CloudFormationResourceFactory } from "./cfn/sim-cfn-s3-resource-factory.js";
 import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
@@ -28,6 +24,7 @@ export class SimS3 {
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly s3GlobalRegistry: SimS3GlobalRegistry;
   private readonly commands: SimS3Commands;
+  private readonly bucketAccess: SimS3BucketAccess;
   private readonly cfnFactory = new SimS3CloudFormationResourceFactory(this);
   private readonly sdkRouter = new SimS3SdkCommandRouter(this);
 
@@ -45,6 +42,10 @@ export class SimS3 {
       s3GlobalRegistry,
       buckets: this.buckets,
     });
+    this.bucketAccess = new SimS3BucketAccess({
+      buckets: this.buckets,
+      accountRegionScope,
+    });
   }
 
   /**
@@ -55,6 +56,16 @@ export class SimS3 {
     options?: SimS3RequestOptions,
   ): Promise<simS3Commands.SimCreateBucketCommandOutput> {
     return await this.commands.buckets.create(command, options);
+  }
+
+  /**
+   * Handle a Delete Bucket Command from the SDK.
+   */
+  async deleteBucket(
+    command: simS3Commands.SimDeleteBucketCommand,
+    options?: SimS3RequestOptions,
+  ): Promise<simS3Commands.SimDeleteBucketCommandOutput> {
+    return await this.commands.buckets.delete(command, options);
   }
 
   /**
@@ -240,23 +251,14 @@ export class SimS3 {
    * Get the simulated S3 REST API endpoint URL for one Bucket.
    */
   getBucketUrl(bucketName: SimS3BucketName | string): URL {
-    const bucket = this.getSimBucketByName(bucketName);
-    assertDefined(bucket, `Sim S3 Bucket named ${bucketName}`);
-
-    return simS3BucketUrl(
-      bucket.bucketName,
-      this.accountRegionScope.regionName,
-    );
+    return this.bucketAccess.url(bucketName);
   }
 
   /**
    * Get the simulated S3 static website URL for a Bucket.
    */
   getBucketWebsiteUrl(bucketName: SimS3BucketName | string): URL {
-    const bucket = this.getSimBucketByName(bucketName);
-    assertDefined(bucket, `Sim S3 Bucket named ${bucketName}`);
-
-    return bucket.getWebsiteUrl();
+    return this.bucketAccess.websiteUrl(bucketName);
   }
 
   /**
@@ -275,11 +277,7 @@ export class SimS3 {
     bucketName: SimS3BucketName | string,
     directoryPath: string,
   ): void {
-    const bucket = this.getSimBucketByName(bucketName);
-    assertDefined(bucket, `Sim S3 Bucket named ${bucketName}`);
-    bucket.configureSimStorage(
-      new FilesystemS3BucketStorage({ directoryPath }),
-    );
+    this.bucketAccess.mountFilesystem(bucketName, directoryPath);
   }
 
   /**

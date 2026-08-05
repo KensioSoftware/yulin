@@ -90,6 +90,20 @@ export class SimS3BucketAlreadyOwnedByYou extends SimS3Error {
 }
 
 /**
+ * Simulated S3 BucketNotEmpty error.
+ *
+ * Real S3 refuses to delete a Bucket that still holds Objects, leaving it to
+ * the caller to empty it first.
+ */
+export class SimS3BucketNotEmpty extends SimS3Error {
+  public override readonly name = "BucketNotEmpty";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 409 });
+  }
+}
+
+/**
  * Simulated S3 MalformedXML error.
  *
  * Real S3 answers this when the request document is not one it accepts, which

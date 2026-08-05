@@ -1,54 +1,11 @@
 import type { SimArn } from "../aws/arn.js";
 import type { SimAwsAccountId } from "../aws/sim-aws-account.js";
-import type {
-  SimCreatePolicyCommand,
-  SimCreatePolicyCommandOutput,
-} from "./command/policy/create-policy/create-policy.command.js";
 import type { SimIamManagedPolicy } from "./policy/sim-iam-policy.js";
-import type {
-  SimGetPolicyCommand,
-  SimGetPolicyCommandOutput,
-} from "./command/policy/get-policy/get-policy.command.js";
-import type {
-  SimListPoliciesCommand,
-  SimListPoliciesCommandOutput,
-} from "./command/policy/list-policies/list-policies.command.js";
-import type {
-  SimCreateRoleCommand,
-  SimCreateRoleCommandOutput,
-} from "./command/role/create-role/create-role.command.js";
-import type {
-  SimGetRoleCommand,
-  SimGetRoleCommandOutput,
-} from "./command/role/get-role/get-role.command.js";
 import type { SimIamRole, SimIamRoleName } from "./role/sim-iam-role.js";
-import type {
-  SimListRolesCommand,
-  SimListRolesCommandOutput,
-} from "./command/role/list-roles/list-roles.command.js";
 import type { SimIamAuthorizationInput } from "./authorize/context/sim-iam-auth-z-context-builder.js";
 import type { SimIamPolicyDecision } from "./authorize/sim-iam-decision.js";
-import type {
-  SimPutRolePolicyCommand,
-  SimPutRolePolicyCommandOutput,
-} from "./command/policy/put-role-policy/put-role-policy.command.js";
-import type {
-  SimAttachRolePolicyCommand,
-  SimAttachRolePolicyCommandOutput,
-} from "./command/role/attach-role-policy/attach-role-policy.command.js";
-import type {
-  SimCreateUserCommand,
-  SimCreateUserCommandOutput,
-} from "./command/user/create-user/create-user.command.js";
-import type {
-  SimCreateAccessKeyCommand,
-  SimCreateAccessKeyCommandOutput,
-} from "./command/user/create-access-key/create-access-key.command.js";
+import type * as simIamCommands from "./command/sim-iam-command.types.js";
 import type { SimIamRequestOptions } from "./command/sim-iam-request-options.js";
-import type {
-  SimPutUserPolicyCommand,
-  SimPutUserPolicyCommandOutput,
-} from "./command/policy/put-user-policy/put-user-policy.command.js";
 import { SimIamCloudFormationResourceFactory } from "./cfn/sim-cfn-iam-resource-factory.js";
 import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import type { SimIamInterServiceAuthZ } from "./authorize/sim-iam-inter-service-auth-z.js";
@@ -140,9 +97,9 @@ export class SimIam
    * Handle a Create Policy Command from the SDK.
    */
   async createPolicy(
-    command: SimCreatePolicyCommand,
+    command: simIamCommands.SimCreatePolicyCommand,
     options?: SimIamRequestOptions,
-  ): Promise<SimCreatePolicyCommandOutput> {
+  ): Promise<simIamCommands.SimCreatePolicyCommandOutput> {
     return await this.commands.policies.createPolicy(command, options);
   }
 
@@ -150,9 +107,9 @@ export class SimIam
    * Handle a Get Policy Command from the SDK.
    */
   async getPolicy(
-    command: SimGetPolicyCommand,
+    command: simIamCommands.SimGetPolicyCommand,
     options?: SimIamRequestOptions,
-  ): Promise<SimGetPolicyCommandOutput> {
+  ): Promise<simIamCommands.SimGetPolicyCommandOutput> {
     return await this.commands.policies.getPolicy(command, options);
   }
 
@@ -160,9 +117,9 @@ export class SimIam
    * Handle a List Policies Command from the SDK.
    */
   async listPolicies(
-    command: SimListPoliciesCommand,
+    command: simIamCommands.SimListPoliciesCommand,
     options?: SimIamRequestOptions,
-  ): Promise<SimListPoliciesCommandOutput> {
+  ): Promise<simIamCommands.SimListPoliciesCommandOutput> {
     return await this.commands.policies.listPolicies(command, options);
   }
 
@@ -170,9 +127,9 @@ export class SimIam
    * Handle a Put Role Policy Command from the SDK.
    */
   async putRolePolicy(
-    command: SimPutRolePolicyCommand,
+    command: simIamCommands.SimPutRolePolicyCommand,
     options?: SimIamRequestOptions,
-  ): Promise<SimPutRolePolicyCommandOutput> {
+  ): Promise<simIamCommands.SimPutRolePolicyCommandOutput> {
     return await this.commands.roles.putRolePolicy(command, options);
   }
 
@@ -180,9 +137,9 @@ export class SimIam
    * Handle an IAM PutUserPolicy command.
    */
   async putUserPolicy(
-    command: SimPutUserPolicyCommand,
+    command: simIamCommands.SimPutUserPolicyCommand,
     options?: SimIamRequestOptions,
-  ): Promise<SimPutUserPolicyCommandOutput> {
+  ): Promise<simIamCommands.SimPutUserPolicyCommandOutput> {
     return await this.commands.policies.putUserPolicy(command, options);
   }
 
@@ -190,9 +147,9 @@ export class SimIam
    * Handle a Create Role Command from the SDK.
    */
   async createRole(
-    command: SimCreateRoleCommand,
+    command: simIamCommands.SimCreateRoleCommand,
     options?: SimIamRequestOptions,
-  ): Promise<SimCreateRoleCommandOutput> {
+  ): Promise<simIamCommands.SimCreateRoleCommandOutput> {
     return await this.commands.roles.createRole(command, options);
   }
 
@@ -200,19 +157,59 @@ export class SimIam
    * Handle an Attach Role Policy Command from the SDK.
    */
   async attachRolePolicy(
-    command: SimAttachRolePolicyCommand,
+    command: simIamCommands.SimAttachRolePolicyCommand,
     options?: SimIamRequestOptions,
-  ): Promise<SimAttachRolePolicyCommandOutput> {
+  ): Promise<simIamCommands.SimAttachRolePolicyCommandOutput> {
     return await this.commands.roles.attachRolePolicy(command, options);
+  }
+
+  /**
+   * Handle a Detach Role Policy Command from the SDK.
+   */
+  async detachRolePolicy(
+    command: simIamCommands.SimDetachRolePolicyCommand,
+    options?: SimIamRequestOptions,
+  ): Promise<simIamCommands.SimDetachRolePolicyCommandOutput> {
+    return await this.commands.roles.detachRolePolicy(command, options);
+  }
+
+  /**
+   * Handle a Delete Role Policy Command from the SDK.
+   */
+  async deleteRolePolicy(
+    command: simIamCommands.SimDeleteRolePolicyCommand,
+    options?: SimIamRequestOptions,
+  ): Promise<simIamCommands.SimDeleteRolePolicyCommandOutput> {
+    return await this.commands.roles.deleteRolePolicy(command, options);
+  }
+
+  /**
+   * Handle a Delete Role Command from the SDK.
+   */
+  async deleteRole(
+    command: simIamCommands.SimDeleteRoleCommand,
+    options?: SimIamRequestOptions,
+  ): Promise<simIamCommands.SimDeleteRoleCommandOutput> {
+    return await this.commands.roles.deleteRole(command, options);
+  }
+
+  /**
+   * Handle a Delete Policy Command from the SDK.
+   */
+  async deletePolicy(
+    command: simIamCommands.SimDeletePolicyCommand,
+    options?: SimIamRequestOptions,
+  ): Promise<simIamCommands.SimDeletePolicyCommandOutput> {
+    return await this.commands.policies.deletePolicy(command, options);
   }
 
   /**
    * Handle a Get Role Command from the SDK.
    */
   async getRole(
-    command: SimGetRoleCommand,
+    command: simIamCommands.SimGetRoleCommand,
     options?: SimIamRequestOptions,
-  ): Promise<SimGetRoleCommandOutput> {
+  ): Promise<simIamCommands.SimGetRoleCommandOutput> {
     return await this.commands.roles.getRole(command, options);
   }
 
@@ -220,9 +217,9 @@ export class SimIam
    * Handle a List Roles Command from the SDK.
    */
   async listRoles(
-    command: SimListRolesCommand,
+    command: simIamCommands.SimListRolesCommand,
     options?: SimIamRequestOptions,
-  ): Promise<SimListRolesCommandOutput> {
+  ): Promise<simIamCommands.SimListRolesCommandOutput> {
     return await this.commands.roles.listRoles(command, options);
   }
 
@@ -230,9 +227,9 @@ export class SimIam
    * Handle an IAM CreateUser command.
    */
   async createUser(
-    command: SimCreateUserCommand,
+    command: simIamCommands.SimCreateUserCommand,
     options?: SimIamRequestOptions,
-  ): Promise<SimCreateUserCommandOutput> {
+  ): Promise<simIamCommands.SimCreateUserCommandOutput> {
     return await this.commands.users.createUser(command, options);
   }
 
@@ -240,9 +237,9 @@ export class SimIam
    * Handle an IAM CreateAccessKey command.
    */
   async createAccessKey(
-    command: SimCreateAccessKeyCommand,
+    command: simIamCommands.SimCreateAccessKeyCommand,
     options?: SimIamRequestOptions,
-  ): Promise<SimCreateAccessKeyCommandOutput> {
+  ): Promise<simIamCommands.SimCreateAccessKeyCommandOutput> {
     return await this.commands.users.createAccessKey(command, options);
   }
 

@@ -60,6 +60,7 @@ export class SimIamCommandHandlers {
     this.policies = new SimIamPolicyCommandHandlers({
       accountId: properties.accountId,
       policies: properties.policies,
+      roles: properties.roles,
       users: properties.users,
       background: properties.background,
       authorizer,

@@ -121,6 +121,7 @@ export class SimLambdaCommands {
     this.functions = new SimLambdaFunctionCommands({
       accountRegionScope,
       functions: properties.functions,
+      functionUrls: this.functionUrlStore,
       iam,
       background,
       runAsOwner: properties.runAsOwner,

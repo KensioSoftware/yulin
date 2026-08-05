@@ -3,6 +3,7 @@ import type { BackgroundScheduler } from "../../../../util/background/background
 import type { SimArn } from "../../../aws/arn.js";
 import type { SimIamActionAuthorizer } from "../../authorize/sim-iam-action-authorizer.js";
 import type { SimIamManagedPolicy } from "../../policy/sim-iam-policy.js";
+import type { SimIamRole, SimIamRoleName } from "../../role/sim-iam-role.js";
 import type { SimIamUser, SimIamUsername } from "../../user/sim-iam-user.js";
 import type { SimIamRequestOptions } from "../sim-iam-request-options.js";
 import { CreatePolicyCommandHandler } from "./create-policy/create-policy.handler.js";
@@ -20,6 +21,11 @@ import type {
   SimListPoliciesCommand,
   SimListPoliciesCommandOutput,
 } from "./list-policies/list-policies.command.js";
+import { DeletePolicyCommandHandler } from "./delete-policy/delete-policy.handler.js";
+import type {
+  SimDeletePolicyCommand,
+  SimDeletePolicyCommandOutput,
+} from "./delete-policy/delete-policy.command.js";
 import { PutUserPolicyCommandHandler } from "./put-user-policy/put-user-policy.handler.js";
 import type {
   SimPutUserPolicyCommand,
@@ -29,6 +35,7 @@ import type {
 interface SimIamPolicyCommandHandlersProperties {
   readonly accountId: SimAwsAccountId;
   readonly policies: Map<SimArn, SimIamManagedPolicy>;
+  readonly roles: Map<SimIamRoleName, SimIamRole>;
   readonly users: Map<SimIamUsername, SimIamUser>;
   readonly background: BackgroundScheduler;
   readonly authorizer: SimIamActionAuthorizer;
@@ -44,18 +51,42 @@ interface SimIamPolicyCommandHandlersProperties {
 export class SimIamPolicyCommandHandlers {
   private readonly accountId: SimAwsAccountId;
   private readonly policies: Map<SimArn, SimIamManagedPolicy>;
+  private readonly roles: Map<SimIamRoleName, SimIamRole>;
   private readonly users: Map<SimIamUsername, SimIamUser>;
   private readonly background: BackgroundScheduler;
   private readonly authorizer: SimIamActionAuthorizer;
 
   constructor(properties: SimIamPolicyCommandHandlersProperties) {
-    const { accountId, policies, users, background, authorizer } = properties;
+    const { accountId, policies, roles, users, background, authorizer } =
+      properties;
 
     this.accountId = accountId;
     this.policies = policies;
+    this.roles = roles;
     this.users = users;
     this.background = background;
     this.authorizer = authorizer;
+  }
+
+  /**
+   * Handle a DeletePolicy command from the SDK.
+   */
+  async deletePolicy(
+    command: SimDeletePolicyCommand,
+    options?: SimIamRequestOptions,
+  ): Promise<SimDeletePolicyCommandOutput> {
+    this.authorizer.authorize(
+      "iam:DeletePolicy",
+      command.input.PolicyArn ?? "*",
+      options?.caller,
+    );
+    const handler = new DeletePolicyCommandHandler({
+      policies: this.policies,
+      roles: this.roles,
+      users: this.users,
+      background: this.background,
+    });
+    return await handler.handle(command);
   }
 
   /**

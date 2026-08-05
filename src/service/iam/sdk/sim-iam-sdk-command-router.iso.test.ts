@@ -5,7 +5,11 @@ import {
   CreatePolicyCommand,
   CreateRoleCommand,
   CreateUserCommand,
+  DeletePolicyCommand,
   DeleteRoleCommand,
+  DeleteRolePolicyCommand,
+  DeleteUserCommand,
+  DetachRolePolicyCommand,
   GetPolicyCommand,
   GetRoleCommand,
   IAMClient,
@@ -65,6 +69,69 @@ describe("simulated IAM SDK Command routing", () => {
         PolicyDocument: allowAllPolicyDocument,
       }),
     );
+  });
+
+  it("round-trips the removal Commands through an intercepted client", async () => {
+    using simSdk = new SimSdk();
+    const client = new IAMClient({ region: "us-east-1" });
+    simSdk.intercept(client);
+
+    await client.send(
+      new CreateRoleCommand({
+        RoleName: "RemovableRole",
+        AssumeRolePolicyDocument: JSON.stringify({
+          Version: "2012-10-17",
+          Statement: {
+            Effect: "Allow",
+            Principal: { Service: "lambda.amazonaws.com" },
+            Action: "sts:AssumeRole",
+          },
+        }),
+      }),
+    );
+    const policyCreation = await client.send(
+      new CreatePolicyCommand({
+        PolicyName: "RemovablePolicy",
+        PolicyDocument: allowAllPolicyDocument,
+      }),
+    );
+    assertNonNullable(policyCreation.Policy?.Arn);
+    await client.send(
+      new AttachRolePolicyCommand({
+        RoleName: "RemovableRole",
+        PolicyArn: policyCreation.Policy.Arn,
+      }),
+    );
+    await client.send(
+      new PutRolePolicyCommand({
+        RoleName: "RemovableRole",
+        PolicyName: "inline-policy",
+        PolicyDocument: allowAllPolicyDocument,
+      }),
+    );
+
+    // The Role's policies come off first, as real IAM requires.
+    await client.send(
+      new DetachRolePolicyCommand({
+        RoleName: "RemovableRole",
+        PolicyArn: policyCreation.Policy.Arn,
+      }),
+    );
+    await client.send(
+      new DeleteRolePolicyCommand({
+        RoleName: "RemovableRole",
+        PolicyName: "inline-policy",
+      }),
+    );
+    await client.send(new DeleteRoleCommand({ RoleName: "RemovableRole" }));
+    await client.send(
+      new DeletePolicyCommand({ PolicyArn: policyCreation.Policy.Arn }),
+    );
+
+    const error = await assertThrowsErrorAsync(async () =>
+      client.send(new GetRoleCommand({ RoleName: "RemovableRole" })),
+    );
+    assertStringIncludes(error.message, "No IAM Role named RemovableRole");
   });
 
   it("round-trips managed Policy Commands through an intercepted client", async () => {
@@ -166,10 +233,10 @@ describe("simulated IAM SDK Command routing", () => {
     simSdk.intercept(client);
 
     const error = await assertThrowsErrorAsync(async () => {
-      await client.send(new DeleteRoleCommand({ RoleName: "InterceptRole" }));
+      await client.send(new DeleteUserCommand({ UserName: "InterceptUser" }));
     });
 
-    assertStringIncludes(error.message, "DeleteRoleCommand");
+    assertStringIncludes(error.message, "DeleteUserCommand");
     assertStringIncludes(error.message, "CreateRoleCommand");
   });
 });

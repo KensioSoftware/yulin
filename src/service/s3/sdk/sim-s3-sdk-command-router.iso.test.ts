@@ -1,6 +1,7 @@
 import { describe, it } from "vitest";
 import {
   CreateBucketCommand,
+  DeleteBucketCommand,
   DeleteBucketPolicyCommand,
   DeleteObjectCommand,
   DeleteObjectsCommand,
@@ -51,6 +52,20 @@ describe("simulated S3 SDK Command routing", () => {
     );
 
     assertIdentical(output.Contents?.length, 2);
+  });
+
+  it("routes DeleteBucketCommand through an intercepted client", async () => {
+    using simSdk = new SimSdk();
+    const client = new S3Client({ region: "us-east-1" });
+    simSdk.intercept(client);
+
+    await client.send(new CreateBucketCommand({ Bucket: "bucket-to-go" }));
+
+    await client.send(new DeleteBucketCommand({ Bucket: "bucket-to-go" }));
+
+    assertUndefined(
+      simSdk.simAws.region("us-east-1").s3().getSimBucketByName("bucket-to-go"),
+    );
   });
 
   it("routes PutBucketWebsiteCommand through an intercepted client", async () => {
@@ -236,8 +251,9 @@ describe("simulated S3 SDK Command routing", () => {
 
     const supported = router.supportedCommandNames();
 
-    assertArrayLength(supported, 16);
+    assertArrayLength(supported, 17);
     assertArrayIncludes(supported, "GetObjectCommand");
+    assertArrayIncludes(supported, "DeleteBucketCommand");
     assertArrayIncludes(supported, "PutBucketNotificationConfigurationCommand");
     assertArrayIncludes(supported, "GetBucketNotificationConfigurationCommand");
     assertArrayIncludes(supported, "DeleteObjectCommand");

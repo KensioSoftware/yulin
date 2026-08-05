@@ -28,6 +28,21 @@ import type {
   SimAttachRolePolicyCommand,
   SimAttachRolePolicyCommandOutput,
 } from "./attach-role-policy/attach-role-policy.command.js";
+import { DetachRolePolicyCommandHandler } from "./detach-role-policy/detach-role-policy.handler.js";
+import type {
+  SimDetachRolePolicyCommand,
+  SimDetachRolePolicyCommandOutput,
+} from "./detach-role-policy/detach-role-policy.command.js";
+import { DeleteRoleCommandHandler } from "./delete-role/delete-role.handler.js";
+import type {
+  SimDeleteRoleCommand,
+  SimDeleteRoleCommandOutput,
+} from "./delete-role/delete-role.command.js";
+import { DeleteRolePolicyCommandHandler } from "../policy/delete-role-policy/delete-role-policy.handler.js";
+import type {
+  SimDeleteRolePolicyCommand,
+  SimDeleteRolePolicyCommandOutput,
+} from "../policy/delete-role-policy/delete-role-policy.command.js";
 
 interface SimIamRoleCommandHandlersProperties {
   readonly accountId: SimAwsAccountId;
@@ -146,6 +161,63 @@ export class SimIamRoleCommandHandlers {
       options?.caller,
     );
     const handler = new AttachRolePolicyCommandHandler({
+      roles: this.roles,
+      background: this.background,
+    });
+    return await handler.handle(command);
+  }
+
+  /**
+   * Handle a DetachRolePolicy command from the SDK.
+   */
+  async detachRolePolicy(
+    command: SimDetachRolePolicyCommand,
+    options?: SimIamRequestOptions,
+  ): Promise<SimDetachRolePolicyCommandOutput> {
+    this.authorizer.authorize(
+      "iam:DetachRolePolicy",
+      this.roleArn(command.input.RoleName),
+      options?.caller,
+    );
+    const handler = new DetachRolePolicyCommandHandler({
+      roles: this.roles,
+      background: this.background,
+    });
+    return await handler.handle(command);
+  }
+
+  /**
+   * Handle a DeleteRolePolicy command from the SDK.
+   */
+  async deleteRolePolicy(
+    command: SimDeleteRolePolicyCommand,
+    options?: SimIamRequestOptions,
+  ): Promise<SimDeleteRolePolicyCommandOutput> {
+    this.authorizer.authorize(
+      "iam:DeleteRolePolicy",
+      this.roleArn(command.input.RoleName),
+      options?.caller,
+    );
+    const handler = new DeleteRolePolicyCommandHandler({
+      roles: this.roles,
+      background: this.background,
+    });
+    return await handler.handle(command);
+  }
+
+  /**
+   * Handle a DeleteRole command from the SDK.
+   */
+  async deleteRole(
+    command: SimDeleteRoleCommand,
+    options?: SimIamRequestOptions,
+  ): Promise<SimDeleteRoleCommandOutput> {
+    this.authorizer.authorize(
+      "iam:DeleteRole",
+      this.roleArn(command.input.RoleName),
+      options?.caller,
+    );
+    const handler = new DeleteRoleCommandHandler({
       roles: this.roles,
       background: this.background,
     });
