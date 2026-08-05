@@ -1331,6 +1331,88 @@ const stages = await apiGateway.getStages(new GetStagesCommand({ ApiId }));
 console.log(stages.Items[0]?.StageVariables);
 ```
 
+## Deleting what an API has
+
+`DeleteRouteCommand`, `DeleteIntegrationCommand` and `DeleteStageCommand` each take one resource off
+an API and leave the rest of it in place. A deleted route stops matching, so a request that used to
+reach it is answered the way any unmatched request is. A deleted stage stops resolving, so a request
+addressed to it finds nothing, while the routes it served are still served by the API's other stages.
+
+An integration a route still points at cannot be deleted. That is a `BadRequestException` naming the
+routes in the way, as it is on real AWS, so an API comes apart routes first and then the integrations
+behind them. Deleting a route does not delete its integration, since an integration outlives the
+routes pointing at it.
+
+```typescript sim-apigatewayv2-delete-resources
+/**
+ * Deleting a route, an integration and a stage from a simulated HTTP API.
+ */
+
+import {
+  CreateApiCommand,
+  CreateIntegrationCommand,
+  CreateRouteCommand,
+  CreateStageCommand,
+  DeleteIntegrationCommand,
+  DeleteRouteCommand,
+  DeleteStageCommand,
+  GetIntegrationsCommand,
+  GetRoutesCommand,
+} from "@aws-sdk/client-apigatewayv2";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const apiGateway = simAws.apiGatewayV2();
+
+const { ApiId } = await apiGateway.createApi(
+  new CreateApiCommand({ Name: "orders", ProtocolType: "HTTP" }),
+);
+
+const { IntegrationId } = await apiGateway.createIntegration(
+  new CreateIntegrationCommand({
+    ApiId,
+    IntegrationType: "AWS_PROXY",
+    IntegrationUri: "arn:aws:lambda:eu-west-2:111111111111:function:orders",
+    PayloadFormatVersion: "2.0",
+  }),
+);
+
+const { RouteId } = await apiGateway.createRoute(
+  new CreateRouteCommand({
+    ApiId,
+    RouteKey: "GET /orders",
+    Target: `integrations/${IntegrationId}`,
+  }),
+);
+
+await apiGateway.createStage(
+  new CreateStageCommand({ ApiId, StageName: "dev", AutoDeploy: true }),
+);
+
+// The route comes off first, since the integration cannot be deleted while
+// anything still targets it.
+await apiGateway.deleteRoute(new DeleteRouteCommand({ ApiId, RouteId }));
+
+await apiGateway.deleteIntegration(
+  new DeleteIntegrationCommand({ ApiId, IntegrationId }),
+);
+
+await apiGateway.deleteStage(
+  new DeleteStageCommand({ ApiId, StageName: "dev" }),
+);
+
+const routes = await apiGateway.getRoutes(new GetRoutesCommand({ ApiId }));
+const integrations = await apiGateway.getIntegrations(
+  new GetIntegrationsCommand({ ApiId }),
+);
+
+console.log(routes.Items.length, integrations.Items.length);
+```
+
+`DeleteApiCommand` deletes the API and everything under it, so taking a whole API away needs none of
+these.
+
 ## Turning the generated endpoint off
 
 `DisableExecuteApiEndpoint: true` stops the generated endpoint serving, which is how an API reachable
@@ -1795,10 +1877,11 @@ the simulation without being given one. See the
 
 - `CreateApi`, `GetApi`, `GetApis` and `DeleteApi`, with the API id, the generated endpoint, and the
   Account and Region scoping a real API has
-- `CreateIntegration` and `GetIntegrations` for an `AWS_PROXY` integration naming a Lambda function
-- `CreateRoute` and `GetRoutes`, with route keys parsed and validated at creation, and requests
-  matched to a route by method, literal segment, `{name}` parameter, `{proxy+}` parameter and
-  `$default`
+- `CreateIntegration`, `GetIntegrations` and `DeleteIntegration` for an `AWS_PROXY` integration
+  naming a Lambda function, with an integration a route still targets refused rather than deleted
+- `CreateRoute`, `GetRoutes` and `DeleteRoute`, with route keys parsed and validated at creation,
+  requests matched to a route by method, literal segment, `{name}` parameter, `{proxy+}` parameter
+  and `$default`, and a deleted route no longer matching anything
 - Path parameters captured by the matched route, reaching the handler as `event.pathParameters`
 - `CreateAuthorizer`, `GetAuthorizers` and `DeleteAuthorizer` for a JWT authorizer, and routes
   protected by one with `AuthorizationType: "JWT"` and `AuthorizationScopes`
@@ -1815,8 +1898,8 @@ the simulation without being given one. See the
 - `AuthorizerResultTtlInSeconds`, holding a decision against the identity source values it was made
   for and expiring it against the simulation's clock, with `$context.routeKey` as an identity source
   to hold one per route
-- `CreateStage` and `GetStages` for the `$default` stage and for named stages served under their own
-  path segment, including stage variables
+- `CreateStage`, `GetStages` and `DeleteStage` for the `$default` stage and for named stages served
+  under their own path segment, including stage variables
 - Serving the generated endpoint through `serveSimAws`, invoking the integrated function with a
   payload format 2.0 event and turning its result back into an HTTP response
 - The invoke permission of an integration's function and of an authorizer's, each evaluated against
@@ -1941,9 +2024,8 @@ Current documented limitations:
   [Granting the API permission to invoke the function](#granting-the-api-permission-to-invoke-the-function).
 - An integration `CredentialsArn`, the IAM Role alternative to a resource policy grant, is refused
   by `CreateIntegration`. A permission on the function is the only way to admit the invocation.
-- No `Update*` commands, and no per-resource `Delete*`. A route, integration or stage is changed by
-  deleting its API and creating it again. `DeleteApi` deletes everything under the API, as it does on
-  AWS.
+- No `Update*` commands. A route, integration or stage is changed by deleting it and creating it
+  again. `DeleteApi` deletes everything under the API, as it does on AWS.
 - Custom domain names and API mappings are not simulated. They change what `rawPath` holds, so an API
   reached through one behaves differently on AWS from what is served here.
 - No paging. `MaxResults` and `NextToken` are refused rather than ignored, and every list command

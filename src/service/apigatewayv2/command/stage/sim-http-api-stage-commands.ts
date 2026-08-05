@@ -1,5 +1,6 @@
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import { SimHttpApiStage } from "../../api/stage/sim-http-api-stage.js";
+import { SimApiGatewayV2NotFound } from "../../error/sim-api-gateway-v2.error.js";
 import type { SimApiGatewayV2RequestOptions } from "../sim-api-gateway-v2-request-options.js";
 import { SimApiGatewayV2UnsimulatedInput } from "../sim-api-gateway-v2-unsimulated-input.js";
 import type { SimHttpApiAccess } from "../sim-http-api-access.js";
@@ -7,6 +8,8 @@ import { SimHttpApiStageRules } from "./sim-http-api-stage-rules.js";
 import type {
   SimCreateStageCommand,
   SimCreateStageCommandOutput,
+  SimDeleteStageCommand,
+  SimDeleteStageCommandOutput,
   SimGetStagesCommand,
   SimGetStagesCommandOutput,
 } from "./stage.command.js";
@@ -98,5 +101,40 @@ export class SimHttpApiStageCommands {
       Items: httpApi.stages.list().map((stage) => stage.view()),
       $metadata: {},
     };
+  }
+
+  /**
+   * Handle a DeleteStage command.
+   *
+   * The stage stops serving, so a request addressed to it resolves to nothing.
+   * The API's routes stay, since they belong to the API rather than to the
+   * stage, and another stage of the same API still serves them.
+   */
+  deleteStage(
+    command: SimDeleteStageCommand,
+    options?: SimApiGatewayV2RequestOptions,
+  ): SimDeleteStageCommandOutput {
+    const unsimulated = new SimApiGatewayV2UnsimulatedInput("DeleteStage");
+    unsimulated.refuseUnaccepted(command.input, ["ApiId", "StageName"]);
+    const apiId = unsimulated.require("ApiId", command.input.ApiId);
+    const stageName = unsimulated.require("StageName", command.input.StageName);
+
+    const httpApi = this.access.api({
+      method: "DELETE",
+      apiId,
+      childPath: `${stagesPath}/${stageName}`,
+      caller: options?.caller,
+    });
+    const stage = httpApi.stages.find(stageName);
+
+    if (stage === undefined) {
+      throw new SimApiGatewayV2NotFound(
+        `No stage named ${stageName} on API ${apiId}`,
+      );
+    }
+
+    httpApi.stages.remove(stage.stageName);
+
+    return { $metadata: {} };
   }
 }

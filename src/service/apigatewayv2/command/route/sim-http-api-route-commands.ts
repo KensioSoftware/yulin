@@ -1,11 +1,14 @@
 import { SimHttpApiRouteKeyParser } from "../../api/route/key/sim-http-api-route-key-parser.js";
 import { SimHttpApiRoute } from "../../api/route/sim-http-api-route.js";
+import { SimApiGatewayV2NotFound } from "../../error/sim-api-gateway-v2.error.js";
 import type { SimApiGatewayV2RequestOptions } from "../sim-api-gateway-v2-request-options.js";
 import { SimApiGatewayV2UnsimulatedInput } from "../sim-api-gateway-v2-unsimulated-input.js";
 import type { SimHttpApiAccess } from "../sim-http-api-access.js";
 import type {
   SimCreateRouteCommand,
   SimCreateRouteCommandOutput,
+  SimDeleteRouteCommand,
+  SimDeleteRouteCommandOutput,
   SimGetRoutesCommand,
   SimGetRoutesCommandOutput,
 } from "./route.command.js";
@@ -116,5 +119,40 @@ export class SimHttpApiRouteCommands {
       Items: httpApi.routes.list().map((route) => route.view()),
       $metadata: {},
     };
+  }
+
+  /**
+   * Handle a DeleteRoute command.
+   *
+   * The route stops matching, so a request that used to reach it is answered
+   * the way any unmatched request is. The integration it targeted stays, since
+   * an integration outlives the routes pointing at it on real AWS.
+   */
+  deleteRoute(
+    command: SimDeleteRouteCommand,
+    options?: SimApiGatewayV2RequestOptions,
+  ): SimDeleteRouteCommandOutput {
+    const unsimulated = new SimApiGatewayV2UnsimulatedInput("DeleteRoute");
+    unsimulated.refuseUnaccepted(command.input, ["ApiId", "RouteId"]);
+    const apiId = unsimulated.require("ApiId", command.input.ApiId);
+    const routeId = unsimulated.require("RouteId", command.input.RouteId);
+
+    const httpApi = this.access.api({
+      method: "DELETE",
+      apiId,
+      childPath: `${routesPath}/${routeId}`,
+      caller: options?.caller,
+    });
+    const route = httpApi.routes.find(routeId);
+
+    if (route === undefined) {
+      throw new SimApiGatewayV2NotFound(
+        `No route with id ${routeId} on API ${apiId}`,
+      );
+    }
+
+    httpApi.routes.remove(route);
+
+    return { $metadata: {} };
   }
 }

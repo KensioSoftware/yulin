@@ -1,46 +1,13 @@
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
-import {
-  type BackgroundScheduler,
-  BackgroundTasks,
-} from "../../util/background/background.js";
-import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
-import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
-import {
-  SimIamAllowAllAuth,
-  type SimIamInterServiceAuthZ,
-} from "../iam/authorize/sim-iam-inter-service-auth-z.js";
-import {
-  type SimHttpApiJwtIssuerKeys,
-  SimHttpApiNoJwtIssuerKeys,
-} from "./api/authorizer/sim-http-api-jwt-issuer-keys.js";
-import { SimHttpApiStore } from "./api/sim-http-api-store.js";
 import { SimApiGatewayV2CfnResourceFactory } from "./cfn/sim-cfn-api-gateway-v2-resource-factory.js";
 import type { SimHttpApi } from "./api/sim-http-api.js";
-import { SimHttpApiCommands } from "./command/api/sim-http-api-commands.js";
-import { SimHttpApiImportCommands } from "./command/api/sim-http-api-import-commands.js";
-import { SimApiGatewayV2Authorizer } from "./command/authorize/sim-api-gateway-v2-authorizer.js";
-import { SimHttpApiAuthorizerCommands } from "./command/authorizer/sim-http-api-authorizer-commands.js";
-import { SimHttpApiIntegrationCommands } from "./command/integration/sim-http-api-integration-commands.js";
-import { SimHttpApiRouteCommands } from "./command/route/sim-http-api-route-commands.js";
 import type * as simApiGatewayV2Commands from "./command/sim-api-gateway-v2-command.types.js";
 import type { SimApiGatewayV2RequestOptions } from "./command/sim-api-gateway-v2-request-options.js";
-import { SimHttpApiAccess } from "./command/sim-http-api-access.js";
-import { SimHttpApiStageCommands } from "./command/stage/sim-http-api-stage-commands.js";
-import { SimHttpApiRegistry } from "./registry/sim-http-api-registry.js";
 import { SimApiGatewayV2SdkCommandRouter } from "./sdk/sim-api-gateway-v2-sdk-command-router.js";
-
-interface SimApiGatewayV2Properties {
-  readonly accountRegionScope?: SimAwsAccountRegionScope;
-  readonly iam?: SimIamInterServiceAuthZ;
-  readonly background?: BackgroundScheduler;
-  readonly registry?: SimHttpApiRegistry;
-  /**
-   * The issuers this API Gateway's JWT authorizers can verify against. A
-   * standalone simulated API Gateway has none, so a JWT route refuses every
-   * request rather than admitting one it could not check.
-   */
-  readonly jwtIssuerKeys?: SimHttpApiJwtIssuerKeys;
-}
+import {
+  SimApiGatewayV2Commands,
+  type SimApiGatewayV2Properties,
+} from "./sim-api-gateway-v2-commands.js";
 
 /**
  * Simulated API Gateway v2. Handles SDK commands. Emulates AWS behaviour and
@@ -55,57 +22,14 @@ interface SimApiGatewayV2Properties {
  * them is addressed by ApiId on real AWS and none of them outlives the API.
  */
 export class SimApiGatewayV2 {
-  private readonly apis = new SimHttpApiStore();
-  private readonly apiCommands: SimHttpApiCommands;
-  private readonly importCommands: SimHttpApiImportCommands;
-  private readonly authorizerCommands: SimHttpApiAuthorizerCommands;
-  private readonly integrationCommands: SimHttpApiIntegrationCommands;
-  private readonly routeCommands: SimHttpApiRouteCommands;
-  private readonly stageCommands: SimHttpApiStageCommands;
-  private readonly background: BackgroundScheduler;
+  private readonly commands: SimApiGatewayV2Commands;
   private readonly sdkRouter = new SimApiGatewayV2SdkCommandRouter(this);
   private readonly cfnFactory = new SimApiGatewayV2CfnResourceFactory({
     apiGatewayV2: this,
   });
 
   constructor(properties: SimApiGatewayV2Properties = {}) {
-    const {
-      accountRegionScope = simAwsAccountRegionScopeFactory.make(),
-      iam = new SimIamAllowAllAuth(),
-      background = new BackgroundTasks(),
-      registry = new SimHttpApiRegistry(),
-      jwtIssuerKeys = new SimHttpApiNoJwtIssuerKeys(),
-    } = properties;
-
-    const access = new SimHttpApiAccess({
-      apis: this.apis,
-      authorizer: new SimApiGatewayV2Authorizer({ iam, accountRegionScope }),
-    });
-
-    this.background = background;
-    this.apiCommands = new SimHttpApiCommands({
-      apis: this.apis,
-      registry,
-      access,
-      accountRegionScope,
-      clock: background,
-      jwtIssuerKeys,
-    });
-    this.authorizerCommands = new SimHttpApiAuthorizerCommands({ access });
-    this.integrationCommands = new SimHttpApiIntegrationCommands({ access });
-    this.routeCommands = new SimHttpApiRouteCommands({ access });
-    this.stageCommands = new SimHttpApiStageCommands({
-      access,
-      clock: background,
-    });
-    this.importCommands = new SimHttpApiImportCommands({
-      apis: this.apis,
-      registry,
-      apiCommands: this.apiCommands,
-      authorizerCommands: this.authorizerCommands,
-      integrationCommands: this.integrationCommands,
-      routeCommands: this.routeCommands,
-    });
+    this.commands = new SimApiGatewayV2Commands(properties);
   }
 
   /**
@@ -115,7 +39,7 @@ export class SimApiGatewayV2 {
    * state without going through a Command and its authorization.
    */
   findApi(apiId: string): SimHttpApi | undefined {
-    return this.apis.find(apiId);
+    return this.commands.apis.find(apiId);
   }
 
   /**
@@ -125,8 +49,8 @@ export class SimApiGatewayV2 {
     command: simApiGatewayV2Commands.SimCreateApiCommand,
     options?: SimApiGatewayV2RequestOptions,
   ): Promise<simApiGatewayV2Commands.SimCreateApiCommandOutput> {
-    await this.background.sequence();
-    return this.apiCommands.createApi(command, options);
+    await this.commands.background.sequence();
+    return this.commands.api.createApi(command, options);
   }
 
   /**
@@ -141,8 +65,8 @@ export class SimApiGatewayV2 {
     command: simApiGatewayV2Commands.SimImportApiCommand,
     options?: SimApiGatewayV2RequestOptions,
   ): Promise<simApiGatewayV2Commands.SimImportApiCommandOutput> {
-    await this.background.sequence();
-    return this.importCommands.importApi(command, options);
+    await this.commands.background.sequence();
+    return this.commands.imports.importApi(command, options);
   }
 
   /**
@@ -152,8 +76,8 @@ export class SimApiGatewayV2 {
     command: simApiGatewayV2Commands.SimGetApiCommand,
     options?: SimApiGatewayV2RequestOptions,
   ): Promise<simApiGatewayV2Commands.SimGetApiCommandOutput> {
-    await this.background.sequence();
-    return this.apiCommands.getApi(command, options);
+    await this.commands.background.sequence();
+    return this.commands.api.getApi(command, options);
   }
 
   /**
@@ -163,8 +87,8 @@ export class SimApiGatewayV2 {
     command: simApiGatewayV2Commands.SimGetApisCommand,
     options?: SimApiGatewayV2RequestOptions,
   ): Promise<simApiGatewayV2Commands.SimGetApisCommandOutput> {
-    await this.background.sequence();
-    return this.apiCommands.getApis(command, options);
+    await this.commands.background.sequence();
+    return this.commands.api.getApis(command, options);
   }
 
   /**
@@ -174,8 +98,8 @@ export class SimApiGatewayV2 {
     command: simApiGatewayV2Commands.SimDeleteApiCommand,
     options?: SimApiGatewayV2RequestOptions,
   ): Promise<simApiGatewayV2Commands.SimDeleteApiCommandOutput> {
-    await this.background.sequence();
-    return this.apiCommands.deleteApi(command, options);
+    await this.commands.background.sequence();
+    return this.commands.api.deleteApi(command, options);
   }
 
   /**
@@ -185,8 +109,8 @@ export class SimApiGatewayV2 {
     command: simApiGatewayV2Commands.SimCreateAuthorizerCommand,
     options?: SimApiGatewayV2RequestOptions,
   ): Promise<simApiGatewayV2Commands.SimCreateAuthorizerCommandOutput> {
-    await this.background.sequence();
-    return this.authorizerCommands.createAuthorizer(command, options);
+    await this.commands.background.sequence();
+    return this.commands.authorizers.createAuthorizer(command, options);
   }
 
   /**
@@ -196,8 +120,8 @@ export class SimApiGatewayV2 {
     command: simApiGatewayV2Commands.SimGetAuthorizersCommand,
     options?: SimApiGatewayV2RequestOptions,
   ): Promise<simApiGatewayV2Commands.SimGetAuthorizersCommandOutput> {
-    await this.background.sequence();
-    return this.authorizerCommands.getAuthorizers(command, options);
+    await this.commands.background.sequence();
+    return this.commands.authorizers.getAuthorizers(command, options);
   }
 
   /**
@@ -207,8 +131,8 @@ export class SimApiGatewayV2 {
     command: simApiGatewayV2Commands.SimDeleteAuthorizerCommand,
     options?: SimApiGatewayV2RequestOptions,
   ): Promise<simApiGatewayV2Commands.SimDeleteAuthorizerCommandOutput> {
-    await this.background.sequence();
-    return this.authorizerCommands.deleteAuthorizer(command, options);
+    await this.commands.background.sequence();
+    return this.commands.authorizers.deleteAuthorizer(command, options);
   }
 
   /**
@@ -218,8 +142,8 @@ export class SimApiGatewayV2 {
     command: simApiGatewayV2Commands.SimCreateIntegrationCommand,
     options?: SimApiGatewayV2RequestOptions,
   ): Promise<simApiGatewayV2Commands.SimCreateIntegrationCommandOutput> {
-    await this.background.sequence();
-    return this.integrationCommands.createIntegration(command, options);
+    await this.commands.background.sequence();
+    return this.commands.integrations.createIntegration(command, options);
   }
 
   /**
@@ -229,8 +153,19 @@ export class SimApiGatewayV2 {
     command: simApiGatewayV2Commands.SimGetIntegrationsCommand,
     options?: SimApiGatewayV2RequestOptions,
   ): Promise<simApiGatewayV2Commands.SimGetIntegrationsCommandOutput> {
-    await this.background.sequence();
-    return this.integrationCommands.getIntegrations(command, options);
+    await this.commands.background.sequence();
+    return this.commands.integrations.getIntegrations(command, options);
+  }
+
+  /**
+   * Handle a DeleteIntegration Command from the SDK.
+   */
+  async deleteIntegration(
+    command: simApiGatewayV2Commands.SimDeleteIntegrationCommand,
+    options?: SimApiGatewayV2RequestOptions,
+  ): Promise<simApiGatewayV2Commands.SimDeleteIntegrationCommandOutput> {
+    await this.commands.background.sequence();
+    return this.commands.integrations.deleteIntegration(command, options);
   }
 
   /**
@@ -240,8 +175,8 @@ export class SimApiGatewayV2 {
     command: simApiGatewayV2Commands.SimCreateRouteCommand,
     options?: SimApiGatewayV2RequestOptions,
   ): Promise<simApiGatewayV2Commands.SimCreateRouteCommandOutput> {
-    await this.background.sequence();
-    return this.routeCommands.createRoute(command, options);
+    await this.commands.background.sequence();
+    return this.commands.routes.createRoute(command, options);
   }
 
   /**
@@ -251,8 +186,19 @@ export class SimApiGatewayV2 {
     command: simApiGatewayV2Commands.SimGetRoutesCommand,
     options?: SimApiGatewayV2RequestOptions,
   ): Promise<simApiGatewayV2Commands.SimGetRoutesCommandOutput> {
-    await this.background.sequence();
-    return this.routeCommands.getRoutes(command, options);
+    await this.commands.background.sequence();
+    return this.commands.routes.getRoutes(command, options);
+  }
+
+  /**
+   * Handle a DeleteRoute Command from the SDK.
+   */
+  async deleteRoute(
+    command: simApiGatewayV2Commands.SimDeleteRouteCommand,
+    options?: SimApiGatewayV2RequestOptions,
+  ): Promise<simApiGatewayV2Commands.SimDeleteRouteCommandOutput> {
+    await this.commands.background.sequence();
+    return this.commands.routes.deleteRoute(command, options);
   }
 
   /**
@@ -262,8 +208,8 @@ export class SimApiGatewayV2 {
     command: simApiGatewayV2Commands.SimCreateStageCommand,
     options?: SimApiGatewayV2RequestOptions,
   ): Promise<simApiGatewayV2Commands.SimCreateStageCommandOutput> {
-    await this.background.sequence();
-    return this.stageCommands.createStage(command, options);
+    await this.commands.background.sequence();
+    return this.commands.stages.createStage(command, options);
   }
 
   /**
@@ -273,8 +219,19 @@ export class SimApiGatewayV2 {
     command: simApiGatewayV2Commands.SimGetStagesCommand,
     options?: SimApiGatewayV2RequestOptions,
   ): Promise<simApiGatewayV2Commands.SimGetStagesCommandOutput> {
-    await this.background.sequence();
-    return this.stageCommands.getStages(command, options);
+    await this.commands.background.sequence();
+    return this.commands.stages.getStages(command, options);
+  }
+
+  /**
+   * Handle a DeleteStage Command from the SDK.
+   */
+  async deleteStage(
+    command: simApiGatewayV2Commands.SimDeleteStageCommand,
+    options?: SimApiGatewayV2RequestOptions,
+  ): Promise<simApiGatewayV2Commands.SimDeleteStageCommandOutput> {
+    await this.commands.background.sequence();
+    return this.commands.stages.deleteStage(command, options);
   }
 
   /**

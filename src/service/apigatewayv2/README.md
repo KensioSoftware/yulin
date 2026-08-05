@@ -9,6 +9,8 @@ rather than only against a hand-built event passed to `InvokeCommand`.
 ## Entry points
 
 - `sim-api-gateway-v2.ts` is the main in-memory service object for one account/region scope.
+- `sim-api-gateway-v2-commands.ts` holds the command areas and the state they share, so the facade
+  is state plus delegation.
 - `index.ts` exports the public API for `@kensio/yulin/apigatewayv2`.
 
 The facade is available from account/region containers, for example `simAws.apiGatewayV2()`,
@@ -34,6 +36,11 @@ construction.
 
 The API also carries the `SimHttpApiJwtIssuerKeys` port its authorizers verify against, for the same
 reason: a served request finds the API and nothing else.
+
+Deleting one of them is `DeleteRoute`, `DeleteIntegration` or `DeleteStage`, each taking its own
+resource out of the store holding it. `SimHttpApi.assertIntegrationDeletable` is the one rule
+crossing two of those stores: an integration a route still targets is refused, as it is on real AWS,
+so it lives on the API rather than in the command that asks.
 
 ## Matching a request
 

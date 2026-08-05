@@ -41,3 +41,21 @@ export interface SimGetIntegrationsCommandOutput {
   readonly Items: readonly SimHttpApiIntegrationView[];
   readonly $metadata: SimResponseMetadata;
 }
+
+/**
+ * Minimal structural sim API Gateway v2 DeleteIntegration command.
+ *
+ * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/apigatewayv2/command/DeleteIntegrationCommand/
+ */
+export interface SimDeleteIntegrationCommand {
+  readonly input: SimDeleteIntegrationCommandInput;
+}
+
+export interface SimDeleteIntegrationCommandInput {
+  readonly ApiId?: string | undefined;
+  readonly IntegrationId?: string | undefined;
+}
+
+export interface SimDeleteIntegrationCommandOutput {
+  readonly $metadata: SimResponseMetadata;
+}

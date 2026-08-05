@@ -41,3 +41,21 @@ export interface SimGetStagesCommandOutput {
   readonly Items: readonly SimHttpApiStageView[];
   readonly $metadata: SimResponseMetadata;
 }
+
+/**
+ * Minimal structural sim API Gateway v2 DeleteStage command.
+ *
+ * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/apigatewayv2/command/DeleteStageCommand/
+ */
+export interface SimDeleteStageCommand {
+  readonly input: SimDeleteStageCommandInput;
+}
+
+export interface SimDeleteStageCommandInput {
+  readonly ApiId?: string | undefined;
+  readonly StageName?: string | undefined;
+}
+
+export interface SimDeleteStageCommandOutput {
+  readonly $metadata: SimResponseMetadata;
+}
