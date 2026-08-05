@@ -1,6 +1,7 @@
 import type { SimAwsServiceTarget } from "../../../serve/controller/sim-service-controller.js";
 import {
   simRoute53LocalName,
+  simRoute53LogicalHostname,
   simRoute53LogicalName,
 } from "../local-name/sim-route53-local-name.js";
 import type { SimRoute53HostedZone } from "../hosted-zone/sim-route53-hosted-zone.js";
@@ -29,18 +30,24 @@ export class SimRoute53Resolver {
   }
 
   /**
-   * Resolve a Yulin-local HTTP hostname to a simulated AWS service target.
+   * Resolve an HTTP hostname to a simulated AWS service target.
    *
    * Resolution follows the same shape used by local integration tests:
    *
-   * 1. Strip the Yulin localhost suffix to get the logical Route53 name.
+   * 1. Strip the Yulin localhost suffix, if the hostname carries one, to get the
+   *    logical Route53 name.
    * 2. Check whether that name already points at a built-in simulated service.
    * 3. If not, follow CNAME or alias records to the next hostname.
    * 4. Stop when a service target is found, a chain breaks, a cycle appears, or
    *    the maximum CNAME depth is reached.
+   *
+   * The suffix is optional because the simulated DNS server answers for logical
+   * zone names, so a resolver pointed at the simulator sends a browser here with
+   * the hostname the application really uses. Refusing that name would leave the
+   * DNS server pointing at a server that will not answer for it.
    */
   resolveHttpHost(hostname: string): SimAwsServiceTarget | undefined {
-    const initialLogicalName = simRoute53LogicalName(hostname);
+    const initialLogicalName = simRoute53LogicalHostname(hostname);
     if (initialLogicalName === undefined) {
       return undefined;
     }

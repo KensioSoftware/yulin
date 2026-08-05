@@ -100,6 +100,51 @@ describe("Simulated AWS HTTP", () => {
     );
   });
 
+  it("routes custom domains without the Yulin-local suffix", async () => {
+    // Given a hosted zone with a CNAME pointing at a CloudFront hostname.
+    const simAws = new SimAws();
+    const hostedZoneCreation = await simAws.route53().createHostedZone({
+      input: {
+        Name: "bar.com",
+        CallerReference: "bar-com-test",
+      },
+    });
+
+    await simAws.route53().changeResourceRecordSets({
+      input: {
+        HostedZoneId: hostedZoneCreation.HostedZone?.Id,
+        ChangeBatch: {
+          Changes: [
+            {
+              Action: "UPSERT",
+              ResourceRecordSet: {
+                Name: "www.bar.com",
+                Type: "CNAME",
+                ResourceRecords: [{ Value: "d123.cloudfront.net" }],
+              },
+            },
+          ],
+        },
+      },
+    });
+    await simAws.backgroundTasksComplete();
+
+    const simAwsHttp = new SimAwsHttp({ simAws });
+
+    // When the request names the hostname as a browser would, with no suffix,
+    // which is what the simulated DNS server answers for.
+    const response = await simAwsHttp.fetch(new Request("http://www.bar.com/"));
+
+    // Then it reaches CloudFront routing rather than being refused as an
+    // unknown host.
+    assertResponseStatus(response, 404);
+    const responseBody = await response.text();
+    assertStringIncludes(
+      responseBody,
+      "Suitable sim CloudFront Distribution not found",
+    );
+  });
+
   it("serves an S3 Object over simulated HTTP when static website hosting is configured", async () => {
     const simAws = new SimAws();
 

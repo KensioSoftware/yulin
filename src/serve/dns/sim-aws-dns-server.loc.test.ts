@@ -138,23 +138,40 @@ describe("Simulated AWS DNS server", () => {
     assertArrayEquals(addresses, ["127.0.0.1"]);
   });
 
-  it("serves over HTTP what DNS pointed at, for the same name", async () => {
+  it("serves over HTTP what DNS pointed at, under the same name", async () => {
     // Given the address DNS just answered with.
     const addresses = await resolver.resolve4("www.example.test");
     assertIdentical(addresses[0], "127.0.0.1");
 
-    // When the site is requested at exactly the address DNS gave, rather than by
-    // resolving the hostname again. `sim-aws.localhost` resolves to both ::1 and
+    // When the site is requested at exactly the address DNS gave, under the name
+    // that was resolved. The address is used literally rather than by resolving
+    // the hostname again, because `sim-aws.localhost` resolves to both ::1 and
     // 127.0.0.1, so going by name could reach a different socket than the one
     // the DNS answer named, and hide a disagreement between the two.
     const { statusCode, body } = await requestAt(
       addresses[0],
       server.port,
+      "www.example.test",
+    );
+
+    // Then the simulated S3 website answers, so a resolver pointed at the
+    // simulator sends a browser somewhere that serves the name it asked for.
+    assertIdentical(statusCode, 200);
+    assertStringIncludes(body, "Hello from Yulin");
+  });
+
+  it("serves the same name carrying the Yulin-local suffix", async () => {
+    // Given a client that reaches the local server without a resolver pointed at
+    // it, and so asks for the name with the local suffix on it.
+    // When the site is requested under that hostname.
+    const { statusCode, body } = await requestAt(
+      "127.0.0.1",
+      server.port,
       "www.example.test.sim-aws.localhost",
     );
 
-    // Then the simulated S3 website answers, so the address in the DNS answer is
-    // one that really serves the name.
+    // Then the same simulated S3 website answers, because the suffix only says
+    // where the request is going, not which name is being asked for.
     assertIdentical(statusCode, 200);
     assertStringIncludes(body, "Hello from Yulin");
   });
