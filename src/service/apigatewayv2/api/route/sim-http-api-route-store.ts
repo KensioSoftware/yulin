@@ -63,6 +63,25 @@ export class SimHttpApiRouteStore {
   }
 
   /**
+   * List the routes sending their requests to one integration, which is what
+   * tells whether that integration is still in use.
+   */
+  findByIntegrationId(integrationId: string): SimHttpApiRoute[] {
+    return this.list().filter((route) => route.integrationId === integrationId);
+  }
+
+  /**
+   * Forget a deleted route.
+   *
+   * The route itself says which entries hold it, since it is indexed both by
+   * route key signature and by id.
+   */
+  remove(route: SimHttpApiRoute): void {
+    this.routes.delete(route.key.signature);
+    this.routeIds.delete(route.routeId);
+  }
+
+  /**
    * List every route of this API, in the order they were created.
    */
   list(): SimHttpApiRoute[] {

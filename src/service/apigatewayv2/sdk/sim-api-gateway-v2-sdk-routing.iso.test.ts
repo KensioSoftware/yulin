@@ -7,6 +7,9 @@ import {
   CreateStageCommand,
   DeleteApiCommand,
   DeleteAuthorizerCommand,
+  DeleteIntegrationCommand,
+  DeleteRouteCommand,
+  DeleteStageCommand,
   GetApiCommand,
   GetApisCommand,
   GetAuthorizersCommand,
@@ -101,13 +104,32 @@ describe("Intercepting an ApiGatewayV2 SDK client", () => {
     const stages = await client.send(new GetStagesCommand({ ApiId: apiId }));
     assertIdentical(stages.Items?.[0]?.StageName, "$default");
 
-    // And deleting through the client takes things away again
+    // And deleting through the client takes things away again, routes before
+    // the integration they target
+    await client.send(
+      new DeleteRouteCommand({
+        ApiId: apiId,
+        RouteId: routes.Items[0].RouteId,
+      }),
+    );
+    await client.send(
+      new DeleteIntegrationCommand({
+        ApiId: apiId,
+        IntegrationId: integration.IntegrationId,
+      }),
+    );
+    await client.send(
+      new DeleteStageCommand({ ApiId: apiId, StageName: "$default" }),
+    );
     await client.send(
       new DeleteAuthorizerCommand({
         ApiId: apiId,
         AuthorizerId: authorizer.AuthorizerId,
       }),
     );
+    const emptied = await client.send(new GetRoutesCommand({ ApiId: apiId }));
+    expect(emptied.Items).toStrictEqual([]);
+
     await client.send(new DeleteApiCommand({ ApiId: apiId }));
     const remaining = await client.send(new GetApisCommand({}));
     expect(remaining.Items).toStrictEqual([]);

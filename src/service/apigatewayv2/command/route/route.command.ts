@@ -42,3 +42,21 @@ export interface SimGetRoutesCommandOutput {
   readonly Items: readonly SimHttpApiRouteView[];
   readonly $metadata: SimResponseMetadata;
 }
+
+/**
+ * Minimal structural sim API Gateway v2 DeleteRoute command.
+ *
+ * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/apigatewayv2/command/DeleteRouteCommand/
+ */
+export interface SimDeleteRouteCommand {
+  readonly input: SimDeleteRouteCommandInput;
+}
+
+export interface SimDeleteRouteCommandInput {
+  readonly ApiId?: string | undefined;
+  readonly RouteId?: string | undefined;
+}
+
+export interface SimDeleteRouteCommandOutput {
+  readonly $metadata: SimResponseMetadata;
+}

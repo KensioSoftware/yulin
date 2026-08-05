@@ -17,14 +17,17 @@ import type {
 } from "../command/authorizer/authorizer.command.js";
 import type {
   SimCreateIntegrationCommand,
+  SimDeleteIntegrationCommand,
   SimGetIntegrationsCommand,
 } from "../command/integration/integration.command.js";
 import type {
   SimCreateRouteCommand,
+  SimDeleteRouteCommand,
   SimGetRoutesCommand,
 } from "../command/route/route.command.js";
 import type {
   SimCreateStageCommand,
+  SimDeleteStageCommand,
   SimGetStagesCommand,
 } from "../command/stage/stage.command.js";
 import type { SimApiGatewayV2 } from "../sim-api-gateway-v2.js";
@@ -118,6 +121,14 @@ export class SimApiGatewayV2SdkCommandRouter implements SimSdkCommandRouter {
           ),
       ],
       [
+        "DeleteIntegrationCommand",
+        async (command, context): Promise<unknown> =>
+          await simApiGatewayV2.deleteIntegration(
+            command as SimDeleteIntegrationCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
         "CreateRouteCommand",
         async (command, context): Promise<unknown> =>
           await simApiGatewayV2.createRoute(
@@ -134,6 +145,14 @@ export class SimApiGatewayV2SdkCommandRouter implements SimSdkCommandRouter {
           ),
       ],
       [
+        "DeleteRouteCommand",
+        async (command, context): Promise<unknown> =>
+          await simApiGatewayV2.deleteRoute(
+            command as SimDeleteRouteCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
         "CreateStageCommand",
         async (command, context): Promise<unknown> =>
           await simApiGatewayV2.createStage(
@@ -146,6 +165,14 @@ export class SimApiGatewayV2SdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simApiGatewayV2.getStages(
             command as SimGetStagesCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteStageCommand",
+        async (command, context): Promise<unknown> =>
+          await simApiGatewayV2.deleteStage(
+            command as SimDeleteStageCommand,
             simSdkCallerOptions(context),
           ),
       ],

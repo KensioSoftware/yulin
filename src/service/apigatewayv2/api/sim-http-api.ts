@@ -4,6 +4,7 @@ import type { SimHttpApiJwtIssuerKeys } from "./authorizer/sim-http-api-jwt-issu
 import { SimHttpApiIntegrationStore } from "./integration/sim-http-api-integration-store.js";
 import { SimHttpApiRouteStore } from "./route/sim-http-api-route-store.js";
 import { SimHttpApiStageStore } from "./stage/sim-http-api-stage-store.js";
+import { SimApiGatewayV2BadRequest } from "../error/sim-api-gateway-v2.error.js";
 import { simHttpApiHost } from "./sim-http-api-host.js";
 import {
   type SimHttpApiMatch,
@@ -99,6 +100,30 @@ export class SimHttpApi {
    */
   match(request: SimHttpApiRequest): SimHttpApiMatch | undefined {
     return this.matcher.match(this, request);
+  }
+
+  /**
+   * Ensure no route still sends requests to an integration, which is what real
+   * API Gateway requires before it will delete one.
+   *
+   * The refusal is the ordering constraint anything tearing an API down has to
+   * respect: the routes come off first, then the integration behind them. It
+   * lives here because the routes and the integrations are both this API's,
+   * and the rule is about how they relate rather than about the command.
+   */
+  assertIntegrationDeletable(integrationId: string): void {
+    const routing = this.routes.findByIntegrationId(integrationId);
+
+    if (routing.length === 0) {
+      return;
+    }
+
+    const routeKeys = routing.map((route) => route.routeKey).join(", ");
+
+    throw new SimApiGatewayV2BadRequest(
+      `Integration ${integrationId} on API ${this.apiId} cannot be deleted ` +
+        `while it is the target of ${routeKeys}. Delete those routes first.`,
+    );
   }
 
   /**

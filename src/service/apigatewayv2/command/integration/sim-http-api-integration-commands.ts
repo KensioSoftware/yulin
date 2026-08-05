@@ -6,9 +6,12 @@ import { SimHttpApiLambdaUri } from "../../api/integration/sim-http-api-lambda-u
 import type { SimApiGatewayV2RequestOptions } from "../sim-api-gateway-v2-request-options.js";
 import { SimApiGatewayV2UnsimulatedInput } from "../sim-api-gateway-v2-unsimulated-input.js";
 import type { SimHttpApiAccess } from "../sim-http-api-access.js";
+import { SimApiGatewayV2NotFound } from "../../error/sim-api-gateway-v2.error.js";
 import type {
   SimCreateIntegrationCommand,
   SimCreateIntegrationCommandOutput,
+  SimDeleteIntegrationCommand,
+  SimDeleteIntegrationCommandOutput,
   SimGetIntegrationsCommand,
   SimGetIntegrationsCommandOutput,
 } from "./integration.command.js";
@@ -116,5 +119,46 @@ export class SimHttpApiIntegrationCommands {
       Items: api.integrations.list().map((integration) => integration.view()),
       $metadata: {},
     };
+  }
+
+  /**
+   * Handle a DeleteIntegration command.
+   *
+   * An integration a route still points at is refused, which is what real API
+   * Gateway does. The API says so, since the rule is about how its routes and
+   * its integrations relate.
+   */
+  deleteIntegration(
+    command: SimDeleteIntegrationCommand,
+    options?: SimApiGatewayV2RequestOptions,
+  ): SimDeleteIntegrationCommandOutput {
+    const unsimulated = new SimApiGatewayV2UnsimulatedInput(
+      "DeleteIntegration",
+    );
+    unsimulated.refuseUnaccepted(command.input, ["ApiId", "IntegrationId"]);
+    const apiId = unsimulated.require("ApiId", command.input.ApiId);
+    const integrationId = unsimulated.require(
+      "IntegrationId",
+      command.input.IntegrationId,
+    );
+
+    const api = this.access.api({
+      method: "DELETE",
+      apiId,
+      childPath: `${integrationsPath}/${integrationId}`,
+      caller: options?.caller,
+    });
+    const integration = api.integrations.find(integrationId);
+
+    if (integration === undefined) {
+      throw new SimApiGatewayV2NotFound(
+        `No integration with id ${integrationId} on API ${apiId}`,
+      );
+    }
+
+    api.assertIntegrationDeletable(integration.integrationId);
+    api.integrations.remove(integration.integrationId);
+
+    return { $metadata: {} };
   }
 }

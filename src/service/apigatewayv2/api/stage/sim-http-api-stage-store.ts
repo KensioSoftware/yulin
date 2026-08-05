@@ -22,6 +22,13 @@ export class SimHttpApiStageStore {
   }
 
   /**
+   * Forget a deleted stage.
+   */
+  remove(stageName: string): void {
+    this.stages.delete(stageName);
+  }
+
+  /**
    * List every stage of this API, in the order they were created.
    */
   list(): SimHttpApiStage[] {

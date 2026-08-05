@@ -45,6 +45,13 @@ export class SimHttpApiIntegrationStore {
   }
 
   /**
+   * Forget a deleted integration.
+   */
+  remove(integrationId: SimHttpApiIntegrationId): void {
+    this.integrations.delete(integrationId);
+  }
+
+  /**
    * List every integration of this API, in the order they were created.
    */
   list(): SimHttpApiIntegration[] {
