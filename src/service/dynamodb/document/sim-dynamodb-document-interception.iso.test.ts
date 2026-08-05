@@ -22,7 +22,6 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimSdk, SimSdkUnsupportedCommandError } from "../../../sdk/index.js";
-import { SimDynamoDbUnsupportedOperation } from "../error/dynamodb.error.js";
 import { SimIamAccessDenied } from "../../iam/error/sim-iam.error.js";
 
 /**
@@ -139,8 +138,8 @@ describe("simulated DynamoDB document client interception", () => {
     assertStringIncludes(error.message, "PutCommand");
   });
 
-  it("refuses a document Command sharing its name with a client Command", async () => {
-    // Given an intercepted document client.
+  it("routes a Command sharing its name with a client Command by which client sent it", async () => {
+    // Given an intercepted document client holding one item.
     using simSdk = new SimSdk();
     const documents = DynamoDBDocumentClient.from(
       new DynamoDBClient({ region: "eu-west-2" }),
@@ -148,23 +147,26 @@ describe("simulated DynamoDB document client interception", () => {
     simSdk.intercept(documents);
     await createTable(simSdk, documents);
 
-    // When a document Query is sent, which is named the same as the client
-    // Query the simulator does route.
-    const error = await assertThrowsErrorAsync(async () => {
-      await documents.send(
-        new QueryCommand({
-          TableName: "OrdersTable",
-          KeyConditionExpression: "orderId = :order",
-          ExpressionAttributeValues: { ":order": "order-1" },
-        }),
-      );
-    });
+    await documents.send(
+      new PutCommand({
+        TableName: "OrdersTable",
+        Item: { orderId: "order-1", total: 42 },
+      }),
+    );
 
-    // Then it is refused rather than read as though it carried
-    // AttributeValues, which is what the client Query would have done with its
-    // native values.
-    assertInstanceOf(error, SimDynamoDbUnsupportedOperation);
-    assertStringIncludes(error.message, "document client's QueryCommand");
+    // When a document Query is sent, which is named the same as the client
+    // Query the simulator also routes.
+    const read = await documents.send(
+      new QueryCommand({
+        TableName: "OrdersTable",
+        KeyConditionExpression: "orderId = :order",
+        ExpressionAttributeValues: { ":order": "order-1" },
+      }),
+    );
+
+    // Then it is read as the document Command it is, rather than as though its
+    // native values were AttributeValues.
+    assertObjectEquals(read.Items?.[0], { orderId: "order-1", total: 42 });
   });
 
   it("authorizes a document Command as the caller sending it", async () => {

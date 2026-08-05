@@ -1103,9 +1103,16 @@ intercepted send never runs it and the conversion happens at the interception bo
 - `sim-dynamodb-document-route.ts` converts, sends to the ordinary facade method, and converts back.
   `-routes.ts` builds one per Command for the SDK router to merge in.
 
-A document Command is named differently to the Command it stands for, so `PutCommand` and
+Most document Commands are named differently to the Command they stand for, so `PutCommand` and
 `PutItemCommand` route separately. One with no route, such as `TransactWriteCommand`, is refused by
 name before anything tries to convert its values.
+
+`QueryCommand` and `ScanCommand` are named the same in both packages, so the SDK router cannot key on
+the name alone. `sim-dynamodb-document-shared-name-route.ts` holds the document route and the client
+route for one name and picks between them by asking the Command which client built it:
+`@aws-sdk/lib-dynamodb` declares `inputKeyNodes`, `outputKeyNodes` and `clientCommand` on its own
+Commands, which are `protected` and so present at runtime where a client Command has nothing.
+`sim-dynamodb-document-command.ts` is that check.
 
 Which object a user intercepts is settled: the document client itself.
 `DynamoDBDocumentClient.from(client)` builds a separate object that extends the same `Client` base as

@@ -2850,14 +2850,99 @@ const tags = read.Item?.["tags"] as Set<string>;
 console.log(tags.has("priority")); // true
 ```
 
-`PutCommand`, `GetCommand`, `DeleteCommand`, `UpdateCommand`, `BatchWriteCommand` and
-`BatchGetCommand` are converted. A document Command with no route here, such as
-`TransactWriteCommand`, is refused by name before anything tries to convert its values.
+`PutCommand`, `GetCommand`, `DeleteCommand`, `UpdateCommand`, `QueryCommand`, `ScanCommand`,
+`BatchWriteCommand` and `BatchGetCommand` are converted. A document Command with no route here, such
+as `TransactWriteCommand`, is refused by name before anything tries to convert its values.
 
 Intercept the document client itself. `DynamoDBDocumentClient.from(client)` builds a separate object
 that is not an instance of `DynamoDBClient`, so intercepting the base client does nothing for
 Commands sent through the document one. See
 [the SDK docs](../../sdk/README.md#the-dynamodb-document-client).
+
+### Querying and scanning through the document client
+
+`@aws-sdk/lib-dynamodb` names its `QueryCommand` and `ScanCommand` exactly as
+`@aws-sdk/client-dynamodb` does. Both are routed, and which one a request gets is decided by the
+Command it was sent with rather than by the name, so the two can be used on the same intercepted
+client.
+
+Expression values and `ExclusiveStartKey` are converted on the way in, and `Items` and
+`LastEvaluatedKey` on the way out. A key from one page goes straight back in as the start of the
+next, so `paginateQuery` and `paginateScan` work as they are.
+
+```typescript sim-dynamodb-document-read
+/**
+ * Querying a simulated table through the document client, a page at a time.
+ */
+
+import { CreateTableCommand, DynamoDBClient } from "@aws-sdk/client-dynamodb";
+import {
+  DynamoDBDocumentClient,
+  paginateQuery,
+  PutCommand,
+  QueryCommand,
+} from "@aws-sdk/lib-dynamodb";
+
+import { SimSdk } from "@kensio/yulin/sdk";
+
+using simSdk = new SimSdk();
+
+const documents = DynamoDBDocumentClient.from(
+  new DynamoDBClient({ region: "eu-west-2" }),
+);
+simSdk.intercept(documents);
+
+await documents.send(
+  new CreateTableCommand({
+    TableName: "OrdersTable",
+    KeySchema: [
+      { AttributeName: "customerId", KeyType: "HASH" },
+      { AttributeName: "orderId", KeyType: "RANGE" },
+    ],
+    AttributeDefinitions: [
+      { AttributeName: "customerId", AttributeType: "S" },
+      { AttributeName: "orderId", AttributeType: "S" },
+    ],
+    BillingMode: "PAY_PER_REQUEST",
+  }),
+);
+await simSdk.simAws.backgroundTasksComplete();
+
+for (const orderId of ["order-1", "order-2"]) {
+  await documents.send(
+    new PutCommand({
+      TableName: "OrdersTable",
+      Item: { customerId: "cust-1", orderId, total: 42 },
+    }),
+  );
+}
+
+const query = {
+  TableName: "OrdersTable",
+  KeyConditionExpression: "customerId = :customer",
+  ExpressionAttributeValues: { ":customer": "cust-1" },
+  Limit: 1,
+};
+
+const first = await documents.send(new QueryCommand(query));
+
+console.log(first.Items?.[0]?.["total"]); // 42
+
+// The key comes back as plain JavaScript, and goes back in as it is.
+const second = await documents.send(
+  new QueryCommand({ ...query, ExclusiveStartKey: first.LastEvaluatedKey }),
+);
+
+console.log(second.Items?.[0]?.["orderId"]); // order-2
+
+// The paginators send the same Commands, so they need nothing extra. Each one
+// writes the next start key into the input it was given, so it gets a copy.
+const pages = paginateQuery({ client: documents, pageSize: 1 }, { ...query });
+
+for await (const page of pages) {
+  console.log(page.Items?.length); // 1
+}
+```
 
 ### Which native types map to which descriptors
 
@@ -3449,22 +3534,20 @@ Arn`, `Fn::GetAtt … StreamArn` and `Fn::GetAtt … TableId` answering. A CDK `
 - SDK interception, so an intercepted `DynamoDBClient` or `DynamoDBStreamsClient` reaches the
   simulation.
 - The `@aws-sdk/lib-dynamodb` document client, with `PutCommand`, `GetCommand`, `DeleteCommand`,
-  `UpdateCommand`, `BatchWriteCommand` and `BatchGetCommand` converting native JavaScript values on
-  the way in and out.
+  `UpdateCommand`, `QueryCommand`, `ScanCommand`, `BatchWriteCommand` and `BatchGetCommand`
+  converting native JavaScript values on the way in and out, and `paginateQuery` and `paginateScan`
+  paging through a simulated table.
 
 ## Limitations
 
-- The document client's `Query`, `Scan`, transaction and PartiQL Commands are not converted. PartiQL
-  is an operation this simulation does not have yet. The rest are simulated as operations, so only
-  the document form is missing: for the transaction Commands that is simply not written yet, and for
-  `Query` and `Scan` it is because `@aws-sdk/lib-dynamodb` and `@aws-sdk/client-dynamodb` both name
-  their Commands `QueryCommand` and `ScanCommand`, which the interception routes by. All of them are
-  refused by name rather than half converted.
+- The document client's transaction and PartiQL Commands are not converted. PartiQL is an operation
+  this simulation does not have yet. The transactions are simulated as operations, so only the
+  document form of them is missing. Both are refused by name rather than half converted.
 - A document client's translate config is not read, so the marshalling options it was built with do
   not apply. See [the SDK docs](../../sdk/README.md#limitations).
-- `Expected`, `ConditionalOperator` and `AttributeUpdates` are not converted for the document
-  client, because simulated DynamoDB refuses all three anyway. A request carrying one is refused by
-  the operation rather than by the conversion.
+- `Expected`, `ConditionalOperator`, `AttributeUpdates`, `KeyConditions`, `QueryFilter` and
+  `ScanFilter` are not converted for the document client, because simulated DynamoDB refuses all six
+  anyway. A request carrying one is refused by the operation rather than by the conversion.
 - A read of a global secondary index answers with the attributes the index projects, and nothing
   fills in the rest. Real DynamoDB does not either: it never reads the base table for an attribute a
   global secondary index does not project, which is why `Select: ALL_ATTRIBUTES` against a partial

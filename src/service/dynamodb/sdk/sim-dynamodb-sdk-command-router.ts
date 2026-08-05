@@ -35,8 +35,11 @@ import type {
   SimDescribeTimeToLiveCommand,
   SimUpdateTimeToLiveCommand,
 } from "../command/time-to-live/time-to-live.command.js";
-import { refuseSimDynamoDbDocumentCommand } from "../document/sim-dynamodb-document-command.js";
-import { simDynamoDbDocumentRoutes } from "../document/sim-dynamodb-document-routes.js";
+import {
+  simDynamoDbDocumentRoutes,
+  simDynamoDbDocumentSharedNameRoutes,
+} from "../document/sim-dynamodb-document-routes.js";
+import { SimDynamoDbSharedNameRoute } from "../document/sim-dynamodb-document-shared-name-route.js";
 import type { SimDynamoDb as SimDynamoDatabase } from "../sim-dynamodb.js";
 
 /**
@@ -46,6 +49,11 @@ export class SimDynamoDatabaseSdkCommandRouter implements SimSdkCommandRouter {
   private readonly routes: ReadonlyMap<string, SimSdkCommandRoute>;
 
   constructor(simDynamoDatabase: SimDynamoDatabase) {
+    // The document Commands named the same as a client Command, each paired
+    // below with the client route it shares its name with.
+    const documentShared =
+      simDynamoDbDocumentSharedNameRoutes(simDynamoDatabase);
+
     this.routes = new Map<string, SimSdkCommandRoute>([
       [
         "CreateTableCommand",
@@ -121,29 +129,25 @@ export class SimDynamoDatabaseSdkCommandRouter implements SimSdkCommandRouter {
       ],
       [
         "QueryCommand",
-        async (command, context): Promise<unknown> => {
-          // The document client names its Query the same as this one, so the
-          // Command name alone cannot tell them apart.
-          refuseSimDynamoDbDocumentCommand(command, "QueryCommand");
-
-          return await simDynamoDatabase.query(
-            command as SimQueryCommand,
-            simSdkCallerOptions(context),
-          );
-        },
+        new SimDynamoDbSharedNameRoute({
+          document: documentShared.query,
+          client: async (command, context): Promise<unknown> =>
+            await simDynamoDatabase.query(
+              command as SimQueryCommand,
+              simSdkCallerOptions(context),
+            ),
+        }).route(),
       ],
       [
         "ScanCommand",
-        async (command, context): Promise<unknown> => {
-          // The document client names its Scan the same as this one, so the
-          // Command name alone cannot tell them apart.
-          refuseSimDynamoDbDocumentCommand(command, "ScanCommand");
-
-          return await simDynamoDatabase.scan(
-            command as SimScanCommand,
-            simSdkCallerOptions(context),
-          );
-        },
+        new SimDynamoDbSharedNameRoute({
+          document: documentShared.scan,
+          client: async (command, context): Promise<unknown> =>
+            await simDynamoDatabase.scan(
+              command as SimScanCommand,
+              simSdkCallerOptions(context),
+            ),
+        }).route(),
       ],
       [
         "BatchWriteItemCommand",

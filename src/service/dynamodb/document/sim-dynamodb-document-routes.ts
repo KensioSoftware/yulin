@@ -17,32 +17,69 @@ type SimDynamoDbDocumentSend = (
 ) => Promise<object>;
 
 /**
- * Build the routed entry for one document Command.
+ * Build the route for one document Command.
  */
 function documentRoute(
+  commandPaths: SimDynamoDbDocumentCommandPaths,
+  send: SimDynamoDbDocumentSend,
+): SimSdkCommandRoute {
+  return new SimDynamoDbDocumentRoute({
+    input: commandPaths.input,
+    output: commandPaths.output,
+    send: async (input, options) => await send(input as never, options),
+  }).route();
+}
+
+/**
+ * Build the routed entry for one document Command with a name of its own.
+ */
+function namedDocumentRoute(
   name: string,
   commandPaths: SimDynamoDbDocumentCommandPaths,
   send: SimDynamoDbDocumentSend,
 ): readonly [string, SimSdkCommandRoute] {
-  return [
-    name,
-    new SimDynamoDbDocumentRoute({
-      input: commandPaths.input,
-      output: commandPaths.output,
-      send: async (input, options) => await send(input as never, options),
-    }).route(),
-  ];
+  return [name, documentRoute(commandPaths, send)];
 }
 
 /**
- * The routes that handle `@aws-sdk/lib-dynamodb` document client Commands.
+ * The document routes for the two Commands `@aws-sdk/lib-dynamodb` names
+ * exactly as `@aws-sdk/client-dynamodb` does.
  *
- * A document Command is named differently to the Command it stands for, so
- * `PutCommand` and `PutItemCommand` route separately and only the document one
- * converts. Everything after the conversion is the ordinary operation: the same
- * validation, the same authorization, the same simulated table.
+ * These cannot be routed by name on their own. Each is paired with the client
+ * route of the same name by `SimDynamoDbSharedNameRoute`, which asks the
+ * Command which client it came from.
+ */
+export function simDynamoDbDocumentSharedNameRoutes(dynamoDb: SimDynamoDb): {
+  readonly query: SimSdkCommandRoute;
+  readonly scan: SimSdkCommandRoute;
+} {
+  return {
+    query: documentRoute(
+      paths.query,
+      async (input: simDynamoDbCommands.SimQueryCommandInput, options) =>
+        await dynamoDb.query({ input }, options),
+    ),
+    scan: documentRoute(
+      paths.scan,
+      async (input: simDynamoDbCommands.SimScanCommandInput, options) =>
+        await dynamoDb.scan({ input }, options),
+    ),
+  };
+}
+
+/**
+ * The routes that handle the `@aws-sdk/lib-dynamodb` document client Commands
+ * with a name of their own.
  *
- * An operation with no document route here, such as a document
+ * Most document Commands are named differently to the Command they stand for,
+ * so `PutCommand` and `PutItemCommand` route separately and only the document
+ * one converts. Everything after the conversion is the ordinary operation: the
+ * same validation, the same authorization, the same simulated table.
+ *
+ * `QueryCommand` and `ScanCommand` share their names with client Commands and
+ * so are routed by `simDynamoDbDocumentSharedNameRoutes` instead.
+ *
+ * An operation with no document route at all, such as a document
  * `TransactWriteCommand`, is refused by name like any other unsupported
  * Command, rather than failing part way through a conversion.
  */
@@ -50,31 +87,31 @@ export function simDynamoDbDocumentRoutes(
   dynamoDb: SimDynamoDb,
 ): readonly (readonly [string, SimSdkCommandRoute])[] {
   return [
-    documentRoute(
+    namedDocumentRoute(
       "PutCommand",
       paths.put,
       async (input: simDynamoDbCommands.SimPutItemCommandInput, options) =>
         await dynamoDb.putItem({ input }, options),
     ),
-    documentRoute(
+    namedDocumentRoute(
       "GetCommand",
       paths.get,
       async (input: simDynamoDbCommands.SimGetItemCommandInput, options) =>
         await dynamoDb.getItem({ input }, options),
     ),
-    documentRoute(
+    namedDocumentRoute(
       "DeleteCommand",
       paths.remove,
       async (input: simDynamoDbCommands.SimDeleteItemCommandInput, options) =>
         await dynamoDb.deleteItem({ input }, options),
     ),
-    documentRoute(
+    namedDocumentRoute(
       "UpdateCommand",
       paths.update,
       async (input: simDynamoDbCommands.SimUpdateItemCommandInput, options) =>
         await dynamoDb.updateItem({ input }, options),
     ),
-    documentRoute(
+    namedDocumentRoute(
       "BatchWriteCommand",
       paths.batchWrite,
       async (
@@ -82,7 +119,7 @@ export function simDynamoDbDocumentRoutes(
         options,
       ) => await dynamoDb.batchWriteItem({ input }, options),
     ),
-    documentRoute(
+    namedDocumentRoute(
       "BatchGetCommand",
       paths.batchGet,
       async (input: simDynamoDbCommands.SimBatchGetItemCommandInput, options) =>
