@@ -38,6 +38,7 @@ npm i -D @kensio/yulin
 ## Feature specific docs
 
 - [AWS SDK interception](./docs/sdk "Simulated AWS SDK docs")
+- [Serving on localhost](./docs/serve "Serving simulated AWS on localhost docs")
 - [Simulated time](./docs/time "Simulated time docs")
 
 ## Usage
@@ -207,6 +208,21 @@ process.on("SIGTERM", () => {
 A restart usually overlaps the process it is replacing. `listen` waits a couple of seconds for a
 pinned port that is still held, then throws `SimAwsLocalPortInUse` naming the port, which means
 something other than the outgoing process owns it.
+
+#### Reload the browser on a restart
+
+Yulin is the only thing in the response path of a page it serves, so it can tell the browser to
+reload. Turning `liveReload` on puts a small script into the HTML pages served to browsers, and the
+page reloads itself when the process restarts:
+
+```typescript
+const srv = await serveSimAws({ simAws, port: 4599, liveReload: true });
+```
+
+`srv.reload()` reloads connected browsers for a change that needs no restart. Live reload is off by
+default, since an injected page is not byte for byte what the real service returns. See the
+[serving docs](./docs/serve "Serving simulated AWS on localhost docs") for what gets the script and
+what does not.
 
 ### Control simulated time
 

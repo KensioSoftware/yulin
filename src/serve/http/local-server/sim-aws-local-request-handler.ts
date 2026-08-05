@@ -1,6 +1,12 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { NodeFetchHttpAdapter } from "../node-fetch-http-adapter.js";
 import type { SimAwsHttp } from "../sim-aws-http.js";
+import type { SimLiveReload } from "../live-reload/sim-live-reload.js";
+
+interface SimAwsLocalRequestHandlerProperties {
+  readonly simAwsHttp: SimAwsHttp;
+  readonly liveReload?: SimLiveReload;
+}
 
 /**
  * Bridges Node's HTTP server callbacks to the Fetch-shaped simulated AWS HTTP
@@ -9,13 +15,21 @@ import type { SimAwsHttp } from "../sim-aws-http.js";
  * Node hands over a request and a response object and expects nothing back,
  * while `SimAwsHttp` takes a `Request` and returns a `Response`. Keeping that
  * adaptation here leaves the local server owning only the socket lifecycle.
+ *
+ * Live reload sits either side of `SimAwsHttp` rather than inside it. That
+ * interface is also the SDK interception path and the in-process test path, so
+ * keeping the reload channel and the injected script out here means only a real
+ * browser talking to the local server ever sees either of them.
  */
 export class SimAwsLocalRequestHandler {
   private readonly simAwsHttp: SimAwsHttp;
+  private readonly liveReload: SimLiveReload | undefined;
   private readonly nodeFetchHttpAdapter = new NodeFetchHttpAdapter();
 
-  constructor(simAwsHttp: SimAwsHttp) {
+  constructor(properties: SimAwsLocalRequestHandlerProperties) {
+    const { simAwsHttp, liveReload } = properties;
     this.simAwsHttp = simAwsHttp;
+    this.liveReload = liveReload;
   }
 
   /**
@@ -23,6 +37,11 @@ export class SimAwsLocalRequestHandler {
    * than letting it escape into an unhandled rejection.
    */
   handle(nodeRequest: IncomingMessage, nodeResponse: ServerResponse): void {
+    if (this.liveReload?.isChannelRequest(nodeRequest) === true) {
+      this.liveReload.connect(nodeResponse);
+      return;
+    }
+
     // eslint-disable-next-line unicorn/prefer-await
     this.respond(nodeRequest, nodeResponse).catch((error: unknown) => {
       this.respondWithError(error, nodeResponse);
@@ -37,7 +56,21 @@ export class SimAwsLocalRequestHandler {
       this.nodeFetchHttpAdapter.nodeRequestToFetchRequest(nodeRequest);
     const response = await this.simAwsHttp.handleRequest(request);
 
-    await this.nodeFetchHttpAdapter.sendFetchResponse(nodeResponse, response);
+    await this.nodeFetchHttpAdapter.sendFetchResponse(
+      nodeResponse,
+      await this.served(request, response),
+    );
+  }
+
+  private async served(
+    request: Request,
+    response: Response,
+  ): Promise<Response> {
+    if (this.liveReload === undefined) {
+      return response;
+    }
+
+    return this.liveReload.injectInto(request, response);
   }
 
   private respondWithError(error: unknown, nodeResponse: ServerResponse): void {

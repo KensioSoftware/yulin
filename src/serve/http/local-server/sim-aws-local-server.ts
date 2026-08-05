@@ -6,9 +6,12 @@ import { SimAwsLocalUrl } from "../url/sim-aws-local-url.js";
 import { NodeServerPortBinder } from "./node-server-port-binder.js";
 import { SimAwsLocalRequestHandler } from "./sim-aws-local-request-handler.js";
 import { SimAwsDnsServer } from "../../dns/sim-aws-dns-server.js";
+import { SimLiveReload } from "../live-reload/sim-live-reload.js";
+import { SimLiveReloadReport } from "../live-reload/sim-live-reload-report.js";
 
 interface SimAwsLocalServerProperties {
   readonly simAws?: SimAws;
+  readonly liveReload?: boolean;
 }
 
 /**
@@ -20,12 +23,15 @@ export class SimAwsLocalServer {
   private readonly server: Server;
   private readonly portBinder: NodeServerPortBinder;
   private readonly dnsServer: SimAwsDnsServer;
+  private readonly liveReload: SimLiveReload | undefined;
 
   constructor(properties: SimAwsLocalServerProperties = {}) {
-    const { simAws = new SimAws() } = properties;
-    this.requestHandler = new SimAwsLocalRequestHandler(
-      new SimAwsHttp({ simAws }),
-    );
+    const { simAws = new SimAws(), liveReload = false } = properties;
+    this.liveReload = liveReload ? new SimLiveReload() : undefined;
+    this.requestHandler = new SimAwsLocalRequestHandler({
+      simAwsHttp: new SimAwsHttp({ simAws }),
+      ...(this.liveReload !== undefined && { liveReload: this.liveReload }),
+    });
     this.dnsServer = new SimAwsDnsServer({ simAws });
     this.server = http.createServer((request, response) => {
       this.requestHandler.handle(request, response);
@@ -53,6 +59,11 @@ export class SimAwsLocalServer {
   async listen(port: number = simAwsLocalConfig.defaultPort): Promise<this> {
     await this.portBinder.bind(port);
     await this.dnsServer.listen(Number(this.port));
+
+    if (this.liveReload !== undefined) {
+      new SimLiveReloadReport().announce(this.port);
+    }
+
     return this;
   }
 
@@ -103,9 +114,27 @@ export class SimAwsLocalServer {
    * the open ones are being ended.
    */
   close(): void {
+    this.liveReload?.stopping();
     this.server.close();
     this.server.closeAllConnections();
     this.dnsServer.close();
+  }
+
+  /**
+   * Reload every browser connected to this server.
+   *
+   * For a change that needs no restart, such as new content in a simulated
+   * Bucket. A change to the code that built the environment needs the process
+   * to restart, and the pages reload themselves when it comes back.
+   */
+  reload(): void {
+    if (this.liveReload === undefined) {
+      throw new Error(
+        "Live reload is off for this server, serve with { liveReload: true } to use reload()",
+      );
+    }
+
+    this.liveReload.reload();
   }
 
   /**
@@ -120,6 +149,7 @@ export class SimAwsLocalServer {
 interface ServeSimAwsProperties {
   readonly simAws?: SimAws;
   readonly port?: number;
+  readonly liveReload?: boolean;
 }
 
 /**
@@ -128,8 +158,11 @@ interface ServeSimAwsProperties {
 export async function serveSimAws(
   properties: ServeSimAwsProperties = {},
 ): Promise<SimAwsLocalServer> {
-  const { simAws = new SimAws(), port = simAwsLocalConfig.defaultPort } =
-    properties;
-  const server = new SimAwsLocalServer({ simAws });
+  const {
+    simAws = new SimAws(),
+    port = simAwsLocalConfig.defaultPort,
+    liveReload = false,
+  } = properties;
+  const server = new SimAwsLocalServer({ simAws, liveReload });
   return server.listen(port);
 }
