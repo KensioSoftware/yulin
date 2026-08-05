@@ -111,4 +111,32 @@ describe("Sim CloudFront custom error response configuration", () => {
     assertInstanceOf(error, SimCloudFrontInvalidResponseCode);
     assertStringIncludes(error.message, "not-a-status");
   });
+
+  it("refuses a response code outside the set CloudFront returns", async () => {
+    // Given a status CloudFront does not return with a custom error page. It
+    // allows 200 and the error codes, and nothing else.
+    const error = await refusedCustomErrorResponse({
+      ErrorCode: 404,
+      ResponsePagePath: "/404.html",
+      ResponseCode: "201",
+    });
+
+    // Then it is refused as InvalidResponseCode.
+    assertInstanceOf(error, SimCloudFrontInvalidResponseCode);
+    assertStringIncludes(error.message, "201");
+  });
+
+  it("refuses a response code that cannot carry the response page", async () => {
+    // Given 204, which has no body to put the page in.
+    const error = await refusedCustomErrorResponse({
+      ErrorCode: 404,
+      ResponsePagePath: "/404.html",
+      ResponseCode: "204",
+    });
+
+    // Then it is refused when the Distribution is created, rather than
+    // failing on the request that would serve the page.
+    assertInstanceOf(error, SimCloudFrontInvalidResponseCode);
+    assertStringIncludes(error.message, "204");
+  });
 });

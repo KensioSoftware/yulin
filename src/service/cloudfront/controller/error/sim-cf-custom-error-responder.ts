@@ -78,9 +78,15 @@ export class SimCfCustomErrorResponder {
     url.pathname = customErrorResponse.responsePagePath;
     url.search = "";
 
+    // The response page is fetched without a body, whatever the viewer sent,
+    // so headers describing the viewer's body would describe nothing.
+    const headers = new Headers(request.headers);
+    headers.delete("content-type");
+    headers.delete("content-length");
+
     return new Request(url, {
       method: request.method === "HEAD" ? "HEAD" : "GET",
-      headers: request.headers,
+      headers,
       redirect: request.redirect,
       signal: request.signal,
     });

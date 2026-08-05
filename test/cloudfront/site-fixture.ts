@@ -48,6 +48,10 @@ export async function simCfSiteBucket(
 /**
  * A DistributionConfig serving one S3 Origin, with the given config merged on
  * top so a test only states the part it is about.
+ *
+ * The merge is shallow, so overriding `DefaultCacheBehavior` or `Origins`
+ * replaces the whole value rather than adding to it, and the caller has to
+ * restate what it still needs, such as `TargetOriginId`.
  */
 export function simCfSiteDistributionConfig(
   bucketName: string,

@@ -1,6 +1,9 @@
 import type { SimCloudFrontCustomErrorResponseConfig } from "../../command/create-distribution/create-distribution.command.js";
 import type { SimCloudFrontDistribution } from "../sim-cloudfront-distribution.js";
-import { simCloudFrontCustomErrorCodes } from "../../custom-error/sim-cloudfront-custom-error-response.js";
+import {
+  simCloudFrontCustomErrorCodes,
+  simCloudFrontCustomErrorResponseCodes,
+} from "../../custom-error/sim-cloudfront-custom-error-response.js";
 import {
   SimCloudFrontInvalidArgument,
   SimCloudFrontInvalidErrorCode,
@@ -74,9 +77,9 @@ export class SimCloudFrontCustomErrorConfigurator {
     }
 
     const parsed = Number(responseCode);
-    if (!Number.isSafeInteger(parsed) || parsed < 100 || parsed > 599) {
+    if (!simCloudFrontCustomErrorResponseCodes.has(parsed)) {
       throw new SimCloudFrontInvalidResponseCode(
-        `CloudFront CustomErrorResponse ResponseCode ${String(responseCode)} is not an HTTP status code`,
+        `CloudFront CustomErrorResponse ResponseCode ${String(responseCode)} is not one of ${[...simCloudFrontCustomErrorResponseCodes].join(", ")}`,
       );
     }
 

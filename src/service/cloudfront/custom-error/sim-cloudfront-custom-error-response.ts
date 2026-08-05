@@ -6,6 +6,15 @@ export const simCloudFrontCustomErrorCodes: ReadonlySet<number> = new Set([
 ]);
 
 /**
+ * The HTTP status codes CloudFront can return alongside a custom error page.
+ *
+ * These are the error codes plus 200, which is how a Distribution serves a
+ * page for an error without telling the viewer anything went wrong.
+ */
+export const simCloudFrontCustomErrorResponseCodes: ReadonlySet<number> =
+  new Set([200, ...simCloudFrontCustomErrorCodes]);
+
+/**
  * A custom error response of a sim CloudFront Distribution.
  *
  * Only a rule with a response page reaches this model. A rule carrying nothing

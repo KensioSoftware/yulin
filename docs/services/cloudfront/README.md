@@ -171,9 +171,10 @@ A custom error response replaces the Origin's response when its status matches `
 one of the codes CloudFront supports: 400, 403, 404, 405, 414, 416, 500, 501, 502, 503 and 504. The
 response page is fetched as a request in its own right, so the Cache Behavior matching
 `ResponsePagePath` chooses which Origin it comes from, and error pages can live somewhere other than
-the content that failed. `ResponseCode` is the status the viewer sees, which is how a single page
-app serves its shell with a 200 for a URL the Bucket has no object for. Where the response page is
-itself missing, the viewer gets the status from fetching it, as in CloudFront.
+the content that failed. `ResponseCode` is the status the viewer sees, which is how a single-page
+app serves its shell with a 200 for a URL the Bucket has no object for. It is one of the same error
+codes or 200, the set CloudFront allows. Where the response page is itself missing, the viewer gets
+the status from fetching it, as in CloudFront.
 
 Custom error responses are applied before a `viewer-response` CloudFront Function runs, so the
 function sees the response the viewer is about to get. `ErrorCachingMinTTL` is accepted and ignored,
@@ -679,7 +680,7 @@ Sim CloudFront currently supports:
 - Custom Origins reaching sim HTTP APIs and sim Lambda Function URLs in process
 - CloudFront Distribution hostnames such as `distro123.cloudfront.net`
 - Default cache Behavior and path-based cache Behaviors
-- `DefaultRootObject` and `CustomErrorResponses`, for static sites and single page apps
+- `DefaultRootObject` and `CustomErrorResponses`, for static sites and single-page apps
 - `viewer-request` and `viewer-response` CloudFront Functions
 - Viewer certificates from sim ACM, including CloudFront's `us-east-1` requirement
 - Serving simulated CloudFront traffic on localhost with `serveSimAws`
