@@ -104,22 +104,42 @@ export class SimCloudFrontRegistry {
     alternateDomainName: string,
     distributionId: SimCloudFrontDistributionId,
   ): void {
-    const existingDistributionId =
-      this.alternateDomainDistributionIds.get(alternateDomainName);
-
-    if (
-      existingDistributionId !== undefined &&
-      existingDistributionId !== distributionId
-    ) {
-      throw new Error(
-        `Sim CloudFront alternate domain name ${alternateDomainName} is already registered to Distribution ${existingDistributionId}`,
-      );
-    }
+    this.assertAlternateDomainNamesAvailable(
+      [alternateDomainName],
+      distributionId,
+    );
 
     this.alternateDomainDistributionIds.set(
       alternateDomainName,
       distributionId,
     );
+  }
+
+  /**
+   * Check that a Distribution can take every one of a set of alternate domain
+   * names, without registering any of them.
+   *
+   * An update applies its Aliases wholesale, so it asks this first: a name
+   * another Distribution already holds is refused while the Distribution being
+   * updated is still intact, rather than half way through being replaced.
+   */
+  assertAlternateDomainNamesAvailable(
+    alternateDomainNames: Iterable<string>,
+    distributionId: SimCloudFrontDistributionId,
+  ): void {
+    for (const alternateDomainName of alternateDomainNames) {
+      const existingDistributionId =
+        this.alternateDomainDistributionIds.get(alternateDomainName);
+
+      if (
+        existingDistributionId !== undefined &&
+        existingDistributionId !== distributionId
+      ) {
+        throw new Error(
+          `Sim CloudFront alternate domain name ${alternateDomainName} is already registered to Distribution ${existingDistributionId}`,
+        );
+      }
+    }
   }
 
   /**

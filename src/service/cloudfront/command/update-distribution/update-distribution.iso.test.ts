@@ -177,6 +177,48 @@ describe("CloudFront UpdateDistributionCommand", () => {
     );
   });
 
+  it("refuses an alternate domain name another Distribution holds", async () => {
+    // Given two Distributions, one of them answering on an alternate domain
+    // name.
+    const distro = await givenDistribution(["taken.updatable.test"]);
+    const other = await distro.simCloudFront.createDistribution(
+      new CreateDistributionCommand({
+        DistributionConfig: distributionConfig({
+          CallerReference: "other-distribution",
+          Aliases: { Quantity: 1, Items: ["own.updatable.test"] },
+        }),
+      }),
+    );
+    await distro.simAws.backgroundTasksComplete();
+    assertNonNullable(other.Distribution?.Id);
+
+    // When the second Distribution is updated to claim the first one's name.
+    await assertThrowsErrorAsync(async () =>
+      distro.simCloudFront.updateDistribution(
+        new UpdateDistributionCommand({
+          Id: other.Distribution?.Id,
+          DistributionConfig: distributionConfig({
+            CallerReference: "other-distribution",
+            Aliases: { Quantity: 1, Items: ["taken.updatable.test"] },
+          }),
+        }),
+      ),
+    );
+
+    // Then it is left as it was, rather than half updated: it still answers on
+    // its own name, and the name it tried to take still routes to the first
+    // Distribution.
+    const registry = distro.simAws.serviceFactory.cloudFrontRegistry;
+    assertIdentical(
+      registry.distributionIdForAlternateDomainName("own.updatable.test"),
+      other.Distribution.Id,
+    );
+    assertIdentical(
+      registry.distributionIdForAlternateDomainName("taken.updatable.test"),
+      distro.distributionId,
+    );
+  });
+
   it("refuses an unusable viewer certificate, leaving the Distribution alone", async () => {
     // Given an enabled Distribution.
     const distro = await givenDistribution();

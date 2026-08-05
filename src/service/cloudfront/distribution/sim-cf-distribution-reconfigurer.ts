@@ -33,12 +33,21 @@ export class SimCloudFrontDistributionReconfigurer {
    * Apply a replacement DistributionConfig, resynchronizing the alternate
    * domain names the Distribution answers on so a name the update drops is
    * free for another Distribution.
+   *
+   * A name another Distribution already holds is refused before anything is
+   * changed, so a rejected update leaves the Distribution as it was rather
+   * than half replaced.
    */
   reconfigure(
     distribution: SimCloudFrontDistribution,
     distributionConfig: SimCloudFrontDistributionConfig,
   ): void {
     const { distributionId } = distribution;
+
+    this.cloudFrontRegistry.assertAlternateDomainNamesAvailable(
+      distributionConfig.Aliases?.Items ?? [],
+      distributionId,
+    );
 
     this.cloudFrontRegistry.deregisterAlternateDomainNames(distributionId);
 
