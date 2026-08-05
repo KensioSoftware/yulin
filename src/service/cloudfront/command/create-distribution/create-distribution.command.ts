@@ -41,6 +41,13 @@ export interface SimCloudFrontDistributionConfig {
   readonly CallerReference?: string | undefined;
   readonly Comment?: string | undefined;
   readonly Enabled?: boolean | undefined;
+  readonly DefaultRootObject?: string | undefined;
+  readonly CustomErrorResponses?:
+    | undefined
+    | {
+        readonly Items?:
+          readonly SimCloudFrontCustomErrorResponseConfig[] | undefined;
+      };
   readonly Aliases?:
     | undefined
     | {
@@ -60,6 +67,19 @@ export interface SimCloudFrontDistributionConfig {
           readonly SimCloudFrontCacheBehaviorConfig[] | undefined;
       };
   readonly ViewerCertificate?: SimCloudFrontViewerCertificate | undefined;
+}
+
+/**
+ * Minimal structural sim CloudFront CustomErrorResponse.
+ *
+ * The CloudFront API types `ResponseCode` as a string, while
+ * `AWS::CloudFront::Distribution` types it as an integer, so both arrive here.
+ */
+export interface SimCloudFrontCustomErrorResponseConfig {
+  readonly ErrorCode?: number | undefined;
+  readonly ResponsePagePath?: string | undefined;
+  readonly ResponseCode?: string | number | undefined;
+  readonly ErrorCachingMinTTL?: number | undefined;
 }
 
 /**
