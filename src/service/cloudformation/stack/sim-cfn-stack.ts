@@ -8,19 +8,20 @@ import type {
   CfnTemplateBodyRecord,
   SimCfnTemplate,
 } from "../template/sim-cfn-template.js";
-import { SimCfnStackResourceCreator } from "./deploy/sim-cfn-stack-resource-creator.js";
-import { SimCfnStackResourceDeleter } from "./teardown/sim-cfn-stack-resource-deleter.js";
 import {
   SimCfnStackDeletionLifecycle,
   type SimCfnStackDeleteProperties,
 } from "./teardown/sim-cfn-stack-deletion-lifecycle.js";
 import { makeSimCfnStackResourceMap } from "./resource-map/sim-cfn-stack-resource-map.js";
 import { SimCfnStackDeploymentLifecycle } from "./deploy/sim-cfn-stack-deployment-lifecycle.js";
+import { SimCfnStackResourceOperations } from "./sim-cfn-stack-resource-operations.js";
+import { SimCfnStackUpdateLifecycle } from "./update/sim-cfn-stack-update-lifecycle.js";
 import type { SimCdkOutContext } from "../cdk/sim-cdk-out-context.js";
-import { SimCdkAssetsPublisher } from "../cdk/assets/sim-cdk-assets-publisher.js";
 import type { SimCfnExecutableResourceBinding } from "../bind/sim-cfn-exec-binding.type.js";
 import type { SimCfnStackOutput } from "./output/sim-cfn-stack-output.js";
 import { SimCfnStackOutputResolver } from "./output/sim-cfn-stack-output-resolver.js";
+import { SimCfnStackResourceReport } from "./report/sim-cfn-stack-resource-report.js";
+import { SimCfnStackOperationStatus } from "./status/sim-cfn-stack-operation-status.js";
 import { validateSimCfnExecutableResourceBindings } from "../bind/validate/sim-cfn-exec-binding-validator.js";
 
 export type SimCloudFormationStackName = Brand<
@@ -33,6 +34,9 @@ export type SimCloudFormationStackStatus =
   | "CREATE_IN_PROGRESS"
   | "CREATE_COMPLETE"
   | "CREATE_FAILED"
+  | "UPDATE_IN_PROGRESS"
+  | "UPDATE_COMPLETE"
+  | "UPDATE_FAILED"
   | "DELETE_IN_PROGRESS"
   | "DELETE_COMPLETE"
   | "DELETE_FAILED";
@@ -51,32 +55,30 @@ interface SimCloudFormationStackProperties {
  * Lightweight simulated CloudFormation Stack.
  *
  * This class owns the externally visible Stack lifecycle: identity, template
- * body, resources, status, error, and wait-for-completion behavior for both
- * deploying and deleting. It delegates the mechanics of each to smaller
- * collaborators:
+ * body, resources, status, error, and wait-for-completion behavior for
+ * deploying, updating and deleting. It delegates the mechanics of each to
+ * smaller collaborators:
  *
  * - makeSimCfnStackResourceMap converts the template into runtime resources.
- * - SimCfnStackDeploymentLifecycle and SimCfnStackDeletionLifecycle own the
- *   status and completion of one Stack operation each.
- * - SimCfnStackOperationScheduler controls when either runs in the background.
- * - SimCfnStackResourceCreator creates resources in dependency order, and
- *   SimCfnStackResourceDeleter deletes them in the reverse of it.
+ * - A lifecycle per Stack operation owns that operation's status and
+ *   completion, and SimCfnStackOperationScheduler decides when each runs.
+ * - SimCfnStackResourceOperations creates and deletes resources against
+ *   simulated AWS, and SimCfnStackUpdater does some of each at once against a
+ *   changed template.
  */
 export class SimCfnStack {
   public readonly lifecycle: SimCfnStackDeploymentLifecycle;
+  public readonly updating: SimCfnStackUpdateLifecycle;
   public readonly deletion: SimCfnStackDeletionLifecycle;
   public readonly stackName: SimCloudFormationStackName;
-  public readonly template: CfnTemplateBodyRecord;
   public readonly resources: Map<string, SimCfnResource>;
+  public template: CfnTemplateBodyRecord;
   public outputs = new Map<string, SimCfnStackOutput>();
 
-  private readonly simAws: SimAws;
-  private readonly accountRegionScope: SimAwsAccountRegionScope;
-  private readonly cfnTemplate: SimCfnTemplate;
-  private readonly cdkOutContext: SimCdkOutContext | undefined;
-  private readonly bindings:
-    readonly SimCfnExecutableResourceBinding[] | undefined;
-  private readonly skippedResourceList: SimCfnResource[] = [];
+  private readonly background: BackgroundScheduler;
+  private readonly operations: SimCfnStackResourceOperations;
+  private readonly operationStatus: SimCfnStackOperationStatus;
+  private cfnTemplate: SimCfnTemplate;
 
   constructor(properties: SimCloudFormationStackProperties) {
     const {
@@ -89,12 +91,9 @@ export class SimCfnStack {
       bindings,
     } = properties;
 
-    this.simAws = simAws;
-    this.accountRegionScope = accountRegionScope;
+    this.background = background;
     this.stackName = stackName;
     this.cfnTemplate = template;
-    this.cdkOutContext = cdkOutContext;
-    this.bindings = bindings;
     this.template = this.cfnTemplate.template;
     this.resources = makeSimCfnStackResourceMap({
       accountRegionScope,
@@ -106,6 +105,13 @@ export class SimCfnStack {
       resources: this.resources,
       bindings,
     });
+    this.operations = new SimCfnStackResourceOperations({
+      simAws,
+      accountRegionScope,
+      stackName,
+      cdkOutContext,
+      bindings,
+    });
     this.lifecycle = new SimCfnStackDeploymentLifecycle({
       background,
       stackName,
@@ -113,39 +119,28 @@ export class SimCfnStack {
         await this.createResources();
       },
     });
+    this.updating = new SimCfnStackUpdateLifecycle({ background });
     this.deletion = new SimCfnStackDeletionLifecycle({
       background,
       runTeardown: async (): Promise<void> => {
         await this.teardown();
       },
     });
+    this.operationStatus = new SimCfnStackOperationStatus({
+      deployment: this.lifecycle,
+      update: this.updating,
+      deletion: this.deletion,
+    });
   }
 
-  /**
-   * The externally visible Stack status.
-   *
-   * A Stack keeps the status its deployment left it with until it is asked to
-   * delete, so the status reads as the last thing CloudFormation did to it.
-   * This is the Stack-level shape of what SimCfnResource does per Resource.
-   */
+  /** The externally visible Stack status. */
   public get status(): SimCloudFormationStackStatus {
-    return this.deletion.status ?? this.lifecycle.status;
+    return this.operationStatus.status;
   }
 
-  /**
-   * The error captured by the Stack operation the status is reporting, if it
-   * failed.
-   *
-   * A deployment failure is not the reason a deletion is in progress, so once
-   * deletion has started the error comes from the deletion alone, the same way
-   * the status does.
-   */
+  /** The error the operation the status reports failed with, if it failed. */
   public get error(): Error | undefined {
-    if (this.deletion.status === undefined) {
-      return this.lifecycle.error;
-    }
-
-    return this.deletion.error;
+    return this.operationStatus.error;
   }
 
   /**
@@ -160,6 +155,43 @@ export class SimCfnStack {
    */
   async waitForDeployComplete(): Promise<void> {
     await this.lifecycle.waitForComplete();
+  }
+
+  /**
+   * Apply a changed template to this deployed Stack.
+   *
+   * The Resources the new template adds are created, the ones it drops are
+   * deleted, and the ones whose resolved template changed are replaced.
+   * Everything else is left alone, holding whatever it holds in simulated AWS.
+   *
+   * An update that would do nothing is refused the way CloudFormation refuses
+   * it. The Resource work is scheduled in the background, as a deployment is,
+   * so callers that need the final state should use waitForUpdateComplete().
+   */
+  async update(template: SimCfnTemplate): Promise<void> {
+    const updater = this.operations.updater({
+      background: this.background,
+      resources: this.resources,
+      current: this.cfnTemplate,
+      updated: template,
+    });
+
+    updater.assertHasChanges();
+
+    this.cfnTemplate = template;
+    this.template = template.template;
+
+    await this.updating.update(async (): Promise<void> => {
+      await updater.apply();
+      this.resolveOutputs();
+    });
+  }
+
+  /**
+   * Wait for the scheduled Stack update to finish.
+   */
+  async waitForUpdateComplete(): Promise<void> {
+    await this.updating.waitForComplete();
   }
 
   /**
@@ -186,105 +218,50 @@ export class SimCfnStack {
    * order.
    *
    * The Resource half of deleting a Stack, without the Stack-level status or
-   * the Stack name release that delete() puts on top of it, so the Resource
-   * teardown can be exercised on its own.
+   * the Stack name release that delete() puts on top of it.
    */
   async teardown(): Promise<void> {
-    await new SimCfnStackResourceDeleter({
-      simAws: this.simAws,
-      resources: this.resources,
-      stackName: this.stackName,
-    }).deleteAll();
+    await this.operations.deleteAll(this.resources);
   }
 
-  /**
-   * Get a Stack Resource by logical ID.
-   */
+  /** Get a Stack Resource by logical ID. */
   getResource(logicalId: string): SimCfnResource | undefined {
     return this.resources.get(logicalId);
   }
 
-  /**
-   * Resources that were skipped because their sim implementation is not yet
-   * available.
-   */
+  /** Resources skipped because their sim implementation is not available. */
   public get skippedResources(): readonly SimCfnResource[] {
-    return this.skippedResourceList;
+    return this.report.skipped;
   }
 
-  /**
-   * Resources the teardown recorded rather than deleted, because sim
-   * CloudFormation has no way to delete their Resource type.
-   *
-   * Read from the Resources rather than collected during teardown, the same way
-   * ignored properties are, so the Stack and its Resources cannot disagree.
-   */
+  /** Resources a teardown recorded rather than deleted. */
   public get skippedResourceDeletions(): readonly SimCfnResource[] {
-    return this.resources
-      .values()
-      .filter((resource) => resource.deletionSkipped)
-      .toArray();
+    return this.report.deletionSkipped;
   }
 
-  /**
-   * Resources a teardown left in simulated AWS because their DeletionPolicy
-   * says to keep them.
-   */
+  /** Resources a teardown left in simulated AWS, as their policy says to. */
   public get retainedResources(): readonly SimCfnResource[] {
-    return this.resources
-      .values()
-      .filter((resource) => resource.retained)
-      .toArray();
+    return this.report.retained;
   }
 
-  /**
-   * Every property the deployment created a Resource without acting on.
-   *
-   * Read from the Resources rather than collected during deployment, so a
-   * Resource created outside a stack deployment still reports its own, and the
-   * two never disagree.
-   */
+  /** Every property a Resource was created without acting on. */
   public get ignoredProperties(): readonly SimCfnIgnoredProperty[] {
-    return this.resources
-      .values()
-      .flatMap((resource) => resource.ignoredProperties)
-      .toArray();
+    return this.report.ignoredProperties;
   }
 
-  /**
-   * Delegate resource dependency ordering and creation to the resource
-   * creator.
-   *
-   * CDK cloud assembly assets are published into sim S3 first, as a real
-   * `cdk deploy` publishes them before CloudFormation processes the template
-   * that references them.
-   */
+  private get report(): SimCfnStackResourceReport {
+    return new SimCfnStackResourceReport(this.resources);
+  }
+
   private async createResources(): Promise<void> {
-    await new SimCdkAssetsPublisher({
-      simAws: this.simAws,
-      accountRegionScope: this.accountRegionScope,
-      stackName: this.stackName,
-      cdkOutContext: this.cdkOutContext,
-    }).publish();
-
-    const resourceCreator = new SimCfnStackResourceCreator({
-      simAws: this.simAws,
-      resources: this.resources,
-      stackName: this.stackName,
-      cdkOutContext: this.cdkOutContext,
-      bindings: this.bindings,
-      skippedResources: this.skippedResourceList,
-    });
-
-    await resourceCreator.createAll();
+    await this.operations.createAll(this.resources);
     this.resolveOutputs();
   }
 
   private resolveOutputs(): void {
-    const outputResolver = new SimCfnStackOutputResolver({
+    this.outputs = new SimCfnStackOutputResolver({
       template: this.cfnTemplate,
       resources: this.resources,
-    });
-    this.outputs = outputResolver.resolve();
+    }).resolve();
   }
 }

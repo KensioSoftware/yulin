@@ -500,15 +500,15 @@ Current documented limitations:
 - Multi-Region keys are not simulated. An `AWS::KMS::Key` declaring `MultiRegion: true` is created as
   a key in one region, and the property is recorded.
 - `AWS::KMS::Key` accepts but ignores `PendingWindowInDays` and `BypassPolicyLockoutSafetyCheck`.
-  Neither has anything to act on: simulated CloudFormation does not delete stacks, and simulated KMS
-  applies no policy lockout safety check to bypass.
-- CloudFormation creates KMS resources but never changes or removes them. An `AWS::KMS::Alias` cannot
-  be retargeted by a stack update, because `UpdateAlias` and `DeleteAlias` are not simulated.
+  Neither has anything to act on: a stack teardown schedules the key for deletion with the default
+  window, and simulated KMS applies no policy lockout safety check to bypass.
+- An `AWS::KMS::Alias` retargeted by a stack update is deleted and created again pointing at the new
+  key, because a stack update replaces a changed resource and simulated KMS has no `UpdateAlias`.
 - `AWS::KMS::Grant` and `AWS::KMS::ReplicaKey` are not supported; a template declaring one is
   refused.
 - A key pending deletion stays in that state indefinitely. Advancing the simulated clock past the
   recovery window does not delete it, so the key ID stays taken.
-- Aliases cannot be updated or deleted; `UpdateAlias` and `DeleteAlias` are not supported.
+- `UpdateAlias` is not supported. An alias is retargeted by deleting it and creating it again.
 - Tags, `ListResourceTags` and the `aws:ResourceTag` condition key are not simulated. An
   `AWS::KMS::Key` declaring `Tags` deploys with the tags dropped and the property recorded, so a
   policy condition written around one matches nothing here and matches on AWS.

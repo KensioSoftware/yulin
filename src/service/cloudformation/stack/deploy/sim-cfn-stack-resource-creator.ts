@@ -11,7 +11,6 @@ interface SimCfnStackResourceCreatorProperties {
   readonly stackName: string;
   readonly cdkOutContext?: SimCdkOutContext | undefined;
   readonly bindings?: readonly SimCfnExecutableResourceBinding[] | undefined;
-  readonly skippedResources?: SimCfnResource[] | undefined;
 }
 
 /**
@@ -36,14 +35,8 @@ export class SimCfnStackResourceCreator {
   private readonly batchCreator: SimCfnStackResourceBatchCreator;
 
   constructor(properties: SimCfnStackResourceCreatorProperties) {
-    const {
-      simAws,
-      resources,
-      stackName,
-      cdkOutContext,
-      bindings,
-      skippedResources = [],
-    } = properties;
+    const { simAws, resources, stackName, cdkOutContext, bindings } =
+      properties;
 
     this.resources = resources;
     this.stackName = stackName;
@@ -52,22 +45,39 @@ export class SimCfnStackResourceCreator {
       resources,
       cdkOutContext,
       bindings,
-      skippedResources,
     });
   }
 
   /**
    * Create every Stack Resource once its dependencies become satisfiable.
    *
+   * What a deployment does, where an update creates only the Resources its
+   * template added or replaced.
+   */
+  async createAll(): Promise<void> {
+    await this.create(this.resources.values().toArray());
+  }
+
+  /**
+   * Create the given Stack Resources once their dependencies become
+   * satisfiable.
+   *
    * The loop is sequential between batches because each completed batch may
    * satisfy dependencies for later Resources. Creation inside a batch is
    * parallel and delegated to SimCfnStackResourceBatchCreator.
    *
+   * Dependencies are read against every Resource in the Stack rather than only
+   * the ones being created, so a Resource an update leaves alone still counts
+   * as a satisfied dependency.
+   *
    * If a loop iteration finds pending Resources but none are creatable, the
    * template has unresolved, failed, or cyclic dependencies.
    */
-  async createAll(): Promise<void> {
-    let pendingResources = new SimCfnStackPendingResources(this.resources);
+  async create(creating: readonly SimCfnResource[]): Promise<void> {
+    let pendingResources = new SimCfnStackPendingResources(
+      this.resources,
+      new Set(creating),
+    );
 
     while (pendingResources.hasResources) {
       const creatableResources = pendingResources.creatableResources();

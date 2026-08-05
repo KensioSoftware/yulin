@@ -22,8 +22,8 @@ familiar CloudFormation/CDK outputs.
 
 - `sim-cloudformation.ts` is the main service object for one account/region scope.
 - `index.ts` exports the public CloudFormation simulator API.
-- `command/` contains AWS SDK-style command handlers such as `CreateStack`, `DescribeStacks` and
-  `DeleteStack`.
+- `command/` contains AWS SDK-style command handlers such as `CreateStack`, `DescribeStacks`,
+  `UpdateStack` and `DeleteStack`.
 - `deploy/` contains convenience helpers for deploying already-parsed templates or synthesized
   template files.
 - `template/` contains template body validation, template value parsing, intrinsic-function nodes,
@@ -31,8 +31,9 @@ familiar CloudFormation/CDK outputs.
 - `parameters/` contains parameter input/default handling.
 - `resource/` contains the runtime CloudFormation resource model, resource type parsing, dependency
   extraction, property resolution, and service factory resolution.
-- `stack/` contains the runtime stack model, the dependency-ordered deployment lifecycle, and the
-  reverse-ordered teardown under `teardown/`.
+- `stack/` contains the runtime stack model, the dependency-ordered deployment lifecycle, the
+  reverse-ordered teardown under `teardown/`, and the template difference an update applies under
+  `update/`.
 - `cdk/` contains CDK-specific integration support, including synthesized output context and custom
   resource implementations.
 - `bind/` contains executable resource binding types used by CDK/custom-resource simulation.
@@ -57,6 +58,7 @@ The implementation is split into several layers:
 
 - `CreateStackCommandHandler`
 - `DescribeStacksCommandHandler`
+- `UpdateStackCommandHandler`
 - `DeleteStackCommandHandler`
 - Translate SDK-shaped commands into stack operations and AWS-like outputs.
 
@@ -74,15 +76,18 @@ The implementation is split into several layers:
 - Owns stack identity, visible template body, resource map, lifecycle, skipped resources, and wait
   behaviour.
 
-5. **Stack deployment orchestration**
+5. **Stack operation orchestration**
 
 - `SimCfnStackDeploymentLifecycle`
+- `SimCfnStackResourceOperations`
 - `SimCfnStackResourceCreator`
 - `SimCfnStackPendingResources`
 - `SimCfnStackResourceBatchCreator`
 - Schedule deployment in the background and create resources in dependency-ready batches.
 - `SimCfnStackResourceDeleter`, `SimCfnStackPendingDeletions` and
   `SimCfnStackResourceBatchDeleter` do the same in reverse for a teardown.
+- `SimCfnStackUpdateLifecycle`, `SimCfnStackUpdater` and `SimCfnStackUpdatePlan` do some of each
+  against a changed template.
 
 6. **Resource model**
 
@@ -336,8 +341,12 @@ resource creation finishes asynchronously.
 `waitForDeployComplete()` waits for the scheduled deployment task. If deployment failed, it rethrows
 the captured error so tests can observe deployment failures directly.
 
-`SimCfnStackOperationScheduler` is the piece both stack operations share. It wraps the work in
+`SimCfnStackOperationScheduler` is the piece every stack operation shares. It wraps the work in
 background scheduling and reports the outcome back, without knowing which operation it is running.
+
+`SimCfnStackResourceOperations` is the other shared piece. It holds the simulated AWS scope a stack
+creates and deletes resources in, because deploying, updating and tearing down all need the same
+one, and it publishes the CDK cloud assembly assets before any creation.
 
 ## Stack deletion lifecycle
 
@@ -350,10 +359,12 @@ When it finishes:
   how `DeleteStackCommandHandler` releases the stack name
 - failure changes the stack to `DELETE_FAILED` and captures the error, leaving the stack where it is
 
-The two lifecycles are separate objects rather than one status field, for the reason
+The lifecycles are separate objects rather than one status field, for the reason
 `SimCfnResourceDeletionState` is separate from `SimCfnResourceCreationState`: a stack that was never
-asked to delete has no deletion status at all. `SimCfnStack.status` reads the deletion status first
-and falls back to the deployment status, so it says the last thing CloudFormation did to the stack.
+asked to delete has no deletion status at all. `SimCfnStackOperationStatus` reads the deletion
+status first, then the update status, then the deployment status, so `SimCfnStack.status` says the
+last thing CloudFormation did to the stack. `SimCfnStack.error` follows the same order, so a
+deployment failure is never reported as the reason for a later operation.
 
 Asking twice does nothing the second time, as a repeated `DeleteStack` does in CloudFormation. A
 stack left in `DELETE_FAILED` can be asked again, because whatever refused may have been dealt with
@@ -361,6 +372,47 @@ since, and the teardown loop starts from every resource again.
 
 Releasing the name belongs to whoever holds the stack map. The lifecycle only says when the name is
 free, so a failed deletion keeps the name in use and the stack describable.
+
+## Stack update lifecycle
+
+`SimCfnStackUpdateLifecycle` owns stack update state, and is scheduled the way the other two are.
+Calling `update()` moves the stack to `UPDATE_IN_PROGRESS` and schedules the work, which leaves the
+stack `UPDATE_COMPLETE` or `UPDATE_FAILED` with the error on it. There is no rollback to the
+template the stack was deployed from, so a failed update leaves the stack holding whatever it
+managed.
+
+The work itself is passed in per update rather than held on the lifecycle, because each update
+applies a different template.
+
+`SimCfnStackUpdater` works out and applies the difference:
+
+- `SimCfnStackUpdatePlan` compares the deployed resources with the ones the new template describes,
+  and says which to delete, which to create, and what the stack holds afterwards.
+- `simCfnStackReplacedLogicalIds` decides what changed, by comparing each resource's resolved
+  template entry through `simCfnTemplateSignature`. Comparing resolved entries rather than template
+  text is what makes a changed parameter value a changed resource, and a reordered template no
+  change at all.
+- `simCfnStackOutputsChanged` answers the same question for the `Outputs` section, because an update
+  that only changes an output is still an update. A template that changes nothing raises the
+  `ValidationError` CloudFormation raises.
+
+Applying the plan is a teardown and a deployment over subsets of the stack: the dropped and replaced
+resources are deleted in reverse dependency order, the resource map is moved on to the new template,
+and the added and replaced resources are created in dependency order. This is why
+`SimCfnStackResourceCreator` and `SimCfnStackResourceDeleter` each take the resources to work on
+alongside the whole stack: dependencies are read across every resource, while only some of them are
+being changed.
+
+Sim CloudFormation has no in-place resource update, so a changed resource is deleted and created
+again. That diverges from CloudFormation, which updates most properties in place and keeps what the
+resource holds, and it is recorded in the usage docs rather than hidden. Two things follow from it:
+
+- A resource naming a replaced resource is replaced too, all the way up the chain, so nothing is
+  left pointing at a resource that has gone. Real CloudFormation hands the dependent the new
+  physical name instead.
+- `UpdateReplacePolicy` is not read. Retaining the old resource would leave it holding the name its
+  replacement needs, and CDK marks buckets and tables `Retain` as a matter of course, so honouring
+  it would fail every such update.
 
 ## Resource deployment loop
 
@@ -404,7 +456,9 @@ Skipped resources are treated as create-complete for dependency progress. This i
 simulator choice: a stack with unsupported resources can still create the supported resources needed
 for a test.
 
-Skipped resources are also recorded on the stack in `skippedResources` for diagnostics.
+Skipped resources are read off the resources as `stack.skippedResources`, the same way retained and
+ignored ones are, by `SimCfnStackResourceReport`. Nothing is collected while the stack runs, so a
+stack an update changed reports the resources it holds now.
 
 ## Resource teardown loop
 
@@ -678,7 +732,8 @@ The CloudFormation error model is lightweight.
 Current behaviour includes:
 
 - duplicate stack names throw an AWS-like `AlreadyExistsException`
-- describing a stack name the service does not hold throws an AWS-like `ValidationError`
+- describing or updating a stack name the service does not hold throws an AWS-like `ValidationError`
+- an update with no differences throws the same `ValidationError`
 - invalid JSON template body throws a diagnostic template error
 - missing required command input throws assertion-style errors
 - unsupported providers/services/resource types throw diagnostic errors
@@ -728,6 +783,11 @@ Useful areas:
   - `DeletionPolicy` handling
   - failed teardowns and the statuses they leave behind
 
+- `command/update-stack/*.iso.test.ts`
+  - applying a changed template, and what an update leaves alone
+  - the refusal of an update with nothing to do
+  - failed updates and the statuses they leave behind
+
 - `template/*.iso.test.ts`
   - template body validation
   - parameter handling
@@ -774,6 +834,9 @@ Useful areas:
 
 - `stack/teardown/*.iso.test.ts`
   - reverse-dependency-ordered resource deletion and teardown failure behaviour
+
+- `stack/update/*.iso.test.ts`
+  - what counts as a changed resource, and what an update replaces
 
 - `cdk/**/*.loc.test.ts`
   - higher-level CDK synthesized template scenarios

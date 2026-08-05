@@ -24,6 +24,11 @@ import type {
   SimDeleteStackCommandOutput,
 } from "./command/delete-stack/delete-stack.command.js";
 import { DeleteStackCommandHandler } from "./command/delete-stack/delete-stack.handler.js";
+import type {
+  SimUpdateStackCommand,
+  SimUpdateStackCommandOutput,
+} from "./command/update-stack/update-stack.command.js";
+import { UpdateStackCommandHandler } from "./command/update-stack/update-stack.handler.js";
 import type { SimCdkOutContext } from "./cdk/sim-cdk-out-context.js";
 import {
   type SimCloudFormationCreateStackProperties as SimCloudFormationCreateStackProperties,
@@ -132,6 +137,26 @@ export class SimCloudFormation {
   }
 
   /**
+   * Handle an Update Stack Command from the SDK.
+   */
+  async updateStack(
+    command: SimUpdateStackCommand,
+    options?: SimCloudFormationRequestOptions,
+  ): Promise<SimUpdateStackCommandOutput> {
+    this.authorizer.authorize(
+      "cloudformation:UpdateStack",
+      this.stackArn(command.input.StackName),
+      options?.caller,
+    );
+    const handler = new UpdateStackCommandHandler({
+      accountRegionScope: this.accountRegionScope,
+      stacks: this.stacks,
+      background: this.background,
+    });
+    return await handler.handle(command);
+  }
+
+  /**
    * Handle a Delete Stack Command from the SDK.
    */
   async deleteStack(
@@ -160,6 +185,18 @@ export class SimCloudFormation {
     assertDefined(stack, `Sim CloudFormation Stack named ${stackName}`);
 
     await stack.waitForDeployComplete();
+  }
+
+  /**
+   * Wait for a simulated CloudFormation Stack update operation to complete.
+   */
+  async waitForStackUpdateComplete(
+    stackName: SimCloudFormationStackName | string,
+  ): Promise<void> {
+    const stack = this.getStackByName(stackName);
+    assertDefined(stack, `Sim CloudFormation Stack named ${stackName}`);
+
+    await stack.waitForUpdateComplete();
   }
 
   /**

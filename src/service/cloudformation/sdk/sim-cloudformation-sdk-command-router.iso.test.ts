@@ -5,6 +5,7 @@ import {
   DeleteStackCommand,
   DescribeStacksCommand,
   ListStacksCommand,
+  UpdateStackCommand,
 } from "@aws-sdk/client-cloudformation";
 import {
   assertIdentical,
@@ -121,6 +122,60 @@ describe("simulated CloudFormation SDK Command routing", () => {
         .getSimBucketByName("cfn-disposable-bucket"),
     );
     assertUndefined(cloudFormation.getStackByName("disposable-stack"));
+  });
+
+  it("updates a Stack through an intercepted client", async () => {
+    using simSdk = new SimSdk();
+    const client = new CloudFormationClient({ region: "eu-west-2" });
+    simSdk.intercept(client);
+
+    await client.send(
+      new CreateStackCommand({
+        StackName: "updatable-stack",
+        TemplateBody: JSON.stringify({
+          Resources: {
+            FooBucket: {
+              Type: "AWS::S3::Bucket",
+              Properties: { BucketName: "cfn-updatable-bucket" },
+            },
+          },
+        }),
+      }),
+    );
+
+    const cloudFormation = simSdk.simAws.region("eu-west-2").cloudFormation();
+    await cloudFormation.waitForStackDeployComplete("updatable-stack");
+
+    // When a changed template is sent through the same intercepted client.
+    const stackUpdate = await client.send(
+      new UpdateStackCommand({
+        StackName: "updatable-stack",
+        TemplateBody: JSON.stringify({
+          Resources: {
+            FooBucket: {
+              Type: "AWS::S3::Bucket",
+              Properties: { BucketName: "cfn-updatable-bucket" },
+            },
+            BarBucket: {
+              Type: "AWS::S3::Bucket",
+              Properties: { BucketName: "cfn-added-bucket" },
+            },
+          },
+        }),
+      }),
+    );
+    assertIdentical(stackUpdate.StackId, "updatable-stack");
+
+    await cloudFormation.waitForStackUpdateComplete("updatable-stack");
+
+    // Then the added Bucket is in simulated S3, in the scope resolved from the
+    // intercepted client's Region.
+    assertNonNullable(
+      simSdk.simAws
+        .region("eu-west-2")
+        .s3()
+        .getSimBucketByName("cfn-added-bucket"),
+    );
   });
 
   it("rejects a Command simulated CloudFormation does not support", async () => {

@@ -6,6 +6,7 @@ import {
 import type { SimCreateStackCommand } from "../command/create-stack/create-stack.command.js";
 import type { SimDeleteStackCommand } from "../command/delete-stack/delete-stack.command.js";
 import type { SimDescribeStacksCommand } from "../command/describe-stacks/describe-stacks.command.js";
+import type { SimUpdateStackCommand } from "../command/update-stack/update-stack.command.js";
 import type { SimCloudFormation } from "../sim-cloudformation.js";
 
 /**
@@ -30,6 +31,14 @@ export class SimCloudFormationSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simCloudFormation.deleteStack(
             command as SimDeleteStackCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "UpdateStackCommand",
+        async (command, context): Promise<unknown> =>
+          await simCloudFormation.updateStack(
+            command as SimUpdateStackCommand,
             simSdkCallerOptions(context),
           ),
       ],

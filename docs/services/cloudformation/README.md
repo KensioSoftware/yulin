@@ -164,11 +164,130 @@ const simAws = new SimAws();
 await simAws.backgroundTasksComplete();
 ```
 
+## Updating a stack
+
+`UpdateStackCommand` applies a changed template to a stack that is already deployed. Resources the
+new template adds are created, resources it drops are deleted, and resources it changed are
+replaced. Everything else is left alone, holding whatever it holds in simulated S3, DynamoDB or
+anywhere else. That is what lets a long-running local process pick up an infrastructure change
+without restarting and losing its data.
+
+```typescript sim-cloudformation-update-stack
+/**
+ * Applying a changed template with UpdateStackCommand.
+ */
+
+import {
+  CreateStackCommand,
+  UpdateStackCommand,
+} from "@aws-sdk/client-cloudformation";
+import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const simCfn = simAws.cloudFormation();
+
+const siteBucket = {
+  Type: "AWS::S3::Bucket",
+  Properties: { BucketName: "site-content" },
+};
+
+const deployedTemplate = JSON.stringify({
+  Resources: { SiteBucket: siteBucket },
+});
+
+const changedTemplate = JSON.stringify({
+  Resources: {
+    SiteBucket: siteBucket,
+    UploadsBucket: {
+      Type: "AWS::S3::Bucket",
+      Properties: { BucketName: "site-uploads" },
+    },
+  },
+});
+
+await simCfn.createStack(
+  new CreateStackCommand({
+    StackName: "site",
+    TemplateBody: deployedTemplate,
+  }),
+);
+await simCfn.waitForStackDeployComplete("site");
+
+await simAws.s3().putObject(
+  new PutObjectCommand({
+    Bucket: "site-content",
+    Key: "index.html",
+    Body: "<h1>Hello</h1>",
+  }),
+);
+
+// Apply the changed template to the stack that is already there.
+await simCfn.updateStack(
+  new UpdateStackCommand({
+    StackName: "site",
+    TemplateBody: changedTemplate,
+  }),
+);
+await simCfn.waitForStackUpdateComplete("site");
+
+// The bucket the new template adds is in simulated S3.
+console.log(simAws.s3().getSimBucketByName("site-uploads"));
+
+// And the bucket the template did not change still holds its object.
+const page = await simAws
+  .s3()
+  .getObject(
+    new GetObjectCommand({ Bucket: "site-content", Key: "index.html" }),
+  );
+console.log(page.Body);
+```
+
+The resource work runs in the background, as deployment does. `updateStack(...)` returns once the
+stack has moved to `UPDATE_IN_PROGRESS`, and `waitForStackUpdateComplete(...)` waits for the
+resources to change. `DescribeStacksCommand` reports `UPDATE_IN_PROGRESS` in between and
+`UPDATE_COMPLETE` after, along with the outputs resolved again against the new template.
+
+Updating a stack name that is not there is refused with the same `ValidationError` that
+`DescribeStacksCommand` refuses it with, because there is nothing else an update of a stack that is
+not there could mean.
+
+### What counts as a change
+
+Resources are compared as they resolve rather than as they are written, so a changed parameter value
+shows up as a changed resource even when the template body is identical, and a template reordered
+without being changed does not. Outputs are compared the same way.
+
+A template that changes nothing at all is refused with a `ValidationError` reading
+`No updates are to be performed.`, which is what CloudFormation answers.
+
+### Changed resources are replaced
+
+A resource whose template entry changed is deleted and created again from the new template. Real
+CloudFormation updates most properties in place and keeps what the resource holds, so this is a
+divergence worth knowing about: a bucket that gains a property loses its objects here, where in AWS
+it would keep them. In-place update is the obvious next step and is not implemented yet.
+
+Two things follow from replacement:
+
+- A resource naming a replaced resource is replaced too, all the way up the dependency chain, so
+  nothing is left pointing at a resource that has gone. Real CloudFormation hands the dependent the
+  new physical name instead of recreating it.
+- `UpdateReplacePolicy` is not read. Honouring `Retain` would leave the old resource holding the
+  name the replacement needs, and CDK marks buckets and tables with it as a matter of course, so
+  every such update would fail. The old resource is deleted whatever the policy says.
+
+A failed update leaves the stack in `UPDATE_FAILED` with the reason on it, and leaves the resources
+where the update got to. There is no rollback to the previous template.
+`waitForStackUpdateComplete(...)` rethrows the error, and `DescribeStacksCommand` reports it as
+`StackStatusReason`. Dealing with the cause and sending `UpdateStackCommand` again applies the rest
+of the change.
+
 ## Deleting a stack
 
 `DeleteStackCommand` deletes the resources a stack created, in the reverse of the order they were
-created in, and then releases the stack name. This is what lets a long-running local process replace
-a stack rather than restart.
+created in, and then releases the stack name.
 
 ```typescript sim-cloudformation-delete-stack
 /**
@@ -1557,8 +1676,8 @@ normal application tests, prefer the `SimAws` entry point.
 
 Sim CloudFormation currently supports:
 
-- `CreateStackCommand`, `DescribeStacksCommand` and `DeleteStackCommand`
-- Waiting for simulated stack deployment and deletion completion
+- `CreateStackCommand`, `DescribeStacksCommand`, `UpdateStackCommand` and `DeleteStackCommand`
+- Waiting for simulated stack deployment, update and deletion completion
 - The resource `DeletionPolicy` attribute, for `Retain` and `RetainExceptOnCreate`
 - `deployTemplate(...)` for parsed template objects, optionally naming the synthesized template file
   a template edited in memory came from
@@ -1609,14 +1728,23 @@ Each service's own docs describe what its resource types support.
   template describes. See
   [properties a Resource was created without](#properties-a-resource-was-created-without) for what
   is still refused outright.
-- Stack updates are not supported.
+- A stack update replaces a changed resource rather than updating it in place, so what the resource
+  held is lost. See [changed resources are replaced](#changed-resources-are-replaced).
+- A stack update applies a whole template directly. Change sets are not supported, so
+  `CreateChangeSetCommand` and `ExecuteChangeSetCommand` have nothing behind them, and neither does
+  drift detection.
+- A failed stack update is not rolled back to the template the stack was deployed from. The stack is
+  left in `UPDATE_FAILED` holding whatever the update managed.
+- `UpdateStackCommand` reads `StackName`, `TemplateBody` and `Parameters`. `UsePreviousTemplate` and
+  `UsePreviousValue` are not read, so an update has to be given the whole new template.
 - A stack deletion deletes only the resource types the simulator can delete. A resource type it
   creates but cannot delete is recorded in `stack.skippedResourceDeletions` and stepped over, the
   same way an unsupported resource type is on create, so the stack still deletes with that resource
   left behind.
 - `DeletionPolicy` is read for `Retain` and `RetainExceptOnCreate` only. `Snapshot` is treated as
   `Delete`, because no simulated service takes snapshots.
-- `UpdateReplacePolicy` is ignored, and only applies to stack updates, which are not supported.
+- `UpdateReplacePolicy` is not read. A replaced resource is deleted whatever it says, for the reason
+  given under [changed resources are replaced](#changed-resources-are-replaced).
 - `DeleteStackCommand` reads only `StackName`. `RetainResources`, `DeletionMode`, `RoleARN` and
   `ClientRequestToken` are not read, so a stack left in `DELETE_FAILED` cannot be forced through the
   way `FORCE_DELETE_STACK` forces it in AWS.

@@ -17,9 +17,10 @@ interface SimCfnSsmParameterCreatorProperties {
  * thing an SDK caller would have got: the same name validation, the same ARN,
  * the same refusals for the options this simulation does not model.
  *
- * The write is a create rather than an overwrite. Sim CloudFormation has no
- * UpdateStack, so every deployment is a create, and a name already in use
- * fails here as a second stack claiming the same parameter name fails on real
+ * The write is a create rather than an overwrite. Creating a Resource is always
+ * a create in sim CloudFormation, because a stack update replaces a changed
+ * Resource rather than writing over it, so a name already in use fails here as
+ * a second stack claiming the same parameter name fails on real
  * CloudFormation.
  */
 export class SimCfnSsmParameterCreator {
