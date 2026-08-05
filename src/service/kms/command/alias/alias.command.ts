@@ -19,6 +19,23 @@ export interface SimCreateAliasCommandOutput {
 }
 
 /**
+ * Minimal structural sim KMS DeleteAlias command.
+ *
+ * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/kms/command/DeleteAliasCommand/
+ */
+export interface SimDeleteAliasCommand {
+  readonly input: SimDeleteAliasCommandInput;
+}
+
+export interface SimDeleteAliasCommandInput {
+  readonly AliasName?: string | undefined;
+}
+
+export interface SimDeleteAliasCommandOutput {
+  readonly $metadata: SimResponseMetadata;
+}
+
+/**
  * Minimal structural sim KMS ListAliases command.
  *
  * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/kms/command/ListAliasesCommand/

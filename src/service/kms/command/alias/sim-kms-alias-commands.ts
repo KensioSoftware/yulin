@@ -1,11 +1,19 @@
 import type { SimKmsRequestOptions } from "../sim-kms-request-options.js";
-import { SimKmsValidationException } from "../../error/sim-kms.error.js";
-import { SimKmsAliasName } from "../../key/sim-kms-alias.js";
+import {
+  SimKmsNotFoundException,
+  SimKmsValidationException,
+} from "../../error/sim-kms.error.js";
+import {
+  SimKmsAliasName,
+  simKmsAwsAliasPrefix,
+} from "../../key/sim-kms-alias.js";
 import type { SimKmsKeyStore } from "../../key/sim-kms-key-store.js";
 import type { SimKmsAuthorizer } from "../authorize/sim-kms-authorizer.js";
 import type {
   SimCreateAliasCommand,
   SimCreateAliasCommandOutput,
+  SimDeleteAliasCommand,
+  SimDeleteAliasCommandOutput,
   SimListAliasesCommand,
   SimListAliasesCommandOutput,
 } from "./alias.command.js";
@@ -50,6 +58,43 @@ export class SimKmsAliasCommands {
     const key = this.keys.require(command.input.TargetKeyId);
     this.authorizer.authorizeKey("kms:CreateAlias", key, options);
     this.keys.addAlias(aliasName, key);
+
+    return { $metadata: {} };
+  }
+
+  /**
+   * Remove an alias, leaving the key it pointed at alone.
+   *
+   * Real KMS authorizes this against the alias and the target key, and the
+   * key is the half checked here for the same reason CreateAlias checks it.
+   * An alias reserved for an AWS managed key is refused rather than removed,
+   * as real KMS does not let a customer delete one.
+   */
+  delete(
+    command: SimDeleteAliasCommand,
+    options?: SimKmsRequestOptions,
+  ): SimDeleteAliasCommandOutput {
+    const aliasName = command.input.AliasName;
+
+    if (aliasName === undefined) {
+      throw new SimKmsValidationException("AliasName is required");
+    }
+
+    if (aliasName.startsWith(simKmsAwsAliasPrefix)) {
+      throw new SimKmsValidationException(
+        `Alias '${aliasName}' is reserved for AWS managed keys`,
+      );
+    }
+
+    const alias = this.keys.findAlias(aliasName);
+
+    if (alias === undefined) {
+      throw new SimKmsNotFoundException(`Alias '${aliasName}' does not exist`);
+    }
+
+    const key = this.keys.require(alias.targetKeyId);
+    this.authorizer.authorizeKey("kms:DeleteAlias", key, options);
+    this.keys.removeAlias(aliasName);
 
     return { $metadata: {} };
   }

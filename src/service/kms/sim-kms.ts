@@ -1,37 +1,11 @@
-import {
-  type BackgroundScheduler,
-  BackgroundTasks,
-} from "../../util/background/background.js";
-import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
-import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
-import {
-  SimIamAllowAllAuth,
-  type SimIamInterServiceAuthZ,
-} from "../iam/authorize/sim-iam-inter-service-auth-z.js";
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
-import { SimKmsAliasCommands } from "./command/alias/sim-kms-alias-commands.js";
 import type * as simKmsCommands from "./command/sim-kms-command.types.js";
 import type { SimKmsRequestOptions } from "./command/sim-kms-request-options.js";
-import { SimKmsAuthorizer } from "./command/authorize/sim-kms-authorizer.js";
-import { SimKmsCryptoCommands } from "./command/crypto/sim-kms-crypto-commands.js";
-import { SimKmsGenerateDataKey } from "./command/crypto/sim-kms-generate-data-key.js";
-import { SimKmsKeyCommands } from "./command/key/sim-kms-key-commands.js";
-import { SimKmsListKeys } from "./command/key/sim-kms-list-keys.js";
-import { SimKmsKeyLifecycleCommands } from "./command/key/sim-kms-key-lifecycle-commands.js";
-import { SimKmsKeyPolicyCommands } from "./command/key/sim-kms-key-policy-commands.js";
 import { SimKmsCfnResourceFactory } from "./cfn/sim-cfn-kms-resource-factory.js";
 import type { SimKmsAlias } from "./key/sim-kms-alias.js";
 import type { SimKmsKey } from "./key/sim-kms-key.js";
-import { SimKmsKeyFactory } from "./key/sim-kms-key-factory.js";
-import { SimKmsKeyMetadataView } from "./key/sim-kms-key-metadata.js";
-import { SimKmsKeyStore } from "./key/sim-kms-key-store.js";
 import { SimKmsSdkCommandRouter } from "./sdk/sim-kms-sdk-command-router.js";
-
-interface SimKmsProperties {
-  readonly accountRegionScope?: SimAwsAccountRegionScope;
-  readonly iam?: SimIamInterServiceAuthZ;
-  readonly background?: BackgroundScheduler;
-}
+import { SimKmsCommands, type SimKmsProperties } from "./sim-kms-commands.js";
 
 /**
  * Simulated KMS. Handles SDK commands. Emulates AWS behaviour and state.
@@ -42,61 +16,12 @@ interface SimKmsProperties {
  * the wrong encryption context genuinely fails.
  */
 export class SimKms {
-  private readonly keys: SimKmsKeyStore;
-  private readonly keyCommands: SimKmsKeyCommands;
-  private readonly listKeysCommand: SimKmsListKeys;
-  private readonly lifecycleCommands: SimKmsKeyLifecycleCommands;
-  private readonly policyCommands: SimKmsKeyPolicyCommands;
-  private readonly aliasCommands: SimKmsAliasCommands;
-  private readonly cryptoCommands: SimKmsCryptoCommands;
-  private readonly generateDataKeyCommand: SimKmsGenerateDataKey;
-  private readonly background: BackgroundScheduler;
+  private readonly commands: SimKmsCommands;
   private readonly sdkRouter = new SimKmsSdkCommandRouter(this);
   private readonly cfnFactory = new SimKmsCfnResourceFactory({ kms: this });
 
   constructor(properties: SimKmsProperties = {}) {
-    const {
-      accountRegionScope = simAwsAccountRegionScopeFactory.make(),
-      iam = new SimIamAllowAllAuth(),
-      background = new BackgroundTasks(),
-    } = properties;
-
-    const keyFactory = new SimKmsKeyFactory({
-      accountRegionScope,
-      clock: background,
-    });
-    const authorizer = new SimKmsAuthorizer({ iam, accountRegionScope });
-
-    this.background = background;
-    this.keys = new SimKmsKeyStore({ accountRegionScope, keyFactory });
-    this.keyCommands = new SimKmsKeyCommands({
-      keys: this.keys,
-      keyFactory,
-      authorizer,
-      metadata: new SimKmsKeyMetadataView(accountRegionScope.accountId),
-    });
-    this.listKeysCommand = new SimKmsListKeys({ keys: this.keys, authorizer });
-    this.lifecycleCommands = new SimKmsKeyLifecycleCommands({
-      keys: this.keys,
-      authorizer,
-      clock: background,
-    });
-    this.policyCommands = new SimKmsKeyPolicyCommands({
-      keys: this.keys,
-      authorizer,
-    });
-    this.aliasCommands = new SimKmsAliasCommands({
-      keys: this.keys,
-      authorizer,
-    });
-    this.cryptoCommands = new SimKmsCryptoCommands({
-      keys: this.keys,
-      authorizer,
-    });
-    this.generateDataKeyCommand = new SimKmsGenerateDataKey({
-      keys: this.keys,
-      authorizer,
-    });
+    this.commands = new SimKmsCommands(properties);
   }
 
   /**
@@ -106,7 +31,7 @@ export class SimKms {
    * state without going through a Command and its authorization.
    */
   findKey(keyId: string): SimKmsKey | undefined {
-    return this.keys.find(keyId);
+    return this.commands.keys.find(keyId);
   }
 
   /**
@@ -116,7 +41,7 @@ export class SimKms {
    * for CloudFormation Resource creation to get at the alias it just made.
    */
   findAlias(aliasName: string): SimKmsAlias | undefined {
-    return this.keys.findAlias(aliasName);
+    return this.commands.keys.findAlias(aliasName);
   }
 
   /**
@@ -126,8 +51,8 @@ export class SimKms {
     command: simKmsCommands.SimCreateKeyCommand,
     options?: SimKmsRequestOptions,
   ): Promise<simKmsCommands.SimCreateKeyCommandOutput> {
-    await this.background.sequence();
-    return this.keyCommands.create(command, options);
+    await this.commands.background.sequence();
+    return this.commands.key.create(command, options);
   }
 
   /**
@@ -137,8 +62,8 @@ export class SimKms {
     command: simKmsCommands.SimDescribeKeyCommand,
     options?: SimKmsRequestOptions,
   ): Promise<simKmsCommands.SimDescribeKeyCommandOutput> {
-    await this.background.sequence();
-    return this.keyCommands.describe(command, options);
+    await this.commands.background.sequence();
+    return this.commands.key.describe(command, options);
   }
 
   /**
@@ -148,8 +73,8 @@ export class SimKms {
     command: simKmsCommands.SimListKeysCommand,
     options?: SimKmsRequestOptions,
   ): Promise<simKmsCommands.SimListKeysCommandOutput> {
-    await this.background.sequence();
-    return this.listKeysCommand.handle(command, options);
+    await this.commands.background.sequence();
+    return this.commands.listKeys.handle(command, options);
   }
 
   /**
@@ -159,8 +84,8 @@ export class SimKms {
     command: simKmsCommands.SimGetKeyPolicyCommand,
     options?: SimKmsRequestOptions,
   ): Promise<simKmsCommands.SimGetKeyPolicyCommandOutput> {
-    await this.background.sequence();
-    return this.policyCommands.get(command, options);
+    await this.commands.background.sequence();
+    return this.commands.policies.get(command, options);
   }
 
   /**
@@ -170,8 +95,8 @@ export class SimKms {
     command: simKmsCommands.SimPutKeyPolicyCommand,
     options?: SimKmsRequestOptions,
   ): Promise<simKmsCommands.SimPutKeyPolicyCommandOutput> {
-    await this.background.sequence();
-    return this.policyCommands.put(command, options);
+    await this.commands.background.sequence();
+    return this.commands.policies.put(command, options);
   }
 
   /**
@@ -181,8 +106,8 @@ export class SimKms {
     command: simKmsCommands.SimEnableKeyCommand,
     options?: SimKmsRequestOptions,
   ): Promise<simKmsCommands.SimEnableKeyCommandOutput> {
-    await this.background.sequence();
-    return this.lifecycleCommands.enable(command, options);
+    await this.commands.background.sequence();
+    return this.commands.lifecycle.enable(command, options);
   }
 
   /**
@@ -192,8 +117,8 @@ export class SimKms {
     command: simKmsCommands.SimDisableKeyCommand,
     options?: SimKmsRequestOptions,
   ): Promise<simKmsCommands.SimDisableKeyCommandOutput> {
-    await this.background.sequence();
-    return this.lifecycleCommands.disable(command, options);
+    await this.commands.background.sequence();
+    return this.commands.lifecycle.disable(command, options);
   }
 
   /**
@@ -203,8 +128,8 @@ export class SimKms {
     command: simKmsCommands.SimScheduleKeyDeletionCommand,
     options?: SimKmsRequestOptions,
   ): Promise<simKmsCommands.SimScheduleKeyDeletionCommandOutput> {
-    await this.background.sequence();
-    return this.lifecycleCommands.scheduleDeletion(command, options);
+    await this.commands.background.sequence();
+    return this.commands.lifecycle.scheduleDeletion(command, options);
   }
 
   /**
@@ -214,8 +139,8 @@ export class SimKms {
     command: simKmsCommands.SimCancelKeyDeletionCommand,
     options?: SimKmsRequestOptions,
   ): Promise<simKmsCommands.SimCancelKeyDeletionCommandOutput> {
-    await this.background.sequence();
-    return this.lifecycleCommands.cancelDeletion(command, options);
+    await this.commands.background.sequence();
+    return this.commands.lifecycle.cancelDeletion(command, options);
   }
 
   /**
@@ -225,8 +150,19 @@ export class SimKms {
     command: simKmsCommands.SimCreateAliasCommand,
     options?: SimKmsRequestOptions,
   ): Promise<simKmsCommands.SimCreateAliasCommandOutput> {
-    await this.background.sequence();
-    return this.aliasCommands.create(command, options);
+    await this.commands.background.sequence();
+    return this.commands.aliases.create(command, options);
+  }
+
+  /**
+   * Handle a DeleteAlias Command from the SDK.
+   */
+  async deleteAlias(
+    command: simKmsCommands.SimDeleteAliasCommand,
+    options?: SimKmsRequestOptions,
+  ): Promise<simKmsCommands.SimDeleteAliasCommandOutput> {
+    await this.commands.background.sequence();
+    return this.commands.aliases.delete(command, options);
   }
 
   /**
@@ -236,8 +172,8 @@ export class SimKms {
     command: simKmsCommands.SimListAliasesCommand,
     options?: SimKmsRequestOptions,
   ): Promise<simKmsCommands.SimListAliasesCommandOutput> {
-    await this.background.sequence();
-    return this.aliasCommands.list(command, options);
+    await this.commands.background.sequence();
+    return this.commands.aliases.list(command, options);
   }
 
   /**
@@ -247,8 +183,8 @@ export class SimKms {
     command: simKmsCommands.SimEncryptCommand,
     options?: SimKmsRequestOptions,
   ): Promise<simKmsCommands.SimEncryptCommandOutput> {
-    await this.background.sequence();
-    return this.cryptoCommands.encrypt(command, options);
+    await this.commands.background.sequence();
+    return this.commands.crypto.encrypt(command, options);
   }
 
   /**
@@ -258,8 +194,8 @@ export class SimKms {
     command: simKmsCommands.SimDecryptCommand,
     options?: SimKmsRequestOptions,
   ): Promise<simKmsCommands.SimDecryptCommandOutput> {
-    await this.background.sequence();
-    return this.cryptoCommands.decrypt(command, options);
+    await this.commands.background.sequence();
+    return this.commands.crypto.decrypt(command, options);
   }
 
   /**
@@ -269,8 +205,8 @@ export class SimKms {
     command: simKmsCommands.SimGenerateDataKeyCommand,
     options?: SimKmsRequestOptions,
   ): Promise<simKmsCommands.SimGenerateDataKeyCommandOutput> {
-    await this.background.sequence();
-    return this.generateDataKeyCommand.handle(command, options);
+    await this.commands.background.sequence();
+    return this.commands.generateDataKey.handle(command, options);
   }
 
   /**

@@ -3,12 +3,14 @@ import {
   ChangeResourceRecordSetsCommand,
   CreateHostedZoneCommand,
   DeleteHostedZoneCommand,
+  GetChangeCommand,
   GetHostedZoneCommand,
   ListHostedZonesByNameCommand,
   ListResourceRecordSetsCommand,
   Route53Client,
 } from "@aws-sdk/client-route-53";
 import {
+  assertArrayLength,
   assertIdentical,
   assertNonNullable,
   assertStringIncludes,
@@ -41,6 +43,12 @@ describe("simulated Route53 SDK Command routing", () => {
       new ListHostedZonesByNameCommand({ DNSName: "example.com" }),
     );
     assertIdentical(listOutput.HostedZones?.[0]?.Id, hostedZoneId);
+
+    await client.send(new DeleteHostedZoneCommand({ Id: hostedZoneId }));
+    const listAfterDelete = await client.send(
+      new ListHostedZonesByNameCommand({ DNSName: "example.com" }),
+    );
+    assertArrayLength(listAfterDelete.HostedZones ?? [], 0);
   });
 
   it("routes ChangeResourceRecordSetsCommand through an intercepted client", async () => {
@@ -137,10 +145,10 @@ describe("simulated Route53 SDK Command routing", () => {
     simSdk.intercept(client);
 
     const error = await assertThrowsErrorAsync(async () => {
-      await client.send(new DeleteHostedZoneCommand({ Id: "Z123" }));
+      await client.send(new GetChangeCommand({ Id: "C123" }));
     });
 
-    assertStringIncludes(error.message, "DeleteHostedZoneCommand");
+    assertStringIncludes(error.message, "GetChangeCommand");
     assertStringIncludes(error.message, "CreateHostedZoneCommand");
   });
 });

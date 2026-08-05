@@ -33,6 +33,18 @@ export class SimRoute53Registry {
   }
 
   /**
+   * Stop resolving a Hosted Zone, because it has been deleted.
+   *
+   * Anything watching for record changes stays subscribed: zones come and go
+   * while other simulated services are already watching, which is why the
+   * listeners are held here rather than on one zone.
+   */
+  deregisterHostedZone(hostedZoneId: SimRoute53HostedZoneId): void {
+    this.hostedZonesById.delete(hostedZoneId);
+    this.notifyRecordChange();
+  }
+
+  /**
    * Register a listener called whenever a record changes in any registered
    * Hosted Zone.
    *

@@ -5,6 +5,7 @@ import {
 } from "../../../sdk/index.js";
 import type {
   SimCreateAliasCommand,
+  SimDeleteAliasCommand,
   SimListAliasesCommand,
 } from "../command/alias/alias.command.js";
 import type {
@@ -110,6 +111,14 @@ export class SimKmsSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simKms.createAlias(
             command as SimCreateAliasCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteAliasCommand",
+        async (command, context): Promise<unknown> =>
+          await simKms.deleteAlias(
+            command as SimDeleteAliasCommand,
             simSdkCallerOptions(context),
           ),
       ],

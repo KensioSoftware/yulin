@@ -16,6 +16,11 @@ import type {
 } from "./command/describe-certificate/describe-certificate.command.js";
 import { DescribeCertificateCommandHandler } from "./command/describe-certificate/describe-certificate.handler.js";
 import type {
+  SimDeleteCertificateCommand,
+  SimDeleteCertificateCommandOutput,
+} from "./command/delete-certificate/delete-certificate.command.js";
+import { DeleteCertificateCommandHandler } from "./command/delete-certificate/delete-certificate.handler.js";
+import type {
   SimListCertificatesCommand,
   SimListCertificatesCommandOutput,
 } from "./command/list-certificates/list-certificates.command.js";
@@ -134,6 +139,21 @@ export class SimAcm {
     options?: SimAcmRequestOptions,
   ): Promise<SimDescribeCertificateCommandOutput> {
     const handler = new DescribeCertificateCommandHandler({
+      certificates: this.certificates,
+      iam: this.iam,
+      background: this.background,
+    });
+    return await handler.handle(command, options);
+  }
+
+  /**
+   * Handle a Delete Certificate Command from the SDK.
+   */
+  async deleteCertificate(
+    command: SimDeleteCertificateCommand,
+    options?: SimAcmRequestOptions,
+  ): Promise<SimDeleteCertificateCommandOutput> {
+    const handler = new DeleteCertificateCommandHandler({
       certificates: this.certificates,
       iam: this.iam,
       background: this.background,

@@ -117,6 +117,16 @@ export class SimKmsKeyStore {
   }
 
   /**
+   * Remove an alias, leaving the key it pointed at alone.
+   *
+   * An alias is a name for a key rather than part of it, so this is the one
+   * KMS removal that destroys nothing.
+   */
+  removeAlias(aliasName: string): void {
+    this.aliases.delete(aliasName);
+  }
+
+  /**
    * The aliases pointing at one key, or all of them.
    */
   aliasesFor(keyId: SimKmsKeyId | undefined): readonly SimKmsAlias[] {

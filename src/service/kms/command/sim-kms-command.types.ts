@@ -7,6 +7,8 @@
 export type {
   SimCreateAliasCommand,
   SimCreateAliasCommandOutput,
+  SimDeleteAliasCommand,
+  SimDeleteAliasCommandOutput,
   SimListAliasesCommand,
   SimListAliasesCommandOutput,
 } from "./alias/alias.command.js";
