@@ -1,12 +1,15 @@
 import { ListBucketsCommand } from "@aws-sdk/client-s3";
 import {
   assertArrayLength,
+  assertIdentical,
+  assertNonNullable,
   assertStringIncludes,
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
+import type { SimCfnStack } from "../../../cloudformation/stack/sim-cfn-stack.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 
 /**
@@ -32,37 +35,96 @@ async function deployFailing(
   });
 }
 
+/**
+ * Deploy a Bucket carrying the given properties and wait for it to settle.
+ */
+async function deployBucket(
+  simAws: SimAws,
+  properties: SimCfnTemplateValueRecord,
+): Promise<SimCfnStack> {
+  const stack = await simAws.cloudFormation().deployTemplate({
+    stackName: "uploads-stack",
+    template: {
+      Resources: {
+        Bucket: {
+          Type: "AWS::S3::Bucket",
+          Properties: { BucketName: "uploads", ...properties },
+        },
+      },
+    },
+  });
+  await stack.waitForDeployComplete();
+
+  return stack;
+}
+
+/**
+ * How many Buckets simulated S3 holds.
+ */
+async function bucketCount(simAws: SimAws): Promise<number> {
+  const output = await simAws.s3().listBuckets(new ListBucketsCommand());
+
+  return (output.Buckets ?? []).length;
+}
+
 describe("AWS::S3::Bucket property rules", () => {
-  it("refuses a real Bucket property simulated S3 does not simulate", async () => {
+  it("deploys a Bucket without a real property simulated S3 cannot act on", async () => {
     // Given a template asking for Bucket versioning.
     const simAws = new SimAws();
 
     // When the template is deployed.
-    const error = await deployFailing(simAws, {
+    const stack = await deployBucket(simAws, {
       VersioningConfiguration: { Status: "Enabled" },
     });
 
-    // Then the Stack fails naming the property, rather than deploying a Bucket
-    // that looks versioned to the template and is not.
-    assertStringIncludes(
-      error.message,
-      "Invalid AWS::S3::Bucket Resource Bucket: VersioningConfiguration is a " +
-        "real AWS::S3::Bucket property that simulated S3 does not simulate",
-    );
+    // Then the Bucket is created, unversioned, and the property it was created
+    // without is recorded against the Resource.
+    assertIdentical(await bucketCount(simAws), 1);
+    assertArrayLength(stack.ignoredProperties, 1);
+    const ignored = stack.ignoredProperties[0];
+    assertNonNullable(ignored);
+    assertIdentical(ignored.logicalId, "Bucket");
+    assertIdentical(ignored.resourceType, "AWS::S3::Bucket");
+    assertIdentical(ignored.path, "VersioningConfiguration");
+    assertStringIncludes(ignored.reason, "Object versions are not simulated");
   });
 
-  it("refuses a name that is not a Bucket property at all", async () => {
+  it("deploys a Bucket without a name it has never heard of", async () => {
     // Given a template carrying a misspelled property.
     const simAws = new SimAws();
 
     // When the template is deployed.
-    const error = await deployFailing(simAws, { BucketNam: "uploads" });
+    const stack = await deployBucket(simAws, { BucketNam: "uploads" });
 
-    // Then the Stack fails naming it.
+    // Then the Bucket is still created, and the name nothing read is recorded
+    // rather than failing a stack over a typo or a property AWS added since.
+    assertIdentical(await bucketCount(simAws), 1);
+    assertArrayLength(stack.ignoredProperties, 1);
+    const ignored = stack.ignoredProperties[0];
+    assertNonNullable(ignored);
+    assertIdentical(ignored.path, "BucketNam");
     assertStringIncludes(
-      error.message,
-      "Invalid AWS::S3::Bucket Resource Bucket: BucketNam is not an " +
-        "AWS::S3::Bucket property",
+      ignored.reason,
+      "BucketNam is not a property simulated S3 knows about",
+    );
+  });
+
+  it("records every unsimulated property, not only the first", async () => {
+    // Given a template asking for object locking as well as versioning.
+    const simAws = new SimAws();
+
+    // When the template is deployed.
+    const stack = await deployBucket(simAws, {
+      ObjectLockEnabled: true,
+      VersioningConfiguration: { Status: "Enabled" },
+    });
+
+    // Then the Bucket exists and both omissions are reported.
+    assertIdentical(await bucketCount(simAws), 1);
+    assertArrayLength(stack.ignoredProperties, 2);
+    assertIdentical(
+      stack.ignoredProperties.map((entry) => entry.path).join(", "),
+      "ObjectLockEnabled, VersioningConfiguration",
     );
   });
 
@@ -136,52 +198,25 @@ describe("AWS::S3::Bucket property rules", () => {
     );
   });
 
-  it("refuses the property before creating the Bucket", async () => {
-    // Given a template asking for object locking alongside a valid Bucket name.
-    const simAws = new SimAws();
-
-    // When the template is deployed.
-    await deployFailing(simAws, { ObjectLockEnabled: true });
-
-    // Then no Bucket is left behind for a later deployment to collide with.
-    const output = await simAws.s3().listBuckets(new ListBucketsCommand());
-
-    assertArrayLength(output.Buckets ?? [], 0);
-  });
-
   it("deploys a Bucket carrying properties nothing simulated can tell apart", async () => {
     // Given a template with the encryption and tags CDK puts on almost every
     // Bucket it synthesizes.
     const simAws = new SimAws();
 
     // When the template is deployed.
-    const stack = await simAws.cloudFormation().deployTemplate({
-      stackName: "uploads-stack",
-      template: {
-        Resources: {
-          Bucket: {
-            Type: "AWS::S3::Bucket",
-            Properties: {
-              BucketName: "uploads",
-              BucketEncryption: {
-                ServerSideEncryptionConfiguration: [
-                  {
-                    ServerSideEncryptionByDefault: { SSEAlgorithm: "AES256" },
-                  },
-                ],
-              },
-              Tags: [{ Key: "app", Value: "uploads" }],
-            },
-          },
-        },
+    const stack = await deployBucket(simAws, {
+      BucketEncryption: {
+        ServerSideEncryptionConfiguration: [
+          { ServerSideEncryptionByDefault: { SSEAlgorithm: "AES256" } },
+        ],
       },
+      Tags: [{ Key: "app", Value: "uploads" }],
     });
-    await stack.waitForDeployComplete();
 
-    // Then the Bucket is created, and the properties are read and ignored.
-    const output = await simAws.s3().listBuckets(new ListBucketsCommand());
-
-    assertArrayLength(output.Buckets ?? [], 1);
+    // Then the Bucket is created, and nothing is reported: no simulated
+    // command could tell either property was left out.
+    assertIdentical(await bucketCount(simAws), 1);
+    assertArrayLength(stack.ignoredProperties, 0);
   });
 
   it("accepts the four properties simulated S3 acts on", async () => {
@@ -190,27 +225,14 @@ describe("AWS::S3::Bucket property rules", () => {
     const simAws = new SimAws();
 
     // When the template is deployed.
-    const stack = await simAws.cloudFormation().deployTemplate({
-      stackName: "uploads-stack",
-      template: {
-        Resources: {
-          Bucket: {
-            Type: "AWS::S3::Bucket",
-            Properties: {
-              BucketName: "uploads",
-              NotificationConfiguration: { LambdaConfigurations: [] },
-              PublicAccessBlockConfiguration: { BlockPublicPolicy: false },
-              WebsiteConfiguration: { IndexDocument: "index.html" },
-            },
-          },
-        },
-      },
+    const stack = await deployBucket(simAws, {
+      NotificationConfiguration: { LambdaConfigurations: [] },
+      PublicAccessBlockConfiguration: { BlockPublicPolicy: false },
+      WebsiteConfiguration: { IndexDocument: "index.html" },
     });
-    await stack.waitForDeployComplete();
 
-    // Then the Bucket is created.
-    const output = await simAws.s3().listBuckets(new ListBucketsCommand());
-
-    assertArrayLength(output.Buckets ?? [], 1);
+    // Then the Bucket is created with nothing left out.
+    assertIdentical(await bucketCount(simAws), 1);
+    assertArrayLength(stack.ignoredProperties, 0);
   });
 });

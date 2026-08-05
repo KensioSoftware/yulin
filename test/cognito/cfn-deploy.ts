@@ -12,6 +12,7 @@
 import { assertInstanceOf, assertThrowsErrorAsync } from "@kensio/smartass";
 
 import { SimAws } from "../../src/service/aws/sim-aws.js";
+import type { SimCfnStack } from "../../src/service/cloudformation/stack/sim-cfn-stack.js";
 import type { SimCfnTemplateValueRecord } from "../../src/service/cloudformation/template/value/sim-cfn-template-value.js";
 
 /**
@@ -43,4 +44,30 @@ export async function deployFailure(
   assertInstanceOf(error, Error);
 
   return error;
+}
+
+/**
+ * Deploy a template that is expected to succeed, and give back the stack.
+ */
+export async function deploySuccess(
+  simAws: SimAws,
+  resources: SimCfnTemplateValueRecord,
+): Promise<SimCfnStack> {
+  const stack = await simAws.cloudFormation().deployTemplate({
+    stackName: "app-stack",
+    template: { Resources: resources },
+  });
+  await stack.waitForDeployComplete();
+
+  return stack;
+}
+
+/**
+ * The reasons a deployed stack gave for the properties it created Resources
+ * without, as one string per ignored property.
+ */
+export function ignoredReasons(stack: SimCfnStack): string[] {
+  return stack.ignoredProperties.map((ignored) => {
+    return `${ignored.logicalId} ${ignored.reason}`;
+  });
 }

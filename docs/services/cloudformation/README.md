@@ -318,8 +318,8 @@ simulated CloudFront hostname, such as `e123example.cloudfront.net`.
 
 #### Values from a skipped Resource
 
-A Resource that was skipped, because its type is not simulated or because it sets a property whose
-behaviour is not simulated, still answers both intrinsics. `Ref` returns the logical ID, and
+A Resource that was skipped, because its type is not simulated or because there is no simulated
+Resource to create at all, still answers both intrinsics. `Ref` returns the logical ID, and
 `Fn::GetAtt` returns the string `<logical ID>.<attribute name>`.
 
 ```typescript sim-cloudformation-skipped-resource-values
@@ -1281,8 +1281,8 @@ This is useful in tests when you want to assert that a specific template resourc
 expected simulated service resource.
 
 `stack.skippedResources` lists the Resources the deployment did not create. Each one carries a
-`skippedReason` naming the type or the property that is not simulated, so a test that expected a
-resource to exist can find out why it does not.
+`skippedReason` naming the type that is not simulated, so a test that expected a resource to exist
+can find out why it does not.
 
 ```typescript sim-cloudformation-inspect-skipped
 /**
@@ -1321,6 +1321,81 @@ console.log(stack.getResource("AlarmTopic")?.skippedReason);
 
 A skipped Resource is still in `stack.resources`, and still answers `Ref` and `Fn::GetAtt` with
 [stand-in values](#values-from-a-skipped-resource).
+
+## Properties a Resource was created without
+
+Deployment is best effort. A Resource type that is not simulated is skipped and the rest of the
+stack still deploys, and the same goes one level down: a property the Resource's own service cannot
+act on does not stop the Resource being created. It is left out, and the omission is recorded in
+`stack.ignoredProperties`.
+
+```typescript sim-cloudformation-ignored-properties
+/**
+ * Finding out which properties a Stack created its Resources without.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "uploads-stack",
+  template: {
+    Resources: {
+      UploadsBucket: {
+        Type: "AWS::S3::Bucket",
+        Properties: {
+          BucketName: "uploads",
+          VersioningConfiguration: { Status: "Enabled" },
+        },
+      },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+
+// The Bucket exists and is usable, unversioned.
+console.log(stack.getResource("UploadsBucket")?.deployed);
+// true
+
+for (const ignored of stack.ignoredProperties) {
+  console.log(ignored.logicalId, ignored.path, ignored.reason);
+  // "UploadsBucket VersioningConfiguration VersioningConfiguration is a real
+  //  AWS::S3::Bucket property simulated S3 does not act on: Object versions
+  //  are not simulated, ..."
+}
+```
+
+Each entry names the `logicalId` and `resourceType` of the Resource, the `path` to the property, and
+a `reason`. The path is the whole way down, so a setting on one entry of a list says which entry it
+was on, such as `GlobalSecondaryIndexes.1.WarmThroughput`. The same list is on each Resource as
+`resource.ignoredProperties`.
+
+**An ignored property means the simulated Resource behaves differently to the one the template
+describes.** That is the trade this makes: a template deploys as far as it can, and the record is
+where to check whether what it could not do matters to the test you are writing. A test asserting on
+object versions, on a dead-letter queue, or on a rotated key needs to look here before trusting the
+result.
+
+A property name that is not one AWS has is recorded the same way rather than failing the stack. A
+typo and a property AWS added after this simulator read the docs look identical from here, and a
+Resource that deploys with the unread name reported is more useful than a stack that fails over
+either.
+
+Two things are still refused outright, and fail the Resource:
+
+- A property that leaves nothing coherent to create, such as an `AWS::S3::Bucket` whose `BucketName`
+  is not a string, or an `AWS::DynamoDB::GlobalTable` whose replica list does not include the region
+  the stack is deploying into. Real CloudFormation refuses these templates too.
+- A value the simulated service itself refuses, which is refused in the same words an SDK caller
+  gets. An `AWS::SQS::Queue` with `FifoQueue: true` is one: a FIFO queue is named `<name>.fifo`,
+  which simulated SQS refuses, so there is no queue to create under the name the template gave it.
+
+Properties nothing simulated could tell apart are not listed. There is no simulated KMS and Object
+bytes are stored as they arrive, so an `AWS::S3::Bucket` carrying `BucketEncryption` and `Tags`, as
+almost every Bucket CDK synthesizes does, records nothing: a report of differences that make no
+difference is one nobody can read.
 
 ## Handling deployment failures
 
@@ -1438,7 +1513,11 @@ Each service's own docs describe what its resource types support.
   resource answers `Ref` and `Fn::GetAtt` with
   [stand-in values](#values-from-a-skipped-resource) rather than the value a created resource would
   have given.
-- Unsupported resource properties may be ignored or rejected depending on the resource simulator.
+- A resource property that is not simulated is left out and recorded in `stack.ignoredProperties`
+  rather than failing the stack, so the resource is created behaving differently to the one the
+  template describes. See
+  [properties a Resource was created without](#properties-a-resource-was-created-without) for what
+  is still refused outright.
 - Stack updates and deletes are not supported.
 - `Fn::FindInMap` accepts only the three-argument form. The four-argument form, where the fourth
   argument is `{ "DefaultValue": ... }`, is rejected.

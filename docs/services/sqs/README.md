@@ -1059,12 +1059,17 @@ that, which a template cannot predict either way. The generated name is trimmed 
 a queue name allows, ending in a hash of the untrimmed name so two long names that start the same
 stay apart.
 
-`FifoQueue: true` fails the resource, because only standard queues are simulated and a FIFO queue
-created as a standard one would take messages in an order the deployment does not promise. The
-properties with behaviour that is not simulated fail the resource in the same way rather than being
-dropped: `RedrivePolicy`, `RedriveAllowPolicy`, `KmsMasterKeyId`, `KmsDataKeyReusePeriodSeconds`,
-`SqsManagedSseEnabled`, `ContentBasedDeduplication`, `DeduplicationScope`, `FifoThroughputLimit` and
-`Tags`. So does a property `AWS::SQS::Queue` does not have.
+`FifoQueue: true` fails the resource. Only standard queues are simulated, and a FIFO queue is named
+`<name>.fifo`, which simulated SQS refuses to an SDK caller as well, so there is no queue to create
+under the name the template gave it.
+
+The properties with behaviour that is not simulated are a different case: the queue is created
+without them and each one is recorded in
+[`stack.ignoredProperties`](../cloudformation/README.md#properties-a-resource-was-created-without),
+so a stack full of queues still deploys. Those are `RedrivePolicy`, `RedriveAllowPolicy`,
+`KmsMasterKeyId`, `KmsDataKeyReusePeriodSeconds`, `SqsManagedSseEnabled`,
+`ContentBasedDeduplication`, `DeduplicationScope`, `FifoThroughputLimit` and `Tags`. A property
+`AWS::SQS::Queue` does not have is recorded the same way.
 
 `AWS::SQS::QueuePolicy` deploys the policy it names onto each queue in its `Queues` list, through
 `SetQueueAttributes`. A policy declared in a template is therefore validated and enforced exactly as
@@ -1139,8 +1144,9 @@ Current documented limitations:
   over either. The 60 second hold on a deleted queue's name is simulated, so recreating a queue
   straight after deleting it fails with `QueueDeletedRecently` until the clock moves on.
 - Dead-letter queues are simulated for standard queues only, and only the `RedrivePolicy` half of
-  them. `RedriveAllowPolicy` is refused, so a dead-letter queue cannot restrict which queues may
-  redrive to it. `ListDeadLetterSourceQueues` and the `StartMessageMoveTask` family for draining a
+  them. Setting `RedriveAllowPolicy` through the SQS API is refused, and on an `AWS::SQS::Queue` it
+  is recorded and the queue created without it, so a dead-letter queue cannot restrict which queues
+  may redrive to it either way. `ListDeadLetterSourceQueues` and the `StartMessageMoveTask` family for draining a
   dead-letter queue back to its source are not supported, so a redriven message is moved back by a
   test sending it again.
 - `ApproximateReceiveCount` starting again from one on a dead-letter queue is this simulation's
@@ -1148,8 +1154,8 @@ Current documented limitations:
   and the moved message has not been received from the dead-letter queue yet. `SentTimestamp` being
   unchanged by the move is documented AWS behaviour, and is simulated as such.
 - The `RedrivePolicy` property on `AWS::SQS::Queue` is not simulated, so a dead-letter queue is
-  configured by an SDK call rather than by a template. The property fails the resource rather than
-  being dropped.
+  configured by an SDK call rather than by a template. The queue is created without the property and
+  the omission is recorded in `stack.ignoredProperties`.
 - A queue policy is set through the `Policy` attribute only. `AddPermission` and `RemovePermission`,
   which are shorthands for writing one statement of it, are not supported.
 - `GetQueueAttributes` reports the `Policy` string that was set. Real SQS re-serialises the document
@@ -1158,8 +1164,8 @@ Current documented limitations:
   policy admits another account's principal to a queue here; it does not make another account's
   queues reachable through this one.
 - Encryption is not simulated. `KmsMasterKeyId`, `KmsDataKeyReusePeriodSeconds` and
-  `SqsManagedSseEnabled` are refused, and message bodies are held in process memory as they were
-  sent. That is not a security boundary: anything sharing the process can reach them.
+  `SqsManagedSseEnabled` are recorded rather than applied on an `AWS::SQS::Queue`, and message bodies
+  are held in process memory as they were sent. That is not a security boundary: anything sharing the process can reach them.
 - Tags are not simulated. `TagQueue`, `UntagQueue` and `ListQueueTags` are not supported, and
   `CreateQueue` refuses a `tags` parameter rather than dropping it.
 - `SenderId` is not reported, because a simulated caller has no user or role id to report it as.

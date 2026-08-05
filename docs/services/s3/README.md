@@ -794,16 +794,22 @@ An `AWS::S3::Bucket` resource carries four properties simulated S3 acts on: `Buc
 `BucketName` the Bucket is named after the resource's logical id, lowercased, rather than the
 generated name real CloudFormation invents.
 
-Any other property fails the stack by name. A Bucket deployed without the lifecycle rules,
-versioning or CORS configuration its template asked for would look configured and behave as though it
-were not, and the failure that causes turns up somewhere else entirely. One of the four that is there
-but is not the shape it should be fails the stack too, rather than being read as absent.
+Any other property is left out and recorded in
+[`stack.ignoredProperties`](../cloudformation/README.md#properties-a-resource-was-created-without),
+so the Bucket is created and the stack carries on. That matters because a Bucket deployed without the
+lifecycle rules, versioning or CORS configuration its template asked for looks configured and behaves
+as though it were not, and the failure that causes turns up somewhere else entirely. The record is
+where a test checks which of those it is standing on. A property name `AWS::S3::Bucket` does not have
+is recorded the same way, rather than a stack failing over a typo.
 
-`BucketEncryption` and `Tags` are the two exceptions. They are read and ignored, because nothing this
-simulator models can tell the difference: there is no simulated KMS, Object bytes are stored as they
-arrive, and no simulated service reads a Bucket tag. CDK puts both on almost every Bucket it
-synthesizes, so refusing them would leave a CDK app unable to deploy over a difference no test could
-observe.
+One of the four that is there but is not the shape it should be still fails the stack, rather than
+being read as absent, and so does a `BucketName` that is not a string: there is no Bucket to create
+under a name nothing else in the template refers to.
+
+`BucketEncryption` and `Tags` are read, ignored and not recorded, because nothing this simulator
+models can tell the difference: there is no simulated KMS, Object bytes are stored as they arrive,
+and no simulated service reads a Bucket tag. CDK puts both on almost every Bucket it synthesizes, and
+listing a difference no test could observe would only bury the ones that matter.
 
 ## Bucket policies
 

@@ -1,4 +1,5 @@
 import { SimCfnDynamoDbPropertyRules } from "../property/sim-cfn-dynamodb-property-rules.js";
+import type { SimCfnDynamoDbResourceScope } from "../property/sim-cfn-dynamodb-resource-scope.js";
 import { dynamoDbTableResourceTypeName } from "../sim-cfn-dynamodb-resource-type.js";
 
 /**
@@ -27,16 +28,17 @@ const unsimulatedStreamPropertyNames: ReadonlySet<string> = new Set([
  * The rules a table's `StreamSpecification` is read under.
  *
  * This is the table's own property rule applied a level down, as the index
- * rules are. A real property that is not simulated skips the table, since a
- * stream deployed without a policy the template asked for would be read by
- * whatever that policy was meant to keep out.
+ * rules are. A real property that is not simulated is recorded and the table is
+ * created without it, since a stream deployed without a policy the template
+ * asked for is read by whatever that policy was meant to keep out, and a test
+ * needs to be able to find that out.
  */
 export function simCfnDynamoDbTableStreamRules(
-  logicalId: string,
+  scope: SimCfnDynamoDbResourceScope,
 ): SimCfnDynamoDbPropertyRules {
   return new SimCfnDynamoDbPropertyRules({
     resourceTypeName: dynamoDbTableResourceTypeName,
-    logicalId,
+    scope,
     kind: "StreamSpecification",
     simulated: simulatedStreamPropertyNames,
     unsimulated: unsimulatedStreamPropertyNames,

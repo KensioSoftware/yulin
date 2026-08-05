@@ -1,5 +1,7 @@
 import {
+  assertArrayLength,
   assertIdentical,
+  assertNonNullable,
   assertStringIncludes,
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
@@ -250,19 +252,29 @@ describe("AWS::DynamoDB::Table property reading", () => {
     );
   });
 
-  it("refuses a property AWS::DynamoDB::Table does not have", async () => {
-    // Given a template carrying a property that is not on the Resource type,
-    // which real CloudFormation refuses too.
-    // When the Resource is created, then it is refused rather than skipped:
-    // nothing is missing from the simulation, the template is wrong.
-    const error = await createTableResource(
-      tableBreaking({ ReadCapacityUnits: 5 }),
-    );
+  it("creates a table carrying a property AWS::DynamoDB::Table does not have", async () => {
+    // Given a template carrying a property that is not on the Resource type.
+    const simAws = new SimAws();
+    const factory = new SimDynamoDbCfnResourceFactory({
+      dynamoDb: simAws.dynamoDb(),
+    });
+    const resource = simCfnResourceFactory.make({
+      logicalId: "OddTable",
+      template: tableBreaking({ ReadCapacityUnits: 5 }),
+    });
 
-    assertIdentical(
-      error.message,
-      "Invalid AWS::DynamoDB::Table Resource BadTable: ReadCapacityUnits is " +
-        "not an AWS::DynamoDB::Table property",
+    // When the Resource is created.
+    await factory.create("Table", resource, { simAws, resources: new Map() });
+
+    // Then the table exists, with the property nothing read recorded against
+    // it rather than the Resource being refused over it.
+    assertArrayLength(resource.ignoredProperties, 1);
+    const [ignored] = resource.ignoredProperties;
+    assertNonNullable(ignored);
+    assertStringIncludes(
+      ignored.reason,
+      "ReadCapacityUnits is not an AWS::DynamoDB::Table property simulated " +
+        "DynamoDB knows about",
     );
   });
 });

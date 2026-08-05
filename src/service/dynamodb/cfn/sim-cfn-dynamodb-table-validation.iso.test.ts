@@ -50,7 +50,7 @@ describe("DynamoDB CloudFormation Table validation", () => {
     assertUndefined(simAws.dynamoDb().findTable("orders"));
   });
 
-  it("skips a table with a property that is not simulated", async () => {
+  it("creates a table without a property that is not simulated", async () => {
     // Given a template asking for point in time recovery, which is not
     // simulated, in a stack with another Resource in it.
     const simAws = new SimAws();
@@ -74,17 +74,22 @@ describe("DynamoDB CloudFormation Table validation", () => {
     });
     await stack.waitForDeployComplete();
 
-    // Then the table is skipped, with a reason naming the property, rather
-    // than created without the behaviour the template asked for.
+    // Then the table exists, without the behaviour the template asked for, and
+    // the property it was created without is recorded against the Resource.
     const resource = stack.getResource("OrdersTable");
     assertNonNullable(resource);
-    assertTrue(resource.skipped);
+    assertFalse(resource.skipped);
+    assertTrue(resource.deployed);
+    assertNonNullable(simAws.dynamoDb().findTable("orders"));
+
+    const ignored = resource.ignoredProperties[0];
+    assertNonNullable(ignored);
+    assertIdentical(ignored.path, "PointInTimeRecoverySpecification");
     assertStringIncludes(
-      resource.skippedReason ?? "",
+      ignored.reason,
       "PointInTimeRecoverySpecification is a real AWS::DynamoDB::Table " +
         "property that simulated DynamoDB does not simulate",
     );
-    assertUndefined(simAws.dynamoDb().findTable("orders"));
 
     // And the rest of the stack still deploys.
     assertTrue(stack.getResource("OrdersBucket")?.deployed);

@@ -34,6 +34,7 @@ export class SimCfnSqsQueueProperties {
     this.rules = new SimCfnSqsQueuePropertyRules({
       logicalId: properties.resource.logicalId,
       properties: properties.properties,
+      ignorer: properties.resource,
     });
   }
 
@@ -65,7 +66,7 @@ export class SimCfnSqsQueueProperties {
    * takes them in.
    */
   attributes(): SimSqsQueueAttributeInput {
-    this.rules.assertSimulated();
+    this.rules.apply();
 
     return Object.fromEntries(
       Object.entries(this.properties)

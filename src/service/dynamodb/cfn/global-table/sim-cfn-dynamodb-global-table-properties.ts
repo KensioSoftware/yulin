@@ -9,7 +9,8 @@ import {
   simCfnDynamoDbGlobalTableProperty,
 } from "./sim-cfn-dynamodb-global-table-property.js";
 import { SimCfnDynamoDbGlobalTableReplicas } from "./sim-cfn-dynamodb-global-table-replicas.js";
-import { assertSimCfnDynamoDbGlobalTableSimulated } from "./sim-cfn-dynamodb-global-table-simulated.js";
+import { applySimCfnDynamoDbGlobalTableRules } from "./sim-cfn-dynamodb-global-table-simulated.js";
+import type { SimCfnDynamoDbResourceScope } from "../property/sim-cfn-dynamodb-resource-scope.js";
 
 /**
  * The properties a global table states the same way an ordinary table does.
@@ -55,36 +56,39 @@ interface SimCfnDynamoDbGlobalTablePropertiesProperties {
  * about replication that have nothing to be true of on one table in one region.
  */
 export class SimCfnDynamoDbGlobalTableProperties {
-  private readonly logicalId: string;
+  private readonly scope: SimCfnDynamoDbResourceScope;
   private readonly values: SimCfnDynamoDbPropertyValues;
   private readonly replicas: SimCfnDynamoDbGlobalTableReplicas;
 
   constructor(properties: SimCfnDynamoDbGlobalTablePropertiesProperties) {
-    this.logicalId = properties.resource.logicalId;
+    this.scope = {
+      logicalId: properties.resource.logicalId,
+      ignorer: properties.resource,
+    };
     this.values = new SimCfnDynamoDbPropertyValues({
       resourceTypeName: dynamoDbGlobalTableResourceTypeName,
-      logicalId: this.logicalId,
+      logicalId: this.scope.logicalId,
       properties: properties.properties,
     });
     this.replicas = new SimCfnDynamoDbGlobalTableReplicas({
-      logicalId: this.logicalId,
+      scope: this.scope,
       regionName: properties.resource.accountRegionScope.regionName,
       values: this.values,
     });
   }
 
   /**
-   * The AWS::DynamoDB::Table properties this global table is, refusing
+   * The AWS::DynamoDB::Table properties this global table is, recording
    * everything about it that is not simulated on the way.
    *
-   * The replica is settled first, since a table replicating across regions is
-   * skipped whatever else it asks for.
+   * The replica is settled first, since which region the table is created in
+   * decides which replica's settings the rest of the read comes from.
    */
   tableProperties(): SimCfnTemplateValueRecord {
     const replica = this.replicas.single();
 
-    assertSimCfnDynamoDbGlobalTableSimulated({
-      logicalId: this.logicalId,
+    applySimCfnDynamoDbGlobalTableRules({
+      scope: this.scope,
       values: this.values,
       replica,
     });

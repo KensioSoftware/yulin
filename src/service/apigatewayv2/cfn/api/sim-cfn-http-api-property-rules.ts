@@ -5,10 +5,10 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
  * The properties an imported API cannot also carry.
  *
  * `ImportApi` takes neither, and nothing here changes an API after it is
- * created, so a template asking for one alongside a `Body` would get an API
- * that ignored it. AWS applies both by updating the imported API afterwards.
+ * created, so a template asking for one alongside a `Body` gets an API without
+ * it. AWS applies both by updating the imported API afterwards.
  */
-const refusedAlongsideBody = new Set([
+const droppedAlongsideBody = new Set([
   "Description",
   "DisableExecuteApiEndpoint",
 ]);
@@ -19,9 +19,15 @@ interface SimCfnHttpApiPropertyRulesProperties {
 }
 
 /**
- * The AWS::ApiGatewayV2::Api rules about which properties may appear together,
- * each refused with the reason it cannot be deployed rather than with the
- * generic "not simulated" message.
+ * The AWS::ApiGatewayV2::Api rules about which properties may appear together.
+ *
+ * Each one says why that combination cannot be deployed as written, rather
+ * than falling back on the generic "not simulated" wording. Which of them
+ * refuses the Resource and which records it and carries on turns on what real
+ * CloudFormation does with the same template: a property AWS has no such thing
+ * as, or one asking for a WebSocket API, is a template AWS refuses too, and one
+ * AWS quietly applies in a second step is one to create the API without and
+ * report.
  */
 export class SimCfnHttpApiPropertyRules {
   private readonly resource: SimCfnResource;
@@ -51,10 +57,14 @@ export class SimCfnHttpApiPropertyRules {
   }
 
   /**
-   * Refuse a `FailOnWarnings` on an API that imports nothing.
+   * Record a `FailOnWarnings` on an API that imports nothing.
+   *
+   * There are no import warnings without an import, so the property says
+   * nothing about this API either way, and real CloudFormation accepts the
+   * same template.
    */
-  requireBodyForFailOnWarnings(): void {
-    this.refuse(
+  ignoreFailOnWarningsWithoutBody(): void {
+    this.ignore(
       "FailOnWarnings",
       "it says what to do with the warnings an OpenAPI import finds, and " +
         "this Resource has no Body to import",
@@ -62,22 +72,19 @@ export class SimCfnHttpApiPropertyRules {
   }
 
   /**
-   * Refuse the properties an imported API would silently drop.
+   * Record the properties an imported API cannot be created with.
    */
-  refuseUnimportableProperties(): void {
-    const refused = Object.keys(this.properties).find((name) =>
-      refusedAlongsideBody.has(name),
-    );
-
-    if (refused === undefined) {
-      return;
+  ignoreUnimportableProperties(): void {
+    for (const name of Object.keys(this.properties)) {
+      if (droppedAlongsideBody.has(name)) {
+        this.ignore(
+          name,
+          "ImportApi does not take it, and nothing here changes an API after " +
+            "it is created, so the API is created without it where real AWS " +
+            "would apply it in a second step",
+        );
+      }
     }
-
-    throw this.error(
-      refused,
-      "ImportApi does not take it, and nothing here changes an API after it " +
-        "is created, so it would be ignored here and applied on real AWS",
-    );
   }
 
   /**
@@ -104,6 +111,21 @@ export class SimCfnHttpApiPropertyRules {
     }
 
     throw this.error(name, reason);
+  }
+
+  /**
+   * Record a property this Resource carries and is created without, if it
+   * carries it.
+   */
+  private ignore(name: string, reason: string): void {
+    if (!Object.keys(this.properties).includes(name)) {
+      return;
+    }
+
+    this.resource.ignoreProperty(
+      name,
+      `AWS::ApiGatewayV2::Api property ${name} is not applied: ${reason}`,
+    );
   }
 
   /**

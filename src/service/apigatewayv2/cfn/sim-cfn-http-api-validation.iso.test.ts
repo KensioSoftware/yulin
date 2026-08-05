@@ -9,17 +9,18 @@ import { describe, it } from "vitest";
 import {
   deployHttpApi,
   deployHttpApiFailure,
+  ignoredReasons,
   simAwsInEuWest2,
 } from "../../../../test/apigatewayv2/cfn-deploy.js";
 import { simCfnHttpApiTemplateFactory } from "./sim-cfn-http-api-template.factory.js";
 
 describe("API Gateway v2 CloudFormation validation", () => {
-  it("refuses an API property outside the simulated set", async () => {
+  it("creates an API without a property outside the simulated set", async () => {
     // Given an API asking for CORS, which is not simulated
     const simAws = simAwsInEuWest2();
 
     // When the template is deployed
-    const error = await deployHttpApiFailure(
+    const stack = await deployHttpApi(
       simAws,
       simCfnHttpApiTemplateFactory.make({
         apiProperties: {
@@ -28,15 +29,19 @@ describe("API Gateway v2 CloudFormation validation", () => {
       }),
     );
 
-    // Then the stack fails, naming the Resource type, the logical ID, the
-    // property and what is simulated
-    assertStringIncludes(error.message, "Api");
+    // Then the API is created without answering preflight requests, and the
+    // record names the logical ID, the property and what is simulated
+    assertTrue(stack.getResource("Api")?.deployed);
+
+    const [reason] = ignoredReasons(stack);
+    assertNonNullable(reason);
+    assertStringIncludes(reason, "Api");
     assertStringIncludes(
-      error.message,
-      "AWS::ApiGatewayV2::Api Api property CorsConfiguration is not simulated",
+      reason,
+      "AWS::ApiGatewayV2::Api property CorsConfiguration is not simulated",
     );
     assertStringIncludes(
-      error.message,
+      reason,
       "The simulated properties are Name, ProtocolType, Description, " +
         "DisableExecuteApiEndpoint, Body, FailOnWarnings.",
     );
@@ -58,27 +63,32 @@ describe("API Gateway v2 CloudFormation validation", () => {
     assertStringIncludes(error.message, "WebSocket APIs are not simulated");
   });
 
-  it("refuses an integration property outside the simulated set", async () => {
+  it("creates an integration without a property outside the simulated set", async () => {
     // Given an integration asking for a request timeout
     const simAws = simAwsInEuWest2();
 
     // When the template is deployed
-    const error = await deployHttpApiFailure(
+    const stack = await deployHttpApi(
       simAws,
       simCfnHttpApiTemplateFactory.make({
         integrationProperties: { TimeoutInMillis: 5000 },
       }),
     );
 
-    // Then the stack fails, naming the Resource type, the logical ID, the
-    // property and what is simulated
+    // Then the integration is created without a timeout, and the record names
+    // the Resource type, the logical ID, the property and what is simulated
+    assertTrue(stack.getResource("Integration")?.deployed);
+
+    const [reason] = ignoredReasons(stack);
+    assertNonNullable(reason);
+    assertStringIncludes(reason, "Integration");
     assertStringIncludes(
-      error.message,
-      "AWS::ApiGatewayV2::Integration Integration property TimeoutInMillis " +
-        "is not simulated",
+      reason,
+      "AWS::ApiGatewayV2::Integration property TimeoutInMillis is not " +
+        "simulated",
     );
     assertStringIncludes(
-      error.message,
+      reason,
       "The simulated properties are ApiId, IntegrationType, IntegrationUri, " +
         "PayloadFormatVersion, Description.",
     );
@@ -150,12 +160,12 @@ describe("API Gateway v2 CloudFormation validation", () => {
     );
   });
 
-  it("refuses a stage property outside the simulated set", async () => {
+  it("creates a stage without a property outside the simulated set", async () => {
     // Given a stage asking for throttling settings
     const simAws = simAwsInEuWest2();
 
     // When the template is deployed
-    const error = await deployHttpApiFailure(
+    const stack = await deployHttpApi(
       simAws,
       simCfnHttpApiTemplateFactory.make({
         stageProperties: {
@@ -164,15 +174,20 @@ describe("API Gateway v2 CloudFormation validation", () => {
       }),
     );
 
-    // Then the stack fails, naming the Resource type, the logical ID, the
-    // property and what is simulated
+    // Then the stage is created throttling nothing, and the record names the
+    // Resource type, the logical ID, the property and what is simulated
+    assertTrue(stack.getResource("Stage")?.deployed);
+
+    const [reason] = ignoredReasons(stack);
+    assertNonNullable(reason);
+    assertStringIncludes(reason, "Stage");
     assertStringIncludes(
-      error.message,
-      "AWS::ApiGatewayV2::Stage Stage property DefaultRouteSettings is not " +
+      reason,
+      "AWS::ApiGatewayV2::Stage property DefaultRouteSettings is not " +
         "simulated",
     );
     assertStringIncludes(
-      error.message,
+      reason,
       "The simulated properties are ApiId, StageName, AutoDeploy, " +
         "StageVariables, Description.",
     );

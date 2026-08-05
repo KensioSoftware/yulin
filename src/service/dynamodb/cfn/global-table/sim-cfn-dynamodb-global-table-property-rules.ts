@@ -1,4 +1,5 @@
 import { SimCfnDynamoDbPropertyRules } from "../property/sim-cfn-dynamodb-property-rules.js";
+import type { SimCfnDynamoDbResourceScope } from "../property/sim-cfn-dynamodb-resource-scope.js";
 import { dynamoDbGlobalTableResourceTypeName } from "../sim-cfn-dynamodb-resource-type.js";
 
 /**
@@ -88,8 +89,8 @@ const simulatedStreamPropertyNames: ReadonlySet<string> = new Set([
  * A fixed `WriteCapacityUnits` is the capacity an ordinary table's
  * `ProvisionedThroughput` states, so it is carried across.
  * `WriteCapacityAutoScalingSettings` asks for capacity that changes with load,
- * which nothing here changes, so it skips the table rather than being read as
- * the capacity it starts at.
+ * which nothing here changes, so it is recorded and the table is created at the
+ * `MinCapacity` it names.
  */
 const simulatedWriteCapacityPropertyNames: ReadonlySet<string> = new Set([
   "WriteCapacityUnits",
@@ -103,11 +104,11 @@ const unsimulatedWriteCapacityPropertyNames: ReadonlySet<string> = new Set([
  * The rules the Resource's own properties are read under.
  */
 export function simCfnDynamoDbGlobalTableRules(
-  logicalId: string,
+  scope: SimCfnDynamoDbResourceScope,
 ): SimCfnDynamoDbPropertyRules {
   return new SimCfnDynamoDbPropertyRules({
     resourceTypeName: dynamoDbGlobalTableResourceTypeName,
-    logicalId,
+    scope,
     simulated: simulatedPropertyNames,
     unsimulated: unsimulatedPropertyNames,
   });
@@ -117,11 +118,11 @@ export function simCfnDynamoDbGlobalTableRules(
  * The rules a `GlobalSecondaryIndexes` entry on the table itself is read under.
  */
 export function simCfnDynamoDbGlobalTableIndexRules(
-  logicalId: string,
+  scope: SimCfnDynamoDbResourceScope,
 ): SimCfnDynamoDbPropertyRules {
   return new SimCfnDynamoDbPropertyRules({
     resourceTypeName: dynamoDbGlobalTableResourceTypeName,
-    logicalId,
+    scope,
     kind: "GlobalSecondaryIndex",
     simulated: simulatedIndexPropertyNames,
     unsimulated: unsimulatedIndexPropertyNames,
@@ -132,11 +133,11 @@ export function simCfnDynamoDbGlobalTableIndexRules(
  * The rules a `LocalSecondaryIndexes` entry is read under.
  */
 export function simCfnDynamoDbGlobalTableLocalIndexRules(
-  logicalId: string,
+  scope: SimCfnDynamoDbResourceScope,
 ): SimCfnDynamoDbPropertyRules {
   return new SimCfnDynamoDbPropertyRules({
     resourceTypeName: dynamoDbGlobalTableResourceTypeName,
-    logicalId,
+    scope,
     kind: "LocalSecondaryIndex",
     simulated: simulatedLocalIndexPropertyNames,
   });
@@ -146,11 +147,11 @@ export function simCfnDynamoDbGlobalTableLocalIndexRules(
  * The rules the `StreamSpecification` is read under.
  */
 export function simCfnDynamoDbGlobalTableStreamRules(
-  logicalId: string,
+  scope: SimCfnDynamoDbResourceScope,
 ): SimCfnDynamoDbPropertyRules {
   return new SimCfnDynamoDbPropertyRules({
     resourceTypeName: dynamoDbGlobalTableResourceTypeName,
-    logicalId,
+    scope,
     kind: "StreamSpecification",
     simulated: simulatedStreamPropertyNames,
   });
@@ -161,11 +162,11 @@ export function simCfnDynamoDbGlobalTableStreamRules(
  * or on one of its global secondary indexes.
  */
 export function simCfnDynamoDbGlobalTableWriteCapacityRules(
-  logicalId: string,
+  scope: SimCfnDynamoDbResourceScope,
 ): SimCfnDynamoDbPropertyRules {
   return new SimCfnDynamoDbPropertyRules({
     resourceTypeName: dynamoDbGlobalTableResourceTypeName,
-    logicalId,
+    scope,
     kind: "WriteProvisionedThroughputSettings",
     simulated: simulatedWriteCapacityPropertyNames,
     unsimulated: unsimulatedWriteCapacityPropertyNames,

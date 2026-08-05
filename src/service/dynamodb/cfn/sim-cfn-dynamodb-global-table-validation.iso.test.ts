@@ -12,7 +12,7 @@ import { SimAws } from "../../aws/sim-aws.js";
 import { simCfnDynamoDbGlobalTableResourceFactory } from "./global-table/sim-cfn-dynamodb-global-table-resource.factory.js";
 
 describe("DynamoDB CloudFormation GlobalTable validation", () => {
-  it("skips a global table replicating between regions", async () => {
+  it("creates a global table replicating between regions in its own region", async () => {
     // Given a template naming two replica regions, which genuinely replicates,
     // in a stack with another Resource in it.
     const simAws = new SimAws();
@@ -32,20 +32,54 @@ describe("DynamoDB CloudFormation GlobalTable validation", () => {
     });
     await stack.waitForDeployComplete();
 
-    // Then the table is skipped, with a reason naming the regions, rather than
-    // created as an ordinary table in one of them.
+    // Then the table is created as an ordinary table in the region the stack
+    // is deploying into, and the replication nothing performs is recorded with
+    // the regions it named.
     const resource = stack.getResource("OrdersTable");
     assertNonNullable(resource);
-    assertTrue(resource.skipped);
+    assertTrue(resource.deployed);
+    assertNonNullable(simAws.dynamoDb().findTable("orders"));
+
+    const ignored = resource.ignoredProperties[0];
+    assertNonNullable(ignored);
+    assertIdentical(ignored.path, "Replicas");
     assertStringIncludes(
-      resource.skippedReason ?? "",
+      ignored.reason,
       "Replicas names us-east-1, eu-west-2, and replicating a table between " +
         "regions is not simulated",
     );
-    assertUndefined(simAws.dynamoDb().findTable("orders"));
 
     // And the rest of the stack still deploys.
     assertTrue(stack.getResource("OrdersBucket")?.deployed);
+  });
+
+  it("fails a global table replicating nowhere near the stack's own region", async () => {
+    // Given a template naming two replica regions, neither of which is where
+    // the stack is deploying. Real CloudFormation refuses that template too.
+    const simAws = new SimAws();
+
+    // When the template is deployed, then the deployment fails rather than
+    // creating a table in a region no replica asked for.
+    const error = await assertThrowsErrorAsync(async () => {
+      return await simAws.cloudFormation().deployTemplate({
+        stackName: "orders-stack",
+        template: {
+          Resources: {
+            OrdersTable: simCfnDynamoDbGlobalTableResourceFactory.make({
+              tableName: "orders",
+              replicaRegions: ["eu-west-2", "eu-west-1"],
+            }),
+          },
+        },
+      });
+    });
+
+    assertStringIncludes(
+      error.message,
+      "Replicas names eu-west-2, eu-west-1, and the stack is deploying into " +
+        "us-east-1",
+    );
+    assertUndefined(simAws.dynamoDb().findTable("orders"));
   });
 
   it("fails a global table with no replicas at all", async () => {
@@ -118,7 +152,7 @@ describe("DynamoDB CloudFormation GlobalTable validation", () => {
     assertUndefined(simAws.dynamoDb().findTable("orders"));
   });
 
-  it("skips a global table asking for a replica setting that is not simulated", async () => {
+  it("creates a global table without a replica setting that is not simulated", async () => {
     // Given a template asking for point in time recovery, which a global table
     // asks for on its replica and which is not simulated either way.
     const simAws = new SimAws();
@@ -141,23 +175,30 @@ describe("DynamoDB CloudFormation GlobalTable validation", () => {
     });
     await stack.waitForDeployComplete();
 
-    // Then the table is skipped, with a reason naming the whole path to the
+    // Then the table exists, and the record names the whole path to the
     // property, so it says which replica asked for it.
     const resource = stack.getResource("OrdersTable");
     assertNonNullable(resource);
-    assertTrue(resource.skipped);
+    assertTrue(resource.deployed);
+    assertNonNullable(simAws.dynamoDb().findTable("orders"));
+
+    const ignored = resource.ignoredProperties[0];
+    assertNonNullable(ignored);
+    assertIdentical(
+      ignored.path,
+      "Replicas.0.PointInTimeRecoverySpecification",
+    );
     assertStringIncludes(
-      resource.skippedReason ?? "",
+      ignored.reason,
       "Replicas.0.PointInTimeRecoverySpecification is a real " +
         "AWS::DynamoDB::GlobalTable property that simulated DynamoDB does " +
         "not simulate",
     );
-    assertUndefined(simAws.dynamoDb().findTable("orders"));
   });
 
-  it("skips a global table asking for capacity that scales with load", async () => {
-    // Given a template asking for autoscaled write capacity, which is what
-    // CDK's Capacity.autoscaled synthesises and which nothing here scales.
+  it("creates a global table asking for capacity that scales with load", async () => {
+    // Given a template asking for autoscaled capacity on both halves, which is
+    // what CDK's Capacity.autoscaled synthesises and which nothing here scales.
     const simAws = new SimAws();
 
     // When the template is deployed.
@@ -171,8 +212,16 @@ describe("DynamoDB CloudFormation GlobalTable validation", () => {
             properties: {
               WriteProvisionedThroughputSettings: {
                 WriteCapacityAutoScalingSettings: {
-                  MinCapacity: 1,
+                  MinCapacity: 2,
                   MaxCapacity: 10,
+                },
+              },
+            },
+            replicaProperties: {
+              ReadProvisionedThroughputSettings: {
+                ReadCapacityAutoScalingSettings: {
+                  MinCapacity: 3,
+                  MaxCapacity: 30,
                 },
               },
             },
@@ -182,45 +231,63 @@ describe("DynamoDB CloudFormation GlobalTable validation", () => {
     });
     await stack.waitForDeployComplete();
 
-    // Then the table is skipped rather than created at the capacity it would
-    // have started at.
+    // Then the table exists at the capacity autoscaling would have started it
+    // at, rather than the deployment failing for want of a capacity, and the
+    // scaling nothing performs is recorded on both halves.
     const resource = stack.getResource("OrdersTable");
     assertNonNullable(resource);
-    assertTrue(resource.skipped);
-    assertStringIncludes(
-      resource.skippedReason ?? "",
-      "WriteProvisionedThroughputSettings.WriteCapacityAutoScalingSettings " +
-        "is a real AWS::DynamoDB::GlobalTable property",
+    assertTrue(resource.deployed);
+
+    const table = simAws.dynamoDb().findTable("orders");
+    assertNonNullable(table);
+    const throughput = table.billing.throughputDescription();
+    assertIdentical(throughput.WriteCapacityUnits, 2);
+    assertIdentical(throughput.ReadCapacityUnits, 3);
+
+    assertIdentical(
+      resource.ignoredProperties
+        .map((entry) => entry.path)
+        .toSorted((first, second) => first.localeCompare(second))
+        .join(", "),
+      "Replicas.0.ReadProvisionedThroughputSettings." +
+        "ReadCapacityAutoScalingSettings, " +
+        "WriteProvisionedThroughputSettings.WriteCapacityAutoScalingSettings",
     );
-    assertUndefined(simAws.dynamoDb().findTable("orders"));
   });
 
-  it("fails a global table with a property the Resource type does not have", async () => {
+  it("creates a global table with a property the Resource type does not have", async () => {
     // Given a template putting an AWS::DynamoDB::Table property on a global
     // table, which states that one on its replica instead.
     const simAws = new SimAws();
 
-    // When the template is deployed, then the deployment fails, because that
-    // is a template real CloudFormation would refuse too.
-    const error = await assertThrowsErrorAsync(async () => {
-      return await simAws.cloudFormation().deployTemplate({
-        stackName: "orders-stack",
-        template: {
-          Resources: {
-            OrdersTable: simCfnDynamoDbGlobalTableResourceFactory.make({
-              tableName: "orders",
-              properties: { TableClass: "STANDARD_INFREQUENT_ACCESS" },
-            }),
-          },
+    // When the template is deployed.
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "orders-stack",
+      template: {
+        Resources: {
+          OrdersTable: simCfnDynamoDbGlobalTableResourceFactory.make({
+            tableName: "orders",
+            properties: { TableClass: "STANDARD_INFREQUENT_ACCESS" },
+          }),
         },
-      });
+      },
     });
+    await stack.waitForDeployComplete();
 
+    // Then the table is created in the default class, with the property that
+    // belongs on the replica recorded where it was written instead.
+    const resource = stack.getResource("OrdersTable");
+    assertNonNullable(resource);
+    assertTrue(resource.deployed);
+    assertNonNullable(simAws.dynamoDb().findTable("orders"));
+
+    const ignored = resource.ignoredProperties[0];
+    assertNonNullable(ignored);
     assertStringIncludes(
-      error.message,
-      "TableClass is not an AWS::DynamoDB::GlobalTable property",
+      ignored.reason,
+      "TableClass is not an AWS::DynamoDB::GlobalTable property simulated " +
+        "DynamoDB knows about",
     );
-    assertUndefined(simAws.dynamoDb().findTable("orders"));
   });
 
   it("fails a global table whose one replica names no region", async () => {

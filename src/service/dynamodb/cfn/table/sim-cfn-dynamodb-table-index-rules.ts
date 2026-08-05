@@ -1,4 +1,5 @@
 import { SimCfnDynamoDbPropertyRules } from "../property/sim-cfn-dynamodb-property-rules.js";
+import type { SimCfnDynamoDbResourceScope } from "../property/sim-cfn-dynamodb-resource-scope.js";
 import { dynamoDbTableResourceTypeName } from "../sim-cfn-dynamodb-resource-type.js";
 
 /**
@@ -42,15 +43,16 @@ const simulatedLocalIndexPropertyNames: ReadonlySet<string> = new Set([
  * The rules a `GlobalSecondaryIndexes` entry is read under.
  *
  * This is the table's own property rule applied a level down. A real index
- * property that is not simulated skips the whole table, since a table deployed
- * without a setting its index asked for answers reads differently.
+ * property that is not simulated is recorded and the index is created without
+ * it, since a table deployed without a setting its index asked for answers reads
+ * differently.
  */
 export function simCfnDynamoDbTableGlobalIndexRules(
-  logicalId: string,
+  scope: SimCfnDynamoDbResourceScope,
 ): SimCfnDynamoDbPropertyRules {
   return new SimCfnDynamoDbPropertyRules({
     resourceTypeName: dynamoDbTableResourceTypeName,
-    logicalId,
+    scope,
     kind: "GlobalSecondaryIndex",
     simulated: simulatedGlobalIndexPropertyNames,
     unsimulated: unsimulatedGlobalIndexPropertyNames,
@@ -61,11 +63,11 @@ export function simCfnDynamoDbTableGlobalIndexRules(
  * The rules a `LocalSecondaryIndexes` entry is read under.
  */
 export function simCfnDynamoDbTableLocalIndexRules(
-  logicalId: string,
+  scope: SimCfnDynamoDbResourceScope,
 ): SimCfnDynamoDbPropertyRules {
   return new SimCfnDynamoDbPropertyRules({
     resourceTypeName: dynamoDbTableResourceTypeName,
-    logicalId,
+    scope,
     kind: "LocalSecondaryIndex",
     simulated: simulatedLocalIndexPropertyNames,
   });

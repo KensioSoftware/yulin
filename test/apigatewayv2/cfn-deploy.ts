@@ -54,3 +54,13 @@ export async function deployHttpApiFailure(
 
   return error;
 }
+
+/**
+ * The reasons a deployed stack gave for the properties it created Resources
+ * without, as one string per ignored property.
+ */
+export function ignoredReasons(stack: SimCfnStack): string[] {
+  return stack.ignoredProperties.map((ignored) => {
+    return `${ignored.logicalId} ${ignored.reason}`;
+  });
+}

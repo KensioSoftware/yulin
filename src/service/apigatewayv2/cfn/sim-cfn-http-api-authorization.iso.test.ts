@@ -1,8 +1,14 @@
-import { assertStringIncludes } from "@kensio/smartass";
+import {
+  assertNonNullable,
+  assertStringIncludes,
+  assertTrue,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import {
+  deployHttpApi,
   deployHttpApiFailure,
+  ignoredReasons,
   simAwsInEuWest2,
 } from "../../../../test/apigatewayv2/cfn-deploy.js";
 import { simCfnHttpApiTemplateFactory } from "./sim-cfn-http-api-template.factory.js";
@@ -156,13 +162,13 @@ describe("API Gateway v2 CloudFormation authorization validation", () => {
     );
   });
 
-  it("refuses an authorizer Resource naming a Role to assume", async () => {
-    // Given a template whose Lambda authorizer names credentials for API
-    // Gateway to assume rather than relying on the function's own policy
+  it("creates an authorizer Resource without the Role it names to assume", async () => {
+    // Given a template whose authorizer names credentials for API Gateway to
+    // assume rather than relying on the invoked function's own policy
     const simAws = simAwsInEuWest2();
 
     // When the template is deployed
-    const error = await deployHttpApiFailure(
+    const stack = await deployHttpApi(
       simAws,
       simCfnHttpApiTemplateFactory.make({
         resources: {
@@ -170,8 +176,13 @@ describe("API Gateway v2 CloudFormation authorization validation", () => {
             Type: "AWS::ApiGatewayV2::Authorizer",
             Properties: {
               ApiId: { Ref: "Api" },
-              AuthorizerType: "REQUEST",
-              Name: "lambda",
+              AuthorizerType: "JWT",
+              Name: "pool",
+              IdentitySource: ["$request.header.Authorization"],
+              JwtConfiguration: {
+                Issuer: "https://issuer.test",
+                Audience: ["client01"],
+              },
               AuthorizerCredentialsArn: "arn:aws:iam::111111111111:role/Auth",
             },
           },
@@ -179,9 +190,14 @@ describe("API Gateway v2 CloudFormation authorization validation", () => {
       }),
     );
 
-    // Then it is refused by name, since nothing here assumes that Role
+    // Then the authorizer is created, with the Role nothing here assumes
+    // recorded against the Resource
+    assertTrue(stack.getResource("Authorizer")?.deployed);
+
+    const [reason] = ignoredReasons(stack);
+    assertNonNullable(reason);
     assertStringIncludes(
-      error.message,
+      reason,
       "property AuthorizerCredentialsArn is not simulated",
     );
   });

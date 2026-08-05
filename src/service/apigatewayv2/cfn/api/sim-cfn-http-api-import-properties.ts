@@ -36,7 +36,7 @@ export class SimCfnHttpApiImportProperties {
    * what AWS documents, and a `ProtocolType` that is present has to be `HTTP`.
    */
   importApiInput(): SimImportApiCommandInput {
-    this.rules.refuseUnimportableProperties();
+    this.rules.ignoreUnimportableProperties();
     this.rules.requireHttpProtocolType(
       this.propertyParser.optionalString(
         this.resource,

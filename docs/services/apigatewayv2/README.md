@@ -1675,8 +1675,11 @@ console.log(await response.text());
 srv.close();
 ```
 
-Every property outside the simulated set is refused by name, and the refusal fails the stack. The
-simulated properties are:
+Every property outside the simulated set is left out of what is created and recorded in
+[`stack.ignoredProperties`](../cloudformation/README.md#properties-a-resource-was-created-without),
+naming the Resource type, the logical id and the ones this can act on instead. The API, authorizer,
+integration, route or stage is created either way, so the stack deploys and the record says which of
+its parts behaves differently to the template. The simulated properties are:
 
 - `Api`: `Name`, `ProtocolType`, `Description`, `DisableExecuteApiEndpoint`, `Body`,
   `FailOnWarnings`
@@ -1756,6 +1759,7 @@ Api:
 `ProtocolType` that is present has to be `HTTP`, and a `Name` that is present names the API instead
 of the document's `info.title`. `Description` and `DisableExecuteApiEndpoint` are refused alongside a
 `Body`, because `ImportApi` does not take them and nothing here changes an API after it is created.
+Each is recorded rather than applied, so the API is created from the document without them.
 
 A template combining an `Api` with a `Body` and a separate `Route`, `Integration` or `Authorizer`
 Resource for that same API fails the stack, naming both logical IDs. The document already declares
@@ -1886,10 +1890,10 @@ Current documented limitations:
 - An authorizer function that throws is a 500 rather than a 401. Real Lambda turns a thrown error
   into a payload carrying `errorMessage`, and simulated Lambda rejects with the error itself, so
   returning `{ "errorMessage": "Unauthorized" }` is how an authorizer asks for a 401 here.
-- `AuthorizerCredentialsArn` is refused, as is `AuthorizerCredentialsArn` on an
-  `AWS::ApiGatewayV2::Authorizer` and `authorizerCredentials` in an imported document. It names a
-  Role API Gateway assumes to invoke the authorizer, and the function's own resource policy is the
-  whole decision here.
+- `AuthorizerCredentialsArn` is refused on `CreateAuthorizer`, as is `authorizerCredentials` in an
+  imported document. On an `AWS::ApiGatewayV2::Authorizer` it is recorded instead, and the authorizer
+  is created without it. It names a Role API Gateway assumes to invoke the authorizer, and the
+  function's own resource policy is the whole decision here.
 - `AuthorizerResultTtlInSeconds` is accepted between 0 and 3600, which is the range AWS accepts, and
   is refused on an authorizer with no `IdentitySource`, since there would be nothing to key the held
   decision on.
@@ -1947,10 +1951,9 @@ Current documented limitations:
 - `CorsConfiguration` and `Tags` are refused, as is the `RouteKey`/`Target` quick-create shorthand on
   `CreateApi`. Anything else the real commands accept and this one does not is refused by name rather
   than dropped.
-- `AWS::ApiGatewayV2::Api` refuses `CorsConfiguration` by name rather than accepting it with no
-  effect. CORS request handling is not simulated, and a template that configured it would otherwise
-  get an API that answered preflight requests here differently from AWS. A CDK stack using
-  `corsPreflight` does not deploy.
+- `AWS::ApiGatewayV2::Api` records `CorsConfiguration` rather than applying it. CORS request handling
+  is not simulated, so a CDK stack using `corsPreflight` deploys and its API answers preflight
+  requests here differently from AWS. The record is where a test checks that.
 - Only OpenAPI 3.0.x is imported. A `swagger: "2.0"` document and an `openapi: "3.1.0"` one are both
   refused by version, and only JSON is parsed, not YAML.
 - `FailOnWarnings` is honoured only in its strict sense. Everything an import cannot apply is refused
@@ -1984,8 +1987,9 @@ Current documented limitations:
   only the name `GetApi` reports.
 - A terminal `{proxy+}` in an imported path reaches `CreateRoute` unchanged. Greedy segments are
   established for route keys rather than for OpenAPI path templating.
-- `AWS::ApiGatewayV2::Api` refuses `BodyS3Location` by name. Reading a document out of a simulated S3
-  bucket adds a fetch path and nothing about OpenAPI.
+- `AWS::ApiGatewayV2::Api` records `BodyS3Location` rather than reading it, so the API is created
+  with no routes at all. Reading a document out of a simulated S3 bucket adds a fetch path and
+  nothing about OpenAPI.
 - `AWS::ApiGatewayV2::Api` refuses `Policy` with a message of its own saying an HTTP API has no
   resource policy. There is no such property on the real Resource type, so a template carrying one
   was written for a REST API rather than hitting a gap here.
