@@ -3117,11 +3117,13 @@ table with no `StreamSpecification` it is refused by name, naming the table, sin
 ARN would read as a working stream to whatever the template handed it to. Real CloudFormation refuses
 the same template while validating it, where this refuses when the attribute is asked for.
 
-A property with behaviour that is not simulated skips the resource, with a reason naming the
-property, and the rest of the stack still deploys: `KinesisStreamSpecification`, `SSESpecification`,
-`PointInTimeRecoverySpecification`, `ContributorInsightsSpecification`, `ImportSourceSpecification`,
-`ResourcePolicy`, `OnDemandThroughput` and `WarmThroughput`. A property `AWS::DynamoDB::Table` does
-not have fails the resource instead, since that is a template real CloudFormation would refuse too.
+A property with behaviour that is not simulated is left out and recorded in
+[`stack.ignoredProperties`](../cloudformation/README.md#properties-a-resource-was-created-without),
+so the table is created and the rest of the stack still deploys: `KinesisStreamSpecification`,
+`SSESpecification`, `PointInTimeRecoverySpecification`, `ContributorInsightsSpecification`,
+`ImportSourceSpecification`, `ResourcePolicy`, `OnDemandThroughput` and `WarmThroughput`. A property
+`AWS::DynamoDB::Table` does not have is recorded the same way, rather than a stack failing over a
+typo or a property AWS added since this list was written.
 
 `AWS::DynamoDB::GlobalTable` deploys a table as well, under
 [deploying a global table](#deploying-a-global-table-from-cloudformation).
@@ -3237,9 +3239,11 @@ per-index throughput a provisioned table needs, and the rule that a local second
 table's partition key.
 
 `ContributorInsightsSpecification`, `OnDemandThroughput` and `WarmThroughput` on a global secondary
-index are not simulated, so a table declaring one is skipped with a reason naming the index it was
-on. `LocalSecondaryIndexes` entries have `IndexName`, `KeySchema` and `Projection` and nothing else,
-so anything further on one fails the resource, as it would on real CloudFormation.
+index are not simulated, so the index is created without them and the record names the index it was
+on, such as `GlobalSecondaryIndexes.0.WarmThroughput`. `LocalSecondaryIndexes` entries have
+`IndexName`, `KeySchema` and `Projection` and nothing else, so anything further on one is recorded
+the same way. A `ProvisionedThroughput` there still fails the resource, because an index entry goes
+to `CreateTable` as the template wrote it and real DynamoDB refuses capacity on a local index.
 
 A CDK `Table` with `addGlobalSecondaryIndex` and `addLocalSecondaryIndex` synthesises a template that
 deploys here without hand-editing.
@@ -3420,9 +3424,11 @@ go back together into the `ProvisionedThroughput` `CreateTable` takes. A global 
 split the same way: the table declares the index and provisions its writes, and the replica's
 `GlobalSecondaryIndexes` entry names that index and provisions its reads.
 
-A global table naming two or more replica regions is skipped, with a reason naming the regions, and
-the rest of the stack still deploys. Replication genuinely is not simulated, so drawing the line at
-the replica count puts it where the behaviour actually differs.
+A global table naming two or more replica regions is created as an ordinary table in the region the
+stack is deploying into, with `Replicas` recorded in
+[`stack.ignoredProperties`](../cloudformation/README.md#properties-a-resource-was-created-without)
+naming the regions. Replication genuinely is not simulated, so everything the table does within one
+region behaves as the template describes and nothing is copied to the others.
 
 A global table with no `Replicas` at all fails the resource, since `Replicas` is required and real
 CloudFormation refuses that template too. So does one whose single replica names a region the stack

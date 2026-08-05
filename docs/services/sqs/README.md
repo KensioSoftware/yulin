@@ -1144,8 +1144,9 @@ Current documented limitations:
   over either. The 60 second hold on a deleted queue's name is simulated, so recreating a queue
   straight after deleting it fails with `QueueDeletedRecently` until the clock moves on.
 - Dead-letter queues are simulated for standard queues only, and only the `RedrivePolicy` half of
-  them. `RedriveAllowPolicy` is refused, so a dead-letter queue cannot restrict which queues may
-  redrive to it. `ListDeadLetterSourceQueues` and the `StartMessageMoveTask` family for draining a
+  them. Setting `RedriveAllowPolicy` through the SQS API is refused, and on an `AWS::SQS::Queue` it
+  is recorded and the queue created without it, so a dead-letter queue cannot restrict which queues
+  may redrive to it either way. `ListDeadLetterSourceQueues` and the `StartMessageMoveTask` family for draining a
   dead-letter queue back to its source are not supported, so a redriven message is moved back by a
   test sending it again.
 - `ApproximateReceiveCount` starting again from one on a dead-letter queue is this simulation's

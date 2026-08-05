@@ -1890,10 +1890,10 @@ Current documented limitations:
 - An authorizer function that throws is a 500 rather than a 401. Real Lambda turns a thrown error
   into a payload carrying `errorMessage`, and simulated Lambda rejects with the error itself, so
   returning `{ "errorMessage": "Unauthorized" }` is how an authorizer asks for a 401 here.
-- `AuthorizerCredentialsArn` is refused, as is `AuthorizerCredentialsArn` on an
-  `AWS::ApiGatewayV2::Authorizer` and `authorizerCredentials` in an imported document. It names a
-  Role API Gateway assumes to invoke the authorizer, and the function's own resource policy is the
-  whole decision here.
+- `AuthorizerCredentialsArn` is refused on `CreateAuthorizer`, as is `authorizerCredentials` in an
+  imported document. On an `AWS::ApiGatewayV2::Authorizer` it is recorded instead, and the authorizer
+  is created without it. It names a Role API Gateway assumes to invoke the authorizer, and the
+  function's own resource policy is the whole decision here.
 - `AuthorizerResultTtlInSeconds` is accepted between 0 and 3600, which is the range AWS accepts, and
   is refused on an authorizer with no `IdentitySource`, since there would be nothing to key the held
   decision on.
@@ -1987,8 +1987,9 @@ Current documented limitations:
   only the name `GetApi` reports.
 - A terminal `{proxy+}` in an imported path reaches `CreateRoute` unchanged. Greedy segments are
   established for route keys rather than for OpenAPI path templating.
-- `AWS::ApiGatewayV2::Api` refuses `BodyS3Location` by name. Reading a document out of a simulated S3
-  bucket adds a fetch path and nothing about OpenAPI.
+- `AWS::ApiGatewayV2::Api` records `BodyS3Location` rather than reading it, so the API is created
+  with no routes at all. Reading a document out of a simulated S3 bucket adds a fetch path and
+  nothing about OpenAPI.
 - `AWS::ApiGatewayV2::Api` refuses `Policy` with a message of its own saying an HTTP API has no
   resource policy. There is no such property on the real Resource type, so a template carrying one
   was written for a REST API rather than hitting a gap here.
