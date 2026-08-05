@@ -35,6 +35,18 @@ global service while still fitting Yulin's account/region navigation API.
 are normalized and stored on the hosted-zone object, not used as the primary key, because Route53
 supports multiple hosted zones with the same DNS name in some scenarios.
 
+### Hosted-zone IDs
+
+Allocated hosted-zone IDs are a `Z` prefix followed by 21 uppercase alphanumerics. Caller-supplied
+IDs are only checked for that shape, not for that length: real Route53 hosted-zone IDs vary, with a
+documented maximum of 32 characters and IDs in the wild commonly 14 or 21 characters. A real ID
+copied out of an AWS account is therefore usable against the simulator.
+
+`normalizeSimRoute53HostedZoneId` strips an optional `/hostedzone/` prefix and rejects a malformed
+or missing ID with `SimRoute53InvalidInput`. A well-formed ID that no hosted zone owns is left to
+fail later with `SimRoute53NoSuchHostedZone`, so callers can tell a bad ID apart from an unknown
+zone. `assertIsSimRoute53HostedZoneId` applies the same shape check as an internal invariant.
+
 `SimRoute53` is a thin facade. It does not contain command implementation details. Each
 public AWS-style operation constructs the appropriate command handler with the hosted-zone map and
 background scheduler, then delegates to that handler.
