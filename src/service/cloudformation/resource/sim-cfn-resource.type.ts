@@ -22,11 +22,31 @@ export interface SimCloudFormationResourceProperties {
 /**
  * Simulated CloudFormation Resource status.
  *
- * These states model the CloudFormation creation lifecycle for one Resource
- * entry, not the lifecycle of the underlying simulated AWS service object.
+ * These states model the CloudFormation creation and deletion lifecycle for one
+ * Resource entry, not the lifecycle of the underlying simulated AWS service
+ * object.
+ *
+ * A Resource keeps its creation status until it is asked to delete, so a status
+ * reads as the last thing CloudFormation did to the Resource.
  */
 export type SimCloudFormationResourceStatus =
-  "CREATE_PENDING" | "CREATE_IN_PROGRESS" | "CREATE_COMPLETE" | "CREATE_FAILED";
+  | "CREATE_PENDING"
+  | "CREATE_IN_PROGRESS"
+  | "CREATE_COMPLETE"
+  | "CREATE_FAILED"
+  | "DELETE_IN_PROGRESS"
+  | "DELETE_COMPLETE"
+  | "DELETE_FAILED";
+
+/**
+ * What resolving one Resource's Properties needs from the operation running.
+ *
+ * Creation and deletion both resolve Properties against the Stack's other
+ * Resources, and neither needs anything else of the operation to do it.
+ */
+export interface SimCfnResourceResolveContext {
+  readonly resources: ReadonlyMap<string, SimCfnResource>;
+}
 
 export interface SimCloudFormationResourceCreateContext {
   readonly simAws: SimAws;
@@ -34,4 +54,19 @@ export interface SimCloudFormationResourceCreateContext {
   readonly resolvedProperties?: SimCfnTemplateValueRecord | undefined;
   readonly cdkOutContext?: SimCdkOutContext | undefined;
   readonly bindings?: readonly SimCfnExecutableResourceBinding[] | undefined;
+}
+
+/**
+ * What a service is given to delete a Resource it created.
+ *
+ * The same shape as the creation context, minus the parts only creation has an
+ * answer for. Properties are resolved again at deletion time rather than
+ * remembered from creation, which works because a Stack tears down in reverse
+ * dependency order: everything a Resource refers to is still there when the
+ * Resource itself is deleted.
+ */
+export interface SimCloudFormationResourceDeleteContext {
+  readonly simAws: SimAws;
+  readonly resources: ReadonlyMap<string, SimCfnResource>;
+  readonly resolvedProperties?: SimCfnTemplateValueRecord | undefined;
 }

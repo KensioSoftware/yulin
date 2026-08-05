@@ -8,6 +8,7 @@ import { SimCfnLambdaEventSourceMappingCreator } from "./event-source-mapping/si
 import { SimCfnLambdaFunctionCreator } from "./function/sim-cfn-lambda-function-creator.js";
 import { SimCfnLambdaPermissionCreator } from "./permission/sim-cfn-lambda-permission-creator.js";
 import { SimCfnLambdaUrlCreator } from "./url/sim-cfn-lambda-url-creator.js";
+import { SimCfnLambdaResourceDeleter } from "./sim-cfn-lambda-resource-deleter.js";
 
 /**
  * CloudFormation Resource factory for simulated Lambda resources.
@@ -17,8 +18,10 @@ export class SimLambdaCloudFormationResourceFactory implements SimCfnServiceReso
   private readonly urlCreator: SimCfnLambdaUrlCreator;
   private readonly permissionCreator: SimCfnLambdaPermissionCreator;
   private readonly eventSourceMappingCreator: SimCfnLambdaEventSourceMappingCreator;
+  private readonly deleter: SimCfnLambdaResourceDeleter;
 
   constructor(lambda: SimLambda) {
+    this.deleter = new SimCfnLambdaResourceDeleter({ lambda });
     this.functionCreator = new SimCfnLambdaFunctionCreator({ lambda });
     this.urlCreator = new SimCfnLambdaUrlCreator({ lambda });
     this.permissionCreator = new SimCfnLambdaPermissionCreator({ lambda });
@@ -67,5 +70,15 @@ export class SimLambdaCloudFormationResourceFactory implements SimCfnServiceReso
         );
       }
     }
+  }
+
+  /**
+   * Delete a simulated Lambda resource created from a CloudFormation Resource.
+   */
+  async delete(
+    resourceTypeName: string,
+    resource: SimCfnResource,
+  ): Promise<void> {
+    await this.deleter.delete(resourceTypeName, resource);
   }
 }

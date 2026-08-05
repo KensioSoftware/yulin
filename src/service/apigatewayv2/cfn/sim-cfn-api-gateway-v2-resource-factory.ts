@@ -10,6 +10,8 @@ import { SimCfnHttpApiIntegrationCreator } from "./integration/sim-cfn-http-api-
 import { SimCfnHttpApiRouteCreator } from "./route/sim-cfn-http-api-route-creator.js";
 import { SimCfnHttpApiImports } from "./sim-cfn-http-api-imports.js";
 import { SimCfnHttpApiStageCreator } from "./stage/sim-cfn-http-api-stage-creator.js";
+import { SimCfnApiGatewayV2ResourceDeleter } from "./sim-cfn-api-gateway-v2-resource-deleter.js";
+import type { SimCloudFormationResourceDeleteContext } from "../../cloudformation/resource/sim-cfn-resource.type.js";
 
 /**
  * The Resource types belonging to a WebSocket API, which is the half of API
@@ -34,6 +36,7 @@ export class SimApiGatewayV2CfnResourceFactory implements SimCfnServiceResourceF
   private readonly integrationCreator: SimCfnHttpApiIntegrationCreator;
   private readonly routeCreator: SimCfnHttpApiRouteCreator;
   private readonly stageCreator: SimCfnHttpApiStageCreator;
+  private readonly deleter: SimCfnApiGatewayV2ResourceDeleter;
 
   constructor(properties: SimApiGatewayV2CfnResourceFactoryProperties) {
     const { apiGatewayV2 } = properties;
@@ -53,6 +56,7 @@ export class SimApiGatewayV2CfnResourceFactory implements SimCfnServiceResourceF
       imports,
     });
     this.stageCreator = new SimCfnHttpApiStageCreator({ apiGatewayV2 });
+    this.deleter = new SimCfnApiGatewayV2ResourceDeleter({ apiGatewayV2 });
   }
 
   /**
@@ -92,6 +96,22 @@ export class SimApiGatewayV2CfnResourceFactory implements SimCfnServiceResourceF
         );
       }
     }
+  }
+
+  /**
+   * Delete a simulated API Gateway v2 resource created from a CloudFormation
+   * Resource.
+   */
+  async delete(
+    resourceTypeName: string,
+    resource: SimCfnResource,
+    context: SimCloudFormationResourceDeleteContext,
+  ): Promise<void> {
+    await this.deleter.delete(
+      resourceTypeName,
+      resource,
+      context.resolvedProperties ?? resource.properties,
+    );
   }
 
   /**

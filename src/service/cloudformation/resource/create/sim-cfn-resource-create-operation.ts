@@ -5,6 +5,7 @@ import type {
 } from "../sim-cfn-resource.js";
 import type { SimCfnServiceResourceFactory } from "../factory/sim-cfn-resource-factory.type.js";
 import { SimCfnResourceCreator } from "./sim-cfn-resource-creator.js";
+import { isSimCfnUnsupportedResourceError } from "../unsupported/sim-cfn-unsupported-resource.js";
 
 interface SimCfnResourceCreateOperationProperties<T extends object> {
   readonly background: BackgroundScheduler;
@@ -56,7 +57,7 @@ export class SimCfnResourceCreateOperation<T extends object = object> {
           this.resource.markCreateComplete(simResource as T | undefined);
           resolve();
         } catch (error) {
-          if (this.isUnsupportedResourceError(error)) {
+          if (isSimCfnUnsupportedResourceError(error)) {
             const reason =
               error instanceof Error ? error.message : String(error);
 
@@ -73,14 +74,6 @@ export class SimCfnResourceCreateOperation<T extends object = object> {
         }
       });
     });
-  }
-
-  private isUnsupportedResourceError(error: unknown): boolean {
-    return (
-      error instanceof Error &&
-      error.message.includes("Unsupported sim") &&
-      error.message.includes("CloudFormation")
-    );
   }
 
   private resourceCreationError(error: unknown): Error {

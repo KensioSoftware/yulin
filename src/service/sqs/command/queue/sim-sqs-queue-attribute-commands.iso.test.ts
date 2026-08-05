@@ -206,6 +206,49 @@ describe("SQS queue attribute commands", () => {
     assertIdentical(read.Attributes["VisibilityTimeout"], "120");
   });
 
+  it("removes a queue policy set to an empty string", async () => {
+    // Given a queue carrying a policy. SQS has no DeleteQueuePolicy, so an
+    // empty value is the only way back to a queue without one.
+    const { simAws, queueUrl } = await simAwsWithQueue();
+    const policy = JSON.stringify({
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Allow",
+          Principal: { Service: "s3.amazonaws.com" },
+          Action: "sqs:SendMessage",
+          Resource: "*",
+        },
+      ],
+    });
+
+    await simAws.sqs().setQueueAttributes(
+      new SetQueueAttributesCommand({
+        QueueUrl: queueUrl,
+        Attributes: { Policy: policy },
+      }),
+    );
+
+    // When the policy attribute is set to nothing.
+    await simAws.sqs().setQueueAttributes(
+      new SetQueueAttributesCommand({
+        QueueUrl: queueUrl,
+        Attributes: { Policy: "" },
+      }),
+    );
+
+    // Then the queue reports no policy at all, rather than an empty one.
+    const read = await simAws.sqs().getQueueAttributes(
+      new GetQueueAttributesCommand({
+        QueueUrl: queueUrl,
+        AttributeNames: ["All"],
+      }),
+    );
+
+    assertNonNullable(read.Attributes);
+    assertUndefined(read.Attributes["Policy"]);
+  });
+
   it("refuses an attribute value outside the range real SQS accepts", async () => {
     // Given a queue.
     const { simAws, queueUrl } = await simAwsWithQueue();

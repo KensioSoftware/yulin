@@ -6,6 +6,7 @@ import type {
 import type { SimKms } from "../sim-kms.js";
 import { SimCfnKmsAliasCreator } from "./alias/sim-cfn-kms-alias-creator.js";
 import { SimCfnKmsKeyCreator } from "./key/sim-cfn-kms-key-creator.js";
+import { SimCfnKmsResourceDeleter } from "./sim-cfn-kms-resource-deleter.js";
 
 interface SimKmsCfnResourceFactoryProperties {
   readonly kms: SimKms;
@@ -17,10 +18,12 @@ interface SimKmsCfnResourceFactoryProperties {
 export class SimKmsCfnResourceFactory implements SimCfnServiceResourceFactory {
   private readonly keyCreator: SimCfnKmsKeyCreator;
   private readonly aliasCreator: SimCfnKmsAliasCreator;
+  private readonly deleter: SimCfnKmsResourceDeleter;
 
   constructor(properties: SimKmsCfnResourceFactoryProperties) {
     this.keyCreator = new SimCfnKmsKeyCreator({ kms: properties.kms });
     this.aliasCreator = new SimCfnKmsAliasCreator({ kms: properties.kms });
+    this.deleter = new SimCfnKmsResourceDeleter({ kms: properties.kms });
   }
 
   /**
@@ -49,5 +52,15 @@ export class SimKmsCfnResourceFactory implements SimCfnServiceResourceFactory {
         );
       }
     }
+  }
+
+  /**
+   * Delete a simulated KMS resource created from a CloudFormation Resource.
+   */
+  async delete(
+    resourceTypeName: string,
+    resource: SimCfnResource,
+  ): Promise<void> {
+    await this.deleter.delete(resourceTypeName, resource);
   }
 }

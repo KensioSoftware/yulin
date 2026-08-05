@@ -6,6 +6,7 @@ import type { SimS3 } from "../sim-s3.js";
 import type { SimCfnServiceResourceFactory } from "../../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import { SimCfnS3BucketCreator } from "./bucket/sim-cfn-s3-bucket-creator.js";
 import { SimCfnS3BucketPolicyCreator } from "./bucket-policy/sim-cfn-s3-bucket-policy-creator.js";
+import { SimCfnS3ResourceDeleter } from "./sim-cfn-s3-resource-deleter.js";
 
 /**
  * CloudFormation Resource factory for simulated S3 resources.
@@ -13,10 +14,12 @@ import { SimCfnS3BucketPolicyCreator } from "./bucket-policy/sim-cfn-s3-bucket-p
 export class SimS3CloudFormationResourceFactory implements SimCfnServiceResourceFactory {
   private readonly bucketCreator: SimCfnS3BucketCreator;
   private readonly bucketPolicyCreator: SimCfnS3BucketPolicyCreator;
+  private readonly deleter: SimCfnS3ResourceDeleter;
 
   constructor(simS3: SimS3) {
     this.bucketCreator = new SimCfnS3BucketCreator({ simS3 });
     this.bucketPolicyCreator = new SimCfnS3BucketPolicyCreator({ simS3 });
+    this.deleter = new SimCfnS3ResourceDeleter({ simS3 });
   }
 
   /**
@@ -46,5 +49,15 @@ export class SimS3CloudFormationResourceFactory implements SimCfnServiceResource
         );
       }
     }
+  }
+
+  /**
+   * Delete a simulated S3 resource created from a CloudFormation Resource.
+   */
+  async delete(
+    resourceTypeName: string,
+    resource: SimCfnResource,
+  ): Promise<void> {
+    await this.deleter.delete(resourceTypeName, resource);
   }
 }

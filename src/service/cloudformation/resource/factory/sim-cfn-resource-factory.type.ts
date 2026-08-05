@@ -1,6 +1,7 @@
 import type {
   SimCfnResource,
   SimCloudFormationResourceCreateContext,
+  SimCloudFormationResourceDeleteContext,
 } from "../sim-cfn-resource.js";
 
 export interface SimCfnServiceResourceFactory {
@@ -9,6 +10,25 @@ export interface SimCfnServiceResourceFactory {
     resource: SimCfnResource,
     context: SimCloudFormationResourceCreateContext,
   ): Promise<object | undefined>;
+
+  /**
+   * Remove a Resource this factory created.
+   *
+   * The service owning a Resource type is the one that knows which command
+   * removes it, and what has to be true before that command will work: a
+   * CloudFront distribution has to be disabled first, an IAM role has to have
+   * its policies taken off it. CloudFormation orchestrates the order Resources
+   * come down in and nothing more.
+   *
+   * A Resource type this factory can create but has no way to remove should
+   * throw an unsupported-Resource error, the same as an unknown type does, so
+   * the teardown records it and carries on.
+   */
+  delete(
+    resourceTypeName: string,
+    resource: SimCfnResource,
+    context: SimCloudFormationResourceDeleteContext,
+  ): Promise<void>;
 }
 
 export interface SimCloudFormationParsedResourceType {
