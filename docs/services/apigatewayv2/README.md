@@ -2075,8 +2075,8 @@ Current documented limitations:
 - `AWS::ApiGatewayV2::Api` refuses `Policy` with a message of its own saying an HTTP API has no
   resource policy. There is no such property on the real Resource type, so a template carrying one
   was written for a REST API rather than hitting a gap here.
-- Stack updates and deletes are not supported for these resource types, as they are not for any
-  others. See the [CloudFormation limitations](../cloudformation/#limitations).
+- A stack update replaces a changed resource of these types rather than updating it in place, as it
+  does for any other type. See the [CloudFormation limitations](../cloudformation/#limitations).
 - Access logging, throttling, usage plans and API keys are not simulated.
 - The response an API Gateway endpoint returns itself uses a lower-case `message` field, as a real
   HTTP API does. A Lambda Function URL uses `Message` for the same thing, so the two are not

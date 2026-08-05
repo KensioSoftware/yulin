@@ -227,8 +227,8 @@ describe("SQS CloudFormation Queue validation", () => {
   });
 
   it("refuses a queue name another stack already used", async () => {
-    // Given a queue a stack already deployed. Sim CloudFormation has no
-    // UpdateStack, so every deployment is a create.
+    // Given a queue a stack already deployed. Creating a Resource is always a
+    // create in sim CloudFormation.
     const simAws = new SimAws();
     const factory = new SimSqsCfnResourceFactory({ sqs: simAws.sqs() });
     await factory.create(

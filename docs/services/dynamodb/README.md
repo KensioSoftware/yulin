@@ -3733,8 +3733,9 @@ Arn`, `Fn::GetAtt … StreamArn` and `Fn::GetAtt … TableId` answering. A CDK `
 - A CloudFormation stack reaches `CREATE_COMPLETE` while the table it created is still `CREATING`.
   Real CloudFormation waits for the table to be `ACTIVE`, so a test reading the status after the
   stack deployed calls `simAws.backgroundTasksComplete()` first.
-- CloudFormation stack updates and deletes are not simulated, so neither is table replacement or the
-  `DeletionPolicy` a template sets on a table.
+- A CloudFormation stack update replaces a changed table rather than updating it in place, so the
+  items in it are lost where real CloudFormation would keep them for a property it can change
+  without replacement.
 - `ProjectionExpression` is simulated on `GetItem`, `BatchGetItem` and `TransactGetItems`. On `Query`
   and `Scan` it is refused rather than ignored.
 - The legacy `AttributesToGet` is refused rather than ignored, since an item that came back whole

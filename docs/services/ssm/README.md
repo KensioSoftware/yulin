@@ -779,8 +779,8 @@ Current documented limitations:
   `PatchBaseline`, `ResourceDataSync` and the rest) are reported as unsupported and skipped rather
   than deployed.
 - Every deployment of an `AWS::SSM::Parameter` is a create, so a name another stack already used is
-  refused. Sim CloudFormation has no stack updates, so the in-place overwrite real CloudFormation
-  does when a template changes `Value` cannot happen yet.
+  refused. A stack update that changes `Value` deletes the parameter and creates it again, where
+  real CloudFormation overwrites it in place, so the parameter's version starts from 1 again.
 - `{{resolve:ssm:...}}` dynamic references and the `AWS::SSM::Parameter::Value<String>` template
   parameter type are not supported. Those are CloudFormation engine features rather than Parameter
   Store ones; pass the name from `Ref` instead.

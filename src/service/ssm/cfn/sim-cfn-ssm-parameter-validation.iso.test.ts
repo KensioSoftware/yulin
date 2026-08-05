@@ -183,9 +183,9 @@ describe("SSM CloudFormation Parameter validation", () => {
   });
 
   it("refuses a name another stack already used", async () => {
-    // Given a parameter a stack already deployed. Sim CloudFormation has no
-    // UpdateStack, so every deployment is a create, and real CloudFormation
-    // fails a create naming a parameter that exists.
+    // Given a parameter a stack already deployed. Creating a Resource is
+    // always a create in sim CloudFormation, and real CloudFormation fails a
+    // create naming a parameter that exists.
     const simAws = new SimAws();
     const factory = new SimSsmCfnResourceFactory({ ssm: simAws.ssm() });
     const properties = {

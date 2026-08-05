@@ -43,15 +43,32 @@ export class SimCfnStackResourceDeleter {
   /**
    * Delete every Stack Resource once nothing depends on it any more.
    *
+   * What a teardown does, where an update deletes only the Resources its
+   * template dropped or replaced.
+   */
+  async deleteAll(): Promise<void> {
+    await this.delete(this.resources.values().toArray());
+  }
+
+  /**
+   * Delete the given Stack Resources once nothing depends on them any more.
+   *
    * The loop is sequential between batches because a Resource can only go once
    * the Resources naming it have gone. Deletion inside a batch is parallel and
    * delegated to SimCfnStackResourceBatchDeleter.
    *
+   * Dependents are read across every Resource in the Stack rather than only the
+   * ones being deleted, so a Resource an update leaves alone still holds up the
+   * Resource it names.
+   *
    * If a loop iteration finds pending Resources but none are deletable, the
    * template's dependencies are cyclic, the same condition creation reports.
    */
-  async deleteAll(): Promise<void> {
-    let pendingDeletions = new SimCfnStackPendingDeletions(this.resources);
+  async delete(deleting: readonly SimCfnResource[]): Promise<void> {
+    let pendingDeletions = new SimCfnStackPendingDeletions(
+      this.resources,
+      new Set(deleting),
+    );
 
     while (pendingDeletions.hasResources) {
       const deletableResources = pendingDeletions.deletableResources();
