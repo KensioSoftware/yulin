@@ -1,5 +1,19 @@
 const sigV4AuthorizationPrefix = "AWS4-HMAC-SHA256";
 const htmlContentType = "text/html";
+const awsNamePrefix = "x-amz-";
+
+/**
+ * Whether any of these header or query parameter names is an AWS one.
+ */
+function hasAwsPrefixed(names: IterableIterator<string>): boolean {
+  for (const name of names) {
+    if (name.toLowerCase().startsWith(awsNamePrefix)) {
+      return true;
+    }
+  }
+
+  return false;
+}
 
 /**
  * Decides whether a response can carry the live reload script.
@@ -41,14 +55,17 @@ export class SimLiveReloadInjectable {
   }
 
   /**
-   * An encoded body would have to be decoded, changed and re-encoded, and the
-   * simulator has no reason to be in that business.
+   * The media type has to be `text/html` itself, not merely start with it, so a
+   * type such as `text/htmlx` is left alone. An encoded body would have to be
+   * decoded, changed and re-encoded, and the simulator has no reason to be in
+   * that business.
    */
   private isPlainHtml(response: Response): boolean {
     const contentType = response.headers.get("content-type") ?? "";
+    const [mediaType = ""] = contentType.split(";");
 
     return (
-      contentType.toLowerCase().startsWith(htmlContentType) &&
+      mediaType.trim().toLowerCase() === htmlContentType &&
       !response.headers.has("content-encoding")
     );
   }
@@ -62,22 +79,25 @@ export class SimLiveReloadInjectable {
     return accept.toLowerCase().includes(htmlContentType);
   }
 
+  /**
+   * A signature comes either in a header or, for a presigned URL, in the query
+   * string. A presigned URL is the one signed request a browser makes with an
+   * ordinary HTML `accept` header, which is what an address bar sends, so
+   * missing it would mean handing back an Object with bytes added to it.
+   */
   private isSignedRequest(request: Request): boolean {
     const authorization = request.headers.get("authorization") ?? "";
 
-    return authorization.startsWith(sigV4AuthorizationPrefix);
+    return (
+      authorization.startsWith(sigV4AuthorizationPrefix) ||
+      hasAwsPrefixed(new URL(request.url).searchParams.keys())
+    );
   }
 
   /**
    * An `x-amz-*` header is an AWS client talking, whether it signed or not.
    */
   private isSdkRequest(request: Request): boolean {
-    for (const name of request.headers.keys()) {
-      if (name.toLowerCase().startsWith("x-amz-")) {
-        return true;
-      }
-    }
-
-    return false;
+    return hasAwsPrefixed(request.headers.keys());
   }
 }

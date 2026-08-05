@@ -13,6 +13,7 @@ await simAws.s3().createBucket(new CreateBucketCommand({ Bucket: "foo-site" }));
 
 const websiteUrl = simAws.s3().getBucketWebsiteUrl("foo-site");
 console.log(srv.localUrl(websiteUrl).toString());
-// http://foo-site.s3-website.us-east-1.sim-aws.localhost:52413/
+// http://foo-site.s3-website.us-east-1.sim-aws.localhost:<srv.port>/
+// with whatever port this run took, since none was pinned.
 
 srv.close();

@@ -26,6 +26,34 @@ describe("SimLiveReloadInjectable", () => {
     assertFalse(allowed);
   });
 
+  it("refuses a media type that only starts like HTML", () => {
+    // Given a response whose type begins with the one being looked for
+    const injectable = new SimLiveReloadInjectable();
+    const response = htmlResponse({ "content-type": "text/htmlx" });
+
+    // When it is considered for the reload script
+    const allowed = injectable.allows(browserRequest(), response);
+
+    // Then it is left alone, since it is not HTML
+    assertFalse(allowed);
+  });
+
+  it("refuses a request signed in its query string", () => {
+    // Given a presigned URL opened in a browser, which sends an HTML accept
+    // header and carries its signature in the query string rather than a header
+    const injectable = new SimLiveReloadInjectable();
+    const request = new Request(
+      "http://site.sim-aws.localhost/page.html?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Signature=abc",
+      { headers: { accept: "text/html" } },
+    );
+
+    // When its response is considered for the reload script
+    const allowed = injectable.allows(request, htmlResponse());
+
+    // Then the Object comes back as it was stored
+    assertFalse(allowed);
+  });
+
   it("refuses a response that does not say what it is", () => {
     // Given a response with no content type at all
     const injectable = new SimLiveReloadInjectable();

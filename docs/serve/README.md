@@ -45,7 +45,8 @@ await simAws.s3().createBucket(new CreateBucketCommand({ Bucket: "foo-site" }));
 
 const websiteUrl = simAws.s3().getBucketWebsiteUrl("foo-site");
 console.log(srv.localUrl(websiteUrl).toString());
-// http://foo-site.s3-website.us-east-1.sim-aws.localhost:52413/
+// http://foo-site.s3-website.us-east-1.sim-aws.localhost:<srv.port>/
+// with whatever port this run took, since none was pinned.
 
 srv.close();
 ```
@@ -167,9 +168,10 @@ Yulin's own account of a request goes in headers and never in the body, so a res
 the real service returns. Live reload breaks that rule on purpose, and only for a page a browser is
 about to render. A response gets the script only when all of this holds:
 
-- the response `content-type` is `text/html`
+- the response media type is `text/html` exactly
 - the request `accept` header asks for `text/html`
-- the request carries no SigV4 `authorization` header and no `x-amz-*` header
+- the request carries no SigV4 signature, in either an `authorization` header or
+  the query string of a presigned URL, and no `x-amz-*` header
 - the response has no `content-encoding`
 - the response status is not 206, and the request is not a `HEAD`
 
@@ -178,8 +180,10 @@ looking at the same Object through a website endpoint gets the script.
 
 An injected response carries `x-sim-aws-live-reload: injected`. Its `content-length` is recomputed,
 and `etag` and `last-modified` are dropped, since the bytes are no longer the ones those headers
-describe. The script goes in before `</body>`, or before `</html>` when there is no body element, or
-on the end when the HTML has neither.
+describe. Its `cache-control` is set to `no-store`, replacing whatever the service said, because a
+page held in the browser cache is a page live reload cannot reach. The script goes in before
+`</body>`, or before `</html>` when there is no body element, or on the end when the HTML has
+neither.
 
 ### The reserved path
 
@@ -189,8 +193,9 @@ service can serve anything at that path.
 
 ## Limitations
 
-- An injected page is not byte for byte what the real service would return. That is the point of the
-  feature, and the reason it is off by default and says so on startup.
+- An injected page is not byte for byte what the real service would return, and its `cache-control`
+  is the simulator's rather than the service's. That is the point of the feature, and the reason it
+  is off by default and says so on startup.
 - `/__sim-aws/live-reload` is shadowed on every served hostname while live reload is on.
 - Injection decodes the HTML as UTF-8. A page stored in another encoding would be corrupted, so
   serve HTML as UTF-8.

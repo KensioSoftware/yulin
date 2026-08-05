@@ -10,6 +10,10 @@ import { simLiveReloadHeaderName } from "./sim-live-reload.config.js";
  * those bytes has to change with them: `content-length` is recomputed, and
  * `etag` and `last-modified` are dropped rather than left describing the
  * stored Object the page no longer is.
+ *
+ * An injected page is also not stored. A cached copy would outlive the reload
+ * it was injected for, and a page held in the browser cache is a page live
+ * reload cannot reach.
  */
 export class SimLiveReloadInjector {
   private readonly injectable = new SimLiveReloadInjectable();
@@ -32,6 +36,7 @@ export class SimLiveReloadInjector {
     headers.delete("etag");
     headers.delete("last-modified");
     headers.set("content-length", String(Buffer.byteLength(body)));
+    headers.set("cache-control", "no-store");
     headers.set(simLiveReloadHeaderName, "injected");
 
     return new Response(body, {

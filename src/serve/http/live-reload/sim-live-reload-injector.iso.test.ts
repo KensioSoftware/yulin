@@ -95,6 +95,20 @@ describe("SimLiveReloadInjector", () => {
     assertIdentical(injected.headers.get("last-modified"), null);
   });
 
+  it("keeps an injected page out of the browser cache", async () => {
+    // Given a page the service said could be held on to
+    const injector = new SimLiveReloadInjector();
+    const response = htmlResponse("<html><body></body></html>", {
+      "cache-control": "public, max-age=3600",
+    });
+
+    // When it is served to a browser
+    const injected = await injector.injectInto(browserRequest(), response);
+
+    // Then it is not stored, since a cached copy is one live reload cannot reach
+    assertIdentical(injected.headers.get("cache-control"), "no-store");
+  });
+
   it("returns a response it cannot inject untouched", async () => {
     // Given a response that is not an HTML page
     const injector = new SimLiveReloadInjector();
