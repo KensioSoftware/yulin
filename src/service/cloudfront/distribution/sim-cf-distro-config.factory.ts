@@ -8,6 +8,7 @@ import type { SimCfnTemplateValue } from "../../cloudformation/template/value/si
 export const simCfDistroConfigFactory = new DynamicFactory<
   SimCloudFrontDistributionConfig & SimCfnTemplateValue
 >(() => ({
+  Enabled: true,
   Origins: {
     Items: [
       {

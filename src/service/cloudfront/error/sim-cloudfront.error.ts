@@ -89,3 +89,43 @@ export class SimCloudFrontResourceNotFoundException extends SimCloudFrontError {
     super(message, { httpStatusCode: 404 });
   }
 }
+
+/**
+ * Simulated CloudFront NoSuchDistribution error.
+ *
+ * What CloudFront answers when a Distribution ID names nothing.
+ */
+export class SimCloudFrontNoSuchDistribution extends SimCloudFrontError {
+  public override readonly name = "NoSuchDistribution";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 404 });
+  }
+}
+
+/**
+ * Simulated CloudFront NoSuchFunctionExists error.
+ *
+ * What CloudFront answers when a Function name names nothing.
+ */
+export class SimCloudFrontNoSuchFunctionExists extends SimCloudFrontError {
+  public override readonly name = "NoSuchFunctionExists";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 404 });
+  }
+}
+
+/**
+ * Simulated CloudFront DistributionNotDisabled error.
+ *
+ * CloudFront will not delete a Distribution that is still serving. The caller
+ * disables it with UpdateDistribution first.
+ */
+export class SimCloudFrontDistributionNotDisabled extends SimCloudFrontError {
+  public override readonly name = "DistributionNotDisabled";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 409 });
+  }
+}

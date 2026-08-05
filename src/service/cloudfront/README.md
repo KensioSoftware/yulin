@@ -33,12 +33,17 @@ those shapes fit the real AWS SDK types.
 
 Current command areas include:
 
-- `create-Distribution/`
-- `get-Distribution/`
+- `create-distribution/`
+- `get-distribution/`
+- `update-distribution/`
+- `delete-distribution/`
 - `create-function/`
+- `delete-function/`
 
-The main `SimCloudFront` class delegates command execution to these handlers rather than keeping
-command logic inline.
+The main `SimCloudFront` class owns the Distribution and Function maps and nothing else.
+`SimCloudFrontCommands` holds the collaborators every command shares (IAM, the registry, the Origin
+resolvers, the background scheduler) and builds the handlers, so the facade stays state plus
+delegation.
 
 ## Distribution model
 
@@ -54,9 +59,25 @@ time, including:
 - CloudFront Function associations
 - the default root object
 - custom error responses
+- whether the Distribution is enabled
 
 The `Distribution/configurator/` classes translate AWS-style `DistributionConfig` input into the
 internal Distribution model.
+
+### Updating and deleting
+
+CloudFront takes a whole `DistributionConfig` on an update rather than a patch, so
+`UpdateDistribution` applies it as a replacement: `replaceConfiguration` on the Distribution drops
+everything derived from the previous config, and the same configurators then apply the new one from
+scratch. The alternate domain names are resynchronized in the registry around that, so a name the
+update drops is free for another Distribution.
+
+`assertDeletable` on the Distribution holds the rule that CloudFront will not delete a Distribution
+that is still serving. Deleting also deregisters the Distribution from `SimCloudFrontRegistry`,
+which is what actually stops it serving: request routing reads the registry rather than one
+Account's own Distribution map.
+
+The `IfMatch` ETag is accepted and not checked. See the Limitations section of the usage docs.
 
 ### Default root object and custom error responses
 
