@@ -30,11 +30,30 @@ export function simRoute53LogicalName(localName: string): string | undefined {
     return undefined;
   }
 
-  const logicalName = normalisedName.slice(0, -simRoute53LocalSuffix.length);
-  const logicalNameLabels = logicalName.split(".");
+  return simRoute53LogicalHostname(normalisedName);
+}
+
+/**
+ * Convert a hostname a client requested to a logical DNS name.
+ *
+ * The Yulin-local suffix is optional here, unlike in `simRoute53LogicalName`.
+ * A hostname arriving over HTTP may carry it, because that is how a client
+ * reaches the local server without the name resolving on the public internet,
+ * or it may be the logical name itself, because the simulator's own DNS server
+ * answers for logical names and can point a resolver straight at the local
+ * server.
+ */
+export function simRoute53LogicalHostname(
+  hostname: string,
+): string | undefined {
+  const normalisedName = normaliseSimRoute53Name(hostname);
+
+  const logicalName = normalisedName.endsWith(simRoute53LocalSuffix)
+    ? normalisedName.slice(0, -simRoute53LocalSuffix.length)
+    : normalisedName;
 
   // Reject empty labels before normalization can hide malformed hostnames.
-  if (logicalNameLabels.some((label) => label.length === 0)) {
+  if (logicalName.split(".").some((label) => label.length === 0)) {
     return undefined;
   }
 

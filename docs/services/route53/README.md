@@ -567,7 +567,8 @@ number is already held on UDP by something else, DNS binds an ephemeral port ins
 Nothing binds port 53, which would need root. To resolve simulated names system-wide without naming a
 port, point your resolver at the simulator yourself. On macOS, a file such as `/etc/resolver/test`
 containing `nameserver 127.0.0.1` and `port <dnsPort>` makes the whole `.test` TLD resolve through
-it. That is a change to your machine, so Yulin does not make it for you.
+it. That is a change to your machine, so Yulin does not make it for you. With that in place, the HTTP
+server answers for those names too: see [Local hostname resolution](#local-hostname-resolution).
 
 ### What is answered
 
@@ -600,6 +601,20 @@ http://www.example.test.sim-aws.localhost:<port>/
 
 The local server resolves the logical hostname `www.example.test` through sim Route53 and routes the
 request to the simulated target named by the record.
+
+The suffix is optional. It exists so a client can reach the local server without the hostname
+resolving on the public internet, so it is only needed while nothing is resolving the name to the
+simulator. Once a resolver is pointed at the served DNS server, as under [Ports](#ports) above, the
+name resolves on its own and the request can be made under the hostname your application really
+uses:
+
+```text
+http://www.example.test:<port>/
+```
+
+Both forms reach the same simulated target. The suffix-free form is what makes an exact apex `Host`
+possible, so a CloudFront Function redirecting `example.test` to `www.example.test` can be exercised
+in a browser.
 
 This is most useful with CloudFront aliases. You can create a CloudFront distribution, create a
 Route53 record pointing at the distribution hostname, then fetch through your application hostname.
@@ -956,7 +971,7 @@ Sim Route53 currently supports:
 - Stored record types: `A`, `AAAA`, `CNAME`, `TXT`, `NS` and `SOA`
 - Local HTTP hostname routing through `CNAME` records that point to simulated service hostnames
 - Alias records, with `AliasTarget.DNSName` stored as the record value
-- Local hostname resolution through `*.sim-aws.localhost`
+- Local hostname resolution, with or without the `sim-aws.localhost` suffix on the requested hostname
 - A browser-viewable hosted zone and record summary at `dns.sim-aws.localhost`
 - DNS answers over UDP, so records can be queried with `dig` or any DNS client
 - The `AWS::Route53::HostedZone` and `AWS::Route53::RecordSet` CloudFormation resources

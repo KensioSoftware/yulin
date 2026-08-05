@@ -53,11 +53,11 @@ describe("SimRoute53 hostname resolution", () => {
     await properties.simAws.backgroundTasksComplete();
   }
 
-  it("returns undefined when the hostname is not a local Route53 name", () => {
-    // Given simulated AWS.
+  it("returns undefined when no hosted zone holds the hostname", () => {
+    // Given simulated AWS holding no hosted zones.
     const simAws = new SimAws();
 
-    // When a non-local hostname is resolved.
+    // When a hostname is resolved.
     const target = simAws.route53().resolveHttpHost("example.com");
 
     // Then no target is resolved.
