@@ -257,10 +257,13 @@ not there could mean.
 
 Resources are compared as they resolve rather than as they are written, so a changed parameter value
 shows up as a changed resource even when the template body is identical, and a template reordered
-without being changed does not. Outputs are compared the same way.
+without being changed does not. Outputs are compared the same way. The rest of the template body is
+compared as written, so a change to a section the simulator does not act on, such as `Description`,
+is still an update.
 
 A template that changes nothing at all is refused with a `ValidationError` reading
-`No updates are to be performed.`, which is what CloudFormation answers.
+`No updates are to be performed.`, which is what CloudFormation answers. So is an update asked for
+while another is still running.
 
 ### Changed resources are replaced
 
@@ -1716,8 +1719,8 @@ Each service's own docs describe what its resource types support.
 
 ## Limitations
 
-- `TemplateBody` must be JSON when using `CreateStackCommand`. YAML parsing is not currently provided
-  by the CloudFormation service.
+- `TemplateBody` must be JSON when using `CreateStackCommand` or `UpdateStackCommand`. YAML parsing
+  is not currently provided by the CloudFormation service.
 - Only supported resource types create simulated service resources. An unsupported resource may be
   skipped or may fail the stack, depending on how safely the simulator can model it. A skipped
   resource answers `Ref` and `Fn::GetAtt` with
@@ -1736,7 +1739,9 @@ Each service's own docs describe what its resource types support.
 - A failed stack update is not rolled back to the template the stack was deployed from. The stack is
   left in `UPDATE_FAILED` holding whatever the update managed.
 - `UpdateStackCommand` reads `StackName`, `TemplateBody` and `Parameters`. `UsePreviousTemplate` and
-  `UsePreviousValue` are not read, so an update has to be given the whole new template.
+  `UsePreviousValue` are not read, so an update has to be given the whole new template as JSON.
+- An update asked for while another is still running is refused, as CloudFormation refuses it. There
+  is no queue behind it.
 - A stack deletion deletes only the resource types the simulator can delete. A resource type it
   creates but cannot delete is recorded in `stack.skippedResourceDeletions` and stepped over, the
   same way an unsupported resource type is on create, so the stack still deletes with that resource

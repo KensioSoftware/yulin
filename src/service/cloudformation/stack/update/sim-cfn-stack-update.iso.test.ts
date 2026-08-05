@@ -141,6 +141,86 @@ describe("simulated CloudFormation Stack update", () => {
     assertIdentical(error.message, "No updates are to be performed.");
   });
 
+  it("updates a Stack whose template only changes a Description", async () => {
+    // Given a deployed Stack.
+    const simAws = new SimAws();
+    const cloudFormation = simAws.cloudFormation();
+
+    await cloudFormation.createStack(
+      new CreateStackCommand({
+        StackName: "reports-stack",
+        TemplateBody: jsonStringify(parameterisedTemplate),
+      }),
+    );
+    await cloudFormation.waitForStackDeployComplete("reports-stack");
+
+    // When a template that only adds a Description is applied.
+    await cloudFormation.updateStack(
+      new UpdateStackCommand({
+        StackName: "reports-stack",
+        TemplateBody: jsonStringify({
+          ...parameterisedTemplate,
+          Description: "Where the reports go",
+        }),
+      }),
+    );
+    await cloudFormation.waitForStackUpdateComplete("reports-stack");
+
+    // Then the Stack updated rather than refusing an update with nothing to
+    // do, because a section this simulation does not act on is still part of
+    // the template. Its Buckets were left alone.
+    const stack = cloudFormation.getStackByName("reports-stack");
+    assertNonNullable(stack);
+
+    assertIdentical(stack.status, "UPDATE_COMPLETE");
+    assertIdentical(stack.template["Description"], "Where the reports go");
+    assertNonNullable(simAws.s3().getSimBucketByName("reports-one"));
+  });
+
+  it("reads a changed Parameter value in an Output as a change", async () => {
+    // Given a Stack whose Parameter reaches an Output and no Resource.
+    const simAws = new SimAws();
+    const cloudFormation = simAws.cloudFormation();
+    const templateBody = jsonStringify({
+      Parameters: { SiteUrl: { Type: "String", Default: "https://one.test" } },
+      Resources: {
+        ArchiveBucket: {
+          Type: "AWS::S3::Bucket",
+          Properties: { BucketName: "archive" },
+        },
+      },
+      Outputs: { SiteUrl: { Value: { Ref: "SiteUrl" } } },
+    });
+
+    await cloudFormation.createStack(
+      new CreateStackCommand({
+        StackName: "site-stack",
+        TemplateBody: templateBody,
+      }),
+    );
+    await cloudFormation.waitForStackDeployComplete("site-stack");
+
+    // When the same template is updated with a different value for it.
+    await cloudFormation.updateStack(
+      new UpdateStackCommand({
+        StackName: "site-stack",
+        TemplateBody: templateBody,
+        Parameters: [
+          { ParameterKey: "SiteUrl", ParameterValue: "https://two.test" },
+        ],
+      }),
+    );
+    await cloudFormation.waitForStackUpdateComplete("site-stack");
+
+    // Then the update ran, because Outputs are compared as they resolve as
+    // well, and the Output reads as the new value.
+    const stack = cloudFormation.getStackByName("site-stack");
+    assertNonNullable(stack);
+
+    assertIdentical(stack.status, "UPDATE_COMPLETE");
+    assertIdentical(stack.outputs.get("SiteUrl")?.value, "https://two.test");
+  });
+
   it("deletes a Stack an update changed", async () => {
     // Given a Stack an update added a Bucket to.
     const simAws = new SimAws();

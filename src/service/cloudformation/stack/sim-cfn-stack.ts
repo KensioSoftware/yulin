@@ -119,7 +119,7 @@ export class SimCfnStack {
         await this.createResources();
       },
     });
-    this.updating = new SimCfnStackUpdateLifecycle({ background });
+    this.updating = new SimCfnStackUpdateLifecycle({ background, stackName });
     this.deletion = new SimCfnStackDeletionLifecycle({
       background,
       runTeardown: async (): Promise<void> => {
@@ -164,11 +164,15 @@ export class SimCfnStack {
    * deleted, and the ones whose resolved template changed are replaced.
    * Everything else is left alone, holding whatever it holds in simulated AWS.
    *
-   * An update that would do nothing is refused the way CloudFormation refuses
-   * it. The Resource work is scheduled in the background, as a deployment is,
-   * so callers that need the final state should use waitForUpdateComplete().
+   * An update that would do nothing, and one asked for while another is still
+   * running, are both refused the way CloudFormation refuses them, before the
+   * Stack's template moves on. The Resource work is scheduled in the
+   * background, as a deployment is, so callers that need the final state should
+   * use waitForUpdateComplete().
    */
   async update(template: SimCfnTemplate): Promise<void> {
+    this.updating.assertNotUpdating();
+
     const updater = this.operations.updater({
       background: this.background,
       resources: this.resources,

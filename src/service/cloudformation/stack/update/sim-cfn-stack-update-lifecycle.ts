@@ -1,9 +1,14 @@
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
-import type { SimCloudFormationStackStatus } from "../sim-cfn-stack.js";
+import { SimCloudFormationValidationError } from "../../error/sim-cloudformation.error.js";
+import type {
+  SimCloudFormationStackName,
+  SimCloudFormationStackStatus,
+} from "../sim-cfn-stack.js";
 import { SimCfnStackOperationScheduler } from "../sim-cfn-stack-operation-scheduler.js";
 
 interface SimCfnStackUpdateLifecycleProperties {
   readonly background: BackgroundScheduler;
+  readonly stackName: SimCloudFormationStackName;
 }
 
 /**
@@ -20,6 +25,7 @@ interface SimCfnStackUpdateLifecycleProperties {
  */
 export class SimCfnStackUpdateLifecycle {
   private readonly background: BackgroundScheduler;
+  private readonly stackName: SimCloudFormationStackName;
   #status: SimCloudFormationStackStatus | undefined;
 
   private completePromise: Promise<void> | undefined;
@@ -27,6 +33,7 @@ export class SimCfnStackUpdateLifecycle {
 
   constructor(properties: SimCfnStackUpdateLifecycleProperties) {
     this.background = properties.background;
+    this.stackName = properties.stackName;
   }
 
   /**
@@ -42,6 +49,20 @@ export class SimCfnStackUpdateLifecycle {
    */
   public get error(): Error | undefined {
     return this.updateError;
+  }
+
+  /**
+   * Refuse an update while one is already running.
+   *
+   * CloudFormation takes one update at a time, and a second here would read
+   * the difference to apply from a Stack half way through the first.
+   */
+  assertNotUpdating(): void {
+    if (this.#status === "UPDATE_IN_PROGRESS") {
+      throw new SimCloudFormationValidationError(
+        `Stack ${this.stackName} is in UPDATE_IN_PROGRESS state and can not be updated`,
+      );
+    }
   }
 
   /**

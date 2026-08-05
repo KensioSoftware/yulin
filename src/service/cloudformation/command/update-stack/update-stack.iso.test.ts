@@ -234,7 +234,8 @@ describe("CloudFormation UpdateStackCommand", () => {
     );
     const [describedStack] = describeOutput.Stacks ?? [];
 
-    assertIdentical(describedStack?.Outputs?.[0]?.OutputValue, "reports-v2");
+    assertNonNullable(describedStack);
+    assertIdentical(describedStack.Outputs?.[0]?.OutputValue, "reports-v2");
   });
 
   it("updates a Stack whose template only changes an Output", async () => {
@@ -262,7 +263,8 @@ describe("CloudFormation UpdateStackCommand", () => {
     );
     const [describedStack] = describeOutput.Stacks ?? [];
 
-    assertIdentical(describedStack?.StackStatus, "UPDATE_COMPLETE");
+    assertNonNullable(describedStack);
+    assertIdentical(describedStack.StackStatus, "UPDATE_COMPLETE");
     assertIdentical(
       describedStack.Outputs?.[0]?.Description,
       "Where the reports go",

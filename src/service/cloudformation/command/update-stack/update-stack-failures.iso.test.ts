@@ -147,17 +147,53 @@ describe("CloudFormation UpdateStackCommand failures", () => {
     assertNonNullable(simAws.s3().getSimBucketByName("reports"));
   });
 
+  it("refuses a second update while one is running", async () => {
+    // Given a deployed Stack with an update already under way.
+    const simAws = new SimAws();
+    const cloudFormation = simAws.cloudFormation();
+
+    await deployReportsStack(simAws);
+    await cloudFormation.updateStack(
+      new UpdateStackCommand({
+        StackName: "reports-stack",
+        TemplateBody: jsonStringify(renamedBucketTemplate),
+      }),
+    );
+
+    // When another update is asked for before that one has finished, then it
+    // is refused: the difference to apply would be read from a Stack half way
+    // through the first update.
+    const error = await assertThrowsErrorAsync(async () =>
+      cloudFormation.updateStack(
+        new UpdateStackCommand({
+          StackName: "reports-stack",
+          TemplateBody: jsonStringify(template),
+        }),
+      ),
+    );
+
+    assertInstanceOf(error, SimCloudFormationValidationError);
+    assertStringIncludes(error.message, "UPDATE_IN_PROGRESS");
+
+    // And the first update still finishes.
+    await cloudFormation.waitForStackUpdateComplete("reports-stack");
+    assertNonNullable(simAws.s3().getSimBucketByName("reports-v2"));
+  });
+
   it("requires a StackName", async () => {
     // Given an UpdateStackCommand input without the required StackName.
     const simAws = new SimAws();
 
-    // When UpdateStackCommand is handled without StackName, then it rejects.
-    await assertThrowsErrorAsync(async () =>
+    // When UpdateStackCommand is handled without StackName, then it rejects
+    // saying which input it wanted.
+    const error = await assertThrowsErrorAsync(async () =>
       simAws.cloudFormation().updateStack(
         // @ts-expect-error -- testing missing StackName
         new UpdateStackCommand({ TemplateBody: jsonStringify(template) }),
       ),
     );
+
+    assertIdentical(error.message, "UpdateStackCommand.input.StackName");
   });
 
   it("requires a TemplateBody", async () => {
@@ -168,11 +204,13 @@ describe("CloudFormation UpdateStackCommand failures", () => {
 
     // When UpdateStackCommand is handled without TemplateBody, then it
     // rejects: sim CloudFormation has no UsePreviousTemplate.
-    await assertThrowsErrorAsync(async () =>
+    const error = await assertThrowsErrorAsync(async () =>
       simAws
         .cloudFormation()
         .updateStack(new UpdateStackCommand({ StackName: "reports-stack" })),
     );
+
+    assertIdentical(error.message, "UpdateStackCommand.input.TemplateBody");
   });
 
   it("refuses a caller without cloudformation:UpdateStack", async () => {

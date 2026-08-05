@@ -6,7 +6,7 @@ import { SimCloudFormationValidationError } from "../../error/sim-cloudformation
 import type { SimCfnStackResourceOperations } from "../sim-cfn-stack-resource-operations.js";
 import { makeSimCfnStackResourceMap } from "../resource-map/sim-cfn-stack-resource-map.js";
 import { SimCfnStackUpdatePlan } from "./sim-cfn-stack-update-plan.js";
-import { simCfnStackOutputsChanged } from "./sim-cfn-stack-output-changes.js";
+import { simCfnStackTemplateChanged } from "./sim-cfn-stack-template-changes.js";
 
 interface SimCfnStackUpdaterProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
@@ -50,15 +50,16 @@ export class SimCfnStackUpdater {
   /**
    * Refuse an update that would do nothing, the way CloudFormation refuses one.
    *
-   * Outputs count as well as Resources: a template that only changes an Output
-   * still updates the Stack.
+   * Everything else in the template counts as well as the Resources: a
+   * template that only changes an Output or a Description still updates the
+   * Stack.
    */
   assertHasChanges(): void {
     const { current, updated } = this.properties;
 
     if (
       !this.plan.changesResources &&
-      !simCfnStackOutputsChanged(current, updated)
+      !simCfnStackTemplateChanged(current, updated)
     ) {
       throw new SimCloudFormationValidationError(
         "No updates are to be performed.",
