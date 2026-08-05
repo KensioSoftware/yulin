@@ -222,7 +222,6 @@ describe("IAM CloudFormation ManagedPolicy", () => {
     );
 
     const resolvedWaitHandleProperties = waitHandleResource.resolvedProperties({
-      simAws,
       resources: stack.resources,
     });
 

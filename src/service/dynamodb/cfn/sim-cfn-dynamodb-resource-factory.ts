@@ -6,6 +6,7 @@ import type {
 import type { SimDynamoDb } from "../sim-dynamodb.js";
 import { SimCfnDynamoDbGlobalTableCreator } from "./global-table/sim-cfn-dynamodb-global-table-creator.js";
 import { SimCfnDynamoDbTableCreator } from "./table/sim-cfn-dynamodb-table-creator.js";
+import { SimCfnDynamoDbResourceDeleter } from "./sim-cfn-dynamodb-resource-deleter.js";
 
 interface SimDynamoDbCfnResourceFactoryProperties {
   readonly dynamoDb: SimDynamoDb;
@@ -17,6 +18,7 @@ interface SimDynamoDbCfnResourceFactoryProperties {
 export class SimDynamoDbCfnResourceFactory implements SimCfnServiceResourceFactory {
   private readonly tableCreator: SimCfnDynamoDbTableCreator;
   private readonly globalTableCreator: SimCfnDynamoDbGlobalTableCreator;
+  private readonly deleter: SimCfnDynamoDbResourceDeleter;
 
   constructor(properties: SimDynamoDbCfnResourceFactoryProperties) {
     this.tableCreator = new SimCfnDynamoDbTableCreator({
@@ -24,6 +26,9 @@ export class SimDynamoDbCfnResourceFactory implements SimCfnServiceResourceFacto
     });
     this.globalTableCreator = new SimCfnDynamoDbGlobalTableCreator({
       tableCreator: this.tableCreator,
+    });
+    this.deleter = new SimCfnDynamoDbResourceDeleter({
+      dynamoDb: properties.dynamoDb,
     });
   }
 
@@ -56,5 +61,15 @@ export class SimDynamoDbCfnResourceFactory implements SimCfnServiceResourceFacto
         );
       }
     }
+  }
+
+  /**
+   * Delete a simulated DynamoDB resource created from a CloudFormation Resource.
+   */
+  async delete(
+    resourceTypeName: string,
+    resource: SimCfnResource,
+  ): Promise<void> {
+    await this.deleter.delete(resourceTypeName, resource);
   }
 }

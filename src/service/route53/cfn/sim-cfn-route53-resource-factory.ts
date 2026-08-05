@@ -6,6 +6,8 @@ import type { SimCfnServiceResourceFactory } from "../../cloudformation/resource
 import { SimRoute53 } from "../sim-route53.js";
 import { SimCfnRoute53HostedZoneCreator } from "./hosted-zone/sim-cfn-r53-zone-creator.js";
 import { SimCfnRoute53RecordSetApplicator } from "./record-set/apply/sim-cfn-r53-record-set-applicator.js";
+import { SimCfnRoute53ResourceDeleter } from "./sim-cfn-route53-resource-deleter.js";
+import type { SimCloudFormationResourceDeleteContext } from "../../cloudformation/resource/sim-cfn-resource.type.js";
 
 interface SimRoute53CloudFormationResourceFactoryProperties {
   readonly route53?: SimRoute53 | undefined;
@@ -17,6 +19,7 @@ interface SimRoute53CloudFormationResourceFactoryProperties {
 export class SimRoute53CloudFormationResourceFactory implements SimCfnServiceResourceFactory {
   private readonly hostedZoneCreator: SimCfnRoute53HostedZoneCreator;
   private readonly recordSetCreator: SimCfnRoute53RecordSetApplicator;
+  private readonly deleter: SimCfnRoute53ResourceDeleter;
 
   constructor(
     properties: SimRoute53CloudFormationResourceFactoryProperties = {},
@@ -25,6 +28,7 @@ export class SimRoute53CloudFormationResourceFactory implements SimCfnServiceRes
 
     this.hostedZoneCreator = new SimCfnRoute53HostedZoneCreator({ route53 });
     this.recordSetCreator = new SimCfnRoute53RecordSetApplicator({ route53 });
+    this.deleter = new SimCfnRoute53ResourceDeleter({ route53 });
   }
 
   /**
@@ -54,5 +58,20 @@ export class SimRoute53CloudFormationResourceFactory implements SimCfnServiceRes
         );
       }
     }
+  }
+
+  /**
+   * Delete a simulated Route53 resource created from a CloudFormation Resource.
+   */
+  async delete(
+    resourceTypeName: string,
+    resource: SimCfnResource,
+    context: SimCloudFormationResourceDeleteContext,
+  ): Promise<void> {
+    await this.deleter.delete(
+      resourceTypeName,
+      resource,
+      context.resolvedProperties ?? resource.properties,
+    );
   }
 }

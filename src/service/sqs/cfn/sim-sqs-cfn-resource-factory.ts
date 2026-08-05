@@ -6,6 +6,8 @@ import type {
 import type { SimSqs } from "../sim-sqs.js";
 import { SimCfnSqsQueueCreator } from "./queue/sim-cfn-sqs-queue-creator.js";
 import { SimCfnSqsQueuePolicyCreator } from "./queue-policy/sim-cfn-sqs-queue-policy-creator.js";
+import { SimCfnSqsResourceDeleter } from "./sim-cfn-sqs-resource-deleter.js";
+import type { SimCloudFormationResourceDeleteContext } from "../../cloudformation/resource/sim-cfn-resource.type.js";
 
 interface SimSqsCfnResourceFactoryProperties {
   readonly sqs: SimSqs;
@@ -17,12 +19,14 @@ interface SimSqsCfnResourceFactoryProperties {
 export class SimSqsCfnResourceFactory implements SimCfnServiceResourceFactory {
   private readonly queueCreator: SimCfnSqsQueueCreator;
   private readonly queuePolicyCreator: SimCfnSqsQueuePolicyCreator;
+  private readonly deleter: SimCfnSqsResourceDeleter;
 
   constructor(properties: SimSqsCfnResourceFactoryProperties) {
     this.queueCreator = new SimCfnSqsQueueCreator({ sqs: properties.sqs });
     this.queuePolicyCreator = new SimCfnSqsQueuePolicyCreator({
       sqs: properties.sqs,
     });
+    this.deleter = new SimCfnSqsResourceDeleter({ sqs: properties.sqs });
   }
 
   /**
@@ -56,5 +60,20 @@ export class SimSqsCfnResourceFactory implements SimCfnServiceResourceFactory {
         );
       }
     }
+  }
+
+  /**
+   * Delete a simulated SQS resource created from a CloudFormation Resource.
+   */
+  async delete(
+    resourceTypeName: string,
+    resource: SimCfnResource,
+    context: SimCloudFormationResourceDeleteContext,
+  ): Promise<void> {
+    await this.deleter.delete(
+      resourceTypeName,
+      resource,
+      context.resolvedProperties ?? resource.properties,
+    );
   }
 }

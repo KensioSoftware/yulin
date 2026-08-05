@@ -5,6 +5,8 @@ import type {
 } from "../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimSecretsManager } from "../sim-secrets-manager.js";
 import { SimCfnSecretsManagerSecretCreator } from "./secret/sim-cfn-secrets-manager-secret-creator.js";
+import type { SimSecretsManagerSecret } from "../secret/sim-secrets-manager-secret.js";
+import { assertDefined } from "../../../util/type-guard/defined.js";
 
 interface SimSecretsManagerCfnResourceFactoryProperties {
   readonly secretsManager: SimSecretsManager;
@@ -14,9 +16,11 @@ interface SimSecretsManagerCfnResourceFactoryProperties {
  * CloudFormation Resource factory for simulated Secrets Manager resources.
  */
 export class SimSecretsManagerCfnResourceFactory implements SimCfnServiceResourceFactory {
+  private readonly secretsManager: SimSecretsManager;
   private readonly secretCreator: SimCfnSecretsManagerSecretCreator;
 
   constructor(properties: SimSecretsManagerCfnResourceFactoryProperties) {
+    this.secretsManager = properties.secretsManager;
     this.secretCreator = new SimCfnSecretsManagerSecretCreator({
       secretsManager: properties.secretsManager,
     });
@@ -48,5 +52,35 @@ export class SimSecretsManagerCfnResourceFactory implements SimCfnServiceResourc
         );
       }
     }
+  }
+
+  /**
+   * Delete a simulated Secrets Manager resource created from a CloudFormation
+   * Resource.
+   *
+   * DeleteSecret schedules the deletion rather than carrying it out, so a torn
+   * down Stack leaves a secret waiting out its recovery window. That is what
+   * CloudFormation does: the secret is recoverable afterwards, which is the
+   * point of the window.
+   */
+  async delete(
+    resourceTypeName: string,
+    resource: SimCfnResource,
+  ): Promise<void> {
+    if (resourceTypeName !== "Secret") {
+      throw new Error(
+        `Unsupported sim Secrets Manager CloudFormation Resource ${resourceTypeName} deletion`,
+      );
+    }
+
+    const secret = resource.simResource as SimSecretsManagerSecret | undefined;
+    assertDefined(
+      secret,
+      `sim Secrets Manager secret for CloudFormation Resource ${resource.logicalId}`,
+    );
+
+    await this.secretsManager.deleteSecret({
+      input: { SecretId: secret.arn.value },
+    });
   }
 }

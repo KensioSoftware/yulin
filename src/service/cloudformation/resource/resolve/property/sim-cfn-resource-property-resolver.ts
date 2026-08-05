@@ -4,7 +4,7 @@ import type {
   SimCfnTemplateValue,
   SimCfnTemplateValueRecord,
 } from "../../../template/value/sim-cfn-template-value.js";
-import type { SimCloudFormationResourceCreateContext } from "../../sim-cfn-resource.js";
+import type { SimCfnResourceResolveContext } from "../../sim-cfn-resource.type.js";
 import type { SimCfnPseudoParameters } from "../../../parameters/pseudo/sim-cfn-pseudo-parameters.js";
 
 interface SimCfnResourcePropertyResolverProperties {
@@ -47,7 +47,7 @@ export class SimCfnResourcePropertyResolver {
    */
   resolve(
     properties: SimCfnTemplateValueRecord,
-    context: SimCloudFormationResourceCreateContext,
+    context: SimCfnResourceResolveContext,
   ): SimCfnTemplateValueRecord {
     const resolver = new SimCfnTemplateValueResolver({
       parameters: this.parameters ?? new SimCfnParameters(),

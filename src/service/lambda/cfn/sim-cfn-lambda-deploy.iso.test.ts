@@ -225,7 +225,6 @@ describe("Lambda CloudFormation Function deployment", () => {
     assertIdentical(functionResource.refValue, "output-function");
 
     const resolvedWaitHandleProperties = waitHandleResource.resolvedProperties({
-      simAws,
       resources: stack.resources,
     });
 

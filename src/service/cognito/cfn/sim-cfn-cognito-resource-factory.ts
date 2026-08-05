@@ -7,6 +7,7 @@ import type { SimCognitoIdentityProvider } from "../sim-cognito-identity-provide
 import { SimCfnCognitoClientCreator } from "./client/sim-cfn-cognito-client-creator.js";
 import { SimCfnCognitoGroupCreator } from "./group/sim-cfn-cognito-group-creator.js";
 import { SimCfnCognitoUserPoolCreator } from "./user-pool/sim-cfn-cognito-user-pool-creator.js";
+import { SimCfnCognitoResourceDeleter } from "./sim-cfn-cognito-resource-deleter.js";
 
 interface SimCognitoCfnResourceFactoryProperties {
   readonly cognito: SimCognitoIdentityProvider;
@@ -19,6 +20,7 @@ export class SimCognitoCfnResourceFactory implements SimCfnServiceResourceFactor
   private readonly userPoolCreator: SimCfnCognitoUserPoolCreator;
   private readonly clientCreator: SimCfnCognitoClientCreator;
   private readonly groupCreator: SimCfnCognitoGroupCreator;
+  private readonly deleter: SimCfnCognitoResourceDeleter;
 
   constructor(properties: SimCognitoCfnResourceFactoryProperties) {
     const { cognito } = properties;
@@ -26,6 +28,7 @@ export class SimCognitoCfnResourceFactory implements SimCfnServiceResourceFactor
     this.userPoolCreator = new SimCfnCognitoUserPoolCreator({ cognito });
     this.clientCreator = new SimCfnCognitoClientCreator({ cognito });
     this.groupCreator = new SimCfnCognitoGroupCreator({ cognito });
+    this.deleter = new SimCfnCognitoResourceDeleter({ cognito });
   }
 
   /**
@@ -58,5 +61,15 @@ export class SimCognitoCfnResourceFactory implements SimCfnServiceResourceFactor
         );
       }
     }
+  }
+
+  /**
+   * Delete a simulated Cognito resource created from a CloudFormation Resource.
+   */
+  async delete(
+    resourceTypeName: string,
+    resource: SimCfnResource,
+  ): Promise<void> {
+    await this.deleter.delete(resourceTypeName, resource);
   }
 }

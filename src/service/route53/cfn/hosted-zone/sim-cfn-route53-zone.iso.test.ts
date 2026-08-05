@@ -219,7 +219,6 @@ describe("Route53 CloudFormation HostedZone", () => {
     assertTypeString(hostedZoneId);
 
     const resolvedWaitHandleProperties = waitHandleResource.resolvedProperties({
-      simAws,
       resources: stack.resources,
     });
 

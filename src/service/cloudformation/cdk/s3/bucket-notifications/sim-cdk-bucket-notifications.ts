@@ -2,10 +2,12 @@ import type { SimCfnServiceResourceFactory } from "../../../resource/factory/sim
 import type {
   SimCfnResource,
   SimCloudFormationResourceCreateContext,
+  SimCloudFormationResourceDeleteContext,
 } from "../../../resource/sim-cfn-resource.js";
 import { SimCdkBucketNotificationConfiguration } from "./configuration/sim-cdk-bucket-notification-configuration.js";
 import { bucketNotificationsError } from "./error/sim-cdk-bucket-notification-error.js";
 import { SimCdkBucketNotificationProperties } from "./property/sim-cdk-bucket-notification-properties.js";
+import { SimCdkBucketNotificationsRemover } from "./sim-cdk-bucket-notifications-remover.js";
 
 /**
  * CloudFormation Resource factory for CDK Bucket event notifications.
@@ -67,5 +69,24 @@ export class SimCdkBucketNotificationsResourceFactory implements SimCfnServiceRe
       });
 
     return undefined;
+  }
+
+  /**
+   * Take the Bucket's notification configuration back off again.
+   *
+   * The CDK provider function does the same on its Delete event: the
+   * configuration it put on is the configuration it removes, by putting an
+   * empty one back.
+   */
+  async delete(
+    resourceTypeName: string,
+    resource: SimCfnResource,
+    context: SimCloudFormationResourceDeleteContext,
+  ): Promise<void> {
+    await new SimCdkBucketNotificationsRemover().remove(
+      resourceTypeName,
+      resource,
+      context,
+    );
   }
 }

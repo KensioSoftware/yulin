@@ -36,6 +36,25 @@ export class SimCdkBucketDeploymentResourceFactory implements SimCfnServiceResou
     return undefined;
   }
 
+  /**
+   * Undeploy a CDK BucketDeployment.
+   *
+   * Nothing happens, because nothing happens on AWS either. The provider
+   * function keeps what it deployed unless the construct was given
+   * `retainOnDelete: false`, so the Objects stay in the Bucket, and the
+   * Bucket's own deletion is refused while they do.
+   */
+  async delete(resourceTypeName: string): Promise<void> {
+    await Promise.resolve();
+
+    if (resourceTypeName !== "CDKBucketDeployment") {
+      throw new Error(
+        `Unsupported sim CDK BucketDeployment CloudFormation Resource ` +
+          `${resourceTypeName} deletion`,
+      );
+    }
+  }
+
   private createCdkBucketDeployment(
     resource: SimCfnResource,
     context: SimCloudFormationResourceCreateContext,

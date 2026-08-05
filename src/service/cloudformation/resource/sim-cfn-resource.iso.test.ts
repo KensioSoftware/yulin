@@ -195,6 +195,10 @@ describe("SimCfnResource", () => {
 
         return createdSimResource;
       },
+
+      async delete(): Promise<void> {
+        await Promise.resolve();
+      },
     };
 
     const resource = new SimCfnResource({
@@ -270,6 +274,10 @@ describe("SimCfnResource", () => {
 
           // eslint-disable-next-line @typescript-eslint/only-throw-error
           throw "factory failed";
+        },
+
+        async delete() {
+          await Promise.resolve();
         },
       },
     });

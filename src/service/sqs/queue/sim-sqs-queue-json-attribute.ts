@@ -46,6 +46,10 @@ export class SimSqsQueueJsonAttribute<
   /**
    * This attribute after a request, which holds the document the request sets
    * or the one already there.
+   *
+   * An empty string takes the document off the queue, which is how SQS is told
+   * to remove one: there is no DeleteQueuePolicy, so setting the attribute to
+   * nothing is the only way back to a queue without one.
    */
   with(requested: SimSqsQueueAttributeInput): SimSqsQueueJsonAttribute<T> {
     const value = this.valueIn(requested);
@@ -57,7 +61,7 @@ export class SimSqsQueueJsonAttribute<
     return new SimSqsQueueJsonAttribute({
       name: this.name,
       parse: this.parse,
-      held: this.parse(value),
+      held: value === "" ? undefined : this.parse(value),
     });
   }
 

@@ -1,29 +1,16 @@
-import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import {
   type BackgroundScheduler,
   BackgroundTasks,
 } from "../../../util/background/background.js";
 import type { SimCfnServiceResourceFactory } from "./factory/sim-cfn-resource-factory.type.js";
 import { SimCfnResourceCreateOperation } from "./create/sim-cfn-resource-create-operation.js";
+import { SimCfnResourceDeleteOperation } from "./delete/sim-cfn-resource-delete-operation.js";
 import { SimCfnResourceCreationState } from "./state/sim-cfn-resource-creation-state.js";
-import { SimCfnIgnoredProperties } from "./ignore/sim-cfn-ignored-properties.js";
-import type {
-  SimCfnIgnoredProperty,
-  SimCfnPropertyIgnorer,
-} from "./ignore/sim-cfn-ignored-property.type.js";
-import { SimCfnResourceTemplateReader } from "./template/sim-cfn-resource-template-reader.js";
-import type {
-  SimCfnTemplateValue,
-  SimCfnTemplateValueRecord,
-} from "../template/value/sim-cfn-template-value.js";
-import { SimCfnResourcePropertyResolver } from "./resolve/property/sim-cfn-resource-property-resolver.js";
-import {
-  type SimCfnResourceValueAdapter,
-  simCfnResourceValueAdapter,
-} from "./cfn/sim-cfn-resource-value-adapter.js";
-import { simAwsAccountRegionScopeFactory } from "../../aws/sim-aws-account-region-scope.factory.js";
+import { SimCfnResourceDeletionState } from "./state/sim-cfn-resource-deletion-state.js";
+import { SimCfnResourceRecord } from "./sim-cfn-resource-record.js";
 import type {
   SimCloudFormationResourceCreateContext,
+  SimCloudFormationResourceDeleteContext,
   SimCloudFormationResourceProperties,
   SimCloudFormationResourceStatus,
 } from "./sim-cfn-resource.type.js";
@@ -33,61 +20,47 @@ import type {
  *
  * A SimCfnResource is created from one item in a stack template's Resources map.
  * It keeps the Resource logical ID, account/region scope, original Resource
- * template object, CloudFormation creation state, and the simulated AWS object
+ * template object, CloudFormation lifecycle state, and the simulated AWS object
  * produced by Resource creation.
  *
  * This class stays small:
+ * - what the Resource is, rather than what has happened to it, belongs to
+ *   SimCfnResourceRecord, which this extends;
  * - whole-template validation and Parameter resolution belong to SimCfnTemplate;
- * - Resource-field reading belongs to SimCfnResourceTemplateReader;
- * - asynchronous creation orchestration belongs to SimCfnResourceCreateOperation;
- * - service-specific object construction belongs to SimCfnServiceResourceFactory.
+ * - asynchronous creation and deletion orchestration belong to
+ *   SimCfnResourceCreateOperation and SimCfnResourceDeleteOperation;
+ * - service-specific object construction and removal belong to
+ *   SimCfnServiceResourceFactory.
  * As a result, SimCfnResource acts as the stable Resource record passed between
- * stack creation, dependency resolution, and service-specific factories.
+ * stack deployment, dependency resolution, and service-specific factories.
  */
 export class SimCfnResource<
   T extends object = object,
-> implements SimCfnPropertyIgnorer {
-  public readonly accountRegionScope: SimAwsAccountRegionScope;
-  public readonly logicalId: string;
-  /** The Stack this Resource belongs to, where a generated name comes from. */
-  public readonly stackName: string | undefined;
-  public readonly template: SimCfnTemplateValueRecord;
+> extends SimCfnResourceRecord {
   private readonly creationState = new SimCfnResourceCreationState<T>();
-  private readonly ignoredPropertyList = new SimCfnIgnoredProperties();
-  private readonly resourceTemplateReader: SimCfnResourceTemplateReader;
-  private readonly propertyResolver: SimCfnResourcePropertyResolver;
+  private readonly deletionState = new SimCfnResourceDeletionState();
   private readonly background: BackgroundScheduler;
   private readonly cfnResourceFactory: SimCfnServiceResourceFactory | undefined;
-  private readonly resourceLogicalIds: ReadonlySet<string>;
 
   constructor(properties: SimCloudFormationResourceProperties = {}) {
-    const {
-      accountRegionScope = simAwsAccountRegionScopeFactory.make(),
-      background = new BackgroundTasks(),
-      logicalId = "Resource",
-      stackName,
-      template = {},
-      cfnResourceFactory,
-      parameters,
-      resourceLogicalIds = new Set(),
-    } = properties;
+    super(properties);
 
-    this.accountRegionScope = accountRegionScope;
+    const { background = new BackgroundTasks(), cfnResourceFactory } =
+      properties;
+
     this.background = background;
-    this.logicalId = logicalId;
-    this.stackName = stackName;
-    this.template = template;
-    this.resourceTemplateReader = new SimCfnResourceTemplateReader(template);
-    this.propertyResolver = new SimCfnResourcePropertyResolver({ parameters });
     this.cfnResourceFactory = cfnResourceFactory;
-    this.resourceLogicalIds = resourceLogicalIds;
   }
 
   /**
-   * Get the current CloudFormation creation status for this Resource.
+   * Get the current CloudFormation status for this Resource.
+   *
+   * A Resource keeps the status its creation left it with until the Stack asks
+   * for it to be deleted, so the status reads as the last thing CloudFormation
+   * did to the Resource.
    */
   public get status(): SimCloudFormationResourceStatus {
-    return this.creationState.status;
+    return this.deletionState.status ?? this.creationState.status;
   }
 
   /**
@@ -113,22 +86,6 @@ export class SimCfnResource<
   }
 
   /**
-   * The properties this Resource was created without acting on.
-   */
-  public get ignoredProperties(): readonly SimCfnIgnoredProperty[] {
-    return this.ignoredPropertyList.all;
-  }
-
-  /**
-   * Record that this Resource is being created without acting on a property.
-   * Called by the service parsing this Resource's properties, which is the
-   * only thing that knows whether a property changes behaviour it simulates.
-   */
-  ignoreProperty(path: string, reason: string): void {
-    this.ignoredPropertyList.record(this, path, reason);
-  }
-
-  /**
    * Whether this Resource has reached a terminal successful creation status.
    */
   public get createComplete(): boolean {
@@ -136,44 +93,32 @@ export class SimCfnResource<
   }
 
   /**
-   * The CloudFormation Resource type from the Resource template.
-   *
-   * E.g. AWS::S3::Bucket
+   * Whether this Resource has reached a terminal deletion status.
    */
-  public get type(): string | undefined {
-    return this.resourceTemplateReader.type();
+  public get deleteComplete(): boolean {
+    return this.deletionState.deleteComplete;
   }
 
   /**
-   * The CloudFormation Resource properties object from the Resource template.
-   *
-   * Missing or non-object Properties are treated as an empty object by the
-   * Resource template reader.
+   * Whether this Resource was removed from simulated AWS.
    */
-  public get properties(): SimCfnTemplateValueRecord {
-    return this.resourceTemplateReader.properties();
+  public get deleted(): boolean {
+    return this.deletionState.deleted;
   }
 
   /**
-   * The value returned when this Resource is referenced via { "Ref": logicalId }.
-   *
-   * Mirroring CloudFormation, Resource Ref behavior is Resource-type specific.
-   * CloudFormation-specific value behavior is delegated to a Resource adapter so
-   * simulated service objects do not need to know about CloudFormation.
+   * Whether this Resource's deletion was recorded rather than carried out,
+   * because sim CloudFormation has no way to delete its Resource type.
    */
-  public get refValue(): SimCfnTemplateValue {
-    return this.cfnValueAdapter().refValue();
+  public get deletionSkipped(): boolean {
+    return this.deletionState.skipped;
   }
 
   /**
-   * The value returned when this Resource is referenced via Fn::GetAtt.
-   *
-   * Mirroring CloudFormation, Resource attributes are Resource-type specific.
-   * CloudFormation-specific value behavior is delegated to a Resource adapter so
-   * simulated service objects do not need to know about CloudFormation.
+   * The reason this Resource's deletion was skipped, if it was skipped.
    */
-  public attributeValue(attributeName: string): SimCfnTemplateValue {
-    return this.cfnValueAdapter().attributeValue(attributeName);
+  public get deletionSkippedReason(): string | undefined {
+    return this.deletionState.skippedReason;
   }
 
   /**
@@ -183,38 +128,15 @@ export class SimCfnResource<
    * after creation completes. Resources that do not produce a concrete service
    * object may leave this undefined.
    */
-  public get simResource(): T | undefined {
+  public override get simResource(): T | undefined {
     return this.creationState.simResource;
   }
 
   /**
-   * The creation failure captured for this Resource, if creation failed.
+   * The failure captured for this Resource, if creation or deletion failed.
    */
   public get error(): Error | undefined {
-    return this.creationState.error;
-  }
-
-  /**
-   * Logical IDs of Resources that must complete before this Resource can
-   * create.
-   *
-   * Includes both explicit DependsOn entries and implicit dependencies from Ref
-   * expressions that target other Resources.
-   */
-  dependencies(): string[] {
-    return this.resourceTemplateReader.dependencies(this.resourceLogicalIds);
-  }
-
-  /**
-   * Resolve this Resource's Properties, including Refs to other Resources.
-   *
-   * Called by the creation operation once every dependency has reached
-   * CREATE_COMPLETE, so referenced Resources have valid Ref values.
-   */
-  resolvedProperties(
-    context: SimCloudFormationResourceCreateContext,
-  ): SimCfnTemplateValueRecord {
-    return this.propertyResolver.resolve(this.properties, context);
+    return this.deletionState.error ?? this.creationState.error;
   }
 
   /**
@@ -236,12 +158,25 @@ export class SimCfnResource<
    * remains a lifecycle record rather than an async workflow implementation.
    */
   create(context: SimCloudFormationResourceCreateContext): Promise<void> {
-    const creationOperation = new SimCfnResourceCreateOperation({
+    return new SimCfnResourceCreateOperation({
       background: this.background,
       resource: this,
       cfnResourceFactory: this.cfnResourceFactory,
-    });
-    return creationOperation.run(context);
+    }).run(context);
+  }
+
+  /**
+   * Start deleting this Resource from simulated AWS.
+   *
+   * The actual work is delegated to SimCfnResourceDeleteOperation, for the same
+   * reason creation is.
+   */
+  delete(context: SimCloudFormationResourceDeleteContext): Promise<void> {
+    return new SimCfnResourceDeleteOperation({
+      background: this.background,
+      resource: this,
+      cfnResourceFactory: this.cfnResourceFactory,
+    }).run(context);
   }
 
   /**
@@ -251,7 +186,7 @@ export class SimCfnResource<
    * CloudFormation lifecycle.
    */
   markCreateInProgress(): void {
-    this.ignoredPropertyList.clear();
+    this.clearIgnoredProperties();
     this.creationState.markCreateInProgress();
   }
 
@@ -284,17 +219,39 @@ export class SimCfnResource<
     this.creationState.markCreateFailed(error);
   }
 
-  private cfnValueAdapter(): SimCfnResourceValueAdapter {
-    return simCfnResourceValueAdapter({
-      logicalId: this.logicalId,
-      type: this.type,
-      simResource: this.simResource,
-    });
+  /**
+   * Mark this Resource as deletion in progress.
+   */
+  markDeleteInProgress(): void {
+    this.deletionState.markDeleteInProgress();
+  }
+
+  /**
+   * Mark this Resource as successfully deleted.
+   */
+  markDeleteComplete(): void {
+    this.deletionState.markDeleteComplete();
+  }
+
+  /**
+   * Mark this Resource's deletion as skipped because sim CloudFormation has no
+   * way to delete its service or Resource type.
+   */
+  markDeleteSkipped(reason: string): void {
+    this.deletionState.markDeleteSkipped(reason);
+  }
+
+  /**
+   * Mark this Resource as failed to delete and store the failure reason.
+   */
+  markDeleteFailed(error?: Error): void {
+    this.deletionState.markDeleteFailed(error);
   }
 }
 
 export {
   type SimCloudFormationResourceCreateContext,
+  type SimCloudFormationResourceDeleteContext,
   type SimCloudFormationResourceProperties,
   type SimCloudFormationResourceStatus,
 } from "./sim-cfn-resource.type.js";

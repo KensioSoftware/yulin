@@ -9,6 +9,7 @@ import type {
   SimCfnTemplate,
 } from "../template/sim-cfn-template.js";
 import { SimCfnStackResourceCreator } from "./deploy/sim-cfn-stack-resource-creator.js";
+import { SimCfnStackResourceDeleter } from "./teardown/sim-cfn-stack-resource-deleter.js";
 import { makeSimCfnStackResourceMap } from "./resource-map/sim-cfn-stack-resource-map.js";
 import { SimCfnStackDeploymentLifecycle } from "./deploy/sim-cfn-stack-deployment-lifecycle.js";
 import type { SimCdkOutContext } from "../cdk/sim-cdk-out-context.js";
@@ -119,6 +120,22 @@ export class SimCfnStack {
   }
 
   /**
+   * Delete this Stack's Resources from simulated AWS, in reverse dependency
+   * order.
+   *
+   * The Resource half of deleting a Stack. Stack deletion status, releasing the
+   * Stack name and the DeleteStack command itself sit on top of this rather
+   * than inside it, so the Resource teardown can be exercised on its own.
+   */
+  async teardown(): Promise<void> {
+    await new SimCfnStackResourceDeleter({
+      simAws: this.simAws,
+      resources: this.resources,
+      stackName: this.stackName,
+    }).deleteAll();
+  }
+
+  /**
    * Get a Stack Resource by logical ID.
    */
   getResource(logicalId: string): SimCfnResource | undefined {
@@ -131,6 +148,20 @@ export class SimCfnStack {
    */
   public get skippedResources(): readonly SimCfnResource[] {
     return this.skippedResourceList;
+  }
+
+  /**
+   * Resources the teardown recorded rather than deleted, because sim
+   * CloudFormation has no way to delete their Resource type.
+   *
+   * Read from the Resources rather than collected during teardown, the same way
+   * ignored properties are, so the Stack and its Resources cannot disagree.
+   */
+  public get skippedResourceDeletions(): readonly SimCfnResource[] {
+    return this.resources
+      .values()
+      .filter((resource) => resource.deletionSkipped)
+      .toArray();
   }
 
   /**

@@ -278,7 +278,6 @@ describe("IAM CloudFormation Role", () => {
     assertIdentical(roleResource.refValue, "OutputRole");
 
     const resolvedWaitHandleProperties = waitHandleResource.resolvedProperties({
-      simAws,
       resources: stack.resources,
     });
 

@@ -42,4 +42,21 @@ export class SimCfnCfnResourceFactory implements SimCfnServiceResourceFactory {
       }
     }
   }
+
+  /**
+   * Delete a simulated CloudFormation resource.
+   *
+   * A WaitConditionHandle is a pre-signed URL and nothing else. There is
+   * nothing behind it to remove, so deleting one is the Stack forgetting about
+   * it, which the Stack does whether this is called or not.
+   */
+  async delete(resourceTypeName: string): Promise<void> {
+    await Promise.resolve();
+
+    if (resourceTypeName !== "WaitConditionHandle") {
+      throw new Error(
+        `Unsupported sim CloudFormation CloudFormation Resource ${resourceTypeName} deletion`,
+      );
+    }
+  }
 }

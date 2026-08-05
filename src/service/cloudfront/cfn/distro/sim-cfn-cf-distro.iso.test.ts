@@ -146,7 +146,6 @@ describe("CloudFront CloudFormation Distribution", () => {
     assertTypeString(distributionId);
 
     const resolvedWaitHandleProperties = waitHandleResource.resolvedProperties({
-      simAws,
       resources: stack.resources,
     });
 

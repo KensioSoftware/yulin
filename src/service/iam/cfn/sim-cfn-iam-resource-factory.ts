@@ -7,6 +7,8 @@ import type { SimIam } from "../sim-iam.js";
 import { SimCfnIamManagedPolicyCreator } from "./managed-policy/sim-cfn-iam-managed-policy-creator.js";
 import { SimCfnIamPolicyCreator } from "./policy/sim-cfn-iam-policy-creator.js";
 import { SimCfnIamRoleCreator } from "./role/sim-cfn-iam-role-creator.js";
+import { SimCfnIamResourceDeleter } from "./sim-cfn-iam-resource-deleter.js";
+import type { SimCloudFormationResourceDeleteContext } from "../../cloudformation/resource/sim-cfn-resource.type.js";
 
 /**
  * CloudFormation Resource factory for simulated IAM resources.
@@ -15,11 +17,13 @@ export class SimIamCloudFormationResourceFactory implements SimCfnServiceResourc
   private readonly managedPolicyCreator: SimCfnIamManagedPolicyCreator;
   private readonly policyCreator: SimCfnIamPolicyCreator;
   private readonly roleCreator: SimCfnIamRoleCreator;
+  private readonly deleter: SimCfnIamResourceDeleter;
 
   constructor(iam: SimIam) {
     this.managedPolicyCreator = new SimCfnIamManagedPolicyCreator({ iam });
     this.policyCreator = new SimCfnIamPolicyCreator({ iam });
     this.roleCreator = new SimCfnIamRoleCreator({ iam });
+    this.deleter = new SimCfnIamResourceDeleter({ iam });
   }
 
   /**
@@ -56,5 +60,20 @@ export class SimIamCloudFormationResourceFactory implements SimCfnServiceResourc
         );
       }
     }
+  }
+
+  /**
+   * Delete a simulated IAM resource created from a CloudFormation Resource.
+   */
+  async delete(
+    resourceTypeName: string,
+    resource: SimCfnResource,
+    context: SimCloudFormationResourceDeleteContext,
+  ): Promise<void> {
+    await this.deleter.delete(
+      resourceTypeName,
+      resource,
+      context.resolvedProperties ?? resource.properties,
+    );
   }
 }

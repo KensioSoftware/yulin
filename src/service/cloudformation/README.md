@@ -30,7 +30,8 @@ familiar CloudFormation/CDK outputs.
 - `parameters/` contains parameter input/default handling.
 - `resource/` contains the runtime CloudFormation resource model, resource type parsing, dependency
   extraction, property resolution, and service factory resolution.
-- `stack/` contains the runtime stack model and dependency-ordered deployment lifecycle.
+- `stack/` contains the runtime stack model, the dependency-ordered deployment lifecycle, and the
+  reverse-ordered teardown under `teardown/`.
 - `cdk/` contains CDK-specific integration support, including synthesized output context and custom
   resource implementations.
 - `bind/` contains executable resource binding types used by CDK/custom-resource simulation.
@@ -78,21 +79,24 @@ The implementation is split into several layers:
 - `SimCfnStackPendingResources`
 - `SimCfnStackResourceBatchCreator`
 - Schedule deployment in the background and create resources in dependency-ready batches.
+- `SimCfnStackResourceDeleter`, `SimCfnStackPendingDeletions` and
+  `SimCfnStackResourceBatchDeleter` do the same in reverse for a teardown.
 
 6. **Resource model**
 
-- `SimCfnResource`
-- `SimCfnResourceCreateOperation`
-- `SimCfnResourceCreator`
+- `SimCfnResource` and `SimCfnResourceRecord`
+- `SimCfnResourceCreateOperation` and `SimCfnResourceDeleteOperation`
+- `SimCfnResourceCreator` and `SimCfnResourceDeleter`
 - Track individual resource lifecycle state, dependencies, resolved properties, Ref/GetAtt values,
-  and underlying simulated service resource.
+  and underlying simulated service resource. What a resource is belongs to the record; what has
+  happened to it belongs to the lifecycle half.
 
 7. **Service-specific resource factories**
 
 - `SimCfnCfnResourceFactory`
 - S3 and CloudFront factories exposed by those service simulators
 - CDK/custom factories such as the bucket deployment custom resource
-- Convert a CloudFormation resource into an actual simulated service object.
+- Convert a CloudFormation resource into an actual simulated service object, and remove it again.
 
 This separation is important. CloudFormation owns orchestration and lifecycle; individual services
 own how their own resources are created and represented.
@@ -374,6 +378,88 @@ for a test.
 
 Skipped resources are also recorded on the stack in `skippedResources` for diagnostics.
 
+## Resource teardown loop
+
+`SimCfnStackResourceDeleter` owns the reverse-dependency-ordered deletion loop, and mirrors
+`SimCfnStackResourceCreator` batch for batch:
+
+1. Start with all resources pending.
+2. Ask `SimCfnStackPendingDeletions` for resources nothing still standing depends on.
+3. If no resources are deletable, fail because the teardown cannot make progress.
+4. Delete the ready batch.
+5. Remove resources that reached a terminal delete status.
+6. Repeat until no resources remain pending.
+
+The graph is the one creation already reads, turned round. `simCfnResourceDependents` inverts the
+`dependencies()` each resource reports, so a resource waits for the resources naming it rather than
+for the resources it names.
+
+This ordering is what makes the individual service deleters workable. A bucket policy is taken off
+before its bucket goes, a role's policies before the role, and a route before the integration it
+targets. It also means every `Ref` a resource carries still resolves while that resource is being
+deleted, so deletion can resolve properties the same way creation does rather than remembering what
+creation resolved.
+
+`SimCfnStack.teardown()` is the entry point. It is deliberately only the resource half: stack-level
+delete status, releasing the stack name, and the `DeleteStack` command itself sit on top of it.
+
+## Resource deletion lifecycle
+
+`SimCfnResourceDeleteOperation` owns the asynchronous lifecycle for deleting one resource, and is
+the mirror image of the creation operation.
+
+A resource keeps its creation status until deletion starts, at which point it becomes
+`DELETE_IN_PROGRESS`. The work is scheduled through the background scheduler, and then:
+
+1. background sequencing runs
+2. `SimCfnResourceDeleter` removes the underlying simulated service resource
+3. the resource is marked `DELETE_COMPLETE`
+
+If deletion throws:
+
+- an "unsupported resource" diagnostic marks the deletion skipped, which is `DELETE_COMPLETE` with a
+  reason, exactly as an unsupported resource type is `CREATE_COMPLETE` with one
+- other failures mark the resource `DELETE_FAILED` and reject
+
+A resource that never reached simulated AWS is not passed to its service at all. That covers a
+resource whose type was skipped, and one a failed deployment never got as far as, so a partly
+deployed stack can still be torn down.
+
+Skipped deletions are read off the resources as `stack.skippedResourceDeletions`, the same way
+ignored properties are, so the stack and its resources cannot disagree.
+
+Deletion statuses live on `SimCfnResourceDeletionState`, separate from `SimCfnResourceCreationState`
+rather than sharing one field, because the two answer different questions: what the resource became,
+and what happened when the stack asked for it back.
+
+## Service-specific resource deletion
+
+`SimCfnServiceResourceFactory` has a `delete` alongside `create`, and the engine calls it the same
+way: parse the resource type, resolve the owning service's factory, resolve properties, delegate.
+CloudFormation orchestrates; services delete.
+
+Which command removes a resource type, and what has to be true first, belongs to the service. Real
+CloudFormation does that extra step itself, and so do these deleters:
+
+- a CloudFront distribution is disabled with `UpdateDistribution` before `DeleteDistribution`, which
+  refuses an enabled one
+- an IAM role has its attached and inline policies taken off before `DeleteRole`, which refuses a
+  role that still has any
+- an SQS queue policy is removed by setting the `Policy` attribute to an empty string, because SQS
+  has no `DeleteQueuePolicy`
+- a Route53 record set is removed by a `DELETE` change, because Route53 only takes changes
+
+Two of them stop short on purpose, because AWS does:
+
+- an S3 bucket holding objects fails the teardown with `BucketNotEmpty` rather than being emptied
+  first. That refusal is the reason CDK ships an `autoDeleteObjects` custom resource, and hiding it
+  would hide the difference between a stack that can be deleted and one that cannot.
+- a KMS key is scheduled for deletion and left in `PendingDeletion`, because `ScheduleKeyDeletion` is
+  the only deletion KMS has.
+
+A resource type a service can create but cannot delete throws the same unsupported-resource error an
+unknown type does, so the teardown records it and carries on.
+
 ## Service-specific resource creation
 
 `SimCfnResourceCreator` bridges CloudFormation resources to simulated service resources.
@@ -636,6 +722,9 @@ Useful areas:
 - `stack/deploy/*.iso.test.ts`
   - dependency-ordered resource creation and deployment failure behaviour
 
+- `stack/teardown/*.iso.test.ts`
+  - reverse-dependency-ordered resource deletion and teardown failure behaviour
+
 - `cdk/**/*.loc.test.ts`
   - higher-level CDK synthesized template scenarios
   - local integration of CloudFormation, S3, CloudFront, assets, and custom resources
@@ -656,7 +745,8 @@ When extending simulated CloudFormation:
 - resolve parameters before runtime resource creation
 - resolve resource references only when dependencies are complete
 - keep dependency ordering in the stack/resource orchestration layer
-- add service-specific CloudFormation resource creation to the owning service simulator
+- add service-specific CloudFormation resource creation and deletion to the owning service
+  simulator
 - prefer resource value adapters for `Ref` and `Fn::GetAtt` behaviour
 - do not import real AWS SDK packages from implementation code under `src/`
 - define local structural command/template types that are compatible with SDK-shaped inputs
@@ -665,6 +755,7 @@ When extending simulated CloudFormation:
 - add focused isolated tests for new template/resource behaviour
 - add local integration tests when the full served/CDK/filesystem path matters
 
-The most important design rule is: CloudFormation orchestrates; services create. If a change
+The most important design rule is: CloudFormation orchestrates; services create, and services
+delete. If a change
 requires knowledge of a service's resource schema or runtime object model, it probably belongs in
 that service's CloudFormation resource factory rather than in the generic CloudFormation engine.

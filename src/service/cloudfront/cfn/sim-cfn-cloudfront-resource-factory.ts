@@ -6,17 +6,24 @@ import type {
 } from "../../cloudformation/resource/sim-cfn-resource.js";
 import { SimCfnCfDistroCreator } from "./distro/sim-cfn-cf-distro-creator.js";
 import { SimCfnCffCreator } from "./cff/sim-cfn-cff-creator.js";
+import { SimCfnCfDistroDeleter } from "./distro/sim-cfn-cf-distro-deleter.js";
+import type { SimCloudFrontFunction } from "../cff/sim-cloudfront-function.js";
+import { assertDefined } from "../../../util/type-guard/defined.js";
 
 /**
  * CloudFormation Resource factory for simulated CloudFront resources.
  */
 export class SimCloudFrontCloudFormationResourceFactory implements SimCfnServiceResourceFactory {
+  private readonly cloudFront: SimCloudFront;
   private readonly distroCreator: SimCfnCfDistroCreator;
   private readonly functionCreator: SimCfnCffCreator;
+  private readonly distroDeleter: SimCfnCfDistroDeleter;
 
   constructor(cloudFront: SimCloudFront) {
+    this.cloudFront = cloudFront;
     this.distroCreator = new SimCfnCfDistroCreator({ cloudFront });
     this.functionCreator = new SimCfnCffCreator({ cloudFront });
+    this.distroDeleter = new SimCfnCfDistroDeleter({ cloudFront });
   }
 
   /**
@@ -47,5 +54,43 @@ export class SimCloudFrontCloudFormationResourceFactory implements SimCfnService
         );
       }
     }
+  }
+
+  /**
+   * Delete a simulated CloudFront resource created from a CloudFormation
+   * Resource.
+   */
+  async delete(
+    resourceTypeName: string,
+    resource: SimCfnResource,
+  ): Promise<void> {
+    switch (resourceTypeName) {
+      case "Distribution": {
+        await this.distroDeleter.delete(resource);
+        return;
+      }
+      case "Function": {
+        await this.deleteFunction(resource);
+        return;
+      }
+      default: {
+        throw new Error(
+          `Unsupported sim CloudFront CloudFormation Resource ${resourceTypeName} deletion`,
+        );
+      }
+    }
+  }
+
+  private async deleteFunction(resource: SimCfnResource): Promise<void> {
+    const cloudFrontFunction = resource.simResource as
+      SimCloudFrontFunction | undefined;
+    assertDefined(
+      cloudFrontFunction,
+      `sim CloudFront Function for CloudFormation Resource ${resource.logicalId}`,
+    );
+
+    await this.cloudFront.deleteFunction({
+      input: { Name: cloudFrontFunction.name },
+    });
   }
 }
