@@ -385,6 +385,13 @@ The sim CloudFront supports `viewer-request` and `viewer-response` CloudFront Fu
 
 Use `makeCffFunctionCodeInput` to pass a JavaScript handler function to `CreateFunctionCommand`.
 
+The `host` header a function sees is the hostname the request was made to CloudFront with: the
+Distribution domain name, or one of its alternate domain names. Requests served on localhost arrive
+with a Yulin-local host such as `distro123.cloudfront.net.sim-aws.localhost:52341`, and the local
+suffix and port are dropped before the function runs, so a function building a URL from
+`event.request.headers.host.value` behaves as it would on AWS. As on AWS, `host` is read-only: a
+host a function writes is discarded rather than sent on to the Origin.
+
 ```typescript sim-cloudfront-function
 /**
  * Simulated CloudFront Functions.

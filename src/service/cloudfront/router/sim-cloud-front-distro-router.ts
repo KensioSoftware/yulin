@@ -2,8 +2,7 @@ import type {
   SimCloudFrontDistribution,
   SimCloudFrontDistributionId,
 } from "../distribution/sim-cloudfront-distribution.js";
-import { assertNotNull } from "../../../util/type-guard/defined.js";
-import { SimAwsLocalUrl } from "../../../serve/http/url/sim-aws-local-url.js";
+import { simAwsRequestHostname } from "../../../serve/http/url/sim-aws-request-hostname.js";
 import type { SimCloudFront } from "../sim-cloudfront.js";
 import type { SimCloudFrontRegistry } from "../registry/sim-cloud-front-registry.js";
 import { SimAws } from "../../aws/sim-aws.js";
@@ -80,11 +79,7 @@ export class SimCloudFrontDistroRouter {
    * are handled identically.
    */
   routeForRequest(request: Request): SimCloudFrontDistroRoute | undefined {
-    const url = new URL(request.url);
-    const hostname = request.headers.get("host") ?? url.hostname;
-    assertNotNull(hostname, "distroForRequest.req.headers.host");
-    const simUrl = new SimAwsLocalUrl({ input: `http://${hostname}/` });
-    const baseHostname = simUrl.withoutLocalhostSuffix().hostname;
+    const baseHostname = simAwsRequestHostname(request);
 
     const distributionId = extractCloudFrontHostDistroId(baseHostname);
     if (distributionId !== undefined) {
