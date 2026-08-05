@@ -133,10 +133,19 @@ export class SimCfnStack {
   }
 
   /**
-   * The error captured by whichever Stack operation ran last, if it failed.
+   * The error captured by the Stack operation the status is reporting, if it
+   * failed.
+   *
+   * A deployment failure is not the reason a deletion is in progress, so once
+   * deletion has started the error comes from the deletion alone, the same way
+   * the status does.
    */
   public get error(): Error | undefined {
-    return this.deletion.error ?? this.lifecycle.error;
+    if (this.deletion.status === undefined) {
+      return this.lifecycle.error;
+    }
+
+    return this.deletion.error;
   }
 
   /**

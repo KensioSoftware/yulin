@@ -147,6 +147,45 @@ describe("CloudFormation DeleteStackCommand failures", () => {
     );
   });
 
+  it("does not report a deployment failure as the delete reason", async () => {
+    // Given a Stack left in CREATE_FAILED by a Bucket name S3 refused.
+    const simAws = new SimAws();
+    const cloudFormation = simAws.cloudFormation();
+
+    await cloudFormation.createStack(
+      new CreateStackCommand({
+        StackName: "invalid-stack",
+        TemplateBody: jsonStringify({
+          Resources: {
+            InvalidBucket: {
+              Type: "AWS::S3::Bucket",
+              Properties: { BucketName: "Invalid_Bucket_Name" },
+            },
+          },
+        }),
+      }),
+    );
+    await assertThrowsErrorAsync(async () =>
+      cloudFormation.waitForStackDeployComplete("invalid-stack"),
+    );
+
+    // When the Stack is deleted.
+    await cloudFormation.deleteStack(
+      new DeleteStackCommand({ StackName: "invalid-stack" }),
+    );
+
+    // Then the reason reported beside the delete status is the deletion's own,
+    // rather than the deployment failure the Stack was left with.
+    const describeOutput = await cloudFormation.describeStacks(
+      new DescribeStacksCommand({ StackName: "invalid-stack" }),
+    );
+    const [describedStack] = describeOutput.Stacks ?? [];
+
+    assertNonNullable(describedStack);
+    assertIdentical(describedStack.StackStatus, "DELETE_IN_PROGRESS");
+    assertUndefined(describedStack.StackStatusReason);
+  });
+
   it("requires a StackName", async () => {
     // Given a DeleteStackCommand input without the required StackName.
     const simAws = new SimAws();
