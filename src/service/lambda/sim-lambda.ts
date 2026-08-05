@@ -67,6 +67,16 @@ export class SimLambda {
   }
 
   /**
+   * Handle a Delete Function Command from the SDK.
+   */
+  async deleteFunction(
+    command: simLambdaCommands.SimDeleteFunctionCommand,
+    options?: SimLambdaRequestOptions,
+  ): Promise<simLambdaCommands.SimDeleteFunctionCommandOutput> {
+    return await this.commands.functions.delete(command, options);
+  }
+
+  /**
    * Handle an Invoke Command from the SDK.
    */
   async invoke(

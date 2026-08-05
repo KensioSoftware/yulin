@@ -12,6 +12,7 @@ import type {
   SimListEventSourceMappingsCommand,
 } from "../command/event-source-mapping/event-source-mapping.command.js";
 import type { SimCreateFunctionUrlConfigCommand } from "../command/create-function-url-config/create-function-url-config.command.js";
+import type { SimDeleteFunctionCommand } from "../command/delete-function/delete-function.command.js";
 import type { SimDeleteFunctionUrlConfigCommand } from "../command/delete-function-url-config/delete-function-url-config.command.js";
 import type { SimGetFunctionCommand } from "../command/get-function/get-function.command.js";
 import type { SimGetFunctionUrlConfigCommand } from "../command/get-function-url-config/get-function-url-config.command.js";
@@ -75,6 +76,14 @@ export class SimLambdaSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simLambda.updateFunctionUrlConfig(
             command as SimUpdateFunctionUrlConfigCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteFunctionCommand",
+        async (command, context): Promise<unknown> =>
+          await simLambda.deleteFunction(
+            command as SimDeleteFunctionCommand,
             simSdkCallerOptions(context),
           ),
       ],

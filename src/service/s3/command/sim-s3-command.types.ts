@@ -10,6 +10,10 @@ export type {
   SimCreateBucketCommandOutput,
 } from "./create-bucket/create-bucket.command.js";
 export type {
+  SimDeleteBucketCommand,
+  SimDeleteBucketCommandOutput,
+} from "./delete-bucket/delete-bucket.command.js";
+export type {
   SimDeleteBucketPolicyCommand,
   SimDeleteBucketPolicyCommandOutput,
 } from "./delete-bucket-policy/delete-bucket-policy.command.js";

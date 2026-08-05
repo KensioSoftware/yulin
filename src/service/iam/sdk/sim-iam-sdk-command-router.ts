@@ -4,6 +4,10 @@ import {
   type SimSdkCommandRouter,
 } from "../../../sdk/index.js";
 import type { SimCreatePolicyCommand } from "../command/policy/create-policy/create-policy.command.js";
+import type { SimDeletePolicyCommand } from "../command/policy/delete-policy/delete-policy.command.js";
+import type { SimDeleteRolePolicyCommand } from "../command/policy/delete-role-policy/delete-role-policy.command.js";
+import type { SimDeleteRoleCommand } from "../command/role/delete-role/delete-role.command.js";
+import type { SimDetachRolePolicyCommand } from "../command/role/detach-role-policy/detach-role-policy.command.js";
 import type { SimGetPolicyCommand } from "../command/policy/get-policy/get-policy.command.js";
 import type { SimListPoliciesCommand } from "../command/policy/list-policies/list-policies.command.js";
 import type { SimPutRolePolicyCommand } from "../command/policy/put-role-policy/put-role-policy.command.js";
@@ -29,6 +33,38 @@ export class SimIamSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simIam.attachRolePolicy(
             command as SimAttachRolePolicyCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DetachRolePolicyCommand",
+        async (command, context): Promise<unknown> =>
+          await simIam.detachRolePolicy(
+            command as SimDetachRolePolicyCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteRoleCommand",
+        async (command, context): Promise<unknown> =>
+          await simIam.deleteRole(
+            command as SimDeleteRoleCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteRolePolicyCommand",
+        async (command, context): Promise<unknown> =>
+          await simIam.deleteRolePolicy(
+            command as SimDeleteRolePolicyCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeletePolicyCommand",
+        async (command, context): Promise<unknown> =>
+          await simIam.deletePolicy(
+            command as SimDeletePolicyCommand,
             simSdkCallerOptions(context),
           ),
       ],

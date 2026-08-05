@@ -104,6 +104,18 @@ export class SimLambdaFunctionUrlStore {
   }
 
   /**
+   * Delete a function's Function URL when it has one.
+   *
+   * Deleting a function takes its URL with it, and a function without one is
+   * not an error there the way a DeleteFunctionUrlConfig request is.
+   */
+  deleteIfPresent(simFunction: SimLambdaFunction): void {
+    if (this.get(simFunction.name) !== undefined) {
+      this.delete(simFunction);
+    }
+  }
+
+  /**
    * Delete a function's Function URL, so its hostname stops resolving.
    */
   delete(simFunction: SimLambdaFunction): void {

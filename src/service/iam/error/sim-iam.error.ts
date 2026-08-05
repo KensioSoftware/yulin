@@ -84,6 +84,21 @@ export class SimIamEntityAlreadyExists extends SimIamError {
 }
 
 /**
+ * Simulated IAM DeleteConflict error.
+ *
+ * Real IAM refuses to delete an entity something still depends on, which is
+ * how a Role with policies on it and a managed policy that is still attached
+ * are both refused. The caller detaches first and deletes after.
+ */
+export class SimIamDeleteConflict extends SimIamError {
+  public override readonly name = "DeleteConflict";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 409 });
+  }
+}
+
+/**
  * Simulated IAM InvalidMarker error.
  */
 export class SimIamInvalidMarkerException extends SimIamError {

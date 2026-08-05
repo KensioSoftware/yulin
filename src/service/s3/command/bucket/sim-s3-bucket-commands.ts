@@ -1,6 +1,7 @@
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimS3GlobalRegistry } from "../../sim-s3-global-registry.js";
 import { CreateBucketCommandHandler } from "../create-bucket/create-bucket.handler.js";
+import { DeleteBucketCommandHandler } from "../delete-bucket/delete-bucket.handler.js";
 import { ListBucketsCommandHandler } from "../list-buckets/list-buckets.handler.js";
 import { PutBucketWebsiteCommandHandler } from "../put-bucket-website/put-bucket-website.handler.js";
 import type { SimS3BucketCommandState } from "../sim-s3-bucket-command-state.js";
@@ -34,6 +35,19 @@ export class SimS3BucketCommands {
     options?: SimS3RequestOptions,
   ): Promise<simS3Commands.SimCreateBucketCommandOutput> {
     return await new CreateBucketCommandHandler(this.properties).handle(
+      command,
+      options,
+    );
+  }
+
+  /**
+   * Delete a Bucket from this scope and release its name globally.
+   */
+  async delete(
+    command: simS3Commands.SimDeleteBucketCommand,
+    options?: SimS3RequestOptions,
+  ): Promise<simS3Commands.SimDeleteBucketCommandOutput> {
+    return await new DeleteBucketCommandHandler(this.properties).handle(
       command,
       options,
     );

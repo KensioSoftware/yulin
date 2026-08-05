@@ -7,11 +7,17 @@ import type { SimLambdaCodeStore } from "../../function/code/store/sim-lambda-co
 import type { SimLambdaVmSdkModuleProvider } from "../../function/code/vm/sdk/sim-lambda-vm-sdk-module-provider.js";
 import type { SimLambdaEnvironmentConflicts } from "../../function/environment/sim-lambda-environment-conflicts.js";
 import type { SimLambdaFunctionMap } from "../../function/sim-lambda-function.js";
+import type { SimLambdaFunctionUrlStore } from "../../function/url/sim-lambda-function-url-store.js";
 import { CreateFunctionCommandHandler } from "../create-function/create-function.handler.js";
 import type {
   SimCreateFunctionCommand,
   SimCreateFunctionCommandOutput,
 } from "../create-function/create-function.command.js";
+import { DeleteFunctionCommandHandler } from "../delete-function/delete-function.handler.js";
+import type {
+  SimDeleteFunctionCommand,
+  SimDeleteFunctionCommandOutput,
+} from "../delete-function/delete-function.command.js";
 import { GetFunctionCommandHandler } from "../get-function/get-function.handler.js";
 import type {
   SimGetFunctionCommand,
@@ -29,6 +35,7 @@ interface SimLambdaFunctionCommandsProperties {
   readonly iam: SimIamInterServiceAuthZ;
   readonly background: BackgroundScheduler;
   readonly runAsOwner: SimAwsRunAsOwner;
+  readonly functionUrls: SimLambdaFunctionUrlStore;
   readonly environmentConflicts: SimLambdaEnvironmentConflicts;
   readonly codeStore?: SimLambdaCodeStore | undefined;
   readonly vmSdkModuleProvider?: SimLambdaVmSdkModuleProvider | undefined;
@@ -73,6 +80,19 @@ export class SimLambdaFunctionCommands {
     options?: SimLambdaFunctionCommandOptions,
   ): Promise<SimGetFunctionCommandOutput> {
     return await new GetFunctionCommandHandler(this.properties).handle(
+      command,
+      options,
+    );
+  }
+
+  /**
+   * Delete a function, and the Function URL that belongs to it.
+   */
+  async delete(
+    command: SimDeleteFunctionCommand,
+    options?: SimLambdaFunctionCommandOptions,
+  ): Promise<SimDeleteFunctionCommandOutput> {
+    return await new DeleteFunctionCommandHandler(this.properties).handle(
       command,
       options,
     );

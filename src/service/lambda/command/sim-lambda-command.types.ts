@@ -34,6 +34,10 @@ export type {
   SimCreateFunctionUrlConfigCommandOutput,
 } from "./create-function-url-config/create-function-url-config.command.js";
 export type {
+  SimDeleteFunctionCommand,
+  SimDeleteFunctionCommandOutput,
+} from "./delete-function/delete-function.command.js";
+export type {
   SimDeleteFunctionUrlConfigCommand,
   SimDeleteFunctionUrlConfigCommandOutput,
 } from "./delete-function-url-config/delete-function-url-config.command.js";

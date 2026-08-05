@@ -1,5 +1,6 @@
 import {
   CreateFunctionCommand,
+  DeleteFunctionCommand,
   GetFunctionCommand,
   InvokeCommand,
   LambdaClient,
@@ -62,6 +63,15 @@ describe("simulated Lambda SDK Command routing", () => {
       .lambda()
       .getFunction(new GetFunctionCommand({ FunctionName: "intercepted" }));
     assertIdentical(directGetOutput.Configuration.FunctionName, "intercepted");
+
+    // And deleting it through the client takes it out of that scope.
+    await client.send(
+      new DeleteFunctionCommand({ FunctionName: "intercepted" }),
+    );
+    const deletedError = await assertThrowsErrorAsync(async () =>
+      client.send(new GetFunctionCommand({ FunctionName: "intercepted" })),
+    );
+    assertStringIncludes(deletedError.message, "Function not found");
   });
 
   it("attributes handler execution to the function's execution Role", async () => {
