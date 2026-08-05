@@ -8,6 +8,7 @@
  */
 
 import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { assertResponseStatus } from "@kensio/smartass";
 
 import type { SimAws } from "../../src/service/aws/sim-aws.js";
 import { SimAwsHttp } from "../../src/serve/http/sim-aws-http.js";
@@ -77,6 +78,10 @@ export class MediaPipelineClient {
   async requestUpload(): Promise<RequestedUpload> {
     const response = await this.request({ method: "POST", path: "/uploads" });
 
+    // Checked here so a step that failed says so, rather than leaving the
+    // caller to assert on a body that is an error document.
+    assertResponseStatus(response, 202);
+
     return (await response.json()) as RequestedUpload;
   }
 
@@ -104,6 +109,8 @@ export class MediaPipelineClient {
       method: "GET",
       path: `/uploads/${uploadId}`,
     });
+
+    assertResponseStatus(response, 200);
 
     return (await response.json()) as ReportedUpload;
   }

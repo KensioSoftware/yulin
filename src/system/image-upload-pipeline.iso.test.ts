@@ -15,6 +15,7 @@ import {
   mediaBucketName,
   publishedKey,
   renditionKey,
+  renditionsPrefix,
   renditionWidths,
   screenedPrefix,
 } from "../../test/media-pipeline/media-pipeline-names.js";
@@ -22,6 +23,8 @@ import { mediaPipelineFactory } from "../../test/media-pipeline/media-pipeline.f
 import { SimAws } from "../service/aws/sim-aws.js";
 import { simS3BodyToBuffer } from "../service/s3/storage/s3-body-buffer.js";
 import { simRekognitionSampleImages } from "../service/rekognition/index.js";
+
+const widestWidth = Math.max(...renditionWidths);
 
 /**
  * The user id is the pool subject the API took out of the token, which the
@@ -100,7 +103,7 @@ describe("An image upload pipeline spanning several simulated AWS services", () 
     assertBufferEqual(Buffer.from(await delivered.arrayBuffer()), image);
 
     // When the user publishes the widest rendition
-    const published = await client.publish(requested.uploadId, 640);
+    const published = await client.publish(requested.uploadId, widestWidth);
 
     assertResponseStatus(published, 200);
 
@@ -142,7 +145,7 @@ describe("An image upload pipeline spanning several simulated AWS services", () 
     assertArrayLength(await keysUnder(simAws, screenedPrefix), 0);
 
     // And there is nothing to publish
-    const refused = await client.publish(requested.uploadId, 640);
+    const refused = await client.publish(requested.uploadId, widestWidth);
 
     assertResponseStatus(refused, 409);
     assertArrayLength(await keysUnder(simAws, publishedKey(userId)), 0);
@@ -190,8 +193,9 @@ describe("An image upload pipeline spanning several simulated AWS services", () 
       upload.renditions.map((rendition) => rendition.width),
       [128],
     );
-    assertArrayEquals(await keysUnder(simAws, `renditions/${userId}/`), [
-      renditionKey(userId, requested.uploadId, 128),
-    ]);
+    assertArrayEquals(
+      await keysUnder(simAws, `${renditionsPrefix}${userId}/`),
+      [renditionKey(userId, requested.uploadId, 128)],
+    );
   });
 });

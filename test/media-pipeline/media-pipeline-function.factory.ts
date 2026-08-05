@@ -60,6 +60,10 @@ export const mediaPipelineFunctionFactory = new AsyncMappedFactory<
       }),
     );
 
+    // Creation schedules activation, and a caller asking for a function is
+    // asking for one it can invoke.
+    await simAws.backgroundTasksComplete();
+
     const created = simLambda.getSimFunctionByName(input.functionName);
     assertNonNullable(created, `Simulated Lambda holds ${input.functionName}`);
 

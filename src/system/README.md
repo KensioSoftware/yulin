@@ -25,7 +25,7 @@ package, and these use them.
 takes an image from a signed-in user, checks it, and builds a set of renditions from it. The system
 is built by [test/media-pipeline](../../test/media-pipeline).
 
-One upload passes through eight simulated services:
+One upload passes through nine simulated services:
 
 1. The user signs in to a **Cognito** user pool and calls `POST /uploads` on an **API Gateway** HTTP
    API, which only accepts requests carrying a token from that pool.

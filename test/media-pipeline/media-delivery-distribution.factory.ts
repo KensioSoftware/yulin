@@ -3,6 +3,7 @@ import { AsyncMappedFactory } from "@kensio/part-factory";
 import { assertNonNullable } from "@kensio/smartass";
 
 import type { SimAws } from "../../src/service/aws/sim-aws.js";
+import { mediaBucketName } from "./media-pipeline-names.js";
 
 /**
  * What the pipeline asks for when it wants somewhere to serve renditions from.
@@ -32,7 +33,7 @@ export const mediaDeliveryDistributionFactory = new AsyncMappedFactory<
   SimAws
 >(
   () => ({
-    originBucketName: "image-uploads",
+    originBucketName: mediaBucketName,
     originId: "images-origin",
     callerReference: "image-delivery",
     comment: "Image delivery",

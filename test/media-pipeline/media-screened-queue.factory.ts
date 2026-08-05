@@ -7,6 +7,7 @@ import {
 
 import type { SimAws } from "../../src/service/aws/sim-aws.js";
 import { simIamPolicyDocumentFactory } from "../../src/service/iam/policy/sim-iam-policy-document.factory.js";
+import { mediaBucketName, mediaQueueName } from "./media-pipeline-names.js";
 import type { SimSqsQueue } from "../../src/service/sqs/queue/sim-sqs-queue.js";
 
 /**
@@ -35,7 +36,10 @@ export const mediaScreenedQueueFactory = new AsyncMappedFactory<
   SimSqsQueue,
   SimAws
 >(
-  () => ({ queueName: "screened-images", sourceBucketName: "image-uploads" }),
+  () => ({
+    queueName: mediaQueueName,
+    sourceBucketName: mediaBucketName,
+  }),
   async (input, simAws) => {
     const simSqs = simAws.sqs();
 

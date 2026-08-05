@@ -5,6 +5,12 @@ import { assertNonNullable } from "@kensio/smartass";
 
 import type { SimAws } from "../../src/service/aws/sim-aws.js";
 import type { SimS3Bucket } from "../../src/service/s3/bucket/sim-s3-bucket.js";
+import {
+  incomingPrefix,
+  mediaBucketName,
+  screenedPrefix,
+  screenUploadFunctionName,
+} from "./media-pipeline-names.js";
 
 /**
  * What the pipeline asks for when it wants its Bucket to set the rest of it
@@ -48,10 +54,10 @@ export const mediaUploadNotificationsFactory = new AsyncMappedFactory<
   SimAws
 >(
   () => ({
-    bucketName: "image-uploads",
-    incomingPrefix: "incoming/",
-    screenedPrefix: "screened/",
-    screeningFunctionName: "screen-upload",
+    bucketName: mediaBucketName,
+    incomingPrefix,
+    screenedPrefix,
+    screeningFunctionName: screenUploadFunctionName,
     screeningFunctionArn: "",
     screenedQueueArn: "",
   }),

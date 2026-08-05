@@ -9,7 +9,6 @@ import { simCognitoSignedInFactory } from "../../src/service/cognito/user-pool/a
 import { mediaDeliveryDistributionFactory } from "./media-delivery-distribution.factory.js";
 import { MediaPipelineClient } from "./media-pipeline-client.js";
 import {
-  buildRenditionsFunctionName,
   mediaApiName,
   mediaAppClientName,
   mediaBucketName,
@@ -135,7 +134,7 @@ export const mediaPipelineFactory = new AsyncMappedFactory<
     await simAws.lambda().createEventSourceMapping(
       new CreateEventSourceMappingCommand({
         EventSourceArn: queue.arn.value,
-        FunctionName: buildRenditionsFunctionName,
+        FunctionName: steps.buildRenditions.name,
       }),
     );
 

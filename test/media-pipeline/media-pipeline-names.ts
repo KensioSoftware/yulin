@@ -56,6 +56,11 @@ export const incomingPrefix = "incoming/";
 export const screenedPrefix = "screened/";
 
 /**
+ * Renditions are written under this prefix, which nothing is notified for.
+ */
+export const renditionsPrefix = "renditions/";
+
+/**
  * Where an upload sits while it is waiting to be screened.
  */
 export function incomingKey(userId: string, uploadId: string): string {
@@ -74,7 +79,7 @@ export function screenedKey(userId: string, uploadId: string): string {
  * The prefix holding every rendition built from one upload.
  */
 export function renditionPrefix(userId: string, uploadId: string): string {
-  return `renditions/${userId}/${uploadId}/`;
+  return `${renditionsPrefix}${userId}/${uploadId}/`;
 }
 
 /**
