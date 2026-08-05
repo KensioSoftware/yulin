@@ -31,6 +31,24 @@ const writtenAttributes = simDynamoDbDocumentFields({
 const valueRecords = simDynamoDbDocumentEach(simDynamoDbDocumentValues());
 
 /**
+ * What a read is given: where to carry on from, and the values its expressions
+ * compare against. A Query and a Scan take the same ones.
+ */
+const readInput = simDynamoDbDocumentFields({
+  ExclusiveStartKey: simDynamoDbDocumentValues(),
+  ExpressionAttributeValues: simDynamoDbDocumentValues(),
+});
+
+/**
+ * What a read answers with: the items it found, and where the page after it
+ * carries on from.
+ */
+const readPage = simDynamoDbDocumentFields({
+  Items: valueRecords,
+  LastEvaluatedKey: simDynamoDbDocumentValues(),
+});
+
+/**
  * One put or delete in a batch write.
  */
 const batchWriteRequest = simDynamoDbDocumentFields({
@@ -64,9 +82,10 @@ const batchGetKeys = simDynamoDbDocumentEach(
  *
  * They stop short of the real ones in one place. `Expected`,
  * `ConditionalOperator` and `AttributeUpdates` are the conditional write and
- * the update that expressions replaced, and simulated DynamoDB refuses all
- * three, so a request carrying one never reaches a conversion. Converting input
- * that is about to be refused would only move the refusal.
+ * the update that expressions replaced, and `KeyConditions`, `QueryFilter` and
+ * `ScanFilter` are the read the same expressions replaced. Simulated DynamoDB
+ * refuses all six, so a request carrying one never reaches a conversion.
+ * Converting input that is about to be refused would only move the refusal.
  */
 export const simDynamoDbDocumentCommandPaths = {
   put: {
@@ -93,6 +112,14 @@ export const simDynamoDbDocumentCommandPaths = {
       ExpressionAttributeValues: simDynamoDbDocumentValues(),
     }),
     output: writtenAttributes,
+  },
+  query: {
+    input: readInput,
+    output: readPage,
+  },
+  scan: {
+    input: readInput,
+    output: readPage,
   },
   batchWrite: {
     input: simDynamoDbDocumentFields({ RequestItems: batchWriteRequests }),

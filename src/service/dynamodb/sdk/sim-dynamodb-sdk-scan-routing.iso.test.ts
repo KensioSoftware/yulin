@@ -8,16 +8,9 @@ import {
   DynamoDBDocumentClient,
   ScanCommand as DocumentScanCommand,
 } from "@aws-sdk/lib-dynamodb";
-import {
-  assertArrayLength,
-  assertIdentical,
-  assertInstanceOf,
-  assertStringIncludes,
-  assertThrowsErrorAsync,
-} from "@kensio/smartass";
+import { assertArrayLength, assertIdentical } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimSdk } from "../../../sdk/index.js";
-import { SimDynamoDbUnsupportedOperation } from "../error/dynamodb.error.js";
 
 /**
  * An intercepted client with two items written to a table.
@@ -73,7 +66,7 @@ describe("simulated DynamoDB Scan SDK Command routing", () => {
     assertIdentical(output.ScannedCount, 2);
   });
 
-  it("refuses the document client's Scan, which shares its name", async () => {
+  it("routes the document client's Scan, which shares its name", async () => {
     // Given an intercepted document client. It is the document client that is
     // intercepted, since it has a send of its own.
     using simSdk = new SimSdk();
@@ -82,16 +75,14 @@ describe("simulated DynamoDB Scan SDK Command routing", () => {
     simSdk.intercept(documentClient);
 
     // When a document Scan is sent through it.
-    const error = await assertThrowsErrorAsync(async () =>
-      documentClient.send(
-        new DocumentScanCommand({ TableName: "CollectionTable" }),
-      ),
+    const output = await documentClient.send(
+      new DocumentScanCommand({ TableName: "CollectionTable" }),
     );
 
-    // Then it is refused by name rather than read as though it carried
-    // AttributeValues, since @aws-sdk/lib-dynamodb names its Command the same
-    // as @aws-sdk/client-dynamodb does.
-    assertInstanceOf(error, SimDynamoDbUnsupportedOperation);
-    assertStringIncludes(error.message, "ScanCommand");
+    // Then it reads the same table, answering with native values rather than
+    // AttributeValues, even though @aws-sdk/lib-dynamodb names its Command the
+    // same as @aws-sdk/client-dynamodb does.
+    assertArrayLength(output.Items ?? [], 2);
+    assertIdentical(output.Items?.[0]?.["customerId"], "c-1");
   });
 });
