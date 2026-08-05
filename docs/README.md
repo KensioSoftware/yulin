@@ -25,4 +25,5 @@ behaviour and includes example code that can be copied into tests or local devel
 ## Feature documentation
 
 - [AWS SDK interception](./sdk/ "Simulated AWS SDK usage docs")
+- [Serving on localhost](./serve/ "Serving simulated AWS on localhost usage docs")
 - [Simulated time](./time/ "Simulated time usage docs")

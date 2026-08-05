@@ -6,6 +6,11 @@ export {
   SimAwsLocalServer,
 } from "./http/local-server/sim-aws-local-server.js";
 export { SimAwsLocalPortInUse } from "./http/local-server/sim-aws-local-port.error.js";
+export { SimLiveReload } from "./http/live-reload/sim-live-reload.js";
+export {
+  simLiveReloadConfig,
+  simLiveReloadHeaderName,
+} from "./http/live-reload/sim-live-reload.config.js";
 export {
   type SimAwsServiceController,
   SimAwsServiceRequest,
