@@ -3,7 +3,7 @@ import { SimAws } from "../../../service/aws/sim-aws.js";
 import { simAwsLocalConfig } from "./sim-aws-local.config.js";
 import { SimAwsHttp } from "../sim-aws-http.js";
 import { SimAwsLocalUrl } from "../url/sim-aws-local-url.js";
-import { waitNodeServerListen } from "./wait-node-server-listen.js";
+import { NodeServerPortBinder } from "./node-server-port-binder.js";
 import { SimAwsLocalRequestHandler } from "./sim-aws-local-request-handler.js";
 import { SimAwsDnsServer } from "../../dns/sim-aws-dns-server.js";
 
@@ -18,6 +18,7 @@ interface SimAwsLocalServerProperties {
 export class SimAwsLocalServer {
   private readonly requestHandler: SimAwsLocalRequestHandler;
   private readonly server: Server;
+  private readonly portBinder: NodeServerPortBinder;
   private readonly dnsServer: SimAwsDnsServer;
 
   constructor(properties: SimAwsLocalServerProperties = {}) {
@@ -29,6 +30,7 @@ export class SimAwsLocalServer {
     this.server = http.createServer((request, response) => {
       this.requestHandler.handle(request, response);
     });
+    this.portBinder = new NodeServerPortBinder({ server: this.server });
   }
 
   /**
@@ -44,10 +46,12 @@ export class SimAwsLocalServer {
    * the resolver returns first, which is commonly `::1`. DNS answers with the
    * IPv4 loopback address, so binding it explicitly is what makes the address in
    * a DNS answer one that actually serves HTTP.
+   *
+   * A pinned port that is still held is waited for rather than refused, so a
+   * restart that overlaps the process it replaces still gets its port back.
    */
   async listen(port: number = simAwsLocalConfig.defaultPort): Promise<this> {
-    this.server.listen(port, simAwsLocalConfig.loopbackAddress);
-    await waitNodeServerListen(this.server);
+    await this.portBinder.bind(port);
     await this.dnsServer.listen(Number(this.port));
     return this;
   }
@@ -89,9 +93,18 @@ export class SimAwsLocalServer {
 
   /**
    * Stop serving simulated AWS services.
+   *
+   * Open connections are ended rather than left to finish. Node's own close
+   * stops the server accepting and lets go of the connections that are idle,
+   * but one that is in use, which is what a browser part way through a request
+   * or a live reload stream holds, keeps its socket open and the process with
+   * it. Local development restarts on that process exiting, so the connections
+   * go. Closing the listening socket first means nothing new is accepted while
+   * the open ones are being ended.
    */
   close(): void {
     this.server.close();
+    this.server.closeAllConnections();
     this.dnsServer.close();
   }
 
