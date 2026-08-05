@@ -63,6 +63,123 @@ const distributionCreation = await simCloudFront.createDistribution(
 console.log(distributionCreation.Distribution?.DomainName);
 ```
 
+## Static sites: default root object and error pages
+
+A static site behind CloudFront usually leans on two Distribution settings: `DefaultRootObject`, so
+a request for the site root returns the home page, and `CustomErrorResponses`, so a URL that matches
+no object returns the site's own error page rather than the Origin's. Sim CloudFront applies both,
+so a test can assert what a visitor would actually see.
+
+```typescript sim-cloudfront-static-site
+/**
+ * Serving a static site with a default root object and a custom error page.
+ */
+
+import { CreateDistributionCommand } from "@aws-sdk/client-cloudfront";
+import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const srv = await serveSimAws({ simAws });
+
+try {
+  const simS3 = simAws.s3();
+
+  await simS3.createBucket(new CreateBucketCommand({ Bucket: "site-bucket" }));
+
+  const pages = {
+    "index.html": "<h1>Home</h1>",
+    "404.html": "<h1>Page not found</h1>",
+  };
+
+  for (const [key, body] of Object.entries(pages)) {
+    await simS3.putObject(
+      new PutObjectCommand({
+        Bucket: "site-bucket",
+        Key: key,
+        ContentType: "text/html",
+        Body: body,
+      }),
+    );
+  }
+
+  const distributionCreation = await simAws.cloudFront().createDistribution(
+    new CreateDistributionCommand({
+      DistributionConfig: {
+        CallerReference: "static-site",
+        Comment: "Static site",
+        Enabled: true,
+        DefaultRootObject: "index.html",
+        CustomErrorResponses: {
+          Quantity: 2,
+          Items: [
+            {
+              ErrorCode: 404,
+              ResponsePagePath: "/404.html",
+              ResponseCode: "404",
+            },
+            {
+              ErrorCode: 403,
+              ResponsePagePath: "/404.html",
+              ResponseCode: "404",
+            },
+          ],
+        },
+        Origins: {
+          Quantity: 1,
+          Items: [
+            {
+              Id: "site-origin",
+              DomainName: "site-bucket.s3.amazonaws.com",
+              S3OriginConfig: { OriginAccessIdentity: "" },
+            },
+          ],
+        },
+        DefaultCacheBehavior: {
+          TargetOriginId: "site-origin",
+          ViewerProtocolPolicy: "allow-all",
+        },
+      },
+    }),
+  );
+
+  const distroHostname = distributionCreation.Distribution!.DomainName!;
+
+  const home = await fetch(srv.localUrl(`http://${distroHostname}/`));
+  console.log(await home.text()); // <h1>Home</h1>
+
+  const missing = await fetch(srv.localUrl(`http://${distroHostname}/nowhere`));
+  console.log(missing.status); // 404
+  console.log(await missing.text()); // <h1>Page not found</h1>
+} finally {
+  srv.close();
+}
+```
+
+The default root object stands in for a request to the root of the Distribution and nothing else. A
+request for `/blog/` is passed to the Origin as it arrived, even where that folder holds its own
+`index.html`, which is where CloudFront differs from an S3 website index document. The substituted
+path is what the rest of request handling sees, so a Cache Behavior pattern and a `viewer-request`
+CloudFront Function both act on the object being served rather than on the root. The value names an
+object at the Origin, so it may be a path such as `public/index.html` but must not begin with a
+forward slash: sim CloudFront refuses one that does with `InvalidDefaultRootObject`, rather than
+creating a Distribution that answers its own root with a 403.
+
+A custom error response replaces the Origin's response when its status matches `ErrorCode`, which is
+one of the codes CloudFront supports: 400, 403, 404, 405, 414, 416, 500, 501, 502, 503 and 504. The
+response page is fetched as a request in its own right, so the Cache Behavior matching
+`ResponsePagePath` chooses which Origin it comes from, and error pages can live somewhere other than
+the content that failed. `ResponseCode` is the status the viewer sees, which is how a single-page
+app serves its shell with a 200 for a URL the Bucket has no object for. It is one of the same error
+codes or 200, the set CloudFront allows. Where the response page is itself missing, the viewer gets
+the status from fetching it, as in CloudFront.
+
+Custom error responses are applied before a `viewer-response` CloudFront Function runs, so the
+function sees the response the viewer is about to get. `ErrorCachingMinTTL` is accepted and ignored,
+along with a rule that sets nothing else, because sim CloudFront has no cache to apply it to.
+
 ## Serve simulated CloudFront on localhost
 
 Use `serveSimAws` when you want to make real HTTP requests to the simulated system on localhost.
@@ -385,6 +502,13 @@ The sim CloudFront supports `viewer-request` and `viewer-response` CloudFront Fu
 
 Use `makeCffFunctionCodeInput` to pass a JavaScript handler function to `CreateFunctionCommand`.
 
+The `host` header a function sees is the hostname the request was made to CloudFront with: the
+Distribution domain name, or one of its alternate domain names. Requests served on localhost arrive
+with a Yulin-local host such as `distro123.cloudfront.net.sim-aws.localhost:52341`, and the local
+suffix and port are dropped before the function runs, so a function building a URL from
+`event.request.headers.host.value` behaves as it would on AWS. As on AWS, `host` is read-only: a
+host a function writes is discarded rather than sent on to the Origin.
+
 ```typescript sim-cloudfront-function
 /**
  * Simulated CloudFront Functions.
@@ -563,6 +687,7 @@ Sim CloudFront currently supports:
 - Custom Origins reaching sim HTTP APIs and sim Lambda Function URLs in process
 - CloudFront Distribution hostnames such as `distro123.cloudfront.net`
 - Default cache Behavior and path-based cache Behaviors
+- `DefaultRootObject` and `CustomErrorResponses`, for static sites and single-page apps
 - `viewer-request` and `viewer-response` CloudFront Functions
 - Viewer certificates from sim ACM, including CloudFront's `us-east-1` requirement
 - Serving simulated CloudFront traffic on localhost with `serveSimAws`

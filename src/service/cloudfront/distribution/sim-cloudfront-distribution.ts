@@ -1,6 +1,7 @@
 import type { Brand } from "../../../util/brand.type.js";
 import type { SimCloudFrontOrigin } from "../origin/sim-cloudfront-origin.js";
 import type { SimCloudFrontBehavior } from "../behaviour/sim-cloud-front-behavior.js";
+import type { SimCloudFrontCustomErrorResponse } from "../custom-error/sim-cloudfront-custom-error-response.js";
 import { faker } from "@faker-js/faker";
 import {
   makeSimAwsAccountId,
@@ -37,9 +38,11 @@ export class SimCloudFrontDistribution {
   public readonly distributionConfig:
     SimCloudFrontDistributionConfig | undefined;
   public readonly behaviors: SimCloudFrontBehavior[] = [];
+  public readonly customErrorResponses: SimCloudFrontCustomErrorResponse[] = [];
   public readonly lastModifiedTime: Date;
 
   #status: SimCloudFrontDistributionStatus;
+  #defaultRootObject: string | undefined;
   private readonly alternateDomainNames = new Set<string>();
 
   private readonly origins = new Map<string, SimCloudFrontOrigin>();
@@ -65,6 +68,20 @@ export class SimCloudFrontDistribution {
    */
   get status(): SimCloudFrontDistributionStatus {
     return this.#status;
+  }
+
+  /**
+   * Get the object this sim Distribution serves for a request to its root.
+   */
+  get defaultRootObject(): string | undefined {
+    return this.#defaultRootObject;
+  }
+
+  /**
+   * Set the object this sim Distribution serves for a request to its root.
+   */
+  set defaultRootObject(defaultRootObject: string | undefined) {
+    this.#defaultRootObject = defaultRootObject;
   }
 
   /**
@@ -101,6 +118,15 @@ export class SimCloudFrontDistribution {
    */
   addBehavior(behavior: SimCloudFrontBehavior): void {
     this.behaviors.push(behavior);
+  }
+
+  /**
+   * Add a custom error response to this sim Distribution.
+   */
+  addCustomErrorResponse(
+    customErrorResponse: SimCloudFrontCustomErrorResponse,
+  ): void {
+    this.customErrorResponses.push(customErrorResponse);
   }
 
   /**

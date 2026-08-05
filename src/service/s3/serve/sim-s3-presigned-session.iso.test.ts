@@ -10,12 +10,11 @@ import { assertIdentical, assertNonNullable } from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
-import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
 import type { AwsRegionName } from "../../aws/sim-aws-region.js";
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
-const accountId = "111111111111" as SimAwsAccountId;
+const accountId = "111111111111";
 const regionName = "eu-west-2" as AwsRegionName;
 const roleArn = `arn:aws:iam::${accountId}:role/ReportPublisher`;
 

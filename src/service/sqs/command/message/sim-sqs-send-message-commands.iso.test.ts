@@ -10,7 +10,6 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
-import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import {
   SimSqsInvalidMessageContents,
   SimSqsInvalidParameterValue,
@@ -215,7 +214,7 @@ describe("SQS SendMessage", () => {
   it("reaches no queue through a URL naming another Region", async () => {
     // Given a queue in one Region.
     const simAws = new SimAws({
-      defaultAccountId: "111111111111" as SimAwsAccountId,
+      defaultAccountId: "111111111111",
       defaultRegionName: "eu-west-2",
     });
     await simAws

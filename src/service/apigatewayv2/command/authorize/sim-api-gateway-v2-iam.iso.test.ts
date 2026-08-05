@@ -9,13 +9,12 @@ import { assertIdentical } from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
-import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { simIamPolicyDocumentFactory } from "../../../iam/policy/sim-iam-policy-document.factory.js";
 import { simHttpApiOpenApiDocumentFactory } from "../../openapi/sim-http-api-openapi-document.factory.js";
 import { simHttpApiOpenApiIntegrationFactory } from "../../openapi/sim-http-api-openapi-integration.factory.js";
 
-const accountId = "111111111111" as SimAwsAccountId;
+const accountId = "111111111111";
 const regionName = "eu-west-2";
 
 /**

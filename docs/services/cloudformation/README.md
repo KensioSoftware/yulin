@@ -788,6 +788,55 @@ await stack.waitForDeployComplete();
 This is useful for local integration tests where you want CDK to produce the template, then Yulin to
 create the simulated resources from that synthesized output template.
 
+## Editing a synthesized template before deploying it
+
+Sometimes a synthesized template needs a change before Yulin will deploy it, such as dropping a
+resource or property that this simulator does not accept. Read the file, edit the parsed object,
+then deploy it with `deployTemplate(...)`, naming the file it came from:
+
+```typescript sim-cloudformation-cdk-edited-template
+/**
+ * Deploying a synthesized CDK template edited in memory.
+ */
+
+import { readFile } from "node:fs/promises";
+import path from "node:path";
+
+import { SimAws } from "@kensio/yulin";
+
+const templatePath = path.join(
+  process.cwd(),
+  "cdk.out",
+  "TestStack.template.json",
+);
+
+const synthesized = JSON.parse(await readFile(templatePath, "utf8")) as {
+  Resources: Record<string, { Type: string }>;
+};
+
+const resources = Object.fromEntries(
+  Object.entries(synthesized.Resources).filter(
+    ([logicalId]) => logicalId !== "AnalyticsQueue",
+  ),
+);
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "local-cdk-stack",
+  template: { ...synthesized, Resources: resources },
+  templatePath,
+});
+
+await stack.waitForDeployComplete();
+```
+
+The template file is not read as the template: the `template` object is what gets deployed.
+`templatePath` only tells Yulin which cloud assembly the template came from, so it can find the
+sibling `TestStack.assets.json` manifest and the staged asset directories beside it. Without it,
+anything that needs a CDK asset, such as a `Custom::CDKBucketDeployment` or a Lambda function
+bundled with `Code.fromAsset`, fails with `No CDK assets manifest is available.`
+
 ## CDK S3 BucketDeployment
 
 Yulin can simulate selected CDK custom resources. A common use case is CDK S3 BucketDeployment,
@@ -1345,7 +1394,8 @@ Sim CloudFormation currently supports:
 
 - `CreateStackCommand` and `DescribeStacksCommand`
 - Waiting for simulated stack deployment completion
-- `deployTemplate(...)` for parsed template objects
+- `deployTemplate(...)` for parsed template objects, optionally naming the synthesized template file
+  a template edited in memory came from
 - `deployTemplateFile(...)` for synthesized JSON template files
 - Template `Parameters` with supplied values and defaults
 - Template `Outputs`, resolved after resource creation and read from `stack.outputs`

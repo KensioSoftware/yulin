@@ -5,7 +5,10 @@ import type {
 import type { CfnTemplateBodyRecord } from "../template/sim-cfn-template.js";
 import { jsonStringify } from "../../../util/type-guard/json.js";
 import { assertDefined } from "../../../util/type-guard/defined.js";
-import type { SimCdkOutContext } from "../cdk/sim-cdk-out-context.js";
+import {
+  loadSiblingCdkAssetsManifest,
+  type SimCdkOutContext,
+} from "../cdk/sim-cdk-out-context.js";
 import {
   SimCfnTemplateFileLoader,
   type SimCloudFormationDeployTemplateFileProperties as SimCloudFormationDeployTemplateFileProperties,
@@ -26,6 +29,16 @@ export interface SimCloudFormationCreateStackProperties {
   readonly template: CfnTemplateBodyRecord;
   readonly parameters?: Record<string, string> | undefined;
   readonly bindings?: readonly SimCfnExecutableResourceBinding[] | undefined;
+
+  /**
+   * The synthesized CDK template file this in-memory template stands in for.
+   *
+   * The file itself is not read as the template: the given `template` object is
+   * what gets deployed. Only the file's directory and its sibling CDK assets
+   * manifest are loaded, so a template edited in memory can still resolve
+   * staged assets from the cloud assembly it came from.
+   */
+  readonly templatePath?: string | undefined;
 }
 
 export type { SimCloudFormationDeployTemplateFileProperties } from "./sim-cfn-template-file-loader.js";
@@ -73,6 +86,9 @@ export class SimCloudFormationTemplateDeployer {
       template: properties.template,
       parameters: properties.parameters,
       bindings: properties.bindings,
+      cdkOutContext: await cdkOutContextForTemplatePath(
+        properties.templatePath,
+      ),
     });
   }
 
@@ -150,6 +166,20 @@ export class SimCloudFormationTemplateDeployer {
 
     return await handler.handle(command);
   }
+}
+
+/**
+ * Load the CDK cloud assembly context a template deployed from memory points
+ * at, if it points at one at all.
+ */
+async function cdkOutContextForTemplatePath(
+  templatePath: string | undefined,
+): Promise<SimCdkOutContext | undefined> {
+  if (templatePath === undefined) {
+    return undefined;
+  }
+
+  return await loadSiblingCdkAssetsManifest(templatePath);
 }
 
 /**

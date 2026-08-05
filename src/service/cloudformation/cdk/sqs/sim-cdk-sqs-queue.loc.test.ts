@@ -19,12 +19,11 @@ import { describe, it } from "vitest";
  * one CDK actually produced rather than one written by hand.
  */
 import { SimAws } from "../../../aws/sim-aws.js";
-import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import { SimSqsQueueUrl } from "../../../sqs/queue/sim-sqs-queue-url.js";
 import { TestCdkProject } from "../../../../util/filesystem/test-cdk-project.js";
 
 const emptyBytes = new Uint8Array();
-const accountIdOneOnes = "111111111111" as SimAwsAccountId;
+const accountIdOneOnes = "111111111111";
 
 /**
  * A handler sending to the queue whose URL CDK put in its environment.

@@ -6,10 +6,9 @@ import {
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../../../aws/sim-aws.js";
-import type { SimAwsAccountId } from "../../../../aws/sim-aws-account.js";
 import type { CfnTemplateBodyRecord } from "../../../template/sim-cfn-template.js";
 
-const accountIdOneOnes = "111111111111" as SimAwsAccountId;
+const accountIdOneOnes = "111111111111";
 
 /**
  * A template referencing its table by one attribute, so a test only has to say
