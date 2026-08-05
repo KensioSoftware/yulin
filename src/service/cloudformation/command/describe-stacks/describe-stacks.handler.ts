@@ -12,6 +12,7 @@ import type {
   SimDescribeStacksCommandOutput,
 } from "./describe-stacks.command.js";
 import { SimCfnStackDescriber } from "./sim-cfn-stack-describer.js";
+import { SimCfnDescribedStacks } from "./sim-cfn-described-stacks.js";
 
 interface DescribeStacksCommandHandlerProperties {
   readonly stacks: Map<SimCloudFormationStackName, SimCfnStack>;
@@ -56,20 +57,10 @@ export class DescribeStacksCommandHandler implements CommandHandler<
     const stackName = command.input.StackName as
       SimCloudFormationStackName | undefined;
 
-    if (stackName !== undefined) {
-      const stack = this.stacks.get(stackName);
-
-      return {
-        Stacks: stack === undefined ? [] : [this.describer.describe(stack)],
-        $metadata: {},
-      };
-    }
-
     return {
-      Stacks: this.stacks
-        .values()
-        .map((stack) => this.describer.describe(stack))
-        .toArray(),
+      Stacks: new SimCfnDescribedStacks(this.stacks)
+        .matching(stackName)
+        .map((stack) => this.describer.describe(stack)),
       $metadata: {},
     };
   }

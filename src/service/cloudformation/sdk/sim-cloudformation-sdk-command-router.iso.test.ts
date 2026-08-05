@@ -4,6 +4,7 @@ import {
   CreateStackCommand,
   DeleteStackCommand,
   DescribeStacksCommand,
+  ListStacksCommand,
 } from "@aws-sdk/client-cloudformation";
 import {
   assertIdentical,
@@ -84,16 +85,54 @@ describe("simulated CloudFormation SDK Command routing", () => {
     );
   });
 
+  it("deletes a Stack and its resources through an intercepted client", async () => {
+    using simSdk = new SimSdk();
+    const client = new CloudFormationClient({ region: "eu-west-2" });
+    simSdk.intercept(client);
+
+    await client.send(
+      new CreateStackCommand({
+        StackName: "disposable-stack",
+        TemplateBody: JSON.stringify({
+          Resources: {
+            FooBucket: {
+              Type: "AWS::S3::Bucket",
+              Properties: { BucketName: "cfn-disposable-bucket" },
+            },
+          },
+        }),
+      }),
+    );
+
+    const cloudFormation = simSdk.simAws.region("eu-west-2").cloudFormation();
+    await cloudFormation.waitForStackDeployComplete("disposable-stack");
+
+    // When the Stack is deleted through the same intercepted client.
+    await client.send(
+      new DeleteStackCommand({ StackName: "disposable-stack" }),
+    );
+    await cloudFormation.waitForStackDeleteComplete("disposable-stack");
+
+    // Then the Bucket has gone from simulated S3, and the Stack name with it.
+    assertUndefined(
+      simSdk.simAws
+        .region("eu-west-2")
+        .s3()
+        .getSimBucketByName("cfn-disposable-bucket"),
+    );
+    assertUndefined(cloudFormation.getStackByName("disposable-stack"));
+  });
+
   it("rejects a Command simulated CloudFormation does not support", async () => {
     using simSdk = new SimSdk();
     const client = new CloudFormationClient({ region: "eu-west-2" });
     simSdk.intercept(client);
 
     const error = await assertThrowsErrorAsync(async () => {
-      await client.send(new DeleteStackCommand({ StackName: "some-stack" }));
+      await client.send(new ListStacksCommand({}));
     });
 
-    assertStringIncludes(error.message, "DeleteStackCommand");
+    assertStringIncludes(error.message, "ListStacksCommand");
     assertStringIncludes(error.message, "CreateStackCommand");
   });
 });

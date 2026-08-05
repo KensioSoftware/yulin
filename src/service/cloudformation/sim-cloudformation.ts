@@ -19,6 +19,11 @@ import type {
   SimDescribeStacksCommandOutput,
 } from "./command/describe-stacks/describe-stacks.command.js";
 import { DescribeStacksCommandHandler } from "./command/describe-stacks/describe-stacks.handler.js";
+import type {
+  SimDeleteStackCommand,
+  SimDeleteStackCommandOutput,
+} from "./command/delete-stack/delete-stack.command.js";
+import { DeleteStackCommandHandler } from "./command/delete-stack/delete-stack.handler.js";
 import type { SimCdkOutContext } from "./cdk/sim-cdk-out-context.js";
 import {
   type SimCloudFormationCreateStackProperties as SimCloudFormationCreateStackProperties,
@@ -127,6 +132,25 @@ export class SimCloudFormation {
   }
 
   /**
+   * Handle a Delete Stack Command from the SDK.
+   */
+  async deleteStack(
+    command: SimDeleteStackCommand,
+    options?: SimCloudFormationRequestOptions,
+  ): Promise<SimDeleteStackCommandOutput> {
+    this.authorizer.authorize(
+      "cloudformation:DeleteStack",
+      this.stackArn(command.input.StackName),
+      options?.caller,
+    );
+    const handler = new DeleteStackCommandHandler({
+      stacks: this.stacks,
+      background: this.background,
+    });
+    return await handler.handle(command);
+  }
+
+  /**
    * Wait for a simulated CloudFormation Stack deploy operation to complete.
    */
   async waitForStackDeployComplete(
@@ -136,6 +160,18 @@ export class SimCloudFormation {
     assertDefined(stack, `Sim CloudFormation Stack named ${stackName}`);
 
     await stack.waitForDeployComplete();
+  }
+
+  /**
+   * Wait for a simulated CloudFormation Stack delete operation to complete.
+   *
+   * A Stack name that is not there has nothing left to wait for: a Stack that
+   * finished deleting has already released its name.
+   */
+  async waitForStackDeleteComplete(
+    stackName: SimCloudFormationStackName | string,
+  ): Promise<void> {
+    await this.getStackByName(stackName)?.waitForDeleteComplete();
   }
 
   /**

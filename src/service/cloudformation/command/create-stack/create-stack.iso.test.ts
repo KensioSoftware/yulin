@@ -8,7 +8,7 @@ import {
   assertInstanceOf,
 } from "@kensio/smartass";
 import { SimAws } from "../../../aws/sim-aws.js";
-import { SimCloudFormationAlreadyExistsException } from "../../error/sim-cloudfront.error.js";
+import { SimCloudFormationAlreadyExistsException } from "../../error/sim-cloudformation.error.js";
 import {
   CreateStackCommand,
   DescribeStacksCommand,

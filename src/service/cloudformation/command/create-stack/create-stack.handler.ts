@@ -10,7 +10,7 @@ import {
   SimCfnStack,
   type SimCloudFormationStackName,
 } from "../../stack/sim-cfn-stack.js";
-import { SimCloudFormationAlreadyExistsException } from "../../error/sim-cloudfront.error.js";
+import { SimCloudFormationAlreadyExistsException } from "../../error/sim-cloudformation.error.js";
 import type {
   SimCreateStackCommand,
   SimCreateStackCommandOutput,

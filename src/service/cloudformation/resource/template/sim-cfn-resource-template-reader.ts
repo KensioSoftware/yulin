@@ -29,6 +29,15 @@ export class SimCfnResourceTemplateReader {
   }
 
   /**
+   * The CloudFormation DeletionPolicy attribute, for example Retain.
+   */
+  deletionPolicy(): string | undefined {
+    const deletionPolicy = this.template["DeletionPolicy"];
+
+    return typeof deletionPolicy === "string" ? deletionPolicy : undefined;
+  }
+
+  /**
    * The CloudFormation Resource properties object.
    *
    * CloudFormation Resources may omit Properties. In that case, and when the

@@ -3,7 +3,7 @@ import type {
   SimCloudFormationStackName,
   SimCloudFormationStackStatus,
 } from "../sim-cfn-stack.js";
-import { SimCfnStackDeploymentScheduler } from "./sim-cfn-stack-deployment-scheduler.js";
+import { SimCfnStackOperationScheduler } from "../sim-cfn-stack-operation-scheduler.js";
 
 interface SimCfnStackDeploymentProperties {
   readonly background: BackgroundScheduler;
@@ -33,7 +33,7 @@ interface SimCfnStackDeploymentProperties {
  * It does not interpret templates, resolve resource dependencies, create
  * resources, or choose background execution order. The injected runDeployment
  * callback performs the actual resource deployment, and
- * SimCfnStackDeploymentScheduler controls when that callback runs.
+ * SimCfnStackOperationScheduler controls when that callback runs.
  */
 export class SimCfnStackDeploymentLifecycle {
   private readonly background: BackgroundScheduler;
@@ -95,7 +95,7 @@ export class SimCfnStackDeploymentLifecycle {
     this.#status = "CREATE_IN_PROGRESS";
     this.deployError = undefined;
 
-    const scheduler = new SimCfnStackDeploymentScheduler({
+    const scheduler = new SimCfnStackOperationScheduler({
       background: this.background,
       failureMessage: "Sim CloudFormation Stack deploy failed",
     });
@@ -103,7 +103,7 @@ export class SimCfnStackDeploymentLifecycle {
     await scheduler.sequence();
 
     this.completePromise = scheduler.schedule({
-      deploy: this.runDeployment,
+      operation: this.runDeployment,
       onSuccess: () => {
         this.#status = "CREATE_COMPLETE";
       },

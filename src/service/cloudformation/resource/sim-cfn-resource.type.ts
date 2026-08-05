@@ -36,6 +36,7 @@ export type SimCloudFormationResourceStatus =
   | "CREATE_FAILED"
   | "DELETE_IN_PROGRESS"
   | "DELETE_COMPLETE"
+  | "DELETE_SKIPPED"
   | "DELETE_FAILED";
 
 /**

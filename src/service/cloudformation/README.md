@@ -22,7 +22,8 @@ familiar CloudFormation/CDK outputs.
 
 - `sim-cloudformation.ts` is the main service object for one account/region scope.
 - `index.ts` exports the public CloudFormation simulator API.
-- `command/` contains AWS SDK-style command handlers such as `CreateStack` and `DescribeStacks`.
+- `command/` contains AWS SDK-style command handlers such as `CreateStack`, `DescribeStacks` and
+  `DeleteStack`.
 - `deploy/` contains convenience helpers for deploying already-parsed templates or synthesized
   template files.
 - `template/` contains template body validation, template value parsing, intrinsic-function nodes,
@@ -56,6 +57,7 @@ The implementation is split into several layers:
 
 - `CreateStackCommandHandler`
 - `DescribeStacksCommandHandler`
+- `DeleteStackCommandHandler`
 - Translate SDK-shaped commands into stack operations and AWS-like outputs.
 
 3. **Template model**
@@ -334,6 +336,32 @@ resource creation finishes asynchronously.
 `waitForDeployComplete()` waits for the scheduled deployment task. If deployment failed, it rethrows
 the captured error so tests can observe deployment failures directly.
 
+`SimCfnStackOperationScheduler` is the piece both stack operations share. It wraps the work in
+background scheduling and reports the outcome back, without knowing which operation it is running.
+
+## Stack deletion lifecycle
+
+`SimCfnStackDeletionLifecycle` owns stack deletion state, and mirrors the deployment lifecycle.
+
+Calling `delete()` moves the stack to `DELETE_IN_PROGRESS` synchronously and schedules the teardown.
+When it finishes:
+
+- success changes the stack to `DELETE_COMPLETE` and calls the `onDeleteComplete` callback, which is
+  how `DeleteStackCommandHandler` releases the stack name
+- failure changes the stack to `DELETE_FAILED` and captures the error, leaving the stack where it is
+
+The two lifecycles are separate objects rather than one status field, for the reason
+`SimCfnResourceDeletionState` is separate from `SimCfnResourceCreationState`: a stack that was never
+asked to delete has no deletion status at all. `SimCfnStack.status` reads the deletion status first
+and falls back to the deployment status, so it says the last thing CloudFormation did to the stack.
+
+Asking twice does nothing the second time, as a repeated `DeleteStack` does in CloudFormation. A
+stack left in `DELETE_FAILED` can be asked again, because whatever refused may have been dealt with
+since, and the teardown loop starts from every resource again.
+
+Releasing the name belongs to whoever holds the stack map. The lifecycle only says when the name is
+free, so a failed deletion keeps the name in use and the stack describable.
+
 ## Resource deployment loop
 
 `SimCfnStackResourceCreator` owns the dependency-ordered resource creation loop.
@@ -400,15 +428,23 @@ targets. It also means every `Ref` a resource carries still resolves while that 
 deleted, so deletion can resolve properties the same way creation does rather than remembering what
 creation resolved.
 
-`SimCfnStack.teardown()` is the entry point. It is deliberately only the resource half: stack-level
-delete status, releasing the stack name, and the `DeleteStack` command itself sit on top of it.
+`SimCfnStack.teardown()` is the entry point for the resource half on its own. `SimCfnStack.delete()`
+is the whole operation: the stack-level delete status and the stack name release sit on top of the
+same teardown.
 
 ## Resource deletion lifecycle
 
 `SimCfnResourceDeleteOperation` owns the asynchronous lifecycle for deleting one resource, and is
 the mirror image of the creation operation.
 
-A resource keeps its creation status until deletion starts, at which point it becomes
+A resource whose `DeletionPolicy` is `Retain` never reaches the operation at all. `SimCfnResource`
+answers the deletion itself by marking the resource `DELETE_SKIPPED`, which is the status
+CloudFormation reports for a resource it stepped over, and the stack reads them back as
+`stack.retainedResources`. `RetainExceptOnCreate` is treated the same way, because the two differ
+only in what a rolled back creation does and sim CloudFormation does not roll a deployment back.
+`Snapshot` is treated as `Delete`, because no simulated service takes snapshots.
+
+Otherwise a resource keeps its creation status until deletion starts, at which point it becomes
 `DELETE_IN_PROGRESS`. The work is scheduled through the background scheduler, and then:
 
 1. background sequencing runs
@@ -549,7 +585,14 @@ AWS-like stack descriptions.
 
 The externally visible stack status comes from the stack lifecycle, not from the command handler.
 This means callers may observe in-progress status before background deployment completes, and
-complete/failed status after waiting for deployment or draining background tasks.
+complete/failed status after waiting for deployment or draining background tasks. The same applies to
+deletion, so a stack can be observed as `DELETE_IN_PROGRESS`.
+
+`SimCfnDescribedStacks` decides which stacks a request is about. A request naming a stack the service
+does not hold is refused with a `ValidationError`, as CloudFormation refuses it, while a request
+naming none over an empty stack map is an empty list. A deleted stack name reaches the refusal too:
+CloudFormation describes a deleted stack only by its unique stack ID, and the simulator identifies a
+stack by its name alone.
 
 The describe path is read-only. It should not trigger deployment or mutate resources.
 
@@ -635,6 +678,7 @@ The CloudFormation error model is lightweight.
 Current behaviour includes:
 
 - duplicate stack names throw an AWS-like `AlreadyExistsException`
+- describing a stack name the service does not hold throws an AWS-like `ValidationError`
 - invalid JSON template body throws a diagnostic template error
 - missing required command input throws assertion-style errors
 - unsupported providers/services/resource types throw diagnostic errors
@@ -677,6 +721,12 @@ Useful areas:
 - `command/describe-stacks/*.iso.test.ts`
   - stack status reporting
   - stack lookup and listing behaviour
+  - the refusal of a stack name the service does not hold
+
+- `command/delete-stack/*.iso.test.ts`
+  - stack deletion and stack name release
+  - `DeletionPolicy` handling
+  - failed teardowns and the statuses they leave behind
 
 - `template/*.iso.test.ts`
   - template body validation

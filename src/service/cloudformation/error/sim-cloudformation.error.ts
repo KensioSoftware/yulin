@@ -29,3 +29,17 @@ export class SimCloudFormationAlreadyExistsException extends SimCloudFormationEr
     super(message, { httpStatusCode: 400 });
   }
 }
+
+/**
+ * Simulated CloudFormation ValidationError.
+ *
+ * CloudFormation returns this for a request that names a Stack it cannot find,
+ * which includes a Stack name that has been deleted.
+ */
+export class SimCloudFormationValidationError extends SimCloudFormationError {
+  public override readonly name = "ValidationError";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
