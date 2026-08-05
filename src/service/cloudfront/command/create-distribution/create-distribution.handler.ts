@@ -13,10 +13,10 @@ import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type { SimCloudFrontS3OriginResolver } from "../../origin/s3/sim-cloudfront-s3-origin.js";
 import type { SimCfCustomOriginDispatcher } from "../../origin/custom/sim-cf-custom-origin-dispatcher.js";
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
-import { SimCloudFrontOriginConfigurator } from "../../distribution/configurator/sim-cloud-front-origin-configurator.js";
-import { SimCloudFrontBehaviorConfigurator } from "../../distribution/configurator/sim-cloud-front-behavior-configurator.js";
-import { SimCloudFrontDistributionConfigurator } from "../../distribution/configurator/sim-cloud-front-distribution-configurator.js";
+import { makeSimCloudFrontDistributionConfigurator } from "../../distribution/configurator/sim-cf-distribution-configurator.factory.js";
+import type { SimCloudFrontDistributionConfigurator } from "../../distribution/configurator/sim-cloud-front-distribution-configurator.js";
 import { SimCloudFrontDistributionConfigNormalizer } from "./sim-cf-distro-config-normalizer.js";
+import { simCloudFrontDistributionView } from "../../distribution/sim-cf-distribution-view.js";
 import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
@@ -68,13 +68,8 @@ export class CreateDistributionCommandHandler implements CommandHandler<
     this.accountId = properties.accountId;
     this.distributions = properties.distributions;
     this.cloudFrontRegistry = properties.cloudFrontRegistry;
-    this.distributionConfigurator = new SimCloudFrontDistributionConfigurator(
-      new SimCloudFrontOriginConfigurator(
-        properties.s3OriginResolver,
-        properties.customOriginDispatcher,
-      ),
-      new SimCloudFrontBehaviorConfigurator(),
-    );
+    this.distributionConfigurator =
+      makeSimCloudFrontDistributionConfigurator(properties);
     this.authorizer = new CreateDistributionAuthorizer({
       iam: properties.iam ?? new SimIamAllowAllAuth(),
     });
@@ -140,15 +135,7 @@ export class CreateDistributionCommandHandler implements CommandHandler<
     this.background.schedule(() => distribution.completeDeployment());
 
     return {
-      Distribution: {
-        Id: distribution.distributionId,
-        ARN: `arn:aws:cloudfront::${this.accountId}:distribution/${distribution.distributionId}`,
-        Status: distribution.status,
-        LastModifiedTime: distribution.lastModifiedTime,
-        InProgressInvalidationBatches: 0,
-        DomainName: `${distribution.distributionId.toLowerCase()}.cloudfront.net`,
-        DistributionConfig: distribution.distributionConfig,
-      },
+      Distribution: simCloudFrontDistributionView(distribution),
       Location: `https://cloudfront.amazonaws.com/2020-05-31/distribution/${distribution.distributionId}`,
       $metadata: {},
     };

@@ -61,6 +61,43 @@ export class SimCloudFrontRegistry {
   }
 
   /**
+   * Deregister a simulated CloudFront Distribution ID.
+   *
+   * Request routing reads this registry rather than one Account's own
+   * Distribution map, so deregistering is what stops a deleted Distribution
+   * serving. The alternate domain names it answered on go with it, leaving
+   * them free for another Distribution.
+   */
+  deregisterDistribution(distributionId: SimCloudFrontDistributionId): void {
+    const accountId = this.distributionAccountIds.get(distributionId);
+
+    this.distributionAccountIds.delete(distributionId);
+
+    if (accountId !== undefined) {
+      this.accountDistributionIds.get(accountId)?.delete(distributionId);
+    }
+
+    this.deregisterAlternateDomainNames(distributionId);
+  }
+
+  /**
+   * Deregister every alternate domain name held by a Distribution ID.
+   *
+   * An update replaces a Distribution's Aliases wholesale, so the old names
+   * are dropped before the new ones are registered.
+   */
+  deregisterAlternateDomainNames(
+    distributionId: SimCloudFrontDistributionId,
+  ): void {
+    for (const [alternateDomainName, registeredDistributionId] of this
+      .alternateDomainDistributionIds) {
+      if (registeredDistributionId === distributionId) {
+        this.alternateDomainDistributionIds.delete(alternateDomainName);
+      }
+    }
+  }
+
+  /**
    * Register an alternate domain name to a simulated CloudFront Distribution ID.
    */
   registerAlternateDomainName(

@@ -7,6 +7,7 @@ import type {
   SimCloudFrontDistribution,
   SimCloudFrontDistributionId,
 } from "../../distribution/sim-cloudfront-distribution.js";
+import { simCloudFrontDistributionView } from "../../distribution/sim-cf-distribution-view.js";
 import { SimCloudFrontResourceNotFoundException } from "../../error/sim-cloudfront.error.js";
 import {
   type BackgroundScheduler,
@@ -89,15 +90,7 @@ export class GetDistributionCommandHandler implements CommandHandler<
     }
 
     return {
-      Distribution: {
-        Id: distribution.distributionId,
-        ARN: `arn:aws:cloudfront::${distribution.accountId}:distribution/${distribution.distributionId}`,
-        Status: distribution.status,
-        LastModifiedTime: distribution.lastModifiedTime,
-        InProgressInvalidationBatches: 0,
-        DomainName: `${distribution.distributionId.toLowerCase()}.cloudfront.net`,
-        DistributionConfig: distribution.distributionConfig,
-      },
+      Distribution: simCloudFrontDistributionView(distribution),
       $metadata: {},
     };
   }

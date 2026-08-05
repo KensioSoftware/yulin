@@ -1,4 +1,5 @@
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
+import type { SimCloudFrontDistributionView } from "../../distribution/sim-cf-distribution-view.js";
 
 /**
  * Minimal structural sim CloudFront CreateDistribution command.
@@ -18,18 +19,7 @@ export interface SimCreateDistributionCommandInput {
  * Minimal structural sim CloudFront CreateDistribution output.
  */
 export interface SimCreateDistributionCommandOutput {
-  readonly Distribution?:
-    | undefined
-    | {
-        readonly Id?: string | undefined;
-        readonly ARN?: string | undefined;
-        readonly Status?: string | undefined;
-        readonly LastModifiedTime?: Date | undefined;
-        readonly InProgressInvalidationBatches?: number | undefined;
-        readonly DomainName?: string | undefined;
-        readonly DistributionConfig?:
-          SimCloudFrontDistributionConfig | undefined;
-      };
+  readonly Distribution?: SimCloudFrontDistributionView | undefined;
   readonly Location?: string | undefined;
   readonly $metadata: SimResponseMetadata;
 }

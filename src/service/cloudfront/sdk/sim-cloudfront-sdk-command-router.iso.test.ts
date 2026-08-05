@@ -3,8 +3,11 @@ import {
   CloudFrontClient,
   CreateDistributionCommand,
   CreateFunctionCommand,
+  CreateInvalidationCommand,
   DeleteDistributionCommand,
+  DeleteFunctionCommand,
   GetDistributionCommand,
+  UpdateDistributionCommand,
 } from "@aws-sdk/client-cloudfront";
 import { CreateBucketCommand } from "@aws-sdk/client-s3";
 import {
@@ -12,6 +15,7 @@ import {
   assertNonNullable,
   assertStringIncludes,
   assertThrowsErrorAsync,
+  assertUndefined,
 } from "@kensio/smartass";
 import { SimSdk } from "../../../sdk/index.js";
 import type { SimCloudFrontFunctionName } from "../cff/sim-cloudfront-function.js";
@@ -53,11 +57,46 @@ describe("simulated CloudFront SDK Command routing", () => {
     );
 
     assertNonNullable(distroCreation.Distribution?.Id);
+    const distributionId = distroCreation.Distribution.Id;
     const distroOut = await client.send(
-      new GetDistributionCommand({ Id: distroCreation.Distribution.Id }),
+      new GetDistributionCommand({ Id: distributionId }),
     );
 
-    assertIdentical(distroOut.Distribution?.Id, distroCreation.Distribution.Id);
+    assertIdentical(distroOut.Distribution?.Id, distributionId);
+
+    // Disabling and then deleting goes through the router the same way.
+    await client.send(
+      new UpdateDistributionCommand({
+        Id: distributionId,
+        IfMatch: "E2QWRUHAPOMQZL",
+        DistributionConfig: {
+          CallerReference: "sdk-intercept-ref-1",
+          DefaultRootObject: "index.html",
+          Origins: {
+            Items: [
+              {
+                Id: "origin1",
+                DomainName: "origin-bucket.s3.amazonaws.com",
+                S3OriginConfig: { OriginAccessIdentity: "" },
+              },
+            ],
+            Quantity: 1,
+          },
+          DefaultCacheBehavior: {
+            TargetOriginId: "origin1",
+            ViewerProtocolPolicy: "redirect-to-https",
+            AllowedMethods: { Items: ["GET", "HEAD"], Quantity: 2 },
+          },
+          Comment: "SDK intercepted distribution",
+          Enabled: false,
+        },
+      }),
+    );
+    await client.send(new DeleteDistributionCommand({ Id: distributionId }));
+
+    assertUndefined(
+      simSdk.simAws.cloudFront().getSimDistributionById(distributionId),
+    );
   });
 
   it("routes CreateFunctionCommand through an intercepted client", async () => {
@@ -88,6 +127,22 @@ describe("simulated CloudFront SDK Command routing", () => {
           "intercepted-cff" as SimCloudFrontFunctionName,
         ),
     );
+
+    // Deleting it again goes through the router the same way.
+    await client.send(
+      new DeleteFunctionCommand({
+        Name: "intercepted-cff",
+        IfMatch: "E2QWRUHAPOMQZL",
+      }),
+    );
+
+    assertUndefined(
+      simSdk.simAws
+        .cloudFront()
+        .getCloudFrontFunctionByName(
+          "intercepted-cff" as SimCloudFrontFunctionName,
+        ),
+    );
   });
 
   it("rejects a Command simulated CloudFront does not support", async () => {
@@ -96,10 +151,18 @@ describe("simulated CloudFront SDK Command routing", () => {
     simSdk.intercept(client);
 
     const error = await assertThrowsErrorAsync(async () => {
-      await client.send(new DeleteDistributionCommand({ Id: "D123" }));
+      await client.send(
+        new CreateInvalidationCommand({
+          DistributionId: "D123",
+          InvalidationBatch: {
+            CallerReference: "unsupported",
+            Paths: { Quantity: 1, Items: ["/*"] },
+          },
+        }),
+      );
     });
 
-    assertStringIncludes(error.message, "DeleteDistributionCommand");
+    assertStringIncludes(error.message, "CreateInvalidationCommand");
     assertStringIncludes(error.message, "CreateDistributionCommand");
   });
 });

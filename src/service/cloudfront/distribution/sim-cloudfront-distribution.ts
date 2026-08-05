@@ -9,6 +9,7 @@ import {
 } from "../../aws/sim-aws-account.js";
 import type { SimCloudFrontDistributionConfig } from "../command/create-distribution/create-distribution.command.js";
 import { type SimClock, SimRealClock } from "../../../util/clock/sim-clock.js";
+import { SimCloudFrontDistributionNotDisabled } from "../error/sim-cloudfront.error.js";
 
 export type SimCloudFrontDistributionId = Brand<
   string,
@@ -35,13 +36,13 @@ interface SimCloudFrontDistributionProperties {
 export class SimCloudFrontDistribution {
   public readonly distributionId: SimCloudFrontDistributionId;
   public readonly accountId: SimAwsAccountId;
-  public readonly distributionConfig:
-    SimCloudFrontDistributionConfig | undefined;
   public readonly behaviors: SimCloudFrontBehavior[] = [];
   public readonly customErrorResponses: SimCloudFrontCustomErrorResponse[] = [];
   public readonly lastModifiedTime: Date;
 
   #status: SimCloudFrontDistributionStatus;
+  #distributionConfig: SimCloudFrontDistributionConfig | undefined;
+  #enabled: boolean;
   #defaultRootObject: string | undefined;
   private readonly alternateDomainNames = new Set<string>();
 
@@ -60,7 +61,8 @@ export class SimCloudFrontDistribution {
     this.distributionId = distributionId;
     this.#status = status;
     this.accountId = accountId;
-    this.distributionConfig = distributionConfig;
+    this.#distributionConfig = distributionConfig;
+    this.#enabled = distributionConfig?.Enabled ?? true;
   }
 
   /**
@@ -68,6 +70,20 @@ export class SimCloudFrontDistribution {
    */
   get status(): SimCloudFrontDistributionStatus {
     return this.#status;
+  }
+
+  /**
+   * Get the DistributionConfig this sim Distribution was configured from.
+   */
+  get distributionConfig(): SimCloudFrontDistributionConfig | undefined {
+    return this.#distributionConfig;
+  }
+
+  /**
+   * Whether this sim Distribution is enabled, and so serving requests.
+   */
+  get enabled(): boolean {
+    return this.#enabled;
   }
 
   /**
@@ -90,6 +106,44 @@ export class SimCloudFrontDistribution {
   completeDeployment(): Promise<void> {
     this.#status = "Deployed";
     return Promise.resolve();
+  }
+
+  /**
+   * Replace this sim Distribution's configuration, clearing everything derived
+   * from the previous one.
+   *
+   * CloudFront takes a whole DistributionConfig on an update rather than a
+   * patch, so an update is a replacement here too: the caller applies the new
+   * config from scratch, the same way creation does. The Distribution goes
+   * back into Deploying while that happens, as it does in AWS.
+   */
+  replaceConfiguration(
+    distributionConfig: SimCloudFrontDistributionConfig,
+  ): void {
+    this.#distributionConfig = distributionConfig;
+    this.#enabled = distributionConfig.Enabled ?? true;
+    this.#status = "Deploying";
+    this.#defaultRootObject = undefined;
+    this.behaviors.length = 0;
+    this.customErrorResponses.length = 0;
+    this.alternateDomainNames.clear();
+    this.origins.clear();
+  }
+
+  /**
+   * Refuse deletion while this sim Distribution is still enabled.
+   *
+   * CloudFront will not delete a Distribution that is still serving, so the
+   * real sequence is UpdateDistribution with `Enabled: false` and then
+   * DeleteDistribution. Nothing here waits for the disable to deploy, which
+   * real CloudFront does before it accepts the deletion.
+   */
+  assertDeletable(): void {
+    if (this.#enabled) {
+      throw new SimCloudFrontDistributionNotDisabled(
+        `Sim CloudFront Distribution ${this.distributionId} is enabled, so it cannot be deleted. Disable it with UpdateDistribution first.`,
+      );
+    }
   }
 
   /**

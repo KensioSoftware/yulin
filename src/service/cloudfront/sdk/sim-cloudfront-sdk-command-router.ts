@@ -5,7 +5,10 @@ import {
 } from "../../../sdk/index.js";
 import type { SimCreateDistributionCommand } from "../command/create-distribution/create-distribution.command.js";
 import type { SimCreateFunctionCommand } from "../command/create-function/create-function.command.js";
+import type { SimDeleteDistributionCommand } from "../command/delete-distribution/delete-distribution.command.js";
+import type { SimDeleteFunctionCommand } from "../command/delete-function/delete-function.command.js";
 import type { SimGetDistributionCommand } from "../command/get-distribution/get-distribution.command.js";
+import type { SimUpdateDistributionCommand } from "../command/update-distribution/update-distribution.command.js";
 import type { SimCloudFront } from "../sim-cloudfront.js";
 
 /**
@@ -34,10 +37,34 @@ export class SimCloudFrontSdkCommandRouter implements SimSdkCommandRouter {
           ),
       ],
       [
+        "DeleteDistributionCommand",
+        async (command, context): Promise<unknown> =>
+          await simCloudFront.deleteDistribution(
+            command as SimDeleteDistributionCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteFunctionCommand",
+        async (command, context): Promise<unknown> =>
+          await simCloudFront.deleteFunction(
+            command as SimDeleteFunctionCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
         "GetDistributionCommand",
         async (command, context): Promise<unknown> =>
           await simCloudFront.getDistribution(
             command as SimGetDistributionCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "UpdateDistributionCommand",
+        async (command, context): Promise<unknown> =>
+          await simCloudFront.updateDistribution(
+            command as SimUpdateDistributionCommand,
             simSdkCallerOptions(context),
           ),
       ],

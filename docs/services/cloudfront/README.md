@@ -496,6 +496,107 @@ CDK app works without changes.
 A Distribution using `CloudFrontDefaultCertificate` needs no ACM certificate and is not checked. A
 standalone `new SimCloudFront()` has no sim ACM to check against, so it does not check either.
 
+## Disabling and deleting a Distribution
+
+`DeleteDistributionCommand` removes a Distribution. CloudFront will not delete one that is still
+serving, so the sequence is `UpdateDistributionCommand` with `Enabled: false` first, then the
+deletion. Deleting an enabled Distribution answers `DistributionNotDisabled`, as it does in AWS.
+
+`UpdateDistributionCommand` takes a whole `DistributionConfig` rather than a patch, so the update is
+applied as a replacement. Anything left out of the new config is dropped, including alternate domain
+names and the default root object. Read the Distribution first, change the field you want, and send
+the config back.
+
+Once the Distribution is deleted, a request to its CloudFront domain or any of its alternate domain
+names no longer resolves to it, and those alternate domain names are free for another Distribution.
+
+```typescript sim-cloudfront-delete-distribution
+/**
+ * Disabling a simulated CloudFront Distribution and then deleting it.
+ */
+
+import {
+  CreateDistributionCommand,
+  DeleteDistributionCommand,
+  type DistributionConfig,
+  GetDistributionCommand,
+  UpdateDistributionCommand,
+} from "@aws-sdk/client-cloudfront";
+import { CreateBucketCommand } from "@aws-sdk/client-s3";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const simCloudFront = simAws.cloudFront();
+
+await simAws
+  .s3()
+  .createBucket(new CreateBucketCommand({ Bucket: "site-bucket" }));
+
+const distributionConfig: DistributionConfig = {
+  CallerReference: "site-distribution",
+  Comment: "Site distribution",
+  Enabled: true,
+  Origins: {
+    Quantity: 1,
+    Items: [
+      {
+        Id: "site-origin",
+        DomainName: "site-bucket.s3.amazonaws.com",
+        S3OriginConfig: { OriginAccessIdentity: "" },
+      },
+    ],
+  },
+  DefaultCacheBehavior: {
+    TargetOriginId: "site-origin",
+    ViewerProtocolPolicy: "allow-all",
+  },
+};
+
+const created = await simCloudFront.createDistribution(
+  new CreateDistributionCommand({ DistributionConfig: distributionConfig }),
+);
+await simAws.backgroundTasksComplete();
+
+const distributionId = created.Distribution?.Id;
+
+try {
+  await simCloudFront.deleteDistribution(
+    new DeleteDistributionCommand({ Id: distributionId }),
+  );
+} catch (error) {
+  // DistributionNotDisabled: Sim CloudFront Distribution ... is enabled, so it
+  // cannot be deleted. Disable it with UpdateDistribution first.
+  console.log((error as Error).message);
+}
+
+// Disable the Distribution, then delete it.
+await simCloudFront.updateDistribution(
+  new UpdateDistributionCommand({
+    Id: distributionId,
+    DistributionConfig: { ...distributionConfig, Enabled: false },
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+await simCloudFront.deleteDistribution(
+  new DeleteDistributionCommand({ Id: distributionId }),
+);
+
+try {
+  await simCloudFront.getDistribution(
+    new GetDistributionCommand({ Id: distributionId }),
+  );
+} catch (error) {
+  // NoSuchDistribution: No sim CloudFront Distribution with ID ...
+  console.log((error as Error).message);
+}
+```
+
+`DeleteFunctionCommand` removes a CloudFront Function by name, and answers `NoSuchFunctionExists`
+when the name matches nothing. A cache Behavior still pointing at a deleted Function finds nothing
+and runs no Function code.
+
 ## Simulated CloudFront Functions
 
 The sim CloudFront supports `viewer-request` and `viewer-response` CloudFront Functions.
@@ -682,7 +783,9 @@ export function handler(event) {
 
 Sim CloudFront currently supports:
 
-- `CreateDistributionCommand` and `GetDistributionCommand`
+- `CreateDistributionCommand`, `GetDistributionCommand`, `UpdateDistributionCommand` and
+  `DeleteDistributionCommand`
+- `CreateFunctionCommand` and `DeleteFunctionCommand`
 - S3 Origins backed by sim S3 Buckets
 - Custom Origins reaching sim HTTP APIs and sim Lambda Function URLs in process
 - CloudFront Distribution hostnames such as `distro123.cloudfront.net`
@@ -695,3 +798,19 @@ Sim CloudFront currently supports:
 The simulator focuses on useful behaviour for tests and local development rather than full CloudFront
 feature parity. Unsupported CloudFront options may be ignored or may throw errors depending on
 whether the simulator needs them to model the requested behaviour safely.
+
+## Limitations
+
+Where sim CloudFront knowingly behaves differently from AWS:
+
+- **`IfMatch` ETags are not checked.** `UpdateDistributionCommand`, `DeleteDistributionCommand` and
+  `DeleteFunctionCommand` all accept `IfMatch` and ignore it, so neither `PreconditionFailed` nor
+  `InvalidIfMatchVersion` is ever returned. Nothing else here versions a resource, and a stale ETag
+  is a retry rather than a design mistake. A test expecting the ETag refusal will not get it.
+- **A deletion does not wait for the disable to deploy.** Real CloudFront needs the disabled
+  Distribution to reach `Deployed` before it accepts the deletion. Here, `Enabled: false` is enough.
+- **A disabled Distribution still serves requests.** Real CloudFront answers a disabled Distribution
+  with a 403. Only deleting a Distribution stops it serving here.
+- **`DeleteFunctionCommand` never answers `FunctionInUse`.** Nothing tells a CloudFront Function that
+  a cache Behavior has taken it up, so every Function is deletable. A Behavior left pointing at a
+  deleted Function runs no Function code.
