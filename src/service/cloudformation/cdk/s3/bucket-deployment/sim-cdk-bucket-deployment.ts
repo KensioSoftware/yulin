@@ -49,7 +49,8 @@ export class SimCdkBucketDeploymentResourceFactory implements SimCfnServiceResou
 
     if (resourceTypeName !== "CDKBucketDeployment") {
       throw new Error(
-        `Unsupported sim CDK BucketDeployment Resource ${resourceTypeName} deletion`,
+        `Unsupported sim CDK BucketDeployment CloudFormation Resource ` +
+          `${resourceTypeName} deletion`,
       );
     }
   }

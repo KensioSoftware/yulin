@@ -59,10 +59,10 @@ const consumerFunction = {
 };
 
 describe("Lambda CloudFormation Resource teardown", () => {
-  it("deletes a Function URL without deleting its function", async () => {
+  it("deletes a Function URL before the function it is on", async () => {
     // Given a deployed function with a Function URL on it. The URL is state on
-    // the function rather than a resource of its own, so removing it leaves
-    // the function alone.
+    // the function rather than a resource of its own, so its Resource has to
+    // be taken off before the function it names goes.
     const simAws = new SimAws();
     const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "greeter-stack",
@@ -99,7 +99,8 @@ describe("Lambda CloudFormation Resource teardown", () => {
     // When the Stack's Resources are torn down.
     await stack.teardown();
 
-    // Then the URL configuration is gone, and so is the function it was on.
+    // Then the URL configuration is gone, and the function it was on has
+    // followed it out with the rest of the Stack.
     assertUndefined(simAws.lambda().getSimFunctionUrl("greeter"));
     assertUndefined(simAws.lambda().getSimFunctionByName("greeter"));
   });

@@ -52,10 +52,10 @@ export class SimCfnStackPendingDeletions {
   /**
    * Return the pending-set view for the next loop iteration.
    *
-   * Resources that are delete-complete are removed. Resources that failed or
-   * are still waiting for their dependents remain pending, so the orchestrator
-   * can either make progress in a later batch or detect that no progress is
-   * possible.
+   * Resources that reached a terminal delete status are removed, whether they
+   * were deleted or failed to delete. Only Resources still waiting for their
+   * dependents remain pending, so the orchestrator can either make progress in
+   * a later batch or detect that no progress is possible.
    */
   incompleteResources(): SimCfnStackPendingDeletions {
     return new SimCfnStackPendingDeletions(

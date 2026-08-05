@@ -1,4 +1,8 @@
-import { assertStringIncludes, assertThrowsErrorAsync } from "@kensio/smartass";
+import {
+  assertStringIncludes,
+  assertThrowsErrorAsync,
+  assertTrue,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
@@ -6,6 +10,7 @@ import { SimCfnResource } from "../sim-cfn-resource.js";
 import type { SimCfnServiceResourceFactory } from "../factory/sim-cfn-resource-factory.type.js";
 import { SimCfnCfnResourceFactory } from "../factory/sim-cfn-cfn-resource-factory.js";
 import { SimCdkBucketDeploymentResourceFactory } from "../../cdk/s3/bucket-deployment/sim-cdk-bucket-deployment.js";
+import { isSimCfnUnsupportedResourceError } from "../unsupported/sim-cfn-unsupported-resource.js";
 
 interface UnsupportedDeletion {
   readonly serviceName: string;
@@ -101,9 +106,10 @@ describe("Unsupported sim CloudFormation Resource deletion", () => {
         }),
       );
 
-      // Then the refusal names the Resource type, so a Stack teardown can
-      // record what it could not remove.
-      assertStringIncludes(error.message, "Unsupported sim");
+      // Then the refusal is one a Stack teardown records and steps over,
+      // rather than one that fails the teardown, and it names the Resource
+      // type so the record says what could not be removed.
+      assertTrue(isSimCfnUnsupportedResourceError(error));
       assertStringIncludes(error.message, "Unsimulated");
     },
   );
