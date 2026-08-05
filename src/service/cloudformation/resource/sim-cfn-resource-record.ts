@@ -98,6 +98,27 @@ export abstract class SimCfnResourceRecord implements SimCfnPropertyIgnorer {
   }
 
   /**
+   * The DeletionPolicy attribute from the Resource template, if it has one.
+   */
+  public get deletionPolicy(): string | undefined {
+    return this.resourceTemplateReader.deletionPolicy();
+  }
+
+  /**
+   * Whether a Stack teardown should leave this Resource where it is.
+   *
+   * RetainExceptOnCreate differs from Retain only in what a rolled back
+   * creation does, and sim CloudFormation does not roll a deployment back, so
+   * the two are the same thing here.
+   */
+  public get retainedOnDelete(): boolean {
+    return (
+      this.deletionPolicy === "Retain" ||
+      this.deletionPolicy === "RetainExceptOnCreate"
+    );
+  }
+
+  /**
    * The value returned when this Resource is referenced via { "Ref": logicalId }.
    *
    * Mirroring CloudFormation, Resource Ref behavior is Resource-type specific.

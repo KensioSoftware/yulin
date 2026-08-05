@@ -2,8 +2,10 @@ import { describe, it } from "vitest";
 import {
   assertArrayLength,
   assertIdentical,
-  assertUndefined,
+  assertInstanceOf,
+  assertThrowsErrorAsync,
 } from "@kensio/smartass";
+import { SimCloudFormationValidationError } from "../../error/sim-cloudformation.error.js";
 import { SimAws } from "../../../aws/sim-aws.js";
 import {
   CreateStackCommand,
@@ -137,7 +139,7 @@ describe("CloudFormation DescribeStacksCommand", () => {
     );
   });
 
-  it("returns no Stacks for an unknown Stack name", async () => {
+  it("refuses an unknown Stack name with a ValidationError", async () => {
     // Given a CloudFormation service without a Stack matching the requested name.
     const simAws = new SimAws();
 
@@ -150,15 +152,23 @@ describe("CloudFormation DescribeStacksCommand", () => {
       }),
     );
 
-    // When DescribeStacksCommand is handled with an unknown StackName filter.
-    const describeStacksOutput = await cloudFormation.describeStacks(
-      new DescribeStacksCommand({
-        StackName: "unknown-stack",
-      }),
+    // When DescribeStacksCommand is handled with an unknown StackName filter,
+    // then it rejects the way CloudFormation does rather than answering with an
+    // empty list.
+    const error = await assertThrowsErrorAsync(async () =>
+      cloudFormation.describeStacks(
+        new DescribeStacksCommand({
+          StackName: "unknown-stack",
+        }),
+      ),
     );
 
-    // Then an empty Stacks list is returned.
-    assertArrayLength(describeStacksOutput.Stacks, 0);
-    assertUndefined(describeStacksOutput.Stacks[0]);
+    assertInstanceOf(error, SimCloudFormationValidationError);
+    assertIdentical(error.name, "ValidationError");
+    assertIdentical(
+      error.message,
+      "Stack with id unknown-stack does not exist",
+    );
+    assertIdentical(error.$metadata.httpStatusCode, 400);
   });
 });

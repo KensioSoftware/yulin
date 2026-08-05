@@ -164,6 +164,96 @@ const simAws = new SimAws();
 await simAws.backgroundTasksComplete();
 ```
 
+## Deleting a stack
+
+`DeleteStackCommand` deletes the resources a stack created, in the reverse of the order they were
+created in, and then releases the stack name. This is what lets a long-running local process replace
+a stack rather than restart.
+
+```typescript sim-cloudformation-delete-stack
+/**
+ * Deleting a simulated CloudFormation Stack with DeleteStackCommand.
+ */
+
+import {
+  CreateStackCommand,
+  DeleteStackCommand,
+} from "@aws-sdk/client-cloudformation";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const simCfn = simAws.cloudFormation();
+
+const templateBody = JSON.stringify({
+  Resources: {
+    SiteBucket: {
+      Type: "AWS::S3::Bucket",
+      Properties: {
+        BucketName: "deletable-stack-bucket",
+      },
+    },
+  },
+});
+
+await simCfn.createStack(
+  new CreateStackCommand({
+    StackName: "deletable-stack",
+    TemplateBody: templateBody,
+  }),
+);
+await simCfn.waitForStackDeployComplete("deletable-stack");
+
+await simCfn.deleteStack(
+  new DeleteStackCommand({ StackName: "deletable-stack" }),
+);
+await simCfn.waitForStackDeleteComplete("deletable-stack");
+
+// The Bucket has gone from simulated S3.
+console.log(simAws.s3().getSimBucketByName("deletable-stack-bucket"));
+
+// And the Stack name is free, so the same Stack can be deployed again.
+await simCfn.createStack(
+  new CreateStackCommand({
+    StackName: "deletable-stack",
+    TemplateBody: templateBody,
+  }),
+);
+await simCfn.waitForStackDeployComplete("deletable-stack");
+```
+
+Deletion runs in the background, as deployment does. `deleteStack(...)` returns once the stack has
+moved to `DELETE_IN_PROGRESS`, and `waitForStackDeleteComplete(...)` waits for the resources to go.
+`DescribeStacksCommand` reports `DELETE_IN_PROGRESS` in between, and then refuses the stack name with
+a `ValidationError` once the deletion has finished, which is how CloudFormation answers a name it no
+longer holds.
+
+Deleting a stack name that is not there succeeds rather than failing, as it does in CloudFormation.
+
+### When a resource cannot be deleted
+
+Some resources refuse to go, the same way they do in AWS. An S3 bucket that still holds objects is
+the common one: CloudFormation fails there rather than emptying the bucket first, which is why CDK
+ships an `autoDeleteObjects` custom resource.
+
+A refusal leaves the stack in `DELETE_FAILED` with the reason on it, and keeps the stack name in use.
+`waitForStackDeleteComplete(...)` rethrows the error, and `DescribeStacksCommand` reports it as
+`StackStatusReason`. Dealing with the cause and sending `DeleteStackCommand` again deletes the stack.
+
+### `DeletionPolicy`
+
+A resource declared with `DeletionPolicy: Retain` is left in simulated AWS and reported as
+`DELETE_SKIPPED`, which is what CloudFormation does with it. The rest of the stack still deletes
+around it, and the stack name is still released. `RetainExceptOnCreate` is treated the same way,
+because the two differ only in what a rolled back creation does, and sim CloudFormation does not roll
+a deployment back.
+
+Retained resources are readable from the stack:
+
+```typescript
+console.log(stack.retainedResources.map((resource) => resource.logicalId));
+```
+
 ## Parameters
 
 Template parameters can be supplied when creating a stack.
@@ -1467,8 +1557,9 @@ normal application tests, prefer the `SimAws` entry point.
 
 Sim CloudFormation currently supports:
 
-- `CreateStackCommand` and `DescribeStacksCommand`
-- Waiting for simulated stack deployment completion
+- `CreateStackCommand`, `DescribeStacksCommand` and `DeleteStackCommand`
+- Waiting for simulated stack deployment and deletion completion
+- The resource `DeletionPolicy` attribute, for `Retain` and `RetainExceptOnCreate`
 - `deployTemplate(...)` for parsed template objects, optionally naming the synthesized template file
   a template edited in memory came from
 - `deployTemplateFile(...)` for synthesized JSON template files
@@ -1518,7 +1609,19 @@ Each service's own docs describe what its resource types support.
   template describes. See
   [properties a Resource was created without](#properties-a-resource-was-created-without) for what
   is still refused outright.
-- Stack updates and deletes are not supported.
+- Stack updates are not supported.
+- A stack deletion deletes only the resource types the simulator can delete. A resource type it
+  creates but cannot delete is recorded in `stack.skippedResourceDeletions` and stepped over, the
+  same way an unsupported resource type is on create, so the stack still deletes with that resource
+  left behind.
+- `DeletionPolicy` is read for `Retain` and `RetainExceptOnCreate` only. `Snapshot` is treated as
+  `Delete`, because no simulated service takes snapshots.
+- `UpdateReplacePolicy` is ignored, and only applies to stack updates, which are not supported.
+- `DeleteStackCommand` reads only `StackName`. `RetainResources`, `DeletionMode`, `RoleARN` and
+  `ClientRequestToken` are not read, so a stack left in `DELETE_FAILED` cannot be forced through the
+  way `FORCE_DELETE_STACK` forces it in AWS.
+- A deleted stack cannot be described. Real CloudFormation keeps a deleted stack readable by its
+  unique stack ID, and the simulator identifies a stack by its name alone.
 - `Fn::FindInMap` accepts only the three-argument form. The four-argument form, where the fourth
   argument is `{ "DefaultValue": ... }`, is rejected.
 - `Fn::FindInMap` arguments are resolved from literals, `Parameters` and pseudo parameters. An

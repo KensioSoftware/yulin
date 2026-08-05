@@ -10,6 +10,10 @@ import type {
 } from "../template/sim-cfn-template.js";
 import { SimCfnStackResourceCreator } from "./deploy/sim-cfn-stack-resource-creator.js";
 import { SimCfnStackResourceDeleter } from "./teardown/sim-cfn-stack-resource-deleter.js";
+import {
+  SimCfnStackDeletionLifecycle,
+  type SimCfnStackDeleteProperties,
+} from "./teardown/sim-cfn-stack-deletion-lifecycle.js";
 import { makeSimCfnStackResourceMap } from "./resource-map/sim-cfn-stack-resource-map.js";
 import { SimCfnStackDeploymentLifecycle } from "./deploy/sim-cfn-stack-deployment-lifecycle.js";
 import type { SimCdkOutContext } from "../cdk/sim-cdk-out-context.js";
@@ -28,7 +32,10 @@ export type SimCloudFormationStackStatus =
   | "REVIEW_IN_PROGRESS"
   | "CREATE_IN_PROGRESS"
   | "CREATE_COMPLETE"
-  | "CREATE_FAILED";
+  | "CREATE_FAILED"
+  | "DELETE_IN_PROGRESS"
+  | "DELETE_COMPLETE"
+  | "DELETE_FAILED";
 
 interface SimCloudFormationStackProperties {
   readonly simAws: SimAws;
@@ -44,17 +51,20 @@ interface SimCloudFormationStackProperties {
  * Lightweight simulated CloudFormation Stack.
  *
  * This class owns the externally visible Stack lifecycle: identity, template
- * body, resources, deployment status, deployment error, and wait-for-completion
- * behavior. It delegates lower-level deployment mechanics to smaller
+ * body, resources, status, error, and wait-for-completion behavior for both
+ * deploying and deleting. It delegates the mechanics of each to smaller
  * collaborators:
  *
  * - makeSimCfnStackResourceMap converts the template into runtime resources.
- * - SimCfnStackDeploymentScheduler controls when deployment runs in the
- *   background.
- * - SimCfnStackResourceCreator creates resources in dependency order.
+ * - SimCfnStackDeploymentLifecycle and SimCfnStackDeletionLifecycle own the
+ *   status and completion of one Stack operation each.
+ * - SimCfnStackOperationScheduler controls when either runs in the background.
+ * - SimCfnStackResourceCreator creates resources in dependency order, and
+ *   SimCfnStackResourceDeleter deletes them in the reverse of it.
  */
 export class SimCfnStack {
   public readonly lifecycle: SimCfnStackDeploymentLifecycle;
+  public readonly deletion: SimCfnStackDeletionLifecycle;
   public readonly stackName: SimCloudFormationStackName;
   public readonly template: CfnTemplateBodyRecord;
   public readonly resources: Map<string, SimCfnResource>;
@@ -103,6 +113,39 @@ export class SimCfnStack {
         await this.createResources();
       },
     });
+    this.deletion = new SimCfnStackDeletionLifecycle({
+      background,
+      runTeardown: async (): Promise<void> => {
+        await this.teardown();
+      },
+    });
+  }
+
+  /**
+   * The externally visible Stack status.
+   *
+   * A Stack keeps the status its deployment left it with until it is asked to
+   * delete, so the status reads as the last thing CloudFormation did to it.
+   * This is the Stack-level shape of what SimCfnResource does per Resource.
+   */
+  public get status(): SimCloudFormationStackStatus {
+    return this.deletion.status ?? this.lifecycle.status;
+  }
+
+  /**
+   * The error captured by the Stack operation the status is reporting, if it
+   * failed.
+   *
+   * A deployment failure is not the reason a deletion is in progress, so once
+   * deletion has started the error comes from the deletion alone, the same way
+   * the status does.
+   */
+  public get error(): Error | undefined {
+    if (this.deletion.status === undefined) {
+      return this.lifecycle.error;
+    }
+
+    return this.deletion.error;
   }
 
   /**
@@ -120,12 +163,31 @@ export class SimCfnStack {
   }
 
   /**
+   * Start deleting this Stack from simulated AWS.
+   *
+   * Deletion is scheduled in the background, as deployment is, so this returns
+   * before the Resources have gone. The optional onDeleteComplete callback runs
+   * once the teardown has finished successfully, which is when the Stack name
+   * becomes free to use again.
+   */
+  async delete(properties: SimCfnStackDeleteProperties = {}): Promise<void> {
+    await this.deletion.delete(properties);
+  }
+
+  /**
+   * Wait for the scheduled Stack deletion to finish.
+   */
+  async waitForDeleteComplete(): Promise<void> {
+    await this.deletion.waitForComplete();
+  }
+
+  /**
    * Delete this Stack's Resources from simulated AWS, in reverse dependency
    * order.
    *
-   * The Resource half of deleting a Stack. Stack deletion status, releasing the
-   * Stack name and the DeleteStack command itself sit on top of this rather
-   * than inside it, so the Resource teardown can be exercised on its own.
+   * The Resource half of deleting a Stack, without the Stack-level status or
+   * the Stack name release that delete() puts on top of it, so the Resource
+   * teardown can be exercised on its own.
    */
   async teardown(): Promise<void> {
     await new SimCfnStackResourceDeleter({
@@ -161,6 +223,17 @@ export class SimCfnStack {
     return this.resources
       .values()
       .filter((resource) => resource.deletionSkipped)
+      .toArray();
+  }
+
+  /**
+   * Resources a teardown left in simulated AWS because their DeletionPolicy
+   * says to keep them.
+   */
+  public get retainedResources(): readonly SimCfnResource[] {
+    return this.resources
+      .values()
+      .filter((resource) => resource.retained)
       .toArray();
   }
 

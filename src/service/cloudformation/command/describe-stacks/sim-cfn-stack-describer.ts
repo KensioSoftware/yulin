@@ -23,8 +23,8 @@ export class SimCfnStackDescriber {
     return {
       StackId: stack.stackName,
       StackName: stack.stackName,
-      StackStatus: stack.lifecycle.status,
-      StackStatusReason: stack.lifecycle.error?.message,
+      StackStatus: stack.status,
+      StackStatusReason: stack.error?.message,
       Outputs: stack.outputs
         .values()
         .map((output) => ({
