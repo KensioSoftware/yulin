@@ -1,5 +1,6 @@
 import type {
   SimCloudFrontCacheBehaviorConfig,
+  SimCloudFrontCustomErrorResponseConfig,
   SimCloudFrontDefaultCacheBehaviorConfig,
   SimCloudFrontDistributionConfig,
   SimCloudFrontFunctionAssociation,
@@ -45,6 +46,10 @@ export class SimCloudFrontDistributionConfigNormalizer {
       Origins: this.normalizeList<SimCloudFrontOriginConfig>(
         distributionConfig["Origins"],
       ),
+      CustomErrorResponses:
+        this.normalizeList<SimCloudFrontCustomErrorResponseConfig>(
+          distributionConfig["CustomErrorResponses"],
+        ),
       DefaultCacheBehavior:
         this.distributionConfig.DefaultCacheBehavior === undefined
           ? undefined

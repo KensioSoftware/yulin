@@ -117,6 +117,88 @@ describe("sim CloudFront local server", () => {
     assertIdentical(missingResponse.status, 404);
   });
 
+  it("serves a static site with a root object and an error page", async () => {
+    // Given a site with a home page and an error page in a Bucket.
+    const simS3 = simAws.s3();
+    await simS3.createBucket(
+      new CreateBucketCommand({ Bucket: "site-bucket" }),
+    );
+    await simS3.putObject(
+      new PutObjectCommand({
+        Bucket: "site-bucket",
+        Key: "index.html",
+        ContentType: "text/html",
+        Body: "<h1>Home</h1>",
+      }),
+    );
+    await simS3.putObject(
+      new PutObjectCommand({
+        Bucket: "site-bucket",
+        Key: "404.html",
+        ContentType: "text/html",
+        Body: "<h1>Not found</h1>",
+      }),
+    );
+
+    // And a Distribution serving it the way a static site is usually set up.
+    const distributionCreation = await simAws.cloudFront().createDistribution(
+      new CreateDistributionCommand({
+        DistributionConfig: {
+          CallerReference: "static-site",
+          Comment: "Static site CDN",
+          Enabled: true,
+          DefaultRootObject: "index.html",
+          CustomErrorResponses: {
+            Quantity: 2,
+            Items: [
+              {
+                ErrorCode: 404,
+                ResponsePagePath: "/404.html",
+                ResponseCode: "404",
+              },
+              {
+                ErrorCode: 403,
+                ResponsePagePath: "/404.html",
+                ResponseCode: "404",
+              },
+            ],
+          },
+          Origins: {
+            Quantity: 1,
+            Items: [
+              {
+                Id: "site-origin",
+                DomainName: "site-bucket.s3.amazonaws.com",
+                S3OriginConfig: { OriginAccessIdentity: "" },
+              },
+            ],
+          },
+          DefaultCacheBehavior: {
+            TargetOriginId: "site-origin",
+            ViewerProtocolPolicy: "allow-all",
+          },
+        },
+      }),
+    );
+    const distroId = distributionCreation.Distribution?.Id;
+    assertNonNullable(distroId);
+    const siteUrl = `http://${distroId.toLowerCase()}.cloudfront.net.sim-aws.localhost:${srv.port}`;
+
+    // When the site root is requested over localhost.
+    const homeResponse = await fetch(`${siteUrl}/`);
+
+    // Then the home page is served.
+    assertIdentical(homeResponse.status, 200);
+    assertIdentical(await homeResponse.text(), "<h1>Home</h1>");
+
+    // And when a page that does not exist is requested.
+    const missingResponse = await fetch(`${siteUrl}/nowhere`);
+
+    // Then the site's own error page is served, not the simulator's.
+    assertIdentical(missingResponse.status, 404);
+    assertIdentical(await missingResponse.text(), "<h1>Not found</h1>");
+  });
+
   it("can use S3 Origin in any Region", async () => {
     const regionA = makeAwsRegionName();
     const regionB = makeAwsRegionName();

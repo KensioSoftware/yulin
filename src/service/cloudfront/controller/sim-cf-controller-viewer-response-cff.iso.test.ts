@@ -15,6 +15,12 @@ import { SimAwsServiceRequest } from "../../../serve/controller/sim-service-cont
 import { makeCffFunctionCodeInput } from "../cff/function-code-input/cff-function-code-input.js";
 import type { CloudFrontFunction } from "../typings/cloudfront-functions.namespace.js";
 import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import {
+  simCfSiteBucket,
+  simCfSiteDistributionConfig,
+  simCfSiteDistributionId,
+  simCfSiteRequest,
+} from "../../../../test/cloudfront/site-fixture.js";
 
 describe("Simulated CloudFront local HTTP controller CFF", () => {
   it("preserves the Origin response body when a viewer-response CFF only changes headers", async () => {
@@ -119,5 +125,70 @@ describe("Simulated CloudFront local HTTP controller CFF", () => {
       String(Buffer.byteLength(body)),
     );
     assertFalse(response.headers.has("transfer-encoding"));
+  });
+
+  it("runs the viewer-response CFF on a custom error response", async () => {
+    // Given a site whose 404s are answered with its own error page.
+    const simAws = new SimAws();
+    await simCfSiteBucket(simAws, "cff-error-page-site", {
+      "404.html": "<h1>Not found</h1>",
+    });
+
+    // And a viewer-response CFF marking whatever the viewer is about to get.
+    const cffOutput = await simAws.cloudFront().createFunction(
+      new CreateFunctionCommand({
+        Name: "error-page-marker-cff",
+        FunctionConfig: {
+          Comment: "Error page marker CFF",
+          Runtime: "cloudfront-js-2.0",
+        },
+        FunctionCode: makeCffFunctionCodeInput(
+          (event: CloudFrontFunction.ViewerResponseEvent) => {
+            event.response.headers["x-served-status"] = {
+              value: String(event.response.statusCode),
+            };
+            return event.response;
+          },
+        ),
+      }),
+    );
+
+    const distributionId = await simCfSiteDistributionId(
+      simAws,
+      simCfSiteDistributionConfig("cff-error-page-site", {
+        DefaultCacheBehavior: {
+          TargetOriginId: "site-origin",
+          ViewerProtocolPolicy: "allow-all",
+          FunctionAssociations: {
+            Quantity: 1,
+            Items: [
+              {
+                EventType: "viewer-response",
+                FunctionARN: cffOutput.FunctionMetadata.FunctionARN,
+              },
+            ],
+          },
+        },
+        CustomErrorResponses: {
+          Quantity: 1,
+          Items: [
+            {
+              ErrorCode: 404,
+              ResponsePagePath: "/404.html",
+              ResponseCode: "404",
+            },
+          ],
+        },
+      }),
+    );
+
+    // When a page that does not exist is requested.
+    const response = await simCfSiteRequest(simAws, distributionId, "/missing");
+
+    // Then the function saw the custom error response rather than the Origin's
+    // own, so the error page is what the CFF gets to act on.
+    assertResponseStatus(response, 404);
+    assertIdentical(await response.text(), "<h1>Not found</h1>");
+    assertIdentical(response.headers.get("x-served-status"), "404");
   });
 });

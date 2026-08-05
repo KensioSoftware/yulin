@@ -52,9 +52,20 @@ time, including:
 - Origins
 - Cache Behaviors
 - CloudFront Function associations
+- the default root object
+- custom error responses
 
 The `Distribution/configurator/` classes translate AWS-style `DistributionConfig` input into the
 internal Distribution model.
+
+### Default root object and custom error responses
+
+`SimCloudFrontCustomErrorConfigurator` refuses configuration CloudFront refuses: an `ErrorCode`
+outside the set CloudFront supports, and a `ResponsePagePath` or `ResponseCode` given without the
+other. A rule with neither only configures error caching, which nothing here caches, so it is
+accepted and left out of the internal model. `DefaultRootObject` beginning with a forward slash is
+refused for the same reason: in real CloudFront it answers the Distribution root with a 403, so a
+Distribution carrying one is not worth creating.
 
 ### Viewer certificates
 
@@ -85,6 +96,12 @@ registry checks nothing.
 HTTP request behaviour is split across a few directories:
 
 - `controller/` coordinates request handling for served CloudFront traffic.
+  `controller/root-object/` substitutes the default root object for a request to the Distribution
+  root, before Behavior resolution so that everything downstream sees the object being served.
+  `controller/error/` replaces an Origin error with the Distribution's response page, after the
+  Origin fetch and before the viewer-response CloudFront Function. The response page is fetched
+  through the same Behavior resolution and Origin fetching as any other request, so it can come from
+  an Origin of its own.
 - `router/` resolves an incoming `Request` to a simulated Distribution by CloudFront hostname or
   alternate domain name.
 - `resolver/` chooses the matching Cache Behavior for a request path.
