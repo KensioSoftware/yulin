@@ -11,7 +11,7 @@ import {
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import { SimAws } from "../../../aws/sim-aws.js";
-import { SimCloudFrontResourceNotFoundException } from "../../error/sim-cloudfront.error.js";
+import { SimCloudFrontNoSuchDistribution } from "../../error/sim-cloudfront.error.js";
 import { CreateBucketCommand } from "@aws-sdk/client-s3";
 
 describe("CloudFront GetDistributionCommand", () => {
@@ -107,6 +107,6 @@ describe("CloudFront GetDistributionCommand", () => {
         new GetDistributionCommand({ Id: "NonExistentDistribution" }),
       ),
     );
-    assertInstanceOf(error, SimCloudFrontResourceNotFoundException);
+    assertInstanceOf(error, SimCloudFrontNoSuchDistribution);
   });
 });

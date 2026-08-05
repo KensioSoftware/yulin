@@ -80,17 +80,6 @@ export class SimCloudFrontInvalidArgument extends SimCloudFrontError {
 }
 
 /**
- * Simulated CloudFront ResourceNotFoundException error.
- */
-export class SimCloudFrontResourceNotFoundException extends SimCloudFrontError {
-  public override readonly name = "ResourceNotFoundException";
-
-  constructor(message: string) {
-    super(message, { httpStatusCode: 404 });
-  }
-}
-
-/**
  * Simulated CloudFront NoSuchDistribution error.
  *
  * What CloudFront answers when a Distribution ID names nothing.
