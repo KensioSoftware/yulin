@@ -29,6 +29,22 @@ export class SimRoute53NoSuchHostedZone extends SimRoute53Error {
 }
 
 /**
+ * Simulated Route53 HostedZoneNotEmpty error.
+ *
+ * Real Route53 refuses to delete a Hosted Zone that still holds records,
+ * counting everything except the NS and SOA records it created with the zone.
+ * Simulated zones are created without those two, so here every remaining
+ * record counts.
+ */
+export class SimRoute53HostedZoneNotEmpty extends SimRoute53Error {
+  public override readonly name = "HostedZoneNotEmpty";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
  * Simulated Route53 InvalidInput error.
  */
 export class SimRoute53InvalidInput extends SimRoute53Error {

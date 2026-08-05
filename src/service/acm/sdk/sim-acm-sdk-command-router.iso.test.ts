@@ -1,6 +1,7 @@
 import { describe, it } from "vitest";
 import {
   ACMClient,
+  AddTagsToCertificateCommand,
   DeleteCertificateCommand,
   DescribeCertificateCommand,
   ListCertificatesCommand,
@@ -48,6 +49,14 @@ describe("simulated ACM SDK Command routing", () => {
     assertNonNullable(describeOutput.Certificate);
     assertIdentical(describeOutput.Certificate.DomainName, "example.com");
     assertIdentical(describeOutput.Certificate.Status, "PENDING_VALIDATION");
+
+    await client.send(
+      new DeleteCertificateCommand({
+        CertificateArn: requestOutput.CertificateArn,
+      }),
+    );
+    const listAfterDelete = await client.send(new ListCertificatesCommand({}));
+    assertArrayLength(listAfterDelete.CertificateSummaryList, 0);
   });
 
   it("shares certificate state with direct sim ACM use", async () => {
@@ -76,14 +85,15 @@ describe("simulated ACM SDK Command routing", () => {
 
     const error = await assertThrowsErrorAsync(async () => {
       await client.send(
-        new DeleteCertificateCommand({
+        new AddTagsToCertificateCommand({
           CertificateArn:
             "arn:aws:acm:eu-west-1:888888888888:certificate/00000001",
+          Tags: [{ Key: "team", Value: "platform" }],
         }),
       );
     });
 
-    assertStringIncludes(error.message, "DeleteCertificateCommand");
+    assertStringIncludes(error.message, "AddTagsToCertificateCommand");
     assertStringIncludes(error.message, "RequestCertificateCommand");
   });
 });

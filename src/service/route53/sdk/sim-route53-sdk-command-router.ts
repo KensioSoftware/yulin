@@ -5,6 +5,7 @@ import {
 } from "../../../sdk/index.js";
 import type { SimChangeResourceRecordSetsCommand } from "../command/change-resource-record-sets/change-resource-record-sets.command.js";
 import type { SimCreateHostedZoneCommand } from "../command/create-hosted-zone/create-hosted-zone.command.js";
+import type { SimDeleteHostedZoneCommand } from "../command/delete-hosted-zone/delete-hosted-zone.command.js";
 import type { SimGetHostedZoneCommand } from "../command/get-hosted-zone/get-hosted-zone.command.js";
 import type { SimListHostedZonesByNameCommand } from "../command/list-hosted-zones-by-name/list-hosted-zones-by-name.command.js";
 import type { SimListResourceRecordSetsCommand } from "../command/list-resource-record-sets/list-resource-record-sets.command.js";
@@ -39,6 +40,14 @@ export class SimRoute53SdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simRoute53.getHostedZone(
             command as SimGetHostedZoneCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteHostedZoneCommand",
+        async (command, context): Promise<unknown> =>
+          await simRoute53.deleteHostedZone(
+            command as SimDeleteHostedZoneCommand,
             simSdkCallerOptions(context),
           ),
       ],

@@ -1,6 +1,7 @@
 import {
   CancelKeyDeletionCommand,
   CreateAliasCommand,
+  DeleteAliasCommand,
   CreateKeyCommand,
   DecryptCommand,
   DescribeKeyCommand,
@@ -49,6 +50,7 @@ describe("SimKmsSdkCommandRouter", () => {
       "ScheduleKeyDeletionCommand",
       "CancelKeyDeletionCommand",
       "CreateAliasCommand",
+      "DeleteAliasCommand",
       "ListAliasesCommand",
       "EncryptCommand",
       "DecryptCommand",
@@ -113,6 +115,9 @@ describe("SimKmsSdkCommandRouter", () => {
       }),
     );
 
+    await kms.send(new DeleteAliasCommand({ AliasName: "alias/router" }));
+    const aliasesAfterDelete = await kms.send(new ListAliasesCommand({}));
+
     await kms.send(new DisableKeyCommand({ KeyId: keyArn }));
     await kms.send(new EnableKeyCommand({ KeyId: keyArn }));
     await kms.send(new ScheduleKeyDeletionCommand({ KeyId: keyArn }));
@@ -127,6 +132,7 @@ describe("SimKmsSdkCommandRouter", () => {
     assertIdentical(described.KeyMetadata?.Description, "Router key");
     assertArrayLength(keys.Keys ?? [], 1);
     assertArrayLength(aliases.Aliases ?? [], 1);
+    assertArrayLength(aliasesAfterDelete.Aliases ?? [], 0);
     assertIdentical(cancelled.KeyId, keyArn);
 
     simSdk.restoreAll();

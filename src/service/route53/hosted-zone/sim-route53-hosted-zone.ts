@@ -6,6 +6,7 @@ import {
   type SimRoute53HostedZoneId,
 } from "../command/create-hosted-zone/sim-route53-zone-id.js";
 import type { BackgroundScheduler } from "../../../util/background/background.js";
+import { SimRoute53HostedZoneNotEmpty } from "../error/sim-route53.error.js";
 
 export type SimRoute53HostedZoneStatus = "PENDING" | "INSYNC";
 
@@ -126,6 +127,22 @@ export class SimRoute53HostedZone {
   async waitForSynchronizationComplete(): Promise<void> {
     if (this.synchronizationComplete !== undefined) {
       await this.synchronizationComplete;
+    }
+  }
+
+  /**
+   * Refuse deletion while this Hosted Zone still holds records.
+   *
+   * Real Route53 counts everything except the NS and SOA records it creates
+   * with the zone. A simulated zone is created without those two, so every
+   * record left here counts.
+   */
+  assertDeletable(): void {
+    if (this.records.count > 0) {
+      throw new SimRoute53HostedZoneNotEmpty(
+        `Sim Route53 Hosted Zone ${this.id} still holds ` +
+          `${String(this.records.count)} records`,
+      );
     }
   }
 

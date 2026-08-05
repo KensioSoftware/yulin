@@ -13,6 +13,11 @@ import type {
 } from "./command/get-hosted-zone/get-hosted-zone.command.js";
 import { GetHostedZoneCommandHandler } from "./command/get-hosted-zone/get-hosted-zone.handler.js";
 import type {
+  SimDeleteHostedZoneCommand,
+  SimDeleteHostedZoneCommandOutput,
+} from "./command/delete-hosted-zone/delete-hosted-zone.command.js";
+import { DeleteHostedZoneCommandHandler } from "./command/delete-hosted-zone/delete-hosted-zone.handler.js";
+import type {
   SimListHostedZonesByNameCommand,
   SimListHostedZonesByNameCommandOutput,
 } from "./command/list-hosted-zones-by-name/list-hosted-zones-by-name.command.js";
@@ -110,6 +115,22 @@ export class SimRoute53 {
   ): Promise<SimGetHostedZoneCommandOutput> {
     const handler = new GetHostedZoneCommandHandler({
       hostedZones: this.hostedZones,
+      iam: this.iam,
+      background: this.background,
+    });
+    return await handler.handle(command, options);
+  }
+
+  /**
+   * Handle a Delete Hosted Zone command from the SDK.
+   */
+  async deleteHostedZone(
+    command: SimDeleteHostedZoneCommand,
+    options?: SimRoute53RequestOptions,
+  ): Promise<SimDeleteHostedZoneCommandOutput> {
+    const handler = new DeleteHostedZoneCommandHandler({
+      hostedZones: this.hostedZones,
+      route53Registry: this.route53Registry,
       iam: this.iam,
       background: this.background,
     });

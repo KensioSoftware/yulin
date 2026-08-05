@@ -3,6 +3,7 @@ import {
   type SimSdkCommandRoute,
   type SimSdkCommandRouter,
 } from "../../../sdk/index.js";
+import type { SimDeleteCertificateCommand } from "../command/delete-certificate/delete-certificate.command.js";
 import type { SimDescribeCertificateCommand } from "../command/describe-certificate/describe-certificate.command.js";
 import type { SimListCertificatesCommand } from "../command/list-certificates/list-certificates.command.js";
 import type { SimRequestCertificateCommand } from "../command/request-certificate/request-certificate.command.js";
@@ -21,6 +22,14 @@ export class SimAcmSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simAcm.describeCertificate(
             command as SimDescribeCertificateCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteCertificateCommand",
+        async (command, context): Promise<unknown> =>
+          await simAcm.deleteCertificate(
+            command as SimDeleteCertificateCommand,
             simSdkCallerOptions(context),
           ),
       ],
