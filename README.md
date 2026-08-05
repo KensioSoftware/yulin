@@ -185,6 +185,29 @@ console.log(bucketWebsiteUrl.toString());
 const res = await fetch(new URL("/foo/", bucketWebsiteUrl));
 ```
 
+#### Restarting a served environment
+
+A served environment takes an available port by default, so the URL changes every time the process
+starts. Pin a port to keep the URL the same across restarts:
+
+```typescript
+const srv = await serveSimAws({ simAws, port: 4599 });
+```
+
+Closing the server ends the connections it is holding, so the process can exit rather than being
+kept alive by a browser tab. Yulin does not install signal handlers, so call `close()` from your
+own:
+
+```typescript
+process.on("SIGTERM", () => {
+  srv.close();
+});
+```
+
+A restart usually overlaps the process it is replacing. `listen` waits a couple of seconds for a
+pinned port that is still held, then throws `SimAwsLocalPortInUse` naming the port, which means
+something other than the outgoing process owns it.
+
 ### Control simulated time
 
 Each simulated AWS has its own clock, which you can freeze, set, or advance. This lets a test

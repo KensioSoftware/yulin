@@ -4,6 +4,7 @@ import http from "node:http";
 import { describe, it } from "vitest";
 import { assertIdentical, assertTrue } from "@kensio/smartass";
 import { waitNodeServerListen } from "./wait-node-server-listen.js";
+import { promiseError } from "../../../../test/promise-error.js";
 
 describe("waitNodeServerListen", () => {
   it("resolves immediately when server is already listening", async () => {
@@ -41,7 +42,6 @@ describe("waitNodeServerListen", () => {
 
     server.emit("error", cause);
 
-    // @ts-expect-error -- testing error
     const error = await promiseError(wait);
 
     assertIdentical(error, cause);
@@ -58,20 +58,4 @@ class TestServer extends EventEmitter {
     // @ts-expect-error -- test mock
     return this;
   }
-}
-
-async function promiseError(promise: Promise<never>): Promise<Error> {
-  try {
-    await promise;
-  } catch (error) {
-    if (error instanceof Error) {
-      return error;
-    }
-
-    throw new TypeError("Expected promise to reject with an Error", {
-      cause: error,
-    });
-  }
-
-  throw new Error("Expected promise to reject");
 }

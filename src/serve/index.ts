@@ -5,6 +5,7 @@ export {
   serveSimAws,
   SimAwsLocalServer,
 } from "./http/local-server/sim-aws-local-server.js";
+export { SimAwsLocalPortInUse } from "./http/local-server/sim-aws-local-port.error.js";
 export {
   type SimAwsServiceController,
   SimAwsServiceRequest,
