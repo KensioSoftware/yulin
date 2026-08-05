@@ -11,10 +11,9 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
-import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
 import { SimSecretsManagerResourceNotFoundException } from "../error/sim-secrets-manager.error.js";
 
-const accountIdOneOnes = "111111111111" as SimAwsAccountId;
+const accountIdOneOnes = "111111111111";
 
 async function simAwsWithSecret(): Promise<SimAws> {
   const simAws = new SimAws({

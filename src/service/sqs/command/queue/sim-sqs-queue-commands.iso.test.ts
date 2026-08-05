@@ -15,7 +15,6 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
-import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import {
   SimSqsInvalidParameterValue,
   SimSqsQueueDeletedRecently,
@@ -29,7 +28,7 @@ describe("SQS queue commands", () => {
   it("creates a queue with a URL and ARN naming its Account and Region", async () => {
     // Given a simulated AWS in one Account and Region.
     const simAws = new SimAws({
-      defaultAccountId: "111111111111" as SimAwsAccountId,
+      defaultAccountId: "111111111111",
       defaultRegionName: "eu-west-2",
     });
 
@@ -168,7 +167,7 @@ describe("SQS queue commands", () => {
   it("refuses a request for a queue owned by another Account", async () => {
     // Given an existing queue.
     const simAws = new SimAws({
-      defaultAccountId: "111111111111" as SimAwsAccountId,
+      defaultAccountId: "111111111111",
     });
     await simAws
       .sqs()

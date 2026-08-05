@@ -73,7 +73,7 @@ export class SimAws extends SimAwsServiceAccessors {
     });
     const background = timekeeping.background;
 
-    this.defaultAccountId = defaultAccountId;
+    this.defaultAccountId = defaultAccountId as SimAwsAccountId;
     this.defaultRegionName = defaultRegionName;
     this.timekeeping = timekeeping;
     this.background = background;

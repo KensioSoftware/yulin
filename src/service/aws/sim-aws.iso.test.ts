@@ -2,9 +2,35 @@ import { describe, expect, it } from "vitest";
 import { assertIdentical } from "@kensio/smartass";
 import { CreateUserCommand } from "@aws-sdk/client-iam";
 import { SimAws } from "./sim-aws.js";
+import {
+  makeSimAwsAccountId,
+  type SimAwsAccountId,
+} from "./sim-aws-account.js";
 import { SimFixedClock } from "../../util/clock/sim-clock.js";
 
 describe("SimAws", () => {
+  it("takes a plain string as the default Account ID", () => {
+    const simAws = new SimAws({ defaultAccountId: "207763040965" });
+
+    expect(simAws.defaultAccountId).toBe("207763040965");
+  });
+
+  it("takes an already branded default Account ID", () => {
+    const accountId = makeSimAwsAccountId();
+
+    const simAws = new SimAws({ defaultAccountId: accountId });
+
+    expect(simAws.defaultAccountId).toBe(accountId);
+  });
+
+  it("reads the default Account ID back as a branded Account ID", () => {
+    const simAws = new SimAws({ defaultAccountId: "207763040965" });
+
+    const accountId: SimAwsAccountId = simAws.defaultAccountId;
+
+    expect(accountId).toBe("207763040965");
+  });
+
   it("returns same Account for same Account ID", () => {
     const simAws = new SimAws();
 

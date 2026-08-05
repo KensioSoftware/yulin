@@ -21,10 +21,9 @@ import { describe, it } from "vitest";
  * one CDK actually produced rather than one written by hand.
  */
 import { SimAws } from "../../../aws/sim-aws.js";
-import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import { TestCdkProject } from "../../../../util/filesystem/test-cdk-project.js";
 
-const accountIdOneOnes = "111111111111" as SimAwsAccountId;
+const accountIdOneOnes = "111111111111";
 
 describe("Sim CDK DynamoDB TableV2 deployment local integration", () => {
   it("deploys a CDK TableV2 an SDK caller then writes to and reads from", async () => {

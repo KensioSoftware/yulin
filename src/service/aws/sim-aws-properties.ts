@@ -26,7 +26,12 @@ export interface SimAwsRequestCallerOptions {
  * How one simulated AWS environment is set up.
  */
 export interface SimAwsProperties {
-  readonly defaultAccountId?: SimAwsAccountId;
+  /**
+   * AWS Account ID this simulation uses when a call does not name one.
+   * Plain strings are accepted, so callers do not need the internal
+   * SimAwsAccountId brand to set it.
+   */
+  readonly defaultAccountId?: SimAwsAccountId | string;
   readonly defaultRegionName?: AwsRegionName;
   readonly background?: BackgroundScheduler & BackgroundCompleter;
   /**

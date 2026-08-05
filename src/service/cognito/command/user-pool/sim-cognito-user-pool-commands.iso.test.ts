@@ -15,12 +15,11 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
-import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import { SimCognitoResourceNotFoundException } from "../../error/sim-cognito.error.js";
 
 function simCognitoInEuWest2(): SimAws {
   return new SimAws({
-    defaultAccountId: "111111111111" as SimAwsAccountId,
+    defaultAccountId: "111111111111",
     defaultRegionName: "eu-west-2",
   });
 }

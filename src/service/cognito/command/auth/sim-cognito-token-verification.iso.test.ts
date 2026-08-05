@@ -14,7 +14,6 @@ import {
 import { CognitoJwtVerifier } from "aws-jwt-verify";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
-import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 
 const password = "Sup3rSecret!";
 
@@ -36,7 +35,7 @@ async function simCognitoSignedIn(
   signedInAt?: Date,
 ): Promise<SimCognitoSignedIn> {
   const simAws = new SimAws({
-    defaultAccountId: "111111111111" as SimAwsAccountId,
+    defaultAccountId: "111111111111",
     defaultRegionName: "eu-west-2",
   });
   const cognito = simAws.cognitoIdentityProvider();

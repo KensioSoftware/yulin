@@ -6,6 +6,7 @@ import type { SimCloudFrontBehaviorResolver } from "../../resolver/sim-cloud-fro
 import { SimCloudFrontBehaviorResolver as DefaultSimCloudFrontBehaviorResolver } from "../../resolver/sim-cloud-front-behavior-resolver.js";
 import { SimCffApplicator } from "../cff/sim-cff-applicator.js";
 import { SimCloudFrontOriginFetcher } from "../origin/sim-cloudfront-origin-fetcher.js";
+import { SimCfCustomErrorResponder } from "../error/sim-cf-custom-error-responder.js";
 
 export interface SimCloudFrontServiceControllerProperties {
   readonly simAws?: SimAws;
@@ -14,6 +15,7 @@ export interface SimCloudFrontServiceControllerProperties {
   readonly behaviourResolver?: SimCloudFrontBehaviorResolver;
   readonly cffApplicator?: SimCffApplicator;
   readonly originFetcher?: SimCloudFrontOriginFetcher;
+  readonly customErrorResponder?: SimCfCustomErrorResponder;
 }
 
 export interface SimCloudFrontControllerDependencies {
@@ -21,6 +23,7 @@ export interface SimCloudFrontControllerDependencies {
   readonly behaviourResolver: SimCloudFrontBehaviorResolver;
   readonly cffApplicator: SimCffApplicator;
   readonly originFetcher: SimCloudFrontOriginFetcher;
+  readonly customErrorResponder: SimCfCustomErrorResponder;
 }
 
 /**
@@ -37,6 +40,15 @@ export class SimCloudFrontControllerDependenciesFactory {
     const cloudFrontRegistry =
       properties.cloudFrontRegistry ?? simAws.serviceFactory.cloudFrontRegistry;
 
+    // The custom error responder fetches its response page through the same
+    // Behavior resolution and Origin fetching as any other request, so it is
+    // built from whichever of those the caller supplied.
+    const behaviourResolver =
+      properties.behaviourResolver ??
+      new DefaultSimCloudFrontBehaviorResolver();
+    const originFetcher =
+      properties.originFetcher ?? new SimCloudFrontOriginFetcher();
+
     return {
       distroRouter:
         properties.distroRouter ??
@@ -44,12 +56,12 @@ export class SimCloudFrontControllerDependenciesFactory {
           simAws,
           cloudFrontRegistry,
         }),
-      behaviourResolver:
-        properties.behaviourResolver ??
-        new DefaultSimCloudFrontBehaviorResolver(),
+      behaviourResolver,
       cffApplicator: properties.cffApplicator ?? new SimCffApplicator(),
-      originFetcher:
-        properties.originFetcher ?? new SimCloudFrontOriginFetcher(),
+      originFetcher,
+      customErrorResponder:
+        properties.customErrorResponder ??
+        new SimCfCustomErrorResponder({ behaviourResolver, originFetcher }),
     };
   }
 }
