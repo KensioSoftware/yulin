@@ -21,10 +21,9 @@ import {
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
-import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
 import { simKmsCfnKey } from "../../../../test/kms/cfn-key-resource.js";
 
-const accountIdOneOnes = "111111111111" as SimAwsAccountId;
+const accountIdOneOnes = "111111111111";
 
 function simAwsInEuWest2(): SimAws {
   return new SimAws({

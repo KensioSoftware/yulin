@@ -19,7 +19,6 @@ import {
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import type { SimCognitoAttributeType } from "../../user-pool/user/sim-cognito-user-attributes.js";
-import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import type { SimCognitoIdentityProvider } from "../../sim-cognito-identity-provider.js";
 import { SimCognitoUserNotFoundException } from "../../error/sim-cognito.error.js";
 
@@ -37,7 +36,7 @@ interface SimCognitoWithPool {
 
 async function simCognitoWithPool(): Promise<SimCognitoWithPool> {
   const simAws = new SimAws({
-    defaultAccountId: "111111111111" as SimAwsAccountId,
+    defaultAccountId: "111111111111",
     defaultRegionName: "eu-west-2",
   });
   const cognito = simAws.cognitoIdentityProvider();

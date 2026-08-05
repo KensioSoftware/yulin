@@ -11,11 +11,10 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
-import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import { simIamPolicyDocumentFactory } from "../../../iam/policy/sim-iam-policy-document.factory.js";
 
-const accountIdOneOnes = "111111111111" as SimAwsAccountId;
+const accountIdOneOnes = "111111111111";
 
 describe("Secrets Manager ListSecrets authorization", () => {
   it("denies a policy naming individual secret ARNs", async () => {

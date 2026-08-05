@@ -14,10 +14,9 @@ import { describe, it } from "vitest";
  * one CDK actually produced rather than one written by hand.
  */
 import { SimAws } from "../../../aws/sim-aws.js";
-import type { SimAwsAccountId } from "../../../aws/sim-aws-account.js";
 import { TestCdkProject } from "../../../../util/filesystem/test-cdk-project.js";
 
-const accountIdOneOnes = "111111111111" as SimAwsAccountId;
+const accountIdOneOnes = "111111111111";
 
 /**
  * A handler sending each stream record's key on to the queue CDK put in its
