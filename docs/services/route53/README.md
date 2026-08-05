@@ -57,6 +57,12 @@ becomes `example.test.`.
 Hosted Zone creation uses background tasks to move the zone to `INSYNC`. If your test needs final
 state, call `await simAws.backgroundTasksComplete()` before continuing.
 
+Hosted Zone IDs are accepted in any real Route53 shape: a `Z` prefix followed by uppercase
+alphanumerics, up to 32 characters. That means a real Hosted Zone ID copied out of an AWS account,
+such as `Z2FDTNDATAQYW2`, can be used in your test setup. An ID with no matching Hosted Zone gives
+`NoSuchHostedZone`, while a malformed one gives `InvalidInput`. Commands also accept the
+`/hostedzone/Z...` form as well as the bare ID.
+
 ## Creating records
 
 Use `ChangeResourceRecordSetsCommand` to add records to a Hosted Zone.

@@ -7,6 +7,7 @@ import {
 import { describe, it } from "vitest";
 import { SimAws } from "../../../../aws/sim-aws.js";
 import { SimCfnResource } from "../../../../cloudformation/resource/sim-cfn-resource.js";
+import { SimRoute53NoSuchHostedZone } from "../../../error/sim-route53.error.js";
 import { SimCfnRoute53RecordSetApplicator } from "./sim-cfn-r53-record-set-applicator.js";
 
 describe("SimCfnRoute53RecordSetApplicator", () => {
@@ -70,6 +71,28 @@ describe("SimCfnRoute53RecordSetApplicator", () => {
       error.message,
       "Invalid AWS::Route53::RecordSet TestRecordSet: HostedZoneId must be a string",
     );
+  });
+
+  it("reports an unknown real world HostedZoneId as NoSuchHostedZone", async () => {
+    // Given a RecordSet applicator.
+    const simAws = new SimAws();
+    const applicator = new SimCfnRoute53RecordSetApplicator({
+      route53: simAws.route53(),
+    });
+
+    // When a CloudFormation RecordSet uses a real 14 character HostedZoneId.
+    const error = await assertThrowsErrorAsync(async () =>
+      applicator.create(resource(), {
+        HostedZoneId: "Z2FDTNDATAQYW2",
+        Name: "www.example.com",
+        Type: "A",
+        ResourceRecords: ["192.0.2.1"],
+      }),
+    );
+
+    // Then the ID passes validation and the missing zone is reported.
+    assertInstanceOf(error, SimRoute53NoSuchHostedZone);
+    assertStringIncludes(error.message, "Z2FDTNDATAQYW2");
   });
 
   it("throws when HostedZoneName is invalid or cannot be found", async () => {

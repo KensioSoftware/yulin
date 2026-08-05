@@ -7,7 +7,10 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
-import { SimRoute53NoSuchHostedZone } from "../../error/sim-route53.error.js";
+import {
+  SimRoute53InvalidInput,
+  SimRoute53NoSuchHostedZone,
+} from "../../error/sim-route53.error.js";
 import {
   assertIsSimRoute53HostedZoneId,
   makeSimRoute53HostedZoneId,
@@ -183,9 +186,10 @@ describe("ChangeResourceRecordSetsCommand validation", () => {
     );
 
     // Then HostedZoneId validation fails.
+    assertInstanceOf(missingHostedZoneIdError, SimRoute53InvalidInput);
     assertIdentical(
       missingHostedZoneIdError.message,
-      "Not a SimRoute53HostedZoneId",
+      "Invalid Route53 Hosted Zone ID: (missing)",
     );
 
     // When ChangeBatch.Changes is missing.
@@ -203,6 +207,27 @@ describe("ChangeResourceRecordSetsCommand validation", () => {
       missingChangesError.message,
       "ChangeResourceRecordSetsCommand.ChangeBatch.Changes",
     );
+  });
+
+  it("reports an unknown real world HostedZoneId as NoSuchHostedZone", async () => {
+    // Given a simulated Route53 service with one Hosted Zone.
+    const { simRoute53 } = await createHostedZone("real-world.example.com");
+
+    // When a change is submitted for a real 14 character Hosted Zone ID.
+    const error = await assertThrowsErrorAsync(async () =>
+      simRoute53.changeResourceRecordSets({
+        input: {
+          HostedZoneId: "Z2FDTNDATAQYW2",
+          ChangeBatch: {
+            Changes: [],
+          },
+        },
+      }),
+    );
+
+    // Then the ID passes validation and the missing zone is reported.
+    assertInstanceOf(error, SimRoute53NoSuchHostedZone);
+    assertStringIncludes(error.message, "Z2FDTNDATAQYW2");
   });
 
   it("accepts a /hostedzone/ prefixed HostedZoneId", async () => {

@@ -29,6 +29,17 @@ export class SimRoute53NoSuchHostedZone extends SimRoute53Error {
 }
 
 /**
+ * Simulated Route53 InvalidInput error.
+ */
+export class SimRoute53InvalidInput extends SimRoute53Error {
+  public override readonly name = "InvalidInput";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
  * Simulated Route53 HostedZoneAlreadyExists error.
  */
 export class SimRoute53HostedZoneAlreadyExists extends SimRoute53Error {
