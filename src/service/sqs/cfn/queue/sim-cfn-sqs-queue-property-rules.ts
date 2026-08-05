@@ -1,67 +1,19 @@
-import type {
-  SimCfnTemplateValue,
-  SimCfnTemplateValueRecord,
-} from "../../../cloudformation/template/value/sim-cfn-template-value.js";
-
-/**
- * The AWS::SQS::Queue properties carrying a queue attribute of the same name.
- *
- * CloudFormation names these exactly as the SQS API names the attributes, so
- * they are handed to CreateQueue rather than applied here. That leaves the
- * ranges and defaults in one place: the ones simulated SQS already validates.
- */
-const attributePropertyNames: ReadonlySet<string> = new Set([
-  "DelaySeconds",
-  "MaximumMessageSize",
-  "MessageRetentionPeriod",
-  "ReceiveMessageWaitTimeSeconds",
-  "VisibilityTimeout",
-]);
-
-/**
- * Real AWS::SQS::Queue properties this simulation does not model.
- *
- * A queue deployed without its redrive policy would look like a queue with a
- * dead-letter queue to the template and have none, so these fail the Resource
- * rather than being dropped on the way through.
- */
-const unsimulatedPropertyNames: ReadonlySet<string> = new Set([
-  "ContentBasedDeduplication",
-  "DeduplicationScope",
-  "FifoThroughputLimit",
-  "KmsDataKeyReusePeriodSeconds",
-  "KmsMasterKeyId",
-  "RedriveAllowPolicy",
-  "RedrivePolicy",
-  "SqsManagedSseEnabled",
-  "Tags",
-]);
-
-/**
- * The FifoQueue values that ask for a FIFO queue. CloudFormation carries a
- * boolean property as either, depending on where the value came from.
- */
-const fifoQueueValues: ReadonlySet<SimCfnTemplateValue> = new Set([
-  true,
-  "true",
-]);
-
-/**
- * The FifoQueue values that ask for a standard queue, which is the only kind
- * this simulation creates.
- */
-const standardQueueValues: ReadonlySet<SimCfnTemplateValue> = new Set([
-  false,
-  "false",
-]);
+import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
+import type { SimCfnPropertyIgnorer } from "../../../cloudformation/resource/ignore/sim-cfn-ignored-property.type.js";
+import {
+  attributePropertyNames,
+  fifoQueueValues,
+  standardQueueValues,
+  unsimulatedPropertyReasons,
+} from "./sim-cfn-sqs-queue-property-names.js";
 
 /**
  * Build the error a property of an AWS::SQS::Queue Resource is refused with.
  *
- * The wording matters. Sim CloudFormation skips a Resource whose error reads as
- * an unsupported Resource type, and skipping is the wrong answer for a queue
- * that cannot be created as the template asks: the stack would deploy without
- * it.
+ * Refusing is the rarer answer now. A property simulated SQS cannot act on is
+ * recorded against the Resource and the queue is created without it, so what
+ * is left here is the template that describes no queue at all: a QueueName
+ * that is not a name, a FifoQueue that is neither true nor false.
  */
 export function sqsQueuePropertyError(
   logicalId: string,
@@ -73,22 +25,27 @@ export function sqsQueuePropertyError(
 interface SimCfnSqsQueuePropertyRulesProperties {
   readonly logicalId: string;
   readonly properties: SimCfnTemplateValueRecord;
+  readonly ignorer: SimCfnPropertyIgnorer;
 }
 
 /**
- * Which AWS::SQS::Queue properties simulated SQS can act on.
+ * What simulated SQS does with each AWS::SQS::Queue property it is handed.
  *
- * Anything else fails the Resource. Being stricter than CloudFormation shows up
- * as a puzzling deployment failure here; being looser shows up as a queue
- * behaving one way in a test and another way on AWS.
+ * A property this simulation cannot act on does not stop the queue being
+ * created. It is left out and recorded against the Resource, where a test can
+ * find it, so a stack full of queues still deploys around the settings this
+ * models nothing for. Refusing is kept for the template that describes no
+ * queue at all.
  */
 export class SimCfnSqsQueuePropertyRules {
   private readonly logicalId: string;
   private readonly properties: SimCfnTemplateValueRecord;
+  private readonly ignorer: SimCfnPropertyIgnorer;
 
   constructor(properties: SimCfnSqsQueuePropertyRulesProperties) {
     this.logicalId = properties.logicalId;
     this.properties = properties.properties;
+    this.ignorer = properties.ignorer;
   }
 
   /**
@@ -99,26 +56,31 @@ export class SimCfnSqsQueuePropertyRules {
   }
 
   /**
-   * Refuse everything about this Resource that is not simulated.
+   * Record everything about this Resource the queue is created without.
    */
-  assertSimulated(): void {
-    this.refuseFifoQueue();
+  apply(): void {
+    this.applyToFifoQueue();
 
     for (const name of Object.keys(this.properties)) {
-      this.assertSimulatedProperty(name);
+      this.applyToProperty(name);
     }
   }
 
   /**
    * Refuse a FIFO queue.
    *
-   * Only standard queues are simulated, and a FIFO queue quietly created as a
-   * standard one would take messages in an order the deployment does not
-   * promise, so the Resource fails instead. A value that is neither true nor
-   * false is refused as well, rather than read as false: CloudFormation would
-   * refuse it too, and the queue it asked for is not knowable.
+   * This is one of the few properties still worth refusing over. A FIFO queue
+   * is named `<name>.fifo`, and simulated SQS refuses that name to an SDK
+   * caller as well, so there is no queue to create the Resource without the
+   * property as: the only queue that could exist would answer to a different
+   * name from the one the template gave it, and everything referring to it
+   * would be referring to nothing.
+   *
+   * A value that is neither true nor false is refused as well, rather than
+   * read as false: CloudFormation refuses it too, and the queue it asked for
+   * is not knowable.
    */
-  private refuseFifoQueue(): void {
+  private applyToFifoQueue(): void {
     const fifo = this.properties["FifoQueue"];
 
     if (fifo === undefined || standardQueueValues.has(fifo)) {
@@ -129,8 +91,9 @@ export class SimCfnSqsQueuePropertyRules {
       throw sqsQueuePropertyError(
         this.logicalId,
         "FifoQueue names a FIFO queue, which simulated SQS does not " +
-          "simulate. Only standard queues are simulated, so the queue is not " +
-          "created rather than created as a standard queue",
+          "simulate. Only standard queues are simulated, and a FIFO queue " +
+          "is named <name>.fifo, which simulated SQS refuses, so there is no " +
+          "queue to create under the name the template gave it",
       );
     }
 
@@ -140,13 +103,17 @@ export class SimCfnSqsQueuePropertyRules {
     );
   }
 
-  private assertSimulatedProperty(name: string): void {
-    if (unsimulatedPropertyNames.has(name)) {
-      throw sqsQueuePropertyError(
-        this.logicalId,
-        `${name} is a real AWS::SQS::Queue property that simulated SQS does ` +
-          `not simulate, so it is refused rather than ignored`,
+  private applyToProperty(name: string): void {
+    const unsimulatedReason = unsimulatedPropertyReasons.get(name);
+
+    if (unsimulatedReason !== undefined) {
+      this.ignorer.ignoreProperty(
+        name,
+        `${name} is a real AWS::SQS::Queue property simulated SQS does not ` +
+          `act on: ${unsimulatedReason}`,
       );
+
+      return;
     }
 
     if (
@@ -154,9 +121,10 @@ export class SimCfnSqsQueuePropertyRules {
       name !== "FifoQueue" &&
       !this.isAttributeProperty(name)
     ) {
-      throw sqsQueuePropertyError(
-        this.logicalId,
-        `${name} is not an AWS::SQS::Queue property`,
+      this.ignorer.ignoreProperty(
+        name,
+        `${name} is not a property simulated SQS knows about, so the queue ` +
+          `is created without it`,
       );
     }
   }

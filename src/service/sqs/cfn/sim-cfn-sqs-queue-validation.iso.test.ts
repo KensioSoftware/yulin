@@ -13,6 +13,7 @@ import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
 import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
 import { SimCfnResource } from "../../cloudformation/resource/sim-cfn-resource.js";
+import type { SimCfnIgnoredProperty } from "../../cloudformation/resource/ignore/sim-cfn-ignored-property.type.js";
 import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
 import { SimSqsCfnResourceFactory } from "./sim-sqs-cfn-resource-factory.js";
 
@@ -27,6 +28,23 @@ function queueResource(properties: SimCfnTemplateValueRecord): SimCfnResource {
     logicalId: "BadQueue",
     template: { Type: "AWS::SQS::Queue", Properties: properties },
   });
+}
+
+/**
+ * Create a queue straight through the Resource factory, returning what it
+ * recorded creating the queue without. Keeps the property rules under test
+ * without a whole stack.
+ */
+async function createdQueueResource(
+  properties: SimCfnTemplateValueRecord,
+): Promise<readonly SimCfnIgnoredProperty[]> {
+  const simAws = new SimAws();
+  const factory = new SimSqsCfnResourceFactory({ sqs: simAws.sqs() });
+  const resource = queueResource(properties);
+
+  await factory.create("Queue", resource, { simAws, resources: new Map() });
+
+  return resource.ignoredProperties;
 }
 
 /**
@@ -67,8 +85,9 @@ describe("SQS CloudFormation Queue validation", () => {
       });
     });
 
-    // And the failure names FIFO, rather than the Resource being skipped or
-    // quietly deployed as a standard queue.
+    // And the failure names FIFO, rather than the property being recorded and
+    // the queue created: a FIFO queue is named <name>.fifo, which simulated
+    // SQS refuses, so there is no queue to create under that name.
     assertStringIncludes(
       error.message,
       "FifoQueue names a FIFO queue, which simulated SQS does not simulate",
@@ -119,54 +138,55 @@ describe("SQS CloudFormation Queue validation", () => {
     );
   });
 
-  it("refuses the properties this simulation does not model", async () => {
+  it("records the properties this simulation does not model", async () => {
     // Given templates declaring properties with behaviour that is not
     // simulated.
-    // When each Resource is created, then each is refused by name rather than
-    // deploying a queue that behaves differently here than on AWS.
-    const redrive = await createQueueResource({
+    // When each Resource is created, then each queue exists with the property
+    // it behaves differently to AWS without recorded by name.
+    const redrive = await createdQueueResource({
       QueueName: "orders",
       RedrivePolicy: { maxReceiveCount: 3 },
     });
     assertIdentical(
-      redrive.message,
-      "Invalid AWS::SQS::Queue Resource BadQueue: RedrivePolicy is a real " +
-        "AWS::SQS::Queue property that simulated SQS does not simulate, so " +
-        "it is refused rather than ignored",
+      redrive[0]?.reason,
+      "RedrivePolicy is a real AWS::SQS::Queue property simulated SQS does " +
+        "not act on: dead-letter queues are not simulated, so a message that " +
+        "is received past maxReceiveCount stays on this queue rather than " +
+        "moving",
     );
 
-    const encryption = await createQueueResource({
+    const encryption = await createdQueueResource({
       QueueName: "orders",
       KmsMasterKeyId: "alias/aws/sqs",
     });
     assertStringIncludes(
-      encryption.message,
+      encryption[0]?.reason ?? "",
       "KmsMasterKeyId is a real AWS::SQS::Queue property",
     );
 
-    const tags = await createQueueResource({
+    const tags = await createdQueueResource({
       QueueName: "orders",
       Tags: [{ Key: "component", Value: "orders" }],
     });
     assertStringIncludes(
-      tags.message,
+      tags[0]?.reason ?? "",
       "Tags is a real AWS::SQS::Queue property",
     );
   });
 
-  it("refuses a property AWS::SQS::Queue does not have", async () => {
+  it("records a property AWS::SQS::Queue does not have", async () => {
     // Given a template naming a property that is not on this Resource type.
-    // When the Resource is created, then it is refused rather than ignored, so
-    // a misspelled property does not pass here and fail the deployment.
-    const error = await createQueueResource({
+    // When the Resource is created, then the queue exists with the misspelling
+    // recorded, rather than a stack failing over a name nothing reads.
+    const ignored = await createdQueueResource({
       QueueName: "orders",
       VisibilityTimeoutSeconds: 30,
     });
 
     assertIdentical(
-      error.message,
-      "Invalid AWS::SQS::Queue Resource BadQueue: VisibilityTimeoutSeconds " +
-        "is not an AWS::SQS::Queue property",
+      ignored[0]?.reason,
+      "VisibilityTimeoutSeconds is not a property simulated SQS knows " +
+        "about, so the queue is created without it",
     );
   });
 

@@ -24,11 +24,10 @@ export class SimCfnS3BucketCreator {
   /**
    * Create a simulated Bucket, with the configurations it declares.
    *
-   * Which properties the Resource carries is checked before anything is
-   * created, so a Resource asking for something this simulation does not model
-   * fails the Stack rather than leaving a Bucket behind that is configured
-   * differently from the template. What each of them says is then checked as it
-   * is applied.
+   * Which properties the Resource carries is settled before anything is
+   * created. A property this simulation does not model is recorded against the
+   * Resource and the Bucket is created without it. What each of the remaining
+   * ones says is then checked as it is applied.
    */
   async create(
     resource: SimCfnResource,
@@ -37,7 +36,8 @@ export class SimCfnS3BucketCreator {
     new SimCfnS3BucketPropertyRules({
       logicalId: resource.logicalId,
       properties,
-    }).assertSimulated();
+      ignorer: resource,
+    }).apply();
 
     const bucketName = this.bucketNameForResource(resource, properties);
     validateS3BucketName(bucketName);

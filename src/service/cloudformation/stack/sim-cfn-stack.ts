@@ -3,6 +3,7 @@ import type { Brand } from "../../../util/brand.type.js";
 import type { BackgroundScheduler } from "../../../util/background/background.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimCfnResource } from "../resource/sim-cfn-resource.js";
+import type { SimCfnIgnoredProperty } from "../resource/ignore/sim-cfn-ignored-property.type.js";
 import type {
   CfnTemplateBodyRecord,
   SimCfnTemplate,
@@ -130,6 +131,20 @@ export class SimCfnStack {
    */
   public get skippedResources(): readonly SimCfnResource[] {
     return this.skippedResourceList;
+  }
+
+  /**
+   * Every property the deployment created a Resource without acting on.
+   *
+   * Read from the Resources rather than collected during deployment, so a
+   * Resource created outside a stack deployment still reports its own, and the
+   * two never disagree.
+   */
+  public get ignoredProperties(): readonly SimCfnIgnoredProperty[] {
+    return this.resources
+      .values()
+      .flatMap((resource) => resource.ignoredProperties)
+      .toArray();
   }
 
   /**

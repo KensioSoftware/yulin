@@ -40,7 +40,7 @@ export class SimCfnHttpApiIntegrationProperties {
     this.resource = properties.resource;
     this.properties = properties.properties;
 
-    this.propertyParser.requireOnlySimulated(this.resource, this.properties);
+    this.propertyParser.ignoreUnsimulated(this.resource, this.properties);
   }
 
   /**

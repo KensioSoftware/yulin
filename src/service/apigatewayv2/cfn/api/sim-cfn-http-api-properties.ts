@@ -56,7 +56,7 @@ export class SimCfnHttpApiProperties {
     });
 
     this.rules.requireNoResourcePolicy();
-    this.propertyParser.requireOnlySimulated(this.resource, this.properties);
+    this.propertyParser.ignoreUnsimulated(this.resource, this.properties);
   }
 
   /**
@@ -85,7 +85,7 @@ export class SimCfnHttpApiProperties {
    * WebSocket API is refused by CreateApi with the reason it is refused.
    */
   createApiInput(): SimCreateApiCommandInput {
-    this.rules.requireBodyForFailOnWarnings();
+    this.rules.ignoreFailOnWarningsWithoutBody();
 
     return {
       Name: this.propertyParser.requiredString(

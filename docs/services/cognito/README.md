@@ -1063,10 +1063,13 @@ The properties each type reads are the ones this simulation models:
 - `AWS::Cognito::UserPoolGroup`: `UserPoolId`, `GroupName`, `Description`, `Precedence` and
   `RoleArn`.
 
-Any other property is refused at deploy time, naming the logical id and the property, rather than
-deploying a resource that would behave differently on AWS. A stack that forgets
-`ALLOW_ADMIN_USER_PASSWORD_AUTH` therefore fails at the sign-in here as it would in a deployment,
-which is the point of deploying the template rather than restating it.
+Any other property is left out of what is created and recorded in
+[`stack.ignoredProperties`](../cloudformation/README.md#properties-a-resource-was-created-without),
+naming the logical id, the property and the ones this can act on instead. The pool or client is
+created either way, so a stack full of Cognito resources deploys and the record says which of them
+behaves differently to the template. A stack that forgets `ALLOW_ADMIN_USER_PASSWORD_AUTH` still
+fails at the sign-in here as it would in a deployment, which is the point of deploying the template
+rather than restating it.
 
 `UserPoolName` and `ClientName` are optional. A template that sets neither gets
 `<stack name>-<logical id>`, as real CloudFormation generates a name, trimmed to the 128 characters

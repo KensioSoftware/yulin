@@ -11,6 +11,8 @@ import { describe, it } from "vitest";
 import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
 import {
   deployFailure,
+  deploySuccess,
+  ignoredReasons,
   simAwsInEuWest2,
 } from "../../../../test/cognito/cfn-deploy.js";
 
@@ -107,10 +109,10 @@ describe("Cognito CloudFormation property shapes", () => {
     );
   });
 
-  it("refuses a nested property key it does not model", async () => {
+  it("records a nested property key it does not model", async () => {
     // Given templates carrying a key nothing reads inside each of the nested
     // objects.
-    const passwordPolicyError = await deployFailure(simAwsInEuWest2(), {
+    const passwordPolicyStack = await deploySuccess(simAwsInEuWest2(), {
       AppPool: {
         Type: "AWS::Cognito::UserPool",
         Properties: {
@@ -119,7 +121,7 @@ describe("Cognito CloudFormation property shapes", () => {
         },
       },
     });
-    const unitsError = await deployFailure(simAwsInEuWest2(), {
+    const unitsStack = await deploySuccess(simAwsInEuWest2(), {
       AppPool: appPool,
       AppClient: {
         Type: "AWS::Cognito::UserPoolClient",
@@ -130,14 +132,19 @@ describe("Cognito CloudFormation property shapes", () => {
       },
     });
 
-    // Then each is refused where it sits, rather than dropped on the way to
-    // the Command as the top-level properties would not be.
+    // Then each is recorded at the level it sits at, rather than dropped on
+    // the way to the Command with nothing said about it.
+    const [passwordPolicyReason] = ignoredReasons(passwordPolicyStack);
+    assertNonNullable(passwordPolicyReason);
     assertStringIncludes(
-      passwordPolicyError.message,
+      passwordPolicyReason,
       "property Policies PasswordPolicy RequireEmoji is not simulated",
     );
+
+    const [unitsReason] = ignoredReasons(unitsStack);
+    assertNonNullable(unitsReason);
     assertStringIncludes(
-      unitsError.message,
+      unitsReason,
       "property TokenValidityUnits SessionToken is not simulated",
     );
   });

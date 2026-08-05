@@ -112,7 +112,7 @@ describe("DynamoDB CloudFormation Table secondary index validation", () => {
     assertStringIncludes(error.message, "Index byStatus has no Projection");
   });
 
-  it("skips a table whose index asks for something not simulated", async () => {
+  it("creates a table whose index asks for something not simulated", async () => {
     // Given a template asking for warm throughput on one index, which is not
     // simulated, in a stack with another Resource in it.
     const simAws = new SimAws();
@@ -129,48 +129,58 @@ describe("DynamoDB CloudFormation Table secondary index validation", () => {
       ],
     });
 
-    // Then the whole table is skipped, with a reason naming the index the
-    // setting was on, rather than deployed with an index that ignores it.
+    // Then the table and its index exist, and the record names the index the
+    // setting was on rather than only the property.
     const stack = simAws.cloudFormation().getStackByName("orders-stack");
     const resource = stack?.getResource("OrdersTable");
     assertNonNullable(resource);
-    assertTrue(resource.skipped);
+    assertTrue(resource.deployed);
+    assertNonNullable(simAws.dynamoDb().findTable("orders"));
+
+    const ignored = resource.ignoredProperties[0];
+    assertNonNullable(ignored);
+    assertIdentical(ignored.path, "GlobalSecondaryIndexes.0.WarmThroughput");
     assertStringIncludes(
-      resource.skippedReason ?? "",
+      ignored.reason,
       "GlobalSecondaryIndexes.0.WarmThroughput is a real " +
         "AWS::DynamoDB::Table property that simulated DynamoDB does not " +
         "simulate",
     );
-    assertUndefined(simAws.dynamoDb().findTable("orders"));
 
     // And the rest of the stack still deploys.
     assertTrue(stack?.getResource("OrdersBucket")?.deployed);
   });
 
-  it("fails an index carrying something that is not an index property", async () => {
+  it("creates a table whose index carries something that is not an index property", async () => {
     // Given a template naming something on its index that AWS::DynamoDB::Table
     // has no such property for.
     const simAws = new SimAws();
 
-    // When the template is deployed, then the deployment fails rather than
-    // skipping, since real CloudFormation would refuse this template too.
-    const error = await assertThrowsErrorAsync(async () => {
-      await deployIndexedTable(simAws, {
-        GlobalSecondaryIndexes: [
-          {
-            IndexName: "byStatus",
-            KeySchema: [{ AttributeName: "status", KeyType: "HASH" }],
-            Projection: { ProjectionType: "ALL" },
-            Sorted: true,
-          },
-        ],
-      });
+    // When the template is deployed.
+    await deployIndexedTable(simAws, {
+      GlobalSecondaryIndexes: [
+        {
+          IndexName: "byStatus",
+          KeySchema: [{ AttributeName: "status", KeyType: "HASH" }],
+          Projection: { ProjectionType: "ALL" },
+          Sorted: true,
+        },
+      ],
     });
 
+    // Then the table is created, and the name nothing read is recorded rather
+    // than failing a stack over a typo or a property AWS added since.
+    const stack = simAws.cloudFormation().getStackByName("orders-stack");
+    const resource = stack?.getResource("OrdersTable");
+    assertNonNullable(resource);
+    assertTrue(resource.deployed);
+
+    const ignored = resource.ignoredProperties[0];
+    assertNonNullable(ignored);
     assertStringIncludes(
-      error.message,
+      ignored.reason,
       "GlobalSecondaryIndexes.0.Sorted is not an AWS::DynamoDB::Table " +
-        "GlobalSecondaryIndex property",
+        "GlobalSecondaryIndex property simulated DynamoDB knows about",
     );
   });
 
@@ -179,8 +189,10 @@ describe("DynamoDB CloudFormation Table secondary index validation", () => {
     // which has no such property: it reads out of the table's own capacity.
     const simAws = new SimAws();
 
-    // When the template is deployed, then the deployment fails naming the
-    // property.
+    // When the template is deployed, then the deployment fails rather than
+    // recording the property and carrying on. An index entry is handed to
+    // CreateTable as the template wrote it, so this is refused where an SDK
+    // caller's identical index is, and real DynamoDB refuses it too.
     const error = await assertThrowsErrorAsync(async () => {
       await deployIndexedTable(simAws, {
         LocalSecondaryIndexes: [
@@ -202,8 +214,8 @@ describe("DynamoDB CloudFormation Table secondary index validation", () => {
 
     assertStringIncludes(
       error.message,
-      "LocalSecondaryIndexes.0.ProvisionedThroughput is not an " +
-        "AWS::DynamoDB::Table LocalSecondaryIndex property",
+      "ProvisionedThroughput cannot be specified for index: byTotal because " +
+        "it is a local secondary index",
     );
   });
 

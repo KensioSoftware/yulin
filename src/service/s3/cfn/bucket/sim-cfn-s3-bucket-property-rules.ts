@@ -1,92 +1,52 @@
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
+import type { SimCfnPropertyIgnorer } from "../../../cloudformation/resource/ignore/sim-cfn-ignored-property.type.js";
 import { s3BucketResourceError } from "./error/sim-cfn-s3-bucket-error.js";
-
-/**
- * The AWS::S3::Bucket properties this simulation acts on.
- */
-const simulatedPropertyNames: ReadonlySet<string> = new Set([
-  "BucketName",
-  "NotificationConfiguration",
-  "PublicAccessBlockConfiguration",
-  "WebsiteConfiguration",
-]);
-
-/**
- * Real AWS::S3::Bucket properties this simulation reads and does nothing with.
- *
- * Nothing this simulator models can tell the difference. There is no simulated
- * KMS and Object bytes are stored as they arrive, so an encrypted Bucket and an
- * unencrypted one answer every simulated command identically, and no simulated
- * service reads a Bucket tag. Both are on almost every Bucket CDK synthesizes,
- * so refusing them would leave a CDK app unable to deploy over a difference no
- * test could observe.
- */
-const inertPropertyNames: ReadonlySet<string> = new Set([
-  "BucketEncryption",
-  "Tags",
-]);
-
-/**
- * Real AWS::S3::Bucket properties this simulation does not model.
- *
- * Each of these changes what a simulated command answers on real AWS. A
- * versioned Bucket answers a delete with a delete marker and an
- * `ObjectRemoved:DeleteMarkerCreated` event, where this simulator removes the
- * Object and raises `ObjectRemoved:Delete`. So they fail the Resource rather
- * than being dropped on the way through, which would leave a Bucket that looks
- * configured to the template and behaves as though it were not.
- */
-const unsimulatedPropertyNames: ReadonlySet<string> = new Set([
-  "AbacStatus",
-  "AccelerateConfiguration",
-  "AccessControl",
-  "AnalyticsConfigurations",
-  "BucketNamePrefix",
-  "BucketNamespace",
-  "CorsConfiguration",
-  "IntelligentTieringConfigurations",
-  "InventoryConfigurations",
-  "LifecycleConfiguration",
-  "LoggingConfiguration",
-  "MetadataConfiguration",
-  "MetadataTableConfiguration",
-  "MetricsConfigurations",
-  "ObjectLockConfiguration",
-  "ObjectLockEnabled",
-  "OwnershipControls",
-  "ReplicationConfiguration",
-  "VersioningConfiguration",
-]);
+import {
+  inertPropertyNames,
+  simulatedPropertyNames,
+  unsimulatedPropertyReasons,
+} from "./sim-cfn-s3-bucket-property-names.js";
 
 interface SimCfnS3BucketPropertyRulesProperties {
   readonly logicalId: string;
   readonly properties: SimCfnTemplateValueRecord;
+  readonly ignorer: SimCfnPropertyIgnorer;
 }
 
 /**
- * Which AWS::S3::Bucket properties simulated S3 can act on.
+ * What simulated S3 does with each AWS::S3::Bucket property it is handed.
  *
- * Anything else fails the Resource. Being stricter than CloudFormation shows up
- * as a puzzling deployment failure here; being looser shows up as a Bucket
- * behaving one way in a test and another way on AWS.
+ * Simulated CloudFormation deploys what it can, so a property this simulation
+ * cannot act on does not stop the Bucket being created. It is left out and
+ * recorded against the Resource, where a test can find it. Refusing is kept for
+ * the one case where there is nothing coherent to create: a BucketName that is
+ * not a name.
+ *
+ * A property this simulation has never heard of is treated the same way. It may
+ * be a typo, or a property AWS added since this list was written, and a Bucket
+ * that deploys with the unknown name recorded is more useful than a stack that
+ * fails over either.
  */
 export class SimCfnS3BucketPropertyRules {
   private readonly logicalId: string;
   private readonly properties: SimCfnTemplateValueRecord;
+  private readonly ignorer: SimCfnPropertyIgnorer;
 
   constructor(properties: SimCfnS3BucketPropertyRulesProperties) {
     this.logicalId = properties.logicalId;
     this.properties = properties.properties;
+    this.ignorer = properties.ignorer;
   }
 
   /**
-   * Refuse everything about this Resource that is not simulated.
+   * Record everything about this Resource that is not simulated, refusing only
+   * what leaves nothing to create.
    */
-  assertSimulated(): void {
+  apply(): void {
     this.refuseUnusableBucketName();
 
     for (const name of Object.keys(this.properties)) {
-      this.assertSimulatedProperty(name);
+      this.applyToProperty(name);
     }
   }
 
@@ -111,22 +71,27 @@ export class SimCfnS3BucketPropertyRules {
     );
   }
 
-  private assertSimulatedProperty(name: string): void {
+  private applyToProperty(name: string): void {
     if (simulatedPropertyNames.has(name) || inertPropertyNames.has(name)) {
       return;
     }
 
-    if (unsimulatedPropertyNames.has(name)) {
-      throw s3BucketResourceError(
-        this.logicalId,
-        `${name} is a real AWS::S3::Bucket property that simulated S3 does ` +
-          `not simulate, so it is refused rather than ignored`,
+    const unsimulatedReason = unsimulatedPropertyReasons.get(name);
+
+    if (unsimulatedReason !== undefined) {
+      this.ignorer.ignoreProperty(
+        name,
+        `${name} is a real AWS::S3::Bucket property simulated S3 does not ` +
+          `act on: ${unsimulatedReason}`,
       );
+
+      return;
     }
 
-    throw s3BucketResourceError(
-      this.logicalId,
-      `${name} is not an AWS::S3::Bucket property`,
+    this.ignorer.ignoreProperty(
+      name,
+      `${name} is not a property simulated S3 knows about, so the Bucket is ` +
+        `created without it`,
     );
   }
 }

@@ -3333,7 +3333,8 @@ that does not exist, or naming none at all, is refused in the words `CreateTable
 caller in.
 
 `StreamSpecification.ResourcePolicy` is a policy on the stream rather than on the table. It is not
-simulated, so a template declaring one skips the table, naming the whole property path.
+simulated, so the table is created without it and the whole property path is recorded in
+[`stack.ignoredProperties`](../cloudformation/README.md#properties-a-resource-was-created-without).
 
 Changing `StreamViewType` in a deployed template is a different thing here to what it is on real
 CloudFormation, which replaces the table. `UpdateTable` refuses the change in place, so switching the
@@ -3622,15 +3623,16 @@ Arn`, `Fn::GetAtt … StreamArn` and `Fn::GetAtt … TableId` answering. A CDK `
   the outcome does not.
 - Changing a deployed table's `StreamViewType` is not the table replacement real CloudFormation
   performs. The change goes through `UpdateTable`, which refuses a view type change in place.
-- An `AWS::DynamoDB::GlobalTable` naming two or more replica regions is skipped rather than
-  deployed. Replication between regions is not simulated at all, so there is no half of it to give:
-  a table in one of the regions would answer reads the other regions were meant to serve, and
-  nothing would carry a write from one to the other.
+- An `AWS::DynamoDB::GlobalTable` naming two or more replica regions is created as an ordinary table
+  in the region the stack is deploying into, with `Replicas` recorded in `stack.ignoredProperties`.
+  Replication between regions is not simulated at all, so everything the table does within one region
+  behaves as the template describes and nothing is copied to the others. A replica list that does not
+  include the stack's own region is refused, as real CloudFormation refuses it.
 - A global table's per-replica settings cannot differ from the primary's, because there is only ever
   one replica. Anything a second replica would have said differently is not reachable.
-- `WriteCapacityAutoScalingSettings` and `ReadCapacityAutoScalingSettings` skip the resource rather
-  than being read as the capacity the table would start at. Nothing here scales capacity, and a
-  capacity nothing enforces would still be a number a template asked for and did not get.
+- `WriteCapacityAutoScalingSettings` and `ReadCapacityAutoScalingSettings` are recorded rather than
+  applied, and the table is created at the `MinCapacity` each of them names, which is where
+  autoscaling starts it on AWS. Nothing here scales capacity afterwards.
 - A shard iterator never expires. Real DynamoDB gives one 15 minutes and then answers
   `ExpiredIteratorException`, which a consumer handles by asking for another from the sequence
   number it last checkpointed. Nothing here refuses an iterator for being old.
@@ -3658,13 +3660,13 @@ Arn`, `Fn::GetAtt … StreamArn` and `Fn::GetAtt … TableId` answering. A CDK `
   the record carries. That is the rule AWS's own published sample records follow, and it is not the
   rule the 400 KB item limit uses, where a number costs about half its digits.
 - `KinesisStreamSpecification` is not simulated. A table's changes go to its own stream or nowhere.
-- Encryption at rest is not simulated. An `SSESpecification` with `Enabled` set is refused rather
-  than reported back against items held in the clear. `Enabled: false` asks for the AWS owned key
-  real DynamoDB uses by default, so it is accepted.
-- Table resource policies are not simulated. `ResourcePolicy` is refused, since a table left open to
-  callers the policy would have kept out is the wrong way to fail.
-- `OnDemandThroughput` and `WarmThroughput` are refused. Nothing here applies a request-unit maximum
-  or pre-warms capacity.
+- Encryption at rest is not simulated. An `SSESpecification` with `Enabled` set on a
+  CloudFormation Resource is recorded rather than reported back against items held in the clear.
+  `Enabled: false` asks for the AWS owned key real DynamoDB uses by default, so it is accepted.
+- Table resource policies are not simulated. `ResourcePolicy` on a CloudFormation Resource is
+  recorded, so a table a policy was meant to keep callers out of is open here and closed on AWS.
+- `OnDemandThroughput` and `WarmThroughput` are recorded rather than applied. Nothing here applies a
+  request-unit maximum or pre-warms capacity.
 - `BillingModeSummary` and `TableClassSummary` are reported only when the request named a
   `BillingMode` or a `TableClass`. Real DynamoDB reports the effective values whichever way the table
   was created.

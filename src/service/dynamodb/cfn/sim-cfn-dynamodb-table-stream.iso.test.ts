@@ -171,7 +171,7 @@ describe("DynamoDB CloudFormation Table stream", () => {
     assertUndefined(simAws.dynamoDb().findTable("orders"));
   });
 
-  it("skips a table publishing its changes to a Kinesis stream", async () => {
+  it("creates a table publishing its changes to a Kinesis stream", async () => {
     // Given a template asking for a Kinesis stream, which is a different thing
     // from the table's own stream and is not simulated.
     const simAws = new SimAws();
@@ -183,20 +183,23 @@ describe("DynamoDB CloudFormation Table stream", () => {
       },
     });
 
-    // Then the table is skipped, naming the property, rather than deployed
-    // publishing its changes nowhere.
+    // Then the table exists, publishing its changes nowhere, and the property
+    // it was created without is recorded against the Resource.
     const resource = stack.getResource("OrdersTable");
     assertNonNullable(resource);
-    assertTrue(resource.skipped);
+    assertTrue(resource.deployed);
+    assertNonNullable(simAws.dynamoDb().findTable("orders"));
+
+    const ignored = resource.ignoredProperties[0];
+    assertNonNullable(ignored);
     assertStringIncludes(
-      resource.skippedReason ?? "",
+      ignored.reason,
       "KinesisStreamSpecification is a real AWS::DynamoDB::Table property " +
         "that simulated DynamoDB does not simulate",
     );
-    assertUndefined(simAws.dynamoDb().findTable("orders"));
   });
 
-  it("skips a table asking for a policy on its stream", async () => {
+  it("creates a table asking for a policy on its stream", async () => {
     // Given a template putting a resource policy on the stream, which is a
     // different property from the table's own ResourcePolicy.
     const simAws = new SimAws();
@@ -209,38 +212,48 @@ describe("DynamoDB CloudFormation Table stream", () => {
       },
     });
 
-    // Then the table is skipped, naming the whole path to the property, rather
-    // than deployed with a stream anything could read.
+    // Then the table exists with a stream anything can read, and the record
+    // names the whole path to the property it was created without.
     const resource = stack.getResource("OrdersTable");
     assertNonNullable(resource);
-    assertTrue(resource.skipped);
+    assertTrue(resource.deployed);
+    assertNonNullable(simAws.dynamoDb().findTable("orders"));
+
+    const ignored = resource.ignoredProperties[0];
+    assertNonNullable(ignored);
+    assertIdentical(ignored.path, "StreamSpecification.ResourcePolicy");
     assertStringIncludes(
-      resource.skippedReason ?? "",
+      ignored.reason,
       "StreamSpecification.ResourcePolicy is a real AWS::DynamoDB::Table " +
         "property that simulated DynamoDB does not simulate",
     );
-    assertUndefined(simAws.dynamoDb().findTable("orders"));
   });
 
-  it("fails a table whose StreamSpecification has a made up property", async () => {
+  it("creates a table whose StreamSpecification has a made up property", async () => {
     // Given a template stating something StreamSpecification has no such thing
-    // as, which real CloudFormation would refuse too.
+    // as, which real CloudFormation would refuse.
     const simAws = new SimAws();
 
-    // When the template is deployed, then the failure names the property path.
-    const error = await assertThrowsErrorAsync(async () => {
-      await deployTable(simAws, {
-        StreamSpecification: {
-          StreamViewType: "NEW_IMAGE",
-          StreamEnabled: true,
-        },
-      });
+    // When the template is deployed.
+    const stack = await deployTable(simAws, {
+      StreamSpecification: {
+        StreamViewType: "NEW_IMAGE",
+        StreamEnabled: true,
+      },
     });
 
+    // Then the table is created, with the property path recorded rather than
+    // the stack failing over a name this simulation does not read.
+    const resource = stack.getResource("OrdersTable");
+    assertNonNullable(resource);
+    assertTrue(resource.deployed);
+
+    const ignored = resource.ignoredProperties[0];
+    assertNonNullable(ignored);
     assertStringIncludes(
-      error.message,
+      ignored.reason,
       "StreamSpecification.StreamEnabled is not an AWS::DynamoDB::Table " +
-        "StreamSpecification property",
+        "StreamSpecification property simulated DynamoDB knows about",
     );
   });
 });

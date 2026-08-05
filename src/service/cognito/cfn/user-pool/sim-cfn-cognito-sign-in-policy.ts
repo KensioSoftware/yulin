@@ -44,7 +44,7 @@ export class SimCfnCognitoSignInPolicy {
       return undefined;
     }
 
-    this.propertyParser.requireOnlyKeys(
+    this.propertyParser.ignoreUnmodelledKeys(
       this.resource,
       policy,
       modelledFields,

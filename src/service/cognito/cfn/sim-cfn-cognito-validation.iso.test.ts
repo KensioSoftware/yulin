@@ -5,6 +5,7 @@ import {
   assertNonNullable,
   assertStringIncludes,
   assertStringLength,
+  assertTrue,
   assertTypeString,
   assertUndefined,
 } from "@kensio/smartass";
@@ -14,6 +15,8 @@ import { describe, it } from "vitest";
 import { SimCognitoUserPool } from "../../cognito/user-pool/sim-cognito-user-pool.js";
 import {
   deployFailure,
+  deploySuccess,
+  ignoredReasons,
   simAwsInEuWest2,
 } from "../../../../test/cognito/cfn-deploy.js";
 
@@ -81,12 +84,12 @@ describe("Cognito CloudFormation validation", () => {
     assertUndefined(browserClient.secret);
   });
 
-  it("refuses a user pool property it does not simulate", async () => {
+  it("creates a user pool without a property it does not simulate", async () => {
     // Given a template asking for a pool that signs users in by email.
     const simAws = simAwsInEuWest2();
 
     // When it is deployed.
-    const error = await deployFailure(simAws, {
+    const stack = await deploySuccess(simAws, {
       AppPool: {
         Type: "AWS::Cognito::UserPool",
         Properties: {
@@ -96,19 +99,24 @@ describe("Cognito CloudFormation validation", () => {
       },
     });
 
-    // Then the failure names the logical ID and the property, rather than the
-    // pool being deployed without it.
-    assertStringIncludes(error.message, "AppPool");
-    assertStringIncludes(error.message, "UsernameAttributes is not simulated");
-    assertStringIncludes(error.message, "The simulated properties are");
+    // Then the pool exists, and the record names the logical ID, the property
+    // and what this simulation can act on instead.
+    assertTrue(stack.getResource("AppPool")?.deployed);
+    assertArrayLength(stack.ignoredProperties, 1);
+
+    const [reason] = ignoredReasons(stack);
+    assertNonNullable(reason);
+    assertStringIncludes(reason, "AppPool");
+    assertStringIncludes(reason, "UsernameAttributes is not simulated");
+    assertStringIncludes(reason, "The simulated properties are");
   });
 
-  it("refuses an app client property it does not simulate", async () => {
+  it("creates an app client without a property it does not simulate", async () => {
     // Given a template asking for a client with the hosted UI OAuth flows.
     const simAws = simAwsInEuWest2();
 
     // When it is deployed.
-    const error = await deployFailure(simAws, {
+    const stack = await deploySuccess(simAws, {
       AppPool: {
         Type: "AWS::Cognito::UserPool",
         Properties: { UserPoolName: "myapp-users" },
@@ -122,9 +130,14 @@ describe("Cognito CloudFormation validation", () => {
       },
     });
 
-    // Then the failure names that client and that property.
-    assertStringIncludes(error.message, "AppClient");
-    assertStringIncludes(error.message, "AllowedOAuthFlows is not simulated");
+    // Then the client exists, with a record naming that client and that
+    // property.
+    assertTrue(stack.getResource("AppClient")?.deployed);
+
+    const [reason] = ignoredReasons(stack);
+    assertNonNullable(reason);
+    assertStringIncludes(reason, "AppClient");
+    assertStringIncludes(reason, "AllowedOAuthFlows is not simulated");
   });
 
   it("refuses a pool feature the Cognito API refuses", async () => {

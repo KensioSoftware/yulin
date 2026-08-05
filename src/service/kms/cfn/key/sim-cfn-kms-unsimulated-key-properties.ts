@@ -10,14 +10,16 @@ interface SimCfnKmsUnsimulatedKeyPropertiesProperties {
 }
 
 /**
- * Refuses AWS::KMS::Key properties that ask for behaviour simulated KMS does
- * not model.
+ * Records the AWS::KMS::Key properties that ask for behaviour simulated KMS
+ * does not model.
  *
  * Each of these changes what the key is, not merely how it is described, so
- * quietly ignoring one would leave a template deploying a key that behaves
- * differently here than it would on AWS: rotation that never happens, a
- * multi-Region key whose replica cannot exist, or tags no policy can match.
- * Refusing at deploy time makes that visible where it was declared.
+ * dropping one without a word would leave a template deploying a key that
+ * behaves differently here than it would on AWS: rotation that never happens,
+ * a multi-Region key whose replica cannot exist, or tags no policy can match.
+ * None of them stops a key existing and encrypting, though, so the key is
+ * created without them and each one is recorded against the Resource, where a
+ * test written against the behaviour can find out it was never configured.
  */
 export class SimCfnKmsUnsimulatedKeyProperties {
   private readonly propertyParser: SimCfnKmsPropertyParser;
@@ -27,28 +29,25 @@ export class SimCfnKmsUnsimulatedKeyProperties {
   }
 
   /**
-   * Refuse the Resource if it asks for something unmodelled.
+   * Record everything unmodelled the Resource asks for.
    *
    * KeySpec, KeyUsage and Origin are not checked here: they go through to
    * CreateKey, which already refuses the types this simulation does not
    * create.
    */
-  require(
-    resource: SimCfnResource,
-    properties: SimCfnTemplateValueRecord,
-  ): void {
-    this.requireNoRotation(resource, properties);
-    this.requireSingleRegion(resource, properties);
-    this.requireNoTags(resource, properties);
+  apply(resource: SimCfnResource, properties: SimCfnTemplateValueRecord): void {
+    this.applyToRotation(resource, properties);
+    this.applyToRegion(resource, properties);
+    this.applyToTags(resource, properties);
   }
 
   /**
    * Automatic key rotation is not simulated.
    *
-   * `EnableKeyRotation: false` is the AWS default and says nothing, so it is
-   * accepted.
+   * `EnableKeyRotation: false` is the AWS default and says nothing, so there
+   * is nothing to record for it.
    */
-  private requireNoRotation(
+  private applyToRotation(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
   ): void {
@@ -59,17 +58,17 @@ export class SimCfnKmsUnsimulatedKeyProperties {
     );
 
     if (enabled === true) {
-      throw this.propertyParser.propertyError(
-        resource,
+      resource.ignoreProperty(
+        "EnableKeyRotation",
         "EnableKeyRotation is not simulated: simulated KMS keys keep the " +
-          "same key material for their lifetime, so a rotated ciphertext " +
-          "would not be modelled",
+          "same key material for their lifetime, so the key is created " +
+          "without rotation and a rotated ciphertext is not modelled",
       );
     }
 
     if (properties["RotationPeriodInDays"] !== undefined) {
-      throw this.propertyParser.propertyError(
-        resource,
+      resource.ignoreProperty(
+        "RotationPeriodInDays",
         "RotationPeriodInDays is not simulated: simulated KMS does not " +
           "rotate key material",
       );
@@ -81,7 +80,7 @@ export class SimCfnKmsUnsimulatedKeyProperties {
    * account and region, and a ciphertext produced under it cannot be decrypted
    * elsewhere.
    */
-  private requireSingleRegion(
+  private applyToRegion(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
   ): void {
@@ -92,31 +91,31 @@ export class SimCfnKmsUnsimulatedKeyProperties {
     );
 
     if (multiRegion === true) {
-      throw this.propertyParser.propertyError(
-        resource,
-        "MultiRegion is not simulated: a simulated key belongs to one " +
-          "account and region, and its ciphertext cannot be decrypted in " +
-          "another",
+      resource.ignoreProperty(
+        "MultiRegion",
+        "MultiRegion is not simulated: the key is created in one account and " +
+          "region, and its ciphertext cannot be decrypted in another",
       );
     }
   }
 
   /**
-   * Tags are not simulated on KMS keys, so a template declaring them is
-   * refused rather than deploying a key whose tags nothing can read and no
-   * `aws:ResourceTag` condition can match.
+   * Tags are not simulated on KMS keys, so a template declaring them deploys a
+   * key whose tags nothing can read and no `aws:ResourceTag` condition can
+   * match. That is worth recording, since a policy written around one would
+   * match nothing here and match on AWS.
    */
-  private requireNoTags(
+  private applyToTags(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
   ): void {
     const tags: SimCfnTemplateValue | undefined = properties["Tags"];
 
     if (tags !== undefined) {
-      throw this.propertyParser.propertyError(
-        resource,
+      resource.ignoreProperty(
+        "Tags",
         "Tags are not simulated on KMS keys: ListResourceTags and the " +
-          "aws:ResourceTag condition key would not see them",
+          "aws:ResourceTag condition key do not see them",
       );
     }
   }

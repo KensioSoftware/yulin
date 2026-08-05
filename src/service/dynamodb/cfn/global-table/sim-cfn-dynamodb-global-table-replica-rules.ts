@@ -1,4 +1,5 @@
 import { SimCfnDynamoDbPropertyRules } from "../property/sim-cfn-dynamodb-property-rules.js";
+import type { SimCfnDynamoDbResourceScope } from "../property/sim-cfn-dynamodb-resource-scope.js";
 import { dynamoDbGlobalTableResourceTypeName } from "../sim-cfn-dynamodb-resource-type.js";
 
 /**
@@ -54,8 +55,8 @@ const unsimulatedReplicaIndexPropertyNames: ReadonlySet<string> = new Set([
  *
  * A fixed `ReadCapacityUnits` is half of the capacity an ordinary table's
  * `ProvisionedThroughput` states. `ReadCapacityAutoScalingSettings` asks for
- * capacity that changes with load, which nothing here changes, so it skips the
- * table rather than being read as the capacity it starts at.
+ * capacity that changes with load, which nothing here changes, so it is
+ * recorded and the table is created at the `MinCapacity` it names.
  */
 const simulatedReadCapacityPropertyNames: ReadonlySet<string> = new Set([
   "ReadCapacityUnits",
@@ -69,11 +70,11 @@ const unsimulatedReadCapacityPropertyNames: ReadonlySet<string> = new Set([
  * The rules a `Replicas` entry is read under.
  */
 export function simCfnDynamoDbGlobalTableReplicaRules(
-  logicalId: string,
+  scope: SimCfnDynamoDbResourceScope,
 ): SimCfnDynamoDbPropertyRules {
   return new SimCfnDynamoDbPropertyRules({
     resourceTypeName: dynamoDbGlobalTableResourceTypeName,
-    logicalId,
+    scope,
     kind: "Replica",
     simulated: simulatedReplicaPropertyNames,
     unsimulated: unsimulatedReplicaPropertyNames,
@@ -84,11 +85,11 @@ export function simCfnDynamoDbGlobalTableReplicaRules(
  * The rules a replica's `GlobalSecondaryIndexes` entry is read under.
  */
 export function simCfnDynamoDbGlobalTableReplicaIndexRules(
-  logicalId: string,
+  scope: SimCfnDynamoDbResourceScope,
 ): SimCfnDynamoDbPropertyRules {
   return new SimCfnDynamoDbPropertyRules({
     resourceTypeName: dynamoDbGlobalTableResourceTypeName,
-    logicalId,
+    scope,
     kind: "Replica GlobalSecondaryIndex",
     simulated: simulatedReplicaIndexPropertyNames,
     unsimulated: unsimulatedReplicaIndexPropertyNames,
@@ -100,11 +101,11 @@ export function simCfnDynamoDbGlobalTableReplicaIndexRules(
  * or on one of its global secondary indexes.
  */
 export function simCfnDynamoDbGlobalTableReadCapacityRules(
-  logicalId: string,
+  scope: SimCfnDynamoDbResourceScope,
 ): SimCfnDynamoDbPropertyRules {
   return new SimCfnDynamoDbPropertyRules({
     resourceTypeName: dynamoDbGlobalTableResourceTypeName,
-    logicalId,
+    scope,
     kind: "ReadProvisionedThroughputSettings",
     simulated: simulatedReadCapacityPropertyNames,
     unsimulated: unsimulatedReadCapacityPropertyNames,

@@ -13,8 +13,8 @@ import { SimCfnCognitoPolicies } from "./sim-cfn-cognito-policies.js";
  *
  * `MfaConfiguration` and `UserPoolTier` are here because CreateUserPool
  * accepts each at its AWS default and refuses it otherwise, in words that say
- * why. A CDK stack states both routinely, so refusing them outright would
- * refuse templates that ask for nothing unsimulated.
+ * why. A CDK stack states both routinely, and a pool created without either
+ * would be reported as behaving differently when it does not.
  *
  * The six from `AccountRecoverySetting` down are here for the same reason,
  * and are the six a CDK `UserPool` construct emits when it was asked for
@@ -46,9 +46,9 @@ interface SimCfnCognitoUserPoolPropertiesProperties {
  * Reads AWS::Cognito::UserPool CloudFormation properties into the CreateUserPool
  * input the pool creator needs.
  *
- * The refusal of unsimulated properties runs on construction rather than when
- * a property is read, so a Resource asking for something unmodelled cannot get
- * as far as creating a pool that would then be wrong.
+ * The recording of unsimulated properties runs on construction rather than
+ * when a property is read, so the report of what the pool was created without
+ * is complete whichever properties the creator goes on to ask for.
  */
 export class SimCfnCognitoUserPoolProperties {
   private readonly resource: SimCfnResource;
@@ -62,7 +62,7 @@ export class SimCfnCognitoUserPoolProperties {
     this.resource = properties.resource;
     this.properties = properties.properties;
 
-    this.propertyParser.requireOnlySimulated(this.resource, this.properties);
+    this.propertyParser.ignoreUnsimulated(this.resource, this.properties);
   }
 
   /**

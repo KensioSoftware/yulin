@@ -51,17 +51,20 @@ export class SimCfnDynamoDbTableProperties {
       properties: properties.properties,
     });
     this.rules = new SimCfnDynamoDbTablePropertyRules({
-      logicalId: properties.resource.logicalId,
+      scope: {
+        logicalId: properties.resource.logicalId,
+        ignorer: properties.resource,
+      },
       values: this.values,
     });
   }
 
   /**
-   * Refuse everything about this Resource that is not simulated, before
+   * Record everything about this Resource the table is created without, before
    * anything is read off it.
    */
-  assertSimulated(): void {
-    this.rules.assertSimulated();
+  applyPropertyRules(): void {
+    this.rules.apply();
   }
 
   /**

@@ -1,5 +1,6 @@
 import { SimCfnDynamoDbPropertyRules } from "../property/sim-cfn-dynamodb-property-rules.js";
 import type { SimCfnDynamoDbPropertyValues } from "../property/sim-cfn-dynamodb-property-values.js";
+import type { SimCfnDynamoDbResourceScope } from "../property/sim-cfn-dynamodb-resource-scope.js";
 import { dynamoDbTableResourceTypeName } from "../sim-cfn-dynamodb-resource-type.js";
 import {
   simCfnDynamoDbTableGlobalIndexRules,
@@ -33,9 +34,9 @@ const simulatedPropertyNames: ReadonlySet<string> = new Set([
  * Real AWS::DynamoDB::Table properties this simulation does not model.
  *
  * Each one changes what the table does. A table deployed without the Kinesis
- * stream its changes were meant to be published to would leave whatever reads
- * that stream waiting, so the Resource is skipped rather than deployed as
- * something else.
+ * stream its changes were meant to be published to leaves whatever reads that
+ * stream waiting, so the table is created without the property and the
+ * omission is recorded where a test can find it.
  */
 const unsimulatedPropertyNames: ReadonlySet<string> = new Set([
   "ContributorInsightsSpecification",
@@ -49,59 +50,58 @@ const unsimulatedPropertyNames: ReadonlySet<string> = new Set([
 ]);
 
 interface SimCfnDynamoDbTablePropertyRulesProperties {
-  readonly logicalId: string;
+  readonly scope: SimCfnDynamoDbResourceScope;
   readonly values: SimCfnDynamoDbPropertyValues;
 }
 
 /**
- * Which AWS::DynamoDB::Table properties simulated DynamoDB can act on.
+ * What simulated DynamoDB does with each AWS::DynamoDB::Table property.
  *
- * A real property that is not simulated skips the Resource, with a reason
- * naming it, so the rest of the stack still deploys and the report says what
- * was left out. Anything that is not an AWS::DynamoDB::Table property at all
- * fails the Resource instead, because that is a template real CloudFormation
- * would refuse too.
+ * A property this simulation cannot act on is recorded against the Resource
+ * and the table is created without it, rather than the table going missing
+ * from the stack over one setting. Anything that is not an
+ * AWS::DynamoDB::Table property at all is recorded the same way.
  *
  * The two index properties and the stream specification carry properties of
  * their own, which are held to the same rule a level down.
  */
 export class SimCfnDynamoDbTablePropertyRules {
-  private readonly logicalId: string;
+  private readonly scope: SimCfnDynamoDbResourceScope;
   private readonly values: SimCfnDynamoDbPropertyValues;
 
   constructor(properties: SimCfnDynamoDbTablePropertyRulesProperties) {
-    this.logicalId = properties.logicalId;
+    this.scope = properties.scope;
     this.values = properties.values;
   }
 
   /**
-   * Refuse everything about this Resource that is not simulated.
+   * Record everything about this Resource the table is created without.
    */
-  assertSimulated(): void {
+  apply(): void {
     new SimCfnDynamoDbPropertyRules({
       resourceTypeName: dynamoDbTableResourceTypeName,
-      logicalId: this.logicalId,
+      scope: this.scope,
       simulated: simulatedPropertyNames,
       unsimulated: unsimulatedPropertyNames,
-    }).assertSimulated(this.values);
+    }).apply(this.values);
 
-    this.assertSimulatedMembers();
+    this.applyToMembers();
   }
 
   /**
-   * Refuse what the properties carrying properties of their own ask for and
-   * cannot get: the two index lists, and the stream specification.
+   * Apply the same rule to the properties carrying properties of their own:
+   * the two index lists, and the stream specification.
    */
-  private assertSimulatedMembers(): void {
-    const logicalId = this.logicalId;
+  private applyToMembers(): void {
+    const scope = this.scope;
 
-    simCfnDynamoDbTableGlobalIndexRules(logicalId).assertEachSimulated(
+    simCfnDynamoDbTableGlobalIndexRules(scope).applyToEach(
       this.values.list("GlobalSecondaryIndexes"),
     );
-    simCfnDynamoDbTableLocalIndexRules(logicalId).assertEachSimulated(
+    simCfnDynamoDbTableLocalIndexRules(scope).applyToEach(
       this.values.list("LocalSecondaryIndexes"),
     );
-    simCfnDynamoDbTableStreamRules(logicalId).assertSimulated(
+    simCfnDynamoDbTableStreamRules(scope).apply(
       this.values.object("StreamSpecification"),
     );
   }

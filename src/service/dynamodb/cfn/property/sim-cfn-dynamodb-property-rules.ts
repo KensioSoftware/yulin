@@ -1,16 +1,13 @@
-import {
-  dynamoDbPropertyError,
-  dynamoDbUnsimulatedPropertyError,
-} from "./sim-cfn-dynamodb-property-error.js";
 import type { SimCfnDynamoDbPropertyValues } from "./sim-cfn-dynamodb-property-values.js";
+import type { SimCfnDynamoDbResourceScope } from "./sim-cfn-dynamodb-resource-scope.js";
 
 interface SimCfnDynamoDbPropertyRulesProperties {
   readonly resourceTypeName: string;
-  readonly logicalId: string;
+  readonly scope: SimCfnDynamoDbResourceScope;
 
   /**
    * What the properties belong to, where they are not the Resource's own: a
-   * `GlobalSecondaryIndex`, a `StreamSpecification`, a replica. A refusal names
+   * `GlobalSecondaryIndex`, a `StreamSpecification`, a replica. A record names
    * it, so an unrecognised property says which shape it was not part of.
    */
   readonly kind?: string | undefined;
@@ -19,14 +16,16 @@ interface SimCfnDynamoDbPropertyRulesProperties {
 }
 
 /**
- * Which properties of one object in a DynamoDB Resource template simulated
- * DynamoDB can act on.
+ * What simulated DynamoDB does with each property of one object in a table
+ * template.
  *
- * A real property that is not simulated skips the Resource, with a reason
- * naming it, so the rest of the stack still deploys and the report says what
- * was left out. Anything that is not a property of that object at all fails the
- * Resource instead, because that is a template real CloudFormation would refuse
- * too.
+ * A property this simulation cannot act on does not stop the table being
+ * created. The table is created without it and the omission is recorded
+ * against the Resource, where a test that expected the setting to do something
+ * can find out that it never did. Anything that is not a property of that
+ * object at all is recorded the same way, since a typo and a property AWS added
+ * after this list was written look identical from here, and a table that
+ * deploys is more useful than a stack that fails over either.
  *
  * The same rule applies at every level a template nests: the Resource's own
  * properties, the entries of an index list, a stream specification, a replica.
@@ -35,31 +34,31 @@ interface SimCfnDynamoDbPropertyRulesProperties {
  */
 export class SimCfnDynamoDbPropertyRules {
   private readonly resourceTypeName: string;
-  private readonly logicalId: string;
+  private readonly scope: SimCfnDynamoDbResourceScope;
   private readonly kind: string | undefined;
   private readonly simulated: ReadonlySet<string>;
   private readonly unsimulated: ReadonlySet<string>;
 
   constructor(properties: SimCfnDynamoDbPropertyRulesProperties) {
     this.resourceTypeName = properties.resourceTypeName;
-    this.logicalId = properties.logicalId;
+    this.scope = properties.scope;
     this.kind = properties.kind;
     this.simulated = properties.simulated;
     this.unsimulated = properties.unsimulated ?? new Set<string>();
   }
 
   /**
-   * Refuse everything about this object that is not simulated.
+   * Record everything about this object the table is created without.
    *
-   * An object the template left out has nothing here to refuse.
+   * An object the template left out has nothing here to record.
    */
-  assertSimulated(values: SimCfnDynamoDbPropertyValues | undefined): void {
+  apply(values: SimCfnDynamoDbPropertyValues | undefined): void {
     if (values === undefined) {
       return;
     }
 
     for (const name of values.names) {
-      this.assertSimulatedProperty(values, name);
+      this.applyToProperty(values, name);
     }
   }
 
@@ -67,13 +66,13 @@ export class SimCfnDynamoDbPropertyRules {
    * Apply the same rule to every entry of a list, such as the indexes or the
    * replicas a template declares.
    */
-  assertEachSimulated(entries: readonly SimCfnDynamoDbPropertyValues[]): void {
+  applyToEach(entries: readonly SimCfnDynamoDbPropertyValues[]): void {
     for (const entry of entries) {
-      this.assertSimulated(entry);
+      this.apply(entry);
     }
   }
 
-  private assertSimulatedProperty(
+  private applyToProperty(
     values: SimCfnDynamoDbPropertyValues,
     name: string,
   ): void {
@@ -81,23 +80,27 @@ export class SimCfnDynamoDbPropertyRules {
       return;
     }
 
+    const path = values.pathTo(name);
+
     if (this.unsimulated.has(name)) {
-      throw dynamoDbUnsimulatedPropertyError(
-        this.resourceTypeName,
-        this.logicalId,
-        values.pathTo(name),
+      this.scope.ignorer.ignoreProperty(
+        path,
+        `${path} is a real ${this.resourceTypeName} property that simulated ` +
+          `DynamoDB does not simulate, so the table is created without it`,
       );
+
+      return;
     }
 
-    throw dynamoDbPropertyError(
-      this.resourceTypeName,
-      this.logicalId,
-      `${values.pathTo(name)} is not ${this.description()} property`,
+    this.scope.ignorer.ignoreProperty(
+      path,
+      `${path} is not ${this.description()} property simulated DynamoDB ` +
+        `knows about, so the table is created without it`,
     );
   }
 
   /**
-   * What an unrecognised property was not part of, as a refusal names it.
+   * What an unrecognised property was not part of, as a record names it.
    */
   private description(): string {
     if (this.kind === undefined) {

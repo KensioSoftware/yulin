@@ -11,14 +11,18 @@ interface SimCfnCognitoPropertyParserProperties {
 }
 
 /**
- * Validates the AWS::Cognito::* CloudFormation properties of one Resource
- * type, both which of them may appear and what shape each has to be.
+ * Reads the AWS::Cognito::* CloudFormation properties of one Resource type,
+ * deciding which of them are acted on and checking the shape of those that are.
  *
  * Each Resource type states the properties it simulates, and every other
- * property is refused. An allow-list rather than a list of known-unsimulated
- * properties is what keeps a template from quietly deploying something this
- * simulation would ignore, including properties CloudFormation has that the
- * Cognito API does not.
+ * property is recorded against the Resource and left out of what is created.
+ * An allow-list rather than a list of known-unsimulated properties is what
+ * keeps the record honest: a property CloudFormation has that the Cognito API
+ * does not still shows up in it, without this having to name every one.
+ *
+ * Nothing is deployed quietly. What is not simulated is not silently dropped;
+ * it is created without and reported, so a user pool that behaves differently
+ * to the template says so.
  */
 export class SimCfnCognitoPropertyParser extends SimCfnCognitoValueParser {
   private readonly simulated: readonly string[];
@@ -29,28 +33,28 @@ export class SimCfnCognitoPropertyParser extends SimCfnCognitoValueParser {
   }
 
   /**
-   * Refuse every property this Resource type does not simulate.
+   * Record every property this Resource type does not simulate.
    *
    * A property whose only simulated value is its AWS default, such as
    * `MfaConfiguration`, counts as simulated here and is refused further down
    * by the Cognito command that receives it.
    */
-  requireOnlySimulated(
+  ignoreUnsimulated(
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
   ): void {
-    this.requireOnlyKeys(resource, properties, this.simulated);
+    this.ignoreUnmodelledKeys(resource, properties, this.simulated);
   }
 
   /**
-   * Refuse every key of a nested property object that is not modelled.
+   * Record every key of a nested property object that is not modelled.
    *
    * A nested object is held to the same rule as the properties around it. A
    * `Policies` or a `TokenValidityUnits` carrying a key nothing here reads
-   * would otherwise be dropped on the way to the Command, which is the quiet
-   * ignoring the top-level allow-list exists to prevent.
+   * would otherwise be dropped on the way to the Command without a word about
+   * it, which is the quiet ignoring the top-level allow-list exists to prevent.
    */
-  requireOnlyKeys(
+  ignoreUnmodelledKeys(
     resource: SimCfnResource,
     record: SimCfnTemplateValueRecord,
     modelled: readonly string[],
@@ -58,10 +62,9 @@ export class SimCfnCognitoPropertyParser extends SimCfnCognitoValueParser {
   ): void {
     for (const name of Object.keys(record)) {
       if (!modelled.includes(name)) {
-        throw this.unsimulatedPropertyError(
-          resource,
+        resource.ignoreProperty(
           `${path}${name}`,
-          modelled,
+          this.unsimulatedPropertyReason(`${path}${name}`, modelled),
         );
       }
     }
@@ -108,18 +111,20 @@ export class SimCfnCognitoPropertyParser extends SimCfnCognitoValueParser {
   }
 
   /**
-   * Build the diagnostic error for a property this simulator does not model.
+   * Say why a property this simulator does not model was left out.
+   *
+   * The modelled names are listed because a Cognito Resource type has a lot of
+   * properties and few of them are simulated, so what this can act on is
+   * shorter and more useful to read than what it cannot.
    */
-  private unsimulatedPropertyError(
-    resource: SimCfnResource,
+  private unsimulatedPropertyReason(
     label: string,
     modelled: readonly string[],
-  ): Error {
-    return new Error(
-      `${this.resourceType} ${resource.logicalId} property ${label} is not ` +
-        `simulated, and a deployed Resource ignoring it would behave ` +
-        `differently here than on AWS. The simulated properties are ` +
-        `${modelled.join(", ")}.`,
+  ): string {
+    return (
+      `${this.resourceType} property ${label} is not simulated, so the ` +
+      `Resource is created without it and behaves differently here than on ` +
+      `AWS. The simulated properties are ${modelled.join(", ")}.`
     );
   }
 }

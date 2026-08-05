@@ -452,12 +452,15 @@ console.log(Buffer.from(decrypted.Plaintext ?? []).toString("utf8")); // "hunter
 console.log(stack.outputs.get("KeyArn")?.value); // "arn:aws:kms:...:key/..."
 ```
 
-Properties asking for behaviour that is not simulated refuse the deployment rather than being
-ignored, so a template does not quietly deploy a key that would behave differently on AWS.
-`EnableKeyRotation`, `RotationPeriodInDays`, `MultiRegion` and `Tags` are all refused. An asymmetric
-or HMAC `KeySpec` or `KeyUsage`, or an `Origin` other than `AWS_KMS`, is refused by `CreateKey` in
-the same terms it refuses an SDK caller. `Enabled: false` is supported, and deploys a key that is
-disabled from the moment it exists.
+Properties asking for behaviour that is not simulated do not stop the key being created. The key is
+created without them and each one is recorded in
+[`stack.ignoredProperties`](../cloudformation/README.md#properties-a-resource-was-created-without),
+so a template deploys and the record says what the key does not do. `EnableKeyRotation`,
+`RotationPeriodInDays`, `MultiRegion` and `Tags` are all recorded that way: the key encrypts and
+decrypts, its material never rotates, it exists in one region, and nothing reads its tags. An
+asymmetric or HMAC `KeySpec` or `KeyUsage`, or an `Origin` other than `AWS_KMS`, is still refused by
+`CreateKey` in the same terms it refuses an SDK caller, because there is no key to create at all.
+`Enabled: false` is supported, and deploys a key that is disabled from the moment it exists.
 
 ## Inside a simulated Lambda handler
 
@@ -492,8 +495,10 @@ Current documented limitations:
   refused.
 - Grants (`CreateGrant` and friends) are not simulated.
 - Automatic key rotation is not simulated. An `AWS::KMS::Key` declaring `EnableKeyRotation` or
-  `RotationPeriodInDays` is refused.
-- Multi-Region keys are not simulated. An `AWS::KMS::Key` declaring `MultiRegion: true` is refused.
+  `RotationPeriodInDays` is created without it, and the property is recorded in
+  `stack.ignoredProperties`.
+- Multi-Region keys are not simulated. An `AWS::KMS::Key` declaring `MultiRegion: true` is created as
+  a key in one region, and the property is recorded.
 - `AWS::KMS::Key` accepts but ignores `PendingWindowInDays` and `BypassPolicyLockoutSafetyCheck`.
   Neither has anything to act on: simulated CloudFormation does not delete stacks, and simulated KMS
   applies no policy lockout safety check to bypass.
@@ -505,7 +510,8 @@ Current documented limitations:
   recovery window does not delete it, so the key ID stays taken.
 - Aliases cannot be updated or deleted; `UpdateAlias` and `DeleteAlias` are not supported.
 - Tags, `ListResourceTags` and the `aws:ResourceTag` condition key are not simulated. An
-  `AWS::KMS::Key` declaring `Tags` is refused rather than deploying with the tags dropped.
+  `AWS::KMS::Key` declaring `Tags` deploys with the tags dropped and the property recorded, so a
+  policy condition written around one matches nothing here and matches on AWS.
 - `kms:EncryptionContext:*` and other KMS-specific condition keys beyond `kms:ViaService` and
   `kms:CallerAccount` are not derived, so a policy relying on them will not match. Ordinary condition
   operators on values sim IAM does supply work as usual.

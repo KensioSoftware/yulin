@@ -1,5 +1,7 @@
 import {
+  assertIdentical,
   assertInstanceOf,
+  assertNonNullable,
   assertStringIncludes,
   assertThrowsError,
 } from "@kensio/smartass";
@@ -8,6 +10,7 @@ import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
 import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
 import { SimCfnResource } from "../../cloudformation/resource/sim-cfn-resource.js";
+import type { SimCfnIgnoredProperty } from "../../cloudformation/resource/ignore/sim-cfn-ignored-property.type.js";
 import type { SimCfnTemplateValueRecord } from "../../cloudformation/template/value/sim-cfn-template-value.js";
 import { SimKmsKey } from "../key/sim-kms-key.js";
 import { SimKmsCfnResourceFactory } from "./sim-cfn-kms-resource-factory.js";
@@ -26,6 +29,22 @@ function kmsResource(
     logicalId: "BadKey",
     template: { Type: resourceType, Properties: properties },
   });
+}
+
+/**
+ * Create a KMS Resource straight through the Resource factory, returning what
+ * it recorded creating the Resource without.
+ */
+async function createdKmsResource(
+  properties: SimCfnTemplateValueRecord,
+): Promise<readonly SimCfnIgnoredProperty[]> {
+  const simAws = new SimAws({ defaultAccountId: accountIdOneOnes });
+  const factory = new SimKmsCfnResourceFactory({ kms: simAws.kms() });
+  const resource = kmsResource("AWS::KMS::Key", properties);
+
+  await factory.create("Key", resource, { simAws, resources: new Map() });
+
+  return resource.ignoredProperties;
 }
 
 /**
@@ -56,15 +75,18 @@ async function createKmsResource(
 }
 
 describe("KMS CloudFormation Resource validation", () => {
-  it("refuses EnableKeyRotation", async () => {
+  it("records EnableKeyRotation", async () => {
     // Given a template asking for automatic key rotation, which simulated KMS
     // does not model.
-    // When the Resource is created, then it is refused rather than deploying a
-    // key whose material never actually rotates.
-    const error = await createKmsResource("Key", { EnableKeyRotation: true });
+    // When the Resource is created, then the key exists and the rotation that
+    // never happens is recorded against it.
+    const ignored = await createdKmsResource({ EnableKeyRotation: true });
 
-    assertStringIncludes(error.message, "AWS::KMS::Key Resource BadKey");
-    assertStringIncludes(error.message, "EnableKeyRotation is not simulated");
+    const [rotation] = ignored;
+    assertNonNullable(rotation);
+    assertIdentical(rotation.logicalId, "BadKey");
+    assertIdentical(rotation.resourceType, "AWS::KMS::Key");
+    assertStringIncludes(rotation.reason, "EnableKeyRotation is not simulated");
   });
 
   it("accepts EnableKeyRotation false, which is the AWS default", async () => {
@@ -83,38 +105,43 @@ describe("KMS CloudFormation Resource validation", () => {
     assertInstanceOf(created, SimKmsKey);
   });
 
-  it("refuses RotationPeriodInDays", async () => {
+  it("records RotationPeriodInDays", async () => {
     // Given a template setting a rotation period.
-    // When the Resource is created, then it is refused.
-    const error = await createKmsResource("Key", {
-      RotationPeriodInDays: 180,
-    });
+    // When the Resource is created, then it is recorded.
+    const ignored = await createdKmsResource({ RotationPeriodInDays: 180 });
 
     assertStringIncludes(
-      error.message,
+      ignored[0]?.reason ?? "",
       "RotationPeriodInDays is not simulated",
     );
   });
 
-  it("refuses MultiRegion", async () => {
+  it("records MultiRegion", async () => {
     // Given a template asking for a multi-Region key, whose whole point is a
     // replica in another region that simulated KMS cannot produce.
-    // When the Resource is created, then it is refused.
-    const error = await createKmsResource("Key", { MultiRegion: true });
+    // When the Resource is created, then the key exists in this region alone
+    // and the replica that cannot be is recorded.
+    const ignored = await createdKmsResource({ MultiRegion: true });
 
-    assertStringIncludes(error.message, "MultiRegion is not simulated");
+    assertStringIncludes(
+      ignored[0]?.reason ?? "",
+      "MultiRegion is not simulated",
+    );
   });
 
-  it("refuses Tags", async () => {
+  it("records Tags", async () => {
     // Given a template tagging the key, which simulated KMS neither stores nor
     // matches in a policy condition.
-    // When the Resource is created, then it is refused rather than dropping
-    // the tags silently.
-    const error = await createKmsResource("Key", {
+    // When the Resource is created, then the tags are recorded rather than
+    // dropped with nothing said about them.
+    const ignored = await createdKmsResource({
       Tags: [{ Key: "component", Value: "database" }],
     });
 
-    assertStringIncludes(error.message, "Tags are not simulated on KMS keys");
+    assertStringIncludes(
+      ignored[0]?.reason ?? "",
+      "Tags are not simulated on KMS keys",
+    );
   });
 
   it("refuses an asymmetric KeySpec", async () => {

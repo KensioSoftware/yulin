@@ -1,4 +1,3 @@
-import type { SimAws } from "../../aws/sim-aws.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import {
   type BackgroundScheduler,
@@ -7,48 +6,27 @@ import {
 import type { SimCfnServiceResourceFactory } from "./factory/sim-cfn-resource-factory.type.js";
 import { SimCfnResourceCreateOperation } from "./create/sim-cfn-resource-create-operation.js";
 import { SimCfnResourceCreationState } from "./state/sim-cfn-resource-creation-state.js";
+import { SimCfnIgnoredProperties } from "./ignore/sim-cfn-ignored-properties.js";
+import type {
+  SimCfnIgnoredProperty,
+  SimCfnPropertyIgnorer,
+} from "./ignore/sim-cfn-ignored-property.type.js";
 import { SimCfnResourceTemplateReader } from "./template/sim-cfn-resource-template-reader.js";
 import type {
   SimCfnTemplateValue,
   SimCfnTemplateValueRecord,
 } from "../template/value/sim-cfn-template-value.js";
-import type { SimCfnParameters } from "../parameters/sim-cfn-parameters.js";
 import { SimCfnResourcePropertyResolver } from "./resolve/property/sim-cfn-resource-property-resolver.js";
 import {
   type SimCfnResourceValueAdapter,
   simCfnResourceValueAdapter,
 } from "./cfn/sim-cfn-resource-value-adapter.js";
-import type { SimCdkOutContext } from "../cdk/sim-cdk-out-context.js";
-import type { SimCfnExecutableResourceBinding } from "../bind/sim-cfn-exec-binding.type.js";
 import { simAwsAccountRegionScopeFactory } from "../../aws/sim-aws-account-region-scope.factory.js";
-
-export interface SimCloudFormationResourceProperties {
-  readonly accountRegionScope?: SimAwsAccountRegionScope;
-  readonly background?: BackgroundScheduler;
-  readonly logicalId?: string;
-  readonly stackName?: string | undefined;
-  readonly template?: SimCfnTemplateValueRecord;
-  readonly cfnResourceFactory?: SimCfnServiceResourceFactory | undefined;
-  readonly parameters?: SimCfnParameters | undefined;
-  readonly resourceLogicalIds?: ReadonlySet<string> | undefined;
-}
-
-/**
- * Simulated CloudFormation Resource status.
- *
- * These states model the CloudFormation creation lifecycle for one Resource
- * entry, not the lifecycle of the underlying simulated AWS service object.
- */
-export type SimCloudFormationResourceStatus =
-  "CREATE_PENDING" | "CREATE_IN_PROGRESS" | "CREATE_COMPLETE" | "CREATE_FAILED";
-
-export interface SimCloudFormationResourceCreateContext {
-  readonly simAws: SimAws;
-  readonly resources: ReadonlyMap<string, SimCfnResource>;
-  readonly resolvedProperties?: SimCfnTemplateValueRecord | undefined;
-  readonly cdkOutContext?: SimCdkOutContext | undefined;
-  readonly bindings?: readonly SimCfnExecutableResourceBinding[] | undefined;
-}
+import type {
+  SimCloudFormationResourceCreateContext,
+  SimCloudFormationResourceProperties,
+  SimCloudFormationResourceStatus,
+} from "./sim-cfn-resource.type.js";
 
 /**
  * Runtime representation of one CloudFormation Resource entry.
@@ -63,17 +41,19 @@ export interface SimCloudFormationResourceCreateContext {
  * - Resource-field reading belongs to SimCfnResourceTemplateReader;
  * - asynchronous creation orchestration belongs to SimCfnResourceCreateOperation;
  * - service-specific object construction belongs to SimCfnServiceResourceFactory.
- *
  * As a result, SimCfnResource acts as the stable Resource record passed between
  * stack creation, dependency resolution, and service-specific factories.
  */
-export class SimCfnResource<T extends object = object> {
+export class SimCfnResource<
+  T extends object = object,
+> implements SimCfnPropertyIgnorer {
   public readonly accountRegionScope: SimAwsAccountRegionScope;
   public readonly logicalId: string;
   /** The Stack this Resource belongs to, where a generated name comes from. */
   public readonly stackName: string | undefined;
   public readonly template: SimCfnTemplateValueRecord;
   private readonly creationState = new SimCfnResourceCreationState<T>();
+  private readonly ignoredPropertyList = new SimCfnIgnoredProperties();
   private readonly resourceTemplateReader: SimCfnResourceTemplateReader;
   private readonly propertyResolver: SimCfnResourcePropertyResolver;
   private readonly background: BackgroundScheduler;
@@ -130,6 +110,22 @@ export class SimCfnResource<T extends object = object> {
    */
   public get skippedReason(): string | undefined {
     return this.creationState.skippedReason;
+  }
+
+  /**
+   * The properties this Resource was created without acting on.
+   */
+  public get ignoredProperties(): readonly SimCfnIgnoredProperty[] {
+    return this.ignoredPropertyList.all;
+  }
+
+  /**
+   * Record that this Resource is being created without acting on a property.
+   * Called by the service parsing this Resource's properties, which is the
+   * only thing that knows whether a property changes behaviour it simulates.
+   */
+  ignoreProperty(path: string, reason: string): void {
+    this.ignoredPropertyList.record(this, path, reason);
   }
 
   /**
@@ -255,13 +251,13 @@ export class SimCfnResource<T extends object = object> {
    * CloudFormation lifecycle.
    */
   markCreateInProgress(): void {
+    this.ignoredPropertyList.clear();
     this.creationState.markCreateInProgress();
   }
 
   /**
-   * Mark this Resource as successfully created and store its simulated AWS object.
-   *
-   * Intended for use by the creation operation after the appropriate
+   * Mark this Resource as successfully created and store its simulated AWS
+   * object. Intended for use by the creation operation after the appropriate
    * service-specific factory has created the simulated resource.
    */
   markCreateComplete(simResource?: T): void {
@@ -281,7 +277,6 @@ export class SimCfnResource<T extends object = object> {
 
   /**
    * Mark this Resource as failed to create and store the failure reason.
-   *
    * Intended for use by the creation operation when service-specific creation
    * throws or rejects.
    */
@@ -297,3 +292,9 @@ export class SimCfnResource<T extends object = object> {
     });
   }
 }
+
+export {
+  type SimCloudFormationResourceCreateContext,
+  type SimCloudFormationResourceProperties,
+  type SimCloudFormationResourceStatus,
+} from "./sim-cfn-resource.type.js";

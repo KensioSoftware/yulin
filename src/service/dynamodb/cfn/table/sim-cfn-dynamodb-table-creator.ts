@@ -36,7 +36,7 @@ export class SimCfnDynamoDbTableCreator {
       resource,
       properties,
     });
-    tableProperties.assertSimulated();
+    tableProperties.applyPropertyRules();
 
     const name = tableProperties.name();
 

@@ -36,7 +36,7 @@ export class SimCfnKmsKeyProperties {
 
     new SimCfnKmsUnsimulatedKeyProperties({
       propertyParser: this.propertyParser,
-    }).require(this.resource, this.properties);
+    }).apply(this.resource, this.properties);
   }
 
   /**

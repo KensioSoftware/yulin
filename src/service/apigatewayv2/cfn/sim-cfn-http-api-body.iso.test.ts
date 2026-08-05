@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 import {
   deployHttpApi,
   deployHttpApiFailure,
+  ignoredReasons,
   simAwsInEuWest2,
 } from "../../../../test/apigatewayv2/cfn-deploy.js";
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
@@ -118,12 +119,12 @@ describe("Deploying a sim HTTP API from an AWS::ApiGatewayV2::Api Body", () => {
     );
   });
 
-  it("refuses a property an imported API would drop", async () => {
+  it("creates an imported API without a property it would drop", async () => {
     // Given a template describing the API it imports
     const simAws = simAwsInEuWest2();
 
     // When it is deployed
-    const error = await deployHttpApiFailure(
+    const stack = await deployHttpApi(
       simAws,
       simCfnImportedHttpApiTemplateFactory.make({
         paths: ordersPaths,
@@ -131,28 +132,31 @@ describe("Deploying a sim HTTP API from an AWS::ApiGatewayV2::Api Body", () => {
       }),
     );
 
-    // Then the stack fails rather than deploying an API that ignored it,
-    // since ImportApi does not take it and nothing here updates an API
-    expect(error.message).toContain(
-      "property Description cannot be deployed: ImportApi does not take it",
+    // Then the API is created from the document without the description, since
+    // ImportApi does not take it and nothing here updates an API afterwards
+    const [reason] = ignoredReasons(stack);
+    expect(reason).toContain(
+      "property Description is not applied: ImportApi does not take it",
     );
   });
 
-  it("refuses FailOnWarnings on an Api that imports nothing", async () => {
+  it("creates an Api that imports nothing without its FailOnWarnings", async () => {
     // Given a Resource-declared API asking what to do with import warnings
     const simAws = simAwsInEuWest2();
 
     // When it is deployed
-    const error = await deployHttpApiFailure(
+    const stack = await deployHttpApi(
       simAws,
       simCfnHttpApiTemplateFactory.make({
         apiProperties: { FailOnWarnings: true },
       }),
     );
 
-    // Then the stack fails, since there is no document for it to be about
-    expect(error.message).toContain(
-      "property FailOnWarnings cannot be deployed: it says what to do with " +
+    // Then the API is created and the property is recorded, since there is no
+    // document for it to be about and real CloudFormation accepts this too
+    const [reason] = ignoredReasons(stack);
+    expect(reason).toContain(
+      "property FailOnWarnings is not applied: it says what to do with " +
         "the warnings an OpenAPI import finds",
     );
   });
@@ -193,12 +197,12 @@ describe("Deploying a sim HTTP API from an AWS::ApiGatewayV2::Api Body", () => {
     expect(error.message).toContain("Body must be an inline OpenAPI document");
   });
 
-  it("refuses a BodyS3Location, which is still not read", async () => {
+  it("creates an API without a BodyS3Location, which is still not read", async () => {
     // Given a template keeping its document in a bucket
     const simAws = simAwsInEuWest2();
 
     // When it is deployed
-    const error = await deployHttpApiFailure(
+    const stack = await deployHttpApi(
       simAws,
       simCfnHttpApiTemplateFactory.make({
         apiProperties: {
@@ -207,10 +211,11 @@ describe("Deploying a sim HTTP API from an AWS::ApiGatewayV2::Api Body", () => {
       }),
     );
 
-    // Then the stack fails, since reading a document out of a bucket adds a
-    // fetch path and nothing about OpenAPI
-    expect(error.message).toContain(
-      "AWS::ApiGatewayV2::Api Api property BodyS3Location is not simulated",
+    // Then the API is created with no routes at all, since reading a document
+    // out of a bucket adds a fetch path and nothing about OpenAPI
+    const [reason] = ignoredReasons(stack);
+    expect(reason).toContain(
+      "AWS::ApiGatewayV2::Api property BodyS3Location is not simulated",
     );
   });
 
