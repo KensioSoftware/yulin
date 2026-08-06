@@ -1489,6 +1489,71 @@ simS3.mountBucketFilesystem(
 
 After mounting, Object reads and writes for that Bucket use the filesystem directory.
 
+### Reloading the browser when the directory changes
+
+The Bucket is reading the files, so a rebuild needs nothing copying into it. All that is left is
+telling the browser. Give the mount somewhere to reload and it watches the directory for you:
+
+```typescript sim-s3-mount-reload
+/**
+ * Reloading the browser when a build writes into a mounted directory.
+ */
+
+import path from "node:path";
+
+import { CreateBucketCommand } from "@aws-sdk/client-s3";
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const srv = await serveSimAws({ simAws, port: 8787, liveReload: true });
+
+await simAws.s3().createBucket(new CreateBucketCommand({ Bucket: "site" }));
+
+simAws.s3().mountBucketFilesystem("site", path.join(process.cwd(), "public"), {
+  reload: srv,
+});
+```
+
+A build writing a whole tree of files is one reload, not one per file: the writes are held until
+they stop arriving. `settleMs` is how long that wait is, in milliseconds, for a generator that
+pauses part way through a build:
+
+```typescript sim-s3-mount-reload-settle
+/**
+ * Waiting longer for a slow build to finish writing.
+ */
+
+import path from "node:path";
+
+import { CreateBucketCommand } from "@aws-sdk/client-s3";
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const srv = await serveSimAws({ simAws, liveReload: true });
+
+await simAws.s3().createBucket(new CreateBucketCommand({ Bucket: "site" }));
+
+simAws.s3().mountBucketFilesystem("site", path.join(process.cwd(), "dist"), {
+  reload: srv,
+  settleMs: 500,
+});
+```
+
+Anything with a `reload()` method will do, so a test can watch a mount without serving anything.
+
+The watch is recursive, and holds an open filesystem handle, which keeps the process alive. A dev
+process wants exactly that. Anything with an end, such as a test, calls
+`simAws.s3().stopWatchingMountedDirectories()` when it is done.
+`simAws.s3().watchedMountedDirectories()` says which directories are being watched.
+
+Under [`yulin watch`](../../serve/README.md#restarting-on-a-file-change), a mount that reloads for
+itself is left alone by the supervisor: a rebuild reloads the page rather than restarting the
+process and taking every simulated Bucket, Table and Stack with it. A mount without a reload target
+is still reported to the supervisor as a directory to watch, and a change in it restarts the
+process.
+
 Filesystem storage is somewhat restrictive to make it slightly safer:
 
 - The directory path must be absolute
@@ -1564,7 +1629,8 @@ Sim S3 currently supports:
   configuration, and routing-rule redirects
 - Bucket-global uniqueness within a `SimAws` instance across simulated Accounts and Regions
 - In-memory Object storage by default
-- Optional filesystem-backed Bucket storage with `mountBucketFilesystem(...)`
+- Optional filesystem-backed Bucket storage with `mountBucketFilesystem(...)`, watching the mounted
+  directory and reloading connected browsers when it is rebuilt
 
 The simulator focuses on useful behaviour for tests and local development rather than full S3 feature
 parity. Unsupported S3 options may be ignored or may throw errors depending on whether the simulator
