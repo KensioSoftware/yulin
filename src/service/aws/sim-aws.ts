@@ -28,6 +28,10 @@ import type {
 } from "./sim-aws-properties.js";
 import type { SimIamCredentialIdentity } from "../iam/credential/sim-aws-credentials.js";
 import type { SimAwsRequestCaller } from "../iam/request/sim-aws-request-caller.js";
+import {
+  closeOnSignal,
+  type SimCloseOnSignalOptions,
+} from "../../util/process/close-on-signal.js";
 
 /**
  * Top-level container for simulated AWS.
@@ -212,5 +216,46 @@ export class SimAws extends SimAwsServiceAccessors {
    */
   async backgroundTasksComplete(): Promise<void> {
     await this.background.complete();
+  }
+
+  /**
+   * Let go of everything this simulated environment is holding open.
+   *
+   * A watched template file and a watched mounted directory each hold an open
+   * filesystem handle, which keeps the process alive. This is the one call that
+   * releases all of them, in every Account and Region this simulation has
+   * reached, so a script that wants to exit has one thing to wait for rather
+   * than a list to keep up with. A served environment is closed by its server,
+   * so a script with one of those has nothing to call here.
+   *
+   * Simulated state is not discarded. Every Bucket, Table and Stack is where it
+   * was, and the environment goes on working: this is about the handles that
+   * keep the process alive, not about resetting a simulation. Closing an
+   * environment that started nothing is not an error, and closing again does
+   * nothing again.
+   */
+  async close(): Promise<void> {
+    await this.scopes.close();
+  }
+
+  /**
+   * Close this simulated environment when the process is signalled.
+   *
+   * Nothing installs a signal handler unless it is asked to, since a library
+   * taking over process signals gets in the way of whatever else the process is
+   * doing. Asking looks like this:
+   *
+   * ```typescript
+   * simAws.closeOnSignal();
+   * ```
+   *
+   * `SIGINT` and `SIGTERM` unless other signals are named. What comes back
+   * takes the handlers off again, for a script that stops wanting them before
+   * the process ends.
+   */
+  closeOnSignal(options: SimCloseOnSignalOptions = {}): () => void {
+    return closeOnSignal(async () => {
+      await this.close();
+    }, options);
   }
 }

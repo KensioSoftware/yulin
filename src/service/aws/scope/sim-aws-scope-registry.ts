@@ -87,4 +87,20 @@ export class SimAwsScopeRegistry {
 
     return accountRegionScope;
   }
+
+  /**
+   * Let go of everything the scopes in this registry are holding open.
+   *
+   * Every Account Region scope that has been reached for, rather than the
+   * default one alone, because a simulation deploying into a second Account or
+   * Region starts its watches there and they hold the process open just the
+   * same. A registry nothing has been asked of has nothing to close.
+   */
+  async close(): Promise<void> {
+    await Promise.all(
+      this.accountRegionScopes.values().map(async (accountRegionScope) => {
+        await accountRegionScope.close();
+      }),
+    );
+  }
 }

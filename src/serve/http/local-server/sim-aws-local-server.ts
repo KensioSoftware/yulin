@@ -8,6 +8,10 @@ import { nodeServerPort } from "./node-server-port.js";
 import { SimAwsLocalRequestHandler } from "./sim-aws-local-request-handler.js";
 import { SimAwsDnsServer } from "../../dns/sim-aws-dns-server.js";
 import { SimLocalLiveReload } from "../live-reload/sim-local-live-reload.js";
+import {
+  closeOnSignal,
+  type SimCloseOnSignalOptions,
+} from "../../../util/process/close-on-signal.js";
 
 interface SimAwsLocalServerProperties {
   readonly simAws?: SimAws;
@@ -19,6 +23,7 @@ interface SimAwsLocalServerProperties {
  * Useful for local integration testing and local development.
  */
 export class SimAwsLocalServer {
+  private readonly simAws: SimAws;
   private readonly requestHandler: SimAwsLocalRequestHandler;
   private readonly server: Server;
   private readonly portBinder: NodeServerPortBinder;
@@ -27,6 +32,7 @@ export class SimAwsLocalServer {
 
   constructor(properties: SimAwsLocalServerProperties = {}) {
     const { simAws = new SimAws(), liveReload = false } = properties;
+    this.simAws = simAws;
     this.liveReload = new SimLocalLiveReload({ enabled: liveReload });
     const channel = this.liveReload.channel();
     this.requestHandler = new SimAwsLocalRequestHandler({
@@ -101,12 +107,19 @@ export class SimAwsLocalServer {
    * it. Local development restarts on that process exiting, so the connections
    * go.
    *
+   * The environment being served goes with it, so the template file watches
+   * and mounted directory watches it holds are let go of here rather than in a
+   * second call the script has to know to make. Everything Yulin was holding
+   * open is released by this one call, and the simulated state it was serving
+   * is left exactly where it was.
+   *
    * The order is what a browser needs. Both ports are let go first, so a
    * replacement process can have them however long the rest takes. Then the
-   * live reload streams are told a reload is coming and seen out, because a
-   * socket destroyed with bytes still in flight is reset, and a reset costs the
-   * browser the event it was just sent. Only what is left after that is
-   * destroyed.
+   * environment, so a watch cannot answer a change while the server it would
+   * reload is going. Then the live reload streams are told a reload is coming
+   * and seen out, because a socket destroyed with bytes still in flight is
+   * reset, and a reset costs the browser the event it was just sent. Only what
+   * is left after that is destroyed.
    *
    * Await it to know the last event has gone before leaving the process.
    */
@@ -114,9 +127,32 @@ export class SimAwsLocalServer {
     this.server.close();
     this.dnsServer.close();
 
+    await this.simAws.close();
     await this.liveReload.stopping();
 
     this.server.closeAllConnections();
+  }
+
+  /**
+   * Close this server, and the environment it serves, when the process is
+   * signalled.
+   *
+   * Nothing installs a signal handler unless it is asked to, since a library
+   * taking over process signals gets in the way of whatever else the process is
+   * doing. Asking looks like this:
+   *
+   * ```typescript
+   * srv.closeOnSignal();
+   * ```
+   *
+   * `SIGINT` and `SIGTERM` unless other signals are named. What comes back
+   * takes the handlers off again, for a script that stops wanting them before
+   * the process ends.
+   */
+  closeOnSignal(options: SimCloseOnSignalOptions = {}): () => void {
+    return closeOnSignal(async () => {
+      await this.close();
+    }, options);
   }
 
   /**

@@ -269,7 +269,9 @@ The pieces are in `mount/`:
   it, while an unwatched one is a reported path as it always was.
 
 A recursive watch holds an open filesystem handle, so `SimS3.stopWatchingMountedDirectories()` is the
-way to let it go. A dev process never calls it; a test does.
+way to let it go. A dev process never calls it; a test does. `SimS3.close()` is the same thing under
+the name `SimAwsClosing` gives it, which is how `SimAws.close()` reaches these watches without
+knowing that S3 is where they live.
 
 Filesystem storage behaviour:
 

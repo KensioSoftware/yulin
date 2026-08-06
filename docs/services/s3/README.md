@@ -1547,6 +1547,9 @@ The watch is recursive, and holds an open filesystem handle, which keeps the pro
 process wants exactly that. Anything with an end, such as a test, calls
 `simAws.s3().stopWatchingMountedDirectories()` when it is done.
 `simAws.s3().watchedMountedDirectories()` says which directories are being watched.
+[`simAws.close()`](../../serve/README.md#stopping-and-restarting) is the one that does not need
+naming a service or a scope: it lets go of the mounted directory watches along with everything else
+the environment is holding, and a served environment gets that from `srv.close()`.
 
 Under [`yulin watch`](../../serve/README.md#restarting-on-a-file-change), a mount that reloads for
 itself is left alone by the supervisor: a rebuild reloads the page rather than restarting the

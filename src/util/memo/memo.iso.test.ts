@@ -1,6 +1,11 @@
 import { describe, it } from "vitest";
 import { Memo } from "./memo.js";
-import { assertFalse, assertIdentical, assertTrue } from "@kensio/smartass";
+import {
+  assertArrayEquals,
+  assertFalse,
+  assertIdentical,
+  assertTrue,
+} from "@kensio/smartass";
 
 describe("Memo", () => {
   it("creates and caches values", () => {
@@ -39,5 +44,15 @@ describe("Memo", () => {
     assertFalse(memo.has("key"));
     memo.getOrCreate("key", () => "value");
     assertTrue(memo.has("key"));
+  });
+
+  it("reads back what was created, without creating anything", () => {
+    const memo = new Memo<string>();
+
+    assertArrayEquals(memo.values(), []);
+    memo.getOrCreate("a", () => "first");
+    memo.getOrCreate("b", () => "second");
+
+    assertArrayEquals(memo.values(), ["first", "second"]);
   });
 });

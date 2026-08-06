@@ -1,4 +1,6 @@
 export { SimAws } from "./service/aws/sim-aws.js";
+export type { SimAwsClosing } from "./service/aws/sim-aws-closing.js";
+export type { SimCloseOnSignalOptions } from "./util/process/close-on-signal.js";
 export type { AwsRegionName } from "./service/aws/sim-aws-region.js";
 export {
   isSimAwsAccountId,
