@@ -1,19 +1,9 @@
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
-import { SimCognitoName } from "../sim-cognito-name.js";
 import type { SimCognitoUserPool } from "../sim-cognito-user-pool.js";
 import { makeSimCognitoClientSecret } from "./sim-cognito-client-secret.js";
-import { SimCognitoExplicitAuthFlows } from "./sim-cognito-explicit-auth-flows.js";
-import { SimCognitoPreventUserExistenceErrors } from "./sim-cognito-prevent-user-existence-errors.js";
-import {
-  SimCognitoTokenValidity,
-  type SimCognitoTokenValidityInput,
-} from "./sim-cognito-token-validity.js";
-import {
-  SimCognitoUnsimulatedClientSettings,
-  type SimCognitoUnsimulatedClientSettingsType,
-} from "./sim-cognito-unsimulated-client-settings.js";
 import { SimCognitoUserPoolClient } from "./sim-cognito-user-pool-client.js";
 import { makeSimCognitoUserPoolClientId } from "./sim-cognito-user-pool-client-id.js";
+import type { SimCognitoUserPoolClientSettings } from "./sim-cognito-user-pool-client-settings.js";
 
 interface SimCognitoUserPoolClientFactoryProperties {
   readonly clock: SimClock;
@@ -21,18 +11,8 @@ interface SimCognitoUserPoolClientFactoryProperties {
 
 interface SimCognitoMakeUserPoolClientProperties {
   readonly pool: SimCognitoUserPool;
-  readonly name: string | undefined;
   readonly generateSecret?: boolean | undefined;
-  readonly explicitAuthFlows?: readonly string[] | undefined;
-  readonly preventUserExistenceErrors?: string | undefined;
-  readonly tokenValidity: SimCognitoTokenValidityInput;
-
-  /**
-   * The settings the request set that this simulation accepts without acting
-   * on, which a described client reports back.
-   */
-  readonly unsimulatedSettings?:
-    SimCognitoUnsimulatedClientSettingsType | undefined;
+  readonly settings: SimCognitoUserPoolClientSettings;
 }
 
 /**
@@ -60,22 +40,9 @@ export class SimCognitoUserPoolClientFactory {
     return new SimCognitoUserPoolClient({
       id: makeSimCognitoUserPoolClientId(pool.clientIds),
       userPoolId: pool.id,
-      name: new SimCognitoName({
-        field: "ClientName",
-        value: properties.name,
-      }),
       secret: this.secretFor(properties.generateSecret),
-      explicitAuthFlows: new SimCognitoExplicitAuthFlows(
-        properties.explicitAuthFlows,
-      ),
-      preventUserExistenceErrors: new SimCognitoPreventUserExistenceErrors(
-        properties.preventUserExistenceErrors,
-      ),
-      tokenValidity: new SimCognitoTokenValidity(properties.tokenValidity),
-      unsimulatedSettings: new SimCognitoUnsimulatedClientSettings(
-        properties.unsimulatedSettings ?? {},
-      ),
-      createdDate: this.clock.now(),
+      settings: properties.settings,
+      clock: this.clock,
     });
   }
 

@@ -61,9 +61,20 @@ is a number in a unit, and the two arrive in separate request inputs, so the sam
 for an access token and a day for a refresh token. Resolving both into seconds in one place is what
 stops the pairing being got wrong when tokens are actually issued.
 
+`SimCognitoUserPoolClientSettings` holds the properties a request can set: the name, the
+authentication flows, `PreventUserExistenceErrors`, the token validities, and the two managed login
+settings that are reported back without being acted on. `CreateUserPoolClient` builds one from its
+request and `UpdateUserPoolClient` builds a fresh one and replaces what the client had, so a setting
+an update leaves out goes back to the default a create would have given it. That is what real
+Cognito does. `ClientName` is the exception the command applies: a client has to have a name and
+`CreateUserPoolClient` requires one, so there is no default to reset to and an update naming none
+keeps the name the client has.
+
 `makeSimCognitoClientSecret` generates a client secret, and only a client created with
 `GenerateSecret` gets one. A public client has no secret at all rather than an empty one, which is
-what makes code computing a `SECRET_HASH` fail on the client it should fail on.
+what makes code computing a `SECRET_HASH` fail on the client it should fail on. The secret is not
+one of the settings, so an update leaves it alone, as real Cognito does with no `GenerateSecret`
+input on `UpdateUserPoolClient`.
 
 ## User model
 
@@ -318,15 +329,19 @@ resource, here or on real AWS.
   `RESET_REQUIRED` is a status no user here reaches.
 - A client-side sign-up operation naming a user the pool does not hold reports it, whatever the app
   client's `PreventUserExistenceErrors` says. That setting is honoured for sign-in only.
-- Every unsimulated `CreateUserPool` and `CreateUserPoolClient` input is refused rather than ignored.
+- Every unsimulated `CreateUserPool`, `CreateUserPoolClient` and `UpdateUserPoolClient` input is
+  refused rather than ignored.
   `UsernameAttributes` is the one that matters most: a pool signing users in by email stores a
   generated UUID as the username, so a pool quietly created without it would answer with the wrong
   username here and the right one on real AWS.
 - A pool created with `DeletionProtection: ACTIVE` cannot be deleted at all, because `UpdateUserPool`
   is not simulated and that is the only way to deactivate the protection.
-- Nothing changes a pool or an app client after creation, so `LastModifiedDate` is always the
-  creation date. A user is different: every operation that changes one moves its
-  `UserLastModifiedDate` on.
+- Nothing changes a pool after creation, so its `LastModifiedDate` is always its creation date. An
+  app client is different: `UpdateUserPoolClient` moves its `LastModifiedDate` on, as every
+  operation that changes a user moves that user's `UserLastModifiedDate` on.
+- `UpdateUserPoolClient` replaces an app client's settings rather than merging into them, so a
+  setting the request leaves out goes back to its `CreateUserPoolClient` default. The client's
+  secret is not a setting and is left alone.
 - `SchemaAttributes` is not reported on a pool, though every pool holds the standard schema and
   validates user attributes against it.
 - Users are resolved by username only, and real Cognito also accepts a `sub` there.

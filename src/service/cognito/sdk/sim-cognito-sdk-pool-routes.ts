@@ -7,6 +7,7 @@ import type {
   SimCreateUserPoolClientCommand,
   SimDeleteUserPoolClientCommand,
   SimDescribeUserPoolClientCommand,
+  SimUpdateUserPoolClientCommand,
 } from "../command/client/user-pool-client.command.js";
 import type { SimListUserPoolsCommand } from "../command/user-pool/list-user-pools.command.js";
 import type {
@@ -68,6 +69,14 @@ export function simCognitoSdkPoolRoutes(
       async (command, context): Promise<unknown> =>
         await simCognito.describeUserPoolClient(
           command as SimDescribeUserPoolClientCommand,
+          simSdkCallerOptions(context),
+        ),
+    ],
+    [
+      "UpdateUserPoolClientCommand",
+      async (command, context): Promise<unknown> =>
+        await simCognito.updateUserPoolClient(
+          command as SimUpdateUserPoolClientCommand,
           simSdkCallerOptions(context),
         ),
     ],

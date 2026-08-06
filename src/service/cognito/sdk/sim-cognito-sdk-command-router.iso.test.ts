@@ -21,6 +21,7 @@ describe("SimCognitoSdkCommandRouter", () => {
       "ListUserPoolsCommand",
       "CreateUserPoolClientCommand",
       "DescribeUserPoolClientCommand",
+      "UpdateUserPoolClientCommand",
       "DeleteUserPoolClientCommand",
       "ListUserPoolClientsCommand",
       "AdminCreateUserCommand",

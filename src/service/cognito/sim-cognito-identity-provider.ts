@@ -199,6 +199,17 @@ export class SimCognitoIdentityProvider extends SimCognitoUserDirectory {
   }
 
   /**
+   * Handle an UpdateUserPoolClient Command from the SDK.
+   */
+  async updateUserPoolClient(
+    command: simCognitoCommands.SimUpdateUserPoolClientCommand,
+    options?: SimCognitoIdentityProviderRequestOptions,
+  ): Promise<simCognitoCommands.SimUpdateUserPoolClientCommandOutput> {
+    await this.background.sequence();
+    return this.commands.clients.update(command, options);
+  }
+
+  /**
    * Handle a DeleteUserPoolClient Command from the SDK.
    */
   async deleteUserPoolClient(

@@ -4,6 +4,7 @@ import {
   DescribeUserPoolCommand,
   DescribeUserPoolClientCommand,
   ListUserPoolsCommand,
+  UpdateUserPoolClientCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
@@ -175,6 +176,73 @@ describe("sim Cognito IAM authorization", () => {
 
     // Then it is allowed.
     assertIdentical(described.UserPoolClient?.ClientName, "web");
+  });
+
+  it("authorizes updating an app client against the pool's ARN", async () => {
+    // Given a Role allowed to describe and create app clients in a pool, but
+    // not to update one.
+    const { simAws, caller, userPoolId } = await simCognitoWithRole({
+      Effect: "Allow",
+      Action: [
+        "cognito-idp:CreateUserPoolClient",
+        "cognito-idp:DescribeUserPoolClient",
+      ],
+      Resource: userPoolArn("*"),
+    });
+    const cognito = simAws.cognitoIdentityProvider();
+    const created = await cognito.createUserPoolClient(
+      new CreateUserPoolClientCommand({
+        UserPoolId: userPoolId,
+        ClientName: "web",
+      }),
+      { caller },
+    );
+
+    // When that Role updates the client it made.
+    const error = await assertThrowsErrorAsync(async () => {
+      await cognito.updateUserPoolClient(
+        new UpdateUserPoolClientCommand({
+          UserPoolId: userPoolId,
+          ClientId: created.UserPoolClient?.ClientId,
+          ClientName: "web-app",
+        }),
+        { caller },
+      );
+    });
+
+    // Then it is denied, because the policy grants no
+    // cognito-idp:UpdateUserPoolClient on the pool.
+    assertInstanceOf(error, SimIamAccessDenied);
+  });
+
+  it("allows updating an app client to a policy granting the action", async () => {
+    // Given a Role allowed everything on one pool.
+    const { simAws, caller, userPoolId } = await simCognitoWithRole({
+      Effect: "Allow",
+      Action: "cognito-idp:*",
+      Resource: userPoolArn("*"),
+    });
+    const cognito = simAws.cognitoIdentityProvider();
+    const created = await cognito.createUserPoolClient(
+      new CreateUserPoolClientCommand({
+        UserPoolId: userPoolId,
+        ClientName: "web",
+      }),
+      { caller },
+    );
+
+    // When that Role renames the client.
+    const updated = await cognito.updateUserPoolClient(
+      new UpdateUserPoolClientCommand({
+        UserPoolId: userPoolId,
+        ClientId: created.UserPoolClient?.ClientId,
+        ClientName: "web-app",
+      }),
+      { caller },
+    );
+
+    // Then it is allowed.
+    assertIdentical(updated.UserPoolClient?.ClientName, "web-app");
   });
 
   it("denies creating a pool to a policy naming pool ARNs", async () => {

@@ -8,6 +8,7 @@ import {
   DescribeUserPoolCommand,
   ListUserPoolClientsCommand,
   ListUserPoolsCommand,
+  UpdateUserPoolClientCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import { CreateFunctionCommand, InvokeCommand } from "@aws-sdk/client-lambda";
@@ -159,6 +160,15 @@ describe("Cognito SDK interception", () => {
     const clientId = appClient.UserPoolClient?.ClientId;
 
     // When each of the remaining operations is used.
+    const updatedClient = await client.send(
+      new UpdateUserPoolClientCommand({
+        UserPoolId: userPoolId,
+        ClientId: clientId,
+        ClientName: "web",
+        AccessTokenValidity: 30,
+        TokenValidityUnits: { AccessToken: "minutes" },
+      }),
+    );
     const describedClient = await client.send(
       new DescribeUserPoolClientCommand({
         UserPoolId: userPoolId,
@@ -185,7 +195,9 @@ describe("Cognito SDK interception", () => {
     );
 
     // Then each one reached simulated Cognito.
+    assertIdentical(updatedClient.UserPoolClient?.AccessTokenValidity, 30);
     assertIdentical(describedClient.UserPoolClient?.ClientName, "web");
+    assertIdentical(describedClient.UserPoolClient.AccessTokenValidity, 30);
     assertArrayEquals(
       listedPools.UserPools?.map((listed) => listed.Name),
       ["myapp-users"],

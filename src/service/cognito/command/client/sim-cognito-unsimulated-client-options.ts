@@ -1,23 +1,27 @@
 import { SimCognitoUnsimulatedInput } from "../sim-cognito-unsimulated-input.js";
 import { SimCognitoUnsimulatedManagedLogin } from "./sim-cognito-unsimulated-managed-login.js";
-import type { SimCreateUserPoolClientCommandInput } from "./user-pool-client.command.js";
+import type { SimCognitoUserPoolClientSettingsInput } from "./user-pool-client.command.js";
 
 /**
- * Refuses the CreateUserPoolClient inputs this simulation does not model.
+ * Refuses the app client inputs this simulation does not model.
  *
  * Storing any of them would suggest an app client that works here would work
- * there.
+ * there. `CreateUserPoolClient` and `UpdateUserPoolClient` take the same
+ * settings, so both refuse the same ones and each says its own name.
  */
 export class SimCognitoUnsimulatedUserPoolClientOptions {
-  private readonly unsimulated = new SimCognitoUnsimulatedInput(
-    "CreateUserPoolClient",
-  );
-  private readonly managedLogin = new SimCognitoUnsimulatedManagedLogin();
+  private readonly unsimulated: SimCognitoUnsimulatedInput;
+  private readonly managedLogin: SimCognitoUnsimulatedManagedLogin;
+
+  constructor(operation: string) {
+    this.unsimulated = new SimCognitoUnsimulatedInput(operation);
+    this.managedLogin = new SimCognitoUnsimulatedManagedLogin(operation);
+  }
 
   /**
    * Refuse a request carrying an input this simulation cannot honour.
    */
-  refuseIn(input: SimCreateUserPoolClientCommandInput): void {
+  refuseIn(input: SimCognitoUserPoolClientSettingsInput): void {
     this.managedLogin.refuseIn(input);
 
     this.unsimulated.refuseUnless(

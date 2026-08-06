@@ -477,6 +477,80 @@ is refused, as real Cognito refuses it. A client holding `ADMIN_NO_SRP_AUTH` can
 `ADMIN_USER_PASSWORD_AUTH` and one holding `USER_PASSWORD_AUTH` can run `USER_PASSWORD_AUTH`, which
 is what those settings meant before the `ALLOW_` prefixed ones replaced them.
 
+## Updating an app client
+
+`UpdateUserPoolClient` changes a client's settings, and `DescribeUserPoolClient` reports them along
+with a `LastModifiedDate` from when the update happened. A client nothing has updated reports its
+creation date there.
+
+```typescript sim-cognito-update-app-client
+/**
+ * Changing a simulated app client's settings, which replaces them rather than
+ * merging into them.
+ */
+
+import {
+  CreateUserPoolClientCommand,
+  CreateUserPoolCommand,
+  UpdateUserPoolClientCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const cognito = simAws.cognitoIdentityProvider();
+
+const pool = await cognito.createUserPool(
+  new CreateUserPoolCommand({ PoolName: "myapp-users" }),
+);
+
+const appClient = await cognito.createUserPoolClient(
+  new CreateUserPoolClientCommand({
+    UserPoolId: pool.UserPool?.Id,
+    ClientName: "web",
+    ExplicitAuthFlows: ["ALLOW_USER_PASSWORD_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"],
+  }),
+);
+
+const updated = await cognito.updateUserPoolClient(
+  new UpdateUserPoolClientCommand({
+    UserPoolId: pool.UserPool?.Id,
+    ClientId: appClient.UserPoolClient?.ClientId,
+    ClientName: "web",
+    ExplicitAuthFlows: ["ALLOW_USER_PASSWORD_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"],
+    AccessTokenValidity: 5,
+    TokenValidityUnits: { AccessToken: "minutes" },
+  }),
+);
+
+// The next sign-in gets an access token lasting five minutes.
+console.log(updated.UserPoolClient?.AccessTokenValidity); // 5
+console.log(updated.UserPoolClient?.LastModifiedDate); // when the update ran
+```
+
+An update replaces the client's configuration rather than merging into it, which is what real
+Cognito does. A setting the request leaves out goes back to the default `CreateUserPoolClient` would
+have given it, so the example above repeats `ExplicitAuthFlows` to keep them. A request carrying
+only `ClientName` sends the authentication flows back to `ALLOW_REFRESH_TOKEN_AUTH`,
+`ALLOW_USER_SRP_AUTH` and `ALLOW_CUSTOM_AUTH`, the token validities back to an hour and thirty days,
+and `PreventUserExistenceErrors` back to `LEGACY`.
+
+`ClientName` is the one setting an omitted request keeps rather than resets. A client has to have a
+name, and `CreateUserPoolClient` requires one, so there is no default to go back to.
+
+The client's secret is untouched by an update. `UpdateUserPoolClient` has no `GenerateSecret` input
+on real Cognito, so a client created without a secret never gains one and a client with one keeps the
+same value.
+
+A token already issued keeps the expiry it was issued with, because that expiry was stamped when the
+token was handed out. Shortening `AccessTokenValidity` therefore applies to the next sign-in rather
+than to a token a test is already holding, as it does on real Cognito. A changed `ExplicitAuthFlows`
+takes effect for the next `InitiateAuth`, so removing `ALLOW_USER_PASSWORD_AUTH` starts refusing that
+flow.
+
+The inputs `CreateUserPoolClient` refuses are refused here too, in the same words, saying
+`UpdateUserPoolClient`.
+
 ## Signing in and verifying tokens
 
 `AdminInitiateAuth` runs the `ADMIN_USER_PASSWORD_AUTH` flow and answers with real signed tokens. The
@@ -1636,8 +1710,8 @@ Sim Cognito currently supports:
 
 - `CreateUserPoolCommand`, `DescribeUserPoolCommand`, `DeleteUserPoolCommand` and
   `ListUserPoolsCommand`
-- `CreateUserPoolClientCommand`, `DescribeUserPoolClientCommand`, `DeleteUserPoolClientCommand` and
-  `ListUserPoolClientsCommand`
+- `CreateUserPoolClientCommand`, `DescribeUserPoolClientCommand`, `UpdateUserPoolClientCommand`,
+  `DeleteUserPoolClientCommand` and `ListUserPoolClientsCommand`
 - `AdminCreateUserCommand`, `AdminGetUserCommand`, `AdminDeleteUserCommand`,
   `AdminSetUserPasswordCommand`, `AdminUpdateUserAttributesCommand`, `AdminDisableUserCommand`,
   `AdminEnableUserCommand` and `ListUsersCommand`
@@ -1755,8 +1829,17 @@ Current documented limitations:
   periodically rather than on each write, so it can lag there in a way it never does here.
 - MFA is not simulated, so `AdminGetUser` reports no `UserMFASettingList`, `PreferredMfaSetting` or
   `MFAOptions`.
-- Nothing updates a pool or an app client. `UpdateUserPool` and `UpdateUserPoolClient` are not
-  implemented, so `LastModifiedDate` is always the creation date.
+- Nothing updates a pool. `UpdateUserPool` is not implemented, so a pool's `LastModifiedDate` is
+  always its creation date.
+- `UpdateUserPoolClient` replaces an app client's settings rather than merging into them, as real
+  Cognito does, so a setting the request leaves out goes back to the default `CreateUserPoolClient`
+  would have given it. `ClientName` is the exception: a client has to have a name and there is no
+  default to reset to, so an update that names none keeps the one the client has.
+- An update leaves the client's secret alone. `UpdateUserPoolClient` has no `GenerateSecret` input
+  on real Cognito, so a client created without a secret never gains one.
+- Redeploying a template that changed an `AWS::Cognito::UserPoolClient` does not run
+  `UpdateUserPoolClient`. Sim CloudFormation replaces a resource whose resolved template entry
+  changed rather than updating it in place.
 - A pool with `DeletionProtection: ACTIVE` cannot be deleted at all, because deactivating the
   protection needs `UpdateUserPool`.
 - `PreAuthentication` and `PostAuthentication` are the only Lambda triggers that run. Every other
@@ -1792,7 +1875,7 @@ Current documented limitations:
   `SupportedIdentityProviders` naming anything but `COGNITO`, a `ClientSecret` of your own,
   `AnalyticsConfiguration`, `AuthSessionValidity`, `EnablePropagateAdditionalUserContextData`,
   `RefreshTokenRotation`, `ReadAttributes`, `WriteAttributes`, and an `EnableTokenRevocation` of
-  `false`.
+  `false`. `UpdateUserPoolClient` refuses the same inputs, in the same words.
 - An `AllowedOAuthFlowsUserPoolClient` of `false`, and a `SupportedIdentityProviders` of
   `["COGNITO"]`, are accepted and change nothing, because both say the client wants the pool's own
   users and nothing else, which is all there is here. `DescribeUserPoolClient` reports them back.

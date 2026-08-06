@@ -9,7 +9,11 @@ import { SimCognitoInvalidParameterException } from "../error/sim-cognito.error.
  * every refusal say why it happened rather than only that it did.
  */
 export class SimCognitoUnsimulatedInput {
-  private readonly operation: string;
+  /**
+   * The operation a refusal names, which is also what a caller building its
+   * own message about an input needs.
+   */
+  public readonly operation: string;
 
   constructor(operation: string) {
     this.operation = operation;

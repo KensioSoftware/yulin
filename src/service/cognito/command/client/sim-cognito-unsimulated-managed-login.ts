@@ -1,6 +1,6 @@
 import { SimCognitoInvalidParameterException } from "../../error/sim-cognito.error.js";
 import { SimCognitoUnsimulatedInput } from "../sim-cognito-unsimulated-input.js";
-import type { SimCreateUserPoolClientCommandInput } from "./user-pool-client.command.js";
+import type { SimCognitoUserPoolClientSettingsInput } from "./user-pool-client.command.js";
 
 /**
  * The only identity provider a simulated app client can support.
@@ -18,14 +18,16 @@ const cognitoIdentityProvider = "COGNITO";
  * settings mean anything here.
  */
 export class SimCognitoUnsimulatedManagedLogin {
-  private readonly unsimulated = new SimCognitoUnsimulatedInput(
-    "CreateUserPoolClient",
-  );
+  private readonly unsimulated: SimCognitoUnsimulatedInput;
+
+  constructor(operation: string) {
+    this.unsimulated = new SimCognitoUnsimulatedInput(operation);
+  }
 
   /**
    * Refuse a request carrying a managed login setting.
    */
-  refuseIn(input: SimCreateUserPoolClientCommandInput): void {
+  refuseIn(input: SimCognitoUserPoolClientSettingsInput): void {
     this.refuseSupportedIdentityProviders(input.SupportedIdentityProviders);
 
     this.unsimulated.refuseUnless(
@@ -68,12 +70,8 @@ export class SimCognitoUnsimulatedManagedLogin {
    * which is what this simulation has, so that one is allowed through.
    */
   private refuseSupportedIdentityProviders(
-    providers: readonly string[] | undefined,
+    providers: readonly string[] = [],
   ): void {
-    if (providers === undefined) {
-      return;
-    }
-
     const federated = providers.filter(
       (provider) => provider !== cognitoIdentityProvider,
     );
@@ -83,7 +81,7 @@ export class SimCognitoUnsimulatedManagedLogin {
     }
 
     throw new SimCognitoInvalidParameterException(
-      `CreateUserPoolClient SupportedIdentityProviders ` +
+      `${this.unsimulated.operation} SupportedIdentityProviders ` +
         `'${federated.join(", ")}' is not simulated: federated sign-in ` +
         `happens at the provider rather than in this simulation. Only ` +
         `'${cognitoIdentityProvider}' is supported.`,
