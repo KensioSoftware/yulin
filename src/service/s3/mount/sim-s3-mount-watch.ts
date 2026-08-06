@@ -42,6 +42,7 @@ export class SimS3MountWatch {
     this.watch = watch;
     this.settle = new SimWatchSettle({
       settleMs,
+      maxWaitMs: simWatchConfig.settleMaxWaitMs,
       onSettled: (): void => {
         this.onChanged();
       },
