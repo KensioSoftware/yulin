@@ -1,10 +1,11 @@
 import {
   AdminCreateUserCommand,
   ResendConfirmationCodeCommand,
-  SignUpCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 import {
+  assertArrayEquals,
   assertIdentical,
+  assertTrue,
   assertNonNullable,
   assertObjectMatches,
   assertUndefined,
@@ -13,13 +14,13 @@ import { describe, it } from "vitest";
 
 import {
   makeTriggerPool,
+  signUpTriggerUser,
   triggerFunctionArn,
+  triggerUsername,
   type SimCognitoTriggerPool,
 } from "../../../../../test/cognito/trigger-fixture.js";
+import { recordingTriggerHandler } from "../../../../../test/cognito/trigger-handler-fixture.js";
 import type { SimCognitoSentMessage } from "../message/sim-cognito-sent-message.js";
-
-/** The password the user in each of these signs up with. */
-const password = "Sup3rSecret!";
 
 /**
  * The parts of a `CustomMessage` event a handler here reads.
@@ -28,18 +29,6 @@ interface CustomMessageEvent {
   readonly request: {
     readonly codeParameter: string;
     readonly usernameParameter?: string | undefined;
-  };
-}
-
-/**
- * Record every event the handler is given, and hand the event back untouched,
- * which is what a handler with nothing to say has to do.
- */
-function recordingHandler(events: unknown[]): (event: unknown) => unknown {
-  return (event: unknown) => {
-    events.push(structuredClone(event));
-
-    return event;
   };
 }
 
@@ -60,23 +49,14 @@ function writingHandler(event: unknown): unknown {
   };
 }
 
-async function signUp(pool: SimCognitoTriggerPool): Promise<void> {
-  await pool.cognito.signUp(
-    new SignUpCommand({
-      ClientId: pool.clientId,
-      Username: "alice",
-      Password: password,
-      UserAttributes: [{ Name: "email", Value: "alice@example.com" }],
-    }),
-  );
-}
-
 function sentBy(pool: SimCognitoTriggerPool): readonly SimCognitoSentMessage[] {
   return pool.cognito.userPool(pool.userPoolId).sentMessages();
 }
 
 function codeIn(pool: SimCognitoTriggerPool): string {
-  const code = pool.cognito.userPool(pool.userPoolId).confirmationCode("alice");
+  const code = pool.cognito
+    .userPool(pool.userPoolId)
+    .confirmationCode(triggerUsername);
   assertNonNullable(code);
 
   return code;
@@ -99,10 +79,10 @@ describe("sim Cognito CustomMessage trigger", () => {
   it("invokes the handler with the sign-up event", async () => {
     // Given a pool whose CustomMessage trigger records what it is given.
     const events: unknown[] = [];
-    const pool = await makeMessagePool(recordingHandler(events));
+    const pool = await makeMessagePool(recordingTriggerHandler(events));
 
     // When a user signs itself up.
-    await signUp(pool);
+    await signUpTriggerUser(pool);
 
     // Then the handler was given the real event, naming the occasion, the
     // pool, the app client the sign-up came through and the user.
@@ -128,7 +108,7 @@ describe("sim Cognito CustomMessage trigger", () => {
     const pool = await makeMessagePool(writingHandler);
 
     // When a user signs itself up.
-    await signUp(pool);
+    await signUpTriggerUser(pool);
 
     // Then the recorded message says what the handler wrote rather than what
     // the pool would have said.
@@ -143,8 +123,8 @@ describe("sim Cognito CustomMessage trigger", () => {
   it("names the occasion a resent code fired on", async () => {
     // Given a signed-up user of a pool with the trigger on it.
     const events: unknown[] = [];
-    const pool = await makeMessagePool(recordingHandler(events));
-    await signUp(pool);
+    const pool = await makeMessagePool(recordingTriggerHandler(events));
+    await signUpTriggerUser(pool);
 
     // When the user asks for its code again.
     await pool.cognito.resendConfirmationCode(
@@ -163,7 +143,7 @@ describe("sim Cognito CustomMessage trigger", () => {
   it("names the occasion an invitation fired on", async () => {
     // Given a pool with the trigger on it.
     const events: unknown[] = [];
-    const pool = await makeMessagePool(recordingHandler(events));
+    const pool = await makeMessagePool(recordingTriggerHandler(events));
 
     // When an administrator creates a user.
     await pool.cognito.adminCreateUser(
@@ -195,14 +175,9 @@ describe("sim Cognito CustomMessage trigger", () => {
     });
 
     // When a user with a phone number signs itself up.
-    await pool.cognito.signUp(
-      new SignUpCommand({
-        ClientId: pool.clientId,
-        Username: "alice",
-        Password: password,
-        UserAttributes: [{ Name: "phone_number", Value: "+447700900123" }],
-      }),
-    );
+    await signUpTriggerUser(pool, {
+      UserAttributes: [{ Name: "phone_number", Value: "+447700900123" }],
+    });
 
     // Then the message the handler wrote for SMS is the one recorded, and the
     // subject it wrote for email reaches nothing.
@@ -216,18 +191,10 @@ describe("sim Cognito CustomMessage trigger", () => {
   it("passes the request's ClientMetadata to the handler", async () => {
     // Given a pool with the trigger on it.
     const events: unknown[] = [];
-    const pool = await makeMessagePool(recordingHandler(events));
+    const pool = await makeMessagePool(recordingTriggerHandler(events));
 
-    // When the sign-up carries ClientMetadata, which used to be refused.
-    await pool.cognito.signUp(
-      new SignUpCommand({
-        ClientId: pool.clientId,
-        Username: "alice",
-        Password: password,
-        UserAttributes: [{ Name: "email", Value: "alice@example.com" }],
-        ClientMetadata: { tenant: "acme" },
-      }),
-    );
+    // When the sign-up carries ClientMetadata, which reaches the handler.
+    await signUpTriggerUser(pool, { ClientMetadata: { tenant: "acme" } });
 
     // Then the handler reads it, which is what it is sent for.
     assertObjectMatches(events[0], {
@@ -240,7 +207,7 @@ describe("sim Cognito CustomMessage trigger", () => {
     const pool = await makeMessagePool((event: unknown) => event);
 
     // When a user signs itself up.
-    await signUp(pool);
+    await signUpTriggerUser(pool);
 
     // Then the pool's own wording is what was recorded, as it is for a pool
     // with no trigger at all.
@@ -248,5 +215,40 @@ describe("sim Cognito CustomMessage trigger", () => {
     assertNonNullable(message);
     assertIdentical(message.subject, "Your verification code");
     assertIdentical(message.body, `Your verification code is ${codeIn(pool)}`);
+  });
+
+  it("sends nothing for a sign-up PreSignUp confirmed itself", async () => {
+    // Given a pool whose PreSignUp trigger confirms the user, and whose
+    // CustomMessage trigger would write a message if it ran.
+    const events: unknown[] = [];
+    const pool = await makeTriggerPool({
+      triggers: {
+        PreSignUp: triggerFunctionArn,
+        CustomMessage: triggerFunctionArn,
+      },
+      autoVerifiedAttributes: ["email"],
+      handler: (event: unknown) => {
+        events.push(structuredClone(event));
+        Object.assign((event as { response: object }).response, {
+          autoConfirmUser: true,
+        });
+
+        return event;
+      },
+    });
+
+    // When a user signs itself up.
+    const signedUp = await signUpTriggerUser(pool);
+
+    // Then the user is confirmed already, so there is no code to send it and
+    // no message was recorded, which is what real Cognito does here.
+    assertTrue(signedUp.UserConfirmed);
+    assertArrayEquals(sentBy(pool), []);
+
+    // And CustomMessage never fired: only PreSignUp did.
+    assertArrayEquals(
+      events.map((event) => (event as { triggerSource: string }).triggerSource),
+      ["PreSignUp_SignUp"],
+    );
   });
 });

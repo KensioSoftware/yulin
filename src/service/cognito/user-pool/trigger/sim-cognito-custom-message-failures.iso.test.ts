@@ -1,4 +1,3 @@
-import { SignUpCommand } from "@aws-sdk/client-cognito-identity-provider";
 import {
   assertArrayEquals,
   assertIdentical,
@@ -10,12 +9,11 @@ import { describe, it } from "vitest";
 
 import {
   makeTriggerPool,
+  signUpTriggerUser,
   triggerFunctionArn,
   type SimCognitoTriggerPool,
 } from "../../../../../test/cognito/trigger-fixture.js";
 import type { SimLambdaHandler } from "../../../lambda/function/sim-lambda-handler.type.js";
-
-const password = "Sup3rSecret!";
 
 /**
  * A pool that verifies an email address and runs a CustomMessage handler that
@@ -31,17 +29,8 @@ async function makeMessagePool(
   });
 }
 
-async function signUp(pool: SimCognitoTriggerPool): Promise<Error> {
-  return await assertThrowsErrorAsync(async () =>
-    pool.cognito.signUp(
-      new SignUpCommand({
-        ClientId: pool.clientId,
-        Username: "alice",
-        Password: password,
-        UserAttributes: [{ Name: "email", Value: "alice@example.com" }],
-      }),
-    ),
-  );
+async function refusedSignUp(pool: SimCognitoTriggerPool): Promise<Error> {
+  return await assertThrowsErrorAsync(async () => signUpTriggerUser(pool));
 }
 
 describe("sim Cognito CustomMessage trigger failures", () => {
@@ -52,7 +41,7 @@ describe("sim Cognito CustomMessage trigger failures", () => {
     });
 
     // When a user signs itself up.
-    const error = await signUp(pool);
+    const error = await refusedSignUp(pool);
 
     // Then the request failed on the trigger, carrying the handler's own
     // words.
@@ -78,7 +67,7 @@ describe("sim Cognito CustomMessage trigger failures", () => {
     }));
 
     // When a user signs itself up.
-    const error = await signUp(pool);
+    const error = await refusedSignUp(pool);
 
     // Then it is refused rather than the string being read as a message.
     assertIdentical(error.name, "InvalidLambdaResponseException");
@@ -93,7 +82,7 @@ describe("sim Cognito CustomMessage trigger failures", () => {
     }));
 
     // When a user signs itself up.
-    const error = await signUp(pool);
+    const error = await refusedSignUp(pool);
 
     // Then it is refused, naming the field and what it was given, rather than
     // recording a message the pool could never have sent.
@@ -112,14 +101,7 @@ describe("sim Cognito CustomMessage trigger failures", () => {
     }));
 
     // When a user signs itself up.
-    await pool.cognito.signUp(
-      new SignUpCommand({
-        ClientId: pool.clientId,
-        Username: "alice",
-        Password: password,
-        UserAttributes: [{ Name: "email", Value: "alice@example.com" }],
-      }),
-    );
+    await signUpTriggerUser(pool);
 
     // Then the pool's own wording is what was recorded: a handler that wrote
     // nothing has not changed the message.
@@ -138,7 +120,7 @@ describe("sim Cognito CustomMessage trigger failures", () => {
     });
 
     // When a user signs itself up.
-    const error = await signUp(pool);
+    const error = await refusedSignUp(pool);
 
     // Then the trigger failed for the permission it is missing, naming the
     // pool whose resource policy has to admit Cognito.

@@ -139,13 +139,13 @@ export class SimCognitoTriggerOccasion {
   ): SimCognitoTriggerOccasion {
     switch (occasion) {
       case "SignUp": {
-        return SimCognitoTriggerOccasion.customMessageSignUp;
+        return this.customMessageSignUp;
       }
       case "ResendCode": {
-        return SimCognitoTriggerOccasion.customMessageResendCode;
+        return this.customMessageResendCode;
       }
       case "AdminCreateUser": {
-        return SimCognitoTriggerOccasion.customMessageAdminCreateUser;
+        return this.customMessageAdminCreateUser;
       }
     }
   }

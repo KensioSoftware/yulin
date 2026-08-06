@@ -156,9 +156,9 @@ template left out. Confirming by link is refused in
 `SimCognitoUnsimulatedUserPoolMessaging` instead, so what reaches the settings is always wording for
 a code.
 
-`SimCognitoMessageOccasion` is the three occasions a message is sent on, and it is what a
-`CustomMessage` `triggerSource` is built from. It is a leaf module so that both the trigger and the
-message sides can name an occasion without depending on each other.
+`SimCognitoMessageOccasion` is the three occasions a message is sent on, in the vocabulary a
+recorded message reports. `SimCognitoTriggerOccasion.customMessage` turns one into the trigger
+occasion the handler is invoked for, so the record keeps its own names and the event keeps Cognito's.
 
 ## Group model
 
@@ -332,9 +332,12 @@ shape down to the `response` a `PreSignUp` handler is sent with its three flags 
 false. `SimCognitoTriggerContext` is what an operation hands them: the pool, the user, the app
 client where there is one, and the client metadata and validation data the request carried.
 
-`SimCognitoPreSignUpResponse` reads what a `PreSignUp` handler answered. It is the only trigger here
-whose response is read, and the reading is lenient in the same way real Cognito is: anything but
-`true` is no, and a handler that dropped the response has asked for nothing.
+`SimCognitoPreSignUpResponse` reads what a `PreSignUp` handler answered, and
+`SimCognitoCustomMessage` reads what a `CustomMessage` one wrote. Those are the two triggers whose
+response is read at all, and both read a dropped response as a handler having asked for nothing.
+`PreSignUp` is lenient beyond that, in the same way real Cognito is, because anything but `true` is
+no. `CustomMessage` is not: a message that is not a string is refused rather than rendered into what
+the pool records.
 
 `SimAwsCognitoTriggerFunctions` is the bridge to simulated Lambda, and
 `SimCognitoNoTriggerFunctions` is what a standalone `SimCognitoIdentityProvider` gets instead. The

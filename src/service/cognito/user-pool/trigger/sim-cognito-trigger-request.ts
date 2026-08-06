@@ -117,7 +117,8 @@ export class SimCognitoTriggerRequest {
     return {
       userAttributes: this.userAttributes(),
       codeParameter: simCognitoCodeParameter,
-      ...(occasion === SimCognitoTriggerOccasion.customMessageAdminCreateUser && {
+      ...(occasion ===
+        SimCognitoTriggerOccasion.customMessageAdminCreateUser && {
         usernameParameter: simCognitoUsernameParameter,
       }),
       ...this.clientMetadata(),

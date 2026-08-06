@@ -286,7 +286,9 @@ medium, the subject, the body and the occasion it was sent on.
 
 A message is recorded on three occasions: a `SignUp`, a `ResendConfirmationCode`, and an
 `AdminCreateUser` that did not ask for `MessageAction: SUPPRESS`. The verification wording is the
-pool's own, and `{####}` is replaced with the code the user was issued.
+pool's own, and `{####}` is replaced with the code the user was issued. A sign-up a `PreSignUp`
+handler auto-confirmed records none: that user has no code to answer with, and real Cognito sends it
+nothing.
 
 ```typescript sim-cognito-sent-messages
 /**

@@ -10,6 +10,4 @@
  * occasion the `CustomMessage` trigger fires for.
  */
 export type SimCognitoMessageOccasion =
-  | "SignUp"
-  | "ResendCode"
-  | "AdminCreateUser";
+  "SignUp" | "ResendCode" | "AdminCreateUser";
