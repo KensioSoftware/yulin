@@ -37,7 +37,7 @@ function findRepoRoot(startDirectories: readonly string[]): string {
 /**
  * Finds the repository root by walking upward from one directory.
  */
-function findRepoRootFrom(startDirectory: string): string | undefined {
+export function findRepoRootFrom(startDirectory: string): string | undefined {
   let currentDirectory = path.resolve(startDirectory);
 
   for (let level = 0; level < 100; level++) {
@@ -61,10 +61,15 @@ function findRepoRootFrom(startDirectory: string): string | undefined {
 
 /**
  * Checks whether a directory looks like this repository's root.
+ *
+ * Marker files only, deliberately: a git worktree is a checkout in a directory
+ * named after the branch rather than after the repository, so matching on the
+ * directory name walks straight past it and lands in whichever checkout is
+ * further up. The three markers together are specific enough on their own,
+ * with the workspace file ruling out a nested package.
  */
 function isRepoRoot(directory: string): boolean {
   return (
-    path.basename(directory) === "yulin" &&
     fs.existsSync(path.join(directory, "package.json")) &&
     fs.existsSync(path.join(directory, "tsconfig.json")) &&
     fs.existsSync(path.join(directory, "pnpm-workspace.yaml"))
