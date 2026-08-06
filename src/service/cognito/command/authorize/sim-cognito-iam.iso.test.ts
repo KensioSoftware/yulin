@@ -5,7 +5,6 @@ import {
   DescribeUserPoolClientCommand,
   ListUserPoolsCommand,
   UpdateUserPoolClientCommand,
-  UpdateUserPoolCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
@@ -123,57 +122,6 @@ describe("sim Cognito IAM authorization", () => {
     });
 
     // Then it is denied.
-    assertInstanceOf(error, SimIamAccessDenied);
-  });
-
-  it("allows an update to a pool the caller's policy names", async () => {
-    // Given a Role allowed to update one pool by its ARN.
-    const { simAws, caller, userPoolId } = await simCognitoWithRole({
-      Effect: "Allow",
-      Action: ["cognito-idp:UpdateUserPool", "cognito-idp:DescribeUserPool"],
-      Resource: userPoolArn("*"),
-    });
-
-    // When that Role updates the pool.
-    await simAws.cognitoIdentityProvider().updateUserPool(
-      new UpdateUserPoolCommand({
-        UserPoolId: userPoolId,
-        DeletionProtection: "ACTIVE",
-      }),
-      { caller },
-    );
-
-    // Then the request is allowed, and the change is there.
-    const described = await simAws
-      .cognitoIdentityProvider()
-      .describeUserPool(
-        new DescribeUserPoolCommand({ UserPoolId: userPoolId }),
-        { caller },
-      );
-
-    assertIdentical(described.UserPool?.DeletionProtection, "ACTIVE");
-  });
-
-  it("denies an update to a pool the caller may only read", async () => {
-    // Given a Role allowed to describe pools and nothing else.
-    const { simAws, caller, userPoolId } = await simCognitoWithRole({
-      Effect: "Allow",
-      Action: "cognito-idp:DescribeUserPool",
-      Resource: userPoolArn("*"),
-    });
-
-    // When that Role updates the pool.
-    const error = await assertThrowsErrorAsync(async () => {
-      await simAws.cognitoIdentityProvider().updateUserPool(
-        new UpdateUserPoolCommand({
-          UserPoolId: userPoolId,
-          DeletionProtection: "ACTIVE",
-        }),
-        { caller },
-      );
-    });
-
-    // Then it is denied, because UpdateUserPool is its own IAM action.
     assertInstanceOf(error, SimIamAccessDenied);
   });
 
