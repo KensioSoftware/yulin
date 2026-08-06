@@ -161,6 +161,115 @@ Attributes come back under `Attributes` from `AdminCreateUser` and `ListUsers`, 
 Only the standard attributes exist. A pool here is created without a `Schema` of its own, so a
 `custom:` attribute is refused, as it would be on a real pool created the same way.
 
+## Signing up
+
+`SignUp` is the other way a user gets into a pool. It names an app client rather than a pool, is
+authorized by no IAM policy, and leaves the user in `UNCONFIRMED` with the password it chose.
+
+Real Cognito emails or texts a confirmation code at that point. Nothing here delivers a message, so
+the code is readable from the pool instead, through `confirmationCode` on the pool object. That is a
+deliberate divergence: real Cognito never reports a code back to anyone, and reading one is what
+makes a registration flow testable at all.
+
+```typescript sim-cognito-sign-up
+/**
+ * Signing a user up and confirming it with the code the pool issued.
+ */
+
+import {
+  ConfirmSignUpCommand,
+  CreateUserPoolClientCommand,
+  CreateUserPoolCommand,
+  InitiateAuthCommand,
+  SignUpCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const cognito = simAws.cognitoIdentityProvider();
+
+const pool = await cognito.createUserPool(
+  new CreateUserPoolCommand({
+    PoolName: "myapp-users",
+    AutoVerifiedAttributes: ["email"],
+  }),
+);
+const userPoolId = pool.UserPool!.Id!;
+
+const appClient = await cognito.createUserPoolClient(
+  new CreateUserPoolClientCommand({
+    UserPoolId: userPoolId,
+    ClientName: "web",
+    ExplicitAuthFlows: ["ALLOW_USER_PASSWORD_AUTH"],
+  }),
+);
+const clientId = appClient.UserPoolClient!.ClientId!;
+
+const signedUp = await cognito.signUp(
+  new SignUpCommand({
+    ClientId: clientId,
+    Username: "alice",
+    Password: "Sup3rSecret!",
+    UserAttributes: [{ Name: "email", Value: "alice@example.com" }],
+  }),
+);
+
+console.log(signedUp.UserConfirmed); // false
+console.log(signedUp.UserSub); // A UUID, and not "alice"
+
+// Real Cognito sends this to the user and never reports it. Nothing here
+// delivers a message, so the pool hands it over instead.
+const code = cognito.userPool(userPoolId).confirmationCode("alice");
+
+await cognito.confirmSignUp(
+  new ConfirmSignUpCommand({
+    ClientId: clientId,
+    Username: "alice",
+    ConfirmationCode: code,
+  }),
+);
+
+// The user is CONFIRMED now, and signs in with the password it chose.
+const signedIn = await cognito.initiateAuth(
+  new InitiateAuthCommand({
+    ClientId: clientId,
+    AuthFlow: "USER_PASSWORD_AUTH",
+    AuthParameters: { USERNAME: "alice", PASSWORD: "Sup3rSecret!" },
+  }),
+);
+
+console.log(signedIn.AuthenticationResult?.AccessToken !== undefined); // true
+```
+
+Signing in before confirming is refused with `UserNotConfirmedException`, which real Cognito answers
+with even when the password was right, so an application can tell the two apart and send the user to
+`ConfirmSignUp`. A wrong password is still refused as any wrong password is, and says nothing about
+the account being unconfirmed.
+
+A wrong code is refused with `CodeMismatchException`, and leaves the user unconfirmed holding the
+code it was issued, so a second attempt with the right one works. A code is single use, and
+confirming spends it.
+
+`ResendConfirmationCode` issues a fresh code and the earlier one stops working, as it does on real
+Cognito. A test holding the earlier code has to read the new one from the pool. Asking for a code
+for a user that has already confirmed is refused with `InvalidParameterException`.
+
+`AdminConfirmSignUp` confirms a user with no code at all. It names the pool and the user, and is
+authorized by IAM the way the other admin operations are.
+
+The pool's `AutoVerifiedAttributes` decide what confirming verifies. A pool created with
+`["email"]` has `email_verified` set to `true` on the user when it confirms, because answering with
+the code shows the address is the user's. `AdminConfirmSignUp` sets nothing, as it sets nothing on
+real Cognito: an admin confirming a user says nothing about whose address it is. Only `email` and
+`phone_number` can be verified, and an attribute the user does not have is left alone.
+
+A pool created with `AdminCreateUserConfig: { AllowAdminCreateUserOnly: true }` refuses `SignUp`
+with `NotAuthorizedException`, as a real one does. That value is what a CDK `UserPool` without
+`selfSignUpEnabled` emits, so a project testing its registration flow gets the same answer here that
+the deployed pool would give. A pool created without the setting allows sign-up, which is the AWS
+default.
+
 ## Listing users
 
 `ListUsers` pages by `Limit` and `PaginationToken`, which is what the real operation calls them.
@@ -1051,11 +1160,11 @@ the secret with `DescribeUserPoolClient`, which reports it here as it does on re
 
 The properties each type reads are the ones this simulation models:
 
-- `AWS::Cognito::UserPool`: `UserPoolName`, `Policies`, `DeletionProtection`, `MfaConfiguration`,
-  `UserPoolTier`, `AccountRecoverySetting`, `AdminCreateUserConfig`, `EmailVerificationMessage`,
-  `EmailVerificationSubject`, `SmsVerificationMessage` and `VerificationMessageTemplate`. All but
-  the first three are accepted at one value each and refused at any other, as `CreateUserPool`
-  refuses them.
+- `AWS::Cognito::UserPool`: `UserPoolName`, `Policies`, `DeletionProtection`,
+  `AdminCreateUserConfig`, `AutoVerifiedAttributes`, `MfaConfiguration`, `UserPoolTier`,
+  `AccountRecoverySetting`, `EmailVerificationMessage`, `EmailVerificationSubject`,
+  `SmsVerificationMessage` and `VerificationMessageTemplate`. The last six are accepted at one value
+  each and refused at any other, as `CreateUserPool` refuses them.
 - `AWS::Cognito::UserPoolClient`: `UserPoolId`, `ClientName`, `GenerateSecret`, `ExplicitAuthFlows`,
   `PreventUserExistenceErrors`, `AccessTokenValidity`, `IdTokenValidity`, `RefreshTokenValidity`,
   `TokenValidityUnits`, `AllowedOAuthFlowsUserPoolClient` and `SupportedIdentityProviders`. The last
@@ -1081,10 +1190,12 @@ test can assert it.
 
 A CDK `UserPool` construct emits six properties on `AWS::Cognito::UserPool` before it has been asked
 for anything, and a client created with `disableOAuth` emits two on `AWS::Cognito::UserPoolClient`.
-None of the eight is simulated. They configure email and SMS delivery, verification message wording,
-account recovery, and whether users may sign themselves up, and none of those happens here.
+`AdminCreateUserConfig` is simulated, and decides whether `SignUp` works against the pool. The other
+seven are not: they configure email and SMS delivery, verification message wording and account
+recovery, and none of that happens here.
 
-They are accepted anyway, at one value each and no other, so a CDK stack deploys as it stands.
+Those seven are accepted anyway, at one value each and no other, so a CDK stack deploys as it
+stands.
 
 ```typescript sim-cognito-cdk-defaults
 /**
@@ -1152,7 +1263,8 @@ const described = await simAws
 
 console.log(described.UserPool?.Name); // "app-stack-Pool"
 
-// What the template declared is reported back, though nothing here reads it.
+// What the template declared is reported back. This one is acted on: it is
+// what says only an admin creates users in this pool.
 console.log(described.UserPool?.AdminCreateUserConfig);
 // { AllowAdminCreateUserOnly: true }
 ```
@@ -1163,7 +1275,6 @@ at all, rather than reporting the value it would have had to use.
 | Property                          | Accepted value                                                             |
 | --------------------------------- | -------------------------------------------------------------------------- |
 | `AccountRecoverySetting`          | `verified_phone_number` at priority 1, then `verified_email` at priority 2 |
-| `AdminCreateUserConfig`           | `{ AllowAdminCreateUserOnly: true }`                                       |
 | `EmailVerificationMessage`        | `The verification code to your new account is {####}`                      |
 | `EmailVerificationSubject`        | `Verify your new account`                                                  |
 | `SmsVerificationMessage`          | `The verification code to your new account is {####}`                      |
@@ -1175,12 +1286,9 @@ Every key is compared, so an object carrying one the accepted value does not hav
 with everything else that differs. The refusal names the property, the value asked for and the value
 that is simulated.
 
-Two of these are worth reading twice. `AllowAdminCreateUserOnly` is accepted at `true` and refused
-at `false`, which is the opposite way round from the AWS default: `false` says users may sign
-themselves up, and there is no `SignUp` command here to do that with, so accepting it would promise
-something this simulation cannot do. And the verification wording is accepted only at the wording
-CDK emits, because a request writing its own is asking for a message a user would read, and no
-message is ever delivered.
+The verification wording is worth reading twice. It is accepted only at the wording CDK emits,
+because a request writing its own is asking for a message a user would read, and no message is ever
+delivered.
 
 These values are what `aws-cdk-lib` 2.262.1 synthesizes. Whether real Cognito defaults a bare pool
 to the same wording has not been checked against a live account.
@@ -1381,6 +1489,12 @@ Sim Cognito currently supports:
 - `AdminCreateUserCommand`, `AdminGetUserCommand`, `AdminDeleteUserCommand`,
   `AdminSetUserPasswordCommand`, `AdminUpdateUserAttributesCommand`, `AdminDisableUserCommand`,
   `AdminEnableUserCommand` and `ListUsersCommand`
+- `SignUpCommand`, `ConfirmSignUpCommand` and `ResendConfirmationCodeCommand`, authorized by no IAM
+  policy as they are on real Cognito, and `AdminConfirmSignUpCommand`, which is authorized like the
+  other admin operations
+- `AutoVerifiedAttributes`, so confirming a sign-up sets `email_verified` or
+  `phone_number_verified`, and `AdminCreateUserConfig.AllowAdminCreateUserOnly`, which refuses
+  `SignUp` against a pool created with it
 - `CreateGroupCommand`, `GetGroupCommand`, `UpdateGroupCommand`, `DeleteGroupCommand`,
   `ListGroupsCommand`, `AdminAddUserToGroupCommand`, `AdminRemoveUserFromGroupCommand`,
   `AdminListGroupsForUserCommand` and `ListUsersInGroupCommand`
@@ -1401,7 +1515,7 @@ Sim Cognito currently supports:
 - Pool ids in the real `<region>_<nine characters>` form, and pool ARNs built from them
 - The real default password policy, applied to the passwords users are given
 - The real user status lifecycle, so an admin-created user stays in `FORCE_CHANGE_PASSWORD` until it
-  has a permanent password
+  has a permanent password, and a signed-up user stays in `UNCONFIRMED` until it confirms
 - Group membership, and the precedence order the `cognito:groups` claim uses
 - App client authentication flows, token lifetimes, generated client secrets and
   `PreventUserExistenceErrors`
@@ -1437,11 +1551,30 @@ Current documented limitations:
 - A password is kept so a user can sign in with it, and nothing reads one back.
 - Users are resolved by username only. Real Cognito also accepts a user's `sub` where an admin
   operation asks for a username, and that fails here with `UserNotFoundException`.
-- Self-service sign-up is not simulated. `SignUp`, `ConfirmSignUp`, `ForgotPassword`,
-  `ChangePassword` and `ResendConfirmationCode` are not implemented, so the `UNCONFIRMED` and
-  `RESET_REQUIRED` statuses cannot be reached. `AdminCreateUser` is the only way to make a user.
-- No message is ever delivered. `AdminCreateUser` sends no invitation, so `MessageAction: SUPPRESS`
-  is accepted and changes nothing, `RESEND` is refused, and `DesiredDeliveryMediums` is refused.
+- A pool reports the confirmation code a signed-up user is waiting to answer with, through
+  `confirmationCode` on the pool object. Real Cognito sends the code and never reports it to anyone.
+  Nothing here delivers a message, so this is what makes a registration flow testable, and it is a
+  deliberate divergence rather than an operation to write application code against.
+- A confirmation code never expires, where a real one lasts 24 hours. `ResendConfirmationCode` is
+  what replaces one.
+- `AdminConfirmSignUp` verifies nothing, whatever the pool's `AutoVerifiedAttributes` say, as it
+  verifies nothing on real Cognito. Only `ConfirmSignUp` sets `email_verified` and
+  `phone_number_verified`, and only where the user has the attribute to verify.
+- `AutoVerifiedAttributes` is accepted at `email` and `phone_number`, and anything else is refused.
+  Those are the two Cognito can send a code to.
+- `SignUp`, `ConfirmSignUp` and `ResendConfirmationCode` report a user the pool does not hold
+  whatever the app client's `PreventUserExistenceErrors` says. That setting is honoured for sign-in
+  only.
+- Password reset is not simulated. `ForgotPassword`, `ConfirmForgotPassword` and `ChangePassword`
+  are not implemented, so the `RESET_REQUIRED` status cannot be reached.
+- Unsimulated sign-up inputs are refused rather than ignored: `ClientMetadata`, `AnalyticsMetadata`
+  and `UserContextData` on the three client-side operations, `ValidationData` on `SignUp`,
+  `ForceAliasCreation` and `Session` on `ConfirmSignUp`, and `ClientMetadata` on
+  `AdminConfirmSignUp`.
+- No message is ever delivered. `SignUp` and `ResendConfirmationCode` send no confirmation code, and
+  neither reports `CodeDeliveryDetails`. `AdminCreateUser` sends no invitation, so
+  `MessageAction: SUPPRESS` is accepted and changes nothing, `RESEND` is refused, and
+  `DesiredDeliveryMediums` is refused.
 - A temporary password never expires. `TemporaryPasswordValidityDays` is stored on the pool and
   nothing acts on it.
 - Unsimulated `AdminCreateUser` inputs are refused rather than ignored: `DesiredDeliveryMediums`,
@@ -1473,21 +1606,19 @@ Current documented limitations:
 - A pool with `DeletionProtection: ACTIVE` cannot be deleted at all, because deactivating the
   protection needs `UpdateUserPool`.
 - Unsimulated `CreateUserPool` inputs are refused rather than ignored: `UsernameAttributes`,
-  `AliasAttributes`, `AutoVerifiedAttributes`, `Schema`, `LambdaConfig`, `UsernameConfiguration`,
+  `AliasAttributes`, `Schema`, `LambdaConfig`, `UsernameConfiguration`,
   `UserAttributeUpdateSettings`, `DeviceConfiguration`, `UserPoolAddOns`, `KeyConfiguration`,
   `IssuerConfiguration`, `UserPoolTags`, the email and SMS configurations, an
   `SmsAuthenticationMessage`, an `MfaConfiguration` other than `OFF`, a `UserPoolTier` other than
   `ESSENTIALS`, a `SignInPolicy`, and a `PasswordHistorySize`.
-- `AccountRecoverySetting`, `AdminCreateUserConfig`, `EmailVerificationMessage`,
-  `EmailVerificationSubject`, `SmsVerificationMessage` and `VerificationMessageTemplate` are
-  accepted at one value each and refused at any other. Nothing here reads any of them. They are
-  accepted so a CDK stack deploys, and reported back by `DescribeUserPool` so what the template
-  declared stays visible. The accepted values are in "Properties accepted without being simulated"
-  above.
-- `AdminCreateUserConfig` is accepted at `{ AllowAdminCreateUserOnly: true }` and refused at
-  `AllowAdminCreateUserOnly: false`, though `false` is what AWS itself defaults to. `false` says
-  users may sign themselves up, and there is no `SignUp` command here, so accepting it would let a
-  pool be created that claims something this simulation cannot do. This is stricter than AWS.
+- `AccountRecoverySetting`, `EmailVerificationMessage`, `EmailVerificationSubject`,
+  `SmsVerificationMessage` and `VerificationMessageTemplate` are accepted at one value each and
+  refused at any other. Nothing here reads any of them. They are accepted so a CDK stack deploys,
+  and reported back by `DescribeUserPool` so what the template declared stays visible. The accepted
+  values are in "Properties accepted without being simulated" above.
+- `AdminCreateUserConfig.AllowAdminCreateUserOnly` is acted on, and the two keys beside it are
+  refused: `InviteMessageTemplate` and `UnusedAccountValidityDays` are both about the invitation an
+  admin-created user is sent, and no message is delivered here.
 - `UsernameAttributes` is worth calling out among those. A pool that signs users in by email or phone
   number stores a generated UUID as the username, so a pool created here without that would answer
   with the wrong username and the right one on real AWS.

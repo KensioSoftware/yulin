@@ -1,4 +1,5 @@
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
+import { SimCognitoUserConfirmation } from "./sim-cognito-user-confirmation.js";
 import type {
   SimCognitoAttributeType,
   SimCognitoUserAttributes,
@@ -12,6 +13,13 @@ interface SimCognitoUserProperties {
   readonly sub: string;
   readonly attributes: SimCognitoUserAttributes;
   readonly password?: SimCognitoUserPassword | undefined;
+
+  /**
+   * Where the user starts. `AdminCreateUser` leaves one in
+   * `FORCE_CHANGE_PASSWORD`, which is the default, and `SignUp` leaves one in
+   * `UNCONFIRMED`.
+   */
+  readonly status?: SimCognitoUserStatus | undefined;
   readonly clock: SimClock;
 }
 
@@ -22,9 +30,10 @@ interface SimCognitoUserProperties {
  * that keys on the wrong one works only while the two happen to match, which
  * they never do on a real pool.
  *
- * A user starts in `FORCE_CHANGE_PASSWORD`, because `AdminCreateUser` is the
- * only way to make one here. That is the status that stops a user signing in
- * with the temporary password it was given.
+ * Where a user starts depends on how it was made. `AdminCreateUser` leaves one
+ * in `FORCE_CHANGE_PASSWORD`, which is the status that stops it signing in
+ * with the temporary password it was given, and `SignUp` leaves one in
+ * `UNCONFIRMED` holding the confirmation code its pool issued.
  */
 export class SimCognitoUser {
   public readonly username: SimCognitoUsername;
@@ -33,7 +42,8 @@ export class SimCognitoUser {
 
   private readonly clock: SimClock;
   private readonly userAttributes: SimCognitoUserAttributes;
-  private userStatus = SimCognitoUserStatus.forceChangePassword;
+  private readonly confirmation: SimCognitoUserConfirmation;
+  private userStatus: SimCognitoUserStatus;
   private userPassword: SimCognitoUserPassword | undefined;
   private isEnabled = true;
   private modifiedDate: Date;
@@ -43,6 +53,9 @@ export class SimCognitoUser {
     this.sub = properties.sub;
     this.userAttributes = properties.attributes;
     this.userPassword = properties.password;
+    this.userStatus =
+      properties.status ?? SimCognitoUserStatus.forceChangePassword;
+    this.confirmation = new SimCognitoUserConfirmation(this.userStatus);
     this.clock = properties.clock;
     this.creationDate = this.clock.now();
     this.modifiedDate = this.creationDate;
@@ -95,6 +108,18 @@ export class SimCognitoUser {
   }
 
   /**
+   * The confirmation code this user has outstanding, if it has one.
+   *
+   * Real Cognito sends the code to the user and never reports it back. Nothing
+   * here delivers a message, so a test reads the code from the pool instead,
+   * which is the divergence that makes a sign-up flow testable at all. A
+   * confirmed user has none: a code is single use, and confirming spends it.
+   */
+  get confirmationCode(): string | undefined {
+    return this.confirmation.code;
+  }
+
+  /**
    * Set the password an admin gave this user.
    *
    * A permanent password is the user's own, and confirms it. A temporary one
@@ -103,7 +128,51 @@ export class SimCognitoUser {
    */
   setPassword(password: string, permanent: boolean | undefined): void {
     this.userPassword = new SimCognitoUserPassword(password);
-    this.userStatus = SimCognitoUserStatus.afterPasswordSet(permanent);
+    this.moveTo(SimCognitoUserStatus.afterPasswordSet(permanent));
+  }
+
+  /**
+   * Issue a fresh confirmation code, forgetting the one this user had.
+   *
+   * `ResendConfirmationCode` issues another one rather than sending the same
+   * one again, as real Cognito does, so a code read before the resend no
+   * longer confirms anything.
+   */
+  resendConfirmationCode(): void {
+    this.userStatus.requireResendable();
+    this.confirmation.issue();
+    this.touch();
+  }
+
+  /**
+   * Confirm the sign-up this user made, given the code it was issued.
+   *
+   * A wrong code leaves the user where it was, still holding the code it was
+   * issued, so a caller can try again with the right one.
+   */
+  confirmSignUp(code: string | undefined): void {
+    this.userStatus.requireConfirmable();
+    this.confirmation.require(code);
+    this.moveTo(SimCognitoUserStatus.confirmed);
+  }
+
+  /**
+   * Confirm the sign-up without a code, as `AdminConfirmSignUp` does.
+   */
+  confirm(): void {
+    this.userStatus.requireConfirmable();
+    this.moveTo(SimCognitoUserStatus.confirmed);
+  }
+
+  /**
+   * Mark the named attributes verified, where this user has them.
+   *
+   * This is what a pool's `AutoVerifiedAttributes` reaches when a user
+   * confirms its sign-up: the address the code was sent to has been shown to
+   * be the user's.
+   */
+  verifyAttributes(names: readonly string[]): void {
+    this.userAttributes.verify(names);
     this.touch();
   }
 
@@ -142,6 +211,19 @@ export class SimCognitoUser {
    */
   disable(): void {
     this.isEnabled = false;
+    this.touch();
+  }
+
+  /**
+   * Move the user to a status, and let its confirmation follow.
+   *
+   * A code confirms one sign-up and no more, so it goes as soon as the user
+   * leaves `UNCONFIRMED`, whether it was `ConfirmSignUp` or an admin setting a
+   * permanent password that took it there.
+   */
+  private moveTo(status: SimCognitoUserStatus): void {
+    this.userStatus = status;
+    this.confirmation.settle(status);
     this.touch();
   }
 

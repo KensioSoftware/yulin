@@ -3,9 +3,9 @@
 This directory contains the simulated Cognito user pools implementation. Cognito identity pools,
 which exchange a token for AWS credentials, are a separate service and are not simulated at all.
 
-The pool, the app client, the users and groups in it, the sign-in flows on both sides of the API,
-the tokens it issues and the authorizer are all here. SRP, the hosted UI, MFA and device tracking
-are not.
+The pool, the app client, the users and groups in it, self-service sign-up, the sign-in flows on
+both sides of the API, the tokens it issues and the authorizer are all here. SRP, the hosted UI,
+MFA, password resets and device tracking are not.
 
 ## Entry points
 
@@ -78,10 +78,24 @@ against the pool's policy when it is set, and held as a `SimCognitoUserPassword`
 whether a candidate matches and exposes nothing, the same modelling choice simulated KMS key
 material makes.
 
-`SimCognitoUserStatus` holds the two statuses this simulation can reach, and the transition between
-them. `AdminCreateUser` leaves a user in `FORCE_CHANGE_PASSWORD`, and only a permanent password
-reaches `CONFIRMED`. The rest of the real statuses belong to sign-up, resets and federation, none of
-which are simulated.
+`SimCognitoUserStatus` holds the three statuses this simulation can reach, and the transitions
+between them. `AdminCreateUser` leaves a user in `FORCE_CHANGE_PASSWORD`, and only a permanent
+password reaches `CONFIRMED`. `SignUp` leaves a user in `UNCONFIRMED`, and `ConfirmSignUp`,
+`AdminConfirmSignUp` or a permanent password reaches `CONFIRMED` from there. The rest of the real
+statuses belong to password resets and federation, neither of which is simulated.
+
+`SimCognitoConfirmationCode` is the six-digit code a signed-up user is issued. A user gets one when
+it is constructed `UNCONFIRMED`, spends it when it leaves that status, and `ResendConfirmationCode`
+replaces it with another rather than sending the same one again. The code is readable, through
+`SimCognitoUserPool.confirmationCode`, which real Cognito never allows: nothing here delivers a
+message, so a test would otherwise have nowhere to read it from. That accessor is the one place this
+simulation knowingly tells a caller something real Cognito would not.
+
+`SimCognitoAdminCreateUserConfig` is whether users may sign themselves up, and
+`SimCognitoAutoVerifiedAttributes` is what confirming a sign-up marks verified. Both are pool state
+rather than settings accepted and ignored: `AllowAdminCreateUserOnly: true` is what a CDK `UserPool`
+without `selfSignUpEnabled` emits, and a simulation that took `SignUp` against such a pool would
+pass code that a deployment refuses.
 
 `SimCognitoUserAttributes` validates attribute names against the pool's schema. Only the standard
 attributes exist, because `CreateUserPool` refuses a `Schema`, so a `custom:` attribute is refused
@@ -232,8 +246,10 @@ rather than one class per command, so the `SimCognitoIdentityProvider` facade st
 - `command/user-pool/`: the pool commands, their structural input/output types and their output
   views
 - `command/client/`: the same for app clients
-- `command/user/`: the same for users, split between the commands that create, read and delete one
-  and the commands that change one afterwards
+- `command/user/`: the same for users, split between the commands that create, read and delete one,
+  the commands that change one afterwards, and the commands a user signs itself up with. The
+  sign-up ones resolve their pool through an app client id the way the client-side sign-in commands
+  do, so they share `SimCognitoAuthResolver` with them
 - `command/group/`: the same for groups, split between the commands that act on a group and the
   commands that move users in and out of one
 - `command/auth/`: the four sign-in operations and the two sign-out ones, the flow and challenge
@@ -279,9 +295,9 @@ command instances.
 - `CreateUserPool` and `ListUserPools` authorize against `*`, because real Cognito gives those two
   actions no resource-level permissions, so a policy naming individual pool ARNs grants nothing.
 
-`InitiateAuth`, `RespondToAuthChallenge` and `GlobalSignOut` authorize nothing, and read no caller.
-Real Cognito evaluates no IAM policy for them: they are what an application calls on behalf of a
-user, holding no AWS credentials at all. Authorizing them here would pass code that a real
+`InitiateAuth`, `RespondToAuthChallenge`, `GlobalSignOut`, `SignUp`, `ConfirmSignUp` and
+`ResendConfirmationCode` authorize nothing, and read no caller. Real Cognito evaluates no IAM policy
+for them: they are what an application calls on behalf of a user, holding no AWS credentials at all. Authorizing them here would pass code that a real
 deployment refuses, and refuse code that really works.
 
 A policy granting an app client action on a pool therefore reaches every client in that pool, and a
@@ -290,6 +306,18 @@ resource, here or on real AWS.
 
 ## Divergences worth knowing
 
+- A user pool reports the confirmation code a signed-up user was issued, through
+  `SimCognitoUserPool.confirmationCode`. Real Cognito sends it and never reports it to anyone.
+  Nothing here delivers a message, so this is what makes a sign-up flow testable at all.
+- `AdminConfirmSignUp` verifies nothing, whatever the pool's `AutoVerifiedAttributes` say, as it
+  verifies nothing on real Cognito. Only `ConfirmSignUp` sets `email_verified` and
+  `phone_number_verified`, and only where the user has the attribute to verify.
+- A confirmation code never expires, where a real one lasts 24 hours. `ResendConfirmationCode` is
+  what replaces one.
+- `ForgotPassword`, `ConfirmForgotPassword` and `ChangePassword` are not implemented, so
+  `RESET_REQUIRED` is a status no user here reaches.
+- A client-side sign-up operation naming a user the pool does not hold reports it, whatever the app
+  client's `PreventUserExistenceErrors` says. That setting is honoured for sign-in only.
 - Every unsimulated `CreateUserPool` and `CreateUserPoolClient` input is refused rather than ignored.
   `UsernameAttributes` is the one that matters most: a pool signing users in by email stores a
   generated UUID as the username, so a pool quietly created without it would answer with the wrong

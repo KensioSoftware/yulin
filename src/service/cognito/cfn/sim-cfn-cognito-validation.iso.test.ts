@@ -164,6 +164,32 @@ describe("Cognito CloudFormation validation", () => {
     );
   });
 
+  it("refuses an attribute Cognito cannot verify", async () => {
+    // Given a template auto-verifying an attribute no confirmation code is
+    // ever sent to.
+    const simAws = simAwsInEuWest2();
+
+    // When it is deployed.
+    const error = await deployFailure(simAws, {
+      AppPool: {
+        Type: "AWS::Cognito::UserPool",
+        Properties: {
+          UserPoolName: "myapp-users",
+          AutoVerifiedAttributes: ["profile"],
+        },
+      },
+    });
+
+    // Then the refusal names the attribute and the two that can be verified.
+    assertStringIncludes(error.message, "AppPool");
+    assertStringIncludes(
+      error.message,
+      "CreateUserPool AutoVerifiedAttributes 'profile' is not an attribute " +
+        "Cognito can verify",
+    );
+    assertStringIncludes(error.message, "email and phone_number");
+  });
+
   it("refuses a property value of the wrong shape", async () => {
     // Given a template whose GroupName is a number rather than a string.
     const simAws = simAwsInEuWest2();

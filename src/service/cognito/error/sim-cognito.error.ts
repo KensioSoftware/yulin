@@ -103,6 +103,36 @@ export class SimCognitoNotAuthorizedException extends SimCognitoError {
 }
 
 /**
+ * Simulated Cognito UserNotConfirmedException error.
+ *
+ * Real Cognito reports a sign-in by a user that signed itself up and never
+ * confirmed this way. The password was right: what is missing is the
+ * confirmation, so an application knows to send the user to `ConfirmSignUp`
+ * rather than back to the password field.
+ */
+export class SimCognitoUserNotConfirmedException extends SimCognitoError {
+  public override readonly name = "UserNotConfirmedException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
+ * Simulated Cognito CodeMismatchException error.
+ *
+ * Real Cognito reports a confirmation code that is not the one it issued this
+ * way, and leaves the user where it was.
+ */
+export class SimCognitoCodeMismatchException extends SimCognitoError {
+  public override readonly name = "CodeMismatchException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
  * Simulated Cognito InvalidPasswordException error.
  *
  * Real Cognito reports a password its pool's password policy does not allow

@@ -65,6 +65,20 @@ export type {
   SimListUsersCommandOutput,
 } from "./user/list-users.command.js";
 export type {
+  SimAdminConfirmSignUpCommand,
+  SimAdminConfirmSignUpCommandInput,
+  SimAdminConfirmSignUpCommandOutput,
+  SimCognitoSignUpCommandInput,
+  SimConfirmSignUpCommand,
+  SimConfirmSignUpCommandInput,
+  SimConfirmSignUpCommandOutput,
+  SimResendConfirmationCodeCommand,
+  SimResendConfirmationCodeCommandOutput,
+  SimSignUpCommand,
+  SimSignUpCommandInput,
+  SimSignUpCommandOutput,
+} from "./user/sign-up.command.js";
+export type {
   SimCognitoGroupCommandInput,
   SimCognitoGroupType,
   SimCreateGroupCommand,

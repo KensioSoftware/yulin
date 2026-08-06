@@ -20,6 +20,10 @@ export class SimCognitoUserPoolView {
    * `EstimatedNumberOfUsers` is how many users the pool holds now. Real
    * Cognito refreshes that number periodically rather than on each write, so
    * it can lag there in a way it never does here.
+   *
+   * `AdminCreateUserConfig` is reported whether or not the request named it,
+   * as real Cognito reports it, because the pool acts on it either way:
+   * it is what decides whether `SignUp` is allowed at all.
    */
   describe(pool: SimCognitoUserPool): SimCognitoUserPoolType {
     return {
@@ -29,6 +33,8 @@ export class SimCognitoUserPoolView {
       Policies: { PasswordPolicy: pool.passwordPolicy.toOutput() },
       DeletionProtection: pool.deletionProtection.value,
       MfaConfiguration: "OFF",
+      AdminCreateUserConfig: pool.adminCreateUserConfig.toOutput(),
+      AutoVerifiedAttributes: pool.autoVerifiedAttributes.toOutput(),
       EstimatedNumberOfUsers: pool.userCount,
       CreationDate: pool.creationDate,
       LastModifiedDate: pool.lastModifiedDate,

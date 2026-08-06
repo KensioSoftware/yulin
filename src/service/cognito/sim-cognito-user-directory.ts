@@ -40,6 +40,47 @@ export abstract class SimCognitoUserDirectory extends SimCognitoAuthentication {
   }
 
   /**
+   * Handle a SignUp Command from the SDK.
+   */
+  async signUp(
+    command: simCognitoCommands.SimSignUpCommand,
+  ): Promise<simCognitoCommands.SimSignUpCommandOutput> {
+    await this.background.sequence();
+    return this.commands.signUp.signUp(command);
+  }
+
+  /**
+   * Handle a ConfirmSignUp Command from the SDK.
+   */
+  async confirmSignUp(
+    command: simCognitoCommands.SimConfirmSignUpCommand,
+  ): Promise<simCognitoCommands.SimConfirmSignUpCommandOutput> {
+    await this.background.sequence();
+    return this.commands.signUp.confirmSignUp(command);
+  }
+
+  /**
+   * Handle a ResendConfirmationCode Command from the SDK.
+   */
+  async resendConfirmationCode(
+    command: simCognitoCommands.SimResendConfirmationCodeCommand,
+  ): Promise<simCognitoCommands.SimResendConfirmationCodeCommandOutput> {
+    await this.background.sequence();
+    return this.commands.signUp.resendConfirmationCode(command);
+  }
+
+  /**
+   * Handle an AdminConfirmSignUp Command from the SDK.
+   */
+  async adminConfirmSignUp(
+    command: simCognitoCommands.SimAdminConfirmSignUpCommand,
+    options?: SimCognitoIdentityProviderRequestOptions,
+  ): Promise<simCognitoCommands.SimAdminConfirmSignUpCommandOutput> {
+    await this.background.sequence();
+    return this.commands.signUp.adminConfirmSignUp(command, options);
+  }
+
+  /**
    * Handle an AdminGetUser Command from the SDK.
    */
   async adminGetUser(

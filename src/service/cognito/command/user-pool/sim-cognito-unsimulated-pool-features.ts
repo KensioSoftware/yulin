@@ -19,29 +19,20 @@ const accountRecoverySetting = {
 };
 
 /**
- * The AdminCreateUser configuration a pool is accepted with.
- *
- * `AllowAdminCreateUserOnly: true` says only an administrator creates users,
- * which is all `AdminCreateUser` does here, so accepting it promises nothing
- * this simulation does not already do. `false` says users may sign themselves
- * up, and there is no `SignUp` command to do that with, so it is refused.
- *
- * That asymmetry is deliberately stricter than AWS, whose own default for the
- * field is `false`. CDK emits `true`, which is why the accepted value is the
- * one that is safe rather than the one AWS defaults to.
- */
-const adminCreateUserConfig = { AllowAdminCreateUserOnly: true };
-
-/**
  * Refuses the user pool features this simulation does not model.
  *
  * These are the settings that decide what a pool does with its users. Most of
  * them cannot be honoured here at all, and a pool created as if they had been
  * would behave differently in a deployment.
  *
- * Two are accepted at one value each, and refused at every other. Neither
- * value asks for anything this simulation does not do, and both are what CDK
- * emits, so a stack that only wanted a pool deploys.
+ * `AccountRecoverySetting` is accepted at one value and refused at every
+ * other. That value asks for nothing this simulation does not do, and it is
+ * what CDK emits, so a stack that only wanted a pool deploys.
+ *
+ * `AdminCreateUserConfig` is simulated as far as `AllowAdminCreateUserOnly`
+ * goes, which is what decides whether `SignUp` is allowed. The two keys beside
+ * it are about the invitation an admin-created user is sent, and no message is
+ * ever delivered here, so those are refused.
  */
 export class SimCognitoUnsimulatedUserPoolFeatures {
   private readonly unsimulated = new SimCognitoUnsimulatedInput(
@@ -65,11 +56,6 @@ export class SimCognitoUnsimulatedUserPoolFeatures {
       input.AliasAttributes,
       "sign-in aliases",
     );
-    this.unsimulated.refuse(
-      "AutoVerifiedAttributes",
-      input.AutoVerifiedAttributes,
-      "automatic attribute verification",
-    );
     this.unsimulated.refuse("Schema", input.Schema, "custom attributes");
     this.unsimulated.refuse(
       "UsernameConfiguration",
@@ -92,11 +78,15 @@ export class SimCognitoUnsimulatedUserPoolFeatures {
       accountRecoverySetting,
       "account recovery",
     );
-    this.structure.refuseUnless(
-      "AdminCreateUserConfig",
-      input.AdminCreateUserConfig,
-      adminCreateUserConfig,
-      "self-service sign-up and the invitation an admin-created user is sent",
+    this.unsimulated.refuse(
+      "AdminCreateUserConfig InviteMessageTemplate",
+      input.AdminCreateUserConfig?.InviteMessageTemplate,
+      "the wording of the invitation an admin-created user is sent",
+    );
+    this.unsimulated.refuse(
+      "AdminCreateUserConfig UnusedAccountValidityDays",
+      input.AdminCreateUserConfig?.UnusedAccountValidityDays,
+      "expiring the temporary password an admin-created user was sent",
     );
     this.unsimulated.refuse(
       "UserPoolAddOns",

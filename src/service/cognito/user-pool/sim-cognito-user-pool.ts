@@ -5,6 +5,8 @@ import { SimCognitoUserPoolClientStore } from "./client/sim-cognito-user-pool-cl
 import type { SimCognitoGroup } from "./group/sim-cognito-group.js";
 import type { SimCognitoGroupName } from "./group/sim-cognito-group-name.js";
 import { SimCognitoGroupStore } from "./group/sim-cognito-group-store.js";
+import type { SimCognitoAdminCreateUserConfig } from "./sim-cognito-admin-create-user-config.js";
+import type { SimCognitoAutoVerifiedAttributes } from "./sim-cognito-auto-verified-attributes.js";
 import type { SimCognitoDeletionProtection } from "./sim-cognito-deletion-protection.js";
 import type { SimCognitoName } from "./sim-cognito-name.js";
 import type { SimCognitoPasswordPolicy } from "./sim-cognito-password-policy.js";
@@ -17,7 +19,10 @@ import {
 } from "./token/sim-cognito-signing-key.js";
 import type { SimCognitoUser } from "./user/sim-cognito-user.js";
 import { SimCognitoUserStore } from "./user/sim-cognito-user-store.js";
-import type { SimCognitoUsername } from "./user/sim-cognito-username.js";
+import {
+  requireSimCognitoUsername,
+  type SimCognitoUsername,
+} from "./user/sim-cognito-username.js";
 
 interface SimCognitoUserPoolProperties {
   readonly id: SimCognitoUserPoolId;
@@ -25,6 +30,8 @@ interface SimCognitoUserPoolProperties {
   readonly name: SimCognitoName;
   readonly passwordPolicy: SimCognitoPasswordPolicy;
   readonly deletionProtection: SimCognitoDeletionProtection;
+  readonly adminCreateUserConfig: SimCognitoAdminCreateUserConfig;
+  readonly autoVerifiedAttributes: SimCognitoAutoVerifiedAttributes;
   readonly unsimulatedSettings: SimCognitoUnsimulatedPoolSettings;
   readonly createdDate: Date;
 }
@@ -42,6 +49,16 @@ export class SimCognitoUserPool {
   public readonly name: string;
   public readonly passwordPolicy: SimCognitoPasswordPolicy;
   public readonly deletionProtection: SimCognitoDeletionProtection;
+
+  /**
+   * Whether users may sign themselves up in this pool.
+   */
+  public readonly adminCreateUserConfig: SimCognitoAdminCreateUserConfig;
+
+  /**
+   * The attributes confirming a sign-up marks as verified.
+   */
+  public readonly autoVerifiedAttributes: SimCognitoAutoVerifiedAttributes;
 
   /**
    * What the pool was created with and nothing here acts on, kept so a
@@ -68,6 +85,8 @@ export class SimCognitoUserPool {
     this.name = properties.name.value;
     this.passwordPolicy = properties.passwordPolicy;
     this.deletionProtection = properties.deletionProtection;
+    this.adminCreateUserConfig = properties.adminCreateUserConfig;
+    this.autoVerifiedAttributes = properties.autoVerifiedAttributes;
     this.unsimulatedSettings = properties.unsimulatedSettings;
     this.creationDate = properties.createdDate;
   }
@@ -221,6 +240,18 @@ export class SimCognitoUserPool {
    */
   requireUser(username: SimCognitoUsername): SimCognitoUser {
     return this.userStore.require(username);
+  }
+
+  /**
+   * The confirmation code a user of this pool has outstanding, if it has one.
+   *
+   * This is the simulator's own accessor, for a test that signed a user up:
+   * nothing here delivers a message for one to read the code from. Real
+   * Cognito reports a code to nobody, so this is a deliberate divergence.
+   */
+  confirmationCode(username: string): string | undefined {
+    return this.requireUser(requireSimCognitoUsername(username))
+      .confirmationCode;
   }
 
   /**
