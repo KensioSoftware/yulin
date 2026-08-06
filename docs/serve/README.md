@@ -250,6 +250,12 @@ await srv.close();
 
 `reload()` throws when live reload is off, rather than quietly doing nothing.
 
+Rather than calling it yourself, hand the server to something that reloads for you: a
+[mounted directory](#reloading-when-a-build-changes-a-mounted-directory) or a
+[watched template file](#answering-a-change-instead-of-restarting), both as `{ reload: srv }`. A
+watched template file refuses a server it could never reload as it is handed over, rather than on
+the first change.
+
 ### Reloading when a build changes a mounted directory
 
 A Bucket mounted on a local directory is already reading the files a site generator writes, so a
@@ -444,17 +450,17 @@ const srv = await serveSimAws({ simAws, port: 8787, liveReload: true });
 await simAws.cloudFormation().deployTemplateFile({
   templatePath: "cdk.out/TestStack.template.json",
   watch: {
-    onUpdated: () => {
-      srv.reload();
-    },
+    reload: srv,
   },
 });
 ```
 
-Re-synthing the stack then updates it in place and reloads the page. Whatever the change left alone
-keeps what it holds in simulated S3, DynamoDB and SQS, where a restart would have taken all of it.
-The process names the template as one it is answering itself, so the supervisor takes it off its own
-list rather than restarting for it. See
+Re-synthing the stack then updates it in place and reloads the page. The reload waits for the update
+rather than the write, so the page comes back on the resources the new template asked for, and an
+update that failed reloads nothing. Whatever the change left alone keeps what it holds in simulated
+S3, DynamoDB and SQS, where a restart would have taken all of it. The process names the template as
+one it is answering itself, so the supervisor takes it off its own list rather than restarting for
+it. See
 [watching a template file](../services/cloudformation/README.md#watching-a-template-file) for what
 an update does to the resources.
 

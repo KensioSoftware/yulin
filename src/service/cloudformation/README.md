@@ -182,7 +182,13 @@ updates the stack rather than needing the process restarted:
   `SimWatchSettle`, the same debounce `yulin watch` uses, and applied one after another.
 - `SimCfnTemplateWatchUpdate` decides what a save came to: an update, a file written without being
   changed, or a failure. Nothing thrown gets past it, since the watch applies changes in a queue
-  that a rejection would stop.
+  that a rejection would stop. An update is where the `reload` target is told, after the `onUpdated`
+  callback and never for a failure.
+
+The `reload` target is named by its shape, as `SimCfnWatchReloadTarget`, so watching a template file
+does not drag the serving side of Yulin into the service. A target that can say it could never
+reload, which a local server serving without live reload does, is asked as the watch is added rather
+than on the first change.
 
 The watch also names the file to a `yulin watch` supervisor as one this process is answering itself,
 through `simWatch.reportHeldPath(...)`, so the supervisor takes it off its own list. Restarting for

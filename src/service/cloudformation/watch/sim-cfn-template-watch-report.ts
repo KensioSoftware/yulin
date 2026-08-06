@@ -24,15 +24,17 @@ export class SimCfnTemplateWatchReport {
   }
 
   /**
-   * Report a callback the watch was given that threw.
+   * Report something the watch was given to run afterwards that threw.
    *
    * Said separately from a failed update, because what went wrong is whatever
-   * was meant to happen about the update rather than the update itself.
+   * was meant to happen about the update rather than the update itself. The
+   * listener names itself, since a callback and a browser to reload fail for
+   * quite different reasons.
    */
   listenerFailed(templatePath: string, listener: string, error: Error): void {
     // eslint-disable-next-line no-console
     console.warn(
-      `Simulated CloudFormation ran the ${listener} callback for the watched ` +
+      `Simulated CloudFormation ran the ${listener} for the watched ` +
         `template ${templatePath}, and it threw: ${error.message}`,
     );
   }

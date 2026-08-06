@@ -167,6 +167,17 @@ export class SimAwsLocalServer {
   }
 
   /**
+   * Give now the refusal a reload would be given later, if there is one.
+   *
+   * This is how something handed the server to reload for it, such as a
+   * watched template file, can refuse a server that was served without live
+   * reload as it is handed over rather than on the first change.
+   */
+  checkReload(): void {
+    this.liveReload.checkReload();
+  }
+
+  /**
    * Adapt a simulated AWS URL for this local server instance.
    */
   localUrl(input: string | URL): URL {

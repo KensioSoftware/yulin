@@ -63,21 +63,32 @@ export class SimCfnTemplateWatchUpdate {
       return;
     }
 
-    this.notify("onFailed", () => {
+    this.notify("onFailed callback", () => {
       options.onFailed?.(error);
     });
   }
 
   private updated(): void {
-    this.notify("onUpdated", this.properties.options.onUpdated);
+    const { onUpdated, reload } = this.properties.options;
+
+    this.notify("onUpdated callback", onUpdated);
+
+    if (reload !== undefined) {
+      // After the callback, so a browser arrives on the Resources the update
+      // made and on whatever the callback did about them.
+      this.notify("reload", () => {
+        reload.reload();
+      });
+    }
   }
 
   /**
-   * Run a callback the watch was given, without letting it break the watch.
+   * Run something the watch was given, without letting it break the watch.
    *
-   * A callback that throws is the caller's own code failing, and it says so
-   * rather than being passed on: a throw from here would go on to be the
-   * rejection that stops every save after it being applied.
+   * A callback that throws, or a server that has since closed, is the caller's
+   * own code failing, and it says so rather than being passed on: a throw from
+   * here would go on to be the rejection that stops every save after it being
+   * applied.
    */
   private notify(listener: string, run: (() => void) | undefined): void {
     try {

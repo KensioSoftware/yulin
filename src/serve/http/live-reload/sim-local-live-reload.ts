@@ -73,12 +73,28 @@ export class SimLocalLiveReload {
    * Reload connected browsers now.
    */
   reload(): void {
+    this.reloadChannel().reload();
+  }
+
+  /**
+   * Give now the refusal a reload would be given later, if there is one.
+   *
+   * For anything handed this server to reload for it, such as a watched
+   * template file. A server serving without live reload can never reload, and
+   * the refusal is worth having where the mistake was made rather than on the
+   * first change, long after.
+   */
+  checkReload(): void {
+    this.reloadChannel();
+  }
+
+  private reloadChannel(): SimLiveReload {
     if (this.liveReload === undefined) {
       throw new Error(
         "Live reload is off for this server, serve with { liveReload: true } to use reload()",
       );
     }
 
-    this.liveReload.reload();
+    return this.liveReload;
   }
 }

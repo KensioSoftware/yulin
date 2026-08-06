@@ -5,7 +5,10 @@ import type { SimCloudFormationDeployTemplateFileProperties } from "../deploy/si
 import type { SimCfnTemplateFileUpdating } from "../deploy/sim-cfn-template-file-updater.js";
 import type { SimCfnStack } from "../stack/sim-cfn-stack.js";
 import { SimCfnTemplateFileWatches } from "./sim-cfn-template-file-watches.js";
-import { templatePause } from "../../../../test/cloudformation/watched-template.js";
+import {
+  templatePause,
+  untilApplied,
+} from "../../../../test/cloudformation/watched-template.js";
 
 describe("SimCfnTemplateFileWatches", () => {
   it("watches a Stack deployed twice from one file once", async () => {
@@ -30,7 +33,8 @@ describe("SimCfnTemplateFileWatches", () => {
     try {
       // When it is synthesized again
       await directory.writeFile("Site.template.json", '{"Resources":{}}');
-      await templatePause(500);
+      await untilApplied(applied, 1);
+      await templatePause(300);
 
       // Then it is applied once, by the deployment that is live
       assertArrayEquals([...watches.paths()], [templatePath]);
@@ -57,7 +61,7 @@ describe("SimCfnTemplateFileWatches", () => {
     try {
       // When it is synthesized again
       await directory.writeFile("Site.template.json", '{"Resources":{}}');
-      await templatePause(500);
+      await untilApplied(applied, 2);
 
       // Then both are updated, and the file is named once whoever is reading it
       assertArrayEquals(

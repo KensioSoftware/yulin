@@ -149,6 +149,26 @@ export class WatchedTemplate {
 }
 
 /**
+ * Wait for a watch to have applied a template file so many times.
+ *
+ * Polled rather than waited out, because how long a filesystem event takes to
+ * arrive is the machine's business: a fixed wait is either slow on every run or
+ * flaky on a loaded one.
+ */
+export async function untilApplied(
+  applied: readonly unknown[],
+  count = 1,
+  withinMs = 5000,
+): Promise<void> {
+  await until(
+    () => applied.length >= count,
+    withinMs,
+    () =>
+      `Watched template applied ${String(applied.length)} times, expected ${String(count)}`,
+  );
+}
+
+/**
  * Give the filesystem events time to arrive and settle, for a test asserting
  * that nothing happened.
  */
