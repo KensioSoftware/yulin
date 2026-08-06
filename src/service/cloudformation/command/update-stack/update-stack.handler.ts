@@ -6,6 +6,7 @@ import type {
 } from "../../../../util/background/background.js";
 import type { JSONString } from "../../../../util/type-guard/json.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
+import type { SimCdkOutContext } from "../../cdk/sim-cdk-out-context.js";
 import type {
   SimCfnStack,
   SimCloudFormationStackName,
@@ -25,6 +26,12 @@ interface UpdateStackCommandHandlerProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly stacks: Map<SimCloudFormationStackName, SimCfnStack>;
   readonly background: BackgroundScheduler & BackgroundCompleter;
+
+  /**
+   * The CDK cloud assembly the new template was synthesized into, for an update
+   * applied from a template file rather than from an SDK Command.
+   */
+  readonly cdkOutContext?: SimCdkOutContext | undefined;
 }
 
 /**
@@ -39,11 +46,13 @@ export class UpdateStackCommandHandler implements CommandHandler<
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly stacks: Map<SimCloudFormationStackName, SimCfnStack>;
   private readonly background: BackgroundScheduler & BackgroundCompleter;
+  private readonly cdkOutContext: SimCdkOutContext | undefined;
 
   constructor(properties: UpdateStackCommandHandlerProperties) {
     this.accountRegionScope = properties.accountRegionScope;
     this.stacks = properties.stacks;
     this.background = properties.background;
+    this.cdkOutContext = properties.cdkOutContext;
   }
 
   /**
@@ -90,6 +99,7 @@ export class UpdateStackCommandHandler implements CommandHandler<
           accountRegionScope: this.accountRegionScope,
         },
       ),
+      { cdkOutContext: this.cdkOutContext },
     );
 
     return {

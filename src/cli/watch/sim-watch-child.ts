@@ -9,6 +9,7 @@ interface SimWatchChildProperties {
   readonly cwd: string;
   readonly env: NodeJS.ProcessEnv;
   readonly onPath: (reportedPath: string) => void;
+  readonly onHeldPath: (heldPath: string) => void;
   readonly onExit: (code: number | null, signal: NodeJS.Signals | null) => void;
 }
 
@@ -30,6 +31,10 @@ export class SimWatchChild {
   private readonly onMessage = (message: unknown): void => {
     if (isWatchPathMessage(message, simWatchMessages.path)) {
       this.properties.onPath(message.path);
+    }
+
+    if (isWatchPathMessage(message, simWatchMessages.heldPath)) {
+      this.properties.onHeldPath(message.path);
     }
   };
 

@@ -9,12 +9,24 @@ import {
 } from "../cdk/sim-cdk-out-context.js";
 import type { SimCfnExecutableResourceBinding } from "../bind/sim-cfn-exec-binding.type.js";
 import { simWatch } from "../../../watch/sim-watch-runtime.js";
+import type { SimCfnTemplateFileWatchOptions } from "../watch/sim-cfn-template-watch.type.js";
 
 export interface SimCloudFormationDeployTemplateFileProperties {
   readonly templatePath: string;
   readonly stackName?: SimCloudFormationStackName | string | undefined;
   readonly parameters?: Record<string, string> | undefined;
   readonly bindings?: readonly SimCfnExecutableResourceBinding[] | undefined;
+
+  /**
+   * Keep watching the template file, and apply it to the Stack again whenever
+   * it changes, rather than the deployment being the one time it is read.
+   *
+   * `true` watches with nothing to do afterwards. An options object is where a
+   * served page gets reloaded once the update is complete. Watching holds the
+   * process open until `stopWatchingTemplateFiles()`, which is what a dev
+   * process wants and a test has to remember.
+   */
+  readonly watch?: boolean | SimCfnTemplateFileWatchOptions | undefined;
 }
 
 export interface SimCfnLoadedTemplateFile {

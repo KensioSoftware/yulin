@@ -41,6 +41,16 @@ export type SimCloudFormationStackStatus =
   | "DELETE_COMPLETE"
   | "DELETE_FAILED";
 
+export interface SimCfnStackUpdateProperties {
+  /**
+   * The CDK cloud assembly the new template was synthesized into, when it came
+   * from a template file that has been synthesized again. The Stack reads
+   * assets from it from then on, since the manifest it was deployed with
+   * describes the assembly the previous template came from.
+   */
+  readonly cdkOutContext?: SimCdkOutContext | undefined;
+}
+
 interface SimCloudFormationStackProperties {
   readonly simAws: SimAws;
   readonly accountRegionScope: SimAwsAccountRegionScope;
@@ -169,8 +179,15 @@ export class SimCfnStack {
    * Stack's template moves on. The Resource work is scheduled in the
    * background, as a deployment is, so callers that need the final state should
    * use waitForUpdateComplete().
+   *
+   * A template that came from a synthesis of its own brings the cloud assembly
+   * it was written into with it, so Resources it replaces read the assets that
+   * synthesis staged rather than the ones the Stack was deployed with.
    */
-  async update(template: SimCfnTemplate): Promise<void> {
+  async update(
+    template: SimCfnTemplate,
+    properties: SimCfnStackUpdateProperties = {},
+  ): Promise<void> {
     this.updating.assertNotUpdating();
 
     const updater = this.operations.updater({
@@ -181,6 +198,12 @@ export class SimCfnStack {
     });
 
     updater.assertHasChanges();
+
+    // Only once the update is going ahead, so a refused update leaves the Stack
+    // reading the cloud assembly it was deployed from.
+    if (properties.cdkOutContext !== undefined) {
+      this.operations.useCdkOutContext(properties.cdkOutContext);
+    }
 
     this.cfnTemplate = template;
     this.template = template.template;

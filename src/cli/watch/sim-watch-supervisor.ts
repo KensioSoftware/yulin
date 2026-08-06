@@ -35,6 +35,15 @@ export class SimWatchSupervisor {
   };
 
   /**
+   * A path the process watches itself, such as a deployed template it updates
+   * the Stack from in place. Restarting for it would throw away the simulated
+   * state the in-place update exists to keep.
+   */
+  private readonly onHeldPath = (heldPath: string): void => {
+    this.watcher.addHeld(heldPath);
+  };
+
+  /**
    * A process that stopped on its own is a setup that threw, or a script that
    * ran to the end. Either way the watching goes on, so the next save tries
    * again without the watch having to be started over.
@@ -43,6 +52,7 @@ export class SimWatchSupervisor {
     code: number | null,
     signal: NodeJS.Signals | null,
   ): void => {
+    this.watcher.clearHeld();
     this.reporter.exited(code, signal);
   };
 
@@ -104,6 +114,11 @@ export class SimWatchSupervisor {
   }
 
   private async start(): Promise<void> {
+    // The run that held a path has gone, and the one replacing it says what it
+    // holds as it registers it. Keeping the old list would leave a file the new
+    // run is not watching neither restarted for nor answered in place.
+    this.watcher.clearHeld();
+
     const child = new SimWatchChild({
       command: this.watchArguments.command,
       args: this.watchArguments.commandArguments,
@@ -113,6 +128,7 @@ export class SimWatchSupervisor {
         inspect: this.watchArguments.inspect,
       }).build(),
       onPath: this.onReportedPath,
+      onHeldPath: this.onHeldPath,
       onExit: this.onChildExit,
     });
 

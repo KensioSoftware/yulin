@@ -1049,6 +1049,103 @@ sibling `TestStack.assets.json` manifest and the staged asset directories beside
 anything that needs a CDK asset, such as a `Custom::CDKBucketDeployment` or a Lambda function
 bundled with `Code.fromAsset`, fails with `No CDK assets manifest is available.`
 
+## Applying a changed template file
+
+`updateTemplateFile(...)` reads a deployed template file again and applies it to its stack, the same
+way [`UpdateStackCommand`](#updating-a-stack) applies a changed template body. Give it what the
+deployment was given, since parameters are part of what an update applies:
+
+```typescript sim-cloudformation-update-template-file
+/**
+ * Applying a synthesized template file to the stack it was deployed as.
+ */
+
+import path from "node:path";
+
+import { SimAws } from "@kensio/yulin";
+
+const templatePath = path.join(
+  process.cwd(),
+  "cdk.out",
+  "TestStack.template.json",
+);
+
+const simAws = new SimAws();
+
+await simAws.cloudFormation().deployTemplateFile({ templatePath });
+
+// Something synthesizes the stack again here.
+
+await simAws.cloudFormation().updateTemplateFile({ templatePath });
+```
+
+The sibling assets manifest is read again with the template, so a resource the update replaces reads
+the assets that synthesis staged rather than the ones the stack was deployed with.
+
+A file written without being changed is refused with `No updates are to be performed.`, and a failed
+update leaves the stack in `UPDATE_FAILED` holding whatever the update reached. There is no rollback
+to the template it was deployed from, so a failure part way through has already deleted, replaced or
+created some of the resources the change asked for.
+
+## Watching a template file
+
+A local dev process holds simulated data that a restart would throw away, and a template file is
+data rather than code. `watch` keeps reading the file, so re-synthesizing the stack updates it in
+place while the process carries on:
+
+```typescript sim-cloudformation-watch-template-file
+/**
+ * Updating a deployed stack whenever its template file is synthesized again.
+ */
+
+import path from "node:path";
+
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const srv = await serveSimAws({ simAws, port: 8787, liveReload: true });
+
+await simAws.cloudFormation().deployTemplateFile({
+  templatePath: path.join(process.cwd(), "cdk.out", "TestStack.template.json"),
+  watch: {
+    onUpdated: () => {
+      srv.reload();
+    },
+  },
+});
+```
+
+`watch: true` watches with nothing to do afterwards.
+
+`onUpdated` runs once the update is complete, which is where a served page gets reloaded. It runs
+when the resources have changed rather than when the write lands, so a browser reloads onto the
+resources the new template asked for. A write that changed nothing is a no-op, so nothing reloads
+for it.
+
+`onFailed` is given an update the changed template did not survive. It reports the failure and
+nothing else: the stack is left holding whatever the update reached, as an update through the
+command is. What a failure does keep is the process, and the resources it never got to, so a
+template that no longer deploys leaves a working environment where a restart on it would leave
+none.
+
+A burst of writes is one update. Saving a file is several filesystem events, so changes are held
+until they stop arriving. `settleMs` is how long that wait is.
+
+Watching holds a filesystem handle open, so the process does not exit on its own. That is what a dev
+process wants. Anything with an end, such as a test, calls `stopWatchingTemplateFiles()` when it is
+done. `watchedTemplateFiles()` names what is being watched.
+
+Yulin never synthesizes anything. It reads the output template, so run your own `cdk synth` and let
+the watch pick up what it writes.
+
+### Under `yulin watch`
+
+[`yulin watch`](../../serve/README.md#restarting-on-a-file-change) restarts the process when a
+deployed template changes. A watched template is left to the process that is watching it instead, so
+the stack updates in place and everything held in simulated S3, DynamoDB and SQS stays where it is.
+Nothing needs configuring for that: the process names the file it is holding.
+
 ## CDK S3 BucketDeployment
 
 Yulin can simulate selected CDK custom resources. A common use case is CDK S3 BucketDeployment,
@@ -1685,6 +1782,8 @@ Sim CloudFormation currently supports:
 - `deployTemplate(...)` for parsed template objects, optionally naming the synthesized template file
   a template edited in memory came from
 - `deployTemplateFile(...)` for synthesized JSON template files
+- `updateTemplateFile(...)` for applying a synthesized template file to the stack it was deployed as
+- Watching a deployed template file, updating its stack in place whenever the file changes
 - Template `Parameters` with supplied values and defaults
 - Template `Outputs`, resolved after resource creation and read from `stack.outputs`
 - Template `Mappings`, read with `Fn::FindInMap`
@@ -1733,6 +1832,11 @@ Each service's own docs describe what its resource types support.
   is still refused outright.
 - A stack update replaces a changed resource rather than updating it in place, so what the resource
   held is lost. See [changed resources are replaced](#changed-resources-are-replaced).
+- A watched template file updates its stack in place, which does not make the update itself any
+  gentler: a changed resource is still replaced and loses what it holds, the same as any other
+  update.
+- Yulin never synthesizes a CDK app. It watches the synthesized output template, so a change to the
+  app itself only reaches the stack once something has run `cdk synth` over it.
 - A stack update applies a whole template directly. Change sets are not supported, so
   `CreateChangeSetCommand` and `ExecuteChangeSetCommand` have nothing behind them, and neither does
   drift detection.

@@ -144,12 +144,13 @@ or drain broader simulator background tasks when appropriate.
 
 `SimCloudFormation` also exposes helper methods for tests and local tooling:
 
-- `deployTemplate(...)`
-- `deployTemplateFile(...)`
+- `deployTemplate(...)`, for a parsed template object
+- `deployTemplateFile(...)`, for a synthesized CDK template file
+- `updateTemplateFile(...)`, for applying such a file to the stack it was deployed as
 
-These are wrappers around the same stack creation machinery. They exist so tests can deploy a parsed
-template object or a synthesized CDK template file without manually constructing a JSON
-`TemplateBody`command.
+The first two are wrappers around the same stack creation machinery, and the third around the same
+update machinery. They exist so tests and local tooling can work in templates without manually
+constructing a JSON `TemplateBody` command.
 
 The deployer is also where extra deployment context can enter the stack creation path:
 
@@ -159,6 +160,33 @@ The deployer is also where extra deployment context can enter the stack creation
 
 The important design point is that these helpers do not bypass stack/resource lifecycle. They feed
 additional context into the normal CloudFormation creation pipeline.
+
+`SimCfnTemplateFileUpdater` is the update half of the same idea. It reads the file with the same
+`SimCfnTemplateFileLoader` a deployment reads it with, and submits an `UpdateStackCommand`, so an
+update from a file resolves the same way the deployment did. The sibling CDK assets manifest is read
+again with it and handed to the stack, because a synthesis rewrites both together and the manifest
+the stack was deployed with describes the assembly the previous template came from.
+
+## Watching a template file
+
+`src/service/cloudformation/watch/` keeps a deployed template file being read, so a re-synthesis
+updates the stack rather than needing the process restarted:
+
+- `SimCfnTemplateFileWatches` holds one watch per deployment, keyed by file and stack, and is what
+  `stopWatchingTemplateFiles()` lets go of. It is also where a deployment's `watch` property is
+  turned into what to do. Keying by deployment is what lets one file deployed as two stacks update
+  both, while deploying the same stack again replaces its own watch.
+- `SimCfnTemplateFileWatch` watches the directory the template is in, filtered to the template's own
+  name, because a synthesis renames a temporary file over the template and a watch on the file
+  itself would be left holding the file that was replaced. Changes are settled through
+  `SimWatchSettle`, the same debounce `yulin watch` uses, and applied one after another.
+- `SimCfnTemplateWatchUpdate` decides what a save came to: an update, a file written without being
+  changed, or a failure. Nothing thrown gets past it, since the watch applies changes in a queue
+  that a rejection would stop.
+
+The watch also names the file to a `yulin watch` supervisor as one this process is answering itself,
+through `simWatch.reportHeldPath(...)`, so the supervisor takes it off its own list. Restarting for
+it would throw away the simulated state that updating in place exists to keep.
 
 ## Template model
 

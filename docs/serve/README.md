@@ -218,10 +218,47 @@ CDK asset directories, and the working files an editor writes around a save.
 On top of that, Yulin names paths it is holding that the module graph never mentions. A directory
 given to `mountBucketFilesystem` and a template given to `deployTemplateFile` are reported to the
 supervisor as they are registered, and watched from then on, without appearing in any list. Editing
-a file in a mounted directory or re-synthing a stack restarts the process.
+a file in a mounted directory or re-synthing a stack restarts the process. A template deployed with
+the `watch` option is the exception, and is
+[left to the process reading it](#updating-a-stack-instead-of-restarting).
 
 A burst of writes is one restart. Saving one file is several filesystem events, so changes are held
 until they stop arriving before anything is restarted.
+
+### Updating a stack instead of restarting
+
+A deployment that watches its own template file is left alone by the supervisor:
+
+```typescript sim-serve-watch-template
+/**
+ * A template the process updates its stack from, rather than restarting for.
+ */
+
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const srv = await serveSimAws({ simAws, port: 8787, liveReload: true });
+
+await simAws.cloudFormation().deployTemplateFile({
+  templatePath: "cdk.out/TestStack.template.json",
+  watch: {
+    onUpdated: () => {
+      srv.reload();
+    },
+  },
+});
+```
+
+Re-synthing the stack then updates it in place and reloads the page. Whatever the change left alone
+keeps what it holds in simulated S3, DynamoDB and SQS, where a restart would have taken all of it.
+The process names the template as one it is answering itself, so the supervisor takes it off its own
+list rather than restarting for it. See
+[watching a template file](../services/cloudformation/README.md#watching-a-template-file) for what
+an update does to the resources.
+
+This works with no supervisor at all, so a dev script started from an IDE debugger picks up a
+re-synth with the debugger attached throughout.
 
 ### When a run goes wrong
 
@@ -264,6 +301,8 @@ restart as it is without watch mode.
 - There is no overlay for a reload that failed. The terminal has the error.
 - `yulin watch` does not re-synth CDK. `cdk watch` is a shortcut for `deploy --watch` against real
   AWS and there is no synth-only watch, so run your own synth and let the watch pick up its output.
+- A template updated in place still replaces a changed resource, so the objects in a bucket the
+  change touches go with it. Only the resources the template left alone keep what they hold.
 - Lambda and CloudFront Function code is not swapped without a restart. A fresh process picks up an
   edited handler correctly, and an in-process swap would have to invalidate an ESM import subgraph
   that the language does not expose.

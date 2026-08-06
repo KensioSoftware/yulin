@@ -3,7 +3,7 @@ import path from "node:path";
 import { simWatchConfig } from "../../watch/sim-watch.config.js";
 import { SimWatchEventPath } from "./sim-watch-event-path.js";
 import { SimWatchIgnore } from "./sim-watch-ignore.js";
-import { SimWatchSettle } from "./sim-watch-settle.js";
+import { SimWatchSettle } from "../../watch/sim-watch-settle.js";
 
 interface SimWatchWatcherProperties {
   readonly cwd: string;
@@ -31,6 +31,7 @@ export class SimWatchWatcher {
   private readonly settle: SimWatchSettle;
   private readonly watchers = new Map<string, FSWatcher>();
   private readonly reportedRoots = new Set<string>();
+  private readonly heldRoots = new Set<string>();
 
   constructor(properties: SimWatchWatcherProperties) {
     const { cwd, onChange, settleMs = simWatchConfig.settleMs } = properties;
@@ -66,6 +67,31 @@ export class SimWatchWatcher {
     }
 
     this.watch(resolved, isDirectory(resolved));
+  }
+
+  /**
+   * Leave a path to the process that reported it.
+   *
+   * A process watching a path itself answers a change to it without being
+   * restarted, so restarting for it would throw away the simulated state that
+   * answering in place exists to keep. This beats having reported the same path
+   * for watching: being told a path is handled there is more specific than
+   * being told it is worth watching here.
+   */
+  addHeld(heldPath: string): void {
+    this.heldRoots.add(path.resolve(heldPath));
+  }
+
+  /**
+   * Take back every held path, for a process that is no longer running.
+   *
+   * Held paths belong to the run that reported them, unlike reported paths,
+   * which are only ever more to watch. A run that stopped holding a path, or
+   * stopped altogether, would otherwise leave a file nothing is watching and
+   * nothing restarts for.
+   */
+  clearHeld(): void {
+    this.heldRoots.clear();
   }
 
   /**
@@ -120,6 +146,12 @@ export class SimWatchWatcher {
   }
 
   private ignored(changedPath: string): boolean {
+    for (const root of this.heldRoots) {
+      if (root === changedPath || this.within(root, changedPath)) {
+        return true;
+      }
+    }
+
     for (const root of this.reportedRoots) {
       if (root === changedPath || this.within(root, changedPath)) {
         return false;

@@ -1,4 +1,5 @@
 import path from "node:path";
+import { assertArrayEquals } from "@kensio/smartass";
 import { afterEach, describe, it } from "vitest";
 import { SimWatchArguments } from "./sim-watch-arguments.js";
 import { SimWatchReporter } from "./sim-watch-reporter.js";
@@ -69,6 +70,34 @@ describe("paths a supervised process reports", () => {
     // Then the process runs again, rebinding against the new template
     await project.untilRuns(2);
   });
+
+  it("leaves a template the process updates in place alone", async () => {
+    // Given a dev script that deploys a synthesized template and keeps
+    // watching it itself
+    const project = await WatchProject.of({});
+    const templatePath = path.join(
+      project.mountedPath(),
+      "Stack.template.json",
+    );
+    await project.writeMounted("Stack.template.json", emptyTemplate);
+    await project.write(
+      "dev.ts",
+      watchingScript(project.runsLogPath(), templatePath),
+    );
+    const supervisor = supervise(project);
+    await project.settled();
+    runSupervisor(supervisor);
+    await project.untilRuns(1);
+    await watchPause(300);
+
+    // When the stack is synthesized again
+    await project.writeMounted("Stack.template.json", changedTemplate);
+
+    // Then the Stack is updated in the process that deployed it, rather than
+    // the process being restarted and everything it holds going with it
+    const recorded = await project.untilRuns(2);
+    assertArrayEquals([...recorded], ["run", "updated"]);
+  });
 });
 
 const emptyTemplate = JSON.stringify({ Resources: {} });
@@ -102,6 +131,26 @@ const simAws = new SimAws();
 await simAws
   .cloudFormation()
   .deployTemplateFile({ templatePath: ${JSON.stringify(templatePath)} });
+
+setInterval(() => {}, 60_000);
+`;
+}
+
+function watchingScript(runsLogPath: string, templatePath: string): string {
+  return String.raw`import { appendFileSync } from "node:fs";
+import { SimAws } from ${JSON.stringify(yulin)};
+
+appendFileSync(${JSON.stringify(runsLogPath)}, "run\n");
+
+const simAws = new SimAws();
+await simAws.cloudFormation().deployTemplateFile({
+  templatePath: ${JSON.stringify(templatePath)},
+  watch: {
+    onUpdated: () => {
+      appendFileSync(${JSON.stringify(runsLogPath)}, "updated\n");
+    },
+  },
+});
 
 setInterval(() => {}, 60_000);
 `;

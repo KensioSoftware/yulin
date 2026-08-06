@@ -8,6 +8,15 @@ import { makeSimCfnStackResourceMap } from "../resource-map/sim-cfn-stack-resour
 import { SimCfnStackUpdatePlan } from "./sim-cfn-stack-update-plan.js";
 import { simCfnStackTemplateChanged } from "./sim-cfn-stack-template-changes.js";
 
+/**
+ * What CloudFormation answers an update that would change nothing.
+ *
+ * Named because a template file being watched is written far more often than it
+ * is changed, so telling this apart from a real failure is what makes a save
+ * with nothing in it a no-op rather than something to report.
+ */
+export const simCfnNoUpdatesMessage = "No updates are to be performed.";
+
 interface SimCfnStackUpdaterProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly background: BackgroundScheduler;
@@ -61,9 +70,7 @@ export class SimCfnStackUpdater {
       !this.plan.changesResources &&
       !simCfnStackTemplateChanged(current, updated)
     ) {
-      throw new SimCloudFormationValidationError(
-        "No updates are to be performed.",
-      );
+      throw new SimCloudFormationValidationError(simCfnNoUpdatesMessage);
     }
   }
 

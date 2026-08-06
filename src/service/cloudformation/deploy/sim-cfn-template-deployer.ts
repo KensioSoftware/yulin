@@ -13,6 +13,9 @@ import {
   SimCfnTemplateFileLoader,
   type SimCloudFormationDeployTemplateFileProperties as SimCloudFormationDeployTemplateFileProperties,
 } from "./sim-cfn-template-file-loader.js";
+import { SimCfnTemplateFileUpdater } from "./sim-cfn-template-file-updater.js";
+import { simCfnTemplateFileDeployment } from "./sim-cfn-template-file-deployment.js";
+import { SimCfnTemplateFileWatches } from "../watch/sim-cfn-template-file-watches.js";
 import type { SimCfnExecutableResourceBinding } from "../bind/sim-cfn-exec-binding.type.js";
 import type { SimAws } from "../../aws/sim-aws.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
@@ -66,12 +69,22 @@ export class SimCloudFormationTemplateDeployer {
   private readonly stacks: Map<SimCloudFormationStackName, SimCfnStack>;
   private readonly background: BackgroundScheduler & BackgroundCompleter;
   private readonly templateFileLoader = new SimCfnTemplateFileLoader();
+  private readonly templateFileUpdater: SimCfnTemplateFileUpdater;
+  private readonly watches: SimCfnTemplateFileWatches;
 
   constructor(properties: SimCloudFormationTemplateDeployerProperties) {
     this.simAws = properties.simAws;
     this.accountRegionScope = properties.accountRegionScope;
     this.stacks = properties.stacks;
     this.background = properties.background;
+    this.templateFileUpdater = new SimCfnTemplateFileUpdater({
+      accountRegionScope: this.accountRegionScope,
+      stacks: this.stacks,
+      background: this.background,
+    });
+    this.watches = new SimCfnTemplateFileWatches({
+      updater: this.templateFileUpdater,
+    });
   }
 
   /**
@@ -95,13 +108,48 @@ export class SimCloudFormationTemplateDeployer {
   /**
    * Create and deploy a simulated CloudFormation Stack from a synthesized CDK
    * template file.
+   *
+   * A deployment asked to watch the file starts watching once the Stack is
+   * deployed, so a template that could not be deployed at all is not one this
+   * keeps trying to update.
    */
   async deployTemplateFile(
     properties: SimCloudFormationDeployTemplateFileProperties | string,
   ): Promise<SimCfnStack> {
-    return await this.deployTemplateWithContext(
-      await this.templateFileLoader.load(properties),
+    const deployment = simCfnTemplateFileDeployment(properties);
+    const stack = await this.deployTemplateWithContext(
+      await this.templateFileLoader.load(deployment),
     );
+
+    this.watches.watchIfAsked(deployment);
+
+    return stack;
+  }
+
+  /**
+   * Apply a synthesized CDK template file to the Stack it was deployed as, and
+   * wait for the Resource work to finish.
+   */
+  async updateTemplateFile(
+    properties: SimCloudFormationDeployTemplateFileProperties | string,
+  ): Promise<SimCfnStack> {
+    return await this.templateFileUpdater.update(
+      simCfnTemplateFileDeployment(properties),
+    );
+  }
+
+  /**
+   * The template files being watched for changes.
+   */
+  watchedTemplateFiles(): readonly string[] {
+    return this.watches.paths();
+  }
+
+  /**
+   * Stop watching every template file being watched.
+   */
+  stopWatchingTemplateFiles(): void {
+    this.watches.stopAll();
   }
 
   private async deployTemplateWithContext(properties: {
