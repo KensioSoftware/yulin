@@ -8,19 +8,28 @@
  * This catches publishes where `dist/` is stale or incomplete, which a local
  * build alone cannot detect because the repository working tree still has the
  * files that the tarball is missing.
+ *
+ * It also compiles a consumer file that names the types Yulin's own API asks
+ * for, which catches a type a consumer cannot name because the package never
+ * exports it.
  */
 
 import { execa } from "execa";
-import {
-  mkdir,
-  mkdtemp,
-  readFile,
-  rm,
-  stat,
-  writeFile,
-} from "node:fs/promises";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+
+import {
+  assertTypesUsable,
+  createConsumer,
+  findMissingTypes,
+  importSubpaths,
+} from "./verify-pack-consumer.mjs";
+import type {
+  ImportResult,
+  PackageManifest,
+  Subpath,
+} from "./verify-pack.type.mjs";
 
 const projectRoot = path.resolve(import.meta.dirname, "../..");
 
@@ -31,28 +40,25 @@ const forbiddenTarballEntries = [
   "/node_modules/",
 ];
 
-interface PackageManifest {
-  readonly name: string;
-  readonly exports: Readonly<Record<string, ExportTarget>>;
-  readonly peerDependencies?: Readonly<Record<string, string>>;
-}
-
-type ExportTarget =
-  string | { readonly import: string; readonly types: string };
-
-interface Subpath {
-  /** Specifier a consumer would import, e.g. `@kensio/yulin/s3`. */
-  readonly specifier: string;
-  /** Package-relative path to the declaration file. */
-  readonly types: string;
-}
-
-interface ImportResult {
-  readonly specifier: string;
-  readonly ok: boolean;
-  readonly exportCount: number;
-  readonly error?: string;
-}
+/**
+ * Exports a consumer imports by name, keyed by export subpath.
+ *
+ * A subpath resolving does not mean the export a consumer reaches for is in it,
+ * so the names an ordinary consumer uses are named here.
+ */
+const requiredExports = new Map<string, readonly string[]>([
+  [
+    ".",
+    [
+      "SimAws",
+      "isSimAwsAccountId",
+      "makeSimAwsAccountId",
+      "simAwsAccountId",
+      "SimInvalidAwsAccountId",
+    ],
+  ],
+  ["./cloudformation", ["SimCloudFormation"]],
+]);
 
 async function main(): Promise<void> {
   const manifest = await readManifest();
@@ -79,6 +85,8 @@ async function main(): Promise<void> {
     );
 
     report(results, missingTypes);
+
+    await assertTypesUsable(consumerDirectory);
   } finally {
     await rm(workDirectory, { recursive: true, force: true });
   }
@@ -104,6 +112,7 @@ function collectSubpaths(manifest: PackageManifest): readonly Subpath[] {
     subpaths.push({
       specifier: `${manifest.name}${suffix}`,
       types: target.types,
+      requiredExports: requiredExports.get(key) ?? [],
     });
   }
 
@@ -147,109 +156,6 @@ async function assertTarballHygiene(tarballPath: string): Promise<void> {
   }
 
   console.log(`Tarball is clean (${String(entries.length)} entries).`);
-}
-
-/**
- * A bare ESM project outside the repository, so module resolution cannot fall
- * back to the repository's own `node_modules` or source tree.
- */
-async function createConsumer(
-  consumerDirectory: string,
-  tarballPath: string,
-  manifest: PackageManifest,
-): Promise<void> {
-  await mkdir(consumerDirectory, { recursive: true });
-
-  await writeFile(
-    path.join(consumerDirectory, "package.json"),
-    `${JSON.stringify({ name: "yulin-verify-pack", version: "0.0.0", private: true, type: "module" }, undefined, 2)}\n`,
-    "utf8",
-  );
-
-  // Optional peers are installed so that subpaths depending on them are
-  // exercised rather than skipped.
-  const peers = Object.keys(manifest.peerDependencies ?? {});
-
-  await execa("npm", ["install", "--silent", tarballPath, ...peers], {
-    cwd: consumerDirectory,
-  });
-
-  console.log(`Installed tarball into ${consumerDirectory}.`);
-}
-
-/** Declaration files an export target points at but the tarball does not have. */
-async function findMissingTypes(
-  consumerDirectory: string,
-  manifest: PackageManifest,
-  subpaths: readonly Subpath[],
-): Promise<readonly string[]> {
-  const packageDirectory = path.join(
-    consumerDirectory,
-    "node_modules",
-    manifest.name,
-  );
-  const missing: string[] = [];
-
-  for (const subpath of subpaths) {
-    if (!(await isFile(path.join(packageDirectory, subpath.types)))) {
-      missing.push(`${subpath.specifier} -> ${subpath.types}`);
-    }
-  }
-
-  return missing;
-}
-
-async function isFile(filePath: string): Promise<boolean> {
-  try {
-    const entry = await stat(filePath);
-
-    return entry.isFile();
-  } catch {
-    return false;
-  }
-}
-
-/** Imports each subpath in a child process running inside the consumer. */
-async function importSubpaths(
-  consumerDirectory: string,
-  subpaths: readonly Subpath[],
-): Promise<readonly ImportResult[]> {
-  const specifiers = subpaths.map((subpath) => subpath.specifier);
-  const runnerPath = path.join(consumerDirectory, "import-subpaths.mjs");
-
-  await writeFile(runnerPath, importRunnerSource(specifiers), "utf8");
-
-  const { stdout } = await execa("node", [runnerPath], {
-    cwd: consumerDirectory,
-  });
-
-  return JSON.parse(stdout) as readonly ImportResult[];
-}
-
-function importRunnerSource(specifiers: readonly string[]): string {
-  return `const specifiers = ${JSON.stringify(specifiers, undefined, 2)};
-const results = [];
-
-for (const specifier of specifiers) {
-  try {
-    const module = await import(specifier);
-    results.push({
-      specifier,
-      ok: true,
-      exportCount: Object.keys(module).length,
-    });
-  } catch (error) {
-    results.push({
-      specifier,
-      ok: false,
-      exportCount: 0,
-      error: \`\${error.code ?? ""} \${error.message}\`.trim().split("\\n")[0],
-    });
-  }
-}
-
-process.stdout.write(JSON.stringify(results));
-`;
 }
 
 function report(

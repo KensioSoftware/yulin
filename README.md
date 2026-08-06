@@ -124,6 +124,17 @@ await simAws.account("111111111111").region("eu-west-2").dynamoDb().createTable(
 AWS state is simulated internally, so you can test realistic interactions with multiple AWS
 services.
 
+An Account ID is a plain string wherever one is accepted. Code that wants to name the type can get a
+`SimAwsAccountId` from `simAwsAccountId(...)`, which refuses anything that is not a 12 digit AWS
+Account ID, or from `makeSimAwsAccountId()` when a test just needs an arbitrary one.
+
+```typescript
+import { makeSimAwsAccountId, simAwsAccountId } from "@kensio/yulin";
+
+const accountId = simAwsAccountId("111111111111");
+const someOtherAccountId = makeSimAwsAccountId();
+```
+
 Each instance of `SimAws` is cheap and encapsulated so you can create them wherever you need them.
 It's fine to create a new instance of `SimAws` in every test case or in shared test setup.
 
