@@ -1161,7 +1161,7 @@ a message. Each one is given the real event and has to return it, changed or not
 | `CustomMessage`      | `AdminCreateUser`, before the invitation is recorded                   | `CustomMessage_AdminCreateUser`        |
 
 `CustomMessage` is the one whose response is read for more than a flag, and it is covered in
-[Messages a pool would have sent](#the-custommessage-trigger) above. The rest are here.
+[The CustomMessage trigger](#the-custommessage-trigger) above. The rest are here.
 
 The function is a simulated Lambda function anywhere in the simulation, and it has to admit
 `cognito-idp.amazonaws.com` for the pool, which is what `AddPermission` grants and what CDK's
@@ -2167,8 +2167,8 @@ if you mean to.
 
 The two real endpoints are anonymous as they are on real Cognito, so no SigV4 signature is needed to
 fetch them. The real hostname `cognito-idp.<region>.amazonaws.com` maps to
-`cognito-idp.<region>.sim-aws.localhost`, and `srv.localUrl(...)` does that rewriting for you. An unknown pool id gets a 404, as does a pool
-reached through another region's hostname.
+`cognito-idp.<region>.sim-aws.localhost`, and `srv.localUrl(...)` does that rewriting for you. An
+unknown pool id gets a 404, as does a pool reached through another region's hostname.
 
 ```typescript sim-cognito-serve-jwks
 /**
