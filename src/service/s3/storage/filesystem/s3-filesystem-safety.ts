@@ -1,8 +1,15 @@
 import { homedir } from "node:os";
 import path from "node:path";
 
+import {
+  defaultAllowedDirectoryNames,
+  defaultAllowedObjectFileExtensions,
+  normaliseExtension,
+} from "./s3-filesystem-allowed.js";
+
 interface FilesystemS3StorageSafetyProperties {
   readonly allowedDirectoryNames?: readonly string[] | undefined;
+  readonly additionalFileExtensions?: readonly string[] | undefined;
 }
 
 /**
@@ -13,10 +20,17 @@ interface FilesystemS3StorageSafetyProperties {
  */
 export class FilesystemS3StorageSafety {
   private readonly allowedDirectoryNames: readonly string[];
+  private readonly allowedFileExtensions: ReadonlySet<string>;
 
   constructor(properties: FilesystemS3StorageSafetyProperties = {}) {
     const { allowedDirectoryNames = defaultAllowedDirectoryNames } = properties;
     this.allowedDirectoryNames = allowedDirectoryNames;
+    this.allowedFileExtensions = new Set([
+      ...defaultAllowedObjectFileExtensions,
+      ...(properties.additionalFileExtensions ?? []).map((extension) =>
+        normaliseExtension(extension),
+      ),
+    ]);
   }
 
   /**
@@ -92,52 +106,10 @@ export class FilesystemS3StorageSafety {
    * Check whether a sim S3 Object key has an allowed file extension.
    */
   isAllowedObjectKeyExtension(key: string): boolean {
-    return allowedObjectFileExtensions.has(path.extname(key).toLowerCase());
+    return this.allowedFileExtensions.has(path.extname(key).toLowerCase());
   }
 
   private pathContainsParentDirectorySegment(value: string): boolean {
     return value.split(/[\\/]/u).includes("..");
   }
 }
-
-/**
- * Default directory names that are safe to use as filesystem storage roots.
- */
-const defaultAllowedDirectoryNames = [
-  "assets",
-  "build",
-  "dist",
-  "out",
-  "public",
-  "static",
-  "www",
-] as const;
-
-/**
- * Cautious list of allowed file extensions for simulated S3 objects. This is to
- * try and avoid reading or writing other files that might be unsafe.
- */
-const allowedObjectFileExtensions = new Set([
-  ".css",
-  ".eot",
-  ".gif",
-  ".htm",
-  ".html",
-  ".ico",
-  ".jpeg",
-  ".jpg",
-  ".js",
-  ".json",
-  ".map",
-  ".mjs",
-  ".otf",
-  ".png",
-  ".svg",
-  ".ttc",
-  ".ttf",
-  ".txt",
-  ".webp",
-  ".woff",
-  ".woff2",
-  ".xml",
-]);

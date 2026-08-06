@@ -71,7 +71,12 @@ export class SimS3BucketAccess {
     options: SimS3MountFilesystemOptions = {},
   ): void {
     this.required(bucketName).configureSimStorage(
-      new FilesystemS3BucketStorage({ directoryPath }),
+      new FilesystemS3BucketStorage({
+        directoryPath,
+        ...(options.additionalFileExtensions !== undefined && {
+          additionalFileExtensions: options.additionalFileExtensions,
+        }),
+      }),
     );
     this.mountWatches.register(bucketName, directoryPath, options);
   }
