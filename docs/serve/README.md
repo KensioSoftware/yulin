@@ -220,10 +220,62 @@ given to `mountBucketFilesystem` and a template given to `deployTemplateFile` ar
 supervisor as they are registered, and watched from then on, without appearing in any list. Editing
 a file in a mounted directory or re-synthing a stack restarts the process. A template deployed with
 the `watch` option is the exception, and is
-[left to the process reading it](#updating-a-stack-instead-of-restarting).
+[left to the process reading it](#updating-a-stack-instead-of-restarting), as is any path the process
+[says it is holding](#holding-a-path-yourself).
 
 A burst of writes is one restart. Saving one file is several filesystem events, so changes are held
 until they stop arriving before anything is restarted.
+
+### Holding a path yourself
+
+A process that is already watching a path and answering changes to it in place has nothing to gain
+from a restart, and everything its simulation holds to lose. `simWatch.reportHeldPath(...)` says so,
+and the supervisor leaves that path alone from then on:
+
+```typescript sim-serve-hold-path
+/**
+ * A mounted directory this process watches itself, reloading the browser
+ * rather than being restarted for it.
+ */
+
+import { watch } from "node:fs";
+import path from "node:path";
+
+import { CreateBucketCommand } from "@aws-sdk/client-s3";
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+import { simWatch } from "@kensio/yulin/watch";
+
+const built = path.join(process.cwd(), "public");
+
+const simAws = new SimAws();
+await simAws.s3().createBucket(new CreateBucketCommand({ Bucket: "site" }));
+simAws.s3().mountBucketFilesystem("site", built);
+
+const srv = await serveSimAws({ simAws, port: 8787, liveReload: true });
+
+simWatch.reportHeldPath(built);
+
+watch(built, { recursive: true }, () => {
+  srv.reload();
+});
+```
+
+A static site build writing into that directory then reloads the page, where the mount alone would
+have restarted the process and taken every simulated Bucket, Table and Stack with it. Holding a path
+beats having reported it: being told a path is answered in the process is more specific than being
+told it is worth watching, so it wins even though `mountBucketFilesystem` reported the same directory
+first.
+
+A held path stays held only for the run that reported it. A run that exits leaves nothing holding
+the path, and the supervisor watches it again until its replacement says otherwise.
+
+`simWatch.onStopping(...)` is the other half, for a restart this process does not decide: it runs
+just before the supervisor kills the process, which is where live reload tells browsers a reload is
+coming so a page comes back on its own. A hand-written reload channel wants the same warning.
+
+Both are best effort and need a supervisor. In a process `yulin watch` did not start, such as a test
+run or a script launched from an IDE debugger, they do nothing at all.
 
 ### Updating a stack instead of restarting
 

@@ -12,6 +12,7 @@ import {
 } from "../../../test/cli/running-supervisors.js";
 
 const yulin = repoPath("src/index.js");
+const yulinWatch = repoPath("src/watch/index.js");
 const tsx = repoPath(path.join("node_modules", ".bin", "tsx"));
 
 /**
@@ -98,6 +99,41 @@ describe("paths a supervised process reports", () => {
     const recorded = await project.untilRuns(2);
     assertArrayEquals([...recorded], ["run", "updated"]);
   });
+
+  it("leaves a mounted directory the process holds alone", async () => {
+    // Given a dev script that mounts a directory and then says it is watching
+    // that directory itself, as a project with its own build and reload does
+    const project = await WatchProject.of({});
+    const mounted = path.join(project.mountedPath(), "public");
+    await project.writeMounted(path.join("public", "index.html"), "<h1>a</h1>");
+    await project.write(
+      "dev.ts",
+      holdingScript(project.runsLogPath(), mounted),
+    );
+    const supervisor = supervise(project);
+    await project.settled();
+    runSupervisor(supervisor);
+    await project.untilRuns(1);
+    await watchPause(300);
+
+    // When the site is built into that directory again
+    await project.writeMounted(path.join("public", "index.html"), "<h1>b</h1>");
+
+    // Then the run that mounted it answers the change itself, keeping every
+    // simulated Bucket, Table and Stack a restart would have taken, even though
+    // mounting reported the same directory for watching first
+    const recorded = await project.untilRuns(2);
+    assertArrayEquals([...recorded].slice(0, 2), ["run", "answered"]);
+
+    // Long enough for a restart to have been recorded, since what is being
+    // waited for here is a run that should never happen
+    await watchPause(3000);
+    const settled = await project.runs();
+    assertArrayEquals(
+      settled.filter((line) => line === "run"),
+      ["run"],
+    );
+  });
 });
 
 const emptyTemplate = JSON.stringify({ Resources: {} });
@@ -150,6 +186,26 @@ await simAws.cloudFormation().deployTemplateFile({
       appendFileSync(${JSON.stringify(runsLogPath)}, "updated\n");
     },
   },
+});
+
+setInterval(() => {}, 60_000);
+`;
+}
+
+function holdingScript(runsLogPath: string, mountedPath: string): string {
+  return String.raw`import { appendFileSync, watch } from "node:fs";
+import { SimAws } from ${JSON.stringify(yulin)};
+import { simWatch } from ${JSON.stringify(yulinWatch)};
+
+appendFileSync(${JSON.stringify(runsLogPath)}, "run\n");
+
+const simAws = new SimAws();
+await simAws.s3().createBucket({ input: { Bucket: "site" } });
+simAws.s3().mountBucketFilesystem("site", ${JSON.stringify(mountedPath)});
+
+simWatch.reportHeldPath(${JSON.stringify(mountedPath)});
+watch(${JSON.stringify(mountedPath)}, { recursive: true }, () => {
+  appendFileSync(${JSON.stringify(runsLogPath)}, "answered\n");
 });
 
 setInterval(() => {}, 60_000);

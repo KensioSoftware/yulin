@@ -3,9 +3,11 @@ import {
   assertArrayLength,
   assertFalse,
   assertIdentical,
+  assertInstanceOf,
   assertStringEndsWith,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
+import { simWatch } from "./index.js";
 import { SimWatchRuntime } from "./sim-watch-runtime.js";
 import { simWatchMessages } from "./sim-watch.config.js";
 import { FakeProcess } from "../../test/watch/fake-process.js";
@@ -157,5 +159,25 @@ describe("SimWatchRuntime", () => {
 
     // Then nothing is attached to a process that will never be told
     assertArrayEquals(host.listeners, []);
+  });
+});
+
+describe("the exported watch runtime", () => {
+  it("is the runtime for the process it was imported into", () => {
+    // Given the export a consumer reaches for, from `@kensio/yulin/watch`
+    // Then it is the one runtime talking to whatever started this process
+    assertInstanceOf(simWatch, SimWatchRuntime);
+  });
+
+  it("does nothing in a process no supervisor started", () => {
+    // Given an ordinary process, such as this test run
+
+    // When it is told about paths and asked about a restart
+    simWatch.reportPath("assets/uploads");
+    simWatch.reportHeldPath("articles/public");
+    simWatch.onStopping(() => undefined);
+
+    // Then it says there is nobody to tell, and nothing was sent
+    assertFalse(simWatch.supervised());
   });
 });
