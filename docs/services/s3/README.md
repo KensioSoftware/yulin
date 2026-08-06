@@ -1564,7 +1564,7 @@ Filesystem storage is somewhat restrictive to make it slightly safer:
 - The directory must not be the user's home directory
 - The path must not contain `..`
 - Object keys must not be absolute paths or contain `..`
-- Unsupported file extensions are rejected or ignored
+- Only files whose extension is on a cautious list are served; see below
 - Symlinks are ignored when listing Objects
 - Deletion is refused rather than unlinking a real file
 
@@ -1576,7 +1576,41 @@ when a test needs deletion to work.
 
 When reading files from filesystem-backed storage, Yulin infers common `content-type` metadata from
 file extensions such as `.html`, `.css`, `.js`, `.json`, `.png`, `.svg`, `.txt`, `.xml`, and common
-font and image formats.
+font and image formats. A served file whose extension is not one of those gets
+`application/octet-stream`, which is what S3 reports for an object whose type it was never told.
+That only comes up for an extension a mount named itself, below: no other file is served at all,
+with or without a type.
+
+### Serving a file extension of your own
+
+A mounted Bucket only serves files whose extension is on a cautious list — the web's own types, and
+nothing else — so that pointing a Bucket at a directory cannot be talked into reading whatever else
+happens to be in it. A file with any other extension is not served, and a `GetObject` for it comes
+back as though the file were not there. That is the right default and the wrong answer for a site
+with a data file of its own, so a mount can name the extensions it needs:
+
+```typescript sim-s3-mount-file-extensions
+/**
+ * Serving a data file whose extension is not one of the web's own.
+ */
+
+import path from "node:path";
+
+import { CreateBucketCommand } from "@aws-sdk/client-s3";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+await simAws.s3().createBucket(new CreateBucketCommand({ Bucket: "site" }));
+
+simAws.s3().mountBucketFilesystem("site", path.join(process.cwd(), "public"), {
+  // A pinyin dictionary ships a binary frequency table beside its text files.
+  additionalFileExtensions: [".freq"],
+});
+```
+
+These are added to the list rather than replacing it, so naming one cannot cost you `.html`, and a
+leading dot is optional. Everything not named is still refused.
 
 ## Standalone SimS3
 

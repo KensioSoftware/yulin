@@ -11,6 +11,7 @@ import { SimS3NotImplemented } from "../../error/sim-s3.error.js";
 interface FilesystemS3BucketStorageProperties {
   readonly directoryPath: string;
   readonly allowedDirectoryNames?: readonly string[];
+  readonly additionalFileExtensions?: readonly string[];
 }
 
 /**
@@ -29,6 +30,7 @@ export class FilesystemS3BucketStorage implements SimS3BucketStorage {
   constructor(properties: FilesystemS3BucketStorageProperties) {
     this.safety = new FilesystemS3StorageSafety({
       allowedDirectoryNames: properties.allowedDirectoryNames,
+      additionalFileExtensions: properties.additionalFileExtensions,
     });
     this.safety.assertSafeDirectoryPath(properties.directoryPath);
     this.directoryPath = path.resolve(properties.directoryPath);
