@@ -8,9 +8,9 @@ import { SimCfnTemplateFileWatches } from "./sim-cfn-template-file-watches.js";
 import { templatePause } from "../../../../test/cloudformation/watched-template.js";
 
 describe("SimCfnTemplateFileWatches", () => {
-  it("watches a template file deployed twice once", async () => {
-    // Given the same template file deployed twice, as a script that deploys it
-    // and is run again in the same process would
+  it("watches a Stack deployed twice from one file once", async () => {
+    // Given the same Stack deployed twice from the same file, as a script that
+    // deploys it and is run again in the same process would
     const applied: string[] = [];
     const directory = new TemporaryDirectory();
     await directory.writeFile("Site.template.json", "{}");
@@ -24,17 +24,47 @@ describe("SimCfnTemplateFileWatches", () => {
       updater: records(applied),
     });
 
-    watches.add({ templatePath }, { settleMs: 100 });
-    watches.add({ templatePath, stackName: "SiteAgain" }, { settleMs: 100 });
+    watches.add({ templatePath, stackName: "Site" }, { settleMs: 100 });
+    watches.add({ templatePath, stackName: "Site" }, { settleMs: 100 });
 
     try {
       // When it is synthesized again
       await directory.writeFile("Site.template.json", '{"Resources":{}}');
       await templatePause(500);
 
-      // Then it is watched once, by the deployment that is live
+      // Then it is applied once, by the deployment that is live
       assertArrayEquals([...watches.paths()], [templatePath]);
-      assertArrayEquals(applied, ["SiteAgain"]);
+      assertArrayEquals(applied, ["Site"]);
+    } finally {
+      watches.stopAll();
+    }
+  });
+
+  it("updates every Stack a template file was deployed as", async () => {
+    // Given one template file deployed as two Stacks
+    const applied: string[] = [];
+    const directory = new TemporaryDirectory();
+    await directory.writeFile("Site.template.json", "{}");
+    const templatePath = directory.join("Site.template.json");
+    await templatePause(250);
+    const watches = new SimCfnTemplateFileWatches({
+      updater: records(applied),
+    });
+
+    watches.add({ templatePath, stackName: "Site" }, { settleMs: 100 });
+    watches.add({ templatePath, stackName: "SiteReview" }, { settleMs: 100 });
+
+    try {
+      // When it is synthesized again
+      await directory.writeFile("Site.template.json", '{"Resources":{}}');
+      await templatePause(500);
+
+      // Then both are updated, and the file is named once whoever is reading it
+      assertArrayEquals(
+        applied.toSorted((one, other) => one.localeCompare(other)),
+        ["Site", "SiteReview"],
+      );
+      assertArrayEquals([...watches.paths()], [templatePath]);
     } finally {
       watches.stopAll();
     }

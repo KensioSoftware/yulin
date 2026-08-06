@@ -127,6 +127,31 @@ describe("SimWatchWatcher over a real directory", () => {
     }
   });
 
+  it("takes a held path back when the run holding it has gone", async () => {
+    // Given a template a run was answering itself
+    const { changes, watcher } = await watching();
+    const synth = new TemporaryDirectory();
+    await synth.resolvePath();
+    await synth.writeFile("Stack.template.json", "{}");
+    watcher.addReported(synth.join("Stack.template.json"));
+    watcher.addHeld(synth.join("Stack.template.json"));
+    await watchPause(200);
+
+    try {
+      // When that run has gone, and the file changes before its replacement
+      // says it is holding it too
+      watcher.clearHeld();
+      await synth.writeFile("Stack.template.json", '{"Resources":{}}');
+      await watchPause(400);
+
+      // Then the change is a restart again, rather than being left to a process
+      // that is no longer there
+      assertStringEndsWith(changes.at(0) ?? "", "Stack.template.json");
+    } finally {
+      watcher.stop();
+    }
+  });
+
   it("takes no notice of a path reported twice", async () => {
     // Given a reported directory
     const { watcher } = await watching();

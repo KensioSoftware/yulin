@@ -57,22 +57,37 @@ export class SimCfnTemplateWatchUpdate {
 
     const { templatePath, options } = this.properties;
 
-    if (options.onFailed !== undefined) {
-      options.onFailed(error);
+    if (options.onFailed === undefined) {
+      this.report.failed(templatePath, error);
 
       return;
     }
 
-    this.report.failed(templatePath, error);
+    this.notify("onFailed", () => {
+      options.onFailed?.(error);
+    });
   }
 
   private updated(): void {
-    const { templatePath, options } = this.properties;
+    this.notify("onUpdated", this.properties.options.onUpdated);
+  }
 
+  /**
+   * Run a callback the watch was given, without letting it break the watch.
+   *
+   * A callback that throws is the caller's own code failing, and it says so
+   * rather than being passed on: a throw from here would go on to be the
+   * rejection that stops every save after it being applied.
+   */
+  private notify(listener: string, run: (() => void) | undefined): void {
     try {
-      options.onUpdated?.();
+      run?.();
     } catch (error) {
-      this.report.listenerFailed(templatePath, watchUpdateError(error));
+      this.report.listenerFailed(
+        this.properties.templatePath,
+        listener,
+        watchUpdateError(error),
+      );
     }
   }
 }

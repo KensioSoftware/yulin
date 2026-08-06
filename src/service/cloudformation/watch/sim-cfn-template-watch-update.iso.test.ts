@@ -107,7 +107,31 @@ describe("SimCfnTemplateWatchUpdate", () => {
     // Then it is said separately, because the Stack did change
     assertStringIncludes(
       warn.mock.calls[0]?.[0] as string,
-      "the onUpdated callback threw: the server is closed",
+      "ran the onUpdated callback for the watched template",
+    );
+    assertStringIncludes(
+      warn.mock.calls[0]?.[0] as string,
+      "the server is closed",
+    );
+  });
+
+  it("reports an onFailed callback that throws, and stays usable", async () => {
+    // Given a watch whose onFailed throws
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const update = watchUpdate(refuses(new Error("Bucket name is taken")), {
+      onFailed: () => {
+        throw new Error("the server is closed");
+      },
+    });
+
+    // When the update fails and the callback fails with it
+    await update.apply();
+
+    // Then the callback is answered for here, rather than being the rejection
+    // that stops every save after this one being applied
+    assertStringIncludes(
+      warn.mock.calls[0]?.[0] as string,
+      "ran the onFailed callback for the watched template",
     );
   });
 });

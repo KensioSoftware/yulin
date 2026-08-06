@@ -218,7 +218,9 @@ CDK asset directories, and the working files an editor writes around a save.
 On top of that, Yulin names paths it is holding that the module graph never mentions. A directory
 given to `mountBucketFilesystem` and a template given to `deployTemplateFile` are reported to the
 supervisor as they are registered, and watched from then on, without appearing in any list. Editing
-a file in a mounted directory or re-synthing a stack restarts the process.
+a file in a mounted directory or re-synthing a stack restarts the process. A template deployed with
+the `watch` option is the exception, and is
+[left to the process reading it](#updating-a-stack-instead-of-restarting).
 
 A burst of writes is one restart. Saving one file is several filesystem events, so changes are held
 until they stop arriving before anything is restarted.
@@ -248,9 +250,10 @@ await simAws.cloudFormation().deployTemplateFile({
 });
 ```
 
-Re-synthing the stack then updates it in place and reloads the page, and everything the process
-holds in simulated S3, DynamoDB and SQS stays where it is. The process names the template as one it
-is answering itself, so the supervisor takes it off its own list rather than restarting for it. See
+Re-synthing the stack then updates it in place and reloads the page. Whatever the change left alone
+keeps what it holds in simulated S3, DynamoDB and SQS, where a restart would have taken all of it.
+The process names the template as one it is answering itself, so the supervisor takes it off its own
+list rather than restarting for it. See
 [watching a template file](../services/cloudformation/README.md#watching-a-template-file) for what
 an update does to the resources.
 

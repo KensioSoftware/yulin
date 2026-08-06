@@ -1,10 +1,13 @@
 import {
+  assertArrayEquals,
   assertIdentical,
   assertNonNullable,
   assertStringIncludes,
   assertTrue,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
+import { TemporaryDirectory } from "../../../util/filesystem/temporary-directory.js";
+import { SimCfnTemplateFileWatch } from "./sim-cfn-template-file-watch.js";
 import {
   putSitePage,
   sitePage,
@@ -14,6 +17,42 @@ import {
 } from "../../../../test/cloudformation/watched-template.js";
 
 describe("a deployed template file that changes", () => {
+  it("goes on watching when applying a change throws", async () => {
+    // Given a watch whose change handler fails outright, rather than answering
+    // a failed update the way the update itself does
+    const directory = new TemporaryDirectory();
+    await directory.writeFile("Site.template.json", "{}");
+    await templatePause(250);
+
+    const applied: string[] = [];
+    const watch = new SimCfnTemplateFileWatch({
+      templatePath: directory.join("Site.template.json"),
+      settleMs: 100,
+      onChanged: async (): Promise<void> => {
+        applied.push("applied");
+
+        await Promise.resolve();
+
+        throw new Error("the watch itself is broken");
+      },
+    });
+    watch.start();
+
+    try {
+      // When the file is written twice, the second time after the first throw
+      await directory.writeFile("Site.template.json", '{"Resources":{}}');
+      await templatePause(500);
+      await directory.writeFile("Site.template.json", '{"Description":"a"}');
+      await templatePause(500);
+
+      // Then the second save is applied too, rather than being refused by a
+      // queue the first one left rejected
+      assertArrayEquals(applied, ["applied", "applied"]);
+    } finally {
+      watch.close();
+    }
+  });
+
   it("updates the Stack in place", async () => {
     // Given a Stack deployed from a watched template file, holding an Object
     const watched = await WatchedTemplate.of(siteTemplate());
@@ -66,7 +105,7 @@ describe("a deployed template file that changes", () => {
     }
   });
 
-  it("leaves the deployed Resources serving when an update fails", async () => {
+  it("leaves the Resources it did not reach serving when an update fails", async () => {
     // Given a Stack deployed from a watched template file, holding an Object,
     // and a Bucket outside the Stack with the name the change wants
     const watched = await WatchedTemplate.of(siteTemplate());
@@ -86,7 +125,9 @@ describe("a deployed template file that changes", () => {
         "site-uploads",
       );
 
-      // And the Resources the Stack already had are still serving
+      // And the Resource the failed update never got to is still serving,
+      // which a restart on a template that no longer deploys could not have
+      // managed
       assertIdentical(await sitePage(watched.simAws), "<h1>Hello</h1>");
     } finally {
       watched.stop();

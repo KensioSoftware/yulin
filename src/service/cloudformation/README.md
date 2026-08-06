@@ -144,13 +144,13 @@ or drain broader simulator background tasks when appropriate.
 
 `SimCloudFormation` also exposes helper methods for tests and local tooling:
 
-- `deployTemplate(...)`
-- `deployTemplateFile(...)`
-- `updateTemplateFile(...)`
+- `deployTemplate(...)`, for a parsed template object
+- `deployTemplateFile(...)`, for a synthesized CDK template file
+- `updateTemplateFile(...)`, for applying such a file to the stack it was deployed as
 
-These are wrappers around the same stack creation machinery. They exist so tests can deploy a parsed
-template object or a synthesized CDK template file without manually constructing a JSON
-`TemplateBody`command.
+The first two are wrappers around the same stack creation machinery, and the third around the same
+update machinery. They exist so tests and local tooling can work in templates without manually
+constructing a JSON `TemplateBody` command.
 
 The deployer is also where extra deployment context can enter the stack creation path:
 
@@ -172,8 +172,10 @@ the stack was deployed with describes the assembly the previous template came fr
 `src/service/cloudformation/watch/` keeps a deployed template file being read, so a re-synthesis
 updates the stack rather than needing the process restarted:
 
-- `SimCfnTemplateFileWatches` holds one watch per file, and is what `stopWatchingTemplateFiles()`
-  lets go of. It is also where a deployment's `watch` property is turned into what to do.
+- `SimCfnTemplateFileWatches` holds one watch per deployment, keyed by file and stack, and is what
+  `stopWatchingTemplateFiles()` lets go of. It is also where a deployment's `watch` property is
+  turned into what to do. Keying by deployment is what lets one file deployed as two stacks update
+  both, while deploying the same stack again replaces its own watch.
 - `SimCfnTemplateFileWatch` watches the directory the template is in, filtered to the template's own
   name, because a synthesis renames a temporary file over the template and a watch on the file
   itself would be left holding the file that was replaced. Changes are settled through

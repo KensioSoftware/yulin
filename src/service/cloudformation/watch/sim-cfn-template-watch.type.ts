@@ -14,9 +14,9 @@ export interface SimCfnTemplateFileWatchOptions {
   /**
    * Handle an update the changed template did not survive.
    *
-   * The Stack keeps the Resources it already had either way. Without this the
-   * reason goes to the console, so a failure is not silent; with it, the reason
-   * is yours to deal with and nothing is written.
+   * The Stack is left where the update got to either way, since there is no
+   * rollback. Without this the reason goes to the console, so a failure is not
+   * silent; with it, the reason is yours to deal with and nothing is written.
    */
   readonly onFailed?: ((error: Error) => void) | undefined;
 

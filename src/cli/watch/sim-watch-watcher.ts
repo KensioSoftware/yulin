@@ -83,6 +83,18 @@ export class SimWatchWatcher {
   }
 
   /**
+   * Take back every held path, for a process that is no longer running.
+   *
+   * Held paths belong to the run that reported them, unlike reported paths,
+   * which are only ever more to watch. A run that stopped holding a path, or
+   * stopped altogether, would otherwise leave a file nothing is watching and
+   * nothing restarts for.
+   */
+  clearHeld(): void {
+    this.heldRoots.clear();
+  }
+
+  /**
    * Stop watching and drop any change that was still settling.
    */
   stop(): void {

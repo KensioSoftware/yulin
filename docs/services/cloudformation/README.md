@@ -1083,7 +1083,9 @@ The sibling assets manifest is read again with the template, so a resource the u
 the assets that synthesis staged rather than the ones the stack was deployed with.
 
 A file written without being changed is refused with `No updates are to be performed.`, and a failed
-update leaves the stack in `UPDATE_FAILED` with its previous resources where they are.
+update leaves the stack in `UPDATE_FAILED` holding whatever the update reached. There is no rollback
+to the template it was deployed from, so a failure part way through has already deleted, replaced or
+created some of the resources the change asked for.
 
 ## Watching a template file
 
@@ -1121,10 +1123,11 @@ when the resources have changed rather than when the write lands, so a browser r
 resources the new template asked for. A write that changed nothing is a no-op, so nothing reloads
 for it.
 
-`onFailed` is given an update the changed template did not survive. The stack keeps the resources it
-already had, so the previous ones are still serving and the process is still up, which a restart on
-a template that no longer deploys could not manage. Without `onFailed` the reason goes to the
-console.
+`onFailed` is given an update the changed template did not survive. It reports the failure and
+nothing else: the stack is left holding whatever the update reached, as an update through the
+command is. What a failure does keep is the process, and the resources it never got to, so a
+template that no longer deploys leaves a working environment where a restart on it would leave
+none.
 
 A burst of writes is one update. Saving a file is several filesystem events, so changes are held
 until they stop arriving. `settleMs` is how long that wait is.
