@@ -1204,19 +1204,27 @@ const srv = await serveSimAws({ simAws, port: 8787, liveReload: true });
 await simAws.cloudFormation().deployTemplateFile({
   templatePath: path.join(process.cwd(), "cdk.out", "TestStack.template.json"),
   watch: {
-    onUpdated: () => {
-      srv.reload();
-    },
+    reload: srv,
   },
 });
 ```
 
 `watch: true` watches with nothing to do afterwards.
 
-`onUpdated` runs once the update is complete, which is where a served page gets reloaded. It runs
-when the resources have changed rather than when the write lands, so a browser reloads onto the
-resources the new template asked for. A write that changed nothing is a no-op, so nothing reloads
-for it.
+`reload` is the local server, and reloads the browsers connected to it once the update is complete.
+It reloads when the resources have changed rather than when the write lands, so a browser reloads
+onto the resources the new template asked for. A write that changed nothing is a no-op, so nothing
+reloads for it, and neither does an update that failed: a browser should not be sent to a stack the
+update did not reach. Anything with a `reload()` method will do, so a test can watch a template
+without serving anything.
+
+A server serving without live reload can never reload anything, and says so as the deployment asks
+it to rather than on the first change, which is a long way from the mistake. Serve with
+[`{ liveReload: true }`](../../serve/README.md#live-reload).
+
+`onUpdated` runs once the update is complete too, for whatever else a change is worth doing, with or
+without a `reload` alongside it. Given both, the callback runs first and the reload follows it, so a
+browser arriving on the new resources finds whatever the callback left ready for it.
 
 `onFailed` is given an update the changed template did not survive. It reports the failure and
 nothing else: the stack is left holding whatever the update reached, as an update through the

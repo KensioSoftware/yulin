@@ -1,6 +1,7 @@
 import type { ServerResponse } from "node:http";
 import {
   assertIdentical,
+  assertNonNullable,
   assertStringIncludes,
   assertThrowsError,
   assertUndefined,
@@ -46,6 +47,32 @@ describe("SimLocalLiveReload", () => {
 
     // Then it says what to turn on
     assertStringIncludes(error.message, "{ liveReload: true }");
+  });
+
+  it("refuses a reload it is checked for when live reload is off", () => {
+    // Given a server serving without live reload, handed to something that
+    // will want to reload it later
+    const liveReload = new SimLocalLiveReload({ enabled: false });
+
+    // When it is asked whether a reload would get anywhere
+    const error = assertThrowsError(() => {
+      liveReload.checkReload();
+    });
+
+    // Then it refuses now what it would refuse on the first change, which is
+    // where the mistake can still be seen
+    assertStringIncludes(error.message, "{ liveReload: true }");
+  });
+
+  it("takes a reload it is checked for when live reload is on", () => {
+    // Given a server serving with live reload
+    const liveReload = new SimLocalLiveReload({ enabled: true });
+
+    // When it is asked whether a reload would get anywhere
+    liveReload.checkReload();
+
+    // Then nothing is refused, since the channel a reload goes down is there
+    assertNonNullable(liveReload.channel());
   });
 
   it("warns connected browsers when a supervisor is about to restart", () => {

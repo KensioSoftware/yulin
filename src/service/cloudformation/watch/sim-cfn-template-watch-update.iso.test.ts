@@ -30,6 +30,74 @@ describe("SimCfnTemplateWatchUpdate", () => {
     assertArrayEquals(updated, ["reloaded"]);
   });
 
+  it("reloads the browser after the callback, once the Stack is updated", async () => {
+    // Given a watch given both somewhere to reload and something to run first
+    const ran: string[] = [];
+    const update = watchUpdate(succeeds(), {
+      reload: {
+        reload: () => {
+          ran.push("reload");
+        },
+      },
+      onUpdated: () => {
+        ran.push("onUpdated");
+      },
+    });
+
+    // When the changed file is applied
+    await update.apply();
+
+    // Then both run, the reload last, so a browser arrives on the Resources
+    // the update made and on whatever the callback did about them
+    assertArrayEquals(ran, ["onUpdated", "reload"]);
+  });
+
+  it("does not reload the browser for an update that failed", async () => {
+    // Given a watch with somewhere to reload, whose update fails
+    const ran: string[] = [];
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const update = watchUpdate(refuses(new Error("Bucket name is taken")), {
+      reload: {
+        reload: () => {
+          ran.push("reload");
+        },
+      },
+    });
+
+    // When it is applied
+    await update.apply();
+
+    // Then the browser is left where it is, since it should not be sent to a
+    // Stack the update did not reach
+    assertArrayEquals(ran, []);
+    expect(warn).toHaveBeenCalledOnce();
+  });
+
+  it("reports a reload that throws, and stays usable", async () => {
+    // Given a watch holding a server that has since closed
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const update = watchUpdate(succeeds(), {
+      reload: {
+        reload: () => {
+          throw new Error("the server is closed");
+        },
+      },
+    });
+
+    // When the update succeeds and the reload does not
+    await update.apply();
+
+    // Then it is said separately, because the Stack did change
+    assertStringIncludes(
+      warn.mock.calls[0]?.[0] as string,
+      "ran the reload for the watched template",
+    );
+    assertStringIncludes(
+      warn.mock.calls[0]?.[0] as string,
+      "the server is closed",
+    );
+  });
+
   it("does nothing for a file written without being changed", async () => {
     // Given a template file the Stack refuses as an update with nothing in it
     const updated: string[] = [];
