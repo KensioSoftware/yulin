@@ -10,12 +10,35 @@ import {
 import type { SimCfnExecutableResourceBinding } from "../bind/sim-cfn-exec-binding.type.js";
 import { simWatch } from "../../../watch/sim-watch-runtime.js";
 import type { SimCfnTemplateFileWatchOptions } from "../watch/sim-cfn-template-watch.type.js";
+import { simCfnTemplateFileDeployment } from "./sim-cfn-template-file-deployment.js";
+import {
+  transformedTemplate,
+  type SimCfnTemplateFileTransform,
+} from "./sim-cfn-template-file-transform.js";
 
 export interface SimCloudFormationDeployTemplateFileProperties {
   readonly templatePath: string;
   readonly stackName?: SimCloudFormationStackName | string | undefined;
   readonly parameters?: Record<string, string> | undefined;
   readonly bindings?: readonly SimCfnExecutableResourceBinding[] | undefined;
+
+  /**
+   * Adapt the parsed template before it is deployed, and again every time a
+   * watched file changes.
+   *
+   * A synthesized template can carry something a simulation cannot resolve at
+   * all, such as an ARN holding a real account or a Hosted Zone ID that came
+   * from a lookup. This is where that gets rewritten, so the template being
+   * deployed and watched is the one the cloud assembly holds rather than a
+   * derived copy of it living somewhere on disk.
+   *
+   * What it returns is what gets deployed. Staged assets still resolve, since
+   * the cloud assembly is found beside `templatePath` rather than read out of
+   * the template. A transform that throws fails the deployment, and on a
+   * watched change is reported the way a failed update is, leaving the watch
+   * to carry on to the next save.
+   */
+  readonly transform?: SimCfnTemplateFileTransform | undefined;
 
   /**
    * Keep watching the template file, and apply it to the Stack again whenever
@@ -49,16 +72,10 @@ export class SimCfnTemplateFileLoader {
   async load(
     properties: SimCloudFormationDeployTemplateFileProperties | string,
   ): Promise<SimCfnLoadedTemplateFile> {
-    const templatePath =
-      typeof properties === "string" ? properties : properties.templatePath;
-    const parameters =
-      typeof properties === "string" ? undefined : properties.parameters;
-    const bindings =
-      typeof properties === "string" ? undefined : properties.bindings;
+    const deployment = simCfnTemplateFileDeployment(properties);
+    const { templatePath, parameters, bindings } = deployment;
     const stackName =
-      typeof properties === "string"
-        ? stackNameFromTemplatePath(templatePath)
-        : (properties.stackName ?? stackNameFromTemplatePath(templatePath));
+      deployment.stackName ?? stackNameFromTemplatePath(templatePath);
 
     // The template is named to a `yulin watch` supervisor, so re-synthing a
     // stack restarts the process that deployed it. Nothing happens outside
@@ -67,9 +84,12 @@ export class SimCfnTemplateFileLoader {
 
     // eslint-disable-next-line security/detect-non-literal-fs-filename
     const templateBody = await readFile(templatePath, "utf8");
-    const template = jsonParse(
-      templateBody as JSONString<CfnTemplateBodyRecord>,
+    const template = transformedTemplate(
+      jsonParse(templateBody as JSONString<CfnTemplateBodyRecord>),
+      deployment.transform,
     );
+    // Read from the path rather than the template, so what a transform did to
+    // the body leaves the staged assets beside it where they were.
     const cdkOutContext = await loadSiblingCdkAssetsManifest(templatePath);
 
     return {

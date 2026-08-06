@@ -1049,6 +1049,63 @@ sibling `TestStack.assets.json` manifest and the staged asset directories beside
 anything that needs a CDK asset, such as a `Custom::CDKBucketDeployment` or a Lambda function
 bundled with `Code.fromAsset`, fails with `No CDK assets manifest is available.`
 
+## Adapting a synthesized template on the way in
+
+Editing the parsed object works for a template you deploy once. A template you keep reading, because
+it is [watched](#watching-a-template-file) or applied again as an update, needs the same change made
+every time it is read. `transform` is that: it is given the parsed template and answers with the one
+to deploy, on the deployment and again on every change:
+
+```typescript sim-cloudformation-transform-template-file
+/**
+ * Adapting a synthesized template every time it is read.
+ */
+
+import { SimAws } from "@kensio/yulin";
+import type { CfnTemplateBodyRecord } from "@kensio/yulin/cloudformation";
+
+const simAws = new SimAws();
+
+/**
+ * Drop the records pointing at a hosted zone that only exists in the real
+ * account.
+ */
+function withoutDnsRecords(
+  template: CfnTemplateBodyRecord,
+): CfnTemplateBodyRecord {
+  const resources = Object.fromEntries(
+    Object.entries(template.Resources).filter(
+      ([, resource]) =>
+        (resource as { Type?: string }).Type !== "AWS::Route53::RecordSet",
+    ),
+  );
+
+  return { ...template, Resources: resources };
+}
+
+await simAws.cloudFormation().deployTemplateFile({
+  templatePath: "cdk.out/TestStack.template.json",
+  transform: withoutDnsRecords,
+  watch: true,
+});
+```
+
+This is for what a simulation cannot resolve at all, such as an ARN carrying a real account or a
+hosted zone ID that came from `HostedZone.fromLookup`. A property Yulin does not model is usually not
+one you need this for: S3, DynamoDB, Cognito, API Gateway v2, SQS and KMS
+[record it and carry on](#properties-a-resource-was-created-without).
+
+The template file is still the real one, so there is no derived `.local.template.json` in `cdk.out`
+to keep in step with it. Staged assets resolve as they always did, from the assets manifest beside
+`templatePath`, since the cloud assembly is found by path rather than read out of the template.
+
+`updateTemplateFile(...)` takes it too, for a consumer driving updates itself. Give it the same
+deployment object, so the difference applied is the difference in the file.
+
+A transform that throws fails the deployment, with what it threw as the cause. On a watched change it
+is reported the way a failed update is: the stack keeps the resources it had, and the watch carries
+on to the next save.
+
 ## Applying a changed template file
 
 `updateTemplateFile(...)` reads a deployed template file again and applies it to its stack, the same
@@ -1131,6 +1188,10 @@ none.
 
 A burst of writes is one update. Saving a file is several filesystem events, so changes are held
 until they stop arriving. `settleMs` is how long that wait is.
+
+[`transform`](#adapting-a-synthesized-template-on-the-way-in) runs again on every change, so a
+template that needs adapting before Yulin will take it can still be watched as the file synthesis
+writes.
 
 Watching holds a filesystem handle open, so the process does not exit on its own. That is what a dev
 process wants. Anything with an end, such as a test, calls `stopWatchingTemplateFiles()` when it is
