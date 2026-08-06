@@ -34,7 +34,9 @@ export class SimCognitoInitiateAuth {
   /**
    * Start an authentication.
    */
-  handle(command: SimInitiateAuthCommand): SimInitiateAuthCommandOutput {
+  async handle(
+    command: SimInitiateAuthCommand,
+  ): Promise<SimInitiateAuthCommandOutput> {
     const { input } = command;
     const { pool, client } = this.authResolver.client(input.ClientId);
 
@@ -44,13 +46,14 @@ export class SimCognitoInitiateAuth {
 
     flow.requireEnabledFor(client);
 
-    return this.flowRunner.run(flow, {
+    return await this.flowRunner.run(flow, {
       pool,
       client,
       parameters: new SimCognitoAuthParameters(
         "AuthParameters",
         input.AuthParameters,
       ),
+      clientMetadata: input.ClientMetadata,
     });
   }
 }

@@ -2,6 +2,7 @@ import type { SimResponseMetadata } from "../../../aws/metadata/response-metadat
 import type { SimCognitoAdminCreateUserConfigType } from "../../user-pool/sim-cognito-admin-create-user-config.js";
 import type { SimCognitoUserPoolPoliciesType } from "../../user-pool/sim-cognito-password-policy.js";
 import type { SimCognitoUnsimulatedPoolSettingsType } from "../../user-pool/sim-cognito-unsimulated-pool-settings.js";
+import type { SimCognitoLambdaConfigType } from "../../user-pool/trigger/sim-cognito-lambda-config.js";
 
 /**
  * A user pool as sim Cognito reports it.
@@ -18,6 +19,7 @@ export interface SimCognitoUserPoolType extends SimCognitoUnsimulatedPoolSetting
   readonly Arn?: string | undefined;
   readonly Policies?: SimCognitoUserPoolPoliciesType | undefined;
   readonly DeletionProtection?: string | undefined;
+  readonly LambdaConfig?: SimCognitoLambdaConfigType | undefined;
   readonly MfaConfiguration?: string | undefined;
   readonly AdminCreateUserConfig?:
     SimCognitoAdminCreateUserConfigType | undefined;

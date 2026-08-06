@@ -67,3 +67,40 @@ export function requireSimCognitoUserPoolId(
 
   return value as SimCognitoUserPoolId;
 }
+
+/**
+ * The Region a pool lives in, which its id names.
+ *
+ * This is where SDK code and token verifiers get it from too: splitting the id
+ * on the underscore is how the region is recovered everywhere, rather than
+ * being carried alongside.
+ */
+export function simCognitoUserPoolRegionName(userPoolId: string): string {
+  const [regionName] = userPoolId.split("_", 1);
+
+  return String(regionName);
+}
+
+/**
+ * The URL a token from a pool names as its issuer.
+ *
+ * This is the `iss` claim of the pool's tokens, the OIDC issuer its
+ * `.well-known` documents are served under, and what a JWT verifier is
+ * configured with.
+ */
+export function simCognitoUserPoolIssuerUrl(userPoolId: string): string {
+  const regionName = simCognitoUserPoolRegionName(userPoolId);
+
+  return `https://cognito-idp.${regionName}.amazonaws.com/${userPoolId}`;
+}
+
+/**
+ * The name a pool is known by where a scheme would be wrong.
+ *
+ * This is the issuer URL without `https://`, and it is what an identity pool
+ * names a user pool provider by, and what `AWS::Cognito::UserPool` answers
+ * `Fn::GetAtt ProviderName` with.
+ */
+export function simCognitoUserPoolProviderName(userPoolId: string): string {
+  return simCognitoUserPoolIssuerUrl(userPoolId).replace("https://", "");
+}

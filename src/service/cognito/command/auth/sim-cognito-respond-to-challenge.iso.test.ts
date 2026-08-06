@@ -191,7 +191,7 @@ describe("sim Cognito RespondToAuthChallenge", () => {
     // Given a user challenged for a new password.
     const { cognito, clientId, session } = await simCognitoChallenged();
 
-    // When the response carries data for a Lambda trigger.
+    // When the response carries Pinpoint analytics.
     const error = await assertThrowsErrorAsync(async () => {
       await cognito.respondToAuthChallenge(
         new RespondToAuthChallengeCommand({
@@ -199,13 +199,33 @@ describe("sim Cognito RespondToAuthChallenge", () => {
           ChallengeName: "NEW_PASSWORD_REQUIRED",
           Session: session,
           ChallengeResponses: { USERNAME: "alice", NEW_PASSWORD: newPassword },
-          ClientMetadata: { tenant: "acme" },
+          AnalyticsMetadata: { AnalyticsEndpointId: "endpoint" },
         }),
       );
     });
 
     // Then it is refused rather than answered as if nothing had been sent.
     assertInstanceOf(error, SimCognitoInvalidParameterException);
-    assertStringIncludes(error.message, "ClientMetadata is not simulated");
+    assertStringIncludes(error.message, "AnalyticsMetadata is not simulated");
+  });
+
+  it("accepts ClientMetadata, which a pool's triggers read", async () => {
+    // Given a user challenged for a new password.
+    const { cognito, clientId, session } = await simCognitoChallenged();
+
+    // When the response carries data for a Lambda trigger.
+    const signedIn = await cognito.respondToAuthChallenge(
+      new RespondToAuthChallengeCommand({
+        ClientId: clientId,
+        ChallengeName: "NEW_PASSWORD_REQUIRED",
+        Session: session,
+        ChallengeResponses: { USERNAME: "alice", NEW_PASSWORD: newPassword },
+        ClientMetadata: { tenant: "acme" },
+      }),
+    );
+
+    // Then the sign-in completed. A pool with no PostAuthentication trigger has
+    // nowhere to pass the metadata to, and ignores it as real Cognito does.
+    assertNonNullable(signedIn.AuthenticationResult?.AccessToken);
   });
 });

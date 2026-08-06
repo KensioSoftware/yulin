@@ -33,16 +33,16 @@ export class SimCognitoRespondToChallenge {
   /**
    * Answer a challenge.
    */
-  handle(
+  async handle(
     command: SimRespondToAuthChallengeCommand,
-  ): SimRespondToAuthChallengeCommandOutput {
+  ): Promise<SimRespondToAuthChallengeCommandOutput> {
     const { input } = command;
     const { pool, client } = this.authResolver.client(input.ClientId);
 
     this.unsimulatedOptions.refuseInResponse(input);
     requireSimCognitoNewPasswordChallenge(input.ChallengeName);
 
-    return this.newPassword.handle({
+    return await this.newPassword.handle({
       pool,
       client,
       parameters: new SimCognitoAuthParameters(
@@ -50,6 +50,7 @@ export class SimCognitoRespondToChallenge {
         input.ChallengeResponses,
       ),
       session: input.Session,
+      clientMetadata: input.ClientMetadata,
     });
   }
 }

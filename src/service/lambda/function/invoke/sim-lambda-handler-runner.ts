@@ -17,6 +17,32 @@ function toHandlerError(error: Error | string): Error {
 }
 
 /**
+ * The Error a rejected handler rejected with.
+ *
+ * Zip code runs in a vm sandbox with its own realm, so the Error it throws is
+ * not an instance of this realm's Error, and stringifying it into the message
+ * of a new one would give whoever reads it `Error: Boom` where the handler said
+ * `Boom`. A thrown value carrying a string message is rebuilt as an Error of
+ * this realm instead, saying what the handler said and keeping the value it
+ * threw as the cause.
+ */
+function toRejectedError(error: unknown): Error {
+  if (error instanceof Error) {
+    return error;
+  }
+
+  if (
+    typeof error !== "object" ||
+    error === null ||
+    typeof (error as Error).message !== "string"
+  ) {
+    return new Error(String(error));
+  }
+
+  return new Error((error as Error).message, { cause: error });
+}
+
+/**
  * Runs a sim Lambda handler function to completion.
  *
  * Mirrors the completion styles of the real Node.js Lambda runtime: a handler
@@ -51,7 +77,7 @@ export class SimLambdaHandlerRunner {
         // this cannot await; the callback path may still settle first.
         // eslint-disable-next-line unicorn/prefer-await
         returned.then(resolve, (error: unknown) => {
-          reject(error instanceof Error ? error : new Error(String(error)));
+          reject(toRejectedError(error));
         });
         return;
       }

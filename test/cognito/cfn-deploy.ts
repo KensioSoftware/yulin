@@ -52,10 +52,14 @@ export async function deployFailure(
 export async function deploySuccess(
   simAws: SimAws,
   resources: SimCfnTemplateValueRecord,
+  outputs?: SimCfnTemplateValueRecord,
 ): Promise<SimCfnStack> {
   const stack = await simAws.cloudFormation().deployTemplate({
     stackName: "app-stack",
-    template: { Resources: resources },
+    template: {
+      Resources: resources,
+      ...(outputs !== undefined && { Outputs: outputs }),
+    },
   });
   await stack.waitForDeployComplete();
 

@@ -1281,10 +1281,13 @@ granted for `AWS_IAM` does not also open a URL later switched to `NONE`.
 
 `SourceArn` becomes an `ArnLike` condition on `AWS:SourceArn`, and `SourceAccount` a `StringEquals`
 condition on `AWS:SourceAccount`. Both are evaluated when another simulated service invokes the
-function, which today means a simulated API Gateway HTTP API invoking it through a Lambda proxy
-integration or as a `REQUEST` authorizer. The source ARN is what the API is invoking the function
-for, and the source Account is the API's own. See
-[Granting the API permission to invoke the function](../apigatewayv2/README.md#granting-the-api-permission-to-invoke-the-function).
+function: a simulated API Gateway HTTP API invoking it through a Lambda proxy integration or as a
+`REQUEST` authorizer, a simulated S3 Bucket delivering an event notification, and a simulated
+Cognito user pool running a Lambda trigger. The source ARN is what that service is invoking the
+function for — the API, the Bucket or the user pool — and the source Account is that service's
+resource's own. See
+[Granting the API permission to invoke the function](../apigatewayv2/README.md#granting-the-api-permission-to-invoke-the-function)
+and [Lambda triggers](../cognito/README.md#lambda-triggers).
 A direct `Invoke`, a Function URL request and an SQS event source mapping supply neither, so a
 statement carrying one does not match them.
 

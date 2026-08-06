@@ -5,6 +5,7 @@ import { SimCognitoUserPoolClientFactory } from "../user-pool/client/sim-cognito
 import { SimCognitoGroupFactory } from "../user-pool/group/sim-cognito-group-factory.js";
 import { SimCognitoUserPoolFactory } from "../user-pool/sim-cognito-user-pool-factory.js";
 import type { SimCognitoUserPoolStore } from "../user-pool/sim-cognito-user-pool-store.js";
+import type { SimCognitoTriggerFunctions } from "../user-pool/trigger/sim-cognito-trigger-functions.js";
 import { SimCognitoUserFactory } from "../user-pool/user/sim-cognito-user-factory.js";
 import { SimCognitoAuthCommands } from "./auth/sim-cognito-auth-commands.js";
 import { SimCognitoAuthResolver } from "./auth/sim-cognito-auth-resolver.js";
@@ -27,6 +28,7 @@ interface SimCognitoCommandsProperties {
   readonly iam: SimIamInterServiceAuthZ;
   readonly clock: SimClock;
   readonly pools: SimCognitoUserPoolStore;
+  readonly triggerFunctions: SimCognitoTriggerFunctions;
 }
 
 /**
@@ -51,7 +53,8 @@ export class SimCognitoCommands {
   public readonly auth: SimCognitoAuthCommands;
 
   constructor(properties: SimCognitoCommandsProperties) {
-    const { accountRegionScope, iam, clock, pools } = properties;
+    const { accountRegionScope, iam, clock, pools, triggerFunctions } =
+      properties;
     const authorizer = new SimCognitoAuthorizer({ iam, accountRegionScope });
     const resolver = new SimCognitoRequestResolver({ pools, authorizer });
     const authResolver = new SimCognitoAuthResolver({ resolver, pools });
@@ -92,6 +95,7 @@ export class SimCognitoCommands {
       authResolver,
       pools,
       clock,
+      triggerFunctions,
     });
   }
 }

@@ -839,6 +839,156 @@ try {
 }
 ```
 
+## Lambda triggers
+
+A pool created with a `LambdaConfig` runs the functions it names as part of a sign-in.
+`PreAuthentication` runs once the user is known and before its password is checked, and
+`PostAuthentication` runs once the tokens have been issued. Both are given the real event, and both
+have to return it.
+
+The function is a simulated Lambda function anywhere in the simulation, and it has to admit
+`cognito-idp.amazonaws.com` for the pool, which is what `AddPermission` grants and what CDK's
+`addTrigger` emits an `AWS::Lambda::Permission` for.
+
+```typescript sim-cognito-lambda-triggers
+/**
+ * A user pool that runs a PreAuthentication trigger on every sign-in.
+ */
+
+import {
+  AdminCreateUserCommand,
+  AdminInitiateAuthCommand,
+  AdminSetUserPasswordCommand,
+  CreateUserPoolClientCommand,
+  CreateUserPoolCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+import {
+  AddPermissionCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+/**
+ * The part of the PreAuthentication event this handler reads.
+ */
+interface PreAuthenticationEvent {
+  readonly request: { readonly userAttributes: Record<string, string> };
+}
+
+const simAws = new SimAws();
+const lambda = simAws.lambda();
+const cognito = simAws.cognitoIdentityProvider();
+
+// The trigger turns away anyone who is not on the domain the pool is for, and
+// hands the event back otherwise, as every trigger handler has to.
+await lambda.createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "pre-auth",
+    Role: "arn:aws:iam::888888888888:role/PreAuthRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput((event: PreAuthenticationEvent) => {
+        const email = event.request.userAttributes["email"] ?? "";
+
+        if (!email.endsWith("@example.com")) {
+          throw new Error("Only example.com may sign in");
+        }
+
+        return event;
+      }),
+    },
+  }),
+);
+
+// The pool names the function by ARN. Nothing is resolved until a sign-in runs
+// the trigger, so the pool can be created before the function exists.
+const pool = await cognito.createUserPool(
+  new CreateUserPoolCommand({
+    PoolName: "myapp-users",
+    LambdaConfig: {
+      PreAuthentication:
+        "arn:aws:lambda:us-east-1:888888888888:function:pre-auth",
+    },
+  }),
+);
+
+// Cognito invokes the function as a service, so the function's resource policy
+// has to admit it for this pool.
+await lambda.addPermission(
+  new AddPermissionCommand({
+    FunctionName: "pre-auth",
+    StatementId: "AllowCognito",
+    Action: "lambda:InvokeFunction",
+    Principal: "cognito-idp.amazonaws.com",
+    SourceArn: pool.UserPool?.Arn,
+  }),
+);
+
+const appClient = await cognito.createUserPoolClient(
+  new CreateUserPoolClientCommand({
+    UserPoolId: pool.UserPool?.Id,
+    ClientName: "web",
+    ExplicitAuthFlows: ["ALLOW_ADMIN_USER_PASSWORD_AUTH"],
+  }),
+);
+
+await cognito.adminCreateUser(
+  new AdminCreateUserCommand({
+    UserPoolId: pool.UserPool?.Id,
+    Username: "mallory",
+    UserAttributes: [{ Name: "email", Value: "mallory@elsewhere.test" }],
+  }),
+);
+await cognito.adminSetUserPassword(
+  new AdminSetUserPasswordCommand({
+    UserPoolId: pool.UserPool?.Id,
+    Username: "mallory",
+    Password: "Sup3rSecretPassw0rd!",
+    Permanent: true,
+  }),
+);
+
+try {
+  await cognito.adminInitiateAuth(
+    new AdminInitiateAuthCommand({
+      UserPoolId: pool.UserPool?.Id,
+      ClientId: appClient.UserPoolClient?.ClientId,
+      AuthFlow: "ADMIN_USER_PASSWORD_AUTH",
+      AuthParameters: {
+        USERNAME: "mallory",
+        PASSWORD: "Sup3rSecretPassw0rd!",
+      },
+    }),
+  );
+} catch (error) {
+  // The handler's own words, in the error real Cognito refuses the sign-in
+  // with.
+  console.log((error as Error).name); // "UserLambdaValidationException"
+  console.log((error as Error).message);
+  // "PreAuthentication failed with error Only example.com may sign in."
+}
+```
+
+The event carries the trigger's own `triggerSource`, which is
+`PreAuthentication_Authentication` or `PostAuthentication_Authentication`, along with `version`,
+`region`, `userPoolId`, `userName`, a `callerContext` naming the app client, and the `request` and
+`response` pair. `ClientMetadata` on the sign-in reaches the handler as `request.validationData` for
+`PreAuthentication` and as `request.clientMetadata` for `PostAuthentication`, as it does on real
+Cognito.
+
+Three failures are reported the way real Cognito reports them:
+
+- A handler that throws refuses the sign-in with `UserLambdaValidationException`, carrying the
+  message it threw.
+- A trigger naming a function that is not there, or one whose resource policy does not admit
+  `cognito-idp.amazonaws.com` for the pool, fails with `UnexpectedLambdaException`.
+- A handler that returns something other than the event it was given fails with
+  `InvalidLambdaResponseException`.
+
+Only these two triggers run. Every other `LambdaConfig` key is refused when the pool is created,
+naming the trigger, so a pool never quietly drops one.
+
 ## Token timestamps and expiry
 
 `iat`, `exp` and `auth_time` come from the simulation's clock rather than the host's, and the tokens
@@ -1160,11 +1310,13 @@ the secret with `DescribeUserPoolClient`, which reports it here as it does on re
 
 The properties each type reads are the ones this simulation models:
 
-- `AWS::Cognito::UserPool`: `UserPoolName`, `Policies`, `DeletionProtection`,
+- `AWS::Cognito::UserPool`: `UserPoolName`, `Policies`, `DeletionProtection`, `LambdaConfig`,
   `AdminCreateUserConfig`, `AutoVerifiedAttributes`, `MfaConfiguration`, `UserPoolTier`,
   `AccountRecoverySetting`, `EmailVerificationMessage`, `EmailVerificationSubject`,
-  `SmsVerificationMessage` and `VerificationMessageTemplate`. The last six are accepted at one value
-  each and refused at any other, as `CreateUserPool` refuses them.
+  `SmsVerificationMessage` and `VerificationMessageTemplate`. `LambdaConfig` is read a trigger at a
+  time, so a template naming a trigger this simulation runs deploys and one naming a trigger it
+  does not fails the stack. The last six are accepted at one value each and refused at any other,
+  as `CreateUserPool` refuses them.
 - `AWS::Cognito::UserPoolClient`: `UserPoolId`, `ClientName`, `GenerateSecret`, `ExplicitAuthFlows`,
   `PreventUserExistenceErrors`, `AccessTokenValidity`, `IdTokenValidity`, `RefreshTokenValidity`,
   `TokenValidityUnits`, `AllowedOAuthFlowsUserPoolClient` and `SupportedIdentityProviders`. The last
@@ -1505,6 +1657,8 @@ Sim Cognito currently supports:
   `USER_PASSWORD_AUTH` and `REFRESH_TOKEN_AUTH` flows, authorized by no IAM policy as they are on
   real Cognito
 - `GlobalSignOutCommand` and `AdminUserGlobalSignOutCommand`, which revoke the tokens a user holds
+- The `PreAuthentication` and `PostAuthentication` Lambda triggers, invoked with the real event
+  around a sign-in, with the pool's own `ClientMetadata` reaching them
 - Real RS256 JWTs, signed by a key the pool publishes as a JWKS, so a verifier configured for the
   pool verifies them unchanged
 - A pool's `.well-known/jwks.json` and `.well-known/openid-configuration` served over HTTP by
@@ -1605,8 +1759,18 @@ Current documented limitations:
   implemented, so `LastModifiedDate` is always the creation date.
 - A pool with `DeletionProtection: ACTIVE` cannot be deleted at all, because deactivating the
   protection needs `UpdateUserPool`.
+- `PreAuthentication` and `PostAuthentication` are the only Lambda triggers that run. Every other
+  `LambdaConfig` key is refused when the pool is created, naming the trigger, because a pool that
+  accepted one would never call the function the template named. The sign-up, token generation and
+  message triggers wait on the features they fire for; the custom challenge triggers would need a
+  challenge loop this simulation does not have; and the migration and federation triggers have no
+  external directory to reach.
+- A `PostAuthentication` handler that throws fails the request, and the sign-in it ran after is not
+  undone: the tokens the pool issued stay issued, as they do on real Cognito.
+- Neither trigger fires for `REFRESH_TOKEN_AUTH`, as neither does on real Cognito. `ClientMetadata`
+  on a refresh is accepted and reaches nothing.
 - Unsimulated `CreateUserPool` inputs are refused rather than ignored: `UsernameAttributes`,
-  `AliasAttributes`, `Schema`, `LambdaConfig`, `UsernameConfiguration`,
+  `AliasAttributes`, `Schema`, `UsernameConfiguration`,
   `UserAttributeUpdateSettings`, `DeviceConfiguration`, `UserPoolAddOns`, `KeyConfiguration`,
   `IssuerConfiguration`, `UserPoolTags`, the email and SMS configurations, an
   `SmsAuthenticationMessage`, an `MfaConfiguration` other than `OFF`, a `UserPoolTier` other than
@@ -1632,10 +1796,9 @@ Current documented limitations:
 - An `AllowedOAuthFlowsUserPoolClient` of `false`, and a `SupportedIdentityProviders` of
   `["COGNITO"]`, are accepted and change nothing, because both say the client wants the pool's own
   users and nothing else, which is all there is here. `DescribeUserPoolClient` reports them back.
-- Unsimulated authentication inputs are refused the same way: `ClientMetadata` and
-  `AnalyticsMetadata` on all four operations, `ContextData` on the admin ones, `UserContextData` on
-  the client ones, and a `Session` on `InitiateAuth` or `AdminInitiateAuth`, which continues a flow
-  neither of them starts.
+- Unsimulated authentication inputs are refused the same way: `AnalyticsMetadata` on all four
+  operations, `ContextData` on the admin ones, `UserContextData` on the client ones, and a `Session`
+  on `InitiateAuth` or `AdminInitiateAuth`, which continues a flow neither of them starts.
 - A pool does not report `SchemaAttributes`. Real Cognito reports the standard attribute schema on
   every pool, and there are no user attributes here to describe.
 - Managed login and the hosted UI are not simulated, and neither are the OAuth endpoints, the

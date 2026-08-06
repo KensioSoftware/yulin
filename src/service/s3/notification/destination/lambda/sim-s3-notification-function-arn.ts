@@ -1,5 +1,6 @@
 import type { SimAwsAccountId } from "../../../../aws/sim-aws-account.js";
 import type { AwsRegionName } from "../../../../aws/sim-aws-region.js";
+import { parseSimLambdaFunctionArn } from "../../../../lambda/function/sim-lambda-function-arn-parts.js";
 import {
   SimS3InvalidArgument,
   SimS3NotImplemented,
@@ -8,9 +9,9 @@ import {
 /**
  * The Lambda function ARN a notification configuration names.
  *
- * Lambda addresses a function with colons rather than a slash, so this reads
- * the ARN itself rather than going through the shared ARN parser, which is
- * built for the slash form.
+ * Reading the ARN is Lambda's own business, so the parts come from there. What
+ * S3 adds is what an unreadable one means to a Bucket, which is an
+ * `InvalidArgument` against the configuration that named it.
  */
 export class SimS3NotificationFunctionArn {
   public readonly regionName: AwsRegionName;
@@ -35,31 +36,13 @@ export class SimS3NotificationFunctionArn {
    * silently notifying `$LATEST` instead would be the wrong function.
    */
   static parse(arn: string): SimS3NotificationFunctionArn {
-    const [
-      prefix,
-      partition,
-      service,
-      region,
-      accountId,
-      resourceType,
-      name,
-      qualifier,
-    ] = arn.split(":");
+    const parts = parseSimLambdaFunctionArn(arn);
 
-    if (
-      prefix !== "arn" ||
-      partition !== "aws" ||
-      service !== "lambda" ||
-      resourceType !== "function" ||
-      region === undefined ||
-      accountId === undefined ||
-      name === undefined ||
-      name === ""
-    ) {
+    if (parts === undefined) {
       throw new SimS3InvalidArgument(`${arn} is not a Lambda function ARN.`);
     }
 
-    if (qualifier !== undefined) {
+    if (parts.qualifier !== undefined) {
       throw new SimS3NotImplemented(
         `Cannot notify ${arn}: simulated Lambda has no function versions or ` +
           "aliases, so a qualified function ARN is refused rather than " +
@@ -68,9 +51,9 @@ export class SimS3NotificationFunctionArn {
     }
 
     return new SimS3NotificationFunctionArn(
-      region as AwsRegionName,
-      accountId as SimAwsAccountId,
-      name,
+      parts.regionName,
+      parts.accountId,
+      parts.functionName,
     );
   }
 }

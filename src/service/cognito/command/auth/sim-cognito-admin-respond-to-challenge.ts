@@ -37,10 +37,10 @@ export class SimCognitoAdminRespondToChallenge {
   /**
    * Answer a challenge.
    */
-  handle(
+  async handle(
     command: SimAdminRespondToAuthChallengeCommand,
     options?: SimCognitoCommandOptions,
-  ): SimAdminRespondToAuthChallengeCommandOutput {
+  ): Promise<SimAdminRespondToAuthChallengeCommandOutput> {
     const { input } = command;
     const { pool, client } = this.authResolver.poolClient(
       "cognito-idp:AdminRespondToAuthChallenge",
@@ -51,7 +51,7 @@ export class SimCognitoAdminRespondToChallenge {
     this.unsimulatedOptions.refuseInAdminResponse(input);
     requireSimCognitoNewPasswordChallenge(input.ChallengeName);
 
-    return this.newPassword.handle({
+    return await this.newPassword.handle({
       pool,
       client,
       parameters: new SimCognitoAuthParameters(
@@ -59,6 +59,7 @@ export class SimCognitoAdminRespondToChallenge {
         input.ChallengeResponses,
       ),
       session: input.Session,
+      clientMetadata: input.ClientMetadata,
     });
   }
 }

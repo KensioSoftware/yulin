@@ -17,6 +17,10 @@ interface SimCognitoAuthFlowRunnerProperties {
  * `AdminInitiateAuth` and `InitiateAuth` accept different flow names and reach
  * the pool differently, and once a flow is resolved they run the same bodies,
  * so the running of one lives here rather than in either command.
+ *
+ * Running a flow is asynchronous because a password sign-in may have to wait
+ * on the pool's Lambda triggers. A refresh runs no trigger, as it does not on
+ * real Cognito, and answers without waiting on anything.
  */
 export class SimCognitoAuthFlowRunner {
   private readonly passwordSignIn: SimCognitoPasswordSignIn;
@@ -30,14 +34,14 @@ export class SimCognitoAuthFlowRunner {
   /**
    * Run a flow the app client is configured for.
    */
-  run(
+  async run(
     flow: SimCognitoAuthFlow,
     request: SimCognitoAuthRequest,
-  ): SimCognitoAuthenticationOutput {
+  ): Promise<SimCognitoAuthenticationOutput> {
     if (flow.exchangesRefreshToken) {
       return this.refreshSignIn.handle(request);
     }
 
-    return this.passwordSignIn.handle(request);
+    return await this.passwordSignIn.handle(request);
   }
 }

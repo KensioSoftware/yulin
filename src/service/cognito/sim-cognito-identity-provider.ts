@@ -25,6 +25,10 @@ import {
   type SimCognitoUserPoolId,
 } from "./user-pool/sim-cognito-user-pool-id.js";
 import { SimCognitoUserPoolStore } from "./user-pool/sim-cognito-user-pool-store.js";
+import {
+  SimCognitoNoTriggerFunctions,
+  type SimCognitoTriggerFunctions,
+} from "./user-pool/trigger/sim-cognito-trigger-functions.js";
 
 export type { SimCognitoIdentityProviderRequestOptions } from "./sim-cognito-user-directory.js";
 
@@ -32,7 +36,20 @@ interface SimCognitoIdentityProviderProperties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
+
+  /**
+   * Where every pool in the simulation is indexed by id. Pool ids are unique
+   * across a simulation, and a pool is reachable by id alone from the serving
+   * layer, whichever scope created it.
+   */
   readonly userPoolRegistry?: SimCognitoUserPoolRegistry;
+
+  /**
+   * The Lambda functions a pool's triggers can reach, which is the whole
+   * simulation rather than this scope: a `LambdaConfig` names a function by
+   * ARN, and that ARN can name any Account and Region.
+   */
+  readonly triggerFunctions?: SimCognitoTriggerFunctions;
 }
 
 /**
@@ -64,6 +81,7 @@ export class SimCognitoIdentityProvider extends SimCognitoUserDirectory {
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
       userPoolRegistry = new SimCognitoUserPoolRegistry(),
+      triggerFunctions = new SimCognitoNoTriggerFunctions(),
     } = properties;
     const pools = new SimCognitoUserPoolStore({ registry: userPoolRegistry });
 
@@ -73,6 +91,7 @@ export class SimCognitoIdentityProvider extends SimCognitoUserDirectory {
         iam,
         clock: background,
         pools,
+        triggerFunctions,
       }),
       background,
     });

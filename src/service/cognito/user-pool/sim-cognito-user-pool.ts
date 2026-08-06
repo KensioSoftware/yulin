@@ -11,8 +11,13 @@ import type { SimCognitoDeletionProtection } from "./sim-cognito-deletion-protec
 import type { SimCognitoName } from "./sim-cognito-name.js";
 import type { SimCognitoPasswordPolicy } from "./sim-cognito-password-policy.js";
 import type { SimCognitoUserPoolArn } from "./sim-cognito-user-pool-arn.js";
-import type { SimCognitoUserPoolId } from "./sim-cognito-user-pool-id.js";
+import {
+  simCognitoUserPoolIssuerUrl,
+  simCognitoUserPoolProviderName,
+  type SimCognitoUserPoolId,
+} from "./sim-cognito-user-pool-id.js";
 import type { SimCognitoUnsimulatedPoolSettings } from "./sim-cognito-unsimulated-pool-settings.js";
+import type { SimCognitoLambdaConfig } from "./trigger/sim-cognito-lambda-config.js";
 import {
   SimCognitoSigningKey,
   type SimCognitoJwks,
@@ -32,6 +37,7 @@ interface SimCognitoUserPoolProperties {
   readonly deletionProtection: SimCognitoDeletionProtection;
   readonly adminCreateUserConfig: SimCognitoAdminCreateUserConfig;
   readonly autoVerifiedAttributes: SimCognitoAutoVerifiedAttributes;
+  readonly lambdaConfig: SimCognitoLambdaConfig;
   readonly unsimulatedSettings: SimCognitoUnsimulatedPoolSettings;
   readonly createdDate: Date;
 }
@@ -61,6 +67,11 @@ export class SimCognitoUserPool {
   public readonly autoVerifiedAttributes: SimCognitoAutoVerifiedAttributes;
 
   /**
+   * The Lambda triggers this pool runs, by the ARN of the function each names.
+   */
+  public readonly lambdaConfig: SimCognitoLambdaConfig;
+
+  /**
    * What the pool was created with and nothing here acts on, kept so a
    * described pool reports it.
    */
@@ -87,31 +98,19 @@ export class SimCognitoUserPool {
     this.deletionProtection = properties.deletionProtection;
     this.adminCreateUserConfig = properties.adminCreateUserConfig;
     this.autoVerifiedAttributes = properties.autoVerifiedAttributes;
+    this.lambdaConfig = properties.lambdaConfig;
     this.unsimulatedSettings = properties.unsimulatedSettings;
     this.creationDate = properties.createdDate;
   }
 
-  /**
-   * The URL a token from this pool names as its issuer.
-   *
-   * The region comes out of the pool id, which is where SDK code and token
-   * verifiers get it from too.
-   */
+  /** The URL a token from this pool names as its issuer. */
   get issuerUrl(): string {
-    const [regionName] = this.id.split("_", 1);
-
-    return `https://cognito-idp.${String(regionName)}.amazonaws.com/${this.id}`;
+    return simCognitoUserPoolIssuerUrl(this.id);
   }
 
-  /**
-   * The name this pool is known by where a scheme would be wrong.
-   *
-   * This is the issuer URL without `https://`, and it is what an identity pool
-   * names a user pool provider by, and what `AWS::Cognito::UserPool` answers
-   * `Fn::GetAtt ProviderName` with.
-   */
+  /** The name this pool is known by where a scheme would be wrong. */
   get providerName(): string {
-    return this.issuerUrl.replace("https://", "");
+    return simCognitoUserPoolProviderName(this.id);
   }
 
   /**

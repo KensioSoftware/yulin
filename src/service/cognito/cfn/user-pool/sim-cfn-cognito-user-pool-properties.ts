@@ -22,6 +22,11 @@ import { SimCfnCognitoPolicies } from "./sim-cfn-cognito-policies.js";
  * decides whether `SignUp` is allowed at all, and the second decides which
  * attributes confirming a sign-up marks as verified.
  *
+ * `LambdaConfig` is here because the pool runs the triggers it names.
+ * CreateUserPool reads it a key at a time, so a template asking for a trigger
+ * this simulation fires deploys and one asking for a trigger it does not fails
+ * the stack, rather than the two being decided together.
+ *
  * The five from `AccountRecoverySetting` down are here because a CDK
  * `UserPool` construct emits them when it was asked for nothing in
  * particular. Each configures message delivery, verification wording or
@@ -33,6 +38,7 @@ const simulatedProperties = [
   "UserPoolName",
   "Policies",
   "DeletionProtection",
+  "LambdaConfig",
   "MfaConfiguration",
   "UserPoolTier",
   "AdminCreateUserConfig",
@@ -88,6 +94,10 @@ export class SimCfnCognitoUserPoolProperties {
       DeletionProtection: this.string(
         this.properties["DeletionProtection"],
         "DeletionProtection",
+      ),
+      LambdaConfig: this.record(
+        this.properties["LambdaConfig"],
+        "LambdaConfig",
       ),
       MfaConfiguration: this.string(
         this.properties["MfaConfiguration"],
