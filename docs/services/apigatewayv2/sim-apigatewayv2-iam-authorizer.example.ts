@@ -124,4 +124,4 @@ const reporter = await fetch(url, {
 
 console.log(await reporter.text()); // "orders for arn:aws:iam::888888888888:role/Reporter"
 
-srv.close();
+await srv.close();

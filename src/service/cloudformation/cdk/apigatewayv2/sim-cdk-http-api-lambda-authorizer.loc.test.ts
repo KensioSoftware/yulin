@@ -137,7 +137,7 @@ describe("Sim CDK HTTP API Lambda authorizer local integration", () => {
       assertIdentical(admitted.status, 200);
       assertIdentical(await admitted.text(), "acme");
     } finally {
-      srv.close();
+      await srv.close();
     }
 
     await simAws.backgroundTasksComplete();

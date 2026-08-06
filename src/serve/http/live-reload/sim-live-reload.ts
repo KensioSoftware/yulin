@@ -84,15 +84,17 @@ export class SimLiveReload {
    * The page learns that the gap it is about to see is a restart rather than a
    * server that has died. Ending the connections rather than leaving them for
    * the browser to notice is what makes the reconnection prompt.
+   *
+   * Resolves once the connections have gone, so a caller closing a server has
+   * something to wait for before destroying sockets or leaving the process.
    */
-  stopping(): void {
+  async stopping(): Promise<void> {
     this.send("reloading");
 
-    for (const client of this.clients) {
-      client.end();
-    }
-
+    const leaving = [...this.clients];
     this.clients.clear();
+
+    await Promise.all(leaving.map((client) => client.end()));
   }
 
   private send(event: string): void {

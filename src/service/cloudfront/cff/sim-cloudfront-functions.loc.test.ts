@@ -19,8 +19,8 @@ describe("Serve sim CloudFront Functions on localhost", () => {
     await srv.listen();
   });
 
-  afterAll(() => {
-    srv.close();
+  afterAll(async () => {
+    await srv.close();
   });
 
   it("applies viewer-request CFF", async () => {

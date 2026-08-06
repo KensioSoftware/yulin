@@ -29,8 +29,8 @@ describe("Sim CDK CloudFront Function binding local integration", () => {
     await srv.listen();
   });
 
-  afterAll(() => {
-    srv.close();
+  afterAll(async () => {
+    await srv.close();
   });
 
   it("deploys a CloudFront Function association using a binding", async () => {

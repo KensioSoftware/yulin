@@ -51,8 +51,8 @@ describe("Simulated Route53 hosted zone summary over localhost", () => {
     server = await serveSimAws({ simAws });
   });
 
-  afterAll(() => {
-    server.close();
+  afterAll(async () => {
+    await server.close();
   });
 
   it("serves the hosted zone summary in a browser-viewable page", async () => {

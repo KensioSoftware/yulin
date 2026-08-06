@@ -109,4 +109,4 @@ const response = await fetch(srv.localUrl(`${apiEndpoint}/orders`));
 console.log(response.status);
 console.log(await response.text());
 
-srv.close();
+await srv.close();

@@ -60,5 +60,5 @@ try {
   console.log(response.status);
   console.log(response.headers.get("location"));
 } finally {
-  srv.close();
+  await srv.close();
 }

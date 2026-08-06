@@ -89,4 +89,4 @@ const response = await fetch(srv.localUrl(`${ApiEndpoint}/dev/pets/6`));
 
 console.log(await response.json());
 
-srv.close();
+await srv.close();

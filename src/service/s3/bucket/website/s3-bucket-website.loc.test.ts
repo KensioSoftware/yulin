@@ -18,8 +18,8 @@ describe("Serve simulated S3 Bucket static website on localhost", () => {
     await srv.listen();
   });
 
-  afterAll(() => {
-    srv.close();
+  afterAll(async () => {
+    await srv.close();
   });
 
   it("does not serve objects before static website hosting is configured", async () => {

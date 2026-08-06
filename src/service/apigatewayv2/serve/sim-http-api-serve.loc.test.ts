@@ -91,7 +91,7 @@ describe("Serving a sim HTTP API on localhost", () => {
       assertIdentical(response.headers.get("content-type"), "text/plain");
       assertIdentical(await response.text(), "orders limit 10");
     } finally {
-      srv.close();
+      await srv.close();
     }
   });
 });

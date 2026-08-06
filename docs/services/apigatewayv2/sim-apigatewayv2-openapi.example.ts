@@ -85,4 +85,4 @@ const response = await fetch(srv.localUrl(`${ApiEndpoint}/orders/42`));
 
 console.log(await response.text()); // "order 42"
 
-srv.close();
+await srv.close();

@@ -143,7 +143,7 @@ const response = await fetch(srv.localUrl(`${ApiEndpoint}/orders?limit=10`));
 console.log(response.status);
 console.log(await response.text());
 
-srv.close();
+await srv.close();
 ```
 
 The `$default` route matches any method and path, so every request to the endpoint reaches the
@@ -358,7 +358,7 @@ const response = await fetch(srv.localUrl(`${ApiEndpoint}/dev/pets/6`));
 
 console.log(await response.json());
 
-srv.close();
+await srv.close();
 ```
 
 That handler reports four fields of its event, so the response body it produces is:
@@ -557,7 +557,7 @@ const expired = await fetch(url, {
 
 console.log(expired.status); // 401
 
-srv.close();
+await srv.close();
 ```
 
 The verification is real. The token is parsed, its `alg` has to be `RS256`, its `kid` has to name a
@@ -797,7 +797,7 @@ const reporter = await fetch(url, {
 
 console.log(await reporter.text()); // "orders for arn:aws:iam::888888888888:role/Reporter"
 
-srv.close();
+await srv.close();
 ```
 
 ### What a refused request gets back
@@ -983,7 +983,7 @@ const admitted = await fetch(url, { headers: { cookie: "session=valid" } });
 
 console.log(await admitted.text()); // '{"tenant":"acme"}'
 
-srv.close();
+await srv.close();
 ```
 
 The authorizer function is invoked once per request reaching the route. Nothing is cached between
@@ -1208,7 +1208,7 @@ await simAws.clock().advanceBy({ minutes: 6 });
 
 console.log(await call()); // { invocations: 2 }
 
-srv.close();
+await srv.close();
 ```
 
 A refusal is held the same way an admission is, so a session the authorizer rejected stays rejected
@@ -1518,7 +1518,7 @@ const response = await fetch(srv.localUrl(`${ApiEndpoint}/orders/42`));
 
 console.log(await response.text()); // "order 42"
 
-srv.close();
+await srv.close();
 ```
 
 The API is named by `info.title`. `uri` is read as either the long
@@ -1754,7 +1754,7 @@ const response = await fetch(srv.localUrl(`${apiEndpoint}/orders`));
 console.log(response.status);
 console.log(await response.text());
 
-srv.close();
+await srv.close();
 ```
 
 Every property outside the simulated set is left out of what is created and recorded in

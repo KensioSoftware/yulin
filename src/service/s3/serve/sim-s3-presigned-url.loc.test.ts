@@ -38,8 +38,8 @@ describe("Presigned simulated S3 URLs over a local server", () => {
     });
   });
 
-  afterAll(() => {
-    srv.close();
+  afterAll(async () => {
+    await srv.close();
   });
 
   it("downloads an Object through a presigned URL", async () => {

@@ -154,7 +154,7 @@ try {
   console.log(missing.status); // 404
   console.log(await missing.text()); // <h1>Page not found</h1>
 } finally {
-  srv.close();
+  await srv.close();
 }
 ```
 
@@ -250,7 +250,7 @@ try {
   console.log(response.status);
   console.log(await response.text());
 } finally {
-  srv.close();
+  await srv.close();
 }
 ```
 
@@ -405,7 +405,7 @@ try {
   console.log(await page.text());
   console.log(await things.text());
 } finally {
-  srv.close();
+  await srv.close();
 }
 ```
 
@@ -713,7 +713,7 @@ try {
   console.log(response.status);
   console.log(response.headers.get("location"));
 } finally {
-  srv.close();
+  await srv.close();
 }
 ```
 

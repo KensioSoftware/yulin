@@ -19,8 +19,8 @@ describe("Sim CDK BucketDeployment local integration", () => {
     await srv.listen();
   });
 
-  afterAll(() => {
-    srv.close();
+  afterAll(async () => {
+    await srv.close();
   });
 
   it("sets up sim S3 bucket deployment on local filesystem", async () => {

@@ -21,8 +21,8 @@ describe("sim CloudFront local server", () => {
     await srv.listen();
   });
 
-  afterAll(() => {
-    srv.close();
+  afterAll(async () => {
+    await srv.close();
   });
 
   it("serves from multiple sim S3 Origins", async () => {

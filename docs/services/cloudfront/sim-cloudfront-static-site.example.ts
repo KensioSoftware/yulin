@@ -81,5 +81,5 @@ try {
   console.log(missing.status); // 404
   console.log(await missing.text()); // <h1>Page not found</h1>
 } finally {
-  srv.close();
+  await srv.close();
 }

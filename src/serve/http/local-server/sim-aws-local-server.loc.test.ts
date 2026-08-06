@@ -15,8 +15,8 @@ describe("Simulated AWS local HTTP server", () => {
     await srv.listen();
   });
 
-  afterAll(() => {
-    srv.close();
+  afterAll(async () => {
+    await srv.close();
   });
 
   it("responds HTTP 400 for missing Host header", async () => {
@@ -99,7 +99,7 @@ describe("Simulated AWS local HTTP server", () => {
     const responseBody = await response.text();
     assertStringIncludes(responseBody, "S3 bucket named my-site not found");
 
-    server.close();
+    await server.close();
   });
 
   it("throws on trying to get port before listening", () => {

@@ -1148,7 +1148,7 @@ try {
   console.log(response.headers.get("content-type"));
   console.log(await response.text());
 } finally {
-  srv.close();
+  await srv.close();
 }
 ```
 
@@ -1253,7 +1253,7 @@ try {
   console.log(response.status);
   console.log(await response.text());
 } finally {
-  srv.close();
+  await srv.close();
 }
 ```
 

@@ -133,5 +133,5 @@ try {
   console.log(await page.text());
   console.log(await things.text());
 } finally {
-  srv.close();
+  await srv.close();
 }

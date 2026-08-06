@@ -78,4 +78,4 @@ const response = await fetch(srv.localUrl(`${ApiEndpoint}/orders?limit=10`));
 console.log(response.status);
 console.log(await response.text());
 
-srv.close();
+await srv.close();

@@ -98,7 +98,7 @@ app.synth();
       assertIdentical(response.headers.get("content-type"), "text/plain");
       assertIdentical(await response.text(), "Hello CDK");
     } finally {
-      srv.close();
+      await srv.close();
     }
 
     await simAws.backgroundTasksComplete();

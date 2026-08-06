@@ -40,5 +40,5 @@ try {
   // caller-header
   console.log(response.headers.get("x-sim-aws-auth"));
 } finally {
-  srv.close();
+  await srv.close();
 }

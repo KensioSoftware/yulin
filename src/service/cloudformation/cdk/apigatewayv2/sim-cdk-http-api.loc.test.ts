@@ -123,7 +123,7 @@ describe("Sim CDK HTTP API deployment local integration", () => {
       assertIdentical(fromApiEndpoint.status, 200);
       assertIdentical(await fromApiEndpoint.text(), "order YL-2");
     } finally {
-      srv.close();
+      await srv.close();
     }
 
     // And the invocation was gated by the AWS::Lambda::Permission CDK pairs

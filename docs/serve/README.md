@@ -20,7 +20,7 @@ const srv = await serveSimAws({ simAws, port: 8787 });
 
 console.log(srv.port); // "8787"
 
-srv.close();
+await srv.close();
 ```
 
 Without a `port` the server takes whatever port is free, which changes on every run. Pin one when
@@ -48,14 +48,16 @@ console.log(srv.localUrl(websiteUrl).toString());
 // http://foo-site.s3-website.us-east-1.sim-aws.localhost:<srv.port>/
 // with whatever port this run took, since none was pinned.
 
-srv.close();
+await srv.close();
 ```
 
 ## Stopping and restarting
 
-`close()` stops serving and ends the connections the server is holding, so the process can exit.
-Yulin installs no signal handlers, since a library taking over process signals gets in the way of
-whatever else the process is doing. Call `close()` from your own handler:
+`close()` stops serving and ends the connections the server is holding, so the process can exit. It
+returns a promise that settles once the last thing the server had to say has gone, so a script that
+means to exit rather than let the event loop empty has something to wait for. Yulin installs no
+signal handlers, since a library taking over process signals gets in the way of whatever else the
+process is doing. Call `close()` from your own handler:
 
 ```typescript sim-serve-shutdown
 /**
@@ -66,8 +68,14 @@ import { serveSimAws } from "@kensio/yulin/serve";
 
 const srv = await serveSimAws({ port: 8787 });
 
+async function stopServing(): Promise<void> {
+  // Waiting means anything the server still had to say has gone before the
+  // process does.
+  await srv.close();
+}
+
 process.on("SIGTERM", () => {
-  srv.close();
+  void stopServing();
 });
 ```
 
@@ -96,8 +104,13 @@ const srv = await serveSimAws({ simAws, port: 8787, liveReload: true });
 
 // Build the simulated environment the pages are served from here.
 
+async function stopServing(): Promise<void> {
+  // Waiting means the browsers hear about the restart before the process goes.
+  await srv.close();
+}
+
 process.on("SIGTERM", () => {
-  srv.close();
+  void stopServing();
 });
 ```
 
@@ -124,6 +137,12 @@ html[data-sim-aws-live-reload="reloading"] {
   opacity: 0.6;
 }
 ```
+
+The event has to reach the browser before the connection does, so `close()` sees the reload streams
+out before it destroys anything else the server was holding, and its promise settles once they have
+gone. A browser that has stopped answering is waited on for half a second and then dropped, so a page
+nobody is looking at cannot hold up a restart. Both ports are released before any of that waiting, so
+a replacement process can take them straight away either way.
 
 This works with no supervisor process involved, so a dev script started from an IDE debugger gets
 browser reload with the debugger attached throughout.
@@ -157,7 +176,7 @@ await simAws.s3().putObject(
 
 srv.reload();
 
-srv.close();
+await srv.close();
 ```
 
 `reload()` throws when live reload is off, rather than quietly doing nothing.

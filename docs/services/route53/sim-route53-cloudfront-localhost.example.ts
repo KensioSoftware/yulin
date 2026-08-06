@@ -100,5 +100,5 @@ try {
   console.log(response.status);
   console.log(await response.text());
 } finally {
-  srv.close();
+  await srv.close();
 }

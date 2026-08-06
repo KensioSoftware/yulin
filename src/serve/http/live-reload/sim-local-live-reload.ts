@@ -23,8 +23,11 @@ export class SimLocalLiveReload {
   private readonly liveReload: SimLiveReload | undefined;
   private readonly watch: SimWatchRuntime;
 
+  // The supervisor has its own handshake for waiting: it holds off killing the
+  // process until this one says it has stopped, which it does once the
+  // listeners have run. So the writes go out here and nothing waits on them.
   private readonly onSupervisorStopping = (): void => {
-    this.liveReload?.stopping();
+    void this.liveReload?.stopping();
   };
 
   constructor(properties: SimLocalLiveReloadProperties) {
@@ -57,10 +60,13 @@ export class SimLocalLiveReload {
 
   /**
    * Tell connected browsers a reload is coming, and stop listening.
+   *
+   * Resolves once those browsers have had it, so the server can go on to
+   * destroy what is left of its connections.
    */
-  stopping(): void {
+  async stopping(): Promise<void> {
     this.watch.offStopping(this.onSupervisorStopping);
-    this.liveReload?.stopping();
+    await this.liveReload?.stopping();
   }
 
   /**

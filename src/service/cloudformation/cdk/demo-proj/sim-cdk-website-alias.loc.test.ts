@@ -24,8 +24,8 @@ describe("Sim CDK website deployment local integration", () => {
     await srv.listen();
   });
 
-  afterAll(() => {
-    srv.close();
+  afterAll(async () => {
+    await srv.close();
   });
 
   it("deploys test demo project into sim AWS", async () => {

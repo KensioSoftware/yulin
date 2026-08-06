@@ -23,8 +23,8 @@ describe("Simulated S3 local HTTP controller", () => {
     await srv.listen();
   });
 
-  afterAll(() => {
-    srv.close();
+  afterAll(async () => {
+    await srv.close();
   });
 
   it("serves an S3 Object body and content type over HTTP GET", async () => {
