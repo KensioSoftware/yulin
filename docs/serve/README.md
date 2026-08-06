@@ -257,6 +257,43 @@ list rather than restarting for it. See
 [watching a template file](../services/cloudformation/README.md#watching-a-template-file) for what
 an update does to the resources.
 
+A template synthesized against a real account sometimes needs adapting before Yulin will take it.
+`transform` is given the parsed template and answers with the one to deploy, on the deployment and
+again on every change, so the file the supervisor leaves alone is still the one in `cdk.out`:
+
+```typescript sim-serve-transform-template
+/**
+ * Adapting a watched template, so the file being watched is the real one.
+ */
+
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const srv = await serveSimAws({ simAws, port: 8787, liveReload: true });
+
+await simAws.cloudFormation().deployTemplateFile({
+  templatePath: "cdk.out/TestStack.template.json",
+  transform: (template) => ({
+    ...template,
+    Resources: Object.fromEntries(
+      Object.entries(template.Resources).filter(
+        ([logicalId]) => logicalId !== "SiteAliasRecord",
+      ),
+    ),
+  }),
+  watch: {
+    onUpdated: () => {
+      srv.reload();
+    },
+  },
+});
+```
+
+A transform that throws is reported the way a failed update is, so the process and the resources it
+is serving are left where they were. See
+[adapting a synthesized template](../services/cloudformation/README.md#adapting-a-synthesized-template-on-the-way-in).
+
 This works with no supervisor at all, so a dev script started from an IDE debugger picks up a
 re-synth with the debugger attached throughout.
 

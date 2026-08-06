@@ -1,7 +1,10 @@
 import path from "node:path";
 import {
+  assertArrayEquals,
   assertIdentical,
   assertObjectMatches,
+  assertStringIncludes,
+  assertThrowsErrorAsync,
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -162,6 +165,82 @@ describe("SimCfnTemplateFileLoader", () => {
         },
       },
     });
+  });
+
+  it("loads the template a transform returned, with the assets manifest beside the file", async () => {
+    // Given a synthesized template naming a Hosted Zone the simulation cannot
+    // look up, and its sibling CDK assets manifest.
+    const temporaryDirectory = new TemporaryDirectory();
+    const templatePath = "SiteStack.template.json";
+
+    await temporaryDirectory.writeFile(
+      templatePath,
+      jsonStringify({
+        Resources: {
+          SiteRecord: {
+            Type: "AWS::Route53::RecordSet",
+            Properties: { HostedZoneId: "Z0123456789ABCDEFGHIJ" },
+          },
+        },
+      }),
+    );
+    await temporaryDirectory.writeFile(
+      "SiteStack.assets.json",
+      jsonStringify({ files: {} }),
+    );
+
+    // When it is loaded through a transform that drops the record.
+    const fileLoader = new SimCfnTemplateFileLoader();
+    const loadedTemplate = await fileLoader.load({
+      templatePath: temporaryDirectory.join(templatePath),
+      transform: (template) => ({ ...template, Resources: {} }),
+    });
+
+    // Then the template to deploy is the one the transform returned.
+    assertArrayEquals(Object.keys(loadedTemplate.template.Resources), []);
+
+    // And the cloud assembly is still the one the file came from, since it is
+    // found beside the path rather than read out of the template.
+    assertObjectMatches(loadedTemplate.cdkOutContext, {
+      templateDirectoryPath: temporaryDirectory.path(),
+      assetsManifest: { files: {} },
+    });
+  });
+
+  it("says a transform threw rather than letting it read as a bad template", async () => {
+    // Given a template file and a transform that fails on it.
+    const temporaryDirectory = new TemporaryDirectory();
+    const templatePath = "SiteStack.template.json";
+
+    await temporaryDirectory.writeFile(
+      templatePath,
+      jsonStringify({ Resources: {} }),
+    );
+
+    // When the template file is loaded through it.
+    const fileLoader = new SimCfnTemplateFileLoader();
+    const error = await assertThrowsErrorAsync(async () => {
+      await fileLoader.load({
+        templatePath: temporaryDirectory.join(templatePath),
+        transform: () => {
+          throw new Error("no Hosted Zone ID for the review environment");
+        },
+      });
+    });
+
+    // Then loading fails, saying what threw and keeping the reason it gave.
+    assertStringIncludes(
+      error.message,
+      "Sim CloudFormation template transform",
+    );
+    assertStringIncludes(
+      error.message,
+      "no Hosted Zone ID for the review environment",
+    );
+    assertIdentical(
+      (error.cause as Error).message,
+      "no Hosted Zone ID for the review environment",
+    );
   });
 
   it("loads a non-CDK template filename without requiring an assets manifest", async () => {

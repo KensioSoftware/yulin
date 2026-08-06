@@ -4,6 +4,7 @@ import { SimAws } from "../../src/index.js";
 import { TemporaryDirectory } from "../../src/util/filesystem/temporary-directory.js";
 import { jsonStringify } from "../../src/util/type-guard/json.js";
 import type { SimCfnTemplateFileWatchOptions } from "../../src/service/cloudformation/watch/sim-cfn-template-watch.type.js";
+import type { SimCfnTemplateFileTransform } from "../../src/service/cloudformation/deploy/sim-cfn-template-file-transform.js";
 
 /**
  * A synthesized template file on disk, deployed and watched.
@@ -24,10 +25,15 @@ export class WatchedTemplate {
 
   /**
    * Deploy a template file and watch it.
+   *
+   * A transform is given to the deployment rather than applied to the template
+   * written here, so what the file holds stays the synthesized template and
+   * the adapting is the simulator's to do again on every change.
    */
   static async of(
     template: object,
     watching: boolean | SimCfnTemplateFileWatchOptions = {},
+    transform?: SimCfnTemplateFileTransform,
   ): Promise<WatchedTemplate> {
     const watched = new WatchedTemplate();
     await watched.write(template);
@@ -40,6 +46,7 @@ export class WatchedTemplate {
 
     await watched.simAws.cloudFormation().deployTemplateFile({
       templatePath: watched.path(),
+      transform,
       watch: watched.watchProperty(watching),
     });
 
