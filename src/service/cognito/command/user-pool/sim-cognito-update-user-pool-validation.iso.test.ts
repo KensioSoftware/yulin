@@ -58,11 +58,13 @@ const refusedInputs: readonly RefusedInput[] = [
     says: "a password the user has used before",
   },
   {
-    label: "LambdaConfig PreSignUp",
+    label: "LambdaConfig PreTokenGeneration",
     input: {
-      LambdaConfig: { PreSignUp: "arn:aws:lambda:eu-west-2:1:function:f" },
+      LambdaConfig: {
+        PreTokenGeneration: "arn:aws:lambda:eu-west-2:1:function:f",
+      },
     },
-    says: "validating a self-service sign-up",
+    says: "changing the claims a pool puts in its tokens",
   },
   {
     label: "UserAttributeUpdateSettings",

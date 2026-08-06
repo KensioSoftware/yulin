@@ -1,10 +1,13 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { SimCognitoPasswordCheck } from "../../user-pool/sim-cognito-password-check.js";
 import type { SimCognitoUserPool } from "../../user-pool/sim-cognito-user-pool.js";
+import { SimCognitoTriggerOccasion } from "../../user-pool/trigger/sim-cognito-trigger-occasion.js";
+import type { SimCognitoUserPoolTriggers } from "../../user-pool/trigger/sim-cognito-user-pool-triggers.js";
 import type { SimCognitoUserFactory } from "../../user-pool/user/sim-cognito-user-factory.js";
 import { requireSimCognitoUsername } from "../../user-pool/user/sim-cognito-username.js";
 import { SimCognitoUnsimulatedUserOptions } from "./sim-cognito-unsimulated-user-options.js";
 import type { SimCognitoRequestResolver } from "../sim-cognito-request-resolver.js";
+import { simCognitoValidationData } from "../sim-cognito-validation-data.js";
 import { SimCognitoUserView } from "./sim-cognito-user-view.js";
 import type {
   SimAdminCreateUserCommand,
@@ -18,6 +21,7 @@ import type {
 interface SimCognitoUserCommandsProperties {
   readonly resolver: SimCognitoRequestResolver;
   readonly userFactory: SimCognitoUserFactory;
+  readonly triggers: SimCognitoUserPoolTriggers;
 }
 
 interface SimCognitoCommandOptions {
@@ -33,12 +37,14 @@ interface SimCognitoCommandOptions {
 export class SimCognitoUserCommands {
   private readonly resolver: SimCognitoRequestResolver;
   private readonly userFactory: SimCognitoUserFactory;
+  private readonly triggers: SimCognitoUserPoolTriggers;
   private readonly view = new SimCognitoUserView();
   private readonly unsimulatedOptions = new SimCognitoUnsimulatedUserOptions();
 
   constructor(properties: SimCognitoUserCommandsProperties) {
     this.resolver = properties.resolver;
     this.userFactory = properties.userFactory;
+    this.triggers = properties.triggers;
   }
 
   /**
@@ -71,11 +77,22 @@ export class SimCognitoUserCommands {
    * admin-created user: it has a temporary password and cannot sign in until
    * that password is replaced. `AdminSetUserPassword` with `Permanent: true`
    * is what moves it on.
+   *
+   * The pool's `PreSignUp` trigger runs before the user is added, reporting
+   * `PreSignUp_AdminCreateUser`, so a handler that throws leaves the pool
+   * without the user. What the handler wrote into the response is read and not
+   * acted on, because real Cognito ignores `autoConfirmUser`, `autoVerifyEmail`
+   * and `autoVerifyPhone` on this occasion: the user is already past
+   * confirmation.
+   *
+   * `PostConfirmation` does not run, here or on real Cognito. It fires for
+   * users who sign themselves up, and an admin-created user never confirms
+   * anything.
    */
-  create(
+  async create(
     command: SimAdminCreateUserCommand,
     options?: SimCognitoCommandOptions,
-  ): SimAdminCreateUserCommandOutput {
+  ): Promise<SimAdminCreateUserCommandOutput> {
     const { input } = command;
     const pool = this.resolver.pool(
       "cognito-idp:AdminCreateUser",
@@ -92,6 +109,16 @@ export class SimCognitoUserCommands {
       temporaryPassword: SimCognitoUserCommands.allowedTemporaryPassword(
         pool,
         input.TemporaryPassword,
+      ),
+    });
+
+    await this.triggers.preSignUp(SimCognitoTriggerOccasion.adminCreateUser, {
+      pool,
+      user,
+      clientMetadata: input.ClientMetadata,
+      validationData: simCognitoValidationData(
+        input.ValidationData,
+        "AdminCreateUser",
       ),
     });
 

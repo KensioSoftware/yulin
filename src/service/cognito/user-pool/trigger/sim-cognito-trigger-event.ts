@@ -1,11 +1,8 @@
-import type { SimCognitoUserPoolClient } from "../client/sim-cognito-user-pool-client.js";
-import type { SimCognitoUserPool } from "../sim-cognito-user-pool.js";
 import { simCognitoUserPoolRegionName } from "../sim-cognito-user-pool-id.js";
-import type { SimCognitoUser } from "../user/sim-cognito-user.js";
-import {
-  simCognitoTriggerSource,
-  type SimCognitoTriggerName,
-} from "./sim-cognito-trigger-name.js";
+import type { SimCognitoTriggerContext } from "./sim-cognito-trigger-context.js";
+import type { SimCognitoTriggerName } from "./sim-cognito-trigger-name.js";
+import type { SimCognitoTriggerOccasion } from "./sim-cognito-trigger-occasion.js";
+import { SimCognitoTriggerRequest } from "./sim-cognito-trigger-request.js";
 
 /**
  * The SDK version real Cognito reports for a caller it could not identify,
@@ -19,22 +16,20 @@ import {
 const awsSdkVersion = "aws-sdk-unknown-unknown";
 
 /**
- * The sign-in a trigger is firing for.
+ * The client id real Cognito reports for an operation no app client made.
+ *
+ * `AdminCreateUser` and `AdminConfirmSignUp` are called with AWS credentials
+ * rather than through an app client, so there is no client id to report.
  */
-export interface SimCognitoTriggerContext {
-  readonly pool: SimCognitoUserPool;
-  readonly client: SimCognitoUserPoolClient;
-  readonly user: SimCognitoUser;
-  readonly clientMetadata?: Readonly<Record<string, string>> | undefined;
-}
+const adminCallerClientId = "CLIENT_ID_NOT_APPLICABLE";
 
 /**
  * The event document a simulated Cognito Lambda trigger is invoked with.
  *
- * The shape is the real one, down to the empty `response` a handler is
- * expected to hand back untouched. Neither of these two triggers reads anything
- * out of `response`, so what a handler writes there is ignored, exactly as real
- * Cognito ignores it.
+ * The shape is the real one, down to the `response` a handler is expected to
+ * hand back with its answer written into it. Only `PreSignUp` is asked
+ * anything, so it is the only one whose response arrives with fields already
+ * in it, which is how real Cognito sends it.
  */
 export class SimCognitoTriggerEvent {
   private readonly context: SimCognitoTriggerContext;
@@ -44,14 +39,28 @@ export class SimCognitoTriggerEvent {
   }
 
   /**
-   * The event for one trigger.
+   * The response half of the event, as real Cognito sends it.
    *
-   * The two triggers name the same data differently, which is not a detail to
-   * smooth over: a `PreAuthentication` handler reads `request.validationData`
-   * and a `PostAuthentication` one reads `request.clientMetadata`, and both
-   * come from the `ClientMetadata` the sign-in request carried.
+   * A `PreSignUp` handler is sent the three flags it can answer with, already
+   * set to false, so a handler reading one before writing it finds what it
+   * would find against a real pool.
    */
-  document(trigger: SimCognitoTriggerName): object {
+  private static response(trigger: SimCognitoTriggerName): object {
+    if (trigger !== "PreSignUp") {
+      return {};
+    }
+
+    return {
+      autoConfirmUser: false,
+      autoVerifyEmail: false,
+      autoVerifyPhone: false,
+    };
+  }
+
+  /**
+   * The event for one occasion.
+   */
+  document(occasion: SimCognitoTriggerOccasion): object {
     return {
       version: "1",
       region: simCognitoUserPoolRegionName(this.context.pool.id),
@@ -59,50 +68,13 @@ export class SimCognitoTriggerEvent {
       userName: this.context.user.username,
       callerContext: {
         awsSdkVersion,
-        clientId: this.context.client.id,
+        clientId: this.context.client?.id ?? adminCallerClientId,
       },
-      triggerSource: simCognitoTriggerSource(trigger),
-      request: this.request(trigger),
-      response: {},
-    };
-  }
-
-  private request(trigger: SimCognitoTriggerName): object {
-    if (trigger === "PreAuthentication") {
-      return {
-        userAttributes: this.userAttributes(),
-        ...(this.context.clientMetadata !== undefined && {
-          validationData: { ...this.context.clientMetadata },
-        }),
-        // A sign-in naming a user the pool does not hold is refused before any
-        // trigger runs here, so the trigger only ever sees a user that exists.
-        // Real Cognito fires it with `userNotFound: true` for an app client
-        // that hides user existence, which this simulation does not do.
-        userNotFound: false,
-      };
-    }
-
-    return {
-      userAttributes: this.userAttributes(),
-      // Devices are not remembered here: `CreateUserPool` refuses a
-      // `DeviceConfiguration`, so no sign-in is ever made from a new device.
-      newDeviceUsed: false,
-      ...(this.context.clientMetadata !== undefined && {
-        clientMetadata: { ...this.context.clientMetadata },
-      }),
-    };
-  }
-
-  /**
-   * The user's attributes by name, as a trigger event carries them.
-   *
-   * The event is a plain object of strings rather than the `Name`/`Value` pairs
-   * the API answers with, and `sub` is among them.
-   */
-  private userAttributes(): Record<string, string> {
-    return {
-      sub: this.context.user.sub,
-      ...Object.fromEntries(this.context.user.attributeValues),
+      triggerSource: occasion.source,
+      request: new SimCognitoTriggerRequest(this.context).document(
+        occasion.trigger,
+      ),
+      response: SimCognitoTriggerEvent.response(occasion.trigger),
     };
   }
 }

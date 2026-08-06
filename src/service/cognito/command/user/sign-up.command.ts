@@ -39,10 +39,10 @@ export interface SimSignUpCommand {
 /**
  * What a sign-up answers with.
  *
- * `UserConfirmed` is always false here, because a pool confirming a user at
- * sign-up is one with a pre sign-up Lambda trigger doing it, and triggers are
- * not simulated. There is no `CodeDeliveryDetails`: real Cognito reports where
- * it sent the confirmation code, and nothing here sends one anywhere.
+ * `UserConfirmed` is true only where the pool's pre sign-up Lambda trigger
+ * answered `autoConfirmUser`, which is the one way a user is confirmed at
+ * sign-up. There is no `CodeDeliveryDetails`: real Cognito reports where it
+ * sent the confirmation code, and nothing here sends one anywhere.
  */
 export interface SimSignUpCommandOutput {
   readonly UserConfirmed?: boolean | undefined;
@@ -90,7 +90,7 @@ export interface SimResendConfirmationCodeCommandOutput {
 }
 
 /**
- * The AdminConfirmSignUp inputs this simulation reads, and the one it refuses.
+ * The AdminConfirmSignUp inputs, which are all simulated.
  *
  * This is the admin side of confirming, so it names the pool and the user
  * rather than an app client, and no confirmation code is involved at all.

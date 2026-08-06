@@ -14,6 +14,7 @@ import {
   assertStringIncludes,
   assertStringLength,
   assertThrowsErrorAsync,
+  assertUndefined,
   assertUuidV4,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -238,25 +239,53 @@ describe("sim Cognito sign-up", () => {
     assertStringIncludes(error.message, "AllowAdminCreateUserOnly");
   });
 
-  it("refuses an input that only a Lambda trigger would read", async () => {
+  it("refuses an input about the device a request came from", async () => {
     // Given a pool with an app client.
     const { cognito, clientId } = await simCognitoWithClient();
 
-    // When a sign-up carries validation data for a pre sign-up trigger.
+    // When a sign-up carries the device context threat protection reads.
     const error = await assertThrowsErrorAsync(async () => {
       await cognito.signUp(
         new SignUpCommand({
           ClientId: clientId,
           Username: "alice",
           Password: password,
-          ValidationData: [{ Name: "tenant", Value: "acme" }],
+          UserContextData: { IpAddress: "192.0.2.1" },
         }),
       );
     });
 
-    // Then it is refused rather than dropped, because the trigger that would
-    // have read it does not run here.
-    assertStringIncludes(error.message, "SignUp ValidationData");
+    // Then it is refused rather than dropped, because nothing here judges a
+    // request by the device it came from.
+    assertStringIncludes(error.message, "SignUp UserContextData");
     assertStringIncludes(error.message, "is not simulated");
+  });
+
+  it("takes the validation data a pre sign-up trigger would read", async () => {
+    // Given a pool with an app client and no pre sign-up trigger.
+    const { cognito, userPoolId, clientId } = await simCognitoWithClient();
+
+    // When a sign-up carries validation data.
+    await cognito.signUp(
+      new SignUpCommand({
+        ClientId: clientId,
+        Username: "alice",
+        Password: password,
+        ValidationData: [{ Name: "tenant", Value: "acme" }],
+      }),
+    );
+
+    // Then the sign-up went ahead, and the data reached nothing: real Cognito
+    // passes it to the pre sign-up trigger and never stores it on the user.
+    const read = await cognito.adminGetUser(
+      new AdminGetUserCommand({ UserPoolId: userPoolId, Username: "alice" }),
+    );
+
+    assertIdentical(read.UserStatus, "UNCONFIRMED");
+    assertUndefined(
+      read.UserAttributes?.find(
+        (attribute) => attribute.Name === "custom:tenant",
+      ),
+    );
   });
 });

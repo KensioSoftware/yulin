@@ -11,8 +11,12 @@
 import {
   AdminCreateUserCommand,
   AdminSetUserPasswordCommand,
+  ConfirmSignUpCommand,
   CreateUserPoolClientCommand,
   CreateUserPoolCommand,
+  SignUpCommand,
+  type SignUpCommandInput,
+  type VerifiedAttributeType,
 } from "@aws-sdk/client-cognito-identity-provider";
 import {
   AddPermissionCommand,
@@ -23,6 +27,7 @@ import { assertNonNullable } from "@kensio/smartass";
 import { SimAws } from "../../src/service/aws/sim-aws.js";
 import { DEFAULT_SIM_AWS_ACCOUNT_ID } from "../../src/service/aws/sim-aws-account.js";
 import { DEFAULT_SIM_AWS_REGION_NAME } from "../../src/service/aws/sim-aws-region.js";
+import type { SimSignUpCommandOutput } from "../../src/service/cognito/command/user/sign-up.command.js";
 import type { SimCognitoIdentityProvider } from "../../src/service/cognito/index.js";
 import { makeLambdaZipFileInput } from "../../src/service/lambda/function/code/lambda-zip-file-input.js";
 import type { SimLambdaHandler } from "../../src/service/lambda/function/sim-lambda-handler.type.js";
@@ -46,8 +51,30 @@ export interface SimCognitoTriggerPoolInput {
   /** The `LambdaConfig` the pool is created with. */
   readonly triggers: Readonly<Record<string, string>>;
 
+  /**
+   * The simulation to build the pool in.
+   *
+   * A test whose trigger reaches another service creates the table or the
+   * Bucket first, so it has to make the simulation itself. Everything else
+   * takes a fresh one.
+   */
+  readonly simAws?: SimAws | undefined;
+
   /** What the function does when a trigger invokes it. */
   readonly handler?: SimLambdaHandler | undefined;
+
+  /**
+   * A real code archive to run instead of a handler function.
+   *
+   * A handler function is the quick way to say what a trigger does. Function
+   * code that calls another simulated service has to be an archive, because
+   * that is what runs in the Lambda vm with the runtime's own AWS SDK
+   * provided to it.
+   */
+  readonly code?: Uint8Array | undefined;
+
+  /** The execution Role the function runs as, and its SDK calls are made as. */
+  readonly roleArn?: string | undefined;
 
   /**
    * Whether the function's resource policy admits `cognito-idp.amazonaws.com`
@@ -55,6 +82,10 @@ export interface SimCognitoTriggerPoolInput {
    * `AWS::Lambda::Permission` for.
    */
   readonly permitted?: boolean | undefined;
+
+  /** The `AutoVerifiedAttributes` the pool is created with. */
+  readonly autoVerifiedAttributes?:
+    readonly VerifiedAttributeType[] | undefined;
 }
 
 /**
@@ -90,14 +121,22 @@ export const triggerFunctionArn =
 export async function makeTriggerPool(
   input: SimCognitoTriggerPoolInput,
 ): Promise<SimCognitoTriggerPool> {
-  const simAws = new SimAws();
+  const simAws = input.simAws ?? new SimAws();
 
   await simAws.lambda().createFunction(
     new CreateFunctionCommand({
       FunctionName: triggerFunctionName,
-      Role: `arn:aws:iam::${simAws.defaultAccountId}:role/TriggerRole`,
+      Role:
+        input.roleArn ??
+        `arn:aws:iam::${simAws.defaultAccountId}:role/TriggerRole`,
+      // A real archive needs the handler naming the module and export the way
+      // a deployed function does. A stowed handler function is its own entry
+      // point and needs none.
+      ...(input.code !== undefined && { Handler: "index.handler" }),
       Code: {
-        ZipFile: makeLambdaZipFileInput(input.handler ?? passThroughHandler),
+        ZipFile:
+          input.code ??
+          makeLambdaZipFileInput(input.handler ?? passThroughHandler),
       },
     }),
   );
@@ -107,6 +146,9 @@ export async function makeTriggerPool(
     new CreateUserPoolCommand({
       PoolName: "myapp-users",
       LambdaConfig: input.triggers,
+      ...(input.autoVerifiedAttributes !== undefined && {
+        AutoVerifiedAttributes: [...input.autoVerifiedAttributes],
+      }),
     }),
   );
 
@@ -168,6 +210,46 @@ export async function makeTriggerUser(
       }),
     );
   }
+}
+
+/**
+ * Sign a user up through the fixture's app client.
+ *
+ * This is the self-service path rather than the admin one, so it is what
+ * reaches `PreSignUp_SignUp` and, once confirmed, `PostConfirmation`.
+ */
+export async function signUpTriggerUser(
+  pool: SimCognitoTriggerPool,
+  input: Partial<SignUpCommandInput> = {},
+): Promise<SimSignUpCommandOutput> {
+  return await pool.cognito.signUp(
+    new SignUpCommand({
+      UserAttributes: [{ Name: "email", Value: "alice@example.com" }],
+      ...input,
+      Username: input.Username ?? "alice",
+      ClientId: pool.clientId,
+      Password: triggerPassword,
+    }),
+  );
+}
+
+/**
+ * Confirm the signed-up user with the code the pool issued.
+ */
+export async function confirmTriggerSignUp(
+  pool: SimCognitoTriggerPool,
+  clientMetadata?: Record<string, string>,
+): Promise<void> {
+  await pool.cognito.confirmSignUp(
+    new ConfirmSignUpCommand({
+      ClientId: pool.clientId,
+      Username: "alice",
+      ConfirmationCode: pool.cognito
+        .userPool(pool.userPoolId)
+        .confirmationCode("alice"),
+      ...(clientMetadata !== undefined && { ClientMetadata: clientMetadata }),
+    }),
+  );
 }
 
 async function makeTriggerClient(

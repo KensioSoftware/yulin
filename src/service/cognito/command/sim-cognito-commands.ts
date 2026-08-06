@@ -6,6 +6,7 @@ import { SimCognitoGroupFactory } from "../user-pool/group/sim-cognito-group-fac
 import { SimCognitoUserPoolFactory } from "../user-pool/sim-cognito-user-pool-factory.js";
 import type { SimCognitoUserPoolStore } from "../user-pool/sim-cognito-user-pool-store.js";
 import type { SimCognitoTriggerFunctions } from "../user-pool/trigger/sim-cognito-trigger-functions.js";
+import { SimCognitoUserPoolTriggers } from "../user-pool/trigger/sim-cognito-user-pool-triggers.js";
 import { SimCognitoUserFactory } from "../user-pool/user/sim-cognito-user-factory.js";
 import { SimCognitoAuthCommands } from "./auth/sim-cognito-auth-commands.js";
 import { SimCognitoAuthResolver } from "./auth/sim-cognito-auth-resolver.js";
@@ -59,6 +60,11 @@ export class SimCognitoCommands {
     const resolver = new SimCognitoRequestResolver({ pools, authorizer });
     const authResolver = new SimCognitoAuthResolver({ resolver, pools });
     const userFactory = new SimCognitoUserFactory({ clock });
+    // One trigger runner serves every command, because a pool's LambdaConfig
+    // is one set of functions whichever operation reaches it.
+    const triggers = new SimCognitoUserPoolTriggers({
+      functions: triggerFunctions,
+    });
 
     this.userPools = new SimCognitoUserPoolCommands({
       pools,
@@ -76,11 +82,16 @@ export class SimCognitoCommands {
       authorizer,
     });
     this.listClients = new SimCognitoListUserPoolClients({ pools, authorizer });
-    this.users = new SimCognitoUserCommands({ resolver, userFactory });
+    this.users = new SimCognitoUserCommands({
+      resolver,
+      userFactory,
+      triggers,
+    });
     this.signUp = new SimCognitoSignUpCommands({
       authResolver,
       resolver,
       userFactory,
+      triggers,
     });
     this.userUpdates = new SimCognitoUserUpdateCommands({ resolver });
     this.listUsers = new SimCognitoListUsers({ resolver });
@@ -95,7 +106,7 @@ export class SimCognitoCommands {
       authResolver,
       pools,
       clock,
-      triggerFunctions,
+      triggers,
     });
   }
 }

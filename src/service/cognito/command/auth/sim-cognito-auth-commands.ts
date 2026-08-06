@@ -1,8 +1,7 @@
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import type { SimCognitoUserPoolStore } from "../../user-pool/sim-cognito-user-pool-store.js";
 import { SimCognitoTokenIssuer } from "../../user-pool/token/sim-cognito-token-issuer.js";
-import type { SimCognitoTriggerFunctions } from "../../user-pool/trigger/sim-cognito-trigger-functions.js";
-import { SimCognitoUserPoolTriggers } from "../../user-pool/trigger/sim-cognito-user-pool-triggers.js";
+import type { SimCognitoUserPoolTriggers } from "../../user-pool/trigger/sim-cognito-user-pool-triggers.js";
 import type { SimCognitoRequestResolver } from "../sim-cognito-request-resolver.js";
 import { SimCognitoAdminInitiateAuth } from "./sim-cognito-admin-initiate-auth.js";
 import { SimCognitoAdminRespondToChallenge } from "./sim-cognito-admin-respond-to-challenge.js";
@@ -21,7 +20,7 @@ interface SimCognitoAuthCommandsProperties {
   readonly authResolver: SimCognitoAuthResolver;
   readonly pools: SimCognitoUserPoolStore;
   readonly clock: SimClock;
-  readonly triggerFunctions: SimCognitoTriggerFunctions;
+  readonly triggers: SimCognitoUserPoolTriggers;
 }
 
 /**
@@ -41,12 +40,8 @@ export class SimCognitoAuthCommands {
   public readonly signOut: SimCognitoSignOutCommands;
 
   constructor(properties: SimCognitoAuthCommandsProperties) {
-    const { resolver, authResolver, pools, clock, triggerFunctions } =
-      properties;
+    const { resolver, authResolver, pools, clock, triggers } = properties;
     const tokenIssuer = new SimCognitoTokenIssuer({ clock });
-    const triggers = new SimCognitoUserPoolTriggers({
-      functions: triggerFunctions,
-    });
     const flowRunner = new SimCognitoAuthFlowRunner({
       passwordSignIn: new SimCognitoPasswordSignIn({
         authResolver,

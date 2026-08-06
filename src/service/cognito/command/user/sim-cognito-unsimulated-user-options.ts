@@ -24,6 +24,10 @@ export class SimCognitoUnsimulatedUserOptions {
    * `MessageAction: SUPPRESS` is allowed, and does nothing, because no
    * invitation is ever sent here. `RESEND` is refused: there is no message to
    * send again.
+   *
+   * `ValidationData` and `ClientMetadata` are not refused. Both exist to reach
+   * the pre sign-up trigger, and that trigger runs here, so they reach the
+   * handler.
    */
   refuseInCreate(input: SimAdminCreateUserCommandInput): void {
     this.creation.refuseUnless(
@@ -41,16 +45,6 @@ export class SimCognitoUnsimulatedUserOptions {
       "ForceAliasCreation",
       input.ForceAliasCreation,
       "moving an email or phone number alias to the new user",
-    );
-    this.creation.refuse(
-      "ValidationData",
-      input.ValidationData,
-      "passing data to a pre sign-up Lambda trigger",
-    );
-    this.creation.refuse(
-      "ClientMetadata",
-      input.ClientMetadata,
-      "passing data to a Lambda trigger",
     );
   }
 

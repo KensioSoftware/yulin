@@ -258,6 +258,10 @@ for a user that has already confirmed is refused with `InvalidParameterException
 `AdminConfirmSignUp` confirms a user with no code at all. It names the pool and the user, and is
 authorized by IAM the way the other admin operations are.
 
+A pool with a `PreSignUp` trigger can confirm a user at sign-up instead, and one with a
+`PostConfirmation` trigger runs it whichever way the user got confirmed. See
+"[Lambda triggers](#lambda-triggers)" below.
+
 The pool's `AutoVerifiedAttributes` decide what confirming verifies. A pool created with
 `["email"]` has `email_verified` set to `true` on the user when it confirms, because answering with
 the code shows the address is the user's. `AdminConfirmSignUp` sets nothing, as it sets nothing on
@@ -915,14 +919,241 @@ try {
 
 ## Lambda triggers
 
-A pool created with a `LambdaConfig` runs the functions it names as part of a sign-in.
-`PreAuthentication` runs once the user is known and before its password is checked, and
-`PostAuthentication` runs once the tokens have been issued. Both are given the real event, and both
-have to return it.
+A pool created with a `LambdaConfig` runs the functions it names as part of a sign-up or a sign-in.
+Each one is given the real event and has to return it, changed or not.
+
+| Trigger              | Fires                                                                  | `triggerSource`                     |
+| -------------------- | ---------------------------------------------------------------------- | ----------------------------------- |
+| `PreSignUp`          | `SignUp`, before the pool takes the new user                           | `PreSignUp_SignUp`                  |
+| `PreSignUp`          | `AdminCreateUser`, before the pool takes the new user                  | `PreSignUp_AdminCreateUser`         |
+| `PostConfirmation`   | `ConfirmSignUp` and `AdminConfirmSignUp`, once the user is `CONFIRMED` | `PostConfirmation_ConfirmSignUp`    |
+| `PreAuthentication`  | a sign-in, once the user is known and before its password is checked   | `PreAuthentication_Authentication`  |
+| `PostAuthentication` | a sign-in, once the tokens have been issued                            | `PostAuthentication_Authentication` |
 
 The function is a simulated Lambda function anywhere in the simulation, and it has to admit
 `cognito-idp.amazonaws.com` for the pool, which is what `AddPermission` grants and what CDK's
 `addTrigger` emits an `AWS::Lambda::Permission` for.
+
+### Sign-up triggers
+
+`PreSignUp` runs before the pool takes the new user, so a handler that throws refuses the sign-up
+with `UserLambdaValidationException` and leaves no user behind. `PostConfirmation` runs once the
+user has reached `CONFIRMED`, and is given its attributes with the `sub` the pool allocated among
+them, which is what a handler keys an external record on.
+
+The handler runs as its function's execution role, so a call it makes to another simulated service
+is authorized by simulated IAM the way the deployed function's would be.
+
+```typescript sim-cognito-sign-up-triggers
+/**
+ * A user pool that auto-confirms its users and writes each one to DynamoDB.
+ */
+
+import {
+  CreateUserPoolClientCommand,
+  CreateUserPoolCommand,
+  SignUpCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+import {
+  CreateTableCommand,
+  GetItemCommand,
+  PutItemCommand,
+} from "@aws-sdk/client-dynamodb";
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import {
+  AddPermissionCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+/**
+ * The parts of the two sign-up events these handlers read.
+ */
+interface SignUpTriggerEvent {
+  readonly userName: string;
+  readonly request: { readonly userAttributes: Record<string, string> };
+  readonly response: {
+    autoConfirmUser?: boolean;
+    autoVerifyEmail?: boolean;
+  };
+}
+
+const simAws = new SimAws();
+const lambda = simAws.lambda();
+const cognito = simAws.cognitoIdentityProvider();
+
+await simAws.dynamoDb().createTable(
+  new CreateTableCommand({
+    TableName: "users",
+    KeySchema: [{ AttributeName: "sub", KeyType: "HASH" }],
+    AttributeDefinitions: [{ AttributeName: "sub", AttributeType: "S" }],
+    BillingMode: "PAY_PER_REQUEST",
+  }),
+);
+
+// The execution role is what the handler's own writes are authorized as, so a
+// missing grant fails the confirmation rather than writing nothing.
+const role = await simAws.iam().createRole(
+  new CreateRoleCommand({
+    RoleName: "SignUpTriggerRole",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { Service: "lambda.amazonaws.com" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+
+await simAws.iam().putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "SignUpTriggerRole",
+    PolicyName: "WriteUsers",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: "dynamodb:PutItem",
+        Resource: `arn:aws:dynamodb:${simAws.defaultRegionName}:${simAws.defaultAccountId}:table/users`,
+      },
+    }),
+  }),
+);
+
+// Anyone on the domain the pool is for skips confirmation, and their address
+// counts as verified without a code ever being answered.
+await lambda.createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "pre-sign-up",
+    Role: role.Role.Arn,
+    Code: {
+      ZipFile: makeLambdaZipFileInput((event: SignUpTriggerEvent) => {
+        const email = event.request.userAttributes["email"] ?? "";
+
+        if (email.endsWith("@example.com")) {
+          event.response.autoConfirmUser = true;
+          event.response.autoVerifyEmail = true;
+        }
+
+        return event;
+      }),
+    },
+  }),
+);
+
+// The confirmed user gets a row of its own, keyed on the sub Cognito
+// allocated rather than on the username.
+await lambda.createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "post-confirmation",
+    Role: role.Role.Arn,
+    Code: {
+      ZipFile: makeLambdaZipFileInput(async (event: SignUpTriggerEvent) => {
+        await simAws.dynamoDb().putItem(
+          new PutItemCommand({
+            TableName: "users",
+            Item: {
+              sub: { S: event.request.userAttributes["sub"] ?? "" },
+              email: { S: event.request.userAttributes["email"] ?? "" },
+              username: { S: event.userName },
+            },
+          }),
+        );
+
+        return event;
+      }),
+    },
+  }),
+);
+
+const pool = await cognito.createUserPool(
+  new CreateUserPoolCommand({
+    PoolName: "myapp-users",
+    LambdaConfig: {
+      PreSignUp: `arn:aws:lambda:${simAws.defaultRegionName}:${simAws.defaultAccountId}:function:pre-sign-up`,
+      PostConfirmation: `arn:aws:lambda:${simAws.defaultRegionName}:${simAws.defaultAccountId}:function:post-confirmation`,
+    },
+  }),
+);
+
+for (const functionName of ["pre-sign-up", "post-confirmation"]) {
+  await lambda.addPermission(
+    new AddPermissionCommand({
+      FunctionName: functionName,
+      StatementId: "AllowCognito",
+      Action: "lambda:InvokeFunction",
+      Principal: "cognito-idp.amazonaws.com",
+      SourceArn: pool.UserPool?.Arn,
+    }),
+  );
+}
+
+const appClient = await cognito.createUserPoolClient(
+  new CreateUserPoolClientCommand({
+    UserPoolId: pool.UserPool?.Id,
+    ClientName: "web",
+    ExplicitAuthFlows: ["ALLOW_USER_PASSWORD_AUTH"],
+  }),
+);
+
+const signedUp = await cognito.signUp(
+  new SignUpCommand({
+    ClientId: appClient.UserPoolClient?.ClientId,
+    Username: "alice",
+    Password: "Sup3rSecret!",
+    UserAttributes: [{ Name: "email", Value: "alice@example.com" }],
+  }),
+);
+
+// The pre sign-up handler confirmed the user, so no ConfirmSignUp call is
+// needed and the post confirmation handler has already run.
+console.log(signedUp.UserConfirmed); // true
+
+const written = await simAws.dynamoDb().getItem(
+  new GetItemCommand({
+    TableName: "users",
+    Key: { sub: { S: signedUp.UserSub ?? "" } },
+  }),
+);
+
+console.log(written.Item?.["email"]?.S); // "alice@example.com"
+```
+
+A `PreSignUp` handler answers in the `response` it is given, which arrives with `autoConfirmUser`,
+`autoVerifyEmail` and `autoVerifyPhone` all set to `false`. Setting `autoConfirmUser` takes the new
+user straight to `CONFIRMED`, and `SignUp` reports `UserConfirmed: true`. The two verify flags set
+`email_verified` and `phone_number_verified` without a code being answered, and work whether or not
+the user was confirmed. Asking to verify an attribute the sign-up did not carry refuses the sign-up,
+as it does on real Cognito, rather than creating a user with the flag quietly unset.
+
+A user confirmed that way still reaches `PostConfirmation`, at sign-up rather than at a
+`ConfirmSignUp` that never comes. A project whose users never confirm is covered by that, here as on
+real Cognito.
+
+`AdminCreateUser` reaches `PreSignUp` and never reaches `PostConfirmation`. That matters more than
+it looks: `AdminCreateUser` is the obvious place to hang the trigger and the wrong one, and a
+project relying on it would pass here and write nothing in production. What the handler wrote into
+the response is ignored on that occasion too, because an admin-created user is already past
+confirmation. Real Cognito ignores all three flags there.
+
+The `ValidationData` and `ClientMetadata` a request carries reach the handler. `SignUp` and
+`AdminCreateUser` pass both to `PreSignUp`, as `request.validationData` and
+`request.clientMetadata`. `ConfirmSignUp` and `AdminConfirmSignUp` pass their `ClientMetadata` to
+`PostConfirmation`. Neither is stored on the user, as neither is on real Cognito.
+
+The admin operations have no app client to name, so a handler fired by `AdminCreateUser` or
+`AdminConfirmSignUp` reads `callerContext.clientId` as `CLIENT_ID_NOT_APPLICABLE`, which is what
+real Cognito sends.
+
+### Sign-in triggers
+
+`PreAuthentication` runs once the user is known and before its password is checked, so a wrong
+password reaches it too: the trigger is given the user to decide about, and deciding is what it is
+for. `PostAuthentication` runs once the tokens have been issued.
 
 ```typescript sim-cognito-lambda-triggers
 /**
@@ -1044,24 +1275,32 @@ try {
 }
 ```
 
-The event carries the trigger's own `triggerSource`, which is
-`PreAuthentication_Authentication` or `PostAuthentication_Authentication`, along with `version`,
-`region`, `userPoolId`, `userName`, a `callerContext` naming the app client, and the `request` and
-`response` pair. `ClientMetadata` on the sign-in reaches the handler as `request.validationData` for
+`ClientMetadata` on the sign-in reaches the handler as `request.validationData` for
 `PreAuthentication` and as `request.clientMetadata` for `PostAuthentication`, as it does on real
-Cognito.
+Cognito. Neither fires for `REFRESH_TOKEN_AUTH`, as neither does on real Cognito.
+
+### The event, and what a failure gets back
+
+Every event carries `version`, `region`, `userPoolId`, `userName`, the `triggerSource` naming the
+occasion, a `callerContext` naming the app client, and the `request` and `response` pair. The
+`request` holds `userAttributes` as a plain object of strings rather than the `Name`/`Value` pairs
+the API answers with.
+
+`sub` is among those attributes everywhere except `PreSignUp`, where the user does not exist yet: on
+real Cognito the sub is allocated once the sign-up has got past that handler. A handler keying an
+external record on `sub` has to be a `PostConfirmation` one, here as there.
 
 Three failures are reported the way real Cognito reports them:
 
-- A handler that throws refuses the sign-in with `UserLambdaValidationException`, carrying the
-  message it threw.
+- A handler that throws fails the request with `UserLambdaValidationException`, carrying the message
+  it threw. For `PreSignUp` and `PreAuthentication` that is how the trigger turns the request down.
 - A trigger naming a function that is not there, or one whose resource policy does not admit
   `cognito-idp.amazonaws.com` for the pool, fails with `UnexpectedLambdaException`.
 - A handler that returns something other than the event it was given fails with
   `InvalidLambdaResponseException`.
 
-Only these two triggers run. Every other `LambdaConfig` key is refused when the pool is created or
-updated, naming the trigger, so a pool never quietly drops one.
+Only the triggers in the table above run. Every other `LambdaConfig` key is refused when the pool is
+created or updated, naming the trigger, so a pool never quietly drops one.
 
 ## Token timestamps and expiry
 
@@ -1787,6 +2026,9 @@ Sim Cognito currently supports:
 - `SignUpCommand`, `ConfirmSignUpCommand` and `ResendConfirmationCodeCommand`, authorized by no IAM
   policy as they are on real Cognito, and `AdminConfirmSignUpCommand`, which is authorized like the
   other admin operations
+- The `PreSignUp` and `PostConfirmation` Lambda triggers, with `autoConfirmUser`, `autoVerifyEmail`
+  and `autoVerifyPhone` applied, and with the `ValidationData` and `ClientMetadata` a request
+  carries reaching the handler
 - `AutoVerifiedAttributes`, so confirming a sign-up sets `email_verified` or
   `phone_number_verified`, and `AdminCreateUserConfig.AllowAdminCreateUserOnly`, which refuses
   `SignUp` against a pool created with it
@@ -1801,7 +2043,7 @@ Sim Cognito currently supports:
   real Cognito
 - `GlobalSignOutCommand` and `AdminUserGlobalSignOutCommand`, which revoke the tokens a user holds
 - The `PreAuthentication` and `PostAuthentication` Lambda triggers, invoked with the real event
-  around a sign-in, with the pool's own `ClientMetadata` reaching them
+  around a sign-in, with the sign-in's own `ClientMetadata` reaching them
 - Real RS256 JWTs, signed by a key the pool publishes as a JWKS, so a verifier configured for the
   pool verifies them unchanged
 - A pool's `.well-known/jwks.json` and `.well-known/openid-configuration` served over HTTP by
@@ -1855,8 +2097,9 @@ Current documented limitations:
 - A confirmation code never expires, where a real one lasts 24 hours. `ResendConfirmationCode` is
   what replaces one.
 - `AdminConfirmSignUp` verifies nothing, whatever the pool's `AutoVerifiedAttributes` say, as it
-  verifies nothing on real Cognito. Only `ConfirmSignUp` sets `email_verified` and
-  `phone_number_verified`, and only where the user has the attribute to verify.
+  verifies nothing on real Cognito. `ConfirmSignUp` sets `email_verified` and
+  `phone_number_verified`, and only where the user has the attribute to verify, and a `PreSignUp`
+  trigger sets them by asking for `autoVerifyEmail` or `autoVerifyPhone`.
 - `AutoVerifiedAttributes` is accepted at `email` and `phone_number`, and anything else is refused.
   Those are the two Cognito can send a code to.
 - `SignUp`, `ConfirmSignUp` and `ResendConfirmationCode` report a user the pool does not hold
@@ -1864,10 +2107,11 @@ Current documented limitations:
   only.
 - Password reset is not simulated. `ForgotPassword`, `ConfirmForgotPassword` and `ChangePassword`
   are not implemented, so the `RESET_REQUIRED` status cannot be reached.
-- Unsimulated sign-up inputs are refused rather than ignored: `ClientMetadata`, `AnalyticsMetadata`
-  and `UserContextData` on the three client-side operations, `ValidationData` on `SignUp`,
-  `ForceAliasCreation` and `Session` on `ConfirmSignUp`, and `ClientMetadata` on
-  `AdminConfirmSignUp`.
+- Unsimulated sign-up inputs are refused rather than ignored: `AnalyticsMetadata` and
+  `UserContextData` on the three client-side operations, `ForceAliasCreation` and `Session` on
+  `ConfirmSignUp`, and `ClientMetadata` on `ResendConfirmationCode`. That last one would reach the
+  custom message trigger on real Cognito, which writes the wording of a message, and no message is
+  delivered here.
 - No message is ever delivered. `SignUp` and `ResendConfirmationCode` send no confirmation code, and
   neither reports `CodeDeliveryDetails`. `AdminCreateUser` sends no invitation, so
   `MessageAction: SUPPRESS` is accepted and changes nothing, `RESEND` is refused, and
@@ -1875,8 +2119,8 @@ Current documented limitations:
 - A temporary password never expires. `TemporaryPasswordValidityDays` is stored on the pool and
   nothing acts on it.
 - Unsimulated `AdminCreateUser` inputs are refused rather than ignored: `DesiredDeliveryMediums`,
-  `ForceAliasCreation`, `ValidationData`, `ClientMetadata`, and a `MessageAction` of `RESEND`.
-  `AdminUpdateUserAttributes` refuses `ClientMetadata` the same way.
+  `ForceAliasCreation`, and a `MessageAction` of `RESEND`. `AdminUpdateUserAttributes` refuses
+  `ClientMetadata`, because the only trigger it would reach there is the custom message one.
 - `ListUsers` refuses `Filter` and `AttributesToGet` rather than ignoring them, and lists users in
   creation order. Real Cognito chooses its own order and does not promise one.
 - `ListUsers`, `ListGroups`, `AdminListGroupsForUser` and `ListUsersInGroup` refuse a `Limit` of
@@ -1912,16 +2156,27 @@ Current documented limitations:
   on real Cognito, so a client created without a secret never gains one.
 - A redeployed template reaches neither update. Sim CloudFormation replaces a resource whose
   resolved template entry changed rather than updating it in place, whatever the resource type.
-- `PreAuthentication` and `PostAuthentication` are the only Lambda triggers that run. Every other
-  `LambdaConfig` key is refused when the pool is created or updated, naming the trigger, because a
-  pool that accepted one would never call the function the template named. The sign-up, token
-  generation and message triggers wait on the features they fire for; the custom challenge triggers
-  would need a challenge loop this simulation does not have; and the migration and federation
-  triggers have no external directory to reach.
-- A `PostAuthentication` handler that throws fails the request, and the sign-in it ran after is not
-  undone: the tokens the pool issued stay issued, as they do on real Cognito.
-- Neither trigger fires for `REFRESH_TOKEN_AUTH`, as neither does on real Cognito. `ClientMetadata`
-  on a refresh is accepted and reaches nothing.
+- `PreSignUp`, `PostConfirmation`, `PreAuthentication` and `PostAuthentication` are the only Lambda
+  triggers that run. Every other `LambdaConfig` key is refused when the pool is created or updated,
+  naming the trigger, because a pool that accepted one would never call the function the template
+  named. The token generation and message triggers wait on the features they fire for; the custom
+  challenge triggers would need a challenge loop this simulation does not have; and the migration
+  and federation triggers have no external directory to reach.
+- `AdminCreateUser` does not fire `PostConfirmation`, here or on real Cognito. It is the tempting
+  place to hang the trigger and the wrong one: a project relying on it would pass here and write
+  nothing in production.
+- `PostConfirmation_ConfirmForgotPassword` is not reached, because password reset is not simulated.
+  `PostConfirmation_ConfirmSignUp` is the only source the trigger reports.
+- A `PreSignUp` handler asking to verify an attribute the sign-up did not carry refuses the sign-up
+  with `InvalidParameterException`. Real Cognito refuses it too, and what it names the error has not
+  been checked against a live account.
+- `PreSignUp_ExternalProvider` is not reached either. Federated sign-in is not simulated, so no user
+  ever arrives from an identity provider.
+- A `PostConfirmation` or `PostAuthentication` handler that throws fails the request, and what it
+  ran after is not undone: a confirmed user stays confirmed and the tokens a pool issued stay
+  issued, as they do on real Cognito.
+- Neither sign-in trigger fires for `REFRESH_TOKEN_AUTH`, as neither does on real Cognito.
+  `ClientMetadata` on a refresh is accepted and reaches nothing.
 - Unsimulated `CreateUserPool` inputs are refused rather than ignored: `UsernameAttributes`,
   `AliasAttributes`, `Schema`, `UsernameConfiguration`,
   `UserAttributeUpdateSettings`, `DeviceConfiguration`, `UserPoolAddOns`, `KeyConfiguration`,
@@ -1963,8 +2218,8 @@ Current documented limitations:
   can fetch the keys they point at. A token's `iss` claim still names the real
   `https://cognito-idp.<region>.amazonaws.com/<userPoolId>`, so the two disagree here and agree on
   real Cognito.
-- Identity providers, resource servers, user pool domains, MFA configuration, risk configuration and
-  Lambda triggers are not simulated.
+- Identity providers, resource servers, user pool domains, MFA configuration and risk configuration
+  are not simulated.
 - Tags are not simulated. `UserPoolTags` is refused, and `TagResource`, `UntagResource` and
   `ListTagsForResource` are not implemented.
 - Listings carry no filtering, and are in creation order rather than any order real Cognito chooses.
