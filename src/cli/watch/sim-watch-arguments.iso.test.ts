@@ -38,6 +38,68 @@ describe("SimWatchArguments", () => {
     assertIdentical(parsed.command, "tsx");
   });
 
+  it("takes a settle window for a project the default does not suit", () => {
+    // Given a build whose writes come in further apart than most
+    const argv = ["--settle=800", "--inspect", "--", "tsx", "dev.ts"];
+
+    // When the arguments are read
+    const parsed = SimWatchArguments.parse(argv);
+
+    // Then the window is watch's own option, alongside one for the command
+    assertIdentical(parsed.settleMs, 800);
+    assertIdentical(parsed.inspect, "--inspect");
+    assertIdentical(parsed.command, "tsx");
+  });
+
+  it("leaves the settle window alone when it was not asked about", () => {
+    // Given a watch written without the option
+    const argv = ["--", "tsx", "dev.ts"];
+
+    // When the arguments are read
+    const parsed = SimWatchArguments.parse(argv);
+
+    // Then the default window is what the watcher will use
+    assertUndefined(parsed.settleMs);
+  });
+
+  it("refuses a settle window that is not a number of milliseconds", () => {
+    // Given a window written as a word
+    const argv = ["--settle=slowly", "--", "tsx", "dev.ts"];
+
+    // When the arguments are read
+    const error = assertThrowsError(() => SimWatchArguments.parse(argv));
+
+    // Then it says how the option is written
+    assertInstanceOf(error, SimWatchUsageError);
+    assertStringIncludes(error.message, "--settle takes a number");
+    assertStringIncludes(error.message, "--settle=250");
+  });
+
+  it("refuses a settle window with no value", () => {
+    // Given the option written as though it took the next word
+    const argv = ["--settle", "250", "--", "tsx", "dev.ts"];
+
+    // When the arguments are read
+    const error = assertThrowsError(() => SimWatchArguments.parse(argv));
+
+    // Then it says how the option is written, rather than reading 250 as an
+    // option of its own
+    assertInstanceOf(error, SimWatchUsageError);
+    assertStringIncludes(error.message, "--settle takes a number");
+  });
+
+  it("refuses a settle window of nothing at all", () => {
+    // Given a window that would act on every event separately
+    const argv = ["--settle=0", "--", "tsx", "dev.ts"];
+
+    // When the arguments are read
+    const error = assertThrowsError(() => SimWatchArguments.parse(argv));
+
+    // Then it is refused rather than turning one save into several restarts
+    assertInstanceOf(error, SimWatchUsageError);
+    assertStringIncludes(error.message, "--settle takes a number");
+  });
+
   it("refuses a run with no separator", () => {
     // Given a command written without the separator
     const argv = ["tsx", "dev.ts"];

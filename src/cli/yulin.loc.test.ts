@@ -21,7 +21,7 @@ describe("yulin command line", () => {
     });
 
     // Then the commands are listed
-    assertStringIncludes(stdout, "watch [--inspect");
+    assertStringIncludes(stdout, "watch [options]");
   });
 
   it("stops when the command to watch cannot be run", async () => {

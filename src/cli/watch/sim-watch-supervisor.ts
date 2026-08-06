@@ -75,6 +75,7 @@ export class SimWatchSupervisor {
     });
     this.watcher = new SimWatchWatcher({
       cwd,
+      settleMs: watchArguments.settleMs,
       onChange: (changedPath: string): void => {
         this.restarts.request(changedPath);
       },

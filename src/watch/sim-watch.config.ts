@@ -9,7 +9,27 @@ export const simWatchConfig = {
   environmentVariableValue: "1",
   // How long a burst of writes has to go quiet before it counts as one change.
   // One save from an editor is several writes, and a rename over the original.
-  settleMs: 120,
+  //
+  // The number is what a real build needs rather than what one save needs.
+  // macOS hands a recursive watch its events in waves rather than one at a
+  // time: a build writing several thousand files was measured arriving as tens
+  // of waves up to 49ms apart, so a window near that turns one build into
+  // several restarts, and 120 was close enough to it to be split by a build
+  // that pauses between its own phases. 250 clears the waves several times
+  // over, and covers the short pauses a multi-stage build takes. It is also
+  // well inside `selfInflictedMs`, so a file the process wrote on startup is
+  // still recognised as one it wrote itself.
+  settleMs: 250,
+  // How long a burst is allowed to defer the change that started it. Every
+  // event pushes the settle window back, so without this a build that writes
+  // for a minute is acted on a minute late, having held everything off for the
+  // whole of it.
+  //
+  // Longer than `selfInflictedMs`, so a change taken during a burst is never
+  // mistaken for one the process made itself, and longer than an ordinary build
+  // takes, so it is a backstop for a stream that will not stop rather than
+  // something a build runs into.
+  settleMaxWaitMs: 5000,
   // How long the supervisor waits for a process to say it has told its browsers
   // a reload is coming. A process not running Yulin's runtime never answers, so
   // this is a short wait rather than a requirement.

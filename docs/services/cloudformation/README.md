@@ -1130,7 +1130,9 @@ template that no longer deploys leaves a working environment where a restart on 
 none.
 
 A burst of writes is one update. Saving a file is several filesystem events, so changes are held
-until they stop arriving. `settleMs` is how long that wait is.
+until they stop arriving. `settleMs` is how long that wait is, and it defaults to the 250ms
+[`yulin watch` settles at](../../serve/README.md#one-restart-for-a-burst-of-writes). A synth that
+keeps writing is updated from after five seconds of it, rather than being held off until it stops.
 
 Watching holds a filesystem handle open, so the process does not exit on its own. That is what a dev
 process wants. Anything with an end, such as a test, calls `stopWatchingTemplateFiles()` when it is

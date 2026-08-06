@@ -3,7 +3,11 @@ import { SimWatchCommand } from "./watch/sim-watch-command.js";
 const usage = `Usage: yulin <command>
 
 Commands:
-  watch [--inspect[=port]] -- <command>   Run a command, and run it again when project files change
+  watch [options] -- <command>   Run a command, and run it again when project files change
+
+Watch options:
+  --inspect[=port]              Run the command with an inspector, for a debugger to attach to
+  --settle=ms                   How long writes have to stop for before they count as one change
 `;
 
 /**

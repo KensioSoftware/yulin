@@ -42,6 +42,7 @@ export class SimCfnTemplateFileWatch {
     this.watch = watch;
     this.settle = new SimWatchSettle({
       settleMs,
+      maxWaitMs: simWatchConfig.settleMaxWaitMs,
       onSettled: (): void => {
         this.apply();
       },
