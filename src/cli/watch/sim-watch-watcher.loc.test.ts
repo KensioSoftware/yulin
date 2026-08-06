@@ -39,10 +39,14 @@ describe("SimWatchWatcher over a real directory", () => {
     try {
       // When a build writes a few hundred files into it, which the platform
       // delivers in waves rather than all at once
+      //
+      // Into the directory already being watched rather than a new one of its
+      // own: a directory arriving is a change in its own right, and one a
+      // recursive watch only sees inside once it has caught up with it.
       await Promise.all(
         Array.from({ length: 500 }, async (_, at) =>
           directory.writeFile(
-            ["site", `page-${String(at)}.html`],
+            `page-${String(at)}.html`,
             `<h1>page ${String(at)}</h1>`,
           ),
         ),
