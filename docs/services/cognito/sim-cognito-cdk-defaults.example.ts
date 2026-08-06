@@ -67,3 +67,7 @@ console.log(described.UserPool?.Name); // "app-stack-Pool"
 // what says only an admin creates users in this pool.
 console.log(described.UserPool?.AdminCreateUserConfig);
 // { AllowAdminCreateUserOnly: true }
+
+// So is this one: it is what a verification message the pool records says.
+console.log(described.UserPool?.EmailVerificationSubject);
+// "Verify your new account"

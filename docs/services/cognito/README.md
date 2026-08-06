@@ -171,6 +171,10 @@ the code is readable from the pool instead, through `confirmationCode` on the po
 deliberate divergence: real Cognito never reports a code back to anyone, and reading one is what
 makes a registration flow testable at all.
 
+The pool also records the message it would have sent, which is where the wording and the code a user
+would have read are. That is in [Messages a pool would have sent](#messages-a-pool-would-have-sent)
+below.
+
 ```typescript sim-cognito-sign-up
 /**
  * Signing a user up and confirming it with the code the pool issued.
@@ -273,6 +277,222 @@ with `NotAuthorizedException`, as a real one does. That value is what a CDK `Use
 `selfSignUpEnabled` emits, so a project testing its registration flow gets the same answer here that
 the deployed pool would give. A pool created without the setting allows sign-up, which is the AWS
 default.
+
+## Messages a pool would have sent
+
+Nothing here delivers an email or a text message. A pool records what it would have sent instead,
+and `sentMessages` on the pool object hands the record over. Each message carries the recipient, the
+medium, the subject, the body and the occasion it was sent on.
+
+A message is recorded on three occasions: a `SignUp`, a `ResendConfirmationCode`, and an
+`AdminCreateUser` that did not ask for `MessageAction: SUPPRESS`. The verification wording is the
+pool's own, and `{####}` is replaced with the code the user was issued.
+
+```typescript sim-cognito-sent-messages
+/**
+ * Reading the verification message a pool would have sent.
+ */
+
+import {
+  CreateUserPoolClientCommand,
+  CreateUserPoolCommand,
+  SignUpCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const cognito = simAws.cognitoIdentityProvider();
+
+const pool = await cognito.createUserPool(
+  new CreateUserPoolCommand({
+    PoolName: "myapp-users",
+    AutoVerifiedAttributes: ["email"],
+    EmailVerificationSubject: "Welcome to Acme",
+    EmailVerificationMessage: "Your Acme code is {####}",
+  }),
+);
+const userPoolId = pool.UserPool!.Id!;
+
+const appClient = await cognito.createUserPoolClient(
+  new CreateUserPoolClientCommand({
+    UserPoolId: userPoolId,
+    ClientName: "web",
+  }),
+);
+
+await cognito.signUp(
+  new SignUpCommand({
+    ClientId: appClient.UserPoolClient!.ClientId!,
+    Username: "alice",
+    Password: "Sup3rSecret!",
+    UserAttributes: [{ Name: "email", Value: "alice@example.com" }],
+  }),
+);
+
+const [message] = cognito.userPool(userPoolId).sentMessages();
+
+console.log(message?.recipient); // "alice@example.com"
+console.log(message?.medium); // "EMAIL"
+console.log(message?.subject); // "Welcome to Acme"
+console.log(message?.occasion); // "SignUp"
+
+// The placeholder carries the code the user was issued.
+const code = cognito.userPool(userPoolId).confirmationCode("alice")!;
+
+console.log(message?.body === `Your Acme code is ${code}`); // true
+```
+
+Where the message goes comes from the user's own attributes, as it does on real Cognito. A
+verification message goes to an attribute the pool verifies automatically, so a pool created with
+`AutoVerifiedAttributes: ["email"]` writes to the user's `email` and a pool that verifies nothing
+records no verification message at all. An invitation goes to the user's `email`, or to its
+`phone_number` where it has no email address. An email is recorded with a subject and a text message
+without one, and a user the pool has no address for is sent nothing.
+
+`AdminCreateUser` records the invitation, carrying the username and the temporary password the
+request named, unless the request asked for `MessageAction: SUPPRESS`.
+
+A pool created with no wording of its own uses the wording real Cognito uses: `Your verification
+code` and `Your verification code is {####}` for a verification message, and `Your temporary
+password` and `Your username is {username} and temporary password is {####}.` for an invitation.
+`EmailVerificationMessage`, `EmailVerificationSubject`, `SmsVerificationMessage` and
+`VerificationMessageTemplate` are all read, at whatever wording a request sets.
+
+This is Cognito's own delivery record rather than a simulated SES. Real Cognito with the default
+`EmailSendingAccount` of `COGNITO_DEFAULT` sends through no other service, and `EmailConfiguration`
+and `SmsConfiguration` are refused here, so no pool is configured for a delivery this record would
+misrepresent.
+
+### The CustomMessage trigger
+
+A pool with a `CustomMessage` Lambda trigger runs it before the message is recorded, and what the
+handler writes into `response.emailSubject`, `response.emailMessage` and `response.smsMessage`
+replaces the pool's own wording. The handler writes `request.codeParameter` into its message where
+the code belongs, as it does on real Cognito, and the code goes in afterwards.
+
+`triggerSource` names the occasion: `CustomMessage_SignUp`, `CustomMessage_ResendCode` or
+`CustomMessage_AdminCreateUser`. The invitation is the one that carries `request.usernameParameter`
+as well.
+
+```typescript sim-cognito-custom-message
+/**
+ * A CustomMessage trigger writing the wording of a verification message.
+ */
+
+import {
+  CreateUserPoolClientCommand,
+  CreateUserPoolCommand,
+  SignUpCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+import {
+  AddPermissionCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+/**
+ * The part of the CustomMessage event this handler reads and writes.
+ */
+interface CustomMessageEvent {
+  readonly triggerSource: string;
+  readonly request: { readonly codeParameter: string };
+  response: {
+    emailSubject?: string;
+    emailMessage?: string;
+  };
+}
+
+const simAws = new SimAws();
+const lambda = simAws.lambda();
+const cognito = simAws.cognitoIdentityProvider();
+
+await lambda.createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "custom-message",
+    Role: "arn:aws:iam::888888888888:role/CustomMessageRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput((event: CustomMessageEvent) => {
+        if (event.triggerSource === "CustomMessage_SignUp") {
+          event.response.emailSubject = "Welcome to Acme";
+          event.response.emailMessage =
+            `Your code is ${event.request.codeParameter}. ` +
+            `It is good for one sign-up.`;
+        }
+
+        return event;
+      }),
+    },
+  }),
+);
+
+const pool = await cognito.createUserPool(
+  new CreateUserPoolCommand({
+    PoolName: "myapp-users",
+    AutoVerifiedAttributes: ["email"],
+    LambdaConfig: {
+      CustomMessage:
+        "arn:aws:lambda:us-east-1:888888888888:function:custom-message",
+    },
+  }),
+);
+const userPoolId = pool.UserPool!.Id!;
+
+await lambda.addPermission(
+  new AddPermissionCommand({
+    FunctionName: "custom-message",
+    StatementId: "AllowCognito",
+    Action: "lambda:InvokeFunction",
+    Principal: "cognito-idp.amazonaws.com",
+    SourceArn: pool.UserPool?.Arn,
+  }),
+);
+
+const appClient = await cognito.createUserPoolClient(
+  new CreateUserPoolClientCommand({
+    UserPoolId: userPoolId,
+    ClientName: "web",
+  }),
+);
+
+await cognito.signUp(
+  new SignUpCommand({
+    ClientId: appClient.UserPoolClient!.ClientId!,
+    Username: "alice",
+    Password: "Sup3rSecret!",
+    UserAttributes: [{ Name: "email", Value: "alice@example.com" }],
+  }),
+);
+
+const [message] = cognito.userPool(userPoolId).sentMessages();
+
+console.log(message?.subject); // "Welcome to Acme"
+
+// The code parameter the handler wrote carries the real code.
+const code = cognito.userPool(userPoolId).confirmationCode("alice")!;
+
+console.log(message?.body.startsWith(`Your code is ${code}.`)); // true
+```
+
+A handler that writes nothing leaves the pool's own wording, which is what a handler that only cares
+about one occasion does for the others. A handler that throws fails the request with
+`UserLambdaValidationException` and leaves the pool with no message, because the trigger runs before
+the message is recorded. A `response` that is not an object, or a message in it that is not a
+string, fails with `InvalidLambdaResponseException`.
+
+`ClientMetadata` on `SignUp`, `ResendConfirmationCode` and `AdminCreateUser` reaches the handler as
+`request.clientMetadata`.
+
+### Reading the messages over HTTP
+
+`serveSimAws` lists a pool's recorded messages at `GET /<userPoolId>/messages`, so they can be read
+during local development. Real Cognito serves nothing at that path: it is the serving side of
+`sentMessages`, and a divergence for the same reason that accessor is one.
+
+The response is `{ "messages": [ ... ] }`, each message carrying `username`, `recipient`, `medium`,
+`subject` where it has one, `body`, `occasion` and an ISO `sentDate`.
 
 ## Listing users
 
@@ -919,8 +1139,8 @@ try {
 
 ## Lambda triggers
 
-A pool created with a `LambdaConfig` runs the functions it names as part of a sign-up or a sign-in.
-Each one is given the real event and has to return it, changed or not.
+A pool created with a `LambdaConfig` runs the functions it names as part of a sign-up, a sign-in or
+a message. Each one is given the real event and has to return it, changed or not.
 
 | Trigger              | Fires                                                                  | `triggerSource`                        |
 | -------------------- | ---------------------------------------------------------------------- | -------------------------------------- |
@@ -932,6 +1152,12 @@ Each one is given the real event and has to return it, changed or not.
 | `PreTokenGeneration` | the sign-in that finishes by answering the new password challenge      | `TokenGeneration_NewPasswordChallenge` |
 | `PreTokenGeneration` | a `REFRESH_TOKEN_AUTH` refresh, over the tokens it reissues            | `TokenGeneration_RefreshTokens`        |
 | `PostAuthentication` | a sign-in, once the tokens have been issued                            | `PostAuthentication_Authentication`    |
+| `CustomMessage`      | `SignUp`, before the verification message is recorded                  | `CustomMessage_SignUp`                 |
+| `CustomMessage`      | `ResendConfirmationCode`, before the message is recorded               | `CustomMessage_ResendCode`             |
+| `CustomMessage`      | `AdminCreateUser`, before the invitation is recorded                   | `CustomMessage_AdminCreateUser`        |
+
+`CustomMessage` is the one whose response is read for more than a flag, and it is covered in
+[Messages a pool would have sent](#the-custommessage-trigger) above. The rest are here.
 
 The function is a simulated Lambda function anywhere in the simulation, and it has to admit
 `cognito-idp.amazonaws.com` for the pool, which is what `AddPermission` grants and what CDK's
@@ -1822,12 +2048,12 @@ test can assert it.
 
 A CDK `UserPool` construct emits six properties on `AWS::Cognito::UserPool` before it has been asked
 for anything, and a client created with `disableOAuth` emits two on `AWS::Cognito::UserPoolClient`.
-`AdminCreateUserConfig` is simulated, and decides whether `SignUp` works against the pool. The other
-seven are not: they configure email and SMS delivery, verification message wording and account
-recovery, and none of that happens here.
+Most of them are simulated: `AdminCreateUserConfig` decides whether `SignUp` works against the pool,
+and the four verification wording properties are what a recorded message says.
 
-Those seven are accepted anyway, at one value each and no other, so a CDK stack deploys as it
-stands.
+`AccountRecoverySetting` is the one that is not. There is no `ForgotPassword` here, so no recovery
+mechanism is ever reached, and it is accepted at one value and no other so that a CDK stack deploys
+as it stands. The two app client properties are accepted the same way.
 
 ```typescript sim-cognito-cdk-defaults
 /**
@@ -1899,6 +2125,10 @@ console.log(described.UserPool?.Name); // "app-stack-Pool"
 // what says only an admin creates users in this pool.
 console.log(described.UserPool?.AdminCreateUserConfig);
 // { AllowAdminCreateUserOnly: true }
+
+// So is this one: it is what a verification message the pool records says.
+console.log(described.UserPool?.EmailVerificationSubject);
+// "Verify your new account"
 ```
 
 The accepted value of each is below. A pool or a client created without one of these reports it not
@@ -1907,23 +2137,17 @@ at all, rather than reporting the value it would have had to use.
 | Property                          | Accepted value                                                             |
 | --------------------------------- | -------------------------------------------------------------------------- |
 | `AccountRecoverySetting`          | `verified_phone_number` at priority 1, then `verified_email` at priority 2 |
-| `EmailVerificationMessage`        | `The verification code to your new account is {####}`                      |
-| `EmailVerificationSubject`        | `Verify your new account`                                                  |
-| `SmsVerificationMessage`          | `The verification code to your new account is {####}`                      |
-| `VerificationMessageTemplate`     | `CONFIRM_WITH_CODE`, with the three strings above                          |
 | `AllowedOAuthFlowsUserPoolClient` | `false`                                                                    |
 | `SupportedIdentityProviders`      | `["COGNITO"]`                                                              |
 
-Every key is compared, so an object carrying one the accepted value does not have is refused along
-with everything else that differs. The refusal names the property, the value asked for and the value
-that is simulated.
+Every key of `AccountRecoverySetting` is compared, so an object carrying one the accepted value does
+not have is refused along with everything else that differs. The refusal names the property, the
+value asked for and the value that is simulated.
 
-The verification wording is worth reading twice. It is accepted only at the wording CDK emits,
-because a request writing its own is asking for a message a user would read, and no message is ever
-delivered.
-
-These values are what `aws-cdk-lib` 2.262.1 synthesizes. Whether real Cognito defaults a bare pool
-to the same wording has not been checked against a live account.
+`VerificationMessageTemplate` is read rather than compared, and the one thing refused in it is
+`DefaultEmailOption: CONFIRM_WITH_LINK`, along with `EmailMessageByLink` and `EmailSubjectByLink`.
+Nothing here serves a link, and `ConfirmSignUp` with the code is the only way a user is confirmed, so
+a pool that asked for a link would be tested against a flow it does not have in a deployment.
 
 ## Serving a pool's JWKS on localhost
 
@@ -1931,6 +2155,9 @@ to the same wording has not been checked against a live account.
 
 - `GET /<userPoolId>/.well-known/jwks.json`
 - `GET /<userPoolId>/.well-known/openid-configuration`
+
+It also lists the messages a pool would have sent, at `GET /<userPoolId>/messages`, which real
+Cognito serves nothing at.
 
 Both are anonymous, as they are on real Cognito, so no SigV4 signature is needed to fetch them. The
 real hostname `cognito-idp.<region>.amazonaws.com` maps to `cognito-idp.<region>.sim-aws.localhost`,
@@ -2214,6 +2441,12 @@ Sim Cognito currently supports:
 - The `PreTokenGeneration` Lambda trigger at `V1_0`, whose `claimsOverrideDetails` adds, overrides
   and suppresses the claims of an id token, and whose `groupOverrideDetails` replaces
   `cognito:groups`, on a sign-in and on a refresh alike
+- A record on each pool of the messages it would have sent, read with `sentMessages`, carrying the
+  recipient, the medium, the subject, the body and the occasion, with the pool's own verification
+  wording and the `{####}` placeholder filled in
+- The `CustomMessage` Lambda trigger, invoked before a message is recorded, with the occasion in its
+  `triggerSource` and the wording it writes replacing the pool's
+- The recorded messages listed over HTTP by `serveSimAws`, at `/<userPoolId>/messages`
 - Real RS256 JWTs, signed by a key the pool publishes as a JWKS, so a verifier configured for the
   pool verifies them unchanged
 - A pool's `.well-known/jwks.json` and `.well-known/openid-configuration` served over HTTP by
@@ -2278,19 +2511,53 @@ Current documented limitations:
 - Password reset is not simulated. `ForgotPassword`, `ConfirmForgotPassword` and `ChangePassword`
   are not implemented, so the `RESET_REQUIRED` status cannot be reached.
 - Unsimulated sign-up inputs are refused rather than ignored: `AnalyticsMetadata` and
-  `UserContextData` on the three client-side operations, `ForceAliasCreation` and `Session` on
-  `ConfirmSignUp`, and `ClientMetadata` on `ResendConfirmationCode`. That last one would reach the
-  custom message trigger on real Cognito, which writes the wording of a message, and no message is
-  delivered here.
-- No message is ever delivered. `SignUp` and `ResendConfirmationCode` send no confirmation code, and
-  neither reports `CodeDeliveryDetails`. `AdminCreateUser` sends no invitation, so
-  `MessageAction: SUPPRESS` is accepted and changes nothing, `RESEND` is refused, and
-  `DesiredDeliveryMediums` is refused.
+  `UserContextData` on the three client-side operations, and `ForceAliasCreation` and `Session` on
+  `ConfirmSignUp`. `ClientMetadata` is not among them on any of them: each reaches a trigger that
+  runs here.
+- No message is ever delivered. A pool records what it would have sent and `sentMessages` reads it
+  back, which real Cognito reports to nobody. Nothing leaves the simulation, and no
+  `CodeDeliveryDetails` is reported by `SignUp` or `ResendConfirmationCode`.
+- A message is recorded on three occasions: `SignUp`, `ResendConfirmationCode` and
+  `AdminCreateUser`. Password reset, MFA and the account-taken-over notices are occasions real
+  Cognito sends on and this simulation does not reach.
+- A verification message is recorded only for an attribute the pool verifies automatically, so a
+  pool with no `AutoVerifiedAttributes` records none, and only for a user that has to confirm: one a
+  `PreSignUp` handler auto-confirmed is sent nothing, as it is sent nothing on real Cognito. An invitation is recorded whatever the pool
+  verifies, and both are recorded only where the user has an `email` or a `phone_number` to be
+  reached at.
+- `DesiredDeliveryMediums` is refused. The medium comes from the attribute the message is written
+  to, so a request naming `SMS` for a user with an email address would be recorded as an email.
+  Real Cognito defaults `AdminCreateUser` to `SMS`, and this records an email where the user has an
+  address.
+- An invitation for a user created with no `TemporaryPassword` keeps the `{####}` placeholder,
+  because real Cognito generates a password there and this simulation leaves the user with none at
+  all.
+- `EmailConfiguration` and `SmsConfiguration` stay refused. A pool configured to send through SES or
+  an SNS SMS role would still only record here, and accepting the configuration would say the
+  messages went that way. The record is Cognito's own, which is what the default
+  `EmailSendingAccount` of `COGNITO_DEFAULT` sends by, and there is no simulated SES.
+- Confirming a sign-up by following a link is not simulated. A `VerificationMessageTemplate` with
+  `DefaultEmailOption: CONFIRM_WITH_LINK`, an `EmailMessageByLink` or an `EmailSubjectByLink` is
+  refused, and a `CustomMessage` event carries no `linkParameter`.
+- `VerificationMessageTemplate` wins over `EmailVerificationMessage`, `EmailVerificationSubject` and
+  `SmsVerificationMessage` where a request sets both, and each of those fills in what the template
+  left out. What real Cognito does when the two disagree was not checked against a live account.
+- The default wording, for a pool that set none, is taken from the Cognito API documentation rather
+  than read back from a live account.
+- The recorded messages are listed over HTTP at `GET /<userPoolId>/messages`, which is an endpoint
+  real Cognito does not have. It is the serving side of `sentMessages` and a divergence for the same
+  reason.
+- The `CustomEmailSender` and `CustomSMSSender` triggers are refused. Real Cognito hands those the
+  code as an AWS Encryption SDK ciphertext to decrypt through KMS, that envelope is not simulated
+  anywhere here, and a version handing over a plain code would give a handler that cannot decrypt
+  anything on real AWS.
 - A temporary password never expires. `TemporaryPasswordValidityDays` is stored on the pool and
   nothing acts on it.
 - Unsimulated `AdminCreateUser` inputs are refused rather than ignored: `DesiredDeliveryMediums`,
-  `ForceAliasCreation`, and a `MessageAction` of `RESEND`. `AdminUpdateUserAttributes` refuses
-  `ClientMetadata`, because the only trigger it would reach there is the custom message one.
+  `ForceAliasCreation`, and a `MessageAction` of `RESEND`, which invites a user that already exists.
+  Its `ValidationData` and `ClientMetadata` are read, and reach the `PreSignUp` and `CustomMessage`
+  triggers. `AdminUpdateUserAttributes` refuses `ClientMetadata`, because the message an attribute
+  update would have sent is not one this simulation sends.
 - `ListUsers` refuses `Filter` and `AttributesToGet` rather than ignoring them, and lists users in
   creation order. Real Cognito chooses its own order and does not promise one.
 - `ListUsers`, `ListGroups`, `AdminListGroupsForUser` and `ListUsersInGroup` refuse a `Limit` of
@@ -2315,7 +2582,8 @@ Current documented limitations:
 - `UpdateUserPool` replaces a pool's settings rather than merging into them, as real Cognito does, so
   a setting the request leaves out goes back to the default `CreateUserPool` would have given it. It
   covers the settings this simulation models: `Policies.PasswordPolicy`, `DeletionProtection`,
-  `AdminCreateUserConfig.AllowAdminCreateUserOnly`, `AutoVerifiedAttributes` and `LambdaConfig`.
+  `AdminCreateUserConfig.AllowAdminCreateUserOnly`, `AutoVerifiedAttributes`, `LambdaConfig` and the
+  verification wording.
   `PoolName` is refused, so a pool cannot be renamed, and every input `CreateUserPool` refuses is
   refused here too, in the same words.
 - `UpdateUserPoolClient` replaces an app client's settings the same way, so a setting the request
@@ -2326,12 +2594,12 @@ Current documented limitations:
   on real Cognito, so a client created without a secret never gains one.
 - A redeployed template reaches neither update. Sim CloudFormation replaces a resource whose
   resolved template entry changed rather than updating it in place, whatever the resource type.
-- `PreSignUp`, `PostConfirmation`, `PreAuthentication`, `PostAuthentication` and
-  `PreTokenGeneration` are the only Lambda triggers that run. Every other `LambdaConfig` key is
+- `PreSignUp`, `PostConfirmation`, `PreAuthentication`, `PostAuthentication`, `PreTokenGeneration`
+  and `CustomMessage` are the only Lambda triggers that run. Every other `LambdaConfig` key is
   refused when the pool is created or updated, naming the trigger, because a pool that accepted one
-  would never call the function the template named. The message triggers wait on the messages this
-  simulation does not deliver; the custom challenge triggers would need a challenge loop it does not
-  have; and the migration and federation triggers have no external directory to reach.
+  would never call the function the template named. The custom challenge triggers would need a
+  challenge loop this simulation does not have, and the migration and federation triggers have no
+  external directory to reach.
 - `AdminCreateUser` does not fire `PostConfirmation`, here or on real Cognito. It is the tempting
   place to hang the trigger and the wrong one: a project relying on it would pass here and write
   nothing in production.
@@ -2369,20 +2637,23 @@ Current documented limitations:
 - `ClientMetadata` reaches `PreTokenGeneration` from `RespondToAuthChallenge` and
   `AdminRespondToAuthChallenge` alone, as it does on real Cognito. A refresh accepts one and it
   reaches nothing.
+- A `CustomMessage` event reports `CLIENT_ID_NOT_APPLICABLE` as its `callerContext.clientId` for an
+  `AdminCreateUser`, as real Cognito does for an admin operation, and names the app client for the
+  two occasions that come through one.
 - Unsimulated `CreateUserPool` inputs are refused rather than ignored: `UsernameAttributes`,
   `AliasAttributes`, `Schema`, `UsernameConfiguration`,
   `UserAttributeUpdateSettings`, `DeviceConfiguration`, `UserPoolAddOns`, `KeyConfiguration`,
   `IssuerConfiguration`, `UserPoolTags`, the email and SMS configurations, an
   `SmsAuthenticationMessage`, an `MfaConfiguration` other than `OFF`, a `UserPoolTier` other than
   `ESSENTIALS`, a `SignInPolicy`, and a `PasswordHistorySize`.
-- `AccountRecoverySetting`, `EmailVerificationMessage`, `EmailVerificationSubject`,
-  `SmsVerificationMessage` and `VerificationMessageTemplate` are accepted at one value each and
-  refused at any other. Nothing here reads any of them. They are accepted so a CDK stack deploys,
-  and reported back by `DescribeUserPool` so what the template declared stays visible. The accepted
-  values are in "Properties accepted without being simulated" above.
+- `AccountRecoverySetting` is accepted at one value and refused at any other. Nothing here reads it,
+  because there is no `ForgotPassword`. It is accepted so a CDK stack deploys, and reported back by
+  `DescribeUserPool` so what the template declared stays visible. The accepted value is in
+  "Properties accepted without being simulated" above.
 - `AdminCreateUserConfig.AllowAdminCreateUserOnly` is acted on, and the two keys beside it are
-  refused: `InviteMessageTemplate` and `UnusedAccountValidityDays` are both about the invitation an
-  admin-created user is sent, and no message is delivered here.
+  refused. `InviteMessageTemplate` is the wording of the invitation, and a pool cannot set its own
+  yet, so an invitation is recorded at Cognito's default wording. `UnusedAccountValidityDays`
+  expires a temporary password, and nothing here expires one.
 - `UsernameAttributes` is worth calling out among those. A pool that signs users in by email or phone
   number stores a generated UUID as the username, so a pool created here without that would answer
   with the wrong username and the right one on real AWS.

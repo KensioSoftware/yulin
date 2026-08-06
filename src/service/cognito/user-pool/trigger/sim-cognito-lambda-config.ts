@@ -17,6 +17,7 @@ export interface SimCognitoLambdaConfigType {
   readonly PreAuthentication?: string | undefined;
   readonly PostAuthentication?: string | undefined;
   readonly PreTokenGeneration?: string | undefined;
+  readonly CustomMessage?: string | undefined;
 }
 
 /**
@@ -25,7 +26,7 @@ export interface SimCognitoLambdaConfigType {
  * A trigger is held as the function ARN the request named, and nothing is
  * looked up here: the function is resolved when the trigger fires, so a pool
  * can be created before the function it names and a function deleted
- * afterwards fails the sign-in rather than the pool.
+ * afterwards fails the request rather than the pool.
  *
  * Every other `LambdaConfig` key real Cognito has is refused, naming the
  * trigger and saying why, so a pool never quietly drops one. That is the whole

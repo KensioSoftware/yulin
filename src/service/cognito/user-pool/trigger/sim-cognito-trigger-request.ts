@@ -1,5 +1,9 @@
+import {
+  simCognitoCodeParameter,
+  simCognitoUsernameParameter,
+} from "../message/sim-cognito-message-placeholders.js";
 import type { SimCognitoTriggerContext } from "./sim-cognito-trigger-context.js";
-import type { SimCognitoTriggerName } from "./sim-cognito-trigger-name.js";
+import { SimCognitoTriggerOccasion } from "./sim-cognito-trigger-occasion.js";
 
 /**
  * The `request` half of the event one trigger is given.
@@ -18,10 +22,13 @@ export class SimCognitoTriggerRequest {
   }
 
   /**
-   * The request for one trigger.
+   * The request for one occasion.
+   *
+   * Only `CustomMessage` reads the occasion rather than the trigger: it covers
+   * three of them, and the invitation is the one that names the user.
    */
-  document(trigger: SimCognitoTriggerName): object {
-    switch (trigger) {
+  document(occasion: SimCognitoTriggerOccasion): object {
+    switch (occasion.trigger) {
       case "PreSignUp": {
         return this.preSignUp();
       }
@@ -36,6 +43,9 @@ export class SimCognitoTriggerRequest {
       }
       case "PreTokenGeneration": {
         return this.preTokenGeneration();
+      }
+      case "CustomMessage": {
+        return this.customMessage(occasion);
       }
     }
   }
@@ -89,6 +99,29 @@ export class SimCognitoTriggerRequest {
    */
   private postConfirmation(): object {
     return { userAttributes: this.userAttributes(), ...this.clientMetadata() };
+  }
+
+  /**
+   * What a `CustomMessage` handler is given.
+   *
+   * `codeParameter` is the placeholder rather than the code, as it is on real
+   * Cognito: a handler writes it into the message it returns and the code goes
+   * in afterwards. `usernameParameter` is there for the invitation an
+   * administrator's user is sent, which is the message that names the user.
+   *
+   * There is no `linkParameter`. Real Cognito passes one for a pool verifying
+   * by link, and `CONFIRM_WITH_LINK` is refused here, so a handler given one
+   * would be writing a link into a message no simulation ever follows.
+   */
+  private customMessage(occasion: SimCognitoTriggerOccasion): object {
+    return {
+      userAttributes: this.userAttributes(),
+      codeParameter: simCognitoCodeParameter,
+      ...(occasion === SimCognitoTriggerOccasion.customMessageAdminCreateUser && {
+        usernameParameter: simCognitoUsernameParameter,
+      }),
+      ...this.clientMetadata(),
+    };
   }
 
   private preAuthentication(): object {

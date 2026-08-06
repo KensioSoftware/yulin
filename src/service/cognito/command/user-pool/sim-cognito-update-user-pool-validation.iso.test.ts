@@ -58,13 +58,13 @@ const refusedInputs: readonly RefusedInput[] = [
     says: "a password the user has used before",
   },
   {
-    label: "LambdaConfig CustomMessage",
+    label: "LambdaConfig UserMigration",
     input: {
       LambdaConfig: {
-        CustomMessage: "arn:aws:lambda:eu-west-2:1:function:f",
+        UserMigration: "arn:aws:lambda:eu-west-2:1:function:f",
       },
     },
-    says: "writing the wording of a message the pool sends",
+    says: "importing a user from an external directory on first sign-in",
   },
   {
     label: "UserAttributeUpdateSettings",
@@ -134,16 +134,11 @@ const refusedInputs: readonly RefusedInput[] = [
     says: "multi-factor authentication messages",
   },
   {
-    label: "VerificationMessageTemplate",
+    label: "VerificationMessageTemplate DefaultEmailOption",
     input: {
       VerificationMessageTemplate: { DefaultEmailOption: "CONFIRM_WITH_LINK" },
     },
-    says: "the wording of a verification message",
-  },
-  {
-    label: "EmailVerificationMessage",
-    input: { EmailVerificationMessage: "Your code is {####}" },
-    says: "the wording of a verification message",
+    says: "confirming a sign-up by following a link",
   },
 ];
 

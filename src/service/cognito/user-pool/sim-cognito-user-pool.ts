@@ -6,6 +6,8 @@ import { SimCognitoUserPoolClientStore } from "./client/sim-cognito-user-pool-cl
 import type { SimCognitoGroup } from "./group/sim-cognito-group.js";
 import type { SimCognitoGroupName } from "./group/sim-cognito-group-name.js";
 import { SimCognitoGroupStore } from "./group/sim-cognito-group-store.js";
+import type { SimCognitoSentMessage } from "./message/sim-cognito-sent-message.js";
+import { SimCognitoSentMessageStore } from "./message/sim-cognito-sent-message-store.js";
 import type { SimCognitoName } from "./sim-cognito-name.js";
 import type { SimCognitoUserPoolArn } from "./sim-cognito-user-pool-arn.js";
 import {
@@ -50,6 +52,13 @@ export class SimCognitoUserPool {
    * The sign-ins part way through this pool, and the tokens it has issued.
    */
   public readonly auth = new SimCognitoPoolAuth();
+
+  /**
+   * The messages this pool would have sent. Nothing here delivers one, and
+   * real Cognito reports its messages to nobody, so this is the simulator's
+   * own record of what a user would have been sent.
+   */
+  public readonly messages = new SimCognitoSentMessageStore();
 
   private readonly clock: SimClock;
   private readonly clientStore = new SimCognitoUserPoolClientStore();
@@ -240,6 +249,11 @@ export class SimCognitoUserPool {
   confirmationCode(username: string): string | undefined {
     return this.requireUser(requireSimCognitoUsername(username))
       .confirmationCode;
+  }
+
+  /** Every message this pool would have sent, oldest first. */
+  sentMessages(): readonly SimCognitoSentMessage[] {
+    return this.messages.all;
   }
 
   /**

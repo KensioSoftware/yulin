@@ -210,7 +210,8 @@ describe("sim Cognito user validation", () => {
       );
     });
 
-    // Then it is refused, because Lambda triggers are not simulated.
+    // Then it is refused: the trigger that would have read it is not one this
+    // simulation runs.
     assertInstanceOf(error, SimCognitoInvalidParameterException);
     assertStringIncludes(error.message, "ClientMetadata");
   });

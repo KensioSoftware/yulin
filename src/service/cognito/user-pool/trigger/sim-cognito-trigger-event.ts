@@ -71,9 +71,7 @@ export class SimCognitoTriggerEvent {
         clientId: this.context.client?.id ?? adminCallerClientId,
       },
       triggerSource: occasion.source,
-      request: new SimCognitoTriggerRequest(this.context).document(
-        occasion.trigger,
-      ),
+      request: new SimCognitoTriggerRequest(this.context).document(occasion),
       response: SimCognitoTriggerEvent.response(occasion.trigger),
     };
   }

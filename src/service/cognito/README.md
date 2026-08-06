@@ -4,8 +4,8 @@ This directory contains the simulated Cognito user pools implementation. Cognito
 which exchange a token for AWS credentials, are a separate service and are not simulated at all.
 
 The pool, the app client, the users and groups in it, self-service sign-up, the sign-in flows on
-both sides of the API, the tokens it issues and the authorizer are all here. SRP, the hosted UI,
-MFA, password resets and device tracking are not.
+both sides of the API, the messages it would have sent, the tokens it issues and the authorizer are
+all here. SRP, the hosted UI, MFA, password resets and device tracking are not.
 
 ## Entry points
 
@@ -32,11 +32,11 @@ real Cognito: deleting a pool takes its clients with it, and a client id means n
 pool that issued it.
 
 `SimCognitoUserPoolSettings` holds the settings a request can change: the password policy, the
-deletion protection, whether users may sign themselves up, what confirming a sign-up verifies, and
-the Lambda triggers the pool runs. `CreateUserPool` and `UpdateUserPool` both build one out of their
-own request, and an update swaps the pool's for it. That is what makes an update replace rather than
-merge, and it is where the pool's `LastModifiedDate` moves. Each takes the operation name, so a
-refusal from inside the settings names the request it came from.
+deletion protection, whether users may sign themselves up, what confirming a sign-up verifies, the
+Lambda triggers the pool runs, and what its messages say. `CreateUserPool` and `UpdateUserPool` both
+build one out of their own request, and an update swaps the pool's for it. That is what makes an
+update replace rather than merge, and it is where the pool's `LastModifiedDate` moves. Each takes the
+operation name, so a refusal from inside the settings names the request it came from.
 
 `makeSimCognitoUserPoolId` builds the `<region>_<nine characters>` form. The region is part of the id
 rather than decoration: SDK code splits a pool id on the underscore to work out which region to talk
@@ -128,6 +128,37 @@ simulation does not.
 characters, and no whitespace. Cognito gives both the same rule, so it lives in one place and
 `requireSimCognitoUsername` and `requireSimCognitoGroupName` each name their own field in the
 refusal.
+
+## Message model
+
+Message state lives under `user-pool/message/`, and the pool owns the messages it would have sent
+the way it owns its users.
+
+`SimCognitoSentMessage` is one recorded message: who it was for, where it would have gone, by which
+medium, what it said and what the pool was doing when it sent it. `SimCognitoSentMessageStore` holds
+them in order, and `SimCognitoUserPool.sentMessages` is where a test reads them. Nothing is
+delivered, so this record is the whole of what a message is here. It is Cognito's own delivery
+rather than a simulated SES: real Cognito with the default `EmailSendingAccount` of
+`COGNITO_DEFAULT` sends through no other service, and `EmailConfiguration` is refused, so no pool is
+configured for a delivery this would misrepresent.
+
+`SimCognitoPoolMessenger` is what the sign-up and user commands ask to send. It resolves where the
+message goes, runs the pool's `CustomMessage` trigger, and records what is left. The steps are
+separate collaborators because each is a different question: `SimCognitoMessageDelivery` is where
+and by what medium, `simCognitoOccasionWording` is what the pool says, `SimCognitoCustomMessage` is
+what a handler said instead, and `SimCognitoMessagePlaceholders` fills in the code and the username
+last, so that what a handler wrote carries them too.
+
+`SimCognitoVerificationMessages` is the wording a pool was created with. It is a pool setting rather
+than a value accepted and reported, because the recorded message is what it says.
+`VerificationMessageTemplate` wins over the three older inputs, each of which fills in what the
+template left out. Confirming by link is refused in
+`SimCognitoUnsimulatedUserPoolMessaging` instead, so what reaches the settings is always wording for
+a code.
+
+`SimCognitoMessageOccasion` is the three occasions a message is sent on, and it is what a
+`CustomMessage` `triggerSource` is built from. It is a leaf module so that both the trigger and the
+message sides can name an occasion without depending on each other.
 
 ## Group model
 
@@ -234,6 +265,10 @@ authentication: `/<userPoolId>/.well-known/jwks.json` and
 serving layer dispatches to, `SimCognitoOpenIdConfiguration` builds the discovery document, and
 `SimCognitoEndpointResponse` builds the responses. The Cognito API itself is not served: an SDK
 client reaches the simulator through `SimSdk`.
+
+`/<userPoolId>/messages` is served alongside them, and real Cognito has no such endpoint. It is the
+serving side of `SimCognitoUserPool.sentMessages`, so a browser or a curl can read what a pool would
+have sent during local development, and it is a divergence for the same reason that accessor is one.
 
 The request hostname is `cognito-idp.<region>`, which names the regional endpoint rather than one
 pool, so the pool id comes from the path. That id says nothing about the Account that owns the pool,
@@ -436,8 +471,17 @@ resource, here or on real AWS.
   past is what produces a token such a verifier refuses.
 - `UpdateGroup` replaces all three group properties rather than merging an omitted one.
 - A password is held so a user can sign in with it, and nothing reads one back.
-- No message is delivered, so `AdminCreateUser` accepts `MessageAction: SUPPRESS` and refuses
-  `RESEND` and `DesiredDeliveryMediums`.
+- No message is delivered. A pool records what it would have sent, and `SimCognitoUserPool.
+sentMessages` reads it back, which real Cognito reports to nobody. `AdminCreateUser` records an
+  invitation, so `MessageAction: SUPPRESS` records none, and `RESEND` and `DesiredDeliveryMediums`
+  are refused.
+- A verification message is recorded only for an attribute the pool verifies automatically, and only
+  where the user has an `email` or a `phone_number` to be reached at.
+- An invitation for a user created with no `TemporaryPassword` keeps the `{####}` placeholder: real
+  Cognito generates a password there, and this leaves the user with none at all.
+- Confirming a sign-up by following a link is refused, so a `CustomMessage` event carries no
+  `linkParameter`, and the `CustomEmailSender` and `CustomSMSSender` triggers are refused because
+  the AWS Encryption SDK envelope they decrypt is not simulated anywhere here.
 - Listings are in creation order and carry no filtering. `ListUsers` refuses a `Filter` rather than
   dropping it, because a dropped filter answers with the wrong users rather than with an error.
 

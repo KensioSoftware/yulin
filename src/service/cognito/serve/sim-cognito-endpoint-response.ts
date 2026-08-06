@@ -38,7 +38,7 @@ export class SimCognitoEndpointResponse {
   /**
    * Refuse a method that does not read a published document.
    *
-   * Both endpoints publish a document, so `GET` and `HEAD` are all they
+   * Every path here publishes a document, so `GET` and `HEAD` are all they
    * answer. The Cognito API is reached through `SimSdk` rather than by posting
    * to this hostname, so a `POST` here is not the API either.
    */
@@ -47,7 +47,8 @@ export class SimCognitoEndpointResponse {
       {
         message:
           `Simulated Cognito answers ${method} at no user pool endpoint. ` +
-          `The JWKS and the OpenID configuration are read with GET.`,
+          `The JWKS, the OpenID configuration and the recorded messages are ` +
+          `read with GET.`,
       },
       { status: 405, headers: { allow: "GET, HEAD" } },
     );

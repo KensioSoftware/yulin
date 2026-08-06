@@ -1,6 +1,5 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
-import { SimCognitoPasswordCheck } from "../../user-pool/sim-cognito-password-check.js";
-import type { SimCognitoUserPool } from "../../user-pool/sim-cognito-user-pool.js";
+import type { SimCognitoPoolMessenger } from "../../user-pool/message/sim-cognito-pool-messenger.js";
 import { SimCognitoTriggerOccasion } from "../../user-pool/trigger/sim-cognito-trigger-occasion.js";
 import type { SimCognitoUserPoolTriggers } from "../../user-pool/trigger/sim-cognito-user-pool-triggers.js";
 import type { SimCognitoUserFactory } from "../../user-pool/user/sim-cognito-user-factory.js";
@@ -22,6 +21,7 @@ interface SimCognitoUserCommandsProperties {
   readonly resolver: SimCognitoRequestResolver;
   readonly userFactory: SimCognitoUserFactory;
   readonly triggers: SimCognitoUserPoolTriggers;
+  readonly messenger: SimCognitoPoolMessenger;
 }
 
 interface SimCognitoCommandOptions {
@@ -38,6 +38,7 @@ export class SimCognitoUserCommands {
   private readonly resolver: SimCognitoRequestResolver;
   private readonly userFactory: SimCognitoUserFactory;
   private readonly triggers: SimCognitoUserPoolTriggers;
+  private readonly messenger: SimCognitoPoolMessenger;
   private readonly view = new SimCognitoUserView();
   private readonly unsimulatedOptions = new SimCognitoUnsimulatedUserOptions();
 
@@ -45,29 +46,7 @@ export class SimCognitoUserCommands {
     this.resolver = properties.resolver;
     this.userFactory = properties.userFactory;
     this.triggers = properties.triggers;
-  }
-
-  /**
-   * Read the temporary password the request named, or none.
-   *
-   * A request naming none is fine, and leaves the user with no password at
-   * all: real Cognito generates one and sends it to the user, and nothing
-   * here delivers a message for the user to read it from. Such a user reaches
-   * the `NEW_PASSWORD_REQUIRED` challenge with no password to get past it, so
-   * name a `TemporaryPassword` when the test means to sign in.
-   */
-  private static allowedTemporaryPassword(
-    pool: SimCognitoUserPool,
-    temporaryPassword: string | undefined,
-  ): string | undefined {
-    if (temporaryPassword === undefined) {
-      return undefined;
-    }
-
-    return new SimCognitoPasswordCheck(pool.settings.passwordPolicy).require(
-      "TemporaryPassword",
-      temporaryPassword,
-    );
+    this.messenger = properties.messenger;
   }
 
   /**
@@ -76,7 +55,8 @@ export class SimCognitoUserCommands {
    * The user is left in `FORCE_CHANGE_PASSWORD`, as real Cognito leaves an
    * admin-created user: it has a temporary password and cannot sign in until
    * that password is replaced. `AdminSetUserPassword` with `Permanent: true`
-   * is what moves it on.
+   * is what moves it on. A request naming no `TemporaryPassword` leaves the
+   * user with no password at all, so name one when the test means to sign in.
    *
    * The pool's `PreSignUp` trigger runs before the user is added, reporting
    * `PreSignUp_AdminCreateUser`, so a handler that throws leaves the pool
@@ -88,6 +68,11 @@ export class SimCognitoUserCommands {
    * `PostConfirmation` does not run, here or on real Cognito. It fires for
    * users who sign themselves up, and an admin-created user never confirms
    * anything.
+   *
+   * The pool records the invitation it would have sent, carrying the temporary
+   * password, unless the request asked for `MessageAction: SUPPRESS`. That is
+   * what makes suppressing mean something here rather than being accepted and
+   * changing nothing.
    */
   async create(
     command: SimAdminCreateUserCommand,
@@ -106,10 +91,8 @@ export class SimCognitoUserCommands {
     const user = this.userFactory.make({
       username,
       attributes: input.UserAttributes,
-      temporaryPassword: SimCognitoUserCommands.allowedTemporaryPassword(
-        pool,
-        input.TemporaryPassword,
-      ),
+      temporaryPassword: input.TemporaryPassword,
+      passwordPolicy: pool.settings.passwordPolicy,
     });
 
     await this.triggers.preSignUp(SimCognitoTriggerOccasion.adminCreateUser, {
@@ -123,6 +106,16 @@ export class SimCognitoUserCommands {
     });
 
     pool.addUser(user);
+
+    if (input.MessageAction !== "SUPPRESS") {
+      await this.messenger.send({
+        pool,
+        user,
+        occasion: "AdminCreateUser",
+        code: input.TemporaryPassword,
+        clientMetadata: input.ClientMetadata,
+      });
+    }
 
     return { $metadata: {}, User: this.view.entry(user) };
   }

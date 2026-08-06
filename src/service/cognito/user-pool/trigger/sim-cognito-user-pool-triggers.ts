@@ -1,5 +1,6 @@
 import type { SimCognitoClaimsOverride } from "../token/sim-cognito-claims-override.js";
 import { SimCognitoClaimsOverrideReader } from "../token/sim-cognito-claims-override-reader.js";
+import { SimCognitoCustomMessage } from "./sim-cognito-custom-message.js";
 import { SimCognitoPreSignUpResponse } from "./sim-cognito-pre-sign-up-response.js";
 import type { SimCognitoTriggerContext } from "./sim-cognito-trigger-context.js";
 import type { SimCognitoTriggerFunctions } from "./sim-cognito-trigger-functions.js";
@@ -57,6 +58,24 @@ export class SimCognitoUserPoolTriggers {
    */
   async postConfirmation(context: SimCognitoTriggerContext): Promise<void> {
     await this.invocation.run(SimCognitoTriggerOccasion.confirmSignUp, context);
+  }
+
+  /**
+   * Run the `CustomMessage` trigger, if the pool has one, and read what it
+   * wrote.
+   *
+   * This runs before the message is recorded, so a handler that throws leaves
+   * the pool with no message rather than with the wording it was about to use.
+   * A pool without the trigger, and a handler that wrote nothing, both read as
+   * having left the pool's own wording alone.
+   */
+  async customMessage(
+    occasion: SimCognitoTriggerOccasion,
+    context: SimCognitoTriggerContext,
+  ): Promise<SimCognitoCustomMessage> {
+    return new SimCognitoCustomMessage(
+      await this.invocation.run(occasion, context),
+    );
   }
 
   /**

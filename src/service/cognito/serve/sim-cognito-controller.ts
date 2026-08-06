@@ -14,6 +14,21 @@ import { SimCognitoOpenIdConfiguration } from "./sim-cognito-openid-configuratio
 const wellKnownSegment = ".well-known";
 
 /**
+ * The path segment the recorded messages are listed under.
+ *
+ * Real Cognito serves nothing here. It is the serving side of
+ * `SimCognitoUserPool.sentMessages`, so that a browser or a curl can read what
+ * a pool would have sent during local development, and it is a divergence for
+ * the same reason that accessor is one: nothing here delivers a message.
+ */
+const messagesSegment = "messages";
+
+/**
+ * The segments a request can name after the pool id.
+ */
+const servedSegments = new Set([wellKnownSegment, messagesSegment]);
+
+/**
  * The methods a published document is read with.
  */
 const readMethods = new Set(["GET", "HEAD"]);
@@ -23,13 +38,28 @@ interface SimCognitoServiceControllerProperties {
 }
 
 /**
- * Localhost HTTP controller for the public endpoints of a simulated user pool.
+ * The parts of a request that decide which document it is asking for.
+ */
+interface SimCognitoServedRequest {
+  readonly segment: string;
+  readonly document: string | undefined;
+  readonly url: URL;
+  readonly method: string;
+}
+
+/**
+ * Localhost HTTP controller for the public endpoints of a simulated user pool,
+ * and for the messages the pool would have sent.
  *
  * Real Cognito serves a pool's JWKS and its OpenID configuration to anyone,
  * with no SigV4 signature, because a token verifier holding no AWS credentials
  * has to be able to fetch them. Both are anonymous here for the same reason,
  * so a verifier pointed at the local URL fetches keys the way it does against
  * real Cognito rather than being handed them.
+ *
+ * The recorded messages are listed at `/<userPoolId>/messages`, which real
+ * Cognito serves nothing at. Nothing here delivers a message, so this is where
+ * one is read during local development.
  *
  * The Cognito API itself is not served. An SDK client reaches the simulator
  * through `SimSdk` rather than through an endpoint override.
@@ -59,17 +89,18 @@ export class SimCognitoServiceController implements SimAwsServiceController {
       return this.response.notRead(request.method);
     }
 
-    // A path is exactly '<userPoolId>/.well-known/<document>'. Anything
-    // longer is a path real Cognito has nothing at, rather than a prefix of
-    // one it serves.
-    const [userPoolId, wellKnown, document, ...rest] = url.pathname
+    // A path is exactly '<userPoolId>/.well-known/<document>' or
+    // '<userPoolId>/messages'. Anything longer is a path nothing is served at,
+    // rather than a prefix of one that is.
+    const [userPoolId, segment, document, ...rest] = url.pathname
       .slice(1)
       .split("/");
 
     if (
       userPoolId === undefined ||
       userPoolId.length === 0 ||
-      wellKnown !== wellKnownSegment ||
+      segment === undefined ||
+      !servedSegments.has(segment) ||
       rest.length > 0
     ) {
       return this.response.noSuchEndpoint(url.pathname);
@@ -81,14 +112,38 @@ export class SimCognitoServiceController implements SimAwsServiceController {
       return this.response.noSuchUserPool(userPoolId);
     }
 
+    return this.served(pool, {
+      segment,
+      document,
+      url,
+      method: request.method,
+    });
+  }
+
+  /**
+   * The document a request names, or nothing served at that path.
+   */
+  private served(
+    pool: SimCognitoUserPool,
+    request: SimCognitoServedRequest,
+  ): Response {
+    const { segment, document, url, method } = request;
+
+    if (segment === messagesSegment && document === undefined) {
+      return this.response.document(
+        { messages: pool.sentMessages().map((message) => message.toOutput()) },
+        method,
+      );
+    }
+
     if (document === "jwks.json") {
-      return this.response.document(pool.jwks(), request.method);
+      return this.response.document(pool.jwks(), method);
     }
 
     if (document === "openid-configuration") {
       return this.response.document(
         this.openIdConfiguration.document(pool, url.origin),
-        request.method,
+        method,
       );
     }
 

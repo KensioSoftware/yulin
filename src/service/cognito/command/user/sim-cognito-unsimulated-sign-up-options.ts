@@ -53,17 +53,11 @@ export class SimCognitoUnsimulatedSignUpOptions {
   /**
    * Refuse a `ResendConfirmationCode` request this simulation cannot honour.
    *
-   * `ClientMetadata` is still refused here. The only trigger it would reach on
-   * this operation is the custom message one, which writes the wording of a
-   * message, and no message is ever delivered here.
+   * `ClientMetadata` is not among them. It reaches the custom message trigger,
+   * which runs here, so it reaches the handler.
    */
   refuseInResend(input: SimCognitoSignUpCommandInput): void {
     this.refuseAppContext(this.resendInput, input);
-    this.resendInput.refuse(
-      "ClientMetadata",
-      input.ClientMetadata,
-      "passing data to the custom message Lambda trigger",
-    );
   }
 
   /**

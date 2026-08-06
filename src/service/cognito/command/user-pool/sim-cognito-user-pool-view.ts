@@ -13,8 +13,9 @@ export class SimCognitoUserPoolView {
    * A pool as `CreateUserPool` and `DescribeUserPool` report it.
    *
    * The settings the pool accepted without acting on are reported back as
-   * the request set them, so a template's declaration stays visible. Nothing
-   * here reads any of them.
+   * the request set them, so a template's declaration stays visible. The
+   * verification wording is reported the same way, and that one the pool does
+   * read: it is what the messages it records say.
    *
    * `LambdaConfig` is reported only by a pool that was created with one, and
    * carries the triggers that pool runs.
@@ -43,6 +44,7 @@ export class SimCognitoUserPoolView {
       CreationDate: pool.creationDate,
       LastModifiedDate: pool.lastModifiedDate,
       ...pool.settings.unsimulated.toOutput(),
+      ...pool.settings.verificationMessages.toOutput(),
     };
   }
 
