@@ -9,6 +9,7 @@ import {
 import { describe, it } from "vitest";
 import { SimCfnResource } from "../../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../../cloudformation/template/value/sim-cfn-template-value.js";
+import { simRoute53RecordTypes } from "../../../record/sim-route53-record.js";
 import { SimCfnRoute53RecordSetBuilder } from "./sim-cfn-r53-record-set-builder.js";
 
 describe("SimCfnRoute53RecordSetBuilder", () => {
@@ -83,10 +84,8 @@ describe("SimCfnRoute53RecordSetBuilder", () => {
   });
 
   it("accepts all supported Route53 record types", () => {
-    // Given every record type supported by the builder.
-    const supportedTypes = ["A", "AAAA", "CNAME", "TXT", "NS", "SOA"] as const;
-
-    for (const type of supportedTypes) {
+    // Given every record type the simulator stores.
+    for (const type of simRoute53RecordTypes) {
       // When the RecordSet is built.
       const recordSet = buildRecordSet({
         Name: `${type.toLowerCase()}.example.com`,
@@ -116,8 +115,9 @@ describe("SimCfnRoute53RecordSetBuilder", () => {
   });
 
   it("throws when Type is not a supported Route53 record type", () => {
-    // Given RecordSets with invalid Type values.
-    const invalidTypes = [undefined, "MX", "a", 123, null];
+    // Given RecordSets with invalid Type values, including a real Route53 type
+    // the simulator does not model.
+    const invalidTypes = [undefined, "DS", "a", 123, null];
 
     for (const type of invalidTypes) {
       // When the RecordSet is built.

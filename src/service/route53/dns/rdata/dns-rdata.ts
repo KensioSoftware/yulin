@@ -1,4 +1,4 @@
-import type { SimRoute53RecordType } from "../../record/sim-route53-record.js";
+import type { SimRoute53DnsRecordType } from "../dns-record-type.js";
 import { encodeDnsName } from "../wire/dns-name.js";
 import { encodeDnsAaaaRdata, encodeDnsARdata } from "./dns-address-rdata.js";
 import { encodeDnsSoaRdata } from "./dns-soa-rdata.js";
@@ -11,7 +11,7 @@ import { encodeDnsTxtRdata } from "./dns-text-rdata.js";
  * name encoder rather than having wrappers of their own.
  */
 export function encodeDnsRdata(
-  recordType: SimRoute53RecordType,
+  recordType: SimRoute53DnsRecordType,
   value: string,
 ): Uint8Array {
   switch (recordType) {

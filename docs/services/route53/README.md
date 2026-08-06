@@ -251,6 +251,98 @@ await simAws.backgroundTasksComplete();
 
 The stored alias value is normalized without the trailing dot.
 
+## Record types
+
+Sim Route53 stores ten record types: `A`, `AAAA`, `CAA`, `CNAME`, `MX`, `NS`, `PTR`, `SOA`, `SRV` and
+`TXT`. All ten can be created through `ChangeResourceRecordSetsCommand`, read back through
+`ListResourceRecordSetsCommand`, and declared as an `AWS::Route53::RecordSet`, so a zone that models
+a real one — mail records, certificate pinning, a service record — deploys as it stands. A type
+outside that list is rejected rather than stored.
+
+Simulated DNS answers queries for six of them: `A`, `AAAA`, `CNAME`, `TXT`, `NS` and `SOA`. `MX`,
+`SRV`, `CAA` and `PTR` are stored for a test to assert the presence and value of, not for a resolver
+to act on, so a DNS query for one is answered as no data. See
+[What is answered](#what-is-answered).
+
+Values of those four are stored exactly as written, along with `TXT`. Nothing takes an `MX`
+preference number or an `SRV` priority apart, so what you assert on is the string your stack
+declared. Values of the other types are hostnames or addresses, and are normalized like DNS names so
+they compare consistently.
+
+```typescript sim-route53-mail-records
+/**
+ * Creating simulated Route53 records a resolver never answers for.
+ */
+
+import {
+  ChangeResourceRecordSetsCommand,
+  CreateHostedZoneCommand,
+  ListResourceRecordSetsCommand,
+} from "@aws-sdk/client-route-53";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const route53 = simAws.route53();
+
+const hostedZoneCreation = await route53.createHostedZone(
+  new CreateHostedZoneCommand({
+    Name: "example.test",
+    CallerReference: "mail-zone",
+  }),
+);
+
+const hostedZoneId = hostedZoneCreation.HostedZone!.Id!;
+
+await simAws.backgroundTasksComplete();
+
+await route53.changeResourceRecordSets(
+  new ChangeResourceRecordSetsCommand({
+    HostedZoneId: hostedZoneId,
+    ChangeBatch: {
+      Changes: [
+        {
+          Action: "CREATE",
+          ResourceRecordSet: {
+            Name: "example.test",
+            Type: "MX",
+            TTL: 3600,
+            ResourceRecords: [
+              { Value: "10 in1-smtp.messagingengine.com." },
+              { Value: "20 in2-smtp.messagingengine.com." },
+            ],
+          },
+        },
+        {
+          Action: "CREATE",
+          ResourceRecordSet: {
+            Name: "example.test",
+            Type: "CAA",
+            TTL: 300,
+            ResourceRecords: [{ Value: '0 issue "letsencrypt.org"' }],
+          },
+        },
+      ],
+    },
+  }),
+);
+
+await simAws.backgroundTasksComplete();
+
+const listOutput = await route53.listResourceRecordSets(
+  new ListResourceRecordSetsCommand({
+    HostedZoneId: hostedZoneId,
+  }),
+);
+
+const mailRecord = listOutput.ResourceRecordSets?.find(
+  (recordSet) => recordSet.Type === "MX",
+);
+
+// [ '10 in1-smtp.messagingengine.com.', '20 in2-smtp.messagingengine.com.' ]
+console.log(mailRecord?.ResourceRecords?.map((record) => record.Value));
+```
+
 ## Listing Hosted Zones by name
 
 Use `ListHostedZonesByNameCommand` to inspect zones in sorted Route53 order.
@@ -572,7 +664,11 @@ server answers for those names too: see [Local hostname resolution](#local-hostn
 
 ### What is answered
 
-- The record types sim Route53 stores: `A`, `AAAA`, `CNAME`, `TXT`, `NS` and `SOA`.
+- Six of the ten record types sim Route53 stores: `A`, `AAAA`, `CNAME`, `TXT`, `NS` and `SOA`. A
+  query for a stored type outside that list — `MX`, `SRV`, `CAA` or `PTR` — is answered as no data,
+  the same as a query type the simulator does not recognise at all. Those records exist to be
+  asserted on rather than resolved; what a browser reaching a simulated site needs is an address or
+  a CNAME. See [Record types](#record-types).
 - CNAME chains are followed, so an `A` query on a name holding a CNAME returns the CNAME and the
   address it leads to together. Chains are bounded, and a cycle stops immediately.
 - Alias records are resolved to the address of whatever they point at, answered under the name that
@@ -968,12 +1064,13 @@ Sim Route53 currently supports:
 - `CreateHostedZoneCommand`, `GetHostedZoneCommand` and `ListHostedZonesByNameCommand`
 - `ChangeResourceRecordSetsCommand` and `ListResourceRecordSetsCommand`
 - `CREATE`, `UPSERT` and `DELETE` record changes
-- Stored record types: `A`, `AAAA`, `CNAME`, `TXT`, `NS` and `SOA`
+- Stored record types: `A`, `AAAA`, `CAA`, `CNAME`, `MX`, `NS`, `PTR`, `SOA`, `SRV` and `TXT`
 - Local HTTP hostname routing through `CNAME` records that point to simulated service hostnames
 - Alias records, with `AliasTarget.DNSName` stored as the record value
 - Local hostname resolution, with or without the `sim-aws.localhost` suffix on the requested hostname
 - A browser-viewable hosted zone and record summary at `dns.sim-aws.localhost`
-- DNS answers over UDP, so records can be queried with `dig` or any DNS client
+- DNS answers over UDP for `A`, `AAAA`, `CNAME`, `TXT`, `NS` and `SOA`, so those records can be
+  queried with `dig` or any DNS client
 - The `AWS::Route53::HostedZone` and `AWS::Route53::RecordSet` CloudFormation resources
 - CDK-created Route53 Hosted Zones and records in synthesized templates
 

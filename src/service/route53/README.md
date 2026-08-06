@@ -147,14 +147,24 @@ contain distinct records such as:
 - `CNAME www.example.test`
 - `TXT example.test`
 
+`simRoute53RecordTypes` in `record/sim-route53-record.ts` is the list, and the union is derived from
+it so the guard in `sim-route53-record-type.ts` cannot drift from the type. It is wider than the set
+simulated DNS answers queries for: `MX`, `SRV`, `CAA` and `PTR` are stored, listed and deployable
+from a template so a zone can model a real one, but nothing resolves them. See
+[DNS wire format](#dns-wire-format).
+
 Record normalization is simple:
 
 - record names are normalized with Route53 local-name helpers
-- non-`TXT` record values are normalized like DNS names
-- `TXT` values are preserved as text values
+- record values go through `normaliseSimRoute53RecordValue` in
+  `record/sim-route53-record-value.ts`, which normalizes them like DNS names
+- `TXT`, `MX`, `SRV`, `CAA` and `PTR` values are preserved exactly as given
 
-DNS-like target values need consistent comparison and resolution, while TXT record values should not
-be transformed as hostnames.
+DNS-like target values need consistent comparison and resolution. A TXT value is arbitrary text, and
+the other four hold a structured string — a preference and a host, a priority, weight, port and
+target, a CAA flag, tag and value — that nothing in the simulator resolves against, so it is stored
+as written rather than taken apart or folded to a hostname. A test asserting on an `MX` record gets
+back the string its stack declared.
 
 The record store supports three mutation modes:
 
@@ -390,10 +400,15 @@ localhost test against a real client.
 
 The scope is narrow, which is what keeps the codec small:
 
-- Only the record types sim Route53 stores are encodable: `A`, `AAAA`, `CNAME`,
-  `TXT`, `NS`, `SOA`. `dns-record-type.ts` maps those to and from wire type
-  numbers, and returns `undefined` for any other query type so a caller answers
-  with no records rather than guessing at an encoding it does not have.
+- Only six of the ten stored record types are encodable: `A`, `AAAA`, `CNAME`,
+  `TXT`, `NS`, `SOA`. `dns-record-type.ts` names that subset as
+  `SimRoute53DnsRecordType`, maps it to and from wire type numbers, and returns
+  `undefined` for any other query type so a caller answers with no records rather
+  than guessing at an encoding it does not have. A stored type with no encoder,
+  such as `MX`, arrives as a wire number the map does not hold and is treated the
+  same way. Narrowing the type rather than widening the map is what keeps the
+  encoders exhaustive: adding a stored type cannot silently leave `encodeDnsRdata`
+  with a case it cannot handle.
 - **`ANY` (QTYPE 255) is a query type, not a record type**, so it
   does not map to a stored record type. `dnsAnyQueryType` is exported for a
   caller that wants to recognise it, but what to _answer_ for `ANY` is answer

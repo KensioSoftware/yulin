@@ -40,11 +40,14 @@ describe("Route53 ChangeResourceRecordSetsCommand errors", () => {
               {
                 Action: "CREATE",
                 ResourceRecordSet: {
-                  Name: "mail.unsupported-type.example.com",
-                  Type: "MX",
+                  Name: "sip.unsupported-type.example.com",
+                  Type: "NAPTR",
                   TTL: 300,
                   ResourceRecords: [
-                    { Value: "10 mail.unsupported-type.example.com" },
+                    {
+                      Value:
+                        '10 100 "S" "SIP+D2U" "" _sip._udp.unsupported-type.example.com.',
+                    },
                   ],
                 },
               },
@@ -57,7 +60,7 @@ describe("Route53 ChangeResourceRecordSetsCommand errors", () => {
     // Then validation reaches ResourceRecordSet conversion and rejects the type.
     assertIdentical(
       error.message,
-      "Unsupported ChangeResourceRecordSetsCommand.ResourceRecordSet.Type MX",
+      "Unsupported ChangeResourceRecordSetsCommand.ResourceRecordSet.Type NAPTR",
     );
     assertStringIncludes(
       error.message,

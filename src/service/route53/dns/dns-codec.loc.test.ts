@@ -7,20 +7,20 @@ import {
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import { afterAll, beforeAll, describe, it } from "vitest";
-import type { SimRoute53RecordType } from "../record/sim-route53-record.js";
 import { decodeDnsQuery } from "./dns-query.js";
 import { dnsRcodes } from "./dns-rcode.js";
 import {
   dnsInternetClass,
   dnsRecordTypeNumber,
   simRoute53RecordTypeFromNumber,
+  type SimRoute53DnsRecordType,
 } from "./dns-record-type.js";
 import { encodeDnsResponse } from "./dns-response.js";
 import { encodeDnsRdata } from "./rdata/dns-rdata.js";
 
 interface FixtureRecord {
   readonly name: string;
-  readonly type: SimRoute53RecordType;
+  readonly type: SimRoute53DnsRecordType;
   readonly value: string;
 }
 

@@ -3,6 +3,7 @@ import type {
   SimRoute53Record,
   SimRoute53RecordType,
 } from "../record/sim-route53-record.js";
+import { normaliseSimRoute53RecordValue } from "../record/sim-route53-record-value.js";
 
 export type SimRoute53RecordChangeListener = () => void;
 
@@ -128,18 +129,11 @@ function normaliseRecord(record: SimRoute53Record): SimRoute53Record {
     ...record,
     name: normaliseSimRoute53Name(record.name),
     values: record.values.map((value) =>
-      normaliseRecordValue(record.type, value),
+      normaliseSimRoute53RecordValue(record.type, value),
     ),
   };
 }
 
 function recordKey(name: string, type: SimRoute53RecordType): string {
   return `${type}:${name}`;
-}
-
-function normaliseRecordValue(
-  type: SimRoute53RecordType,
-  value: string,
-): string {
-  return type === "TXT" ? value : normaliseSimRoute53Name(value);
 }
