@@ -4,6 +4,7 @@ import path from "node:path";
 // the list because a dev script runs from source; a project that runs from its
 // build output is watching the build's inputs anyway.
 const ignoredDirectoryNames = new Set([
+  ".cache",
   ".git",
   ".idea",
   ".next",
@@ -16,10 +17,14 @@ const ignoredDirectoryNames = new Set([
   "node_modules",
 ]);
 
-// CDK writes each asset into its own directory beside the template. The
-// template is worth watching and the copies of the handler code beside it are
-// not, since their source is being watched already.
-const ignoredDirectoryPrefixes = ["asset.", ".cache"];
+// CDK writes each asset into its own directory inside its output directory.
+// The template there is worth watching and the copies of the handler code
+// beside it are not, since their source is being watched already.
+//
+// Only inside that output directory: `asset.` is an ordinary way to start the
+// name of a source file, and `src/asset.config.ts` is a file someone edits.
+const cdkOutputDirectoryName = "cdk.out";
+const cdkAssetPrefix = "asset.";
 
 // Editors write, rename and delete around the file being saved. Reacting to the
 // working files means restarting several times for one save, or restarting for
@@ -50,15 +55,20 @@ export class SimWatchIgnore {
     const fileName = segments.at(-1) ?? "";
 
     return (
-      segments.some((segment) => this.ignoredDirectory(segment)) ||
+      segments.some((segment) => ignoredDirectoryNames.has(segment)) ||
+      this.isCdkAsset(segments) ||
       editorFilePatterns.some((pattern) => pattern.test(fileName))
     );
   }
 
-  private ignoredDirectory(segment: string): boolean {
+  private isCdkAsset(segments: readonly string[]): boolean {
+    const at = segments.indexOf(cdkOutputDirectoryName);
+
     return (
-      ignoredDirectoryNames.has(segment) ||
-      ignoredDirectoryPrefixes.some((prefix) => segment.startsWith(prefix))
+      at !== -1 &&
+      segments
+        .slice(at + 1)
+        .some((segment) => segment.startsWith(cdkAssetPrefix))
     );
   }
 }

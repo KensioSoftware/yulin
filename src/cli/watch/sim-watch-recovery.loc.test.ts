@@ -3,7 +3,7 @@ import {
   assertIdentical,
   assertStringIncludes,
 } from "@kensio/smartass";
-import { describe, it } from "vitest";
+import { afterEach, describe, it } from "vitest";
 import { SimWatchArguments } from "./sim-watch-arguments.js";
 import { SimWatchReporter } from "./sim-watch-reporter.js";
 import { SimWatchSupervisor } from "./sim-watch-supervisor.js";
@@ -14,12 +14,18 @@ import {
   WatchProject,
   watchPause,
 } from "../../../test/cli/watch-project.js";
+import {
+  runSupervisor,
+  stopSupervisors,
+} from "../../../test/cli/running-supervisors.js";
 import { listenOnFreePort, serverPort } from "../../../test/serve/held-port.js";
 
 const message = (value: string): string =>
   `export const message = ${JSON.stringify(value)};`;
 
 describe("yulin watch when a run goes wrong", () => {
+  afterEach(stopSupervisors);
+
   it("keeps watching after a setup that threw", async () => {
     // Given a supervised process whose setup fails on startup
     const project = await WatchProject.of({ "message.mjs": message("broken") });
@@ -27,7 +33,7 @@ describe("yulin watch when a run goes wrong", () => {
     const reported: string[] = [];
     const supervisor = supervise(project, reported);
     await project.settled();
-    const running = supervisor.run();
+    runSupervisor(supervisor);
     await project.untilRuns(1);
     await watchPause(300);
 
@@ -38,9 +44,6 @@ describe("yulin watch when a run goes wrong", () => {
     const runs = await project.untilRuns(2);
     assertArrayEquals([...runs], ["broken", "fixed"]);
     assertStringIncludes(reported.join(""), "waiting for a change");
-
-    supervisor.interrupt();
-    await running;
   });
 
   it("refuses a process that keeps restarting itself", async () => {
@@ -77,7 +80,7 @@ describe("yulin watch when a run goes wrong", () => {
       `--inspect=${String(inspectorPort)}`,
     );
     await project.settled();
-    const running = supervisor.run();
+    runSupervisor(supervisor);
     await project.untilRuns(1);
 
     // When it restarts
@@ -87,9 +90,6 @@ describe("yulin watch when a run goes wrong", () => {
     // go of
     const runs = await project.untilRuns(2);
     assertArrayEquals([...runs], ["first inspector", "second inspector"]);
-
-    supervisor.interrupt();
-    await running;
   });
 });
 

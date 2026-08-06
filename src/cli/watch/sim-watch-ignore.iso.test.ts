@@ -25,6 +25,17 @@ describe("SimWatchIgnore", () => {
     assertTrue(!ignored);
   });
 
+  it("watches a source file whose name starts like a CDK asset", () => {
+    // Given a source file that happens to be named after what it configures
+    const ignore = new SimWatchIgnore();
+
+    // When it changes
+    const ignored = ignore.ignores("src/asset.config.ts");
+
+    // Then it is watched, since only CDK's output directory holds CDK assets
+    assertFalse(ignored);
+  });
+
   it("passes over a change that names nothing", () => {
     // Given an event that named no path at all
     const ignore = new SimWatchIgnore();

@@ -1,10 +1,14 @@
 import path from "node:path";
-import { describe, it } from "vitest";
+import { afterEach, describe, it } from "vitest";
 import { SimWatchArguments } from "./sim-watch-arguments.js";
 import { SimWatchReporter } from "./sim-watch-reporter.js";
 import { SimWatchSupervisor } from "./sim-watch-supervisor.js";
 import { repoPath } from "../../util/filesystem/path.js";
 import { WatchProject, watchPause } from "../../../test/cli/watch-project.js";
+import {
+  runSupervisor,
+  stopSupervisors,
+} from "../../../test/cli/running-supervisors.js";
 
 const yulin = repoPath("src/index.js");
 const tsx = repoPath(path.join("node_modules", ".bin", "tsx"));
@@ -15,6 +19,8 @@ const tsx = repoPath(path.join("node_modules", ".bin", "tsx"));
  * point is that the reporting happens where the path is registered.
  */
 describe("paths a supervised process reports", () => {
+  afterEach(stopSupervisors);
+
   it("watches a directory mounted into a Bucket", async () => {
     // Given a dev script that mounts a directory outside the project
     const project = await WatchProject.of({});
@@ -26,7 +32,7 @@ describe("paths a supervised process reports", () => {
     );
     const supervisor = supervise(project);
     await project.settled();
-    const running = supervisor.run();
+    runSupervisor(supervisor);
     await project.untilRuns(1);
     await watchPause(300);
 
@@ -36,9 +42,6 @@ describe("paths a supervised process reports", () => {
     // Then the process runs again, without the directory being named anywhere
     // but in the mount itself
     await project.untilRuns(2);
-
-    supervisor.interrupt();
-    await running;
   });
 
   it("watches a template that was deployed", async () => {
@@ -56,7 +59,7 @@ describe("paths a supervised process reports", () => {
     );
     const supervisor = supervise(project);
     await project.settled();
-    const running = supervisor.run();
+    runSupervisor(supervisor);
     await project.untilRuns(1);
     await watchPause(300);
 
@@ -65,9 +68,6 @@ describe("paths a supervised process reports", () => {
 
     // Then the process runs again, rebinding against the new template
     await project.untilRuns(2);
-
-    supervisor.interrupt();
-    await running;
   });
 });
 

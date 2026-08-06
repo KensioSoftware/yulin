@@ -62,6 +62,23 @@ describe("SimWatchRestarts", () => {
     assertIdentical(restarts.failures.at(0), "no port");
   });
 
+  it("drops a change queued behind a restart that failed", async () => {
+    // Given a restart that is going to throw, with another change behind it
+    const restarts = new RecordedRestarts({ failWith: new Error("no port") });
+    restarts.request("src/first.ts");
+    restarts.request("src/second.ts");
+
+    // When the restart fails
+    restarts.release();
+    await restarts.settle();
+    restarts.release();
+    await restarts.settle();
+
+    // Then the queued change does not run anyway. Whatever asked for the
+    // restart decides what happens after one fails.
+    assertArrayEquals(restarts.restarted, ["src/first.ts"]);
+  });
+
   it("restarts again after one that failed", async () => {
     // Given a restart that threw
     const restarts = new RecordedRestarts({ failWith: new Error("no port") });

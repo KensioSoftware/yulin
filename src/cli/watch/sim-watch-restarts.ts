@@ -46,6 +46,12 @@ export class SimWatchRestarts {
   private async run(changedPath: string): Promise<void> {
     try {
       await this.restart(changedPath);
+    } catch (error) {
+      // A restart that failed is the end of this run. Whatever asked for it
+      // decides what happens next, and a change queued behind it would be a
+      // restart nobody is waiting for any more.
+      this.queuedPath = undefined;
+      throw error;
     } finally {
       this.running = false;
     }

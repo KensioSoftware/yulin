@@ -1,5 +1,6 @@
 import type { ServerResponse } from "node:http";
 import {
+  assertIdentical,
   assertStringIncludes,
   assertThrowsError,
   assertUndefined,
@@ -68,7 +69,7 @@ describe("SimLocalLiveReload", () => {
   });
 
   it("stops listening for a supervisor once the server has closed", () => {
-    // Given a served page under a supervisor, whose server then closed
+    // Given a page that was connected to a server which has since closed
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const host = new FakeProcess();
     const liveReload = new SimLocalLiveReload({
@@ -76,14 +77,19 @@ describe("SimLocalLiveReload", () => {
       watch: new SimWatchRuntime({ host }),
     });
     liveReload.serving("8787");
+    const page = new FakeServerResponse();
+    liveReload.channel()?.connect(page.asNodeResponse());
     liveReload.stopping();
+    const afterClosing = page.written();
+    const before = host.sent.length;
 
     // When the supervisor says the process is going
-    const before = host.sent.length;
     host.deliver({ type: simWatchMessages.stopping });
 
-    // Then nothing is left holding a reference to a closed server
+    // Then nothing is left holding a reference to a closed server, and the
+    // page it was serving is written to no further
     assertUndefined(host.sent.at(before));
+    assertIdentical(page.written(), afterClosing);
   });
 });
 

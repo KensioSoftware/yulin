@@ -7,7 +7,9 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimWatchChild } from "./sim-watch-child.js";
-import { WatchProject, watchPause } from "../../../test/cli/watch-project.js";
+import { WatchProject } from "../../../test/cli/watch-project.js";
+import { untilExited } from "../../../test/cli/until-exited.js";
+import { simWatchConfig } from "../../watch/sim-watch.config.js";
 
 describe("SimWatchChild over a real process", () => {
   it("fails when the command cannot be run", async () => {
@@ -42,7 +44,7 @@ describe("SimWatchChild over a real process", () => {
     await child.started();
 
     // When it exits
-    await watchPause(500);
+    await untilExited(exits);
 
     // Then the supervisor hears about it
     assertIdentical(exits.at(0), 3);
@@ -85,7 +87,7 @@ describe("SimWatchChild over a real process", () => {
     await child.stop();
 
     // Then it goes anyway, so the port is free for the process replacing it
-    assertTrue(Date.now() - startedAt >= 2000);
+    assertTrue(Date.now() - startedAt >= simWatchConfig.exitMs);
   });
 });
 

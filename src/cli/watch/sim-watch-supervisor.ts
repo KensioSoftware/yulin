@@ -77,16 +77,23 @@ export class SimWatchSupervisor {
   async run(): Promise<number> {
     this.reporter.started(this.watchArguments.describe());
     this.watcher.start();
-    await this.start();
 
-    const exitCode = await new Promise<number>((resolve) => {
+    // Taken before the first start, so an interrupt during startup is heard,
+    // and released in `finally`, so a command that could not be run at all
+    // leaves nothing watching. Open watchers would keep the process alive after
+    // the error had been reported, which reads as a hang rather than a mistake.
+    const stopped = new Promise<number>((resolve) => {
       this.stop = resolve;
     });
 
-    this.watcher.stop();
-    await this.child?.stop();
+    try {
+      await this.start();
 
-    return exitCode;
+      return await stopped;
+    } finally {
+      this.watcher.stop();
+      await this.child?.stop();
+    }
   }
 
   /**
@@ -109,8 +116,11 @@ export class SimWatchSupervisor {
       onExit: this.onChildExit,
     });
 
-    this.child = child;
+    // Kept only once it is running. A command that could not be run has no
+    // process to stop, and waiting for one to exit that never started is a wait
+    // that never ends.
     await child.started();
+    this.child = child;
   }
 
   private async restart(changedPath: string): Promise<void> {

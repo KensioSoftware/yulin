@@ -1,5 +1,5 @@
 import { assertArrayEquals, assertArrayLength } from "@kensio/smartass";
-import { describe, it } from "vitest";
+import { afterEach, describe, it } from "vitest";
 import { SimWatchArguments } from "./sim-watch-arguments.js";
 import { SimWatchReporter } from "./sim-watch-reporter.js";
 import { SimWatchSupervisor } from "./sim-watch-supervisor.js";
@@ -9,11 +9,17 @@ import {
   WatchProject,
   watchPause,
 } from "../../../test/cli/watch-project.js";
+import {
+  runSupervisor,
+  stopSupervisors,
+} from "../../../test/cli/running-supervisors.js";
 
 const message = (value: string): string =>
   `export const message = ${JSON.stringify(value)};`;
 
 describe("yulin watch over a real process", () => {
+  afterEach(stopSupervisors);
+
   it("restarts the process when a watched file changes", async () => {
     // Given a supervised process that has started once
     const project = await WatchProject.of({
@@ -22,7 +28,7 @@ describe("yulin watch over a real process", () => {
     await project.write("dev.mjs", watchChildScript(project.runsLogPath()));
     const supervisor = supervise(project);
     await project.settled();
-    const running = supervisor.run();
+    runSupervisor(supervisor);
     await project.untilRuns(1);
 
     // When a file it imports is saved
@@ -31,9 +37,6 @@ describe("yulin watch over a real process", () => {
     // Then it runs again, with the change in it
     const runs = await project.untilRuns(2);
     assertArrayEquals([...runs], ["first", "second"]);
-
-    supervisor.interrupt();
-    await running;
   });
 
   it("makes one restart out of a burst of saves", async () => {
@@ -44,7 +47,7 @@ describe("yulin watch over a real process", () => {
     await project.write("dev.mjs", watchChildScript(project.runsLogPath()));
     const supervisor = supervise(project);
     await project.settled();
-    const running = supervisor.run();
+    runSupervisor(supervisor);
     await project.untilRuns(1);
 
     // When several writes land in quick succession, as one save does
@@ -57,9 +60,6 @@ describe("yulin watch over a real process", () => {
     assertArrayEquals([...runs], ["first", "last"]);
     await watchPause(400);
     assertArrayLength(await project.runs(), 2);
-
-    supervisor.interrupt();
-    await running;
   });
 
   it("watches a directory the process reported", async () => {
@@ -72,7 +72,7 @@ describe("yulin watch over a real process", () => {
     );
     const supervisor = supervise(project);
     await project.settled();
-    const running = supervisor.run();
+    runSupervisor(supervisor);
     await project.untilRuns(1);
     await watchPause(200);
 
@@ -81,9 +81,6 @@ describe("yulin watch over a real process", () => {
 
     // Then the process runs again, without the directory having been listed
     await project.untilRuns(2);
-
-    supervisor.interrupt();
-    await running;
   });
 });
 

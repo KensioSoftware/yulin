@@ -53,7 +53,14 @@ export class SimWatchChildShutdown {
       ),
     ]);
 
-    this.process.send({ type: simWatchMessages.stopping });
+    // The channel can close between being asked whether it is open and being
+    // written to, because the process is free to exit in between. The callback
+    // is where that failure goes; without one it reaches the process as an
+    // error event, and a warning that could not be delivered is not a reason to
+    // stop taking the process down.
+    this.process.send({ type: simWatchMessages.stopping }, () => {
+      // Nothing to do about a process that has already gone.
+    });
 
     await acknowledged;
   }
