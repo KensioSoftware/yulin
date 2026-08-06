@@ -1,7 +1,6 @@
 import type { AwsRegionName } from "./sim-aws-region.js";
-import type { Brand } from "../../util/brand.type.js";
 import type { SimAwsAccountRegionContainer } from "./sim-aws-account-region-scope.js";
-import { faker } from "@faker-js/faker";
+import { simAwsAccountId, type SimAwsAccountId } from "./sim-aws-account-id.js";
 import type { SimS3 } from "../s3/sim-s3.js";
 import type { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
 import type {
@@ -19,9 +18,21 @@ import type { SimAwsPrincipal } from "./caller/sim-aws-caller.js";
 import { makeSimAwsAccountRootPrincipal } from "./caller/sim-aws-account-root-principal.js";
 import type { SimSts } from "../sts/sim-sts.js";
 
-export type SimAwsAccountId = Brand<string, "SimAwsAccountId">;
+// An Account ID is its own small thing and is defined in its own module. It is
+// re-exported here because this is where the rest of the simulator already
+// reaches for it, alongside the Account it identifies.
+export {
+  isSimAwsAccountId,
+  makeSimAwsAccountId,
+  type SimAwsAccountId,
+  simAwsAccountId,
+  SimInvalidAwsAccountId,
+} from "./sim-aws-account-id.js";
 
-export const DEFAULT_SIM_AWS_ACCOUNT_ID = "888888888888" as SimAwsAccountId;
+/**
+ * The AWS Account a simulated AWS uses when it is not told which one.
+ */
+export const DEFAULT_SIM_AWS_ACCOUNT_ID = simAwsAccountId("888888888888");
 
 interface SimAwsAccountProperties {
   readonly simAws?: Pick<SimAws, "accountRegionScope">;
@@ -137,11 +148,4 @@ export class SimAwsAccount {
   sts(): SimSts {
     return this.region().sts();
   }
-}
-
-/**
- * Generate a fake AWS Account ID.
- */
-export function makeSimAwsAccountId(): SimAwsAccountId {
-  return faker.string.numeric({ length: 12 }) as SimAwsAccountId;
 }

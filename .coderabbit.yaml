@@ -1,0 +1,11 @@
+# yaml-language-server: $schema=https://docs.coderabbit.ai/schemas/coderabbit-schema.json
+---
+# Repository level CodeRabbit settings, which override the organisation ones for
+# this repository only.
+reviews:
+  auto_review:
+    # Review a pull request once, when it is opened.
+    enabled: true
+    # Do not review again on every push after that. Ask for another review with
+    # an `@coderabbitai review` comment on the pull request.
+    auto_incremental_review: false

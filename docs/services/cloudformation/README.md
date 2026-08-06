@@ -45,6 +45,44 @@ console.log(bucket?.bucketName);
 `deployTemplate(...)` returns the simulated stack object. If your test needs the created resources
 to be available, wait for deployment to complete before asserting final state.
 
+### Naming the template type
+
+A template written inline is typed by `deployTemplate(...)` itself. A test that builds a template up
+somewhere else can name that type as `CfnTemplateBodyRecord`.
+
+```typescript sim-cloudformation-template-type
+/**
+ * Naming the type of a template a test builds somewhere other than the call.
+ */
+
+import { SimAws } from "@kensio/yulin";
+import type { CfnTemplateBodyRecord } from "@kensio/yulin/cloudformation";
+
+function siteTemplate(bucketName: string): CfnTemplateBodyRecord {
+  return {
+    Resources: {
+      SiteBucket: {
+        Type: "AWS::S3::Bucket",
+        Properties: {
+          BucketName: bucketName,
+        },
+      },
+    },
+  };
+}
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "typed-site-stack",
+  template: siteTemplate("typed-site-bucket"),
+});
+
+await stack.waitForDeployComplete();
+
+console.log(simAws.s3().getSimBucketByName("typed-site-bucket")?.bucketName);
+```
+
 ## Creating stacks with AWS SDK command shapes
 
 You can also use AWS SDK-style CloudFormation commands.
@@ -1614,6 +1652,10 @@ await scopedCfn.deployTemplate({
 Stacks are scoped to the selected simulated account and region. Resources created by a stack are
 created through that same simulated account/region scope unless the underlying simulated service has
 different AWS-like scoping behaviour.
+
+An Account ID can always be written as a plain string, as above. Code that wants to name the type
+can get a `SimAwsAccountId` from `simAwsAccountId("111111111111")`, which refuses anything that is
+not a 12-digit AWS Account ID.
 
 ## Inspecting stacks and resources
 
