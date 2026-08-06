@@ -234,6 +234,29 @@ a directory mounted into a Bucket, and a synthesized template. See the
 [serving docs](./docs/serve "Serving simulated AWS on localhost docs") for what gets the script, what
 is watched, and what is not.
 
+#### Update a stack when its template changes
+
+A synthesized template is data rather than code, so a change to one does not need the process
+restarted. Deploy it with `watch` and Yulin applies the file again whenever it changes, updating the
+stack in place:
+
+```typescript
+await simAws.cloudFormation().deployTemplateFile({
+  templatePath: "cdk.out/SiteStack.template.json",
+  watch: {
+    onUpdated: () => {
+      srv.reload();
+    },
+  },
+});
+```
+
+Resources the change left alone keep what they hold, so simulated S3, DynamoDB and SQS survive a
+`cdk synth`. Under `yulin watch` the template is left to the process watching it rather than being a
+reason to restart. See the
+[CloudFormation docs](./docs/services/cloudformation "Simulated CloudFormation docs") for what an
+update does to each resource.
+
 ### Control simulated time
 
 Each simulated AWS has its own clock, which you can freeze, set, or advance. This lets a test

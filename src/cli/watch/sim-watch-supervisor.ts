@@ -35,6 +35,15 @@ export class SimWatchSupervisor {
   };
 
   /**
+   * A path the process watches itself, such as a deployed template it updates
+   * the Stack from in place. Restarting for it would throw away the simulated
+   * state the in-place update exists to keep.
+   */
+  private readonly onHeldPath = (heldPath: string): void => {
+    this.watcher.addHeld(heldPath);
+  };
+
+  /**
    * A process that stopped on its own is a setup that threw, or a script that
    * ran to the end. Either way the watching goes on, so the next save tries
    * again without the watch having to be started over.
@@ -113,6 +122,7 @@ export class SimWatchSupervisor {
         inspect: this.watchArguments.inspect,
       }).build(),
       onPath: this.onReportedPath,
+      onHeldPath: this.onHeldPath,
       onExit: this.onChildExit,
     });
 

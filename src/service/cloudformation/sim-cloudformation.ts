@@ -40,7 +40,7 @@ import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-s
 import { SimCloudFormationSdkCommandRouter } from "./sdk/sim-cloudformation-sdk-command-router.js";
 import type { SimSdkCommandRouter } from "../../sdk/index.js";
 import type { SimAwsCaller } from "../aws/caller/sim-aws-caller.js";
-import { SimIamActionAuthorizer } from "../iam/authorize/sim-iam-action-authorizer.js";
+import { SimCloudFormationAuthorization } from "./authorize/sim-cloudformation-authorization.js";
 import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
@@ -71,7 +71,7 @@ export class SimCloudFormation {
   private readonly stacks = new Map<SimCloudFormationStackName, SimCfnStack>();
   private readonly templateDeployer: SimCloudFormationTemplateDeployer;
   private readonly sdkRouter = new SimCloudFormationSdkCommandRouter(this);
-  private readonly authorizer: SimIamActionAuthorizer;
+  private readonly authorization: SimCloudFormationAuthorization;
 
   constructor(properties: SimCloudFormationProperties) {
     const {
@@ -84,7 +84,10 @@ export class SimCloudFormation {
     this.simAws = simAws;
     this.background = background;
     this.accountRegionScope = accountRegionScope;
-    this.authorizer = new SimIamActionAuthorizer({ iam });
+    this.authorization = new SimCloudFormationAuthorization({
+      iam,
+      accountRegionScope: this.accountRegionScope,
+    });
     this.templateDeployer = new SimCloudFormationTemplateDeployer({
       simAws: this.simAws,
       accountRegionScope: this.accountRegionScope,
@@ -109,11 +112,7 @@ export class SimCloudFormation {
     command: SimCreateStackCommand,
     options?: SimCloudFormationRequestOptions,
   ): Promise<SimCreateStackCommandOutput> {
-    this.authorizer.authorize(
-      "cloudformation:CreateStack",
-      this.stackArn(command.input.StackName),
-      options?.caller,
-    );
+    this.authorization.createStack(command.input.StackName, options?.caller);
     return await this.createStackWithContext(command);
   }
 
@@ -124,11 +123,7 @@ export class SimCloudFormation {
     command: SimDescribeStacksCommand,
     options?: SimCloudFormationRequestOptions,
   ): Promise<SimDescribeStacksCommandOutput> {
-    this.authorizer.authorize(
-      "cloudformation:DescribeStacks",
-      this.stackArn(command.input.StackName),
-      options?.caller,
-    );
+    this.authorization.describeStacks(command.input.StackName, options?.caller);
     const handler = new DescribeStacksCommandHandler({
       stacks: this.stacks,
       background: this.background,
@@ -143,11 +138,7 @@ export class SimCloudFormation {
     command: SimUpdateStackCommand,
     options?: SimCloudFormationRequestOptions,
   ): Promise<SimUpdateStackCommandOutput> {
-    this.authorizer.authorize(
-      "cloudformation:UpdateStack",
-      this.stackArn(command.input.StackName),
-      options?.caller,
-    );
+    this.authorization.updateStack(command.input.StackName, options?.caller);
     const handler = new UpdateStackCommandHandler({
       accountRegionScope: this.accountRegionScope,
       stacks: this.stacks,
@@ -163,11 +154,7 @@ export class SimCloudFormation {
     command: SimDeleteStackCommand,
     options?: SimCloudFormationRequestOptions,
   ): Promise<SimDeleteStackCommandOutput> {
-    this.authorizer.authorize(
-      "cloudformation:DeleteStack",
-      this.stackArn(command.input.StackName),
-      options?.caller,
-    );
+    this.authorization.deleteStack(command.input.StackName, options?.caller);
     const handler = new DeleteStackCommandHandler({
       stacks: this.stacks,
       background: this.background,
@@ -232,18 +219,50 @@ export class SimCloudFormation {
   }
 
   /**
+   * Convenience wrapper method to apply a synthesized CDK template file to the
+   * simulated CloudFormation Stack it was deployed as.
+   *
+   * The file is read again, so a template synthesized a second time is applied
+   * as the change it is: Resources it adds are created, ones it drops are
+   * deleted, and everything else keeps what it holds. Give it what the
+   * deployment was given, since parameters are part of what an update applies.
+   *
+   * Returns once the update has finished, and throws what stopped it if it
+   * failed, including the `No updates are to be performed.` a file that was
+   * written without being changed is refused with.
+   */
+  async updateTemplateFile(
+    properties: SimCloudFormationDeployTemplateFileProperties | string,
+  ): Promise<SimCfnStack> {
+    return await this.templateDeployer.updateTemplateFile(properties);
+  }
+
+  /**
+   * The template files being watched for changes.
+   *
+   * A file deployed with `watch` is read again whenever it changes, and the
+   * Stack it deployed is updated in place from it.
+   */
+  watchedTemplateFiles(): readonly string[] {
+    return this.templateDeployer.watchedTemplateFiles();
+  }
+
+  /**
+   * Stop watching template files.
+   *
+   * A watch holds an open filesystem handle, so a process with one open does
+   * not exit on its own. A dev process wants exactly that and never calls this;
+   * anything with an end, such as a test, calls it when it is done.
+   */
+  stopWatchingTemplateFiles(): void {
+    this.templateDeployer.stopWatchingTemplateFiles();
+  }
+
+  /**
    * Get this service's SDK Command router for SDK client interception.
    */
   sdkCommandRouter(): SimSdkCommandRouter {
     return this.sdkRouter;
-  }
-
-  /**
-   * The Stack ARN a command operates on, for authorization.
-   */
-  private stackArn(stackName: string | undefined): string {
-    const { accountId, regionName } = this.accountRegionScope;
-    return `arn:aws:cloudformation:${regionName}:${accountId}:stack/${stackName ?? "*"}/*`;
   }
 
   private async createStackWithContext(

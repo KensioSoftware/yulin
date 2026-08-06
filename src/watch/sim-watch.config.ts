@@ -29,6 +29,9 @@ export const simWatchConfig = {
 export const simWatchMessages = {
   // Child to parent: a path Yulin is reading that is worth watching.
   path: "yulin:watch-path",
+  // Child to parent: a path Yulin is watching itself and answering in place, so
+  // a change to it is not something to restart the process for.
+  heldPath: "yulin:watch-held-path",
   // Parent to child: this process is about to be restarted.
   stopping: "yulin:watch-stopping",
   // Child to parent: the browsers have been told, go ahead.

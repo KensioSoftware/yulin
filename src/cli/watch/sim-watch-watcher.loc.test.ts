@@ -104,6 +104,29 @@ describe("SimWatchWatcher over a real directory", () => {
     }
   });
 
+  it("leaves a held path to the process that is answering it", async () => {
+    // Given a template the supervised process both reported and is updating
+    // its Stack from in place
+    const { changes, watcher } = await watching();
+    const synth = new TemporaryDirectory();
+    await synth.resolvePath();
+    await synth.writeFile("Stack.template.json", "{}");
+    watcher.addReported(synth.join("Stack.template.json"));
+    watcher.addHeld(synth.join("Stack.template.json"));
+    await watchPause(200);
+
+    try {
+      // When it is synthesized again
+      await synth.writeFile("Stack.template.json", '{"Resources":{}}');
+      await watchPause(400);
+
+      // Then nothing is restarted, and the in-place update is what answers it
+      assertArrayEquals(changes, []);
+    } finally {
+      watcher.stop();
+    }
+  });
+
   it("takes no notice of a path reported twice", async () => {
     // Given a reported directory
     const { watcher } = await watching();

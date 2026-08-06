@@ -43,9 +43,9 @@ export class SimCfnStackResourceOperations {
   private readonly simAws: SimAws;
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly stackName: SimCloudFormationStackName;
-  private readonly cdkOutContext: SimCdkOutContext | undefined;
   private readonly bindings:
     readonly SimCfnExecutableResourceBinding[] | undefined;
+  private cdkOutContext: SimCdkOutContext | undefined;
 
   constructor(properties: SimCfnStackResourceOperationsProperties) {
     const { simAws, accountRegionScope, stackName, cdkOutContext, bindings } =
@@ -56,6 +56,18 @@ export class SimCfnStackResourceOperations {
     this.stackName = stackName;
     this.cdkOutContext = cdkOutContext;
     this.bindings = bindings;
+  }
+
+  /**
+   * Read Resources from a different CDK cloud assembly from now on.
+   *
+   * A synthesis writes the template and the assets manifest beside it together,
+   * so a Stack updated from a re-synthesized template needs the manifest that
+   * came with it. Keeping the one the Stack was deployed from would look up the
+   * asset a replaced Resource names in a manifest written before it existed.
+   */
+  useCdkOutContext(cdkOutContext: SimCdkOutContext): void {
+    this.cdkOutContext = cdkOutContext;
   }
 
   /**

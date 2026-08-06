@@ -83,6 +83,28 @@ export class SimWatchRuntime {
   }
 
   /**
+   * Name a path this process is watching itself, and answering without needing
+   * a restart, such as a deployed template being updated in place.
+   *
+   * The supervisor leaves it alone from then on. Being told that a path is
+   * handled here is more specific than any rule the supervisor has about which
+   * paths are worth restarting for, so it wins over having reported the same
+   * path for watching.
+   *
+   * Best effort, as reportPath is: a process with no supervisor drops it.
+   */
+  reportHeldPath(heldPath: string): void {
+    if (!this.supervised()) {
+      return;
+    }
+
+    this.host.send?.({
+      type: simWatchMessages.heldPath,
+      path: path.resolve(heldPath),
+    });
+  }
+
+  /**
    * Run something when the supervisor says this process is about to restart.
    */
   onStopping(listener: SimWatchStoppingListener): void {

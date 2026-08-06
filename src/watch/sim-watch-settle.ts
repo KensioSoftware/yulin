@@ -8,8 +8,8 @@ interface SimWatchSettleProperties {
  *
  * Saving one file in an editor is several filesystem events: a temporary file
  * written, renamed over the original, and often the directory touched as well.
- * Restarting on each of those would be several restarts for one save, so the
- * changes are held until they stop arriving.
+ * Acting on each of those would be several restarts, or several Stack updates,
+ * for one save, so the changes are held until they stop arriving.
  *
  * The path reported is the first of the burst, which is the one that actually
  * changed rather than whatever the editor did around it.

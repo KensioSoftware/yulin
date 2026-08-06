@@ -52,6 +52,34 @@ describe("SimWatchRuntime", () => {
     assertStringEndsWith(String(reported["path"]), "assets/uploads");
   });
 
+  it("names a path it is answering itself, so the supervisor leaves it", () => {
+    // Given a process `yulin watch` started, watching a template it updates
+    // the Stack from in place
+    const host = new FakeProcess();
+    const runtime = new SimWatchRuntime({ host });
+
+    // When the path is held
+    runtime.reportHeldPath("cdk.out/Site.template.json");
+
+    // Then the supervisor is told not to restart for it
+    assertArrayLength(host.sent, 1);
+    const [held = {}] = host.sent;
+    assertIdentical(held["type"], simWatchMessages.heldPath);
+    assertStringEndsWith(String(held["path"]), "cdk.out/Site.template.json");
+  });
+
+  it("holds no path in a process no supervisor started", () => {
+    // Given an ordinary process, such as a test run
+    const host = new FakeProcess({ supervised: false });
+    const runtime = new SimWatchRuntime({ host });
+
+    // When a path is held
+    runtime.reportHeldPath("cdk.out/Site.template.json");
+
+    // Then nothing is sent anywhere
+    assertArrayEquals(host.sent, []);
+  });
+
   it("passes on the warning that a restart is coming", () => {
     // Given a supervised process listening for a restart
     const host = new FakeProcess();

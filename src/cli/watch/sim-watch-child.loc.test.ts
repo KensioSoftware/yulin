@@ -107,6 +107,7 @@ function childOf(
     cwd: project.path(),
     env: process.env,
     onPath: () => undefined,
+    onHeldPath: () => undefined,
     onExit: (code) => {
       properties.onExit?.(code);
     },
