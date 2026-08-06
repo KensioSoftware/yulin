@@ -1760,7 +1760,8 @@ await cognito.deleteUserPool(new DeleteUserPoolCommand({ UserPoolId }));
 ```
 
 A pool reports the time of its last update as its `LastModifiedDate`, in `DescribeUserPool` and in
-`ListUserPools`. A pool no update has reached reports its creation date there.
+`ListUserPools`. A pool that has never been updated reports its creation date as its
+`LastModifiedDate`.
 
 ## Deletion protection
 

@@ -130,8 +130,8 @@ export class SimCognitoUserPool {
   /**
    * When the pool's settings last changed.
    *
-   * A pool no `UpdateUserPool` request has reached reports its creation date,
-   * as a real one does.
+   * A pool that no `UpdateUserPool` request has reached reports its creation
+   * date, as a real one does.
    */
   get lastModifiedDate(): Date {
     return this.#modifiedDate;
