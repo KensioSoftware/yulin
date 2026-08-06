@@ -90,11 +90,10 @@ export class SimCognitoTriggerOccasion {
    * changed since the sign-in reaches the reissued token rather than being
    * stale for the life of the session.
    */
-  public static readonly refreshTokenGeneration =
-    new SimCognitoTriggerOccasion(
-      "PreTokenGeneration",
-      "TokenGeneration_RefreshTokens",
-    );
+  public static readonly refreshTokenGeneration = new SimCognitoTriggerOccasion(
+    "PreTokenGeneration",
+    "TokenGeneration_RefreshTokens",
+  );
 
   public readonly trigger: SimCognitoTriggerName;
   public readonly source: string;
