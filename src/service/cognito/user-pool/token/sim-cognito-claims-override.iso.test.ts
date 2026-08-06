@@ -95,6 +95,20 @@ describe("sim Cognito PreTokenGeneration claims override refusals", () => {
     assertStringIncludes(error.message, "reserves the cognito: claims");
   });
 
+  it("refuses suppressing a cognito claim other than the groups", async () => {
+    // Given a handler suppressing the roles claim directly, which real Cognito
+    // takes off a token by suppressing cognito:groups instead.
+    // When the user signs in.
+    const error = await refusalOf({ claimsToSuppress: ["cognito:roles"] });
+
+    // Then it is refused, and told which claim to name.
+    assertStringIncludes(error.message, "cognito:roles");
+    assertStringIncludes(
+      error.message,
+      "cognito:groups is the only cognito: claim",
+    );
+  });
+
   it("refuses a claim value that is not a string", async () => {
     // Given a handler adding a number, which arrived with the V2_0 event.
     // When the user signs in.

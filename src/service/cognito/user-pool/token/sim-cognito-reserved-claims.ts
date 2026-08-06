@@ -67,9 +67,20 @@ export function requireSimCognitoOverridableClaim(claim: string): void {
  * Refuse a claim a handler asked to suppress that it may not.
  *
  * `cognito:groups` is suppressible, as it is on real Cognito, and it is the one
- * `cognito:` claim that is.
+ * `cognito:` claim that is. Suppressing it is also how real Cognito takes the
+ * role claims off a token, so a handler naming one of those directly is refused
+ * and told which claim to name instead.
  */
 export function requireSimCognitoSuppressibleClaim(claim: string): void {
+  if (claim !== simCognitoGroupsClaim && claim.startsWith("cognito:")) {
+    throw new SimCognitoInvalidLambdaResponseException(
+      `The PreTokenGeneration trigger returned claimsToSuppress naming ` +
+        `${claim}. ${simCognitoGroupsClaim} is the only cognito: claim real ` +
+        `Cognito suppresses, and suppressing that one is what takes the ` +
+        `cognito:roles and cognito:preferred_role claims with it.`,
+    );
+  }
+
   requireUnreservedClaim(claim, "claimsToSuppress");
 }
 

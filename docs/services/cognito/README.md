@@ -1330,6 +1330,7 @@ import {
   AddPermissionCommand,
   CreateFunctionCommand,
 } from "@aws-sdk/client-lambda";
+import { CognitoJwtVerifier } from "aws-jwt-verify";
 
 import { SimAws } from "@kensio/yulin";
 import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
@@ -1380,6 +1381,7 @@ const pool = await cognito.createUserPool(
     },
   }),
 );
+const userPoolId = pool.UserPool!.Id!;
 
 await lambda.addPermission(
   new AddPermissionCommand({
@@ -1387,28 +1389,29 @@ await lambda.addPermission(
     StatementId: "AllowCognito",
     Action: "lambda:InvokeFunction",
     Principal: "cognito-idp.amazonaws.com",
-    SourceArn: pool.UserPool?.Arn,
+    SourceArn: pool.UserPool!.Arn!,
   }),
 );
 
 const appClient = await cognito.createUserPoolClient(
   new CreateUserPoolClientCommand({
-    UserPoolId: pool.UserPool?.Id,
+    UserPoolId: userPoolId,
     ClientName: "web",
     ExplicitAuthFlows: ["ALLOW_ADMIN_USER_PASSWORD_AUTH"],
   }),
 );
+const clientId = appClient.UserPoolClient!.ClientId!;
 
 await cognito.adminCreateUser(
   new AdminCreateUserCommand({
-    UserPoolId: pool.UserPool?.Id,
+    UserPoolId: userPoolId,
     Username: "alice",
     UserAttributes: [{ Name: "email", Value: "alice@acme.example" }],
   }),
 );
 await cognito.adminSetUserPassword(
   new AdminSetUserPasswordCommand({
-    UserPoolId: pool.UserPool?.Id,
+    UserPoolId: userPoolId,
     Username: "alice",
     Password: "Sup3rSecretPassw0rd!",
     Permanent: true,
@@ -1417,20 +1420,26 @@ await cognito.adminSetUserPassword(
 
 const signedIn = await cognito.adminInitiateAuth(
   new AdminInitiateAuthCommand({
-    UserPoolId: pool.UserPool?.Id,
-    ClientId: appClient.UserPoolClient?.ClientId,
+    UserPoolId: userPoolId,
+    ClientId: clientId,
     AuthFlow: "ADMIN_USER_PASSWORD_AUTH",
     AuthParameters: { USERNAME: "alice", PASSWORD: "Sup3rSecretPassw0rd!" },
   }),
 );
 
-// The id token carries the claim the handler added, and not the one it
-// suppressed. It verifies against the pool's JWKS unchanged.
-const [, claims] = (signedIn.AuthenticationResult?.IdToken ?? "").split(".");
-const payload = JSON.parse(
-  Buffer.from(claims ?? "", "base64url").toString("utf8"),
-) as Record<string, unknown>;
+// The overridden token is signed like any other, so the application's own
+// verifier is what reads the claims off it.
+const verifier = CognitoJwtVerifier.create({
+  userPoolId,
+  tokenUse: "id",
+  clientId,
+});
 
+verifier.cacheJwks(cognito.userPool(userPoolId).jwks());
+
+const payload = await verifier.verify(signedIn.AuthenticationResult!.IdToken!);
+
+// The claim the handler added is there, and the one it suppressed is not.
 console.log(payload["tenantId"]); // "acme.example"
 console.log(payload["email"]); // undefined
 console.log(payload["cognito:groups"]); // ["tenant-admin"]
@@ -2344,6 +2353,11 @@ Current documented limitations:
   `cognito:groups`, is applied.
 - A `V1_0` claim value is a string, and a handler returning anything else is refused. The complex
   claim values arrived with the `V2_0` event.
+- `claimsToAddOrOverride` and `claimsToSuppress` reach the id token alone, because a `V1_0` event
+  customises that token. `cognito:groups` on an access token is changed through
+  `groupOverrideDetails`, which is what real Cognito calls the only change a `V1_0` event makes to
+  an access token. `claimsToSuppress` naming a `cognito:` claim other than `cognito:groups` is
+  refused, since real Cognito suppresses none of the others.
 - A `PreTokenGeneration` response naming a claim real Cognito reserves is refused rather than
   ignored, which is what real Cognito does with one. That is a deliberate divergence: a claim that
   silently does not arrive in production is the failure a test with a trigger in it is there to

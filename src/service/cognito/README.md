@@ -422,7 +422,9 @@ resource, here or on real AWS.
 - A `PreTokenGeneration` response is refused where real Cognito would quietly drop part of it: a
   reserved claim, any `cognito:` claim in `claimsToAddOrOverride`, a claim value that is not a
   string, and a group override naming IAM roles. The trigger runs at `V1_0` only, so
-  `PreTokenGenerationConfig` is refused and no access token claim or scope is customised.
+  `PreTokenGenerationConfig` is refused, and the group override replacing `cognito:groups` is the
+  only change that reaches an access token. The `V2_0` and `V3_0` access token claims and scopes are
+  not customised.
 - A refresh answers with no new refresh token, as real Cognito does with refresh token rotation off.
   `RefreshTokenRotation` is refused on an app client, and `GetTokensFromRefreshToken` and
   `RevokeToken` are not implemented.
