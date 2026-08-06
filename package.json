@@ -117,6 +117,10 @@
     "./serve": {
       "import": "./dist/serve/index.js",
       "types": "./dist/serve/index.d.ts"
+    },
+    "./watch": {
+      "import": "./dist/watch/index.js",
+      "types": "./dist/watch/index.d.ts"
     }
   },
   "files": [
