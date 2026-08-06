@@ -1,6 +1,5 @@
 import { spawn } from "node:child_process";
 import { mkdir } from "node:fs/promises";
-import path from "node:path";
 import type { SimAws } from "../../src/index.js";
 import { repoPath } from "../../src/util/filesystem/path.js";
 import { TemporaryDirectory } from "../../src/util/filesystem/temporary-directory.js";
@@ -8,7 +7,22 @@ import { jsonStringify } from "../../src/util/type-guard/json.js";
 
 const yulin = repoPath("src/index.js");
 const yulinServe = repoPath("src/serve/index.js");
-const tsx = repoPath(path.join("node_modules", ".bin", "tsx"));
+
+/**
+ * How TypeScript is loaded into the process the dev script runs in.
+ *
+ * `node --import`, rather than the `tsx` binary, because that binary is a
+ * wrapper around a second process. A signal sent to it reaches the script, but
+ * what the parent then reads is the wrapper's own exit status, and a wrapper
+ * that was signalled reports 143 however cleanly the script it was wrapping
+ * closed. Since the exit code is most of what these tests assert, nothing may
+ * stand between the script and the signal.
+ *
+ * Resolved through tsx's export map rather than reached for as a path under
+ * node_modules, because the script runs with its own project directory as the
+ * working directory, where a bare `tsx` would not resolve.
+ */
+const tsxLoader = import.meta.resolve("tsx");
 
 /**
  * How long a dev script is given to serve, hold and then close everything.
@@ -93,17 +107,32 @@ export class ServedProject {
    * point of it is that the process ended on its own.
    */
   async run(options: RunOptions = {}): Promise<ScriptRun> {
-    const child = spawn(tsx, [this.directory.join("dev.ts")], {
-      cwd: this.directory.path(),
-      stdio: ["ignore", "pipe", "pipe"],
-    });
+    const child = spawn(
+      process.execPath,
+      ["--import", tsxLoader, this.directory.join("dev.ts")],
+      {
+        cwd: this.directory.path(),
+        stdio: ["ignore", "pipe", "pipe"],
+      },
+    );
     const output = { stdout: "", stderr: "" };
+    let signalled = false;
 
     child.stdout.setEncoding("utf8");
     child.stdout.on("data", (chunk: string) => {
       output.stdout += chunk;
 
-      if (options.signal !== undefined && output.stdout.includes("watching ")) {
+      // Once, on the first chunk saying the script is up. What is read is
+      // everything written so far, which goes on saying "watching " for the
+      // rest of the run, so without the flag every later chunk — the "closed"
+      // the script prints on its way out, among them — sends another signal at
+      // a script that has already given its handlers up.
+      if (
+        options.signal !== undefined &&
+        !signalled &&
+        output.stdout.includes("watching ")
+      ) {
+        signalled = true;
         child.kill(options.signal);
       }
     });
