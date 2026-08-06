@@ -3,7 +3,8 @@ import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-
 import { FilesystemS3BucketStorage } from "../storage/filesystem/s3-filesystem-storage.js";
 import { simS3BucketUrl } from "./sim-s3-endpoint-url.js";
 import type { SimS3Bucket, SimS3BucketName } from "./sim-s3-bucket.js";
-import { simWatch } from "../../../watch/sim-watch-runtime.js";
+import { SimS3MountWatches } from "../mount/sim-s3-mount-watches.js";
+import type { SimS3MountFilesystemOptions } from "../mount/sim-s3-mount.type.js";
 
 interface SimS3BucketAccessProperties {
   readonly buckets: ReadonlyMap<SimS3BucketName, SimS3Bucket>;
@@ -21,6 +22,7 @@ interface SimS3BucketAccessProperties {
 export class SimS3BucketAccess {
   private readonly buckets: ReadonlyMap<SimS3BucketName, SimS3Bucket>;
   private readonly accountRegionScope: SimAwsAccountRegionScope;
+  private readonly mountWatches = new SimS3MountWatches();
 
   constructor(properties: SimS3BucketAccessProperties) {
     this.buckets = properties.buckets;
@@ -57,17 +59,34 @@ export class SimS3BucketAccess {
   /**
    * Have a Bucket use a local filesystem directory for storage.
    *
-   * The directory is named to a `yulin watch` supervisor, so editing a file the
-   * Bucket serves restarts the process without the directory having been listed
-   * anywhere. Nothing happens outside watch mode.
+   * Given somewhere to reload, the directory is watched here and a build in it
+   * reloads the connected browsers once the writes stop. Without that the
+   * directory is only named to a `yulin watch` supervisor, so editing a file
+   * the Bucket serves restarts the process without the directory having been
+   * listed anywhere, and nothing happens outside watch mode.
    */
   mountFilesystem(
     bucketName: SimS3BucketName | string,
     directoryPath: string,
+    options: SimS3MountFilesystemOptions = {},
   ): void {
     this.required(bucketName).configureSimStorage(
       new FilesystemS3BucketStorage({ directoryPath }),
     );
-    simWatch.reportPath(directoryPath);
+    this.mountWatches.register(bucketName, directoryPath, options);
+  }
+
+  /**
+   * The mounted directories being watched for changes.
+   */
+  watchedMounts(): readonly string[] {
+    return this.mountWatches.paths();
+  }
+
+  /**
+   * Stop watching mounted directories.
+   */
+  stopWatchingMounts(): void {
+    this.mountWatches.stopAll();
   }
 }

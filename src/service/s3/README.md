@@ -250,8 +250,26 @@ This storage is fast, isolated, and appropriate for most tests.
 for local development scenarios such as serving a static site from a real directory through
 simulated S3 and CloudFront.
 
-`SimS3.mountBucketFilesystem(bucketName, directoryPath)` is the high-level API for switching an
-existing Bucket to filesystem-backed storage.
+`SimS3.mountBucketFilesystem(bucketName, directoryPath, options)` is the high-level API for switching
+an existing Bucket to filesystem-backed storage.
+
+### Watching a mounted directory
+
+A mount given somewhere to reload, as `{ reload: srv }`, watches the directory as well as serving it.
+The pieces are in `mount/`:
+
+- `SimS3MountDirectoryEvents` holds the recursive `fs.watch`. It drops an event naming the directory
+  itself, which is macOS replaying the directory's own creation to a watch started moments after it,
+  and would otherwise reload the browser on start-up for a build that never happened.
+- `SimS3MountWatch` puts those events through `SimWatchSettle`, so a build writing a tree of files is
+  one reload, and reloads when they stop.
+- `SimS3MountWatches` is the collection, one watch per Bucket, held by `SimS3BucketAccess`. It also
+  decides what a `yulin watch` supervisor is told: a watched mount is a held path, so a rebuild
+  reloads rather than restarting the process and taking every simulated Bucket, Table and Stack with
+  it, while an unwatched one is a reported path as it always was.
+
+A recursive watch holds an open filesystem handle, so `SimS3.stopWatchingMountedDirectories()` is the
+way to let it go. A dev process never calls it; a test does.
 
 Filesystem storage behaviour:
 
