@@ -8,6 +8,7 @@ import {
   type SimCdkOutContext,
 } from "../cdk/sim-cdk-out-context.js";
 import type { SimCfnExecutableResourceBinding } from "../bind/sim-cfn-exec-binding.type.js";
+import { simWatch } from "../../../watch/sim-watch-runtime.js";
 
 export interface SimCloudFormationDeployTemplateFileProperties {
   readonly templatePath: string;
@@ -46,6 +47,11 @@ export class SimCfnTemplateFileLoader {
       typeof properties === "string"
         ? stackNameFromTemplatePath(templatePath)
         : (properties.stackName ?? stackNameFromTemplatePath(templatePath));
+
+    // The template is named to a `yulin watch` supervisor, so re-synthing a
+    // stack restarts the process that deployed it. Nothing happens outside
+    // watch mode.
+    simWatch.reportPath(templatePath);
 
     // eslint-disable-next-line security/detect-non-literal-fs-filename
     const templateBody = await readFile(templatePath, "utf8");

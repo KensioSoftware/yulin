@@ -7,6 +7,9 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "yulin": "./dist/cli/yulin.js"
+  },
   "scripts": {
     "clean": "rm -rf ./dist/ ./*.tsbuildinfo",
     "build": "pnpm clean && tsc -p tsconfig.build.json",

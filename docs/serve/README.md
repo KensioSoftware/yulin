@@ -191,6 +191,67 @@ The reload channel is served at `/__sim-aws/live-reload` on every hostname the s
 a page can ask for it relative to wherever it was served from. While live reload is on, no simulated
 service can serve anything at that path.
 
+## Restarting on a file change
+
+Live reload gets a page back on its feet after the process restarts. `yulin watch` is what restarts
+it. Run the dev script through it and a save is the whole loop:
+
+```bash
+yulin watch -- tsx dev.ts
+```
+
+Everything after `--` is the command, run as written and restarted when something changes. The CLI
+does not import it, does not look for an exported setup function, and does not care whether the
+simulation was built from SDK commands, a CloudFormation template, or several `SimAws` instances at
+once. The only change to a dev script is turning `liveReload` on.
+
+A restart, rather than swapping code in place, is the deliberate choice. A Lambda handler is a
+function reference out of your own module graph, and a new process re-imports it with no module cache
+to defeat. It also keeps simulated state the same as what a fresh test run sees, since seeding is
+part of the setup script and runs again.
+
+### What is watched
+
+The working directory, minus what nothing edits by hand: `node_modules`, `.git`, `dist`, `coverage`,
+CDK asset directories, and the working files an editor writes around a save.
+
+On top of that, Yulin names paths it is holding that the module graph never mentions. A directory
+given to `mountBucketFilesystem` and a template given to `deployTemplateFile` are reported to the
+supervisor as they are registered, and watched from then on, without appearing in any list. Editing
+a file in a mounted directory or re-synthing a stack restarts the process.
+
+A burst of writes is one restart. Saving one file is several filesystem events, so changes are held
+until they stop arriving before anything is restarted.
+
+### When a run goes wrong
+
+A setup script that throws leaves the watcher up. The error is on the terminal and the next save is
+the retry, with no watch to start over.
+
+Setup that writes into a watched path restarts the process, which writes again, which restarts it.
+That is refused rather than run: after a few restarts caused by the same file changing straight after
+startup, `yulin watch` stops and names the file. Write generated files outside the working directory,
+or into a directory the watch passes over.
+
+### Debugging
+
+A process started by `yulin watch` can be debugged, but the debugger has to attach to that process
+rather than to the supervisor, which does nothing worth stepping through. Pass an inspector flag to
+the watch and it reaches each run through `NODE_OPTIONS`, so it works whether the command is `node`
+or something that spawns it:
+
+```bash
+yulin watch --inspect=9230 -- tsx dev.ts
+```
+
+Each run binds the same inspector port, because the process it replaces has fully exited by the time
+the replacement starts. Attaching to that port with reconnect turned on in your IDE keeps a debugger
+across restarts. The exact run configuration differs between IDEs and is not documented here yet.
+
+Nothing about live reload needs the supervisor. A dev script launched straight from an IDE debugger
+still gets browser reload and still picks up a re-synthed template, and a handler edit is a manual
+restart as it is without watch mode.
+
 ## Limitations
 
 - An injected page is not byte for byte what the real service would return, and its `cache-control`
@@ -200,6 +261,12 @@ service can serve anything at that path.
 - Injection decodes the HTML as UTF-8. A page stored in another encoding would be corrupted, so
   serve HTML as UTF-8.
 - An open reload connection uses one of the browser's six connections per origin per tab.
-- Nothing is watched. Yulin reloads when the process restarts or when `reload()` is called, and
-  choosing what to watch is left to whatever runs the dev script.
 - There is no overlay for a reload that failed. The terminal has the error.
+- `yulin watch` does not re-synth CDK. `cdk watch` is a shortcut for `deploy --watch` against real
+  AWS and there is no synth-only watch, so run your own synth and let the watch pick up its output.
+- Lambda and CloudFront Function code is not swapped without a restart. A fresh process picks up an
+  edited handler correctly, and an in-process swap would have to invalidate an ESM import subgraph
+  that the language does not expose.
+- Simulated state is not carried across a restart. Seeding belongs in the setup script, so it runs
+  again and local state stays the same as what tests and CI see.
+- The IDE run configurations for attaching a debugger to a watched process are not documented yet.

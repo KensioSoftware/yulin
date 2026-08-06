@@ -220,9 +220,19 @@ const srv = await serveSimAws({ simAws, port: 4599, liveReload: true });
 ```
 
 `srv.reload()` reloads connected browsers for a change that needs no restart. Live reload is off by
-default, since an injected page is not byte for byte what the real service returns. See the
-[serving docs](./docs/serve "Serving simulated AWS on localhost docs") for what gets the script and
-what does not.
+default, since an injected page is not byte for byte what the real service returns.
+
+Run the dev script through `yulin watch` and a save is the whole loop, with the process restarted and
+the page refreshed:
+
+```bash
+yulin watch -- tsx dev.ts
+```
+
+It watches the working directory, plus the paths Yulin is holding that a module graph never mentions:
+a directory mounted into a Bucket, and a synthesized template. See the
+[serving docs](./docs/serve "Serving simulated AWS on localhost docs") for what gets the script, what
+is watched, and what is not.
 
 ### Control simulated time
 

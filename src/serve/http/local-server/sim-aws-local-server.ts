@@ -4,10 +4,10 @@ import { simAwsLocalConfig } from "./sim-aws-local.config.js";
 import { SimAwsHttp } from "../sim-aws-http.js";
 import { SimAwsLocalUrl } from "../url/sim-aws-local-url.js";
 import { NodeServerPortBinder } from "./node-server-port-binder.js";
+import { nodeServerPort } from "./node-server-port.js";
 import { SimAwsLocalRequestHandler } from "./sim-aws-local-request-handler.js";
 import { SimAwsDnsServer } from "../../dns/sim-aws-dns-server.js";
-import { SimLiveReload } from "../live-reload/sim-live-reload.js";
-import { SimLiveReloadReport } from "../live-reload/sim-live-reload-report.js";
+import { SimLocalLiveReload } from "../live-reload/sim-local-live-reload.js";
 
 interface SimAwsLocalServerProperties {
   readonly simAws?: SimAws;
@@ -23,14 +23,15 @@ export class SimAwsLocalServer {
   private readonly server: Server;
   private readonly portBinder: NodeServerPortBinder;
   private readonly dnsServer: SimAwsDnsServer;
-  private readonly liveReload: SimLiveReload | undefined;
+  private readonly liveReload: SimLocalLiveReload;
 
   constructor(properties: SimAwsLocalServerProperties = {}) {
     const { simAws = new SimAws(), liveReload = false } = properties;
-    this.liveReload = liveReload ? new SimLiveReload() : undefined;
+    this.liveReload = new SimLocalLiveReload({ enabled: liveReload });
+    const channel = this.liveReload.channel();
     this.requestHandler = new SimAwsLocalRequestHandler({
       simAwsHttp: new SimAwsHttp({ simAws }),
-      ...(this.liveReload !== undefined && { liveReload: this.liveReload }),
+      ...(channel !== undefined && { liveReload: channel }),
     });
     this.dnsServer = new SimAwsDnsServer({ simAws });
     this.server = http.createServer((request, response) => {
@@ -60,9 +61,7 @@ export class SimAwsLocalServer {
     await this.portBinder.bind(port);
     await this.dnsServer.listen(Number(this.port));
 
-    if (this.liveReload !== undefined) {
-      new SimLiveReloadReport().announce(this.port);
-    }
+    this.liveReload.serving(this.port);
 
     return this;
   }
@@ -78,17 +77,7 @@ export class SimAwsLocalServer {
    * Get the TCP port on which this local server is listening.
    */
   get port(): string {
-    if (!this.server.listening) {
-      throw new Error("Server is not yet listening, cannot get port number");
-    }
-
-    const address = this.server.address();
-    /* v8 ignore if -- does not happen in practice */
-    if (address === null || typeof address === "string") {
-      throw new Error("Expected local HTTP server to listen on a TCP port");
-    }
-
-    return String(address.port);
+    return nodeServerPort(this.server);
   }
 
   /**
@@ -114,7 +103,7 @@ export class SimAwsLocalServer {
    * the open ones are being ended.
    */
   close(): void {
-    this.liveReload?.stopping();
+    this.liveReload.stopping();
     this.server.close();
     this.server.closeAllConnections();
     this.dnsServer.close();
@@ -128,12 +117,6 @@ export class SimAwsLocalServer {
    * to restart, and the pages reload themselves when it comes back.
    */
   reload(): void {
-    if (this.liveReload === undefined) {
-      throw new Error(
-        "Live reload is off for this server, serve with { liveReload: true } to use reload()",
-      );
-    }
-
     this.liveReload.reload();
   }
 
