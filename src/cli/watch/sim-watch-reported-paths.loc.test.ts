@@ -46,6 +46,32 @@ describe("paths a supervised process reports", () => {
     await project.untilRuns(2);
   });
 
+  it("leaves a mount that reloads for itself alone", async () => {
+    // Given a dev script that mounts a directory outside the project with
+    // somewhere to reload, so the mount watches it and reloads the browser
+    // when it is rebuilt
+    const project = await WatchProject.of({});
+    const mounted = path.join(project.mountedPath(), "public");
+    await project.writeMounted(path.join("public", "index.html"), "<h1>a</h1>");
+    await project.write(
+      "dev.ts",
+      reloadingMountScript(project.runsLogPath(), mounted),
+    );
+    const supervisor = supervise(project);
+    await project.settled();
+    runSupervisor(supervisor);
+    await project.untilRuns(1);
+    await watchPause(300);
+
+    // When a file in that directory is rebuilt
+    await project.writeMounted(path.join("public", "index.html"), "<h1>b</h1>");
+
+    // Then the browser is reloaded in the process that mounted it, rather than
+    // the process being restarted and everything it holds going with it
+    const recorded = await project.untilRuns(2);
+    assertArrayEquals([...recorded], ["run", "reloaded"]);
+  });
+
   it("watches a template that was deployed", async () => {
     // Given a dev script that deploys a synthesized template from outside the
     // project, as a separate synth step would leave it
@@ -152,6 +178,29 @@ appendFileSync(${JSON.stringify(runsLogPath)}, "run\n");
 const simAws = new SimAws();
 await simAws.s3().createBucket({ input: { Bucket: "site" } });
 simAws.s3().mountBucketFilesystem("site", ${JSON.stringify(mountedPath)});
+
+setInterval(() => {}, 60_000);
+`;
+}
+
+function reloadingMountScript(
+  runsLogPath: string,
+  mountedPath: string,
+): string {
+  return String.raw`import { appendFileSync } from "node:fs";
+import { SimAws } from ${JSON.stringify(yulin)};
+
+appendFileSync(${JSON.stringify(runsLogPath)}, "run\n");
+
+const simAws = new SimAws();
+await simAws.s3().createBucket({ input: { Bucket: "site" } });
+simAws.s3().mountBucketFilesystem("site", ${JSON.stringify(mountedPath)}, {
+  reload: {
+    reload: () => {
+      appendFileSync(${JSON.stringify(runsLogPath)}, "reloaded\n");
+    },
+  },
+});
 
 setInterval(() => {}, 60_000);
 `;

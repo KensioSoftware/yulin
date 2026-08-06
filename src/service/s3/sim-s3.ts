@@ -12,6 +12,7 @@ import { SimS3SdkCommandRouter } from "./sdk/sim-s3-sdk-command-router.js";
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
 import type { SimS3RequestOptions } from "./command/sim-s3-request-options.js";
 import type { SimS3NotificationDeliveryFailure } from "./notification/sim-s3-notification-failures.js";
+import type { SimS3MountFilesystemOptions } from "./mount/sim-s3-mount.type.js";
 
 /**
  * Simulated S3. Handles SDK commands. Emulates AWS behaviour and state.
@@ -48,9 +49,7 @@ export class SimS3 {
     });
   }
 
-  /**
-   * Handle a Create Bucket Command from the SDK.
-   */
+  /** Handle a Create Bucket Command from the SDK. */
   async createBucket(
     command: simS3Commands.SimCreateBucketCommand,
     options?: SimS3RequestOptions,
@@ -58,9 +57,7 @@ export class SimS3 {
     return await this.commands.buckets.create(command, options);
   }
 
-  /**
-   * Handle a Delete Bucket Command from the SDK.
-   */
+  /** Handle a Delete Bucket Command from the SDK. */
   async deleteBucket(
     command: simS3Commands.SimDeleteBucketCommand,
     options?: SimS3RequestOptions,
@@ -68,9 +65,7 @@ export class SimS3 {
     return await this.commands.buckets.delete(command, options);
   }
 
-  /**
-   * Handle a Put Bucket Policy Command from the SDK.
-   */
+  /** Handle a Put Bucket Policy Command from the SDK. */
   async putBucketPolicy(
     command: simS3Commands.SimPutBucketPolicyCommand,
     options?: SimS3RequestOptions,
@@ -78,9 +73,7 @@ export class SimS3 {
     return await this.commands.bucketPolicies.put(command, options);
   }
 
-  /**
-   * Handle a Get Bucket Policy Command from the SDK.
-   */
+  /** Handle a Get Bucket Policy Command from the SDK. */
   async getBucketPolicy(
     command: simS3Commands.SimGetBucketPolicyCommand,
     options?: SimS3RequestOptions,
@@ -88,9 +81,7 @@ export class SimS3 {
     return await this.commands.bucketPolicies.get(command, options);
   }
 
-  /**
-   * Handle a Delete Bucket Policy Command from the SDK.
-   */
+  /** Handle a Delete Bucket Policy Command from the SDK. */
   async deleteBucketPolicy(
     command: simS3Commands.SimDeleteBucketPolicyCommand,
     options?: SimS3RequestOptions,
@@ -98,9 +89,7 @@ export class SimS3 {
     return await this.commands.bucketPolicies.delete(command, options);
   }
 
-  /**
-   * Handle a Put Public Access Block Command from the SDK.
-   */
+  /** Handle a Put Public Access Block Command from the SDK. */
   async putPublicAccessBlock(
     command: simS3Commands.SimPutPublicAccessBlockCommand,
     options?: SimS3RequestOptions,
@@ -108,9 +97,7 @@ export class SimS3 {
     return await this.commands.publicAccessBlocks.put(command, options);
   }
 
-  /**
-   * Handle a Get Public Access Block Command from the SDK.
-   */
+  /** Handle a Get Public Access Block Command from the SDK. */
   async getPublicAccessBlock(
     command: simS3Commands.SimGetPublicAccessBlockCommand,
     options?: SimS3RequestOptions,
@@ -118,9 +105,7 @@ export class SimS3 {
     return await this.commands.publicAccessBlocks.get(command, options);
   }
 
-  /**
-   * Handle a Delete Public Access Block Command from the SDK.
-   */
+  /** Handle a Delete Public Access Block Command from the SDK. */
   async deletePublicAccessBlock(
     command: simS3Commands.SimDeletePublicAccessBlockCommand,
     options?: SimS3RequestOptions,
@@ -128,9 +113,7 @@ export class SimS3 {
     return await this.commands.publicAccessBlocks.delete(command, options);
   }
 
-  /**
-   * Handle a Put Bucket Website Command from the SDK.
-   */
+  /** Handle a Put Bucket Website Command from the SDK. */
   async putBucketWebsite(
     command: simS3Commands.SimPutBucketWebsiteCommand,
     options?: SimS3RequestOptions,
@@ -138,9 +121,7 @@ export class SimS3 {
     return await this.commands.buckets.putWebsite(command, options);
   }
 
-  /**
-   * Handle a Put Bucket Notification Configuration Command from the SDK.
-   */
+  /** Handle a Put Bucket Notification Configuration Command from the SDK. */
   async putBucketNotificationConfiguration(
     command: simS3Commands.SimPutBucketNotificationConfigurationCommand,
     options?: SimS3RequestOptions,
@@ -148,9 +129,7 @@ export class SimS3 {
     return await this.commands.notifications.put(command, options);
   }
 
-  /**
-   * Handle a Get Bucket Notification Configuration Command from the SDK.
-   */
+  /** Handle a Get Bucket Notification Configuration Command from the SDK. */
   async getBucketNotificationConfiguration(
     command: simS3Commands.SimGetBucketNotificationConfigurationCommand,
     options?: SimS3RequestOptions,
@@ -158,9 +137,7 @@ export class SimS3 {
     return await this.commands.notifications.get(command, options);
   }
 
-  /**
-   * Handle a List Buckets Command from the SDK.
-   */
+  /** Handle a List Buckets Command from the SDK. */
   async listBuckets(
     command: simS3Commands.SimListBucketsCommand,
     options?: SimS3RequestOptions,
@@ -168,9 +145,7 @@ export class SimS3 {
     return await this.commands.buckets.list(command, options);
   }
 
-  /**
-   * Handle a Put Object Command from the SDK.
-   */
+  /** Handle a Put Object Command from the SDK. */
   async putObject(
     command: simS3Commands.SimPutObjectCommand,
     options?: SimS3RequestOptions,
@@ -178,9 +153,7 @@ export class SimS3 {
     return await this.commands.objects.put(command, options);
   }
 
-  /**
-   * Handle a Get Object Command from the SDK.
-   */
+  /** Handle a Get Object Command from the SDK. */
   async getObject(
     command: simS3Commands.SimGetObjectCommand,
     options?: SimS3RequestOptions,
@@ -188,9 +161,7 @@ export class SimS3 {
     return await this.commands.objects.get(command, options);
   }
 
-  /**
-   * Handle a Delete Object Command from the SDK.
-   */
+  /** Handle a Delete Object Command from the SDK. */
   async deleteObject(
     command: simS3Commands.SimDeleteObjectCommand,
     options?: SimS3RequestOptions,
@@ -198,9 +169,7 @@ export class SimS3 {
     return await this.commands.objects.delete(command, options);
   }
 
-  /**
-   * Handle a Delete Objects Command from the SDK.
-   */
+  /** Handle a Delete Objects Command from the SDK. */
   async deleteObjects(
     command: simS3Commands.SimDeleteObjectsCommand,
     options?: SimS3RequestOptions,
@@ -208,9 +177,7 @@ export class SimS3 {
     return await this.commands.objects.deleteMany(command, options);
   }
 
-  /**
-   * Handle a List Objects Command from the SDK.
-   */
+  /** Handle a List Objects Command from the SDK. */
   async listObjects(
     command: simS3Commands.SimListObjectsCommand,
     options?: SimS3RequestOptions,
@@ -218,9 +185,7 @@ export class SimS3 {
     return await this.commands.objects.list(command, options);
   }
 
-  /**
-   * Get a simulated S3 Bucket instance by name.
-   */
+  /** Get a simulated S3 Bucket instance by name. */
   getSimBucketByName(
     bucketName: SimS3BucketName | string,
   ): SimS3Bucket | undefined {
@@ -247,16 +212,12 @@ export class SimS3 {
     return simS3ServiceUrl(this.accountRegionScope.regionName);
   }
 
-  /**
-   * Get the simulated S3 REST API endpoint URL for one Bucket.
-   */
+  /** Get the simulated S3 REST API endpoint URL for one Bucket. */
   getBucketUrl(bucketName: SimS3BucketName | string): URL {
     return this.bucketAccess.url(bucketName);
   }
 
-  /**
-   * Get the simulated S3 static website URL for a Bucket.
-   */
+  /** Get the simulated S3 static website URL for a Bucket. */
   getBucketWebsiteUrl(bucketName: SimS3BucketName | string): URL {
     return this.bucketAccess.websiteUrl(bucketName);
   }
@@ -272,24 +233,46 @@ export class SimS3 {
 
   /**
    * Have a simulated S3 Bucket use a local filesystem directory for storage.
+   *
+   * Passing somewhere to reload, as `{ reload: srv }`, also watches the
+   * directory: a build that writes into it reloads the connected browsers once
+   * the writes stop, without the Bucket having to be filled again.
    */
   mountBucketFilesystem(
     bucketName: SimS3BucketName | string,
     directoryPath: string,
+    options: SimS3MountFilesystemOptions = {},
   ): void {
-    this.bucketAccess.mountFilesystem(bucketName, directoryPath);
+    this.bucketAccess.mountFilesystem(bucketName, directoryPath, options);
   }
 
   /**
-   * Get this service's CloudFormation Resource factory.
+   * The mounted directories being watched for changes.
+   *
+   * A directory mounted with somewhere to reload is watched from then on, and
+   * a build in it reloads the browser rather than restarting anything.
    */
+  watchedMountedDirectories(): readonly string[] {
+    return this.bucketAccess.watchedMounts();
+  }
+
+  /**
+   * Stop watching mounted directories.
+   *
+   * A watch holds an open filesystem handle, so a process with one open does
+   * not exit on its own. A dev process wants exactly that and never calls this;
+   * anything with an end, such as a test, calls it when it is done.
+   */
+  stopWatchingMountedDirectories(): void {
+    this.bucketAccess.stopWatchingMounts();
+  }
+
+  /** Get this service's CloudFormation Resource factory. */
   cfnResourceFactory(): SimCfnServiceResourceFactory {
     return this.cfnFactory;
   }
 
-  /**
-   * Get this service's SDK Command router for SDK client interception.
-   */
+  /** Get this service's SDK Command router for SDK client interception. */
   sdkCommandRouter(): SimSdkCommandRouter {
     return this.sdkRouter;
   }

@@ -162,6 +162,39 @@ srv.close();
 
 `reload()` throws when live reload is off, rather than quietly doing nothing.
 
+### Reloading when a build changes a mounted directory
+
+A Bucket mounted on a local directory is already reading the files a site generator writes, so a
+rebuild needs nothing copying into it. Hand the mount the server and it watches the directory and
+reloads for you once the writes stop:
+
+```typescript sim-serve-mount-reload
+/**
+ * A built site the process reloads the browser for, rather than restarting for.
+ */
+
+import path from "node:path";
+
+import { CreateBucketCommand } from "@aws-sdk/client-s3";
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const srv = await serveSimAws({ simAws, port: 8787, liveReload: true });
+
+await simAws.s3().createBucket(new CreateBucketCommand({ Bucket: "site" }));
+
+simAws
+  .s3()
+  .mountBucketFilesystem("site", path.join(process.cwd(), "articles/public"), {
+    reload: srv,
+  });
+```
+
+One build is one reload, however many files it wrote. See
+[filesystem-backed Bucket storage](../services/s3/README.md#reloading-the-browser-when-the-directory-changes)
+for the `settleMs` override and for stopping the watch.
+
 ### What gets the script
 
 Yulin's own account of a request goes in headers and never in the body, so a response keeps the shape
@@ -218,10 +251,12 @@ CDK asset directories, and the working files an editor writes around a save.
 On top of that, Yulin names paths it is holding that the module graph never mentions. A directory
 given to `mountBucketFilesystem` and a template given to `deployTemplateFile` are reported to the
 supervisor as they are registered, and watched from then on, without appearing in any list. Editing
-a file in a mounted directory or re-synthing a stack restarts the process. A template deployed with
-the `watch` option is the exception, and is
-[left to the process reading it](#updating-a-stack-instead-of-restarting), as is any path the process
-[says it is holding](#holding-a-path-yourself).
+a file in a mounted directory or re-synthing a stack restarts the process.
+
+A path the process is watching itself is the exception, and is
+[left to the process reading it](#answering-a-change-instead-of-restarting): a template deployed
+with the `watch` option, and a directory mounted with somewhere to reload. So is any other path the
+process [says it is holding](#holding-a-path-yourself).
 
 A burst of writes is one restart. Saving one file is several filesystem events, so changes are held
 until they stop arriving before anything is restarted.
@@ -277,7 +312,12 @@ coming so a page comes back on its own. A hand-written reload channel wants the 
 Both are best effort and need a supervisor. In a process `yulin watch` did not start, such as a test
 run or a script launched from an IDE debugger, they do nothing at all.
 
-### Updating a stack instead of restarting
+This is the general case, for a path nothing else knows about. A mounted directory is the one Yulin
+does know about: `mountBucketFilesystem` takes a reload target, holds the path itself and settles the
+writes, so the example above is written for you. See
+[reloading when a build changes a mounted directory](#reloading-when-a-build-changes-a-mounted-directory).
+
+### Answering a change instead of restarting
 
 A deployment that watches its own template file is left alone by the supervisor:
 
@@ -308,6 +348,12 @@ The process names the template as one it is answering itself, so the supervisor 
 list rather than restarting for it. See
 [watching a template file](../services/cloudformation/README.md#watching-a-template-file) for what
 an update does to the resources.
+
+A directory mounted with somewhere to reload is left alone the same way. The Bucket is reading the
+files either way, so a rebuild has nothing to redo: the browser is reloaded and everything else the
+process is holding stays where it is, rather than the whole simulated environment going for the sake
+of a page that changed. See
+[reloading when a build changes a mounted directory](#reloading-when-a-build-changes-a-mounted-directory).
 
 A template synthesized against a real account sometimes needs adapting before Yulin will take it.
 `transform` is given the parsed template and answers with the one to deploy, on the deployment and
@@ -346,8 +392,8 @@ A transform that throws is reported the way a failed update is, so the process a
 is serving are left where they were. See
 [adapting a synthesized template](../services/cloudformation/README.md#adapting-a-synthesized-template-on-the-way-in).
 
-This works with no supervisor at all, so a dev script started from an IDE debugger picks up a
-re-synth with the debugger attached throughout.
+Both work with no supervisor at all, so a dev script started from an IDE debugger picks up a
+re-synth or a rebuild with the debugger attached throughout.
 
 ### When a run goes wrong
 
