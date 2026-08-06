@@ -1,6 +1,9 @@
 import type { SimAws } from "../../../aws/sim-aws.js";
-import type { SimRoute53RecordType } from "../../record/sim-route53-record.js";
-import { dnsInternetClass, dnsRecordTypeNumber } from "../dns-record-type.js";
+import {
+  dnsInternetClass,
+  dnsRecordTypeNumber,
+  type SimRoute53DnsRecordType,
+} from "../dns-record-type.js";
 import type { DnsQuestion } from "../wire/dns-question.js";
 import { SimRoute53DnsAnswerer } from "./sim-route53-dns-answerer.js";
 
@@ -16,12 +19,15 @@ export function testAnswerer(simAws: SimAws): SimRoute53DnsAnswerer {
 }
 
 /**
- * Build a question for a name and record type.
+ * Build a question for a name and a record type simulated DNS answers.
+ *
+ * A question about a stored type with no wire number here, such as `MX`, is
+ * built by naming the number, as a real resolver's query carries it.
  * @internal
  */
 export function testQuestion(
   name: string,
-  type: SimRoute53RecordType,
+  type: SimRoute53DnsRecordType,
 ): DnsQuestion {
   return {
     name,

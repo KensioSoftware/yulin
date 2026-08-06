@@ -2,9 +2,21 @@ import { assertArrayLength, assertIdentical } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { dnsRcodes } from "../dns-rcode.js";
-import { dnsAnyQueryType, dnsRecordTypeNumber } from "../dns-record-type.js";
+import {
+  dnsAnyQueryType,
+  dnsInternetClass,
+  dnsRecordTypeNumber,
+} from "../dns-record-type.js";
 import { testAnswerer, testQuestion } from "./dns-answerer-test-query.js";
 import { createTestZone } from "./dns-answerer-test-zone.js";
+
+/**
+ * The MX wire type number, which the codec has no encoder for and so does not
+ * name.
+ *
+ * https://www.iana.org/assignments/dns-parameters/dns-parameters.xhtml
+ */
+const mxQueryType = 15;
 
 describe("Simulated Route53 DNS negative answers", () => {
   it("reports no data for a name holding no record of the queried type", async () => {
@@ -101,6 +113,34 @@ describe("Simulated Route53 DNS negative answers", () => {
     assertIdentical(answer.rcode, dnsRcodes.noError);
     assertArrayLength(answer.answers, 0);
     assertArrayLength(answer.authority, 1);
+  });
+
+  it("reports no data for a stored record type it does not answer, such as MX", async () => {
+    // Given a zone holding an MX record, which the simulator stores for a test
+    // to assert on rather than for a resolver to act on.
+    const simAws = new SimAws();
+    await createTestZone(simAws, "example.test", [
+      {
+        name: "example.test",
+        type: "MX",
+        values: ["10 in1-smtp.messagingengine.com."],
+      },
+    ]);
+
+    // When the name is queried for MX.
+    const answer = testAnswerer(simAws).answer({
+      name: "example.test",
+      type: mxQueryType,
+      class: dnsInternetClass,
+    });
+
+    // Then the record is left out of the answer rather than encoded, and the
+    // query is answered as no data, with the zone SOA a resolver caches that
+    // against.
+    assertIdentical(answer.rcode, dnsRcodes.noError);
+    assertArrayLength(answer.answers, 0);
+    assertArrayLength(answer.authority, 1);
+    assertIdentical(answer.authority[0].type, dnsRecordTypeNumber("SOA"));
   });
 
   it("stops a CNAME cycle instead of following it forever", async () => {

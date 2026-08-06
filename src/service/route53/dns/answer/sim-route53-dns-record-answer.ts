@@ -1,5 +1,9 @@
 import type { SimRoute53Record } from "../../record/sim-route53-record.js";
-import { dnsInternetClass, dnsRecordTypeNumber } from "../dns-record-type.js";
+import {
+  dnsInternetClass,
+  dnsRecordTypeNumber,
+  isSimRoute53DnsRecordType,
+} from "../dns-record-type.js";
 import { encodeDnsRdata } from "../rdata/dns-rdata.js";
 import type { DnsResourceRecord } from "../wire/dns-resource-record.js";
 
@@ -20,11 +24,19 @@ const defaultRecordTtl = 60;
 export function simRoute53DnsAnswerRecords(
   record: SimRoute53Record,
 ): readonly DnsResourceRecord[] {
+  const recordType = record.type;
+
+  /* v8 ignore if -- a query only reaches records of a type it asked for by
+     wire number, and only answered types have one */
+  if (!isSimRoute53DnsRecordType(recordType)) {
+    return [];
+  }
+
   return record.values.map((value) => ({
     name: record.name,
-    type: dnsRecordTypeNumber(record.type),
+    type: dnsRecordTypeNumber(recordType),
     class: dnsInternetClass,
     ttl: record.ttl ?? defaultRecordTtl,
-    rdata: encodeDnsRdata(record.type, value),
+    rdata: encodeDnsRdata(recordType, value),
   }));
 }
