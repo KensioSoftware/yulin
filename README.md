@@ -125,7 +125,7 @@ AWS state is simulated internally, so you can test realistic interactions with m
 services.
 
 An Account ID is a plain string wherever one is accepted. Code that wants to name the type can get a
-`SimAwsAccountId` from `simAwsAccountId(...)`, which refuses anything that is not a 12 digit AWS
+`SimAwsAccountId` from `simAwsAccountId(...)`, which refuses anything that is not a 12-digit AWS
 Account ID, or from `makeSimAwsAccountId()` when a test just needs an arbitrary one.
 
 ```typescript

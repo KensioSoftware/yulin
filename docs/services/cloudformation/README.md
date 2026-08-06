@@ -1653,7 +1653,7 @@ different AWS-like scoping behaviour.
 
 An Account ID can always be written as a plain string, as above. Code that wants to name the type
 can get a `SimAwsAccountId` from `simAwsAccountId("111111111111")`, which refuses anything that is
-not a 12 digit AWS Account ID.
+not a 12-digit AWS Account ID.
 
 ## Inspecting stacks and resources
 
