@@ -20,6 +20,7 @@ export type {
   SimListUserPoolsCommandOutput,
 } from "./user-pool/list-user-pools.command.js";
 export type {
+  SimCognitoUserPoolClientSettingsInput,
   SimCognitoUserPoolClientType,
   SimCreateUserPoolClientCommand,
   SimCreateUserPoolClientCommandInput,
@@ -30,6 +31,9 @@ export type {
   SimDescribeUserPoolClientCommand,
   SimDescribeUserPoolClientCommandInput,
   SimDescribeUserPoolClientCommandOutput,
+  SimUpdateUserPoolClientCommand,
+  SimUpdateUserPoolClientCommandInput,
+  SimUpdateUserPoolClientCommandOutput,
 } from "./client/user-pool-client.command.js";
 export type {
   SimCognitoUserPoolClientDescription,

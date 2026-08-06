@@ -7,8 +7,8 @@ import type { SimCognitoUserPoolClientType } from "./user-pool-client.command.js
  */
 export class SimCognitoUserPoolClientView {
   /**
-   * A client as `CreateUserPoolClient` and `DescribeUserPoolClient` report
-   * it.
+   * A client as `CreateUserPoolClient`, `DescribeUserPoolClient` and
+   * `UpdateUserPoolClient` report it.
    *
    * The secret is included, as real Cognito includes it: `ClientSecret` on
    * `DescribeUserPoolClient` is how an application reads the secret it was

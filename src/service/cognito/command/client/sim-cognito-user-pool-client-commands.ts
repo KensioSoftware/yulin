@@ -1,6 +1,7 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimCognitoUserPoolClientFactory } from "../../user-pool/client/sim-cognito-user-pool-client-factory.js";
 import { requireSimCognitoUserPoolClientId } from "../../user-pool/client/sim-cognito-user-pool-client-id.js";
+import { SimCognitoUserPoolClientSettings } from "../../user-pool/client/sim-cognito-user-pool-client-settings.js";
 import { requireSimCognitoUserPoolId } from "../../user-pool/sim-cognito-user-pool-id.js";
 import type { SimCognitoUserPool } from "../../user-pool/sim-cognito-user-pool.js";
 import type { SimCognitoUserPoolStore } from "../../user-pool/sim-cognito-user-pool-store.js";
@@ -14,6 +15,8 @@ import type {
   SimDeleteUserPoolClientCommandOutput,
   SimDescribeUserPoolClientCommand,
   SimDescribeUserPoolClientCommandOutput,
+  SimUpdateUserPoolClientCommand,
+  SimUpdateUserPoolClientCommandOutput,
 } from "./user-pool-client.command.js";
 
 interface SimCognitoUserPoolClientCommandsProperties {
@@ -27,7 +30,8 @@ interface SimCognitoCommandOptions {
 }
 
 /**
- * The commands that create, describe and delete a simulated app client.
+ * The commands that create, describe, change and delete a simulated app
+ * client.
  *
  * Each one authorizes against the pool's ARN, because an app client has no
  * ARN of its own.
@@ -37,8 +41,10 @@ export class SimCognitoUserPoolClientCommands {
   private readonly clientFactory: SimCognitoUserPoolClientFactory;
   private readonly authorizer: SimCognitoAuthorizer;
   private readonly view = new SimCognitoUserPoolClientView();
-  private readonly unsimulatedOptions =
-    new SimCognitoUnsimulatedUserPoolClientOptions();
+  private readonly unsimulatedCreateOptions =
+    new SimCognitoUnsimulatedUserPoolClientOptions("CreateUserPoolClient");
+  private readonly unsimulatedUpdateOptions =
+    new SimCognitoUnsimulatedUserPoolClientOptions("UpdateUserPoolClient");
 
   constructor(properties: SimCognitoUserPoolClientCommandsProperties) {
     this.pools = properties.pools;
@@ -60,19 +66,59 @@ export class SimCognitoUserPoolClientCommands {
       options,
     );
 
-    this.unsimulatedOptions.refuseIn(input);
+    this.unsimulatedCreateOptions.refuseIn(input);
 
     const client = this.clientFactory.make({
       pool,
-      name: input.ClientName,
       generateSecret: input.GenerateSecret,
-      explicitAuthFlows: input.ExplicitAuthFlows,
-      preventUserExistenceErrors: input.PreventUserExistenceErrors,
-      tokenValidity: input,
-      unsimulatedSettings: input,
+      settings: new SimCognitoUserPoolClientSettings(input),
     });
 
     pool.addClient(client);
+
+    return { $metadata: {}, UserPoolClient: this.view.describe(client) };
+  }
+
+  /**
+   * Change an app client's settings.
+   *
+   * The settings are replaced by what the request holds, as real Cognito
+   * replaces them, so one the request leaves out goes back to the default
+   * `CreateUserPoolClient` would have given it. A request naming only
+   * `ClientName` therefore sends the authentication flows and the token
+   * lifetimes back to their defaults.
+   *
+   * The client's secret is not a setting and survives untouched.
+   * `UpdateUserPoolClient` has no `GenerateSecret` input on real Cognito, so
+   * a client created without a secret never gains one.
+   *
+   * `ClientName` is the one setting an omitted request keeps rather than
+   * resets. A client has to have a name, and `CreateUserPoolClient` requires
+   * one, so there is no default for an update to go back to.
+   */
+  update(
+    command: SimUpdateUserPoolClientCommand,
+    options?: SimCognitoCommandOptions,
+  ): SimUpdateUserPoolClientCommandOutput {
+    const { input } = command;
+    const pool = this.authorizedPool(
+      "cognito-idp:UpdateUserPoolClient",
+      input.UserPoolId,
+      options,
+    );
+
+    this.unsimulatedUpdateOptions.refuseIn(input);
+
+    const client = pool.requireClient(
+      requireSimCognitoUserPoolClientId(input.ClientId),
+    );
+
+    client.update(
+      new SimCognitoUserPoolClientSettings({
+        ...input,
+        ClientName: input.ClientName ?? client.name,
+      }),
+    );
 
     return { $metadata: {}, UserPoolClient: this.view.describe(client) };
   }

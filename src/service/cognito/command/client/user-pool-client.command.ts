@@ -28,19 +28,20 @@ export interface SimCognitoUserPoolClientType extends SimCognitoUnsimulatedClien
 }
 
 /**
- * The CreateUserPoolClient inputs this simulation reads, and the ones it
- * refuses.
+ * The app client settings `CreateUserPoolClient` and `UpdateUserPoolClient`
+ * both take, which is every one of them apart from the client's secret.
  *
  * Every input real Cognito accepts is named here, whether or not it is
  * simulated, so a request carrying one this simulation does not model can be
  * refused rather than silently ignored.
  *
- * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/cognito-identity-provider/command/CreateUserPoolClientCommand/
+ * `ClientSecret` is among them although only `CreateUserPoolClient` has it on
+ * real Cognito. It is refused either way, so a request that reached this
+ * simulation with one is told why rather than ignored.
  */
-export interface SimCreateUserPoolClientCommandInput {
+export interface SimCognitoUserPoolClientSettingsInput {
   readonly UserPoolId?: string | undefined;
   readonly ClientName?: string | undefined;
-  readonly GenerateSecret?: boolean | undefined;
   readonly ExplicitAuthFlows?: readonly string[] | undefined;
   readonly AccessTokenValidity?: number | undefined;
   readonly IdTokenValidity?: number | undefined;
@@ -65,6 +66,16 @@ export interface SimCreateUserPoolClientCommandInput {
 }
 
 /**
+ * The CreateUserPoolClient inputs this simulation reads, and the ones it
+ * refuses.
+ *
+ * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/cognito-identity-provider/command/CreateUserPoolClientCommand/
+ */
+export interface SimCreateUserPoolClientCommandInput extends SimCognitoUserPoolClientSettingsInput {
+  readonly GenerateSecret?: boolean | undefined;
+}
+
+/**
  * Minimal structural sim Cognito CreateUserPoolClient command.
  */
 export interface SimCreateUserPoolClientCommand {
@@ -72,6 +83,31 @@ export interface SimCreateUserPoolClientCommand {
 }
 
 export interface SimCreateUserPoolClientCommandOutput {
+  readonly UserPoolClient?: SimCognitoUserPoolClientType | undefined;
+  readonly $metadata: SimResponseMetadata;
+}
+
+/**
+ * The UpdateUserPoolClient inputs, which are the settings
+ * `CreateUserPoolClient` takes against a client that already exists.
+ *
+ * There is no `GenerateSecret` here, as there is none on real Cognito: an
+ * update cannot give a client a secret or take one away.
+ *
+ * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/cognito-identity-provider/command/UpdateUserPoolClientCommand/
+ */
+export interface SimUpdateUserPoolClientCommandInput extends SimCognitoUserPoolClientSettingsInput {
+  readonly ClientId?: string | undefined;
+}
+
+/**
+ * Minimal structural sim Cognito UpdateUserPoolClient command.
+ */
+export interface SimUpdateUserPoolClientCommand {
+  readonly input: SimUpdateUserPoolClientCommandInput;
+}
+
+export interface SimUpdateUserPoolClientCommandOutput {
   readonly UserPoolClient?: SimCognitoUserPoolClientType | undefined;
   readonly $metadata: SimResponseMetadata;
 }

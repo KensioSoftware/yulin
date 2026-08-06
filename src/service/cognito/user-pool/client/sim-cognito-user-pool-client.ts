@@ -1,21 +1,18 @@
-import type { SimCognitoName } from "../sim-cognito-name.js";
+import type { SimClock } from "../../../../util/clock/sim-clock.js";
 import type { SimCognitoUserPoolId } from "../sim-cognito-user-pool-id.js";
 import type { SimCognitoExplicitAuthFlows } from "./sim-cognito-explicit-auth-flows.js";
 import type { SimCognitoPreventUserExistenceErrors } from "./sim-cognito-prevent-user-existence-errors.js";
 import type { SimCognitoTokenValidity } from "./sim-cognito-token-validity.js";
 import type { SimCognitoUnsimulatedClientSettings } from "./sim-cognito-unsimulated-client-settings.js";
+import type { SimCognitoUserPoolClientSettings } from "./sim-cognito-user-pool-client-settings.js";
 import type { SimCognitoUserPoolClientId } from "./sim-cognito-user-pool-client-id.js";
 
 interface SimCognitoUserPoolClientProperties {
   readonly id: SimCognitoUserPoolClientId;
   readonly userPoolId: SimCognitoUserPoolId;
-  readonly name: SimCognitoName;
   readonly secret: string | undefined;
-  readonly explicitAuthFlows: SimCognitoExplicitAuthFlows;
-  readonly preventUserExistenceErrors: SimCognitoPreventUserExistenceErrors;
-  readonly tokenValidity: SimCognitoTokenValidity;
-  readonly unsimulatedSettings: SimCognitoUnsimulatedClientSettings;
-  readonly createdDate: Date;
+  readonly settings: SimCognitoUserPoolClientSettings;
+  readonly clock: SimClock;
 }
 
 /**
@@ -29,17 +26,6 @@ interface SimCognitoUserPoolClientProperties {
 export class SimCognitoUserPoolClient {
   public readonly id: SimCognitoUserPoolClientId;
   public readonly userPoolId: SimCognitoUserPoolId;
-  public readonly name: string;
-  public readonly explicitAuthFlows: SimCognitoExplicitAuthFlows;
-  public readonly preventUserExistenceErrors: SimCognitoPreventUserExistenceErrors;
-  public readonly tokenValidity: SimCognitoTokenValidity;
-
-  /**
-   * What the client was created with and nothing here acts on, kept so a
-   * described client reports it.
-   */
-  public readonly unsimulatedSettings: SimCognitoUnsimulatedClientSettings;
-
   public readonly creationDate: Date;
 
   /**
@@ -48,26 +34,62 @@ export class SimCognitoUserPoolClient {
    */
   public readonly secret: string | undefined;
 
+  private readonly clock: SimClock;
+  private clientSettings: SimCognitoUserPoolClientSettings;
+  private modifiedDate: Date;
+
   constructor(properties: SimCognitoUserPoolClientProperties) {
     this.id = properties.id;
     this.userPoolId = properties.userPoolId;
-    this.name = properties.name.value;
     this.secret = properties.secret;
-    this.explicitAuthFlows = properties.explicitAuthFlows;
-    this.preventUserExistenceErrors = properties.preventUserExistenceErrors;
-    this.tokenValidity = properties.tokenValidity;
-    this.unsimulatedSettings = properties.unsimulatedSettings;
-    this.creationDate = properties.createdDate;
+    this.clientSettings = properties.settings;
+    this.clock = properties.clock;
+    this.creationDate = this.clock.now();
+    this.modifiedDate = this.creationDate;
   }
 
   /**
-   * When the client last changed.
-   *
-   * Nothing can change an app client here, as `UpdateUserPoolClient` is not
-   * simulated, so this is its creation date.
+   * The client's friendly name.
+   */
+  get name(): string {
+    return this.clientSettings.name;
+  }
+
+  /**
+   * The authentication flows this client allows.
+   */
+  get explicitAuthFlows(): SimCognitoExplicitAuthFlows {
+    return this.clientSettings.explicitAuthFlows;
+  }
+
+  /**
+   * Whether a sign-in naming an unknown user says so.
+   */
+  get preventUserExistenceErrors(): SimCognitoPreventUserExistenceErrors {
+    return this.clientSettings.preventUserExistenceErrors;
+  }
+
+  /**
+   * How long each kind of token this client is given lasts.
+   */
+  get tokenValidity(): SimCognitoTokenValidity {
+    return this.clientSettings.tokenValidity;
+  }
+
+  /**
+   * What the client was given and nothing here acts on, kept so a described
+   * client reports it.
+   */
+  get unsimulatedSettings(): SimCognitoUnsimulatedClientSettings {
+    return this.clientSettings.unsimulated;
+  }
+
+  /**
+   * When the client's settings last changed, which is its creation date until
+   * something updates it.
    */
   get lastModifiedDate(): Date {
-    return this.creationDate;
+    return this.modifiedDate;
   }
 
   /**
@@ -76,5 +98,19 @@ export class SimCognitoUserPoolClient {
    */
   get hasSecret(): boolean {
     return this.secret !== undefined;
+  }
+
+  /**
+   * Replace the client's settings.
+   *
+   * `UpdateUserPoolClient` replaces rather than merges, as real Cognito does,
+   * so a setting the request left out goes back to the default a
+   * `CreateUserPoolClient` request leaving it out would have got. The secret
+   * is not among the settings and survives an update untouched, because real
+   * Cognito has no way to change it either.
+   */
+  update(settings: SimCognitoUserPoolClientSettings): void {
+    this.clientSettings = settings;
+    this.modifiedDate = this.clock.now();
   }
 }
