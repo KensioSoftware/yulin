@@ -267,6 +267,18 @@ export class SimS3 {
     this.bucketAccess.stopWatchingMounts();
   }
 
+  /**
+   * Let go of everything this simulated S3 is holding open.
+   *
+   * The mounted directory watches, which is what `SimAws.close()` reaches to
+   * release when a simulated environment is closed as a whole. The Buckets and
+   * the Objects in them are left where they are, mounts included: this is the
+   * open filesystem handles going, not the storage behind them.
+   */
+  close(): void {
+    this.stopWatchingMountedDirectories();
+  }
+
   /** Get this service's CloudFormation Resource factory. */
   cfnResourceFactory(): SimCfnServiceResourceFactory {
     return this.cfnFactory;

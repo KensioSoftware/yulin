@@ -173,7 +173,7 @@ the stack was deployed with describes the assembly the previous template came fr
 updates the stack rather than needing the process restarted:
 
 - `SimCfnTemplateFileWatches` holds one watch per deployment, keyed by file and stack, and is what
-  `stopWatchingTemplateFiles()` lets go of. It is also where a deployment's `watch` property is
+  `stopWatchingTemplateFiles()`, and `close()` behind it, lets go of. It is also where a deployment's `watch` property is
   turned into what to do. Keying by deployment is what lets one file deployed as two stacks update
   both, while deploying the same stack again replaces its own watch.
 - `SimCfnTemplateFileWatch` watches the directory the template is in, filtered to the template's own

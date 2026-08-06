@@ -6,6 +6,7 @@ export {
   SimAwsLocalServer,
 } from "./http/local-server/sim-aws-local-server.js";
 export { SimAwsLocalPortInUse } from "./http/local-server/sim-aws-local-port.error.js";
+export type { SimCloseOnSignalOptions } from "../util/process/close-on-signal.js";
 export { SimLiveReload } from "./http/live-reload/sim-live-reload.js";
 export {
   simLiveReloadConfig,

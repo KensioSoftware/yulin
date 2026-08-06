@@ -1235,7 +1235,11 @@ writes.
 
 Watching holds a filesystem handle open, so the process does not exit on its own. That is what a dev
 process wants. Anything with an end, such as a test, calls `stopWatchingTemplateFiles()` when it is
-done. `watchedTemplateFiles()` names what is being watched.
+done. `watchedTemplateFiles()` names what is being watched. Both are per Account and Region, so a
+simulation deploying into more than one has one call each.
+[`simAws.close()`](../../serve/README.md#stopping-and-restarting) is the one that is not: it lets go
+of the template watches in every scope, along with everything else the environment is holding, and a
+served environment gets that from `srv.close()`.
 
 Yulin never synthesizes anything. It reads the output template, so run your own `cdk synth` and let
 the watch pick up what it writes.

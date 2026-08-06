@@ -53,9 +53,16 @@ await srv.close();
 
 ## Stopping and restarting
 
-`close()` stops serving and ends the connections the server is holding, so the process can exit. It
-returns a promise that settles once the last thing the server had to say has gone, so a script that
-means to exit rather than let the event loop empty has something to wait for. Yulin installs no
+`close()` stops serving and lets go of everything Yulin was holding, so the process can exit. That
+is the HTTP port, the DNS port and the connections the server is holding, and the simulated
+environment it was serving with them: the template files a deployment is
+[watching](../services/cloudformation/README.md#watching-a-template-file) and the directories a
+[mount](../services/s3/README.md#reloading-the-browser-when-the-directory-changes) is watching,
+in whichever Account and Region each of them lives in. One call, so a script that does not exit is
+not a hunt for the handle you missed.
+
+It returns a promise that settles once the last thing the server had to say has gone, so a script
+that means to exit rather than let the event loop empty has something to wait for. Yulin installs no
 signal handlers, since a library taking over process signals gets in the way of whatever else the
 process is doing. Call `close()` from your own handler:
 
@@ -78,6 +85,68 @@ process.on("SIGTERM", () => {
   void stopServing();
 });
 ```
+
+Closing twice does nothing twice, and closing a server whose environment started nothing is not an
+error. What is closed is the handles that keep the process alive: every simulated Bucket, Table and
+Stack is where it was, and the environment goes on working, so a script that closes and carries on
+can.
+
+An environment that is not being served has the same call on it. `simAws.close()` lets go of its
+template file watches and mounted directory watches, and a test with one of those has one line
+rather than a list:
+
+```typescript sim-serve-close-environment
+/**
+ * Letting go of what an unserved environment is holding.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+await simAws.cloudFormation().deployTemplateFile({
+  templatePath: "cdk.out/TestStack.template.json",
+  watch: true,
+});
+
+// The Stack, and everything the template deployed, is still there afterwards.
+await simAws.close();
+```
+
+### Asking for a signal handler
+
+The handler above is yours to write, which is the point: your script decides what a signal means and
+in what order things happen. A script that wants nothing more than the usual can say so instead, and
+gets the same close on `SIGINT` and `SIGTERM`:
+
+```typescript sim-serve-close-on-signal
+/**
+ * Asking for the signal handler rather than writing one.
+ */
+
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const srv = await serveSimAws({ simAws, port: 8787, liveReload: true });
+
+// Build the simulated environment the pages are served from here.
+
+// Asking is the whole of it. The handler closes the server and the environment
+// it serves, and the process then exits on its own.
+const stopListening = srv.closeOnSignal();
+
+// A script that stops wanting the handler before the process ends takes it off
+// again:
+stopListening();
+```
+
+Nothing is installed until that call, so the default stands: a process that never asks keeps its
+signals to itself. `closeOnSignal({ signals: ["SIGHUP"] })` names other signals. The handlers come
+off as the first one arrives, so a second Ctrl-C from someone who has waited long enough lands on
+Node's own default and ends the process. Nothing here exits the process either: closing lets go of
+what Yulin was holding, and a process with nothing else to do then exits on its own. `SimAws` has
+the same method, for an environment that is not served.
 
 A restart usually overlaps the process it replaces. `listen` waits a couple of seconds for a pinned
 port that is still held, then throws `SimAwsLocalPortInUse` naming the port, which means something

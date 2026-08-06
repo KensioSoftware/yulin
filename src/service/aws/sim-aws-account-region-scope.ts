@@ -1,6 +1,7 @@
 import type { SimAwsAccount, SimAwsAccountId } from "./sim-aws-account.js";
 import type { AwsRegionName, SimAwsRegion } from "./sim-aws-region.js";
 import { Memo } from "../../util/memo/memo.js";
+import { isSimAwsClosing } from "./sim-aws-closing.js";
 import { SimAws } from "./sim-aws.js";
 import type { SimS3 } from "../s3/sim-s3.js";
 import type { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
@@ -211,6 +212,26 @@ export class SimAwsAccountRegionContainer {
   sts(): SimSts {
     return this.memo.getOrCreate("sts", () =>
       this.simAws.serviceFactory.createSts(this),
+    );
+  }
+
+  /**
+   * Let go of everything the services in this scope are holding open.
+   *
+   * Whatever this scope has made that closes is closed, so a service that
+   * starts holding a file or directory watch is let go of here without this
+   * having to be told about it. Services that were never asked for were never
+   * made and have nothing to let go of, so reading them here would only bring
+   * them into being.
+   */
+  async close(): Promise<void> {
+    await Promise.all(
+      this.memo
+        .values()
+        .filter((service) => isSimAwsClosing(service))
+        .map(async (service) => {
+          await service.close();
+        }),
     );
   }
 }

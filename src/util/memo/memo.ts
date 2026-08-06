@@ -23,4 +23,15 @@ export class Memo<T> {
   has(key: PropertyKey): boolean {
     return this.cache.has(key);
   }
+
+  /**
+   * Returns what has been created so far, in the order it was created.
+   *
+   * Only what was actually asked for: reading this never makes anything, so a
+   * caller that wants to do something to everything memoized here does it to
+   * the things that exist rather than bringing the rest into being.
+   */
+  values(): readonly T[] {
+    return this.cache.values().toArray();
+  }
 }

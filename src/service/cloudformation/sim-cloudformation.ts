@@ -259,6 +259,18 @@ export class SimCloudFormation {
   }
 
   /**
+   * Let go of everything this simulated CloudFormation is holding open.
+   *
+   * The template file watches, which is what `SimAws.close()` reaches to
+   * release when a simulated environment is closed as a whole. The Stacks and
+   * the resources they deployed are left where they are: this is the open
+   * filesystem handles going, not the deployment.
+   */
+  close(): void {
+    this.stopWatchingTemplateFiles();
+  }
+
+  /**
    * Get this service's SDK Command router for SDK client interception.
    */
   sdkCommandRouter(): SimSdkCommandRouter {
