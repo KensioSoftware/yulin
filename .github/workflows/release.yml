@@ -1,0 +1,104 @@
+---
+# Publishes @kensio/yulin when a merge to main carries a feat or fix commit.
+# What it does is decided by .releaserc.yaml; this file is the plumbing.
+#
+# Two things live outside the repository and have to exist for it to work:
+#
+#   1. A trusted publisher on npmjs.com for @kensio/yulin, pointing at this
+#      repository, this workflow file, and the "release" environment below,
+#      with npm publish as the only allowed action. This is what replaces a
+#      stored NPM_TOKEN — there is no npm credential in this repository.
+#
+#   2. A repository environment named "release". Giving it a required
+#      reviewer makes every publish wait for a human; leaving it bare makes
+#      releases fully automatic. Either works, and the choice is only made
+#      there, not here.
+#
+# Neither is recorded in the repository, so if publishes start failing with an
+# authentication error, check that the trusted publisher still names this
+# workflow file — renaming this file silently invalidates it.
+
+name: Release
+
+on:
+  push:
+    branches:
+      - main
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CI: true
+
+# One release at a time, and never cancelled part-way: a run killed between
+# pushing the tag and publishing the tarball leaves a version that exists in
+# git and not on the registry, which is awkward to unpick.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+# Nothing is granted by default; the job below asks for the two scopes it
+# needs and no more.
+permissions: {}
+
+jobs:
+  release:
+    name: Release
+    # A GitHub-hosted runner rather than the Blacksmith ones pr.yml uses. The
+    # release path is the one place worth keeping third parties out of, and
+    # this job runs a few times a month, so the speed is not worth the reach.
+    runs-on: ubuntu-latest
+
+    # What the npm trusted publisher is scoped to, and where any approval
+    # requirement lives. See the note at the top of this file.
+    environment: release
+
+    permissions:
+      # Push the tag and create the GitHub Release.
+      contents: write
+      # Mint the OIDC token npm exchanges for a short-lived publish
+      # credential. Without this, @semantic-release/npm falls back to looking
+      # for an NPM_TOKEN and fails.
+      id-token: write
+
+    steps:
+      # Actions are pinned to commit SHAs rather than tags throughout this
+      # workflow. A tag can be moved to point at new code, which is how the
+      # tj-actions/changed-files compromise reached the repositories using it;
+      # a SHA cannot. The trailing comment is the tag each SHA was resolved
+      # from, so a bump is still readable in review.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # semantic-release works out the next version by reading the
+          # existing tags, so a shallow clone would have it start from zero.
+          fetch-depth: 0
+          # semantic-release authenticates its own push with GITHUB_TOKEN, so
+          # leaving checkout's credential in .git/config only widens what a
+          # later step could use.
+          persist-credentials: false
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+        with:
+          version: 11.17.0
+          cache: true
+
+      - run: pnpm install --frozen-lockfile
+
+      # The same check pr.yml runs as Pack: builds the tarball, installs it
+      # into a throwaway project and imports every export subpath. The pull
+      # request already ran it, but main is what gets published, so this is
+      # the last gate before a broken dist/ reaches the registry.
+      - run: pnpm verify:pack
+
+      # Decides the version, publishes to npm, tags and writes the GitHub
+      # Release. Does nothing at all if the commits since the last tag are
+      # only chore/test/docs. See .releaserc.yaml.
+      - run: pnpm exec semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
