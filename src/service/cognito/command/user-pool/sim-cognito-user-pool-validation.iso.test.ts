@@ -59,10 +59,10 @@ const refusedInputs: readonly RefusedInput[] = [
     label: "LambdaConfig",
     input: {
       LambdaConfig: {
-        PreTokenGeneration: "arn:aws:lambda:eu-west-2:1:function:f",
+        CustomMessage: "arn:aws:lambda:eu-west-2:1:function:f",
       },
     },
-    says: "LambdaConfig PreTokenGeneration is not simulated",
+    says: "LambdaConfig CustomMessage is not simulated",
   },
   {
     label: "AliasAttributes",

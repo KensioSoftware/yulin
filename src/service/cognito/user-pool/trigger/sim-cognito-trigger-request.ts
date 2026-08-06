@@ -34,7 +34,37 @@ export class SimCognitoTriggerRequest {
       case "PostAuthentication": {
         return this.postAuthentication();
       }
+      case "PreTokenGeneration": {
+        return this.preTokenGeneration();
+      }
     }
+  }
+
+  /**
+   * What a `PreTokenGeneration` handler is given.
+   *
+   * `groupConfiguration.groupsToOverride` is the user's groups in precedence
+   * order, which is what a handler copies back into `groupOverrideDetails` to
+   * leave the `cognito:groups` claim alone. The `iamRolesToOverride` and
+   * `preferredRole` real Cognito sends beside it are left out, because the
+   * claims they feed are not issued here and a response naming them is refused.
+   *
+   * The client metadata is there only where the occasion carried it, which is a
+   * challenge response and nothing else: real Cognito does not pass an
+   * `InitiateAuth` request's `ClientMetadata` on to this trigger.
+   */
+  private preTokenGeneration(): object {
+    const { pool, user } = this.context;
+
+    return {
+      userAttributes: this.userAttributes(),
+      groupConfiguration: {
+        groupsToOverride: pool
+          .groupsOf(user.username)
+          .map((group) => group.name),
+      },
+      ...this.clientMetadata(),
+    };
   }
 
   /**

@@ -64,6 +64,13 @@ export {
   SimCognitoTokenIssuer,
   type SimCognitoIssuedTokens,
 } from "./user-pool/token/sim-cognito-token-issuer.js";
+export { SimCognitoUserPoolTriggers } from "./user-pool/trigger/sim-cognito-user-pool-triggers.js";
+export {
+  SimCognitoNoTriggerFunctions,
+  type SimCognitoTriggerFunctions,
+} from "./user-pool/trigger/sim-cognito-trigger-functions.js";
+export type { SimCognitoTriggerName } from "./user-pool/trigger/sim-cognito-trigger-name.js";
+export { SimCognitoTriggerOccasion } from "./user-pool/trigger/sim-cognito-trigger-occasion.js";
 export { SimCognitoAuthSession } from "./user-pool/auth/sim-cognito-auth-session.js";
 export { SimCognitoIssuedToken } from "./user-pool/auth/sim-cognito-issued-token.js";
 export { SimCognitoPoolAuth } from "./user-pool/auth/sim-cognito-pool-auth.js";

@@ -6,6 +6,7 @@ import {
 import type { SimCognitoUserPoolClient } from "../../user-pool/client/sim-cognito-user-pool-client.js";
 import type { SimCognitoUserPool } from "../../user-pool/sim-cognito-user-pool.js";
 import type { SimCognitoTokenIssuer } from "../../user-pool/token/sim-cognito-token-issuer.js";
+import { SimCognitoTriggerOccasion } from "../../user-pool/trigger/sim-cognito-trigger-occasion.js";
 import type { SimCognitoUserPoolTriggers } from "../../user-pool/trigger/sim-cognito-user-pool-triggers.js";
 import { SimCognitoAuthenticationResult } from "./sim-cognito-authentication-result.js";
 import type { SimCognitoAuthParameters } from "./sim-cognito-auth-parameters.js";
@@ -68,7 +69,8 @@ export class SimCognitoPasswordSignIn {
    *
    * `PostAuthentication` runs only where tokens were issued. A user answered
    * with the `NEW_PASSWORD_REQUIRED` challenge has not signed in yet, and runs
-   * it when it answers the challenge instead.
+   * it when it answers the challenge instead. `PreTokenGeneration` runs between
+   * the two, where the token issuer settles the claims.
    */
   async handle(
     request: SimCognitoAuthRequest,
@@ -91,10 +93,18 @@ export class SimCognitoPasswordSignIn {
       return this.challenge.issue({ pool, clientId: client.id, user });
     }
 
+    // `ClientMetadata` reaches PreAuthentication and PostAuthentication, and
+    // not the token trigger: real Cognito does not pass an InitiateAuth or
+    // AdminInitiateAuth request's on to that one.
     const authenticated = {
       $metadata: {},
       AuthenticationResult: this.result.of(
-        this.tokenIssuer.issue({ pool, client, user }),
+        await this.tokenIssuer.issue({
+          pool,
+          client,
+          user,
+          occasion: SimCognitoTriggerOccasion.tokenGeneration,
+        }),
       ),
     };
 

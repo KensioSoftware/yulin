@@ -35,3 +35,16 @@ export function answeringTriggerHandler(
     return event;
   };
 }
+
+/**
+ * Answer with one `claimsOverrideDetails`, which is how a `PreTokenGeneration`
+ * handler says what a token is to carry.
+ */
+export function claimsOverrideHandler(
+  details: unknown,
+): (event: unknown) => unknown {
+  return (event: unknown) => ({
+    ...(event as object),
+    response: { claimsOverrideDetails: details },
+  });
+}

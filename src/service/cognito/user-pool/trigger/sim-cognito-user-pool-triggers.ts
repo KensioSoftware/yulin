@@ -2,6 +2,8 @@ import {
   SimCognitoUnexpectedLambdaException,
   SimCognitoUserLambdaValidationException,
 } from "../../error/sim-cognito-trigger.error.js";
+import type { SimCognitoClaimsOverride } from "../token/sim-cognito-claims-override.js";
+import { SimCognitoClaimsOverrideReader } from "../token/sim-cognito-claims-override-reader.js";
 import { SimCognitoPreSignUpResponse } from "./sim-cognito-pre-sign-up-response.js";
 import type { SimCognitoTriggerContext } from "./sim-cognito-trigger-context.js";
 import { SimCognitoTriggerEvent } from "./sim-cognito-trigger-event.js";
@@ -30,6 +32,7 @@ interface SimCognitoUserPoolTriggersProperties {
  */
 export class SimCognitoUserPoolTriggers {
   private readonly functions: SimCognitoTriggerFunctions;
+  private readonly claimsOverrides = new SimCognitoClaimsOverrideReader();
 
   constructor(properties: SimCognitoUserPoolTriggersProperties) {
     this.functions = properties.functions;
@@ -86,6 +89,21 @@ export class SimCognitoUserPoolTriggers {
    */
   async postAuthentication(context: SimCognitoTriggerContext): Promise<void> {
     await this.run(SimCognitoTriggerOccasion.postAuthentication, context);
+  }
+
+  /**
+   * Run the `PreTokenGeneration` trigger, if the pool has one, and answer with
+   * what its handler asked to change about the claims.
+   *
+   * A pool without the trigger, and a handler that returned the event without
+   * writing a response, both answer with an override that changes nothing, so
+   * the token layer applies one either way.
+   */
+  async preTokenGeneration(
+    occasion: SimCognitoTriggerOccasion,
+    context: SimCognitoTriggerContext,
+  ): Promise<SimCognitoClaimsOverride> {
+    return this.claimsOverrides.read(await this.run(occasion, context));
   }
 
   /**

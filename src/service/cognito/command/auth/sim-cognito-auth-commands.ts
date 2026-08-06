@@ -41,7 +41,7 @@ export class SimCognitoAuthCommands {
 
   constructor(properties: SimCognitoAuthCommandsProperties) {
     const { resolver, authResolver, pools, clock, triggers } = properties;
-    const tokenIssuer = new SimCognitoTokenIssuer({ clock });
+    const tokenIssuer = new SimCognitoTokenIssuer({ clock, triggers });
     const flowRunner = new SimCognitoAuthFlowRunner({
       passwordSignIn: new SimCognitoPasswordSignIn({
         authResolver,
