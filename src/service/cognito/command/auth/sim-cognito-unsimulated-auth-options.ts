@@ -11,7 +11,6 @@ import type {
  * honour.
  */
 interface SimCognitoUnsimulatedAuthInput {
-  readonly ClientMetadata?: Readonly<Record<string, string>> | undefined;
   readonly AnalyticsMetadata?: object | undefined;
 }
 
@@ -21,6 +20,11 @@ interface SimCognitoUnsimulatedAuthInput {
  * All of them change what real Cognito does with a sign-in, and none of them
  * can be honoured here, so a request carrying one is refused rather than
  * signed in as if it had not.
+ *
+ * `ClientMetadata` is not among them. It is what a sign-in passes to a Lambda
+ * trigger, and the pool's triggers now receive it, so a request carrying it is
+ * honoured rather than refused. A pool with no trigger to hand it to ignores it,
+ * which is what real Cognito does with it too.
  *
  * The admin operations and the client ones name the caller's device and
  * address differently, `ContextData` against `UserContextData`, so each
@@ -42,11 +46,6 @@ export class SimCognitoUnsimulatedAuthOptions {
     unsimulated: SimCognitoUnsimulatedInput,
     input: SimCognitoUnsimulatedAuthInput,
   ): void {
-    unsimulated.refuse(
-      "ClientMetadata",
-      input.ClientMetadata,
-      "passing data to a Lambda trigger",
-    );
     unsimulated.refuse(
       "AnalyticsMetadata",
       input.AnalyticsMetadata,

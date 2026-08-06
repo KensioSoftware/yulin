@@ -19,6 +19,7 @@ import {
   type SimCognitoUnsimulatedPoolSettingsType,
 } from "./sim-cognito-unsimulated-pool-settings.js";
 import type { SimCognitoUserPoolStore } from "./sim-cognito-user-pool-store.js";
+import { SimCognitoLambdaConfig } from "./trigger/sim-cognito-lambda-config.js";
 
 interface SimCognitoUserPoolFactoryProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
@@ -33,6 +34,11 @@ interface SimCognitoMakeUserPoolProperties {
   readonly adminCreateUserConfig?:
     SimCognitoAdminCreateUserConfigType | undefined;
   readonly autoVerifiedAttributes?: readonly string[] | undefined;
+
+  /**
+   * The Lambda triggers the request asked the pool to run.
+   */
+  readonly lambdaConfig?: object | undefined;
 
   /**
    * The settings the request set that this simulation accepts without acting
@@ -91,6 +97,7 @@ export class SimCognitoUserPoolFactory {
       autoVerifiedAttributes: new SimCognitoAutoVerifiedAttributes(
         properties.autoVerifiedAttributes,
       ),
+      lambdaConfig: new SimCognitoLambdaConfig(properties.lambdaConfig),
       unsimulatedSettings: new SimCognitoUnsimulatedPoolSettings(
         properties.unsimulatedSettings ?? {},
       ),

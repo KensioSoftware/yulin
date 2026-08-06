@@ -33,6 +33,11 @@ const accountRecoverySetting = {
  * goes, which is what decides whether `SignUp` is allowed. The two keys beside
  * it are about the invitation an admin-created user is sent, and no message is
  * ever delivered here, so those are refused.
+ *
+ * `LambdaConfig` is not here either. The triggers a pool can run are read by
+ * SimCognitoLambdaConfig, which accepts the two this simulation fires and
+ * refuses the rest one key at a time, so a pool can have a trigger without
+ * having every trigger.
  */
 export class SimCognitoUnsimulatedUserPoolFeatures {
   private readonly unsimulated = new SimCognitoUnsimulatedInput(
@@ -46,11 +51,6 @@ export class SimCognitoUnsimulatedUserPoolFeatures {
    * Refuse a request carrying a feature this simulation cannot honour.
    */
   refuseIn(input: SimCreateUserPoolCommandInput): void {
-    this.unsimulated.refuse(
-      "LambdaConfig",
-      input.LambdaConfig,
-      "Lambda triggers",
-    );
     this.unsimulated.refuse(
       "AliasAttributes",
       input.AliasAttributes,

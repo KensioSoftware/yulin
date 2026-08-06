@@ -16,6 +16,9 @@ export class SimCognitoUserPoolView {
    * the request set them, so a template's declaration stays visible. Nothing
    * here reads any of them.
    *
+   * `LambdaConfig` is reported only by a pool that was created with one, and
+   * carries the triggers that pool runs.
+   *
    * `MfaConfiguration` is always `OFF` because MFA is not simulated.
    * `EstimatedNumberOfUsers` is how many users the pool holds now. Real
    * Cognito refreshes that number periodically rather than on each write, so
@@ -32,6 +35,7 @@ export class SimCognitoUserPoolView {
       Arn: pool.arn.value,
       Policies: { PasswordPolicy: pool.passwordPolicy.toOutput() },
       DeletionProtection: pool.deletionProtection.value,
+      LambdaConfig: pool.lambdaConfig.toOutput(),
       MfaConfiguration: "OFF",
       AdminCreateUserConfig: pool.adminCreateUserConfig.toOutput(),
       AutoVerifiedAttributes: pool.autoVerifiedAttributes.toOutput(),

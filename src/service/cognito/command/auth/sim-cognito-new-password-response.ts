@@ -5,6 +5,7 @@ import {
 } from "../../user-pool/auth/sim-cognito-sign-in.js";
 import { SimCognitoPasswordCheck } from "../../user-pool/sim-cognito-password-check.js";
 import type { SimCognitoTokenIssuer } from "../../user-pool/token/sim-cognito-token-issuer.js";
+import type { SimCognitoUserPoolTriggers } from "../../user-pool/trigger/sim-cognito-user-pool-triggers.js";
 import { SimCognitoAuthenticationResult } from "./sim-cognito-authentication-result.js";
 import type { SimCognitoAuthResolver } from "./sim-cognito-auth-resolver.js";
 import type { SimCognitoAuthRequest } from "./sim-cognito-password-sign-in.js";
@@ -13,6 +14,7 @@ import type { SimCognitoAuthenticationOutput } from "./auth.command.js";
 interface SimCognitoNewPasswordResponseProperties {
   readonly authResolver: SimCognitoAuthResolver;
   readonly tokenIssuer: SimCognitoTokenIssuer;
+  readonly triggers: SimCognitoUserPoolTriggers;
   readonly clock: SimClock;
 }
 
@@ -36,21 +38,28 @@ export interface SimCognitoChallengeResponseRequest extends SimCognitoAuthReques
 export class SimCognitoNewPasswordResponse {
   private readonly authResolver: SimCognitoAuthResolver;
   private readonly tokenIssuer: SimCognitoTokenIssuer;
+  private readonly triggers: SimCognitoUserPoolTriggers;
   private readonly clock: SimClock;
   private readonly result = new SimCognitoAuthenticationResult();
 
   constructor(properties: SimCognitoNewPasswordResponseProperties) {
     this.authResolver = properties.authResolver;
     this.tokenIssuer = properties.tokenIssuer;
+    this.triggers = properties.triggers;
     this.clock = properties.clock;
   }
 
   /**
    * Complete the challenge, and sign the user in.
+   *
+   * This is where the sign-in the challenge interrupted finishes, so it is
+   * where the pool's `PostAuthentication` trigger runs. `PreAuthentication`
+   * does not run again: it ran when the challenge was issued, and real Cognito
+   * fires it once per sign-in rather than once per request.
    */
-  handle(
+  async handle(
     request: SimCognitoChallengeResponseRequest,
-  ): SimCognitoAuthenticationOutput {
+  ): Promise<SimCognitoAuthenticationOutput> {
     const { pool, client, parameters } = request;
     const username = this.authResolver.username(client, parameters);
     const session = pool.auth.requireSession({
@@ -75,11 +84,20 @@ export class SimCognitoNewPasswordResponse {
 
     pool.auth.removeSession(session);
 
-    return {
+    const authenticated = {
       $metadata: {},
       AuthenticationResult: this.result.of(
         this.tokenIssuer.issue({ pool, client, user }),
       ),
     };
+
+    await this.triggers.postAuthentication({
+      pool,
+      client,
+      user,
+      clientMetadata: request.clientMetadata,
+    });
+
+    return authenticated;
   }
 }

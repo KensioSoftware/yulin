@@ -10,6 +10,7 @@ import { SimCognitoHttpApiJwtIssuerKeys } from "../../apigatewayv2/api/authorize
 import { SimRoute53AcmDnsRecords } from "../../acm/validation/sim-route53-acm-dns-records.js";
 import { SimCloudFormation } from "../../cloudformation/index.js";
 import { SimCognitoIdentityProvider } from "../../cognito/index.js";
+import { simAwsCognitoTriggerFunctions } from "../../cognito/user-pool/trigger/sim-aws-cognito-trigger-functions.js";
 import { SimDynamoDb as SimDynamoDatabase } from "../../dynamodb/index.js";
 import type { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
 import { SimKms } from "../../kms/index.js";
@@ -141,9 +142,8 @@ export class SimAwsAccountRegionServiceBuilder {
       accountRegionScope: scope.accountRegionScope,
       iam: this.accountServices.createIam(scope),
       background: this.background,
-      // Pool ids are unique across the simulation, and a pool is reachable by
-      // id alone from the serving layer, whichever scope created it.
       userPoolRegistry: this.registries.cognito,
+      triggerFunctions: simAwsCognitoTriggerFunctions(this.simAws),
     });
   }
 

@@ -30,9 +30,19 @@ interface SimCognitoUserPoolArnProperties {
 export class SimCognitoUserPoolArn {
   public readonly value: string;
 
+  /**
+   * The Account that owns the pool.
+   *
+   * This is kept alongside the ARN because it is what another service supplies
+   * as `AWS:SourceAccount` when the pool reaches it, such as a Lambda trigger
+   * invocation.
+   */
+  public readonly accountId: string;
+
   constructor(properties: SimCognitoUserPoolArnProperties) {
     this.value =
       cognitoUserPoolArnPrefix(properties.accountRegionScope) +
       properties.userPoolId;
+    this.accountId = properties.accountRegionScope.accountId;
   }
 }

@@ -63,6 +63,7 @@ export class SimCognitoUserPoolCommands {
       deletionProtection: input.DeletionProtection,
       adminCreateUserConfig: input.AdminCreateUserConfig,
       autoVerifiedAttributes: input.AutoVerifiedAttributes,
+      lambdaConfig: input.LambdaConfig,
       unsimulatedSettings: input,
     });
 

@@ -40,10 +40,10 @@ export class SimCognitoAdminInitiateAuth {
   /**
    * Start an authentication.
    */
-  handle(
+  async handle(
     command: SimAdminInitiateAuthCommand,
     options?: SimCognitoCommandOptions,
-  ): SimAdminInitiateAuthCommandOutput {
+  ): Promise<SimAdminInitiateAuthCommandOutput> {
     const { input } = command;
     const { pool, client } = this.authResolver.poolClient(
       "cognito-idp:AdminInitiateAuth",
@@ -57,13 +57,14 @@ export class SimCognitoAdminInitiateAuth {
 
     flow.requireEnabledFor(client);
 
-    return this.flowRunner.run(flow, {
+    return await this.flowRunner.run(flow, {
       pool,
       client,
       parameters: new SimCognitoAuthParameters(
         "AuthParameters",
         input.AuthParameters,
       ),
+      clientMetadata: input.ClientMetadata,
     });
   }
 }
