@@ -1,6 +1,6 @@
 import { SimCognitoUnsimulatedInput } from "../sim-cognito-unsimulated-input.js";
 import { SimCognitoUnsimulatedStructure } from "../sim-cognito-unsimulated-structure.js";
-import type { SimCreateUserPoolCommandInput } from "./user-pool.command.js";
+import type { SimCognitoUserPoolCommandInput } from "./user-pool.command.js";
 
 /**
  * The verification wording a pool is accepted with.
@@ -39,18 +39,19 @@ const verificationWording = "the wording of a verification message";
  * asking for a message a user would read.
  */
 export class SimCognitoUnsimulatedUserPoolMessaging {
-  private readonly unsimulated = new SimCognitoUnsimulatedInput(
-    "CreateUserPool",
-  );
-  private readonly structure = new SimCognitoUnsimulatedStructure(
-    "CreateUserPool",
-  );
+  private readonly unsimulated: SimCognitoUnsimulatedInput;
+  private readonly structure: SimCognitoUnsimulatedStructure;
+
+  constructor(operation: string) {
+    this.unsimulated = new SimCognitoUnsimulatedInput(operation);
+    this.structure = new SimCognitoUnsimulatedStructure(operation);
+  }
 
   /**
    * Refuse a request carrying a message setting this simulation cannot
    * honour.
    */
-  refuseIn(input: SimCreateUserPoolCommandInput): void {
+  refuseIn(input: SimCognitoUserPoolCommandInput): void {
     this.unsimulated.refuse(
       "EmailConfiguration",
       input.EmailConfiguration,
@@ -74,7 +75,7 @@ export class SimCognitoUnsimulatedUserPoolMessaging {
    * Refuse verification wording other than the one this simulation accepts.
    */
   private refuseVerificationWording(
-    input: SimCreateUserPoolCommandInput,
+    input: SimCognitoUserPoolCommandInput,
   ): void {
     this.unsimulated.refuseUnless(
       "EmailVerificationMessage",

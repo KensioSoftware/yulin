@@ -73,8 +73,8 @@ describe("Cognito CloudFormation property shapes", () => {
     assertTypeString(userPoolId);
 
     const pool = simAws.cognitoIdentityProvider().userPool(userPoolId);
-    assertIdentical(pool.passwordPolicy.minimumLength, 12);
-    assertFalse(pool.passwordPolicy.requiresSymbols);
+    assertIdentical(pool.settings.passwordPolicy.minimumLength, 12);
+    assertFalse(pool.settings.passwordPolicy.requiresSymbols);
 
     const client = pool.clients[0];
     assertNonNullable(client);

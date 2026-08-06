@@ -1,6 +1,6 @@
 import { SimCognitoUnsimulatedInput } from "../sim-cognito-unsimulated-input.js";
 import { SimCognitoUnsimulatedStructure } from "../sim-cognito-unsimulated-structure.js";
-import type { SimCreateUserPoolCommandInput } from "./user-pool.command.js";
+import type { SimCognitoUserPoolCommandInput } from "./user-pool.command.js";
 
 /**
  * The account recovery a pool is accepted with, which is what `aws-cdk-lib`
@@ -34,34 +34,24 @@ const accountRecoverySetting = {
  * it are about the invitation an admin-created user is sent, and no message is
  * ever delivered here, so those are refused.
  *
- * `LambdaConfig` is not here either. The triggers a pool can run are read by
+ * `LambdaConfig` is not here. The triggers a pool can run are read by
  * SimCognitoLambdaConfig, which accepts the two this simulation fires and
  * refuses the rest one key at a time, so a pool can have a trigger without
  * having every trigger.
  */
 export class SimCognitoUnsimulatedUserPoolFeatures {
-  private readonly unsimulated = new SimCognitoUnsimulatedInput(
-    "CreateUserPool",
-  );
-  private readonly structure = new SimCognitoUnsimulatedStructure(
-    "CreateUserPool",
-  );
+  private readonly unsimulated: SimCognitoUnsimulatedInput;
+  private readonly structure: SimCognitoUnsimulatedStructure;
+
+  constructor(operation: string) {
+    this.unsimulated = new SimCognitoUnsimulatedInput(operation);
+    this.structure = new SimCognitoUnsimulatedStructure(operation);
+  }
 
   /**
    * Refuse a request carrying a feature this simulation cannot honour.
    */
-  refuseIn(input: SimCreateUserPoolCommandInput): void {
-    this.unsimulated.refuse(
-      "AliasAttributes",
-      input.AliasAttributes,
-      "sign-in aliases",
-    );
-    this.unsimulated.refuse("Schema", input.Schema, "custom attributes");
-    this.unsimulated.refuse(
-      "UsernameConfiguration",
-      input.UsernameConfiguration,
-      "case-insensitive usernames",
-    );
+  refuseIn(input: SimCognitoUserPoolCommandInput): void {
     this.unsimulated.refuse(
       "UserAttributeUpdateSettings",
       input.UserAttributeUpdateSettings,

@@ -184,8 +184,7 @@ describe("Cognito CloudFormation validation", () => {
     assertStringIncludes(error.message, "AppPool");
     assertStringIncludes(
       error.message,
-      "CreateUserPool AutoVerifiedAttributes 'profile' is not an attribute " +
-        "Cognito can verify",
+      "AutoVerifiedAttributes 'profile' is not an attribute Cognito can verify",
     );
     assertStringIncludes(error.message, "email and phone_number");
   });

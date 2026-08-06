@@ -17,6 +17,7 @@ describe("SimCognitoSdkCommandRouter", () => {
     assertArrayIncludesAll(names, [
       "CreateUserPoolCommand",
       "DescribeUserPoolCommand",
+      "UpdateUserPoolCommand",
       "DeleteUserPoolCommand",
       "ListUserPoolsCommand",
       "CreateUserPoolClientCommand",

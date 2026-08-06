@@ -12,6 +12,9 @@ export type {
   SimDescribeUserPoolCommand,
   SimDescribeUserPoolCommandInput,
   SimDescribeUserPoolCommandOutput,
+  SimUpdateUserPoolCommand,
+  SimUpdateUserPoolCommandInput,
+  SimUpdateUserPoolCommandOutput,
 } from "./user-pool/user-pool.command.js";
 export type {
   SimCognitoUserPoolDescriptionType,
