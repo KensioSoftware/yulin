@@ -15,7 +15,7 @@
  */
 
 import { execa } from "execa";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
@@ -73,6 +73,7 @@ async function main(): Promise<void> {
     const tarballPath = await pack(workDirectory);
 
     await assertTarballHygiene(tarballPath);
+    await reportTarballSize(tarballPath);
 
     const consumerDirectory = path.join(workDirectory, "consumer");
     await createConsumer(consumerDirectory, tarballPath, manifest);
@@ -156,6 +157,43 @@ async function assertTarballHygiene(tarballPath: string): Promise<void> {
   }
 
   console.log(`Tarball is clean (${String(entries.length)} entries).`);
+}
+
+/**
+ * Reports what the tarball weighs, so a publish that suddenly ships far more
+ * than the last one is visible before it goes out.
+ */
+async function reportTarballSize(tarballPath: string): Promise<void> {
+  const { size } = await stat(tarballPath);
+  const { stdout } = await execa("tar", ["tzvf", tarballPath]);
+
+  const unpacked = stdout
+    .split("\n")
+    .reduce((total, entry) => total + entrySize(entry), 0);
+
+  console.log(
+    `Tarball is ${formatBytes(size)} packed, ${formatBytes(unpacked)} unpacked.`,
+  );
+}
+
+/**
+ * Size of one `tar tzvf` entry, whichever of BSD tar and GNU tar produced it.
+ *
+ * The two put the size in different columns, but in both it is the last
+ * whole-number field before the modification date.
+ */
+function entrySize(entry: string): number {
+  const fields = entry.trim().split(/\s+/).slice(0, 5);
+  const sizes = fields.filter((field) => /^\d+$/.test(field));
+  const size = sizes.at(-1);
+
+  return size === undefined ? 0 : Number(size);
+}
+
+function formatBytes(bytes: number): string {
+  const mib = bytes / 1024 / 1024;
+
+  return `${mib.toFixed(2)} MiB (${bytes.toLocaleString("en-GB")} bytes)`;
 }
 
 function report(
