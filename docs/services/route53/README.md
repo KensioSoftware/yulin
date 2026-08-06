@@ -316,8 +316,12 @@ The stored alias value is normalized without the trailing dot.
 Sim Route53 stores ten record types: `A`, `AAAA`, `CAA`, `CNAME`, `MX`, `NS`, `PTR`, `SOA`, `SRV` and
 `TXT`. All ten can be created through `ChangeResourceRecordSetsCommand`, read back through
 `ListResourceRecordSetsCommand`, and declared as an `AWS::Route53::RecordSet`, so a zone that models
-a real one — mail records, certificate pinning, a service record — deploys as it stands. A type
-outside that list is rejected rather than stored.
+a real one — mail records, certificate pinning, a service record — deploys as it stands.
+
+A type outside that list is not stored. `ChangeResourceRecordSetsCommand` rejects it, because the
+call asked for a record the simulator cannot keep. A template declaring one is treated more gently:
+the `AWS::Route53::RecordSet` is skipped and the rest of the stack deploys. See
+[unsupported record types in a template](#unsupported-record-types-in-a-template).
 
 Simulated DNS answers queries for six of them: `A`, `AAAA`, `CNAME`, `TXT`, `NS` and `SOA`. `MX`,
 `SRV`, `CAA` and `PTR` are stored for a test to assert the presence and value of, not for a resolver
@@ -982,6 +986,80 @@ await simAws.backgroundTasksComplete();
 Record sets can use either `HostedZoneId` or `HostedZoneName`. `HostedZoneId` is usually the
 clearest option in templates because it can reference the zone resource directly.
 
+### Unsupported record types in a template
+
+A real DNS stack usually holds a few records that have nothing to do with what is being tested. When
+one of them declares a [record type](#record-types) sim Route53 does not store, the RecordSet is
+skipped and the rest of the stack deploys, the same way an unsupported resource type is. The skipped
+RecordSet is in `stack.skippedResources` with a `skippedReason` naming the record type.
+
+```typescript sim-route53-skipped-record-type
+/**
+ * Deploying a template that carries a record type sim Route53 does not store.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "signed-dns-stack",
+  template: {
+    Resources: {
+      SiteZone: {
+        Type: "AWS::Route53::HostedZone",
+        Properties: {
+          Name: "example.test",
+        },
+      },
+      SiteRecord: {
+        Type: "AWS::Route53::RecordSet",
+        Properties: {
+          HostedZoneId: { Ref: "SiteZone" },
+          Name: "www.example.test",
+          Type: "A",
+          TTL: "300",
+          ResourceRecords: ["192.0.2.1"],
+        },
+      },
+      DelegationSigner: {
+        Type: "AWS::Route53::RecordSet",
+        Properties: {
+          HostedZoneId: { Ref: "SiteZone" },
+          Name: "example.test",
+          Type: "DS",
+          TTL: "3600",
+          ResourceRecords: ["12345 13 2 49FD46E6C4B45C55D4AC"],
+        },
+      },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+await simAws.backgroundTasksComplete();
+
+// The A record the test is about was created.
+console.log(stack.getResource("SiteRecord")?.status);
+// "CREATE_COMPLETE"
+
+console.log(stack.skippedResources.map((resource) => resource.logicalId));
+// ["DelegationSigner"]
+
+console.log(stack.getResource("DelegationSigner")?.skippedReason);
+// "Unsupported sim Route53 CloudFormation Resource DelegationSigner: sim Route53
+//  does not model the DS record type, and stores A, AAAA, CAA, CNAME, MX, NS,
+//  PTR, SOA, SRV, TXT."
+```
+
+Only the record type is treated this way. A RecordSet that makes no sense as a RecordSet still fails
+the stack, so a `Name` that is not a string, a `Type` that is not a string, or a negative `TTL` is
+refused. An unmodelled record type is a gap in the simulation; a malformed RecordSet is a broken
+template.
+
+Tearing the stack down works with the skipped RecordSet in it. Nothing was created for it, so the
+teardown steps over it rather than asking Route53 to remove a record it never stored.
+
 ## CDK integration
 
 You can synthesize a CDK app and deploy the generated template with sim CloudFormation. CDK Route53
@@ -1138,7 +1216,8 @@ Sim Route53 currently supports:
 - A browser-viewable hosted zone and record summary at `dns.sim-aws.localhost`
 - DNS answers over UDP for `A`, `AAAA`, `CNAME`, `TXT`, `NS` and `SOA`, so those records can be
   queried with `dig` or any DNS client
-- The `AWS::Route53::HostedZone` and `AWS::Route53::RecordSet` CloudFormation resources
+- The `AWS::Route53::HostedZone` and `AWS::Route53::RecordSet` CloudFormation resources, with a
+  RecordSet declaring an unstored record type skipped rather than failing the stack
 - CDK-created Route53 Hosted Zones and records in synthesized templates
 
 The simulator focuses on useful behaviour for tests and local development rather than full Route53
