@@ -551,7 +551,7 @@ try {
 
   console.log(addresses); // [ '192.0.2.10' ]
 } finally {
-  srv.close();
+  await srv.close();
 }
 ```
 
@@ -722,7 +722,7 @@ try {
   console.log(response.status);
   console.log(await response.text());
 } finally {
-  srv.close();
+  await srv.close();
 }
 ```
 
@@ -871,7 +871,7 @@ try {
   console.log(response.status);
   console.log(await response.text());
 } finally {
-  srv.close();
+  await srv.close();
 }
 ```
 

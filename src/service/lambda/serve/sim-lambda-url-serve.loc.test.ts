@@ -50,7 +50,7 @@ describe("Serving a sim Lambda Function URL on localhost", () => {
       assertIdentical(response.headers.get("content-type"), "text/plain");
       assertIdentical(await response.text(), "Hello Yulin");
     } finally {
-      srv.close();
+      await srv.close();
     }
   });
 });

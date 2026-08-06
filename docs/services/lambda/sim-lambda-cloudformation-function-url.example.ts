@@ -66,5 +66,5 @@ try {
 
   console.log(await response.text());
 } finally {
-  srv.close();
+  await srv.close();
 }

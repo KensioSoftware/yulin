@@ -143,7 +143,7 @@ describe("Sim CDK HTTP API IAM authorizer local integration", () => {
       assertIdentical(reporter.status, 200);
       assertIdentical(await reporter.text(), reporterArn);
     } finally {
-      srv.close();
+      await srv.close();
     }
 
     await simAws.backgroundTasksComplete();

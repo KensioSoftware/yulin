@@ -130,4 +130,4 @@ await simAws.clock().advanceBy({ minutes: 6 });
 
 console.log(await call()); // { invocations: 2 }
 
-srv.close();
+await srv.close();

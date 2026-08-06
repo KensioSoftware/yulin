@@ -79,5 +79,5 @@ try {
   console.log(response.headers.get("content-type"));
   console.log(await response.text());
 } finally {
-  srv.close();
+  await srv.close();
 }

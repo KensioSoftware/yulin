@@ -100,7 +100,7 @@ describe("Serving a sim Cognito JWKS on localhost", () => {
       const payload = await verifier.verify(accessToken);
       assertIdentical(payload.username, "alice");
     } finally {
-      srv.close();
+      await srv.close();
     }
   });
 
@@ -133,7 +133,7 @@ describe("Serving a sim Cognito JWKS on localhost", () => {
       const payload = await verifier.verify(accessToken);
       assertIdentical(payload.username, "alice");
     } finally {
-      srv.close();
+      await srv.close();
     }
   });
 
@@ -164,7 +164,7 @@ describe("Serving a sim Cognito JWKS on localhost", () => {
       const jwks = await fetch(document.jwks_uri);
       assertIdentical(jwks.status, 200);
     } finally {
-      srv.close();
+      await srv.close();
     }
   });
 });

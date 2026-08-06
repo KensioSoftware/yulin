@@ -99,14 +99,24 @@ export class SimAwsLocalServer {
    * but one that is in use, which is what a browser part way through a request
    * or a live reload stream holds, keeps its socket open and the process with
    * it. Local development restarts on that process exiting, so the connections
-   * go. Closing the listening socket first means nothing new is accepted while
-   * the open ones are being ended.
+   * go.
+   *
+   * The order is what a browser needs. Both ports are let go first, so a
+   * replacement process can have them however long the rest takes. Then the
+   * live reload streams are told a reload is coming and seen out, because a
+   * socket destroyed with bytes still in flight is reset, and a reset costs the
+   * browser the event it was just sent. Only what is left after that is
+   * destroyed.
+   *
+   * Await it to know the last event has gone before leaving the process.
    */
-  close(): void {
-    this.liveReload.stopping();
+  async close(): Promise<void> {
     this.server.close();
-    this.server.closeAllConnections();
     this.dnsServer.close();
+
+    await this.liveReload.stopping();
+
+    this.server.closeAllConnections();
   }
 
   /**

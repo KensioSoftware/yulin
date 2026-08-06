@@ -124,8 +124,8 @@ describe("Simulated AWS DNS server", () => {
     resolver.setServers([`127.0.0.1:${server.dnsPort}`]);
   });
 
-  afterAll(() => {
-    server.close();
+  afterAll(async () => {
+    await server.close();
   });
 
   it("resolves a simulated Route53 name with a real DNS client", async () => {

@@ -16,4 +16,4 @@ console.log(srv.localUrl(websiteUrl).toString());
 // http://foo-site.s3-website.us-east-1.sim-aws.localhost:<srv.port>/
 // with whatever port this run took, since none was pinned.
 
-srv.close();
+await srv.close();

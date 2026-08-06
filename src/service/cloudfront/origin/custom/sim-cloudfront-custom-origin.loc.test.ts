@@ -88,7 +88,7 @@ describe("Serving a sim CloudFront custom Origin on localhost", () => {
       assertIdentical(response.status, 200);
       assertIdentical(await response.text(), "/greet Yulin");
     } finally {
-      srv.close();
+      await srv.close();
     }
   });
 });

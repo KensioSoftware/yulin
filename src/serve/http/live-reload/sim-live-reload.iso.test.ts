@@ -99,14 +99,14 @@ describe("SimLiveReload", () => {
     assertStringIncludes(second.written(), "event: reload");
   });
 
-  it("says a reload is coming, then ends the connection", () => {
+  it("says a reload is coming, then ends the connection", async () => {
     // Given a connected browser
     const liveReload = new SimLiveReload({ bootId });
     const response = new FakeServerResponse();
     liveReload.connect(response.asNodeResponse());
 
     // When the server is stopping
-    liveReload.stopping();
+    await liveReload.stopping();
 
     // Then the browser hears about it and is let go, so it reconnects
     assertStringIncludes(response.written(), "event: reloading");
@@ -144,7 +144,7 @@ describe("SimLiveReload", () => {
     assertIdentical(response.written(), onConnect);
   });
 
-  it("leaves a finished connection alone when stopping", () => {
+  it("leaves a finished connection alone when stopping", async () => {
     // Given a connected browser whose response has already finished
     const liveReload = new SimLiveReload({ bootId });
     const response = new FakeServerResponse();
@@ -153,7 +153,7 @@ describe("SimLiveReload", () => {
     const onConnect = response.written();
 
     // When the server stops
-    liveReload.stopping();
+    await liveReload.stopping();
 
     // Then there is nothing to say to it and nothing to end
     assertIdentical(response.written(), onConnect);
@@ -172,6 +172,9 @@ class FakeServerResponse extends EventEmitter {
   status = 0;
   headers: Record<string, string> = {};
   writableEnded = false;
+  // No socket, as a response that never went over one has none, which is what
+  // tells the channel there is no connection to see out.
+  readonly socket = null;
 
   private readonly chunks: string[] = [];
 
@@ -188,8 +191,9 @@ class FakeServerResponse extends EventEmitter {
     return true;
   }
 
-  end(): void {
+  end(onFinished?: () => void): void {
     this.writableEnded = true;
+    onFinished?.();
   }
 
   written(): string {

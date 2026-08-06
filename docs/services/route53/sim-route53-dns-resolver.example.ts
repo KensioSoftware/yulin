@@ -53,5 +53,5 @@ try {
 
   console.log(addresses); // [ '192.0.2.10' ]
 } finally {
-  srv.close();
+  await srv.close();
 }

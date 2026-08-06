@@ -18,7 +18,7 @@ describe("Simulated AWS local HTTP server restart", () => {
     const connection = await keepAliveConnection(Number(server.port));
 
     // When the server is closed
-    server.close();
+    await server.close();
 
     // Then the connection ends without the client having done anything
     await assertConnectionEnds(connection);
@@ -31,7 +31,7 @@ describe("Simulated AWS local HTTP server restart", () => {
     await startAnotherRequest(connection);
 
     // When the server is closed
-    server.close();
+    await server.close();
 
     // Then that connection ends too, rather than being left to finish
     await assertConnectionEnds(connection);
@@ -50,7 +50,7 @@ describe("Simulated AWS local HTTP server restart", () => {
 
     // Then it took the port rather than failing on it being busy
     assertIdentical(server.port, String(pinnedPort));
-    server.close();
+    await server.close();
   });
 
   it("binds a pinned port again immediately after closing", async () => {
@@ -60,11 +60,11 @@ describe("Simulated AWS local HTTP server restart", () => {
     await keepAliveConnection(pinnedPort);
 
     // When it closes and a replacement asks for the same port
-    first.close();
+    await first.close();
     const second = await new SimAwsLocalServer().listen(pinnedPort);
 
     // Then the replacement serves on the port the first one had
     assertIdentical(second.port, String(pinnedPort));
-    second.close();
+    await second.close();
   });
 });

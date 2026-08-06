@@ -18,8 +18,8 @@ describe("Serve simulated S3 Bucket static website on localhost", () => {
     await srv.listen();
   });
 
-  afterAll(() => {
-    srv.close();
+  afterAll(async () => {
+    await srv.close();
   });
 
   it("redirects to a slash-terminated folder URL when a folder index document exists", async () => {

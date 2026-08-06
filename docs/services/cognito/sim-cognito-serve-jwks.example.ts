@@ -77,5 +77,5 @@ try {
 
   console.log(payload.username); // "alice"
 } finally {
-  srv.close();
+  await srv.close();
 }

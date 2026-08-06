@@ -21,4 +21,4 @@ await simAws.s3().putObject(
 
 srv.reload();
 
-srv.close();
+await srv.close();

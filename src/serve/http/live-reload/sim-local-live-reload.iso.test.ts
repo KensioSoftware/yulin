@@ -68,7 +68,7 @@ describe("SimLocalLiveReload", () => {
     assertStringIncludes(page.written(), "event: reloading");
   });
 
-  it("stops listening for a supervisor once the server has closed", () => {
+  it("stops listening for a supervisor once the server has closed", async () => {
     // Given a page that was connected to a server which has since closed
     vi.spyOn(console, "warn").mockImplementation(() => undefined);
     const host = new FakeProcess();
@@ -79,7 +79,7 @@ describe("SimLocalLiveReload", () => {
     liveReload.serving("8787");
     const page = new FakeServerResponse();
     liveReload.channel()?.connect(page.asNodeResponse());
-    liveReload.stopping();
+    await liveReload.stopping();
     const afterClosing = page.written();
     const before = host.sent.length;
 
@@ -98,6 +98,9 @@ describe("SimLocalLiveReload", () => {
  */
 class FakeServerResponse {
   writableEnded = false;
+  // No socket, as a response that never went over one has none, which is what
+  // tells the channel there is no connection to see out.
+  readonly socket = null;
 
   private readonly chunks: string[] = [];
 
@@ -111,8 +114,9 @@ class FakeServerResponse {
     return true;
   }
 
-  end(): void {
+  end(onFinished?: () => void): void {
     this.writableEnded = true;
+    onFinished?.();
   }
 
   on(): this {

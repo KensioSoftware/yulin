@@ -126,4 +126,4 @@ const admitted = await fetch(url, { headers: { cookie: "session=valid" } });
 
 console.log(await admitted.text()); // '{"tenant":"acme"}'
 
-srv.close();
+await srv.close();

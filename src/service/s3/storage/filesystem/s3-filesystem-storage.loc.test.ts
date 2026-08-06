@@ -25,8 +25,8 @@ describe("Serve sim S3 Bucket on localhost with filesystem storage", () => {
     await srv.listen();
   });
 
-  afterAll(() => {
-    srv.close();
+  afterAll(async () => {
+    await srv.close();
   });
 
   it("reads files from filesystem and serves on localhost", async () => {

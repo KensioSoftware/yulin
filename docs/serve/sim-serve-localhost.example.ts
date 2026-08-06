@@ -10,4 +10,4 @@ const srv = await serveSimAws({ simAws, port: 8787 });
 
 console.log(srv.port); // "8787"
 
-srv.close();
+await srv.close();

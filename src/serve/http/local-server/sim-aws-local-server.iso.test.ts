@@ -20,7 +20,7 @@ describe("SimAwsLocalServer", () => {
         "local sim server nodeRequest.headers.host required",
       );
     } finally {
-      server.close();
+      await server.close();
     }
   });
 
@@ -43,7 +43,7 @@ describe("SimAwsLocalServer", () => {
         "local sim server nodeRequest.headers.host required",
       );
     } finally {
-      server.close();
+      await server.close();
     }
   });
 });

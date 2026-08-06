@@ -141,7 +141,7 @@ app.synth();
       );
       assertIdentical(ungranted.status, 403);
     } finally {
-      srv.close();
+      await srv.close();
     }
 
     await simAws.backgroundTasksComplete();

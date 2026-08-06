@@ -85,5 +85,5 @@ try {
   console.log(allowed.status); // 200
   console.log(await allowed.text()); // called by arn:aws:iam::888888888888:role/Reporter
 } finally {
-  srv.close();
+  await srv.close();
 }

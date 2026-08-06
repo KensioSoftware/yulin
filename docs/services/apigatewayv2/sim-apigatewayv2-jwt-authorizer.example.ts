@@ -157,4 +157,4 @@ const expired = await fetch(url, {
 
 console.log(expired.status); // 401
 
-srv.close();
+await srv.close();

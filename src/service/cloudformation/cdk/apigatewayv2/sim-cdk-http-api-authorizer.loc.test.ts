@@ -166,7 +166,7 @@ describe("Sim CDK HTTP API JWT authorizer local integration", () => {
       });
       assertIdentical(expired.status, 401);
     } finally {
-      srv.close();
+      await srv.close();
     }
 
     await simAws.backgroundTasksComplete();

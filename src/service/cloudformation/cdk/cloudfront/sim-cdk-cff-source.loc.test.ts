@@ -27,8 +27,8 @@ describe("Sim CDK CloudFront Function embedded source local integration", () => 
     await srv.listen();
   });
 
-  afterAll(() => {
-    srv.close();
+  afterAll(async () => {
+    await srv.close();
   });
 
   it("deploys a CloudFront Function association using embedded source code", async () => {

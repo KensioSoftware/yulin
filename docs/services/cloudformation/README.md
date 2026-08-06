@@ -1174,7 +1174,7 @@ try {
   console.log(response.status);
   console.log(await response.text());
 } finally {
-  srv.close();
+  await srv.close();
 }
 ```
 
@@ -1339,7 +1339,7 @@ try {
   console.log(response.status);
   console.log(response.headers.get("location"));
 } finally {
-  srv.close();
+  await srv.close();
 }
 ```
 
@@ -1475,7 +1475,7 @@ try {
   console.log(response.status);
   console.log(await response.text());
 } finally {
-  srv.close();
+  await srv.close();
 }
 ```
 
