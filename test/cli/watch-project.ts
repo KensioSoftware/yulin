@@ -2,6 +2,17 @@ import { readFile } from "node:fs/promises";
 import { TemporaryDirectory } from "../../src/util/filesystem/temporary-directory.js";
 
 /**
+ * How long one run of a supervised process is waited for.
+ *
+ * A run is a real process, spawned through `tsx`, importing whatever the dev
+ * script imports. On a loaded CI runner that is seconds rather than the
+ * fraction of one it takes on a developer machine. Two of these fit inside the
+ * local test timeout, so a test that waited for a restart it never got fails
+ * saying how many times the process ran rather than with a bare timeout.
+ */
+export const watchRunTimeoutMs = 12_000;
+
+/**
  * A throwaway project for `yulin watch` to supervise.
  *
  * Three directories, because two of them have to be outside the watched one.
@@ -101,7 +112,7 @@ export class WatchProject {
    */
   async untilRuns(
     count: number,
-    withinMs = 10_000,
+    withinMs = watchRunTimeoutMs,
   ): Promise<readonly string[]> {
     return await this.pollRuns(count, Date.now() + withinMs);
   }
