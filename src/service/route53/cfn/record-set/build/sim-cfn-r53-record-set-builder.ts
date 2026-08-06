@@ -6,11 +6,17 @@ import type {
 } from "../../../command/change-resource-record-sets/change-resource-record-sets.command.js";
 import type { SimRoute53RecordType } from "../../../record/sim-route53-record.js";
 import { SimCfnRoute53AliasTargetParser } from "../parse/sim-cfn-r53-alias-target-parser.js";
+import { SimCfnRoute53RecordTypeSkip } from "./sim-cfn-r53-record-type-skip.js";
 import { isSimRoute53RecordType } from "../../../record/sim-route53-record-type.js";
 
 /**
  * Builds Route53 ResourceRecordSet command input from CloudFormation
  * AWS::Route53::RecordSet properties.
+ *
+ * A property that makes no sense as a RecordSet is refused, which fails the
+ * Resource. A record type sim Route53 does not store is a different thing: that
+ * raises the unsupported-resource diagnostic the Stack lifecycle skips over,
+ * through {@link SimCfnRoute53RecordTypeSkip}.
  */
 export class SimCfnRoute53RecordSetBuilder {
   constructor(
@@ -50,13 +56,22 @@ export class SimCfnRoute53RecordSetBuilder {
   private type(): SimRoute53RecordType {
     const type = this.properties["Type"];
 
-    if (!isSimRoute53RecordType(type)) {
-      throw new TypeError(
-        `Invalid AWS::Route53::RecordSet ${this.resource.logicalId}: Type must be a supported Route53 record type`,
-      );
+    if (isSimRoute53RecordType(type)) {
+      return type;
     }
 
-    return type;
+    const skipError = new SimCfnRoute53RecordTypeSkip().findSkipError(
+      this.resource,
+      type,
+    );
+
+    if (skipError !== undefined) {
+      throw skipError;
+    }
+
+    throw new TypeError(
+      `Invalid AWS::Route53::RecordSet ${this.resource.logicalId}: Type must be a non-empty string`,
+    );
   }
 
   private ttl(): number | undefined {
