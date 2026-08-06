@@ -59,10 +59,10 @@ const refusedInputs: readonly RefusedInput[] = [
     label: "LambdaConfig",
     input: {
       LambdaConfig: {
-        CustomMessage: "arn:aws:lambda:eu-west-2:1:function:f",
+        UserMigration: "arn:aws:lambda:eu-west-2:1:function:f",
       },
     },
-    says: "LambdaConfig CustomMessage is not simulated",
+    says: "LambdaConfig UserMigration is not simulated",
   },
   {
     label: "AliasAttributes",
@@ -152,26 +152,25 @@ const refusedInputs: readonly RefusedInput[] = [
     says: "SMS delivery",
   },
   {
-    label: "VerificationMessageTemplate",
+    label: "VerificationMessageTemplate DefaultEmailOption",
     input: {
-      VerificationMessageTemplate: { DefaultEmailOption: "CONFIRM_WITH_CODE" },
+      VerificationMessageTemplate: { DefaultEmailOption: "CONFIRM_WITH_LINK" },
     },
-    says: "the wording of a verification message",
+    says: "confirming a sign-up by following a link",
   },
   {
-    label: "EmailVerificationMessage",
-    input: { EmailVerificationMessage: "Your code is {####}" },
-    says: "the wording of a verification message",
+    label: "VerificationMessageTemplate EmailMessageByLink",
+    input: {
+      VerificationMessageTemplate: { EmailMessageByLink: "Follow {##here##}" },
+    },
+    says: "confirming a sign-up by following a link",
   },
   {
-    label: "EmailVerificationSubject",
-    input: { EmailVerificationSubject: "Verify your email" },
-    says: "the wording of a verification message",
-  },
-  {
-    label: "SmsVerificationMessage",
-    input: { SmsVerificationMessage: "Your code is {####}" },
-    says: "the wording of a verification message",
+    label: "VerificationMessageTemplate EmailSubjectByLink",
+    input: {
+      VerificationMessageTemplate: { EmailSubjectByLink: "Confirm" },
+    },
+    says: "confirming a sign-up by following a link",
   },
   {
     label: "SmsAuthenticationMessage",

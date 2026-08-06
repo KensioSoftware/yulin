@@ -1,6 +1,7 @@
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
 import type { SimCognitoAdminCreateUserConfigType } from "../../user-pool/sim-cognito-admin-create-user-config.js";
 import type { SimCognitoUserPoolPoliciesType } from "../../user-pool/sim-cognito-password-policy.js";
+import type { SimCognitoVerificationMessagesType } from "../../user-pool/message/sim-cognito-verification-messages.js";
 import type { SimCognitoUnsimulatedPoolSettingsType } from "../../user-pool/sim-cognito-unsimulated-pool-settings.js";
 import type { SimCognitoUserPoolSettingsInput } from "../../user-pool/sim-cognito-user-pool-settings.js";
 import type { SimCognitoLambdaConfigType } from "../../user-pool/trigger/sim-cognito-lambda-config.js";
@@ -14,7 +15,10 @@ import type { SimCognitoLambdaConfigType } from "../../user-pool/trigger/sim-cog
  *
  * https://docs.aws.amazon.com/cognito-user-identity-pools/latest/APIReference/API_UserPoolType.html
  */
-export interface SimCognitoUserPoolType extends SimCognitoUnsimulatedPoolSettingsType {
+export interface SimCognitoUserPoolType
+  extends
+    SimCognitoUnsimulatedPoolSettingsType,
+    SimCognitoVerificationMessagesType {
   readonly Id?: string | undefined;
   readonly Name?: string | undefined;
   readonly Arn?: string | undefined;

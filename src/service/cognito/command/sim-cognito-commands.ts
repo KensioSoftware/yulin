@@ -5,6 +5,7 @@ import { SimCognitoUserPoolClientFactory } from "../user-pool/client/sim-cognito
 import { SimCognitoGroupFactory } from "../user-pool/group/sim-cognito-group-factory.js";
 import { SimCognitoUserPoolFactory } from "../user-pool/sim-cognito-user-pool-factory.js";
 import type { SimCognitoUserPoolStore } from "../user-pool/sim-cognito-user-pool-store.js";
+import { SimCognitoPoolMessenger } from "../user-pool/message/sim-cognito-pool-messenger.js";
 import type { SimCognitoTriggerFunctions } from "../user-pool/trigger/sim-cognito-trigger-functions.js";
 import { SimCognitoUserPoolTriggers } from "../user-pool/trigger/sim-cognito-user-pool-triggers.js";
 import { SimCognitoUserFactory } from "../user-pool/user/sim-cognito-user-factory.js";
@@ -65,6 +66,9 @@ export class SimCognitoCommands {
     const triggers = new SimCognitoUserPoolTriggers({
       functions: triggerFunctions,
     });
+    // The messages a pool would have sent are recorded by the sign-up and user
+    // commands alike, and both run the pool's CustomMessage trigger first.
+    const messenger = new SimCognitoPoolMessenger({ triggers, clock });
 
     this.userPools = new SimCognitoUserPoolCommands({
       pools,
@@ -86,12 +90,14 @@ export class SimCognitoCommands {
       resolver,
       userFactory,
       triggers,
+      messenger,
     });
     this.signUp = new SimCognitoSignUpCommands({
       authResolver,
       resolver,
       userFactory,
       triggers,
+      messenger,
     });
     this.userUpdates = new SimCognitoUserUpdateCommands({ resolver });
     this.listUsers = new SimCognitoListUsers({ resolver });

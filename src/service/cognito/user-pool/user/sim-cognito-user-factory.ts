@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
+import { SimCognitoPasswordCheck } from "../sim-cognito-password-check.js";
+import type { SimCognitoPasswordPolicy } from "../sim-cognito-password-policy.js";
 import {
   type SimCognitoAttributeType,
   SimCognitoUserAttributes,
@@ -16,22 +18,30 @@ interface SimCognitoUserFactoryProperties {
 interface SimCognitoMakeUserProperties {
   readonly username: SimCognitoUsername;
   readonly attributes?: readonly SimCognitoAttributeType[] | undefined;
+
   /**
-   * The password the user starts with, already checked against the pool's
-   * policy. A user made without one has no password at all.
+   * The password the user starts with, checked here against the pool's policy.
+   * A user made without one has no password at all.
    */
   readonly temporaryPassword?: string | undefined;
+
+  /** The policy the pool holds its users' passwords to. */
+  readonly passwordPolicy: SimCognitoPasswordPolicy;
 }
 
 interface SimCognitoSignUpUserProperties {
   readonly username: SimCognitoUsername;
   readonly attributes?: readonly SimCognitoAttributeType[] | undefined;
+
   /**
-   * The password the user chose, already checked against the pool's policy.
-   * It is the user's own rather than a temporary one, so the user signs in
-   * with it as soon as it is confirmed.
+   * The password the user chose, checked here against the pool's policy. It is
+   * the user's own rather than a temporary one, so the user signs in with it
+   * as soon as it is confirmed.
    */
-  readonly password: string;
+  readonly password: string | undefined;
+
+  /** The policy the pool holds its users' passwords to. */
+  readonly passwordPolicy: SimCognitoPasswordPolicy;
 }
 
 /**
@@ -44,14 +54,25 @@ export class SimCognitoUserFactory {
     this.clock = properties.clock;
   }
 
+  /**
+   * The password a user starts with, checked against the pool's policy.
+   *
+   * `AdminCreateUser` naming no `TemporaryPassword` leaves the user with no
+   * password at all: real Cognito generates one and sends it to the user, and
+   * the invitation this simulation records carries no password to read.
+   */
   private static passwordFor(
-    temporaryPassword: string | undefined,
+    field: string,
+    given: string | undefined,
+    policy: SimCognitoPasswordPolicy,
   ): SimCognitoUserPassword | undefined {
-    if (temporaryPassword === undefined) {
+    if (given === undefined) {
       return undefined;
     }
 
-    return new SimCognitoUserPassword(temporaryPassword);
+    return new SimCognitoUserPassword(
+      new SimCognitoPasswordCheck(policy).require(field, given),
+    );
   }
 
   /**
@@ -66,7 +87,11 @@ export class SimCognitoUserFactory {
       username: properties.username,
       sub: randomUUID(),
       attributes: new SimCognitoUserAttributes(properties.attributes),
-      password: SimCognitoUserFactory.passwordFor(properties.temporaryPassword),
+      password: SimCognitoUserFactory.passwordFor(
+        "TemporaryPassword",
+        properties.temporaryPassword,
+        properties.passwordPolicy,
+      ),
       clock: this.clock,
     });
   }
@@ -82,7 +107,14 @@ export class SimCognitoUserFactory {
       username: properties.username,
       sub: randomUUID(),
       attributes: new SimCognitoUserAttributes(properties.attributes),
-      password: new SimCognitoUserPassword(properties.password),
+      // The password a user chose is required, where the temporary one an
+      // administrator gives is not.
+      password: new SimCognitoUserPassword(
+        new SimCognitoPasswordCheck(properties.passwordPolicy).require(
+          "Password",
+          properties.password,
+        ),
+      ),
       status: SimCognitoUserStatus.unconfirmed,
       clock: this.clock,
     });

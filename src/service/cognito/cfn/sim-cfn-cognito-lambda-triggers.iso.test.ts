@@ -175,14 +175,14 @@ describe("Sim CloudFormation Cognito user pool Lambda triggers", () => {
   });
 
   it("fails a stack asking for a trigger this simulation does not run", async () => {
-    // Given a template naming a custom message trigger.
+    // Given a template naming a user migration trigger.
     const simAws = simAwsInEuWest2();
 
     // When the stack is deployed.
     const error = await deployFailure(
       simAws,
       poolWithTrigger({
-        CustomMessage: { "Fn::GetAtt": ["Trigger", "Arn"] },
+        UserMigration: { "Fn::GetAtt": ["Trigger", "Arn"] },
       }),
     );
 
@@ -190,7 +190,7 @@ describe("Sim CloudFormation Cognito user pool Lambda triggers", () => {
     // the function the template named.
     assertStringIncludes(
       error.message,
-      "CreateUserPool LambdaConfig CustomMessage is not simulated",
+      "CreateUserPool LambdaConfig UserMigration is not simulated",
     );
   });
 });

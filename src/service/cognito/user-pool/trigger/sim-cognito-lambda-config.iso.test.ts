@@ -151,7 +151,7 @@ describe("sim Cognito user pool LambdaConfig", () => {
           PoolName: "myapp-users",
           LambdaConfig: {
             PreAuthentication: triggerFunctionArn,
-            CustomMessage: otherFunctionArn,
+            UserMigration: otherFunctionArn,
           },
         }),
       ),
@@ -162,11 +162,11 @@ describe("sim Cognito user pool LambdaConfig", () => {
     assertIdentical(error.name, "InvalidParameterException");
     assertStringIncludes(
       error.message,
-      "CreateUserPool LambdaConfig CustomMessage is not simulated",
+      "CreateUserPool LambdaConfig UserMigration is not simulated",
     );
     assertStringIncludes(
       error.message,
-      "writing the wording of a message the pool sends",
+      "importing a user from an external directory on first sign-in",
     );
   });
 

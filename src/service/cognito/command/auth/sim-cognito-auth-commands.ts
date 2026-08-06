@@ -30,7 +30,9 @@ interface SimCognitoAuthCommandsProperties {
  * they run, and the sign-out commands share the pool store with them, so they
  * are built together here rather than among the pool and directory commands.
  * The resolvers arrive from outside because the sign-up commands resolve an
- * app client the same way these do.
+ * app client the same way these do, and the triggers because the sign-up and
+ * user commands run the pool's `CustomMessage` trigger through the same
+ * collaborator.
  */
 export class SimCognitoAuthCommands {
   public readonly adminInitiateAuth: SimCognitoAdminInitiateAuth;

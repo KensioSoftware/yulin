@@ -1,7 +1,7 @@
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { requireSimCognitoSecretHash } from "../../user-pool/auth/sim-cognito-secret-hash.js";
 import type { SimCognitoUserPoolClient } from "../../user-pool/client/sim-cognito-user-pool-client.js";
-import { SimCognitoPasswordCheck } from "../../user-pool/sim-cognito-password-check.js";
+import type { SimCognitoPoolMessenger } from "../../user-pool/message/sim-cognito-pool-messenger.js";
 import type { SimCognitoUserPool } from "../../user-pool/sim-cognito-user-pool.js";
 import { SimCognitoTriggerOccasion } from "../../user-pool/trigger/sim-cognito-trigger-occasion.js";
 import type { SimCognitoUserPoolTriggers } from "../../user-pool/trigger/sim-cognito-user-pool-triggers.js";
@@ -29,6 +29,7 @@ interface SimCognitoSignUpCommandsProperties {
   readonly resolver: SimCognitoRequestResolver;
   readonly userFactory: SimCognitoUserFactory;
   readonly triggers: SimCognitoUserPoolTriggers;
+  readonly messenger: SimCognitoPoolMessenger;
 }
 
 interface SimCognitoCommandOptions {
@@ -46,14 +47,15 @@ interface SimCognitoCommandOptions {
  * operation does.
  *
  * Nothing here delivers the confirmation code. It is issued and held on the
- * user, and `SimCognitoUserPool.confirmationCode` is where a test reads it
- * from.
+ * user, `SimCognitoUserPool.confirmationCode` is where a test reads it from,
+ * and the message the pool would have sent it in is recorded on the pool.
  */
 export class SimCognitoSignUpCommands {
   private readonly authResolver: SimCognitoAuthResolver;
   private readonly resolver: SimCognitoRequestResolver;
   private readonly userFactory: SimCognitoUserFactory;
   private readonly triggers: SimCognitoUserPoolTriggers;
+  private readonly messenger: SimCognitoPoolMessenger;
   private readonly unsimulatedOptions =
     new SimCognitoUnsimulatedSignUpOptions();
 
@@ -62,6 +64,7 @@ export class SimCognitoSignUpCommands {
     this.resolver = properties.resolver;
     this.userFactory = properties.userFactory;
     this.triggers = properties.triggers;
+    this.messenger = properties.messenger;
   }
 
   /**
@@ -79,6 +82,10 @@ export class SimCognitoSignUpCommands {
    * `autoConfirmUser` takes the user straight to `CONFIRMED` and reaches
    * `PostConfirmation` here rather than at a `ConfirmSignUp` that never comes,
    * which is what real Cognito does for a pool whose users never confirm.
+   *
+   * The verification message is recorded for a user that has to confirm, and
+   * for no other: a user the trigger auto-confirmed has nothing to answer with
+   * a code, so real Cognito sends it none.
    */
   async signUp(command: SimSignUpCommand): Promise<SimSignUpCommandOutput> {
     const { input } = command;
@@ -94,9 +101,8 @@ export class SimCognitoSignUpCommands {
     const user = this.userFactory.signUp({
       username,
       attributes: input.UserAttributes,
-      password: new SimCognitoPasswordCheck(
-        pool.settings.passwordPolicy,
-      ).require("Password", input.Password),
+      password: input.Password,
+      passwordPolicy: pool.settings.passwordPolicy,
     });
 
     const preSignUp = await this.triggers.preSignUp(
@@ -122,6 +128,15 @@ export class SimCognitoSignUpCommands {
         pool,
         client,
         user,
+        clientMetadata: input.ClientMetadata,
+      });
+    } else {
+      await this.messenger.send({
+        pool,
+        user,
+        client,
+        occasion: "SignUp",
+        code: user.confirmationCode,
         clientMetadata: input.ClientMetadata,
       });
     }
@@ -168,17 +183,31 @@ export class SimCognitoSignUpCommands {
    * Issue a fresh confirmation code for a user waiting to be confirmed.
    *
    * The code the user had stops working, as it does on real Cognito, so a
-   * test holding the earlier one has to read the new one from the pool.
+   * test holding the earlier one has to read the new one from the pool. The
+   * pool records a second message carrying the fresh code, and a
+   * `CustomMessage` handler tells this occasion from a sign-up by its
+   * `CustomMessage_ResendCode` trigger source.
    */
-  resendConfirmationCode(
+  async resendConfirmationCode(
     command: SimResendConfirmationCodeCommand,
-  ): SimResendConfirmationCodeCommandOutput {
+  ): Promise<SimResendConfirmationCodeCommandOutput> {
     const { input } = command;
     const { pool, client } = this.authResolver.client(input.ClientId);
 
     this.unsimulatedOptions.refuseInResend(input);
 
-    this.signingUpUser(pool, client, input).resendConfirmationCode();
+    const user = this.signingUpUser(pool, client, input);
+
+    user.resendConfirmationCode();
+
+    await this.messenger.send({
+      pool,
+      user,
+      client,
+      occasion: "ResendCode",
+      code: user.confirmationCode,
+      clientMetadata: input.ClientMetadata,
+    });
 
     return { $metadata: {} };
   }

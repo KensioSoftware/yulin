@@ -1,3 +1,4 @@
+import type { SimCognitoMessageOccasion } from "../message/sim-cognito-message-occasion.js";
 import type { SimCognitoTriggerName } from "./sim-cognito-trigger-name.js";
 
 /**
@@ -95,11 +96,57 @@ export class SimCognitoTriggerOccasion {
     "TokenGeneration_RefreshTokens",
   );
 
+  /**
+   * The verification message a user signing itself up is sent.
+   */
+  public static readonly customMessageSignUp = new SimCognitoTriggerOccasion(
+    "CustomMessage",
+    "CustomMessage_SignUp",
+  );
+
+  /**
+   * The verification message a user asking for another code is sent.
+   */
+  public static readonly customMessageResendCode =
+    new SimCognitoTriggerOccasion("CustomMessage", "CustomMessage_ResendCode");
+
+  /**
+   * The invitation an admin-created user is sent.
+   */
+  public static readonly customMessageAdminCreateUser =
+    new SimCognitoTriggerOccasion(
+      "CustomMessage",
+      "CustomMessage_AdminCreateUser",
+    );
+
   public readonly trigger: SimCognitoTriggerName;
   public readonly source: string;
 
   private constructor(trigger: SimCognitoTriggerName, source: string) {
     this.trigger = trigger;
     this.source = source;
+  }
+
+  /**
+   * The `CustomMessage` occasion a message is being sent on.
+   *
+   * One trigger covers all three, and the source is the only thing telling a
+   * handler which it is firing for, so an application customising one message
+   * and not another branches on it.
+   */
+  static customMessage(
+    occasion: SimCognitoMessageOccasion,
+  ): SimCognitoTriggerOccasion {
+    switch (occasion) {
+      case "SignUp": {
+        return this.customMessageSignUp;
+      }
+      case "ResendCode": {
+        return this.customMessageResendCode;
+      }
+      case "AdminCreateUser": {
+        return this.customMessageAdminCreateUser;
+      }
+    }
   }
 }

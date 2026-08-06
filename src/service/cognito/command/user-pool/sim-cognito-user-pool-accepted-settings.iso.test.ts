@@ -22,11 +22,10 @@ import type { SimCognitoIdentityProvider } from "../../sim-cognito-identity-prov
  * asking for nothing in particular, apart from the `AdminCreateUserConfig`
  * this simulation acts on.
  *
- * Each configures message delivery, verification wording or account recovery.
- * None of those is simulated, and none of these values asks for anything this
- * simulation does not already do, so a pool is created with them rather than
- * refused. They are recorded here as one block because a default CDK stack
- * sends them together.
+ * The verification wording is read: it is what the messages the pool records
+ * say, and any wording is accepted. `AccountRecoverySetting` is not, and this
+ * value asks for nothing this simulation does not already do. They are
+ * recorded here as one block because a default CDK stack sends them together.
  */
 const verificationMessage =
   "The verification code to your new account is {####}";
@@ -50,8 +49,8 @@ const cdkDefaultSettings = {
 } satisfies Partial<CreateUserPoolCommandInput>;
 
 /**
- * A value of each accepted setting that this simulation refuses, with what
- * the refusal has to say about it.
+ * A value this simulation refuses among the settings it otherwise accepts,
+ * with what the refusal has to say about it.
  */
 interface RefusedValue {
   readonly label: string;
@@ -70,26 +69,11 @@ const refusedValues: readonly RefusedValue[] = [
     says: "account recovery",
   },
   {
-    label: "EmailVerificationMessage",
-    input: { EmailVerificationMessage: "Your code is {####}" },
-    says: "the wording of a verification message",
-  },
-  {
-    label: "EmailVerificationSubject",
-    input: { EmailVerificationSubject: "Confirm your address" },
-    says: "the wording of a verification message",
-  },
-  {
-    label: "SmsVerificationMessage",
-    input: { SmsVerificationMessage: "Your code is {####}" },
-    says: "the wording of a verification message",
-  },
-  {
-    label: "VerificationMessageTemplate",
+    label: "VerificationMessageTemplate DefaultEmailOption",
     input: {
       VerificationMessageTemplate: { DefaultEmailOption: "CONFIRM_WITH_LINK" },
     },
-    says: "the wording of a verification message",
+    says: "confirming a sign-up by following a link",
   },
 ];
 
@@ -126,7 +110,7 @@ describe("sim Cognito user pool settings accepted without being simulated", () =
     assertNonNullable(described.UserPool);
 
     // And each setting is reported back as the request set it, so what the
-    // pool was asked for stays visible even though nothing here reads it.
+    // pool was asked for stays visible.
     assertObjectEquals(
       described.UserPool.AccountRecoverySetting,
       cdkDefaultSettings.AccountRecoverySetting,

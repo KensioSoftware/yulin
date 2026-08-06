@@ -6,20 +6,16 @@
  */
 export interface SimCognitoUnsimulatedPoolSettingsType {
   readonly AccountRecoverySetting?: object | undefined;
-  readonly EmailVerificationMessage?: string | undefined;
-  readonly EmailVerificationSubject?: string | undefined;
-  readonly SmsVerificationMessage?: string | undefined;
-  readonly VerificationMessageTemplate?: object | undefined;
 }
 
 /**
  * The settings a pool was created with and this simulation does not act on.
  *
- * Each one configures message delivery or account recovery, and neither is
- * simulated, so nothing reads any of them back out. They are kept so
- * `DescribeUserPool` reports what the request set, which is how a test can
- * see that a template's declaration reached the pool rather than being
- * dropped on the way.
+ * `AccountRecoverySetting` chooses how a forgotten password is recovered, and
+ * there is no `ForgotPassword` command here, so nothing reads it back out. It
+ * is kept so `DescribeUserPool` reports what the request set, which is how a
+ * test can see that a template's declaration reached the pool rather than
+ * being dropped on the way.
  *
  * Only what the request set is reported. A pool created without one of these
  * describes without it, rather than describing it as the value the request
@@ -44,12 +40,12 @@ export class SimCognitoUnsimulatedPoolSettings {
    * reference.
    *
    * A caller passes its whole `CreateUserPool` input in, and may reuse or
-   * edit that object afterwards. Two of these are nested objects, so the
-   * copy goes all the way down. Copying means a described pool reports what
-   * the request said at the time it was made, as a real one does.
+   * edit that object afterwards. This one is a nested object, so the copy goes
+   * all the way down. Copying means a described pool reports what the request
+   * said at the time it was made, as a real one does.
    *
-   * Each setting is kept only where the request set it, so a pool created
-   * without one describes without it rather than describing it as the value
+   * The setting is kept only where the request set it, so a pool created
+   * without it describes without it rather than describing it as the value
    * the request would have needed to use.
    */
   private accepted(
@@ -58,18 +54,6 @@ export class SimCognitoUnsimulatedPoolSettings {
     return structuredClone({
       ...(settings.AccountRecoverySetting !== undefined && {
         AccountRecoverySetting: settings.AccountRecoverySetting,
-      }),
-      ...(settings.EmailVerificationMessage !== undefined && {
-        EmailVerificationMessage: settings.EmailVerificationMessage,
-      }),
-      ...(settings.EmailVerificationSubject !== undefined && {
-        EmailVerificationSubject: settings.EmailVerificationSubject,
-      }),
-      ...(settings.SmsVerificationMessage !== undefined && {
-        SmsVerificationMessage: settings.SmsVerificationMessage,
-      }),
-      ...(settings.VerificationMessageTemplate !== undefined && {
-        VerificationMessageTemplate: settings.VerificationMessageTemplate,
       }),
     });
   }

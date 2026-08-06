@@ -8,8 +8,10 @@ import type {
 /**
  * Refuses the user operation inputs this simulation does not model.
  *
- * Nothing here delivers a message, verifies an attribute or runs a Lambda
- * trigger, so an input asking for any of those is refused rather than dropped.
+ * Nothing here delivers a message or verifies an attribute, so an input asking
+ * for either is refused rather than dropped. The data a Lambda trigger reads is
+ * refused only where the trigger that would read it is one this simulation does
+ * not run.
  */
 export class SimCognitoUnsimulatedUserOptions {
   private readonly creation = new SimCognitoUnsimulatedInput("AdminCreateUser");
@@ -21,25 +23,29 @@ export class SimCognitoUnsimulatedUserOptions {
   /**
    * Refuse an `AdminCreateUser` request this simulation cannot honour.
    *
-   * `MessageAction: SUPPRESS` is allowed, and does nothing, because no
-   * invitation is ever sent here. `RESEND` is refused: there is no message to
-   * send again.
+   * `MessageAction: SUPPRESS` records no invitation, which is the difference
+   * it makes on real Cognito too. `RESEND` is refused: it invites a user that
+   * already exists, and `AdminCreateUser` refuses to create one twice here.
    *
-   * `ValidationData` and `ClientMetadata` are not refused. Both exist to reach
-   * the pre sign-up trigger, and that trigger runs here, so they reach the
-   * handler.
+   * `DesiredDeliveryMediums` is refused because the pool picks the medium from
+   * the attributes the user has, and a request naming `SMS` for a user with an
+   * email address would be recorded as an email.
+   *
+   * `ValidationData` and `ClientMetadata` are not refused. They exist to reach
+   * the pre sign-up and custom message triggers, and both run here, so they
+   * reach the handler.
    */
   refuseInCreate(input: SimAdminCreateUserCommandInput): void {
     this.creation.refuseUnless(
       "MessageAction",
       input.MessageAction,
       "SUPPRESS",
-      "sending the invitation message again",
+      "inviting a user that already exists",
     );
     this.creation.refuse(
       "DesiredDeliveryMediums",
       input.DesiredDeliveryMediums,
-      "emailing or texting the user their temporary password",
+      "choosing which of a user's attributes the invitation goes to",
     );
     this.creation.refuse(
       "ForceAliasCreation",
