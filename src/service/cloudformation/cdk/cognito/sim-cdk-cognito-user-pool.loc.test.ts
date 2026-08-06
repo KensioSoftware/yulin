@@ -1,9 +1,13 @@
 import {
   AdminCreateUserCommand,
+  AdminGetUserCommand,
   AdminInitiateAuthCommand,
   AdminSetUserPasswordCommand,
+  ConfirmSignUpCommand,
   DescribeUserPoolClientCommand,
   DescribeUserPoolCommand,
+  InitiateAuthCommand,
+  SignUpCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 import {
   assertArrayEquals,
@@ -12,6 +16,7 @@ import {
   assertNonNullable,
   assertObjectEquals,
   assertStringStartsWith,
+  assertTrue,
   assertTypeString,
 } from "@kensio/smartass";
 import path from "node:path";
@@ -155,6 +160,105 @@ app.synth();
     );
 
     assertNonNullable(signedIn.AuthenticationResult?.AccessToken);
+
+    await simAws.backgroundTasksComplete();
+  });
+
+  it("deploys a CDK user pool a user signs itself up in", async () => {
+    // Given a CDK stack with a user pool that lets users sign themselves up
+    // and verifies the email address they sign up with.
+    const cdkProject = new TestCdkProject();
+    await cdkProject.writeCdkAppFile(
+      `
+import * as cdk from "aws-cdk-lib/core";
+import * as cognito from "aws-cdk-lib/aws-cognito";
+
+const app = new cdk.App();
+const stack = new cdk.Stack(app, "TestStack", {
+  env: { account: "111111111111", region: "eu-west-2" },
+});
+
+const pool = new cognito.UserPool(stack, "Pool", {
+  selfSignUpEnabled: true,
+  autoVerify: { email: true },
+});
+const client = pool.addClient("Client", {
+  disableOAuth: true,
+  authFlows: { userPassword: true },
+});
+
+new cdk.CfnOutput(stack, "PoolId", { value: pool.userPoolId });
+new cdk.CfnOutput(stack, "ClientId", { value: client.userPoolClientId });
+
+app.synth();
+      `,
+    );
+
+    // And we synth the CDK template.
+    const cdkOutDirectory = await cdkProject.synth();
+
+    // When we deploy it, and someone signs themselves up through the deployed
+    // app client.
+    const simAws = new SimAws();
+    const scoped = simAws.account(accountIdOneOnes).region("eu-west-2");
+    const stack = await scoped
+      .cloudFormation()
+      .deployTemplateFile(
+        path.join(cdkOutDirectory, "TestStack.template.json"),
+      );
+    await stack.waitForDeployComplete();
+
+    const userPoolId = stack.outputs.get("PoolId")?.value;
+    const clientId = stack.outputs.get("ClientId")?.value;
+    assertTypeString(userPoolId);
+    assertTypeString(clientId);
+
+    const cognito = scoped.cognitoIdentityProvider();
+
+    await cognito.signUp(
+      new SignUpCommand({
+        ClientId: clientId,
+        Username: "alice",
+        Password: "Sup3rSecretPassw0rd!",
+        UserAttributes: [{ Name: "email", Value: "alice@example.com" }],
+      }),
+    );
+    await cognito.confirmSignUp(
+      new ConfirmSignUpCommand({
+        ClientId: clientId,
+        Username: "alice",
+        ConfirmationCode: cognito
+          .userPool(userPoolId)
+          .confirmationCode("alice"),
+      }),
+    );
+
+    // Then the user signs in against the deployed pool, and the email address
+    // it signed up with is verified, because the template asked for that.
+    const signedIn = await cognito.initiateAuth(
+      new InitiateAuthCommand({
+        ClientId: clientId,
+        AuthFlow: "USER_PASSWORD_AUTH",
+        AuthParameters: {
+          USERNAME: "alice",
+          PASSWORD: "Sup3rSecretPassw0rd!",
+        },
+      }),
+    );
+
+    assertNonNullable(signedIn.AuthenticationResult?.AccessToken);
+
+    const described = await cognito.adminGetUser(
+      new AdminGetUserCommand({ UserPoolId: userPoolId, Username: "alice" }),
+    );
+
+    assertIdentical(described.UserStatus, "CONFIRMED");
+    assertTrue(
+      (described.UserAttributes ?? []).some(
+        (attribute) =>
+          attribute.Name === "email_verified" && attribute.Value === "true",
+      ),
+    );
 
     await simAws.backgroundTasksComplete();
   });

@@ -13,6 +13,11 @@ export {
   type SimCognitoDeletionProtectionValue,
 } from "./user-pool/sim-cognito-deletion-protection.js";
 export {
+  SimCognitoAdminCreateUserConfig,
+  type SimCognitoAdminCreateUserConfigType,
+} from "./user-pool/sim-cognito-admin-create-user-config.js";
+export { SimCognitoAutoVerifiedAttributes } from "./user-pool/sim-cognito-auto-verified-attributes.js";
+export {
   SimCognitoPasswordPolicy,
   type SimCognitoPasswordPolicyType,
   type SimCognitoSignInPolicyType,
@@ -34,6 +39,7 @@ export {
 export { SimCognitoUserDirectory } from "./sim-cognito-user-directory.js";
 export { SimCognitoAuthentication } from "./sim-cognito-authentication.js";
 export { SimCognitoUser } from "./user-pool/user/sim-cognito-user.js";
+export { SimCognitoConfirmationCode } from "./user-pool/user/sim-cognito-confirmation-code.js";
 export type { SimCognitoUsername } from "./user-pool/user/sim-cognito-username.js";
 export {
   SimCognitoUserStatus,
@@ -62,6 +68,7 @@ export { SimCognitoAuthSession } from "./user-pool/auth/sim-cognito-auth-session
 export { SimCognitoIssuedToken } from "./user-pool/auth/sim-cognito-issued-token.js";
 export { SimCognitoPoolAuth } from "./user-pool/auth/sim-cognito-pool-auth.js";
 export {
+  SimCognitoCodeMismatchException,
   SimCognitoError,
   SimCognitoGroupExistsException,
   SimCognitoInvalidParameterException,
@@ -69,5 +76,6 @@ export {
   SimCognitoNotAuthorizedException,
   SimCognitoResourceNotFoundException,
   SimCognitoUsernameExistsException,
+  SimCognitoUserNotConfirmedException,
   SimCognitoUserNotFoundException,
 } from "./error/sim-cognito.error.js";

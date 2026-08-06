@@ -19,13 +19,14 @@ import type { SimCognitoIdentityProvider } from "../../sim-cognito-identity-prov
 
 /**
  * The pool settings `aws-cdk-lib` 2.262.1 emits for a `UserPool` construct
- * asking for nothing in particular.
+ * asking for nothing in particular, apart from the `AdminCreateUserConfig`
+ * this simulation acts on.
  *
  * Each configures message delivery, verification wording or account recovery.
  * None of those is simulated, and none of these values asks for anything this
  * simulation does not already do, so a pool is created with them rather than
  * refused. They are recorded here as one block because a default CDK stack
- * sends all six together.
+ * sends them together.
  */
 const verificationMessage =
   "The verification code to your new account is {####}";
@@ -37,7 +38,6 @@ const cdkDefaultSettings = {
       { Name: "verified_email", Priority: 2 },
     ],
   },
-  AdminCreateUserConfig: { AllowAdminCreateUserOnly: true },
   EmailVerificationMessage: verificationMessage,
   EmailVerificationSubject: "Verify your new account",
   SmsVerificationMessage: verificationMessage,
@@ -68,21 +68,6 @@ const refusedValues: readonly RefusedValue[] = [
       },
     },
     says: "account recovery",
-  },
-  {
-    label: "AdminCreateUserConfig self sign-up",
-    input: { AdminCreateUserConfig: { AllowAdminCreateUserOnly: false } },
-    says: "self-service sign-up",
-  },
-  {
-    label: "AdminCreateUserConfig extra key",
-    input: {
-      AdminCreateUserConfig: {
-        AllowAdminCreateUserOnly: true,
-        InviteMessageTemplate: { EmailSubject: "Welcome" },
-      },
-    },
-    says: "self-service sign-up",
   },
   {
     label: "EmailVerificationMessage",
@@ -147,10 +132,6 @@ describe("sim Cognito user pool settings accepted without being simulated", () =
       cdkDefaultSettings.AccountRecoverySetting,
     );
     assertObjectEquals(
-      described.UserPool.AdminCreateUserConfig,
-      cdkDefaultSettings.AdminCreateUserConfig,
-    );
-    assertObjectEquals(
       described.UserPool.VerificationMessageTemplate,
       cdkDefaultSettings.VerificationMessageTemplate,
     );
@@ -182,7 +163,6 @@ describe("sim Cognito user pool settings accepted without being simulated", () =
     // value a request would have had to use to be accepted.
     assertNonNullable(described.UserPool);
     assertUndefined(described.UserPool.AccountRecoverySetting);
-    assertUndefined(described.UserPool.AdminCreateUserConfig);
     assertUndefined(described.UserPool.VerificationMessageTemplate);
     assertUndefined(described.UserPool.EmailVerificationMessage);
     assertUndefined(described.UserPool.EmailVerificationSubject);
@@ -195,11 +175,11 @@ describe("sim Cognito user pool settings accepted without being simulated", () =
     const input: Partial<CreateUserPoolCommandInput> =
       structuredClone(cdkDefaultSettings);
     const userPoolId = await createdPoolId(cognito, input);
-    assertNonNullable(input.AdminCreateUserConfig);
+    assertNonNullable(input.VerificationMessageTemplate);
 
     // When the caller edits that object afterwards, as it would to create a
     // second pool from the same starting point.
-    input.AdminCreateUserConfig.AllowAdminCreateUserOnly = false;
+    input.VerificationMessageTemplate.EmailSubject = "Something else";
     input.EmailVerificationSubject = "Something else";
 
     // Then the pool still reports what the request said when it was made,
@@ -208,9 +188,10 @@ describe("sim Cognito user pool settings accepted without being simulated", () =
       new DescribeUserPoolCommand({ UserPoolId: userPoolId }),
     );
     assertNonNullable(described.UserPool);
-    assertObjectEquals(described.UserPool.AdminCreateUserConfig, {
-      AllowAdminCreateUserOnly: true,
-    });
+    assertObjectEquals(
+      described.UserPool.VerificationMessageTemplate,
+      cdkDefaultSettings.VerificationMessageTemplate,
+    );
     assertIdentical(
       described.UserPool.EmailVerificationSubject,
       "Verify your new account",

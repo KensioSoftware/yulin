@@ -1,5 +1,10 @@
 import type { SimClock } from "../../../util/clock/sim-clock.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
+import {
+  SimCognitoAdminCreateUserConfig,
+  type SimCognitoAdminCreateUserConfigType,
+} from "./sim-cognito-admin-create-user-config.js";
+import { SimCognitoAutoVerifiedAttributes } from "./sim-cognito-auto-verified-attributes.js";
 import { SimCognitoDeletionProtection } from "./sim-cognito-deletion-protection.js";
 import { SimCognitoName } from "./sim-cognito-name.js";
 import {
@@ -25,6 +30,9 @@ interface SimCognitoMakeUserPoolProperties {
   readonly name: string | undefined;
   readonly policies?: SimCognitoUserPoolPoliciesType | undefined;
   readonly deletionProtection?: string | undefined;
+  readonly adminCreateUserConfig?:
+    SimCognitoAdminCreateUserConfigType | undefined;
+  readonly autoVerifiedAttributes?: readonly string[] | undefined;
 
   /**
    * The settings the request set that this simulation accepts without acting
@@ -76,6 +84,12 @@ export class SimCognitoUserPoolFactory {
       ),
       deletionProtection: new SimCognitoDeletionProtection(
         properties.deletionProtection,
+      ),
+      adminCreateUserConfig: new SimCognitoAdminCreateUserConfig(
+        properties.adminCreateUserConfig,
+      ),
+      autoVerifiedAttributes: new SimCognitoAutoVerifiedAttributes(
+        properties.autoVerifiedAttributes,
       ),
       unsimulatedSettings: new SimCognitoUnsimulatedPoolSettings(
         properties.unsimulatedSettings ?? {},

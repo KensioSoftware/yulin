@@ -63,6 +63,7 @@ const described = await simAws
 
 console.log(described.UserPool?.Name); // "app-stack-Pool"
 
-// What the template declared is reported back, though nothing here reads it.
+// What the template declared is reported back. This one is acted on: it is
+// what says only an admin creates users in this pool.
 console.log(described.UserPool?.AdminCreateUserConfig);
 // { AllowAdminCreateUserOnly: true }

@@ -68,11 +68,6 @@ const refusedInputs: readonly RefusedInput[] = [
     says: "sign-in aliases",
   },
   {
-    label: "AutoVerifiedAttributes",
-    input: { AutoVerifiedAttributes: ["email"] },
-    says: "automatic attribute verification",
-  },
-  {
     label: "Schema",
     input: { Schema: [{ Name: "tenant", AttributeDataType: "String" }] },
     says: "custom attributes",
@@ -106,9 +101,21 @@ const refusedInputs: readonly RefusedInput[] = [
     says: "account recovery",
   },
   {
-    label: "AdminCreateUserConfig",
-    input: { AdminCreateUserConfig: { AllowAdminCreateUserOnly: false } },
-    says: "self-service sign-up",
+    label: "AdminCreateUserConfig InviteMessageTemplate",
+    input: {
+      AdminCreateUserConfig: {
+        AllowAdminCreateUserOnly: true,
+        InviteMessageTemplate: { EmailSubject: "Welcome" },
+      },
+    },
+    says: "the wording of the invitation an admin-created user is sent",
+  },
+  {
+    label: "AdminCreateUserConfig UnusedAccountValidityDays",
+    input: {
+      AdminCreateUserConfig: { UnusedAccountValidityDays: 3 },
+    },
+    says: "expiring the temporary password an admin-created user was sent",
   },
   {
     label: "UserPoolAddOns",

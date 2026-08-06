@@ -120,6 +120,21 @@ export class SimCognitoUserAttributes {
   }
 
   /**
+   * Mark the named attributes verified, where they are held.
+   *
+   * This is what a pool's `AutoVerifiedAttributes` reaches when a user
+   * confirms its sign-up. An attribute the user does not have is left alone
+   * rather than flagged as verified, because there was nothing to verify.
+   */
+  verify(names: readonly string[]): void {
+    this.update(
+      names
+        .filter((name) => this.byName.has(name))
+        .map((name) => ({ Name: `${name}_verified`, Value: "true" })),
+    );
+  }
+
+  /**
    * Apply requested attributes over the ones already held.
    *
    * An update names only the attributes it changes, as `AdminUpdateUserAttributes`

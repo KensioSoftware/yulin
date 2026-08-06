@@ -1,4 +1,7 @@
-import { SimCognitoNotAuthorizedException } from "../../error/sim-cognito.error.js";
+import {
+  SimCognitoNotAuthorizedException,
+  SimCognitoUserNotConfirmedException,
+} from "../../error/sim-cognito.error.js";
 import type { SimCognitoUserPoolClient } from "../client/sim-cognito-user-pool-client.js";
 import type { SimCognitoUserPool } from "../sim-cognito-user-pool.js";
 import type { SimCognitoUser } from "../user/sim-cognito-user.js";
@@ -44,6 +47,20 @@ export function requireSimCognitoSignInUser(
 export function requireSimCognitoEnabled(user: SimCognitoUser): void {
   if (!user.enabled) {
     throw new SimCognitoNotAuthorizedException("User is disabled.");
+  }
+}
+
+/**
+ * Refuse a sign-in by a user that has not confirmed its sign-up.
+ *
+ * This is checked after the password, because that is the order real Cognito
+ * answers in: an unconfirmed user with the wrong password is refused as any
+ * other wrong password is, and one with the right password is told what is
+ * actually missing, so an application can send it to `ConfirmSignUp`.
+ */
+export function requireSimCognitoConfirmed(user: SimCognitoUser): void {
+  if (user.status.isUnconfirmed) {
+    throw new SimCognitoUserNotConfirmedException("User is not confirmed.");
   }
 }
 

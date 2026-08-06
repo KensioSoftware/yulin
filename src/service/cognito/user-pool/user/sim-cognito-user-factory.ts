@@ -6,6 +6,7 @@ import {
 } from "./sim-cognito-user-attributes.js";
 import { SimCognitoUser } from "./sim-cognito-user.js";
 import { SimCognitoUserPassword } from "./sim-cognito-user-password.js";
+import { SimCognitoUserStatus } from "./sim-cognito-user-status.js";
 import type { SimCognitoUsername } from "./sim-cognito-username.js";
 
 interface SimCognitoUserFactoryProperties {
@@ -20,6 +21,17 @@ interface SimCognitoMakeUserProperties {
    * policy. A user made without one has no password at all.
    */
   readonly temporaryPassword?: string | undefined;
+}
+
+interface SimCognitoSignUpUserProperties {
+  readonly username: SimCognitoUsername;
+  readonly attributes?: readonly SimCognitoAttributeType[] | undefined;
+  /**
+   * The password the user chose, already checked against the pool's policy.
+   * It is the user's own rather than a temporary one, so the user signs in
+   * with it as soon as it is confirmed.
+   */
+  readonly password: string;
 }
 
 /**
@@ -55,6 +67,23 @@ export class SimCognitoUserFactory {
       sub: randomUUID(),
       attributes: new SimCognitoUserAttributes(properties.attributes),
       password: SimCognitoUserFactory.passwordFor(properties.temporaryPassword),
+      clock: this.clock,
+    });
+  }
+
+  /**
+   * Make a user that signed itself up, waiting to be confirmed.
+   *
+   * The user starts in `UNCONFIRMED` holding the confirmation code it gets
+   * with that status, which is where real Cognito leaves a `SignUp`.
+   */
+  signUp(properties: SimCognitoSignUpUserProperties): SimCognitoUser {
+    return new SimCognitoUser({
+      username: properties.username,
+      sub: randomUUID(),
+      attributes: new SimCognitoUserAttributes(properties.attributes),
+      password: new SimCognitoUserPassword(properties.password),
+      status: SimCognitoUserStatus.unconfirmed,
       clock: this.clock,
     });
   }

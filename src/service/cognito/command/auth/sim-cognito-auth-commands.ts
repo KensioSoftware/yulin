@@ -5,7 +5,7 @@ import type { SimCognitoRequestResolver } from "../sim-cognito-request-resolver.
 import { SimCognitoAdminInitiateAuth } from "./sim-cognito-admin-initiate-auth.js";
 import { SimCognitoAdminRespondToChallenge } from "./sim-cognito-admin-respond-to-challenge.js";
 import { SimCognitoAuthFlowRunner } from "./sim-cognito-auth-flow-runner.js";
-import { SimCognitoAuthResolver } from "./sim-cognito-auth-resolver.js";
+import type { SimCognitoAuthResolver } from "./sim-cognito-auth-resolver.js";
 import { SimCognitoInitiateAuth } from "./sim-cognito-initiate-auth.js";
 import { SimCognitoNewPasswordChallenge } from "./sim-cognito-new-password-challenge.js";
 import { SimCognitoNewPasswordResponse } from "./sim-cognito-new-password-response.js";
@@ -16,6 +16,7 @@ import { SimCognitoSignOutCommands } from "./sim-cognito-sign-out.js";
 
 interface SimCognitoAuthCommandsProperties {
   readonly resolver: SimCognitoRequestResolver;
+  readonly authResolver: SimCognitoAuthResolver;
   readonly pools: SimCognitoUserPoolStore;
   readonly clock: SimClock;
 }
@@ -23,10 +24,11 @@ interface SimCognitoAuthCommandsProperties {
 /**
  * The authentication command handlers of one simulated Cognito scope.
  *
- * The four sign-in commands share a resolver, a token issuer and the bodies of
- * the flows they run, and the sign-out commands share the pool store with
- * them, so they are built together here rather than among the pool and
- * directory commands.
+ * The four sign-in commands share a token issuer and the bodies of the flows
+ * they run, and the sign-out commands share the pool store with them, so they
+ * are built together here rather than among the pool and directory commands.
+ * The resolvers arrive from outside because the sign-up commands resolve an
+ * app client the same way these do.
  */
 export class SimCognitoAuthCommands {
   public readonly adminInitiateAuth: SimCognitoAdminInitiateAuth;
@@ -36,8 +38,7 @@ export class SimCognitoAuthCommands {
   public readonly signOut: SimCognitoSignOutCommands;
 
   constructor(properties: SimCognitoAuthCommandsProperties) {
-    const { resolver, pools, clock } = properties;
-    const authResolver = new SimCognitoAuthResolver({ resolver, pools });
+    const { resolver, authResolver, pools, clock } = properties;
     const tokenIssuer = new SimCognitoTokenIssuer({ clock });
     const flowRunner = new SimCognitoAuthFlowRunner({
       passwordSignIn: new SimCognitoPasswordSignIn({

@@ -1,4 +1,5 @@
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
+import type { SimCognitoAdminCreateUserConfigType } from "../../user-pool/sim-cognito-admin-create-user-config.js";
 import type { SimCognitoUserPoolPoliciesType } from "../../user-pool/sim-cognito-password-policy.js";
 import type { SimCognitoUnsimulatedPoolSettingsType } from "../../user-pool/sim-cognito-unsimulated-pool-settings.js";
 
@@ -18,6 +19,9 @@ export interface SimCognitoUserPoolType extends SimCognitoUnsimulatedPoolSetting
   readonly Policies?: SimCognitoUserPoolPoliciesType | undefined;
   readonly DeletionProtection?: string | undefined;
   readonly MfaConfiguration?: string | undefined;
+  readonly AdminCreateUserConfig?:
+    SimCognitoAdminCreateUserConfigType | undefined;
+  readonly AutoVerifiedAttributes?: readonly string[] | undefined;
   readonly EstimatedNumberOfUsers?: number | undefined;
   readonly CreationDate?: Date | undefined;
   readonly LastModifiedDate?: Date | undefined;
@@ -39,7 +43,8 @@ export interface SimCreateUserPoolCommandInput {
   readonly MfaConfiguration?: string | undefined;
   readonly UserPoolTier?: string | undefined;
   readonly AccountRecoverySetting?: object | undefined;
-  readonly AdminCreateUserConfig?: object | undefined;
+  readonly AdminCreateUserConfig?:
+    SimCognitoAdminCreateUserConfigType | undefined;
   readonly AliasAttributes?: readonly string[] | undefined;
   readonly AutoVerifiedAttributes?: readonly string[] | undefined;
   readonly DeviceConfiguration?: object | undefined;

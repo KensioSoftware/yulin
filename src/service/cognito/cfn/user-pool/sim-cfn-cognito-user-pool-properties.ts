@@ -6,6 +6,7 @@ import type {
 import type { SimCreateUserPoolCommandInput } from "../../command/user-pool/user-pool.command.js";
 import { SimCfnCognitoGeneratedName } from "../sim-cfn-cognito-generated-name.js";
 import { SimCfnCognitoPropertyParser } from "../sim-cfn-cognito-property-parser.js";
+import { SimCfnCognitoAdminCreateUserConfig } from "./sim-cfn-cognito-admin-create-user-config.js";
 import { SimCfnCognitoPolicies } from "./sim-cfn-cognito-policies.js";
 
 /**
@@ -16,12 +17,17 @@ import { SimCfnCognitoPolicies } from "./sim-cfn-cognito-policies.js";
  * why. A CDK stack states both routinely, and a pool created without either
  * would be reported as behaving differently when it does not.
  *
- * The six from `AccountRecoverySetting` down are here for the same reason,
- * and are the six a CDK `UserPool` construct emits when it was asked for
- * nothing in particular. Each configures message delivery, verification
- * wording or account recovery, none of which is simulated, so CreateUserPool
- * accepts each at the one value that asks for nothing this simulation does
- * not already do and refuses it at every other.
+ * `AdminCreateUserConfig` and `AutoVerifiedAttributes` are the two a
+ * `selfSignUpEnabled` CDK pool turns on, and both are acted on: the first
+ * decides whether `SignUp` is allowed at all, and the second decides which
+ * attributes confirming a sign-up marks as verified.
+ *
+ * The five from `AccountRecoverySetting` down are here because a CDK
+ * `UserPool` construct emits them when it was asked for nothing in
+ * particular. Each configures message delivery, verification wording or
+ * account recovery, none of which is simulated, so CreateUserPool accepts each
+ * at the one value that asks for nothing this simulation does not already do
+ * and refuses it at every other.
  */
 const simulatedProperties = [
   "UserPoolName",
@@ -29,8 +35,9 @@ const simulatedProperties = [
   "DeletionProtection",
   "MfaConfiguration",
   "UserPoolTier",
-  "AccountRecoverySetting",
   "AdminCreateUserConfig",
+  "AutoVerifiedAttributes",
+  "AccountRecoverySetting",
   "EmailVerificationMessage",
   "EmailVerificationSubject",
   "SmsVerificationMessage",
@@ -94,9 +101,14 @@ export class SimCfnCognitoUserPoolProperties {
         this.properties["AccountRecoverySetting"],
         "AccountRecoverySetting",
       ),
-      AdminCreateUserConfig: this.record(
-        this.properties["AdminCreateUserConfig"],
-        "AdminCreateUserConfig",
+      AdminCreateUserConfig: new SimCfnCognitoAdminCreateUserConfig({
+        resource: this.resource,
+        propertyParser: this.propertyParser,
+      }).parse(this.properties["AdminCreateUserConfig"]),
+      AutoVerifiedAttributes: this.propertyParser.optionalStringArray(
+        this.resource,
+        this.properties["AutoVerifiedAttributes"],
+        "AutoVerifiedAttributes",
       ),
       VerificationMessageTemplate: this.record(
         this.properties["VerificationMessageTemplate"],

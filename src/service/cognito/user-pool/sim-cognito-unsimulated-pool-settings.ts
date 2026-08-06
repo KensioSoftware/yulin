@@ -6,7 +6,6 @@
  */
 export interface SimCognitoUnsimulatedPoolSettingsType {
   readonly AccountRecoverySetting?: object | undefined;
-  readonly AdminCreateUserConfig?: object | undefined;
   readonly EmailVerificationMessage?: string | undefined;
   readonly EmailVerificationSubject?: string | undefined;
   readonly SmsVerificationMessage?: string | undefined;
@@ -45,7 +44,7 @@ export class SimCognitoUnsimulatedPoolSettings {
    * reference.
    *
    * A caller passes its whole `CreateUserPool` input in, and may reuse or
-   * edit that object afterwards. Three of these are nested objects, so the
+   * edit that object afterwards. Two of these are nested objects, so the
    * copy goes all the way down. Copying means a described pool reports what
    * the request said at the time it was made, as a real one does.
    *
@@ -59,9 +58,6 @@ export class SimCognitoUnsimulatedPoolSettings {
     return structuredClone({
       ...(settings.AccountRecoverySetting !== undefined && {
         AccountRecoverySetting: settings.AccountRecoverySetting,
-      }),
-      ...(settings.AdminCreateUserConfig !== undefined && {
-        AdminCreateUserConfig: settings.AdminCreateUserConfig,
       }),
       ...(settings.EmailVerificationMessage !== undefined && {
         EmailVerificationMessage: settings.EmailVerificationMessage,

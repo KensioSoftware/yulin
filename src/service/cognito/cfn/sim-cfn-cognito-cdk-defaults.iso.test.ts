@@ -138,8 +138,8 @@ describe("Cognito CloudFormation defaults a CDK stack emits", () => {
   });
 
   it("refuses a pool property at a value other than the one it accepts", async () => {
-    // Given a template asking for self-service sign-up, which no command here
-    // implements.
+    // Given a template writing its own account recovery, which nothing here
+    // reaches whichever mechanisms are listed.
     const simAws = simAwsInEuWest2();
 
     // When it is deployed.
@@ -148,7 +148,9 @@ describe("Cognito CloudFormation defaults a CDK stack emits", () => {
         Type: "AWS::Cognito::UserPool",
         Properties: {
           UserPoolName: "myapp-users",
-          AdminCreateUserConfig: { AllowAdminCreateUserOnly: false },
+          AccountRecoverySetting: {
+            RecoveryMechanisms: [{ Name: "admin_only", Priority: 1 }],
+          },
         },
       },
     });
@@ -156,13 +158,54 @@ describe("Cognito CloudFormation defaults a CDK stack emits", () => {
     // Then the failure names the logical ID, the property, the value asked
     // for and the one that is simulated.
     assertStringIncludes(error.message, "AppPool");
-    assertStringIncludes(error.message, "CreateUserPool AdminCreateUserConfig");
-    assertStringIncludes(error.message, '{"AllowAdminCreateUserOnly":false}');
-    assertStringIncludes(error.message, "self-service sign-up");
     assertStringIncludes(
       error.message,
-      'Only {"AllowAdminCreateUserOnly":true} is supported',
+      "CreateUserPool AccountRecoverySetting",
     );
+    assertStringIncludes(error.message, '"Name":"admin_only"');
+    assertStringIncludes(error.message, "account recovery");
+    assertStringIncludes(error.message, "Only");
+  });
+
+  it("deploys a pool a CDK stack asked for self-service sign-up on", async () => {
+    // Given the AdminCreateUserConfig and AutoVerifiedAttributes CDK emits for
+    // a UserPool with selfSignUpEnabled and autoVerify of the email address.
+    const simAws = simAwsInEuWest2();
+
+    // When it is deployed.
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "app-stack",
+      template: {
+        Resources: {
+          Pool: {
+            Type: "AWS::Cognito::UserPool",
+            Properties: {
+              ...cdkPoolProperties,
+              AdminCreateUserConfig: { AllowAdminCreateUserOnly: false },
+              AutoVerifiedAttributes: ["email"],
+            },
+          },
+        },
+        Outputs: { PoolId: { Value: { Ref: "Pool" } } },
+      },
+    });
+    await stack.waitForDeployComplete();
+
+    // Then the pool deployed with both, so a user can sign itself up in it.
+    const userPoolId = stack.outputs.get("PoolId")?.value;
+    assertTypeString(userPoolId);
+
+    const described = await simAws
+      .cognitoIdentityProvider()
+      .describeUserPool(
+        new DescribeUserPoolCommand({ UserPoolId: userPoolId }),
+      );
+
+    assertNonNullable(described.UserPool);
+    assertObjectEquals(described.UserPool.AdminCreateUserConfig, {
+      AllowAdminCreateUserOnly: false,
+    });
+    assertArrayEquals(described.UserPool.AutoVerifiedAttributes, ["email"]);
   });
 
   it("refuses a client asking for the hosted UI flows", async () => {
