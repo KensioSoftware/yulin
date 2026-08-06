@@ -31,6 +31,13 @@ on:
   # Running this from a branch other than main is harmless — .releaserc.yaml
   # releases from main only, so semantic-release finds nothing to do.
   workflow_dispatch:
+    inputs:
+      minor:
+        description: >-
+          Release a minor version. Leave unticked for a patch, which is
+          what everything releasable defaults to.
+        type: boolean
+        default: false
 
 defaults:
   run:
@@ -124,3 +131,6 @@ jobs:
       - run: pnpm exec semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Read by analyzeCommitsCmd in .releaserc.yaml, which raises the
+          # release to a minor when this is "true".
+          RELEASE_MINOR: ${{ inputs.minor }}

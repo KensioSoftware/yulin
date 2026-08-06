@@ -9,37 +9,71 @@ branches:
   - main
 
 plugins:
-  # Reads the conventional-commit subjects on main and works out the bump.
-  # The stock rules already match what this repository writes: feat gives a
-  # minor, fix and perf give a patch, and chore, test, docs, refactor, style,
-  # build and ci release nothing.
+  # Reads the commit subjects on main and works out the bump.
   #
-  # Two of the stock rules are worth knowing about, since neither is angular.
-  # A commit the parser recognises as a revert gives a patch, which is wanted:
-  # undoing something already published is a change consumers need. The rest —
-  # Atom emoji, Ember and ESLint tags, Express components, JSHint's uppercase
-  # types — read commit fields the angular parser never fills in, so they can
-  # match nothing here.
+  # Anything that ships is a patch. A minor is not something a commit subject
+  # can ask for: it is the checkbox on the workflow, below. The reasoning is
+  # that "is this significant enough to be a minor" is a judgement about the
+  # release as a whole, made once, by a person looking at the whole batch —
+  # not a judgement each commit subject should be trusted to make. Reserving
+  # it that way is also what keeps the minor number meaning something.
   #
-  # No custom releaseRules deliberately. A rule set here would be a second
-  # place defining the commit convention, and the catch-all needed to make it
-  # exhaustive can swallow feat and fix outright if it is ordered wrong.
-  - "@semantic-release/commit-analyzer"
+  # So the ladder is: patch automatically, minor by checkbox, major by hand
+  # and never from this workflow at all.
+  #
+  # The breaking rule has to come first and has to be here. Without it the
+  # feat rule below matches "feat!: …" too, and a breaking change would go out
+  # as a patch — worse than any of this, because it would be silent. With it,
+  # both "feat!: …" and a BREAKING CHANGE: footer reach the guard further
+  # down and fail the run.
+  #
+  # docs, test, chore, ci and style are absent on purpose: they change nothing
+  # a consumer installs, so they release nothing.
+  - - "@semantic-release/commit-analyzer"
+    - preset: conventionalcommits
+      releaseRules:
+        - breaking: true
+          release: major
+        - type: feat
+          release: patch
+        - type: fix
+          release: patch
+        - type: perf
+          release: patch
+        - type: refactor
+          release: patch
+        - type: build
+          release: patch
 
-  # Turns those same commits into the GitHub Release notes.
-  - "@semantic-release/release-notes-generator"
+  # Turns those same commits into the GitHub Release notes. Same preset as the
+  # analyzer, so the notes group commits the way the analyzer read them.
+  - - "@semantic-release/release-notes-generator"
+    - preset: conventionalcommits
 
-  # Majors are published by hand, deliberately: a breaking change to a
-  # simulator is a decision about what consumers have to rewrite, not
-  # something a commit footer should be able to trigger on its own.
+  # The two ends of the ladder the analyzer above deliberately cannot reach.
   #
-  # This runs after the version is worked out and before anything is
-  # published, so a stray "BREAKING CHANGE:" footer fails the run rather than
-  # silently shipping 2.0.0. The alternative — mapping breaking changes down
-  # to a minor — was rejected because it would put a false version number
-  # against a genuinely breaking change.
+  # analyzeCommitsCmd raises the release to a minor when the workflow was
+  # started with its checkbox ticked. semantic-release takes the highest
+  # result across every analyzer, so this can only ever raise a patch to a
+  # minor — it cannot lower anything, and it leaves a major alone. Printing
+  # nothing, which is what happens when the box is unticked, is read as "no
+  # opinion" rather than "no release".
+  #
+  # Ticking the box with nothing releasable on main would publish a minor
+  # with empty notes. That is a deliberate act with an obvious result, so it
+  # is left possible rather than guarded against.
+  #
+  # verifyReleaseCmd refuses majors. A breaking change to a simulator is a
+  # decision about what consumers have to rewrite, so it is made by a person
+  # publishing by hand, not by a marker in a subject line. This runs after
+  # the version is worked out and before anything is published, so "feat!: …"
+  # or a BREAKING CHANGE: footer fails the run rather than shipping 2.0.0.
+  # Mapping breaking changes down to a minor was rejected: it would put a
+  # false version number against a genuinely breaking change.
   - - "@semantic-release/exec"
-    - verifyReleaseCmd: >-
+    - analyzeCommitsCmd: >-
+        if [ "$RELEASE_MINOR" = "true" ]; then echo minor; fi
+      verifyReleaseCmd: >-
         if [ "${nextRelease.type}" = "major" ]; then
         echo "Refusing to publish ${nextRelease.version} automatically:
         major releases are published by hand." >&2;
