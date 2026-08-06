@@ -38,6 +38,9 @@ import type { SimLambdaHandler } from "../../src/service/lambda/function/sim-lam
  */
 const passThroughHandler: SimLambdaHandler = (event: unknown) => event;
 
+/** The user every suite in the fixture signs up, creates or signs in. */
+export const triggerUsername = "alice";
+
 /** The password the fixture's user signs in with. */
 export const triggerPassword = "Sup3rSecret!";
 
@@ -60,15 +63,19 @@ export interface SimCognitoTriggerPoolInput {
    */
   readonly simAws?: SimAws | undefined;
 
-  /** What the function does when a trigger invokes it. */
+  /**
+   * What the function does when a trigger invokes it, as a handler function.
+   *
+   * This is the quick way to say what a trigger does, and it is ignored when
+   * `code` is given as well: the two are alternatives, and the archive wins.
+   */
   readonly handler?: SimLambdaHandler | undefined;
 
   /**
    * A real code archive to run instead of a handler function.
    *
-   * A handler function is the quick way to say what a trigger does. Function
-   * code that calls another simulated service has to be an archive, because
-   * that is what runs in the Lambda vm with the runtime's own AWS SDK
+   * Function code that calls another simulated service has to be an archive,
+   * because that is what runs in the Lambda vm with the runtime's own AWS SDK
    * provided to it.
    */
   readonly code?: Uint8Array | undefined;
@@ -213,20 +220,26 @@ export async function makeTriggerUser(
 }
 
 /**
- * Sign a user up through the fixture's app client.
+ * Sign the fixture's user up through its app client.
  *
  * This is the self-service path rather than the admin one, so it is what
  * reaches `PreSignUp_SignUp` and, once confirmed, `PostConfirmation`.
+ *
+ * The app client, the username and the password are the fixture's own, so a
+ * caller names only what the trigger under test reads: the attributes, the
+ * validation data and the client metadata.
  */
 export async function signUpTriggerUser(
   pool: SimCognitoTriggerPool,
-  input: Partial<SignUpCommandInput> = {},
+  input: Partial<
+    Omit<SignUpCommandInput, "ClientId" | "Password" | "Username">
+  > = {},
 ): Promise<SimSignUpCommandOutput> {
   return await pool.cognito.signUp(
     new SignUpCommand({
       UserAttributes: [{ Name: "email", Value: "alice@example.com" }],
       ...input,
-      Username: input.Username ?? "alice",
+      Username: triggerUsername,
       ClientId: pool.clientId,
       Password: triggerPassword,
     }),
@@ -243,10 +256,10 @@ export async function confirmTriggerSignUp(
   await pool.cognito.confirmSignUp(
     new ConfirmSignUpCommand({
       ClientId: pool.clientId,
-      Username: "alice",
+      Username: triggerUsername,
       ConfirmationCode: pool.cognito
         .userPool(pool.userPoolId)
-        .confirmationCode("alice"),
+        .confirmationCode(triggerUsername),
       ...(clientMetadata !== undefined && { ClientMetadata: clientMetadata }),
     }),
   );

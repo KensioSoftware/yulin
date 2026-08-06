@@ -16,30 +16,11 @@ import {
   signUpTriggerUser,
   triggerFunctionArn,
 } from "../../../../../test/cognito/trigger-fixture.js";
+import {
+  answeringTriggerHandler,
+  recordingTriggerHandler,
+} from "../../../../../test/cognito/trigger-handler-fixture.js";
 import type { SimCognitoTriggerPool } from "../../../../../test/cognito/trigger-fixture.js";
-
-/**
- * Record every event a trigger handler is given, and hand the event back so
- * the sign-up carries on.
- */
-function recordingHandler(events: unknown[]): (event: unknown) => unknown {
-  return (event: unknown) => {
-    events.push(structuredClone(event));
-
-    return event;
-  };
-}
-
-/**
- * A handler that answers the pre sign-up flags a test named.
- */
-function answeringHandler(answer: Record<string, boolean>) {
-  return (event: { response: Record<string, boolean> }) => {
-    Object.assign(event.response, answer);
-
-    return event;
-  };
-}
 
 /**
  * The status the pool holds a user at.
@@ -83,7 +64,7 @@ describe("sim Cognito PreSignUp trigger", () => {
     const events: unknown[] = [];
     const pool = await makeTriggerPool({
       triggers: { PreSignUp: triggerFunctionArn },
-      handler: recordingHandler(events),
+      handler: recordingTriggerHandler(events),
     });
 
     // When a user signs itself up, carrying data for the trigger to read.
@@ -119,7 +100,7 @@ describe("sim Cognito PreSignUp trigger", () => {
     const events: unknown[] = [];
     const pool = await makeTriggerPool({
       triggers: { PreSignUp: triggerFunctionArn },
-      handler: recordingHandler(events),
+      handler: recordingTriggerHandler(events),
     });
 
     // When a sign-up carries a validation data entry with no value.
@@ -139,7 +120,7 @@ describe("sim Cognito PreSignUp trigger", () => {
     const events: unknown[] = [];
     const pool = await makeTriggerPool({
       triggers: { PreSignUp: triggerFunctionArn },
-      handler: recordingHandler(events),
+      handler: recordingTriggerHandler(events),
     });
 
     // When a user signs itself up.
@@ -158,7 +139,7 @@ describe("sim Cognito PreSignUp trigger", () => {
     // Given a pool whose PreSignUp trigger auto-confirms every user.
     const pool = await makeTriggerPool({
       triggers: { PreSignUp: triggerFunctionArn },
-      handler: answeringHandler({ autoConfirmUser: true }),
+      handler: answeringTriggerHandler({ autoConfirmUser: true }),
     });
 
     // When a user signs itself up.
@@ -175,7 +156,7 @@ describe("sim Cognito PreSignUp trigger", () => {
     // given.
     const pool = await makeTriggerPool({
       triggers: { PreSignUp: triggerFunctionArn },
-      handler: answeringHandler({
+      handler: answeringTriggerHandler({
         autoVerifyEmail: true,
         autoVerifyPhone: true,
       }),
@@ -199,7 +180,7 @@ describe("sim Cognito PreSignUp trigger", () => {
     // about confirming, which real Cognito treats as two separate answers.
     const pool = await makeTriggerPool({
       triggers: { PreSignUp: triggerFunctionArn },
-      handler: answeringHandler({ autoVerifyEmail: true }),
+      handler: answeringTriggerHandler({ autoVerifyEmail: true }),
     });
 
     // When a user signs itself up.
@@ -216,7 +197,7 @@ describe("sim Cognito PreSignUp trigger", () => {
     const events: unknown[] = [];
     const pool = await makeTriggerPool({
       triggers: { PreSignUp: triggerFunctionArn },
-      handler: recordingHandler(events),
+      handler: recordingTriggerHandler(events),
     });
 
     // When an admin creates a user instead.
@@ -249,7 +230,7 @@ describe("sim Cognito PreSignUp trigger", () => {
     // Given a pool whose PreSignUp trigger answers every flag it has.
     const pool = await makeTriggerPool({
       triggers: { PreSignUp: triggerFunctionArn },
-      handler: answeringHandler({
+      handler: answeringTriggerHandler({
         autoConfirmUser: true,
         autoVerifyEmail: true,
         autoVerifyPhone: true,
@@ -277,7 +258,7 @@ describe("sim Cognito PreSignUp trigger", () => {
     const events: unknown[] = [];
     const pool = await makeTriggerPool({
       triggers: { PostConfirmation: triggerFunctionArn },
-      handler: recordingHandler(events),
+      handler: recordingTriggerHandler(events),
     });
 
     // When a user signs itself up.

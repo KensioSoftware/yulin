@@ -20,18 +20,7 @@ import {
   signUpTriggerUser,
   triggerFunctionArn,
 } from "../../../../../test/cognito/trigger-fixture.js";
-
-/**
- * Record every event a trigger handler is given, and hand the event back so
- * the confirmation carries on.
- */
-function recordingHandler(events: unknown[]): (event: unknown) => unknown {
-  return (event: unknown) => {
-    events.push(structuredClone(event));
-
-    return event;
-  };
-}
+import { recordingTriggerHandler } from "../../../../../test/cognito/trigger-handler-fixture.js";
 
 /**
  * The `triggerSource` of every event a handler recorded.
@@ -49,7 +38,7 @@ describe("sim Cognito PostConfirmation trigger", () => {
     const events: unknown[] = [];
     const pool = await makeTriggerPool({
       triggers: { PostConfirmation: triggerFunctionArn },
-      handler: recordingHandler(events),
+      handler: recordingTriggerHandler(events),
       autoVerifiedAttributes: ["email"],
     });
 
@@ -81,7 +70,7 @@ describe("sim Cognito PostConfirmation trigger", () => {
     const events: unknown[] = [];
     const pool = await makeTriggerPool({
       triggers: { PostConfirmation: triggerFunctionArn },
-      handler: recordingHandler(events),
+      handler: recordingTriggerHandler(events),
     });
 
     const signedUp = await signUpTriggerUser(pool);
@@ -131,7 +120,7 @@ describe("sim Cognito PostConfirmation trigger", () => {
     const events: unknown[] = [];
     const pool = await makeTriggerPool({
       triggers: { PostConfirmation: triggerFunctionArn },
-      handler: recordingHandler(events),
+      handler: recordingTriggerHandler(events),
     });
 
     await signUpTriggerUser(pool);
@@ -160,7 +149,7 @@ describe("sim Cognito PostConfirmation trigger", () => {
     const events: unknown[] = [];
     const pool = await makeTriggerPool({
       triggers: { PostConfirmation: triggerFunctionArn },
-      handler: recordingHandler(events),
+      handler: recordingTriggerHandler(events),
     });
 
     // When an admin creates a user and gives it a permanent password, which is

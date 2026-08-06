@@ -18,18 +18,7 @@ import {
   triggerFunctionArn,
   triggerPassword,
 } from "../../../../../test/cognito/trigger-fixture.js";
-
-/**
- * Record every event a trigger handler is given, and hand the event back so
- * the sign-in carries on.
- */
-function recordingHandler(events: unknown[]): (event: unknown) => unknown {
-  return (event: unknown) => {
-    events.push(structuredClone(event));
-
-    return event;
-  };
-}
+import { recordingTriggerHandler } from "../../../../../test/cognito/trigger-handler-fixture.js";
 
 function signIn(clientId: string): InitiateAuthCommand {
   return new InitiateAuthCommand({
@@ -45,7 +34,7 @@ describe("sim Cognito user pool authentication triggers", () => {
     const events: unknown[] = [];
     const pool = await makeTriggerPool({
       triggers: { PreAuthentication: triggerFunctionArn },
-      handler: recordingHandler(events),
+      handler: recordingTriggerHandler(events),
     });
 
     await makeTriggerUser(pool);
@@ -81,7 +70,7 @@ describe("sim Cognito user pool authentication triggers", () => {
         PreAuthentication: triggerFunctionArn,
         PostAuthentication: triggerFunctionArn,
       },
-      handler: recordingHandler(events),
+      handler: recordingTriggerHandler(events),
     });
 
     await makeTriggerUser(pool);
@@ -108,7 +97,7 @@ describe("sim Cognito user pool authentication triggers", () => {
         PreAuthentication: triggerFunctionArn,
         PostAuthentication: triggerFunctionArn,
       },
-      handler: recordingHandler(events),
+      handler: recordingTriggerHandler(events),
     });
 
     await makeTriggerUser(pool);
@@ -141,7 +130,7 @@ describe("sim Cognito user pool authentication triggers", () => {
     const events: unknown[] = [];
     const pool = await makeTriggerPool({
       triggers: { PostAuthentication: triggerFunctionArn },
-      handler: recordingHandler(events),
+      handler: recordingTriggerHandler(events),
     });
 
     await makeTriggerUser(pool);
@@ -172,7 +161,7 @@ describe("sim Cognito user pool authentication triggers", () => {
         PreAuthentication: triggerFunctionArn,
         PostAuthentication: triggerFunctionArn,
       },
-      handler: recordingHandler(events),
+      handler: recordingTriggerHandler(events),
     });
 
     await makeTriggerUser(pool);

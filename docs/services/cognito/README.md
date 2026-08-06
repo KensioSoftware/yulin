@@ -2102,9 +2102,8 @@ Current documented limitations:
   trigger sets them by asking for `autoVerifyEmail` or `autoVerifyPhone`.
 - `AutoVerifiedAttributes` is accepted at `email` and `phone_number`, and anything else is refused.
   Those are the two Cognito can send a code to.
-- `SignUp`, `ConfirmSignUp` and `ResendConfirmationCode` report a user the pool does not hold
-  whatever the app client's `PreventUserExistenceErrors` says. That setting is honoured for sign-in
-  only.
+- `ConfirmSignUp` and `ResendConfirmationCode` report a user the pool does not hold whatever the app
+  client's `PreventUserExistenceErrors` says. That setting is honoured for sign-in only.
 - Password reset is not simulated. `ForgotPassword`, `ConfirmForgotPassword` and `ChangePassword`
   are not implemented, so the `RESET_REQUIRED` status cannot be reached.
 - Unsimulated sign-up inputs are refused rather than ignored: `AnalyticsMetadata` and
