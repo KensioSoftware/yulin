@@ -169,6 +169,7 @@
     "aws-jwt-verify": "^5.2.1",
     "aws-sdk-client-mock": "^4.1.0",
     "constructs": "^10.8.0",
+    "conventional-changelog-conventionalcommits": "10.2.1",
     "eslint": "^10.8.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-jsdoc": "^63.3.2",

@@ -31,6 +31,13 @@ on:
   # Running this from a branch other than main is harmless — .releaserc.yaml
   # releases from main only, so semantic-release finds nothing to do.
   workflow_dispatch:
+    inputs:
+      minor:
+        description: >-
+          Release a minor version. Leave unticked for a patch, which is
+          what everything releasable defaults to.
+        type: boolean
+        default: false
 
 defaults:
   run:
@@ -97,10 +104,25 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # The checks pr.yml already ran, run again against main.
+      #
+      # This is not belt and braces. The main ruleset does not require a pull
+      # request to be up to date with main before it merges, so two branches
+      # that were each green on their own can still break main together, and
+      # a release is the first thing after that which anyone would notice.
+      #
+      # Spelled out rather than calling `pnpm check`, because that starts with
+      # `pnpm fmt`, which rewrites files instead of reporting on them. Keep
+      # this list and the jobs in pr.yml in step with each other.
+      - run: pnpm lint
+      - run: pnpm fta
+      - run: pnpm build:check
+      - run: pnpm examples:check
+      - run: pnpm test:coverage
+
       # The same check pr.yml runs as Pack: builds the tarball, installs it
-      # into a throwaway project and imports every export subpath. The pull
-      # request already ran it, but main is what gets published, so this is
-      # the last gate before a broken dist/ reaches the registry.
+      # into a throwaway project and imports every export subpath. The last
+      # gate before a broken dist/ reaches the registry.
       - run: pnpm verify:pack
 
       # Decides the version, publishes to npm, tags and writes the GitHub
@@ -109,3 +131,6 @@ jobs:
       - run: pnpm exec semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Read by analyzeCommitsCmd in .releaserc.yaml, which raises the
+          # release to a minor when this is "true".
+          RELEASE_MINOR: ${{ inputs.minor }}
