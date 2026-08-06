@@ -1,5 +1,5 @@
 ---
-# Publishes @kensio/yulin when a merge to main carries a feat or fix commit.
+# Publishes @kensio/yulin, when someone runs it from the Actions tab.
 # What it does is decided by .releaserc.yaml; this file is the plumbing.
 #
 # Two things live outside the repository and have to exist for it to work:
@@ -9,10 +9,11 @@
 #      with npm publish as the only allowed action. This is what replaces a
 #      stored NPM_TOKEN — there is no npm credential in this repository.
 #
-#   2. A repository environment named "release". Giving it a required
-#      reviewer makes every publish wait for a human; leaving it bare makes
-#      releases fully automatic. Either works, and the choice is only made
-#      there, not here.
+#   2. A repository environment named "release". Adding a required reviewer
+#      makes a publish wait for a second pair of eyes, which is worth having
+#      if anyone else ever gains write access. Starting the run is already a
+#      deliberate act, so approving your own run adds little on its own. The
+#      choice is only made there, not here.
 #
 # Neither is recorded in the repository, so if publishes start failing with an
 # authentication error, check that the trusted publisher still names this
@@ -21,9 +22,15 @@
 name: Release
 
 on:
-  push:
-    branches:
-      - main
+  # Started by hand, not by merging. Pull requests land here in bursts, and
+  # publishing each one would put a version on the registry that nobody
+  # installs any sooner: pnpm v11 holds new versions back for a day by
+  # default. One run ships everything accumulated since the last tag, as a
+  # single version with one set of release notes.
+  #
+  # Running this from a branch other than main is harmless — .releaserc.yaml
+  # releases from main only, so semantic-release finds nothing to do.
+  workflow_dispatch:
 
 defaults:
   run:

@@ -10,10 +10,20 @@ branches:
 
 plugins:
   # Reads the conventional-commit subjects on main and works out the bump.
-  # The default angular rules are already what this repository writes: feat
-  # gives a minor, fix and perf give a patch, and chore, test, docs, refactor,
-  # style, build and ci release nothing at all. No custom releaseRules, so
-  # there is no second place where the commit convention is defined.
+  # The stock rules already match what this repository writes: feat gives a
+  # minor, fix and perf give a patch, and chore, test, docs, refactor, style,
+  # build and ci release nothing.
+  #
+  # Two of the stock rules are worth knowing about, since neither is angular.
+  # A commit the parser recognises as a revert gives a patch, which is wanted:
+  # undoing something already published is a change consumers need. The rest —
+  # Atom emoji, Ember and ESLint tags, Express components, JSHint's uppercase
+  # types — read commit fields the angular parser never fills in, so they can
+  # match nothing here.
+  #
+  # No custom releaseRules deliberately. A rule set here would be a second
+  # place defining the commit convention, and the catch-all needed to make it
+  # exhaustive can swallow feat and fix outright if it is ordered wrong.
   - "@semantic-release/commit-analyzer"
 
   # Turns those same commits into the GitHub Release notes.
