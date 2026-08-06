@@ -3,6 +3,7 @@ import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-
 import { FilesystemS3BucketStorage } from "../storage/filesystem/s3-filesystem-storage.js";
 import { simS3BucketUrl } from "./sim-s3-endpoint-url.js";
 import type { SimS3Bucket, SimS3BucketName } from "./sim-s3-bucket.js";
+import { simWatch } from "../../../watch/sim-watch-runtime.js";
 
 interface SimS3BucketAccessProperties {
   readonly buckets: ReadonlyMap<SimS3BucketName, SimS3Bucket>;
@@ -55,6 +56,10 @@ export class SimS3BucketAccess {
 
   /**
    * Have a Bucket use a local filesystem directory for storage.
+   *
+   * The directory is named to a `yulin watch` supervisor, so editing a file the
+   * Bucket serves restarts the process without the directory having been listed
+   * anywhere. Nothing happens outside watch mode.
    */
   mountFilesystem(
     bucketName: SimS3BucketName | string,
@@ -63,5 +68,6 @@ export class SimS3BucketAccess {
     this.required(bucketName).configureSimStorage(
       new FilesystemS3BucketStorage({ directoryPath }),
     );
+    simWatch.reportPath(directoryPath);
   }
 }
