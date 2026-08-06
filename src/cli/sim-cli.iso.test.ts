@@ -15,8 +15,9 @@ describe("SimCli", () => {
     // When it is asked for help
     void new SimCli().run(["--help"]);
 
-    // Then the commands are listed
-    assertStringIncludes(written.join(""), "watch [--inspect");
+    // Then the commands are listed, with the options they take
+    assertStringIncludes(written.join(""), "watch [options]");
+    assertStringIncludes(written.join(""), "--settle=ms");
   });
 
   it("reports a run with no command as a mistake", async () => {
@@ -55,7 +56,7 @@ describe("SimCli", () => {
     // Then it names the command and says what there is instead
     assertInstanceOf(error, SimCliUnknownCommand);
     assertStringIncludes(error.message, "Unknown command serve.");
-    assertStringIncludes(error.message, "watch [--inspect");
+    assertStringIncludes(error.message, "watch [options]");
   });
 });
 

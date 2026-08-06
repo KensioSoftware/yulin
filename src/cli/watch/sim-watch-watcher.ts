@@ -8,7 +8,7 @@ import { SimWatchSettle } from "../../watch/sim-watch-settle.js";
 interface SimWatchWatcherProperties {
   readonly cwd: string;
   readonly onChange: (changedPath: string) => void;
-  readonly settleMs?: number;
+  readonly settleMs?: number | undefined;
 }
 
 /**
@@ -36,7 +36,11 @@ export class SimWatchWatcher {
   constructor(properties: SimWatchWatcherProperties) {
     const { cwd, onChange, settleMs = simWatchConfig.settleMs } = properties;
     this.cwd = path.resolve(cwd);
-    this.settle = new SimWatchSettle({ settleMs, onSettled: onChange });
+    this.settle = new SimWatchSettle({
+      settleMs,
+      maxWaitMs: simWatchConfig.settleMaxWaitMs,
+      onSettled: onChange,
+    });
   }
 
   /**

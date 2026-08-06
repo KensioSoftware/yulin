@@ -1,11 +1,14 @@
 import path from "node:path";
 import {
   assertArrayEquals,
+  assertArrayLength,
+  assertNumberBetween,
   assertStringEndsWith,
   assertStringStartsWith,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimWatchWatcher } from "./sim-watch-watcher.js";
+import { simWatchConfig } from "../../watch/sim-watch.config.js";
 import { TemporaryDirectory } from "../../util/filesystem/temporary-directory.js";
 import { watchPause } from "../../../test/cli/watch-project.js";
 
@@ -21,6 +24,44 @@ describe("SimWatchWatcher over a real directory", () => {
 
       // Then the change is reported, by name
       assertStringEndsWith(changes.at(0) ?? "", "handler.ts");
+    } finally {
+      watcher.stop();
+    }
+  });
+
+  it("makes one change out of a build writing several hundred files", async () => {
+    // Given a watched working directory settling at the window a project gets
+    // by default
+    const { directory, changes, changedAt, watcher } = await watching({
+      settleMs: simWatchConfig.settleMs,
+    });
+
+    try {
+      // When a build writes a few hundred files into it, which the platform
+      // delivers in waves rather than all at once
+      //
+      // Into the directory already being watched rather than a new one of its
+      // own: a directory arriving is a change in its own right, and one a
+      // recursive watch only sees inside once it has caught up with it.
+      await Promise.all(
+        Array.from({ length: 500 }, async (_, at) =>
+          directory.writeFile(
+            `page-${String(at)}.html`,
+            `<h1>page ${String(at)}</h1>`,
+          ),
+        ),
+      );
+      const writtenAt = Date.now();
+      await watchPause(simWatchConfig.settleMs * 6);
+
+      // Then the build is one restart, taken shortly after its last write
+      // rather than once per wave
+      assertArrayLength(changes, 1);
+      assertNumberBetween(
+        (changedAt.at(0) ?? 0) - writtenAt,
+        0,
+        simWatchConfig.settleMs * 4,
+      );
     } finally {
       watcher.stop();
     }
@@ -200,24 +241,34 @@ describe("SimWatchWatcher over a real directory", () => {
 interface Watching {
   readonly directory: TemporaryDirectory;
   readonly changes: string[];
+  readonly changedAt: number[];
   readonly watcher: SimWatchWatcher;
 }
 
-async function watching(): Promise<Watching> {
+interface WatchingProperties {
+  readonly settleMs?: number;
+}
+
+async function watching(
+  properties: WatchingProperties = {},
+): Promise<Watching> {
+  const { settleMs = 30 } = properties;
   const directory = new TemporaryDirectory();
   await directory.resolvePath();
 
   const changes: string[] = [];
+  const changedAt: number[] = [];
   const watcher = new SimWatchWatcher({
     cwd: directory.path(),
     onChange: (changedPath: string): void => {
       changes.push(changedPath);
+      changedAt.push(Date.now());
     },
-    settleMs: 30,
+    settleMs,
   });
 
   watcher.start();
   await watchPause(200);
 
-  return { directory, changes, watcher };
+  return { directory, changes, changedAt, watcher };
 }

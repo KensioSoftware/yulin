@@ -3,6 +3,7 @@ const inspectorFlags = new Set([
   "--inspect-brk",
   "--inspect-wait",
 ]);
+const settleFlag = "--settle";
 
 /**
  * Thrown when `yulin watch` was not given something to run.
@@ -11,7 +12,9 @@ export class SimWatchUsageError extends Error {
   public override readonly name = "SimWatchUsageError";
 
   constructor(message: string) {
-    super(`${message}\n\nUsage: yulin watch [--inspect[=port]] -- <command>`);
+    super(
+      `${message}\n\nUsage: yulin watch [--inspect[=port]] [--settle=ms] -- <command>`,
+    );
   }
 }
 
@@ -27,15 +30,17 @@ export class SimWatchArguments {
   readonly command: string;
   readonly commandArguments: readonly string[];
   readonly inspect: string | undefined;
+  readonly settleMs: number | undefined;
 
   private constructor(
     command: string,
     commandArguments: readonly string[],
-    inspect: string | undefined,
+    options: SimWatchOptions,
   ) {
     this.command = command;
     this.commandArguments = commandArguments;
-    this.inspect = inspect;
+    this.inspect = options.inspect;
+    this.settleMs = options.settleMs;
   }
 
   /**
@@ -59,7 +64,7 @@ export class SimWatchArguments {
     return new SimWatchArguments(
       command,
       rest,
-      inspectorFlag(argv.slice(0, separator)),
+      optionsIn(argv.slice(0, separator)),
     );
   }
 
@@ -71,21 +76,57 @@ export class SimWatchArguments {
   }
 }
 
-/**
- * The inspector flag to pass through to each run, if one was asked for.
- */
-function inspectorFlag(options: readonly string[]): string | undefined {
-  const unknown = options.find((option) => !isInspectorFlag(option));
-
-  if (unknown !== undefined) {
-    throw new SimWatchUsageError(`Unknown option ${unknown}.`);
-  }
-
-  return options.at(-1);
+interface SimWatchOptions {
+  readonly inspect: string | undefined;
+  readonly settleMs: number | undefined;
 }
 
-function isInspectorFlag(option: string): boolean {
+/**
+ * The options written before the separator, which are the only ones watch reads
+ * itself.
+ */
+function optionsIn(given: readonly string[]): SimWatchOptions {
+  let inspect: string | undefined;
+  let settleMs: number | undefined;
+
+  for (const option of given) {
+    const flag = flagOf(option);
+
+    if (inspectorFlags.has(flag)) {
+      inspect = option;
+    } else if (flag === settleFlag) {
+      settleMs = settleValue(option);
+    } else {
+      throw new SimWatchUsageError(`Unknown option ${option}.`);
+    }
+  }
+
+  return { inspect, settleMs };
+}
+
+/**
+ * How long a burst of writes has to go quiet, for a project whose build the
+ * default window does not suit.
+ */
+function settleValue(option: string): number {
+  const [, value] = option.split("=");
+  const milliseconds = Number(value);
+
+  if (
+    value === undefined ||
+    !Number.isSafeInteger(milliseconds) ||
+    milliseconds < 1
+  ) {
+    throw new SimWatchUsageError(
+      `${settleFlag} takes a number of milliseconds, written as ${settleFlag}=250.`,
+    );
+  }
+
+  return milliseconds;
+}
+
+function flagOf(option: string): string {
   const [flag = ""] = option.split("=");
 
-  return inspectorFlags.has(flag);
+  return flag;
 }

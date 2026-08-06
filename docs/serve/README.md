@@ -242,8 +242,29 @@ the `watch` option is the exception, and is
 [left to the process reading it](#updating-a-stack-instead-of-restarting), as is any path the process
 [says it is holding](#holding-a-path-yourself).
 
+### One restart for a burst of writes
+
 A burst of writes is one restart. Saving one file is several filesystem events, so changes are held
-until they stop arriving before anything is restarted.
+until they stop arriving before anything is restarted. The wait is 250ms by default, and a build
+writing hundreds of files is one restart rather than one per file.
+
+The number is what a build needs rather than what a save needs. macOS hands a recursive watch its
+events in waves rather than one at a time: a build writing several thousand files was measured
+arriving as tens of waves up to 49ms apart, so a window anywhere near that turns one build into
+several restarts. A build that pauses between its own phases, as a tool that resolves before it
+writes does, pauses for longer than that again. 250ms clears the waves several times over and covers
+the shorter of those pauses, at the cost of 250ms before a plain save is acted on.
+
+A project whose build is unusual can say so, rather than moving the default:
+
+```bash
+yulin watch --settle=600 -- tsx dev.ts
+```
+
+Writes that keep arriving push the wait back, so a build that never goes quiet would otherwise hold
+the restart off for as long as it ran. A burst is acted on after five seconds however much is still
+arriving, and the writes after that are a burst of their own. That is a backstop for a build that
+writes continuously for minutes, not something an ordinary build reaches.
 
 ### Holding a path yourself
 
