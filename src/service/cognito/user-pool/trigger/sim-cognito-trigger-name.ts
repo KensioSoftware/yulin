@@ -1,16 +1,18 @@
 /**
  * The Lambda triggers a simulated user pool runs.
  *
- * These are the ones that fire around a sign-up and around a sign-in, which is
- * the part of a user's life this simulation has. A pool sends no messages and
- * federates with nobody, so the message and federation triggers would never run
- * whatever a pool named for them.
+ * These are the ones that fire around a sign-up, around a sign-in, and over the
+ * tokens a sign-in hands out, which is the part of a user's life this
+ * simulation has. A pool sends no messages and federates with nobody, so the
+ * message and federation triggers would never run whatever a pool named for
+ * them.
  */
 export const simCognitoTriggerNames = [
   "PreSignUp",
   "PostConfirmation",
   "PreAuthentication",
   "PostAuthentication",
+  "PreTokenGeneration",
 ] as const;
 
 export type SimCognitoTriggerName = (typeof simCognitoTriggerNames)[number];
@@ -25,10 +27,11 @@ export type SimCognitoTriggerName = (typeof simCognitoTriggerNames)[number];
  */
 export const simCognitoUnsimulatedTriggers: ReadonlyMap<string, string> =
   new Map([
-    ["PreTokenGeneration", "changing the claims a pool puts in its tokens"],
     [
       "PreTokenGenerationConfig",
-      "changing the claims a pool puts in its tokens",
+      "the V2_0 and V3_0 token triggers, which customise access token claims " +
+        "and scopes. Name the function in PreTokenGeneration for the V1_0 " +
+        "trigger, which customises the id token",
     ],
     ["CustomMessage", "writing the wording of a message the pool sends"],
     ["DefineAuthChallenge", "the custom authentication challenge flow"],

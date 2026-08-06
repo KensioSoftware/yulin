@@ -1,16 +1,10 @@
-import {
-  SimCognitoUnexpectedLambdaException,
-  SimCognitoUserLambdaValidationException,
-} from "../../error/sim-cognito-trigger.error.js";
+import type { SimCognitoClaimsOverride } from "../token/sim-cognito-claims-override.js";
+import { SimCognitoClaimsOverrideReader } from "../token/sim-cognito-claims-override-reader.js";
 import { SimCognitoPreSignUpResponse } from "./sim-cognito-pre-sign-up-response.js";
 import type { SimCognitoTriggerContext } from "./sim-cognito-trigger-context.js";
-import { SimCognitoTriggerEvent } from "./sim-cognito-trigger-event.js";
-import type {
-  SimCognitoTriggerFunctionRequest,
-  SimCognitoTriggerFunctions,
-} from "./sim-cognito-trigger-functions.js";
+import type { SimCognitoTriggerFunctions } from "./sim-cognito-trigger-functions.js";
+import { SimCognitoTriggerInvocation } from "./sim-cognito-trigger-invocation.js";
 import { SimCognitoTriggerOccasion } from "./sim-cognito-trigger-occasion.js";
-import { requireSimCognitoTriggerResponse } from "./sim-cognito-trigger-response.js";
 
 interface SimCognitoUserPoolTriggersProperties {
   readonly functions: SimCognitoTriggerFunctions;
@@ -19,20 +13,17 @@ interface SimCognitoUserPoolTriggersProperties {
 /**
  * Runs the Lambda triggers a simulated user pool names.
  *
- * A pool with no trigger for the occasion runs nothing, which is the ordinary
- * case and costs a map lookup. A pool with one invokes it and waits: these
- * triggers are synchronous, so the request is held up until the handler
- * answers, as it is on real Cognito.
- *
- * The function's resource policy is checked on every invocation rather than
- * remembered from the first, because a permission revoked afterwards stops the
- * trigger on real Cognito too.
+ * One method per trigger, because each says something different about when it
+ * fires and what the pool does with what the handler answered. Reaching the
+ * function is the same for all of them, and lives in
+ * `SimCognitoTriggerInvocation`.
  */
 export class SimCognitoUserPoolTriggers {
-  private readonly functions: SimCognitoTriggerFunctions;
+  private readonly invocation: SimCognitoTriggerInvocation;
+  private readonly claimsOverrides = new SimCognitoClaimsOverrideReader();
 
   constructor(properties: SimCognitoUserPoolTriggersProperties) {
-    this.functions = properties.functions;
+    this.invocation = new SimCognitoTriggerInvocation(properties.functions);
   }
 
   /**
@@ -51,7 +42,9 @@ export class SimCognitoUserPoolTriggers {
     occasion: SimCognitoTriggerOccasion,
     context: SimCognitoTriggerContext,
   ): Promise<SimCognitoPreSignUpResponse> {
-    return new SimCognitoPreSignUpResponse(await this.run(occasion, context));
+    return new SimCognitoPreSignUpResponse(
+      await this.invocation.run(occasion, context),
+    );
   }
 
   /**
@@ -63,7 +56,7 @@ export class SimCognitoUserPoolTriggers {
    * reaches it on real Cognito.
    */
   async postConfirmation(context: SimCognitoTriggerContext): Promise<void> {
-    await this.run(SimCognitoTriggerOccasion.confirmSignUp, context);
+    await this.invocation.run(SimCognitoTriggerOccasion.confirmSignUp, context);
   }
 
   /**
@@ -74,7 +67,10 @@ export class SimCognitoUserPoolTriggers {
    * `UserLambdaValidationException` the caller sees.
    */
   async preAuthentication(context: SimCognitoTriggerContext): Promise<void> {
-    await this.run(SimCognitoTriggerOccasion.preAuthentication, context);
+    await this.invocation.run(
+      SimCognitoTriggerOccasion.preAuthentication,
+      context,
+    );
   }
 
   /**
@@ -85,68 +81,26 @@ export class SimCognitoUserPoolTriggers {
    * tokens the pool issued stay issued, exactly as on real Cognito.
    */
   async postAuthentication(context: SimCognitoTriggerContext): Promise<void> {
-    await this.run(SimCognitoTriggerOccasion.postAuthentication, context);
+    await this.invocation.run(
+      SimCognitoTriggerOccasion.postAuthentication,
+      context,
+    );
   }
 
   /**
-   * Invoke the trigger for one occasion, answering with what the handler
-   * returned, or with nothing where the pool has no such trigger.
-   */
-  private async run(
-    occasion: SimCognitoTriggerOccasion,
-    context: SimCognitoTriggerContext,
-  ): Promise<unknown> {
-    const { trigger } = occasion;
-    const functionArn = context.pool.settings.lambdaConfig.find(trigger);
-
-    if (functionArn === undefined) {
-      return undefined;
-    }
-
-    const request: SimCognitoTriggerFunctionRequest = {
-      functionArn,
-      userPoolArn: context.pool.arn.value,
-      userPoolAccountId: context.pool.arn.accountId,
-    };
-    const refusal = this.functions.invokeRefusal(request);
-
-    if (refusal !== undefined) {
-      throw new SimCognitoUnexpectedLambdaException(
-        `The ${trigger} trigger of user pool ${context.pool.id} could not be ` +
-          `invoked. ${refusal}`,
-      );
-    }
-
-    const returned = await this.invoke(occasion, request, context);
-
-    requireSimCognitoTriggerResponse(trigger, returned);
-
-    return returned;
-  }
-
-  /**
-   * Invoke the handler, reporting a failure the way real Cognito reports one.
+   * Run the `PreTokenGeneration` trigger, if the pool has one, and answer with
+   * what its handler asked to change about the claims.
    *
-   * The handler's own message is repeated because that is the whole mechanism a
-   * `PreSignUp` or `PreAuthentication` trigger refuses a request with: it
-   * throws, and the words it threw are what the caller is told.
+   * A pool without the trigger, and a handler that returned the event without
+   * writing a response, both answer with an override that changes nothing, so
+   * the token layer applies one either way.
    */
-  private async invoke(
+  async preTokenGeneration(
     occasion: SimCognitoTriggerOccasion,
-    request: SimCognitoTriggerFunctionRequest,
     context: SimCognitoTriggerContext,
-  ): Promise<unknown> {
-    try {
-      return await this.functions.invoke(
-        request,
-        new SimCognitoTriggerEvent(context).document(occasion),
-      );
-    } catch (error) {
-      throw new SimCognitoUserLambdaValidationException(
-        `${occasion.trigger} failed with error ${
-          error instanceof Error ? error.message : String(error)
-        }.`,
-      );
-    }
+  ): Promise<SimCognitoClaimsOverride> {
+    return this.claimsOverrides.read(
+      await this.invocation.run(occasion, context),
+    );
   }
 }

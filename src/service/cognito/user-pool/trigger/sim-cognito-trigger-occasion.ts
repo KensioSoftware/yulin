@@ -61,6 +61,40 @@ export class SimCognitoTriggerOccasion {
     "PostAuthentication_Authentication",
   );
 
+  /**
+   * The tokens a sign-in hands out.
+   */
+  public static readonly tokenGeneration = new SimCognitoTriggerOccasion(
+    "PreTokenGeneration",
+    "TokenGeneration_Authentication",
+  );
+
+  /**
+   * The tokens handed out where a sign-in finishes by answering the new
+   * password challenge.
+   *
+   * This is also the one occasion a request's `ClientMetadata` reaches the
+   * token trigger, because real Cognito passes it on from
+   * `RespondToAuthChallenge` and `AdminRespondToAuthChallenge` alone.
+   */
+  public static readonly newPasswordTokenGeneration =
+    new SimCognitoTriggerOccasion(
+      "PreTokenGeneration",
+      "TokenGeneration_NewPasswordChallenge",
+    );
+
+  /**
+   * The tokens a `REFRESH_TOKEN_AUTH` refresh hands out.
+   *
+   * Real Cognito runs the token trigger again here, so a claim a handler has
+   * changed since the sign-in reaches the reissued token rather than being
+   * stale for the life of the session.
+   */
+  public static readonly refreshTokenGeneration = new SimCognitoTriggerOccasion(
+    "PreTokenGeneration",
+    "TokenGeneration_RefreshTokens",
+  );
+
   public readonly trigger: SimCognitoTriggerName;
   public readonly source: string;
 

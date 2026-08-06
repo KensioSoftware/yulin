@@ -922,13 +922,16 @@ try {
 A pool created with a `LambdaConfig` runs the functions it names as part of a sign-up or a sign-in.
 Each one is given the real event and has to return it, changed or not.
 
-| Trigger              | Fires                                                                  | `triggerSource`                     |
-| -------------------- | ---------------------------------------------------------------------- | ----------------------------------- |
-| `PreSignUp`          | `SignUp`, before the pool takes the new user                           | `PreSignUp_SignUp`                  |
-| `PreSignUp`          | `AdminCreateUser`, before the pool takes the new user                  | `PreSignUp_AdminCreateUser`         |
-| `PostConfirmation`   | `ConfirmSignUp` and `AdminConfirmSignUp`, once the user is `CONFIRMED` | `PostConfirmation_ConfirmSignUp`    |
-| `PreAuthentication`  | a sign-in, once the user is known and before its password is checked   | `PreAuthentication_Authentication`  |
-| `PostAuthentication` | a sign-in, once the tokens have been issued                            | `PostAuthentication_Authentication` |
+| Trigger              | Fires                                                                  | `triggerSource`                        |
+| -------------------- | ---------------------------------------------------------------------- | -------------------------------------- |
+| `PreSignUp`          | `SignUp`, before the pool takes the new user                           | `PreSignUp_SignUp`                     |
+| `PreSignUp`          | `AdminCreateUser`, before the pool takes the new user                  | `PreSignUp_AdminCreateUser`            |
+| `PostConfirmation`   | `ConfirmSignUp` and `AdminConfirmSignUp`, once the user is `CONFIRMED` | `PostConfirmation_ConfirmSignUp`       |
+| `PreAuthentication`  | a sign-in, once the user is known and before its password is checked   | `PreAuthentication_Authentication`     |
+| `PreTokenGeneration` | a sign-in, where the claims of its tokens are settled                  | `TokenGeneration_Authentication`       |
+| `PreTokenGeneration` | the sign-in that finishes by answering the new password challenge      | `TokenGeneration_NewPasswordChallenge` |
+| `PreTokenGeneration` | a `REFRESH_TOKEN_AUTH` refresh, over the tokens it reissues            | `TokenGeneration_RefreshTokens`        |
+| `PostAuthentication` | a sign-in, once the tokens have been issued                            | `PostAuthentication_Authentication`    |
 
 The function is a simulated Lambda function anywhere in the simulation, and it has to admit
 `cognito-idp.amazonaws.com` for the pool, which is what `AddPermission` grants and what CDK's
@@ -1277,7 +1280,8 @@ try {
 
 `ClientMetadata` on the sign-in reaches the handler as `request.validationData` for
 `PreAuthentication` and as `request.clientMetadata` for `PostAuthentication`, as it does on real
-Cognito. Neither fires for `REFRESH_TOKEN_AUTH`, as neither does on real Cognito.
+Cognito. Neither fires for `REFRESH_TOKEN_AUTH`, as neither does on real Cognito, where
+`PreTokenGeneration` does.
 
 ### The event, and what a failure gets back
 
@@ -1301,6 +1305,169 @@ Three failures are reported the way real Cognito reports them:
 
 Only the triggers in the table above run. Every other `LambdaConfig` key is refused when the pool is
 created or updated, naming the trigger, so a pool never quietly drops one.
+
+## Custom claims from a token trigger
+
+`PreTokenGeneration` decides what the pool puts on a token. The handler writes
+`response.claimsOverrideDetails`, and the id token is signed with what it asked for.
+`claimsToAddOrOverride` adds or replaces a claim, `claimsToSuppress` removes one, and
+`groupOverrideDetails.groupsToOverride` replaces the `cognito:groups` claim. The group override
+reaches the access token too, which is the one change a `V1_0` trigger makes to one.
+
+```typescript sim-cognito-pre-token-generation
+/**
+ * A user pool whose token trigger puts a tenant on every id token.
+ */
+
+import {
+  AdminCreateUserCommand,
+  AdminInitiateAuthCommand,
+  AdminSetUserPasswordCommand,
+  CreateUserPoolClientCommand,
+  CreateUserPoolCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+import {
+  AddPermissionCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-lambda";
+import { CognitoJwtVerifier } from "aws-jwt-verify";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+/**
+ * The part of the PreTokenGeneration event this handler reads and writes.
+ */
+interface PreTokenGenerationEvent {
+  readonly request: { readonly userAttributes: Record<string, string> };
+  readonly response: object;
+}
+
+const simAws = new SimAws();
+const lambda = simAws.lambda();
+const cognito = simAws.cognitoIdentityProvider();
+
+// The trigger reads the user's email and puts the tenant it belongs to on the
+// token, along with the groups that tenant's users get.
+await lambda.createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "pre-token",
+    Role: "arn:aws:iam::888888888888:role/PreTokenRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput((event: PreTokenGenerationEvent) => {
+        const email = event.request.userAttributes["email"] ?? "";
+
+        return {
+          ...event,
+          response: {
+            claimsOverrideDetails: {
+              claimsToAddOrOverride: { tenantId: email.split("@", 2)[1] ?? "" },
+              claimsToSuppress: ["email"],
+              groupOverrideDetails: { groupsToOverride: ["tenant-admin"] },
+            },
+          },
+        };
+      }),
+    },
+  }),
+);
+
+const pool = await cognito.createUserPool(
+  new CreateUserPoolCommand({
+    PoolName: "myapp-users",
+    LambdaConfig: {
+      PreTokenGeneration:
+        "arn:aws:lambda:us-east-1:888888888888:function:pre-token",
+    },
+  }),
+);
+const userPoolId = pool.UserPool!.Id!;
+
+await lambda.addPermission(
+  new AddPermissionCommand({
+    FunctionName: "pre-token",
+    StatementId: "AllowCognito",
+    Action: "lambda:InvokeFunction",
+    Principal: "cognito-idp.amazonaws.com",
+    SourceArn: pool.UserPool!.Arn!,
+  }),
+);
+
+const appClient = await cognito.createUserPoolClient(
+  new CreateUserPoolClientCommand({
+    UserPoolId: userPoolId,
+    ClientName: "web",
+    ExplicitAuthFlows: ["ALLOW_ADMIN_USER_PASSWORD_AUTH"],
+  }),
+);
+const clientId = appClient.UserPoolClient!.ClientId!;
+
+await cognito.adminCreateUser(
+  new AdminCreateUserCommand({
+    UserPoolId: userPoolId,
+    Username: "alice",
+    UserAttributes: [{ Name: "email", Value: "alice@acme.example" }],
+  }),
+);
+await cognito.adminSetUserPassword(
+  new AdminSetUserPasswordCommand({
+    UserPoolId: userPoolId,
+    Username: "alice",
+    Password: "Sup3rSecretPassw0rd!",
+    Permanent: true,
+  }),
+);
+
+const signedIn = await cognito.adminInitiateAuth(
+  new AdminInitiateAuthCommand({
+    UserPoolId: userPoolId,
+    ClientId: clientId,
+    AuthFlow: "ADMIN_USER_PASSWORD_AUTH",
+    AuthParameters: { USERNAME: "alice", PASSWORD: "Sup3rSecretPassw0rd!" },
+  }),
+);
+
+// The overridden token is signed like any other, so the application's own
+// verifier is what reads the claims off it.
+const verifier = CognitoJwtVerifier.create({
+  userPoolId,
+  tokenUse: "id",
+  clientId,
+});
+
+verifier.cacheJwks(cognito.userPool(userPoolId).jwks());
+
+const payload = await verifier.verify(signedIn.AuthenticationResult!.IdToken!);
+
+// The claim the handler added is there, and the one it suppressed is not.
+console.log(payload["tenantId"]); // "acme.example"
+console.log(payload["email"]); // undefined
+console.log(payload["cognito:groups"]); // ["tenant-admin"]
+```
+
+The trigger runs wherever the pool issues tokens, and names the occasion in `triggerSource`:
+`TokenGeneration_Authentication` for a sign-in, `TokenGeneration_NewPasswordChallenge` for the
+sign-in that finishes by answering the new password challenge, and `TokenGeneration_RefreshTokens`
+for `REFRESH_TOKEN_AUTH`. A refresh runs the handler again, so a claim that changed since the
+sign-in is on the reissued token rather than being stale for the life of the session.
+
+The request the handler is given carries `userAttributes`, a `groupConfiguration.groupsToOverride`
+holding the groups the user is in, and, from a challenge response, `clientMetadata`. Real Cognito
+passes `ClientMetadata` to this trigger from `RespondToAuthChallenge` and
+`AdminRespondToAuthChallenge` only, and not from `InitiateAuth` or `AdminInitiateAuth`.
+
+A response naming something this simulation would have to drop is refused with
+`InvalidLambdaResponseException` rather than applied in part:
+
+- A reserved claim in `claimsToAddOrOverride` or `claimsToSuppress`, such as `sub`, `aud`, `iss`,
+  `token_use`, `exp`, `iat` or `auth_time`. Real Cognito ignores an override of one, so a handler
+  that appeared to work here would do nothing deployed.
+- Any `cognito:` claim in `claimsToAddOrOverride`. `cognito:groups` is changed through
+  `groupOverrideDetails` instead, and the refusal says so.
+- `groupOverrideDetails.iamRolesToOverride` or `preferredRole`, because the `cognito:roles` and
+  `cognito:preferred_role` claims they feed are not issued here at all.
+- A claim value that is not a string. Complex claim values arrived with the `V2_0` event, which is
+  not simulated.
 
 ## Token timestamps and expiry
 
@@ -2044,6 +2211,9 @@ Sim Cognito currently supports:
 - `GlobalSignOutCommand` and `AdminUserGlobalSignOutCommand`, which revoke the tokens a user holds
 - The `PreAuthentication` and `PostAuthentication` Lambda triggers, invoked with the real event
   around a sign-in, with the sign-in's own `ClientMetadata` reaching them
+- The `PreTokenGeneration` Lambda trigger at `V1_0`, whose `claimsOverrideDetails` adds, overrides
+  and suppresses the claims of an id token, and whose `groupOverrideDetails` replaces
+  `cognito:groups`, on a sign-in and on a refresh alike
 - Real RS256 JWTs, signed by a key the pool publishes as a JWKS, so a verifier configured for the
   pool verifies them unchanged
 - A pool's `.well-known/jwks.json` and `.well-known/openid-configuration` served over HTTP by
@@ -2082,7 +2252,8 @@ Current documented limitations:
   caller's own verifier, which asks this simulation nothing, so nothing here can tell it the token
   was revoked. Real Cognito is the same for a verifier reading only the JWKS.
 - The `cognito:preferred_role` and `cognito:roles` claims are not on the tokens. A group's `RoleArn`
-  is stored and reported, and nothing assumes that role.
+  is stored and reported, and nothing assumes that role. A `PreTokenGeneration` handler naming
+  either claim is refused rather than half-applied.
 - A pool publishes one signing key where real Cognito publishes two and rotates between them, so
   code assuming a single JWKS entry passes here and is still wrong against real AWS. The key is
   generated with `node:crypto` the first time the pool signs or publishes one, and kept in memory
@@ -2155,12 +2326,12 @@ Current documented limitations:
   on real Cognito, so a client created without a secret never gains one.
 - A redeployed template reaches neither update. Sim CloudFormation replaces a resource whose
   resolved template entry changed rather than updating it in place, whatever the resource type.
-- `PreSignUp`, `PostConfirmation`, `PreAuthentication` and `PostAuthentication` are the only Lambda
-  triggers that run. Every other `LambdaConfig` key is refused when the pool is created or updated,
-  naming the trigger, because a pool that accepted one would never call the function the template
-  named. The token generation and message triggers wait on the features they fire for; the custom
-  challenge triggers would need a challenge loop this simulation does not have; and the migration
-  and federation triggers have no external directory to reach.
+- `PreSignUp`, `PostConfirmation`, `PreAuthentication`, `PostAuthentication` and
+  `PreTokenGeneration` are the only Lambda triggers that run. Every other `LambdaConfig` key is
+  refused when the pool is created or updated, naming the trigger, because a pool that accepted one
+  would never call the function the template named. The message triggers wait on the messages this
+  simulation does not deliver; the custom challenge triggers would need a challenge loop it does not
+  have; and the migration and federation triggers have no external directory to reach.
 - `AdminCreateUser` does not fire `PostConfirmation`, here or on real Cognito. It is the tempting
   place to hang the trigger and the wrong one: a project relying on it would pass here and write
   nothing in production.
@@ -2175,7 +2346,29 @@ Current documented limitations:
   ran after is not undone: a confirmed user stays confirmed and the tokens a pool issued stay
   issued, as they do on real Cognito.
 - Neither sign-in trigger fires for `REFRESH_TOKEN_AUTH`, as neither does on real Cognito.
-  `ClientMetadata` on a refresh is accepted and reaches nothing.
+  `PreTokenGeneration` does fire there, because the pool is issuing tokens.
+- `PreTokenGenerationConfig` is refused, so the trigger runs at `V1_0` and nothing else. The `V2_0`
+  and `V3_0` events customise access token claims and carry `scopesToAdd` and `scopesToSuppress`,
+  none of which is simulated. The one change a `V1_0` event makes to an access token, replacing its
+  `cognito:groups`, is applied.
+- A `V1_0` claim value is a string, and a handler returning anything else is refused. The complex
+  claim values arrived with the `V2_0` event.
+- `claimsToAddOrOverride` and `claimsToSuppress` reach the id token alone, because a `V1_0` event
+  customises that token. `cognito:groups` on an access token is changed through
+  `groupOverrideDetails`, which is what real Cognito calls the only change a `V1_0` event makes to
+  an access token. `claimsToSuppress` naming a `cognito:` claim other than `cognito:groups` is
+  refused, since real Cognito suppresses none of the others.
+- A `PreTokenGeneration` response naming a claim real Cognito reserves is refused rather than
+  ignored, which is what real Cognito does with one. That is a deliberate divergence: a claim that
+  silently does not arrive in production is the failure a test with a trigger in it is there to
+  catch.
+- `groupOverrideDetails.iamRolesToOverride` and `preferredRole` are refused, and the request's
+  `groupConfiguration` carries neither, because the `cognito:roles` and `cognito:preferred_role`
+  claims they feed are not issued here. A handler copying the request's `groupConfiguration` back
+  into its response, which is how real Cognito says to leave the groups alone, works unchanged.
+- `ClientMetadata` reaches `PreTokenGeneration` from `RespondToAuthChallenge` and
+  `AdminRespondToAuthChallenge` alone, as it does on real Cognito. A refresh accepts one and it
+  reaches nothing.
 - Unsimulated `CreateUserPool` inputs are refused rather than ignored: `UsernameAttributes`,
   `AliasAttributes`, `Schema`, `UsernameConfiguration`,
   `UserAttributeUpdateSettings`, `DeviceConfiguration`, `UserPoolAddOns`, `KeyConfiguration`,

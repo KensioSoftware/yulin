@@ -5,6 +5,7 @@ import {
 } from "../../user-pool/auth/sim-cognito-sign-in.js";
 import { SimCognitoPasswordCheck } from "../../user-pool/sim-cognito-password-check.js";
 import type { SimCognitoTokenIssuer } from "../../user-pool/token/sim-cognito-token-issuer.js";
+import { SimCognitoTriggerOccasion } from "../../user-pool/trigger/sim-cognito-trigger-occasion.js";
 import type { SimCognitoUserPoolTriggers } from "../../user-pool/trigger/sim-cognito-user-pool-triggers.js";
 import { SimCognitoAuthenticationResult } from "./sim-cognito-authentication-result.js";
 import type { SimCognitoAuthResolver } from "./sim-cognito-auth-resolver.js";
@@ -53,9 +54,11 @@ export class SimCognitoNewPasswordResponse {
    * Complete the challenge, and sign the user in.
    *
    * This is where the sign-in the challenge interrupted finishes, so it is
-   * where the pool's `PostAuthentication` trigger runs. `PreAuthentication`
-   * does not run again: it ran when the challenge was issued, and real Cognito
-   * fires it once per sign-in rather than once per request.
+   * where the pool's `PostAuthentication` trigger runs, and where its
+   * `PreTokenGeneration` trigger runs with a `triggerSource` of
+   * `TokenGeneration_NewPasswordChallenge`. `PreAuthentication` does not run
+   * again: it ran when the challenge was issued, and real Cognito fires it once
+   * per sign-in rather than once per request.
    */
   async handle(
     request: SimCognitoChallengeResponseRequest,
@@ -84,10 +87,19 @@ export class SimCognitoNewPasswordResponse {
 
     pool.auth.removeSession(session);
 
+    // This is the one occasion real Cognito passes a request's `ClientMetadata`
+    // to the token trigger, so it travels with the tokens here and nowhere
+    // else.
     const authenticated = {
       $metadata: {},
       AuthenticationResult: this.result.of(
-        this.tokenIssuer.issue({ pool, client, user }),
+        await this.tokenIssuer.issue({
+          pool,
+          client,
+          user,
+          occasion: SimCognitoTriggerOccasion.newPasswordTokenGeneration,
+          clientMetadata: request.clientMetadata,
+        }),
       ),
     };
 

@@ -16,6 +16,7 @@ export interface SimCognitoLambdaConfigType {
   readonly PostConfirmation?: string | undefined;
   readonly PreAuthentication?: string | undefined;
   readonly PostAuthentication?: string | undefined;
+  readonly PreTokenGeneration?: string | undefined;
 }
 
 /**

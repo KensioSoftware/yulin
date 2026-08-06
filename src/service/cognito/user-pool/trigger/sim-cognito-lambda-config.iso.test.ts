@@ -47,6 +47,61 @@ describe("sim Cognito user pool LambdaConfig", () => {
     });
   });
 
+  it("creates a pool with the token trigger and reports it", async () => {
+    // Given a simulation.
+    const cognito = new SimAws().cognitoIdentityProvider();
+
+    // When a pool is created with a PreTokenGeneration trigger, which is the
+    // V1_0 token trigger this simulation runs.
+    const created = await cognito.createUserPool(
+      new CreateUserPoolCommand({
+        PoolName: "myapp-users",
+        LambdaConfig: { PreTokenGeneration: triggerFunctionArn },
+      }),
+    );
+
+    assertNonNullable(created.UserPool?.Id);
+
+    // Then a described pool reports it.
+    const described = await cognito.describeUserPool(
+      new DescribeUserPoolCommand({ UserPoolId: created.UserPool.Id }),
+    );
+    assertObjectEquals(described.UserPool?.LambdaConfig, {
+      PreTokenGeneration: triggerFunctionArn,
+    });
+  });
+
+  it("refuses the token trigger versions that customise an access token", async () => {
+    // Given a simulation.
+    const cognito = new SimAws().cognitoIdentityProvider();
+
+    // When a pool asks for the V2_0 or V3_0 token trigger.
+    const error = await assertThrowsErrorAsync(async () =>
+      cognito.createUserPool(
+        new CreateUserPoolCommand({
+          PoolName: "myapp-users",
+          LambdaConfig: {
+            PreTokenGenerationConfig: {
+              LambdaArn: triggerFunctionArn,
+              LambdaVersion: "V2_0",
+            },
+          },
+        }),
+      ),
+    );
+
+    // Then it is refused, and pointed at the trigger that does run here.
+    assertIdentical(error.name, "InvalidParameterException");
+    assertStringIncludes(
+      error.message,
+      "CreateUserPool LambdaConfig PreTokenGenerationConfig is not simulated",
+    );
+    assertStringIncludes(
+      error.message,
+      "Name the function in PreTokenGeneration",
+    );
+  });
+
   it("reports no LambdaConfig for a pool created without one", async () => {
     // Given a simulation.
     const cognito = new SimAws().cognitoIdentityProvider();
@@ -89,15 +144,14 @@ describe("sim Cognito user pool LambdaConfig", () => {
     // Given a simulation.
     const cognito = new SimAws().cognitoIdentityProvider();
 
-    // When a pool asks for a token generation trigger alongside one that is
-    // simulated.
+    // When a pool asks for a message trigger alongside one that is simulated.
     const error = await assertThrowsErrorAsync(async () =>
       cognito.createUserPool(
         new CreateUserPoolCommand({
           PoolName: "myapp-users",
           LambdaConfig: {
             PreAuthentication: triggerFunctionArn,
-            PreTokenGeneration: otherFunctionArn,
+            CustomMessage: otherFunctionArn,
           },
         }),
       ),
@@ -108,11 +162,11 @@ describe("sim Cognito user pool LambdaConfig", () => {
     assertIdentical(error.name, "InvalidParameterException");
     assertStringIncludes(
       error.message,
-      "CreateUserPool LambdaConfig PreTokenGeneration is not simulated",
+      "CreateUserPool LambdaConfig CustomMessage is not simulated",
     );
     assertStringIncludes(
       error.message,
-      "changing the claims a pool puts in its tokens",
+      "writing the wording of a message the pool sends",
     );
   });
 

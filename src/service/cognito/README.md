@@ -173,6 +173,21 @@ hands out all three tokens and `reissue` signs a new access and id token for a r
 difference `REFRESH_TOKEN_AUTH` answers with. Everything it issues is recorded on the pool, because
 the pool is what a refresh or a sign-out presents a token back to.
 
+The pool's `PreTokenGeneration` trigger runs from the issuer, because that is where a token's claims
+are settled, and it runs from `reissue` as well as from `issue`: real Cognito fires it on a refresh
+too, and a simulation that only fired it on a first sign-in would let a claim the handler has since
+changed survive one. Each caller says which occasion it is issuing for, which is what becomes the
+handler's `triggerSource`.
+
+`SimCognitoClaimsOverrideReader` reads what the handler wrote into `response.claimsOverrideDetails`
+and answers with a `SimCognitoClaimsOverride`, which is what applies the changes to a claim set. A
+pool with no such trigger produces an empty override rather than nothing, so the issuer applies one
+either way. `sim-cognito-reserved-claims.ts` holds the claims a handler may not name. Refusing those is a
+deliberate divergence: real Cognito drops the override without saying so, and a handler that appears
+to work here and does nothing deployed is the failure worth catching. The claim changes reach the id
+token, and the group override reaches the access token as well, which is the one change a `V1_0`
+event makes to one.
+
 ## CloudFormation resources
 
 `cfn/` creates `AWS::Cognito::UserPool`, `AWS::Cognito::UserPoolClient` and
@@ -404,6 +419,12 @@ resource, here or on real AWS.
 - The password and refresh flows run on both sides of the API, and only `NEW_PASSWORD_REQUIRED` is
   issued. SRP, `USER_AUTH`, custom authentication, MFA challenges and device tracking are refused
   rather than treated as a flow or challenge that is simulated.
+- A `PreTokenGeneration` response is refused where real Cognito would quietly drop part of it: a
+  reserved claim, any `cognito:` claim in `claimsToAddOrOverride`, a claim value that is not a
+  string, and a group override naming IAM roles. The trigger runs at `V1_0` only, so
+  `PreTokenGenerationConfig` is refused, and the group override replacing `cognito:groups` is the
+  only change that reaches an access token. The `V2_0` and `V3_0` access token claims and scopes are
+  not customised.
 - A refresh answers with no new refresh token, as real Cognito does with refresh token rotation off.
   `RefreshTokenRotation` is refused on an app client, and `GetTokensFromRefreshToken` and
   `RevokeToken` are not implemented.

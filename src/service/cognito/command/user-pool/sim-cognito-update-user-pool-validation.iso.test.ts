@@ -58,13 +58,13 @@ const refusedInputs: readonly RefusedInput[] = [
     says: "a password the user has used before",
   },
   {
-    label: "LambdaConfig PreTokenGeneration",
+    label: "LambdaConfig CustomMessage",
     input: {
       LambdaConfig: {
-        PreTokenGeneration: "arn:aws:lambda:eu-west-2:1:function:f",
+        CustomMessage: "arn:aws:lambda:eu-west-2:1:function:f",
       },
     },
-    says: "changing the claims a pool puts in its tokens",
+    says: "writing the wording of a message the pool sends",
   },
   {
     label: "UserAttributeUpdateSettings",
