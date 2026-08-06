@@ -1,0 +1,68 @@
+---
+# How a merge to main becomes a published version. Run by
+# .github/workflows/release.yml, which holds the account-side setup this
+# depends on.
+#
+# YAML rather than JSON so the reasoning below can live next to the settings.
+
+branches:
+  - main
+
+plugins:
+  # Reads the conventional-commit subjects on main and works out the bump.
+  # The stock rules already match what this repository writes: feat gives a
+  # minor, fix and perf give a patch, and chore, test, docs, refactor, style,
+  # build and ci release nothing.
+  #
+  # Two of the stock rules are worth knowing about, since neither is angular.
+  # A commit the parser recognises as a revert gives a patch, which is wanted:
+  # undoing something already published is a change consumers need. The rest —
+  # Atom emoji, Ember and ESLint tags, Express components, JSHint's uppercase
+  # types — read commit fields the angular parser never fills in, so they can
+  # match nothing here.
+  #
+  # No custom releaseRules deliberately. A rule set here would be a second
+  # place defining the commit convention, and the catch-all needed to make it
+  # exhaustive can swallow feat and fix outright if it is ordered wrong.
+  - "@semantic-release/commit-analyzer"
+
+  # Turns those same commits into the GitHub Release notes.
+  - "@semantic-release/release-notes-generator"
+
+  # Majors are published by hand, deliberately: a breaking change to a
+  # simulator is a decision about what consumers have to rewrite, not
+  # something a commit footer should be able to trigger on its own.
+  #
+  # This runs after the version is worked out and before anything is
+  # published, so a stray "BREAKING CHANGE:" footer fails the run rather than
+  # silently shipping 2.0.0. The alternative — mapping breaking changes down
+  # to a minor — was rejected because it would put a false version number
+  # against a genuinely breaking change.
+  - - "@semantic-release/exec"
+    - verifyReleaseCmd: >-
+        if [ "${nextRelease.type}" = "major" ]; then
+        echo "Refusing to publish ${nextRelease.version} automatically:
+        major releases are published by hand." >&2;
+        exit 1;
+        fi
+
+  # Publishes to npm. No NPM_TOKEN anywhere: the npm CLI detects the OIDC
+  # token the workflow requests and exchanges it for a credential that lasts
+  # the length of this one publish, which is also what makes npm attach a
+  # provenance attestation. Needs npm >= 11.5.1, which the Node in .nvmrc
+  # carries.
+  - "@semantic-release/npm"
+
+  # Creates the git tag and the GitHub Release.
+  #
+  # Note there is no @semantic-release/git plugin: nothing here commits the
+  # bumped version back to main. That is partly taste — the tag and the
+  # registry are the version of record for a library — and partly that it
+  # could not work anyway, since the main ruleset requires pull requests,
+  # signed commits and linear history, and only an org admin bypasses it.
+  # Tags are unaffected, because the ruleset only covers the default branch.
+  - - "@semantic-release/github"
+    # The released-in comments this would otherwise leave on every merged pull
+    # request and closed issue. The GitHub Release is the announcement.
+    - successComment: false
+      failComment: false
