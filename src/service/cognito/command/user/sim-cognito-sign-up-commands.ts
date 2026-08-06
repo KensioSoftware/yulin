@@ -3,11 +3,14 @@ import { requireSimCognitoSecretHash } from "../../user-pool/auth/sim-cognito-se
 import type { SimCognitoUserPoolClient } from "../../user-pool/client/sim-cognito-user-pool-client.js";
 import { SimCognitoPasswordCheck } from "../../user-pool/sim-cognito-password-check.js";
 import type { SimCognitoUserPool } from "../../user-pool/sim-cognito-user-pool.js";
+import { SimCognitoTriggerOccasion } from "../../user-pool/trigger/sim-cognito-trigger-occasion.js";
+import type { SimCognitoUserPoolTriggers } from "../../user-pool/trigger/sim-cognito-user-pool-triggers.js";
 import type { SimCognitoUser } from "../../user-pool/user/sim-cognito-user.js";
 import type { SimCognitoUserFactory } from "../../user-pool/user/sim-cognito-user-factory.js";
 import { requireSimCognitoUsername } from "../../user-pool/user/sim-cognito-username.js";
 import type { SimCognitoAuthResolver } from "../auth/sim-cognito-auth-resolver.js";
 import type { SimCognitoRequestResolver } from "../sim-cognito-request-resolver.js";
+import { simCognitoValidationData } from "../sim-cognito-validation-data.js";
 import { SimCognitoUnsimulatedSignUpOptions } from "./sim-cognito-unsimulated-sign-up-options.js";
 import type {
   SimAdminConfirmSignUpCommand,
@@ -25,6 +28,7 @@ interface SimCognitoSignUpCommandsProperties {
   readonly authResolver: SimCognitoAuthResolver;
   readonly resolver: SimCognitoRequestResolver;
   readonly userFactory: SimCognitoUserFactory;
+  readonly triggers: SimCognitoUserPoolTriggers;
 }
 
 interface SimCognitoCommandOptions {
@@ -49,6 +53,7 @@ export class SimCognitoSignUpCommands {
   private readonly authResolver: SimCognitoAuthResolver;
   private readonly resolver: SimCognitoRequestResolver;
   private readonly userFactory: SimCognitoUserFactory;
+  private readonly triggers: SimCognitoUserPoolTriggers;
   private readonly unsimulatedOptions =
     new SimCognitoUnsimulatedSignUpOptions();
 
@@ -56,6 +61,7 @@ export class SimCognitoSignUpCommands {
     this.authResolver = properties.authResolver;
     this.resolver = properties.resolver;
     this.userFactory = properties.userFactory;
+    this.triggers = properties.triggers;
   }
 
   /**
@@ -67,8 +73,14 @@ export class SimCognitoSignUpCommands {
    * against the pool's policy first, as `AdminCreateUser` checks a temporary
    * one, and a username the pool already holds is refused whether that user
    * signed itself up or an admin created it.
+   *
+   * The pool's `PreSignUp` trigger runs before the user is added, so a handler
+   * that throws leaves the pool without it. A handler answering
+   * `autoConfirmUser` takes the user straight to `CONFIRMED` and reaches
+   * `PostConfirmation` here rather than at a `ConfirmSignUp` that never comes,
+   * which is what real Cognito does for a pool whose users never confirm.
    */
-  signUp(command: SimSignUpCommand): SimSignUpCommandOutput {
+  async signUp(command: SimSignUpCommand): Promise<SimSignUpCommandOutput> {
     const { input } = command;
     const { pool, client } = this.authResolver.client(input.ClientId);
 
@@ -87,9 +99,38 @@ export class SimCognitoSignUpCommands {
       ).require("Password", input.Password),
     });
 
+    const preSignUp = await this.triggers.preSignUp(
+      SimCognitoTriggerOccasion.signUp,
+      {
+        pool,
+        client,
+        user,
+        clientMetadata: input.ClientMetadata,
+        validationData: simCognitoValidationData(
+          input.ValidationData,
+          "SignUp",
+        ),
+      },
+    );
+
+    preSignUp.verifyAttributesOf(user);
     pool.addUser(user);
 
-    return { $metadata: {}, UserConfirmed: false, UserSub: user.sub };
+    if (preSignUp.autoConfirmUser) {
+      user.confirm();
+      await this.triggers.postConfirmation({
+        pool,
+        client,
+        user,
+        clientMetadata: input.ClientMetadata,
+      });
+    }
+
+    return {
+      $metadata: {},
+      UserConfirmed: preSignUp.autoConfirmUser,
+      UserSub: user.sub,
+    };
   }
 
   /**
@@ -97,11 +138,12 @@ export class SimCognitoSignUpCommands {
    *
    * The user reaches `CONFIRMED` and can sign in from then on. The pool's
    * `AutoVerifiedAttributes` are marked verified here, because answering with
-   * the code is what shows the address the code went to is the user's.
+   * the code is what shows the address the code went to is the user's. The
+   * pool's `PostConfirmation` trigger runs last, on the confirmed user.
    */
-  confirmSignUp(
+  async confirmSignUp(
     command: SimConfirmSignUpCommand,
-  ): SimConfirmSignUpCommandOutput {
+  ): Promise<SimConfirmSignUpCommandOutput> {
     const { input } = command;
     const { pool, client } = this.authResolver.client(input.ClientId);
 
@@ -111,6 +153,13 @@ export class SimCognitoSignUpCommands {
 
     user.confirmSignUp(input.ConfirmationCode);
     user.verifyAttributes(pool.settings.autoVerifiedAttributes.names);
+
+    await this.triggers.postConfirmation({
+      pool,
+      client,
+      user,
+      clientMetadata: input.ClientMetadata,
+    });
 
     return { $metadata: {} };
   }
@@ -141,22 +190,31 @@ export class SimCognitoSignUpCommands {
    * `phone_number_verified` alone here even on a pool with
    * `AutoVerifiedAttributes`, because an admin confirming a user says nothing
    * about whether the address is really theirs.
+   *
+   * The `PostConfirmation` trigger still runs, and reports the same
+   * `PostConfirmation_ConfirmSignUp` source `ConfirmSignUp` does, because the
+   * user being confirmed signed itself up either way. There is no app client
+   * in the request, so the handler reads `CLIENT_ID_NOT_APPLICABLE`.
    */
-  adminConfirmSignUp(
+  async adminConfirmSignUp(
     command: SimAdminConfirmSignUpCommand,
     options?: SimCognitoCommandOptions,
-  ): SimAdminConfirmSignUpCommandOutput {
+  ): Promise<SimAdminConfirmSignUpCommandOutput> {
     const { input } = command;
 
-    const user = this.resolver.user(
+    const { pool, user } = this.resolver.poolUser(
       "cognito-idp:AdminConfirmSignUp",
       input,
       options,
     );
 
-    this.unsimulatedOptions.refuseInAdminConfirm(input);
-
     user.confirm();
+
+    await this.triggers.postConfirmation({
+      pool,
+      user,
+      clientMetadata: input.ClientMetadata,
+    });
 
     return { $metadata: {} };
   }

@@ -175,20 +175,22 @@ describe("Sim CloudFormation Cognito user pool Lambda triggers", () => {
   });
 
   it("fails a stack asking for a trigger this simulation does not run", async () => {
-    // Given a template naming a sign-up trigger.
+    // Given a template naming a token generation trigger.
     const simAws = simAwsInEuWest2();
 
     // When the stack is deployed.
     const error = await deployFailure(
       simAws,
-      poolWithTrigger({ PreSignUp: { "Fn::GetAtt": ["Trigger", "Arn"] } }),
+      poolWithTrigger({
+        PreTokenGeneration: { "Fn::GetAtt": ["Trigger", "Arn"] },
+      }),
     );
 
     // Then the stack fails rather than deploying a pool that would never call
     // the function the template named.
     assertStringIncludes(
       error.message,
-      "CreateUserPool LambdaConfig PreSignUp is not simulated",
+      "CreateUserPool LambdaConfig PreTokenGeneration is not simulated",
     );
   });
 });

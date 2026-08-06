@@ -12,6 +12,8 @@ import {
  * https://docs.aws.amazon.com/cognito-user-identity-pools/latest/APIReference/API_LambdaConfigType.html
  */
 export interface SimCognitoLambdaConfigType {
+  readonly PreSignUp?: string | undefined;
+  readonly PostConfirmation?: string | undefined;
   readonly PreAuthentication?: string | undefined;
   readonly PostAuthentication?: string | undefined;
 }
@@ -27,8 +29,8 @@ export interface SimCognitoLambdaConfigType {
  * Every other `LambdaConfig` key real Cognito has is refused, naming the
  * trigger and saying why, so a pool never quietly drops one. That is the whole
  * reason this reads the config rather than storing it: a pool that accepted a
- * `PreSignUp` trigger and never called it would sign users up differently here
- * and on real AWS.
+ * `PreTokenGeneration` trigger and never called it would issue different tokens
+ * here and on real AWS.
  */
 export class SimCognitoLambdaConfig {
   private readonly operation: string;

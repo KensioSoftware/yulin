@@ -11,9 +11,11 @@ import type { SimCognitoTriggerName } from "./sim-cognito-trigger-name.js";
  * something without the `request` it was given has returned a different event.
  * Both are `InvalidLambdaResponseException` there and here.
  *
- * `response` is not checked. Neither of the triggers this simulation runs reads
- * anything out of it, so a handler that dropped it has not changed what happens
- * next, and refusing it here would refuse handlers real Cognito accepts.
+ * `response` is not checked. `PreSignUp` is the only trigger here that reads
+ * anything out of it, and a handler that dropped it is read as having answered
+ * no to all three of its flags, which is what a handler with nothing to ask for
+ * means. Refusing a missing `response` would refuse handlers real Cognito
+ * accepts.
  */
 export function requireSimCognitoTriggerResponse(
   trigger: SimCognitoTriggerName,

@@ -256,6 +256,41 @@ use.
 `SimCognitoUserPassword` holds what a user signs in with. It answers whether a candidate matches and
 nothing exposes it, the same modelling choice simulated KMS key material makes.
 
+## Lambda trigger model
+
+Trigger state and the running of a trigger live under `user-pool/trigger/`.
+
+`SimCognitoLambdaConfig` is the `LambdaConfig` a pool was created or updated with. It holds the
+function ARN each trigger names and resolves nothing, so a pool can be created before the function
+it names, and a function deleted afterwards fails the request rather than having silently broken the
+pool. Every `LambdaConfig` key this simulation does not run is refused there, naming the trigger,
+because a pool that accepted one would never call the function the template named.
+
+`SimCognitoTriggerOccasion` is a trigger paired with the `triggerSource` of one occasion it fires
+on. The two are not the same thing: `PreSignUp` fires both on `SignUp` and on `AdminCreateUser`, and
+a handler tells them apart by the source. Pairing them in a value object is what stops a source
+being derived from a trigger name, which would only work while every trigger had one.
+
+`SimCognitoUserPoolTriggers` runs them. A pool with no trigger for the occasion runs nothing and
+costs a map lookup. A pool with one checks the function's resource policy, invokes it, waits, and
+refuses what came back unless it is the event the handler was given. The policy is checked on every
+invocation rather than remembered, because a permission revoked afterwards stops the trigger on real
+Cognito too.
+
+`SimCognitoTriggerEvent` and `SimCognitoTriggerRequest` build the event document, which is the real
+shape down to the `response` a `PreSignUp` handler is sent with its three flags already set to
+false. `SimCognitoTriggerContext` is what an operation hands them: the pool, the user, the app
+client where there is one, and the client metadata and validation data the request carried.
+
+`SimCognitoPreSignUpResponse` reads what a `PreSignUp` handler answered. It is the only trigger here
+whose response is read, and the reading is lenient in the same way real Cognito is: anything but
+`true` is no, and a handler that dropped the response has asked for nothing.
+
+`SimAwsCognitoTriggerFunctions` is the bridge to simulated Lambda, and
+`SimCognitoNoTriggerFunctions` is what a standalone `SimCognitoIdentityProvider` gets instead. The
+functions come from the whole simulation rather than from the pool's own scope, because a
+`LambdaConfig` names a function by ARN and that ARN can name any Account and Region.
+
 ## Command handling
 
 AWS SDK-style operations are implemented under `command/`, grouped by the collaborators they share
@@ -328,8 +363,12 @@ resource, here or on real AWS.
   `SimCognitoUserPool.confirmationCode`. Real Cognito sends it and never reports it to anyone.
   Nothing here delivers a message, so this is what makes a sign-up flow testable at all.
 - `AdminConfirmSignUp` verifies nothing, whatever the pool's `AutoVerifiedAttributes` say, as it
-  verifies nothing on real Cognito. Only `ConfirmSignUp` sets `email_verified` and
-  `phone_number_verified`, and only where the user has the attribute to verify.
+  verifies nothing on real Cognito. `ConfirmSignUp` sets `email_verified` and
+  `phone_number_verified` where the user has the attribute to verify, and a `PreSignUp` trigger sets
+  them by answering `autoVerifyEmail` or `autoVerifyPhone`.
+- `AdminCreateUser` fires `PreSignUp` and never fires `PostConfirmation`, as on real Cognito, and
+  what a handler answered is ignored on that occasion. It is the tempting place to hang a user
+  record and the wrong one.
 - A confirmation code never expires, where a real one lasts 24 hours. `ResendConfirmationCode` is
   what replaces one.
 - `ForgotPassword`, `ConfirmForgotPassword` and `ChangePassword` are not implemented, so

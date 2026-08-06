@@ -58,9 +58,11 @@ const refusedInputs: readonly RefusedInput[] = [
   {
     label: "LambdaConfig",
     input: {
-      LambdaConfig: { PreSignUp: "arn:aws:lambda:eu-west-2:1:function:f" },
+      LambdaConfig: {
+        PreTokenGeneration: "arn:aws:lambda:eu-west-2:1:function:f",
+      },
     },
-    says: "LambdaConfig PreSignUp is not simulated",
+    says: "LambdaConfig PreTokenGeneration is not simulated",
   },
   {
     label: "AliasAttributes",
