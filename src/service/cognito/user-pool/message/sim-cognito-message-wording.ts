@@ -36,15 +36,10 @@ export class SimCognitoMessageWording {
    * This wording with whatever a `CustomMessage` handler wrote in place of it.
    *
    * A handler that wrote neither leaves the pool's own wording, which is what
-   * a handler returning the event untouched does.
+   * a handler returning the event untouched does, and what a pool with no such
+   * trigger at all gets.
    */
-  replacedBy(
-    written: SimCognitoWrittenWording | undefined,
-  ): SimCognitoMessageWording {
-    if (written === undefined) {
-      return this;
-    }
-
+  replacedBy(written: SimCognitoWrittenWording): SimCognitoMessageWording {
     return new SimCognitoMessageWording({
       subject: written.subject ?? this.subject,
       body: written.body ?? this.body,
