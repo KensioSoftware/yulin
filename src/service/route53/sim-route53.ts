@@ -6,6 +6,10 @@ import type {
   SimCreateHostedZoneCommandOutput,
 } from "./command/create-hosted-zone/create-hosted-zone.command.js";
 import type { SimRoute53HostedZone } from "./hosted-zone/sim-route53-hosted-zone.js";
+import {
+  registerSimRoute53HostedZone,
+  type SimRoute53HostedZoneRegistration,
+} from "./hosted-zone/register-sim-route53-hosted-zone.js";
 import type { SimRoute53HostedZoneId } from "./command/create-hosted-zone/sim-route53-zone-id.js";
 import type {
   SimGetHostedZoneCommand,
@@ -104,6 +108,25 @@ export class SimRoute53 {
       route53Registry: this.route53Registry,
     });
     return await handler.handle(command, options);
+  }
+
+  /**
+   * Register a Hosted Zone that already exists, with an ID of your choosing.
+   *
+   * `CreateHostedZone` allocates its own ID, as real Route53 does, so this is
+   * the way to stand up a zone a template already names: a CDK app using
+   * `HostedZone.fromLookup` bakes that zone's real ID into every RecordSet it
+   * synthesizes. A registered zone answers Route53 commands and resolves
+   * through simulated DNS the same as one the simulation created.
+   *
+   * An ID another Hosted Zone holds, or one that is not a Route53 Hosted Zone
+   * ID, is refused.
+   */
+  registerHostedZone(registration: SimRoute53HostedZoneRegistration): void {
+    registerSimRoute53HostedZone(registration, {
+      hostedZones: this.hostedZones,
+      route53Registry: this.route53Registry,
+    });
   }
 
   /**

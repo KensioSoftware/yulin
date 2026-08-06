@@ -150,7 +150,17 @@ export class SimRoute53HostedZone {
    * Move the sim Hosted Zone into INSYNC status.
    */
   completeSynchronization(): Promise<void> {
-    this.#status = "INSYNC";
+    this.markSynchronized();
     return Promise.resolve();
+  }
+
+  /**
+   * Put the sim Hosted Zone into INSYNC status without awaiting anything.
+   *
+   * A zone registered as already existing has no synchronization to wait for,
+   * and setup methods are not asynchronous.
+   */
+  markSynchronized(): void {
+    this.#status = "INSYNC";
   }
 }
