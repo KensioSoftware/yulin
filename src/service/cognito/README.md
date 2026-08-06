@@ -471,10 +471,10 @@ resource, here or on real AWS.
   past is what produces a token such a verifier refuses.
 - `UpdateGroup` replaces all three group properties rather than merging an omitted one.
 - A password is held so a user can sign in with it, and nothing reads one back.
-- No message is delivered. A pool records what it would have sent, and `SimCognitoUserPool.
-sentMessages` reads it back, which real Cognito reports to nobody. `AdminCreateUser` records an
-  invitation, so `MessageAction: SUPPRESS` records none, and `RESEND` and `DesiredDeliveryMediums`
-  are refused.
+- No message is delivered. A pool records what it would have sent, and
+  `SimCognitoUserPool.sentMessages` reads it back, which real Cognito reports to nobody.
+  `AdminCreateUser` records an invitation, so `MessageAction: SUPPRESS` records none, and `RESEND`
+  and `DesiredDeliveryMediums` are refused.
 - A verification message is recorded only for an attribute the pool verifies automatically, and only
   where the user has an `email` or a `phone_number` to be reached at.
 - An invitation for a user created with no `TemporaryPassword` keeps the `{####}` placeholder: real

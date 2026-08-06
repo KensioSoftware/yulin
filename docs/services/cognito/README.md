@@ -357,7 +357,9 @@ A pool created with no wording of its own uses the wording real Cognito uses: `Y
 code` and `Your verification code is {####}` for a verification message, and `Your temporary
 password` and `Your username is {username} and temporary password is {####}.` for an invitation.
 `EmailVerificationMessage`, `EmailVerificationSubject`, `SmsVerificationMessage` and
-`VerificationMessageTemplate` are all read, at whatever wording a request sets.
+`VerificationMessageTemplate` are all read, at whatever wording a request sets, held to the two
+rules real Cognito holds them to: a message carries `{####}`, and runs to 20,000 characters for an
+email and the 140 an SMS carries.
 
 This is Cognito's own delivery record rather than a simulated SES. Real Cognito with the default
 `EmailSendingAccount` of `COGNITO_DEFAULT` sends through no other service, and `EmailConfiguration`
@@ -2157,11 +2159,13 @@ a pool that asked for a link would be tested against a flow it does not have in 
 - `GET /<userPoolId>/.well-known/openid-configuration`
 
 It also lists the messages a pool would have sent, at `GET /<userPoolId>/messages`, which real
-Cognito serves nothing at.
+Cognito serves nothing at. That one is anonymous too, and it hands out confirmation codes and
+temporary passwords to anyone who asks, so serve a simulation on a port other people can reach only
+if you mean to.
 
-Both are anonymous, as they are on real Cognito, so no SigV4 signature is needed to fetch them. The
-real hostname `cognito-idp.<region>.amazonaws.com` maps to `cognito-idp.<region>.sim-aws.localhost`,
-and `srv.localUrl(...)` does that rewriting for you. An unknown pool id gets a 404, as does a pool
+The two real endpoints are anonymous as they are on real Cognito, so no SigV4 signature is needed to
+fetch them. The real hostname `cognito-idp.<region>.amazonaws.com` maps to
+`cognito-idp.<region>.sim-aws.localhost`, and `srv.localUrl(...)` does that rewriting for you. An unknown pool id gets a 404, as does a pool
 reached through another region's hostname.
 
 ```typescript sim-cognito-serve-jwks
@@ -2542,6 +2546,10 @@ Current documented limitations:
 - `VerificationMessageTemplate` wins over `EmailVerificationMessage`, `EmailVerificationSubject` and
   `SmsVerificationMessage` where a request sets both, and each of those fills in what the template
   left out. What real Cognito does when the two disagree was not checked against a live account.
+- Verification wording with no `{####}` in it is refused, as it is on real Cognito, because the
+  message would reach a user with no code in it. So is wording outside the lengths Cognito takes:
+  6 to 20,000 characters for an email, and 6 to 140 for a text message. The subject is not checked
+  against its own length.
 - The default wording, for a pool that set none, is taken from the Cognito API documentation rather
   than read back from a live account.
 - The recorded messages are listed over HTTP at `GET /<userPoolId>/messages`, which is an endpoint

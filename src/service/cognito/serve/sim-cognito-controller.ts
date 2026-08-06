@@ -129,11 +129,18 @@ export class SimCognitoServiceController implements SimAwsServiceController {
   ): Response {
     const { segment, document, url, method } = request;
 
+    // The listing is the whole of what the messages segment serves, and the
+    // two published documents sit under `.well-known` and nowhere else, so a
+    // path that mixes the two reaches neither.
     if (segment === messagesSegment && document === undefined) {
       return this.response.document(
         { messages: pool.sentMessages().map((message) => message.toOutput()) },
         method,
       );
+    }
+
+    if (segment !== wellKnownSegment) {
+      return this.response.noSuchEndpoint(url.pathname);
     }
 
     if (document === "jwks.json") {

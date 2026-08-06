@@ -151,13 +151,18 @@ describe("Serving the messages a sim Cognito user pool would have sent", () => {
     // Given a pool that has recorded a message.
     const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
     const userPoolId = await poolWithMessageIn(simAws);
+    const simAwsHttp = new SimAwsHttp({ simAws });
 
     // When something below the messages path is requested.
-    const response = await new SimAwsHttp({ simAws }).fetch(
-      `${messagesUrl(userPoolId)}/0`,
-    );
+    const belowListing = await simAwsHttp.fetch(`${messagesUrl(userPoolId)}/0`);
 
-    // Then it is not served: there is no endpoint for one message.
-    assertIdentical(response.status, 404);
+    // And when a published document is asked for under it rather than under
+    // .well-known.
+    const jwks = await simAwsHttp.fetch(`${messagesUrl(userPoolId)}/jwks.json`);
+
+    // Then neither is served: there is no endpoint for one message, and the
+    // two published documents sit under .well-known and nowhere else.
+    assertIdentical(belowListing.status, 404);
+    assertIdentical(jwks.status, 404);
   });
 });

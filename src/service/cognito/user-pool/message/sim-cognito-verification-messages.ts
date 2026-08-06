@@ -1,5 +1,10 @@
 import type { SimCognitoMessageMedium } from "./sim-cognito-sent-message.js";
 import { SimCognitoMessageWording } from "./sim-cognito-message-wording.js";
+import {
+  requireSimCognitoVerificationWording,
+  simCognitoLongestEmailMessage,
+  simCognitoLongestSmsMessage,
+} from "./sim-cognito-verification-wording.js";
 
 /**
  * The wording real Cognito gives a pool that asked for none.
@@ -50,7 +55,8 @@ export interface SimCognitoVerificationMessagesType {
  *
  * Only the wording is read here. Confirming by following a link is refused by
  * SimCognitoUnsimulatedUserPoolMessaging before a pool gets this far, so
- * whatever wording arrives is wording for a code.
+ * whatever wording arrives is wording for a code, and it is held to the rules
+ * real Cognito holds it to: the code placeholder, and a length.
  */
 export class SimCognitoVerificationMessages {
   public readonly emailSubject: string;
@@ -66,12 +72,18 @@ export class SimCognitoVerificationMessages {
       template?.EmailSubject ??
       input.EmailVerificationSubject ??
       defaultEmailSubject;
-    this.emailMessage =
+    this.emailMessage = requireSimCognitoVerificationWording(
+      "EmailVerificationMessage",
       template?.EmailMessage ??
-      input.EmailVerificationMessage ??
-      defaultMessage;
-    this.smsMessage =
-      template?.SmsMessage ?? input.SmsVerificationMessage ?? defaultMessage;
+        input.EmailVerificationMessage ??
+        defaultMessage,
+      simCognitoLongestEmailMessage,
+    );
+    this.smsMessage = requireSimCognitoVerificationWording(
+      "SmsVerificationMessage",
+      template?.SmsMessage ?? input.SmsVerificationMessage ?? defaultMessage,
+      simCognitoLongestSmsMessage,
+    );
     this.requested = SimCognitoVerificationMessages.copied(input);
   }
 

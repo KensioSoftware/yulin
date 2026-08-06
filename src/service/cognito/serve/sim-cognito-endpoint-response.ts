@@ -48,7 +48,7 @@ export class SimCognitoEndpointResponse {
         message:
           `Simulated Cognito answers ${method} at no user pool endpoint. ` +
           `The JWKS, the OpenID configuration and the recorded messages are ` +
-          `read with GET.`,
+          `read with GET or HEAD.`,
       },
       { status: 405, headers: { allow: "GET, HEAD" } },
     );

@@ -8,15 +8,18 @@ import type { CreateUserPoolCommandInput } from "@aws-sdk/client-cognito-identit
 import {
   assertArrayEquals,
   assertIdentical,
+  assertInstanceOf,
   assertNonNullable,
   assertStringIncludes,
   assertStringNotIncludes,
+  assertThrowsErrorAsync,
   assertTypeString,
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
+import { SimCognitoInvalidParameterException } from "../../error/sim-cognito.error.js";
 import type { SimCognitoIdentityProvider } from "../../sim-cognito-identity-provider.js";
 import type { SimCognitoSentMessage } from "./sim-cognito-sent-message.js";
 
@@ -226,5 +229,30 @@ describe("sim Cognito user pool verification messages", () => {
     assertNonNullable(resent);
     assertStringIncludes(resent.body, codeIn(pool));
     assertStringNotIncludes(resent.body, firstCode);
+  });
+
+  it("refuses wording with no code placeholder in it", async () => {
+    // When a pool is created with wording that would carry no code.
+    const error = await assertThrowsErrorAsync(async () => {
+      await makePool({ EmailVerificationMessage: "Welcome to Acme" });
+    });
+
+    // Then it is refused as real Cognito refuses it, rather than recording a
+    // message a user could not confirm with.
+    assertInstanceOf(error, SimCognitoInvalidParameterException);
+    assertStringIncludes(error.message, "{####}");
+  });
+
+  it("refuses wording longer than the medium takes", async () => {
+    // When a pool is created with a text message longer than an SMS carries.
+    const error = await assertThrowsErrorAsync(async () => {
+      await makePool({
+        SmsVerificationMessage: `{####} ${"a".repeat(140)}`,
+      });
+    });
+
+    // Then it is refused, naming the length Cognito takes.
+    assertInstanceOf(error, SimCognitoInvalidParameterException);
+    assertStringIncludes(error.message, "140");
   });
 });
