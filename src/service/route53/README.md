@@ -129,6 +129,28 @@ The creation flow is:
 
 Duplicate caller references throw `SimRoute53HostedZoneAlreadyExists`.
 
+## Registering a pre-existing Hosted Zone
+
+`SimRoute53.registerHostedZone()` stands up a Hosted Zone with a caller-chosen ID. It is a setup
+method rather than a command, in the way `SimS3.mountBucketFilesystem` is: it arranges the world in
+a way the real API has no operation for, so it stays off the command surface and `CreateHostedZone`
+keeps allocating its own ID as AWS does.
+
+It exists because a CDK app using `HostedZone.fromLookup` bakes the looked-up zone's real ID into
+the synthesized template, and every `AWS::Route53::RecordSet` names that ID. Nothing rewrites IDs as
+a template deploys, so the simulation has to be able to own the ID the template already names.
+
+`registerSimRoute53HostedZone` in `hosted-zone/` does the work. It normalizes the ID the same way
+commands do, so a malformed one is `SimRoute53InvalidInput` before any state changes, and refuses an
+ID already held with `SimRoute53HostedZoneAlreadyExists`. The zone goes into both the Account's
+hosted-zone map and `SimRoute53Registry`, which is what a created zone does and what makes DNS
+resolution work for it.
+
+A registered zone is `INSYNC` from the start through `markSynchronized()`, because there is nothing
+to synchronize: the zone is described as already existing rather than created here. Its caller
+reference is derived from its ID, since the creation that would have supplied one happened outside
+the simulation.
+
 The simulator does not currently try to emulate all AWS edge cases around duplicate zone names,
 delegation sets, private-zone VPC associations, or caller-reference replay output. The caller
 reference is mainly used to prevent accidental duplicate CloudFormation-created zones and to match

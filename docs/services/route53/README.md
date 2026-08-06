@@ -63,6 +63,66 @@ such as `Z2FDTNDATAQYW2`, can be used in your test setup. An ID with no matching
 `NoSuchHostedZone`, while a malformed one gives `InvalidInput`. Commands also accept the
 `/hostedzone/Z...` form as well as the bare ID.
 
+## Registering a Hosted Zone with a chosen ID
+
+`CreateHostedZoneCommand` allocates its own Hosted Zone ID, as real Route53 does, and takes none
+from you. When something else already decided the ID, register the Hosted Zone as part of your test
+setup instead.
+
+The usual reason is a CDK app that looks its zone up with `HostedZone.fromLookup` rather than
+creating it. That bakes the real Hosted Zone ID into the synthesized template, and every
+`AWS::Route53::RecordSet` in the template names that ID. Registering the zone first means the
+template deploys as it is, with no rewriting.
+
+```typescript sim-route53-register-hosted-zone
+/**
+ * Registering a simulated Route53 Hosted Zone with a chosen Hosted Zone ID.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const route53 = simAws.route53();
+
+// The Hosted Zone ID a CDK HostedZone.fromLookup baked into the template.
+route53.registerHostedZone({
+  id: "Z0123456789ABCDEFGHIJ",
+  name: "example.test",
+});
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "site-stack",
+  template: {
+    Resources: {
+      SiteRecord: {
+        Type: "AWS::Route53::RecordSet",
+        Properties: {
+          HostedZoneId: "Z0123456789ABCDEFGHIJ",
+          Name: "www.example.test",
+          Type: "A",
+          TTL: "300",
+          ResourceRecords: ["192.0.2.10"],
+        },
+      },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+await simAws.backgroundTasksComplete();
+
+console.log(stack.getResource("SiteRecord")?.status);
+```
+
+A registered Hosted Zone behaves like any other. It answers `GetHostedZoneCommand`,
+`ListHostedZonesByNameCommand` and `ChangeResourceRecordSetsCommand`, its records resolve through
+local hostname routing and simulated DNS, and it is `INSYNC` straight away, having been described as
+already existing rather than created.
+
+`registerHostedZone` takes the same optional `config` as `CreateHostedZoneCommand`, and accepts the
+`/hostedzone/Z...` form of the ID. An ID that another Hosted Zone already holds is refused with
+`HostedZoneAlreadyExists`, and one that is not a Route53 Hosted Zone ID with `InvalidInput`.
+
 ## Creating records
 
 Use `ChangeResourceRecordSetsCommand` to add records to a Hosted Zone.
@@ -878,6 +938,11 @@ try {
 This lets local integration tests use the same CDK infrastructure shape as production while keeping
 the test process local.
 
+A CDK app whose Hosted Zone comes from `HostedZone.fromLookup` names a real Hosted Zone ID
+throughout its template rather than creating the zone. Register that zone before deploying, as in
+[Registering a Hosted Zone with a chosen ID](#registering-a-hosted-zone-with-a-chosen-id), and the
+template's RecordSets find it.
+
 ## Accounts and Regions
 
 Use `SimAws` scopes to create Route53 state in different simulated Accounts and Regions.
@@ -966,6 +1031,8 @@ A standalone `SimRoute53` instance has its own isolated state and is not connect
 Sim Route53 currently supports:
 
 - `CreateHostedZoneCommand`, `GetHostedZoneCommand` and `ListHostedZonesByNameCommand`
+- Registering a Hosted Zone with a chosen Hosted Zone ID, for a zone a template looked up rather
+  than created
 - `ChangeResourceRecordSetsCommand` and `ListResourceRecordSetsCommand`
 - `CREATE`, `UPSERT` and `DELETE` record changes
 - Stored record types: `A`, `AAAA`, `CNAME`, `TXT`, `NS` and `SOA`
