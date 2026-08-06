@@ -62,7 +62,7 @@ export class SimCognitoUserPoolTriggers {
     trigger: SimCognitoTriggerName,
     context: SimCognitoTriggerContext,
   ): Promise<void> {
-    const functionArn = context.pool.lambdaConfig.find(trigger);
+    const functionArn = context.pool.settings.lambdaConfig.find(trigger);
 
     if (functionArn === undefined) {
       return;

@@ -75,7 +75,7 @@ export class SimCognitoNewPasswordResponse {
     requireSimCognitoEnabled(user);
 
     user.setPassword(
-      new SimCognitoPasswordCheck(pool.passwordPolicy).require(
+      new SimCognitoPasswordCheck(pool.settings.passwordPolicy).require(
         "NEW_PASSWORD",
         parameters.find("NEW_PASSWORD"),
       ),

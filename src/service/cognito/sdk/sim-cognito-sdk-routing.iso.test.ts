@@ -9,6 +9,7 @@ import {
   ListUserPoolClientsCommand,
   ListUserPoolsCommand,
   UpdateUserPoolClientCommand,
+  UpdateUserPoolCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import { CreateFunctionCommand, InvokeCommand } from "@aws-sdk/client-lambda";
@@ -175,6 +176,16 @@ describe("Cognito SDK interception", () => {
         ClientId: clientId,
       }),
     );
+    await client.send(
+      new UpdateUserPoolCommand({
+        UserPoolId: userPoolId,
+        AutoVerifiedAttributes: ["email"],
+      }),
+    );
+
+    const describedPool = await client.send(
+      new DescribeUserPoolCommand({ UserPoolId: userPoolId }),
+    );
     const listedPools = await client.send(
       new ListUserPoolsCommand({ MaxResults: 10 }),
     );
@@ -198,6 +209,9 @@ describe("Cognito SDK interception", () => {
     assertIdentical(updatedClient.UserPoolClient?.AccessTokenValidity, 30);
     assertIdentical(describedClient.UserPoolClient?.ClientName, "web");
     assertIdentical(describedClient.UserPoolClient.AccessTokenValidity, 30);
+    assertArrayEquals(describedPool.UserPool?.AutoVerifiedAttributes, [
+      "email",
+    ]);
     assertArrayEquals(
       listedPools.UserPools?.map((listed) => listed.Name),
       ["myapp-users"],

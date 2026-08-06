@@ -31,31 +31,21 @@ export interface SimCognitoLambdaConfigType {
  * and on real AWS.
  */
 export class SimCognitoLambdaConfig {
-  private readonly unsimulated = new SimCognitoUnsimulatedInput(
-    "CreateUserPool",
-  );
+  private readonly operation: string;
+  private readonly unsimulated: SimCognitoUnsimulatedInput;
   private readonly triggers = new Map<SimCognitoTriggerName, string>();
   private readonly configured: boolean;
 
-  constructor(config: object | undefined) {
+  constructor(config: object | undefined, operation: string) {
     const entries = Object.entries(config ?? {});
 
+    this.operation = operation;
+    this.unsimulated = new SimCognitoUnsimulatedInput(operation);
     this.configured = config !== undefined;
 
     for (const [key, value] of entries) {
       this.read(key, value);
     }
-  }
-
-  private static requireFunctionArn(key: string, value: unknown): string {
-    if (typeof value !== "string" || value === "") {
-      throw new SimCognitoInvalidParameterException(
-        `CreateUserPool LambdaConfig ${key} must be the ARN of the function ` +
-          `the trigger invokes`,
-      );
-    }
-
-    return value;
   }
 
   /**
@@ -104,7 +94,18 @@ export class SimCognitoLambdaConfig {
 
     this.triggers.set(
       key as SimCognitoTriggerName,
-      SimCognitoLambdaConfig.requireFunctionArn(key, value),
+      this.requireFunctionArn(key, value),
     );
+  }
+
+  private requireFunctionArn(key: string, value: unknown): string {
+    if (typeof value !== "string" || value === "") {
+      throw new SimCognitoInvalidParameterException(
+        `${this.operation} LambdaConfig ${key} must be the ARN of the ` +
+          `function the trigger invokes`,
+      );
+    }
+
+    return value;
   }
 }

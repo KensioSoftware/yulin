@@ -1,30 +1,33 @@
-import { SimCognitoInvalidParameterException } from "../../error/sim-cognito.error.js";
 import { SimCognitoUnsimulatedInput } from "../sim-cognito-unsimulated-input.js";
 import { SimCognitoUnsimulatedUserPoolFeatures } from "./sim-cognito-unsimulated-pool-features.js";
 import { SimCognitoUnsimulatedUserPoolMessaging } from "./sim-cognito-unsimulated-pool-messaging.js";
-import type { SimCreateUserPoolCommandInput } from "./user-pool.command.js";
+import type { SimCognitoUserPoolCommandInput } from "./user-pool.command.js";
 
 /**
- * Refuses the CreateUserPool inputs this simulation does not model.
+ * Refuses the pool inputs this simulation does not model.
  *
  * Every one of these changes what the pool does on real AWS, so ignoring any
  * of them would let a request succeed here and behave differently in a
- * deployment. `UsernameAttributes` is the one that would hurt most, and it
- * gets its own refusal saying why.
+ * deployment.
+ *
+ * `CreateUserPool` and `UpdateUserPool` both carry them, so both refuse them,
+ * each naming itself in the refusal.
  */
 export class SimCognitoUnsimulatedUserPoolOptions {
-  private readonly unsimulated = new SimCognitoUnsimulatedInput(
-    "CreateUserPool",
-  );
-  private readonly features = new SimCognitoUnsimulatedUserPoolFeatures();
-  private readonly messaging = new SimCognitoUnsimulatedUserPoolMessaging();
+  private readonly unsimulated: SimCognitoUnsimulatedInput;
+  private readonly features: SimCognitoUnsimulatedUserPoolFeatures;
+  private readonly messaging: SimCognitoUnsimulatedUserPoolMessaging;
+
+  constructor(operation: string) {
+    this.unsimulated = new SimCognitoUnsimulatedInput(operation);
+    this.features = new SimCognitoUnsimulatedUserPoolFeatures(operation);
+    this.messaging = new SimCognitoUnsimulatedUserPoolMessaging(operation);
+  }
 
   /**
    * Refuse a request carrying an input this simulation cannot honour.
    */
-  refuseIn(input: SimCreateUserPoolCommandInput): void {
-    this.refuseUsernameAttributes(input.UsernameAttributes);
-
+  refuseIn(input: SimCognitoUserPoolCommandInput): void {
     this.unsimulated.refuseUnless(
       "MfaConfiguration",
       input.MfaConfiguration,
@@ -50,28 +53,5 @@ export class SimCognitoUnsimulatedUserPoolOptions {
 
     this.features.refuseIn(input);
     this.messaging.refuseIn(input);
-  }
-
-  /**
-   * Refuse a pool that signs users in by an attribute rather than by
-   * username.
-   *
-   * Such a pool stores a generated UUID as the username, so code written
-   * against it looks users up by something this simulation would not have
-   * given them.
-   */
-  private refuseUsernameAttributes(
-    attributes: readonly string[] | undefined,
-  ): void {
-    if (attributes === undefined) {
-      return;
-    }
-
-    throw new SimCognitoInvalidParameterException(
-      "CreateUserPool UsernameAttributes is not simulated: a pool that signs " +
-        "users in by email or phone number stores a generated UUID as the " +
-        "username, so simulating the pool without that would answer with the " +
-        "wrong username here and the right one on real AWS",
-    );
   }
 }

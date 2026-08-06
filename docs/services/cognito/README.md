@@ -1060,8 +1060,8 @@ Three failures are reported the way real Cognito reports them:
 - A handler that returns something other than the event it was given fails with
   `InvalidLambdaResponseException`.
 
-Only these two triggers run. Every other `LambdaConfig` key is refused when the pool is created,
-naming the trigger, so a pool never quietly drops one.
+Only these two triggers run. Every other `LambdaConfig` key is refused when the pool is created or
+updated, naming the trigger, so a pool never quietly drops one.
 
 ## Token timestamps and expiry
 
@@ -1694,22 +1694,90 @@ console.log(pool.UserPool?.Arn);
 // "arn:aws:cognito-idp:eu-west-2:111111111111:userpool/eu-west-2_aBcDeFgHi"
 ```
 
+## Updating a pool
+
+`UpdateUserPool` changes a pool's password policy, deletion protection, auto-verified attributes,
+Lambda triggers and `AdminCreateUserConfig.AllowAdminCreateUserOnly`.
+
+It replaces those settings rather than merging into them, as real Cognito does. A setting the
+request leaves out goes back to the default `CreateUserPool` would have given it, so a request that
+names only the one setting it wants to change resets the others. Name every setting the pool should
+keep. That is the sharp edge on real Cognito too, and a request written that way behaves the same
+here and in a deployment.
+
+A pool's `LambdaConfig` is replaced the same way, so an update that says nothing about it stops the
+pool running the triggers it was created with, as real Cognito would.
+
+The pool's name is not among the settings an update carries. Real `UpdateUserPool` renames a pool
+with `PoolName`, and a rename is not simulated, so a request carrying one is refused. Every other
+input `CreateUserPool` refuses is refused here too, in the same words, saying `UpdateUserPool`.
+
+`UpdateUserPool` answers with nothing but the response metadata, as the real operation does, so
+`DescribeUserPool` is what reads the change back.
+
+```typescript sim-cognito-update-user-pool
+/**
+ * Changing a simulated user pool's settings.
+ */
+
+import {
+  CreateUserPoolCommand,
+  DeleteUserPoolCommand,
+  DescribeUserPoolCommand,
+  UpdateUserPoolCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+
+import { SimAws } from "@kensio/yulin";
+
+const cognito = new SimAws().cognitoIdentityProvider();
+
+const created = await cognito.createUserPool(
+  new CreateUserPoolCommand({
+    PoolName: "myapp-users",
+    DeletionProtection: "ACTIVE",
+    Policies: { PasswordPolicy: { MinimumLength: 12 } },
+  }),
+);
+
+const UserPoolId = created.UserPool?.Id;
+
+await cognito.updateUserPool(
+  new UpdateUserPoolCommand({ UserPoolId, DeletionProtection: "INACTIVE" }),
+);
+
+const described = await cognito.describeUserPool(
+  new DescribeUserPoolCommand({ UserPoolId }),
+);
+
+console.log(described.UserPool?.DeletionProtection); // "INACTIVE"
+
+// The update said nothing about the password policy, so it is back at the
+// default rather than the twelve characters the pool was created with.
+console.log(described.UserPool?.Policies?.PasswordPolicy?.MinimumLength); // 8
+
+// The pool can be deleted now its protection is off.
+await cognito.deleteUserPool(new DeleteUserPoolCommand({ UserPoolId }));
+```
+
+A pool reports the time of its last update as its `LastModifiedDate`, in `DescribeUserPool` and in
+`ListUserPools`. A pool no update has reached reports its creation date there.
+
 ## Deletion protection
 
 A pool created through the API is unprotected unless the request asks for protection, which is the
 opposite of what the console does. A pool created with `DeletionProtection: "ACTIVE"` refuses
 `DeleteUserPool` with `InvalidParameterException`.
 
-Real Cognito wants an `UpdateUserPool` request deactivating the protection before the pool can go.
-`UpdateUserPool` is not simulated, so a protected pool cannot be deleted here at all. Create the pool
-without `DeletionProtection` if the test needs to delete it.
+Real Cognito wants an `UpdateUserPool` request deactivating the protection before the pool can go,
+and so does this. Send an `UpdateUserPool` with `DeletionProtection: "INACTIVE"` first, then delete
+the pool.
 
 ## Available functionality
 
 Sim Cognito currently supports:
 
-- `CreateUserPoolCommand`, `DescribeUserPoolCommand`, `DeleteUserPoolCommand` and
-  `ListUserPoolsCommand`
+- `CreateUserPoolCommand`, `DescribeUserPoolCommand`, `UpdateUserPoolCommand`,
+  `DeleteUserPoolCommand` and `ListUserPoolsCommand`
 - `CreateUserPoolClientCommand`, `DescribeUserPoolClientCommand`, `UpdateUserPoolClientCommand`,
   `DeleteUserPoolClientCommand` and `ListUserPoolClientsCommand`
 - `AdminCreateUserCommand`, `AdminGetUserCommand`, `AdminDeleteUserCommand`,
@@ -1829,25 +1897,26 @@ Current documented limitations:
   periodically rather than on each write, so it can lag there in a way it never does here.
 - MFA is not simulated, so `AdminGetUser` reports no `UserMFASettingList`, `PreferredMfaSetting` or
   `MFAOptions`.
-- Nothing updates a pool. `UpdateUserPool` is not implemented, so a pool's `LastModifiedDate` is
-  always its creation date.
-- `UpdateUserPoolClient` replaces an app client's settings rather than merging into them, as real
-  Cognito does, so a setting the request leaves out goes back to the default `CreateUserPoolClient`
-  would have given it. `ClientName` is the exception: a client has to have a name and there is no
-  default to reset to, so an update that names none keeps the one the client has.
+- `UpdateUserPool` replaces a pool's settings rather than merging into them, as real Cognito does, so
+  a setting the request leaves out goes back to the default `CreateUserPool` would have given it. It
+  covers the settings this simulation models: `Policies.PasswordPolicy`, `DeletionProtection`,
+  `AdminCreateUserConfig.AllowAdminCreateUserOnly`, `AutoVerifiedAttributes` and `LambdaConfig`.
+  `PoolName` is refused, so a pool cannot be renamed, and every input `CreateUserPool` refuses is
+  refused here too, in the same words.
+- `UpdateUserPoolClient` replaces an app client's settings the same way, so a setting the request
+  leaves out goes back to the default `CreateUserPoolClient` would have given it. `ClientName` is
+  the exception: a client has to have a name and there is no default to reset to, so an update that
+  names none keeps the one the client has.
 - An update leaves the client's secret alone. `UpdateUserPoolClient` has no `GenerateSecret` input
   on real Cognito, so a client created without a secret never gains one.
-- Redeploying a template that changed an `AWS::Cognito::UserPoolClient` does not run
-  `UpdateUserPoolClient`. Sim CloudFormation replaces a resource whose resolved template entry
-  changed rather than updating it in place.
-- A pool with `DeletionProtection: ACTIVE` cannot be deleted at all, because deactivating the
-  protection needs `UpdateUserPool`.
+- A redeployed template reaches neither update. Sim CloudFormation replaces a resource whose
+  resolved template entry changed rather than updating it in place, whatever the resource type.
 - `PreAuthentication` and `PostAuthentication` are the only Lambda triggers that run. Every other
-  `LambdaConfig` key is refused when the pool is created, naming the trigger, because a pool that
-  accepted one would never call the function the template named. The sign-up, token generation and
-  message triggers wait on the features they fire for; the custom challenge triggers would need a
-  challenge loop this simulation does not have; and the migration and federation triggers have no
-  external directory to reach.
+  `LambdaConfig` key is refused when the pool is created or updated, naming the trigger, because a
+  pool that accepted one would never call the function the template named. The sign-up, token
+  generation and message triggers wait on the features they fire for; the custom challenge triggers
+  would need a challenge loop this simulation does not have; and the migration and federation
+  triggers have no external directory to reach.
 - A `PostAuthentication` handler that throws fails the request, and the sign-in it ran after is not
   undone: the tokens the pool issued stay issued, as they do on real Cognito.
 - Neither trigger fires for `REFRESH_TOKEN_AUTH`, as neither does on real Cognito. `ClientMetadata`

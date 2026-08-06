@@ -32,9 +32,8 @@ export class SimCognitoAutoVerifiedAttributes {
   private static requireVerifiable(name: string): string {
     if (!verifiableAttributeNames.includes(name)) {
       throw new SimCognitoInvalidParameterException(
-        `CreateUserPool AutoVerifiedAttributes '${name}' is not an attribute ` +
-          `Cognito can verify. Only ${verifiableAttributeNames.join(" and ")} ` +
-          `can be`,
+        `AutoVerifiedAttributes '${name}' is not an attribute Cognito can ` +
+          `verify. Only ${verifiableAttributeNames.join(" and ")} can be`,
       );
     }
 

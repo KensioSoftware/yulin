@@ -14,6 +14,7 @@ import type {
   SimCreateUserPoolCommand,
   SimDeleteUserPoolCommand,
   SimDescribeUserPoolCommand,
+  SimUpdateUserPoolCommand,
 } from "../command/user-pool/user-pool.command.js";
 import type { SimCognitoIdentityProvider } from "../sim-cognito-identity-provider.js";
 
@@ -37,6 +38,14 @@ export function simCognitoSdkPoolRoutes(
       async (command, context): Promise<unknown> =>
         await simCognito.describeUserPool(
           command as SimDescribeUserPoolCommand,
+          simSdkCallerOptions(context),
+        ),
+    ],
+    [
+      "UpdateUserPoolCommand",
+      async (command, context): Promise<unknown> =>
+        await simCognito.updateUserPool(
+          command as SimUpdateUserPoolCommand,
           simSdkCallerOptions(context),
         ),
     ],

@@ -55,10 +55,9 @@ export class SimCognitoUserUpdateCommands {
       options,
     );
 
-    const password = new SimCognitoPasswordCheck(pool.passwordPolicy).require(
-      "Password",
-      input.Password,
-    );
+    const password = new SimCognitoPasswordCheck(
+      pool.settings.passwordPolicy,
+    ).require("Password", input.Password);
 
     user.setPassword(password, input.Permanent);
 

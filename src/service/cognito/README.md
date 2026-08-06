@@ -26,10 +26,17 @@ a pool in one region cannot be reached from another.
 
 Pool state lives under `user-pool/`, and app client state under `user-pool/client/`.
 
-`SimCognitoUserPool` is the stored resource: its id, its ARN, its password policy, its deletion
-protection, and its app clients. The pool owns the clients rather than a separate store owning them,
-because that is where they live on real Cognito: deleting a pool takes its clients with it, and a
-client id means nothing outside the pool that issued it.
+`SimCognitoUserPool` is the stored resource: its id, its ARN, its settings, and its app clients. The
+pool owns the clients rather than a separate store owning them, because that is where they live on
+real Cognito: deleting a pool takes its clients with it, and a client id means nothing outside the
+pool that issued it.
+
+`SimCognitoUserPoolSettings` holds the settings a request can change: the password policy, the
+deletion protection, whether users may sign themselves up, what confirming a sign-up verifies, and
+the Lambda triggers the pool runs. `CreateUserPool` and `UpdateUserPool` both build one out of their
+own request, and an update swaps the pool's for it. That is what makes an update replace rather than
+merge, and it is where the pool's `LastModifiedDate` moves. Each takes the operation name, so a
+refusal from inside the settings names the request it came from.
 
 `makeSimCognitoUserPoolId` builds the `<region>_<nine characters>` form. The region is part of the id
 rather than decoration: SDK code splits a pool id on the underscore to work out which region to talk
@@ -329,19 +336,21 @@ resource, here or on real AWS.
   `RESET_REQUIRED` is a status no user here reaches.
 - A client-side sign-up operation naming a user the pool does not hold reports it, whatever the app
   client's `PreventUserExistenceErrors` says. That setting is honoured for sign-in only.
-- Every unsimulated `CreateUserPool`, `CreateUserPoolClient` and `UpdateUserPoolClient` input is
-  refused rather than ignored.
+- Every unsimulated `CreateUserPool`, `UpdateUserPool`, `CreateUserPoolClient` and
+  `UpdateUserPoolClient` input is refused rather than ignored.
   `UsernameAttributes` is the one that matters most: a pool signing users in by email stores a
   generated UUID as the username, so a pool quietly created without it would answer with the wrong
   username here and the right one on real AWS.
-- A pool created with `DeletionProtection: ACTIVE` cannot be deleted at all, because `UpdateUserPool`
-  is not simulated and that is the only way to deactivate the protection.
-- Nothing changes a pool after creation, so its `LastModifiedDate` is always its creation date. An
-  app client is different: `UpdateUserPoolClient` moves its `LastModifiedDate` on, as every
-  operation that changes a user moves that user's `UserLastModifiedDate` on.
-- `UpdateUserPoolClient` replaces an app client's settings rather than merging into them, so a
-  setting the request leaves out goes back to its `CreateUserPoolClient` default. The client's
-  secret is not a setting and is left alone.
+- A pool created with `DeletionProtection: ACTIVE` refuses `DeleteUserPool` until an `UpdateUserPool`
+  request deactivates the protection, as real Cognito refuses it.
+- `UpdateUserPool` replaces a pool's settings rather than merging into them, so a setting the request
+  leaves out goes back to its `CreateUserPool` default, its `LambdaConfig` included. `PoolName` is
+  refused, so a pool cannot be renamed here.
+- `UpdateUserPoolClient` replaces an app client's settings the same way, so a setting the request
+  leaves out goes back to its `CreateUserPoolClient` default. The client's secret is not a setting
+  and is left alone.
+- An update moves a pool's or an app client's `LastModifiedDate` on, as every operation that changes
+  a user moves that user's `UserLastModifiedDate` on.
 - `SchemaAttributes` is not reported on a pool, though every pool holds the standard schema and
   validates user attributes against it.
 - Users are resolved by username only, and real Cognito also accepts a `sub` there.

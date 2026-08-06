@@ -1,3 +1,4 @@
+import type { SimClock } from "../../../util/clock/sim-clock.js";
 import { SimCognitoPoolAuth } from "./auth/sim-cognito-pool-auth.js";
 import type { SimCognitoUserPoolClient } from "./client/sim-cognito-user-pool-client.js";
 import type { SimCognitoUserPoolClientId } from "./client/sim-cognito-user-pool-client-id.js";
@@ -5,19 +6,14 @@ import { SimCognitoUserPoolClientStore } from "./client/sim-cognito-user-pool-cl
 import type { SimCognitoGroup } from "./group/sim-cognito-group.js";
 import type { SimCognitoGroupName } from "./group/sim-cognito-group-name.js";
 import { SimCognitoGroupStore } from "./group/sim-cognito-group-store.js";
-import type { SimCognitoAdminCreateUserConfig } from "./sim-cognito-admin-create-user-config.js";
-import type { SimCognitoAutoVerifiedAttributes } from "./sim-cognito-auto-verified-attributes.js";
-import type { SimCognitoDeletionProtection } from "./sim-cognito-deletion-protection.js";
 import type { SimCognitoName } from "./sim-cognito-name.js";
-import type { SimCognitoPasswordPolicy } from "./sim-cognito-password-policy.js";
 import type { SimCognitoUserPoolArn } from "./sim-cognito-user-pool-arn.js";
 import {
   simCognitoUserPoolIssuerUrl,
   simCognitoUserPoolProviderName,
   type SimCognitoUserPoolId,
 } from "./sim-cognito-user-pool-id.js";
-import type { SimCognitoUnsimulatedPoolSettings } from "./sim-cognito-unsimulated-pool-settings.js";
-import type { SimCognitoLambdaConfig } from "./trigger/sim-cognito-lambda-config.js";
+import type { SimCognitoUserPoolSettings } from "./sim-cognito-user-pool-settings.js";
 import {
   SimCognitoSigningKey,
   type SimCognitoJwks,
@@ -33,13 +29,8 @@ interface SimCognitoUserPoolProperties {
   readonly id: SimCognitoUserPoolId;
   readonly arn: SimCognitoUserPoolArn;
   readonly name: SimCognitoName;
-  readonly passwordPolicy: SimCognitoPasswordPolicy;
-  readonly deletionProtection: SimCognitoDeletionProtection;
-  readonly adminCreateUserConfig: SimCognitoAdminCreateUserConfig;
-  readonly autoVerifiedAttributes: SimCognitoAutoVerifiedAttributes;
-  readonly lambdaConfig: SimCognitoLambdaConfig;
-  readonly unsimulatedSettings: SimCognitoUnsimulatedPoolSettings;
-  readonly createdDate: Date;
+  readonly settings: SimCognitoUserPoolSettings;
+  readonly clock: SimClock;
 }
 
 /**
@@ -53,30 +44,6 @@ export class SimCognitoUserPool {
   public readonly id: SimCognitoUserPoolId;
   public readonly arn: SimCognitoUserPoolArn;
   public readonly name: string;
-  public readonly passwordPolicy: SimCognitoPasswordPolicy;
-  public readonly deletionProtection: SimCognitoDeletionProtection;
-
-  /**
-   * Whether users may sign themselves up in this pool.
-   */
-  public readonly adminCreateUserConfig: SimCognitoAdminCreateUserConfig;
-
-  /**
-   * The attributes confirming a sign-up marks as verified.
-   */
-  public readonly autoVerifiedAttributes: SimCognitoAutoVerifiedAttributes;
-
-  /**
-   * The Lambda triggers this pool runs, by the ARN of the function each names.
-   */
-  public readonly lambdaConfig: SimCognitoLambdaConfig;
-
-  /**
-   * What the pool was created with and nothing here acts on, kept so a
-   * described pool reports it.
-   */
-  public readonly unsimulatedSettings: SimCognitoUnsimulatedPoolSettings;
-
   public readonly creationDate: Date;
 
   /**
@@ -84,23 +51,45 @@ export class SimCognitoUserPool {
    */
   public readonly auth = new SimCognitoPoolAuth();
 
+  private readonly clock: SimClock;
   private readonly clientStore = new SimCognitoUserPoolClientStore();
   private readonly userStore = new SimCognitoUserStore();
   private readonly groupStore = new SimCognitoGroupStore();
 
+  #settings: SimCognitoUserPoolSettings;
+  #modifiedDate: Date;
   #signingKey: SimCognitoSigningKey | undefined;
 
   constructor(properties: SimCognitoUserPoolProperties) {
     this.id = properties.id;
     this.arn = properties.arn;
     this.name = properties.name.value;
-    this.passwordPolicy = properties.passwordPolicy;
-    this.deletionProtection = properties.deletionProtection;
-    this.adminCreateUserConfig = properties.adminCreateUserConfig;
-    this.autoVerifiedAttributes = properties.autoVerifiedAttributes;
-    this.lambdaConfig = properties.lambdaConfig;
-    this.unsimulatedSettings = properties.unsimulatedSettings;
-    this.creationDate = properties.createdDate;
+    this.#settings = properties.settings;
+    this.clock = properties.clock;
+    this.creationDate = this.clock.now();
+    this.#modifiedDate = this.creationDate;
+  }
+
+  /**
+   * The settings this pool applies: its password policy, its deletion
+   * protection, whether users may sign themselves up, and what confirming a
+   * sign-up verifies.
+   */
+  get settings(): SimCognitoUserPoolSettings {
+    return this.#settings;
+  }
+
+  /**
+   * Replace this pool's settings with the ones an update asked for.
+   *
+   * `UpdateUserPool` replaces rather than merges, as real Cognito does: the
+   * settings object is built from the update's own request, so a setting the
+   * request left out goes back to the default `CreateUserPool` would have
+   * given it rather than staying as it was.
+   */
+  update(settings: SimCognitoUserPoolSettings): void {
+    this.#settings = settings;
+    this.#modifiedDate = this.clock.now();
   }
 
   /** The URL a token from this pool names as its issuer. */
@@ -139,13 +128,13 @@ export class SimCognitoUserPool {
   }
 
   /**
-   * When the pool last changed.
+   * When the pool's settings last changed.
    *
-   * Nothing can change a pool here, as `UpdateUserPool` is not simulated, so
-   * this is its creation date.
+   * A pool no `UpdateUserPool` request has reached reports its creation date,
+   * as a real one does.
    */
   get lastModifiedDate(): Date {
-    return this.creationDate;
+    return this.#modifiedDate;
   }
 
   /**

@@ -167,9 +167,14 @@ describe("sim Cognito user pool commands", () => {
       );
     });
 
-    // Then it is refused, as real Cognito refuses it.
+    // Then it is refused, as real Cognito refuses it, and the refusal says to
+    // deactivate the protection with UpdateUserPool first.
     assertIdentical(error.name, "InvalidParameterException");
     assertStringIncludes(error.message, "protected against deletion");
+    assertStringIncludes(
+      error.message,
+      "UpdateUserPool request with a DeletionProtection of INACTIVE",
+    );
   });
 
   it("keeps pools in one account and region out of another", async () => {

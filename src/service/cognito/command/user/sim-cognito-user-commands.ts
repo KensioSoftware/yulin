@@ -58,7 +58,7 @@ export class SimCognitoUserCommands {
       return undefined;
     }
 
-    return new SimCognitoPasswordCheck(pool.passwordPolicy).require(
+    return new SimCognitoPasswordCheck(pool.settings.passwordPolicy).require(
       "TemporaryPassword",
       temporaryPassword,
     );

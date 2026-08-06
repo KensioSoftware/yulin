@@ -73,7 +73,7 @@ export class SimCognitoSignUpCommands {
     const { pool, client } = this.authResolver.client(input.ClientId);
 
     this.unsimulatedOptions.refuseInSignUp(input);
-    pool.adminCreateUserConfig.requireSelfServiceSignUp();
+    pool.settings.adminCreateUserConfig.requireSelfServiceSignUp();
 
     const username = requireSimCognitoUsername(input.Username);
 
@@ -82,10 +82,9 @@ export class SimCognitoSignUpCommands {
     const user = this.userFactory.signUp({
       username,
       attributes: input.UserAttributes,
-      password: new SimCognitoPasswordCheck(pool.passwordPolicy).require(
-        "Password",
-        input.Password,
-      ),
+      password: new SimCognitoPasswordCheck(
+        pool.settings.passwordPolicy,
+      ).require("Password", input.Password),
     });
 
     pool.addUser(user);
@@ -111,7 +110,7 @@ export class SimCognitoSignUpCommands {
     const user = this.signingUpUser(pool, client, input);
 
     user.confirmSignUp(input.ConfirmationCode);
-    user.verifyAttributes(pool.autoVerifiedAttributes.names);
+    user.verifyAttributes(pool.settings.autoVerifiedAttributes.names);
 
     return { $metadata: {} };
   }

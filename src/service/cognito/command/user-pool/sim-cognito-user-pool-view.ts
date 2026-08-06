@@ -33,16 +33,16 @@ export class SimCognitoUserPoolView {
       Id: pool.id,
       Name: pool.name,
       Arn: pool.arn.value,
-      Policies: { PasswordPolicy: pool.passwordPolicy.toOutput() },
-      DeletionProtection: pool.deletionProtection.value,
-      LambdaConfig: pool.lambdaConfig.toOutput(),
+      Policies: { PasswordPolicy: pool.settings.passwordPolicy.toOutput() },
+      DeletionProtection: pool.settings.deletionProtection.value,
+      LambdaConfig: pool.settings.lambdaConfig.toOutput(),
       MfaConfiguration: "OFF",
-      AdminCreateUserConfig: pool.adminCreateUserConfig.toOutput(),
-      AutoVerifiedAttributes: pool.autoVerifiedAttributes.toOutput(),
+      AdminCreateUserConfig: pool.settings.adminCreateUserConfig.toOutput(),
+      AutoVerifiedAttributes: pool.settings.autoVerifiedAttributes.toOutput(),
       EstimatedNumberOfUsers: pool.userCount,
       CreationDate: pool.creationDate,
       LastModifiedDate: pool.lastModifiedDate,
-      ...pool.unsimulatedSettings.toOutput(),
+      ...pool.settings.unsimulated.toOutput(),
     };
   }
 
