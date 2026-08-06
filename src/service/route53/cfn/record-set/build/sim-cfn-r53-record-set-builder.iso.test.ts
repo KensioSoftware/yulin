@@ -1,14 +1,17 @@
 import {
+  assertFalse,
   assertIdentical,
   assertInstanceOf,
   assertObjectMatches,
   assertStringIncludes,
   assertThrowsError,
+  assertTrue,
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimCfnResource } from "../../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../../cloudformation/template/value/sim-cfn-template-value.js";
+import { isSimCfnUnsupportedResourceError } from "../../../../cloudformation/resource/unsupported/sim-cfn-unsupported-resource.js";
 import { simRoute53RecordTypes } from "../../../record/sim-route53-record.js";
 import { SimCfnRoute53RecordSetBuilder } from "./sim-cfn-r53-record-set-builder.js";
 
@@ -114,10 +117,9 @@ describe("SimCfnRoute53RecordSetBuilder", () => {
     );
   });
 
-  it("throws when Type is not a supported Route53 record type", () => {
-    // Given RecordSets with invalid Type values, including a real Route53 type
-    // the simulator does not model.
-    const invalidTypes = [undefined, "DS", "a", 123, null];
+  it("throws when Type is not a declared record type", () => {
+    // Given RecordSets whose Type says nothing about which record was wanted.
+    const invalidTypes = [undefined, "", "  ", 123, null];
 
     for (const type of invalidTypes) {
       // When the RecordSet is built.
@@ -129,11 +131,37 @@ describe("SimCfnRoute53RecordSetBuilder", () => {
         }),
       );
 
-      // Then a clear validation error is thrown.
+      // Then a clear validation error is thrown, rather than the skip a
+      // declared but unmodelled type gets.
       assertInstanceOf(error, TypeError);
       assertStringIncludes(
         error.message,
-        "Invalid AWS::Route53::RecordSet TestRecordSet: Type must be a supported Route53 record type",
+        "Invalid AWS::Route53::RecordSet TestRecordSet: Type must be a non-empty string",
+      );
+      assertFalse(isSimCfnUnsupportedResourceError(error));
+    }
+  });
+
+  it("raises the unsupported-resource diagnostic for a record type the simulator does not store", () => {
+    // Given RecordSets declaring record types sim Route53 does not store: real
+    // Route53 types, and a string that is no record type at all.
+    const unmodelledTypes = ["DS", "NAPTR", "HTTPS", "a"];
+
+    for (const type of unmodelledTypes) {
+      // When the RecordSet is built.
+      const error = assertThrowsError(() =>
+        buildRecordSet({
+          Name: "www.example.com",
+          Type: type,
+        }),
+      );
+
+      // Then the error is the one the Stack lifecycle skips over rather than
+      // fails on, and it names the record type that was left out.
+      assertTrue(isSimCfnUnsupportedResourceError(error));
+      assertStringIncludes(
+        error.message,
+        `Unsupported sim Route53 CloudFormation Resource TestRecordSet: sim Route53 does not model the ${type} record type`,
       );
     }
   });

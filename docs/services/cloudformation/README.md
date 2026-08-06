@@ -1736,6 +1736,16 @@ console.log(stack.getResource("AlarmTopic")?.skippedReason);
 A skipped Resource is still in `stack.resources`, and still answers `Ref` and `Fn::GetAtt` with
 [stand-in values](#values-from-a-skipped-resource).
 
+A skip is not always a whole Resource type nothing simulates. A service can decline one Resource of a
+type it does create, when that Resource asks for something the service cannot model, and the
+`skippedReason` says which part it was. An `AWS::Route53::RecordSet` declaring a record type sim
+Route53 does not store is skipped with the record type named, so a DNS stack carrying a record the
+test is not about still deploys. See [record types](../route53/README.md#record-types).
+
+A Resource that was skipped on create is stepped over by a teardown rather than deleted, because
+nothing reached simulated AWS to delete. It reaches `DELETE_COMPLETE` and stays out of
+`stack.skippedResourceDeletions`, which is for Resources that were created and could not be removed.
+
 ## Properties a Resource was created without
 
 Deployment is best effort. A Resource type that is not simulated is skipped and the rest of the
