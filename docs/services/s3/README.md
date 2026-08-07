@@ -1775,6 +1775,48 @@ simAws.s3().mountBucketFilesystem("site", path.join(process.cwd(), "public"), {
 These are added to the list rather than replacing it, so naming one cannot cost you `.html`, and a
 leading dot is optional. Everything not named is still refused.
 
+### Metadata a file cannot carry
+
+A stored Object holds what S3 was told when it was written. A file holds its bytes and its name, so
+a mounted Bucket has only the extension to go on, and reports a `content-type` and nothing else.
+Anything a deployment would have set is declared on the mount instead, for the Objects under a key
+prefix.
+
+`ContentEncoding` is the one a site can be broken without. A directory of brotli files served with
+no `content-encoding` is bytes no browser can decode:
+
+```typescript sim-s3-mount-system-metadata
+/**
+ * Declaring the encoding of a compressed mirror in a mounted directory.
+ */
+
+import path from "node:path";
+
+import { CreateBucketCommand } from "@aws-sdk/client-s3";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+await simAws.s3().createBucket(new CreateBucketCommand({ Bucket: "site" }));
+
+simAws.s3().mountBucketFilesystem("site", path.join(process.cwd(), "public"), {
+  // The mirrored copies keep their own names, so `br/js/app.js` is still typed
+  // `text/javascript` from its extension. Nothing about the file says it is
+  // compressed, which is what this declares.
+  systemMetadata: [{ keyPrefix: "br/", metadata: { ContentEncoding: "br" } }],
+});
+```
+
+The fields are the ones a [`PutObjectCommand`](#object-system-metadata) sets, and every value is a
+string, including `Expires`. Every declaration whose prefix the key starts with applies, in the
+order they were given, so a later one wins where two name the same header. An empty prefix is every
+Object in the Bucket. A declared `ContentType` replaces the one guessed from the extension.
+
+This is what a Bucket mounted for local development needs to answer as the deployed one does. A CDK
+`BucketDeployment` sets the same headers through its own `SystemMetadata`, and a mount serves the
+files as they are built rather than as they were staged, so the two say the same thing in different
+places. See [CDK S3 BucketDeployment](../cloudformation/README.md#cdk-s3-bucketdeployment).
+
 ## Object system metadata
 
 S3 keeps a handful of headers about an Object when it is written and hands them back on every read.
@@ -1833,7 +1875,9 @@ report it. `Expires` is the one field that is not a string: the SDK takes a `Dat
 as the HTTP date a read hands back.
 
 A CDK BucketDeployment's `SystemMetadata` sets the same headers on every Object it copies. See
-[CDK S3 BucketDeployment](../cloudformation/README.md#cdk-s3-bucketdeployment).
+[CDK S3 BucketDeployment](../cloudformation/README.md#cdk-s3-bucketdeployment). A
+[mounted directory](#metadata-a-file-cannot-carry) declares them for the Objects under a key prefix,
+since a file on disk carries none of them.
 
 ## Standalone SimS3
 
@@ -1893,7 +1937,8 @@ Sim S3 currently supports:
 - Bucket-global uniqueness within a `SimAws` instance across simulated Accounts and Regions
 - In-memory Object storage by default
 - Optional filesystem-backed Bucket storage with `mountBucketFilesystem(...)`, watching the mounted
-  directory and reloading connected browsers when it is rebuilt
+  directory and reloading connected browsers when it is rebuilt, and reporting the system metadata
+  the mount declares for a key prefix
 
 The simulator focuses on useful behaviour for tests and local development rather than full S3 feature
 parity. Unsupported S3 options may be ignored or may throw errors depending on whether the simulator

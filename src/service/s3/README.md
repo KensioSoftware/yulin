@@ -298,6 +298,10 @@ Filesystem storage behaviour:
 - file extensions are filtered through filesystem safety rules
 - path traversal and unsafe directory/object paths are rejected
 - `deleteObject` refuses with `SimS3NotImplemented` rather than unlinking the file
+- system metadata comes from `object/s3-key-prefix-metadata.ts`, because a file carries none of it:
+  the extension gives a default `content-type`, and the mount's `systemMetadata` option declares
+  system metadata for the Objects under a key prefix, including a `ContentType` that replaces the
+  inferred one
 
 The filesystem implementation includes safety checks to reduce accidental unsafe file access, but it
 should still be treated as local-development tooling rather than a sandbox boundary. That is why

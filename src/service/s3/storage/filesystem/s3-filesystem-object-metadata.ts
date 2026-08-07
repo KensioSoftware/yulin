@@ -3,9 +3,15 @@ import { SimS3ObjectMetadata } from "../../object/s3-object.js";
 
 /**
  * Make up reasonable metadata for an Object based on the file on disk.
+ *
+ * Anything the mount declared about the key is laid over the guess, so a
+ * declared `content-type` replaces the one the extension suggested, and a
+ * declared `content-encoding` is reported for a file whose name says nothing
+ * about how it was compressed.
  */
 export function metadataForFilesystemS3ObjectKey(
   key: string,
+  declaredHeaders: Readonly<Record<string, string>> = {},
 ): SimS3ObjectMetadata {
   return new SimS3ObjectMetadata({
     // Octet-stream for anything the table below has never heard of, which is
@@ -14,6 +20,7 @@ export function metadataForFilesystemS3ObjectKey(
     // types, and the option exists for files that are not one of them.
     "content-type":
       contentTypeForFilesystemS3ObjectKey(key) ?? "application/octet-stream",
+    ...declaredHeaders,
   });
 }
 

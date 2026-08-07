@@ -7,11 +7,18 @@ import { metadataForFilesystemS3ObjectKey } from "./s3-filesystem-object-metadat
 import { FilesystemS3ObjectKeys } from "./s3-filesystem-object-keys.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import { SimS3NotImplemented } from "../../error/sim-s3.error.js";
+import { SimS3KeyPrefixSystemMetadata } from "../../object/s3-key-prefix-metadata.js";
 
 interface FilesystemS3BucketStorageProperties {
   readonly directoryPath: string;
   readonly allowedDirectoryNames?: readonly string[];
   readonly additionalFileExtensions?: readonly string[];
+
+  /**
+   * What S3 was told about these files, which a file cannot say for itself.
+   * Without it an Object is described by its extension and nothing else.
+   */
+  readonly systemMetadata?: SimS3KeyPrefixSystemMetadata;
 }
 
 /**
@@ -26,8 +33,11 @@ export class FilesystemS3BucketStorage implements SimS3BucketStorage {
   private readonly directoryPath: string;
   private readonly safety: FilesystemS3StorageSafety;
   private readonly objectKeys: FilesystemS3ObjectKeys;
+  private readonly systemMetadata: SimS3KeyPrefixSystemMetadata;
 
   constructor(properties: FilesystemS3BucketStorageProperties) {
+    this.systemMetadata =
+      properties.systemMetadata ?? new SimS3KeyPrefixSystemMetadata();
     this.safety = new FilesystemS3StorageSafety({
       allowedDirectoryNames: properties.allowedDirectoryNames,
       additionalFileExtensions: properties.additionalFileExtensions,
@@ -57,7 +67,10 @@ export class FilesystemS3BucketStorage implements SimS3BucketStorage {
       return new SimS3Object({
         key,
         body,
-        metadata: metadataForFilesystemS3ObjectKey(key),
+        metadata: metadataForFilesystemS3ObjectKey(
+          key,
+          this.systemMetadata.headersForObjectKey(key),
+        ),
       });
     } catch (error) {
       if (

@@ -3,6 +3,7 @@ import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-
 import { FilesystemS3BucketStorage } from "../storage/filesystem/s3-filesystem-storage.js";
 import { simS3BucketUrl } from "./sim-s3-endpoint-url.js";
 import type { SimS3Bucket, SimS3BucketName } from "./sim-s3-bucket.js";
+import { SimS3KeyPrefixSystemMetadata } from "../object/s3-key-prefix-metadata.js";
 import { SimS3MountWatches } from "../mount/sim-s3-mount-watches.js";
 import type { SimS3MountFilesystemOptions } from "../mount/sim-s3-mount.type.js";
 
@@ -64,6 +65,10 @@ export class SimS3BucketAccess {
    * directory is only named to a `yulin watch` supervisor, so editing a file
    * the Bucket serves restarts the process without the directory having been
    * listed anywhere, and nothing happens outside watch mode.
+   *
+   * A file says nothing about how it was compressed or how long it may be
+   * cached, so `systemMetadata` is where a mount declares what a deployment
+   * would have set.
    */
   mountFilesystem(
     bucketName: SimS3BucketName | string,
@@ -75,6 +80,9 @@ export class SimS3BucketAccess {
         directoryPath,
         ...(options.additionalFileExtensions !== undefined && {
           additionalFileExtensions: options.additionalFileExtensions,
+        }),
+        systemMetadata: new SimS3KeyPrefixSystemMetadata({
+          declarations: options.systemMetadata,
         }),
       }),
     );
