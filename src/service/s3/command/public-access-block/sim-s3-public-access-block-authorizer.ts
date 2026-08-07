@@ -1,9 +1,10 @@
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import { simS3BucketArn } from "../../bucket/sim-s3-bucket-arn.js";
 import type { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
 import { simS3BucketResourcePolicies } from "../authorize/sim-s3-bucket-resource-policies.js";
+import { simS3ConditionContext } from "../authorize/sim-s3-condition-context.js";
+import type { SimS3RequestOptions } from "../sim-s3-request-options.js";
 
 interface SimS3PublicAccessBlockAuthorizerProperties {
   readonly iam: SimIamInterServiceAuthZ;
@@ -30,31 +31,36 @@ export class SimS3PublicAccessBlockAuthorizer {
   /**
    * Ensure the caller may read the Bucket's Block Public Access settings.
    */
-  authorizeRead(bucket: SimS3Bucket, caller?: SimAwsCaller): void {
-    this.authorize(SimS3PublicAccessBlockAuthorizer.readAction, bucket, caller);
+  authorizeRead(bucket: SimS3Bucket, options?: SimS3RequestOptions): void {
+    this.authorize(
+      SimS3PublicAccessBlockAuthorizer.readAction,
+      bucket,
+      options,
+    );
   }
 
   /**
    * Ensure the caller may replace or remove the Block Public Access settings.
    */
-  authorizeWrite(bucket: SimS3Bucket, caller?: SimAwsCaller): void {
+  authorizeWrite(bucket: SimS3Bucket, options?: SimS3RequestOptions): void {
     this.authorize(
       SimS3PublicAccessBlockAuthorizer.writeAction,
       bucket,
-      caller,
+      options,
     );
   }
 
   private authorize(
     action: string,
     bucket: SimS3Bucket,
-    caller?: SimAwsCaller,
+    options?: SimS3RequestOptions,
   ): void {
     const resource = simS3BucketArn(bucket.bucketName);
     const decision = this.iam.authorize({
       action,
       resource,
-      caller,
+      caller: options?.caller,
+      conditionContext: simS3ConditionContext(options),
       resourcePolicies: simS3BucketResourcePolicies(bucket),
     });
 

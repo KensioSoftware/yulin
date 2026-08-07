@@ -4,7 +4,7 @@ import {
   BackgroundTasks,
 } from "../../../../util/background/background.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimS3RequestOptions } from "../sim-s3-request-options.js";
 import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
@@ -27,10 +27,6 @@ interface DeleteBucketCommandHandlerProperties {
   readonly s3GlobalRegistry: SimS3GlobalRegistry;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
-}
-
-interface DeleteBucketCommandHandlerOptions {
-  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -74,7 +70,7 @@ export class DeleteBucketCommandHandler implements CommandHandler<
    */
   async handle(
     command: SimDeleteBucketCommand,
-    options?: DeleteBucketCommandHandlerOptions,
+    options?: SimS3RequestOptions,
   ): Promise<SimDeleteBucketCommandOutput> {
     assertDefined(command.input.Bucket, "DeleteBucketCommand.input.Bucket");
 
@@ -83,7 +79,7 @@ export class DeleteBucketCommandHandler implements CommandHandler<
 
     await this.background.sequence();
 
-    this.authorizer.authorize(bucket, options?.caller);
+    this.authorizer.authorize(bucket, options);
     await this.assertEmpty(bucket);
 
     this.buckets.delete(bucketName);

@@ -17,7 +17,7 @@ import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
 } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimS3RequestOptions } from "../sim-s3-request-options.js";
 import { ListObjectsAuthorizer } from "./list-objects-authorizer.js";
 import { ListObjectsPageBuilder } from "./list-objects-page-builder.js";
 
@@ -25,10 +25,6 @@ interface ListObjectsCommandHandlerProperties {
   readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
-}
-
-interface ListObjectsCommandHandlerOptions {
-  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -66,7 +62,7 @@ export class ListObjectsCommandHandler implements CommandHandler<
    */
   async handle(
     command: SimListObjectsCommand,
-    options?: ListObjectsCommandHandlerOptions,
+    options?: SimS3RequestOptions,
   ): Promise<SimListObjectsCommandOutput> {
     assertDefined(command.input.Bucket, "ListObjectsCommand.input.Bucket");
 
@@ -84,7 +80,7 @@ export class ListObjectsCommandHandler implements CommandHandler<
       bucket,
       prefix: command.input.Prefix,
       maxKeys,
-      caller: options?.caller,
+      options,
     });
 
     return await this.pageBuilder.build({

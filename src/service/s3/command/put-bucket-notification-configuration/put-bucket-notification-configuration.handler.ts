@@ -4,7 +4,7 @@ import {
   BackgroundTasks,
 } from "../../../../util/background/background.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimS3RequestOptions } from "../sim-s3-request-options.js";
 import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
@@ -28,10 +28,6 @@ interface PutBucketNotificationConfigurationHandlerProperties {
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
   readonly notificationDestinations: SimS3NotificationDestinations;
-}
-
-interface PutBucketNotificationConfigurationHandlerOptions {
-  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -74,7 +70,7 @@ export class PutBucketNotificationConfigurationCommandHandler implements Command
    */
   async handle(
     command: SimPutBucketNotificationConfigurationCommand,
-    options?: PutBucketNotificationConfigurationHandlerOptions,
+    options?: SimS3RequestOptions,
   ): Promise<SimPutBucketNotificationConfigurationCommandOutput> {
     const input = command.input;
     assertDefined(
@@ -93,7 +89,7 @@ export class PutBucketNotificationConfigurationCommandHandler implements Command
 
     await this.background.sequence();
 
-    this.authorizer.authorizeWrite(bucket, options?.caller);
+    this.authorizer.authorizeWrite(bucket, options);
 
     const configuration = this.reader.read(input.NotificationConfiguration);
 

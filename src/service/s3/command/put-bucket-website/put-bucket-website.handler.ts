@@ -15,7 +15,7 @@ import {
   BackgroundTasks,
 } from "../../../../util/background/background.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimS3RequestOptions } from "../sim-s3-request-options.js";
 import { SimIam } from "../../../iam/index.js";
 import { PutBucketWebsiteAuthorizer } from "./put-bucket-website-authorizer.js";
 
@@ -23,10 +23,6 @@ interface PutBucketWebsiteCommandHandlerProperties {
   readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
-}
-
-interface PutBucketWebsiteCommandHandlerOptions {
-  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -63,7 +59,7 @@ export class PutBucketWebsiteCommandHandler implements CommandHandler<
    */
   async handle(
     command: SimPutBucketWebsiteCommand,
-    options?: PutBucketWebsiteCommandHandlerOptions,
+    options?: SimS3RequestOptions,
   ): Promise<SimPutBucketWebsiteCommandOutput> {
     assertDefined(
       command.input.Bucket,
@@ -84,7 +80,7 @@ export class PutBucketWebsiteCommandHandler implements CommandHandler<
     // Allow for potential non-deterministic sequencing of async events.
     await this.background.sequence();
 
-    this.authorizer.authorize(bucketName, options?.caller);
+    this.authorizer.authorize(bucketName, options);
 
     bucket.configureWebsite(
       new SimS3BucketWebsite(command.input.WebsiteConfiguration),

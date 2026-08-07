@@ -17,7 +17,7 @@ import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
 } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimS3RequestOptions } from "../sim-s3-request-options.js";
 import { GetObjectAuthorizer } from "./get-object-authorizer.js";
 import { GetObjectLoader } from "./get-object-loader.js";
 
@@ -25,10 +25,6 @@ interface GetObjectCommandHandlerProperties {
   readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
-}
-
-interface GetObjectCommandHandlerOptions {
-  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -69,7 +65,7 @@ export class GetObjectCommandHandler implements CommandHandler<
    */
   async handle(
     command: SimGetObjectCommand,
-    options?: GetObjectCommandHandlerOptions,
+    options?: SimS3RequestOptions,
   ): Promise<SimGetObjectCommandOutput> {
     assertDefined(command.input.Bucket, "GetObjectCommand.input.Bucket");
     assertDefined(command.input.Key, "GetObjectCommand.input.Key");
@@ -83,7 +79,7 @@ export class GetObjectCommandHandler implements CommandHandler<
     // Complete request sequencing before authorization and storage access.
     await this.background.sequence();
 
-    this.authorizer.authorize(bucket, command.input.Key, options?.caller);
+    this.authorizer.authorize(bucket, command.input.Key, options);
 
     return await this.loader.load(bucket, command.input.Key);
   }

@@ -4,7 +4,7 @@ import {
   BackgroundTasks,
 } from "../../../../util/background/background.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimS3RequestOptions } from "../sim-s3-request-options.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamAllowAllAuth } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimS3PublicAccessBlock } from "../../bucket/public-access/sim-s3-public-access-block.js";
@@ -23,10 +23,6 @@ interface PutPublicAccessBlockCommandHandlerProperties {
   readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
-}
-
-interface PutPublicAccessBlockCommandHandlerOptions {
-  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -61,7 +57,7 @@ export class PutPublicAccessBlockCommandHandler implements CommandHandler<
    */
   async handle(
     command: SimPutPublicAccessBlockCommand,
-    options?: PutPublicAccessBlockCommandHandlerOptions,
+    options?: SimS3RequestOptions,
   ): Promise<SimPutPublicAccessBlockCommandOutput> {
     assertDefined(
       command.input.Bucket,
@@ -77,7 +73,7 @@ export class PutPublicAccessBlockCommandHandler implements CommandHandler<
 
     await this.background.sequence();
 
-    this.authorizer.authorizeWrite(bucket, options?.caller);
+    this.authorizer.authorizeWrite(bucket, options);
 
     bucket.configurePublicAccessBlock(
       SimS3PublicAccessBlock.fromConfiguration(

@@ -17,7 +17,7 @@ import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
 } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimS3RequestOptions } from "../sim-s3-request-options.js";
 import { PutObjectAuthorizer } from "./put-object-authorizer.js";
 import { PutObjectBuilder } from "./put-object-builder.js";
 import type { SimS3ObjectNotifier } from "../../notification/sim-s3-object-notifier.js";
@@ -27,10 +27,6 @@ interface PutObjectCommandHandlerProperties {
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
   readonly notifications: SimS3ObjectNotifier;
-}
-
-interface PutObjectCommandHandlerOptions {
-  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -74,7 +70,7 @@ export class PutObjectCommandHandler implements CommandHandler<
    */
   async handle(
     command: SimPutObjectCommand,
-    options?: PutObjectCommandHandlerOptions,
+    options?: SimS3RequestOptions,
   ): Promise<SimPutObjectCommandOutput> {
     assertDefined(command.input.Bucket, "PutObjectCommand.input.Bucket");
     assertDefined(command.input.Key, "PutObjectCommand.input.Key");
@@ -91,7 +87,7 @@ export class PutObjectCommandHandler implements CommandHandler<
     const caller = this.authorizer.authorize(
       bucket,
       command.input.Key,
-      options?.caller,
+      options,
     );
 
     const object = this.objectBuilder.build(command);

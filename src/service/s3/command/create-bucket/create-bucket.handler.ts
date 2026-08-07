@@ -17,8 +17,9 @@ import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
 } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimS3RequestOptions } from "../sim-s3-request-options.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
+import { simS3ConditionContext } from "../authorize/sim-s3-condition-context.js";
 
 interface CreateBucketCommandHandlerProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
@@ -26,10 +27,6 @@ interface CreateBucketCommandHandlerProperties {
   readonly s3GlobalRegistry: SimS3GlobalRegistry;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
-}
-
-interface CreateBucketCommandHandlerOptions {
-  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -67,7 +64,7 @@ export class CreateBucketCommandHandler implements CommandHandler<
    */
   async handle(
     command: SimCreateBucketCommand,
-    options?: CreateBucketCommandHandlerOptions,
+    options?: SimS3RequestOptions,
   ): Promise<SimCreateBucketCommandOutput> {
     assertDefined(
       command.input.Bucket,
@@ -85,6 +82,7 @@ export class CreateBucketCommandHandler implements CommandHandler<
       action: "s3:CreateBucket",
       resource,
       caller: options?.caller,
+      conditionContext: simS3ConditionContext(options),
     });
 
     if (decision.isDenied) {

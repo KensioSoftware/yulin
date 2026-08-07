@@ -100,6 +100,10 @@ what the Distribution can serve. An Origin with no origin access control reads a
 the unsigned request real CloudFront sends to the S3 REST endpoint, so an Object has to be publicly
 readable for the Distribution to serve it. A Bucket with no policy answers 403 for every Object.
 
+An Origin that does have an origin access control reads as the CloudFront service principal instead,
+so the Bucket stays private and its policy names the Distribution. See
+[Origin access controls](#origin-access-controls) for the policy that needs.
+
 That is the two commands in the example above: `PutPublicAccessBlockCommand` to opt out of the block
 on public Bucket policies, then `PutBucketPolicyCommand` granting `s3:GetObject` to `Principal: "*"`.
 The same pair is what a static website Bucket needs, and it is what CDK's `publicReadAccess: true`
@@ -1095,83 +1099,140 @@ An origin access control is how a Distribution authenticates to a private S3 Buc
 `AWS::CloudFront::OriginAccessControl` and point an Origin's `OriginAccessControlId` at it with a
 `Ref`, which is what CDK's `S3BucketOrigin.withOriginAccessControl` synthesizes.
 
-Read the first paragraph of [Limitations](#limitations) before relying on this. Sim CloudFront
-stores an origin access control and reports it back, and it does not yet sign the Origin request.
-The Origin still reads its Bucket anonymously, so a Bucket only an origin access control could reach
-answers 403 rather than serving. See
-[What an S3 Origin can read](#what-an-s3-origin-can-read).
+An Origin whose origin access control signs reads its Bucket as the `cloudfront.amazonaws.com`
+service principal, carrying the Distribution's ARN as `aws:SourceArn`. The Bucket policy is then the
+whole decision, so the Bucket needs a statement granting `s3:GetObject` to that principal,
+conditioned on the Distribution allowed to read it. That is the policy CDK writes. A condition
+naming a different Distribution, or an Origin that was never given an origin access control,
+answers 403 rather than serving.
 
 ```typescript sim-cloudfront-origin-access-control
 /**
- * Giving a Distribution's S3 Origin an origin access control.
+ * Serving a private S3 Bucket through an origin access control.
  */
 
-import { GetDistributionCommand } from "@aws-sdk/client-cloudfront";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
 
 import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
 
 const simAws = new SimAws();
+const srv = await serveSimAws({ simAws });
 
-const stack = await simAws.cloudFormation().deployTemplate({
-  stackName: "site-stack",
-  template: {
-    Resources: {
-      SiteBucket: {
-        Type: "AWS::S3::Bucket",
-        Properties: { BucketName: "site-bucket" },
-      },
-      SiteOac: {
-        Type: "AWS::CloudFront::OriginAccessControl",
-        Properties: {
-          OriginAccessControlConfig: {
-            Name: "site-oac",
-            OriginAccessControlOriginType: "s3",
-            SigningBehavior: "always",
-            SigningProtocol: "sigv4",
+try {
+  const stack = await simAws.cloudFormation().deployTemplate({
+    stackName: "site-stack",
+    template: {
+      Resources: {
+        SiteBucket: {
+          Type: "AWS::S3::Bucket",
+          Properties: { BucketName: "site-bucket" },
+        },
+        SiteOac: {
+          Type: "AWS::CloudFront::OriginAccessControl",
+          Properties: {
+            OriginAccessControlConfig: {
+              Name: "site-oac",
+              OriginAccessControlOriginType: "s3",
+              SigningBehavior: "always",
+              SigningProtocol: "sigv4",
+            },
           },
         },
-      },
-      SiteDistribution: {
-        Type: "AWS::CloudFront::Distribution",
-        DependsOn: ["SiteBucket", "SiteOac"],
-        Properties: {
-          DistributionConfig: {
-            Enabled: true,
-            Origins: [
-              {
-                Id: "SiteOrigin",
-                DomainName: "site-bucket.s3.amazonaws.com",
-                S3OriginConfig: {},
-                OriginAccessControlId: { Ref: "SiteOac" },
+        SiteDistribution: {
+          Type: "AWS::CloudFront::Distribution",
+          Properties: {
+            DistributionConfig: {
+              Enabled: true,
+              DefaultRootObject: "index.html",
+              Origins: [
+                {
+                  Id: "SiteOrigin",
+                  DomainName: "site-bucket.s3.amazonaws.com",
+                  S3OriginConfig: {},
+                  OriginAccessControlId: { Ref: "SiteOac" },
+                },
+              ],
+              DefaultCacheBehavior: {
+                TargetOriginId: "SiteOrigin",
+                ViewerProtocolPolicy: "allow-all",
               },
-            ],
-            DefaultCacheBehavior: {
-              TargetOriginId: "SiteOrigin",
-              ViewerProtocolPolicy: "allow-all",
+            },
+          },
+        },
+        // Nothing but this Distribution may read the Bucket, which is what the
+        // condition on the Distribution's ARN says.
+        SiteBucketPolicy: {
+          Type: "AWS::S3::BucketPolicy",
+          Properties: {
+            Bucket: { Ref: "SiteBucket" },
+            PolicyDocument: {
+              Version: "2012-10-17",
+              Statement: [
+                {
+                  Effect: "Allow",
+                  Principal: { Service: "cloudfront.amazonaws.com" },
+                  Action: "s3:GetObject",
+                  Resource: "arn:aws:s3:::site-bucket/*",
+                  Condition: {
+                    StringEquals: {
+                      "AWS:SourceArn": {
+                        "Fn::Join": [
+                          "",
+                          [
+                            "arn:aws:cloudfront::",
+                            { Ref: "AWS::AccountId" },
+                            ":distribution/",
+                            { Ref: "SiteDistribution" },
+                          ],
+                        ],
+                      },
+                    },
+                  },
+                },
+              ],
             },
           },
         },
       },
+      Outputs: {
+        SiteHostname: {
+          Value: { "Fn::GetAtt": ["SiteDistribution", "DomainName"] },
+        },
+      },
     },
-    Outputs: {
-      DistributionId: { Value: { Ref: "SiteDistribution" } },
-    },
-  },
-});
+  });
 
-await stack.waitForDeployComplete();
+  await stack.waitForDeployComplete();
 
-const distributionId = stack.outputs.get("DistributionId")?.value as string;
-const output = await simAws
-  .cloudFront()
-  .getDistribution(new GetDistributionCommand({ Id: distributionId }));
+  await simAws.s3().putObject(
+    new PutObjectCommand({
+      Bucket: "site-bucket",
+      Key: "index.html",
+      ContentType: "text/html",
+      Body: "<h1>Home</h1>",
+    }),
+  );
 
-const [origin] = output.Distribution?.DistributionConfig?.Origins?.Items ?? [];
+  const siteHostname = stack.outputs.get("SiteHostname")?.value as string;
+  const home = await fetch(srv.localUrl(`http://${siteHostname}/`));
 
-// The ID the Ref resolved to, which is the origin access control the Origin
-// was created with.
-console.log(origin?.OriginAccessControlId);
+  console.log(await home.text()); // <h1>Home</h1>
+} finally {
+  await srv.close();
+}
 ```
+
+The Bucket policy names the Distribution's ARN, so it is created after the Distribution: the `Ref`
+inside `Fn::Join` is the dependency CloudFormation orders the Stack by. Nothing about the read is
+settled when the Distribution is created, because the policy deciding it does not exist yet. The
+Origin works out who it is reading as per request instead.
+
+`SigningBehavior` takes any of `always`, `never` and `no-override`. `always` and `no-override` both
+sign, since nothing here sends a pre-signed viewer request to an Origin for `no-override` to pass
+through. `never` turns the origin access control off without removing it, so the Origin reads
+anonymously and needs a Bucket policy allowing that, as an Origin with no origin access control
+does.
 
 `Ref` and `Fn::GetAtt` on `Id` both return the ID, so either resolves an Origin's
 `OriginAccessControlId`. An Origin naming an ID no origin access control holds is refused with
@@ -1179,8 +1240,7 @@ console.log(origin?.OriginAccessControlId);
 Tearing the Stack down removes the origin access control, and its name is free again.
 
 `OriginAccessControlOriginType` must be `s3` and `SigningProtocol` must be `sigv4`. Any other value
-fails the Stack by name. `SigningBehavior` takes any of `always`, `never` and `no-override`, and is
-stored as written.
+fails the Stack by name.
 
 There is no `CreateOriginAccessControl` command here, so a CloudFormation template is the only way
 to make one.
@@ -1199,7 +1259,7 @@ Sim CloudFront currently supports:
 - `DefaultRootObject` and `CustomErrorResponses`, for static sites and single-page apps
 - `viewer-request` and `viewer-response` CloudFront Functions
 - `AWS::CloudFront::ResponseHeadersPolicy`, for headers a cache Behavior sets on every response
-- `AWS::CloudFront::OriginAccessControl`, stored against the Origin that names it
+- `AWS::CloudFront::OriginAccessControl`, so an Origin reads a private Bucket as CloudFront
 - Viewer certificates from sim ACM, including CloudFront's `us-east-1` requirement
 - Serving simulated CloudFront traffic on localhost with `serveSimAws`
 
@@ -1211,16 +1271,17 @@ whether the simulator needs them to model the requested behaviour safely.
 
 Where sim CloudFront knowingly behaves differently from AWS:
 
-- **An S3 Origin reads its Bucket anonymously.** That is the unsigned request real CloudFront sends
-  to the S3 REST endpoint without an origin access control, so the Bucket policy has to make an
-  Object publicly readable for the Distribution to serve it. A legacy
+- **An S3 Origin with no origin access control reads its Bucket anonymously.** That is the unsigned
+  request real CloudFront sends to the S3 REST endpoint without one, so the Bucket policy has to
+  make an Object publicly readable for the Distribution to serve it. A legacy
   `S3OriginConfig.OriginAccessIdentity` is refused by name rather than read as anonymous: it signs
   the Origin request as a CloudFront canonical user nothing here models, so a Bucket policy written
   for one would deny the read and say nothing about why.
-- **An origin access control is stored and reported, and does not sign anything.** The Origin
-  request is unsigned whether or not the Origin names one, so a Bucket only an origin access control
-  could reach answers 403. A test can assert that an Origin was given the right origin access
-  control, and cannot yet serve a private Bucket through one.
+- **A signed Origin request is not really signed.** An Origin whose origin access control signs
+  reads the Bucket as the `cloudfront.amazonaws.com` service principal carrying the Distribution's
+  ARN, which is what the Bucket policy is evaluated against, but no SigV4 signature is computed or
+  checked. Nothing else here signs a simulated request either, so a test cannot assert anything
+  about the signature itself.
 - **An origin access control is only accepted for an S3 Origin with SigV4.** CloudFront also signs for
   MediaStore, MediaPackage V2 and Lambda Function URL Origins, and none of those is modelled. An
   `OriginAccessControlOriginType` other than `s3`, or a `SigningProtocol` other than `sigv4`, fails

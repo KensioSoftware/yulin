@@ -1,8 +1,9 @@
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimAwsResolvedCaller } from "../../../aws/caller/sim-aws-caller-resolver.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import type { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
+import { simS3ConditionContext } from "../authorize/sim-s3-condition-context.js";
+import type { SimS3RequestOptions } from "../sim-s3-request-options.js";
 
 interface PutObjectAuthorizerProperties {
   readonly iam: SimIamInterServiceAuthZ;
@@ -34,14 +35,15 @@ export class PutObjectAuthorizer {
   authorize(
     bucket: SimS3Bucket,
     key: string,
-    caller?: SimAwsCaller,
+    options?: SimS3RequestOptions,
   ): SimAwsResolvedCaller {
     const resource = `arn:aws:s3:::${bucket.bucketName}/${key}`;
     const policy = bucket.getPolicy();
     const decision = this.iam.authorize({
       action: PutObjectAuthorizer.action,
       resource,
-      caller,
+      caller: options?.caller,
+      conditionContext: simS3ConditionContext(options),
       resourcePolicies:
         policy === undefined
           ? []

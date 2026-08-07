@@ -5,7 +5,7 @@ import {
 } from "../../../../util/background/background.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import { jsonParse } from "../../../../util/type-guard/json.js";
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimS3RequestOptions } from "../sim-s3-request-options.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamAllowAllAuth } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamPolicyDocumentValidator } from "../../../iam/validate/sim-iam-policy-document-validator.js";
@@ -25,10 +25,6 @@ interface PutBucketPolicyCommandHandlerProperties {
   readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
-}
-
-interface PutBucketPolicyCommandHandlerOptions {
-  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -62,7 +58,7 @@ export class PutBucketPolicyCommandHandler implements CommandHandler<
    */
   async handle(
     command: SimPutBucketPolicyCommand,
-    options?: PutBucketPolicyCommandHandlerOptions,
+    options?: SimS3RequestOptions,
   ): Promise<SimPutBucketPolicyCommandOutput> {
     assertDefined(command.input.Bucket, "PutBucketPolicyCommand.input.Bucket");
     assertDefined(command.input.Policy, "PutBucketPolicyCommand.input.Policy");
@@ -73,7 +69,7 @@ export class PutBucketPolicyCommandHandler implements CommandHandler<
 
     await this.background.sequence();
 
-    this.authorizer.authorize(bucketName, options?.caller);
+    this.authorizer.authorize(bucketName, options);
 
     const document = jsonParse(command.input.Policy);
 

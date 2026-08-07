@@ -1,7 +1,8 @@
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import type { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
+import { simS3ConditionContext } from "../authorize/sim-s3-condition-context.js";
+import type { SimS3RequestOptions } from "../sim-s3-request-options.js";
 
 interface ListObjectsAuthorizerProperties {
   readonly iam: SimIamInterServiceAuthZ;
@@ -11,7 +12,7 @@ interface ListObjectsAuthorizationInput {
   readonly bucket: SimS3Bucket;
   readonly prefix?: string | undefined;
   readonly maxKeys: number;
-  readonly caller?: SimAwsCaller | undefined;
+  readonly options?: SimS3RequestOptions | undefined;
 }
 
 /**
@@ -44,8 +45,9 @@ export class ListObjectsAuthorizer {
     const decision = this.iam.authorize({
       action: ListObjectsAuthorizer.action,
       resource,
-      caller: input.caller,
+      caller: input.options?.caller,
       conditionContext: {
+        ...simS3ConditionContext(input.options),
         "s3:prefix": input.prefix ?? "",
         "s3:max-keys": input.maxKeys,
       },
