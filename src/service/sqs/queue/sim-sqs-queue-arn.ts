@@ -18,18 +18,6 @@ export function sqsQueueArnPrefix(
 }
 
 /**
- * The resource an operation naming no particular queue authorizes against.
- *
- * Real SQS gives ListQueues no queue-level permission, so a policy allowing it
- * names every queue in the account and region rather than one of them.
- */
-export function sqsAnyQueueArn(
-  accountRegionScope: SimAwsAccountRegionScope,
-): string {
-  return `${sqsQueueArnPrefix(accountRegionScope)}*`;
-}
-
-/**
  * Where one queue is, in the three facts both its ARN and its URL carry.
  *
  * The strings are unbranded because the callers that have only read an ARN,

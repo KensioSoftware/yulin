@@ -10,7 +10,6 @@ export {
   type SimSqsQueueWatcher,
 } from "./queue/sim-sqs-queue-activity.js";
 export {
-  sqsAnyQueueArn,
   SimSqsQueueArn,
   type SimSqsQueueLocation,
   sqsQueueArnPrefix,
