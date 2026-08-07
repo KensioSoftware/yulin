@@ -3,6 +3,8 @@ import type { SimS3Object } from "../../../s3/object/s3-object.js";
 import { simS3ObjectResponseHeaders } from "../../../s3/object/s3-object-response-headers.js";
 import type { SimCloudFrontOriginRequest } from "../sim-cloudfront-request-response.js";
 import type { SimCloudFrontOrigin } from "../sim-cloudfront-origin.js";
+import type { SimCloudFrontOriginAccessControl } from "../../origin-access-control/sim-cf-origin-access-control.js";
+import { SimCfS3OriginObjectKey } from "./sim-cf-s3-origin-object-key.js";
 
 export type SimCloudFrontS3OriginResolver = (
   originDomainName: string,
@@ -19,6 +21,7 @@ export function emptyCloudFrontS3OriginResolver(): undefined {
 interface SimCloudFrontS3OriginProperties {
   readonly bucket: SimS3Bucket;
   readonly originPath?: string | undefined;
+  readonly originAccessControl?: SimCloudFrontOriginAccessControl | undefined;
 }
 
 /**
@@ -27,12 +30,23 @@ interface SimCloudFrontS3OriginProperties {
  * This represents a basic S3 object origin, not an S3 static website endpoint.
  */
 export class SimCloudFrontS3Origin implements SimCloudFrontOrigin {
+  /**
+   * The origin access control this Origin was created with, if any.
+   *
+   * It is stored and reported, and it does not yet decide whether the read
+   * below is allowed: the object is fetched from the Bucket model either way.
+   */
+  public readonly originAccessControl:
+    | SimCloudFrontOriginAccessControl
+    | undefined;
+
   private readonly bucket: SimS3Bucket;
-  private readonly originPath: string;
+  private readonly objectKey: SimCfS3OriginObjectKey;
 
   constructor(properties: SimCloudFrontS3OriginProperties) {
     this.bucket = properties.bucket;
-    this.originPath = properties.originPath ?? "";
+    this.objectKey = new SimCfS3OriginObjectKey(properties.originPath ?? "");
+    this.originAccessControl = properties.originAccessControl;
   }
 
   /**
@@ -49,7 +63,7 @@ export class SimCloudFrontS3Origin implements SimCloudFrontOrigin {
       });
     }
 
-    const objectKey = this.objectKeyForRequest(request);
+    const objectKey = this.objectKey.forRequest(request);
     const object = await this.bucket.getObject(objectKey);
 
     if (object === undefined) {
@@ -61,19 +75,6 @@ export class SimCloudFrontS3Origin implements SimCloudFrontOrigin {
 
   private methodSupported(method: string): boolean {
     return method === "GET" || method === "HEAD";
-  }
-
-  private objectKeyForRequest(request: SimCloudFrontOriginRequest): string {
-    const url = new URL(request.req.url);
-    const requestPath = url.pathname;
-
-    return this.normalizeObjectKey(`${this.originPath}/${requestPath}`);
-  }
-
-  private normalizeObjectKey(path: string): string {
-    return decodeURIComponent(path)
-      .replaceAll(/\/+/gu, "/")
-      .replace(/^\/+/u, "");
   }
 
   private foundObjectResponse(object: SimS3Object, request: Request): Response {

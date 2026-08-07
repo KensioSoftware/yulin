@@ -896,6 +896,100 @@ The policy is applied after a custom error response is fetched and before a `vie
 CloudFront Function runs, as CloudFront does. An error page carries the policy's headers, and a
 function sees them in `event.response.headers` and can change them.
 
+## Origin access controls
+
+An origin access control is how a Distribution authenticates to a private S3 Bucket. Declare one as
+`AWS::CloudFront::OriginAccessControl` and point an Origin's `OriginAccessControlId` at it with a
+`Ref`, which is what CDK's `S3BucketOrigin.withOriginAccessControl` synthesizes.
+
+Read the first paragraph of [Limitations](#limitations) before relying on this. Sim CloudFront
+stores an origin access control and reports it back, and it does not yet sign the Origin request or
+decide whether the Distribution may read the Bucket.
+
+```typescript sim-cloudfront-origin-access-control
+/**
+ * Giving a Distribution's S3 Origin an origin access control.
+ */
+
+import { GetDistributionCommand } from "@aws-sdk/client-cloudfront";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "site-stack",
+  template: {
+    Resources: {
+      SiteBucket: {
+        Type: "AWS::S3::Bucket",
+        Properties: { BucketName: "site-bucket" },
+      },
+      SiteOac: {
+        Type: "AWS::CloudFront::OriginAccessControl",
+        Properties: {
+          OriginAccessControlConfig: {
+            Name: "site-oac",
+            OriginAccessControlOriginType: "s3",
+            SigningBehavior: "always",
+            SigningProtocol: "sigv4",
+          },
+        },
+      },
+      SiteDistribution: {
+        Type: "AWS::CloudFront::Distribution",
+        DependsOn: ["SiteBucket", "SiteOac"],
+        Properties: {
+          DistributionConfig: {
+            Enabled: true,
+            Origins: [
+              {
+                Id: "SiteOrigin",
+                DomainName: "site-bucket.s3.amazonaws.com",
+                S3OriginConfig: {},
+                OriginAccessControlId: { Ref: "SiteOac" },
+              },
+            ],
+            DefaultCacheBehavior: {
+              TargetOriginId: "SiteOrigin",
+              ViewerProtocolPolicy: "allow-all",
+            },
+          },
+        },
+      },
+    },
+    Outputs: {
+      DistributionId: { Value: { Ref: "SiteDistribution" } },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+
+const distributionId = stack.outputs.get("DistributionId")?.value as string;
+const output = await simAws
+  .cloudFront()
+  .getDistribution(new GetDistributionCommand({ Id: distributionId }));
+
+const [origin] = output.Distribution?.DistributionConfig?.Origins?.Items ?? [];
+
+// The ID the Ref resolved to, which is the origin access control the Origin
+// was created with.
+console.log(origin?.OriginAccessControlId);
+```
+
+`Ref` and `Fn::GetAtt` on `Id` both return the ID, so either resolves an Origin's
+`OriginAccessControlId`. An Origin naming an ID no origin access control holds is refused with
+`InvalidOriginAccessControl` when the Distribution is created, rather than created without one.
+Tearing the Stack down removes the origin access control, and its name is free again.
+
+`OriginAccessControlOriginType` must be `s3` and `SigningProtocol` must be `sigv4`. Any other value
+fails the Stack by name. `SigningBehavior` takes any of `always`, `never` and `no-override`, and is
+stored as written.
+
+There is no `CreateOriginAccessControl` command here, so a CloudFormation template is the only way
+to make one.
+
 ## Available functionality
 
 Sim CloudFront currently supports:
@@ -910,6 +1004,7 @@ Sim CloudFront currently supports:
 - `DefaultRootObject` and `CustomErrorResponses`, for static sites and single-page apps
 - `viewer-request` and `viewer-response` CloudFront Functions
 - `AWS::CloudFront::ResponseHeadersPolicy`, for headers a cache Behavior sets on every response
+- `AWS::CloudFront::OriginAccessControl`, stored against the Origin that names it
 - Viewer certificates from sim ACM, including CloudFront's `us-east-1` requirement
 - Serving simulated CloudFront traffic on localhost with `serveSimAws`
 
@@ -921,6 +1016,20 @@ whether the simulator needs them to model the requested behaviour safely.
 
 Where sim CloudFront knowingly behaves differently from AWS:
 
+- **An origin access control is stored and reported, and nothing else.** The Origin request is not
+  signed, and the Bucket policy is not consulted, so a Distribution reads its S3 Origin the same way
+  with an origin access control as without one. A test can assert that an Origin was given the
+  right origin access control, and cannot yet tell a Bucket policy that grants the Distribution
+  apart from one that grants nothing.
+- **An origin access control only signs for an S3 Origin with SigV4.** CloudFront also signs for
+  MediaStore, MediaPackage V2 and Lambda Function URL Origins, and none of those is modelled. An
+  `OriginAccessControlOriginType` other than `s3`, or a `SigningProtocol` other than `sigv4`, fails
+  the Stack by naming the value, rather than deploying and behaving like an S3 one. For the same
+  reason, a custom Origin naming an origin access control is refused.
+- **An origin access control name is unique, but nothing else about it is checked.** A second one
+  claiming a name is refused with `OriginAccessControlAlreadyExists`, as CloudFront refuses one.
+- **There is no command surface for an origin access control.** `CreateOriginAccessControl` and its
+  siblings are not simulated, so `AWS::CloudFront::OriginAccessControl` is the only way to make one.
 - **`IfMatch` ETags are not checked.** `UpdateDistributionCommand`, `DeleteDistributionCommand` and
   `DeleteFunctionCommand` all accept `IfMatch` and ignore it, so neither `PreconditionFailed` nor
   `InvalidIfMatchVersion` is ever returned. Nothing else here versions a resource, and a stale ETag

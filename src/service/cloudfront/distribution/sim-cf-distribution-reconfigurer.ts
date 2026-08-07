@@ -1,6 +1,7 @@
 import type { SimCloudFrontDistributionConfig } from "../command/create-distribution/create-distribution.command.js";
 import type { SimCfCustomOriginDispatcher } from "../origin/custom/sim-cf-custom-origin-dispatcher.js";
 import type { SimCloudFrontS3OriginResolver } from "../origin/s3/sim-cloudfront-s3-origin.js";
+import type { SimCloudFrontOriginAccessControlRegistry } from "../origin-access-control/sim-cf-origin-access-control-registry.js";
 import type { SimCloudFrontRegistry } from "../registry/sim-cloud-front-registry.js";
 import { makeSimCloudFrontDistributionConfigurator } from "./configurator/sim-cf-distribution-configurator.factory.js";
 import type { SimCloudFrontDistributionConfigurator } from "./configurator/sim-cloud-front-distribution-configurator.js";
@@ -10,6 +11,7 @@ interface SimCloudFrontDistributionReconfigurerProperties {
   readonly cloudFrontRegistry: SimCloudFrontRegistry;
   readonly s3OriginResolver: SimCloudFrontS3OriginResolver;
   readonly customOriginDispatcher?: SimCfCustomOriginDispatcher | undefined;
+  readonly originAccessControls: SimCloudFrontOriginAccessControlRegistry;
 }
 
 /**

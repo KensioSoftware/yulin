@@ -133,6 +133,34 @@ export class SimCloudFrontResponseHeadersPolicyAlreadyExists extends SimCloudFro
 }
 
 /**
+ * Simulated CloudFront InvalidOriginAccessControl error.
+ *
+ * What CloudFront answers when an Origin's `OriginAccessControlId` names no
+ * origin access control the account holds.
+ */
+export class SimCloudFrontInvalidOriginAccessControl extends SimCloudFrontError {
+  public override readonly name = "InvalidOriginAccessControl";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
+ * Simulated CloudFront OriginAccessControlAlreadyExists error.
+ *
+ * CloudFront requires an origin access control name to be unique within an
+ * account, so a second one claiming a name is refused rather than created.
+ */
+export class SimCloudFrontOriginAccessControlAlreadyExists extends SimCloudFrontError {
+  public override readonly name = "OriginAccessControlAlreadyExists";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 409 });
+  }
+}
+
+/**
  * Simulated CloudFront DistributionNotDisabled error.
  *
  * CloudFront will not delete a Distribution that is still serving. The caller

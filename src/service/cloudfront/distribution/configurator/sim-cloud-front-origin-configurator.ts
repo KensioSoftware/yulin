@@ -7,6 +7,9 @@ import {
 } from "../../origin/s3/sim-cloudfront-s3-origin.js";
 import type { SimCfCustomOriginDispatcher } from "../../origin/custom/sim-cf-custom-origin-dispatcher.js";
 import { SimCloudFrontCustomOrigin } from "../../origin/custom/sim-cloudfront-custom-origin.js";
+import type { SimCloudFrontOriginAccessControl } from "../../origin-access-control/sim-cf-origin-access-control.js";
+import type { SimCloudFrontOriginAccessControlRegistry } from "../../origin-access-control/sim-cf-origin-access-control-registry.js";
+import { SimCloudFrontInvalidOriginAccessControl } from "../../error/sim-cloudfront.error.js";
 
 /**
  * Applies Origin configuration to a sim CloudFront Distribution.
@@ -21,6 +24,7 @@ import { SimCloudFrontCustomOrigin } from "../../origin/custom/sim-cloudfront-cu
 export class SimCloudFrontOriginConfigurator {
   constructor(
     private readonly s3OriginResolver: SimCloudFrontS3OriginResolver,
+    private readonly originAccessControls: SimCloudFrontOriginAccessControlRegistry,
     private readonly customOriginDispatcher?: SimCfCustomOriginDispatcher,
   ) {}
 
@@ -34,6 +38,11 @@ export class SimCloudFrontOriginConfigurator {
     assertDefined(origin.Id, "CloudFront Origin Id");
     assertDefined(origin.DomainName, "CloudFront Origin DomainName");
 
+    const originAccessControl = this.originAccessControl(
+      origin.Id,
+      origin.OriginAccessControlId,
+    );
+
     if (origin.S3OriginConfig !== undefined) {
       const bucket = this.s3OriginResolver(origin.DomainName);
 
@@ -44,12 +53,18 @@ export class SimCloudFrontOriginConfigurator {
 
       distribution.addOrigin(
         origin.Id,
-        new SimCloudFrontS3Origin({ bucket, originPath: origin.OriginPath }),
+        new SimCloudFrontS3Origin({
+          bucket,
+          originPath: origin.OriginPath,
+          ...(originAccessControl !== undefined && { originAccessControl }),
+        }),
       );
       return;
     }
 
     if (origin.CustomOriginConfig !== undefined) {
+      this.assertNoOriginAccessControl(origin.Id, originAccessControl);
+
       assertDefined(
         this.customOriginDispatcher,
         `Simulated AWS environment for sim CloudFront custom Origin ${origin.Id}, which a standalone SimCloudFront has no way to reach`,
@@ -69,6 +84,62 @@ export class SimCloudFrontOriginConfigurator {
 
     throw new Error(
       `Unsupported sim CloudFront Origin type for Origin ${origin.Id}`,
+    );
+  }
+
+  /**
+   * Resolve the origin access control an Origin names.
+   *
+   * CloudFront refuses a Distribution whose Origin names an origin access
+   * control the account does not hold, so an ID nothing here created is
+   * refused rather than stored as written. An empty ID means no origin access
+   * control, which is how the CloudFront API says an Origin has none.
+   */
+  private originAccessControl(
+    originId: string,
+    originAccessControlId: string | undefined,
+  ): SimCloudFrontOriginAccessControl | undefined {
+    if (
+      originAccessControlId === undefined ||
+      originAccessControlId.length === 0
+    ) {
+      return undefined;
+    }
+
+    const originAccessControl = this.originAccessControls.byId(
+      originAccessControlId,
+    );
+
+    if (originAccessControl === undefined) {
+      throw new SimCloudFrontInvalidOriginAccessControl(
+        `Sim CloudFront Origin ${originId} names origin access control ` +
+          `${originAccessControlId}, which does not exist. Only an origin ` +
+          `access control an AWS::CloudFront::OriginAccessControl Resource ` +
+          `created in this simulation can be named.`,
+      );
+    }
+
+    return originAccessControl;
+  }
+
+  /**
+   * Refuse an origin access control on a custom Origin.
+   *
+   * Every origin access control here signs for an S3 Origin, and CloudFront
+   * refuses one whose origin type does not match the Origin it is attached to.
+   */
+  private assertNoOriginAccessControl(
+    originId: string,
+    originAccessControl: SimCloudFrontOriginAccessControl | undefined,
+  ): void {
+    if (originAccessControl === undefined) {
+      return;
+    }
+
+    throw new SimCloudFrontInvalidOriginAccessControl(
+      `Sim CloudFront custom Origin ${originId} names origin access control ` +
+        `${originAccessControl.name}, which signs for an ` +
+        `${originAccessControl.originType} Origin`,
     );
   }
 }

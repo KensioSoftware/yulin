@@ -170,6 +170,25 @@ A lookup miss is `SimCloudFrontNoSuchResponseHeadersPolicy` rather than a pass-t
 common cause is a managed policy ID, which names a policy AWS owns rather than one a template
 creates.
 
+## Origin access controls
+
+`origin-access-control/` holds the model and its registry, laid out the same way as the response
+headers policies above. A `SimCloudFrontOriginAccessControl` is a name, an ID, an optional
+description and a signing behaviour. The origin type and signing protocol are fixed at `s3` and
+`sigv4`, because `cfn/origin-access-control/` refuses any other value by name rather than storing
+one the simulator would then treat as an S3 origin access control. There is no
+CreateOriginAccessControl command, so a template is the only thing that makes one.
+
+`SimCloudFrontOriginConfigurator` resolves an Origin's `OriginAccessControlId` through the registry
+when the Distribution is created, and stores the result on the `SimCloudFrontS3Origin`. An ID
+nothing created is `SimCloudFrontInvalidOriginAccessControl`, as CloudFront refuses the whole
+CreateDistribution. Resolution is eager here, unlike a response headers policy, because CloudFront
+checks an origin access control at creation rather than when a request arrives.
+
+Nothing reads the stored origin access control yet. It does not sign the Origin request and does not
+decide whether the Bucket may be read, so a Distribution serves its S3 Origin the same way with one
+as without.
+
 ## Cross-service integration
 
 CloudFront often depends on other simulated services.
