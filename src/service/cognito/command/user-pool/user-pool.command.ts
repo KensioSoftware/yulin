@@ -27,7 +27,8 @@ export interface SimCognitoUserPoolType
   readonly LambdaConfig?: SimCognitoLambdaConfigType | undefined;
   readonly MfaConfiguration?: string | undefined;
   readonly AdminCreateUserConfig?:
-    SimCognitoAdminCreateUserConfigType | undefined;
+    | SimCognitoAdminCreateUserConfigType
+    | undefined;
   readonly AutoVerifiedAttributes?: readonly string[] | undefined;
   readonly EstimatedNumberOfUsers?: number | undefined;
   readonly CreationDate?: Date | undefined;

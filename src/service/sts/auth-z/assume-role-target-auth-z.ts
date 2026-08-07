@@ -21,7 +21,8 @@ interface AssumeRoleTargetAuthorizationInput {
   readonly target: IamRoleArnParts | SimAwsAccountId;
   readonly caller: SimAwsPrincipal;
   readonly conditionContext?:
-    Readonly<Record<string, SimIamConditionValue>> | undefined;
+    | Readonly<Record<string, SimIamConditionValue>>
+    | undefined;
 }
 
 interface AssumeRoleTargetAuthorization {

@@ -61,7 +61,7 @@ export class HeldEnvironment {
         );
       }
 
-      // eslint-disable-next-line no-await-in-loop -- polling for a close
+      // oxlint-disable-next-line no-await-in-loop -- polling for a close
       await heldPause(10);
     }
   }
@@ -100,7 +100,7 @@ export class HeldEnvironment {
     await this.directory.resolvePath();
     const mountPath = this.directory.join(name, "public");
 
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    // oxlint-disable-next-line security/detect-non-literal-fs-filename
     await mkdir(mountPath, { recursive: true });
 
     return mountPath;

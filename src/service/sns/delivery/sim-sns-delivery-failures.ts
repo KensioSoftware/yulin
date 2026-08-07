@@ -101,7 +101,7 @@ export class SimSnsDeliveryFailures {
 
     this.warned.add(key);
 
-    // eslint-disable-next-line no-console
+    // oxlint-disable-next-line no-console
     console.warn(
       `Simulated SNS topic ${failure.topicArn} could not deliver to ` +
         `${failure.endpointArn}: ${failure.reason}`,

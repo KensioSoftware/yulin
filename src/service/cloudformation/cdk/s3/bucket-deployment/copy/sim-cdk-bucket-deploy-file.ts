@@ -37,7 +37,7 @@ export class SimCdkBucketDeployFile {
     relativePath: string,
   ): Promise<string> {
     const key = this.properties.objectKey(relativePath);
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    // oxlint-disable-next-line security/detect-non-literal-fs-filename
     const body = await readFile(path.join(sourceDirectoryPath, relativePath));
 
     await this.bucket.putObject(

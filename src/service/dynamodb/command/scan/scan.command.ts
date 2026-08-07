@@ -22,7 +22,8 @@ export interface SimScanCommandInput {
   readonly TableName?: string | undefined;
   readonly Limit?: number | undefined;
   readonly ExclusiveStartKey?:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
   readonly ConsistentRead?: boolean | undefined;
   readonly Segment?: number | undefined;
   readonly TotalSegments?: number | undefined;
@@ -30,14 +31,17 @@ export interface SimScanCommandInput {
   readonly FilterExpression?: string | undefined;
   readonly ProjectionExpression?: string | undefined;
   readonly ExpressionAttributeNames?:
-    Readonly<Record<string, string>> | undefined;
+    | Readonly<Record<string, string>>
+    | undefined;
   readonly ExpressionAttributeValues?:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
   readonly Select?: string | undefined;
   readonly ReturnConsumedCapacity?: string | undefined;
   readonly AttributesToGet?: readonly string[] | undefined;
   readonly ScanFilter?:
-    Readonly<Record<string, SimDynamoDbLegacyCondition>> | undefined;
+    | Readonly<Record<string, SimDynamoDbLegacyCondition>>
+    | undefined;
   readonly ConditionalOperator?: string | undefined;
 }
 
@@ -56,10 +60,12 @@ export interface SimScanCommandInput {
  */
 export interface SimScanCommandOutput {
   readonly Items?:
-    readonly Readonly<Record<string, SimDynamoDbAttributeValue>>[] | undefined;
+    | readonly Readonly<Record<string, SimDynamoDbAttributeValue>>[]
+    | undefined;
   readonly Count?: number | undefined;
   readonly ScannedCount?: number | undefined;
   readonly LastEvaluatedKey?:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
   readonly $metadata: SimResponseMetadata;
 }

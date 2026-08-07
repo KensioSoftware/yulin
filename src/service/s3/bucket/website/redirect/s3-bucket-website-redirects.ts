@@ -110,7 +110,7 @@ export class S3BucketWebsiteRedirects {
     } else if (redirect.ReplaceKeyPrefixWith !== undefined) {
       url.pathname = `/${this.requestKey(request).replace(
         this.matchingKeyPrefix(request),
-        // eslint-disable-next-line unicorn/no-unsafe-string-replacement
+        // oxlint-disable-next-line unicorn-js/no-unsafe-string-replacement
         redirect.ReplaceKeyPrefixWith,
       )}`;
     }

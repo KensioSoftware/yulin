@@ -22,13 +22,16 @@ export interface SimQueryCommandInput {
   readonly TableName?: string | undefined;
   readonly KeyConditionExpression?: string | undefined;
   readonly ExpressionAttributeNames?:
-    Readonly<Record<string, string>> | undefined;
+    | Readonly<Record<string, string>>
+    | undefined;
   readonly ExpressionAttributeValues?:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
   readonly ScanIndexForward?: boolean | undefined;
   readonly Limit?: number | undefined;
   readonly ExclusiveStartKey?:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
   readonly ConsistentRead?: boolean | undefined;
   readonly IndexName?: string | undefined;
   readonly FilterExpression?: string | undefined;
@@ -37,9 +40,11 @@ export interface SimQueryCommandInput {
   readonly ReturnConsumedCapacity?: string | undefined;
   readonly AttributesToGet?: readonly string[] | undefined;
   readonly KeyConditions?:
-    Readonly<Record<string, SimDynamoDbLegacyCondition>> | undefined;
+    | Readonly<Record<string, SimDynamoDbLegacyCondition>>
+    | undefined;
   readonly QueryFilter?:
-    Readonly<Record<string, SimDynamoDbLegacyCondition>> | undefined;
+    | Readonly<Record<string, SimDynamoDbLegacyCondition>>
+    | undefined;
   readonly ConditionalOperator?: string | undefined;
 
   // Scan parameters, which a Query never had. They are declared so a request
@@ -64,10 +69,12 @@ export interface SimQueryCommandInput {
  */
 export interface SimQueryCommandOutput {
   readonly Items?:
-    readonly Readonly<Record<string, SimDynamoDbAttributeValue>>[] | undefined;
+    | readonly Readonly<Record<string, SimDynamoDbAttributeValue>>[]
+    | undefined;
   readonly Count?: number | undefined;
   readonly ScannedCount?: number | undefined;
   readonly LastEvaluatedKey?:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
   readonly $metadata: SimResponseMetadata;
 }

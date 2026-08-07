@@ -13,7 +13,8 @@ export interface SimPutBucketNotificationConfigurationCommand {
 export interface SimPutBucketNotificationConfigurationCommandInput {
   readonly Bucket?: string | undefined;
   readonly NotificationConfiguration?:
-    SimS3NotificationConfigurationInput | undefined;
+    | SimS3NotificationConfigurationInput
+    | undefined;
   readonly SkipDestinationValidation?: boolean | undefined;
 }
 
@@ -34,11 +35,14 @@ export interface SimPutBucketNotificationConfigurationCommandOutput {
  */
 export interface SimS3NotificationConfigurationInput {
   readonly LambdaFunctionConfigurations?:
-    readonly SimS3LambdaFunctionConfigurationInput[] | undefined;
+    | readonly SimS3LambdaFunctionConfigurationInput[]
+    | undefined;
   readonly QueueConfigurations?:
-    readonly SimS3QueueConfigurationInput[] | undefined;
+    | readonly SimS3QueueConfigurationInput[]
+    | undefined;
   readonly TopicConfigurations?:
-    readonly SimS3TopicConfigurationInput[] | undefined;
+    | readonly SimS3TopicConfigurationInput[]
+    | undefined;
   readonly EventBridgeConfiguration?: object | undefined;
 }
 
@@ -84,7 +88,8 @@ export interface SimS3NotificationFilterInput {
  */
 export interface SimS3NotificationKeyFilterInput {
   readonly FilterRules?:
-    readonly SimS3NotificationFilterRuleInput[] | undefined;
+    | readonly SimS3NotificationFilterRuleInput[]
+    | undefined;
 }
 
 /**

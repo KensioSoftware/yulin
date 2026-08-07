@@ -71,7 +71,8 @@ export class SimCfnLambdaResourceDeleter {
 
   private async deleteFunctionUrl(resource: SimCfnResource): Promise<void> {
     const functionUrl = resource.simResource as
-      SimLambdaFunctionUrl | undefined;
+      | SimLambdaFunctionUrl
+      | undefined;
     assertDefined(
       functionUrl,
       `sim Lambda Function URL for CloudFormation Resource ${resource.logicalId}`,
@@ -86,7 +87,8 @@ export class SimCfnLambdaResourceDeleter {
     resource: SimCfnResource,
   ): Promise<void> {
     const mapping = resource.simResource as
-      SimLambdaEventSourceMapping | undefined;
+      | SimLambdaEventSourceMapping
+      | undefined;
     assertDefined(
       mapping,
       `sim Lambda event source mapping for CloudFormation Resource ${resource.logicalId}`,

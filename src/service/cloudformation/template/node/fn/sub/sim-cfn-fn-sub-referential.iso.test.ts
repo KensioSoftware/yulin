@@ -8,7 +8,7 @@ import { describe, it } from "vitest";
 import { SimAws } from "../../../../../aws/sim-aws.js";
 import { SimS3Bucket } from "../../../../../s3/bucket/sim-s3-bucket.js";
 
-/* eslint-disable no-template-curly-in-string */
+/* oxlint-disable no-template-curly-in-string */
 
 describe("CloudFormation Fn::Sub Resource referential", () => {
   it("substitutes a Parameter Ref in a string to name an S3 Bucket", async () => {

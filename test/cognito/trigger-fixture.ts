@@ -92,7 +92,8 @@ export interface SimCognitoTriggerPoolInput {
 
   /** The `AutoVerifiedAttributes` the pool is created with. */
   readonly autoVerifiedAttributes?:
-    readonly VerifiedAttributeType[] | undefined;
+    | readonly VerifiedAttributeType[]
+    | undefined;
 }
 
 /**

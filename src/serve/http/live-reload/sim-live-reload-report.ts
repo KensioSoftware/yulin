@@ -19,7 +19,7 @@ export class SimLiveReloadReport {
   announce(port: string): void {
     const channel = `http://${simAwsLocalConfig.hostname}:${port}${simLiveReloadConfig.channelPath}`;
 
-    // eslint-disable-next-line no-console
+    // oxlint-disable-next-line no-console
     console.warn(
       `Simulated AWS live reload is on. HTML responses to browser requests ` +
         `carry a reload script, so those responses are not byte for byte what ` +

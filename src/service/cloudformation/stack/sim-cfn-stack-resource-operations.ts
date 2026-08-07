@@ -44,7 +44,8 @@ export class SimCfnStackResourceOperations {
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly stackName: SimCloudFormationStackName;
   private readonly bindings:
-    readonly SimCfnExecutableResourceBinding[] | undefined;
+    | readonly SimCfnExecutableResourceBinding[]
+    | undefined;
   private cdkOutContext: SimCdkOutContext | undefined;
 
   constructor(properties: SimCfnStackResourceOperationsProperties) {

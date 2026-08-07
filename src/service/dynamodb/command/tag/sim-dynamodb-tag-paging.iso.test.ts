@@ -93,7 +93,7 @@ describe("DynamoDB ListTagsOfResource paging", () => {
     do {
       // A page can only be asked for once the one before it has answered with
       // its token, which is what a caller paging through tags does.
-      // eslint-disable-next-line no-await-in-loop
+      // oxlint-disable-next-line no-await-in-loop
       const page = await simDynamoDb.listTagsOfResource(
         new ListTagsOfResourceCommand({
           ResourceArn: table.arn,

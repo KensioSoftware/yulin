@@ -20,7 +20,8 @@ export interface SimDynamoDbIndexSegment {
  * One step of a document path.
  */
 export type SimDynamoDbDocumentPathSegment =
-  SimDynamoDbAttributeSegment | SimDynamoDbIndexSegment;
+  | SimDynamoDbAttributeSegment
+  | SimDynamoDbIndexSegment;
 
 /**
  * Where in an item one expression is pointing.

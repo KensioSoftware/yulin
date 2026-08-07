@@ -50,7 +50,7 @@ describe("waitNodeServerListen", () => {
   });
 });
 
-// eslint-disable-next-line unicorn/prefer-event-target
+// oxlint-disable-next-line unicorn-js/prefer-event-target
 class TestServer extends EventEmitter {
   readonly listening = false;
 

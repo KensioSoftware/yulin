@@ -10,11 +10,13 @@ import type { SimDynamoDbSelect } from "./sim-dynamodb-select.js";
  */
 export interface SimDynamoDbReadFields {
   readonly Items?:
-    readonly Readonly<Record<string, SimDynamoDbAttributeValue>>[] | undefined;
+    | readonly Readonly<Record<string, SimDynamoDbAttributeValue>>[]
+    | undefined;
   readonly Count: number;
   readonly ScannedCount: number;
   readonly LastEvaluatedKey?:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
 }
 
 interface SimDynamoDbReadAnswerProperties {
@@ -41,7 +43,8 @@ export class SimDynamoDbReadAnswer {
   private readonly kept: readonly SimDynamoDbItem[];
   private readonly scannedCount: number;
   private readonly lastEvaluatedKey:
-    Record<string, SimDynamoDbAttributeValue> | undefined;
+    | Record<string, SimDynamoDbAttributeValue>
+    | undefined;
   private readonly select: SimDynamoDbSelect;
   private readonly view: SimDynamoDbReadView;
 

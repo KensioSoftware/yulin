@@ -151,7 +151,7 @@ describe("ChangeResourceRecordSetsCommand validation", () => {
 
     for (const invalidChange of invalidChanges) {
       // When a malformed change is submitted.
-      // eslint-disable-next-line no-await-in-loop
+      // oxlint-disable-next-line no-await-in-loop
       const error = await assertThrowsErrorAsync(async () =>
         simRoute53.changeResourceRecordSets({
           input: {

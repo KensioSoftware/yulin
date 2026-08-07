@@ -101,7 +101,7 @@ export class SimCdkBucketNotificationProperties {
    * read here.
    */
   private flag(name: string, whenAbsent: boolean): boolean {
-    // eslint-disable-next-line security/detect-object-injection -- one of the two flag names this class names itself.
+    // oxlint-disable-next-line security/detect-object-injection -- one of the two flag names this class names itself.
     const value = this.properties[name];
 
     if (value === undefined) {

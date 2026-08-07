@@ -30,7 +30,7 @@ function wildcardMatch(
    * from a small wildcard language where "*" and "?" have special meaning. All
    * other regex characters are escaped above.
    */
-  // eslint-disable-next-line security/detect-non-literal-regexp
+  // oxlint-disable-next-line security/detect-non-literal-regexp
   const regExp = new RegExp(
     `^${regexPattern}$`,
     options.caseSensitive ? "u" : "iu",

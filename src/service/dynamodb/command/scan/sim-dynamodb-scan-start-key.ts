@@ -10,7 +10,8 @@ interface SimDynamoDbScanStartKeyProperties {
   readonly scan: SimDynamoDbTableScan;
   readonly segment: SimDynamoDbScanSegment;
   readonly exclusiveStartKey:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
 }
 
 /**

@@ -98,7 +98,7 @@ export class WatchProject {
    */
   async runs(): Promise<readonly string[]> {
     try {
-      // eslint-disable-next-line security/detect-non-literal-fs-filename
+      // oxlint-disable-next-line security/detect-non-literal-fs-filename
       const recorded = await readFile(this.runsLogPath(), "utf8");
 
       return recorded.split("\n").filter(Boolean);

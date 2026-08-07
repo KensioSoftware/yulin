@@ -63,7 +63,7 @@ export class ServedProject {
       "Stack.template.json",
       jsonStringify({ Resources: {} }),
     );
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    // oxlint-disable-next-line security/detect-non-literal-fs-filename
     await mkdir(project.mountPath(), { recursive: true });
 
     return project;

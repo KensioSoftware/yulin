@@ -14,7 +14,7 @@ describe("sim S3 Lambda code store", () => {
   it("wraps a non-Error S3 failure in an Error", async () => {
     // Given an object source failing with a non-Error value.
     const s3: SimLambdaCodeObjectSource = {
-      // eslint-disable-next-line @typescript-eslint/prefer-promise-reject-errors
+      // oxlint-disable-next-line typescript/prefer-promise-reject-errors
       getObject: () => Promise.reject("catastrophic string failure"),
     };
     const store = new SimS3LambdaCodeStore({ s3 });

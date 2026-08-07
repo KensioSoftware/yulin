@@ -22,18 +22,22 @@ export interface SimPutItemCommand {
 export interface SimPutItemCommandInput {
   readonly TableName?: string | undefined;
   readonly Item?:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
   readonly ReturnValues?: string | undefined;
   readonly ConditionExpression?: string | undefined;
   readonly ExpressionAttributeNames?:
-    Readonly<Record<string, string>> | undefined;
+    | Readonly<Record<string, string>>
+    | undefined;
   readonly ExpressionAttributeValues?:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
   readonly ReturnConsumedCapacity?: string | undefined;
   readonly ReturnItemCollectionMetrics?: string | undefined;
   readonly ReturnValuesOnConditionCheckFailure?: string | undefined;
   readonly Expected?:
-    Readonly<Record<string, SimDynamoDbExpectedAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbExpectedAttributeValue>>
+    | undefined;
   readonly ConditionalOperator?: string | undefined;
 }
 
@@ -42,7 +46,8 @@ export interface SimPutItemCommandInput {
  */
 export interface SimPutItemCommandOutput {
   readonly Attributes?:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
   readonly $metadata: SimResponseMetadata;
 }
 
@@ -63,11 +68,13 @@ export interface SimGetItemCommand {
 export interface SimGetItemCommandInput {
   readonly TableName?: string | undefined;
   readonly Key?:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
   readonly ConsistentRead?: boolean | undefined;
   readonly ProjectionExpression?: string | undefined;
   readonly ExpressionAttributeNames?:
-    Readonly<Record<string, string>> | undefined;
+    | Readonly<Record<string, string>>
+    | undefined;
   readonly AttributesToGet?: readonly string[] | undefined;
   readonly ReturnConsumedCapacity?: string | undefined;
 }
@@ -80,7 +87,8 @@ export interface SimGetItemCommandInput {
  */
 export interface SimGetItemCommandOutput {
   readonly Item?:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
   readonly $metadata: SimResponseMetadata;
 }
 
@@ -97,18 +105,22 @@ export interface SimDeleteItemCommand {
 export interface SimDeleteItemCommandInput {
   readonly TableName?: string | undefined;
   readonly Key?:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
   readonly ReturnValues?: string | undefined;
   readonly ConditionExpression?: string | undefined;
   readonly ExpressionAttributeNames?:
-    Readonly<Record<string, string>> | undefined;
+    | Readonly<Record<string, string>>
+    | undefined;
   readonly ExpressionAttributeValues?:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
   readonly ReturnConsumedCapacity?: string | undefined;
   readonly ReturnItemCollectionMetrics?: string | undefined;
   readonly ReturnValuesOnConditionCheckFailure?: string | undefined;
   readonly Expected?:
-    Readonly<Record<string, SimDynamoDbExpectedAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbExpectedAttributeValue>>
+    | undefined;
   readonly ConditionalOperator?: string | undefined;
 }
 
@@ -117,7 +129,8 @@ export interface SimDeleteItemCommandInput {
  */
 export interface SimDeleteItemCommandOutput {
   readonly Attributes?:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
   readonly $metadata: SimResponseMetadata;
 }
 
@@ -138,21 +151,26 @@ export interface SimUpdateItemCommand {
 export interface SimUpdateItemCommandInput {
   readonly TableName?: string | undefined;
   readonly Key?:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
   readonly UpdateExpression?: string | undefined;
   readonly ReturnValues?: string | undefined;
   readonly ConditionExpression?: string | undefined;
   readonly ExpressionAttributeNames?:
-    Readonly<Record<string, string>> | undefined;
+    | Readonly<Record<string, string>>
+    | undefined;
   readonly ExpressionAttributeValues?:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
   readonly ReturnConsumedCapacity?: string | undefined;
   readonly ReturnItemCollectionMetrics?: string | undefined;
   readonly ReturnValuesOnConditionCheckFailure?: string | undefined;
   readonly AttributeUpdates?:
-    Readonly<Record<string, SimDynamoDbAttributeValueUpdate>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValueUpdate>>
+    | undefined;
   readonly Expected?:
-    Readonly<Record<string, SimDynamoDbExpectedAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbExpectedAttributeValue>>
+    | undefined;
   readonly ConditionalOperator?: string | undefined;
 }
 
@@ -161,6 +179,7 @@ export interface SimUpdateItemCommandInput {
  */
 export interface SimUpdateItemCommandOutput {
   readonly Attributes?:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
   readonly $metadata: SimResponseMetadata;
 }

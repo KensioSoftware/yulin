@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/naming-convention -- the challenge
-   response names are Cognito's own, rather than identifier names. */
 import {
   AdminCreateUserCommand,
   AdminDisableUserCommand,

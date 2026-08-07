@@ -13,7 +13,9 @@ export type SimCloudFrontFunctionName = Brand<
 >;
 
 export type CloudFrontFunctionStatus =
-  "UNPUBLISHED" | "UNASSOCIATED" | "ASSOCIATED";
+  | "UNPUBLISHED"
+  | "UNASSOCIATED"
+  | "ASSOCIATED";
 
 interface SimCloudFrontFunctionProperties {
   name: SimCloudFrontFunctionName | string;

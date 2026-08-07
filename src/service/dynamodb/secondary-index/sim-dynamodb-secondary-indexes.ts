@@ -19,9 +19,11 @@ import type {
  */
 export interface SimDynamoDbSecondaryIndexesInput {
   readonly GlobalSecondaryIndexes?:
-    readonly SimDynamoDbSecondaryIndexInput[] | undefined;
+    | readonly SimDynamoDbSecondaryIndexInput[]
+    | undefined;
   readonly LocalSecondaryIndexes?:
-    readonly SimDynamoDbSecondaryIndexInput[] | undefined;
+    | readonly SimDynamoDbSecondaryIndexInput[]
+    | undefined;
 }
 
 interface SimDynamoDbSecondaryIndexesProperties {

@@ -44,7 +44,7 @@ describe("simCdkBucketDeployFiles", () => {
 
     const rootPath = await temporaryDirectory.resolvePath();
 
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- both paths are inside this test's own temporary directory
+    // oxlint-disable-next-line security/detect-non-literal-fs-filename -- both paths are inside this test's own temporary directory
     await symlink(
       path.join(rootPath, "index.html"),
       path.join(rootPath, "linked.html"),
@@ -69,7 +69,7 @@ describe("simCdkBucketDeployFiles", () => {
 
     const rootPath = await temporaryDirectory.resolvePath();
 
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- both paths are inside this test's own temporary directory
+    // oxlint-disable-next-line security/detect-non-literal-fs-filename -- both paths are inside this test's own temporary directory
     await symlink(
       path.join(rootPath, "gone.html"),
       path.join(rootPath, "broken.html"),
@@ -90,7 +90,7 @@ describe("simCdkBucketDeployFiles", () => {
 
     const rootPath = await temporaryDirectory.resolvePath();
 
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- both paths are inside this test's own temporary directory
+    // oxlint-disable-next-line security/detect-non-literal-fs-filename -- both paths are inside this test's own temporary directory
     await symlink(path.join(rootPath, "data"), path.join(rootPath, "linked"));
 
     // When its files are listed, then it is refused by name rather than

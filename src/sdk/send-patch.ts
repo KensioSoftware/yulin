@@ -71,7 +71,7 @@ export function installSendPatch(
           "use the promise form instead",
       );
     }
-    // eslint-disable-next-line unicorn/no-this-outside-of-class -- this is the client instance send was called on, which the handler needs for per-send config resolution.
+    // oxlint-disable-next-line unicorn-js/no-this-outside-of-class -- this is the client instance send was called on, which the handler needs for per-send config resolution.
     return await handler(command, this);
   };
 

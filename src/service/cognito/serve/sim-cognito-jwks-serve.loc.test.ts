@@ -154,8 +154,6 @@ describe("Serving a sim Cognito JWKS on localhost", () => {
         ),
       );
       const document = (await response.json()) as {
-        /* eslint-disable-next-line @typescript-eslint/naming-convention --
-           an OpenID Connect discovery metadata name. */
         jwks_uri: string;
       };
 

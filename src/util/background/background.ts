@@ -1,4 +1,4 @@
-/* eslint-disable unicorn/prefer-await  */
+/* oxlint-disable unicorn-js/prefer-await  */
 
 import { type SimClock, SimRealClock } from "../clock/sim-clock.js";
 import {
@@ -145,7 +145,7 @@ export class BackgroundTasks
    */
   public async complete(): Promise<void> {
     while (this.pending.size > 0) {
-      // eslint-disable-next-line no-await-in-loop
+      // oxlint-disable-next-line no-await-in-loop
       await Promise.all(this.pending);
     }
   }

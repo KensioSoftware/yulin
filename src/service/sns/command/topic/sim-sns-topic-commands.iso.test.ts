@@ -106,7 +106,7 @@ describe("SNS topic commands", () => {
     // Given more topics than one listing page holds.
     const simAws = new SimAws();
     for (let index = 0; index < 101; index += 1) {
-      // eslint-disable-next-line no-await-in-loop
+      // oxlint-disable-next-line no-await-in-loop
       await simAws
         .sns()
         .createTopic(

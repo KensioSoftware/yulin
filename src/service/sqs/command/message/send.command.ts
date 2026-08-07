@@ -87,7 +87,8 @@ export interface SimSqsBatchResultErrorEntry {
 
 export interface SimSendMessageBatchCommandOutput {
   readonly Successful?:
-    readonly SimSqsSendMessageBatchResultEntry[] | undefined;
+    | readonly SimSqsSendMessageBatchResultEntry[]
+    | undefined;
   readonly Failed?: readonly SimSqsBatchResultErrorEntry[] | undefined;
   readonly $metadata: SimResponseMetadata;
 }

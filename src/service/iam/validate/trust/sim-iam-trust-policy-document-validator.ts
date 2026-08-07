@@ -38,7 +38,7 @@ export class SimIamTrustPolicyDocumentValidator {
   private validateParsed(policyDocument: SimIamPolicyDocument): void {
     for (const statement of simIamPolicyDocumentStatements(policyDocument)) {
       // JSON parsing could produce any value so we have to runtime validate.
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      // oxlint-disable-next-line typescript/no-unnecessary-condition
       if (statement.Effect !== "Allow" && statement.Effect !== "Deny") {
         throw new SimIamMalformedPolicyDocument(
           'IAM trust policy statement Effect must be either "Allow" or "Deny"',

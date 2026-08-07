@@ -78,7 +78,7 @@ export class SimCfnFnSelect extends SimCfnNode {
       );
     }
 
-    // eslint-disable-next-line security/detect-object-injection -- checked above
+    // oxlint-disable-next-line security/detect-object-injection -- checked above
     const value = values[position];
     assertDefined(
       value,

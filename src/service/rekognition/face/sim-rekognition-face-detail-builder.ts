@@ -7,9 +7,7 @@ import type {
 type SimRekognitionFaceDetailMember = keyof SimRekognitionFaceDetailOutput;
 
 type SimRekognitionMutableFaceDetail = {
-  -readonly [
-    TMember in SimRekognitionFaceDetailMember
-  ]?: SimRekognitionFaceDetailOutput[TMember];
+  -readonly [TMember in SimRekognitionFaceDetailMember]?: SimRekognitionFaceDetailOutput[TMember];
 };
 
 /**
@@ -42,7 +40,7 @@ export class SimRekognitionFaceDetailBuilder {
       return this;
     }
 
-    // eslint-disable-next-line security/detect-object-injection -- a FaceDetail member name, from the code adding it.
+    // oxlint-disable-next-line security/detect-object-injection -- a FaceDetail member name, from the code adding it.
     this.detail[member] = value;
 
     return this;

@@ -9,7 +9,8 @@ export interface SimIamPolicyDocument {
   readonly Version?: string | undefined;
   readonly Id?: string | undefined;
   readonly Statement?:
-    SimIamPolicyDocumentStatement | readonly SimIamPolicyDocumentStatement[];
+    | SimIamPolicyDocumentStatement
+    | readonly SimIamPolicyDocumentStatement[];
 }
 
 export interface SimIamPolicyDocumentStatement {
@@ -29,10 +30,15 @@ export type SimIamPolicyDocumentPrincipalObject = Readonly<
 >;
 
 export type SimIamPolicyDocumentPrincipal =
-  string | readonly string[] | SimIamPolicyDocumentPrincipalObject;
+  | string
+  | readonly string[]
+  | SimIamPolicyDocumentPrincipalObject;
 
 export type SimIamConditionValue =
-  string | number | boolean | readonly string[];
+  | string
+  | number
+  | boolean
+  | readonly string[];
 
 export type SimIamPolicyDocumentCondition = Readonly<
   Record<string, Readonly<Record<string, SimIamConditionValue>>>

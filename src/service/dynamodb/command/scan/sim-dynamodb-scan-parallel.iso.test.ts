@@ -55,7 +55,7 @@ async function everySegment(
       TotalSegments: totalSegments,
     });
 
-    // eslint-disable-next-line no-await-in-loop -- one segment at a time, as a worker reads it.
+    // oxlint-disable-next-line no-await-in-loop -- one segment at a time, as a worker reads it.
     pages.push(keysOf(await simDynamoDb.scan(command)));
   }
 

@@ -45,7 +45,7 @@ export const simDynamoDbStreamedOrdersFactory = new AsyncMappedFactory<
     );
 
     for (let order = 1; order <= input.orders; order += 1) {
-      // eslint-disable-next-line no-await-in-loop
+      // oxlint-disable-next-line no-await-in-loop
       await simAws.dynamoDb().putItem({
         input: {
           TableName: input.tableName,

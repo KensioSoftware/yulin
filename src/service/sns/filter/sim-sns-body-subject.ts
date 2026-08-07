@@ -72,7 +72,7 @@ export class SimSnsBodySubject implements SimSnsFilterSubject {
         return [];
       }
 
-      // eslint-disable-next-line security/detect-object-injection -- a key the filter policy named, read out of parsed JSON.
+      // oxlint-disable-next-line security/detect-object-injection -- a key the filter policy named, read out of parsed JSON.
       held = held[key] ?? null;
     }
 

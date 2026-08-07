@@ -19,7 +19,8 @@ export interface SimUpdateTimeToLiveCommand {
 export interface SimUpdateTimeToLiveCommandInput {
   readonly TableName?: string | undefined;
   readonly TimeToLiveSpecification?:
-    SimDynamoDbTimeToLiveSpecificationInput | undefined;
+    | SimDynamoDbTimeToLiveSpecificationInput
+    | undefined;
 }
 
 /**
@@ -30,7 +31,8 @@ export interface SimUpdateTimeToLiveCommandInput {
  */
 export interface SimUpdateTimeToLiveCommandOutput {
   readonly TimeToLiveSpecification?:
-    SimDynamoDbTimeToLiveSpecificationInput | undefined;
+    | SimDynamoDbTimeToLiveSpecificationInput
+    | undefined;
   readonly $metadata: SimResponseMetadata;
 }
 

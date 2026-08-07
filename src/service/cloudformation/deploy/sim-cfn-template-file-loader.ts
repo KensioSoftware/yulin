@@ -82,7 +82,7 @@ export class SimCfnTemplateFileLoader {
     // watch mode.
     simWatch.reportPath(templatePath);
 
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    // oxlint-disable-next-line security/detect-non-literal-fs-filename
     const templateBody = await readFile(templatePath, "utf8");
     const template = transformedTemplate(
       jsonParse(templateBody as JSONString<CfnTemplateBodyRecord>),

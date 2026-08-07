@@ -26,7 +26,8 @@ export const simSnsLambdaProtocol = "lambda";
  * A protocol a simulated subscription can be created with.
  */
 export type SimSnsSubscriptionProtocol =
-  typeof simSnsSqsProtocol | typeof simSnsLambdaProtocol;
+  | typeof simSnsSqsProtocol
+  | typeof simSnsLambdaProtocol;
 
 /**
  * The protocols real SNS has that this simulation does not deliver over.

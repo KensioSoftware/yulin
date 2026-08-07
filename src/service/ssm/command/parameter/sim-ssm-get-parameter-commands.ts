@@ -79,7 +79,7 @@ export class SimSsmGetParameterCommands {
     const invalid: string[] = [];
 
     for (const name of names) {
-      // eslint-disable-next-line no-await-in-loop -- one name at a time, so a denial names the first name the caller may not read
+      // oxlint-disable-next-line no-await-in-loop -- one name at a time, so a denial names the first name the caller may not read
       const parameter = await this.reader.readOrInvalid({
         action: "ssm:GetParameters",
         requested: name,

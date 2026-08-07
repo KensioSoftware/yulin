@@ -61,7 +61,7 @@ export class SimCdkAssetsPublisher {
     }).resolve(cdkOutContext.assetsManifest);
 
     for (const publication of publications) {
-      // eslint-disable-next-line no-await-in-loop -- assets sharing a staging Bucket must not race to create it
+      // oxlint-disable-next-line no-await-in-loop -- assets sharing a staging Bucket must not race to create it
       await this.publishAsset(publication);
     }
   }

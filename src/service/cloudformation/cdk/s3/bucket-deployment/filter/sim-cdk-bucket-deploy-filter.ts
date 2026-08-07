@@ -88,6 +88,6 @@ function filterExpression(pattern: string): RegExp {
     .replaceAll(String.raw`\*`, ".*")
     .replaceAll(String.raw`\?`, ".");
 
-  // eslint-disable-next-line security/detect-non-literal-regexp -- built from an escaped template pattern, not from anything a request carries
+  // oxlint-disable-next-line security/detect-non-literal-regexp -- built from an escaped template pattern, not from anything a request carries
   return new RegExp(`^${expression}$`, "u");
 }

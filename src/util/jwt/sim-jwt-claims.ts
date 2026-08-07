@@ -1,4 +1,4 @@
-/* eslint-disable security/detect-object-injection -- every lookup here is a
+/* oxlint-disable security/detect-object-injection -- every lookup here is a
    claim name this simulation asks for, such as `iss` or `exp`, read out of a
    plain object that JSON.parse produced. */
 

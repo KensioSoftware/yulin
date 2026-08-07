@@ -10,7 +10,8 @@ import type { SimDynamoDbAttributeValue } from "../item/item.types.js";
  */
 export interface SimDynamoDbPutRequest {
   readonly Item?:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
   readonly ConditionExpression?: string | undefined;
 }
 
@@ -19,7 +20,8 @@ export interface SimDynamoDbPutRequest {
  */
 export interface SimDynamoDbDeleteRequest {
   readonly Key?:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
   readonly ConditionExpression?: string | undefined;
 }
 
@@ -46,7 +48,8 @@ export interface SimBatchWriteItemCommand {
  */
 export interface SimBatchWriteItemCommandInput {
   readonly RequestItems?:
-    Readonly<Record<string, readonly SimDynamoDbWriteRequest[]>> | undefined;
+    | Readonly<Record<string, readonly SimDynamoDbWriteRequest[]>>
+    | undefined;
   readonly ReturnConsumedCapacity?: string | undefined;
   readonly ReturnItemCollectionMetrics?: string | undefined;
 }
@@ -75,11 +78,13 @@ export interface SimBatchWriteItemCommandOutput {
  */
 export interface SimDynamoDbKeysAndAttributes {
   readonly Keys?:
-    readonly Readonly<Record<string, SimDynamoDbAttributeValue>>[] | undefined;
+    | readonly Readonly<Record<string, SimDynamoDbAttributeValue>>[]
+    | undefined;
   readonly ConsistentRead?: boolean | undefined;
   readonly ProjectionExpression?: string | undefined;
   readonly ExpressionAttributeNames?:
-    Readonly<Record<string, string>> | undefined;
+    | Readonly<Record<string, string>>
+    | undefined;
   readonly AttributesToGet?: readonly string[] | undefined;
 }
 
@@ -95,7 +100,8 @@ export interface SimBatchGetItemCommand {
  */
 export interface SimBatchGetItemCommandInput {
   readonly RequestItems?:
-    Readonly<Record<string, SimDynamoDbKeysAndAttributes>> | undefined;
+    | Readonly<Record<string, SimDynamoDbKeysAndAttributes>>
+    | undefined;
   readonly ReturnConsumedCapacity?: string | undefined;
 }
 

@@ -5,7 +5,11 @@
  * way the request wrote it.
  */
 export type SimDynamoDbExpressionTokenKind =
-  "name" | "namePlaceholder" | "valuePlaceholder" | "number" | "symbol";
+  | "name"
+  | "namePlaceholder"
+  | "valuePlaceholder"
+  | "number"
+  | "symbol";
 
 /**
  * One piece of a DynamoDB expression.

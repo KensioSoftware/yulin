@@ -16,9 +16,11 @@ const failureModes: ReadonlySet<string> = new Set(["NONE", "ALL_OLD"]);
 interface SimDynamoDbConditionCheckInput {
   readonly ConditionExpression?: string | undefined;
   readonly ExpressionAttributeNames?:
-    Readonly<Record<string, string>> | undefined;
+    | Readonly<Record<string, string>>
+    | undefined;
   readonly ExpressionAttributeValues?:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
   readonly ReturnValuesOnConditionCheckFailure?: string | undefined;
 }
 

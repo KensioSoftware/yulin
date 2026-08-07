@@ -29,7 +29,8 @@ export interface SimRekognitionDeclaredModerationLabel {
  * name with the confidence to report it at.
  */
 export type SimRekognitionModerationLabelDeclaration =
-  string | SimRekognitionDeclaredModerationLabel;
+  | string
+  | SimRekognitionDeclaredModerationLabel;
 
 /**
  * What DetectModerationLabels answers with for an image.

@@ -31,7 +31,8 @@ export interface SimCognitoUserPoolSettingsInput
   readonly Policies?: SimCognitoUserPoolPoliciesType | undefined;
   readonly DeletionProtection?: string | undefined;
   readonly AdminCreateUserConfig?:
-    SimCognitoAdminCreateUserConfigType | undefined;
+    | SimCognitoAdminCreateUserConfigType
+    | undefined;
   readonly AutoVerifiedAttributes?: readonly string[] | undefined;
   readonly LambdaConfig?: object | undefined;
 }

@@ -208,7 +208,7 @@ describe("Route53 ListResourceRecordSetsCommand pagination", () => {
     let startRecordType: SimRoute53RecordType | undefined = undefined;
 
     for (let page = 0; page < 4; page += 1) {
-      // eslint-disable-next-line no-await-in-loop -- pagination is sequential: each page needs the previous page's marker
+      // oxlint-disable-next-line no-await-in-loop -- pagination is sequential: each page needs the previous page's marker
       const output = await route53.listResourceRecordSets(
         new ListResourceRecordSetsCommand({
           HostedZoneId: hostedZoneId,

@@ -117,7 +117,7 @@ async function withFixtures<T>(
       fixtureSources.map(async (fixture, index) => {
         const filePath = path.join(directory, fixtureName(index));
 
-        // eslint-disable-next-line security/detect-non-literal-fs-filename -- a temporary directory this test just made
+        // oxlint-disable-next-line security/detect-non-literal-fs-filename -- a temporary directory this test just made
         await writeFile(filePath, fixture.source, "utf8");
 
         return filePath;
@@ -141,7 +141,7 @@ async function withFixtures<T>(
       })),
     };
 
-    // eslint-disable-next-line security/detect-non-literal-fs-filename -- as above, this test's own directory
+    // oxlint-disable-next-line security/detect-non-literal-fs-filename -- as above, this test's own directory
     await writeFile(
       path.join(directory, ".oxlintrc.json"),
       JSON.stringify(oxlintConfig, undefined, 2),
@@ -199,7 +199,6 @@ async function lintWithOxlint(fixtures: Fixtures): Promise<readonly Finding[]> {
       // environment, and the working directory is the repository so that the
       // loader and the plugin's own imports both resolve.
       cwd: projectRoot,
-      // eslint-disable-next-line @typescript-eslint/naming-convention -- an environment variable name, not an identifier
       env: { NODE_OPTIONS: "--import tsx" },
       reject: false,
     },

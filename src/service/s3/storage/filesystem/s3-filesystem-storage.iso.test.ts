@@ -169,7 +169,7 @@ describe("Filesystem simulated S3 storage", () => {
     await testDirectory.writeFile(["public", "safe.txt"], "safe");
     await testDirectory.writeFile("outside.txt", "outside");
 
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    // oxlint-disable-next-line security/detect-non-literal-fs-filename
     await symlink(
       testDirectory.join("outside.txt"),
       testDirectory.join("public", "linked.txt"),

@@ -41,7 +41,8 @@ export class SimCfnCfResponseHeadersPolicyCreator {
    */
   delete(resource: SimCfnResource): void {
     const policy = resource.simResource as
-      SimCloudFrontResponseHeadersPolicy | undefined;
+      | SimCloudFrontResponseHeadersPolicy
+      | undefined;
 
     if (policy === undefined) {
       return;

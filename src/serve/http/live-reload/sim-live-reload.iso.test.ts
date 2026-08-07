@@ -167,7 +167,7 @@ function browserRequest(url: string, method = "GET"): IncomingMessage {
 /**
  * Just enough of a Node response for the channel to write events to.
  */
-// eslint-disable-next-line unicorn/prefer-event-target
+// oxlint-disable-next-line unicorn-js/prefer-event-target
 class FakeServerResponse extends EventEmitter {
   status = 0;
   headers: Record<string, string> = {};

@@ -33,7 +33,7 @@ async function simCognitoWithClients(
   const userPoolId = created.UserPool.Id;
 
   for (const clientName of clientNames) {
-    // eslint-disable-next-line no-await-in-loop -- clients are created in order
+    // oxlint-disable-next-line no-await-in-loop -- clients are created in order
     await cognito.createUserPoolClient(
       new CreateUserPoolClientCommand({
         UserPoolId: userPoolId,

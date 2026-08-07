@@ -62,7 +62,7 @@ export class FilesystemS3BucketStorage implements SimS3BucketStorage {
     const filePath = this.filePathForObjectKey(key);
 
     try {
-      // eslint-disable-next-line security/detect-non-literal-fs-filename
+      // oxlint-disable-next-line security/detect-non-literal-fs-filename
       const body = await readFile(filePath);
       return new SimS3Object({
         key,
@@ -110,9 +110,9 @@ export class FilesystemS3BucketStorage implements SimS3BucketStorage {
   async putObject(object: SimS3Object): Promise<void> {
     const filePath = this.filePathForObjectKey(object.key);
 
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    // oxlint-disable-next-line security/detect-non-literal-fs-filename
     await mkdir(path.dirname(filePath), { recursive: true });
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    // oxlint-disable-next-line security/detect-non-literal-fs-filename
     await writeFile(filePath, object.body);
   }
 

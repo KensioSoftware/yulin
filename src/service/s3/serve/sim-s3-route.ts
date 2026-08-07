@@ -37,7 +37,9 @@ export interface SimS3RouteFailure {
 }
 
 export type SimS3Route =
-  SimS3WebsiteRoute | SimS3RestObjectRoute | SimS3RouteFailure;
+  | SimS3WebsiteRoute
+  | SimS3RestObjectRoute
+  | SimS3RouteFailure;
 
 /**
  * A route that answers the request with a refusal rather than an S3 action.

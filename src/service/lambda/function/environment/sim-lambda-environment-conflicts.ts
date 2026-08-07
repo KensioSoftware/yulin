@@ -53,7 +53,7 @@ export class SimLambdaEnvironmentConflicts {
     value: string,
   ): void {
     // Read-only lookup of a name the function itself declared.
-    // eslint-disable-next-line security/detect-object-injection
+    // oxlint-disable-next-line security/detect-object-injection
     const hostValue = simLambdaProcessEnvironment.hostVariables()[name];
     if (hostValue === undefined || hostValue === value) {
       return;
@@ -105,7 +105,7 @@ export class SimLambdaEnvironmentConflicts {
       return;
     }
     this.warned.add(key);
-    // eslint-disable-next-line no-console
+    // oxlint-disable-next-line no-console
     console.warn(message);
   }
 }

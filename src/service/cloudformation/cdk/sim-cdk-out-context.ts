@@ -54,7 +54,7 @@ export async function loadSiblingCdkAssetsManifest(
   let assetsManifest: SimCdkAssetsManifest;
 
   try {
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    // oxlint-disable-next-line security/detect-non-literal-fs-filename
     const manifestBody = await readFile(assetsManifestPath, "utf8");
 
     assetsManifest = jsonParse(

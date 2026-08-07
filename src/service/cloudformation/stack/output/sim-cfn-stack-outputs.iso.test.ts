@@ -7,7 +7,7 @@ import {
 import { DescribeStacksCommand } from "@aws-sdk/client-cloudformation";
 import { SimAws } from "../../../aws/sim-aws.js";
 
-/* eslint-disable no-template-curly-in-string */
+/* oxlint-disable no-template-curly-in-string */
 
 describe("sim CloudFormation Stack Outputs", () => {
   it("resolves stack Outputs after deployment", async () => {

@@ -29,7 +29,7 @@ export class SimS3MountDirectoryEvents {
    * Start listening for writes under the directory.
    */
   start(): void {
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    // oxlint-disable-next-line security/detect-non-literal-fs-filename
     const watcher = fs.watch(
       this.directoryPath,
       { recursive: true },

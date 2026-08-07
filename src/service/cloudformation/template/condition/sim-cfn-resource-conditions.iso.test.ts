@@ -233,7 +233,7 @@ function conditionedTemplate(): CfnTemplateBodyRecord {
             "Fn::If": [
               "IsProd",
               "site",
-              // eslint-disable-next-line no-template-curly-in-string -- Fn::Sub syntax, not a JavaScript template.
+              // oxlint-disable-next-line no-template-curly-in-string -- Fn::Sub syntax, not a JavaScript template.
               { "Fn::Sub": ["site-${Env}", { Env: { Ref: "EnvName" } }] },
             ],
           },

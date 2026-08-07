@@ -10,7 +10,8 @@ interface SimDynamoDbItemWriteInput {
   readonly ReturnConsumedCapacity?: string | undefined;
   readonly ReturnItemCollectionMetrics?: string | undefined;
   readonly Expected?:
-    Readonly<Record<string, SimDynamoDbExpectedAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbExpectedAttributeValue>>
+    | undefined;
   readonly ConditionalOperator?: string | undefined;
 }
 

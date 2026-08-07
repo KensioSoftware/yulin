@@ -53,7 +53,7 @@ export class SimWatchEventPath {
   ): boolean {
     return (
       fileName === path.basename(this.target) &&
-      // eslint-disable-next-line security/detect-non-literal-fs-filename
+      // oxlint-disable-next-line security/detect-non-literal-fs-filename
       !fs.existsSync(changedPath)
     );
   }

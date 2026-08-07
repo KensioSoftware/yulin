@@ -180,7 +180,7 @@ describe("SQS ReceiveMessage", () => {
     // Given a queue holding three messages.
     const { simAws, queueUrl } = await simAwsWithQueue();
     for (const body of ["order-1", "order-2", "order-3"]) {
-      // eslint-disable-next-line no-await-in-loop
+      // oxlint-disable-next-line no-await-in-loop
       await simAws
         .sqs()
         .sendMessage(

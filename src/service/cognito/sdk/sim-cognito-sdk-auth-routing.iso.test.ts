@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/naming-convention -- the authentication
-   parameter names are Cognito's own, rather than identifier names. */
 import {
   AdminCreateUserCommand,
   AdminInitiateAuthCommand,

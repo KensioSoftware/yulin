@@ -68,8 +68,6 @@ describe("Serving a sim Cognito user pool's public endpoints", () => {
     assertIdentical(response.status, 200);
     assertObjectMatches(await response.json(), {
       issuer,
-      /* eslint-disable-next-line @typescript-eslint/naming-convention -- an
-         OpenID discovery metadata name. */
       jwks_uri: `${issuer}/.well-known/jwks.json`,
     });
   });

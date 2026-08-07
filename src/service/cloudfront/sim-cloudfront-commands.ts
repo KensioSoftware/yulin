@@ -119,7 +119,8 @@ export class SimCloudFrontCommands {
   private readonly functionState: SimCloudFrontFunctionState;
   private readonly s3OriginResolver: SimCloudFrontS3OriginResolver;
   private readonly customOriginDispatcher:
-    SimCfCustomOriginDispatcher | undefined;
+    | SimCfCustomOriginDispatcher
+    | undefined;
   private readonly acmRegistry: SimAcmRegistry | undefined;
 
   constructor(properties: SimCloudFrontCommandsProperties) {

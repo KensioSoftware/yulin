@@ -26,7 +26,8 @@ export interface SimLambdaEventSourceMessage {
   readonly Body: string;
   readonly Attributes?: Record<string, string> | undefined;
   readonly MessageAttributes?:
-    Record<string, SimLambdaEventSourceMessageAttribute> | undefined;
+    | Record<string, SimLambdaEventSourceMessageAttribute>
+    | undefined;
 }
 
 /**

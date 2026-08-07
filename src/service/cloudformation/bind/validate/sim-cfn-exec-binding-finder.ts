@@ -42,7 +42,8 @@ export class SimCfnExecBindingFinder<
 > {
   private readonly resource: SimCfnResource;
   private readonly bindings:
-    readonly SimCfnExecutableResourceBinding[] | undefined;
+    | readonly SimCfnExecutableResourceBinding[]
+    | undefined;
 
   constructor(properties: SimCfnExecBindingFinderProperties) {
     this.resource = properties.resource;
@@ -154,7 +155,7 @@ export class SimCfnExecBindingFinder<
     }
 
     for (const metadataKey of cdkPathMetadataKeys) {
-      // eslint-disable-next-line security/detect-object-injection
+      // oxlint-disable-next-line security/detect-object-injection
       const value = metadata[metadataKey];
 
       if (typeof value === "string") {

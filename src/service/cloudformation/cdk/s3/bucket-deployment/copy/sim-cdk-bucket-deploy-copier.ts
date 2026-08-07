@@ -52,7 +52,7 @@ export class SimCdkBucketDeployCopier {
     // One source at a time, because two of them can hold the same path and the
     // sync the provider function runs lets the later one win.
     for (const sourceDirectoryPath of sourceDirectoryPaths) {
-      // eslint-disable-next-line no-await-in-loop -- sources are copied in the order the deployment lists them
+      // oxlint-disable-next-line no-await-in-loop -- sources are copied in the order the deployment lists them
       const keys = await this.copyDirectory(sourceDirectoryPath);
 
       for (const key of keys) {

@@ -9,7 +9,7 @@ import type { SimLambdaHandler } from "../../lambda/function/sim-lambda-handler.
 export type SimCfnExecutableResource =
   | CloudFrontFunction.Handler
   | SimLambdaHandler
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
+  // oxlint-disable-next-line typescript/no-unsafe-function-type
   | Function;
 
 export type SimCfnExecutableResourceBinding<

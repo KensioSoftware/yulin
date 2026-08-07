@@ -97,7 +97,7 @@ export class SimSdk implements Disposable {
   /**
    * Restore all on dispose, so a SimSdk works with `using` declarations.
    */
-  // eslint-disable-next-line unicorn/no-nonstandard-builtin-properties -- Symbol.dispose is standard from ES2024; the lint rule does not know it yet.
+  // oxlint-disable-next-line unicorn-js/no-nonstandard-builtin-properties -- Symbol.dispose is standard from ES2024; the lint rule does not know it yet.
   [Symbol.dispose](): void {
     this.restoreAll();
   }

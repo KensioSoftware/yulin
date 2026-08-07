@@ -4,7 +4,11 @@ import { SimApiGatewayV2BadRequest } from "../../error/sim-api-gateway-v2.error.
  * The value shapes an authorizer option arrives in.
  */
 type SimHttpApiAuthorizerOption =
-  string | number | boolean | object | undefined;
+  | string
+  | number
+  | boolean
+  | object
+  | undefined;
 
 /**
  * Refuses an option belonging to the other kind of authorizer.

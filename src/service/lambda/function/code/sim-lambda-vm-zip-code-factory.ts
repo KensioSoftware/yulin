@@ -20,7 +20,8 @@ interface SimLambdaVmZipCodeFactoryProperties {
  */
 export class SimLambdaVmZipCodeFactory {
   private readonly vmSdkModuleProvider:
-    SimLambdaVmSdkModuleProvider | undefined;
+    | SimLambdaVmSdkModuleProvider
+    | undefined;
   private readonly clock: SimClock | undefined;
 
   constructor(properties: SimLambdaVmZipCodeFactoryProperties) {

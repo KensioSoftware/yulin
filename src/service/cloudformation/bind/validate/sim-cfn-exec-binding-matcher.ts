@@ -113,7 +113,7 @@ export class SimCfnExecutableResourceBindingMatcher {
       return undefined;
     }
 
-    // eslint-disable-next-line security/detect-object-injection -- fixed per-type property names.
+    // oxlint-disable-next-line security/detect-object-injection -- fixed per-type property names.
     const name = resource.properties[propertyName];
     return typeof name === "string" ? name : "";
   }
@@ -159,7 +159,7 @@ export class SimCfnExecutableResourceBindingMatcher {
     }
 
     for (const metadataKey of cdkPathMetadataKeys) {
-      // eslint-disable-next-line security/detect-object-injection
+      // oxlint-disable-next-line security/detect-object-injection
       const value = metadata[metadataKey];
 
       if (typeof value === "string") {

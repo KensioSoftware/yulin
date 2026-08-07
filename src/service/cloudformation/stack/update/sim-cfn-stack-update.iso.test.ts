@@ -21,7 +21,7 @@ const parameterisedTemplate = {
     ReportsBucket: {
       Type: "AWS::S3::Bucket",
       Properties: {
-        // eslint-disable-next-line no-template-curly-in-string -- Fn::Sub syntax, not a JavaScript template.
+        // oxlint-disable-next-line no-template-curly-in-string -- Fn::Sub syntax, not a JavaScript template.
         BucketName: { "Fn::Sub": "reports-${BucketSuffix}" },
       },
     },

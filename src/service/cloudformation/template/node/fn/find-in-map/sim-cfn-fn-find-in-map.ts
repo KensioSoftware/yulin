@@ -35,7 +35,7 @@ export class SimCfnFnFindInMap extends SimCfnNode {
       };
     }
 
-    // eslint-disable-next-line security/detect-object-injection
+    // oxlint-disable-next-line security/detect-object-injection
     const topLevel = context.mappings?.[mapName]?.[topLevelKey];
 
     /* v8 ignore if -- defensive */
@@ -45,7 +45,7 @@ export class SimCfnFnFindInMap extends SimCfnNode {
       );
     }
 
-    // eslint-disable-next-line security/detect-object-injection
+    // oxlint-disable-next-line security/detect-object-injection
     const value = topLevel[secondLevelKey];
     assertDefined(
       value,

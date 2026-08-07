@@ -31,11 +31,14 @@ export interface SimGetBucketNotificationConfigurationCommandInput {
  */
 export interface SimS3NotificationConfigurationOutput {
   readonly LambdaFunctionConfigurations?:
-    readonly SimS3LambdaFunctionConfigurationInput[] | undefined;
+    | readonly SimS3LambdaFunctionConfigurationInput[]
+    | undefined;
   readonly QueueConfigurations?:
-    readonly SimS3QueueConfigurationInput[] | undefined;
+    | readonly SimS3QueueConfigurationInput[]
+    | undefined;
   readonly TopicConfigurations?:
-    readonly SimS3TopicConfigurationInput[] | undefined;
+    | readonly SimS3TopicConfigurationInput[]
+    | undefined;
 }
 
 /**

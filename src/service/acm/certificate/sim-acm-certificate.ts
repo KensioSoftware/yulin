@@ -26,7 +26,8 @@ interface SimAcmCertificateProperties {
   readonly status?: SimAcmCertificateStatus | undefined;
   readonly validationMethod?: SimAcmValidationMethod | undefined;
   readonly domainValidationOptions?:
-    readonly SimAcmDomainValidation[] | undefined;
+    | readonly SimAcmDomainValidation[]
+    | undefined;
   readonly createdAt?: Date | undefined;
   readonly issuedAt?: Date | undefined;
   readonly tags?: readonly SimAcmTag[] | undefined;

@@ -4,7 +4,9 @@ import { cffJs2LintPlugin, cffJs2PluginName } from "./cff-js2-lint-plugin.js";
  * One rule setting, in the form both linters read it.
  */
 export type LintRuleSetting =
-  "off" | "error" | readonly ["error", Readonly<Record<string, string>>];
+  | "off"
+  | "error"
+  | readonly ["error", Readonly<Record<string, string>>];
 
 /**
  * Rules a general JavaScript config turns on that JS2 cannot satisfy.

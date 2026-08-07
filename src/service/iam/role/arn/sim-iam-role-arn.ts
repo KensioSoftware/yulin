@@ -15,5 +15,5 @@ export function makeSimRoleArn(properties: MakeSimRoleArnProperties): SimArn {
   const { accountId, path, roleName } = properties;
   const pathPart = path === "/" ? "" : path.slice(1);
 
-  return `arn:aws:iam::${accountId}:role/${pathPart}${roleName}` as SimArn;
+  return `arn:aws:iam::${accountId}:role/${pathPart}${roleName}`;
 }

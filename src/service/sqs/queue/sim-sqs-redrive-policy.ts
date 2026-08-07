@@ -153,7 +153,7 @@ export class SimSqsRedrivePolicy {
 export function simSqsRedrivePolicyIn(
   requested: SimSqsQueueAttributeInput,
 ): SimSqsRedrivePolicy | undefined {
-  // eslint-disable-next-line security/detect-object-injection -- a fixed key.
+  // oxlint-disable-next-line security/detect-object-injection -- a fixed key.
   const value = requested[simSqsRedrivePolicyAttributeName];
 
   if (value === undefined) {

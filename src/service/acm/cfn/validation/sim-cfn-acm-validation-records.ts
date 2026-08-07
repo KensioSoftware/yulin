@@ -32,7 +32,7 @@ export class SimCfnAcmValidationRecords {
     hostedZoneIdsByDomain: ReadonlyMap<string, string>,
   ): Promise<void> {
     for (const domainValidation of certificate.domainValidationOptions) {
-      // eslint-disable-next-line no-await-in-loop -- one hosted zone at a time
+      // oxlint-disable-next-line no-await-in-loop -- one hosted zone at a time
       await this.publishRecord(domainValidation, hostedZoneIdsByDomain);
     }
   }

@@ -97,7 +97,8 @@ export class SimCloudFrontCloudFormationResourceFactory implements SimCfnService
 
   private async deleteFunction(resource: SimCfnResource): Promise<void> {
     const cloudFrontFunction = resource.simResource as
-      SimCloudFrontFunction | undefined;
+      | SimCloudFrontFunction
+      | undefined;
     assertDefined(
       cloudFrontFunction,
       `sim CloudFront Function for CloudFormation Resource ${resource.logicalId}`,

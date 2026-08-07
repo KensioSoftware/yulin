@@ -11,9 +11,11 @@ interface SimDynamoDbTransactAction {
   readonly TableName?: string | undefined;
   readonly ConditionExpression?: string | undefined;
   readonly ExpressionAttributeNames?:
-    Readonly<Record<string, string>> | undefined;
+    | Readonly<Record<string, string>>
+    | undefined;
   readonly ExpressionAttributeValues?:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
   readonly ReturnValuesOnConditionCheckFailure?: string | undefined;
 }
 
@@ -22,7 +24,8 @@ interface SimDynamoDbTransactAction {
  */
 export interface SimDynamoDbTransactPut extends SimDynamoDbTransactAction {
   readonly Item?:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
 }
 
 /**
@@ -33,7 +36,8 @@ export interface SimDynamoDbTransactPut extends SimDynamoDbTransactAction {
  */
 export interface SimDynamoDbTransactUpdate extends SimDynamoDbTransactAction {
   readonly Key?:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
   readonly UpdateExpression?: string | undefined;
 }
 
@@ -42,7 +46,8 @@ export interface SimDynamoDbTransactUpdate extends SimDynamoDbTransactAction {
  */
 export interface SimDynamoDbTransactDelete extends SimDynamoDbTransactAction {
   readonly Key?:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
 }
 
 /**
@@ -53,7 +58,8 @@ export interface SimDynamoDbTransactDelete extends SimDynamoDbTransactAction {
  */
 export interface SimDynamoDbTransactConditionCheck extends SimDynamoDbTransactAction {
   readonly Key?:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
 }
 
 /**
@@ -105,10 +111,12 @@ export interface SimTransactWriteItemsCommandOutput {
 export interface SimDynamoDbTransactGet {
   readonly TableName?: string | undefined;
   readonly Key?:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
   readonly ProjectionExpression?: string | undefined;
   readonly ExpressionAttributeNames?:
-    Readonly<Record<string, string>> | undefined;
+    | Readonly<Record<string, string>>
+    | undefined;
 }
 
 /**
@@ -141,7 +149,8 @@ export interface SimTransactGetItemsCommandInput {
  */
 export interface SimDynamoDbItemResponse {
   readonly Item?:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
 }
 
 /**
@@ -162,5 +171,6 @@ export interface SimDynamoDbCancellationReason {
   readonly Code: string;
   readonly Message?: string | undefined;
   readonly Item?:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
 }

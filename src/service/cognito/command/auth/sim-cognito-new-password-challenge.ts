@@ -49,7 +49,6 @@ export class SimCognitoNewPasswordChallenge {
       ChallengeName: newPasswordRequiredChallenge,
       Session: session.id,
       ChallengeParameters: {
-        // eslint-disable-next-line @typescript-eslint/naming-convention -- the challenge parameter names are Cognito's own.
         USER_ID_FOR_SRP: user.username,
         requiredAttributes: "[]",
         userAttributes: "{}",

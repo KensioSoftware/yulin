@@ -13,7 +13,7 @@ describe("SimCfnTemplate Fn::If", () => {
   it("resolves the branch the Condition selects in a Resource property", () => {
     // Given a Resource property choosing a Bucket name by Condition.
     const template = templateWithBucketName({
-      // eslint-disable-next-line no-template-curly-in-string -- Fn::Sub syntax, not a JavaScript template.
+      // oxlint-disable-next-line no-template-curly-in-string -- Fn::Sub syntax, not a JavaScript template.
       "Fn::If": ["IsProd", "site", { "Fn::Sub": "site-${EnvName}" }],
     });
 

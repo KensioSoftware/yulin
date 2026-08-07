@@ -42,7 +42,7 @@ export class SimSdkModuleClientInterceptor {
   interceptModule(moduleExports: object): object {
     const intercepted: Record<string, unknown> = {};
     for (const [exportName, exportValue] of Object.entries(moduleExports)) {
-      // eslint-disable-next-line security/detect-object-injection -- copying the module's own export names verbatim.
+      // oxlint-disable-next-line security/detect-object-injection -- copying the module's own export names verbatim.
       intercepted[exportName] = this.interceptExport(exportValue);
     }
     return intercepted;
@@ -85,7 +85,7 @@ export class SimSdkModuleClientInterceptor {
       construct(
         target: SimSdkClientConstructor,
         constructorArguments: unknown[],
-        newTarget: Function, // eslint-disable-line @typescript-eslint/no-unsafe-function-type -- ProxyHandler construct trap signature.
+        newTarget: Function, // oxlint-disable-line typescript/no-unsafe-function-type -- ProxyHandler construct trap signature.
       ): object {
         const instance = Reflect.construct(
           target,

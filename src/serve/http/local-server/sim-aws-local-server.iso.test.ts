@@ -62,7 +62,7 @@ function sendRawHttpRequest(
     socket.setEncoding("utf8");
 
     socket.on("data", (chunk) => {
-      // eslint-disable-next-line @typescript-eslint/restrict-plus-operands
+      // oxlint-disable-next-line typescript/restrict-plus-operands
       responseText += chunk;
     });
 

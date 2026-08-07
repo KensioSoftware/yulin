@@ -51,11 +51,11 @@ export class SimCffRequestMetadataAdapter {
       const values = searchParameters.getAll(key).map((value) => ({ value }));
 
       if (values[0] !== undefined) {
-        // eslint-disable-next-line security/detect-object-injection
+        // oxlint-disable-next-line security/detect-object-injection
         queryString[key] = values[0];
         if (values.length > 1) {
           // Multi-value: first value as `value`, all values in `multiValue`
-          // eslint-disable-next-line security/detect-object-injection
+          // oxlint-disable-next-line security/detect-object-injection
           queryString[key] = {
             value: values[0].value,
             multiValue: values,
@@ -104,7 +104,7 @@ export class SimCffRequestMetadataAdapter {
       if (name === undefined || name === "") {
         continue;
       }
-      // eslint-disable-next-line security/detect-object-injection
+      // oxlint-disable-next-line security/detect-object-injection
       cookies[name] = {
         value: rawValueParts.join("=").trim(),
       };

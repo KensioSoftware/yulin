@@ -112,7 +112,8 @@ export class SimCfnLambdaEventSourceMappingProperties {
   }
 
   private functionResponseTypes():
-    readonly SimLambdaFunctionResponseType[] | undefined {
+    | readonly SimLambdaFunctionResponseType[]
+    | undefined {
     return this.parser.optionalStringList(
       this.resource,
       this.properties["FunctionResponseTypes"],

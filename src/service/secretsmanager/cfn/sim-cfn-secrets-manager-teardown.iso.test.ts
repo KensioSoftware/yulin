@@ -30,7 +30,8 @@ describe("Secrets Manager CloudFormation Resource teardown", () => {
     await stack.waitForDeployComplete();
 
     const secret = stack.resources.get("ApiSecret")?.simResource as
-      SimSecretsManagerSecret | undefined;
+      | SimSecretsManagerSecret
+      | undefined;
     assertNonNullable(secret);
 
     // When the Stack's Resources are torn down.

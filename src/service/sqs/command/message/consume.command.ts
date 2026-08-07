@@ -47,7 +47,8 @@ export interface SimSqsDeleteMessageBatchResultEntry {
 
 export interface SimDeleteMessageBatchCommandOutput {
   readonly Successful?:
-    readonly SimSqsDeleteMessageBatchResultEntry[] | undefined;
+    | readonly SimSqsDeleteMessageBatchResultEntry[]
+    | undefined;
   readonly Failed?: readonly SimSqsBatchResultErrorEntry[] | undefined;
   readonly $metadata: SimResponseMetadata;
 }

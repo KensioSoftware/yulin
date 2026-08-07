@@ -31,16 +31,19 @@ export interface SimCreateTableCommand {
 export interface SimCreateTableCommandInput {
   readonly TableName?: string | undefined;
   readonly AttributeDefinitions?:
-    readonly SimDynamoDbAttributeDefinitionInput[] | undefined;
+    | readonly SimDynamoDbAttributeDefinitionInput[]
+    | undefined;
   readonly KeySchema?: readonly SimDynamoDbKeySchemaElementInput[] | undefined;
   readonly BillingMode?: string | undefined;
   readonly ProvisionedThroughput?: SimDynamoDbProvisionedThroughput | undefined;
   readonly TableClass?: string | undefined;
   readonly DeletionProtectionEnabled?: boolean | undefined;
   readonly GlobalSecondaryIndexes?:
-    readonly SimDynamoDbSecondaryIndexInput[] | undefined;
+    | readonly SimDynamoDbSecondaryIndexInput[]
+    | undefined;
   readonly LocalSecondaryIndexes?:
-    readonly SimDynamoDbSecondaryIndexInput[] | undefined;
+    | readonly SimDynamoDbSecondaryIndexInput[]
+    | undefined;
   readonly Tags?: readonly SimDynamoDbTagInput[] | undefined;
   readonly StreamSpecification?: SimDynamoDbStreamSpecification | undefined;
   readonly SSESpecification?: SimDynamoDbSseSpecification | undefined;
@@ -75,17 +78,20 @@ export interface SimUpdateTableCommand {
 export interface SimUpdateTableCommandInput {
   readonly TableName?: string | undefined;
   readonly AttributeDefinitions?:
-    readonly SimDynamoDbAttributeDefinitionInput[] | undefined;
+    | readonly SimDynamoDbAttributeDefinitionInput[]
+    | undefined;
   readonly BillingMode?: string | undefined;
   readonly ProvisionedThroughput?: SimDynamoDbProvisionedThroughput | undefined;
   readonly GlobalSecondaryIndexUpdates?:
-    readonly SimDynamoDbGlobalSecondaryIndexUpdateInput[] | undefined;
+    | readonly SimDynamoDbGlobalSecondaryIndexUpdateInput[]
+    | undefined;
   readonly TableClass?: string | undefined;
   readonly DeletionProtectionEnabled?: boolean | undefined;
   readonly StreamSpecification?: SimDynamoDbStreamSpecification | undefined;
   readonly SSESpecification?: SimDynamoDbSseSpecification | undefined;
   readonly ReplicaUpdates?:
-    readonly SimDynamoDbReplicaUpdateInput[] | undefined;
+    | readonly SimDynamoDbReplicaUpdateInput[]
+    | undefined;
   readonly OnDemandThroughput?: SimDynamoDbOnDemandThroughput | undefined;
   readonly WarmThroughput?: SimDynamoDbWarmThroughput | undefined;
 }

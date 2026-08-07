@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/naming-convention -- JWT claim names are
-   the ones RFC 7519 and Cognito define, rather than identifier names. */
 import {
   assertFalse,
   assertIdentical,
@@ -263,7 +261,7 @@ describe("Validating the claims of a token a JWT authorizer accepted", () => {
     const claims = authorization.jwt?.claims ?? {};
     assertIdentical(claims["cognito:groups"], "[Admins Readers]");
     assertIdentical(claims["auth_time"], String(nowSeconds));
-    // eslint-disable-next-line no-restricted-syntax -- the expected value is the string a boolean claim renders as, not a boolean.
+    // oxlint-disable-next-line yulin/prefer-specific-assertions -- the expected value is the string a boolean claim renders as, not a boolean.
     assertIdentical(claims["email_verified"], "true");
     assertIdentical(claims["address"], '{"formatted":"1 Test Street"}');
     assertIdentical(

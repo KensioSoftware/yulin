@@ -57,7 +57,8 @@ export class SimDynamoDbLocalSecondaryIndexes {
    * table with no index, rather than reporting an empty list.
    */
   descriptions():
-    readonly SimDynamoDbLocalSecondaryIndexDescription[] | undefined {
+    | readonly SimDynamoDbLocalSecondaryIndexDescription[]
+    | undefined {
     if (this.elements.length === 0) {
       return undefined;
     }

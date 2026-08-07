@@ -22,7 +22,7 @@ import type { SignAwsRequestCredentials } from "./sign-aws-request.js";
  * secret scanner, so they are kept together here rather than scattering the
  * same exemption across the test files that use them.
  */
-/* eslint-disable no-secrets/no-secrets -- invented access key ids for tests, not credentials. */
+/* oxlint-disable no-secrets/no-secrets -- invented access key ids for tests, not credentials. */
 export const unknownAccessKeyId = "AKIAINVENTEDKEY00000";
 export const deactivatedAccessKeyId = "AKIADEACTIVATED00000";
 export const exampleAccessKeyId = "AKIAEXAMPLEKEY000000";

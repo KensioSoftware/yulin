@@ -6,7 +6,7 @@ import {
 import { describe, it } from "vitest";
 import { SimAws } from "../../../../../aws/sim-aws.js";
 
-/* eslint-disable no-template-curly-in-string */
+/* oxlint-disable no-template-curly-in-string */
 
 describe("CloudFormation Fn::Sub parser", () => {
   it("throws when an Fn::Sub value is not a valid shape", async () => {

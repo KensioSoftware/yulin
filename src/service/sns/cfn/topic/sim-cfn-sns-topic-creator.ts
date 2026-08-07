@@ -76,7 +76,7 @@ export class SimCfnSnsTopicCreator {
     subscriptions: readonly SimCfnSnsInlineSubscription[],
   ): Promise<void> {
     for (const subscription of subscriptions) {
-      // eslint-disable-next-line no-await-in-loop -- one entry at a time, so a refused entry leaves the earlier ones subscribed
+      // oxlint-disable-next-line no-await-in-loop -- one entry at a time, so a refused entry leaves the earlier ones subscribed
       await this.sns.subscribe({
         input: {
           TopicArn: topic.arn.value,
