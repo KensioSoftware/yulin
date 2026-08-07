@@ -585,34 +585,34 @@ const stack = await simAws.cloudFormation().deployTemplate({
   stackName: "stand-in-stack",
   template: {
     Resources: {
-      AlarmTopic: {
-        Type: "AWS::SNS::Topic",
+      AlarmRule: {
+        Type: "AWS::Events::Rule",
       },
     },
     Outputs: {
-      TopicRef: { Value: { Ref: "AlarmTopic" } },
-      TopicArn: { Value: { "Fn::GetAtt": ["AlarmTopic", "TopicArn"] } },
+      RuleRef: { Value: { Ref: "AlarmRule" } },
+      RuleArn: { Value: { "Fn::GetAtt": ["AlarmRule", "Arn"] } },
     },
   },
 });
 
 await stack.waitForDeployComplete();
 
-console.log(stack.outputs.get("TopicRef")?.value);
-// "AlarmTopic"
+console.log(stack.outputs.get("RuleRef")?.value);
+// "AlarmRule"
 
-console.log(stack.outputs.get("TopicArn")?.value);
-// "AlarmTopic.TopicArn"
+console.log(stack.outputs.get("RuleArn")?.value);
+// "AlarmRule.Arn"
 
 for (const skipped of stack.skippedResources) {
   console.log(skipped.logicalId, skipped.skippedReason);
-  // "AlarmTopic Unsupported sim CloudFormation Resource service SNS"
+  // "AlarmRule Unsupported sim CloudFormation Resource service Events"
 }
 ```
 
 The stand-ins are what lets a template with unsimulated Resources in it deploy at all. Without them,
 every Resource holding a `Ref` or `Fn::GetAtt` to a skipped Resource would fail too, and so would
-every Resource depending on those, until one SNS topic took the whole stack down with it. The skip
+every Resource depending on those, until one EventBridge rule took the whole stack down with it. The skip
 stays where it happened.
 
 A stand-in is deliberately not ARN-shaped, so it fails closed wherever the simulator reads it.
@@ -1729,8 +1729,8 @@ const stack = await simAws.cloudFormation().deployTemplate({
           BucketName: "skipped-site-bucket",
         },
       },
-      AlarmTopic: {
-        Type: "AWS::SNS::Topic",
+      AlarmRule: {
+        Type: "AWS::Events::Rule",
       },
     },
   },
@@ -1739,10 +1739,10 @@ const stack = await simAws.cloudFormation().deployTemplate({
 await stack.waitForDeployComplete();
 
 console.log(stack.skippedResources.map((resource) => resource.logicalId));
-// ["AlarmTopic"]
+// ["AlarmRule"]
 
-console.log(stack.getResource("AlarmTopic")?.skippedReason);
-// "Unsupported sim CloudFormation Resource service SNS"
+console.log(stack.getResource("AlarmRule")?.skippedReason);
+// "Unsupported sim CloudFormation Resource service Events"
 ```
 
 A skipped Resource is still in `stack.resources`, and still answers `Ref` and `Fn::GetAtt` with

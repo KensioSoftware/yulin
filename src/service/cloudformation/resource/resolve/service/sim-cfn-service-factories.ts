@@ -90,6 +90,11 @@ export const simCfnServiceResourceFactories: ReadonlyMap<
       scopedAws.secretsManager().cfnResourceFactory(),
   ],
   [
+    "SNS",
+    (scopedAws): SimCfnServiceResourceFactory =>
+      scopedAws.sns().cfnResourceFactory(),
+  ],
+  [
     "SQS",
     (scopedAws): SimCfnServiceResourceFactory =>
       scopedAws.sqs().cfnResourceFactory(),

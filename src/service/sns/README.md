@@ -308,6 +308,44 @@ As elsewhere, implementation code under `src/` does not import real AWS SDK pack
 command types in `*.command.ts` match the SDK shapes closely enough for callers to pass real SDK
 command instances.
 
+## CloudFormation resources
+
+`cfn/` holds the `AWS::SNS::*` Resource factory, resolved into the CloudFormation engine through
+`sim-cfn-service-resolver.ts`. Every Resource type goes through the ordinary SNS commands rather than
+reaching into the stores, so a topic a template created is the same thing an SDK caller would have
+got, and a template asking for something this simulation will not do is refused by the same code that
+refuses an SDK caller.
+
+That is why `sim-cfn-sns-topic-property-names.ts` is short. Most AWS::SNS::Topic properties are topic
+attributes of the same name, so they are handed to `CreateTopic` and SNS decides. Only the three that
+have no single attribute behind them are refused in the CloudFormation layer: `Tags` and
+`DataProtectionPolicy` are inputs of their own on a `CreateTopic` request, and `DeliveryStatusLogging`
+is a list that would become fifteen separate attributes. `AWS::SNS::Subscription` works the same way
+against `Subscribe`, with only `Region` refused here.
+
+`sim-cfn-sns-resource-error.ts` is where a refusal gets its wording, and the wording is the point.
+Sim CloudFormation reads an error saying a Resource is unsupported as one to record and step over,
+and stepping over a topic leaves a Stack that looks deployed with nothing publishing. So a refusal
+says the Resource is invalid, and `simCfnSnsResourceCreation` renames SNS's own errors to say which
+Resource asked for it, since an SNS error carries no logical ID.
+
+`SimCfnSnsTopicName` is the name a topic whose template does not name it gets, built on the shared
+`SimCfnGeneratedResourceName`. It leaves out the random characters real CloudFormation adds, so a test
+can predict it.
+
+`AWS::SNS::TopicPolicy` has no existence of its own, in the same way `AWS::SQS::QueuePolicy` has
+none: it is the `Policy` attribute of the topics it names. The Resource is backed by the first of
+those topics, and the deleter reads the `Topics` list again rather than trusting that one, because
+the policy has to come off all of them. Clearing it is `SetTopicAttributes` with an empty value, which
+is how the SDK clears one too.
+
+The `Ref` and `Fn::GetAtt` adapters live with the other value adapters, under
+`cloudformation/resource/cfn/sns/`, since what a Resource type answers an intrinsic with is
+CloudFormation's business rather than the service's. A topic answers `Ref` with its ARN, and a
+subscription with its subscription ARN. A topic policy is not claimed there at all, so it falls
+through to the default adapter rather than answering `Ref` with a topic ARN belonging to another
+Resource.
+
 ## Authorization
 
 `SimSnsAuthorizer` authorizes each operation against the topic's ARN, which carries the topic name
@@ -400,7 +438,8 @@ here, it does not make another Account's topics reachable through this one.
 - Publishing to a `TargetArn` or a `PhoneNumber` is refused. Only topics are simulated.
 - `AddPermission` and `RemovePermission`, which are shorthands for writing one statement of the topic
   policy, are not implemented. The policy is set through the `Policy` attribute only.
-- The CloudFormation resource types are not implemented, so a template with an `AWS::SNS::Topic` in
-  it does not deploy a topic yet.
+- A CloudFormation property with no simulated behaviour fails the Resource rather than being recorded
+  and stepped over, which is what simulated SQS does with most of its own. SNS refuses these to an
+  SDK caller too, and going through the commands is what keeps the two answers the same.
 
 The full list is in [docs/services/sns](../../../docs/services/sns/).
