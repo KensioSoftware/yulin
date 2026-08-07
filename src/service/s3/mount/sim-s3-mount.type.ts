@@ -1,3 +1,5 @@
+import type { SimS3KeyPrefixMetadata } from "../object/s3-key-prefix-metadata.js";
+
 /**
  * Somewhere a reload can be sent, which in practice is a local server.
  *
@@ -42,4 +44,26 @@ export interface SimS3MountFilesystemOptions {
    * Added to the list rather than replacing it, and a leading dot is optional.
    */
   readonly additionalFileExtensions?: readonly string[] | undefined;
+
+  /**
+   * System metadata to report for the Objects under a key prefix.
+   *
+   * A stored Object carries what S3 was told at upload time. A file carries
+   * its bytes and its name, so a mounted Bucket has only the extension to go
+   * on and describes every Object with a `content-type` and nothing else. This
+   * is where the rest is declared.
+   *
+   * `ContentEncoding` is the one a site can be broken without. A directory of
+   * brotli files served with no `content-encoding` is bytes no browser can
+   * decode, and a deployment that sets the header would have made them work:
+   *
+   * ```typescript
+   * systemMetadata: [{ keyPrefix: "br/", metadata: { ContentEncoding: "br" } }]
+   * ```
+   *
+   * Every declaration whose prefix the key starts with applies, in the order
+   * they were given, so a later one wins where two name the same header. A
+   * declared `ContentType` replaces the one guessed from the extension.
+   */
+  readonly systemMetadata?: readonly SimS3KeyPrefixMetadata[] | undefined;
 }

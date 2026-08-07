@@ -237,6 +237,11 @@ export class SimS3 {
    * Passing somewhere to reload, as `{ reload: srv }`, also watches the
    * directory: a build that writes into it reloads the connected browsers once
    * the writes stop, without the Bucket having to be filled again.
+   *
+   * A file on disk carries no metadata, so an Object read out of one is
+   * described by its extension alone. `systemMetadata` declares the rest for
+   * the Objects under a key prefix, which is what a directory of brotli files
+   * needs to be served with a `content-encoding` a browser can act on.
    */
   mountBucketFilesystem(
     bucketName: SimS3BucketName | string,

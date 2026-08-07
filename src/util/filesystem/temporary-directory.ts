@@ -54,10 +54,13 @@ export class TemporaryDirectory {
 
   /**
    * Write a file inside this temporary directory, creating parent directories as needed.
+   *
+   * Bytes as well as text, so a test can lay down a fixture that is not a
+   * string, such as a compressed copy of a file.
    */
   async writeFile(
     pathParts: string | string[],
-    content: string,
+    content: string | Uint8Array,
   ): Promise<void> {
     await this.resolvePath();
     const filePath = this.join(
