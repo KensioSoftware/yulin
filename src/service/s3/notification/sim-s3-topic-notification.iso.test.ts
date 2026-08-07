@@ -268,6 +268,10 @@ describe("Notifying a simulated SNS topic of an Object event", () => {
     const created = await otherScope
       .sqs()
       .createQueue(new CreateQueueCommand({ QueueName: "uploads-queue" }));
+    assertNonNullable(
+      created.QueueUrl,
+      "CreateQueue answered with a queue URL",
+    );
     await otherScope.sqs().setQueueAttributes(
       new SetQueueAttributesCommand({
         QueueUrl: created.QueueUrl,
@@ -281,7 +285,7 @@ describe("Notifying a simulated SNS topic of an Object event", () => {
         Endpoint: queueArn,
       }),
     );
-    const queueUrl = created.QueueUrl ?? "";
+    const queueUrl = created.QueueUrl;
 
     // And a Bucket in this Account configured to notify it
     await simAws

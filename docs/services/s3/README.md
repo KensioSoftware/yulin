@@ -825,9 +825,9 @@ reaches, so a configuration is validated the same way whichever it arrives by.
 
 `SqsDestination` and `SnsDestination` write their entry into the same resource, alongside the
 `AWS::SQS::QueuePolicy` or `AWS::SNS::TopicPolicy` that grants S3 access. The queue policy deploys;
-the topic policy does not yet, since the SNS CloudFormation resource types are not implemented, so
-set the topic's `Policy` attribute through the SDK before deploying a stack whose Bucket notifies a
-topic.
+the topic policy does not yet, since the SNS CloudFormation resource types are not implemented. An
+`AWS::SNS::Topic` does not deploy either, so create the topic and set its `Policy` attribute through
+the SDK before deploying a stack whose Bucket notifies one.
 
 Deploy into an Account and Region matching the ones the CDK app synthesized for. The `SourceAccount`
 on the permission CDK writes beside the notification is a synth-time literal, so a stack deployed
@@ -936,9 +936,10 @@ writes do not match it. Without that, the simulation stops after a thousand deli
   and an EventBridge destination in one is refused by name as it is for an SDK caller.
 - A FIFO queue destination is refused by name, as real S3 refuses one. Simulated SQS has no FIFO
   queues either, and neither does simulated SNS, so a FIFO topic destination is refused the same way.
-- The `AWS::SNS::TopicPolicy` CDK's `SnsDestination` writes does not deploy, since the SNS
-  CloudFormation resource types are not implemented. Set the topic's `Policy` attribute through the
-  SDK before deploying a stack whose Bucket notifies a topic, or S3 refuses the destination.
+- Neither the `AWS::SNS::Topic` a CDK app declares nor the `AWS::SNS::TopicPolicy` its
+  `SnsDestination` writes beside it deploys, since the SNS CloudFormation resource types are not
+  implemented. Create the topic and set its `Policy` attribute through the SDK before deploying a
+  stack whose Bucket notifies one, or S3 refuses the destination.
 - The KMS key policy statement CDK's `SqsDestination` writes for an encrypted queue is not acted on.
   Queue encryption is not simulated.
 - A CDK `BucketDeployment` and `mountBucketFilesystem(...)` both replace the whole storage backend
