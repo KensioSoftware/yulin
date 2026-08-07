@@ -176,8 +176,8 @@ here, as it matches nothing on real AWS.
 
 Two details are real SQS behaviour worth keeping:
 
-- `ListQueues` authorizes against `arn:aws:sqs:region:account:*`, because real SQS gives it no
-  queue-level permission. A policy naming one queue ARN therefore allows no listing.
+- `ListQueues` authorizes against `*`, because real SQS gives it no resource type at all. A policy
+  naming one queue ARN, or every queue ARN in the Account and Region, therefore allows no listing.
 - The batch operations authorize as their singular action. Real SQS has no `sqs:SendMessageBatch`,
   `sqs:DeleteMessageBatch` or `sqs:ChangeMessageVisibilityBatch` action, so a policy naming one grants
   nothing.

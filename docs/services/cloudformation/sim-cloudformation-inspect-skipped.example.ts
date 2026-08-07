@@ -16,8 +16,8 @@ const stack = await simAws.cloudFormation().deployTemplate({
           BucketName: "skipped-site-bucket",
         },
       },
-      AlarmTopic: {
-        Type: "AWS::SNS::Topic",
+      AlarmRule: {
+        Type: "AWS::Events::Rule",
       },
     },
   },
@@ -26,7 +26,7 @@ const stack = await simAws.cloudFormation().deployTemplate({
 await stack.waitForDeployComplete();
 
 console.log(stack.skippedResources.map((resource) => resource.logicalId));
-// ["AlarmTopic"]
+// ["AlarmRule"]
 
-console.log(stack.getResource("AlarmTopic")?.skippedReason);
-// "Unsupported sim CloudFormation Resource service SNS"
+console.log(stack.getResource("AlarmRule")?.skippedReason);
+// "Unsupported sim CloudFormation Resource service Events"

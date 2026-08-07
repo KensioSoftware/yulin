@@ -457,8 +457,8 @@ Every operation is authorized against the queue's ARN, which carries the queue n
 type in front of it. Two details are worth knowing, because both are real SQS behaviour that a policy
 can get wrong:
 
-- `ListQueues` has no queue-level permission, so a policy allowing it names
-  `arn:aws:sqs:<region>:<account-id>:*`. A policy naming one queue grants no listing.
+- `ListQueues` has no resource type at all, so a policy allowing it names `*`. A policy naming one
+  queue, or every queue in the Account and Region, grants no listing.
 - The batch operations are authorized as their singular action. There is no `sqs:SendMessageBatch`,
   `sqs:DeleteMessageBatch` or `sqs:ChangeMessageVisibilityBatch` action for a policy to name.
 

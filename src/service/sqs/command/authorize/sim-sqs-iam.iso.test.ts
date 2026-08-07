@@ -205,12 +205,12 @@ describe("SQS IAM authorization", () => {
     );
   });
 
-  it("authorizes listing against every queue in the Account and Region", async () => {
-    // Given a Role allowed to list with the resource real SQS documents for it.
+  it("allows listing to a policy whose resource is a bare wildcard", async () => {
+    // Given a Role allowed to list queues the only way real SQS allows it.
     const { simAws, caller } = await simAwsWithRole({
       Effect: "Allow",
       Action: "sqs:ListQueues",
-      Resource: `arn:aws:sqs:${regionName}:${accountId}:*`,
+      Resource: "*",
     });
 
     // When it lists the queues.
@@ -222,22 +222,36 @@ describe("SQS IAM authorization", () => {
     assertIdentical(listed.QueueUrls?.length, 1);
   });
 
-  it("denies listing to a policy naming one queue ARN", async () => {
-    // Given a Role allowed to list only the one queue by name, which real SQS
-    // gives no queue-level permission for.
-    const { simAws, caller } = await simAwsWithRole({
+  it("gives listing no queue-level permission", async () => {
+    // Given Roles allowed to list queues by naming one queue ARN, and by
+    // naming every queue ARN in the Account and Region.
+    const oneQueue = await simAwsWithRole({
       Effect: "Allow",
       Action: "sqs:ListQueues",
       Resource: `arn:aws:sqs:${regionName}:${accountId}:orders`,
     });
-
-    // When it lists the queues.
-    const error = await assertThrowsErrorAsync(async () => {
-      await simAws.sqs().listQueues(new ListQueuesCommand({}), { caller });
+    const everyQueue = await simAwsWithRole({
+      Effect: "Allow",
+      Action: "sqs:ListQueues",
+      Resource: `arn:aws:sqs:${regionName}:${accountId}:*`,
     });
 
-    // Then it is denied, as it would be on real AWS.
-    assertIdentical(error.name, "AccessDenied");
+    // When each lists the queues.
+    const refusals = await Promise.all(
+      [oneQueue, everyQueue].map(async ({ simAws, caller }) =>
+        assertThrowsErrorAsync(async () => {
+          await simAws.sqs().listQueues(new ListQueuesCommand({}), { caller });
+        }),
+      ),
+    );
+
+    // Then neither allows it. Real SQS gives ListQueues no resource type at
+    // all, so it is authorized against `*` and only a policy naming `*`
+    // reaches it.
+    for (const error of refusals) {
+      assertIdentical(error.name, "AccessDenied");
+      assertStringIncludes(error.message, "resource: *");
+    }
   });
 
   it("denies a create the Role has no permission for", async () => {

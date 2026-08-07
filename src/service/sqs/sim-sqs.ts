@@ -66,7 +66,7 @@ export class SimSqs {
 
     const access = new SimSqsQueueAccess({
       queues: this.queues,
-      authorizer: new SimSqsAuthorizer({ iam, accountRegionScope }),
+      authorizer: new SimSqsAuthorizer({ iam }),
       accountRegionScope,
       clock: background,
     });
