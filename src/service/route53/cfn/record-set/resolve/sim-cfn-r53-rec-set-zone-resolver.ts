@@ -7,6 +7,7 @@ import {
 import { normaliseSimRoute53Name } from "../../../local-name/sim-route53-local-name.js";
 import type { SimRoute53 } from "../../../sim-route53.js";
 import { assertDefined } from "../../../../../util/type-guard/defined.js";
+import { SimCfnRoute53LookedUpZone } from "./sim-cfn-r53-looked-up-zone.js";
 
 interface SimCfnRoute53RecordSetHostedZoneResolverProperties {
   readonly route53: SimRoute53;
@@ -17,9 +18,13 @@ interface SimCfnRoute53RecordSetHostedZoneResolverProperties {
  */
 export class SimCfnRoute53RecordSetHostedZoneResolver {
   private readonly route53: SimRoute53;
+  private readonly lookedUpZone: SimCfnRoute53LookedUpZone;
 
   constructor(properties: SimCfnRoute53RecordSetHostedZoneResolverProperties) {
     this.route53 = properties.route53;
+    this.lookedUpZone = new SimCfnRoute53LookedUpZone({
+      route53: this.route53,
+    });
   }
 
   /**
@@ -38,10 +43,35 @@ export class SimCfnRoute53RecordSetHostedZoneResolver {
         );
       }
 
-      return normalizeSimRoute53HostedZoneId(hostedZoneId);
+      const normalizedHostedZoneId =
+        normalizeSimRoute53HostedZoneId(hostedZoneId);
+
+      // A zone named by ID alone is one the CDK app looked up rather than
+      // created, so the simulation stands it up rather than refusing the record.
+      this.lookedUpZone.ensure(
+        normalizedHostedZoneId,
+        this.recordName(resource, properties),
+      );
+
+      return normalizedHostedZoneId;
     }
 
     return this.hostedZoneIdFromName(resource, properties);
+  }
+
+  private recordName(
+    resource: SimCfnResource,
+    properties: SimCfnTemplateValueRecord,
+  ): string {
+    const name = properties["Name"];
+
+    if (typeof name !== "string") {
+      throw new TypeError(
+        `Invalid AWS::Route53::RecordSet ${resource.logicalId}: Name must be a string`,
+      );
+    }
+
+    return name;
   }
 
   private hostedZoneIdFromName(

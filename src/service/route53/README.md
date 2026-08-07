@@ -151,6 +151,24 @@ to synchronize: the zone is described as already existing rather than created he
 reference is derived from its ID, since the creation that would have supplied one happened outside
 the simulation.
 
+### A zone the template names but never creates
+
+Registering the zone is a setup step the caller has to know to take, and a template using
+`HostedZone.fromLookup` describes the zone well enough that they should not have to. So
+`cfn/record-set/resolve/sim-cfn-r53-looked-up-zone.ts` registers one on demand: a RecordSet naming a
+`HostedZoneId` no zone holds gets that zone stood up as the record is created, with `nameInferred`
+set on the registration.
+
+The template carries the ID but never the name, so the name is inferred from the record names.
+`SimRoute53HostedZone.widenInferredName` takes each subsequent record name and drops labels from the
+front of the zone name until what is left is a suffix of both, using
+`hosted-zone/sim-route53-zone-name-widening.ts`. That converges on the shortest name containing every
+record, which is the zone apex for any stack holding a record there.
+
+`nameInferred` is what keeps this off ordinary zones. A zone that was named rather than guessed keeps
+its name, so a record outside it stays outside it rather than silently widening a zone the caller
+described.
+
 The simulator does not currently try to emulate all AWS edge cases around duplicate zone names,
 delegation sets, private-zone VPC associations, or caller-reference replay output. The caller
 reference is mainly used to prevent accidental duplicate CloudFormation-created zones and to match
