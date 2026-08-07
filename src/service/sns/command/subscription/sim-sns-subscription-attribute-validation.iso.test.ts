@@ -26,8 +26,6 @@ describe("SNS subscription attribute validation", () => {
     // subscribe time.
     const refusals = await Promise.all(
       [
-        { FilterPolicy: JSON.stringify({ kind: ["order"] }) },
-        { FilterPolicyScope: "MessageBody" },
         { DeliveryPolicy: JSON.stringify({ healthyRetryPolicy: {} }) },
         { RedrivePolicy: JSON.stringify({ deadLetterTargetArn: queueArn }) },
         { SubscriptionRoleArn: "arn:aws:iam::888888888888:role/Firehose" },

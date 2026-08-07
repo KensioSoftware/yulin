@@ -36,6 +36,16 @@ export class SimSnsMessageAttributes {
   }
 
   /**
+   * Each attribute on its own.
+   *
+   * A subscription filter policy reads them one at a time, because what a
+   * policy can match depends on the data type each one declares.
+   */
+  get all(): readonly SimSnsMessageAttribute[] {
+    return this.attributes;
+  }
+
+  /**
    * What these attributes contribute to the size of a publish.
    */
   get byteSize(): number {
