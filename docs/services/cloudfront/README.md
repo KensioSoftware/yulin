@@ -102,7 +102,7 @@ readable for the Distribution to serve it. A Bucket with no policy answers 403 f
 
 An Origin that does have an origin access control reads as the CloudFront service principal instead,
 so the Bucket stays private and its policy names the Distribution. See
-[Origin access controls](#origin-access-controls) for the policy that needs.
+[Origin access controls](#origin-access-controls) for the Bucket policy that takes.
 
 That is the two commands in the example above: `PutPublicAccessBlockCommand` to opt out of the block
 on public Bucket policies, then `PutBucketPolicyCommand` granting `s3:GetObject` to `Principal: "*"`.

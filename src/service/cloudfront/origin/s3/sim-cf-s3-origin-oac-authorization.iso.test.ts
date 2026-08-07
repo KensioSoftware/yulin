@@ -48,6 +48,26 @@ describe("Simulated CloudFront S3 Origin with an origin access control", () => {
     assertIdentical(await response.text(), simCfOacSitePage);
   });
 
+  it("signs the read for a no-override signing behaviour too", async () => {
+    // Given the same grant, and an origin access control that signs a request
+    // the viewer did not sign, which is every request reaching an Origin here.
+    const { simAws, distributionId } = await simCfOacSiteStack({
+      signingBehavior: "no-override",
+      statement: simCfOacCloudFrontReadStatement(simCfOacSiteDistributionArn),
+    });
+
+    // When a viewer asks for the page.
+    const response = await simCfSiteRequest(
+      simAws,
+      distributionId,
+      "/index.html",
+    );
+
+    // Then it is served, as it is for `always`.
+    assertResponseStatus(response, 200, await describeResponse(response));
+    assertIdentical(await response.text(), simCfOacSitePage);
+  });
+
   it("refuses a read the Bucket policy grants a different Distribution", async () => {
     // Given the same grant, conditioned on somebody else's Distribution ARN.
     const { simAws, distributionId } = await simCfOacSiteStack({
