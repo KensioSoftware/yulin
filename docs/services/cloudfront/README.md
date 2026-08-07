@@ -257,6 +257,12 @@ try {
 The Distribution domain is adapted through `server.localUrl(...)` so that the request is sent to the
 local Yulin server while preserving the simulated CloudFront hostname.
 
+A test that needs no browser can skip the port. `SimAwsHttp` answers the same requests in the
+process, with no server listening and nothing to adapt the URL for, and an alternate domain name a
+simulated Route53 answers for is requested by its own name: `simAwsHttp.fetch("https://cdn.example.test/")`
+reaches the Distribution behind it. See
+[requests without a port](../../serve/#requests-without-a-port "Requests without a port docs").
+
 ## Custom Origins
 
 An Origin with a `CustomOriginConfig` is one CloudFront reaches over HTTP rather than as an S3

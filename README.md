@@ -198,6 +198,30 @@ console.log(bucketWebsiteUrl.toString());
 const res = await fetch(new URL("/foo/", bucketWebsiteUrl));
 ```
 
+#### Send requests without a port
+
+A test usually wants the same requests with nothing listening. `SimAwsHttp` answers a Fetch API
+`Request` with a `Response` in process, so there is no port for parallel test files to collide over,
+and no server to start or tear down:
+
+```typescript
+import { SimAws } from "@kensio/yulin";
+import { SimAwsHttp } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const simAwsHttp = new SimAwsHttp({ simAws });
+
+// Build the simulated environment the requests are answered from here.
+
+const response = await simAwsHttp.fetch("https://www.example.com/");
+```
+
+Nothing binds a port, so a URL a simulated service gives out is fetched as it is, with no
+`localUrl(...)` adapting, and a hostname a simulated Route53 answers for is requested by its own
+name. Both routes go through the same authentication, routing and service code, so `serveSimAws` is
+what you want only when the request comes from outside the process. See the
+[serving docs](./docs/serve "Serving simulated AWS on localhost docs") for which to reach for.
+
 #### Restarting a served environment
 
 A served environment takes an available port by default, so the URL changes every time the process
