@@ -179,7 +179,10 @@ The key integration points are:
 - `SimCloudFrontRegistry`, which records Distribution ownership and alternate domain routing
   information across the broader simulated AWS instance.
 - S3 Origin resolution, which lets CloudFront Distributions fetch from simulated S3 buckets and S3
-  website Origins.
+  website Origins. `makeSimCfS3OriginResolver` resolves an Origin domain to the Bucket in the
+  Account and Region that own it, which need not be where the Distribution was created: real
+  CloudFront checks neither ownership nor existence at CreateDistribution, and what a Distribution
+  may read is the Bucket policy's business.
 - `SimCfCustomOriginDispatcher`, which resolves a custom Origin domain through simulated Route53 and
   serves the request over the same in-process HTTP entry point as a request arriving on localhost.
   CloudFront therefore needs no per-service knowledge: an HTTP API endpoint, a Lambda Function URL

@@ -92,7 +92,7 @@ export class SimAwsAccountServiceCache {
         new SimCloudFront({
           accountRegionScope: scope.accountRegionScope,
           cloudFrontRegistry: this.cloudFrontRegistry,
-          s3OriginResolver: makeSimCfS3OriginResolver(this.simAws, scope),
+          s3OriginResolver: makeSimCfS3OriginResolver(this.simAws),
           customOriginDispatcher: makeSimCfCustomOriginDispatcher(this.simAws),
           iam,
           acmRegistry: this.acmRegistry,
