@@ -284,9 +284,11 @@ are not applied to it, the same way a repeated `CreateTopic` leaves the existing
 are still validated, so a repeated request naming an attribute this simulation will not take is
 refused for it.
 
-`RawMessageDelivery` is the one subscription attribute with behaviour behind it. It can be set on the
-`Subscribe` request or afterwards with `SetSubscriptionAttributes`, and its value is `"true"` or
-`"false"`. Anything else is refused, rather than being treated as false.
+`RawMessageDelivery` can be set on the `Subscribe` request or afterwards with
+`SetSubscriptionAttributes`, and its value is `"true"` or `"false"`. Anything else is refused, rather
+than being treated as false. The other two attributes with behaviour behind them are `FilterPolicy`
+and `FilterPolicyScope`, under
+[filtering what a subscription receives](#filtering-what-a-subscription-receives).
 
 `Unsubscribe` of an ARN that names no subscription is `NotFoundException`, so unsubscribing the same
 ARN twice fails the second time. `DeleteTopic` removes the topic's subscriptions along with it, and a
@@ -574,6 +576,255 @@ envelope leaves both out.
 
 `RawMessageDelivery` has no effect on a `lambda` subscription. Real SNS treats it as an SQS and HTTP
 setting, so a function is invoked with the whole event whether it is set or not.
+
+## Filtering what a subscription receives
+
+A subscription with a `FilterPolicy` receives only the messages its policy matches. Every other
+subscription of the topic is unaffected, so one subscriber filtering a message out has nothing to do
+with what another receives. It applies to a subscribed function as it does to a subscribed queue: the
+policy decides whether the message reaches the subscription at all, whatever the subscription
+delivers to.
+
+The policy is a JSON document of keys and the match conditions each one accepts. Separate keys are an
+and, and the list a key holds is an or.
+
+```typescript sim-sns-filter-policy
+/**
+ * Two queues on one topic, each taking the messages its policy names.
+ */
+
+import {
+  CreateTopicCommand,
+  PublishCommand,
+  SubscribeCommand,
+} from "@aws-sdk/client-sns";
+import {
+  CreateQueueCommand,
+  ReceiveMessageCommand,
+  SetQueueAttributesCommand,
+} from "@aws-sdk/client-sqs";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const sns = simAws.sns();
+const sqs = simAws.sqs();
+
+const { TopicArn } = await sns.createTopic(
+  new CreateTopicCommand({ Name: "orders" }),
+);
+
+/**
+ * Subscribe a queue that admits SNS, with a filter policy of its own.
+ */
+async function subscribeQueue(
+  queueName: string,
+  filterPolicy: unknown,
+): Promise<string> {
+  const { QueueUrl } = await sqs.createQueue(
+    new CreateQueueCommand({ QueueName: queueName }),
+  );
+  const queueArn = `arn:aws:sqs:${simAws.defaultRegionName}:${simAws.defaultAccountId}:${queueName}`;
+
+  await sqs.setQueueAttributes(
+    new SetQueueAttributesCommand({
+      QueueUrl,
+      Attributes: {
+        Policy: JSON.stringify({
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Effect: "Allow",
+              Principal: { Service: "sns.amazonaws.com" },
+              Action: "sqs:SendMessage",
+              Resource: queueArn,
+              Condition: { ArnEquals: { "aws:SourceArn": TopicArn } },
+            },
+          ],
+        }),
+      },
+    }),
+  );
+
+  await sns.subscribe(
+    new SubscribeCommand({
+      TopicArn,
+      Protocol: "sqs",
+      Endpoint: queueArn,
+      Attributes: { FilterPolicy: JSON.stringify(filterPolicy) },
+    }),
+  );
+
+  return QueueUrl ?? "";
+}
+
+const orders = await subscribeQueue("order-handling", { type: ["order"] });
+const refunds = await subscribeQueue("refund-handling", { type: ["refund"] });
+
+await sns.publish(
+  new PublishCommand({
+    TopicArn,
+    Message: "order-1",
+    MessageAttributes: { type: { DataType: "String", StringValue: "order" } },
+  }),
+);
+
+await simAws.backgroundTasksComplete();
+
+const delivered = await sqs.receiveMessage(
+  new ReceiveMessageCommand({ QueueUrl: orders }),
+);
+const filtered = await sqs.receiveMessage(
+  new ReceiveMessageCommand({ QueueUrl: refunds }),
+);
+
+console.log(delivered.Messages?.length); // 1
+console.log(filtered.Messages); // undefined
+```
+
+By default a policy is matched against the message attributes of the publish, which is the
+`MessageAttributes` scope. These are the operators:
+
+| Condition                               | Matches                                     |
+| --------------------------------------- | ------------------------------------------- |
+| `"order"`                               | that value exactly, case sensitively        |
+| `["order", "refund"]`                   | either value, since a list is an or         |
+| `{"prefix": "order-"}`                  | the start of the value                      |
+| `{"suffix": ".csv"}`                    | the end of the value                        |
+| `{"equals-ignore-case": "Order"}`       | the value in any case                       |
+| `{"anything-but": "order"}`             | every value but that one                    |
+| `{"anything-but": ["order", "refund"]}` | every value but those                       |
+| `{"anything-but": {"prefix": "tmp-"}}`  | every value not starting that way           |
+| `{"numeric": [">", 100]}`               | a number, with `=`, `<`, `<=`, `>` and `>=` |
+| `{"numeric": [">", 0, "<=", 100]}`      | a number inside a range                     |
+| `{"exists": true}`                      | the key being there, holding something      |
+| `{"exists": false}`                     | the key not being there                     |
+
+Only `{"exists": false}` matches a key the message does not carry. Every other operator needs a value
+to look at, including `anything-but`: there is nothing there to be anything but the excluded value.
+
+`{"exists": false}` also needs the message to carry something else, which is what real SNS states: a
+publish with no message attributes at all matches no filter policy of the default scope, this one
+included. Under the `MessageBody` scope the same goes for a body holding no keys, so a body that is
+not JSON matches nothing whichever operator the policy uses.
+
+Numeric matching applies to the `Number` message attribute data type, as it does on real SNS, so
+digits published as a `String` are text. A `String.Array` attribute matches when any member of it
+does. A `Binary` attribute matches nothing, since filtering is on text.
+
+`$or` matches when either of two separate keys does, which the rest of a policy cannot say:
+
+```json
+{ "$or": [{ "type": ["order"] }, { "tenant": ["acme"] }] }
+```
+
+Real SNS reads `$or` as an or only when it holds a list of at least two objects, none of which names
+a reserved keyword such as `numeric` or `prefix`. Anything else is an attribute named `$or` there, so
+the policy quietly stops being an or and matches nothing. Each of those is refused here when the
+policy is set instead.
+
+### Filtering on the message body
+
+With `FilterPolicyScope` set to `MessageBody`, the policy is matched against the message body read as
+JSON. That is the scope that nests: a policy names a nested key by nesting itself.
+
+```typescript sim-sns-filter-policy-body
+/**
+ * Filtering on a nested key of the published message body.
+ */
+
+import {
+  CreateTopicCommand,
+  PublishCommand,
+  SubscribeCommand,
+} from "@aws-sdk/client-sns";
+import {
+  CreateQueueCommand,
+  ReceiveMessageCommand,
+  SetQueueAttributesCommand,
+} from "@aws-sdk/client-sqs";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const sns = simAws.sns();
+const sqs = simAws.sqs();
+
+const { TopicArn } = await sns.createTopic(
+  new CreateTopicCommand({ Name: "orders" }),
+);
+const { QueueUrl } = await sqs.createQueue(
+  new CreateQueueCommand({ QueueName: "gold-orders" }),
+);
+const queueArn = `arn:aws:sqs:${simAws.defaultRegionName}:${simAws.defaultAccountId}:gold-orders`;
+
+await sqs.setQueueAttributes(
+  new SetQueueAttributesCommand({
+    QueueUrl,
+    Attributes: {
+      Policy: JSON.stringify({
+        Version: "2012-10-17",
+        Statement: [
+          {
+            Effect: "Allow",
+            Principal: { Service: "sns.amazonaws.com" },
+            Action: "sqs:SendMessage",
+            Resource: queueArn,
+            Condition: { ArnEquals: { "aws:SourceArn": TopicArn } },
+          },
+        ],
+      }),
+    },
+  }),
+);
+
+await sns.subscribe(
+  new SubscribeCommand({
+    TopicArn,
+    Protocol: "sqs",
+    Endpoint: queueArn,
+    Attributes: {
+      FilterPolicyScope: "MessageBody",
+      FilterPolicy: JSON.stringify({
+        customer: { tier: ["gold"] },
+        amount: [{ numeric: [">", 100] }],
+      }),
+    },
+  }),
+);
+
+for (const body of [
+  { customer: { tier: "silver" }, amount: 500 },
+  { customer: { tier: "gold" }, amount: 500 },
+]) {
+  await sns.publish(
+    new PublishCommand({ TopicArn, Message: JSON.stringify(body) }),
+  );
+}
+
+await simAws.backgroundTasksComplete();
+
+const { Messages } = await sqs.receiveMessage(
+  new ReceiveMessageCommand({ QueueUrl, MaxNumberOfMessages: 10 }),
+);
+
+console.log(Messages?.length); // 1
+```
+
+A body that is not JSON, or that is JSON without being an object, matches no policy of this scope. It
+is not an error: the body comes from whoever published, and the scope is the subscription's own
+business, so a publisher would otherwise fail on a subscription it knows nothing about. A key holding
+`null`, an object or an empty list holds no value to match, so it is a key `{"exists": false}`
+matches, as long as the body holds some other key.
+
+The two attributes can be set on `Subscribe` or afterwards with `SetSubscriptionAttributes`, and
+`GetSubscriptionAttributes` reports both once a policy is set. Setting `FilterPolicy` with no value
+takes the policy off, so the subscription receives everything again.
+
+A policy is read when it is set rather than when a message arrives. An operator real SNS does not
+have, a match condition naming two operators, a key holding no conditions, and a nested key under the
+`MessageAttributes` scope are all refused there. So is `cidr`, which is the one operator real SNS has
+that this does not.
 
 ## Verifying a message signature
 
@@ -1088,7 +1339,10 @@ Sim SNS currently supports:
   `UnsubscribeCommand`
 - `ListSubscriptionsCommand` and `ListSubscriptionsByTopicCommand`, paged at a hundred subscriptions
   with a `NextToken`
-- `GetSubscriptionAttributesCommand` and `SetSubscriptionAttributesCommand`, for `RawMessageDelivery`
+- `GetSubscriptionAttributesCommand` and `SetSubscriptionAttributesCommand`, for
+  `RawMessageDelivery`, `FilterPolicy` and `FilterPolicyScope`
+- Subscription filter policies over the message attributes or the message body, with the string,
+  numeric, `exists`, `anything-but` and `$or` operators, applied per subscription
 - Delivery of a published message to every subscribed queue, including a queue in another account or
   another region, authorized by that queue's own policy on every message
 - Invocation of every subscribed Lambda function, including a function in another account or another
@@ -1133,14 +1387,25 @@ Current documented limitations:
   rather than retried.
 - `ConfirmSubscription` is not supported. Neither protocol simulated needs a confirmation, so there
   is no confirmation token to confirm.
-- Subscription filter policies are not simulated, so `FilterPolicy` and `FilterPolicyScope` are
-  refused rather than held and never applied.
+- The `cidr` filter policy operator is not simulated. A policy holding one is refused when it is set,
+  naming the operator, rather than accepted and then matching nothing.
+- A filter policy is reported back as the string it was set with. Real SNS re-serialises the
+  document, so what comes back there is not byte for byte what went in.
+- A nested filter policy key is refused under the `MessageAttributes` scope, since message attributes
+  are a flat set of names and such a policy could never match.
+- A message body that is not a JSON object matches no `MessageBody` filter policy, and is not an
+  error. A key holding `null`, an object or an empty list holds no value to match, so
+  `{"exists": false}` matches it, as long as the body holds some other key.
+- An `$or` real SNS would not read as one, because it holds fewer than two objects or names a
+  reserved keyword, is refused when the policy is set. Real SNS treats it as an attribute named
+  `$or` instead, which matches nothing.
 - Subscription delivery retry policies, subscription dead-letter queues and message replay are not
   simulated, so `DeliveryPolicy`, `RedrivePolicy`, `SubscriptionRoleArn` and `ReplayPolicy` are
   refused.
 - `GetSubscriptionAttributes` reports `SubscriptionArn`, `TopicArn`, `Protocol`, `Endpoint`, `Owner`,
-  `ConfirmationWasAuthenticated`, `PendingConfirmation` and `RawMessageDelivery`.
-  `EffectiveDeliveryPolicy` is left out, since delivery retry policies are not simulated.
+  `ConfirmationWasAuthenticated`, `PendingConfirmation` and `RawMessageDelivery`, with `FilterPolicy`
+  and `FilterPolicyScope` once a policy is set. `EffectiveDeliveryPolicy` is left out, since delivery
+  retry policies are not simulated.
 - A queue whose name ends in `.fifo` is refused as a subscription endpoint. Only a FIFO topic
   delivers to a FIFO queue, and there are no FIFO topics here.
 - Standard topics only. A topic name ending in `.fifo` is refused, as are the `FifoTopic`,

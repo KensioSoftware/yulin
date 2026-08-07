@@ -7,25 +7,37 @@ import {
  * Whether the subscription receives the published message on its own rather
  * than wrapped in the SNS envelope.
  *
- * This is the only subscription attribute with behaviour behind it here, and it
- * is the one a consumer breaks on: code written for the envelope reads
- * `JSON.parse(body).Message`, and code written for raw delivery reads `body`.
+ * This is the subscription attribute a consumer breaks on: code written for the
+ * envelope reads `JSON.parse(body).Message`, and code written for raw delivery
+ * reads `body`.
  */
 export const simSnsRawMessageDeliveryAttributeName = "RawMessageDelivery";
 
-const settableAttributeNames = new Set([simSnsRawMessageDeliveryAttributeName]);
+/**
+ * The JSON document saying which messages the subscription wants.
+ */
+export const simSnsFilterPolicyAttributeName = "FilterPolicy";
+
+/**
+ * What part of a published message the filter policy is matched against.
+ */
+export const simSnsFilterPolicyScopeAttributeName = "FilterPolicyScope";
+
+const settableAttributeNames = new Set([
+  simSnsRawMessageDeliveryAttributeName,
+  simSnsFilterPolicyAttributeName,
+  simSnsFilterPolicyScopeAttributeName,
+]);
 
 /**
  * The other attributes real SNS lets a request set on a subscription.
  *
  * Each is refused by name with the reason rather than taken and ignored. A
- * subscription that appeared to accept a `FilterPolicy` would receive every
- * message while a test believed it was filtering, which is exactly the kind of
- * pass that means nothing.
+ * subscription that appeared to accept a `RedrivePolicy` would drop a failed
+ * delivery while a test believed it was keeping it, which is exactly the kind
+ * of pass that means nothing.
  */
 const unsimulatedAttributeNames = new Map<string, string>([
-  ["FilterPolicy", "Subscription filter policies are not simulated."],
-  ["FilterPolicyScope", "Subscription filter policies are not simulated."],
   ["DeliveryPolicy", "Delivery retry policies are not simulated."],
   [
     "RedrivePolicy",

@@ -1,3 +1,4 @@
+import type { SimSnsPublishedMessage } from "../message/sim-sns-published-message.js";
 import { SimSnsSubscriptionArn } from "./sim-sns-subscription-arn.js";
 import type {
   SimSnsSubscriptionAttributeInput,
@@ -132,6 +133,17 @@ export class SimSnsSubscription {
    */
   applyAttributes(requested: SimSnsSubscriptionAttributeInput): void {
     this.held = this.held.with(requested);
+  }
+
+  /**
+   * Whether this subscription wants a published message.
+   *
+   * The subscription's filter policy is what decides, so this is asked once per
+   * subscription rather than once per publish: one subscriber filtering a
+   * message out has nothing to do with what another receives.
+   */
+  accepts(message: SimSnsPublishedMessage): boolean {
+    return this.held.accepts(message);
   }
 
   /**

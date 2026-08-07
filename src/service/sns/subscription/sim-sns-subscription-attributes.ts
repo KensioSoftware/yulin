@@ -1,38 +1,19 @@
-import { SimSnsInvalidParameterException } from "../error/sim-sns.error.js";
+import type { SimSnsFilterPolicy } from "../filter/sim-sns-filter-policy.js";
 import {
-  assertSimSnsSettableSubscriptionAttribute,
+  simSnsDefaultFilterPolicyScope,
+  type SimSnsFilterPolicyScope,
+} from "../filter/sim-sns-filter-policy-scope.js";
+import type { SimSnsPublishedMessage } from "../message/sim-sns-published-message.js";
+import type { SimSnsSubscriptionAttributeInput } from "./sim-sns-requested-subscription-attributes.js";
+import {
+  simSnsChangedSubscriptionAttributes,
+  type SimSnsSubscriptionAttributeValues,
+} from "./sim-sns-subscription-attribute-changes.js";
+import {
+  simSnsFilterPolicyAttributeName,
+  simSnsFilterPolicyScopeAttributeName,
   simSnsRawMessageDeliveryAttributeName,
 } from "./sim-sns-subscription-attribute-names.js";
-
-/**
- * Subscription attributes as a request carries them, which is always as
- * strings.
- */
-export type SimSnsSubscriptionAttributeInput = Readonly<
-  Record<string, string | undefined>
->;
-
-/**
- * Read the one boolean attribute this simulation holds.
- *
- * Real SNS takes the two lower case spellings and refuses everything else, so a
- * request setting `RawMessageDelivery` to `True` or to `1` is refused rather
- * than quietly treated as false.
- */
-function booleanValue(value: string): boolean {
-  if (value === "true") {
-    return true;
-  }
-
-  if (value === "false") {
-    return false;
-  }
-
-  throw new SimSnsInvalidParameterException(
-    `Invalid parameter: AttributeValue: ${simSnsRawMessageDeliveryAttributeName}` +
-      ` must be true or false, and this one is ${value}`,
-  );
-}
 
 /**
  * The attributes of one simulated subscription that a request can set.
@@ -43,9 +24,13 @@ function booleanValue(value: string): boolean {
  */
 export class SimSnsSubscriptionAttributes {
   public readonly rawMessageDelivery: boolean;
+  public readonly filterPolicy: SimSnsFilterPolicy | undefined;
+  public readonly filterPolicyScope: SimSnsFilterPolicyScope;
 
-  private constructor(rawMessageDelivery: boolean) {
-    this.rawMessageDelivery = rawMessageDelivery;
+  private constructor(values: SimSnsSubscriptionAttributeValues) {
+    this.rawMessageDelivery = values.rawMessageDelivery;
+    this.filterPolicy = values.filterPolicy;
+    this.filterPolicyScope = values.filterPolicyScope;
   }
 
   /**
@@ -53,47 +38,61 @@ export class SimSnsSubscriptionAttributes {
    *
    * Real SNS reports `RawMessageDelivery` as false for a subscription created
    * without it, rather than leaving the attribute out, which is why it is held
-   * rather than being absent until set.
+   * rather than being absent until set. A subscription holds no filter policy
+   * until one is set, and receives everything its topic publishes.
    */
   static defaults(): SimSnsSubscriptionAttributes {
-    return new this(false);
+    return new this({
+      rawMessageDelivery: false,
+      filterPolicy: undefined,
+      filterPolicyScope: simSnsDefaultFilterPolicyScope,
+    });
   }
 
   /**
    * These attributes with a request's changes applied.
-   *
-   * Every name is checked before any value is read, so a request naming one
-   * attribute this simulation will not take changes none of them.
    */
   with(
     requested: SimSnsSubscriptionAttributeInput,
   ): SimSnsSubscriptionAttributes {
-    const named = Object.entries(requested).filter(
-      (entry): entry is [string, string] => entry[1] !== undefined,
+    return new SimSnsSubscriptionAttributes(
+      simSnsChangedSubscriptionAttributes(this, requested),
     );
+  }
 
-    for (const [name] of named) {
-      assertSimSnsSettableSubscriptionAttribute(name);
-    }
-
-    const raw = named.find(
-      ([name]) => name === simSnsRawMessageDeliveryAttributeName,
-    )?.[1];
-
-    if (raw === undefined) {
-      return this;
-    }
-
-    return new SimSnsSubscriptionAttributes(booleanValue(raw));
+  /**
+   * Whether this subscription's filter policy admits a published message.
+   *
+   * A subscription with no policy takes everything its topic publishes, which
+   * is what a subscription without one does on real SNS.
+   */
+  accepts(message: SimSnsPublishedMessage): boolean {
+    return this.filterPolicy?.matches(message) ?? true;
   }
 
   /**
    * Add these attributes to what SNS reports about the subscription.
+   *
+   * The two filter policy attributes are reported only when there is a policy,
+   * as real SNS reports them. A subscription that filters nothing has no scope
+   * to report either, since the scope only says how a policy is read.
    */
   reportInto(reported: Map<string, string>): void {
     reported.set(
       simSnsRawMessageDeliveryAttributeName,
       String(this.rawMessageDelivery),
     );
+
+    if (this.filterPolicy === undefined) {
+      return;
+    }
+
+    reported.set(simSnsFilterPolicyAttributeName, this.filterPolicy.value);
+    reported.set(
+      simSnsFilterPolicyScopeAttributeName,
+      this.filterPolicyScope.value,
+    );
   }
 }
+
+export { type SimSnsSubscriptionAttributeInput } from "./sim-sns-requested-subscription-attributes.js";

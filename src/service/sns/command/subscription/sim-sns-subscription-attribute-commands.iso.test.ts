@@ -8,6 +8,7 @@ import {
   assertObjectMatches,
   assertStringIncludes,
   assertThrowsErrorAsync,
+  assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { simAwsWithSubscription } from "../../../../../test/sns/subscription-fixture.js";
@@ -78,21 +79,92 @@ describe("SNS subscription attribute commands", () => {
       }),
     );
 
-    // When a filter policy is set on it.
+    // When a dead-letter queue is set on it.
     const error = await assertThrowsErrorAsync(async () => {
       await simAws.sns().setSubscriptionAttributes(
         new SetSubscriptionAttributesCommand({
           SubscriptionArn: subscriptionArn,
-          AttributeName: "FilterPolicy",
-          AttributeValue: JSON.stringify({ kind: ["order"] }),
+          AttributeName: "RedrivePolicy",
+          AttributeValue: JSON.stringify({
+            deadLetterTargetArn: "arn:aws:sqs:us-east-1:888888888888:dead",
+          }),
         }),
       );
     });
 
     // Then it is refused with its reason, and what was already set stands.
     assertInstanceOf(error, SimSnsUnsimulatedInputException);
-    assertStringIncludes(error.message, "filter policies are not simulated");
+    assertStringIncludes(error.message, "dead-letter queues are not simulated");
     await assertRawMessageDelivery(simAws, subscriptionArn, "true");
+  });
+
+  it("reports the filter policy it was set with", async () => {
+    // Given a subscription with no filter policy.
+    const { simAws, subscriptionArn } = await simAwsWithSubscription();
+    const before = await simAws.sns().getSubscriptionAttributes(
+      new GetSubscriptionAttributesCommand({
+        SubscriptionArn: subscriptionArn,
+      }),
+    );
+
+    assertUndefined(before.Attributes?.["FilterPolicy"]);
+
+    // When a policy is set on it.
+    const policy = JSON.stringify({ type: ["order"] });
+
+    await simAws.sns().setSubscriptionAttributes(
+      new SetSubscriptionAttributesCommand({
+        SubscriptionArn: subscriptionArn,
+        AttributeName: "FilterPolicy",
+        AttributeValue: policy,
+      }),
+    );
+
+    // Then it comes back as the document it was set with, with the scope it is
+    // read under alongside it.
+    const read = await simAws.sns().getSubscriptionAttributes(
+      new GetSubscriptionAttributesCommand({
+        SubscriptionArn: subscriptionArn,
+      }),
+    );
+
+    assertNonNullable(read.Attributes);
+    assertObjectMatches(read.Attributes, {
+      FilterPolicy: policy,
+      FilterPolicyScope: "MessageAttributes",
+    });
+  });
+
+  it("reports the scope a filter policy is read under", async () => {
+    // Given a subscription filtering on the message body.
+    const { simAws, subscriptionArn } = await simAwsWithSubscription();
+
+    await simAws.sns().setSubscriptionAttributes(
+      new SetSubscriptionAttributesCommand({
+        SubscriptionArn: subscriptionArn,
+        AttributeName: "FilterPolicyScope",
+        AttributeValue: "MessageBody",
+      }),
+    );
+
+    await simAws.sns().setSubscriptionAttributes(
+      new SetSubscriptionAttributesCommand({
+        SubscriptionArn: subscriptionArn,
+        AttributeName: "FilterPolicy",
+        AttributeValue: JSON.stringify({ customer: { tier: ["gold"] } }),
+      }),
+    );
+
+    // When the subscription is read back.
+    const read = await simAws.sns().getSubscriptionAttributes(
+      new GetSubscriptionAttributesCommand({
+        SubscriptionArn: subscriptionArn,
+      }),
+    );
+
+    // Then the scope is reported with the policy it applies to.
+    assertNonNullable(read.Attributes);
+    assertObjectMatches(read.Attributes, { FilterPolicyScope: "MessageBody" });
   });
 
   it("requires an attribute name", async () => {

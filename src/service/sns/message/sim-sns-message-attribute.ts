@@ -46,7 +46,28 @@ export class SimSnsMessageAttribute {
    * `String` and `Number` and their custom types carry text.
    */
   get isBinary(): boolean {
-    return this.dataType === "Binary" || this.dataType.startsWith("Binary.");
+    return this.hasDataType("Binary");
+  }
+
+  /**
+   * Whether this attribute carries a number.
+   *
+   * A number still arrives as text, since that is all a message attribute
+   * carries. The data type is what says the text means a number, which is what
+   * a filter policy needs before it can compare one numerically.
+   */
+  get isNumber(): boolean {
+    return this.hasDataType("Number");
+  }
+
+  /**
+   * Whether this attribute carries a JSON array of values in its text.
+   *
+   * A filter policy matches any member of one, which is what the data type is
+   * for: `String.Array` is a list rather than a string that looks like one.
+   */
+  get isStringArray(): boolean {
+    return this.hasDataType("String.Array");
   }
 
   /**
@@ -71,5 +92,12 @@ export class SimSnsMessageAttribute {
       Buffer.byteLength(this.dataType, "utf8") +
       this.value.length
     );
+  }
+
+  /**
+   * Whether the data type is one of the four, with or without a custom label.
+   */
+  private hasDataType(base: string): boolean {
+    return this.dataType === base || this.dataType.startsWith(`${base}.`);
   }
 }

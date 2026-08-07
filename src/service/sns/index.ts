@@ -36,6 +36,14 @@ export { SimSnsFunctionEndpointArn } from "./subscription/sim-sns-function-endpo
 export { SimSnsQueueEndpointArn } from "./subscription/sim-sns-queue-endpoint-arn.js";
 export type { SimSnsSubscriptionEndpoint } from "./subscription/sim-sns-subscription-endpoint.js";
 export type { SimSnsSubscriptionCounts } from "./subscription/sim-sns-subscription-store.js";
+export { SimSnsFilterPolicy } from "./filter/sim-sns-filter-policy.js";
+export {
+  simSnsDefaultFilterPolicyScope,
+  SimSnsFilterPolicyScope,
+  simSnsFilterPolicyScopeOf,
+} from "./filter/sim-sns-filter-policy-scope.js";
+export type { SimSnsFilterSubject } from "./filter/sim-sns-filter-subject.js";
+export { SimSnsFilterValue } from "./filter/sim-sns-filter-value.js";
 export { SimSnsMessageAttributes } from "./message/sim-sns-message-attributes.js";
 export type {
   SimSnsMessageAttributeInput,

@@ -83,14 +83,77 @@ protocol real SNS has is refused by name with the reason it is missing, rather t
 subscription that would never be delivered to. A protocol real SNS does not have at all is refused
 the way real SNS refuses one.
 
-`SimSnsSubscriptionAttributes` holds `RawMessageDelivery` and nothing else, and
-`SimSnsSubscriptionAttributeNames` is where the refusal of the rest is decided. Applying a request
-makes a new set rather than changing the one the subscription holds, as it does for a topic.
+`SimSnsSubscriptionAttributes` holds `RawMessageDelivery`, the subscription's filter policy and the
+scope that policy is read under, and `SimSnsSubscriptionAttributeNames` is where the refusal of the
+rest is decided. Applying a request makes a new set rather than changing the one the subscription
+holds, as it does for a topic, and `sim-sns-subscription-attribute-changes.ts` is where a request is
+read as the attributes it leaves behind. The two filter policy attributes are read together, because
+a policy of the `MessageBody` scope may say things a policy of the default scope may not: setting
+either one on its own still reads the policy under whichever scope ends up in force.
+
+`SimSnsRequestedSubscriptionAttributes` is one request's attributes with the ones it left out left
+out. Every name is checked as it is read, so a request naming one attribute this simulation will not
+take changes none of them.
 
 `SimSnsSubscriptionStore` holds subscriptions rather than the topic holding its own, because an
 `Unsubscribe` request carries a subscription ARN and nothing else: the subscription has to be
 reachable without knowing which topic it belongs to first. It also keeps a per-topic count of the
 subscriptions that have been removed, which is what `SubscriptionsDeleted` reports.
+
+## Filter policies
+
+Subscription filtering lives under `filter/`. It is its own area rather than part of the fan-out,
+because a policy is read when it is set and applied when a message is published, and those happen at
+opposite ends of the service.
+
+`SimSnsFilterPolicy` is one subscription's policy. It keeps the string it was set with, so
+`GetSubscriptionAttributes` reports back what was set rather than a re-serialised version of it, and
+it holds the scope it was read under: reading it is what refuses an operator this simulation cannot
+apply, and the scope decides what the document may say. `forScope` reads it again when the scope
+changes, so a policy that cannot be written under the new scope is refused there rather than left in
+place matching nothing.
+
+`SimSnsFilterPolicyScope` is the two scopes, each of which knows what part of a published message a
+policy of that scope matches against and whether that part can nest. That is the whole difference
+between them, which is why the scope builds the subject rather than something else branching on it.
+
+`SimSnsFilterSubject` is what a policy is matched against, and there are two: `SimSnsAttributeSubject`
+over the message attributes of the publish, and `SimSnsBodySubject` over the parsed message body. Both
+answer what a key path holds, so no operator has to know which of them it is looking at. A body that
+is not a JSON object holds nothing at any key rather than failing to be read, because the body comes
+from whoever published and the scope is the subscription's own business.
+
+A subject also says whether it holds anything at all, which `{"exists": false}` needs: real SNS
+states that an empty set of message attributes matches no filter policy, so a key missing from a
+message carrying other keys is not the same thing as a message carrying none. That is why the answer
+belongs to the subject rather than to the key being asked about.
+
+`SimSnsFilterValue` is one value a policy can be matched against. It holds the forms it has rather
+than one form, because a `Number` message attribute has two: the digits it was published as, and the
+number they spell. A form a value does not have matches nothing of that form, which is what keeps
+`numeric` from matching a `String` attribute holding digits, as real SNS keeps it.
+
+`SimSnsFilterRules` is one level of a policy document, and every rule in it has to hold. A key holding
+a list is a `SimSnsFilterKeyRule`, a key holding an object is another level of rules, and `$or` is
+alternatives. A nested key is refused under the `MessageAttributes` scope, since message attributes
+are flat and such a policy could never match.
+
+`sim-sns-filter-or-eligibility.ts` holds the rules deciding whether an `$or` is one. Real SNS asks for
+a list of at least two objects, none of which names a reserved keyword, and reads anything else as an
+attribute named `$or`. That is the divergence worth knowing here: real SNS makes such a policy match
+nothing, and this refuses it when it is set, because a policy that quietly stopped being an or is
+what filtering is meant to protect a test from.
+
+`match/` holds one class per operator, each holding what it was written with and answering one
+question about a value. `SimSnsFilterMatch` is what they share, including the answer to whether they
+match a key the message does not carry: only `exists` says yes to that. `SimSnsAnythingButMatch` is
+the negation of the matches inside it rather than an operator of its own, which is what makes
+`anything-but` with a `prefix` in it work without a second implementation of `prefix`.
+
+`sim-sns-filter-matches.ts` reads one match condition, and `sim-sns-filter-operators.ts` is the
+operator table it reads with. `cidr` is refused there by name: it is the one operator real SNS has
+that this does not, and a policy holding it would otherwise be accepted and then match nothing, which
+looks exactly like filtering that worked.
 
 ## Message model
 
@@ -120,8 +183,12 @@ SQS, because a real SNS publish response carries no digest for a caller to check
 
 Delivery lives under `delivery/`, and the signing that goes with it under `signature/`.
 
-`SimSnsFanOut` is what a publish hands a message to. It schedules one delivery per subscription on
-the background scheduler, because real SNS answers a publish before anything is delivered:
+`SimSnsFanOut` is what a publish hands a message to. It asks each subscription whether it wants the
+message before scheduling anything, which is where a filter policy is applied: filtering sits above
+the delivery endpoint rather than inside any one of them, so a `lambda` subscription is filtered the
+same way an `sqs` one is, and a third protocol would be too. Each subscription is asked on its own,
+so one subscriber filtering a message out has nothing to do with what another receives. It schedules one delivery per subscription that wants it on the
+background scheduler, because real SNS answers a publish before anything is delivered:
 `simAws.backgroundTasksComplete()` is what waits for it. A failure is recorded on
 `SimSnsDeliveryFailures` rather than thrown, since a background task left rejected would fail an
 unrelated `backgroundTasksComplete()`, and real SNS never reports a delivery failure to the publisher.
@@ -305,9 +372,14 @@ here, it does not make another Account's topics reachable through this one.
   extensions, because nothing verifying an SNS message looks at any.
 - Delivery retry policies, subscription dead-letter queues and delivery status logging are not
   simulated, so a delivery that fails is recorded once rather than retried.
-- Subscription filter policies, delivery retry policies, dead-letter queues and replay are not
-  simulated, so `FilterPolicy`, `FilterPolicyScope`, `DeliveryPolicy`, `RedrivePolicy`,
-  `SubscriptionRoleArn` and `ReplayPolicy` are refused.
+- The `cidr` filter policy operator is not simulated, and is refused when the policy is set.
+- An `$or` real SNS would read as an ordinary attribute name, because it holds fewer than two objects
+  or names a reserved keyword, is refused when the policy is set rather than matched as that
+  attribute.
+- A filter policy is reported back as the string it was set with, rather than the re-serialised
+  document real SNS answers with.
+- Delivery retry policies, dead-letter queues and replay are not simulated, so `DeliveryPolicy`,
+  `RedrivePolicy`, `SubscriptionRoleArn` and `ReplayPolicy` are refused.
 - `Unsubscribe` of an ARN naming no subscription is a `NotFoundException`, which is the error real
   SNS documents for it.
 - A topic name ending in `.fifo` is refused, as are `FifoTopic` and the other FIFO attributes.
@@ -316,6 +388,8 @@ here, it does not make another Account's topics reachable through this one.
   bytes of the name, the data type and the value.
 - A subject beginning with a space is accepted. Older AWS documentation described a subject as ASCII
   text beginning with a letter, number or punctuation mark, and the current contract does not.
+- `GetSubscriptionAttributes` reports `FilterPolicy` and `FilterPolicyScope` only once a policy is
+  set, since the scope only says how a policy is read.
 - `GetTopicAttributes` reports `TopicArn`, `Owner`, `DisplayName`, the three subscription counts and
   `Policy` when one is set. `EffectiveDeliveryPolicy` and `DeliveryPolicy` are left out, since
   delivery retry policies are not simulated. `SubscriptionsPending` is always zero, because the one

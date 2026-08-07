@@ -45,13 +45,18 @@ export class SimSnsFanOut {
   }
 
   /**
-   * Schedule one message for every subscription of a topic.
+   * Schedule one message for every subscription of a topic that wants it.
    *
-   * Each subscription gets its own copy, which is the whole point of a topic:
-   * two queues subscribed to one topic both receive what was published once.
+   * Each subscription gets its own copy, which is what a topic is for: two
+   * queues subscribed to one topic both receive what was published once. A
+   * subscription whose filter policy does not match the message is left out,
+   * and asking each one separately is what keeps one subscriber's policy from
+   * having anything to do with what another receives.
    */
   publish(topic: SimSnsTopic, message: SimSnsPublishedMessage): void {
-    const subscribed = this.subscriptions.forTopic(topic.name.value);
+    const subscribed = this.subscriptions
+      .forTopic(topic.name.value)
+      .filter((subscription) => subscription.accepts(message));
 
     for (const subscription of subscribed) {
       this.background.schedule(async () => {
