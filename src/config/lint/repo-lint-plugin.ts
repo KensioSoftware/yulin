@@ -1,5 +1,3 @@
-import { smartassPreferSpecificAssertions } from "@kensio/smartass/eslint";
-
 import type {
   LintNode,
   LintPlugin,
@@ -30,6 +28,12 @@ import type {
  * configs setting it cannot silently replace each other. That last one is not
  * hypothetical — under ESLint, `@kensio/smartass` setting `no-restricted-syntax`
  * turned this repository's own restrictions off for 265 commits.
+ *
+ * Only this repository's own restrictions live here. The assertion advice from
+ * `@kensio/smartass` used to as well, lifted out of the `no-restricted-syntax`
+ * block in the config it published because there was nothing else to load.
+ * Since 1.37.0 it publishes a real Oxlint plugin, so `.oxlintrc.json` loads
+ * `smartass/prefer-specific-assertions` from the package instead.
  */
 
 /**
@@ -70,78 +74,38 @@ export const repoSyntaxRestrictions = {
 } satisfies Readonly<Record<string, RepoSyntaxRestriction>>;
 
 /**
- * The name the assertion advice from `@kensio/smartass` is reported under.
+ * The one message id every rule here reports under.
+ *
+ * Each restriction is its own rule, so a rule never has a second message to
+ * tell apart from this one.
  */
-export const preferSpecificAssertionsRuleName = "prefer-specific-assertions";
+const messageId = "restriction";
 
 /**
- * Every selector `@kensio/smartass` asks for, read out of its shared config.
- *
- * Smartass ships its advice as a `no-restricted-syntax` block rather than as a
- * plugin, so there is nothing to load: the selectors have to be lifted out of
- * the config it publishes and rehoused in a rule here. Reading them rather than
- * copying them is what stops the two drifting.
+ * Builds the rule that reports one restriction.
  */
-export function smartassSyntaxRestrictions(): readonly RepoSyntaxRestriction[] {
-  return smartassPreferSpecificAssertions.flatMap((config) => {
-    const entry = (config as { rules?: Record<string, unknown> }).rules?.[
-      "no-restricted-syntax"
-    ];
-
-    return Array.isArray(entry)
-      ? (entry.slice(1) as readonly RepoSyntaxRestriction[])
-      : [];
-  });
-}
-
-/**
- * Builds one rule from the restrictions that share a concern.
- *
- * A visitor is keyed by selector, so two restrictions matching the same syntax
- * would leave only the later message. The selectors are distinct today, and
- * `repo-lint-plugin.iso.test.ts` fails if one goes missing.
- */
-function messageId(index: number): string {
-  return `restriction${String(index)}`;
-}
-
-function restrictionRule(
-  restrictions: readonly RepoSyntaxRestriction[],
-): LintRule {
+function restrictionRule(restriction: RepoSyntaxRestriction): LintRule {
   return {
     meta: {
       type: "problem",
       schema: [],
-      messages: Object.fromEntries(
-        restrictions.map((restriction, index) => [
-          messageId(index),
-          restriction.message,
-        ]),
-      ),
+      messages: { [messageId]: restriction.message },
     },
-    create: (context: LintRuleContext): LintVisitor =>
-      Object.fromEntries(
-        restrictions.map((restriction, index) => [
-          restriction.selector,
-          (node: LintNode): void => {
-            context.report({ node, messageId: messageId(index) });
-          },
-        ]),
-      ),
+    create: (context: LintRuleContext): LintVisitor => ({
+      [restriction.selector]: (node: LintNode): void => {
+        context.report({ node, messageId });
+      },
+    }),
   };
 }
 
 function buildRules(): Record<string, LintRule> {
-  const own = Object.entries(repoSyntaxRestrictions).map(
-    ([name, restriction]) => [name, restrictionRule([restriction])] as const,
+  return Object.fromEntries(
+    Object.entries(repoSyntaxRestrictions).map(([name, restriction]) => [
+      name,
+      restrictionRule(restriction),
+    ]),
   );
-
-  return {
-    ...Object.fromEntries(own),
-    [preferSpecificAssertionsRuleName]: restrictionRule(
-      smartassSyntaxRestrictions(),
-    ),
-  };
 }
 
 /**

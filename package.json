@@ -164,7 +164,7 @@
     "@aws-sdk/lib-dynamodb": "^3.1101.0",
     "@aws-sdk/s3-request-presigner": "^3.1101.0",
     "@eslint/js": "^10.0.1",
-    "@kensio/smartass": "^1.36.0",
+    "@kensio/smartass": "^1.37.0",
     "@semantic-release/exec": "7.1.0",
     "@smithy/signature-v4": "^5.6.12",
     "@smithy/smithy-client": "^4.14.16",
