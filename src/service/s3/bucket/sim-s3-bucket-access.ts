@@ -3,7 +3,7 @@ import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-
 import { FilesystemS3BucketStorage } from "../storage/filesystem/s3-filesystem-storage.js";
 import { simS3BucketUrl } from "./sim-s3-endpoint-url.js";
 import type { SimS3Bucket, SimS3BucketName } from "./sim-s3-bucket.js";
-import { SimS3KeyPrefixSystemMetadata } from "../object/s3-key-prefix-metadata.js";
+import { SimS3DeclaredSystemMetadata } from "../object/s3-declared-system-metadata.js";
 import { SimS3MountWatches } from "../mount/sim-s3-mount-watches.js";
 import type { SimS3MountFilesystemOptions } from "../mount/sim-s3-mount.type.js";
 
@@ -67,23 +67,28 @@ export class SimS3BucketAccess {
    * listed anywhere, and nothing happens outside watch mode.
    *
    * A file says nothing about how it was compressed or how long it may be
-   * cached, so `systemMetadata` is where a mount declares what a deployment
-   * would have set.
+   * cached. A deployment into the same Bucket has already said it, so the mount
+   * inherits what the Bucket was told, and `systemMetadata` is where it
+   * declares the rest or answers differently.
    */
   mountFilesystem(
     bucketName: SimS3BucketName | string,
     directoryPath: string,
     options: SimS3MountFilesystemOptions = {},
   ): void {
-    this.required(bucketName).configureSimStorage(
+    const bucket = this.required(bucketName);
+    const systemMetadata = new SimS3DeclaredSystemMetadata({
+      inherited: bucket.getDeclaredSystemMetadata(),
+      declarations: options.systemMetadata,
+    });
+
+    bucket.configureSimStorage(
       new FilesystemS3BucketStorage({
         directoryPath,
         ...(options.additionalFileExtensions !== undefined && {
           additionalFileExtensions: options.additionalFileExtensions,
         }),
-        systemMetadata: new SimS3KeyPrefixSystemMetadata({
-          declarations: options.systemMetadata,
-        }),
+        systemMetadata,
       }),
     );
     this.mountWatches.register(bucketName, directoryPath, options);

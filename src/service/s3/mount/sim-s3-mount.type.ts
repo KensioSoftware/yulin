@@ -53,6 +53,11 @@ export interface SimS3MountFilesystemOptions {
    * on and describes every Object with a `content-type` and nothing else. This
    * is where the rest is declared.
    *
+   * A CDK `BucketDeployment` into the same Bucket has already said what it
+   * publishes, and a mount inherits that, so this is for what no deployment
+   * covers and for answering differently on purpose. A declaration here goes
+   * over an inherited one, header by header.
+   *
    * `ContentEncoding` is the one a site can be broken without. A directory of
    * brotli files served with no `content-encoding` is bytes no browser can
    * decode, and a deployment that sets the header would have made them work:

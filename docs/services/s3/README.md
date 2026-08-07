@@ -1779,8 +1779,8 @@ leading dot is optional. Everything not named is still refused.
 
 A stored Object holds what S3 was told when it was written. A file holds its bytes and its name, so
 a mounted Bucket has only the extension to go on, and reports a `content-type` and nothing else.
-Anything a deployment would have set is declared on the mount instead, for the Objects under a key
-prefix.
+Anything a deployment would have set is either inherited from the deployment, below, or declared on
+the mount, for the Objects under a key prefix.
 
 `ContentEncoding` is the one a site can be broken without. A directory of brotli files served with
 no `content-encoding` is bytes no browser can decode:
@@ -1812,10 +1812,81 @@ string, including `Expires`. Every declaration whose prefix the key starts with 
 order they were given, so a later one wins where two name the same header. An empty prefix is every
 Object in the Bucket. A declared `ContentType` replaces the one guessed from the extension.
 
-This is what a Bucket mounted for local development needs to answer as the deployed one does. A CDK
-`BucketDeployment` sets the same headers through its own `SystemMetadata`, and a mount serves the
-files as they are built rather than as they were staged, so the two say the same thing in different
-places. See [CDK S3 BucketDeployment](../cloudformation/README.md#cdk-s3-bucketdeployment).
+### Inheriting what the deployment set
+
+A mount usually does not need to declare any of that, because something in the same simulated account
+has already said it. A CDK [`BucketDeployment`](../cloudformation/README.md#cdk-s3-bucketdeployment)
+sets these headers through its own `SystemMetadata`, and says so on the destination Bucket as well as
+setting them on the Objects it copies. Mounting a directory over that Bucket replaces the Objects and
+inherits what the Bucket was told about them, so the files on disk are served as the deployed ones
+were:
+
+```typescript sim-s3-mount-deployed-system-metadata
+/**
+ * Serving a rebuilt directory as the deployment that filled the Bucket did.
+ */
+
+import path from "node:path";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+// The Stack publishes the site. Its BucketDeployments say what they set, such
+// as `content-encoding: br` for the compressed mirror under `br/`.
+await simAws
+  .cloudFormation()
+  .deployTemplateFile("cdk.out/SiteStack.template.json");
+
+// The Bucket then serves the generator's output as it is rebuilt. Nothing about
+// those files says how they were compressed, and nothing here has to either.
+simAws
+  .s3()
+  .mountBucketFilesystem("site-bucket", path.join(process.cwd(), "public"));
+```
+
+The order does not matter: a directory can be mounted into a Bucket before the Stack describing it is
+deployed, and the mount answers with whatever the Bucket has been told by the time an Object is read.
+
+What a deployment published is what it is sure of, so a file it copied is described exactly. A file a
+later build wrote is described by the rule the deployment would have published it under — its
+destination key prefix and its filters — as long as only one deployment claims it. Where two
+deployments into one Bucket could both have published a file that neither did, nothing is inherited
+for it, because serving a page as another deployment's brotli breaks it in a way serving the file as
+it is on disk does not. Declare those on the mount.
+
+Anything declared on the mount goes over the top of all of it, one header at a time, which is how a
+mount answers differently on purpose. A deployed site caching its assets for a year is the usual
+reason:
+
+```typescript sim-s3-mount-override-system-metadata
+/**
+ * Keeping a deployment's encoding while dropping its caching locally.
+ */
+
+import path from "node:path";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+await simAws
+  .cloudFormation()
+  .deployTemplateFile("cdk.out/SiteStack.template.json");
+
+simAws
+  .s3()
+  .mountBucketFilesystem("site-bucket", path.join(process.cwd(), "public"), {
+    // `content-encoding` is still the deployment's, because this says nothing
+    // about it. A year of caching is not what a rebuild wants reaching the
+    // browser, so that one is answered here instead.
+    systemMetadata: [{ keyPrefix: "", metadata: { CacheControl: "no-store" } }],
+  });
+```
+
+Pages served with [live reload](../../serve/README.md) are already sent `no-store`, so an HTML
+document is never what a stale cache is holding on to. Assets a build rewrites in place are, which is
+what a declaration like this one is for.
 
 ## Object system metadata
 
@@ -1937,8 +2008,9 @@ Sim S3 currently supports:
 - Bucket-global uniqueness within a `SimAws` instance across simulated Accounts and Regions
 - In-memory Object storage by default
 - Optional filesystem-backed Bucket storage with `mountBucketFilesystem(...)`, watching the mounted
-  directory and reloading connected browsers when it is rebuilt, and reporting the system metadata
-  the mount declares for a key prefix
+  directory and reloading connected browsers when it is rebuilt, and reporting the system metadata a
+  CDK `BucketDeployment` into the same Bucket published, alongside anything the mount declares for a
+  key prefix itself
 
 The simulator focuses on useful behaviour for tests and local development rather than full S3 feature
 parity. Unsupported S3 options may be ignored or may throw errors depending on whether the simulator

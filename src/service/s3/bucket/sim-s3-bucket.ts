@@ -10,6 +10,7 @@ import type { SimIamPolicyDocument } from "../../iam/policy/sim-iam-policy.js";
 import { simS3BucketWebsiteUrl } from "./website/sim-s3-bucket-website-url.js";
 import { validateS3BucketName } from "./validate/validate-s3-bucket-name.js";
 import { simAwsAccountRegionScopeFactory } from "../../aws/sim-aws-account-region-scope.factory.js";
+import { SimS3BucketSystemMetadata } from "./sim-s3-bucket-system-metadata.js";
 
 export type SimS3BucketName = Brand<string, "SimS3BucketName">;
 
@@ -30,6 +31,7 @@ export class SimS3Bucket {
   public readonly bucketName: SimS3BucketName;
 
   private readonly accountRegionScope: SimAwsAccountRegionScope;
+  private readonly systemMetadata = new SimS3BucketSystemMetadata();
   private storage: SimS3BucketStorage;
   private website: SimS3BucketWebsite;
   private policy: SimIamPolicyDocument | undefined;
@@ -97,6 +99,18 @@ export class SimS3Bucket {
    */
   configureSimStorage(storage: SimS3BucketStorage): void {
     this.storage = storage;
+  }
+
+  /**
+   * What this Bucket has been told about the Objects under its keys, beyond
+   * what the Objects themselves carry.
+   *
+   * A deployment into the Bucket declares here what it publishes, and storage
+   * that cannot hold metadata reads it back, so a directory mounted in place of
+   * those Objects is served with the headers they had.
+   */
+  getDeclaredSystemMetadata(): SimS3BucketSystemMetadata {
+    return this.systemMetadata;
   }
 
   /**

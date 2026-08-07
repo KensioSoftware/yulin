@@ -1306,7 +1306,9 @@ around it are read the same way:
 - `SystemMetadata` sets content headers on every Object the deployment copies, such as
   `content-encoding` or `cache-control`. Without it, the content type is guessed from the file
   extension. See [Object system metadata](../s3/README.md#object-system-metadata) for what comes back
-  on a read.
+  on a read. The deployment also tells the destination Bucket what it publishes, so a directory
+  [mounted over that Bucket](../s3/README.md#inheriting-what-the-deployment-set) for local
+  development is served with the same headers without restating them.
 - `Prune` removes the Objects the deployment covers and its source no longer holds. It is on unless
   the deployment turns it off, as the construct is. Pruning only considers what the filters and the
   key prefix select, so a deployment does not delete Objects it would never have copied.
