@@ -106,6 +106,7 @@ export interface SimCloudFrontOriginConfig {
   readonly Id?: string | undefined;
   readonly DomainName?: string | undefined;
   readonly OriginPath?: string | undefined;
+  readonly OriginAccessControlId?: string | undefined;
   readonly S3OriginConfig?: object | undefined;
   readonly CustomOriginConfig?: object | undefined;
 }

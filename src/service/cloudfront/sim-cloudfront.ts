@@ -43,6 +43,11 @@ import type {
   SimCloudFrontResponseHeadersPolicyId,
 } from "./response-headers-policy/sim-cf-response-headers-policy.js";
 import { SimCloudFrontResponseHeadersPolicyRegistry } from "./response-headers-policy/sim-cf-response-headers-policy-registry.js";
+import type {
+  SimCloudFrontOriginAccessControl,
+  SimCloudFrontOriginAccessControlId,
+} from "./origin-access-control/sim-cf-origin-access-control.js";
+import { SimCloudFrontOriginAccessControlRegistry } from "./origin-access-control/sim-cf-origin-access-control-registry.js";
 import { SimCloudFrontSdkCommandRouter } from "./sdk/sim-cloudfront-sdk-command-router.js";
 import {
   SimCloudFrontCommands,
@@ -64,6 +69,8 @@ export class SimCloudFront {
   private readonly cloudFrontFunctions: SimCloudFrontFunctionMap = new Map();
   private readonly responseHeadersPolicies =
     new SimCloudFrontResponseHeadersPolicyRegistry();
+  private readonly originAccessControls =
+    new SimCloudFrontOriginAccessControlRegistry();
 
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly commands: SimCloudFrontCommands;
@@ -80,6 +87,7 @@ export class SimCloudFront {
       accountId: this.accountRegionScope.accountId,
       distributions: this.distributions,
       cloudFrontFunctions: this.cloudFrontFunctions,
+      originAccessControls: this.originAccessControls,
     });
   }
 
@@ -220,6 +228,38 @@ export class SimCloudFront {
     policyId: SimCloudFrontResponseHeadersPolicyId | string,
   ): SimCloudFrontResponseHeadersPolicy | undefined {
     return this.responseHeadersPolicies.byId(policyId);
+  }
+
+  /**
+   * Store a simulated origin access control.
+   *
+   * There is no CreateOriginAccessControl command here, so CloudFormation is
+   * the only thing that makes one, and this is how it hands it over. A name
+   * another origin access control already holds is refused, as CloudFront
+   * refuses one.
+   */
+  addOriginAccessControl(
+    originAccessControl: SimCloudFrontOriginAccessControl,
+  ): void {
+    this.originAccessControls.add(originAccessControl);
+  }
+
+  /**
+   * Forget a simulated origin access control.
+   */
+  removeOriginAccessControl(
+    originAccessControlId: SimCloudFrontOriginAccessControlId,
+  ): void {
+    this.originAccessControls.remove(originAccessControlId);
+  }
+
+  /**
+   * Get a simulated origin access control by ID.
+   */
+  getOriginAccessControlById(
+    originAccessControlId: SimCloudFrontOriginAccessControlId | string,
+  ): SimCloudFrontOriginAccessControl | undefined {
+    return this.originAccessControls.byId(originAccessControlId);
   }
 
   /**
