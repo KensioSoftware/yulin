@@ -13,7 +13,7 @@ import { describe, it } from "vitest";
 import { SimAwsHttp } from "../../../serve/http/sim-aws-http.js";
 import { makeSimAwsAccountId } from "../../aws/sim-aws-account.js";
 import { SimAws } from "../../aws/sim-aws.js";
-import { grantPublicWebsiteRead } from "../bucket/website/sim-s3-public-website.fixture.js";
+import { grantPublicObjectRead } from "../bucket/sim-s3-public-read.fixture.js";
 import type { SimS3 } from "../sim-s3.js";
 
 /**
@@ -84,7 +84,7 @@ describe("Simulated S3 static website authorization", () => {
     const simS3 = simAws.region("eu-west-2").s3();
 
     await websiteSite(simS3, "readable-site");
-    await grantPublicWebsiteRead(simS3, "readable-site");
+    await grantPublicObjectRead(simS3, "readable-site");
 
     // When a browser asks for the index document.
     const response = await simAwsHttp.fetch(siteUrl("readable-site"));

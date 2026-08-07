@@ -65,7 +65,8 @@ const certificate = new acm.Certificate(stack, "Certificate", {
 });
 
 const websiteBucket = new s3.Bucket(stack, "WebsiteBucket", {
-  blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+  blockPublicAccess: s3.BlockPublicAccess.BLOCK_ACLS,
+  publicReadAccess: true,
   encryption: s3.BucketEncryption.S3_MANAGED,
   enforceSSL: true,
   removalPolicy: cdk.RemovalPolicy.RETAIN,
@@ -78,7 +79,7 @@ const distribution = new cloudfront.Distribution(stack, "Distribution", {
   certificate,
   minimumProtocolVersion: cloudfront.SecurityPolicyProtocol.TLS_V1_2_2021,
   defaultBehavior: {
-    origin: origins.S3BucketOrigin.withOriginAccessControl(websiteBucket),
+    origin: origins.S3BucketOrigin.withBucketDefaults(websiteBucket),
     viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
     allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
     cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,

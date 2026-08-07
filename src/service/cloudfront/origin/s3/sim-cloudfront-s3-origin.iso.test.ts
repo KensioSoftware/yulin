@@ -1,12 +1,16 @@
 import {
   assertIdentical,
   assertInstanceOf,
+  assertNonNullable,
   assertStringIncludes,
   assertThrowsError,
+  assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
-import { SimS3Bucket } from "../../../s3/bucket/sim-s3-bucket.js";
+import { SimAws } from "../../../aws/sim-aws.js";
+import { grantPublicObjectRead } from "../../../s3/bucket/sim-s3-public-read.fixture.js";
+import { SimS3NoSuchBucket } from "../../../s3/error/sim-s3.error.js";
 import {
   SimS3Object,
   SimS3ObjectMetadata,
@@ -20,8 +24,16 @@ describe("sim CloudFront S3 Origin", () => {
   async function originWithObject(
     metadata: Record<string, string>,
   ): Promise<SimCloudFrontS3Origin> {
-    const bucket = new SimS3Bucket({ bucketName: "site-bucket" });
+    const simS3 = new SimAws().s3();
 
+    await simS3.createBucket({ input: { Bucket: "site-bucket" } });
+    await grantPublicObjectRead(simS3, "site-bucket");
+
+    const bucket = simS3.getSimBucketByName("site-bucket");
+    assertNonNullable(bucket);
+
+    // Stored straight into the Bucket so the test states the system metadata
+    // it is about, rather than the PutObject inputs that would set it.
     await bucket.putObject(
       new SimS3Object({
         key: "data/standard.keys",
@@ -30,7 +42,7 @@ describe("sim CloudFront S3 Origin", () => {
       }),
     );
 
-    return new SimCloudFrontS3Origin({ bucket });
+    return new SimCloudFrontS3Origin({ originBucket: { bucket, simS3 } });
   }
 
   function originRequest(request: Request): {
@@ -85,6 +97,31 @@ describe("sim CloudFront S3 Origin", () => {
     assertIdentical(response.headers.get("content-encoding"), "br");
     assertIdentical(response.headers.get("content-length"), "10");
     assertIdentical(await response.text(), "");
+  });
+
+  it("raises a Bucket that has gone rather than answering for it", async () => {
+    // Given an Origin whose Bucket has since been deleted, which is neither an
+    // Object the Distribution can serve nor one it can report on.
+    const simS3 = new SimAws().s3();
+    await simS3.createBucket({ input: { Bucket: "deleted-bucket" } });
+
+    const bucket = simS3.getSimBucketByName("deleted-bucket");
+    assertNonNullable(bucket);
+
+    const origin = new SimCloudFrontS3Origin({
+      originBucket: { bucket, simS3 },
+    });
+    await simS3.deleteBucket({ input: { Bucket: "deleted-bucket" } });
+
+    // When CloudFront fetches from it.
+    const error = await assertThrowsErrorAsync(async () => {
+      await origin.fetch(
+        originRequest(new Request("http://example.test/index.html")),
+      );
+    });
+
+    // Then the failure reaches the caller instead of becoming a 404.
+    assertInstanceOf(error, SimS3NoSuchBucket);
   });
 
   it("resolves bucket name fallback from non-S3 origin domain name", () => {

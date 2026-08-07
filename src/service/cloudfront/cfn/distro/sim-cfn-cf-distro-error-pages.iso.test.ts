@@ -11,6 +11,7 @@ import {
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 
 import { SimAws } from "../../../aws/sim-aws.js";
+import { grantPublicObjectRead } from "../../../s3/bucket/sim-s3-public-read.fixture.js";
 import { SimCloudFrontDistribution } from "../../distribution/sim-cloudfront-distribution.js";
 import { simCfSiteRequest } from "../../../../../test/cloudfront/site-fixture.js";
 
@@ -87,6 +88,7 @@ describe("CloudFormation Distribution error pages and root object", () => {
         Body: "<h1>Not found</h1>",
       }),
     );
+    await grantPublicObjectRead(simS3, "cfn-site-bucket");
 
     // When the root of the Distribution is requested.
     const home = await simCfSiteRequest(simAws, distributionId, "/");

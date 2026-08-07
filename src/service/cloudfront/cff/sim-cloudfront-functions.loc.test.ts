@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
+import { grantPublicObjectRead } from "../../s3/bucket/sim-s3-public-read.fixture.js";
 import { SimAwsLocalServer } from "../../../serve/index.js";
 import {
   CreateDistributionCommand,
@@ -28,6 +29,7 @@ describe("Serve sim CloudFront Functions on localhost", () => {
     const simCloudFront = simAws.cloudFront();
 
     await simS3.createBucket(new CreateBucketCommand({ Bucket: "foo-bucket" }));
+    await grantPublicObjectRead(simS3, "foo-bucket");
 
     function viewerRequestHandlerFunction(
       event: CloudFrontFunction.ViewerRequestEvent,
@@ -188,6 +190,7 @@ describe("Serve sim CloudFront Functions on localhost", () => {
     await simS3.createBucket(
       new CreateBucketCommand({ Bucket: "foobar-bucket" }),
     );
+    await grantPublicObjectRead(simS3, "foobar-bucket");
 
     function viewerResponseHandlerFunction(
       event: CloudFrontFunction.ViewerResponseEvent,

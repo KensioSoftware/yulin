@@ -107,8 +107,15 @@ export interface SimCloudFrontOriginConfig {
   readonly DomainName?: string | undefined;
   readonly OriginPath?: string | undefined;
   readonly OriginAccessControlId?: string | undefined;
-  readonly S3OriginConfig?: object | undefined;
+  readonly S3OriginConfig?: SimCloudFrontS3OriginConfig | undefined;
   readonly CustomOriginConfig?: object | undefined;
+}
+
+/**
+ * Minimal structural sim CloudFront S3 Origin config.
+ */
+export interface SimCloudFrontS3OriginConfig {
+  readonly OriginAccessIdentity?: string | undefined;
 }
 
 /**

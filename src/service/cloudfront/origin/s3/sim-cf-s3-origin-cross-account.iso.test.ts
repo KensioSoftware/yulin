@@ -15,6 +15,7 @@ import {
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
+import { grantPublicObjectRead } from "../../../s3/bucket/sim-s3-public-read.fixture.js";
 import { SimAwsServiceRequest } from "../../../../serve/controller/sim-service-controller.js";
 import { SimCloudFrontServiceController } from "../../controller/sim-cloudfront-controller.js";
 
@@ -78,6 +79,7 @@ describe("Sim CloudFront S3 Origin Bucket resolution", () => {
         Body: "<h1>From the other Account</h1>",
       }),
     );
+    await grantPublicObjectRead(bucketS3, "other-account-bucket");
 
     // When a Distribution in a different Account takes it as an S3 Origin.
     const distributionCreation = await simAws
@@ -123,6 +125,7 @@ describe("Sim CloudFront S3 Origin Bucket resolution", () => {
         Body: "<h1>From the other Region</h1>",
       }),
     );
+    await grantPublicObjectRead(bucketS3, "other-region-bucket");
 
     // When a Distribution created in another Region of that Account takes it
     // as an S3 Origin.

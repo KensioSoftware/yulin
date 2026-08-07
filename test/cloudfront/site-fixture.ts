@@ -16,11 +16,17 @@ import {
 } from "@aws-sdk/client-cloudfront";
 
 import type { SimAws } from "../../src/service/aws/sim-aws.js";
+import { grantPublicObjectRead } from "../../src/service/s3/bucket/sim-s3-public-read.fixture.js";
 import { SimCloudFrontServiceController } from "../../src/service/cloudfront/controller/sim-cloudfront-controller.js";
 import { SimAwsServiceRequest } from "../../src/serve/controller/sim-service-controller.js";
 
 /**
  * Create a Bucket holding the given objects, keyed by object key.
+ *
+ * The Objects are made publicly readable, because a CloudFront S3 Origin with
+ * no origin access control reads them anonymously and the Bucket policy is the
+ * only thing that can allow that. A test about the refusal builds its own
+ * Bucket without the grant.
  */
 export async function simCfSiteBucket(
   simAws: SimAws,
@@ -29,6 +35,7 @@ export async function simCfSiteBucket(
 ): Promise<void> {
   const simS3 = simAws.s3();
   await simS3.createBucket(new CreateBucketCommand({ Bucket: bucketName }));
+  await grantPublicObjectRead(simS3, bucketName);
 
   await Promise.all(
     Object.entries(objects).map(

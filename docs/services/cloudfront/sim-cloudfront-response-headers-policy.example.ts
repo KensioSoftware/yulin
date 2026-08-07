@@ -16,7 +16,31 @@ try {
       Resources: {
         SiteBucket: {
           Type: "AWS::S3::Bucket",
-          Properties: { BucketName: "site-bucket" },
+          Properties: {
+            BucketName: "site-bucket",
+            PublicAccessBlockConfiguration: {
+              BlockPublicAcls: true,
+              IgnorePublicAcls: true,
+            },
+          },
+        },
+        // The Origin reads the Bucket anonymously, so the site needs a policy
+        // making it publicly readable.
+        SiteBucketPolicy: {
+          Type: "AWS::S3::BucketPolicy",
+          DependsOn: "SiteBucket",
+          Properties: {
+            Bucket: "site-bucket",
+            PolicyDocument: {
+              Version: "2012-10-17",
+              Statement: {
+                Effect: "Allow",
+                Principal: "*",
+                Action: "s3:GetObject",
+                Resource: "arn:aws:s3:::site-bucket/*",
+              },
+            },
+          },
         },
         CacheHeaders: {
           Type: "AWS::CloudFront::ResponseHeadersPolicy",

@@ -81,7 +81,8 @@ const stack = new cdk.Stack(app, "TestStack", {
 });
 
 const siteBucket = new s3.Bucket(stack, "SiteBucket", {
-  blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+  blockPublicAccess: s3.BlockPublicAccess.BLOCK_ACLS,
+  publicReadAccess: true,
   encryption: s3.BucketEncryption.S3_MANAGED,
   enforceSSL: true,
   removalPolicy: cdk.RemovalPolicy.RETAIN,
@@ -116,7 +117,7 @@ const distribution = new cloudfront.Distribution(stack, "SiteDistribution", {
   domainNames: ["www.example.test"],
   certificate,
   defaultBehavior: {
-    origin: origins.S3BucketOrigin.withOriginAccessControl(siteBucket),
+    origin: origins.S3BucketOrigin.withBucketDefaults(siteBucket),
     viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
     allowedMethods: cloudfront.AllowedMethods.ALLOW_GET_HEAD_OPTIONS,
     cachedMethods: cloudfront.CachedMethods.CACHE_GET_HEAD_OPTIONS,

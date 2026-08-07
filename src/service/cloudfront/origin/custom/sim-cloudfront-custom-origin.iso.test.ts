@@ -22,6 +22,7 @@ import { SimAwsLocalUrl } from "../../../../serve/http/url/sim-aws-local-url.js"
 import type { SimPayload2Event } from "../../../../serve/payload-2/sim-payload-2-event.type.js";
 import { simHttpApiLambdaProxyFactory } from "../../../apigatewayv2/api/sim-http-api-lambda-proxy.factory.js";
 import { SimAws } from "../../../aws/sim-aws.js";
+import { grantPublicObjectRead } from "../../../s3/bucket/sim-s3-public-read.fixture.js";
 import { makeLambdaZipFileInput } from "../../../lambda/function/code/lambda-zip-file-input.js";
 import { SimCloudFront } from "../../sim-cloudfront.js";
 
@@ -245,6 +246,7 @@ describe("Simulated CloudFront custom Origin", () => {
         Body: "<h1>Site</h1>",
       }),
     );
+    await grantPublicObjectRead(simAws.s3(), "site-bucket");
 
     // And a Distribution serving the site, with /api/* going to the API.
     const creation = await simAws.cloudFront().createDistribution(

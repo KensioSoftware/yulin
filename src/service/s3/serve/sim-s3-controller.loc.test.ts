@@ -10,7 +10,7 @@ import {
   assertStringIncludes,
 } from "@kensio/smartass";
 import { afterAll, beforeAll, describe, it } from "vitest";
-import { grantPublicWebsiteRead } from "../bucket/website/sim-s3-public-website.fixture.js";
+import { grantPublicObjectRead } from "../bucket/sim-s3-public-read.fixture.js";
 import { SimAwsLocalServer } from "../../../serve/index.js";
 import { SimAws } from "../../aws/sim-aws.js";
 
@@ -41,7 +41,7 @@ describe("Simulated S3 local HTTP controller", () => {
         },
       }),
     );
-    await grantPublicWebsiteRead(simS3, "foo-site");
+    await grantPublicObjectRead(simS3, "foo-site");
     await simS3.putObject(
       new PutObjectCommand({
         Bucket: "foo-site",
@@ -82,7 +82,7 @@ describe("Simulated S3 local HTTP controller", () => {
         },
       }),
     );
-    await grantPublicWebsiteRead(simS3, "head-site");
+    await grantPublicObjectRead(simS3, "head-site");
     await simS3.putObject(
       new PutObjectCommand({
         Bucket: "head-site",
@@ -124,7 +124,7 @@ describe("Simulated S3 local HTTP controller", () => {
         },
       }),
     );
-    await grantPublicWebsiteRead(simS3, "encoded-path-site");
+    await grantPublicObjectRead(simS3, "encoded-path-site");
     await simS3.putObject(
       new PutObjectCommand({
         Bucket: "encoded-path-site",
@@ -160,7 +160,7 @@ describe("Simulated S3 local HTTP controller", () => {
         },
       }),
     );
-    await grantPublicWebsiteRead(simS3, "folder-index-redirect-site");
+    await grantPublicObjectRead(simS3, "folder-index-redirect-site");
     await simS3.putObject(
       new PutObjectCommand({
         Bucket: "folder-index-redirect-site",
@@ -200,7 +200,7 @@ describe("Simulated S3 local HTTP controller", () => {
         },
       }),
     );
-    await grantPublicWebsiteRead(simS3, "folder-index-follow-site");
+    await grantPublicObjectRead(simS3, "folder-index-follow-site");
     await simS3.putObject(
       new PutObjectCommand({
         Bucket: "folder-index-follow-site",
@@ -258,7 +258,7 @@ describe("Simulated S3 local HTTP controller", () => {
         },
       }),
     );
-    await grantPublicWebsiteRead(simS3, "missing-object-site");
+    await grantPublicObjectRead(simS3, "missing-object-site");
 
     const response = await fetch(
       `http://missing-object-site.s3-website.eu-west-2.sim-aws.localhost:${srv.port}/missing.txt`,

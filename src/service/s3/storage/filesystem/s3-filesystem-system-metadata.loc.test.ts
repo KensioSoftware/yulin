@@ -17,7 +17,7 @@ import { TemporaryDirectory } from "../../../../util/filesystem/temporary-direct
 import { makeAwsRegionName } from "../../../aws/sim-aws-region.js";
 import { SimAws } from "../../../aws/sim-aws.js";
 import type { SimS3BucketName } from "../../bucket/sim-s3-bucket.js";
-import { grantPublicWebsiteRead } from "../../bucket/website/sim-s3-public-website.fixture.js";
+import { grantPublicObjectRead } from "../../bucket/sim-s3-public-read.fixture.js";
 
 /**
  * A site publishing a compressed mirror of its assets, which is what the
@@ -94,7 +94,7 @@ describe("System metadata declared for a mounted directory", () => {
         WebsiteConfiguration: { IndexDocument: { Suffix: "index.html" } },
       }),
     );
-    await grantPublicWebsiteRead(simS3, bucketName);
+    await grantPublicObjectRead(simS3, bucketName);
 
     simS3.mountBucketFilesystem(bucketName, testDirectory.join("public"), {
       systemMetadata: compressedMirror,

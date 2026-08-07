@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
+import { grantPublicObjectRead } from "../../s3/bucket/sim-s3-public-read.fixture.js";
 import { SimAwsLocalServer } from "../../../serve/index.js";
 import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { CreateDistributionCommand } from "@aws-sdk/client-cloudfront";
@@ -50,6 +51,8 @@ describe("sim CloudFront local server", () => {
         Body: jsonStringify({ something: "foo-B" }),
       }),
     );
+    await grantPublicObjectRead(simS3, "bucket-a");
+    await grantPublicObjectRead(simS3, "bucket-b");
 
     const simCloudFront = simAws.cloudFront();
     const distributionCreation = await simCloudFront.createDistribution(
@@ -139,6 +142,7 @@ describe("sim CloudFront local server", () => {
         Body: "<h1>Not found</h1>",
       }),
     );
+    await grantPublicObjectRead(simS3, "site-bucket");
 
     // And a Distribution serving it the way a static site is usually set up.
     const distributionCreation = await simAws.cloudFront().createDistribution(
@@ -212,6 +216,7 @@ describe("sim CloudFront local server", () => {
         Body: jsonStringify({ something: "foobar" }),
       }),
     );
+    await grantPublicObjectRead(simS3, "foo-bucket");
 
     const simCloudFront = simAws.region(regionB).cloudFront();
     const distributionCreation = await simCloudFront.createDistribution(

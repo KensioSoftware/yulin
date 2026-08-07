@@ -131,9 +131,16 @@ HTTP request behaviour is split across a few directories:
 - `router/` resolves an incoming `Request` to a simulated Distribution by CloudFront hostname or
   alternate domain name.
 - `resolver/` chooses the matching Cache Behavior for a request path.
-- `origin/` adapts CloudFront Origin requests/responses. `origin/s3/` reaches a sim S3 Bucket
-  directly, while `origin/custom/` turns the Origin request back into an HTTP request and sends it
-  into the wider simulated environment.
+- `origin/` adapts CloudFront Origin requests/responses. `origin/s3/` reads a sim S3 Bucket through
+  that Bucket's own GetObject command, while `origin/custom/` turns the Origin request back into an
+  HTTP request and sends it into the wider simulated environment.
+
+  An S3 Origin reads as an anonymous caller, which is the unsigned request real CloudFront sends to
+  the S3 REST endpoint when the Origin has no origin access control, so the Bucket policy decides
+  what the Distribution can serve. That is why `SimCloudFrontS3OriginResolver` answers with the
+  Bucket and the sim S3 holding it rather than a bare `SimS3Bucket`: the read goes through that
+  scope's command. A denial becomes a 403 from the Origin, which the Distribution's custom error
+  response for 403 can then replace.
 
 When a sim AWS is served on localhost, CloudFront requests are routed through this layer to find the
 right sim Distribution, Origin and Behavior.
@@ -185,9 +192,9 @@ nothing created is `SimCloudFrontInvalidOriginAccessControl`, as CloudFront refu
 CreateDistribution. Resolution is eager here, unlike a response headers policy, because CloudFront
 checks an origin access control at creation rather than when a request arrives.
 
-Nothing reads the stored origin access control yet. It does not sign the Origin request and does not
-decide whether the Bucket may be read, so a Distribution serves its S3 Origin the same way with one
-as without.
+Nothing reads the stored origin access control yet. It does not sign the Origin request, so an
+Origin naming one still reads its Bucket anonymously and a Bucket only an origin access control
+could reach answers 403.
 
 ## Cross-service integration
 

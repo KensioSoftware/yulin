@@ -13,7 +13,12 @@ import {
   AddPermissionCommand,
   CreateFunctionCommand,
 } from "@aws-sdk/client-lambda";
-import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import {
+  CreateBucketCommand,
+  PutBucketPolicyCommand,
+  PutObjectCommand,
+  PutPublicAccessBlockCommand,
+} from "@aws-sdk/client-s3";
 
 import { SimAws } from "@kensio/yulin";
 import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
@@ -21,13 +26,36 @@ import { serveSimAws } from "@kensio/yulin/serve";
 
 const simAws = new SimAws();
 
-// A Bucket holding the site.
+// A Bucket holding the site, readable by the Origin that reads it anonymously.
 await simAws.s3().createBucket(new CreateBucketCommand({ Bucket: "site" }));
 await simAws.s3().putObject(
   new PutObjectCommand({
     Bucket: "site",
     Key: "index.html",
     Body: "<h1>Site</h1>",
+  }),
+);
+await simAws.s3().putPublicAccessBlock(
+  new PutPublicAccessBlockCommand({
+    Bucket: "site",
+    PublicAccessBlockConfiguration: {
+      BlockPublicAcls: true,
+      IgnorePublicAcls: true,
+    },
+  }),
+);
+await simAws.s3().putBucketPolicy(
+  new PutBucketPolicyCommand({
+    Bucket: "site",
+    Policy: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: "*",
+        Action: "s3:GetObject",
+        Resource: "arn:aws:s3:::site/*",
+      },
+    }),
   }),
 );
 
