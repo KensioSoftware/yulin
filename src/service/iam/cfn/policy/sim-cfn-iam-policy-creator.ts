@@ -122,7 +122,7 @@ export class SimCfnIamPolicyCreator {
     properties: SimCfnTemplateValueRecord,
   ): void {
     for (const principalProperty of ["Users", "Groups"]) {
-      // eslint-disable-next-line security/detect-object-injection -- fixed property names.
+      // oxlint-disable-next-line security/detect-object-injection -- fixed property names.
       if (properties[principalProperty] !== undefined) {
         throw new TypeError(
           `Invalid AWS::IAM::Policy ${resource.logicalId}: ` +

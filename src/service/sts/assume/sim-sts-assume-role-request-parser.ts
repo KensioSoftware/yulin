@@ -14,7 +14,8 @@ export interface ParsedAssumeRoleRequest {
   readonly roleSessionName: string;
   readonly durationSeconds: number;
   readonly conditionContext:
-    Readonly<Record<string, SimIamConditionValue>> | undefined;
+    | Readonly<Record<string, SimIamConditionValue>>
+    | undefined;
 }
 
 /**

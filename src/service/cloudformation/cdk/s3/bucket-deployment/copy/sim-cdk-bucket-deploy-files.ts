@@ -22,7 +22,7 @@ async function filesUnder(
   rootPath: string,
   directoryPath: string,
 ): Promise<string[]> {
-  // eslint-disable-next-line security/detect-non-literal-fs-filename
+  // oxlint-disable-next-line security/detect-non-literal-fs-filename
   const entries = await readdir(directoryPath, { withFileTypes: true });
   const relativePaths: string[] = [];
   const nested: Promise<string[]>[] = [];
@@ -80,7 +80,7 @@ async function linkedStats(
 ): Promise<Awaited<ReturnType<typeof stat>> | undefined> {
   try {
     // `stat` rather than `lstat`, so the link is followed to what it names.
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    // oxlint-disable-next-line security/detect-non-literal-fs-filename
     return await stat(entryPath);
   } catch {
     return undefined;

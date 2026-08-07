@@ -1,6 +1,3 @@
-/* eslint-disable @typescript-eslint/naming-convention -- environment
- * variable names are UPPER_SNAKE_CASE by AWS convention, not code
- * identifier names. */
 import { CreateFunctionCommand, InvokeCommand } from "@aws-sdk/client-lambda";
 import {
   assertIdentical,

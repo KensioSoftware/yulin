@@ -52,7 +52,8 @@ export interface SimCognitoAuthenticationOutput {
   readonly Session?: string | undefined;
   readonly ChallengeParameters?: Readonly<Record<string, string>> | undefined;
   readonly AuthenticationResult?:
-    SimCognitoAuthenticationResultType | undefined;
+    | SimCognitoAuthenticationResultType
+    | undefined;
   readonly $metadata: SimResponseMetadata;
 }
 

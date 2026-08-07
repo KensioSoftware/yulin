@@ -1,6 +1,3 @@
-/* eslint-disable @typescript-eslint/naming-convention -- environment
- * variable names are UPPER_SNAKE_CASE by AWS convention, not code
- * identifier names. */
 import { assertIdentical, assertUndefined } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { simLambdaProcessEnvironment } from "./sim-lambda-process-environment.js";

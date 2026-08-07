@@ -65,7 +65,7 @@ describe("DynamoDB ListTablesCommand", () => {
     let pages = 0;
 
     do {
-      // eslint-disable-next-line no-await-in-loop -- a page at a time is the point.
+      // oxlint-disable-next-line no-await-in-loop -- a page at a time is the point.
       const page = await simDynamoDb.listTables(
         new ListTablesCommand({
           Limit: 2,

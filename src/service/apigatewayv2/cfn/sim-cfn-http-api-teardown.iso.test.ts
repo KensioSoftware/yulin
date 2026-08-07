@@ -26,7 +26,8 @@ describe("HTTP API CloudFormation Resource teardown", () => {
     await stack.waitForDeployComplete();
 
     const api = stack.resources.get("Api")?.simResource as
-      SimHttpApi | undefined;
+      | SimHttpApi
+      | undefined;
     assertNonNullable(api);
 
     // When the Stack's Resources are torn down.

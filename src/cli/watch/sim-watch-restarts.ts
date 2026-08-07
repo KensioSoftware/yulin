@@ -37,7 +37,7 @@ export class SimWatchRestarts {
 
     this.running = true;
 
-    // eslint-disable-next-line unicorn/prefer-await
+    // oxlint-disable-next-line unicorn-js/prefer-await
     this.run(changedPath).catch((error: unknown) => {
       this.onFailure(error);
     });

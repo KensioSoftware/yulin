@@ -6,7 +6,7 @@ import {
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 
-/* eslint-disable no-template-curly-in-string */
+/* oxlint-disable no-template-curly-in-string */
 
 describe("sim CloudFormation pseudo parameters", () => {
   it("resolves pseudo parameters in deployed Resource properties", async () => {

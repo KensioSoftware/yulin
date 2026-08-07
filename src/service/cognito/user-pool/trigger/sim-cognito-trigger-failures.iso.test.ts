@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/naming-convention -- the authentication
-   parameter names are Cognito's own, rather than identifier names. */
 import {
   AdminGetUserCommand,
   AdminInitiateAuthCommand,
@@ -154,7 +152,7 @@ describe("sim Cognito user pool trigger failures", () => {
     const pool = await makeTriggerPool({
       triggers: { PreAuthentication: triggerFunctionArn },
       handler: () => {
-        // eslint-disable-next-line @typescript-eslint/only-throw-error -- a handler may throw anything, and that is the case under test
+        // oxlint-disable-next-line typescript/only-throw-error -- a handler may throw anything, and that is the case under test
         throw "Sign-in is closed";
       },
     });

@@ -7,7 +7,7 @@ import {
 import { describe, it } from "vitest";
 import { SimAws } from "../../../../../aws/sim-aws.js";
 
-/* eslint-disable no-template-curly-in-string */
+/* oxlint-disable no-template-curly-in-string */
 
 describe("CloudFormation Fn::Sub literals", () => {
   it("substitutes explicit variable values", async () => {

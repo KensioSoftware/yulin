@@ -26,7 +26,8 @@ export class SimAwsInvalidCallerHeader extends Error {
  * handles them together.
  */
 export type SimAwsRequestAuthFailure =
-  SimIamSigV4Error | SimAwsInvalidCallerHeader;
+  | SimIamSigV4Error
+  | SimAwsInvalidCallerHeader;
 
 /**
  * Whether an error is a request authentication failure.

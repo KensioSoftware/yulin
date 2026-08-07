@@ -6,7 +6,11 @@ import type {
 } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
 
 type DistributionConfigInput =
-  string | number | boolean | SimCfnTemplateValueRecord | SimCfnTemplateValue[];
+  | string
+  | number
+  | boolean
+  | SimCfnTemplateValueRecord
+  | SimCfnTemplateValue[];
 
 interface SimCfnCloudFrontDistributionConfigValidatorProperties {
   readonly logicalId: string;

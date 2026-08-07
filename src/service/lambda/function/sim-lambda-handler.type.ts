@@ -44,7 +44,7 @@ export type SimLambdaHandler<TEvent = never, TResult = unknown> = (
   callback: SimLambdaCallback<TResult>,
   // The void return type constituent mirrors the aws-lambda Handler type, so
   // real callback-style handler references remain assignable.
-  // eslint-disable-next-line @typescript-eslint/no-invalid-void-type
+  // oxlint-disable-next-line typescript/no-invalid-void-type
 ) => void | TResult | Promise<TResult>;
 
 /**

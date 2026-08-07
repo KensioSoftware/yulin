@@ -11,7 +11,8 @@ import { SimLambdaDynamoDbStreamEventSourceArn } from "./stream/sim-lambda-dynam
  * mapping names rather than being assumed.
  */
 export type SimLambdaEventSourceArn =
-  SimLambdaSqsEventSourceArn | SimLambdaDynamoDbStreamEventSourceArn;
+  | SimLambdaSqsEventSourceArn
+  | SimLambdaDynamoDbStreamEventSourceArn;
 
 /**
  * What this simulation polls, said in one place so every refusal that mentions

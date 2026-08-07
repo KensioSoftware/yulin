@@ -1,4 +1,4 @@
-/* eslint-disable security/detect-object-injection -- every lookup here is a
+/* oxlint-disable security/detect-object-injection -- every lookup here is a
    field name this simulation asks for, such as `groupsToOverride`, read out of
    the plain object a trigger handler returned. */
 import {

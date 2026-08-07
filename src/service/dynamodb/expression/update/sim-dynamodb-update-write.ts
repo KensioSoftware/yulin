@@ -76,7 +76,7 @@ function listWith(
   const at = Math.min(index, values.length);
 
   // A whole number read out of the expression, written into an array made here.
-  // eslint-disable-next-line security/detect-object-injection
+  // oxlint-disable-next-line security/detect-object-injection
   values[at] = simDynamoDbValueWith(values.at(at), rest, written, target);
 
   return { kind: "L", values };

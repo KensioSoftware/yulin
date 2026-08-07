@@ -54,7 +54,7 @@ describe("Deploying a CDK template from memory [iso]", () => {
     assertIdentical(stack.stackName, "site-stack");
 
     // And nothing was written back into the cloud assembly to make that work.
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    // oxlint-disable-next-line security/detect-non-literal-fs-filename
     const cloudAssemblyFileNames = await readdir(
       temporaryDirectory.join("cdk.out"),
     );
@@ -195,7 +195,7 @@ async function readTemplate(
   templatePath: string,
 ): Promise<CfnTemplateBodyRecord> {
   return jsonParse(
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    // oxlint-disable-next-line security/detect-non-literal-fs-filename
     (await readFile(templatePath, "utf8")) as JSONString<CfnTemplateBodyRecord>,
   );
 }

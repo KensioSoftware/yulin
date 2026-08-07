@@ -191,7 +191,7 @@ describe("SQS queue commands", () => {
     // Given three queues, two of them sharing a prefix.
     const simAws = new SimAws();
     for (const name of ["orders-new", "orders-done", "invoices"]) {
-      // eslint-disable-next-line no-await-in-loop
+      // oxlint-disable-next-line no-await-in-loop
       await simAws
         .sqs()
         .createQueue(new CreateQueueCommand({ QueueName: name }));

@@ -1,6 +1,3 @@
-/* eslint-disable @typescript-eslint/naming-convention -- environment
- * variable names are UPPER_SNAKE_CASE by AWS convention, not code
- * identifier names. */
 import { InvokeCommand } from "@aws-sdk/client-lambda";
 import { GetSecretValueCommand } from "@aws-sdk/client-secrets-manager";
 import {
@@ -48,7 +45,7 @@ exports.handler = async () => {
  * substitute it.
  */
 const bareSecretArnSubstitution =
-  // eslint-disable-next-line no-template-curly-in-string -- Fn::Sub syntax, not a JavaScript template.
+  // oxlint-disable-next-line no-template-curly-in-string -- Fn::Sub syntax, not a JavaScript template.
   "arn:aws:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:db-credentials";
 
 /**

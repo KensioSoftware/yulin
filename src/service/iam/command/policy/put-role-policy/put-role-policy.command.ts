@@ -5,7 +5,9 @@ export interface SimPutRolePolicyCommandInput {
   readonly RoleName?: string | undefined;
   readonly PolicyName?: string | undefined;
   readonly PolicyDocument?:
-    JSONString<SimIamPolicyDocument> | string | undefined;
+    | JSONString<SimIamPolicyDocument>
+    | string
+    | undefined;
 }
 
 export interface SimPutRolePolicyCommand {

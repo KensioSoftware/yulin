@@ -56,7 +56,8 @@ export interface SimPublishBatchCommand {
 export interface SimPublishBatchCommandInput {
   readonly TopicArn?: string | undefined;
   readonly PublishBatchRequestEntries?:
-    readonly SimSnsPublishBatchRequestEntry[] | undefined;
+    | readonly SimSnsPublishBatchRequestEntry[]
+    | undefined;
 }
 
 export interface SimSnsPublishBatchResultEntry {

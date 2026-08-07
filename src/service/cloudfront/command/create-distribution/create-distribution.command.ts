@@ -36,7 +36,8 @@ export interface SimCloudFrontDistributionConfig {
     | undefined
     | {
         readonly Items?:
-          readonly SimCloudFrontCustomErrorResponseConfig[] | undefined;
+          | readonly SimCloudFrontCustomErrorResponseConfig[]
+          | undefined;
       };
   readonly Aliases?:
     | undefined
@@ -49,12 +50,14 @@ export interface SimCloudFrontDistributionConfig {
         readonly Items?: readonly SimCloudFrontOriginConfig[] | undefined;
       };
   readonly DefaultCacheBehavior?:
-    SimCloudFrontDefaultCacheBehaviorConfig | undefined;
+    | SimCloudFrontDefaultCacheBehaviorConfig
+    | undefined;
   readonly CacheBehaviors?:
     | undefined
     | {
         readonly Items?:
-          readonly SimCloudFrontCacheBehaviorConfig[] | undefined;
+          | readonly SimCloudFrontCacheBehaviorConfig[]
+          | undefined;
       };
   readonly ViewerCertificate?: SimCloudFrontViewerCertificate | undefined;
 }
@@ -166,4 +169,6 @@ export interface SimCloudFrontMethodList {
  * Minimal structural sim CloudFront viewer protocol policy.
  */
 export type SimCloudFrontViewerProtocolPolicy =
-  "allow-all" | "redirect-to-https" | "https-only";
+  | "allow-all"
+  | "redirect-to-https"
+  | "https-only";

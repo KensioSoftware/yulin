@@ -20,7 +20,7 @@ async function simCognitoWithPools(
   const cognito = new SimAws().cognitoIdentityProvider();
 
   for (const poolName of poolNames) {
-    // eslint-disable-next-line no-await-in-loop -- pools are created in order
+    // oxlint-disable-next-line no-await-in-loop -- pools are created in order
     await cognito.createUserPool(
       new CreateUserPoolCommand({ PoolName: poolName }),
     );

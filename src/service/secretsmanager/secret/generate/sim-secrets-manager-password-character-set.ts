@@ -1,4 +1,4 @@
-/* eslint-disable no-secrets/no-secrets -- character alphabets, not secrets. */
+/* oxlint-disable no-secrets/no-secrets -- character alphabets, not secrets. */
 import { SimSecretsManagerInvalidParameterException } from "../../error/sim-secrets-manager.error.js";
 
 /**

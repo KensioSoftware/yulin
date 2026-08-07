@@ -1,4 +1,4 @@
-/* eslint-disable security/detect-possible-timing-attacks -- this is a
+/* oxlint-disable security/detect-possible-timing-attacks -- this is a
    simulator in one process, where the secret hash is checked so a test notices
    a client secret it forgot to use, rather than as a defence against anyone
    measuring how long the check took. */

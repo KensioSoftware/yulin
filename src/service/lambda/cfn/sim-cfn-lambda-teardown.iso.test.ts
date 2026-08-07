@@ -133,7 +133,8 @@ describe("Lambda CloudFormation Resource teardown", () => {
     await stack.waitForDeployComplete();
 
     const mapping = stack.resources.get("OrderConsumerMapping")?.simResource as
-      SimLambdaEventSourceMapping | undefined;
+      | SimLambdaEventSourceMapping
+      | undefined;
     assertNonNullable(mapping);
 
     // When the Stack's Resources are torn down.

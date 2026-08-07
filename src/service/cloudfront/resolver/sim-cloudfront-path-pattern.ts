@@ -57,7 +57,7 @@ export class SimCloudFrontPathPattern {
      * small CloudFront-style wildcard language where only "*" and "?" have
      * special meaning. All other graphemes are escaped above.
      */
-    // eslint-disable-next-line security/detect-non-literal-regexp
+    // oxlint-disable-next-line security/detect-non-literal-regexp
     return new RegExp(`^${safeRegexPattern}$`, "u");
   }
 

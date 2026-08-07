@@ -112,14 +112,14 @@ export class SimWatchWatcher {
   }
 
   private watch(target: string, recursive: boolean): void {
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    // oxlint-disable-next-line security/detect-non-literal-fs-filename
     if (this.watchers.has(target) || !fs.existsSync(target)) {
       return;
     }
 
     const eventPath = new SimWatchEventPath(target, recursive);
 
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    // oxlint-disable-next-line security/detect-non-literal-fs-filename
     const watcher = fs.watch(target, { recursive }, (_event, fileName) => {
       const changedPath = eventPath.of(fileName);
 
@@ -177,6 +177,6 @@ export class SimWatchWatcher {
 }
 
 function isDirectory(target: string): boolean {
-  // eslint-disable-next-line security/detect-non-literal-fs-filename
+  // oxlint-disable-next-line security/detect-non-literal-fs-filename
   return fs.statSync(target, { throwIfNoEntry: false })?.isDirectory() === true;
 }

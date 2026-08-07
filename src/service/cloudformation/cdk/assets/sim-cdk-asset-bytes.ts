@@ -19,7 +19,7 @@ export async function readSimCdkAssetBytes(
     return await zipSimCdkAssetDirectory(sourcePath);
   }
 
-  // eslint-disable-next-line security/detect-non-literal-fs-filename
+  // oxlint-disable-next-line security/detect-non-literal-fs-filename
   return await readFile(sourcePath);
 }
 
@@ -36,7 +36,7 @@ async function zipSimCdkAssetDirectory(
   const files = await Promise.all(
     archivePaths.map(async (archivePath) => ({
       archivePath,
-      // eslint-disable-next-line security/detect-non-literal-fs-filename
+      // oxlint-disable-next-line security/detect-non-literal-fs-filename
       content: await readFile(path.join(directoryPath, archivePath)),
     })),
   );
@@ -56,7 +56,7 @@ async function zipSimCdkAssetDirectory(
 async function assetArchivePaths(
   directoryPath: string,
 ): Promise<readonly string[]> {
-  // eslint-disable-next-line security/detect-non-literal-fs-filename
+  // oxlint-disable-next-line security/detect-non-literal-fs-filename
   const entries = await readdir(directoryPath, {
     recursive: true,
     withFileTypes: true,

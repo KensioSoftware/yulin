@@ -31,7 +31,8 @@ describe("KMS CloudFormation Resource teardown", () => {
     await stack.waitForDeployComplete();
 
     const key = stack.resources.get("AppKey")?.simResource as
-      SimKmsKey | undefined;
+      | SimKmsKey
+      | undefined;
     assertNonNullable(key);
 
     // When the Stack's Resources are torn down.

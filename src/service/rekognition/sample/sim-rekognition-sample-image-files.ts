@@ -1,4 +1,4 @@
-/* eslint-disable no-secrets/no-secrets -- base64 image files, not secrets. */
+/* oxlint-disable no-secrets/no-secrets -- base64 image files, not secrets. */
 import { SimRekognitionSampleImage } from "./sim-rekognition-sample-image.js";
 
 /**

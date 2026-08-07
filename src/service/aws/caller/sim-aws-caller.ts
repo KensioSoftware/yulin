@@ -38,7 +38,9 @@ export interface SimCredentialCaller {
  * Resolved simulated AWS identity.
  */
 export type SimAwsPrincipal =
-  SimArnPrincipal | SimServicePrincipal | SimAnonymousPrincipal;
+  | SimArnPrincipal
+  | SimServicePrincipal
+  | SimAnonymousPrincipal;
 
 /**
  * A caller already authenticated somewhere else, carrying both the principal
@@ -60,4 +62,6 @@ export interface SimResolvedCaller {
  * Caller accepted by simulated AWS service operations.
  */
 export type SimAwsCaller =
-  SimAwsPrincipal | SimCredentialCaller | SimResolvedCaller;
+  | SimAwsPrincipal
+  | SimCredentialCaller
+  | SimResolvedCaller;

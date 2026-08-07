@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/naming-convention -- the user attribute
-   names are Cognito's own, rather than identifier names. */
 import {
   AdminConfirmSignUpCommand,
   AdminCreateUserCommand,

@@ -21,7 +21,7 @@ async function simAwsWithSecrets(...names: readonly string[]): Promise<SimAws> {
   const simAws = new SimAws();
 
   for (const name of names) {
-    // eslint-disable-next-line no-await-in-loop
+    // oxlint-disable-next-line no-await-in-loop
     await simAws
       .secretsManager()
       .createSecret(

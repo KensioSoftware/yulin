@@ -10,7 +10,8 @@ interface SimDynamoDbQueryStartKeyProperties {
   readonly view: SimDynamoDbReadView;
   readonly keyCondition: SimDynamoDbKeyCondition;
   readonly exclusiveStartKey:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
 }
 
 /**

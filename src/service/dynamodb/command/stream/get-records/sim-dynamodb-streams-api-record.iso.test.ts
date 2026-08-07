@@ -60,7 +60,7 @@ describe("DynamoDB Streams record rendering", () => {
     await simDynamoDbStreamedTableFactory.make({}, simAws);
 
     for (const total of ["101", "202"]) {
-      // eslint-disable-next-line no-await-in-loop
+      // oxlint-disable-next-line no-await-in-loop
       await simAws.dynamoDb().putItem(
         new PutItemCommand({
           TableName: "orders",

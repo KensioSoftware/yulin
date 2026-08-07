@@ -20,7 +20,8 @@ interface AssumeRoleAuthorizationInput {
   readonly roleArnParts: IamRoleArnParts;
   readonly caller: SimArnPrincipal;
   readonly conditionContext?:
-    Readonly<Record<string, SimIamConditionValue>> | undefined;
+    | Readonly<Record<string, SimIamConditionValue>>
+    | undefined;
 }
 
 type AssumeRoleAuthorizedRole = SimGetRoleCommandOutput["Role"];

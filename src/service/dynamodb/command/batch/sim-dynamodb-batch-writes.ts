@@ -34,7 +34,8 @@ export interface SimDynamoDbBatchTableWrites {
  */
 export function readSimDynamoDbBatchWrites(
   requestItems:
-    Readonly<Record<string, readonly SimDynamoDbWriteRequest[]>> | undefined,
+    | Readonly<Record<string, readonly SimDynamoDbWriteRequest[]>>
+    | undefined,
 ): readonly SimDynamoDbBatchTableWrites[] {
   const tables = readSimDynamoDbBatchRequestItems(requestItems, operation);
 

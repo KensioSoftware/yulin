@@ -54,7 +54,7 @@ export class SimRekognitionFaceLandmarkPoints {
   private landmarkOf(
     name: SimRekognitionLandmarkName,
   ): readonly SimRekognitionLandmarkOutput[] {
-    // eslint-disable-next-line security/detect-object-injection -- one of the landmark names this file lists.
+    // oxlint-disable-next-line security/detect-object-injection -- one of the landmark names this file lists.
     const point = this.declared[name];
 
     if (point === undefined) {
@@ -101,7 +101,7 @@ export class SimRekognitionFaceLandmarkPoints {
 
   private refuseSwapped(): void {
     for (const [left, right] of acrossTheFace) {
-      // eslint-disable-next-line security/detect-object-injection -- the landmark names of one pair listed above.
+      // oxlint-disable-next-line security/detect-object-injection -- the landmark names of one pair listed above.
       this.refusePair(left, right, this.declared[left], this.declared[right]);
     }
   }

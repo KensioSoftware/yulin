@@ -53,7 +53,8 @@ export class CreatePolicyRecordFactory {
       creationDate: now,
       updateDate: now,
       policyDocument: cmd.input.PolicyDocument as
-        JSONString<SimIamPolicyDocument> | undefined,
+        | JSONString<SimIamPolicyDocument>
+        | undefined,
     };
   }
 

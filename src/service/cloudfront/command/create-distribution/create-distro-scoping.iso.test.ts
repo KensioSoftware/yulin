@@ -1,3 +1,6 @@
+/* oxlint-disable typescript/no-deprecated -- CloudFront's cache-behaviour
+   ForwardedValues is deprecated in the AWS API, and simulating the API as
+   it is means accepting the shapes callers still send. */
 import {
   CreateDistributionCommand,
   GetDistributionCommand,

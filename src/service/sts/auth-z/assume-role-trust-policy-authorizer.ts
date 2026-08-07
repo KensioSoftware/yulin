@@ -19,7 +19,8 @@ interface AssumeRoleTrustPolicyAuthorizationInput {
   readonly targetIam: SimIam;
   readonly caller: SimAwsPrincipal;
   readonly conditionContext?:
-    Readonly<Record<string, SimIamConditionValue>> | undefined;
+    | Readonly<Record<string, SimIamConditionValue>>
+    | undefined;
 }
 
 export interface AssumeRoleTrustPolicyAuthorization {

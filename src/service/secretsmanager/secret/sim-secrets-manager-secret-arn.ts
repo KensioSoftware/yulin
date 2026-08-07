@@ -6,7 +6,7 @@ import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-
  * secret ARN.
  */
 const suffixAlphabet =
-  // eslint-disable-next-line no-secrets/no-secrets -- an alphabet, not a secret.
+  // oxlint-disable-next-line no-secrets/no-secrets -- an alphabet, not a secret.
   "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 export const secretArnSuffixLength = 6;
 

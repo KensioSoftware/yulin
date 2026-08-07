@@ -1,6 +1,3 @@
-/* eslint-disable @typescript-eslint/naming-convention -- OpenID Connect
-   discovery metadata names are the ones the specification defines, rather than
-   identifier names. */
 import type { SimCognitoUserPool } from "../user-pool/sim-cognito-user-pool.js";
 
 /**

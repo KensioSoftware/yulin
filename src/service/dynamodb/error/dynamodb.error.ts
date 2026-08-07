@@ -71,7 +71,8 @@ export class SimDynamoDbConditionalCheckFailedException extends SimDynamoDbError
   public override readonly name = "ConditionalCheckFailedException";
 
   public readonly Item:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
 
   constructor(item?: Readonly<Record<string, SimDynamoDbAttributeValue>>) {
     super("The conditional request failed.", { httpStatusCode: 400 });

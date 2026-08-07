@@ -73,7 +73,8 @@ describe("IAM CloudFormation Resource teardown", () => {
       .deployTemplate({ stackName: "handler-stack", template });
 
     const role = stack.resources.get("HandlerRole")?.simResource as
-      SimIamRole | undefined;
+      | SimIamRole
+      | undefined;
     assertIdentical(role?.roleName, "handler-role");
     assertSetSize(role.attachedPolicyArns, 1);
     assertMapSize(role.inlinePolicies, 2);

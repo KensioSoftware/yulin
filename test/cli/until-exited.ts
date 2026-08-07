@@ -15,7 +15,7 @@ export async function untilExited(
       throw new Error("The process did not report an exit");
     }
 
-    // eslint-disable-next-line no-await-in-loop
+    // oxlint-disable-next-line no-await-in-loop
     await watchPause(25);
   }
 }

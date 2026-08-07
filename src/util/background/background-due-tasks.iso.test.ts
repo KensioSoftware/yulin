@@ -60,7 +60,7 @@ describe("BackgroundDueTasks", () => {
     // When everything due by eleven o'clock is taken in turn
     let due = queue.takeNextDueBy(elevenOClock);
     while (due !== undefined) {
-      // eslint-disable-next-line no-await-in-loop
+      // oxlint-disable-next-line no-await-in-loop
       await due.task();
       due = queue.takeNextDueBy(elevenOClock);
     }

@@ -46,7 +46,7 @@ describe("DynamoDB Streams GetRecords", () => {
     // When each successive NextShardIterator is followed four times: three
     // that have a record for them and one that has caught up.
     for (let poll = 0; poll < 4; poll += 1) {
-      // eslint-disable-next-line no-await-in-loop
+      // oxlint-disable-next-line no-await-in-loop
       const output = await simAws
         .dynamoDbStreams()
         .getRecords(

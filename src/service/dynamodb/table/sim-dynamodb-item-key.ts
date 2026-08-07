@@ -17,7 +17,9 @@ import type { SimDynamoDbKeySchema } from "./sim-dynamodb-key-schema.js";
  * a map cannot be one.
  */
 type SimDynamoDbKeyValue =
-  SimDynamoDbStringValue | SimDynamoDbNumberValue | SimDynamoDbBinaryValue;
+  | SimDynamoDbStringValue
+  | SimDynamoDbNumberValue
+  | SimDynamoDbBinaryValue;
 
 /**
  * Refuse a key value of a type the table did not declare for it.

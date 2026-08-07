@@ -2,7 +2,11 @@ import type { SimArn } from "../../aws/arn.js";
 import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
 
 export type SimIamPrincipalType =
-  "root" | "user" | "role" | "assumed-role" | "service";
+  | "root"
+  | "user"
+  | "role"
+  | "assumed-role"
+  | "service";
 
 /**
  * Internal abstraction for anything that can make AWS requests.

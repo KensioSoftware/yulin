@@ -40,7 +40,7 @@ export class FilesystemS3ObjectKeys {
   }
 
   private async listInDirectory(directoryPath: string): Promise<string[]> {
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    // oxlint-disable-next-line security/detect-non-literal-fs-filename
     const entries = await readdir(directoryPath, { withFileTypes: true });
     const keys: string[] = [];
     const nestedKeyPromises: Promise<string[]>[] = [];

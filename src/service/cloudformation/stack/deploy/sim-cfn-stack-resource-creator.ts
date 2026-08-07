@@ -88,7 +88,7 @@ export class SimCfnStackResourceCreator {
         );
       }
 
-      // eslint-disable-next-line no-await-in-loop
+      // oxlint-disable-next-line no-await-in-loop
       await this.batchCreator.create(creatableResources);
 
       pendingResources = pendingResources.incompleteResources();

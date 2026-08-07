@@ -55,7 +55,8 @@ export class DescribeStacksCommandHandler implements CommandHandler<
     await this.background.sequence();
 
     const stackName = command.input.StackName as
-      SimCloudFormationStackName | undefined;
+      | SimCloudFormationStackName
+      | undefined;
 
     return {
       Stacks: new SimCfnDescribedStacks(this.stacks)

@@ -1,7 +1,10 @@
 import { SimCognitoInvalidParameterException } from "../../error/sim-cognito.error.js";
 
 export type SimCognitoTokenValidityUnit =
-  "seconds" | "minutes" | "hours" | "days";
+  | "seconds"
+  | "minutes"
+  | "hours"
+  | "days";
 
 const secondsPerUnit: Readonly<Record<SimCognitoTokenValidityUnit, number>> = {
   seconds: 1,

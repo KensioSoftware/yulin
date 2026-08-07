@@ -75,7 +75,8 @@ describe("Lambda CloudFormation Function deployment", () => {
 
     const role = roleResource.simResource as SimIamRole | undefined;
     const simFunction = functionResource.simResource as
-      SimLambdaFunction | undefined;
+      | SimLambdaFunction
+      | undefined;
 
     assertNonNullable(role);
     assertNonNullable(simFunction);

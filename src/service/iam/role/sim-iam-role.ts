@@ -20,7 +20,8 @@ export interface SimIamRole extends SimIamPrincipal {
    * identity permissions policy for service actions.
    */
   readonly assumeRolePolicyDocument?:
-    JSONString<SimIamPolicyDocument> | undefined;
+    | JSONString<SimIamPolicyDocument>
+    | undefined;
 
   readonly description?: string | undefined;
   readonly creationDate: Date;

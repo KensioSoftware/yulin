@@ -75,7 +75,7 @@ export class SimLambdaHandlerRunner {
       if (isPromiseLike(returned)) {
         // Bridging handler completion styles inside a promise executor, so
         // this cannot await; the callback path may still settle first.
-        // eslint-disable-next-line unicorn/prefer-await
+        // oxlint-disable-next-line unicorn-js/prefer-await
         returned.then(resolve, (error: unknown) => {
           reject(toRejectedError(error));
         });

@@ -93,7 +93,7 @@ export class SimS3NotificationFailures {
 
     this.warned.add(key);
 
-    // eslint-disable-next-line no-console
+    // oxlint-disable-next-line no-console
     console.warn(
       `Simulated S3 Bucket ${failure.event.bucketName} could not notify ` +
         `${failure.destinationArn} of ${failure.event.eventName}: ${

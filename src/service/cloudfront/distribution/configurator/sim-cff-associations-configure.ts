@@ -18,7 +18,8 @@ import type { SimCloudFrontBehavior } from "../../behaviour/sim-cloud-front-beha
  */
 export function configureCffAssociations(
   cacheBehavior:
-    SimCloudFrontDefaultCacheBehaviorConfig | SimCloudFrontCacheBehaviorConfig,
+    | SimCloudFrontDefaultCacheBehaviorConfig
+    | SimCloudFrontCacheBehaviorConfig,
 ): SimCloudFrontBehavior["functionAssociations"] | undefined {
   if (cacheBehavior.FunctionAssociations?.Items === undefined) {
     return undefined;

@@ -65,7 +65,7 @@ export class SimCfnCfResponseHeadersPolicyConfig {
 
   private assertModelled(config: Record<string, unknown>): void {
     for (const section of unmodelledSections) {
-      // eslint-disable-next-line security/detect-object-injection
+      // oxlint-disable-next-line security/detect-object-injection
       if (config[section] !== undefined) {
         this.refuse(
           `${section} is not modelled by simulated response headers ` +
@@ -138,7 +138,7 @@ export class SimCfnCfResponseHeadersPolicyConfig {
     config: Record<string, unknown>,
     sectionName: string,
   ): unknown[] {
-    // eslint-disable-next-line security/detect-object-injection
+    // oxlint-disable-next-line security/detect-object-injection
     const section = config[sectionName];
 
     if (section === undefined) {

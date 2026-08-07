@@ -98,7 +98,7 @@ class SimLambdaProcessEnvironment {
     }
     for (const [name, value] of Object.entries(replacement)) {
       if (value !== undefined) {
-        // eslint-disable-next-line security/detect-object-injection
+        // oxlint-disable-next-line security/detect-object-injection
         store[name] = value;
       }
     }

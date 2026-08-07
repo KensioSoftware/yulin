@@ -33,7 +33,8 @@ export interface SimDynamoDbStreamSequenceNumberRange {
 export interface SimDynamoDbStreamShardDescription {
   readonly ShardId?: string | undefined;
   readonly SequenceNumberRange?:
-    SimDynamoDbStreamSequenceNumberRange | undefined;
+    | SimDynamoDbStreamSequenceNumberRange
+    | undefined;
 }
 
 /**
@@ -70,11 +71,14 @@ export interface SimDynamoDbStreamsIdentity {
 export interface SimDynamoDbStreamsRecordBody {
   readonly ApproximateCreationDateTime?: Date | undefined;
   readonly Keys?:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
   readonly NewImage?:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
   readonly OldImage?:
-    Readonly<Record<string, SimDynamoDbAttributeValue>> | undefined;
+    | Readonly<Record<string, SimDynamoDbAttributeValue>>
+    | undefined;
   readonly SequenceNumber?: string | undefined;
   readonly SizeBytes?: number | undefined;
   readonly StreamViewType?: SimDynamoDbStreamViewType | undefined;

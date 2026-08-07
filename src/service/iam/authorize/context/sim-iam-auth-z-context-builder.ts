@@ -58,7 +58,8 @@ export interface SimIamAuthorizationInput {
    * precedence over supplied values for equivalent keys.
    */
   readonly conditionContext?:
-    Readonly<Record<string, SimIamConditionValue>> | undefined;
+    | Readonly<Record<string, SimIamConditionValue>>
+    | undefined;
 
   /**
    * Condition values the service can only supply once IAM has resolved the

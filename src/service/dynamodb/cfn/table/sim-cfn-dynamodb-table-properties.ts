@@ -166,7 +166,8 @@ export class SimCfnDynamoDbTableProperties {
    * The time to live the template asks for, when it asks for one.
    */
   timeToLiveSpecification():
-    SimDynamoDbTimeToLiveSpecificationInput | undefined {
+    | SimDynamoDbTimeToLiveSpecificationInput
+    | undefined {
     return readSimCfnDynamoDbTableTimeToLive(this.values);
   }
 

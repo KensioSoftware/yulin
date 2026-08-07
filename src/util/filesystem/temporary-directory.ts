@@ -9,7 +9,7 @@ import { assertDefined } from "../type-guard/defined.js";
 export async function makeTemporaryDirectory(): Promise<string> {
   const temporaryDirectoryPath = repoPath(".tmp");
 
-  // eslint-disable-next-line security/detect-non-literal-fs-filename
+  // oxlint-disable-next-line security/detect-non-literal-fs-filename
   await mkdir(temporaryDirectoryPath, { recursive: true });
 
   return await mkdtemp(path.join(temporaryDirectoryPath, "yulin-test-"));
@@ -68,9 +68,9 @@ export class TemporaryDirectory {
       ...(Array.isArray(pathParts) ? pathParts : [pathParts]),
     );
 
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    // oxlint-disable-next-line security/detect-non-literal-fs-filename
     await mkdir(path.dirname(filePath), { recursive: true });
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    // oxlint-disable-next-line security/detect-non-literal-fs-filename
     await fsWriteFile(filePath, content);
   }
 }

@@ -27,7 +27,8 @@ export interface SimListUserPoolClientsCommandInput {
 
 export interface SimListUserPoolClientsCommandOutput {
   readonly UserPoolClients?:
-    readonly SimCognitoUserPoolClientDescription[] | undefined;
+    | readonly SimCognitoUserPoolClientDescription[]
+    | undefined;
   readonly NextToken?: string | undefined;
   readonly $metadata: SimResponseMetadata;
 }

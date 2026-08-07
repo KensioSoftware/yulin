@@ -42,7 +42,7 @@ export class SimAwsLocalRequestHandler {
       return;
     }
 
-    // eslint-disable-next-line unicorn/prefer-await
+    // oxlint-disable-next-line unicorn-js/prefer-await
     this.respond(nodeRequest, nodeResponse).catch((error: unknown) => {
       this.respondWithError(error, nodeResponse);
     });

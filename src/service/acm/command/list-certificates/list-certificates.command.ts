@@ -25,7 +25,8 @@ export interface SimListCertificatesCommandInput {
  */
 export interface SimListCertificatesCommandOutput {
   readonly CertificateSummaryList?:
-    readonly SimAcmCertificateSummary[] | undefined;
+    | readonly SimAcmCertificateSummary[]
+    | undefined;
   readonly NextToken?: string | undefined;
   readonly $metadata: SimResponseMetadata;
 }

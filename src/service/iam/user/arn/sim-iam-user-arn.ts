@@ -14,5 +14,5 @@ interface MakeSimUserArnProperties {
 export function makeSimUserArn(properties: MakeSimUserArnProperties): SimArn {
   const pathPart = properties.path === "/" ? "" : properties.path.slice(1);
 
-  return `arn:aws:iam::${properties.accountId}:user/${pathPart}${properties.userName}` as SimArn;
+  return `arn:aws:iam::${properties.accountId}:user/${pathPart}${properties.userName}`;
 }

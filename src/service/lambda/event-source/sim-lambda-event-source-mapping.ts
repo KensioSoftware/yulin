@@ -25,7 +25,9 @@ export type SimLambdaFunctionResponseType = "ReportBatchItemFailures";
  * Updating and Deleting, belong to operations this simulation does not have.
  */
 export type SimLambdaEventSourceMappingState =
-  "Creating" | "Enabled" | "Disabled";
+  | "Creating"
+  | "Enabled"
+  | "Disabled";
 
 interface SimLambdaEventSourceMappingProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
@@ -36,7 +38,8 @@ interface SimLambdaEventSourceMappingProperties {
   readonly startingPosition?: SimLambdaEventSourceStartingPosition | undefined;
   readonly enabled?: boolean | undefined;
   readonly functionResponseTypes?:
-    readonly SimLambdaFunctionResponseType[] | undefined;
+    | readonly SimLambdaFunctionResponseType[]
+    | undefined;
   readonly createdAt: Date;
 }
 
@@ -81,7 +84,8 @@ export class SimLambdaEventSourceMapping {
    * A queue mapping has none, because a queue only has a front.
    */
   public readonly startingPosition:
-    SimLambdaEventSourceStartingPosition | undefined;
+    | SimLambdaEventSourceStartingPosition
+    | undefined;
   public readonly functionResponseTypes: readonly SimLambdaFunctionResponseType[];
 
   private readonly accountRegionScope: SimAwsAccountRegionScope;

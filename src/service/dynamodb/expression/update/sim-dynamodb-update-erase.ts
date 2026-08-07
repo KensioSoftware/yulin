@@ -74,7 +74,7 @@ function listWithout(
   } else {
     // A whole number read out of the expression, written into an array made
     // here.
-    // eslint-disable-next-line security/detect-object-injection
+    // oxlint-disable-next-line security/detect-object-injection
     values[index] = kept;
   }
 

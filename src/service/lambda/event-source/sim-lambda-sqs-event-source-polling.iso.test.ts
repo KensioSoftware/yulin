@@ -25,7 +25,7 @@ describe("sim Lambda SQS event source polling", () => {
 
     // When five messages are sent.
     for (const body of ["1", "2", "3", "4", "5"]) {
-      // eslint-disable-next-line no-await-in-loop
+      // oxlint-disable-next-line no-await-in-loop
       await simAws
         .sqs()
         .sendMessage(

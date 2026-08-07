@@ -5,7 +5,7 @@ import { stat } from "node:fs/promises";
  */
 export async function filesystemPathExists(path: string): Promise<boolean> {
   try {
-    // eslint-disable-next-line security/detect-non-literal-fs-filename
+    // oxlint-disable-next-line security/detect-non-literal-fs-filename
     await stat(path);
     return true;
   } catch (error) {

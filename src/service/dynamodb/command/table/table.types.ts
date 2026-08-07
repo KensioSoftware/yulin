@@ -6,7 +6,8 @@ import type { SimDynamoDbStreamSpecificationDescription } from "../../stream/sim
  */
 export interface SimDynamoDbTableDescription {
   readonly AttributeDefinitions?:
-    readonly SimDynamoDbAttributeDefinition[] | undefined;
+    | readonly SimDynamoDbAttributeDefinition[]
+    | undefined;
   readonly TableName?: string | undefined;
   readonly TableArn?: SimArn | undefined;
   readonly TableId?: string | undefined;
@@ -15,17 +16,21 @@ export interface SimDynamoDbTableDescription {
   readonly CreationDateTime?: Date | undefined;
   readonly BillingModeSummary?: SimDynamoDbBillingModeSummary | undefined;
   readonly ProvisionedThroughput?:
-    SimDynamoDbProvisionedThroughputDescription | undefined;
+    | SimDynamoDbProvisionedThroughputDescription
+    | undefined;
   readonly TableClassSummary?: SimDynamoDbTableClassSummary | undefined;
   readonly DeletionProtectionEnabled?: boolean | undefined;
   readonly ItemCount?: number | undefined;
   readonly TableSizeBytes?: number | undefined;
   readonly GlobalSecondaryIndexes?:
-    readonly SimDynamoDbGlobalSecondaryIndexDescription[] | undefined;
+    | readonly SimDynamoDbGlobalSecondaryIndexDescription[]
+    | undefined;
   readonly LocalSecondaryIndexes?:
-    readonly SimDynamoDbLocalSecondaryIndexDescription[] | undefined;
+    | readonly SimDynamoDbLocalSecondaryIndexDescription[]
+    | undefined;
   readonly StreamSpecification?:
-    SimDynamoDbStreamSpecificationDescription | undefined;
+    | SimDynamoDbStreamSpecificationDescription
+    | undefined;
   readonly LatestStreamArn?: SimArn | undefined;
   readonly LatestStreamLabel?: string | undefined;
 }
@@ -243,7 +248,8 @@ export interface SimDynamoDbGlobalSecondaryIndexDescription {
   readonly Backfilling?: boolean | undefined;
   readonly IndexArn?: SimArn | undefined;
   readonly ProvisionedThroughput?:
-    SimDynamoDbProvisionedThroughputDescription | undefined;
+    | SimDynamoDbProvisionedThroughputDescription
+    | undefined;
   readonly ItemCount?: number | undefined;
   readonly IndexSizeBytes?: number | undefined;
 }
@@ -282,4 +288,7 @@ export type SimDynamoDbProjectionType = "ALL" | "KEYS_ONLY" | "INCLUDE";
  * Minimal structural sim DynamoDB index status.
  */
 export type SimDynamoDbIndexStatus =
-  "CREATING" | "UPDATING" | "DELETING" | "ACTIVE";
+  | "CREATING"
+  | "UPDATING"
+  | "DELETING"
+  | "ACTIVE";

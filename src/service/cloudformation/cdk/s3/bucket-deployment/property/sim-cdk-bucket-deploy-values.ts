@@ -115,7 +115,7 @@ export class SimCdkBucketDeployValues {
   }
 
   private value(name: string): unknown {
-    // eslint-disable-next-line security/detect-object-injection -- name is a fixed property name from the caller
+    // oxlint-disable-next-line security/detect-object-injection -- name is a fixed property name from the caller
     return this.properties[name];
   }
 

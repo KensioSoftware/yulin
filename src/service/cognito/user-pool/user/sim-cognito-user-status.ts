@@ -4,7 +4,9 @@ import {
 } from "../../error/sim-cognito.error.js";
 
 export type SimCognitoUserStatusValue =
-  "UNCONFIRMED" | "FORCE_CHANGE_PASSWORD" | "CONFIRMED";
+  | "UNCONFIRMED"
+  | "FORCE_CHANGE_PASSWORD"
+  | "CONFIRMED";
 
 /**
  * The status of one simulated user.

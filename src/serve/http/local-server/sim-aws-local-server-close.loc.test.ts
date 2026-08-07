@@ -97,7 +97,7 @@ async function untilClosed(simAws: SimAws, withinMs = 5000): Promise<void> {
       throw new Error("The served environment was not closed");
     }
 
-    // eslint-disable-next-line no-await-in-loop -- polling for a close
+    // oxlint-disable-next-line no-await-in-loop -- polling for a close
     await heldPause(10);
   }
 }

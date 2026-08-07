@@ -14,7 +14,7 @@ export class SimCfnTemplateWatchReport {
    * Report an update the changed template file did not survive.
    */
   failed(templatePath: string, error: Error): void {
-    // eslint-disable-next-line no-console
+    // oxlint-disable-next-line no-console
     console.warn(
       `Simulated CloudFormation could not apply the changed template ` +
         `${templatePath}: ${error.message}. The Stack is left where the ` +
@@ -32,7 +32,7 @@ export class SimCfnTemplateWatchReport {
    * quite different reasons.
    */
   listenerFailed(templatePath: string, listener: string, error: Error): void {
-    // eslint-disable-next-line no-console
+    // oxlint-disable-next-line no-console
     console.warn(
       `Simulated CloudFormation ran the ${listener} for the watched ` +
         `template ${templatePath}, and it threw: ${error.message}`,

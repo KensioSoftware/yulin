@@ -1,7 +1,9 @@
 export type SimAcmValidationMethod = "DNS" | "EMAIL" | "HTTP";
 
 export type SimAcmDomainValidationStatus =
-  "FAILED" | "PENDING_VALIDATION" | "SUCCESS";
+  | "FAILED"
+  | "PENDING_VALIDATION"
+  | "SUCCESS";
 
 export interface SimAcmValidationRecord {
   readonly name: string;

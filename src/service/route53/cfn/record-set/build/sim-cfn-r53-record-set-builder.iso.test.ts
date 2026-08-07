@@ -260,7 +260,7 @@ describe("SimCfnRoute53RecordSetBuilder", () => {
 
   it("throws when TTL is an empty or whitespace-only string", () => {
     // Given RecordSets with blank TTL strings.
-    // eslint-disable-next-line unicorn/prefer-string-repeat
+    // oxlint-disable-next-line unicorn-js/prefer-string-repeat
     const invalidTtls = ["", "   ", "\t\n"];
 
     for (const ttl of invalidTtls) {

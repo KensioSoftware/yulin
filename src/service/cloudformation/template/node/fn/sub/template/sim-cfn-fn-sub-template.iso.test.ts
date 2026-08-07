@@ -6,7 +6,7 @@ import {
 import { describe, it } from "vitest";
 import { SimCfnFnSubTemplate as SimCfnFunctionSubTemplate } from "./sim-cfn-fn-sub-template.js";
 
-/* eslint-disable no-template-curly-in-string */
+/* oxlint-disable no-template-curly-in-string */
 
 describe("SimAws CloudFormation Fn::Sub template string", () => {
   it("returns no variable names for a template without substitutions", () => {

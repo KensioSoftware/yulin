@@ -19,7 +19,8 @@ export interface SimRequestCertificateCommandInput {
   readonly SubjectAlternativeNames?: readonly string[] | undefined;
   readonly ValidationMethod?: SimAcmValidationMethod | undefined;
   readonly DomainValidationOptions?:
-    readonly SimRequestCertificateDomainValidationOption[] | undefined;
+    | readonly SimRequestCertificateDomainValidationOption[]
+    | undefined;
   readonly Tags?: readonly SimRequestCertificateTag[] | undefined;
 }
 

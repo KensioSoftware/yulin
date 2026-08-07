@@ -215,7 +215,7 @@ describe("DynamoDB conditional writes", () => {
 
     for (const asked of [undefined, "NONE"]) {
       // When the condition turns it away.
-      // eslint-disable-next-line no-await-in-loop
+      // oxlint-disable-next-line no-await-in-loop
       const error = await assertThrowsErrorAsync(async () =>
         simDynamoDb.putItem({
           input: {

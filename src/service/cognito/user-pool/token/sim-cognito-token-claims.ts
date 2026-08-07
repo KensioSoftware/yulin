@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/naming-convention -- JWT claim names are the
-   ones RFC 7519 and Cognito define, rather than identifier names. */
 import type { SimCognitoUserPool } from "../sim-cognito-user-pool.js";
 import type { SimCognitoUserPoolClient } from "../client/sim-cognito-user-pool-client.js";
 import type { SimCognitoUser } from "../user/sim-cognito-user.js";

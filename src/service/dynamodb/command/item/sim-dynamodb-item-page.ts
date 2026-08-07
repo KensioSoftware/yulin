@@ -53,7 +53,8 @@ interface SimDynamoDbItemPageProperties {
 export class SimDynamoDbItemPage {
   public readonly items: readonly SimDynamoDbItem[];
   public readonly lastEvaluatedKey:
-    Record<string, SimDynamoDbAttributeValue> | undefined;
+    | Record<string, SimDynamoDbAttributeValue>
+    | undefined;
 
   constructor(properties: SimDynamoDbItemPageProperties) {
     const limit = readLimit(properties.limit);

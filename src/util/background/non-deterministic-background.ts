@@ -12,7 +12,7 @@ import {
 import { BackgroundJitter } from "./background-jitter.js";
 import { BackgroundSettledTasks } from "./background-settled-tasks.js";
 
-/* eslint-disable unicorn/prefer-await  */
+/* oxlint-disable unicorn/prefer-await  */
 
 /**
  * Non-deterministic async background tasks scheduler.
@@ -91,7 +91,7 @@ export class NonDeterministicBackgroundTasks
    */
   public async complete(): Promise<void> {
     while (this.pending.size > 0) {
-      // eslint-disable-next-line no-await-in-loop
+      // oxlint-disable-next-line no-await-in-loop
       const results = await Promise.allSettled(this.pending);
 
       // Surface a task that failed in the background to whoever waited here.

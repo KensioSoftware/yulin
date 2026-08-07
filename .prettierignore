@@ -1,9 +1,0 @@
-tmp/
-.tmp/
-dist/
-coverage/
-test/.coverage/
-node_modules/
-pnpm-lock.yaml
-pnpm-workspace.yaml
-.claude/

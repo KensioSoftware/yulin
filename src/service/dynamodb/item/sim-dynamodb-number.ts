@@ -11,7 +11,7 @@ import { simDynamoDbPlainDecimal } from "./sim-dynamodb-number-text.js";
  */
 // Each part consumes a distinct character, so a value that fails to match
 // backtracks a digit at a time rather than combinatorially.
-// eslint-disable-next-line security/detect-unsafe-regex -- no nested quantifier.
+// oxlint-disable-next-line security/detect-unsafe-regex -- no nested quantifier.
 const numberPattern = /^(-?)(\d+)(?:\.(\d+))?(?:[Ee]([+-]?\d+))?$/;
 
 /**

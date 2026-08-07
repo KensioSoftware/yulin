@@ -26,7 +26,8 @@ export interface SimListResourceRecordSetsCommandInput {
  */
 export interface SimListResourceRecordSetsCommandOutput {
   readonly ResourceRecordSets?:
-    readonly SimRoute53ResourceRecordSet[] | undefined;
+    | readonly SimRoute53ResourceRecordSet[]
+    | undefined;
   readonly IsTruncated?: boolean | undefined;
   readonly NextRecordName?: string | undefined;
   // Narrower than a bare string so a returned marker can be fed straight back

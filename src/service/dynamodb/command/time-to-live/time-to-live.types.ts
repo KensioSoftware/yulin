@@ -5,7 +5,10 @@
  * DISABLED, the same two-step a table's own status goes through.
  */
 export type SimDynamoDbTimeToLiveStatus =
-  "ENABLING" | "DISABLING" | "ENABLED" | "DISABLED";
+  | "ENABLING"
+  | "DISABLING"
+  | "ENABLED"
+  | "DISABLED";
 
 /**
  * Minimal structural sim DynamoDB TimeToLiveSpecification.

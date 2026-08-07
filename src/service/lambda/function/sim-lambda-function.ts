@@ -29,7 +29,10 @@ export type SimLambdaFunctionMap = Map<
 >;
 
 export type SimLambdaFunctionState =
-  "Pending" | "Active" | "Inactive" | "Failed";
+  | "Pending"
+  | "Active"
+  | "Inactive"
+  | "Failed";
 
 /**
  * Lambda function ARNs address the function with a colon, not a slash.

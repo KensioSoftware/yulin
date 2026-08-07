@@ -130,7 +130,7 @@ export class SimClockControl implements SimClock {
       this.clock.setTo(this.laterOfNow(due.dueTime));
       this.background.schedule(due.task);
 
-      // eslint-disable-next-line no-await-in-loop
+      // oxlint-disable-next-line no-await-in-loop
       await this.background.complete();
 
       due = this.background.takeNextDueBy(instant);

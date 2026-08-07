@@ -26,7 +26,8 @@ export interface SimRekognitionDeclaredLabel {
   readonly aliases?: readonly string[] | undefined;
   readonly categories?: readonly string[] | undefined;
   readonly instances?:
-    readonly SimRekognitionDeclaredLabelInstance[] | undefined;
+    | readonly SimRekognitionDeclaredLabelInstance[]
+    | undefined;
 }
 
 /**
@@ -34,7 +35,8 @@ export interface SimRekognitionDeclaredLabel {
  * is to be reported with it.
  */
 export type SimRekognitionLabelDeclaration =
-  string | SimRekognitionDeclaredLabel;
+  | string
+  | SimRekognitionDeclaredLabel;
 
 /**
  * What DetectLabels answers with for an image.

@@ -1,6 +1,3 @@
-/* eslint-disable @typescript-eslint/naming-convention -- environment
-   variable names are AWS-shaped rather than code identifiers. */
-
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import { CreateFunctionCommand, InvokeCommand } from "@aws-sdk/client-lambda";
 import {

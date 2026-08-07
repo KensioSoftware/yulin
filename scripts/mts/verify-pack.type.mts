@@ -10,7 +10,8 @@ export interface PackageManifest {
 }
 
 export type ExportTarget =
-  string | { readonly import: string; readonly types: string };
+  | string
+  | { readonly import: string; readonly types: string };
 
 export interface Subpath {
   /** Specifier a consumer would import, e.g. `@kensio/yulin/s3`. */

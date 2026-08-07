@@ -164,7 +164,8 @@ export interface SimDynamoDbAttributeValueUpdate {
 export interface SimDynamoDbLegacyCondition {
   readonly ComparisonOperator?: string | undefined;
   readonly AttributeValueList?:
-    readonly SimDynamoDbAttributeValue[] | undefined;
+    | readonly SimDynamoDbAttributeValue[]
+    | undefined;
 }
 
 /**
@@ -179,5 +180,6 @@ export interface SimDynamoDbExpectedAttributeValue {
   readonly Exists?: boolean | undefined;
   readonly ComparisonOperator?: string | undefined;
   readonly AttributeValueList?:
-    readonly SimDynamoDbAttributeValue[] | undefined;
+    | readonly SimDynamoDbAttributeValue[]
+    | undefined;
 }

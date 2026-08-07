@@ -6,7 +6,7 @@ import {
 } from "node:crypto";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 
-/* eslint-disable @typescript-eslint/consistent-type-definitions -- these are
+/* oxlint-disable typescript/consistent-type-definitions -- these are
    type aliases rather than interfaces on purpose: a JWKS has to stay
    assignable to the index-signature types verification libraries declare for
    it, and an interface is not. */

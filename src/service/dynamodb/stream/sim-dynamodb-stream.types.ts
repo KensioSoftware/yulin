@@ -23,4 +23,7 @@ export interface SimDynamoDbStreamSpecificationDescription {
  * Minimal structural sim DynamoDB stream view type.
  */
 export type SimDynamoDbStreamViewType =
-  "KEYS_ONLY" | "NEW_IMAGE" | "OLD_IMAGE" | "NEW_AND_OLD_IMAGES";
+  | "KEYS_ONLY"
+  | "NEW_IMAGE"
+  | "OLD_IMAGE"
+  | "NEW_AND_OLD_IMAGES";

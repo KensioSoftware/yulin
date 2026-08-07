@@ -1,7 +1,9 @@
 import type { SimAwsAccountId } from "../sim-aws-account.js";
 
 export type SimAwsAccountServiceCacheServiceName =
-  "cloudFront" | "iam" | "route53";
+  | "cloudFront"
+  | "iam"
+  | "route53";
 
 /**
  * Build a stable memo key for an account-scoped simulated service instance.

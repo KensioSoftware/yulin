@@ -38,7 +38,8 @@ export interface SimCognitoVerificationMessagesType {
   readonly EmailVerificationSubject?: string | undefined;
   readonly SmsVerificationMessage?: string | undefined;
   readonly VerificationMessageTemplate?:
-    SimCognitoVerificationMessageTemplateType | undefined;
+    | SimCognitoVerificationMessageTemplateType
+    | undefined;
 }
 
 /**

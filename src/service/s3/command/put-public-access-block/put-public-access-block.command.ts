@@ -14,7 +14,8 @@ export interface SimPutPublicAccessBlockCommand {
 export interface SimPutPublicAccessBlockCommandInput {
   readonly Bucket?: string | undefined;
   readonly PublicAccessBlockConfiguration?:
-    SimS3PublicAccessBlockConfiguration | undefined;
+    | SimS3PublicAccessBlockConfiguration
+    | undefined;
 }
 
 /**

@@ -6,7 +6,9 @@ export interface SimCreatePolicyCommandInput {
   readonly PolicyName?: string | undefined;
   readonly Path?: string | undefined;
   readonly PolicyDocument?:
-    JSONString<SimIamPolicyDocument> | string | undefined;
+    | JSONString<SimIamPolicyDocument>
+    | string
+    | undefined;
   readonly Description?: string | undefined;
 }
 

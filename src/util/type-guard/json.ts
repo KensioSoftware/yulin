@@ -1,5 +1,10 @@
 export type JSONValue =
-  string | number | boolean | null | JSONArray | JSONObject;
+  | string
+  | number
+  | boolean
+  | null
+  | JSONArray
+  | JSONObject;
 export type JSONArray = JSONValue[];
 export interface JSONObject {
   [key: string]: JSONValue;
@@ -12,7 +17,7 @@ type Jsonify<T> = T extends { toJSON(): infer R }
   ? Jsonify<R> // Date -> string, etc.
   : T extends string | number | boolean | null
     ? T
-    : // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    : // oxlint-disable-next-line typescript/no-explicit-any
       T extends undefined | ((...arguments_: any[]) => any) | symbol
       ? never // dropped in objects
       : T extends [unknown, ...unknown[]]
@@ -33,7 +38,7 @@ type JsonifyObject<T> = {
  */
 export function jsonStringify<T>(
   value: T,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line typescript/no-explicit-any
   replacer?: (this: any, key: string, value: any) => any,
   space?: string | number,
 ): JSONString<Jsonify<T>> {
@@ -45,7 +50,7 @@ export function jsonStringify<T>(
  */
 export function jsonParse<T>(
   text: JSONString<T>,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  // oxlint-disable-next-line typescript/no-explicit-any
   reviver?: (this: any, key: string, value: any) => any,
 ): T {
   return JSON.parse(text, reviver) as T;

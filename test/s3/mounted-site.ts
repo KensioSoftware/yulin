@@ -81,7 +81,7 @@ export class MountedSite {
         );
       }
 
-      // eslint-disable-next-line no-await-in-loop -- polling for a filesystem event
+      // oxlint-disable-next-line no-await-in-loop -- polling for a filesystem event
       await mountPause(20);
     }
   }
@@ -105,7 +105,7 @@ export class MountedSite {
   private async prepare(fresh: boolean): Promise<void> {
     if (fresh) {
       await this.directory.resolvePath();
-      // eslint-disable-next-line security/detect-non-literal-fs-filename
+      // oxlint-disable-next-line security/detect-non-literal-fs-filename
       await mkdir(this.path(), { recursive: true });
 
       return;

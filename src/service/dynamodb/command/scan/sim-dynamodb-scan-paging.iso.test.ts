@@ -65,7 +65,7 @@ async function pagedScan(
   let exclusiveStartKey: Record<string, SimDynamoDbAttributeValue> | undefined;
 
   do {
-    // eslint-disable-next-line no-await-in-loop -- a page at a time is the point.
+    // oxlint-disable-next-line no-await-in-loop -- a page at a time is the point.
     const page = await simDynamoDb.scan(
       new ScanCommand({
         TableName: "OrdersTable",

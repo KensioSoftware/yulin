@@ -18,7 +18,7 @@ import { readFileSync } from "node:fs";
  * ```
  */
 export function cloudFrontFunctionSourceFromModule(filePath: string): string {
-  // eslint-disable-next-line security/detect-non-literal-fs-filename
+  // oxlint-disable-next-line security/detect-non-literal-fs-filename
   const source = readFileSync(filePath, "utf8");
   const handlerPattern =
     /\b(?:export[\t ]+function|function)[\t ]+handler[\t ]*\(/;

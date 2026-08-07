@@ -190,7 +190,7 @@ async function until(
       throw new Error(timedOut());
     }
 
-    // eslint-disable-next-line no-await-in-loop -- polling for a filesystem event
+    // oxlint-disable-next-line no-await-in-loop -- polling for a filesystem event
     await templatePause(20);
   }
 }

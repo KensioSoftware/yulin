@@ -86,7 +86,8 @@ export class SimCfnAcmCertificatePropertyReader {
    * Get the Certificate DomainValidationOptions property.
    */
   domainValidationOptions():
-    readonly SimRequestCertificateDomainValidationOption[] | undefined {
+    | readonly SimRequestCertificateDomainValidationOption[]
+    | undefined {
     const value = this.properties["DomainValidationOptions"];
 
     if (value === undefined) {

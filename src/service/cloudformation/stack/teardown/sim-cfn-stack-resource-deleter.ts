@@ -79,7 +79,7 @@ export class SimCfnStackResourceDeleter {
         );
       }
 
-      // eslint-disable-next-line no-await-in-loop
+      // oxlint-disable-next-line no-await-in-loop
       await this.batchDeleter.delete(deletableResources);
 
       pendingDeletions = pendingDeletions.incompleteResources();

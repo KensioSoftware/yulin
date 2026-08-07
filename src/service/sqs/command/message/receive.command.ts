@@ -13,7 +13,8 @@ export interface SimSqsReceivedMessage {
   readonly Body: string;
   readonly Attributes?: Record<string, string> | undefined;
   readonly MessageAttributes?:
-    Record<string, SimSqsMessageAttributeValue> | undefined;
+    | Record<string, SimSqsMessageAttributeValue>
+    | undefined;
   readonly MD5OfMessageAttributes?: string | undefined;
 }
 

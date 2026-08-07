@@ -38,7 +38,8 @@ export class CreateRoleRecordFactory {
       roleName,
       path,
       assumeRolePolicyDocument: cmd.input.AssumeRolePolicyDocument as
-        JSONString<SimIamPolicyDocument> | undefined,
+        | JSONString<SimIamPolicyDocument>
+        | undefined,
       description: cmd.input.Description,
       creationDate,
       inlinePolicies: new Map(),

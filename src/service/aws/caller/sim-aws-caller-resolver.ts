@@ -38,7 +38,8 @@ export interface SimAwsResolvedCaller {
  */
 export class SimAwsCallerResolver {
   private readonly credentialIdentityResolver?:
-    SimAwsCredentialIdentityResolver | undefined;
+    | SimAwsCredentialIdentityResolver
+    | undefined;
 
   constructor(credentialIdentityResolver?: SimAwsCredentialIdentityResolver) {
     this.credentialIdentityResolver = credentialIdentityResolver;

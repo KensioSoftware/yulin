@@ -1,0 +1,768 @@
+{
+  // Oxlint's configuration for this repository.
+  //
+  // Every rule is named. Under ESLint the bulk of them arrived through
+  // `eslint:recommended`, `strictTypeChecked`, `unicorn/recommended` and the
+  // rest, and a preset gaining a rule brought it here on the next upgrade.
+  // Oxlint has no equivalent of extending a plugin's own preset, so the set is
+  // written out instead. The trade is deliberate: what this repository
+  // enforces is now readable in one file, and a preset growing a rule is
+  // something to pick up on purpose rather than something that lands silently.
+  //
+  // Four ESLint plugins are loaded through Oxlint's JS plugin API rather than
+  // reimplemented. Oxlint carries native `unicorn` and `jsdoc` plugins whose
+  // rule coverage is a long way short of what this repository uses — 166 and 18
+  // of ours have no native counterpart — so both are taken wholesale from the
+  // real plugin under an alias. `unicorn` and `jsdoc` are reserved names, which
+  // is why the aliases exist.
+  //
+  // Nothing in `--type-aware` reaches a JS plugin: Oxlint runs those without
+  // type information, and less scope information than ESLint gives them. Two
+  // rules are gone outright because of it, and seven Unicorn rules are off for
+  // the same reason — see the block among the Unicorn rules below.
+  //
+  //   `@typescript-eslint/naming-convention` calls `getParserServices()`
+  //   unconditionally, so it cannot run here at all. Oxlint has no `camelcase`
+  //   either. Identifier casing is no longer a lint gate; it is a review
+  //   matter, and the 29 disable directives that used to suppress AWS-shaped
+  //   names went with it.
+  //
+  //   `no-octal` has no Oxlint rule, and needs none: modules are strict mode,
+  //   where a legacy octal literal is a parse error rather than a lint finding.
+  //
+  // `no-restricted-syntax` is also absent, but it did survive: its selectors
+  // moved into the `yulin` plugin below as named rules.
+  //
+  // The published `cff-js2` plugin is not loaded here. It restricts syntax to
+  // what the CloudFront Functions JS2 runtime will run, this repository has no
+  // `.cff.js` files of its own, and `src/config/oxlint/` already tests it
+  // against Oxlint. Consumers get it through `@kensio/yulin/oxlint`.
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+
+  "ignorePatterns": [
+    "tmp/",
+    ".tmp/",
+    "dist/",
+    "coverage/",
+    "test/.coverage/",
+    "node_modules/",
+    "**/*.config.ts",
+    ".claude/"
+  ],
+
+  // Only the native plugins whose rules are named below. Oxlint's `unicorn`
+  // and `jsdoc` are deliberately absent; the JS plugins below stand in for
+  // them.
+  "plugins": ["typescript", "oxc", "vitest"],
+
+  // Oxlint turns its `correctness` category on by default, which would add
+  // rules on top of the set below without them appearing anywhere. The list is
+  // the gate, so the category is off.
+  "categories": { "correctness": "off" },
+
+  "jsPlugins": [
+    { "name": "unicorn-js", "specifier": "eslint-plugin-unicorn" },
+    { "name": "jsdoc-js", "specifier": "eslint-plugin-jsdoc" },
+    { "name": "security", "specifier": "eslint-plugin-security" },
+    { "name": "no-secrets", "specifier": "eslint-plugin-no-secrets" },
+    { "name": "yulin", "specifier": "./src/config/lint/repo-lint-plugin.ts" }
+  ],
+
+  "rules": {
+    // ── Core JavaScript rules (59) ──
+    "eslint/complexity": "error",
+    "eslint/eqeqeq": ["error", "always"],
+    "eslint/for-direction": "error",
+    "eslint/max-lines": ["error", 300],
+    "eslint/no-async-promise-executor": "error",
+    "eslint/no-await-in-loop": "error",
+    "eslint/no-case-declarations": "error",
+    "eslint/no-compare-neg-zero": "error",
+    "eslint/no-cond-assign": "error",
+    "eslint/no-console": "warn",
+    "eslint/no-constant-binary-expression": "error",
+    "eslint/no-constant-condition": "error",
+    "eslint/no-control-regex": "error",
+    "eslint/no-debugger": "error",
+    "eslint/no-delete-var": "error",
+    "eslint/no-dupe-else-if": "error",
+    "eslint/no-duplicate-case": "error",
+    "eslint/no-empty": "error",
+    "eslint/no-empty-character-class": "error",
+    "eslint/no-empty-pattern": "error",
+    "eslint/no-empty-static-block": "error",
+    "eslint/no-ex-assign": "error",
+    "eslint/no-extra-boolean-cast": "error",
+    "eslint/no-fallthrough": "error",
+    "eslint/no-global-assign": "error",
+    "eslint/no-invalid-regexp": "error",
+    "eslint/no-irregular-whitespace": "error",
+    "eslint/no-loss-of-precision": "error",
+    "eslint/no-misleading-character-class": "error",
+    "eslint/no-nonoctal-decimal-escape": "error",
+    "eslint/no-param-reassign": "error",
+    "eslint/no-promise-executor-return": "error",
+    "eslint/no-prototype-builtins": "error",
+    "eslint/no-regex-spaces": "error",
+    "eslint/no-self-assign": "error",
+    "eslint/no-shadow-restricted-names": "error",
+    "eslint/no-sparse-arrays": "error",
+    "eslint/no-template-curly-in-string": "error",
+    "eslint/no-unassigned-vars": "error",
+    "eslint/no-unreachable-loop": "error",
+    "eslint/no-unsafe-finally": "error",
+    "eslint/no-unsafe-optional-chaining": "error",
+    "eslint/no-unused-labels": "error",
+    "eslint/no-unused-private-class-members": "error",
+    "eslint/no-useless-assignment": "error",
+    "eslint/no-useless-backreference": "error",
+    "eslint/no-useless-catch": "error",
+    "eslint/no-useless-escape": "error",
+    "eslint/no-var": "error",
+    "eslint/object-shorthand": ["error", "always"],
+    "eslint/prefer-const": "error",
+    "eslint/prefer-rest-params": "error",
+    "eslint/prefer-spread": "error",
+    "eslint/prefer-template": "error",
+    "eslint/preserve-caught-error": "error",
+    "eslint/require-yield": "error",
+    "eslint/use-isnan": "error",
+    "eslint/valid-typeof": "error",
+
+    // ── TypeScript. The type-aware ones need --type-aware (97) ──
+    "typescript/adjacent-overload-signatures": "error",
+    "typescript/array-type": "error",
+    "typescript/await-thenable": "error",
+    "typescript/ban-ts-comment": "error",
+    "typescript/ban-tslint-comment": "error",
+    "typescript/class-literal-property-style": "error",
+    "typescript/consistent-generic-constructors": "error",
+    "typescript/consistent-indexed-object-style": "error",
+    "typescript/consistent-type-assertions": "error",
+    "typescript/consistent-type-definitions": "error",
+    "typescript/consistent-type-exports": [
+      "error",
+      { "fixMixedExportsWithInlineTypeSpecifier": true }
+    ],
+    "typescript/consistent-type-imports": [
+      "error",
+      { "prefer": "type-imports", "fixStyle": "inline-type-imports" }
+    ],
+    "typescript/dot-notation": "error",
+    "typescript/explicit-function-return-type": "error",
+    "typescript/explicit-module-boundary-types": "error",
+    "typescript/no-array-constructor": "error",
+    "typescript/no-array-delete": "error",
+    "typescript/no-base-to-string": "error",
+    "typescript/no-confusing-non-null-assertion": "error",
+    "typescript/no-confusing-void-expression": "error",
+    "typescript/no-deprecated": "error",
+    "typescript/no-duplicate-enum-values": "error",
+    "typescript/no-duplicate-type-constituents": "error",
+    "typescript/no-dynamic-delete": "error",
+    "typescript/no-empty-function": "error",
+    "typescript/no-empty-object-type": "error",
+    "typescript/no-explicit-any": "error",
+    "typescript/no-extra-non-null-assertion": "error",
+    "typescript/no-extraneous-class": "error",
+    "typescript/no-floating-promises": "error",
+    "typescript/no-for-in-array": "error",
+    "typescript/no-implied-eval": "error",
+    "typescript/no-import-type-side-effects": "error",
+    "typescript/no-inferrable-types": "error",
+    "typescript/no-invalid-void-type": "error",
+    "typescript/no-meaningless-void-operator": "error",
+    "typescript/no-misused-new": "error",
+    "typescript/no-misused-promises": "error",
+    "typescript/no-misused-spread": "error",
+    "typescript/no-mixed-enums": "error",
+    "typescript/no-namespace": "error",
+    "typescript/no-non-null-asserted-nullish-coalescing": "error",
+    "typescript/no-non-null-asserted-optional-chain": "error",
+    "typescript/no-non-null-assertion": "error",
+    "typescript/no-redundant-type-constituents": "error",
+    "typescript/no-require-imports": "error",
+    "typescript/no-this-alias": "error",
+    "typescript/no-unnecessary-boolean-literal-compare": "error",
+    "typescript/no-unnecessary-condition": "error",
+    "typescript/no-unnecessary-template-expression": "error",
+    "typescript/no-unnecessary-type-arguments": "error",
+    "typescript/no-unnecessary-type-assertion": "error",
+    "typescript/no-unnecessary-type-constraint": "error",
+    "typescript/no-unnecessary-type-conversion": "error",
+    "typescript/no-unsafe-argument": "error",
+    "typescript/no-unsafe-assignment": "error",
+    "typescript/no-unsafe-call": "error",
+    "typescript/no-unsafe-declaration-merging": "error",
+    "typescript/no-unsafe-enum-comparison": "error",
+    "typescript/no-unsafe-function-type": "error",
+    "typescript/no-unsafe-member-access": "error",
+    "typescript/no-unsafe-return": "error",
+    "typescript/no-unsafe-unary-minus": "error",
+    "typescript/no-unused-expressions": "error",
+    "typescript/no-unused-vars": "error",
+    "typescript/no-useless-constructor": "error",
+    "typescript/no-useless-default-assignment": "error",
+    "typescript/no-wrapper-object-types": "error",
+    "typescript/non-nullable-type-assertion-style": "error",
+    "typescript/only-throw-error": "error",
+    "typescript/prefer-as-const": "error",
+    "typescript/prefer-find": "error",
+    "typescript/prefer-for-of": "error",
+    "typescript/prefer-function-type": "error",
+    "typescript/prefer-includes": "error",
+    "typescript/prefer-literal-enum-member": "error",
+    "typescript/prefer-namespace-keyword": "error",
+    "typescript/prefer-nullish-coalescing": "error",
+    "typescript/prefer-optional-chain": "error",
+    "typescript/prefer-promise-reject-errors": "error",
+    "typescript/prefer-readonly": "error",
+    "typescript/prefer-reduce-type-parameter": "error",
+    "typescript/prefer-regexp-exec": "error",
+    "typescript/prefer-return-this-type": "error",
+    "typescript/prefer-string-starts-ends-with": "error",
+    "typescript/related-getter-setter-pairs": "error",
+    "typescript/require-array-sort-compare": "error",
+    "typescript/require-await": "error",
+    "typescript/restrict-plus-operands": "error",
+    "typescript/restrict-template-expressions": "error",
+    "typescript/return-await": ["error", "error-handling-correctness-only"],
+    "typescript/strict-boolean-expressions": "error",
+    "typescript/switch-exhaustiveness-check": "error",
+    "typescript/triple-slash-reference": "error",
+    "typescript/unbound-method": "error",
+    "typescript/unified-signatures": "error",
+    "typescript/use-unknown-in-catch-callback-variable": "error",
+
+    // ── eslint-plugin-unicorn, loaded whole through the JS plugin API (292) ──
+    "unicorn-js/no-nonstandard-builtin-properties": "error",
+    "unicorn-js/no-this-outside-of-class": "error",
+    "unicorn-js/no-unsafe-string-replacement": "error",
+    "unicorn-js/prefer-event-target": "error",
+    "unicorn-js/prefer-string-repeat": "error",
+    "unicorn-js/better-dom-traversing": "error",
+    "unicorn-js/catch-error-name": "error",
+    "unicorn-js/class-reference-in-static-methods": "error",
+    "unicorn-js/consistent-assert": "error",
+    "unicorn-js/consistent-class-member-order": [
+      "error",
+      {
+        "order": [
+          "static-field",
+          "static-block",
+          "public-field",
+          "private-field",
+          "constructor",
+          "static-method",
+          "public-method",
+          "private-method"
+        ]
+      }
+    ],
+    "unicorn-js/consistent-compound-words": "error",
+    "unicorn-js/consistent-conditional-object-spread": "error",
+    "unicorn-js/consistent-date-clone": "error",
+    "unicorn-js/consistent-empty-array-spread": "error",
+    "unicorn-js/consistent-existence-index-check": "error",
+    "unicorn-js/consistent-export-decorator-position": "error",
+    "unicorn-js/consistent-function-scoping": "error",
+    "unicorn-js/consistent-json-file-read": "error",
+    "unicorn-js/consistent-optional-chaining": "error",
+    "unicorn-js/consistent-template-literal-escape": "error",
+    "unicorn-js/consistent-tuple-labels": "error",
+    "unicorn-js/default-export-style": "error",
+    "unicorn-js/dom-node-dataset": "error",
+    "unicorn-js/error-message": "error",
+    "unicorn-js/escape-case": "error",
+    "unicorn-js/expiring-todo-comments": "error",
+    "unicorn-js/explicit-length-check": "error",
+    "unicorn-js/explicit-timer-delay": "error",
+    "unicorn-js/filename-case": "error",
+    "unicorn-js/import-style": "error",
+    "unicorn-js/isolated-functions": "error",
+    "unicorn-js/logical-assignment-operators": "error",
+    "unicorn-js/max-nested-calls": "error",
+    "unicorn-js/name-replacements": [
+      "error",
+      {
+        "replacements": {
+          "configuration": { "config": false },
+          "fn": false,
+          "ref": false,
+          "db": false
+        }
+      }
+    ],
+    "unicorn-js/new-for-builtins": "error",
+    "unicorn-js/no-abusive-eslint-disable": "error",
+    "unicorn-js/no-accessor-recursion": "error",
+    "unicorn-js/no-accidental-bitwise-operator": "error",
+    "unicorn-js/no-anonymous-default-export": "error",
+    "unicorn-js/no-array-concat-in-loop": "error",
+    "unicorn-js/no-array-fill-with-reference-type": "error",
+    "unicorn-js/no-array-from-fill": "error",
+    "unicorn-js/no-array-reverse": "error",
+    "unicorn-js/no-array-sort": "error",
+    "unicorn-js/no-array-sort-for-min-max": "error",
+    "unicorn-js/no-array-splice": "error",
+    "unicorn-js/no-async-promise-finally": "error",
+    "unicorn-js/no-await-expression-member": "error",
+    "unicorn-js/no-await-in-promise-methods": "error",
+    "unicorn-js/no-blob-to-file": "error",
+    "unicorn-js/no-boolean-sort-comparator": "error",
+    "unicorn-js/no-break-in-nested-loop": "error",
+    "unicorn-js/no-canvas-to-image": "error",
+    "unicorn-js/no-collection-bracket-access": "error",
+    "unicorn-js/no-computed-property-existence-check": "error",
+    "unicorn-js/no-confusing-array-splice": "error",
+    "unicorn-js/no-confusing-array-with": "error",
+    "unicorn-js/no-console-spaces": "error",
+    "unicorn-js/no-constant-zero-expression": "error",
+    "unicorn-js/no-declarations-before-early-exit": "error",
+    "unicorn-js/no-document-cookie": "error",
+    "unicorn-js/no-double-comparison": "error",
+    "unicorn-js/no-duplicate-if-branches": "error",
+    "unicorn-js/no-duplicate-logical-operands": "error",
+    "unicorn-js/no-duplicate-loops": "error",
+    "unicorn-js/no-duplicate-set-values": "error",
+    "unicorn-js/no-empty-file": "error",
+    "unicorn-js/no-error-property-assignment": "error",
+    "unicorn-js/no-exports-in-scripts": "error",
+    "unicorn-js/no-for-loop": "error",
+    "unicorn-js/no-global-object-property-assignment": "error",
+    "unicorn-js/no-immediate-mutation": "error",
+    "unicorn-js/no-impossible-length-comparison": "error",
+    "unicorn-js/no-incorrect-query-selector": "error",
+    "unicorn-js/no-incorrect-template-string-interpolation": "error",
+    "unicorn-js/no-instanceof-builtins": "error",
+    "unicorn-js/no-invalid-argument-count": "error",
+    "unicorn-js/no-invalid-character-comparison": "error",
+    "unicorn-js/no-invalid-fetch-options": "error",
+    "unicorn-js/no-invalid-remove-event-listener": "error",
+    "unicorn-js/no-invalid-well-known-symbol-methods": "error",
+    "unicorn-js/no-late-current-target-access": "error",
+    "unicorn-js/no-late-event-control": "error",
+    "unicorn-js/no-lonely-if": "error",
+    "unicorn-js/no-loop-iterable-mutation": "error",
+    "unicorn-js/no-magic-array-flat-depth": "error",
+    "unicorn-js/no-mismatched-map-key": "error",
+    "unicorn-js/no-misrefactored-assignment": "error",
+    "unicorn-js/no-named-default": "error",
+    "unicorn-js/no-negated-array-predicate": "error",
+    "unicorn-js/no-negated-comparison": "error",
+    "unicorn-js/no-negated-condition": "error",
+    "unicorn-js/no-negation-in-equality-check": "error",
+    "unicorn-js/no-new-array": "error",
+    "unicorn-js/no-new-buffer": "error",
+    "unicorn-js/no-non-function-verb-prefix": "error",
+    "unicorn-js/no-object-as-default-parameter": "error",
+    "unicorn-js/no-object-methods-with-collections": "error",
+    "unicorn-js/no-optional-chaining-on-undeclared-variable": "error",
+    "unicorn-js/no-process-exit": "error",
+    "unicorn-js/no-redundant-comparison": "error",
+    "unicorn-js/no-return-array-push": "error",
+    "unicorn-js/no-selector-as-dom-name": "error",
+    "unicorn-js/no-single-promise-in-promise-methods": "error",
+    "unicorn-js/no-static-only-class": "error",
+    "unicorn-js/no-subtraction-comparison": "error",
+    "unicorn-js/no-thenable": "error",
+    "unicorn-js/no-this-assignment": "error",
+    "unicorn-js/no-top-level-assignment-in-function": "error",
+    "unicorn-js/no-top-level-side-effects": "error",
+    "unicorn-js/no-typeof-undefined": "error",
+    "unicorn-js/no-uncalled-method": "error",
+    "unicorn-js/no-undeclared-class-members": "error",
+    "unicorn-js/no-unnecessary-array-flat-depth": "error",
+    "unicorn-js/no-unnecessary-array-flat-map": "error",
+    "unicorn-js/no-unnecessary-array-splice-count": "error",
+    "unicorn-js/no-unnecessary-await": "error",
+    "unicorn-js/no-unnecessary-boolean-comparison": "error",
+    "unicorn-js/no-unnecessary-fetch-options": "error",
+    "unicorn-js/no-unnecessary-global-this": "error",
+    "unicorn-js/no-unnecessary-nested-ternary": "error",
+    "unicorn-js/no-unnecessary-polyfills": "error",
+    "unicorn-js/no-unnecessary-slice-end": "error",
+    "unicorn-js/no-unnecessary-splice": "error",
+    "unicorn-js/no-unreadable-array-destructuring": "error",
+    "unicorn-js/no-unreadable-for-of-expression": "error",
+    "unicorn-js/no-unreadable-iife": "error",
+    "unicorn-js/no-unreadable-object-destructuring": "error",
+    "unicorn-js/no-unsafe-buffer-conversion": "error",
+    "unicorn-js/no-unsafe-promise-all-settled-values": "error",
+    "unicorn-js/no-unsafe-property-key": "error",
+    "unicorn-js/no-unused-array-method-return": "error",
+    "unicorn-js/no-useless-boolean-cast": "error",
+    "unicorn-js/no-useless-coercion": "error",
+    "unicorn-js/no-useless-collection-argument": "error",
+    "unicorn-js/no-useless-compound-assignment": "error",
+    "unicorn-js/no-useless-concat": "error",
+    "unicorn-js/no-useless-continue": "error",
+    "unicorn-js/no-useless-delete-check": "error",
+    "unicorn-js/no-useless-else": "error",
+    "unicorn-js/no-useless-error-capture-stack-trace": "error",
+    "unicorn-js/no-useless-fallback-in-spread": "error",
+    "unicorn-js/no-useless-iterator-to-array": "error",
+    "unicorn-js/no-useless-length-check": "error",
+    "unicorn-js/no-useless-logical-operand": "error",
+    "unicorn-js/no-useless-override": "error",
+    "unicorn-js/no-useless-promise-resolve-reject": "error",
+    "unicorn-js/no-useless-recursion": "error",
+    "unicorn-js/no-useless-spread": "error",
+    "unicorn-js/no-useless-switch-case": "error",
+    "unicorn-js/no-useless-template-literals": "error",
+    "unicorn-js/no-useless-undefined": "error",
+    "unicorn-js/no-xor-as-exponentiation": "error",
+    "unicorn-js/no-zero-fractions": "error",
+    "unicorn-js/numeric-separators-style": "error",
+    "unicorn-js/operator-assignment": "error",
+    "unicorn-js/prefer-abort-signal-any": "error",
+    "unicorn-js/prefer-abort-signal-timeout": "error",
+    "unicorn-js/prefer-add-event-listener": "error",
+    "unicorn-js/prefer-add-event-listener-options": "error",
+    "unicorn-js/prefer-aggregate-error": "error",
+    "unicorn-js/prefer-array-find": "error",
+    "unicorn-js/prefer-array-flat": "error",
+    "unicorn-js/prefer-array-flat-map": "error",
+    "unicorn-js/prefer-array-from-async": "error",
+    "unicorn-js/prefer-array-from-map": "error",
+    "unicorn-js/prefer-array-from-range": "error",
+    "unicorn-js/prefer-array-index-of": "error",
+    "unicorn-js/prefer-array-iterable-methods": "error",
+    "unicorn-js/prefer-array-last-methods": "error",
+    "unicorn-js/prefer-array-slice": "error",
+    "unicorn-js/prefer-at": "error",
+    "unicorn-js/prefer-bigint-literals": "error",
+    "unicorn-js/prefer-blob-reading-methods": "error",
+    "unicorn-js/prefer-block-statement-over-iife": "error",
+    "unicorn-js/prefer-boolean-return": "error",
+    "unicorn-js/prefer-class-fields": "error",
+    "unicorn-js/prefer-classlist-toggle": "error",
+    "unicorn-js/prefer-code-point": "error",
+    "unicorn-js/prefer-continue": "error",
+    "unicorn-js/prefer-date-now": "error",
+    "unicorn-js/prefer-default-parameters": "error",
+    "unicorn-js/prefer-direct-iteration": "error",
+    "unicorn-js/prefer-dom-node-append": "error",
+    "unicorn-js/prefer-dom-node-remove": "error",
+    "unicorn-js/prefer-dom-node-replace-children": "error",
+    "unicorn-js/prefer-dom-node-text-content": "error",
+    "unicorn-js/prefer-early-return": "error",
+    "unicorn-js/prefer-else-if": "error",
+    "unicorn-js/prefer-export-from": "error",
+    "unicorn-js/prefer-flat-math-min-max": "error",
+    "unicorn-js/prefer-get-or-insert-computed": "error",
+    "unicorn-js/prefer-global-number-constants": "error",
+    "unicorn-js/prefer-global-this": "error",
+    "unicorn-js/prefer-group-by": "error",
+    "unicorn-js/prefer-has-check": "error",
+    "unicorn-js/prefer-hoisting-branch-code": "error",
+    "unicorn-js/prefer-identifier-import-export-specifiers": "error",
+    "unicorn-js/prefer-includes": "error",
+    "unicorn-js/prefer-includes-over-repeated-comparisons": "error",
+    "unicorn-js/prefer-iterable-in-constructor": "error",
+    "unicorn-js/prefer-iterator-helpers": "error",
+    "unicorn-js/prefer-iterator-to-array": "error",
+    "unicorn-js/prefer-iterator-to-array-at-end": "error",
+    "unicorn-js/prefer-keyboard-event-key": "error",
+    "unicorn-js/prefer-location-assign": "error",
+    "unicorn-js/prefer-logical-operator-over-ternary": "error",
+    "unicorn-js/prefer-map-from-entries": "error",
+    "unicorn-js/prefer-math-abs": "error",
+    "unicorn-js/prefer-math-constants": "error",
+    "unicorn-js/prefer-math-min-max": "error",
+    "unicorn-js/prefer-math-trunc": "error",
+    "unicorn-js/prefer-minimal-ternary": "error",
+    "unicorn-js/prefer-modern-dom-apis": "error",
+    "unicorn-js/prefer-modern-math-apis": "error",
+    "unicorn-js/prefer-module": "error",
+    "unicorn-js/prefer-native-coercion-functions": "error",
+    "unicorn-js/prefer-negative-index": "error",
+    "unicorn-js/prefer-node-protocol": "error",
+    "unicorn-js/prefer-number-coercion": "error",
+    "unicorn-js/prefer-number-is-safe-integer": "error",
+    "unicorn-js/prefer-number-properties": "error",
+    "unicorn-js/prefer-object-define-properties": "error",
+    "unicorn-js/prefer-object-destructuring-defaults": "error",
+    "unicorn-js/prefer-object-from-entries": "error",
+    "unicorn-js/prefer-object-iterable-methods": "error",
+    "unicorn-js/prefer-observer-apis": "error",
+    "unicorn-js/prefer-optional-catch-binding": "error",
+    "unicorn-js/prefer-path2d": "error",
+    "unicorn-js/prefer-private-class-fields": "error",
+    "unicorn-js/prefer-promise-try": "error",
+    "unicorn-js/prefer-promise-with-resolvers": "error",
+    "unicorn-js/prefer-prototype-methods": "error",
+    "unicorn-js/prefer-query-selector": "error",
+    "unicorn-js/prefer-queue-microtask": "error",
+    "unicorn-js/prefer-reflect-apply": "error",
+    "unicorn-js/prefer-regexp-test": "error",
+    "unicorn-js/prefer-response-static-json": "error",
+    "unicorn-js/prefer-scoped-selector": "error",
+    "unicorn-js/prefer-set-has": "error",
+    "unicorn-js/prefer-set-methods": "error",
+    "unicorn-js/prefer-set-size": "error",
+    "unicorn-js/prefer-simple-condition-first": "error",
+    "unicorn-js/prefer-simple-sort-comparator": "error",
+    "unicorn-js/prefer-simplified-conditions": "error",
+    "unicorn-js/prefer-single-array-predicate": "error",
+    "unicorn-js/prefer-single-call": "error",
+    "unicorn-js/prefer-single-object-destructuring": "error",
+    "unicorn-js/prefer-single-replace": "error",
+    "unicorn-js/prefer-smaller-scope": "error",
+    "unicorn-js/prefer-split-limit": "error",
+    "unicorn-js/prefer-spread": "error",
+    "unicorn-js/prefer-string-match-all": "error",
+    "unicorn-js/prefer-string-pad-start-end": "error",
+    "unicorn-js/prefer-string-raw": "error",
+    "unicorn-js/prefer-string-replace-all": "error",
+    "unicorn-js/prefer-string-slice": "error",
+    "unicorn-js/prefer-string-starts-ends-with": "error",
+    "unicorn-js/prefer-string-trim-start-end": "error",
+    "unicorn-js/prefer-structured-clone": "error",
+    "unicorn-js/prefer-switch": "error",
+    "unicorn-js/prefer-ternary": "error",
+    "unicorn-js/prefer-toggle-attribute": "error",
+    "unicorn-js/prefer-top-level-await": "error",
+    "unicorn-js/prefer-type-error": "error",
+    "unicorn-js/prefer-type-literal-last": "error",
+    "unicorn-js/prefer-unary-minus": "error",
+    "unicorn-js/prefer-unicode-code-point-escapes": "error",
+    "unicorn-js/prefer-url-can-parse": "error",
+    "unicorn-js/prefer-url-href": "error",
+    "unicorn-js/prefer-url-search-parameters": "error",
+    "unicorn-js/prefer-while-loop-condition": "error",
+    "unicorn-js/relative-url-style": "error",
+    "unicorn-js/require-array-join-separator": "error",
+    "unicorn-js/require-array-sort-compare": "error",
+    "unicorn-js/require-css-escape": "error",
+    "unicorn-js/require-module-attributes": "error",
+    "unicorn-js/require-module-specifiers": "error",
+    "unicorn-js/require-number-to-fixed-digits-argument": "error",
+    "unicorn-js/require-passive-events": "error",
+    "unicorn-js/require-proxy-trap-boolean-return": "error",
+    "unicorn-js/switch-case-braces": "error",
+    "unicorn-js/switch-case-break-position": "error",
+    "unicorn-js/text-encoding-identifier-case": "error",
+    "unicorn-js/throw-new-error": "error",
+
+    // ── Unicorn rules that Oxlint cannot run faithfully (7) ──
+    // A JS plugin gets no type information from Oxlint, and less scope
+    // information than ESLint gives it. These seven decide whether to report by
+    // looking at what they are pointed at — is this receiver really an array,
+    // is this chain really convertible to `await` — so without that they report
+    // on code that is fine. Each fires on this repository under Oxlint and on
+    // none of it under ESLint, which runs the same plugin version with the
+    // TypeScript parser services behind it.
+    //
+    // They are off rather than warnings: a warning nobody can act on is worse
+    // than a rule nobody has. If Oxlint's JS plugin API grows type information,
+    // turn them back on and delete this block.
+    "unicorn-js/no-array-callback-reference": "off",
+    "unicorn-js/no-array-method-this-argument": "off",
+    "unicorn-js/no-array-reduce": "off",
+    "unicorn-js/no-chained-comparison": "off",
+    "unicorn-js/no-for-each": "off",
+    "unicorn-js/prefer-array-some": "off",
+    "unicorn-js/prefer-await": "off",
+
+    // ── eslint-plugin-jsdoc, likewise (33) ──
+    "jsdoc-js/check-access": "error",
+    "jsdoc-js/check-alignment": "error",
+    "jsdoc-js/check-param-names": "error",
+    "jsdoc-js/check-property-names": "error",
+    "jsdoc-js/check-tag-names": "error",
+    "jsdoc-js/check-types": "error",
+    "jsdoc-js/check-values": "error",
+    "jsdoc-js/empty-tags": "error",
+    "jsdoc-js/escape-inline-tags": "error",
+    "jsdoc-js/implements-on-classes": "error",
+    "jsdoc-js/multiline-blocks": "error",
+    "jsdoc-js/no-defaults": "error",
+    "jsdoc-js/no-multi-asterisks": "error",
+    "jsdoc-js/no-undefined-types": "error",
+    "jsdoc-js/reject-any-type": "error",
+    "jsdoc-js/reject-function-type": "error",
+    "jsdoc-js/require-description": [
+      "error",
+      {
+        "descriptionStyle": "body",
+        "checkConstructors": false,
+        "checkGetters": false,
+        "checkSetters": false
+      }
+    ],
+    "jsdoc-js/require-jsdoc": [
+      "error",
+      {
+        "contexts": [
+          "ClassDeclaration",
+          "ExportNamedDeclaration > VariableDeclaration[kind='const'] > VariableDeclarator[init.type='ObjectExpression']",
+          "ExportNamedDeclaration > VariableDeclaration[kind='const'] > VariableDeclarator[init.type='ArrayExpression']",
+          "ExportNamedDeclaration > VariableDeclaration[kind='const'] > VariableDeclarator[init.type='NewExpression']",
+          "ExportNamedDeclaration > VariableDeclaration[kind='const'] > VariableDeclarator[init.type='CallExpression']"
+        ],
+        "publicOnly": true,
+        "checkConstructors": false,
+        "require": {
+          "FunctionDeclaration": true,
+          "MethodDefinition": true,
+          "ClassDeclaration": true
+        }
+      }
+    ],
+    "jsdoc-js/require-next-type": "error",
+    "jsdoc-js/require-param-name": "error",
+    "jsdoc-js/require-param-type": "error",
+    "jsdoc-js/require-property": "error",
+    "jsdoc-js/require-property-description": "error",
+    "jsdoc-js/require-property-name": "error",
+    "jsdoc-js/require-property-type": "error",
+    "jsdoc-js/require-returns-check": "error",
+    "jsdoc-js/require-returns-type": "error",
+    "jsdoc-js/require-throws-type": "error",
+    "jsdoc-js/require-yields-check": "error",
+    "jsdoc-js/require-yields-type": "error",
+    "jsdoc-js/tag-lines": "error",
+    "jsdoc-js/ts-no-empty-object-type": "error",
+    "jsdoc-js/valid-types": "error",
+
+    // ── eslint-plugin-security, likewise (14) ──
+    "security/detect-bidi-characters": "warn",
+    "security/detect-buffer-noassert": "warn",
+    "security/detect-child-process": "warn",
+    "security/detect-disable-mustache-escape": "warn",
+    "security/detect-eval-with-expression": "warn",
+    "security/detect-new-buffer": "warn",
+    "security/detect-no-csrf-before-method-override": "warn",
+    "security/detect-non-literal-fs-filename": "warn",
+    "security/detect-non-literal-regexp": "warn",
+    "security/detect-non-literal-require": "warn",
+    "security/detect-object-injection": "warn",
+    "security/detect-possible-timing-attacks": "warn",
+    "security/detect-pseudoRandomBytes": "warn",
+    "security/detect-unsafe-regex": "warn",
+
+    // ── eslint-plugin-no-secrets, likewise (1) ──
+    "no-secrets/no-secrets": [
+      "error",
+      { "tolerance": 4.5, "ignoreContent": [" * https://", "http://"] }
+    ],
+    // ── This repository's own restrictions (4) ──
+    // Named rules rather than a `no-restricted-syntax` block, which Oxlint has
+    // no equivalent of. See src/config/lint/repo-lint-plugin.ts.
+    "yulin/assert-defined-guard": "error",
+    "yulin/assert-not-null-guard": "error",
+    "yulin/no-reused-props": "error",
+    "yulin/prefer-specific-assertions": "error"
+  },
+
+  // Later overrides win, so these run from the widest scope to the narrowest.
+  "overrides": [
+    {
+      // Runtime source must not depend on AWS SDK packages. Tests may, and
+      // the override for them below turns this back off.
+      "files": ["src/**/*.ts"],
+      "rules": {
+        "eslint/no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "group": ["@aws-sdk/*"],
+                "message": "Do not import AWS SDK packages from runtime source. Define yulin-owned structural types instead; SDK compatibility belongs in tests."
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "files": ["**/index.ts"],
+      "rules": { "unicorn-js/no-empty-file": "off" }
+    },
+    {
+      "files": [
+        "src/**/globals.ts",
+        "src/**/globals.d.ts",
+        "src/**/*.namespace.ts"
+      ],
+      "rules": {
+        "unicorn-js/require-module-specifiers": "off",
+        "typescript/no-namespace": "off"
+      }
+    },
+    {
+      // Examples are written the way a package consumer writes code.
+      "files": ["docs/**/*.example.ts", "docs/**/*.examples.ts"],
+      "rules": {
+        "eslint/no-console": "off",
+        // Paging through an AWS API is sequential by nature, and an example
+        // reads better as the loop a caller would write than as a workaround.
+        "eslint/no-await-in-loop": "off",
+        "typescript/no-non-null-assertion": "off",
+        "eslint/no-restricted-imports": "off",
+        // An example that watches or reads a path the reader just built is
+        // showing the API, not taking a filename from somewhere untrusted.
+        "security/detect-non-literal-fs-filename": "off",
+        // `assertDefined` is an internal helper rather than part of the public
+        // API, so an example should show a hand-written guard.
+        "yulin/assert-defined-guard": "off",
+        "yulin/assert-not-null-guard": "off",
+        "yulin/no-reused-props": "off",
+        "yulin/prefer-specific-assertions": "off"
+      }
+    },
+    {
+      "files": ["scripts/**/*.mts"],
+      "rules": {
+        "eslint/no-await-in-loop": "off",
+        "eslint/no-console": "off",
+        "eslint/no-restricted-imports": "off",
+        "security/detect-non-literal-fs-filename": "off"
+      }
+    },
+    {
+      "files": ["**/*.test.ts"],
+      "rules": {
+        "eslint/max-lines": ["error", 400],
+        "eslint/no-restricted-imports": "off",
+
+        // Vitest's own recommended set, which only applies to test files
+        "vitest/no-commented-out-tests": "warn",
+        "vitest/no-conditional-expect": "error",
+        "vitest/no-identical-title": "error",
+        "vitest/no-import-node-test": "error",
+        "vitest/no-interpolation-in-snapshots": "error",
+        "vitest/no-mocks-import": "error",
+        "vitest/no-standalone-expect": "error",
+        "vitest/no-unneeded-async-expect-function": "error",
+        "vitest/prefer-called-exactly-once-with": "error",
+        "vitest/require-local-test-context-for-concurrent-snapshots": "error",
+        "vitest/valid-describe-callback": "error",
+        "vitest/valid-expect": "error",
+        "vitest/valid-expect-in-promise": "error",
+        "vitest/valid-title": "error",
+
+        // ...and this repository's own additions on top of it
+        "vitest/consistent-test-it": ["error", { "fn": "it" }],
+        "vitest/no-focused-tests": "error",
+        "vitest/no-disabled-tests": "warn",
+        "vitest/no-duplicate-hooks": "error",
+        "vitest/prefer-to-be": "error",
+        "vitest/prefer-to-have-length": "error",
+        "vitest/prefer-strict-equal": "error",
+        "vitest/require-top-level-describe": "error",
+        "vitest/expect-expect": "off",
+
+        // Relax some rules that are too strict for test files
+        "typescript/explicit-function-return-type": "off",
+        "typescript/no-explicit-any": "off",
+        "typescript/no-unsafe-assignment": "off",
+        "typescript/no-unsafe-member-access": "off",
+        "unicorn-js/consistent-function-scoping": "off",
+        "unicorn-js/no-null": "off",
+        "unicorn-js/no-useless-undefined": "off"
+      }
+    }
+  ]
+}

@@ -41,7 +41,8 @@ export class SimLambdaEventSourceMappingInput {
   public readonly functionName: string;
   public readonly batchSize: number;
   public readonly startingPosition:
-    SimLambdaEventSourceStartingPosition | undefined;
+    | SimLambdaEventSourceStartingPosition
+    | undefined;
   public readonly enabled: boolean;
   public readonly functionResponseTypes: readonly SimLambdaFunctionResponseType[];
 

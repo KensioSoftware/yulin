@@ -32,7 +32,8 @@ export class SimCfnCfDistroDeleter {
    */
   async delete(resource: SimCfnResource): Promise<void> {
     const distribution = resource.simResource as
-      SimCloudFrontDistribution | undefined;
+      | SimCloudFrontDistribution
+      | undefined;
     assertDefined(
       distribution,
       `sim CloudFront Distribution for CloudFormation Resource ${resource.logicalId}`,

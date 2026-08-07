@@ -99,11 +99,11 @@ class SimDynamoDbDocumentFieldsPath implements SimDynamoDbDocumentPath {
     const converted: Record<string, unknown> = { ...value };
 
     for (const [name, field] of this.fields) {
-      // eslint-disable-next-line security/detect-object-injection -- a field name this path declares, not one the request chose.
+      // oxlint-disable-next-line security/detect-object-injection -- a field name this path declares, not one the request chose.
       const member = value[name];
 
       if (member !== undefined) {
-        // eslint-disable-next-line security/detect-object-injection -- the same declared field name.
+        // oxlint-disable-next-line security/detect-object-injection -- the same declared field name.
         converted[name] = field.convert(member, conversion, `${path}.${name}`);
       }
     }

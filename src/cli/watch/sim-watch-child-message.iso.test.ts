@@ -85,7 +85,7 @@ describe("watch child messages", () => {
   });
 });
 
-// eslint-disable-next-line unicorn/prefer-event-target
+// oxlint-disable-next-line unicorn-js/prefer-event-target
 class FakeChildProcess extends EventEmitter {
   asChildProcess(): ChildProcess {
     return this as unknown as ChildProcess;

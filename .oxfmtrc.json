@@ -1,0 +1,27 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+
+  "trailingComma": "all",
+  "tabWidth": 2,
+
+  // Oxfmt defaults to 100 where Prettier defaults to 80. Pinning it to what
+  // Prettier used keeps the switch to a hundred-odd files of union types
+  // rewrapping, rather than reflowing every file in the repository. It also
+  // keeps FTA where it was: joining lines up to 100 columns removes lines
+  // without removing tokens, and FTA reads that as a denser file.
+  "printWidth": 80,
+
+  "sortPackageJson": false,
+
+  "ignorePatterns": [
+    "tmp/",
+    ".tmp/",
+    "dist/",
+    "coverage/",
+    "test/.coverage/",
+    "node_modules/",
+    "pnpm-lock.yaml",
+    "pnpm-workspace.yaml",
+    ".claude/"
+  ]
+}

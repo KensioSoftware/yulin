@@ -1,6 +1,3 @@
-/* eslint-disable @typescript-eslint/naming-convention -- environment
- * variable names are UPPER_SNAKE_CASE by AWS convention, not code
- * identifier names. */
 import { InvokeCommand } from "@aws-sdk/client-lambda";
 import {
   assertIdentical,
@@ -47,7 +44,7 @@ exports.handler = async () => {
  * `parameter` rather than two.
  */
 const parameterArnSubstitution =
-  // eslint-disable-next-line no-template-curly-in-string -- Fn::Sub syntax, not a JavaScript template.
+  // oxlint-disable-next-line no-template-curly-in-string -- Fn::Sub syntax, not a JavaScript template.
   "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/myapp/prod/db-host";
 
 function readerRole(
@@ -143,7 +140,7 @@ describe("SSM CloudFormation Parameter with Lambda", () => {
         ...template.Resources,
         ...readerRole({
           "Fn::Sub":
-            // eslint-disable-next-line no-template-curly-in-string -- Fn::Sub syntax, not a JavaScript template.
+            // oxlint-disable-next-line no-template-curly-in-string -- Fn::Sub syntax, not a JavaScript template.
             "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter//myapp/prod/db-host",
         }),
       },

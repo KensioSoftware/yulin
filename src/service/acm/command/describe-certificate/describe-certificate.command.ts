@@ -45,7 +45,8 @@ export interface SimAcmCertificateDetail {
   readonly CreatedAt?: Date | undefined;
   readonly IssuedAt?: Date | undefined;
   readonly DomainValidationOptions?:
-    readonly SimAcmCertificateDomainValidation[] | undefined;
+    | readonly SimAcmCertificateDomainValidation[]
+    | undefined;
 }
 
 /**
