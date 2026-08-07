@@ -5,9 +5,9 @@ every operation is authorized by simulated IAM.
 
 Standard topics only. SNS-specific types are imported from the `@kensio/yulin/sns` subpath.
 
-Subscriptions are not simulated yet, so a published message reaches nothing. A topic with no
-subscriptions still accepts a publish and answers with a `MessageId`, which is what real SNS does
-with one.
+Subscriptions are held, but delivery is not simulated yet, so a published message still reaches
+nothing. A publish is accepted and answered with a `MessageId`, which is what real SNS does with a
+publish to a topic nothing subscribes to.
 
 ## Creating a topic and publishing to it
 
@@ -199,6 +199,107 @@ console.log(published.Successful?.map((entry) => entry.Id)); // ["one"]
 console.log(published.Failed?.[0]?.Code); // "InvalidParameterValueException"
 ```
 
+## Subscriptions
+
+`Subscribe` with the `sqs` protocol and a queue ARN answers with a subscription ARN straight away.
+There is no confirmation step for that protocol, as there is none on real SNS: the subscription is
+confirmed the moment it exists.
+
+Delivery is not simulated yet, so a published message still reaches nothing. What a subscription
+gives a test today is the SNS-side wiring: which queues a topic would reach, and what each would be
+sent.
+
+```typescript sim-sns-subscriptions
+/**
+ * Subscribing a queue to a simulated topic, and reading the subscription back.
+ */
+
+import {
+  CreateTopicCommand,
+  GetSubscriptionAttributesCommand,
+  ListSubscriptionsByTopicCommand,
+  SetSubscriptionAttributesCommand,
+  SubscribeCommand,
+  UnsubscribeCommand,
+} from "@aws-sdk/client-sns";
+import { CreateQueueCommand } from "@aws-sdk/client-sqs";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const sns = simAws.sns();
+
+const { TopicArn } = await sns.createTopic(
+  new CreateTopicCommand({ Name: "orders" }),
+);
+
+await simAws
+  .sqs()
+  .createQueue(new CreateQueueCommand({ QueueName: "order-consumer" }));
+
+const queueArn = `arn:aws:sqs:${simAws.defaultRegionName}:${simAws.defaultAccountId}:order-consumer`;
+
+// An sqs subscription needs no confirmation, so the ARN comes back at once
+// rather than "pending confirmation".
+const { SubscriptionArn } = await sns.subscribe(
+  new SubscribeCommand({ TopicArn, Protocol: "sqs", Endpoint: queueArn }),
+);
+
+console.log(SubscriptionArn?.startsWith(`${TopicArn ?? ""}:`)); // true
+
+const listed = await sns.listSubscriptionsByTopic(
+  new ListSubscriptionsByTopicCommand({ TopicArn }),
+);
+
+console.log(listed.Subscriptions?.[0]?.Endpoint === queueArn); // true
+
+// The subscription reports what it is and how it delivers.
+const read = await sns.getSubscriptionAttributes(
+  new GetSubscriptionAttributesCommand({ SubscriptionArn }),
+);
+
+console.log(read.Attributes?.["PendingConfirmation"]); // "false"
+console.log(read.Attributes?.["RawMessageDelivery"]); // "false"
+
+await sns.setSubscriptionAttributes(
+  new SetSubscriptionAttributesCommand({
+    SubscriptionArn,
+    AttributeName: "RawMessageDelivery",
+    AttributeValue: "true",
+  }),
+);
+
+await sns.unsubscribe(new UnsubscribeCommand({ SubscriptionArn }));
+
+console.log(simAws.sns().topicSubscriptions("orders").length); // 0
+```
+
+A subscription ARN is the topic's ARN with an opaque id on the end. That is the only handle on a
+subscription: `Unsubscribe`, `GetSubscriptionAttributes` and `SetSubscriptionAttributes` all name one
+by it.
+
+Subscribing the same queue to the same topic twice answers with the subscription that is already
+there rather than making a second one, as real SNS does. The attributes the repeated request carries
+are not applied to it, the same way a repeated `CreateTopic` leaves the existing topic alone. They
+are still validated, so a repeated request naming an attribute this simulation will not take is
+refused for it.
+
+`RawMessageDelivery` is the one subscription attribute with behaviour behind it. It can be set on the
+`Subscribe` request or afterwards with `SetSubscriptionAttributes`, and its value is `"true"` or
+`"false"`. Anything else is refused, rather than being treated as false.
+
+`Unsubscribe` of an ARN that names no subscription is `NotFoundException`, so unsubscribing the same
+ARN twice fails the second time. `DeleteTopic` removes the topic's subscriptions along with it, and a
+topic recreated under the same name starts with none.
+
+`GetTopicAttributes` counts the topic's subscriptions in `SubscriptionsConfirmed`, and counts the
+ones that have been unsubscribed in `SubscriptionsDeleted`. `SubscriptionsPending` is always zero,
+because the only protocol simulated is the one that needs no confirmation.
+
+Only the `sqs` protocol is simulated. Every other protocol real SNS has is refused by name at
+`Subscribe` time with the reason it is missing, rather than creating a subscription that would never
+be delivered to.
+
 ## IAM permissions
 
 Every operation is authorized against the topic's ARN, which carries the topic name with no resource
@@ -208,6 +309,11 @@ can get wrong:
 - `ListTopics` has no resource type at all, so it is authorized against `*` and only a policy whose
   `Resource` is `*` allows it. A policy naming one topic grants no listing, and neither does one
   naming `arn:aws:sns:<region>:<account-id>:*`.
+- `Unsubscribe`, `ListSubscriptions`, `GetSubscriptionAttributes` and `SetSubscriptionAttributes`
+  have no resource type either, for the same reason: SNS has no subscription resource type for a
+  policy to name. They are authorized against `*`, so a topic policy cannot grant them and neither
+  can an identity policy naming the topic ARN. `Subscribe` and `ListSubscriptionsByTopic` do name a
+  topic, and are authorized against its ARN.
 - `PublishBatch` is authorized as `sns:Publish`. There is no `sns:PublishBatch` action for a policy to
   name.
 
@@ -431,6 +537,10 @@ Sim SNS currently supports:
 - `GetTopicAttributesCommand` and `SetTopicAttributesCommand`, for `DisplayName` and `Policy`
 - `PublishCommand` and `PublishBatchCommand`, with message attributes, a subject and the 256 KB size
   limit
+- `SubscribeCommand` over the `sqs` protocol, confirmed at once, and `UnsubscribeCommand`
+- `ListSubscriptionsCommand` and `ListSubscriptionsByTopicCommand`, paged at a hundred subscriptions
+  with a `NextToken`
+- `GetSubscriptionAttributesCommand` and `SetSubscriptionAttributesCommand`, for `RawMessageDelivery`
 - Authorization of every operation by simulated IAM, against the real IAM action and topic ARN
 - The `Policy` attribute as the topic's resource policy, admitting another account's principal or a
   service principal, with `aws:SourceArn` and `aws:SourceAccount` conditions honoured
@@ -441,12 +551,23 @@ Sim SNS currently supports:
 
 Current documented limitations:
 
-- Subscriptions and delivery are not simulated. `Subscribe`, `Unsubscribe`,
-  `ListSubscriptions`, `ListSubscriptionsByTopic`, `GetSubscriptionAttributes`,
-  `SetSubscriptionAttributes` and `ConfirmSubscription` are not supported, and a published message
-  reaches nothing. A publish to a topic with no subscriptions is accepted and answered with a
-  `MessageId`, which is what real SNS does with one.
-- Subscription filter policies are not simulated, since there are no subscriptions to attach one to.
+- Delivery is not simulated. A subscription can be created, listed and removed, but a published
+  message reaches no endpoint. A publish is accepted and answered with a `MessageId`, which is what
+  real SNS does with a publish to a topic nothing subscribes to.
+- Only the `sqs` subscription protocol is simulated. `lambda`, `http`, `https`, `email`,
+  `email-json`, `sms`, `application` and `firehose` are refused at `Subscribe` time.
+- `ConfirmSubscription` is not supported. The only protocol simulated needs no confirmation, so
+  there is no confirmation token to confirm.
+- Subscription filter policies are not simulated, so `FilterPolicy` and `FilterPolicyScope` are
+  refused rather than held and never applied.
+- Subscription delivery retry policies, subscription dead-letter queues and message replay are not
+  simulated, so `DeliveryPolicy`, `RedrivePolicy`, `SubscriptionRoleArn` and `ReplayPolicy` are
+  refused.
+- `GetSubscriptionAttributes` reports `SubscriptionArn`, `TopicArn`, `Protocol`, `Endpoint`, `Owner`,
+  `ConfirmationWasAuthenticated`, `PendingConfirmation` and `RawMessageDelivery`.
+  `EffectiveDeliveryPolicy` is left out, since delivery retry policies are not simulated.
+- A queue whose name ends in `.fifo` is refused as a subscription endpoint. Only a FIFO topic
+  delivers to a FIFO queue, and there are no FIFO topics here.
 - Standard topics only. A topic name ending in `.fifo` is refused, as are the `FifoTopic`,
   `FifoThroughputScope` and `ContentBasedDeduplication` attributes, and the `MessageGroupId` and
   `MessageDeduplicationId` publish inputs.
@@ -480,8 +601,8 @@ Current documented limitations:
 - Message archiving and replay are not simulated, so `ArchivePolicy` is refused.
 - Delivery status logging writes to CloudWatch Logs, which is not simulated, so the feedback role and
   sample rate attributes are refused.
-- Platform applications and endpoints, `Subscribe` over `http`, `https`, `email`, `email-json`, `sms`,
-  `application` and `firehose`, and SMS sandbox and opt-out management are not planned.
+- Platform applications and endpoints, subscribing over `http`, `https`, `email`, `email-json`,
+  `sms`, `application` and `firehose`, and SMS sandbox and opt-out management are not planned.
 - SNS condition keys such as `sns:Endpoint` and `sns:Protocol` are not derived, so a policy relying on
   them will not match. Ordinary condition operators on values sim IAM does supply work as usual.
 - The CloudFormation resource types are not implemented, so `AWS::SNS::Topic`,

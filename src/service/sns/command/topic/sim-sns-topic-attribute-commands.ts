@@ -1,4 +1,5 @@
 import { SimSnsInvalidParameterException } from "../../error/sim-sns.error.js";
+import type { SimSnsSubscriptionStore } from "../../subscription/sim-sns-subscription-store.js";
 import type { SimSnsRequestOptions } from "../sim-sns-request-options.js";
 import type { SimSnsTopicAccess } from "./sim-sns-topic-access.js";
 import type {
@@ -10,6 +11,7 @@ import type {
 
 interface SimSnsTopicAttributeCommandsProperties {
   readonly access: SimSnsTopicAccess;
+  readonly subscriptions: SimSnsSubscriptionStore;
 }
 
 /**
@@ -18,9 +20,11 @@ interface SimSnsTopicAttributeCommandsProperties {
  */
 export class SimSnsTopicAttributeCommands {
   private readonly access: SimSnsTopicAccess;
+  private readonly subscriptions: SimSnsSubscriptionStore;
 
   constructor(properties: SimSnsTopicAttributeCommandsProperties) {
     this.access = properties.access;
+    this.subscriptions = properties.subscriptions;
   }
 
   /**
@@ -41,7 +45,12 @@ export class SimSnsTopicAttributeCommands {
       options,
     );
 
-    return { $metadata: {}, Attributes: topic.reportedAttributes() };
+    return {
+      $metadata: {},
+      Attributes: topic.reportedAttributes(
+        this.subscriptions.countsForTopic(topic.name.value),
+      ),
+    };
   }
 
   /**

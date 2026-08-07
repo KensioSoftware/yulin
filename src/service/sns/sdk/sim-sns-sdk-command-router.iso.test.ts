@@ -19,6 +19,12 @@ describe("SimSnsSdkCommandRouter", () => {
       "SetTopicAttributesCommand",
       "PublishCommand",
       "PublishBatchCommand",
+      "SubscribeCommand",
+      "UnsubscribeCommand",
+      "ListSubscriptionsCommand",
+      "ListSubscriptionsByTopicCommand",
+      "GetSubscriptionAttributesCommand",
+      "SetSubscriptionAttributesCommand",
     ]);
   });
 
@@ -27,7 +33,10 @@ describe("SimSnsSdkCommandRouter", () => {
     const simAws = new SimAws();
 
     // When a Command outside the simulated operations is looked up.
-    const route = simAws.sns().sdkCommandRouter().route("SubscribeCommand");
+    const route = simAws
+      .sns()
+      .sdkCommandRouter()
+      .route("ConfirmSubscriptionCommand");
 
     // Then there is none, so interception leaves it alone rather than
     // answering it with something that did nothing.

@@ -1,16 +1,31 @@
+import type { SimAwsResolvedCaller } from "../../../aws/caller/sim-aws-caller-resolver.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
-import {
-  SimSnsInvalidParameterException,
-  SimSnsNotFoundException,
-} from "../../error/sim-sns.error.js";
 import type { SimSnsTopic } from "../../topic/sim-sns-topic.js";
-import {
-  parseSnsTopicArn,
-  snsTopicArnPrefix,
-} from "../../topic/sim-sns-topic-arn.js";
+import { snsTopicArnPrefix } from "../../topic/sim-sns-topic-arn.js";
 import type { SimSnsTopicStore } from "../../topic/sim-sns-topic-store.js";
 import type { SimSnsAuthorizer } from "../authorize/sim-sns-authorizer.js";
 import type { SimSnsRequestOptions } from "../sim-sns-request-options.js";
+import { simSnsRequestTopicName } from "./sim-sns-request-topic-name.js";
+
+/**
+ * A topic a request reached, and the caller that reached it.
+ *
+ * Subscribe is the one command that needs both: the subscription it creates
+ * records the Account making the request as its owner, which is not the topic's
+ * Account when another Account subscribes to it.
+ */
+export interface SimSnsAuthorizedTopic {
+  readonly topic: SimSnsTopic;
+  readonly caller: SimAwsResolvedCaller;
+}
+
+/**
+ * The name of the topic a request reached, and the caller that reached it.
+ */
+interface SimSnsAuthorizedTopicName {
+  readonly name: string;
+  readonly caller: SimAwsResolvedCaller;
+}
 
 interface SimSnsTopicAccessProperties {
   readonly topics: SimSnsTopicStore;
@@ -53,8 +68,8 @@ export class SimSnsTopicAccess {
     action: string,
     name: string,
     options?: SimSnsRequestOptions,
-  ): void {
-    this.authorizer.authorizeTopic({
+  ): SimAwsResolvedCaller {
+    return this.authorizer.authorizeTopic({
       action,
       topicArn: snsTopicArnPrefix(this.accountRegionScope) + name,
       topic: this.topics.find(name),
@@ -65,8 +80,11 @@ export class SimSnsTopicAccess {
   /**
    * Ensure the caller may perform an action naming no particular topic.
    */
-  authorizeAnyTopic(action: string, options?: SimSnsRequestOptions): void {
-    this.authorizer.authorizeAnyTopic(action, options);
+  authorizeAnyTopic(
+    action: string,
+    options?: SimSnsRequestOptions,
+  ): SimAwsResolvedCaller {
+    return this.authorizer.authorizeAnyTopic(action, options);
   }
 
   /**
@@ -77,7 +95,23 @@ export class SimSnsTopicAccess {
     topicArn: string | undefined,
     options?: SimSnsRequestOptions,
   ): SimSnsTopic {
-    return this.topics.require(this.authorizedName(action, topicArn, options));
+    return this.requireByArnForCaller(action, topicArn, options).topic;
+  }
+
+  /**
+   * Resolve the topic a request names, along with the caller that named it.
+   */
+  requireByArnForCaller(
+    action: string,
+    topicArn: string | undefined,
+    options?: SimSnsRequestOptions,
+  ): SimSnsAuthorizedTopic {
+    const authorized = this.authorizedName(action, topicArn, options);
+
+    return {
+      topic: this.topics.require(authorized.name),
+      caller: authorized.caller,
+    };
   }
 
   /**
@@ -92,7 +126,9 @@ export class SimSnsTopicAccess {
     topicArn: string | undefined,
     options?: SimSnsRequestOptions,
   ): SimSnsTopic | undefined {
-    return this.topics.find(this.authorizedName(action, topicArn, options));
+    return this.topics.find(
+      this.authorizedName(action, topicArn, options).name,
+    );
   }
 
   /**
@@ -103,48 +139,9 @@ export class SimSnsTopicAccess {
     action: string,
     topicArn: string | undefined,
     options: SimSnsRequestOptions | undefined,
-  ): string {
-    const name = this.nameFromArn(topicArn);
+  ): SimSnsAuthorizedTopicName {
+    const name = simSnsRequestTopicName(topicArn, this.accountRegionScope);
 
-    this.authorizeName(action, name, options);
-
-    return name;
-  }
-
-  /**
-   * Read the topic name out of the ARN a request carries.
-   *
-   * An ARN naming another Account or Region reaches nothing, rather than having
-   * its name read out and looked up locally. A topic ARN is scoped, and
-   * treating a foreign one as local would let a test pass while the real call
-   * crossed an Account boundary it has no permission for.
-   */
-  private nameFromArn(topicArn: string | undefined): string {
-    if (topicArn === undefined || topicArn === "") {
-      throw new SimSnsInvalidParameterException(
-        "Invalid parameter: TopicArn is required",
-      );
-    }
-
-    const parts = parseSnsTopicArn(topicArn);
-
-    if (parts === undefined) {
-      throw new SimSnsInvalidParameterException(
-        `Invalid parameter: TopicArn Reason: ${topicArn} is not a topic ARN, ` +
-          `which is arn:aws:sns:<region>:<account-id>:<topic-name>`,
-      );
-    }
-
-    const { accountId, regionName } = this.accountRegionScope;
-
-    if (parts.accountId !== accountId || parts.regionName !== regionName) {
-      throw new SimSnsNotFoundException(
-        `Topic does not exist: ${topicArn} names Account ${parts.accountId} ` +
-          `in ${parts.regionName}, and this simulated SNS is Account ` +
-          `${accountId} in ${regionName}`,
-      );
-    }
-
-    return parts.name;
+    return { name, caller: this.authorizeName(action, name, options) };
   }
 }

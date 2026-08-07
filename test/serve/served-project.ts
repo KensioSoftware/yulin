@@ -173,21 +173,32 @@ console.log("closed");
 
 /**
  * The same script, asking for the signal handler rather than writing one.
+ *
+ * The handler goes on before the script says it is up, because saying it is up
+ * is what the run takes as its cue to signal. A handler installed after that
+ * line can miss the signal it was there for, and a Node process with no SIGTERM
+ * handler is terminated by the default action: the run then sees a process
+ * killed by a signal rather than one that exited on its own.
  */
 export function signalledScript(project: ServedProject): string {
-  return `${servingSource(project)}
-srv.closeOnSignal();
+  return servingSource(
+    project,
+    `srv.closeOnSignal();
 process.on("exit", () => {
   console.log("closed");
-});
-`;
+});`,
+  );
 }
 
 /**
  * A dev script up to the point where it is holding everything Yulin can hold:
  * a port, a DNS port, live reload, a watched template and a watched mount.
+ *
+ * Anything the script has to have in place before it can be signalled goes in
+ * `beforeAnnouncing`, since the line after it is the one that invites the
+ * signal.
  */
-function servingSource(project: ServedProject): string {
+function servingSource(project: ServedProject, beforeAnnouncing = ""): string {
   return `import { SimAws } from ${JSON.stringify(yulin)};
 import { serveSimAws } from ${JSON.stringify(yulinServe)};
 
@@ -202,6 +213,8 @@ await simAws.s3().createBucket({ input: { Bucket: "site" } });
 simAws.s3().mountBucketFilesystem("site", ${JSON.stringify(project.mountPath())}, {
   reload: srv,
 });
+
+${beforeAnnouncing}
 
 console.log(
   "watching " +

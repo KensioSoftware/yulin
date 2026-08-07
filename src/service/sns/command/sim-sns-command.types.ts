@@ -21,6 +21,27 @@ export type {
   SimSnsTag,
 } from "./topic/topic.command.js";
 export type {
+  SimGetSubscriptionAttributesCommand,
+  SimGetSubscriptionAttributesCommandInput,
+  SimGetSubscriptionAttributesCommandOutput,
+  SimListSubscriptionsByTopicCommand,
+  SimListSubscriptionsByTopicCommandInput,
+  SimListSubscriptionsByTopicCommandOutput,
+  SimListSubscriptionsCommand,
+  SimListSubscriptionsCommandInput,
+  SimListSubscriptionsCommandOutput,
+  SimSetSubscriptionAttributesCommand,
+  SimSetSubscriptionAttributesCommandInput,
+  SimSetSubscriptionAttributesCommandOutput,
+  SimSnsListedSubscription,
+  SimSubscribeCommand,
+  SimSubscribeCommandInput,
+  SimSubscribeCommandOutput,
+  SimUnsubscribeCommand,
+  SimUnsubscribeCommandInput,
+  SimUnsubscribeCommandOutput,
+} from "./subscription/subscription.command.js";
+export type {
   SimPublishBatchCommand,
   SimPublishBatchCommandInput,
   SimPublishBatchCommandOutput,

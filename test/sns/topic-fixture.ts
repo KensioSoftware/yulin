@@ -72,7 +72,7 @@ export async function simAwsWithTopicPolicy(policy?: string): Promise<SimAws> {
 
 /**
  * Make a Role in another Account, with or without an identity policy of its own
- * allowing it to publish to the `orders` topic.
+ * allowing it one action on the `orders` topic.
  *
  * A caller from another Account needs both sides to allow the request, so this
  * is the half a topic policy cannot supply.
@@ -81,6 +81,7 @@ export async function simAwsWithPublishingRole(
   simAws: SimAws,
   accountId: string,
   allowed: boolean,
+  action = "sns:Publish",
 ): Promise<string> {
   const iam = simAws.account(accountId).iam();
   const topicArn = ordersTopicArn(simAws);
@@ -107,7 +108,7 @@ export async function simAwsWithPublishingRole(
           Version: "2012-10-17",
           Statement: {
             Effect: "Allow",
-            Action: "sns:Publish",
+            Action: action,
             Resource: topicArn,
           },
         }),
