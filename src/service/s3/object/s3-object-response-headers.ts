@@ -1,3 +1,5 @@
+import { simS3SystemMetadataHeaders } from "./s3-system-metadata.js";
+
 /**
  * The headers S3 sets on a read from what it was told when the Object was
  * written.
@@ -21,31 +23,13 @@ export function simS3ObjectResponseHeaders(
     "content-length": String(bodyLength),
   };
 
-  for (const name of simS3SystemMetadataHeaders) {
-    // eslint-disable-next-line security/detect-object-injection -- name comes from the fixed list below
-    const value = metadata?.[name];
+  for (const header of simS3SystemMetadataHeaders) {
+    const value = metadata?.[header.name];
 
     if (value !== undefined) {
-      // eslint-disable-next-line security/detect-object-injection
-      headers[name] = value;
+      headers[header.name] = value;
     }
   }
 
   return headers;
 }
-
-/**
- * The system metadata S3 stores as a header and returns as one.
- *
- * Content length is not here because it describes the body rather than being
- * remembered about it, and content type is set for almost every Object because
- * a deployment or the console guesses one from the file extension.
- */
-const simS3SystemMetadataHeaders = [
-  "cache-control",
-  "content-disposition",
-  "content-encoding",
-  "content-language",
-  "content-type",
-  "expires",
-] as const;

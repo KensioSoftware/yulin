@@ -57,7 +57,8 @@ console.log(objectOut.Metadata?.["source"]);
 body is stored as an empty Object.
 
 `ContentType` is exposed as Object metadata under the `content-type` header name and is used when
-serving Bucket website responses.
+serving Bucket website responses. It is one of several headers a write can say about an Object. See
+[Object system metadata](#object-system-metadata).
 
 ## Accounts and Regions
 
@@ -1786,9 +1787,52 @@ Every path that serves an Object goes through the same mapping, so the REST endp
 for it. `content-encoding` is the one that matters most: bytes served without it are bytes no client
 can decode, so an Object stored as brotli is only usable if the header comes back with it.
 
-Sim S3 stores only `ContentType` and your own `Metadata` from a `PutObjectCommand`. The AWS SDK
-carries the rest, and real S3 keeps them, but the simulator drops them, so the way to set them today
-is a CDK BucketDeployment's `SystemMetadata`, which applies them to every Object it copies. See
+`PutObjectCommand` sets them, one request field per header.
+
+```typescript sim-s3-object-system-metadata
+/**
+ * Writing an Object with the system metadata S3 returns on a read.
+ */
+
+import {
+  CreateBucketCommand,
+  GetObjectCommand,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
+import { SimAws } from "@kensio/yulin";
+
+const simS3 = new SimAws().s3();
+
+await simS3.createBucket(new CreateBucketCommand({ Bucket: "site" }));
+
+await simS3.putObject(
+  new PutObjectCommand({
+    Bucket: "site",
+    Key: "app.js",
+    Body: "compressed bytes",
+    CacheControl: "public, max-age=31536000, immutable",
+    ContentDisposition: 'inline; filename="app.js"',
+    ContentEncoding: "br",
+    ContentLanguage: "en-GB",
+    ContentType: "text/javascript",
+    Expires: new Date("2027-01-02T03:04:05Z"),
+  }),
+);
+
+const objectOut = await simS3.getObject(
+  new GetObjectCommand({ Bucket: "site", Key: "app.js" }),
+);
+
+// Each header is stored under the name a read returns it as.
+console.log(objectOut.Metadata?.["content-encoding"]); // br
+console.log(objectOut.Metadata?.["expires"]); // Sat, 02 Jan 2027 03:04:05 GMT
+```
+
+A header the write says nothing about is left unset rather than stored empty, so a read does not
+report it. `Expires` is the one field that is not a string: the SDK takes a `Date`, which is stored
+as the HTTP date a read hands back.
+
+A CDK BucketDeployment's `SystemMetadata` sets the same headers on every Object it copies. See
 [CDK S3 BucketDeployment](../cloudformation/README.md#cdk-s3-bucketdeployment).
 
 ## Standalone SimS3
@@ -1842,7 +1886,8 @@ Sim S3 currently supports:
 - Serving static website requests on localhost with `serveSimAws`
 - Serving Object `GET`, `HEAD`, `PUT` and `DELETE` over the S3 REST endpoint, authorized by sim IAM
 - Presigned URLs built by the real `@aws-sdk/s3-request-presigner`, with expiry in simulated time
-- Object system metadata returned on a read, over every endpoint that serves an Object
+- Object system metadata set by a `PutObjectCommand` and returned on a read, over every endpoint
+  that serves an Object
 - Bucket website index documents, error documents, trailing-slash redirects, redirect-all
   configuration, and routing-rule redirects
 - Bucket-global uniqueness within a `SimAws` instance across simulated Accounts and Regions
@@ -1868,7 +1913,11 @@ These apply across the page. The sections above each list what is specific to th
   not simulated.
 - A Bucket using filesystem-backed storage cannot delete Objects, and raises no event
   notifications, because it swaps the whole storage backend rather than putting Objects.
-- Sim S3 stores only `ContentType` and user-defined `Metadata` from a `PutObjectCommand`, and drops
-  the other system metadata the SDK carries and real S3 keeps. An Object needing `content-encoding`
-  or `cache-control` gets it from a CDK BucketDeployment's `SystemMetadata`. See
-  [Object system metadata](#object-system-metadata).
+- `GetObjectCommand` returns system metadata through `Metadata`, under the header name it is stored
+  as, rather than through the `ContentType`, `CacheControl` and other response fields real S3 uses.
+  See [Object system metadata](#object-system-metadata).
+- An upload over the S3 REST endpoint keeps its `content-type` and no other system metadata, so a
+  presigned `PUT` cannot set the rest. A `PutObjectCommand` through the SDK keeps all of them.
+- A presigned `GetObject` ignores the `response-content-type`, `response-cache-control` and other
+  `response-*` parameters that override a response header in real S3. An Object is served with the
+  system metadata it was written with.

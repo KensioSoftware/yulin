@@ -219,10 +219,17 @@ Objects are represented as `SimS3Object` instances. In normal command flow,
 Metadata is stored separately from the object body. `PutObjectCommandHandler` combines:
 
 - `input.Metadata`
-- `input.ContentType`, mapped to a lowercase `"content-type"` metadata key
+- the system metadata request fields, mapped to their lowercase header names by
+  `object/s3-system-metadata.ts`
 
 `GetObjectCommandHandler` returns object bodies as Node `Readable` streams and returns stored
 metadata through `Metadata`.
+
+`object/s3-system-metadata.ts` holds the list of headers S3 remembers about an Object, pairing the
+request field a write sets each one with against the lowercase key it is stored under. Both sides
+read that list, so a header cannot be written without being served or served without being writable.
+`SimPutObjectCommandInput` declares one field per entry, and the builder indexes the input by those
+field names, which makes a missing field a type error rather than a silently dropped header.
 
 `object/s3-object-response-headers.ts` is the single mapping from stored metadata to HTTP response
 headers, and every path that serves an Object goes through it: the S3 REST endpoint reader, the
@@ -231,8 +238,9 @@ header and hands back on a read, and nothing else, so user-defined metadata does
 response. Keeping it in one place is what stops the three endpoints disagreeing about what reading an
 Object looks like.
 
-Note that `PutObject` only writes `ContentType` into that set. The other headers reach an Object
-through a CDK BucketDeployment's `SystemMetadata`, which builds the metadata record directly.
+The other way these headers reach an Object is a CDK BucketDeployment's `SystemMetadata`, which
+builds the metadata record directly. A `PUT` over the S3 REST endpoint is the one write path that
+does not cover them all: it reads `content-type` off the request and nothing else.
 
 ## Storage implementations
 
