@@ -1,4 +1,5 @@
 import { SimS3Object, SimS3ObjectMetadata } from "../../object/s3-object.js";
+import { simS3SystemMetadataHeaders } from "../../object/s3-system-metadata.js";
 import type { SimPutObjectCommand } from "./put-object.command.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 
@@ -36,18 +37,41 @@ export class PutObjectBuilder {
   /**
    * Convert SDK metadata fields to the string map stored by SimS3ObjectMetadata.
    *
-   * User-defined metadata is retained as supplied. ContentType is represented by
-   * the standard lowercase metadata key used by the existing GetObject response
-   * path. Omitting ContentType leaves that key absent rather than assigning an
-   * undefined value.
+   * User-defined metadata is retained as supplied. System metadata is read by
+   * the same list of headers a read returns, under the lowercase key that read
+   * looks the value up by, so a write and a read agree on what S3 remembers
+   * about an Object. An omitted header leaves its key absent rather than
+   * assigning an undefined value.
    */
   private toMetadata(command: SimPutObjectCommand): Record<string, string> {
-    return {
-      ...command.input.Metadata,
-      ...(command.input.ContentType !== undefined && {
-        "content-type": command.input.ContentType,
-      }),
-    };
+    const metadata: Record<string, string> = { ...command.input.Metadata };
+
+    for (const header of simS3SystemMetadataHeaders) {
+      const value = this.toMetadataValue(command.input[header.field]);
+
+      if (value !== undefined) {
+        metadata[header.name] = value;
+      }
+    }
+
+    return metadata;
+  }
+
+  /**
+   * Represent a system metadata value as the string S3 stores and returns.
+   *
+   * Only `Expires` arrives as a Date, which the SDK would otherwise format on
+   * the wire. It becomes the same HTTP date here so the read side has a header
+   * value to hand back rather than an object.
+   */
+  private toMetadataValue(
+    value: string | Date | undefined,
+  ): string | undefined {
+    if (value instanceof Date) {
+      return value.toUTCString();
+    }
+
+    return value;
   }
 
   /**
