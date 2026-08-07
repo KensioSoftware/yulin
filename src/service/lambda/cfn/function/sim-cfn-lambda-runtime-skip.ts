@@ -24,7 +24,11 @@ const nodeJsRuntimePrefix = "nodejs";
  * runtime Yulin cannot run.
  *
  * The "Unsupported sim ... CloudFormation" wording marks the Resource as
- * skipped rather than failing the stack.
+ * skipped rather than failing the stack. What the Stack does with the refusal
+ * is then its own decision: a provider function for a custom Resource sim
+ * CloudFormation carries out itself is recorded as inert instead, because this
+ * message would otherwise tell a reader to bind a handler to a function that
+ * has nothing left to do.
  */
 export class SimCfnLambdaRuntimeSkip {
   /**
