@@ -4,9 +4,8 @@ This directory contains the simulated SNS service implementation. Standard topic
 
 A topic holds almost nothing. Its name, the ARN that name implies, and the attributes a request has
 set are the whole of it, because real SNS keeps no messages: a publish is handed to the topic's
-subscriptions and forgotten. Subscriptions are held here, but delivery is not simulated yet, so a
-publish validates the message, answers with a message id, and the message goes nowhere. That is what
-real SNS does with a publish to a topic nothing subscribes to.
+subscriptions and forgotten. That is what happens here too. A publish validates the message, answers
+with a message id, and hands a copy to each subscription on the background scheduler.
 
 ## Entry points
 
@@ -60,20 +59,20 @@ Subscription state lives under `subscription/`.
 
 `SimSnsSubscription` is the stored resource: its ARN, the topic it belongs to, its protocol, its
 endpoint, the Account owning it, and its attributes. The endpoint is held as a
-`SimSnsQueueEndpointArn` rather than as a string, because `sqs` is the only protocol accepted and the
-Account and Region it names are the ones a delivery will have to reach, rather than the topic's. When
-another protocol arrives, this becomes the endpoint of whichever kind the protocol implies.
+`SimSnsQueueEndpointArn` rather than as a string, because `sqs` is the only protocol accepted and a
+delivery reaches the Account and Region that ARN names rather than the topic's. When another protocol
+arrives, this becomes the endpoint of whichever kind the protocol implies.
 
 Nothing checks that the endpoint queue exists when a subscription is created, because real SNS does
 not either: a subscription to a queue that is not there is created, and fails when something is
-delivered to it. Nothing here consults the queue's policy either, since delivery is not simulated
-yet, and both checks belong with it when it arrives.
+delivered to it. The queue's policy is not consulted here either, for the same reason. Both are
+delivery-time questions, which is what makes a permission taken away afterwards stop delivery.
 
 `SimSnsSubscriptionArn` mints an ARN, which is the topic's with an opaque id added as a seventh part,
 and `parseSnsSubscriptionArn` reads one. Counting the colon separated parts is what tells a
 subscription ARN from a topic ARN, since neither has a resource type separator.
 
-`SimSnsSubscriptionProtocol` holds the one protocol a subscription is accepted for. Every other protocol
+`SimSnsSubscriptionProtocol` holds the one protocol delivery is simulated over. Every other protocol
 real SNS has is refused by name with the reason it is missing, rather than accepted as a subscription
 that would never be delivered to. A protocol real SNS does not have at all is refused the way real
 SNS refuses one.
@@ -110,6 +109,44 @@ validated and carried.
 whichever form it arrived in, because the data type already says which form that was: an attribute of
 a `Binary` type carries bytes and any other carries text. There is no digest here, unlike simulated
 SQS, because a real SNS publish response carries no digest for a caller to check.
+
+## Delivery
+
+Delivery lives under `delivery/`, and the signing that goes with it under `signature/`.
+
+`SimSnsFanOut` is what a publish hands a message to. It schedules one delivery per subscription on
+the background scheduler, because real SNS answers a publish before anything is delivered:
+`simAws.backgroundTasksComplete()` is what waits for it. A failure is recorded on
+`SimSnsDeliveryFailures` rather than thrown, since a background task left rejected would fail an
+unrelated `backgroundTasksComplete()`, and real SNS never reports a delivery failure to the publisher.
+A queue policy refusal is recorded quietly, because that is a modelled outcome a test may be asking
+for; anything else is also warned about once, because it is a fault.
+
+`SimSnsEnvelope` is the JSON document a subscription receives unless it asked for raw delivery. It
+also builds the string real SNS signs, which is the signed fields in alphabetical order, each one its
+name and its value followed by a newline. Message attributes are not signed, here or on real AWS.
+
+`SimSnsDeliveryEndpoints` is where a message goes. There is one implementation, for a queue, because
+`sqs` is the only protocol simulated: a second protocol adds a second implementation rather than a
+branch in this one. `SimAwsSnsDeliveryQueues` resolves the queue when a message is delivered, never
+when it is built, for the same reason S3's notification destinations do it that way. A queue in
+another Account or Region is reachable, since real SNS delivers to both. That is a deliberate
+difference from simulated S3 event notifications, which require the destination queue to be in the
+Bucket's Region because real S3 does.
+
+`SimSnsDeliveryQueue` asks the queue's own Account two questions: whether `sns.amazonaws.com` may
+send to it for this topic, through `SimSqsServiceSendAuthorizer`, and then to send. The send goes
+through the ordinary `SendMessage` path, so a delivered message is the same thing an SDK caller would
+have sent, and is authorized again on the way in.
+
+`SimSnsMessageSigner` owns the key pair, which belongs to the scope rather than to a topic: real SNS
+signs every message a Region sends with one certificate. It is generated on first use, because
+generating RSA takes long enough to notice and most simulated SNS scopes never deliver anything.
+
+`SimSnsSigningKey` signs with SHA1withRSA, which is what signature version 1 means. The certificate
+is assembled by hand in `sim-sns-certificate.ts` out of the DER encoding in `sim-sns-der.ts`, because
+Node reads an X.509 certificate and does not write one, and a `Signature` field with no certificate
+behind it is a field a consumer cannot use.
 
 ## Command handling
 
@@ -207,9 +244,17 @@ here, it does not make another Account's topics reachable through this one.
 
 ## Divergences worth knowing
 
-- Delivery is not simulated, so a publish reaches nothing even when the topic has subscriptions.
-- Only the `sqs` subscription protocol is simulated, and `ConfirmSubscription` is not implemented,
-  since that protocol needs no confirmation.
+- Only the `sqs` subscription protocol is simulated, so a queue is the only thing a topic delivers
+  to. `ConfirmSubscription` is not implemented, since that protocol needs no confirmation.
+- `SigningCertURL` and `UnsubscribeURL` name `sns.<region>.yulin.invalid`, and neither is served.
+  The certificate is handed out in process by `SimSns.signingCertificate`. A real verifier such as
+  `sns-validator` hard-codes an `amazonaws.com` certificate host and fetches the URL itself, so it
+  cannot verify a simulated message as it stands.
+- The certificate is minimal: a version, a serial number derived from the key, one common name as
+  both issuer and subject, a validity window fixed at 2000 to 2049, and the public key. There are no
+  extensions, because nothing verifying an SNS message looks at any.
+- Delivery retry policies, subscription dead-letter queues and delivery status logging are not
+  simulated, so a delivery that fails is recorded once rather than retried.
 - Subscription filter policies, delivery retry policies, dead-letter queues and replay are not
   simulated, so `FilterPolicy`, `FilterPolicyScope`, `DeliveryPolicy`, `RedrivePolicy`,
   `SubscriptionRoleArn` and `ReplayPolicy` are refused.

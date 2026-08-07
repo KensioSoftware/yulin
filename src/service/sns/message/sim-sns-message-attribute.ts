@@ -40,6 +40,26 @@ export class SimSnsMessageAttribute {
   }
 
   /**
+   * Whether this attribute carries bytes rather than text.
+   *
+   * The data type says which: `Binary` and anything under it carries bytes, and
+   * `String` and `Number` and their custom types carry text.
+   */
+  get isBinary(): boolean {
+    return this.dataType === "Binary" || this.dataType.startsWith("Binary.");
+  }
+
+  /**
+   * This attribute as the SNS envelope reports it.
+   *
+   * The envelope is JSON, so a binary value travels base64 encoded, which is
+   * what real SNS does with one.
+   */
+  get envelopeValue(): string {
+    return this.value.toString(this.isBinary ? "base64" : "utf8");
+  }
+
+  /**
    * What this attribute contributes to the size of a publish.
    *
    * Real SNS counts message attributes against the same 256 KB a message body

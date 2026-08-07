@@ -9,9 +9,15 @@
  */
 
 import { SubscribeCommand } from "@aws-sdk/client-sns";
+import {
+  CreateQueueCommand,
+  ReceiveMessageCommand,
+  SetQueueAttributesCommand,
+} from "@aws-sdk/client-sqs";
 import { assertNonNullable, assertThrowsErrorAsync } from "@kensio/smartass";
 
 import type { SimAws } from "../../src/service/aws/sim-aws.js";
+import type { AwsRegionName } from "../../src/service/aws/sim-aws-region.js";
 import { simAwsWithTopic } from "./topic-fixture.js";
 
 /**
@@ -113,6 +119,100 @@ export const simSnsEndpointsThatAreNotQueues = [
   "arn:aws:sns:us-east-1:888888888888:orders",
   "",
 ];
+
+/**
+ * An Account and Region a queue lives in, when it is not the default one.
+ */
+export interface SimSnsScope {
+  readonly accountId?: string;
+  readonly regionName?: AwsRegionName;
+}
+
+/**
+ * A queue policy admitting SNS to send to a queue for one topic.
+ *
+ * This is the grant real SNS needs on the queue's side, and it is the one AWS
+ * documents: the service principal, the send action, and the topic it is
+ * sending for as `aws:SourceArn`.
+ */
+export function simSnsQueuePolicy(queueArn: string, topicArn: string): string {
+  return JSON.stringify({
+    Version: "2012-10-17",
+    Statement: [
+      {
+        Effect: "Allow",
+        Principal: { Service: "sns.amazonaws.com" },
+        Action: "sqs:SendMessage",
+        Resource: queueArn,
+        Condition: { ArnLike: { "aws:SourceArn": topicArn } },
+      },
+    ],
+  });
+}
+
+/**
+ * Create a queue in a scope, with a policy admitting SNS for a topic.
+ *
+ * The queue ARN is built rather than read back, because a queue's ARN is the
+ * one thing CreateQueue does not answer with.
+ */
+export async function simSnsSubscribedQueue(
+  simAws: SimAws,
+  queueName: string,
+  topicArn: string,
+  scope: SimSnsScope = {},
+): Promise<{ queueUrl: string; queueArn: string }> {
+  const accountId = scope.accountId ?? simAws.defaultAccountId;
+  const regionName = scope.regionName ?? simAws.defaultRegionName;
+  const sqs = simAws.account(accountId).region(regionName).sqs();
+  const created = await sqs.createQueue(
+    new CreateQueueCommand({ QueueName: queueName }),
+  );
+
+  assertNonNullable(created.QueueUrl, "CreateQueue answered with a queue URL");
+
+  const queueArn = `arn:aws:sqs:${regionName}:${accountId}:${queueName}`;
+
+  await sqs.setQueueAttributes(
+    new SetQueueAttributesCommand({
+      QueueUrl: created.QueueUrl,
+      Attributes: { Policy: simSnsQueuePolicy(queueArn, topicArn) },
+    }),
+  );
+
+  await simAws.sns().subscribe(
+    new SubscribeCommand({
+      TopicArn: topicArn,
+      Protocol: "sqs",
+      Endpoint: queueArn,
+    }),
+  );
+
+  return { queueUrl: created.QueueUrl, queueArn };
+}
+
+/**
+ * Wait for delivery, then take the one message a queue received.
+ *
+ * Delivery happens on the background scheduler, as it does on real SNS after
+ * the publish has been answered, so nothing has arrived until that work is
+ * done.
+ */
+export async function simSnsDeliveredMessage(
+  simAws: SimAws,
+  queueUrl: string,
+  scope: SimSnsScope = {},
+): Promise<string | undefined> {
+  await simAws.backgroundTasksComplete();
+
+  const received = await simAws
+    .account(scope.accountId ?? simAws.defaultAccountId)
+    .region(scope.regionName ?? simAws.defaultRegionName)
+    .sqs()
+    .receiveMessage(new ReceiveMessageCommand({ QueueUrl: queueUrl }));
+
+  return received.Messages?.[0]?.Body;
+}
 
 /**
  * Subscribe a queue over a protocol, answering with whatever it threw.

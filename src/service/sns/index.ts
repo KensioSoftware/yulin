@@ -45,6 +45,21 @@ export {
   SimSnsPublishedMessage,
 } from "./message/sim-sns-published-message.js";
 export {
+  type SimSnsDeliveryEndpoints,
+  type SimSnsDeliveryRequest,
+  simSnsServicePrincipal,
+} from "./delivery/sim-sns-delivery.js";
+export {
+  SimSnsDeliveryFailure,
+  SimSnsDeliveryFailures,
+} from "./delivery/sim-sns-delivery-failures.js";
+export { simSnsHost, simSnsUnsubscribeUrl } from "./signature/sim-sns-host.js";
+export {
+  type SimSnsSignatureFields,
+  simSnsSignatureVersion,
+} from "./signature/sim-sns-message-signer.js";
+export { SimSnsDeliveryNotPermitted } from "./error/sim-sns-delivery.error.js";
+export {
   SimSnsAuthorizationErrorException,
   SimSnsBatchEntryIdsNotDistinctException,
   SimSnsBatchRequestTooLongException,
