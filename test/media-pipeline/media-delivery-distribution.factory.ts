@@ -3,6 +3,7 @@ import { AsyncMappedFactory } from "@kensio/part-factory";
 import { assertNonNullable } from "@kensio/smartass";
 
 import type { SimAws } from "../../src/service/aws/sim-aws.js";
+import { grantPublicObjectRead } from "../../src/service/s3/bucket/sim-s3-public-read.fixture.js";
 import { mediaBucketName } from "./media-pipeline-names.js";
 
 /**
@@ -39,6 +40,10 @@ export const mediaDeliveryDistributionFactory = new AsyncMappedFactory<
     comment: "Image delivery",
   }),
   async (input, simAws) => {
+    // The Origin has no origin access control, so it reads the Bucket
+    // anonymously and only a public read grant lets it serve anything.
+    await grantPublicObjectRead(simAws.s3(), input.originBucketName);
+
     const created = await simAws.cloudFront().createDistribution(
       new CreateDistributionCommand({
         DistributionConfig: {

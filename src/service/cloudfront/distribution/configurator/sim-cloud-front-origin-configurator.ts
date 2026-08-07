@@ -5,6 +5,7 @@ import {
   SimCloudFrontS3Origin,
   type SimCloudFrontS3OriginResolver,
 } from "../../origin/s3/sim-cloudfront-s3-origin.js";
+import { assertNoSimCfS3OriginAccessIdentity } from "../../origin/s3/sim-cf-s3-origin-access-identity.js";
 import type { SimCfCustomOriginDispatcher } from "../../origin/custom/sim-cf-custom-origin-dispatcher.js";
 import { SimCloudFrontCustomOrigin } from "../../origin/custom/sim-cloudfront-custom-origin.js";
 import type { SimCloudFrontOriginAccessControl } from "../../origin-access-control/sim-cf-origin-access-control.js";
@@ -44,17 +45,19 @@ export class SimCloudFrontOriginConfigurator {
     );
 
     if (origin.S3OriginConfig !== undefined) {
-      const bucket = this.s3OriginResolver(origin.DomainName);
+      assertNoSimCfS3OriginAccessIdentity(origin.Id, origin.S3OriginConfig);
+
+      const originBucket = this.s3OriginResolver(origin.DomainName);
 
       assertDefined(
-        bucket,
+        originBucket,
         `Sim S3 Bucket for CloudFront Origin ${origin.DomainName}`,
       );
 
       distribution.addOrigin(
         origin.Id,
         new SimCloudFrontS3Origin({
-          bucket,
+          originBucket,
           originPath: origin.OriginPath,
           ...(originAccessControl !== undefined && { originAccessControl }),
         }),

@@ -13,6 +13,7 @@ import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { SimAws } from "../../../aws/sim-aws.js";
 import type { CfnTemplateBodyRecord } from "../../../cloudformation/template/sim-cfn-template.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
+import { grantPublicObjectRead } from "../../../s3/bucket/sim-s3-public-read.fixture.js";
 import { SimCloudFrontDistribution } from "../../distribution/sim-cloudfront-distribution.js";
 import { SimCloudFrontResponseHeadersPolicy } from "../../response-headers-policy/sim-cf-response-headers-policy.js";
 import { simCfSiteRequest } from "../../../../../test/cloudfront/site-fixture.js";
@@ -99,6 +100,7 @@ describe("CloudFormation Distribution response headers policies", () => {
         Body: "<h1>Not found</h1>",
       }),
     );
+    await grantPublicObjectRead(simAws.s3(), "headers-site-bucket");
 
     return { simAws, distributionId: resource.simResource.distributionId };
   }

@@ -12,7 +12,7 @@ import {
 
 import type { SimAws } from "../../src/service/aws/sim-aws.js";
 import type { SimAwsLocalServer } from "../../src/serve/http/local-server/sim-aws-local-server.js";
-import { grantPublicWebsiteRead } from "../../src/service/s3/bucket/website/sim-s3-public-website.fixture.js";
+import { grantPublicObjectRead } from "../../src/service/s3/bucket/sim-s3-public-read.fixture.js";
 
 /**
  * A Bucket website holding one HTML page, which is the smallest thing a browser
@@ -40,7 +40,7 @@ export async function simServedSite(
       WebsiteConfiguration: { IndexDocument: { Suffix: "index.html" } },
     }),
   );
-  await grantPublicWebsiteRead(simS3, bucketName);
+  await grantPublicObjectRead(simS3, bucketName);
 }
 
 /**

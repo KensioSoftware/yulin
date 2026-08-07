@@ -10,6 +10,7 @@ import {
 } from "@aws-sdk/client-cloudfront";
 import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
+import { grantPublicObjectRead } from "../../s3/bucket/sim-s3-public-read.fixture.js";
 import { SimCloudFrontServiceController } from "./sim-cloudfront-controller.js";
 import { SimAwsServiceRequest } from "../../../serve/controller/sim-service-controller.js";
 import { makeCffFunctionCodeInput } from "../cff/function-code-input/cff-function-code-input.js";
@@ -41,6 +42,7 @@ describe("Simulated CloudFront local HTTP controller CFF", () => {
         Body: body,
       }),
     );
+    await grantPublicObjectRead(simS3, "viewer-response-body-bucket");
 
     const cffOutput = await simAws.cloudFront().createFunction(
       new CreateFunctionCommand({

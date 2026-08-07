@@ -9,6 +9,7 @@ import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { CreateDistributionCommand } from "@aws-sdk/client-cloudfront";
 import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
+import { grantPublicObjectRead } from "../../s3/bucket/sim-s3-public-read.fixture.js";
 import { SimCloudFrontServiceController } from "./sim-cloudfront-controller.js";
 import { SimAwsServiceRequest } from "../../../serve/controller/sim-service-controller.js";
 import { jsonStringify } from "../../../util/type-guard/json.js";
@@ -31,6 +32,7 @@ describe("Simulated CloudFront local HTTP controller request handling", () => {
         Body: jsonStringify([{ name: "Ada" }]),
       }),
     );
+    await grantPublicObjectRead(simS3, "head-request-bucket");
 
     const cloudFront = simAws.cloudFront();
     const distributionCreation = await cloudFront.createDistribution(
@@ -178,6 +180,7 @@ describe("Simulated CloudFront local HTTP controller request handling", () => {
         Body: "<h1>Existing</h1>",
       }),
     );
+    await grantPublicObjectRead(simS3, "not-found-bucket");
 
     const cloudFront = simAws.cloudFront();
     const distributionCreation = await cloudFront.createDistribution(

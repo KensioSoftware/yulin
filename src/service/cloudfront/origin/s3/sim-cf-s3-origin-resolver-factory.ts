@@ -11,6 +11,10 @@ import { assertDefined } from "../../../../util/type-guard/defined.js";
  * one Account from a Distribution in another is ordinary, and real CloudFront
  * checks neither ownership nor existence when a Distribution is created. What
  * the Distribution may read is left to the Bucket policy.
+ *
+ * The simulated S3 holding the Bucket is returned with it, because that is what
+ * the Bucket policy is evaluated by: an Origin reads through that S3's
+ * GetObject command rather than out of Bucket storage.
  */
 export function makeSimCfS3OriginResolver(
   simAws: SimAws,
@@ -23,9 +27,15 @@ export function makeSimCfS3OriginResolver(
       `Unable to find sim S3 Bucket ${bucketName} for sim CloudFront S3 Origin`,
     );
 
-    return simAws
+    const simS3 = simAws
       .accountRegionScope(bucketScope.accountId, bucketScope.regionName)
-      .s3()
-      .getSimBucketByName(bucketName);
+      .s3();
+    const bucket = simS3.getSimBucketByName(bucketName);
+
+    if (bucket === undefined) {
+      return;
+    }
+
+    return { bucket, simS3 };
   };
 }
