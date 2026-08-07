@@ -60,19 +60,20 @@ Subscription state lives under `subscription/`.
 
 `SimSnsSubscription` is the stored resource: its ARN, the topic it belongs to, its protocol, its
 endpoint, the Account owning it, and its attributes. The endpoint is held as a
-`SimSnsQueueEndpointArn` rather than as a string, because `sqs` is the only protocol simulated and a
-delivery has to reach the Account and Region that ARN names rather than the topic's. When another
-protocol arrives, this becomes the endpoint of whichever kind the protocol implies.
+`SimSnsQueueEndpointArn` rather than as a string, because `sqs` is the only protocol accepted and the
+Account and Region it names are the ones a delivery will have to reach, rather than the topic's. When
+another protocol arrives, this becomes the endpoint of whichever kind the protocol implies.
 
 Nothing checks that the endpoint queue exists when a subscription is created, because real SNS does
-not either. A subscription to a queue that is not there is created and fails at delivery time, which
-is the same moment the queue's own policy is consulted.
+not either: a subscription to a queue that is not there is created, and fails when something is
+delivered to it. Nothing here consults the queue's policy either, since delivery is not simulated
+yet, and both checks belong with it when it arrives.
 
 `SimSnsSubscriptionArn` mints an ARN, which is the topic's with an opaque id added as a seventh part,
 and `parseSnsSubscriptionArn` reads one. Counting the colon separated parts is what tells a
 subscription ARN from a topic ARN, since neither has a resource type separator.
 
-`SimSnsSubscriptionProtocol` holds the one protocol delivery is simulated over. Every other protocol
+`SimSnsSubscriptionProtocol` holds the one protocol a subscription is accepted for. Every other protocol
 real SNS has is refused by name with the reason it is missing, rather than accepted as a subscription
 that would never be delivered to. A protocol real SNS does not have at all is refused the way real
 SNS refuses one.

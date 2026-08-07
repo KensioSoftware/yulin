@@ -102,19 +102,30 @@ describe("SNS subscription listings", () => {
   });
 
   it("refuses a continuation token it did not issue", async () => {
-    // Given a topic with a subscribed queue.
+    // Given a topic with two subscribed queues.
     const { simAws, topicArn } = await simAwsWithTopic();
 
     await subscribeQueue(simAws, topicArn, "orders-queue");
+    await subscribeQueue(simAws, topicArn, "audit-queue");
 
-    // When a listing is asked to continue from something else.
-    const error = await assertThrowsErrorAsync(async () => {
-      await simAws
-        .sns()
-        .listSubscriptions(new ListSubscriptionsCommand({ NextToken: "next" }));
-    });
+    // When a listing is asked to continue from something else, including an
+    // offset landing part way into a page.
+    const refusals = await Promise.all(
+      ["next", "0", "1"].map(async (token) =>
+        assertThrowsErrorAsync(async () => {
+          await simAws
+            .sns()
+            .listSubscriptions(
+              new ListSubscriptionsCommand({ NextToken: token }),
+            );
+        }),
+      ),
+    );
 
-    // Then it is refused rather than quietly starting again from the top.
-    assertInstanceOf(error, SimSnsInvalidParameterException);
+    // Then each is refused rather than quietly starting the listing somewhere
+    // real SNS would never start one.
+    for (const error of refusals) {
+      assertInstanceOf(error, SimSnsInvalidParameterException);
+    }
   });
 });

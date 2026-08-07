@@ -80,9 +80,10 @@ export class SimSnsSubscription {
    * Create a subscription, refusing an endpoint the protocol cannot reach.
    *
    * Nothing checks that the queue exists, because real SNS does not either: a
-   * subscription to a queue that is not there is created and fails at delivery
-   * time. That is the moment the queue's own policy is consulted too, so both
-   * failures surface in the same place.
+   * subscription to a queue that is not there is created, and fails when
+   * something is delivered to it. The queue's own policy is not consulted here
+   * either, since delivery is not simulated yet, and both checks belong with it
+   * when it arrives.
    */
   static of(input: SimSnsSubscriptionInput): SimSnsSubscription {
     const arn = SimSnsSubscriptionArn.forTopic(input.topicArn);

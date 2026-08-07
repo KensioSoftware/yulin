@@ -27,9 +27,10 @@ export class SimSnsPage<Item> {
   /**
    * Read a continuation token as its offset into the listed items.
    *
-   * Tokens are the canonical non-negative integer representation these commands
-   * emit, so anything else is refused rather than silently starting again from
-   * the beginning.
+   * A token is refused unless it is one of these listings could have issued,
+   * which is the start of a page after the first. An offset landing part way
+   * into a page is not one, so it is refused rather than answered with a
+   * listing starting somewhere real SNS would never start one.
    */
   private static startIndex(
     nextToken: string | undefined,
@@ -43,7 +44,8 @@ export class SimSnsPage<Item> {
 
     if (
       !Number.isSafeInteger(startIndex) ||
-      startIndex < 0 ||
+      startIndex <= 0 ||
+      startIndex % itemsPerPage !== 0 ||
       startIndex >= listedCount ||
       String(startIndex) !== nextToken
     ) {
