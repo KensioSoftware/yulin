@@ -185,9 +185,9 @@ Delivery lives under `delivery/`, and the signing that goes with it under `signa
 
 `SimSnsFanOut` is what a publish hands a message to. It asks each subscription whether it wants the
 message before scheduling anything, which is where a filter policy is applied: filtering sits above
-the delivery endpoint rather than inside the queue one, so a second protocol picks it up for free.
-Each subscription is asked on its own, so one subscriber filtering a message out has nothing to do
-with what another receives. It schedules one delivery per subscription that wants it on the
+the delivery endpoint rather than inside any one of them, so a `lambda` subscription is filtered the
+same way an `sqs` one is, and a third protocol would be too. Each subscription is asked on its own,
+so one subscriber filtering a message out has nothing to do with what another receives. It schedules one delivery per subscription that wants it on the
 background scheduler, because real SNS answers a publish before anything is delivered:
 `simAws.backgroundTasksComplete()` is what waits for it. A failure is recorded on
 `SimSnsDeliveryFailures` rather than thrown, since a background task left rejected would fail an

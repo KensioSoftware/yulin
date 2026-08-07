@@ -581,7 +581,9 @@ setting, so a function is invoked with the whole event whether it is set or not.
 
 A subscription with a `FilterPolicy` receives only the messages its policy matches. Every other
 subscription of the topic is unaffected, so one subscriber filtering a message out has nothing to do
-with what another receives.
+with what another receives. It applies to a subscribed function as it does to a subscribed queue: the
+policy decides whether the message reaches the subscription at all, whatever the subscription
+delivers to.
 
 The policy is a JSON document of keys and the match conditions each one accepts. Separate keys are an
 and, and the list a key holds is an or.

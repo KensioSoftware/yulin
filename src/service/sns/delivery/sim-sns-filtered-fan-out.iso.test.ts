@@ -14,6 +14,7 @@ import {
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
+import { simSnsSubscribedFunction } from "../../../../test/sns/function-fixture.js";
 import {
   simSnsDeliveredMessage,
   simSnsQueuePolicy,
@@ -182,5 +183,54 @@ describe("SNS fan-out with subscription filter policies", () => {
       envelopeMessage(await simSnsDeliveredMessage(simAws, queueUrl)),
       "order-1",
     );
+  });
+
+  it("filters a subscribed function the same way as a queue", async () => {
+    // Given a topic with a function subscribed to it, filtering on the kind of
+    // message it wants.
+    const { simAws, topicArn } = await simAwsWithTopic();
+    const consumer = await simSnsSubscribedFunction(
+      simAws,
+      "order-consumer",
+      topicArn,
+    );
+    const [subscription] = simAws.sns().topicSubscriptions("orders");
+
+    assertNonNullable(subscription);
+
+    await simAws.sns().setSubscriptionAttributes(
+      new SetSubscriptionAttributesCommand({
+        SubscriptionArn: subscription.arn.value,
+        AttributeName: "FilterPolicy",
+        AttributeValue: JSON.stringify({ type: ["order"] }),
+      }),
+    );
+
+    // When a refund is published, and then an order.
+    await Promise.all(
+      ["refund", "order"].map(async (type) =>
+        simAws.sns().publish(
+          new PublishCommand({
+            TopicArn: topicArn,
+            Message: `${type}-1`,
+            MessageAttributes: {
+              type: { DataType: "String", StringValue: type },
+            },
+          }),
+        ),
+      ),
+    );
+
+    await simAws.backgroundTasksComplete();
+
+    // Then only the order invoked it. Filtering sits above the endpoint a
+    // subscription delivers to, so it applies to a function as it does to a
+    // queue.
+    assertArrayLength(consumer.events, 1);
+
+    const [event] = consumer.events;
+
+    assertNonNullable(event);
+    assertIdentical(event.Records[0]?.Sns["Message"], "order-1");
   });
 });
