@@ -22,6 +22,63 @@ const securityRecommended = security.configs.recommended as Parameters<
   typeof defineConfig
 >[0];
 
+/** One entry in a `no-restricted-syntax` rule configuration. */
+type RestrictedSyntax = { readonly selector: string; readonly message: string };
+
+/**
+ * Every `no-restricted-syntax` entry a shared config sets, gathered up.
+ *
+ * Flat config replaces a rule's whole configuration rather than merging it, so
+ * two configs that both set `no-restricted-syntax` cannot coexist: the later
+ * one wins and the earlier one's selectors are dropped without a word. That is
+ * not hypothetical. Adding `@kensio/smartass/eslint` in #93 silently turned
+ * off this repository's own restrictions, and nothing noticed for 265 commits.
+ *
+ * Collecting the entries and setting the rule once below is what keeps both.
+ * Anything else setting this rule has to come through here too.
+ */
+function restrictedSyntaxFrom(
+  configs: readonly { rules?: Record<string, unknown> }[],
+): readonly RestrictedSyntax[] {
+  return configs.flatMap((config) => {
+    const entry = config.rules?.["no-restricted-syntax"];
+
+    return Array.isArray(entry)
+      ? (entry.slice(1) as readonly RestrictedSyntax[])
+      : [];
+  });
+}
+
+/**
+ * Restrictions this repository sets on itself, as opposed to advice a shared
+ * config brings with it.
+ */
+const yulinRestrictedSyntax: readonly RestrictedSyntax[] = [
+  {
+    selector:
+      "IfStatement[test.type='BinaryExpression'][test.operator='===']:matches([test.left.type='Identifier'][test.left.name='undefined'], [test.right.type='Identifier'][test.right.name='undefined']):has(ThrowStatement[argument.type='NewExpression'][argument.callee.name='Error'])",
+    message:
+      "Use `assertDefined(value, description)` instead of throwing `Error` from an `undefined` guard.",
+  },
+  {
+    selector:
+      "IfStatement[test.type='BinaryExpression'][test.operator='===']:matches([test.left.type='Literal'][test.left.value=null], [test.right.type='Literal'][test.right.value=null]):has(ThrowStatement[argument.type='NewExpression'][argument.callee.name='Error'])",
+    message:
+      "Use `assertNotNull(value, description)` instead of throwing `Error` from a `null` guard.",
+  },
+  {
+    selector:
+      "MemberExpression[object.type='ThisExpression'][property.type='Identifier'][property.name='props']",
+    message:
+      "Do not reuse `this.props`. Destructure constructor props into class members instead.",
+  },
+];
+
+const allRestrictedSyntax: readonly RestrictedSyntax[] = [
+  ...yulinRestrictedSyntax,
+  ...restrictedSyntaxFrom(smartassPreferSpecificAssertions),
+];
+
 export default defineConfig(
   // ── Global ignores ──────────────────────────────────────
   {
@@ -119,33 +176,9 @@ export default defineConfig(
       ],
 
       // ── Discourage various undesirable patterns ─────────────
-      "no-restricted-syntax": [
-        "error",
-        {
-          selector:
-            "TSUnknownKeyword:not(.params > TSTypeAnnotation > TSUnknownKeyword)",
-          message:
-            "Avoid `unknown` as a type, except when narrowing a function parameter to a concrete type.",
-        },
-        {
-          selector:
-            "IfStatement[test.type='BinaryExpression'][test.operator='===']:matches([test.left.type='Identifier'][test.left.name='undefined'], [test.right.type='Identifier'][test.right.name='undefined']):has(ThrowStatement[argument.type='NewExpression'][argument.callee.name='Error'])",
-          message:
-            "Use `assertDefined(value, description)` instead of throwing `Error` from an `undefined` guard.",
-        },
-        {
-          selector:
-            "IfStatement[test.type='BinaryExpression'][test.operator='===']:matches([test.left.type='Literal'][test.left.value=null], [test.right.type='Literal'][test.right.value=null]):has(ThrowStatement[argument.type='NewExpression'][argument.callee.name='Error'])",
-          message:
-            "Use `assertNotNull(value, description)` instead of throwing `Error` from a `null` guard.",
-        },
-        {
-          selector:
-            "MemberExpression[object.type='ThisExpression'][property.type='Identifier'][property.name='props']",
-          message:
-            "Do not reuse `this.props`. Destructure constructor props into class members instead.",
-        },
-      ],
+      // Set once, from every source, so that nothing clobbers anything else.
+      // See `restrictedSyntaxFrom` above.
+      "no-restricted-syntax": ["error", ...allRestrictedSyntax],
 
       // ── General quality ──────────────────────────────
       "no-console": "warn",
@@ -294,6 +327,10 @@ export default defineConfig(
       // Examples model real AWS-shaped data, such as UPPER_SNAKE_CASE Lambda
       // environment variable names, rather than code identifier names.
       "@typescript-eslint/naming-convention": "off",
+      // An example is written the way a package consumer writes code, and
+      // `assertDefined` is an internal helper rather than part of the public
+      // API, so a hand-written guard is what an example should show.
+      "no-restricted-syntax": "off",
     },
   },
 
@@ -360,8 +397,9 @@ export default defineConfig(
     },
   },
 
-  // ── More specific smartass assertions
-  ...smartassPreferSpecificAssertions,
+  // Smartass's own config is deliberately not spread in here. It sets
+  // `no-restricted-syntax` and would replace everything above; its entries
+  // arrive through `allRestrictedSyntax` instead.
 
   // ── CloudFront Functions JS2
   ...cloudFrontFunctionsJs2,

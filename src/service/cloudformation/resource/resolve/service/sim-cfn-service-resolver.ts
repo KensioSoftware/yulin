@@ -1,3 +1,4 @@
+import { assertDefined } from "../../../../../util/type-guard/defined.js";
 import type { SimAws } from "../../../../aws/sim-aws.js";
 import type { SimAwsAccountRegionScope } from "../../../../aws/sim-aws-account-region-scope.js";
 import type {
@@ -29,11 +30,10 @@ export function resolveSimCloudFormationServiceResourceFactory(
     resourceType.serviceName,
   );
 
-  if (serviceFactory === undefined) {
-    throw new Error(
-      `Unsupported sim CloudFormation Resource service ${resourceType.serviceName}`,
-    );
-  }
+  assertDefined(
+    serviceFactory,
+    `Unsupported sim CloudFormation Resource service ${resourceType.serviceName}`,
+  );
 
   return serviceFactory(
     simAws.accountRegionScope(

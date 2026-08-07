@@ -1,3 +1,4 @@
+import { assertDefined } from "../../../util/type-guard/defined.js";
 import type {
   SimAwsCaller,
   SimAwsPrincipal,
@@ -55,11 +56,10 @@ export class SimAwsCallerResolver {
     }
 
     if (caller?.kind === "credentials") {
-      if (this.credentialIdentityResolver === undefined) {
-        throw new Error(
-          "Simulated credential callers require an IAM credential resolver",
-        );
-      }
+      assertDefined(
+        this.credentialIdentityResolver,
+        "Simulated credential callers require an IAM credential resolver",
+      );
 
       const identity = this.credentialIdentityResolver.resolveCredentials(
         caller.credentials,

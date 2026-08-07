@@ -1,3 +1,4 @@
+import { assertDefined } from "../../../../../util/type-guard/defined.js";
 import { dynamoDbGlobalTableResourceTypeName } from "../../../../dynamodb/cfn/sim-cfn-dynamodb-resource-type.js";
 import type { SimDynamoDbTable } from "../../../../dynamodb/table/sim-dynamodb-table.js";
 import type { SimCfnTemplateValue } from "../../../template/value/sim-cfn-template-value.js";
@@ -71,13 +72,12 @@ export class SimDynamoDbTableCfn implements SimCfnResourceValueAdapter {
   private streamArn(): SimCfnTemplateValue {
     const arn = this.table.stream.latest?.arn;
 
-    if (arn === undefined) {
-      throw new Error(
-        `Unsupported ${this.resourceTypeName} attribute StreamArn: table ` +
-          `${this.table.tableName} has no StreamSpecification, so it has no ` +
-          `stream and no stream ARN`,
-      );
-    }
+    assertDefined(
+      arn,
+      `Unsupported ${this.resourceTypeName} attribute StreamArn: table ` +
+        `${this.table.tableName} has no StreamSpecification, so it has no ` +
+        `stream and no stream ARN`,
+    );
 
     return arn;
   }

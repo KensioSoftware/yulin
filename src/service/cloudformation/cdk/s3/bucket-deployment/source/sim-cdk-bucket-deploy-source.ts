@@ -42,6 +42,7 @@ export class SimCdkBucketDeploySource {
       sourceObjectKey,
     );
 
+    // eslint-disable-next-line no-restricted-syntax -- `assertDefined` cannot narrow through the optional chain, which the packaging check below relies on, and its message would have to be built on every call rather than only on failure
     if (fileAsset?.source?.path === undefined) {
       const errorMessage = new SimCdkBucketDeployErrorMessage({
         resource,

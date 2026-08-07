@@ -12,7 +12,8 @@
   },
   "scripts": {
     "clean": "rm -rf ./dist/ ./*.tsbuildinfo",
-    "build": "pnpm clean && tsc -p tsconfig.build.json",
+    "build": "pnpm clean && tsc -p tsconfig.build.json && pnpm oxlint:config",
+    "oxlint:config": "pnpm tsx scripts/mts/write-oxlint-config.mts",
     "build:check": "tsc -p tsconfig.json --noEmit",
     "prepack": "pnpm build",
     "verify:pack": "pnpm tsx scripts/mts/verify-pack.mts",
@@ -85,6 +86,11 @@
       "import": "./dist/service/lambda/index.js",
       "types": "./dist/service/lambda/index.d.ts"
     },
+    "./oxlint": {
+      "import": "./dist/config/oxlint/index.js",
+      "types": "./dist/config/oxlint/index.d.ts"
+    },
+    "./oxlint/cffjs2.oxlintrc.json": "./dist/config/oxlint/cffjs2.oxlintrc.json",
     "./package.json": "./package.json",
     "./rekognition": {
       "import": "./dist/service/rekognition/index.js",
@@ -185,6 +191,7 @@
     "fta-cli": "^3.0.0",
     "globals": "^17.8.0",
     "jiti": "^2.7.0",
+    "oxlint": "^1.77.0",
     "prettier": "^3.9.6",
     "semantic-release": "25.0.9",
     "tsx": "^4.23.1",

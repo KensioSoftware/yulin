@@ -1,3 +1,4 @@
+import { assertDefined } from "../../../util/type-guard/defined.js";
 import { SimLiveReload } from "./sim-live-reload.js";
 import { SimLiveReloadReport } from "./sim-live-reload-report.js";
 import {
@@ -89,11 +90,10 @@ export class SimLocalLiveReload {
   }
 
   private reloadChannel(): SimLiveReload {
-    if (this.liveReload === undefined) {
-      throw new Error(
-        "Live reload is off for this server, serve with { liveReload: true } to use reload()",
-      );
-    }
+    assertDefined(
+      this.liveReload,
+      "Live reload is off for this server, serve with { liveReload: true } to use reload()",
+    );
 
     return this.liveReload;
   }

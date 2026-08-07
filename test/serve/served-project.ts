@@ -3,6 +3,7 @@ import { mkdir } from "node:fs/promises";
 import type { SimAws } from "../../src/index.js";
 import { repoPath } from "../../src/util/filesystem/path.js";
 import { TemporaryDirectory } from "../../src/util/filesystem/temporary-directory.js";
+import { assertNotNull } from "../../src/util/type-guard/defined.js";
 import { jsonStringify } from "../../src/util/type-guard/json.js";
 
 const yulin = repoPath("src/index.js");
@@ -151,11 +152,10 @@ export class ServedProject {
     });
     clearTimeout(giveUp);
 
-    if (code === null) {
-      throw new Error(
-        `The process did not exit on its own. It said: ${output.stdout} ${output.stderr}`,
-      );
-    }
+    assertNotNull(
+      code,
+      `The process did not exit on its own. It said: ${output.stdout} ${output.stderr}`,
+    );
 
     return { ...output, code };
   }
