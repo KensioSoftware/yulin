@@ -228,8 +228,8 @@ describe("SimCfnStack", () => {
       stackName: "TestStack",
       template: {
         Resources: {
-          TestTopic: {
-            Type: "AWS::SNS::Topic",
+          TestRule: {
+            Type: "AWS::Events::Rule",
           },
         },
       },
@@ -240,11 +240,11 @@ describe("SimCfnStack", () => {
     assertIdentical(stack.lifecycle.status, "CREATE_COMPLETE");
     assertArrayLength(stack.skippedResources, 1);
     assertNonNullable(skippedResource);
-    assertIdentical(skippedResource.logicalId, "TestTopic");
+    assertIdentical(skippedResource.logicalId, "TestRule");
     assertTrue(skippedResource.skipped);
     assertIdentical(
       skippedResource.skippedReason,
-      "Unsupported sim CloudFormation Resource service SNS",
+      "Unsupported sim CloudFormation Resource service Events",
     );
   });
 

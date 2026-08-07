@@ -15,6 +15,7 @@ import { SimSnsNoDeliveryEndpoints } from "./delivery/sim-sns-no-delivery-endpoi
 import type * as simSnsCommands from "./command/sim-sns-command.types.js";
 import { SimSnsCommands } from "./command/sim-sns-commands.js";
 import type { SimSnsRequestOptions } from "./command/sim-sns-request-options.js";
+import { SimSnsCfnResourceFactory } from "./cfn/sim-sns-cfn-resource-factory.js";
 import { SimSnsSdkCommandRouter } from "./sdk/sim-sns-sdk-command-router.js";
 import type { SimSnsSubscription } from "./subscription/sim-sns-subscription.js";
 import { SimSnsSubscriptionStore } from "./subscription/sim-sns-subscription-store.js";
@@ -50,6 +51,7 @@ export class SimSns {
   private readonly commands: SimSnsCommands;
   private readonly background: BackgroundScheduler;
   private readonly sdkRouter = new SimSnsSdkCommandRouter(this);
+  private readonly cfnFactory = new SimSnsCfnResourceFactory({ sns: this });
 
   constructor(properties: SimSnsProperties = {}) {
     const {
@@ -109,6 +111,16 @@ export class SimSns {
    */
   topicSubscriptions(topicName: string): readonly SimSnsSubscription[] {
     return this.subscriptions.forTopic(topicName);
+  }
+
+  /**
+   * Find a subscription by ARN.
+   *
+   * This is the simulator's own accessor, for a test or a CloudFormation
+   * Resource holding the ARN a Subscribe answered with.
+   */
+  findSubscription(arn: string): SimSnsSubscription | undefined {
+    return this.subscriptions.find(arn);
   }
 
   /**
@@ -264,6 +276,13 @@ export class SimSns {
   ): Promise<simSnsCommands.SimPublishBatchCommandOutput> {
     await this.background.sequence();
     return this.commands.publish.publishBatch(command, options);
+  }
+
+  /**
+   * Get this service's CloudFormation Resource factory.
+   */
+  cfnResourceFactory(): SimSnsCfnResourceFactory {
+    return this.cfnFactory;
   }
 
   /**

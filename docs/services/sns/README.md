@@ -1326,6 +1326,172 @@ The same applies to `SimSdk` interception: intercepting `SNSClient` routes ordin
 simulation with nothing touching the network. See
 [AWS SDK interception](../../sdk/ "Simulated AWS SDK docs").
 
+## Deploying a topic from CloudFormation
+
+Simulated CloudFormation creates a topic from an `AWS::SNS::Topic` resource, in the stack's account
+and region. The topic is created through `CreateTopic`, so a template-created topic is the same thing
+an SDK caller would get: the same name validation, the same attributes, the same ARN.
+
+`Ref` on the resource gives the topic ARN, as it does on real AWS, so it can be handed straight to
+`Publish` or `Subscribe`. `Fn::GetAtt … TopicArn` gives the same string, and `Fn::GetAtt … TopicName`
+gives the name without the account and region around it.
+
+`AWS::SNS::Subscription` subscribes through `Subscribe`, so its `Protocol` has to be one of the two
+simulated and its `Endpoint` has to be an ARN that protocol can reach. `RawMessageDelivery`,
+`FilterPolicy` and `FilterPolicyScope` are carried through as subscription attributes, so a filter
+policy written in a template is read exactly as one set through the SDK. The policy is an object in
+the template where the API takes a JSON string; the conversion happens on the way in. `Ref` on the
+resource gives the subscription ARN.
+
+```typescript sim-sns-cloudformation-topic
+/**
+ * Deploying a topic and a queue subscription from a CloudFormation template.
+ */
+
+import { PublishCommand } from "@aws-sdk/client-sns";
+import { ReceiveMessageCommand } from "@aws-sdk/client-sqs";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "orders-stack",
+  template: {
+    Resources: {
+      OrdersTopic: {
+        Type: "AWS::SNS::Topic",
+        Properties: { TopicName: "orders", DisplayName: "Orders" },
+      },
+      FulfilmentQueue: {
+        Type: "AWS::SQS::Queue",
+        Properties: { QueueName: "fulfilment" },
+      },
+      // The queue policy is what lets SNS deliver to the queue. It is checked
+      // on every message, as it is on real AWS.
+      FulfilmentQueuePolicy: {
+        Type: "AWS::SQS::QueuePolicy",
+        Properties: {
+          Queues: [{ Ref: "FulfilmentQueue" }],
+          PolicyDocument: {
+            Version: "2012-10-17",
+            Statement: [
+              {
+                Effect: "Allow",
+                Principal: { Service: "sns.amazonaws.com" },
+                Action: "sqs:SendMessage",
+                Resource: { "Fn::GetAtt": ["FulfilmentQueue", "Arn"] },
+                Condition: {
+                  ArnEquals: { "aws:SourceArn": { Ref: "OrdersTopic" } },
+                },
+              },
+            ],
+          },
+        },
+      },
+      FulfilmentSubscription: {
+        Type: "AWS::SNS::Subscription",
+        Properties: {
+          TopicArn: { Ref: "OrdersTopic" },
+          Protocol: "sqs",
+          Endpoint: { "Fn::GetAtt": ["FulfilmentQueue", "Arn"] },
+          RawMessageDelivery: true,
+        },
+      },
+    },
+    Outputs: {
+      OrdersTopicArn: { Value: { Ref: "OrdersTopic" } },
+      FulfilmentQueueUrl: { Value: { Ref: "FulfilmentQueue" } },
+    },
+  },
+});
+
+// Ref on a topic resolves to its ARN, so it works as a Publish TopicArn.
+const topicArn = stack.outputs.get("OrdersTopicArn")?.value as string;
+
+await simAws
+  .sns()
+  .publish(new PublishCommand({ TopicArn: topicArn, Message: "order-1" }));
+
+// Delivery happens after the publish is answered, as it does on real SNS.
+await simAws.backgroundTasksComplete();
+
+const QueueUrl = stack.outputs.get("FulfilmentQueueUrl")?.value as string;
+const { Messages } = await simAws
+  .sqs()
+  .receiveMessage(new ReceiveMessageCommand({ QueueUrl }));
+
+console.log(Messages?.[0]?.Body); // "order-1"
+```
+
+A topic with no `TopicName` is named from the stack name and the logical ID, so the topic above with
+its name left out would be `orders-stack-OrdersTopic`. Real CloudFormation adds random characters to
+that, which a template cannot predict either way. The generated name is trimmed to the 256 characters
+a topic name allows, ending in a hash of the untrimmed name so two long names that start the same
+stay apart.
+
+A topic can also declare its subscriptions inside itself, with the `Subscription` property, which is
+how a hand-written template usually writes them. Each entry is a `Protocol` and an `Endpoint`, and
+each goes through `Subscribe` the same way a separate resource does. A subscription written this way
+has no attributes, so a filter policy or raw message delivery needs the separate resource.
+
+```typescript
+{
+  Type: "AWS::SNS::Topic",
+  Properties: {
+    TopicName: "orders",
+    Subscription: [
+      {
+        Protocol: "sqs",
+        Endpoint: { "Fn::GetAtt": ["FulfilmentQueue", "Arn"] },
+      },
+    ],
+  },
+}
+```
+
+`AWS::SNS::TopicPolicy` deploys the policy it names onto each topic in its `Topics` list, through
+`SetTopicAttributes`. A policy declared in a template is therefore validated and enforced exactly as
+one set through the SDK, and a document SNS would refuse fails the resource. `Topics` carries topic
+ARNs, which is what `Ref` on an `AWS::SNS::Topic` gives.
+
+```typescript
+{
+  Type: "AWS::SNS::TopicPolicy",
+  Properties: {
+    Topics: [{ Ref: "OrdersTopic" }],
+    PolicyDocument: {
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Allow",
+          Principal: { Service: "s3.amazonaws.com" },
+          Action: "sns:Publish",
+          Resource: { Ref: "OrdersTopic" },
+        },
+      ],
+    },
+  },
+}
+```
+
+A property with no simulated behaviour fails the resource rather than being dropped. That covers
+`FifoTopic`, `ContentBasedDeduplication`, `FifoThroughputScope`, `KmsMasterKeyId`,
+`SignatureVersion`, `TracingConfig`, `ArchivePolicy`, `DeliveryStatusLogging`, `DataProtectionPolicy`
+and `Tags` on a topic, and `DeliveryPolicy`, `RedrivePolicy`, `ReplayPolicy`, `SubscriptionRoleArn`
+and `Region` on a subscription. Most of them are refused by simulated SNS itself, since they are
+topic or subscription attributes of the same name, so the reason is the same one an SDK caller gets.
+A property the resource type does not have at all is refused too. The failure is worded as an invalid
+resource rather than an unsupported one, so the resource fails instead of being
+[skipped](../cloudformation/README.md#values-from-a-skipped-resource): a topic that cannot be created
+as the template asked for it would otherwise leave a stack that looks deployed with nothing
+publishing.
+
+CDK works without hand-editing. `topic.addSubscription(new subscriptions.SqsSubscription(queue))`
+synthesises an `AWS::SNS::Subscription` alongside the `AWS::SQS::QueuePolicy` that authorizes the
+delivery, and both deploy. `new subscriptions.LambdaSubscription(fn)` does the same with the
+`AWS::Lambda::Permission` beside it.
+
 ## Available functionality
 
 Sim SNS currently supports:
@@ -1358,6 +1524,9 @@ Sim SNS currently supports:
   the configuration is applied and again on every event
 - Calls made from inside a simulated Lambda handler, authorized as the function's execution role
 - `SNSClient` interception, routing ordinary SDK code into the simulation
+- `AWS::SNS::Topic`, `AWS::SNS::Subscription` and `AWS::SNS::TopicPolicy` deployed from a
+  CloudFormation template, each through the SDK command an SDK caller would reach, with the inline
+  `Subscription` property on a topic and `Ref` and `Fn::GetAtt` over the deployed resources
 
 ## Limitations
 
@@ -1445,10 +1614,13 @@ Current documented limitations:
   `sms`, `application` and `firehose`, and SMS sandbox and opt-out management are not planned.
 - SNS condition keys such as `sns:Endpoint` and `sns:Protocol` are not derived, so a policy relying on
   them will not match. Ordinary condition operators on values sim IAM does supply work as usual.
-- The CloudFormation resource types are not implemented, so `AWS::SNS::Topic`,
-  `AWS::SNS::Subscription` and `AWS::SNS::TopicPolicy` in a template do not deploy a topic yet. A
-  stack whose Bucket notifies a topic therefore needs the topic and its policy set up through the SDK
-  first.
+- `FifoTopic: false` in a template fails the resource rather than deploying a standard topic. It is
+  passed to `CreateTopic` as the attribute of the same name, which simulated SNS refuses by name
+  whatever the value is. CDK leaves the property out for a standard topic, so this only reaches a
+  hand-written template.
+- `AWS::SNS::Topic` and `AWS::SNS::Subscription` are replaced rather than updated in place when a
+  stack update changes one, as every simulated CloudFormation resource is. A replaced topic is a new
+  topic, so anything the old one held is gone.
 - An S3 event notification published to a topic carries no message attributes, since real S3 publishes
   none. The only thing on the message besides the event document is the `Amazon S3 Notification`
   subject.

@@ -10,6 +10,7 @@ import { lambdaValueAdapter } from "./lambda/sim-lambda-cfn-value-adapter.js";
 import { route53ValueAdapter } from "./route53/sim-route53-cfn-value-adapter.js";
 import { s3ValueAdapter } from "./s3/sim-s3-cfn-value-adapter.js";
 import { secretsManagerValueAdapter } from "./secretsmanager/sim-secrets-manager-cfn-value-adapter.js";
+import { snsValueAdapter } from "./sns/sim-sns-cfn-value-adapter.js";
 import { sqsValueAdapter } from "./sqs/sim-sqs-cfn-value-adapter.js";
 import { ssmValueAdapter } from "./ssm/sim-ssm-cfn-value-adapter.js";
 import { SimCfnDefaultResourceValueAdapter } from "./sim-cfn-default-resource-value-adapter.js";
@@ -59,6 +60,7 @@ export function simCfnResourceValueAdapter(
     route53ValueAdapter(properties) ??
     s3ValueAdapter(properties) ??
     secretsManagerValueAdapter(properties) ??
+    snsValueAdapter(properties) ??
     sqsValueAdapter(properties) ??
     ssmValueAdapter(properties) ??
     new SimCfnDefaultResourceValueAdapter({

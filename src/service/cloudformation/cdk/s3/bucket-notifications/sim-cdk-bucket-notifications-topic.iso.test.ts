@@ -21,9 +21,9 @@ import { simCdkBucketNotificationsTemplateFactory } from "./sim-cdk-bucket-notif
 describe("CDK Bucket notifications to an SNS topic", () => {
   it("notifies a topic the way CDK's SnsDestination configures one", async () => {
     // Given a topic whose policy carries the ArnLike source ARN condition
-    // CDK's SnsDestination writes, and a queue subscribed to it. CDK writes
-    // that policy as an AWS::SNS::TopicPolicy, which simulated CloudFormation
-    // does not deploy yet, so the topic is set up through the SDK here.
+    // CDK's SnsDestination writes, and a queue subscribed to it. The topic is
+    // set up through the SDK here, so the test is about the notification
+    // rather than about the AWS::SNS::TopicPolicy CDK writes that policy as.
     const simAws = new SimAws();
     const topicArn = await simS3NotificationTopic(simAws, {
       sourceArn: "arn:aws:s3:::uploads",
