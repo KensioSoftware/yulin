@@ -224,8 +224,15 @@ Metadata is stored separately from the object body. `PutObjectCommandHandler` co
 `GetObjectCommandHandler` returns object bodies as Node `Readable` streams and returns stored
 metadata through `Metadata`.
 
-The static website HTTP controller also reads the `"content-type"` metadata key when producing HTTP
-responses.
+`object/s3-object-response-headers.ts` is the single mapping from stored metadata to HTTP response
+headers, and every path that serves an Object goes through it: the S3 REST endpoint reader, the
+static website endpoint and the CloudFront S3 Origin. It returns the system metadata S3 keeps as a
+header and hands back on a read, and nothing else, so user-defined metadata does not leak into the
+response. Keeping it in one place is what stops the three endpoints disagreeing about what reading an
+Object looks like.
+
+Note that `PutObject` only writes `ContentType` into that set. The other headers reach an Object
+through a CDK BucketDeployment's `SystemMetadata`, which builds the metadata record directly.
 
 ## Storage implementations
 

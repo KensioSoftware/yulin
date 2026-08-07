@@ -1779,6 +1779,22 @@ simAws.s3().mountBucketFilesystem("site", path.join(process.cwd(), "public"), {
 These are added to the list rather than replacing it, so naming one cannot cost you `.html`, and a
 leading dot is optional. Everything not named is still refused.
 
+## Object system metadata
+
+S3 keeps a handful of headers about an Object when it is written and hands them back on every read.
+Sim S3 stores and returns `cache-control`, `content-disposition`, `content-encoding`,
+`content-language`, `content-type` and `expires`, alongside a `content-length` describing the body
+being served.
+
+Every path that serves an Object goes through the same mapping, so the REST endpoint, the
+[website endpoint](#static-website-hosting) and a CloudFront S3 Origin all report the same headers
+for it. `content-encoding` is the one that matters most: bytes served without it are bytes no client
+can decode, so an Object stored as brotli is only usable if the header comes back with it.
+
+`PutObjectCommand` carries `ContentType` and nothing else, so the way to set the rest today is a CDK
+BucketDeployment's `SystemMetadata`, which applies them to every Object it copies. See
+[CDK S3 BucketDeployment](../cloudformation/README.md#cdk-s3-bucketdeployment).
+
 ## Standalone SimS3
 
 If you only need S3 alone, you can instantiate `SimS3` directly.
@@ -1830,6 +1846,7 @@ Sim S3 currently supports:
 - Serving static website requests on localhost with `serveSimAws`
 - Serving Object `GET`, `HEAD`, `PUT` and `DELETE` over the S3 REST endpoint, authorized by sim IAM
 - Presigned URLs built by the real `@aws-sdk/s3-request-presigner`, with expiry in simulated time
+- Object system metadata returned on a read, over every endpoint that serves an Object
 - Bucket website index documents, error documents, trailing-slash redirects, redirect-all
   configuration, and routing-rule redirects
 - Bucket-global uniqueness within a `SimAws` instance across simulated Accounts and Regions
@@ -1855,3 +1872,6 @@ These apply across the page. The sections above each list what is specific to th
   not simulated.
 - A Bucket using filesystem-backed storage cannot delete Objects, and raises no event
   notifications, because it swaps the whole storage backend rather than putting Objects.
+- `PutObjectCommand` stores `ContentType` and user-defined `Metadata`, and no other system metadata.
+  An Object needing `content-encoding` or `cache-control` gets it from a CDK BucketDeployment's
+  `SystemMetadata`. See [Object system metadata](#object-system-metadata).

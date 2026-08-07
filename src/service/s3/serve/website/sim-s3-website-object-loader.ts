@@ -71,7 +71,7 @@ export class SimS3WebsiteObjectLoader {
 
       return new SimS3WebsiteObject(
         await simS3BodyToBuffer(output.Body as AsyncIterable<Buffer>),
-        output.Metadata?.["content-type"],
+        output.Metadata,
       );
     } catch (error) {
       if (error instanceof SimS3NoSuchKey) {

@@ -5,7 +5,7 @@ import {
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { assertIdentical } from "@kensio/smartass";
+import { assertIdentical, assertNonNullable } from "@kensio/smartass";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -14,6 +14,7 @@ import {
   presignObjectKey,
   presignSimulation,
 } from "../../../../test/s3/presign-simulation.js";
+import { SimS3Object, SimS3ObjectMetadata } from "../object/s3-object.js";
 
 const objectUrl = `http://${presignBucketName}.s3.eu-west-2.sim-aws.localhost/${presignObjectKey}`;
 
@@ -223,6 +224,49 @@ describe("The simulated S3 REST endpoint", () => {
     assertIdentical(
       simAws.s3().getBucketUrl(presignBucketName).toString(),
       `http://${presignBucketName}.s3.eu-west-2.sim-aws.localhost/`,
+    );
+  });
+
+  it("serves the system metadata an Object was stored with", async () => {
+    // Given an Object stored as brotli with a cache directive of its own, as a
+    // CDK BucketDeployment stores one
+    const { simAws, client, http } = await presignSimulation();
+    const bucket = simAws.s3().getSimBucketByName(presignBucketName);
+
+    assertNonNullable(bucket);
+
+    await bucket.putObject(
+      new SimS3Object({
+        key: "data/standard.keys",
+        body: Buffer.from("compressed"),
+        metadata: new SimS3ObjectMetadata({
+          "content-type": "text/plain",
+          "content-encoding": "br",
+          "cache-control": "public, max-age=60",
+        }),
+      }),
+    );
+
+    // When it is read back over the REST endpoint
+    const response = await http.fetch(
+      await getSignedUrl(
+        client,
+        new GetObjectCommand({
+          Bucket: presignBucketName,
+          Key: "data/standard.keys",
+        }),
+        { expiresIn: 900 },
+      ),
+    );
+
+    // Then the headers S3 was given come back with the bytes, so a client can
+    // decode what it is sent
+    assertIdentical(response.status, 200);
+    assertIdentical(response.headers.get("content-encoding"), "br");
+    assertIdentical(response.headers.get("content-type"), "text/plain");
+    assertIdentical(
+      response.headers.get("cache-control"),
+      "public, max-age=60",
     );
   });
 

@@ -1,5 +1,6 @@
 import type { SimS3Bucket } from "../../../s3/bucket/sim-s3-bucket.js";
 import type { SimS3Object } from "../../../s3/object/s3-object.js";
+import { simS3ObjectResponseHeaders } from "../../../s3/object/s3-object-response-headers.js";
 import type { SimCloudFrontOriginRequest } from "../sim-cloudfront-request-response.js";
 import type { SimCloudFrontOrigin } from "../sim-cloudfront-origin.js";
 
@@ -76,12 +77,10 @@ export class SimCloudFrontS3Origin implements SimCloudFrontOrigin {
   }
 
   private foundObjectResponse(object: SimS3Object, request: Request): Response {
-    const contentType = object.metadata.values["content-type"];
-
-    const headers = {
-      "content-length": String(object.body.length),
-      ...(contentType !== undefined && { "content-type": contentType }),
-    };
+    const headers = simS3ObjectResponseHeaders(
+      object.metadata.values,
+      object.body.length,
+    );
 
     if (request.method === "HEAD") {
       return new Response(undefined, {
