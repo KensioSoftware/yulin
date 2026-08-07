@@ -17,6 +17,22 @@ export {
 } from "./topic/sim-sns-topic-attributes.js";
 export { SimSnsTopicName } from "./topic/sim-sns-topic-name.js";
 export { SimSnsTopicPolicy } from "./topic/sim-sns-topic-policy.js";
+export { SimSnsSubscription } from "./subscription/sim-sns-subscription.js";
+export {
+  parseSnsSubscriptionArn,
+  SimSnsSubscriptionArn,
+  type SimSnsSubscriptionLocation,
+} from "./subscription/sim-sns-subscription-arn.js";
+export {
+  type SimSnsSubscriptionAttributeInput,
+  SimSnsSubscriptionAttributes,
+} from "./subscription/sim-sns-subscription-attributes.js";
+export {
+  simSnsSqsProtocol,
+  type SimSnsSubscriptionProtocol,
+} from "./subscription/sim-sns-subscription-protocol.js";
+export { SimSnsQueueEndpointArn } from "./subscription/sim-sns-queue-endpoint-arn.js";
+export type { SimSnsSubscriptionCounts } from "./subscription/sim-sns-subscription-store.js";
 export { SimSnsMessageAttributes } from "./message/sim-sns-message-attributes.js";
 export type {
   SimSnsMessageAttributeInput,

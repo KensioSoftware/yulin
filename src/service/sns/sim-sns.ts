@@ -13,11 +13,17 @@ import { SimSnsAuthorizer } from "./command/authorize/sim-sns-authorizer.js";
 import { SimSnsPublishCommands } from "./command/publish/sim-sns-publish-commands.js";
 import type * as simSnsCommands from "./command/sim-sns-command.types.js";
 import type { SimSnsRequestOptions } from "./command/sim-sns-request-options.js";
+import { SimSnsSubscriptionAccess } from "./command/subscription/sim-sns-subscription-access.js";
+import { SimSnsSubscriptionAttributeCommands } from "./command/subscription/sim-sns-subscription-attribute-commands.js";
+import { SimSnsSubscriptionCommands } from "./command/subscription/sim-sns-subscription-commands.js";
+import { SimSnsSubscriptionListings } from "./command/subscription/sim-sns-subscription-listings.js";
 import { SimSnsCreateTopic } from "./command/topic/sim-sns-create-topic.js";
 import { SimSnsTopicAccess } from "./command/topic/sim-sns-topic-access.js";
 import { SimSnsTopicAttributeCommands } from "./command/topic/sim-sns-topic-attribute-commands.js";
 import { SimSnsTopicCommands } from "./command/topic/sim-sns-topic-commands.js";
 import { SimSnsSdkCommandRouter } from "./sdk/sim-sns-sdk-command-router.js";
+import type { SimSnsSubscription } from "./subscription/sim-sns-subscription.js";
+import { SimSnsSubscriptionStore } from "./subscription/sim-sns-subscription-store.js";
 import type { SimSnsTopic } from "./topic/sim-sns-topic.js";
 import { SimSnsTopicStore } from "./topic/sim-sns-topic-store.js";
 
@@ -38,9 +44,13 @@ interface SimSnsProperties {
  */
 export class SimSns {
   private readonly topics = new SimSnsTopicStore();
+  private readonly subscriptions = new SimSnsSubscriptionStore();
   private readonly topicCreation: SimSnsCreateTopic;
   private readonly topicCommands: SimSnsTopicCommands;
   private readonly attributeCommands: SimSnsTopicAttributeCommands;
+  private readonly subscriptionCommands: SimSnsSubscriptionCommands;
+  private readonly subscriptionListings: SimSnsSubscriptionListings;
+  private readonly subscriptionAttributeCommands: SimSnsSubscriptionAttributeCommands;
   private readonly publishCommands: SimSnsPublishCommands;
   private readonly background: BackgroundScheduler;
   private readonly sdkRouter = new SimSnsSdkCommandRouter(this);
@@ -57,6 +67,11 @@ export class SimSns {
       authorizer: new SimSnsAuthorizer({ iam }),
       accountRegionScope,
     });
+    const subscriptionAccess = new SimSnsSubscriptionAccess({
+      subscriptions: this.subscriptions,
+      topicAccess: access,
+      accountRegionScope,
+    });
 
     this.background = background;
     this.topicCreation = new SimSnsCreateTopic({
@@ -66,9 +81,24 @@ export class SimSns {
     });
     this.topicCommands = new SimSnsTopicCommands({
       topics: this.topics,
+      subscriptions: this.subscriptions,
       access,
     });
-    this.attributeCommands = new SimSnsTopicAttributeCommands({ access });
+    this.attributeCommands = new SimSnsTopicAttributeCommands({
+      access,
+      subscriptions: this.subscriptions,
+    });
+    this.subscriptionCommands = new SimSnsSubscriptionCommands({
+      subscriptions: this.subscriptions,
+      topicAccess: access,
+      subscriptionAccess,
+    });
+    this.subscriptionListings = new SimSnsSubscriptionListings({
+      subscriptions: this.subscriptions,
+      topicAccess: access,
+    });
+    this.subscriptionAttributeCommands =
+      new SimSnsSubscriptionAttributeCommands({ access: subscriptionAccess });
     this.publishCommands = new SimSnsPublishCommands({
       access,
       clock: background,
@@ -83,6 +113,16 @@ export class SimSns {
    */
   findTopic(name: string): SimSnsTopic | undefined {
     return this.topics.find(name);
+  }
+
+  /**
+   * The subscriptions of a topic, by topic name.
+   *
+   * This is the simulator's own accessor, for a test inspecting what a topic
+   * would deliver to without going through a Command and its authorization.
+   */
+  topicSubscriptions(topicName: string): readonly SimSnsSubscription[] {
+    return this.subscriptions.forTopic(topicName);
   }
 
   /**
@@ -138,6 +178,78 @@ export class SimSns {
   ): Promise<simSnsCommands.SimSetTopicAttributesCommandOutput> {
     await this.background.sequence();
     return this.attributeCommands.setTopicAttributes(command, options);
+  }
+
+  /**
+   * Handle a Subscribe Command from the SDK.
+   */
+  async subscribe(
+    command: simSnsCommands.SimSubscribeCommand,
+    options?: SimSnsRequestOptions,
+  ): Promise<simSnsCommands.SimSubscribeCommandOutput> {
+    await this.background.sequence();
+    return this.subscriptionCommands.subscribe(command, options);
+  }
+
+  /**
+   * Handle an Unsubscribe Command from the SDK.
+   */
+  async unsubscribe(
+    command: simSnsCommands.SimUnsubscribeCommand,
+    options?: SimSnsRequestOptions,
+  ): Promise<simSnsCommands.SimUnsubscribeCommandOutput> {
+    await this.background.sequence();
+    return this.subscriptionCommands.unsubscribe(command, options);
+  }
+
+  /**
+   * Handle a ListSubscriptions Command from the SDK.
+   */
+  async listSubscriptions(
+    command: simSnsCommands.SimListSubscriptionsCommand,
+    options?: SimSnsRequestOptions,
+  ): Promise<simSnsCommands.SimListSubscriptionsCommandOutput> {
+    await this.background.sequence();
+    return this.subscriptionListings.listSubscriptions(command, options);
+  }
+
+  /**
+   * Handle a ListSubscriptionsByTopic Command from the SDK.
+   */
+  async listSubscriptionsByTopic(
+    command: simSnsCommands.SimListSubscriptionsByTopicCommand,
+    options?: SimSnsRequestOptions,
+  ): Promise<simSnsCommands.SimListSubscriptionsByTopicCommandOutput> {
+    await this.background.sequence();
+    return this.subscriptionListings.listSubscriptionsByTopic(command, options);
+  }
+
+  /**
+   * Handle a GetSubscriptionAttributes Command from the SDK.
+   */
+  async getSubscriptionAttributes(
+    command: simSnsCommands.SimGetSubscriptionAttributesCommand,
+    options?: SimSnsRequestOptions,
+  ): Promise<simSnsCommands.SimGetSubscriptionAttributesCommandOutput> {
+    await this.background.sequence();
+    return this.subscriptionAttributeCommands.getSubscriptionAttributes(
+      command,
+      options,
+    );
+  }
+
+  /**
+   * Handle a SetSubscriptionAttributes Command from the SDK.
+   */
+  async setSubscriptionAttributes(
+    command: simSnsCommands.SimSetSubscriptionAttributesCommand,
+    options?: SimSnsRequestOptions,
+  ): Promise<simSnsCommands.SimSetSubscriptionAttributesCommandOutput> {
+    await this.background.sequence();
+    return this.subscriptionAttributeCommands.setSubscriptionAttributes(
+      command,
+      options,
+    );
   }
 
   /**

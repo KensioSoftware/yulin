@@ -8,6 +8,14 @@ import type {
   SimPublishCommand,
 } from "../command/publish/publish.command.js";
 import type {
+  SimGetSubscriptionAttributesCommand,
+  SimListSubscriptionsByTopicCommand,
+  SimListSubscriptionsCommand,
+  SimSetSubscriptionAttributesCommand,
+  SimSubscribeCommand,
+  SimUnsubscribeCommand,
+} from "../command/subscription/subscription.command.js";
+import type {
   SimCreateTopicCommand,
   SimDeleteTopicCommand,
   SimGetTopicAttributesCommand,
@@ -61,6 +69,54 @@ export class SimSnsSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simSns.setTopicAttributes(
             command as SimSetTopicAttributesCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "SubscribeCommand",
+        async (command, context): Promise<unknown> =>
+          await simSns.subscribe(
+            command as SimSubscribeCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "UnsubscribeCommand",
+        async (command, context): Promise<unknown> =>
+          await simSns.unsubscribe(
+            command as SimUnsubscribeCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListSubscriptionsCommand",
+        async (command, context): Promise<unknown> =>
+          await simSns.listSubscriptions(
+            command as SimListSubscriptionsCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListSubscriptionsByTopicCommand",
+        async (command, context): Promise<unknown> =>
+          await simSns.listSubscriptionsByTopic(
+            command as SimListSubscriptionsByTopicCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "GetSubscriptionAttributesCommand",
+        async (command, context): Promise<unknown> =>
+          await simSns.getSubscriptionAttributes(
+            command as SimGetSubscriptionAttributesCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "SetSubscriptionAttributesCommand",
+        async (command, context): Promise<unknown> =>
+          await simSns.setSubscriptionAttributes(
+            command as SimSetSubscriptionAttributesCommand,
             simSdkCallerOptions(context),
           ),
       ],

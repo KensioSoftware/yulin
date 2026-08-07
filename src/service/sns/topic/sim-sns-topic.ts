@@ -1,4 +1,5 @@
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
+import type { SimSnsSubscriptionCounts } from "../subscription/sim-sns-subscription-store.js";
 import { SimSnsTopicArn } from "./sim-sns-topic-arn.js";
 import type {
   SimSnsTopicAttributeInput,
@@ -20,14 +21,18 @@ const ownerAttributeName = "Owner";
 /**
  * The subscription counts real SNS reports on every topic.
  *
- * They are reported here because a topic with no subscriptions really does have
- * none of each, which is the only kind of topic this simulation has yet.
+ * Nothing is ever pending, because the only subscription protocol simulated is
+ * the one real SNS confirms itself.
  */
-const subscriptionCountAttributeNames = [
-  "SubscriptionsConfirmed",
-  "SubscriptionsPending",
-  "SubscriptionsDeleted",
-];
+function subscriptionCountAttributes(
+  counts: SimSnsSubscriptionCounts,
+): readonly (readonly [string, string])[] {
+  return [
+    ["SubscriptionsConfirmed", String(counts.confirmed)],
+    ["SubscriptionsPending", String(counts.pending)],
+    ["SubscriptionsDeleted", String(counts.deleted)],
+  ];
+}
 
 interface SimSnsTopicProperties {
   readonly name: SimSnsTopicName;
@@ -41,13 +46,19 @@ interface SimSnsTopicProperties {
  * A topic holds almost nothing: its name, the ARN that name implies, and the
  * attributes a request has set. Publishing to it changes none of that, because
  * a topic keeps no messages. What a message reaches is the topic's
- * subscriptions, and those are not simulated yet.
+ * subscriptions, and those are held in their own store rather than here, since
+ * an Unsubscribe reaches one by ARN without naming a topic at all.
  */
 export class SimSnsTopic {
   public readonly name: SimSnsTopicName;
   public readonly arn: SimSnsTopicArn;
 
-  private readonly owner: string;
+  /**
+   * The Account that owns the topic, which a subscription created without a
+   * caller of its own belongs to as well.
+   */
+  public readonly owner: string;
+
   private held: SimSnsTopicAttributes;
 
   constructor(properties: SimSnsTopicProperties) {
@@ -81,15 +92,12 @@ export class SimSnsTopic {
    * Real SNS reports every attribute a topic has rather than only the ones a
    * request asked for, since a GetTopicAttributes request names no attributes.
    */
-  reportedAttributes(): Record<string, string> {
+  reportedAttributes(counts: SimSnsSubscriptionCounts): Record<string, string> {
     const reported = new Map<string, string>([
       [topicArnAttributeName, this.arn.value],
       [ownerAttributeName, this.owner],
+      ...subscriptionCountAttributes(counts),
     ]);
-
-    for (const name of subscriptionCountAttributeNames) {
-      reported.set(name, "0");
-    }
 
     this.held.reportInto(reported);
 

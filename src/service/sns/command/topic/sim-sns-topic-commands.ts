@@ -1,7 +1,9 @@
+import type { SimSnsSubscriptionStore } from "../../subscription/sim-sns-subscription-store.js";
+import type { SimSnsTopic } from "../../topic/sim-sns-topic.js";
 import type { SimSnsTopicStore } from "../../topic/sim-sns-topic-store.js";
+import { SimSnsPage } from "../sim-sns-page.js";
 import type { SimSnsRequestOptions } from "../sim-sns-request-options.js";
 import type { SimSnsTopicAccess } from "./sim-sns-topic-access.js";
-import { SimSnsTopicPage } from "./sim-sns-topic-page.js";
 import type {
   SimDeleteTopicCommand,
   SimDeleteTopicCommandOutput,
@@ -11,6 +13,7 @@ import type {
 
 interface SimSnsTopicCommandsProperties {
   readonly topics: SimSnsTopicStore;
+  readonly subscriptions: SimSnsSubscriptionStore;
   readonly access: SimSnsTopicAccess;
 }
 
@@ -19,10 +22,12 @@ interface SimSnsTopicCommandsProperties {
  */
 export class SimSnsTopicCommands {
   private readonly topics: SimSnsTopicStore;
+  private readonly subscriptions: SimSnsSubscriptionStore;
   private readonly access: SimSnsTopicAccess;
 
   constructor(properties: SimSnsTopicCommandsProperties) {
     this.topics = properties.topics;
+    this.subscriptions = properties.subscriptions;
     this.access = properties.access;
   }
 
@@ -39,11 +44,14 @@ export class SimSnsTopicCommands {
   ): SimListTopicsCommandOutput {
     this.access.authorizeAnyTopic("sns:ListTopics", options);
 
-    const page = new SimSnsTopicPage(this.topics.all, command.input.NextToken);
+    const page = new SimSnsPage<SimSnsTopic>(
+      this.topics.all,
+      command.input.NextToken,
+    );
 
     return {
       $metadata: {},
-      Topics: page.topics.map((topic) => ({ TopicArn: topic.arn.value })),
+      Topics: page.items.map((topic) => ({ TopicArn: topic.arn.value })),
       NextToken: page.nextToken,
     };
   }
@@ -55,6 +63,10 @@ export class SimSnsTopicCommands {
    * under the same name straight away. Deleting a topic that is not there
    * succeeds, as it does on real SNS, which is why the topic is looked for
    * rather than required.
+   *
+   * The topic's subscriptions go with it, as they do on real SNS. A topic
+   * recreated under the same name therefore starts with none, and the
+   * subscription ARNs of the deleted topic name nothing.
    */
   deleteTopic(
     command: SimDeleteTopicCommand,
@@ -67,6 +79,7 @@ export class SimSnsTopicCommands {
     );
 
     if (topic !== undefined) {
+      this.subscriptions.removeForTopic(topic.name.value);
       this.topics.remove(topic);
     }
 
