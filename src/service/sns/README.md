@@ -318,8 +318,7 @@ Two details are real SNS behaviour worth keeping:
 
 - `ListTopics` authorizes against `*`, because real SNS gives it no resource type at all. Only a
   policy whose `Resource` is `*` allows it, and one naming a topic ARN, or every topic ARN in the
-  Account and Region, allows no listing. Simulated SQS authorizes `ListQueues` against
-  `arn:aws:sqs:region:account:*` instead, which admits a policy real SQS would refuse.
+  Account and Region, allows no listing. Simulated SQS authorizes `ListQueues` the same way.
 - `Unsubscribe`, `ListSubscriptions`, `GetSubscriptionAttributes` and `SetSubscriptionAttributes`
   authorize against `*` for the same reason: SNS has one resource type, the topic, and none of these
   four names one. A topic policy therefore cannot grant them. `Subscribe` and

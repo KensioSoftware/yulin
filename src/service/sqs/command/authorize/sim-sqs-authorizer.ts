@@ -1,17 +1,24 @@
 import type { SimAwsResolvedCaller } from "../../../aws/caller/sim-aws-caller-resolver.js";
-import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimIamResourcePolicyInput } from "../../../iam/authorize/context/sim-iam-auth-z-context-builder.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import type { SimSqsQueue } from "../../queue/sim-sqs-queue.js";
-import { sqsAnyQueueArn } from "../../queue/sim-sqs-queue-arn.js";
 import type { SimSqsRequestOptions } from "../sim-sqs-request-options.js";
 import { simSqsConditionContext } from "./sim-sqs-condition-context.js";
 import { simSqsQueueResourcePolicies } from "./sim-sqs-queue-resource-policies.js";
 
+/**
+ * The resource an action with no resource type authorizes against.
+ *
+ * Real SQS gives ListQueues no resource type at all, so IAM evaluates it
+ * against `*` and only a policy whose Resource is `*` allows it. A policy
+ * naming a queue ARN, or every queue ARN in the Account and Region, allows no
+ * listing, here as on AWS.
+ */
+const noResource = "*";
+
 interface SimSqsAuthorizerProperties {
   readonly iam: SimIamInterServiceAuthZ;
-  readonly accountRegionScope: SimAwsAccountRegionScope;
 }
 
 interface SimSqsQueueAuthorizationInput {
@@ -46,17 +53,15 @@ interface SimSqsResourceAuthorizationInput {
  * what admits a caller from another Account or a service principal, since
  * neither is covered by an identity policy in the Account owning the queue.
  *
- * ListQueues is the exception: real SQS gives it no queue-level permission, so
- * it authorizes against every queue in the account and region rather than one of
- * them, and no queue policy applies to it.
+ * ListQueues is the exception: real SQS gives it no resource type, so it
+ * authorizes against `*` rather than against a queue, and no queue policy
+ * applies to it.
  */
 export class SimSqsAuthorizer {
   private readonly iam: SimIamInterServiceAuthZ;
-  private readonly accountRegionScope: SimAwsAccountRegionScope;
 
   constructor(properties: SimSqsAuthorizerProperties) {
     this.iam = properties.iam;
-    this.accountRegionScope = properties.accountRegionScope;
   }
 
   /**
@@ -85,7 +90,7 @@ export class SimSqsAuthorizer {
   ): SimAwsResolvedCaller {
     return this.authorizeResource({
       action,
-      resource: sqsAnyQueueArn(this.accountRegionScope),
+      resource: noResource,
       resourcePolicies: [],
       options,
     });
