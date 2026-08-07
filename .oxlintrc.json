@@ -10,7 +10,9 @@
   // something to pick up on purpose rather than something that lands silently.
   //
   // Four ESLint plugins are loaded through Oxlint's JS plugin API rather than
-  // reimplemented. Oxlint carries native `unicorn` and `jsdoc` plugins whose
+  // reimplemented, alongside two written for Oxlint directly: this
+  // repository's own restrictions, and the assertion advice `@kensio/smartass`
+  // publishes. Oxlint carries native `unicorn` and `jsdoc` plugins whose
   // rule coverage is a long way short of what this repository uses — 166 and 18
   // of ours have no native counterpart — so both are taken wholesale from the
   // real plugin under an alias. `unicorn` and `jsdoc` are reserved names, which
@@ -30,8 +32,10 @@
   //   `no-octal` has no Oxlint rule, and needs none: modules are strict mode,
   //   where a legacy octal literal is a parse error rather than a lint finding.
   //
-  // `no-restricted-syntax` is also absent, but it did survive: its selectors
-  // moved into the `yulin` plugin below as named rules.
+  // `no-restricted-syntax` is also absent, but it did survive: this
+  // repository's selectors moved into the `yulin` plugin below as named rules,
+  // and the 47 that used to arrive from `@kensio/smartass` as a
+  // `no-restricted-syntax` block now come from the Oxlint plugin it publishes.
   //
   // The published `cff-js2` plugin is not loaded here. It restricts syntax to
   // what the CloudFront Functions JS2 runtime will run, this repository has no
@@ -65,6 +69,7 @@
     { "name": "jsdoc-js", "specifier": "eslint-plugin-jsdoc" },
     { "name": "security", "specifier": "eslint-plugin-security" },
     { "name": "no-secrets", "specifier": "eslint-plugin-no-secrets" },
+    { "name": "smartass", "specifier": "@kensio/smartass/oxlint" },
     { "name": "yulin", "specifier": "./src/config/lint/repo-lint-plugin.ts" }
   ],
 
@@ -653,13 +658,19 @@
       "error",
       { "tolerance": 4.5, "ignoreContent": [" * https://", "http://"] }
     ],
-    // ── This repository's own restrictions (4) ──
+    // ── @kensio/smartass, as an Oxlint plugin of its own (1) ──
+    // One rule carrying the 47 selectors that ask for a narrower assertion than
+    // the one written. Generated from the same table as the `no-restricted-
+    // syntax` block in `@kensio/smartass/eslint`, so both linters say the same
+    // thing.
+    "smartass/prefer-specific-assertions": "error",
+
+    // ── This repository's own restrictions (3) ──
     // Named rules rather than a `no-restricted-syntax` block, which Oxlint has
     // no equivalent of. See src/config/lint/repo-lint-plugin.ts.
     "yulin/assert-defined-guard": "error",
     "yulin/assert-not-null-guard": "error",
-    "yulin/no-reused-props": "error",
-    "yulin/prefer-specific-assertions": "error"
+    "yulin/no-reused-props": "error"
   },
 
   // Later overrides win, so these run from the widest scope to the narrowest.
@@ -715,7 +726,9 @@
         "yulin/assert-defined-guard": "off",
         "yulin/assert-not-null-guard": "off",
         "yulin/no-reused-props": "off",
-        "yulin/prefer-specific-assertions": "off"
+        // Likewise the assertion helpers the advice points at: an example is
+        // read by someone who has not installed @kensio/smartass.
+        "smartass/prefer-specific-assertions": "off"
       }
     },
     {

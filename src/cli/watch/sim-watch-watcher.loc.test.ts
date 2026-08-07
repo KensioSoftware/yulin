@@ -1,7 +1,6 @@
 import path from "node:path";
 import {
   assertArrayEquals,
-  assertArrayLength,
   assertNumberBetween,
   assertStringEndsWith,
   assertStringStartsWith,
@@ -29,7 +28,7 @@ describe("SimWatchWatcher over a real directory", () => {
     }
   });
 
-  it("makes one change out of a build writing several hundred files", async () => {
+  it("makes few changes out of a build writing several hundred files", async () => {
     // Given a watched working directory settling at the window a project gets
     // by default
     const { directory, changes, changedAt, watcher } = await watching({
@@ -52,15 +51,32 @@ describe("SimWatchWatcher over a real directory", () => {
         ),
       );
       const writtenAt = Date.now();
-      await watchPause(simWatchConfig.settleMs * 6);
+      await watchPause(simWatchConfig.settleMs * 10);
 
-      // Then the build is one restart, taken shortly after its last write
-      // rather than once per wave
-      assertArrayLength(changes, 1);
+      // Then the build is a restart or two, settled well inside the backstop,
+      // rather than one per wave
+      //
+      // A handful rather than exactly one, because nothing here can hold the
+      // stream of events still. A loaded runner can leave a gap wider than the
+      // settle window in the middle of one build, which ends that burst and
+      // starts another, and this suite has watched that turn one build into
+      // two restarts. That is a busy machine rather than a watcher that
+      // stopped coalescing, and what says so is the count staying orders of
+      // magnitude below the several hundred writes behind it. Exactly one
+      // change out of a burst is asserted where it can be, against a fake
+      // clock, in the tests for SimWatchSettle.
+      assertNumberBetween(changes.length, 1, 5);
+
+      // The last change rather than the first, since a burst split in the
+      // middle settles once while the rest of the writes are still arriving,
+      // which puts that first change before the last write rather than after
+      // it. The bound is loose enough for a gap to have split the burst, and
+      // still far short of settleMaxWaitMs, which is the point: a build that
+      // goes quiet is acted on when it does rather than held to the backstop.
       assertNumberBetween(
-        (changedAt.at(0) ?? 0) - writtenAt,
+        (changedAt.at(-1) ?? 0) - writtenAt,
         0,
-        simWatchConfig.settleMs * 4,
+        simWatchConfig.settleMs * 6,
       );
     } finally {
       watcher.stop();

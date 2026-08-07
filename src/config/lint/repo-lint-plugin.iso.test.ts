@@ -1,12 +1,7 @@
 import { assertArrayIncludes, assertArrayLength } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
-import {
-  preferSpecificAssertionsRuleName,
-  repoLintPlugin,
-  repoSyntaxRestrictions,
-  smartassSyntaxRestrictions,
-} from "./repo-lint-plugin.js";
+import { repoLintPlugin, repoSyntaxRestrictions } from "./repo-lint-plugin.js";
 
 /** Every selector the plugin reports on, whichever rule carries it. */
 function publishedSelectors(): readonly string[] {
@@ -35,39 +30,17 @@ describe("This repository's own lint plugin", () => {
     assertArrayLength(own, 3);
   });
 
-  it("carries every selector the shared assertion config brings", () => {
-    // Given what @kensio/smartass asks for, read from the config it publishes
-    const wanted = smartassSyntaxRestrictions().map(
-      (restriction) => restriction.selector,
-    );
-
-    // When each of those selectors is looked for in the rule that rehouses them
-    const rule = Object.entries(repoLintPlugin.rules).find(
-      ([name]) => name === preferSpecificAssertionsRuleName,
-    )?.[1];
-    const carried = new Set(
-      Object.keys(
-        rule?.create({ sourceCode: { getScope: () => scope } } as never) ?? {},
-      ),
-    );
-    const missing = wanted.filter((selector) => !carried.has(selector));
-
-    // Then none was lost on the way across. Under ESLint these arrived through
-    // a `no-restricted-syntax` block that a second config could replace whole,
-    // and one silently did for 265 commits.
-    assertArrayLength(missing, 0);
-    assertArrayLength(wanted, 47);
-  });
-
-  it("keeps the repository's own restrictions alongside them", () => {
+  it("reports each restriction on the syntax it names", () => {
     // Given every selector the plugin reports on, from all of its rules
     const selectors = publishedSelectors();
 
-    // When this repository's own are looked for among them
-    // Then they are still there, next to the shared ones rather than replaced
-    // by them, which is the arrangement that failed before
+    // When each restriction's own selector is looked for among them
+    // Then it is there, so a rule that exists is also a rule that is wired to
+    // the syntax it was written for
     for (const restriction of Object.values(repoSyntaxRestrictions)) {
       assertArrayIncludes(selectors, restriction.selector);
     }
+
+    assertArrayLength(selectors, 3);
   });
 });
