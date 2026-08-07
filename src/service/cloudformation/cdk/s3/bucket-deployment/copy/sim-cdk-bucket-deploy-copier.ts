@@ -45,8 +45,15 @@ export class SimCdkBucketDeployCopier {
 
   /**
    * Copy every source directory into the Bucket, then prune what is left over.
+   *
+   * The keys it deployed are answered rather than kept, because they are what
+   * the deployment can say for certain about the Bucket: storage that holds
+   * Objects holds their headers with them, and storage that maps them onto
+   * files has only the deployment's word for what they are.
    */
-  async copy(sourceDirectoryPaths: readonly string[]): Promise<void> {
+  async copy(
+    sourceDirectoryPaths: readonly string[],
+  ): Promise<ReadonlySet<string>> {
     const deployedKeys = new Set<string>();
 
     // One source at a time, because two of them can hold the same path and the
@@ -63,6 +70,8 @@ export class SimCdkBucketDeployCopier {
     if (this.properties.prune) {
       await this.pruner.prune(deployedKeys);
     }
+
+    return deployedKeys;
   }
 
   /**

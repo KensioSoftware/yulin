@@ -760,6 +760,13 @@ Important concepts:
 - executable resource bindings let tests connect selected custom resources to local behaviour.
 - CDK bucket deployment support is implemented as a supported custom resource factory.
 
+A bucket deployment also says what it published, as well as setting it. `SimCdkBucketDeployMetadata`
+records the deployment's `SystemMetadata` on the destination Bucket, against the keys it copied and
+the prefix and filters it copied them by, and the S3 simulator reads that back when a mounted
+directory replaces those Objects. The Objects themselves carry their headers, so nothing reads the
+declaration until the storage under them is one that cannot hold metadata. See
+[metadata declared about a Bucket](../s3/README.md#metadata-declared-about-a-bucket-rather-than-an-object).
+
 CloudFront/CDK tests demonstrate this by deploying synthesized templates that create S3 buckets,
 CloudFront distributions, CloudFront Functions, and CDK-style custom resources.
 

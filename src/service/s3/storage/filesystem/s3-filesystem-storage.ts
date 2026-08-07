@@ -7,7 +7,7 @@ import { metadataForFilesystemS3ObjectKey } from "./s3-filesystem-object-metadat
 import { FilesystemS3ObjectKeys } from "./s3-filesystem-object-keys.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import { SimS3NotImplemented } from "../../error/sim-s3.error.js";
-import { SimS3KeyPrefixSystemMetadata } from "../../object/s3-key-prefix-metadata.js";
+import { SimS3DeclaredSystemMetadata } from "../../object/s3-declared-system-metadata.js";
 
 interface FilesystemS3BucketStorageProperties {
   readonly directoryPath: string;
@@ -15,10 +15,11 @@ interface FilesystemS3BucketStorageProperties {
   readonly additionalFileExtensions?: readonly string[];
 
   /**
-   * What S3 was told about these files, which a file cannot say for itself.
+   * What S3 was told about these files, which a file cannot say for itself,
+   * whether the mount declared it or the Bucket was already holding it.
    * Without it an Object is described by its extension and nothing else.
    */
-  readonly systemMetadata?: SimS3KeyPrefixSystemMetadata;
+  readonly systemMetadata?: SimS3DeclaredSystemMetadata;
 }
 
 /**
@@ -33,11 +34,11 @@ export class FilesystemS3BucketStorage implements SimS3BucketStorage {
   private readonly directoryPath: string;
   private readonly safety: FilesystemS3StorageSafety;
   private readonly objectKeys: FilesystemS3ObjectKeys;
-  private readonly systemMetadata: SimS3KeyPrefixSystemMetadata;
+  private readonly systemMetadata: SimS3DeclaredSystemMetadata;
 
   constructor(properties: FilesystemS3BucketStorageProperties) {
     this.systemMetadata =
-      properties.systemMetadata ?? new SimS3KeyPrefixSystemMetadata();
+      properties.systemMetadata ?? new SimS3DeclaredSystemMetadata();
     this.safety = new FilesystemS3StorageSafety({
       allowedDirectoryNames: properties.allowedDirectoryNames,
       additionalFileExtensions: properties.additionalFileExtensions,

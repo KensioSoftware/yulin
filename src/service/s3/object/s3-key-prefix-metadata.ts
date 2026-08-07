@@ -1,19 +1,5 @@
-import {
-  simS3SystemMetadataHeaders,
-  type SimS3SystemMetadataField,
-} from "./s3-system-metadata.js";
-
-/**
- * System metadata values, under the request field names a `PutObject` sets
- * them with.
- *
- * Every value is a string here, including `Expires`, which a `PutObject` takes
- * as a `Date`. Nothing is being written, so there is no request field to format:
- * this says what S3 already holds about a file, in the form a read hands back.
- */
-export type SimS3SystemMetadataValues = Partial<
-  Record<SimS3SystemMetadataField, string>
->;
+import type { SimS3SystemMetadataDeclaration } from "./s3-system-metadata-declaration.type.js";
+import type { SimS3SystemMetadataValues } from "./s3-system-metadata.js";
 
 /**
  * System metadata declared for the Objects under one key prefix.
@@ -29,57 +15,31 @@ export interface SimS3KeyPrefixMetadata {
   readonly metadata: SimS3SystemMetadataValues;
 }
 
-interface SimS3KeyPrefixSystemMetadataProperties {
-  readonly declarations?: readonly SimS3KeyPrefixMetadata[] | undefined;
-}
-
 /**
- * The system metadata declared for an Object key by the prefixes it starts
- * with.
+ * A declaration that describes the Objects under a key prefix.
  *
- * Storage that holds an Object holds its metadata with it, so nothing needs
- * this. Storage that maps Objects onto files has only the file to go on, and a
- * file carries its bytes and its name and nothing else, so anything S3 would
- * have been told at upload time has to be declared instead. `Content-Encoding`
- * is the one that stops a site working without it: a directory of brotli files
- * served without the header is bytes no browser can decode.
+ * This is the plain form, and the one a mount is written in: a prefix and what
+ * to report about everything under it. It is a standing statement rather than a
+ * record of what was published, so it answers the same for a file that is there
+ * and a file that turns up later.
  */
-export class SimS3KeyPrefixSystemMetadata {
-  private readonly declarations: readonly SimS3KeyPrefixMetadata[];
+export class SimS3KeyPrefixDeclaration implements SimS3SystemMetadataDeclaration {
+  readonly metadata: SimS3SystemMetadataValues;
 
-  constructor(properties: SimS3KeyPrefixSystemMetadataProperties = {}) {
-    this.declarations = properties.declarations ?? [];
+  private readonly keyPrefix: string;
+
+  constructor(declared: SimS3KeyPrefixMetadata) {
+    this.keyPrefix = declared.keyPrefix;
+    this.metadata = declared.metadata;
   }
 
-  /**
-   * The headers declared for one Object key, under the names a read returns
-   * them by.
-   *
-   * Every declaration whose prefix the key starts with applies, in the order
-   * they were given, so a later one wins where two name the same header.
-   */
-  headersForObjectKey(key: string): Record<string, string> {
-    const headers: Record<string, string> = {};
-
-    for (const declaration of this.declarations) {
-      if (key.startsWith(declaration.keyPrefix)) {
-        this.addDeclared(headers, declaration);
-      }
-    }
-
-    return headers;
+  /** Whether an Object key is under the declared prefix. */
+  describes(objectKey: string): boolean {
+    return objectKey.startsWith(this.keyPrefix);
   }
 
-  private addDeclared(
-    headers: Record<string, string>,
-    declaration: SimS3KeyPrefixMetadata,
-  ): void {
-    for (const header of simS3SystemMetadataHeaders) {
-      const value = declaration.metadata[header.field];
-
-      if (value !== undefined) {
-        headers[header.name] = value;
-      }
-    }
+  /** The same question, because a prefix describes what has not arrived yet. */
+  wouldDescribe(objectKey: string): boolean {
+    return this.describes(objectKey);
   }
 }
