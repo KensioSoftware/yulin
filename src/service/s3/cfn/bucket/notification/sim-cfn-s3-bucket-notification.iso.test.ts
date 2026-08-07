@@ -16,6 +16,11 @@ import { describe, it } from "vitest";
 
 import { SimAws } from "../../../../aws/sim-aws.js";
 import { simIamPolicyDocumentFactory } from "../../../../iam/policy/sim-iam-policy-document.factory.js";
+import {
+  simSnsDeliveredMessage,
+  simSnsSubscribedQueue,
+} from "../../../../../../test/sns/subscription-fixture.js";
+import { simS3NotificationTopic } from "../../../../../../test/s3/notification-topic-fixture.js";
 import { simCfnS3BucketNotificationTemplateFactory } from "./sim-cfn-s3-bucket-notification-template.factory.js";
 
 /**
@@ -250,6 +255,58 @@ describe("AWS::S3::Bucket NotificationConfiguration", () => {
     const configurations = output.QueueConfigurations ?? [];
     assertArrayLength(configurations, 1);
     assertIdentical(configurations[0].QueueArn, queueArn);
+    assertIdentical(configurations[0].Events?.[0], "s3:ObjectCreated:*");
+  });
+
+  it("notifies a topic a TopicConfigurations entry names", async () => {
+    // Given a topic admitting the Bucket the template deploys, with a queue
+    // subscribed to it.
+    const simAws = new SimAws();
+    const topicArn = await simS3NotificationTopic(simAws, {
+      sourceArn: "arn:aws:s3:::uploads",
+    });
+    const { queueUrl } = await simSnsSubscribedQueue(
+      simAws,
+      "uploads-queue",
+      topicArn,
+    );
+
+    // When a template naming it under CloudFormation's own property names is
+    // deployed: `Topic` rather than `TopicArn`, and one `Event` rather than an
+    // `Events` list.
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "uploads-stack",
+      template: simCfnS3BucketNotificationTemplateFactory.make({
+        notificationConfiguration: {
+          TopicConfigurations: [
+            { Event: "s3:ObjectCreated:*", Topic: topicArn },
+          ],
+        },
+      }),
+    });
+    await stack.waitForDeployComplete();
+
+    // Then an Object put into the deployed Bucket reaches the queue two hops
+    // away.
+    await simAws.s3().putObject(
+      new PutObjectCommand({
+        Bucket: "uploads",
+        Key: "cat.jpg",
+        Body: "cat picture",
+      }),
+    );
+
+    assertNonNullable(await simSnsDeliveredMessage(simAws, queueUrl));
+
+    // And the Bucket reports it back in the SDK's names.
+    const output = await simAws
+      .s3()
+      .getBucketNotificationConfiguration(
+        new GetBucketNotificationConfigurationCommand({ Bucket: "uploads" }),
+      );
+    const configurations = output.TopicConfigurations ?? [];
+    assertArrayLength(configurations, 1);
+    assertIdentical(configurations[0].TopicArn, topicArn);
     assertIdentical(configurations[0].Events?.[0], "s3:ObjectCreated:*");
   });
 

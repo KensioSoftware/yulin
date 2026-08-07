@@ -2,6 +2,7 @@ import type { SimResponseMetadata } from "../../../aws/metadata/response-metadat
 import type {
   SimS3LambdaFunctionConfigurationInput,
   SimS3QueueConfigurationInput,
+  SimS3TopicConfigurationInput,
 } from "../put-bucket-notification-configuration/put-bucket-notification-configuration.command.js";
 
 /**
@@ -33,6 +34,8 @@ export interface SimS3NotificationConfigurationOutput {
     readonly SimS3LambdaFunctionConfigurationInput[] | undefined;
   readonly QueueConfigurations?:
     readonly SimS3QueueConfigurationInput[] | undefined;
+  readonly TopicConfigurations?:
+    readonly SimS3TopicConfigurationInput[] | undefined;
 }
 
 /**

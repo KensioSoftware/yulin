@@ -232,6 +232,13 @@ principal from another Account, or a service principal such as `s3.amazonaws.com
 identity policies anywhere. A topic with no policy contributes nothing and the decision is left to
 the caller's identity policies, as it is on real AWS.
 
+`SimSnsServicePublishAuthorizer` is the same decision offered to another simulated service, as a
+decision rather than a thrown error. Simulated S3 needs it: it validates a notification destination
+when the configuration is applied, before it has an event to publish, and has to report the refusal
+as part of refusing the configuration. Nothing is remembered from that question, so the ordinary
+`Publish` the event later goes through authorizes again and a topic policy changed in between stops
+the delivery. `SimSqsServiceSendAuthorizer` is the same idea on the queue's side.
+
 `SimSnsRequestOptions` carries a `sourceArn` and a `sourceAccount` alongside the caller, supplied to
 IAM as `aws:SourceArn` and `aws:SourceAccount`. A simulated service reaching a topic on a resource's
 behalf sets both, which is how a topic policy granting a service principal tells one Bucket from

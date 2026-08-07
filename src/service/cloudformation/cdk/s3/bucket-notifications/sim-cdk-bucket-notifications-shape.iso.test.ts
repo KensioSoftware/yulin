@@ -181,23 +181,22 @@ describe("CDK Bucket notifications configuration shape", () => {
     assertStringIncludes(error.message, "is not a simulated SQS queue");
   });
 
-  it("refuses a topic destination by name", async () => {
-    // Given a configuration naming an SNS topic.
+  it("refuses a topic destination that is not there", async () => {
+    // Given the configuration CDK synthesizes for an SnsDestination, naming a
+    // topic no stack ever created.
     // When the template is deployed.
     const error = await deployConfiguration({
       TopicConfigurations: [
         {
-          Events: ["s3:ObjectCreated:*"],
+          Events: ["s3:ObjectRemoved:*"],
           TopicArn: "arn:aws:sns:us-east-1:888888888888:uploads",
         },
       ],
     });
 
-    // Then the Stack fails naming the destination.
-    assertStringIncludes(
-      error.message,
-      "Simulated S3 cannot notify a SNS topic",
-    );
+    // Then the Stack fails, because a configuration that is accepted and never
+    // delivered is worse than one that is refused.
+    assertStringIncludes(error.message, "is not a simulated SNS topic");
   });
 
   it("refuses an EventBridge destination by name", async () => {

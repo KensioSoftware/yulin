@@ -2,6 +2,7 @@ import type {
   SimS3LambdaFunctionConfigurationInput,
   SimS3NotificationConfigurationInput,
   SimS3QueueConfigurationInput,
+  SimS3TopicConfigurationInput,
 } from "../../../../../s3/command/put-bucket-notification-configuration/put-bucket-notification-configuration.command.js";
 import type { SimCfnTemplateValue } from "../../../../template/value/sim-cfn-template-value.js";
 import { SimCfnValueShape } from "../../../../template/value/sim-cfn-value-shape.js";
@@ -52,8 +53,7 @@ export class SimCdkBucketNotificationConfiguration {
       ),
       TopicConfigurations: this.shape.present(
         record["TopicConfigurations"],
-        (configurations) =>
-          this.shape.list(configurations, "TopicConfigurations"),
+        (configurations) => this.topicConfigurations(configurations),
       ),
       EventBridgeConfiguration: this.shape.present(
         record["EventBridgeConfiguration"],
@@ -111,6 +111,33 @@ export class SimCdkBucketNotificationConfiguration {
       Id: this.shape.present(record["Id"], (id) => this.shape.string(id, "Id")),
       QueueArn: this.shape.present(record["QueueArn"], (arn) =>
         this.shape.string(arn, "QueueArn"),
+      ),
+      Events: this.shape.present(record["Events"], (events) =>
+        this.events(events),
+      ),
+      Filter: this.shape.present(record["Filter"], (filter) =>
+        this.filter.read(filter),
+      ),
+    };
+  }
+
+  private topicConfigurations(
+    value: SimCfnTemplateValue,
+  ): readonly SimS3TopicConfigurationInput[] {
+    return this.shape
+      .list(value, "TopicConfigurations")
+      .map((configuration) => this.topicConfiguration(configuration));
+  }
+
+  private topicConfiguration(
+    value: SimCfnTemplateValue,
+  ): SimS3TopicConfigurationInput {
+    const record = this.shape.record(value, "TopicConfigurations entry");
+
+    return {
+      Id: this.shape.present(record["Id"], (id) => this.shape.string(id, "Id")),
+      TopicArn: this.shape.present(record["TopicArn"], (arn) =>
+        this.shape.string(arn, "TopicArn"),
       ),
       Events: this.shape.present(record["Events"], (events) =>
         this.events(events),

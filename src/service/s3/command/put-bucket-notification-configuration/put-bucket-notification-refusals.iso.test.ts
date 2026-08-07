@@ -289,4 +289,31 @@ describe("What a simulated S3 notification configuration refuses", () => {
     assertStringIncludes(error.message, "constructed on its own");
     assertStringIncludes(error.message, "SimAws");
   });
+
+  it("refuses a topic destination on a simulated S3 built on its own", async () => {
+    // Given a SimS3 constructed outside SimAws, which has no simulated SNS to
+    // publish to
+    const simS3 = new SimS3();
+    await simS3.createBucket(new CreateBucketCommand({ Bucket: "uploads" }));
+
+    // When a topic notification configuration is applied to one of its Buckets
+    const error = await assertThrowsErrorAsync(async () =>
+      simS3.putBucketNotificationConfiguration(
+        new PutBucketNotificationConfigurationCommand({
+          Bucket: "uploads",
+          NotificationConfiguration: {
+            TopicConfigurations: [
+              {
+                Events: ["s3:ObjectCreated:*"],
+                TopicArn: "arn:aws:sns:us-east-1:888888888888:uploads",
+              },
+            ],
+          },
+        }),
+      ),
+    );
+
+    // Then it says so, as it does for every other kind of destination
+    assertStringIncludes(error.message, "constructed on its own");
+  });
 });

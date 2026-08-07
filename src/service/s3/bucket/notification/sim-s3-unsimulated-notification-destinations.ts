@@ -6,7 +6,6 @@ import { SimS3NotImplemented } from "../../error/sim-s3.error.js";
  * deliver to, and what to say about each.
  */
 const unsimulatedDestinations = new Map<string, string>([
-  ["TopicConfigurations", "SNS topic"],
   ["EventBridgeConfiguration", "EventBridge"],
 ]);
 
@@ -15,7 +14,7 @@ const unsimulatedDestinations = new Map<string, string>([
  *
  * Naming the destination matters more than the refusal: a configuration quietly
  * accepted and never delivered is the failure this feature exists to remove, so
- * an SNS topic destination says so rather than being dropped.
+ * an EventBridge destination says so rather than being dropped.
  */
 export function simS3RefuseUnsimulatedDestinations(
   input: SimS3NotificationConfigurationInput,
@@ -35,7 +34,8 @@ export function simS3RefuseUnsimulatedDestinations(
 
     throw new SimS3NotImplemented(
       `Simulated S3 cannot notify a ${destination}. ${property} is not ` +
-        "simulated; use LambdaFunctionConfigurations or QueueConfigurations.",
+        "simulated; use LambdaFunctionConfigurations, QueueConfigurations or " +
+        "TopicConfigurations.",
     );
   }
 }

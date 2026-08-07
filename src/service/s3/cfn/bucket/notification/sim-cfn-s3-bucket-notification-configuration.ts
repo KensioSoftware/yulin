@@ -5,6 +5,7 @@ import type {
   SimS3NotificationConfigurationInput,
   SimS3NotificationFilterInput,
   SimS3QueueConfigurationInput,
+  SimS3TopicConfigurationInput,
 } from "../../../command/put-bucket-notification-configuration/put-bucket-notification-configuration.command.js";
 import { s3BucketNotificationError } from "../error/sim-cfn-s3-bucket-error.js";
 import { SimCfnS3BucketNotificationFilter } from "./sim-cfn-s3-bucket-notification-filter.js";
@@ -44,6 +45,18 @@ const queueConfigurationNames: ReadonlySet<string> = new Set([
 ]);
 
 /**
+ * The names one CloudFormation TopicConfiguration carries.
+ *
+ * `Topic` is the topic's ARN, the same shortening CloudFormation applies to a
+ * queue destination.
+ */
+const topicConfigurationNames: ReadonlySet<string> = new Set([
+  "Event",
+  "Filter",
+  "Topic",
+]);
+
+/**
  * The parts of one CloudFormation destination configuration that are the same
  * whichever destination it names.
  */
@@ -56,11 +69,12 @@ interface SimCfnS3BucketNotificationParts {
  * Reads the `NotificationConfiguration` property of an AWS::S3::Bucket Resource
  * into a PutBucketNotificationConfiguration request.
  *
- * CloudFormation and the SDK name the same configuration differently in four
+ * CloudFormation and the SDK name the same configuration differently in several
  * places, and each of them is a silent failure if read at the wrong name:
  * `LambdaConfigurations` against `LambdaFunctionConfigurations`, a single
  * `Event` string against an `Events` list, `Function` against
- * `LambdaFunctionArn`, and `Filter.S3Key.Rules` against `Filter.Key.FilterRules`.
+ * `LambdaFunctionArn`, `Queue` against `QueueArn`, `Topic` against `TopicArn`,
+ * and `Filter.S3Key.Rules` against `Filter.Key.FilterRules`.
  *
  * Only the shape is read here. Whether the configuration is one simulated S3
  * accepts is the command's question, so a template and an SDK caller are
@@ -80,10 +94,10 @@ export class SimCfnS3BucketNotificationConfiguration {
   /**
    * Read a whole notification configuration.
    *
-   * A destination group this simulator cannot deliver to is carried through
-   * untouched, so the command refuses it by name rather than dropping it. The
-   * names happen to match: CloudFormation and the SDK both call them
-   * `QueueConfigurations`, `TopicConfigurations` and `EventBridgeConfiguration`.
+   * `EventBridgeConfiguration` is carried through untouched, so the command
+   * refuses it by name rather than dropping it. The name happens to match:
+   * CloudFormation and the SDK both spell it that way, as they do
+   * `QueueConfigurations` and `TopicConfigurations`.
    */
   read(value: SimCfnTemplateValue): SimS3NotificationConfigurationInput {
     const record = this.shape.record(value, "NotificationConfiguration");
@@ -104,8 +118,7 @@ export class SimCfnS3BucketNotificationConfiguration {
       ),
       TopicConfigurations: this.shape.present(
         record["TopicConfigurations"],
-        (configurations) =>
-          this.shape.list(configurations, "TopicConfigurations"),
+        (configurations) => this.topicConfigurations(configurations),
       ),
       EventBridgeConfiguration: this.shape.present(
         record["EventBridgeConfiguration"],
@@ -163,6 +176,32 @@ export class SimCfnS3BucketNotificationConfiguration {
       ...this.notificationParts(record),
       QueueArn: this.shape.present(record["Queue"], (arn) =>
         this.shape.string(arn, "Queue"),
+      ),
+    };
+  }
+
+  private topicConfigurations(
+    value: SimCfnTemplateValue,
+  ): readonly SimS3TopicConfigurationInput[] {
+    return this.shape
+      .list(value, "TopicConfigurations")
+      .map((configuration) => this.topicConfiguration(configuration));
+  }
+
+  private topicConfiguration(
+    value: SimCfnTemplateValue,
+  ): SimS3TopicConfigurationInput {
+    const record = this.shape.record(value, "TopicConfigurations entry");
+    this.shape.knownKeys(
+      record,
+      topicConfigurationNames,
+      "TopicConfigurations entry",
+    );
+
+    return {
+      ...this.notificationParts(record),
+      TopicArn: this.shape.present(record["Topic"], (arn) =>
+        this.shape.string(arn, "Topic"),
       ),
     };
   }

@@ -59,7 +59,7 @@ export interface SimS3NotificationDestination {
  * under `LambdaFunctionConfigurations` is refused for not being a function
  * rather than quietly delivered to as a queue.
  */
-export type SimS3NotificationDestinationService = "lambda" | "sqs";
+export type SimS3NotificationDestinationService = "lambda" | "sns" | "sqs";
 
 /**
  * The destinations one simulated S3 scope can reach.

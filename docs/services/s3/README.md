@@ -280,14 +280,14 @@ failures come back.
 
 ## Event notifications
 
-A simulated S3 Bucket can notify a simulated Lambda function or a simulated SQS queue when an Object
-is created or removed. The configuration is applied with
+A simulated S3 Bucket can notify a simulated Lambda function, a simulated SQS queue or a simulated
+SNS topic when an Object is created or removed. The configuration is applied with
 `PutBucketNotificationConfigurationCommand` and read back with
 `GetBucketNotificationConfigurationCommand`.
 
-The destination's own policy decides whether S3 may reach it: the function's resource policy, or the
-queue's `Policy` attribute. That is checked when the configuration is applied, and again for every
-event, as real S3 does.
+The destination's own policy decides whether S3 may reach it: the function's resource policy, the
+queue's `Policy` attribute, or the topic's. That is checked when the configuration is applied, and
+again for every event, as real S3 does.
 
 ```typescript sim-s3-event-notifications
 /**
@@ -553,16 +553,171 @@ await simAws.backgroundTasksComplete();
 The queue has to be in the Bucket's Region, as real S3 requires. It can be in another Account, since
 its own policy and its own Account's IAM are what admit the Bucket. A FIFO queue is refused by name.
 
+### To an SNS topic
+
+A `TopicConfigurations` entry names a topic by ARN. The whole `Records` document is published as the
+SNS `Message`, with a `Subject` of `Amazon S3 Notification`, which is what real S3 publishes. A queue
+subscribed to the topic therefore has two envelopes to reach through: parse the message body for the
+SNS envelope, then parse its `Message` for the S3 event.
+
+The topic's `Policy` attribute has to allow `sns:Publish` for the `s3.amazonaws.com` service
+principal. S3 supplies `aws:SourceArn` and `aws:SourceAccount`, so the `ArnLike` condition CDK's
+`SnsDestination` writes and the `StringEquals aws:SourceAccount` guard AWS documents are both
+satisfied.
+
+```typescript sim-s3-sns-notification
+/**
+ * An Object event reaching a queue through an SNS topic.
+ */
+
+import {
+  CreateBucketCommand,
+  PutBucketNotificationConfigurationCommand,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
+import {
+  CreateTopicCommand,
+  SetTopicAttributesCommand,
+  SubscribeCommand,
+} from "@aws-sdk/client-sns";
+import {
+  CreateQueueCommand,
+  ReceiveMessageCommand,
+  SetQueueAttributesCommand,
+} from "@aws-sdk/client-sqs";
+import { SimAws } from "@kensio/yulin";
+
+interface SnsEnvelope {
+  Subject: string;
+  Message: string;
+}
+
+interface S3EventDocument {
+  Records: [{ eventName: string; s3: { object: { key: string } } }];
+}
+
+const simAws = new SimAws();
+const { defaultRegionName: region, defaultAccountId: account } = simAws;
+const bucketArn = "arn:aws:s3:::uploads";
+const topicArn = `arn:aws:sns:${region}:${account}:uploads`;
+const queueArn = `arn:aws:sqs:${region}:${account}:uploads-queue`;
+
+const { TopicArn } = await simAws
+  .sns()
+  .createTopic(new CreateTopicCommand({ Name: "uploads" }));
+
+// The topic policy is the whole decision, because S3 owns no identity
+// policies. S3 supplies aws:SourceArn, so the grant names one Bucket.
+await simAws.sns().setTopicAttributes(
+  new SetTopicAttributesCommand({
+    TopicArn,
+    AttributeName: "Policy",
+    AttributeValue: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Allow",
+          Principal: { Service: "s3.amazonaws.com" },
+          Action: "sns:Publish",
+          Resource: topicArn,
+          Condition: { ArnLike: { "aws:SourceArn": bucketArn } },
+        },
+      ],
+    }),
+  }),
+);
+
+const { QueueUrl } = await simAws
+  .sqs()
+  .createQueue(new CreateQueueCommand({ QueueName: "uploads-queue" }));
+
+await simAws.sqs().setQueueAttributes(
+  new SetQueueAttributesCommand({
+    QueueUrl,
+    Attributes: {
+      Policy: JSON.stringify({
+        Version: "2012-10-17",
+        Statement: [
+          {
+            Effect: "Allow",
+            Principal: { Service: "sns.amazonaws.com" },
+            Action: "sqs:SendMessage",
+            Resource: queueArn,
+            Condition: { ArnLike: { "aws:SourceArn": topicArn } },
+          },
+        ],
+      }),
+    },
+  }),
+);
+
+await simAws
+  .sns()
+  .subscribe(
+    new SubscribeCommand({ TopicArn, Protocol: "sqs", Endpoint: queueArn }),
+  );
+
+await simAws.s3().createBucket(new CreateBucketCommand({ Bucket: "uploads" }));
+
+await simAws.s3().putBucketNotificationConfiguration(
+  new PutBucketNotificationConfigurationCommand({
+    Bucket: "uploads",
+    NotificationConfiguration: {
+      TopicConfigurations: [
+        {
+          Id: "raw-uploads",
+          Events: ["s3:ObjectCreated:*"],
+          TopicArn,
+          Filter: { Key: { FilterRules: [{ Name: "prefix", Value: "raw/" }] } },
+        },
+      ],
+    },
+  }),
+);
+
+await simAws.s3().putObject(
+  new PutObjectCommand({
+    Bucket: "uploads",
+    Key: "raw/cat.jpg",
+    Body: "cat picture",
+  }),
+);
+
+// One wait covers the publish to the topic and the delivery to the queue.
+await simAws.backgroundTasksComplete();
+
+const received = await simAws
+  .sqs()
+  .receiveMessage(new ReceiveMessageCommand({ QueueUrl }));
+
+// Two envelopes to reach through: the SNS envelope, then the S3 event.
+const envelope = JSON.parse(received.Messages?.[0]?.Body ?? "") as SnsEnvelope;
+
+console.log(envelope.Subject); // "Amazon S3 Notification"
+
+const event = JSON.parse(envelope.Message) as S3EventDocument;
+
+console.log(event.Records[0].s3.object.key); // "raw/cat.jpg"
+```
+
+The topic has to be in the Bucket's Region, as real S3 requires. It can be in another Account, since
+its own policy and its own Account's IAM are what admit the Bucket. A FIFO topic is refused by name.
+
+The publish goes through the ordinary `Publish` path, so the topic's own subscriptions take it from
+there. That means a topic destination reaches everything the topic reaches, and a subscribed queue is
+two hops from the Object that was written. One `backgroundTasksComplete()` covers both.
+
 ### From a CloudFormation template
 
 The `NotificationConfiguration` property of `AWS::S3::Bucket` deploys through the same
 `PutBucketNotificationConfiguration` path, so a template and an SDK caller get identical validation.
 CloudFormation names the same configuration differently in several places: `LambdaConfigurations`
 rather than `LambdaFunctionConfigurations`, a single `Event` string rather than an `Events` list,
-`Function` rather than `LambdaFunctionArn`, `Queue` rather than `QueueArn`, and `Filter.S3Key.Rules`
-rather than `Filter.Key.FilterRules`. `QueueConfigurations` is the one name both spell the same way.
-Yulin reads the CloudFormation names and refuses the others, so a template using the SDK spelling
-fails the stack rather than deploying an unfiltered configuration.
+`Function` rather than `LambdaFunctionArn`, `Queue` rather than `QueueArn`, `Topic` rather than
+`TopicArn`, and `Filter.S3Key.Rules` rather than `Filter.Key.FilterRules`. `QueueConfigurations` and
+`TopicConfigurations` are the names both spell the same way. Yulin reads the CloudFormation names and
+refuses the others, so a template using the SDK spelling fails the stack rather than deploying an
+unfiltered configuration.
 
 ```typescript sim-s3-cfn-event-notification
 /**
@@ -668,6 +823,12 @@ back with `GetBucketNotificationConfigurationCommand` if a test needs it.
 S3 invoke the function. Yulin applies that request through the same command path an SDK caller
 reaches, so a configuration is validated the same way whichever it arrives by.
 
+`SqsDestination` and `SnsDestination` write their entry into the same resource, alongside the
+`AWS::SQS::QueuePolicy` or `AWS::SNS::TopicPolicy` that grants S3 access. The queue policy deploys;
+the topic policy does not yet, since the SNS CloudFormation resource types are not implemented, so
+set the topic's `Policy` attribute through the SDK before deploying a stack whose Bucket notifies a
+topic.
+
 Deploy into an Account and Region matching the ones the CDK app synthesized for. The `SourceAccount`
 on the permission CDK writes beside the notification is a synth-time literal, so a stack deployed
 into another Account leaves S3 unable to validate the destination, and the stack fails.
@@ -713,8 +874,8 @@ get a managed notification configuration.
 
 ### What arrives at the destination
 
-A function is invoked with the `Records` document real S3 sends, and a queue gets the same document
-as one message body. One event produces one record.
+A function is invoked with the `Records` document real S3 sends. A queue gets the same document as
+one message body, and a topic gets it as the published `Message`. One event produces one record.
 
 Creation records carry the Object's `size` and its `eTag`, which is the MD5 of the bytes as it is for
 an Object real S3 stored in one part. Removal records carry neither, because the Object they describe
@@ -746,8 +907,8 @@ writes do not match it. Without that, the simulation stops after a thousand deli
 
 ### Limitations
 
-- A Lambda function and an SQS queue are the destinations. An SNS topic and EventBridge are each
-  refused by name.
+- A Lambda function, an SQS queue and an SNS topic are the destinations. EventBridge is refused by
+  name.
 - A destination goes where the group it was declared in says, not where its ARN says: a queue ARN
   under `LambdaFunctionConfigurations` is refused for not being a function ARN rather than delivered
   to as a queue.
@@ -769,18 +930,23 @@ writes do not match it. Without that, the simulation stops after a thousand deli
 - A notification cannot be configured on a standalone `SimS3`. It has no other simulated services to
   notify, and no shared background scheduler for `backgroundTasksComplete()` to drain. Reach
   simulated S3 through `SimAws` instead.
-- A topic destination in an `AWS::S3::Bucket` `NotificationConfiguration` is refused by name, as it
-  is for an SDK caller, and so is an `EventBridgeConfiguration`.
+- An `EventBridgeConfiguration` in an `AWS::S3::Bucket` `NotificationConfiguration` is refused by
+  name, as it is for an SDK caller.
 - `Managed: false` on a `Custom::S3BucketNotifications` resource is refused rather than approximated,
-  and a topic or EventBridge destination in one is refused by name as it is for an SDK caller.
+  and an EventBridge destination in one is refused by name as it is for an SDK caller.
 - A FIFO queue destination is refused by name, as real S3 refuses one. Simulated SQS has no FIFO
-  queues either.
+  queues either, and neither does simulated SNS, so a FIFO topic destination is refused the same way.
+- The `AWS::SNS::TopicPolicy` CDK's `SnsDestination` writes does not deploy, since the SNS
+  CloudFormation resource types are not implemented. Set the topic's `Policy` attribute through the
+  SDK before deploying a stack whose Bucket notifies a topic, or S3 refuses the destination.
 - The KMS key policy statement CDK's `SqsDestination` writes for an encrypted queue is not acted on.
   Queue encryption is not simulated.
 - A CDK `BucketDeployment` and `mountBucketFilesystem(...)` both replace the whole storage backend
   rather than putting Objects, so neither raises anything, whereas real CDK `BucketDeployment` fires
   one `ObjectCreated:Put` per file.
 - A function ARN naming a version or an alias is refused, since simulated Lambda has neither.
+- A topic destination publishes with no message attributes, since real S3 publishes none. The only
+  thing on the message besides the event document is the `Amazon S3 Notification` subject.
 - `s3:TestEvent` is not sent. Real S3 puts one on a queue or topic when a configuration naming it is
   applied, carrying a flat `{Service, Event, Time, Bucket, RequestId, HostId}` document with no
   `Records` in it. Sending it here would make the simplest test two messages long and hand a
@@ -1652,7 +1818,8 @@ Sim S3 currently supports:
 - `PutObjectCommand`, `GetObjectCommand` and `ListObjectsCommand`
 - `DeleteObjectCommand` and `DeleteObjectsCommand`, authorized per Object by sim IAM
 - `PutBucketNotificationConfigurationCommand` and `GetBucketNotificationConfigurationCommand`, with
-  Object events delivered to a simulated Lambda function or a simulated SQS queue
+  Object events delivered to a simulated Lambda function, a simulated SQS queue or a simulated SNS
+  topic
 - `PutBucketWebsiteCommand`, for static website hosting
 - `PutBucketPolicyCommand`, `GetBucketPolicyCommand` and `DeleteBucketPolicyCommand`, evaluated by
   sim IAM alongside identity policies
