@@ -733,6 +733,162 @@ Anything else fails with `InvalidParameterException`.
 `GetTopicAttributes` reports `Policy` back as the string it was set with. Setting the attribute with
 no value takes the policy off the topic, which is the only way back to a topic without one.
 
+## Taking S3 Object events
+
+A simulated S3 Bucket can publish its event notifications to a topic. The topic then fans them out to
+its own subscribers, so one Bucket configuration reaches every queue subscribed to the topic.
+
+Set up the topic policy first. S3 asks the topic whether it may publish when the notification
+configuration is applied, and asks again for every event, so a policy that does not admit
+`s3.amazonaws.com` for that Bucket refuses the configuration outright.
+
+```typescript sim-sns-s3-events
+/**
+ * A topic taking S3 Object events and fanning them out to two queues.
+ */
+
+import {
+  CreateBucketCommand,
+  PutBucketNotificationConfigurationCommand,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
+import {
+  CreateTopicCommand,
+  SetTopicAttributesCommand,
+  SubscribeCommand,
+} from "@aws-sdk/client-sns";
+import {
+  CreateQueueCommand,
+  ReceiveMessageCommand,
+  SetQueueAttributesCommand,
+} from "@aws-sdk/client-sqs";
+import { SimAws } from "@kensio/yulin";
+
+interface SnsEnvelope {
+  Message: string;
+}
+
+interface S3EventDocument {
+  Records: [{ s3: { object: { key: string } } }];
+}
+
+const simAws = new SimAws();
+const { defaultRegionName: region, defaultAccountId: account } = simAws;
+const topicArn = `arn:aws:sns:${region}:${account}:uploads`;
+
+const { TopicArn } = await simAws
+  .sns()
+  .createTopic(new CreateTopicCommand({ Name: "uploads" }));
+
+// S3 owns no identity policies, so the topic policy is the whole decision.
+// The Bucket it is publishing for arrives as aws:SourceArn.
+await simAws.sns().setTopicAttributes(
+  new SetTopicAttributesCommand({
+    TopicArn,
+    AttributeName: "Policy",
+    AttributeValue: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: [
+        {
+          Effect: "Allow",
+          Principal: { Service: "s3.amazonaws.com" },
+          Action: "sns:Publish",
+          Resource: topicArn,
+          Condition: { ArnLike: { "aws:SourceArn": "arn:aws:s3:::uploads" } },
+        },
+      ],
+    }),
+  }),
+);
+
+/**
+ * Subscribe a queue that admits SNS to send to it for this topic.
+ */
+async function subscribeQueue(queueName: string): Promise<string> {
+  const { QueueUrl } = await simAws
+    .sqs()
+    .createQueue(new CreateQueueCommand({ QueueName: queueName }));
+  const queueArn = `arn:aws:sqs:${region}:${account}:${queueName}`;
+
+  await simAws.sqs().setQueueAttributes(
+    new SetQueueAttributesCommand({
+      QueueUrl,
+      Attributes: {
+        Policy: JSON.stringify({
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Effect: "Allow",
+              Principal: { Service: "sns.amazonaws.com" },
+              Action: "sqs:SendMessage",
+              Resource: queueArn,
+              Condition: { ArnLike: { "aws:SourceArn": topicArn } },
+            },
+          ],
+        }),
+      },
+    }),
+  );
+
+  await simAws
+    .sns()
+    .subscribe(
+      new SubscribeCommand({ TopicArn, Protocol: "sqs", Endpoint: queueArn }),
+    );
+
+  return QueueUrl ?? "";
+}
+
+const thumbnails = await subscribeQueue("thumbnails");
+const audit = await subscribeQueue("audit");
+
+await simAws.s3().createBucket(new CreateBucketCommand({ Bucket: "uploads" }));
+
+await simAws.s3().putBucketNotificationConfiguration(
+  new PutBucketNotificationConfigurationCommand({
+    Bucket: "uploads",
+    NotificationConfiguration: {
+      TopicConfigurations: [
+        { Id: "uploads", Events: ["s3:ObjectCreated:*"], TopicArn },
+      ],
+    },
+  }),
+);
+
+await simAws.s3().putObject(
+  new PutObjectCommand({
+    Bucket: "uploads",
+    Key: "raw/cat.jpg",
+    Body: "cat picture",
+  }),
+);
+
+await simAws.backgroundTasksComplete();
+
+for (const QueueUrl of [thumbnails, audit]) {
+  const received = await simAws
+    .sqs()
+    .receiveMessage(new ReceiveMessageCommand({ QueueUrl }));
+  const envelope = JSON.parse(
+    received.Messages?.[0]?.Body ?? "",
+  ) as SnsEnvelope;
+  const event = JSON.parse(envelope.Message) as S3EventDocument;
+
+  console.log(event.Records[0].s3.object.key); // "raw/cat.jpg"
+}
+```
+
+The published `Message` is the S3 `Records` document as text, and the `Subject` is
+`Amazon S3 Notification`, which is what real S3 publishes. A subscribed queue receiving the SNS
+envelope therefore has two layers to parse. `RawMessageDelivery` on the subscription takes one of
+them away, leaving the S3 event document as the message body.
+
+The topic has to be in the Bucket's Region, as real S3 requires, which is stricter than a
+subscription: a topic delivers to a queue in any Region. The Accounts can differ on both hops.
+
+See [simulated S3](../s3/README.md#event-notifications "Simulated S3 event notification docs") for the
+rest of the Bucket side, including the object key filters and what a record carries.
+
 ## Scoping
 
 Topics belong to an account and a region, as they do on real AWS. A topic name is unique within one
@@ -804,6 +960,8 @@ Sim SNS currently supports:
 - Authorization of every operation by simulated IAM, against the real IAM action and topic ARN
 - The `Policy` attribute as the topic's resource policy, admitting another account's principal or a
   service principal, with `aws:SourceArn` and `aws:SourceAccount` conditions honoured
+- Simulated S3 Bucket event notifications published to a topic, authorized by the topic policy when
+  the configuration is applied and again on every event
 - Calls made from inside a simulated Lambda handler, authorized as the function's execution role
 - `SNSClient` interception, routing ordinary SDK code into the simulation
 
@@ -876,7 +1034,10 @@ Current documented limitations:
 - SNS condition keys such as `sns:Endpoint` and `sns:Protocol` are not derived, so a policy relying on
   them will not match. Ordinary condition operators on values sim IAM does supply work as usual.
 - The CloudFormation resource types are not implemented, so `AWS::SNS::Topic`,
-  `AWS::SNS::Subscription` and `AWS::SNS::TopicPolicy` in a template do not deploy a topic yet.
-- Simulated S3 still refuses `TopicConfigurations` on a bucket notification configuration, since
-  delivery to a topic is not simulated.
+  `AWS::SNS::Subscription` and `AWS::SNS::TopicPolicy` in a template do not deploy a topic yet. A
+  stack whose Bucket notifies a topic therefore needs the topic and its policy set up through the SDK
+  first.
+- An S3 event notification published to a topic carries no message attributes, since real S3 publishes
+  none. The only thing on the message besides the event document is the `Amazon S3 Notification`
+  subject.
 - SNS is not served as an HTTP API by `serveSimAws`.

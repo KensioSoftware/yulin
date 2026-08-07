@@ -7,6 +7,7 @@ import type {
 
 interface SimS3ServiceNotificationDestinationsProperties {
   readonly lambda: SimS3NotificationDestination;
+  readonly sns: SimS3NotificationDestination;
   readonly sqs: SimS3NotificationDestination;
 }
 
@@ -20,10 +21,12 @@ interface SimS3ServiceNotificationDestinationsProperties {
  */
 export class SimS3ServiceNotificationDestinations implements SimS3NotificationDestinations {
   private readonly lambda: SimS3NotificationDestination;
+  private readonly sns: SimS3NotificationDestination;
   private readonly sqs: SimS3NotificationDestination;
 
   constructor(properties: SimS3ServiceNotificationDestinationsProperties) {
     this.lambda = properties.lambda;
+    this.sns = properties.sns;
     this.sqs = properties.sqs;
   }
 
@@ -36,6 +39,9 @@ export class SimS3ServiceNotificationDestinations implements SimS3NotificationDe
     switch (service) {
       case "lambda": {
         return this.lambda;
+      }
+      case "sns": {
+        return this.sns;
       }
       case "sqs": {
         return this.sqs;

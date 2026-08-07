@@ -3,10 +3,12 @@ import type { SimS3LambdaNotification } from "./sim-s3-lambda-notification.js";
 import type { SimS3Notification } from "./sim-s3-notification.js";
 import type { SimS3NotificationEvent } from "./sim-s3-notification-event.js";
 import type { SimS3QueueNotification } from "./sim-s3-queue-notification.js";
+import type { SimS3TopicNotification } from "./sim-s3-topic-notification.js";
 
 interface SimS3NotificationConfigurationProperties {
   readonly lambdaNotifications?: readonly SimS3LambdaNotification[];
   readonly queueNotifications?: readonly SimS3QueueNotification[];
+  readonly topicNotifications?: readonly SimS3TopicNotification[];
 }
 
 /**
@@ -24,10 +26,12 @@ interface SimS3NotificationConfigurationProperties {
 export class SimS3NotificationConfiguration {
   public readonly lambdaNotifications: readonly SimS3LambdaNotification[];
   public readonly queueNotifications: readonly SimS3QueueNotification[];
+  public readonly topicNotifications: readonly SimS3TopicNotification[];
 
   constructor(properties: SimS3NotificationConfigurationProperties = {}) {
     this.lambdaNotifications = properties.lambdaNotifications ?? [];
     this.queueNotifications = properties.queueNotifications ?? [];
+    this.topicNotifications = properties.topicNotifications ?? [];
   }
 
   /**
@@ -41,7 +45,11 @@ export class SimS3NotificationConfiguration {
    * Every configured destination, whatever kind it is.
    */
   get all(): readonly SimS3Notification[] {
-    return [...this.lambdaNotifications, ...this.queueNotifications];
+    return [
+      ...this.lambdaNotifications,
+      ...this.queueNotifications,
+      ...this.topicNotifications,
+    ];
   }
 
   /**
@@ -69,6 +77,11 @@ export class SimS3NotificationConfiguration {
       }),
       ...(this.queueNotifications.length > 0 && {
         QueueConfigurations: this.queueNotifications.map((notification) =>
+          notification.toOutput(),
+        ),
+      }),
+      ...(this.topicNotifications.length > 0 && {
+        TopicConfigurations: this.topicNotifications.map((notification) =>
           notification.toOutput(),
         ),
       }),

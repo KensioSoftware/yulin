@@ -4,6 +4,7 @@ import { SimS3NotificationConfiguration } from "./sim-s3-notification-configurat
 import { simS3AssertNotificationIdsAreUnique } from "./sim-s3-notification-ids.js";
 import { simS3AssertNoNotificationOverlap } from "./sim-s3-notification-overlap.js";
 import { SimS3QueueNotification } from "./sim-s3-queue-notification.js";
+import { SimS3TopicNotification } from "./sim-s3-topic-notification.js";
 import { simS3RefuseUnsimulatedDestinations } from "./sim-s3-unsimulated-notification-destinations.js";
 
 /**
@@ -35,6 +36,9 @@ export class SimS3NotificationConfigurationReader {
       ),
       queueNotifications: (input.QueueConfigurations ?? []).map((entry) =>
         SimS3QueueNotification.fromInput(entry),
+      ),
+      topicNotifications: (input.TopicConfigurations ?? []).map((entry) =>
+        SimS3TopicNotification.fromInput(entry),
       ),
     });
 

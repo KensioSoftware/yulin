@@ -37,7 +37,8 @@ export interface SimS3NotificationConfigurationInput {
     readonly SimS3LambdaFunctionConfigurationInput[] | undefined;
   readonly QueueConfigurations?:
     readonly SimS3QueueConfigurationInput[] | undefined;
-  readonly TopicConfigurations?: readonly unknown[] | undefined;
+  readonly TopicConfigurations?:
+    readonly SimS3TopicConfigurationInput[] | undefined;
   readonly EventBridgeConfiguration?: object | undefined;
 }
 
@@ -57,6 +58,16 @@ export interface SimS3LambdaFunctionConfigurationInput {
 export interface SimS3QueueConfigurationInput {
   readonly Id?: string | undefined;
   readonly QueueArn?: string | undefined;
+  readonly Events?: readonly string[] | undefined;
+  readonly Filter?: SimS3NotificationFilterInput | undefined;
+}
+
+/**
+ * Minimal structural sim S3 SNS topic notification configuration.
+ */
+export interface SimS3TopicConfigurationInput {
+  readonly Id?: string | undefined;
+  readonly TopicArn?: string | undefined;
   readonly Events?: readonly string[] | undefined;
   readonly Filter?: SimS3NotificationFilterInput | undefined;
 }

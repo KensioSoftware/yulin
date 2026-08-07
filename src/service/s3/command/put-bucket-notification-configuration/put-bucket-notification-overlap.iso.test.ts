@@ -3,9 +3,10 @@
  *
  * https://docs.aws.amazon.com/AmazonS3/latest/userguide/notification-how-to-filtering.html
  *
- * AWS states the rule with SNS topic and SQS queue destinations, which this
- * simulator does not deliver to. The prefixes, suffixes and event types are
- * ported as they are written there; only the destination is a Lambda function.
+ * AWS states the rule with SNS topic and SQS queue destinations. The prefixes,
+ * suffixes and event types are ported as they are written there; the
+ * destination is a Lambda function, since the rule is the same whatever the
+ * destination is, and the last case here proves that by mixing two groups.
  */
 
 import {
@@ -345,5 +346,43 @@ describe("Overlapping S3 notification configurations", () => {
         new GetBucketNotificationConfigurationCommand({ Bucket: "uploads" }),
       );
     assertArrayLength(read.LambdaFunctionConfigurations ?? [], 2);
+  });
+
+  it("refuses a topic and a queue that want the same event", async () => {
+    // Given a Bucket
+    const simAws = new SimAws();
+    await simAws
+      .s3()
+      .createBucket(new CreateBucketCommand({ Bucket: "uploads" }));
+
+    // When a topic destination and a queue destination take the same event
+    // with filters that could both match a key
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws.s3().putBucketNotificationConfiguration(
+        new PutBucketNotificationConfigurationCommand({
+          Bucket: "uploads",
+          NotificationConfiguration: {
+            TopicConfigurations: [
+              {
+                Id: "topic",
+                Events: ["s3:ObjectCreated:*"],
+                TopicArn: "arn:aws:sns:us-east-1:888888888888:uploads",
+              },
+            ],
+            QueueConfigurations: [
+              {
+                Id: "queue",
+                Events: ["s3:ObjectCreated:Put"],
+                QueueArn: "arn:aws:sqs:us-east-1:888888888888:uploads",
+              },
+            ],
+          },
+        }),
+      ),
+    );
+
+    // Then it is refused, as it would be for two of the same kind: the rule is
+    // about event sets and filters rather than about destination groups
+    assertStringIncludes(error.message, "overlap");
   });
 });

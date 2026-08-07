@@ -204,8 +204,8 @@ describe("AWS::S3::Bucket NotificationConfiguration refusals", () => {
     );
   });
 
-  it("refuses a topic destination", async () => {
-    // Given a template naming an SNS topic destination.
+  it("refuses a topic destination that is not a topic ARN", async () => {
+    // Given a template whose topic destination names no Region or Account.
     const simAws = new SimAws();
 
     // When the template is deployed.
@@ -216,9 +216,29 @@ describe("AWS::S3::Bucket NotificationConfiguration refusals", () => {
     });
 
     // Then the Stack fails with the command's own refusal.
+    assertStringIncludes(error.message, "is not an SNS topic ARN");
+  });
+
+  it("refuses a topic destination naming the SDK property", async () => {
+    // Given a template using the SDK's TopicArn rather than CloudFormation's
+    // Topic, which would otherwise deploy a Bucket notifying nothing.
+    const simAws = new SimAws();
+
+    // When the template is deployed.
+    const error = await deployFailing(simAws, {
+      TopicConfigurations: [
+        {
+          Event: "s3:ObjectCreated:*",
+          TopicArn: "arn:aws:sns:us-east-1:888888888888:uploads",
+        },
+      ],
+    });
+
+    // Then the Stack fails on the name CloudFormation does not have.
     assertStringIncludes(
       error.message,
-      "Simulated S3 cannot notify a SNS topic",
+      "TopicArn is not a TopicConfigurations entry property this simulation " +
+        "reads",
     );
   });
 
