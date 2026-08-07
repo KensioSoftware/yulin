@@ -18,9 +18,10 @@ export interface SimSnsSignedValues {
  * signature.
  *
  * Each signed field is its name and its value, both followed by a newline, in
- * the alphabetical order of the names. That order is the declaration order of
- * `SimSnsSignedValues`, since an object keeps the order its keys were written
- * in, and rebuilding the string in any other order fails to verify.
+ * the alphabetical order of the names. The names are sorted here rather than
+ * taken in the order they were passed in: an object keeps the order its keys
+ * were written in, so a caller writing the same fields in another order would
+ * otherwise produce a string no verifier could rebuild.
  *
  * A field with no value is left out rather than signed as an empty string,
  * which is what makes a message published without a subject verify.
@@ -31,6 +32,7 @@ export interface SimSnsSignedValues {
 export function simSnsCanonicalMessage(values: SimSnsSignedValues): string {
   return Object.entries(values)
     .filter(([, value]) => value !== undefined)
+    .toSorted(([left], [right]) => left.localeCompare(right))
     .map(([name, value]) => `${name}\n${String(value)}\n`)
     .join("");
 }
