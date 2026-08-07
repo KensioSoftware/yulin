@@ -38,8 +38,8 @@ export class SimSnsSubscriptionCommands {
    *
    * The subscription comes back confirmed, with an ARN rather than the `pending
    * confirmation` a protocol needing a confirmation token answers with. Real
-   * SNS confirms an `sqs` subscription itself, and that is the only protocol
-   * simulated.
+   * SNS confirms an `sqs` and a `lambda` subscription itself, and those are the
+   * protocols simulated.
    */
   subscribe(
     command: SimSubscribeCommand,
@@ -108,11 +108,6 @@ export class SimSnsSubscriptionCommands {
    * however many times it subscribed. The attributes the repeated request
    * carries are not applied, which is how a repeated `CreateTopic` treats its
    * attributes too.
-   *
-   * Only the endpoint is compared. Real SNS matches on the protocol as well,
-   * and there is one protocol here, so two subscriptions of the same endpoint
-   * are necessarily of the same protocol. That comparison goes back in when a
-   * second protocol arrives.
    */
   private existingLike(
     topic: SimSnsTopic,
@@ -120,6 +115,6 @@ export class SimSnsSubscriptionCommands {
   ): SimSnsSubscription | undefined {
     return this.subscriptions
       .forTopic(topic.name.value)
-      .find((held) => held.endpoint.value === subscription.endpoint.value);
+      .find((held) => held.repeats(subscription));
   }
 }

@@ -11,7 +11,7 @@ import {
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
 import type { SimSnsDeliveryEndpoints } from "./delivery/sim-sns-delivery.js";
 import type { SimSnsDeliveryFailure } from "./delivery/sim-sns-delivery-failures.js";
-import { SimSnsNoDeliveryEndpoints } from "./delivery/sqs/sim-aws-sns-delivery-queues.js";
+import { SimSnsNoDeliveryEndpoints } from "./delivery/sim-sns-no-delivery-endpoints.js";
 import type * as simSnsCommands from "./command/sim-sns-command.types.js";
 import { SimSnsCommands } from "./command/sim-sns-commands.js";
 import type { SimSnsRequestOptions } from "./command/sim-sns-request-options.js";
@@ -29,8 +29,8 @@ interface SimSnsProperties {
   /**
    * Where this scope's subscriptions deliver to.
    *
-   * A SimSns built on its own has none, since a queue in another simulated
-   * service is only reachable through SimAws.
+   * A SimSns built on its own has none, since a queue or a function in another
+   * simulated service is only reachable through SimAws.
    */
   readonly deliveryEndpoints?: SimSnsDeliveryEndpoints;
 }

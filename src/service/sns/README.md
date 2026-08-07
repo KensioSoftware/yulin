@@ -59,23 +59,29 @@ Subscription state lives under `subscription/`.
 
 `SimSnsSubscription` is the stored resource: its ARN, the topic it belongs to, its protocol, its
 endpoint, the Account owning it, and its attributes. The endpoint is held as a
-`SimSnsQueueEndpointArn` rather than as a string, because `sqs` is the only protocol accepted and a
-delivery reaches the Account and Region that ARN names rather than the topic's. When another protocol
-arrives, this becomes the endpoint of whichever kind the protocol implies.
+`SimSnsSubscriptionEndpoint` rather than as a string, because a delivery reaches the Account and
+Region that ARN names rather than the topic's. Which kind of ARN it has to be is the protocol's
+question, answered by `requireSimSnsSubscriptionEndpoint`: `SimSnsQueueEndpointArn` for `sqs`, and
+`SimSnsFunctionEndpointArn` for `lambda`. Reading a function ARN is Lambda's own business, so those
+parts come from `parseSimLambdaFunctionArn`; what SNS adds is what an unreadable one means to a
+`Subscribe` request. A qualified function ARN naming a version or an alias is refused, since
+simulated Lambda has neither and delivering to `$LATEST` instead would be the wrong function.
 
-Nothing checks that the endpoint queue exists when a subscription is created, because real SNS does
-not either: a subscription to a queue that is not there is created, and fails when something is
-delivered to it. The queue's policy is not consulted here either, for the same reason. Both are
-delivery-time questions, which is what makes a permission taken away afterwards stop delivery.
+Nothing checks that the endpoint queue or function exists when a subscription is created, because
+real SNS does not either: a subscription to something that is not there is created, and fails when
+something is delivered to it. The endpoint's own policy is not consulted here either, for the same
+reason. Both are delivery-time questions, which is what makes a permission taken away afterwards stop
+delivery.
 
 `SimSnsSubscriptionArn` mints an ARN, which is the topic's with an opaque id added as a seventh part,
 and `parseSnsSubscriptionArn` reads one. Counting the colon separated parts is what tells a
 subscription ARN from a topic ARN, since neither has a resource type separator.
 
-`SimSnsSubscriptionProtocol` holds the one protocol delivery is simulated over. Every other protocol
-real SNS has is refused by name with the reason it is missing, rather than accepted as a subscription
-that would never be delivered to. A protocol real SNS does not have at all is refused the way real
-SNS refuses one.
+`SimSnsSubscriptionProtocol` holds the two protocols delivery is simulated over, `sqs` and `lambda`.
+Neither needs a confirmation, which is why `ConfirmSubscription` is not implemented. Every other
+protocol real SNS has is refused by name with the reason it is missing, rather than accepted as a
+subscription that would never be delivered to. A protocol real SNS does not have at all is refused
+the way real SNS refuses one.
 
 `SimSnsSubscriptionAttributes` holds `RawMessageDelivery` and nothing else, and
 `SimSnsSubscriptionAttributeNames` is where the refusal of the rest is decided. Applying a request
@@ -119,25 +125,56 @@ the background scheduler, because real SNS answers a publish before anything is 
 `simAws.backgroundTasksComplete()` is what waits for it. A failure is recorded on
 `SimSnsDeliveryFailures` rather than thrown, since a background task left rejected would fail an
 unrelated `backgroundTasksComplete()`, and real SNS never reports a delivery failure to the publisher.
-A queue policy refusal is recorded quietly, because that is a modelled outcome a test may be asking
-for; anything else is also warned about once, because it is a fault.
+An endpoint policy refusal is recorded quietly, because that is a modelled outcome a test may be
+asking for; anything else is also warned about once, because it is a fault.
 
-`SimSnsEnvelope` is the JSON document a subscription receives unless it asked for raw delivery. It
-also builds the string real SNS signs, which is the signed fields in alphabetical order, each one its
-name and its value followed by a newline. Message attributes are not signed, here or on real AWS.
+`SimSnsNotification` is one published message as every destination's document carries it, signed
+once. `simSnsCanonicalMessage` builds the string real SNS signs, which is the signed fields in
+alphabetical order, each one its name and its value followed by a newline. That order is the
+declaration order of `SimSnsSignedValues`, since an object keeps the order its keys were written in.
+Message attributes are not signed, here or on real AWS.
 
-`SimSnsDeliveryEndpoints` is where a message goes. There is one implementation, for a queue, because
-`sqs` is the only protocol simulated: a second protocol adds a second implementation rather than a
-branch in this one. `SimAwsSnsDeliveryQueues` resolves the queue when a message is delivered, never
-when it is built, for the same reason S3's notification destinations do it that way. A queue in
-another Account or Region is reachable, since real SNS delivers to both. That is a deliberate
-difference from simulated S3 event notifications, which require the destination queue to be in the
-Bucket's Region because real S3 does.
+The two documents are built from those fields rather than from each other. `SimSnsEnvelope` is what a
+queue receives unless it asked for raw delivery, and `simSnsLambdaEventDocument` is what a function is
+invoked with. They differ in more than nesting: the envelope has `SigningCertURL` and `UnsubscribeURL`
+where the Lambda event has `SigningCertUrl` and `UnsubscribeUrl`, and the envelope leaves out an
+absent subject and an empty attribute set where the Lambda event carries `null` and `{}`. All of that
+is real SNS behaviour rather than an oversight, which is why the fields are held under names that are
+neither document's.
+
+`SimSnsDeliveryEndpoints` is where a message goes. There is one implementation per protocol, because
+what a destination is asked before it takes a message and what it is handed both differ by protocol:
+a second protocol adds a second implementation rather than a branch in an existing one.
+`SimSnsProtocolDeliveryEndpoints` picks between them by the subscription's protocol, holding them in
+a record keyed by the protocol union so that adding a protocol without somewhere to deliver fails to
+compile. `SimAwsSnsDeliveryEndpoints` is that set for one simulated AWS instance.
+
+`SimAwsSnsDeliveryQueues` and `SimAwsSnsDeliveryFunctions` resolve the endpoint when a message is
+delivered, never when they are built, for the same reason S3's notification destinations do it that
+way. A queue or a function in another Account or Region is reachable, since real SNS delivers to
+both. That is a deliberate difference from simulated S3 event notifications, which require the
+destination queue to be in the Bucket's Region because real S3 does.
 
 `SimSnsDeliveryQueue` asks the queue's own Account two questions: whether `sns.amazonaws.com` may
 send to it for this topic, through `SimSqsServiceSendAuthorizer`, and then to send. The send goes
 through the ordinary `SendMessage` path, so a delivered message is the same thing an SDK caller would
-have sent, and is authorized again on the way in.
+have sent, and is authorized again on the way in. `SimSnsQueueMessage` is what it sends, which is the
+envelope unless the subscription asked for raw delivery. That question is asked here rather than in
+the fan-out because `RawMessageDelivery` is an SQS and HTTP protocol setting on real SNS: a function
+subscribed with it on is invoked with the whole event all the same.
+
+`SimSnsDeliveryFunction` asks the function's own Account the same two questions, through
+`SimLambdaServiceInvokeAuthorizer`, which is where whether a service may invoke a function is decided
+for every service that invokes one. The function is then invoked directly rather than through an
+`Invoke` command, because SNS is already inside the background task standing for the asynchronous
+invocation real SNS makes, and because a handler failure has to reach the delivery outcome rather
+than being swallowed as an asynchronous invocation error. A handler that throws is one delivery
+failure and leaves the topic's other subscriptions alone, since each delivery is its own background
+task.
+
+`Records` in a Lambda event always holds exactly one entry, even for a `PublishBatch`. Real SNS does
+not batch to Lambda: each published message is its own asynchronous invocation, and the fan-out
+already schedules one delivery per message per subscription.
 
 `SimSnsMessageSigner` owns the key pair, which belongs to the scope rather than to a topic: real SNS
 signs every message a Region sends with one certificate. It is generated on first use, because
@@ -251,8 +288,14 @@ here, it does not make another Account's topics reachable through this one.
 
 ## Divergences worth knowing
 
-- Only the `sqs` subscription protocol is simulated, so a queue is the only thing a topic delivers
-  to. `ConfirmSubscription` is not implemented, since that protocol needs no confirmation.
+- Only the `sqs` and `lambda` subscription protocols are simulated, so a queue and a function are the
+  only things a topic delivers to. `ConfirmSubscription` is not implemented, since neither protocol
+  needs a confirmation.
+- A Lambda event carries `Subject: null` and `MessageAttributes: {}` where there is nothing to put in
+  either, which is what real SNS sends. The envelope a queue receives leaves both fields out instead.
+- `RawMessageDelivery` is accepted on a `lambda` subscription and has no effect on it, as it has none
+  on real SNS: it is an SQS and HTTP protocol setting, and a function is invoked with the whole event
+  either way.
 - `SigningCertURL` and `UnsubscribeURL` name `sns.<region>.yulin.invalid`, and neither is served.
   The certificate is handed out in process by `SimSns.signingCertificate`. A real verifier such as
   `sns-validator` hard-codes an `amazonaws.com` certificate host and fetches the URL itself, so it
@@ -280,7 +323,7 @@ here, it does not make another Account's topics reachable through this one.
 - Tags, data protection policies and encryption are refused rather than ignored, whether by
   `CreateTopic` or by `SetTopicAttributes`.
 - `MessageStructure` is refused, because a `json` structure picks a different body per protocol and
-  none of those protocols is simulated.
+  picking one is not simulated.
 - Publishing to a `TargetArn` or a `PhoneNumber` is refused. Only topics are simulated.
 - `AddPermission` and `RemovePermission`, which are shorthands for writing one statement of the topic
   policy, are not implemented. The policy is set through the `Policy` attribute only.

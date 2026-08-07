@@ -27,7 +27,7 @@ import { SimS3 } from "../../s3/sim-s3.js";
 import { simAwsS3NotificationDestinations } from "./sim-aws-s3-notification-destinations.js";
 import { SimSecretsManager } from "../../secretsmanager/index.js";
 import { SimSns } from "../../sns/index.js";
-import { SimAwsSnsDeliveryQueues } from "../../sns/delivery/sqs/sim-aws-sns-delivery-queues.js";
+import { SimAwsSnsDeliveryEndpoints } from "../../sns/delivery/sim-aws-sns-delivery-endpoints.js";
 import { SimSqs } from "../../sqs/index.js";
 import { SimSsm } from "../../ssm/index.js";
 import { SimSts } from "../../sts/sim-sts.js";
@@ -239,15 +239,14 @@ export class SimAwsAccountRegionServiceBuilder {
    * Create simulated SNS for an Account Region scope.
    *
    * Topics are Region-scoped on real AWS: a topic ARN names the Region. Where a
-   * subscription delivers is not, since real SNS delivers to a queue in any
-   * Account or Region, so the endpoints come from the whole simulation and are
-   * resolved on delivery rather than here.
+   * subscription delivers is not, since real SNS delivers to a queue or function
+   * in any Account or Region, so the endpoints come from the whole simulation
+   * and are resolved on delivery rather than here.
    */
   createSns(scope: SimAwsAccountRegionContainer): SimSns {
-    return new SimSns({
-      ...this.scoped(scope),
-      deliveryEndpoints: new SimAwsSnsDeliveryQueues({ simAws: this.simAws }),
-    });
+    const endpoints = new SimAwsSnsDeliveryEndpoints({ simAws: this.simAws });
+
+    return new SimSns({ ...this.scoped(scope), deliveryEndpoints: endpoints });
   }
 
   /**
