@@ -131,9 +131,16 @@ HTTP request behaviour is split across a few directories:
 - `router/` resolves an incoming `Request` to a simulated Distribution by CloudFront hostname or
   alternate domain name.
 - `resolver/` chooses the matching Cache Behavior for a request path.
-- `origin/` adapts CloudFront Origin requests/responses. `origin/s3/` reaches a sim S3 Bucket
-  directly, while `origin/custom/` turns the Origin request back into an HTTP request and sends it
-  into the wider simulated environment.
+- `origin/` adapts CloudFront Origin requests/responses. `origin/s3/` reads a sim S3 Bucket through
+  that Bucket's own GetObject command, while `origin/custom/` turns the Origin request back into an
+  HTTP request and sends it into the wider simulated environment.
+
+  An S3 Origin reads as an anonymous caller, which is the unsigned request real CloudFront sends to
+  the S3 REST endpoint when the Origin has no origin access control, so the Bucket policy decides
+  what the Distribution can serve. That is why `SimCloudFrontS3OriginResolver` answers with the
+  Bucket and the sim S3 holding it rather than a bare `SimS3Bucket`: the read goes through that
+  scope's command. A denial becomes a 403 from the Origin, which the Distribution's custom error
+  response for 403 can then replace.
 
 When a sim AWS is served on localhost, CloudFront requests are routed through this layer to find the
 right sim Distribution, Origin and Behavior.
@@ -169,6 +176,25 @@ divergence a passing test would hide.
 A lookup miss is `SimCloudFrontNoSuchResponseHeadersPolicy` rather than a pass-through, because the
 common cause is a managed policy ID, which names a policy AWS owns rather than one a template
 creates.
+
+## Origin access controls
+
+`origin-access-control/` holds the model and its registry, laid out the same way as the response
+headers policies above. A `SimCloudFrontOriginAccessControl` is a name, an ID, an optional
+description and a signing behaviour. The origin type and signing protocol are fixed at `s3` and
+`sigv4`, because `cfn/origin-access-control/` refuses any other value by name rather than storing
+one the simulator would then treat as an S3 origin access control. There is no
+CreateOriginAccessControl command, so a template is the only thing that makes one.
+
+`SimCloudFrontOriginConfigurator` resolves an Origin's `OriginAccessControlId` through the registry
+when the Distribution is created, and stores the result on the `SimCloudFrontS3Origin`. An ID
+nothing created is `SimCloudFrontInvalidOriginAccessControl`, as CloudFront refuses the whole
+CreateDistribution. Resolution is eager here, unlike a response headers policy, because CloudFront
+checks an origin access control at creation rather than when a request arrives.
+
+Nothing reads the stored origin access control yet. It does not sign the Origin request, so an
+Origin naming one still reads its Bucket anonymously and a Bucket only an origin access control
+could reach answers 403.
 
 ## Cross-service integration
 

@@ -811,7 +811,12 @@ import {
   ChangeResourceRecordSetsCommand,
   CreateHostedZoneCommand,
 } from "@aws-sdk/client-route-53";
-import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import {
+  CreateBucketCommand,
+  PutBucketPolicyCommand,
+  PutObjectCommand,
+  PutPublicAccessBlockCommand,
+} from "@aws-sdk/client-s3";
 
 import { SimAws } from "@kensio/yulin";
 import { serveSimAws } from "@kensio/yulin/serve";
@@ -836,6 +841,32 @@ try {
       Key: "index.html",
       Body: "<h1>Hello from a Route53 hostname</h1>",
       ContentType: "text/html; charset=utf-8",
+    }),
+  );
+
+  // The Distribution's S3 Origin reads the Bucket anonymously, so the site has
+  // to be publicly readable.
+  await s3.putPublicAccessBlock(
+    new PutPublicAccessBlockCommand({
+      Bucket: "site-bucket",
+      PublicAccessBlockConfiguration: {
+        BlockPublicAcls: true,
+        IgnorePublicAcls: true,
+      },
+    }),
+  );
+  await s3.putBucketPolicy(
+    new PutBucketPolicyCommand({
+      Bucket: "site-bucket",
+      Policy: JSON.stringify({
+        Version: "2012-10-17",
+        Statement: {
+          Effect: "Allow",
+          Principal: "*",
+          Action: "s3:GetObject",
+          Resource: "arn:aws:s3:::site-bucket/*",
+        },
+      }),
     }),
   );
 

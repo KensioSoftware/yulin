@@ -3,7 +3,11 @@
  */
 
 import { CreateDistributionCommand } from "@aws-sdk/client-cloudfront";
-import { CreateBucketCommand } from "@aws-sdk/client-s3";
+import {
+  CreateBucketCommand,
+  PutBucketPolicyCommand,
+  PutPublicAccessBlockCommand,
+} from "@aws-sdk/client-s3";
 
 import { SimAws } from "@kensio/yulin";
 
@@ -14,6 +18,32 @@ const simCloudFront = simAws.cloudFront();
 await simS3.createBucket(
   new CreateBucketCommand({
     Bucket: "foo-bucket",
+  }),
+);
+
+// The Origin below has no origin access control, so it reads the Bucket
+// anonymously and only a public read grant lets it serve anything.
+await simS3.putPublicAccessBlock(
+  new PutPublicAccessBlockCommand({
+    Bucket: "foo-bucket",
+    PublicAccessBlockConfiguration: {
+      BlockPublicAcls: true,
+      IgnorePublicAcls: true,
+    },
+  }),
+);
+await simS3.putBucketPolicy(
+  new PutBucketPolicyCommand({
+    Bucket: "foo-bucket",
+    Policy: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: "*",
+        Action: "s3:GetObject",
+        Resource: "arn:aws:s3:::foo-bucket/*",
+      },
+    }),
   }),
 );
 

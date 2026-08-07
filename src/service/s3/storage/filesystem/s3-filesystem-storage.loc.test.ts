@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, it } from "vitest";
-import { grantPublicWebsiteRead } from "../../bucket/website/sim-s3-public-website.fixture.js";
+import { grantPublicObjectRead } from "../../bucket/sim-s3-public-read.fixture.js";
 import { SimAwsLocalServer } from "../../../../serve/index.js";
 import { TemporaryDirectory as TemporaryDirectory } from "../../../../util/filesystem/temporary-directory.js";
 import {
@@ -54,7 +54,7 @@ describe("Serve sim S3 Bucket on localhost with filesystem storage", () => {
         },
       }),
     );
-    await grantPublicWebsiteRead(simS3, bucketName);
+    await grantPublicObjectRead(simS3, bucketName);
 
     const simBucket = simS3.getSimBucketByName(bucketName);
     assertNonNullable(simBucket);
@@ -109,7 +109,7 @@ describe("Serve sim S3 Bucket on localhost with filesystem storage", () => {
         },
       }),
     );
-    await grantPublicWebsiteRead(simS3, bucketName);
+    await grantPublicObjectRead(simS3, bucketName);
 
     const simBucket = simS3.getSimBucketByName(bucketName);
     assertNonNullable(simBucket);

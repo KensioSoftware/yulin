@@ -4,6 +4,8 @@ import { SimCloudFrontFunction } from "../../../../cloudfront/cff/sim-cloudfront
 import { SimCloudFrontFunctionCfn } from "./sim-cloudfront-function-cfn.js";
 import { SimCloudFrontResponseHeadersPolicy } from "../../../../cloudfront/response-headers-policy/sim-cf-response-headers-policy.js";
 import { SimCloudFrontResponseHeadersPolicyCfn } from "./sim-cloudfront-rh-policy-cfn.js";
+import { SimCloudFrontOriginAccessControl } from "../../../../cloudfront/origin-access-control/sim-cf-origin-access-control.js";
+import { SimCloudFrontOriginAccessControlCfn } from "./sim-cloudfront-oac-cfn.js";
 import type {
   SimCfnResourceValueAdapterProperties,
   SimCfnServiceValueAdapter,
@@ -37,6 +39,15 @@ export function cloudFrontValueAdapter(
   ) {
     return new SimCloudFrontResponseHeadersPolicyCfn({
       policy: properties.simResource,
+    });
+  }
+
+  if (
+    properties.type === "AWS::CloudFront::OriginAccessControl" &&
+    properties.simResource instanceof SimCloudFrontOriginAccessControl
+  ) {
+    return new SimCloudFrontOriginAccessControlCfn({
+      originAccessControl: properties.simResource,
     });
   }
 

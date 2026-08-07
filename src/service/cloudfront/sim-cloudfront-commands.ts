@@ -52,6 +52,7 @@ import {
   emptyCloudFrontS3OriginResolver,
   type SimCloudFrontS3OriginResolver,
 } from "./origin/s3/sim-cloudfront-s3-origin.js";
+import type { SimCloudFrontOriginAccessControlRegistry } from "./origin-access-control/sim-cf-origin-access-control-registry.js";
 import { SimCloudFrontRegistry } from "./registry/sim-cloud-front-registry.js";
 
 /**
@@ -71,6 +72,7 @@ interface SimCloudFrontCommandsProperties extends SimCloudFrontProperties {
   readonly accountId: SimAwsAccountId;
   readonly distributions: SimCloudFrontDistributionMap;
   readonly cloudFrontFunctions: SimCloudFrontFunctionMap;
+  readonly originAccessControls: SimCloudFrontOriginAccessControlRegistry;
 }
 
 /**
@@ -122,6 +124,7 @@ export class SimCloudFrontCommands {
     | SimCfCustomOriginDispatcher
     | undefined;
   private readonly acmRegistry: SimAcmRegistry | undefined;
+  private readonly originAccessControls: SimCloudFrontOriginAccessControlRegistry;
 
   constructor(properties: SimCloudFrontCommandsProperties) {
     const {
@@ -152,6 +155,7 @@ export class SimCloudFrontCommands {
     this.s3OriginResolver = s3OriginResolver;
     this.customOriginDispatcher = customOriginDispatcher;
     this.acmRegistry = acmRegistry;
+    this.originAccessControls = properties.originAccessControls;
   }
 
   /**
@@ -237,11 +241,13 @@ export class SimCloudFrontCommands {
     readonly s3OriginResolver: SimCloudFrontS3OriginResolver;
     readonly customOriginDispatcher: SimCfCustomOriginDispatcher | undefined;
     readonly acmRegistry: SimAcmRegistry | undefined;
+    readonly originAccessControls: SimCloudFrontOriginAccessControlRegistry;
   } {
     return {
       s3OriginResolver: this.s3OriginResolver,
       customOriginDispatcher: this.customOriginDispatcher,
       acmRegistry: this.acmRegistry,
+      originAccessControls: this.originAccessControls,
     };
   }
 }

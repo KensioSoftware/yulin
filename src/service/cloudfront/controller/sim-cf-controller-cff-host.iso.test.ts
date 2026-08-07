@@ -7,6 +7,7 @@ import {
 import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
+import { grantPublicObjectRead } from "../../s3/bucket/sim-s3-public-read.fixture.js";
 import { SimCloudFrontServiceController } from "./sim-cloudfront-controller.js";
 import { SimAwsServiceRequest } from "../../../serve/controller/sim-service-controller.js";
 import { makeCffFunctionCodeInput } from "../cff/function-code-input/cff-function-code-input.js";
@@ -38,6 +39,7 @@ async function makeHostCffDistribution(
       Body: "<h1>From the Origin</h1>",
     }),
   );
+  await grantPublicObjectRead(simAws.s3(), "cff-host-bucket");
 
   const cffOutput = await simCloudFront.createFunction(
     new CreateFunctionCommand({

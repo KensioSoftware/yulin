@@ -18,6 +18,7 @@ import { describe, it } from "vitest";
 import { SimAwsServiceRequest } from "../../../../serve/controller/sim-service-controller.js";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
+import { grantPublicObjectRead } from "../../../s3/bucket/sim-s3-public-read.fixture.js";
 import { SimCloudFrontServiceController } from "../../controller/sim-cloudfront-controller.js";
 import {
   SimCloudFrontDistributionNotDisabled,
@@ -74,6 +75,7 @@ async function givenDistribution(aliases: string[] = []): Promise<Distro> {
       Body: "<h1>Served</h1>",
     }),
   );
+  await grantPublicObjectRead(simAws.s3(), "example-bucket");
 
   const simCloudFront = simAws.cloudFront();
   const created = await simCloudFront.createDistribution(

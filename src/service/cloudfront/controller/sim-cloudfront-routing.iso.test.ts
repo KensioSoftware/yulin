@@ -9,6 +9,7 @@ import { CreateBucketCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { CreateDistributionCommand } from "@aws-sdk/client-cloudfront";
 import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
+import { grantPublicObjectRead } from "../../s3/bucket/sim-s3-public-read.fixture.js";
 import { SimCloudFrontServiceController } from "./sim-cloudfront-controller.js";
 import { SimAwsServiceRequest } from "../../../serve/controller/sim-service-controller.js";
 
@@ -48,6 +49,7 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
         Body: "<h1>From Distribution host</h1>",
       }),
     );
+    await grantPublicObjectRead(simAws.s3(), "distro-host-bucket");
 
     const cloudFront = simAws.cloudFront();
     const distributionCreation = await cloudFront.createDistribution(
@@ -118,6 +120,7 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
         Body: "<h1>Default origin page</h1>",
       }),
     );
+    await grantPublicObjectRead(simAws.s3(), "default-origin-bucket");
 
     await simAws.s3().createBucket(
       new CreateBucketCommand({
@@ -131,6 +134,7 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
         Body: "<h1>Wrong origin page</h1>",
       }),
     );
+    await grantPublicObjectRead(simAws.s3(), "asset-origin-bucket");
 
     const cloudFront = simAws.cloudFront();
     const distributionCreation = await cloudFront.createDistribution(
@@ -209,6 +213,7 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
         Body: "default logo",
       }),
     );
+    await grantPublicObjectRead(simAws.s3(), "specific-default-bucket");
 
     await simAws.s3().createBucket(
       new CreateBucketCommand({
@@ -222,6 +227,7 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
         Body: "asset logo",
       }),
     );
+    await grantPublicObjectRead(simAws.s3(), "specific-assets-bucket");
 
     await simAws.s3().createBucket(
       new CreateBucketCommand({
@@ -235,6 +241,7 @@ describe("Simulated CloudFront local HTTP controller routing", () => {
         Body: "image logo",
       }),
     );
+    await grantPublicObjectRead(simAws.s3(), "specific-images-bucket");
 
     const cloudFront = simAws.cloudFront();
     const distributionCreation = await cloudFront.createDistribution(

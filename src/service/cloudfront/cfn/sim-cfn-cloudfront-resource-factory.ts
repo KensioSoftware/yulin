@@ -8,6 +8,7 @@ import { SimCfnCfDistroCreator } from "./distro/sim-cfn-cf-distro-creator.js";
 import { SimCfnCffCreator } from "./cff/sim-cfn-cff-creator.js";
 import { SimCfnCfDistroDeleter } from "./distro/sim-cfn-cf-distro-deleter.js";
 import { SimCfnCfResponseHeadersPolicyCreator } from "./response-headers-policy/sim-cfn-cf-rh-policy-creator.js";
+import { SimCfnCfOriginAccessControlCreator } from "./origin-access-control/sim-cfn-cf-oac-creator.js";
 import type { SimCloudFrontFunction } from "../cff/sim-cloudfront-function.js";
 import { assertDefined } from "../../../util/type-guard/defined.js";
 
@@ -20,6 +21,7 @@ export class SimCloudFrontCloudFormationResourceFactory implements SimCfnService
   private readonly functionCreator: SimCfnCffCreator;
   private readonly distroDeleter: SimCfnCfDistroDeleter;
   private readonly responseHeadersPolicyCreator: SimCfnCfResponseHeadersPolicyCreator;
+  private readonly originAccessControlCreator: SimCfnCfOriginAccessControlCreator;
 
   constructor(cloudFront: SimCloudFront) {
     this.cloudFront = cloudFront;
@@ -28,6 +30,9 @@ export class SimCloudFrontCloudFormationResourceFactory implements SimCfnService
     this.distroDeleter = new SimCfnCfDistroDeleter({ cloudFront });
     this.responseHeadersPolicyCreator =
       new SimCfnCfResponseHeadersPolicyCreator({ cloudFront });
+    this.originAccessControlCreator = new SimCfnCfOriginAccessControlCreator({
+      cloudFront,
+    });
   }
 
   /**
@@ -54,6 +59,12 @@ export class SimCloudFrontCloudFormationResourceFactory implements SimCfnService
       }
       case "ResponseHeadersPolicy": {
         return this.responseHeadersPolicyCreator.create(
+          resource,
+          context.resolvedProperties ?? resource.properties,
+        );
+      }
+      case "OriginAccessControl": {
+        return this.originAccessControlCreator.create(
           resource,
           context.resolvedProperties ?? resource.properties,
         );
@@ -85,6 +96,10 @@ export class SimCloudFrontCloudFormationResourceFactory implements SimCfnService
       }
       case "ResponseHeadersPolicy": {
         this.responseHeadersPolicyCreator.delete(resource);
+        return;
+      }
+      case "OriginAccessControl": {
+        this.originAccessControlCreator.delete(resource);
         return;
       }
       default: {
