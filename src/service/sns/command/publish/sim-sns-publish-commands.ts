@@ -1,13 +1,14 @@
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
-import { SimSnsBatchRequestTooLongException } from "../../error/sim-sns.error.js";
+import type { SimSnsFanOut } from "../../delivery/sim-sns-fan-out.js";
 import {
   assertSimSnsMessageWithinLimit,
-  simSnsMaximumPublishBytes,
   SimSnsPublishedMessage,
 } from "../../message/sim-sns-published-message.js";
+import type { SimSnsTopic } from "../../topic/sim-sns-topic.js";
 import type { SimSnsRequestOptions } from "../sim-sns-request-options.js";
 import type { SimSnsTopicAccess } from "../topic/sim-sns-topic-access.js";
 import {
+  assertSnsBatchWithinSizeLimit,
   requireSnsBatchEntries,
   runSnsBatch,
 } from "./sim-sns-batch-entries.js";
@@ -33,6 +34,7 @@ const publishAction = "sns:Publish";
 interface SimSnsPublishCommandsProperties {
   readonly access: SimSnsTopicAccess;
   readonly clock: BackgroundScheduler;
+  readonly fanOut: SimSnsFanOut;
 }
 
 /**
@@ -41,15 +43,18 @@ interface SimSnsPublishCommandsProperties {
  * A topic keeps nothing a publish sends it. Real SNS hands a message to the
  * topic's subscriptions and forgets it, so a topic with no subscriptions
  * accepts a publish, answers with a message id, and the message goes nowhere.
- * That is what a publish does here, since subscriptions are not simulated yet.
+ * That is what a publish does here too, and a topic with subscriptions hands
+ * each of them a copy on the background scheduler.
  */
 export class SimSnsPublishCommands {
   private readonly access: SimSnsTopicAccess;
   private readonly clock: BackgroundScheduler;
+  private readonly fanOut: SimSnsFanOut;
 
   constructor(properties: SimSnsPublishCommandsProperties) {
     this.access = properties.access;
     this.clock = properties.clock;
+    this.fanOut = properties.fanOut;
   }
 
   /**
@@ -62,12 +67,17 @@ export class SimSnsPublishCommands {
     refuseUnsimulatedPublishTarget(command.input);
 
     // The topic has to be there and the caller has to be allowed to publish to
-    // it, which is all a publish needs of it while nothing subscribes.
-    this.access.requireByArn(publishAction, command.input.TopicArn, options);
-
+    // it before anything is read out of the message.
+    const topic = this.access.requireByArn(
+      publishAction,
+      command.input.TopicArn,
+      options,
+    );
     const message = this.published(command.input);
 
     assertSimSnsMessageWithinLimit(message.byteSize);
+
+    this.fanOut.publish(topic, message);
 
     return { $metadata: {}, MessageId: message.messageId };
   }
@@ -85,8 +95,11 @@ export class SimSnsPublishCommands {
     command: SimPublishBatchCommand,
     options?: SimSnsRequestOptions,
   ): SimPublishBatchCommandOutput {
-    this.access.requireByArn(publishAction, command.input.TopicArn, options);
-
+    const topic = this.access.requireByArn(
+      publishAction,
+      command.input.TopicArn,
+      options,
+    );
     const entries = requireSnsBatchEntries(
       command.input.PublishBatchRequestEntries,
     );
@@ -95,7 +108,8 @@ export class SimSnsPublishCommands {
       message: this.published(entry),
     }));
 
-    this.assertBatchWithinSizeLimit(outcome.successful);
+    assertSnsBatchWithinSizeLimit(outcome.successful);
+    this.fanOutBatch(topic, outcome.successful);
 
     const successful: readonly SimSnsPublishBatchResultEntry[] =
       outcome.successful.map(({ id, message }) => ({
@@ -107,6 +121,22 @@ export class SimSnsPublishCommands {
   }
 
   /**
+   * Hand every message a batch published to the topic's subscriptions.
+   *
+   * The whole batch is checked before any of it is delivered, because a batch
+   * over the size limit fails outright, and a message from a failed request
+   * should reach nothing.
+   */
+  private fanOutBatch(
+    topic: SimSnsTopic,
+    published: readonly { readonly message: SimSnsPublishedMessage }[],
+  ): void {
+    for (const { message } of published) {
+      this.fanOut.publish(topic, message);
+    }
+  }
+
+  /**
    * Read and check one message a request describes.
    */
   private published(published: SimSnsPublishedFields): SimSnsPublishedMessage {
@@ -114,29 +144,5 @@ export class SimSnsPublishCommands {
       simSnsPublishedMessageInput(published),
       this.clock.now(),
     );
-  }
-
-  /**
-   * Refuse a batch weighing more than one publish is allowed to.
-   *
-   * Real SNS holds the whole batch to the 256 KB a single publish is held to,
-   * rather than each entry, so ten entries just inside the limit are one batch
-   * far outside it.
-   */
-  private assertBatchWithinSizeLimit(
-    published: readonly { readonly message: SimSnsPublishedMessage }[],
-  ): void {
-    const byteSize = published.reduce(
-      (total, { message }) => total + message.byteSize,
-      0,
-    );
-
-    if (byteSize > simSnsMaximumPublishBytes) {
-      throw new SimSnsBatchRequestTooLongException(
-        `The batch request is longer than the permitted size. A batch may be ` +
-          `up to ${String(simSnsMaximumPublishBytes)} bytes, and this one is ` +
-          `${String(byteSize)} bytes.`,
-      );
-    }
   }
 }

@@ -9,18 +9,12 @@ import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
-import { SimSnsAuthorizer } from "./command/authorize/sim-sns-authorizer.js";
-import { SimSnsPublishCommands } from "./command/publish/sim-sns-publish-commands.js";
+import type { SimSnsDeliveryEndpoints } from "./delivery/sim-sns-delivery.js";
+import type { SimSnsDeliveryFailure } from "./delivery/sim-sns-delivery-failures.js";
+import { SimSnsNoDeliveryEndpoints } from "./delivery/sqs/sim-aws-sns-delivery-queues.js";
 import type * as simSnsCommands from "./command/sim-sns-command.types.js";
+import { SimSnsCommands } from "./command/sim-sns-commands.js";
 import type { SimSnsRequestOptions } from "./command/sim-sns-request-options.js";
-import { SimSnsSubscriptionAccess } from "./command/subscription/sim-sns-subscription-access.js";
-import { SimSnsSubscriptionAttributeCommands } from "./command/subscription/sim-sns-subscription-attribute-commands.js";
-import { SimSnsSubscriptionCommands } from "./command/subscription/sim-sns-subscription-commands.js";
-import { SimSnsSubscriptionListings } from "./command/subscription/sim-sns-subscription-listings.js";
-import { SimSnsCreateTopic } from "./command/topic/sim-sns-create-topic.js";
-import { SimSnsTopicAccess } from "./command/topic/sim-sns-topic-access.js";
-import { SimSnsTopicAttributeCommands } from "./command/topic/sim-sns-topic-attribute-commands.js";
-import { SimSnsTopicCommands } from "./command/topic/sim-sns-topic-commands.js";
 import { SimSnsSdkCommandRouter } from "./sdk/sim-sns-sdk-command-router.js";
 import type { SimSnsSubscription } from "./subscription/sim-sns-subscription.js";
 import { SimSnsSubscriptionStore } from "./subscription/sim-sns-subscription-store.js";
@@ -31,6 +25,14 @@ interface SimSnsProperties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
+
+  /**
+   * Where this scope's subscriptions deliver to.
+   *
+   * A SimSns built on its own has none, since a queue in another simulated
+   * service is only reachable through SimAws.
+   */
+  readonly deliveryEndpoints?: SimSnsDeliveryEndpoints;
 }
 
 /**
@@ -45,13 +47,7 @@ interface SimSnsProperties {
 export class SimSns {
   private readonly topics = new SimSnsTopicStore();
   private readonly subscriptions = new SimSnsSubscriptionStore();
-  private readonly topicCreation: SimSnsCreateTopic;
-  private readonly topicCommands: SimSnsTopicCommands;
-  private readonly attributeCommands: SimSnsTopicAttributeCommands;
-  private readonly subscriptionCommands: SimSnsSubscriptionCommands;
-  private readonly subscriptionListings: SimSnsSubscriptionListings;
-  private readonly subscriptionAttributeCommands: SimSnsSubscriptionAttributeCommands;
-  private readonly publishCommands: SimSnsPublishCommands;
+  private readonly commands: SimSnsCommands;
   private readonly background: BackgroundScheduler;
   private readonly sdkRouter = new SimSnsSdkCommandRouter(this);
 
@@ -60,49 +56,39 @@ export class SimSns {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
+      deliveryEndpoints = new SimSnsNoDeliveryEndpoints(),
     } = properties;
 
-    const access = new SimSnsTopicAccess({
-      topics: this.topics,
-      authorizer: new SimSnsAuthorizer({ iam }),
-      accountRegionScope,
-    });
-    const subscriptionAccess = new SimSnsSubscriptionAccess({
-      subscriptions: this.subscriptions,
-      topicAccess: access,
-      accountRegionScope,
-    });
-
     this.background = background;
-    this.topicCreation = new SimSnsCreateTopic({
+    this.commands = new SimSnsCommands({
       topics: this.topics,
-      access,
+      subscriptions: this.subscriptions,
+      iam,
+      background,
+      deliveryEndpoints,
       accountRegionScope,
     });
-    this.topicCommands = new SimSnsTopicCommands({
-      topics: this.topics,
-      subscriptions: this.subscriptions,
-      access,
-    });
-    this.attributeCommands = new SimSnsTopicAttributeCommands({
-      access,
-      subscriptions: this.subscriptions,
-    });
-    this.subscriptionCommands = new SimSnsSubscriptionCommands({
-      subscriptions: this.subscriptions,
-      topicAccess: access,
-      subscriptionAccess,
-    });
-    this.subscriptionListings = new SimSnsSubscriptionListings({
-      subscriptions: this.subscriptions,
-      topicAccess: access,
-    });
-    this.subscriptionAttributeCommands =
-      new SimSnsSubscriptionAttributeCommands({ access: subscriptionAccess });
-    this.publishCommands = new SimSnsPublishCommands({
-      access,
-      clock: background,
-    });
+  }
+
+  /**
+   * Every message this simulated SNS could not deliver.
+   *
+   * Real SNS tells the publisher nothing about a failed delivery, and neither
+   * does this. A queue that is unexpectedly empty is explained here.
+   */
+  get deliveryFailures(): readonly SimSnsDeliveryFailure[] {
+    return this.commands.fanOut.deliveryFailures;
+  }
+
+  /**
+   * The certificate a delivered message's `SigningCertURL` names.
+   *
+   * The URL cannot be fetched, because simulated SNS is not served over HTTP,
+   * so this is how a verifier gets at the certificate to check a signature
+   * with. A URL this scope did not issue answers with nothing.
+   */
+  signingCertificate(signingCertUrl: string): string | undefined {
+    return this.commands.signer.certificateFor(signingCertUrl);
   }
 
   /**
@@ -133,7 +119,7 @@ export class SimSns {
     options?: SimSnsRequestOptions,
   ): Promise<simSnsCommands.SimCreateTopicCommandOutput> {
     await this.background.sequence();
-    return this.topicCreation.handle(command, options);
+    return this.commands.topicCreation.handle(command, options);
   }
 
   /**
@@ -144,7 +130,7 @@ export class SimSns {
     options?: SimSnsRequestOptions,
   ): Promise<simSnsCommands.SimListTopicsCommandOutput> {
     await this.background.sequence();
-    return this.topicCommands.listTopics(command, options);
+    return this.commands.topics.listTopics(command, options);
   }
 
   /**
@@ -155,7 +141,7 @@ export class SimSns {
     options?: SimSnsRequestOptions,
   ): Promise<simSnsCommands.SimDeleteTopicCommandOutput> {
     await this.background.sequence();
-    return this.topicCommands.deleteTopic(command, options);
+    return this.commands.topics.deleteTopic(command, options);
   }
 
   /**
@@ -166,7 +152,7 @@ export class SimSns {
     options?: SimSnsRequestOptions,
   ): Promise<simSnsCommands.SimGetTopicAttributesCommandOutput> {
     await this.background.sequence();
-    return this.attributeCommands.getTopicAttributes(command, options);
+    return this.commands.topicAttributes.getTopicAttributes(command, options);
   }
 
   /**
@@ -177,7 +163,7 @@ export class SimSns {
     options?: SimSnsRequestOptions,
   ): Promise<simSnsCommands.SimSetTopicAttributesCommandOutput> {
     await this.background.sequence();
-    return this.attributeCommands.setTopicAttributes(command, options);
+    return this.commands.topicAttributes.setTopicAttributes(command, options);
   }
 
   /**
@@ -188,7 +174,7 @@ export class SimSns {
     options?: SimSnsRequestOptions,
   ): Promise<simSnsCommands.SimSubscribeCommandOutput> {
     await this.background.sequence();
-    return this.subscriptionCommands.subscribe(command, options);
+    return this.commands.subscriptions.subscribe(command, options);
   }
 
   /**
@@ -199,7 +185,7 @@ export class SimSns {
     options?: SimSnsRequestOptions,
   ): Promise<simSnsCommands.SimUnsubscribeCommandOutput> {
     await this.background.sequence();
-    return this.subscriptionCommands.unsubscribe(command, options);
+    return this.commands.subscriptions.unsubscribe(command, options);
   }
 
   /**
@@ -210,7 +196,10 @@ export class SimSns {
     options?: SimSnsRequestOptions,
   ): Promise<simSnsCommands.SimListSubscriptionsCommandOutput> {
     await this.background.sequence();
-    return this.subscriptionListings.listSubscriptions(command, options);
+    return this.commands.subscriptionListings.listSubscriptions(
+      command,
+      options,
+    );
   }
 
   /**
@@ -221,7 +210,10 @@ export class SimSns {
     options?: SimSnsRequestOptions,
   ): Promise<simSnsCommands.SimListSubscriptionsByTopicCommandOutput> {
     await this.background.sequence();
-    return this.subscriptionListings.listSubscriptionsByTopic(command, options);
+    return this.commands.subscriptionListings.listSubscriptionsByTopic(
+      command,
+      options,
+    );
   }
 
   /**
@@ -232,7 +224,7 @@ export class SimSns {
     options?: SimSnsRequestOptions,
   ): Promise<simSnsCommands.SimGetSubscriptionAttributesCommandOutput> {
     await this.background.sequence();
-    return this.subscriptionAttributeCommands.getSubscriptionAttributes(
+    return this.commands.subscriptionAttributes.getSubscriptionAttributes(
       command,
       options,
     );
@@ -246,7 +238,7 @@ export class SimSns {
     options?: SimSnsRequestOptions,
   ): Promise<simSnsCommands.SimSetSubscriptionAttributesCommandOutput> {
     await this.background.sequence();
-    return this.subscriptionAttributeCommands.setSubscriptionAttributes(
+    return this.commands.subscriptionAttributes.setSubscriptionAttributes(
       command,
       options,
     );
@@ -260,7 +252,7 @@ export class SimSns {
     options?: SimSnsRequestOptions,
   ): Promise<simSnsCommands.SimPublishCommandOutput> {
     await this.background.sequence();
-    return this.publishCommands.publish(command, options);
+    return this.commands.publish.publish(command, options);
   }
 
   /**
@@ -271,7 +263,7 @@ export class SimSns {
     options?: SimSnsRequestOptions,
   ): Promise<simSnsCommands.SimPublishBatchCommandOutput> {
     await this.background.sequence();
-    return this.publishCommands.publishBatch(command, options);
+    return this.commands.publish.publishBatch(command, options);
   }
 
   /**

@@ -5,9 +5,8 @@ every operation is authorized by simulated IAM.
 
 Standard topics only. SNS-specific types are imported from the `@kensio/yulin/sns` subpath.
 
-Subscriptions are held, but delivery is not simulated yet, so a published message still reaches
-nothing. A publish is accepted and answered with a `MessageId`, which is what real SNS does with a
-publish to a topic nothing subscribes to.
+A message published to a topic is delivered to every queue subscribed to it. Other subscription
+protocols are not simulated.
 
 ## Creating a topic and publishing to it
 
@@ -205,10 +204,6 @@ console.log(published.Failed?.[0]?.Code); // "InvalidParameterValueException"
 There is no confirmation step for that protocol, as there is none on real SNS: the subscription is
 confirmed the moment it exists.
 
-Delivery is not simulated yet, so a published message still reaches nothing. What a subscription
-gives a test today is the SNS-side wiring: which queues a topic would reach, and what each would be
-sent.
-
 ```typescript sim-sns-subscriptions
 /**
  * Subscribing a queue to a simulated topic, and reading the subscription back.
@@ -299,6 +294,267 @@ because the only protocol simulated is the one that needs no confirmation.
 Only the `sqs` protocol is simulated. Every other protocol real SNS has is refused by name at
 `Subscribe` time with the reason it is missing, rather than creating a subscription that would never
 be delivered to.
+
+## Delivering to a queue
+
+Publishing to a topic delivers one message to each subscribed queue. That happens after the publish
+has been answered, as it does on real SNS, so a test waits for it with
+`simAws.backgroundTasksComplete()` before receiving.
+
+```typescript sim-sns-fan-out
+/**
+ * Publishing once and having two queues each receive a copy.
+ */
+
+import {
+  CreateTopicCommand,
+  PublishCommand,
+  SubscribeCommand,
+} from "@aws-sdk/client-sns";
+import {
+  CreateQueueCommand,
+  ReceiveMessageCommand,
+  SetQueueAttributesCommand,
+} from "@aws-sdk/client-sqs";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const sns = simAws.sns();
+const sqs = simAws.sqs();
+
+const { TopicArn } = await sns.createTopic(
+  new CreateTopicCommand({ Name: "orders" }),
+);
+
+/**
+ * Create a queue that admits SNS to send to it for this topic, and subscribe
+ * it. The queue policy is what allows the delivery, and it is checked on every
+ * message rather than remembered from subscribe time.
+ */
+async function subscribeQueue(queueName: string): Promise<string> {
+  const { QueueUrl } = await sqs.createQueue(
+    new CreateQueueCommand({ QueueName: queueName }),
+  );
+  const queueArn = `arn:aws:sqs:${simAws.defaultRegionName}:${simAws.defaultAccountId}:${queueName}`;
+
+  await sqs.setQueueAttributes(
+    new SetQueueAttributesCommand({
+      QueueUrl,
+      Attributes: {
+        Policy: JSON.stringify({
+          Version: "2012-10-17",
+          Statement: [
+            {
+              Effect: "Allow",
+              Principal: { Service: "sns.amazonaws.com" },
+              Action: "sqs:SendMessage",
+              Resource: queueArn,
+              Condition: { ArnLike: { "aws:SourceArn": TopicArn } },
+            },
+          ],
+        }),
+      },
+    }),
+  );
+
+  await sns.subscribe(
+    new SubscribeCommand({ TopicArn, Protocol: "sqs", Endpoint: queueArn }),
+  );
+
+  return QueueUrl ?? "";
+}
+
+const fulfilment = await subscribeQueue("fulfilment");
+const audit = await subscribeQueue("audit");
+
+await sns.publish(new PublishCommand({ TopicArn, Message: "order-1" }));
+
+// Delivery happens after the publish is answered, as it does on real SNS.
+await simAws.backgroundTasksComplete();
+
+for (const QueueUrl of [fulfilment, audit]) {
+  const { Messages } = await sqs.receiveMessage(
+    new ReceiveMessageCommand({ QueueUrl }),
+  );
+  const envelope = JSON.parse(Messages?.[0]?.Body ?? "{}") as {
+    Type: string;
+    Message: string;
+  };
+
+  console.log(envelope.Type); // "Notification"
+  console.log(envelope.Message); // "order-1"
+}
+```
+
+The queue's policy is what allows the delivery. It has to admit `sns.amazonaws.com` for
+`sqs:SendMessage`, and the `aws:SourceArn` condition is what keeps one topic's grant from opening the
+queue to another. The policy is checked on every message rather than remembered from subscribe time,
+so a permission taken away afterwards stops delivery.
+
+Nothing checks the queue at `Subscribe` time, because real SNS does not either. A subscription to a
+queue that does not exist, or to one whose policy says no, is created and fails when a message is
+delivered to it.
+
+A delivery that fails is not reported to the publisher, as it is not on real SNS: the publish is
+answered with a `MessageId` before anything is delivered. It is recorded instead, so a queue that is
+unexpectedly empty says why:
+
+```typescript
+const [failure] = simAws.sns().deliveryFailures;
+
+console.log(failure?.endpointArn);
+console.log(failure?.reason);
+console.log(failure?.wasRefused); // true when the queue policy said no
+```
+
+A queue in another account or another region receives a message the same way. Real SNS delivers
+across both, which differs from simulated S3 event notifications: real S3 requires a destination
+queue to be in the bucket's region, and this does not.
+
+## The message a queue receives
+
+By default the body is the SNS envelope, which is the JSON document real SNS wraps a published
+message in. A consumer reads the message out of it with `JSON.parse(body).Message`:
+
+```json
+{
+  "Type": "Notification",
+  "MessageId": "0f2a0a49-9e3f-4d02-9e5f-2d9f0e5b6d51",
+  "TopicArn": "arn:aws:sns:us-east-1:888888888888:orders",
+  "Subject": "New order",
+  "Message": "order-1",
+  "Timestamp": "2026-01-01T00:00:00.000Z",
+  "SignatureVersion": "1",
+  "Signature": "...",
+  "SigningCertURL": "https://sns.us-east-1.yulin.invalid/SimulatedNotificationService-....pem",
+  "UnsubscribeURL": "https://sns.us-east-1.yulin.invalid/?Action=Unsubscribe&SubscriptionArn=...",
+  "MessageAttributes": { "tenant": { "Type": "String", "Value": "acme" } }
+}
+```
+
+`Subject` and `MessageAttributes` are there only when the publish carried them. A binary message
+attribute travels base64 encoded, since the envelope is JSON.
+
+With `RawMessageDelivery` set to `true` on the subscription, the body is the published `Message` on
+its own and the published message attributes arrive as SQS message attributes instead. Both matter,
+because a consumer written for one breaks on the other.
+
+## Verifying a message signature
+
+The `Signature` in the envelope is a real RSA signature over the string real SNS signs: the signed
+fields in alphabetical order, each one its name and its value followed by a newline. Signature
+version `1` is SHA1withRSA, which is what real SNS signs with unless a topic opts into version 2.
+
+The key pair belongs to the simulated SNS scope, as a real signing certificate belongs to a region.
+`SigningCertURL` names its certificate, and `simAws.sns().signingCertificate(url)` hands it over: the
+URL itself cannot be fetched, because simulated SNS is not served over HTTP.
+
+```typescript sim-sns-message-signature
+/**
+ * Verifying the signature on a message a simulated topic delivered.
+ */
+
+import { createVerify } from "node:crypto";
+
+import {
+  CreateTopicCommand,
+  PublishCommand,
+  SubscribeCommand,
+} from "@aws-sdk/client-sns";
+import {
+  CreateQueueCommand,
+  ReceiveMessageCommand,
+  SetQueueAttributesCommand,
+} from "@aws-sdk/client-sqs";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const sns = simAws.sns();
+const sqs = simAws.sqs();
+
+const { TopicArn } = await sns.createTopic(
+  new CreateTopicCommand({ Name: "orders" }),
+);
+const { QueueUrl } = await sqs.createQueue(
+  new CreateQueueCommand({ QueueName: "orders" }),
+);
+const queueArn = `arn:aws:sqs:${simAws.defaultRegionName}:${simAws.defaultAccountId}:orders`;
+
+await sqs.setQueueAttributes(
+  new SetQueueAttributesCommand({
+    QueueUrl,
+    Attributes: {
+      Policy: JSON.stringify({
+        Version: "2012-10-17",
+        Statement: [
+          {
+            Effect: "Allow",
+            Principal: { Service: "sns.amazonaws.com" },
+            Action: "sqs:SendMessage",
+            Resource: queueArn,
+            Condition: { ArnLike: { "aws:SourceArn": TopicArn } },
+          },
+        ],
+      }),
+    },
+  }),
+);
+
+await sns.subscribe(
+  new SubscribeCommand({ TopicArn, Protocol: "sqs", Endpoint: queueArn }),
+);
+
+await sns.publish(new PublishCommand({ TopicArn, Message: "order-1" }));
+await simAws.backgroundTasksComplete();
+
+const { Messages } = await sqs.receiveMessage(
+  new ReceiveMessageCommand({ QueueUrl }),
+);
+const envelope = JSON.parse(Messages?.[0]?.Body ?? "{}") as {
+  Type: string;
+  MessageId: string;
+  Subject?: string;
+  Message: string;
+  Timestamp: string;
+  TopicArn: string;
+  SignatureVersion: string;
+  Signature: string;
+  SigningCertURL: string;
+};
+
+// The string SNS signs is the signed fields in alphabetical order, each one its
+// name and its value followed by a newline. A field the message does not carry,
+// such as Subject, is left out.
+const signed = (
+  [
+    ["Message", envelope.Message],
+    ["MessageId", envelope.MessageId],
+    ["Subject", envelope.Subject],
+    ["Timestamp", envelope.Timestamp],
+    ["TopicArn", envelope.TopicArn],
+    ["Type", envelope.Type],
+  ] as const
+)
+  .filter(([, value]) => value !== undefined)
+  .map(([name, value]) => `${name}\n${value ?? ""}\n`)
+  .join("");
+
+// The certificate comes from the simulator rather than from the network: the
+// SigningCertURL names the simulated host and nothing serves it.
+const certificate = sns.signingCertificate(envelope.SigningCertURL);
+
+const verified = createVerify("RSA-SHA1")
+  .update(signed, "utf8")
+  .verify(certificate ?? "", envelope.Signature, "base64");
+
+console.log(envelope.SignatureVersion); // "1"
+console.log(verified); // true
+```
+
+The message attributes are not signed, here or on real AWS, so changing one in flight leaves the
+signature valid.
 
 ## IAM permissions
 
@@ -541,6 +797,10 @@ Sim SNS currently supports:
 - `ListSubscriptionsCommand` and `ListSubscriptionsByTopicCommand`, paged at a hundred subscriptions
   with a `NextToken`
 - `GetSubscriptionAttributesCommand` and `SetSubscriptionAttributesCommand`, for `RawMessageDelivery`
+- Delivery of a published message to every subscribed queue, including a queue in another account or
+  another region, authorized by that queue's own policy on every message
+- The SNS envelope, with a real RSA signature a verifier can check against the certificate the
+  message names, and `RawMessageDelivery` for the published message on its own
 - Authorization of every operation by simulated IAM, against the real IAM action and topic ARN
 - The `Policy` attribute as the topic's resource policy, admitting another account's principal or a
   service principal, with `aws:SourceArn` and `aws:SourceAccount` conditions honoured
@@ -551,11 +811,21 @@ Sim SNS currently supports:
 
 Current documented limitations:
 
-- Delivery is not simulated. A subscription can be created, listed and removed, but a published
-  message reaches no endpoint. A publish is accepted and answered with a `MessageId`, which is what
-  real SNS does with a publish to a topic nothing subscribes to.
-- Only the `sqs` subscription protocol is simulated. `lambda`, `http`, `https`, `email`,
-  `email-json`, `sms`, `application` and `firehose` are refused at `Subscribe` time.
+- Only the `sqs` subscription protocol is simulated, so a queue is the only thing a topic can deliver
+  to. `lambda`, `http`, `https`, `email`, `email-json`, `sms`, `application` and `firehose` are
+  refused at `Subscribe` time.
+- `SigningCertURL` and `UnsubscribeURL` name `sns.<region>.yulin.invalid` rather than
+  `sns.<region>.amazonaws.com`, and neither can be fetched: simulated SNS is not served over HTTP.
+  The certificate is handed out in process by `simAws.sns().signingCertificate(url)`. A real SNS
+  signature verifier such as `sns-validator` hard-codes an `amazonaws.com` certificate host and
+  fetches the URL itself, so it cannot verify a simulated message as it stands. Verify with
+  `node:crypto` against the certificate the simulator hands over instead.
+- A delivery failure is not reported to the publisher, as it is not on real SNS. It is recorded on
+  `simAws.sns().deliveryFailures`, and anything other than a queue policy refusal is also warned
+  about once on the console.
+- Delivery retry policies, subscription dead-letter queues and delivery status logging are not
+  simulated, so a message an endpoint would not take is delivered once and recorded as a failure
+  rather than retried.
 - `ConfirmSubscription` is not supported. The only protocol simulated needs no confirmation, so
   there is no confirmation token to confirm.
 - Subscription filter policies are not simulated, so `FilterPolicy` and `FilterPolicyScope` are

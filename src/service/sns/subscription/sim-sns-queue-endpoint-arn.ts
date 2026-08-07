@@ -1,3 +1,6 @@
+import type { SimAwsAccountId } from "../../aws/sim-aws-account-id.js";
+import type { AwsRegionName } from "../../aws/sim-aws-region.js";
+import { sqsQueueUrl } from "../../sqs/queue/sim-sqs-queue-arn.js";
 import {
   SimSnsInvalidParameterException,
   SimSnsUnsimulatedInputException,
@@ -13,8 +16,8 @@ const queueArnParts = 6;
 
 interface SimSnsQueueEndpointArnProperties {
   readonly value: string;
-  readonly regionName: string;
-  readonly accountId: string;
+  readonly regionName: AwsRegionName;
+  readonly accountId: SimAwsAccountId;
   readonly queueName: string;
 }
 
@@ -27,8 +30,8 @@ interface SimSnsQueueEndpointArnProperties {
  */
 export class SimSnsQueueEndpointArn {
   public readonly value: string;
-  public readonly regionName: string;
-  public readonly accountId: string;
+  public readonly regionName: AwsRegionName;
+  public readonly accountId: SimAwsAccountId;
   public readonly queueName: string;
 
   private constructor(properties: SimSnsQueueEndpointArnProperties) {
@@ -78,9 +81,24 @@ export class SimSnsQueueEndpointArn {
 
     return new this({
       value: endpoint,
-      regionName,
-      accountId,
+      // The Region and the Account come out of an ARN as plain strings. They
+      // are the branded types everywhere else, and an ARN naming a scope the
+      // simulation has never seen resolves to an empty one rather than being
+      // refused here, the same as any other ARN a request carries.
+      regionName: regionName as AwsRegionName,
+      accountId: accountId as SimAwsAccountId,
       queueName,
+    });
+  }
+
+  /**
+   * The URL an SQS request names this queue by.
+   */
+  get queueUrl(): string {
+    return sqsQueueUrl({
+      regionName: this.regionName,
+      accountId: this.accountId,
+      name: this.queueName,
     });
   }
 }

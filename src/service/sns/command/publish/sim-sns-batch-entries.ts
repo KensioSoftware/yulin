@@ -1,10 +1,15 @@
 import {
   SimSnsBatchEntryIdsNotDistinctException,
+  SimSnsBatchRequestTooLongException,
   SimSnsEmptyBatchRequestException,
   SimSnsError,
   SimSnsInvalidBatchEntryIdException,
   SimSnsTooManyEntriesInBatchRequestException,
 } from "../../error/sim-sns.error.js";
+import {
+  simSnsMaximumPublishBytes,
+  type SimSnsPublishedMessage,
+} from "../../message/sim-sns-published-message.js";
 import type { SimSnsBatchResultErrorEntry } from "./publish.command.js";
 
 const maximumEntries = 10;
@@ -119,4 +124,29 @@ function requireEntryId(id: string | undefined): string {
   }
 
   return id;
+}
+
+/**
+ * Refuse a batch weighing more than one publish is allowed to.
+ *
+ * Real SNS holds the whole batch to the 256 KB a single publish is held to,
+ * rather than each entry, so ten entries just inside the limit are one batch
+ * far outside it. That is why `SimSnsPublishedMessage` does not check the limit
+ * and this does.
+ */
+export function assertSnsBatchWithinSizeLimit(
+  published: readonly { readonly message: SimSnsPublishedMessage }[],
+): void {
+  const byteSize = published.reduce(
+    (total, { message }) => total + message.byteSize,
+    0,
+  );
+
+  if (byteSize > simSnsMaximumPublishBytes) {
+    throw new SimSnsBatchRequestTooLongException(
+      `The batch request is longer than the permitted size. A batch may be ` +
+        `up to ${String(simSnsMaximumPublishBytes)} bytes, and this one is ` +
+        `${String(byteSize)} bytes.`,
+    );
+  }
 }
