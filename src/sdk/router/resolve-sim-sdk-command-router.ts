@@ -65,6 +65,9 @@ export function resolveSimSdkCommandRouter(
     case "Secrets Manager": {
       return scoped.secretsManager().sdkCommandRouter();
     }
+    case "SNS": {
+      return scoped.sns().sdkCommandRouter();
+    }
     case "SQS": {
       return scoped.sqs().sdkCommandRouter();
     }

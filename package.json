@@ -106,6 +106,10 @@
       "import": "./dist/service/secretsmanager/index.js",
       "types": "./dist/service/secretsmanager/index.d.ts"
     },
+    "./sns": {
+      "import": "./dist/service/sns/index.js",
+      "types": "./dist/service/sns/index.d.ts"
+    },
     "./sqs": {
       "import": "./dist/service/sqs/index.js",
       "types": "./dist/service/sqs/index.d.ts"
@@ -147,6 +151,7 @@
     "@aws-sdk/client-route-53": "^3.1101.0",
     "@aws-sdk/client-s3": "^3.1101.0",
     "@aws-sdk/client-secrets-manager": "^3.1101.0",
+    "@aws-sdk/client-sns": "^3.1104.0",
     "@aws-sdk/client-sqs": "^3.1101.0",
     "@aws-sdk/client-ssm": "^3.1101.0",
     "@aws-sdk/client-sts": "^3.1101.0",
