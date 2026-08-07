@@ -18,6 +18,12 @@ export interface SimRoute53HostedZoneRegistration {
   readonly id: SimRoute53HostedZoneId | string;
   readonly name: string;
   readonly config?: SimRoute53HostedZoneConfig | undefined;
+  /**
+   * Whether the name is a guess that the records the zone comes to hold may
+   * widen. This is for the zone a CloudFormation template names by ID without
+   * saying what it is called, and ordinary registrations leave it alone.
+   */
+  readonly nameInferred?: boolean | undefined;
 }
 
 interface RegisterSimRoute53HostedZoneProperties {
@@ -59,6 +65,7 @@ export function registerSimRoute53HostedZone(
     // having happened elsewhere, so its ID stands in as the unique one.
     callerReference: `registered-${hostedZoneId}`,
     config: registration.config,
+    nameInferred: registration.nameInferred,
   });
   hostedZone.markSynchronized();
 

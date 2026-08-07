@@ -8,6 +8,10 @@ export interface SimCloudFrontBehavior {
   cachedMethods: Set<string>;
   viewerProtocolPolicy?: "allow-all" | "redirect-to-https" | "https-only";
   originPath?: string;
+  /**
+   * The response headers policy applied to every response this Behavior serves.
+   */
+  responseHeadersPolicyId?: string | undefined;
   functionAssociations?:
     | undefined
     | {

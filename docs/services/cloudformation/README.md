@@ -1291,9 +1291,37 @@ try {
 }
 ```
 
-A CDK BucketDeployment can copy files from synthesized asset output into the simulated Bucket. When
-the Bucket is configured for website hosting, those files can be served through Yulin's local
-server.
+The files in the staged asset directory become Objects in the destination Bucket, keyed by their path
+relative to the asset root. When the Bucket is configured for website hosting, or sits behind a
+CloudFront Distribution, those Objects are what gets served.
+
+This is the `aws s3 sync` the real provider function shells out to, so the properties CDK synthesizes
+around it are read the same way:
+
+- `DestinationBucketKeyPrefix` puts the Objects under a key prefix.
+- `Exclude` and `Include` choose which files are copied. Every `Exclude` pattern is applied first and
+  then every `Include` one, and the last pattern to match a path decides, which is what makes
+  `exclude: ["*"], include: ["*.txt"]` mean "only the text files". A file no pattern matches is
+  copied. `*` matches across `/`, so `data/*` covers everything under a `data` directory.
+- `SystemMetadata` sets content headers on every Object the deployment copies, such as
+  `content-encoding` or `cache-control`. Without it, the content type is guessed from the file
+  extension. See [Object system metadata](../s3/README.md#object-system-metadata) for what comes back
+  on a read.
+- `Prune` removes the Objects the deployment covers and its source no longer holds. It is on unless
+  the deployment turns it off, as the construct is. Pruning only considers what the filters and the
+  key prefix select, so a deployment does not delete Objects it would never have copied.
+
+Several deployments can share one Bucket, which is the usual arrangement when the headers differ by
+file type: a `BucketDeployment` sets them for all of its files at once, so a second deployment is how
+the rest of the site gets different ones. Give the second one `prune: false`, or filters that do not
+overlap the first, the same as you would in AWS.
+
+A deployment with more than one entry in `SourceObjectKeys` copies each source in turn, and a path
+two of them share ends up with the later one's content.
+
+Filter patterns take `*` and `?`. The CLI also takes character classes such as `[abc]`, and a pattern
+using one is refused by name rather than matched as written, since a pattern that quietly means
+something else would copy the wrong files.
 
 ## S3 Bucket notifications
 
@@ -1927,7 +1955,8 @@ The resource types it creates are:
   `AWS::ApiGatewayV2::Stage`
 - `AWS::CertificateManager::Certificate`
 - `AWS::CloudFormation::WaitConditionHandle`
-- `AWS::CloudFront::Distribution` and `AWS::CloudFront::Function`
+- `AWS::CloudFront::Distribution`, `AWS::CloudFront::Function` and
+  `AWS::CloudFront::ResponseHeadersPolicy`
 - `AWS::Cognito::UserPool`, `AWS::Cognito::UserPoolClient` and
   `AWS::Cognito::UserPoolGroup`
 - `AWS::DynamoDB::Table` and `AWS::DynamoDB::GlobalTable`

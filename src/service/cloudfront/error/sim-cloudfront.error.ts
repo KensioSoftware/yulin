@@ -106,6 +106,33 @@ export class SimCloudFrontNoSuchFunctionExists extends SimCloudFrontError {
 }
 
 /**
+ * Simulated CloudFront NoSuchResponseHeadersPolicy error.
+ *
+ * What CloudFront answers when a response headers policy ID names nothing.
+ */
+export class SimCloudFrontNoSuchResponseHeadersPolicy extends SimCloudFrontError {
+  public override readonly name = "NoSuchResponseHeadersPolicy";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 404 });
+  }
+}
+
+/**
+ * Simulated CloudFront ResponseHeadersPolicyAlreadyExists error.
+ *
+ * CloudFront requires a response headers policy name to be unique within an
+ * account, so a second policy claiming a name is refused rather than created.
+ */
+export class SimCloudFrontResponseHeadersPolicyAlreadyExists extends SimCloudFrontError {
+  public override readonly name = "ResponseHeadersPolicyAlreadyExists";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 409 });
+  }
+}
+
+/**
  * Simulated CloudFront DistributionNotDisabled error.
  *
  * CloudFront will not delete a Distribution that is still serving. The caller

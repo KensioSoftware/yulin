@@ -224,8 +224,15 @@ Metadata is stored separately from the object body. `PutObjectCommandHandler` co
 `GetObjectCommandHandler` returns object bodies as Node `Readable` streams and returns stored
 metadata through `Metadata`.
 
-The static website HTTP controller also reads the `"content-type"` metadata key when producing HTTP
-responses.
+`object/s3-object-response-headers.ts` is the single mapping from stored metadata to HTTP response
+headers, and every path that serves an Object goes through it: the S3 REST endpoint reader, the
+static website endpoint and the CloudFront S3 Origin. It returns the system metadata S3 keeps as a
+header and hands back on a read, and nothing else, so user-defined metadata does not leak into the
+response. Keeping it in one place is what stops the three endpoints disagreeing about what reading an
+Object looks like.
+
+Note that `PutObject` only writes `ContentType` into that set. The other headers reach an Object
+through a CDK BucketDeployment's `SystemMetadata`, which builds the metadata record directly.
 
 ## Storage implementations
 
@@ -550,7 +557,8 @@ Signature verification itself is not here: it happens once at the serving bounda
 
 - returns `403` if static website hosting is not enabled
 - applies redirect-all-requests configuration before object lookup
-- serves objects with `content-length` and optional `content-type`
+- serves objects with `content-length` and the system metadata headers S3 returns on a read,
+  through `object/s3-object-response-headers.ts`
 - returns headers but no body for `HEAD`
 - applies trailing-slash redirects for folder index documents
 - serves configured error documents with status `404`

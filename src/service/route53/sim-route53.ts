@@ -122,8 +122,10 @@ export class SimRoute53 {
    * An ID another Hosted Zone holds, or one that is not a Route53 Hosted Zone
    * ID, is refused.
    */
-  registerHostedZone(registration: SimRoute53HostedZoneRegistration): void {
-    registerSimRoute53HostedZone(registration, {
+  registerHostedZone(
+    registration: SimRoute53HostedZoneRegistration,
+  ): SimRoute53HostedZone {
+    return registerSimRoute53HostedZone(registration, {
       hostedZones: this.hostedZones,
       route53Registry: this.route53Registry,
     });

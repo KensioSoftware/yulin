@@ -4,6 +4,7 @@ import {
   assertNonNullable,
   assertThrowsErrorAsync,
   assertTrue,
+  assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -12,6 +13,7 @@ import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
 import type { SimCloudFormationResourceCreateContext } from "../../cloudformation/resource/sim-cfn-resource.js";
 import { SimCfnResource } from "../../cloudformation/resource/sim-cfn-resource.js";
 import { SimCloudFrontDistribution } from "../distribution/sim-cloudfront-distribution.js";
+import { SimCloudFrontResponseHeadersPolicy } from "../response-headers-policy/sim-cf-response-headers-policy.js";
 import { SimCloudFrontCloudFormationResourceFactory } from "./sim-cfn-cloudfront-resource-factory.js";
 import { simCfDistroConfigFactory } from "../distribution/sim-cf-distro-config.factory.js";
 
@@ -149,6 +151,67 @@ describe("SimCloudFrontCloudFormationResourceFactory", () => {
     assertIdentical(
       error.message,
       "Unsupported sim CloudFront CloudFormation Resource UnsupportedResource",
+    );
+  });
+
+  it("creates and deletes a response headers policy", async () => {
+    // Given a CloudFront CloudFormation Resource factory and a response
+    // headers policy resource.
+    const simAws = new SimAws();
+    const cloudFront = simAws.cloudFront();
+    const resource = new SimCfnResource({
+      logicalId: "CacheHeaders",
+      template: {
+        Type: "AWS::CloudFront::ResponseHeadersPolicy",
+        Properties: {
+          ResponseHeadersPolicyConfig: {
+            Name: "CacheHeaders",
+            CustomHeadersConfig: {
+              Items: [
+                { Header: "Vary", Override: true, Value: "Accept-Encoding" },
+              ],
+            },
+          },
+        },
+      },
+    });
+    const context: SimCloudFormationResourceCreateContext = {
+      simAws,
+      resources: new Map(),
+    };
+    const factory = new SimCloudFrontCloudFormationResourceFactory(cloudFront);
+
+    // When it is created.
+    const policy = await factory.create(
+      "ResponseHeadersPolicy",
+      resource,
+      context,
+    );
+
+    assertInstanceOf(policy, SimCloudFrontResponseHeadersPolicy);
+
+    // Then sim CloudFront holds it, so a Behavior naming its ID finds it.
+    assertNonNullable(cloudFront.getResponseHeadersPolicyById(policy.id));
+
+    // And when the Resource is deleted, sim CloudFront forgets it.
+    resource.markCreateComplete(policy);
+    await factory.delete("ResponseHeadersPolicy", resource);
+
+    assertUndefined(cloudFront.getResponseHeadersPolicyById(policy.id));
+  });
+
+  it("steps over deleting a response headers policy that was never created", async () => {
+    // Given a policy Resource whose creation did not get as far as a policy.
+    const simAws = new SimAws();
+    const factory = new SimCloudFrontCloudFormationResourceFactory(
+      simAws.cloudFront(),
+    );
+
+    // When its deletion is attempted, then there is nothing to forget and
+    // nothing is thrown.
+    await factory.delete(
+      "ResponseHeadersPolicy",
+      new SimCfnResource({ logicalId: "CacheHeaders" }),
     );
   });
 

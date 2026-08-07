@@ -64,6 +64,9 @@ function buildBaseBehaviorProperties(
     ...(cacheBehavior.ViewerProtocolPolicy !== undefined && {
       viewerProtocolPolicy: cacheBehavior.ViewerProtocolPolicy,
     }),
+    ...(cacheBehavior.ResponseHeadersPolicyId !== undefined && {
+      responseHeadersPolicyId: cacheBehavior.ResponseHeadersPolicyId,
+    }),
     functionAssociations: configureCffAssociations(cacheBehavior),
   };
 }

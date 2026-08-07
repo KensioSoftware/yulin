@@ -7,6 +7,7 @@ import type {
 import { SimCfnCfDistroCreator } from "./distro/sim-cfn-cf-distro-creator.js";
 import { SimCfnCffCreator } from "./cff/sim-cfn-cff-creator.js";
 import { SimCfnCfDistroDeleter } from "./distro/sim-cfn-cf-distro-deleter.js";
+import { SimCfnCfResponseHeadersPolicyCreator } from "./response-headers-policy/sim-cfn-cf-rh-policy-creator.js";
 import type { SimCloudFrontFunction } from "../cff/sim-cloudfront-function.js";
 import { assertDefined } from "../../../util/type-guard/defined.js";
 
@@ -18,12 +19,15 @@ export class SimCloudFrontCloudFormationResourceFactory implements SimCfnService
   private readonly distroCreator: SimCfnCfDistroCreator;
   private readonly functionCreator: SimCfnCffCreator;
   private readonly distroDeleter: SimCfnCfDistroDeleter;
+  private readonly responseHeadersPolicyCreator: SimCfnCfResponseHeadersPolicyCreator;
 
   constructor(cloudFront: SimCloudFront) {
     this.cloudFront = cloudFront;
     this.distroCreator = new SimCfnCfDistroCreator({ cloudFront });
     this.functionCreator = new SimCfnCffCreator({ cloudFront });
     this.distroDeleter = new SimCfnCfDistroDeleter({ cloudFront });
+    this.responseHeadersPolicyCreator =
+      new SimCfnCfResponseHeadersPolicyCreator({ cloudFront });
   }
 
   /**
@@ -46,6 +50,12 @@ export class SimCloudFrontCloudFormationResourceFactory implements SimCfnService
           resource,
           context.resolvedProperties ?? resource.properties,
           context,
+        );
+      }
+      case "ResponseHeadersPolicy": {
+        return this.responseHeadersPolicyCreator.create(
+          resource,
+          context.resolvedProperties ?? resource.properties,
         );
       }
       default: {
@@ -71,6 +81,10 @@ export class SimCloudFrontCloudFormationResourceFactory implements SimCfnService
       }
       case "Function": {
         await this.deleteFunction(resource);
+        return;
+      }
+      case "ResponseHeadersPolicy": {
+        this.responseHeadersPolicyCreator.delete(resource);
         return;
       }
       default: {

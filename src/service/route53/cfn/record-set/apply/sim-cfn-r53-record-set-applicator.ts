@@ -34,10 +34,9 @@ export class SimCfnRoute53RecordSetApplicator {
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
   ): Promise<SimRoute53Record> {
-    const hostedZoneId = this.hostedZoneResolver.hostedZoneId(
-      resource,
-      properties,
-    );
+    // The record set is built first because resolving the Hosted Zone can
+    // register one, and a RecordSet that turns out to be unbuildable or of a
+    // skipped record type would otherwise leave that zone behind.
     const recordSetBuilder = new SimCfnRoute53RecordSetBuilder(
       resource,
       properties,
@@ -46,6 +45,11 @@ export class SimCfnRoute53RecordSetApplicator {
 
     assertDefined(recordSet.Name, "Route53 record set name");
     assertDefined(recordSet.Type, "Route53 record set type");
+
+    const hostedZoneId = this.hostedZoneResolver.hostedZoneId(
+      resource,
+      properties,
+    );
 
     await this.route53.changeResourceRecordSets({
       input: {

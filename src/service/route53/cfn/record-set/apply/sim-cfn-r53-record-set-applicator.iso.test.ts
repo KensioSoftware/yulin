@@ -1,13 +1,16 @@
 import {
+  assertIdentical,
   assertInstanceOf,
+  assertNonNullable,
   assertObjectMatches,
   assertStringIncludes,
   assertThrowsErrorAsync,
+  assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../../aws/sim-aws.js";
 import { SimCfnResource } from "../../../../cloudformation/resource/sim-cfn-resource.js";
-import { SimRoute53NoSuchHostedZone } from "../../../error/sim-route53.error.js";
+import type { SimRoute53HostedZoneId } from "../../../command/create-hosted-zone/sim-route53-zone-id.js";
 import { SimCfnRoute53RecordSetApplicator } from "./sim-cfn-r53-record-set-applicator.js";
 
 describe("SimCfnRoute53RecordSetApplicator", () => {
@@ -73,26 +76,84 @@ describe("SimCfnRoute53RecordSetApplicator", () => {
     );
   });
 
-  it("reports an unknown real world HostedZoneId as NoSuchHostedZone", async () => {
+  it("registers a Hosted Zone named only by a real world HostedZoneId", async () => {
+    // Given a RecordSet applicator with no Hosted Zones.
+    const simAws = new SimAws();
+    const route53 = simAws.route53();
+    const applicator = new SimCfnRoute53RecordSetApplicator({ route53 });
+
+    // When a CloudFormation RecordSet uses a real 14 character HostedZoneId,
+    // as a zone the CDK app looked up rather than created does.
+    const record = await applicator.create(resource(), {
+      HostedZoneId: "Z2FDTNDATAQYW2",
+      Name: "www.example.com",
+      Type: "A",
+      TTL: 300,
+      ResourceRecords: ["192.0.2.1"],
+    });
+
+    // Then the zone is stood up under that ID and holds the record.
+    const hostedZone = route53.hostedZones.get(
+      "Z2FDTNDATAQYW2" as SimRoute53HostedZoneId,
+    );
+
+    assertNonNullable(hostedZone);
+    assertIdentical(hostedZone.name, "www.example.com.");
+    assertObjectMatches(record, {
+      name: "www.example.com",
+      type: "A",
+      values: ["192.0.2.1"],
+    });
+  });
+
+  it("registers no Hosted Zone for a RecordSet it does not go on to create", async () => {
+    // Given a RecordSet applicator with no Hosted Zones.
+    const simAws = new SimAws();
+    const route53 = simAws.route53();
+    const applicator = new SimCfnRoute53RecordSetApplicator({ route53 });
+
+    // When a RecordSet names a looked-up Hosted Zone but declares a record
+    // type sim Route53 does not store, so the Resource is skipped.
+    await assertThrowsErrorAsync(async () =>
+      applicator.create(resource(), {
+        HostedZoneId: "Z2FDTNDATAQYW2",
+        Name: "www.example.com",
+        Type: "DS",
+        ResourceRecords: ["12345 13 2 abc"],
+      }),
+    );
+
+    // Then no zone is left behind for a record that was never created, which a
+    // retry or a later stack would otherwise find already there.
+    assertUndefined(
+      route53.hostedZones.get("Z2FDTNDATAQYW2" as SimRoute53HostedZoneId),
+    );
+  });
+
+  it("throws when a RecordSet naming a Hosted Zone by ID has no usable Name", async () => {
     // Given a RecordSet applicator.
     const simAws = new SimAws();
     const applicator = new SimCfnRoute53RecordSetApplicator({
       route53: simAws.route53(),
     });
 
-    // When a CloudFormation RecordSet uses a real 14 character HostedZoneId.
+    // When a CloudFormation RecordSet names a Hosted Zone by ID but its own
+    // Name is not a string, so nothing says what the zone is called.
     const error = await assertThrowsErrorAsync(async () =>
       applicator.create(resource(), {
         HostedZoneId: "Z2FDTNDATAQYW2",
-        Name: "www.example.com",
+        Name: 123,
         Type: "A",
         ResourceRecords: ["192.0.2.1"],
       }),
     );
 
-    // Then the ID passes validation and the missing zone is reported.
-    assertInstanceOf(error, SimRoute53NoSuchHostedZone);
-    assertStringIncludes(error.message, "Z2FDTNDATAQYW2");
+    // Then a clear validation error is thrown.
+    assertInstanceOf(error, TypeError);
+    assertStringIncludes(
+      error.message,
+      "Invalid AWS::Route53::RecordSet TestRecordSet: Name must be a string",
+    );
   });
 
   it("throws when HostedZoneName is invalid or cannot be found", async () => {

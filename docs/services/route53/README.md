@@ -123,6 +123,21 @@ already existing rather than created.
 `/hostedzone/Z...` form of the ID. An ID that another Hosted Zone already holds is refused with
 `HostedZoneAlreadyExists`, and one that is not a Route53 Hosted Zone ID with `InvalidInput`.
 
+### A zone a template names but does not create
+
+Registering the zone first is optional. An `AWS::Route53::RecordSet` naming a `HostedZoneId` that no
+Hosted Zone holds gets one registered under that ID as the record is created, so a template built
+with `HostedZone.fromLookup` deploys without being told separately about a zone it already describes.
+
+The template does not carry the zone's name, only its ID, so the name is inferred from the records.
+The first record to name the zone names it, and a record above that name widens it. A stack holding
+`example.test` and `www.example.test` ends up with a zone called `example.test`. A stack holding only
+`www.example.test` ends up with a zone called `www.example.test`.
+
+Register the zone yourself when a test depends on its name, such as one listing zones by name, or
+when its name is not a suffix of any record the stack holds. A registered zone keeps the name it was
+given rather than inferring one, so its records are stored under the name you chose.
+
 ## Creating records
 
 Use `ChangeResourceRecordSetsCommand` to add records to a Hosted Zone.
@@ -1113,9 +1128,11 @@ This lets local integration tests use the same CDK infrastructure shape as produ
 the test process local.
 
 A CDK app whose Hosted Zone comes from `HostedZone.fromLookup` names a real Hosted Zone ID
-throughout its template rather than creating the zone. Register that zone before deploying, as in
-[Registering a Hosted Zone with a chosen ID](#registering-a-hosted-zone-with-a-chosen-id), and the
-template's RecordSets find it.
+throughout its template rather than creating the zone. The template deploys as it is: the zone is
+registered under that ID as the first RecordSet naming it is created, with its name inferred from the
+record names. Register it yourself with
+[Registering a Hosted Zone with a chosen ID](#registering-a-hosted-zone-with-a-chosen-id) when a test
+depends on the zone's name, or when no record in the stack sits inside it.
 
 ## Accounts and Regions
 
@@ -1223,3 +1240,16 @@ Sim Route53 currently supports:
 The simulator focuses on useful behaviour for tests and local development rather than full Route53
 feature parity. Unsupported Route53 options may be ignored or may throw errors depending on whether
 the simulator needs them to model the requested behaviour.
+
+## Limitations
+
+Where sim Route53 knowingly behaves differently from AWS:
+
+- **A RecordSet naming a Hosted Zone that does not exist creates one.** CloudFormation would refuse
+  with `NoSuchHostedZone`, because the ID names a zone in an account the simulation is not. Every
+  template built with `HostedZone.fromLookup` would then be undeployable here, so the zone is
+  registered on demand instead. See
+  [A zone a template names but does not create](#a-zone-a-template-names-but-does-not-create).
+- **The name of such a zone is a guess.** Nothing in a synthesized template says what a looked-up
+  zone is called, so the name is inferred from the records that reference it and is only as specific
+  as they are. Register the zone yourself when a test depends on its name.

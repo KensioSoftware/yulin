@@ -1,6 +1,7 @@
 import type { SimS3 } from "../sim-s3.js";
 import type { SimS3RestObjectRoute } from "./sim-s3-route.js";
 import type { SimAwsServiceRequest } from "../../../serve/controller/sim-service-controller.js";
+import { simS3ObjectResponseHeaders } from "../object/s3-object-response-headers.js";
 
 /**
  * Answers a `GET` or `HEAD` at the simulated S3 REST endpoint.
@@ -24,11 +25,7 @@ export class SimS3RestObjectReader {
     );
 
     const body = await bodyBytes(output.Body);
-    const contentType = output.Metadata?.["content-type"];
-    const headers = {
-      "content-length": String(body.length),
-      ...(contentType !== undefined && { "content-type": contentType }),
-    };
+    const headers = simS3ObjectResponseHeaders(output.Metadata, body.length);
 
     if (serviceRequest.request.method === "HEAD") {
       return new Response(undefined, { status: 200, headers });
