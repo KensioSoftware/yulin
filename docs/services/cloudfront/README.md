@@ -785,6 +785,10 @@ export function handler(event) {
 }
 ```
 
+CloudFront Functions run JS2, which refuses much of what ordinary JavaScript allows. Yulin publishes
+ESLint and Oxlint configs that report those refusals in the editor rather than at publication. See
+[Linting CloudFront Functions JS2](../../lint/ "CloudFront Functions JS2 lint config usage docs").
+
 ## Response headers policies
 
 A response headers policy sets headers on everything a cache Behavior serves. Declare one as

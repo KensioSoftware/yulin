@@ -1,5 +1,19 @@
+import { type ESLint } from "eslint";
 import { defineConfig } from "eslint/config";
 import tseslint from "typescript-eslint";
+
+import {
+  cffJs2LintPlugin,
+  cffJs2LintRules,
+  cffJs2PluginName,
+} from "../lint/index.js";
+
+// ESLint's `Plugin` describes a rule context far wider than these rules read:
+// it is generic over the syntax tree, so a rule typed against the handful of
+// node properties it actually touches cannot satisfy it. This file is the
+// adapter that wires a linter-agnostic plugin into ESLint, so it is where that
+// difference belongs.
+const eslintPlugin = cffJs2LintPlugin as unknown as ESLint.Plugin;
 
 export default defineConfig({
   // ── CloudFront Functions JS2
@@ -10,118 +24,19 @@ export default defineConfig({
       projectService: false,
     },
   },
+  plugins: {
+    // The restrictions live in a plugin rather than in `no-restricted-syntax`
+    // so that Oxlint can load the same rules, and so that switching one off
+    // does not mean restating the rest. See `../lint/cff-js2-lint-plugin.ts`.
+    [cffJs2PluginName]: eslintPlugin,
+  },
   rules: {
-    "no-var": "off",
-    "prefer-const": "off",
-    "object-shorthand": "off",
-    "prefer-template": "off",
+    ...cffJs2LintRules(),
+
+    // ── ESLint-only, because typescript-eslint's own copies of these rules
+    //    take over from the built-in ones in a TypeScript-aware config.
     "@typescript-eslint/explicit-function-return-type": "off",
     "@typescript-eslint/explicit-module-boundary-types": "off",
-    "no-eval": "error",
-    "no-new-func": "error",
-    "no-implied-eval": "error",
-    "no-restricted-globals": [
-      "error",
-      {
-        name: "fetch",
-        message: "CloudFront Functions cannot make network requests.",
-      },
-      {
-        name: "XMLHttpRequest",
-        message: "CloudFront Functions cannot make network requests.",
-      },
-      {
-        name: "WebSocket",
-        message: "CloudFront Functions cannot open network connections.",
-      },
-      {
-        name: "require",
-        message:
-          "CloudFront Functions must be self-contained and cannot require modules.",
-      },
-      {
-        name: "process",
-        message:
-          "CloudFront Functions do not have access to Node.js process APIs.",
-      },
-      {
-        name: "Buffer",
-        message: "CloudFront Functions do not have access to Node.js Buffer.",
-      },
-      {
-        name: "setTimeout",
-        message: "CloudFront Functions do not support timers.",
-      },
-      {
-        name: "setInterval",
-        message: "CloudFront Functions do not support timers.",
-      },
-      {
-        name: "setImmediate",
-        message: "CloudFront Functions do not support timers.",
-      },
-      {
-        name: "Promise",
-        message: "Avoid Promise usage in CloudFront Functions.",
-      },
-    ],
-    "no-restricted-syntax": [
-      "error",
-      {
-        selector: "TemplateLiteral",
-        message:
-          "CloudFront Functions JS2 does not support template literals. Use string concatenation instead.",
-      },
-      {
-        selector: "ImportDeclaration",
-        message:
-          "CloudFront Functions must be self-contained and should not use import syntax.",
-      },
-      {
-        selector:
-          "ExportNamedDeclaration:not([declaration.type='FunctionDeclaration'][declaration.id.name='handler'])",
-        message:
-          "CloudFront Function files may only export the handler as `export function handler(...)`.",
-      },
-      {
-        selector: "ExportDefaultDeclaration, ExportAllDeclaration",
-        message:
-          "CloudFront Function files may only export the handler as `export function handler(...)`.",
-      },
-      {
-        selector: "ClassDeclaration, ClassExpression",
-        message: "Avoid class syntax in CloudFront Functions JS2 files.",
-      },
-      {
-        selector: "ArrowFunctionExpression",
-        message:
-          "Avoid arrow functions in CloudFront Functions JS2 files. Use function declarations/expressions instead.",
-      },
-      {
-        selector:
-          "AwaitExpression, FunctionDeclaration[async=true], FunctionExpression[async=true], ArrowFunctionExpression[async=true]",
-        message: "CloudFront Functions should not use async/await.",
-      },
-      {
-        selector:
-          "YieldExpression, FunctionDeclaration[generator=true], FunctionExpression[generator=true]",
-        message: "CloudFront Functions should not use generators.",
-      },
-      {
-        selector: "ObjectPattern, ArrayPattern",
-        message: "Avoid destructuring in CloudFront Functions JS2 files.",
-      },
-      {
-        selector: "SpreadElement, RestElement",
-        message: "Avoid spread/rest syntax in CloudFront Functions JS2 files.",
-      },
-      {
-        selector: "ForOfStatement",
-        message:
-          "Avoid for...of in CloudFront Functions JS2 files. Use index-based loops instead.",
-      },
-    ],
-    "no-unused-vars": ["error", { varsIgnorePattern: "^handler$" }],
     "@typescript-eslint/no-unused-vars": [
       "error",
       { varsIgnorePattern: "^handler$" },
