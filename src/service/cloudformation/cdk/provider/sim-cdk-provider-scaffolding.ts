@@ -32,10 +32,11 @@ const logGroupResourceType = "AWS::Logs::LogGroup";
  */
 export class SimCdkProviderScaffolding {
   readonly #resources: ReadonlyMap<string, SimCfnResource>;
-  #providerFunctions: ReadonlyMap<string, string> | undefined;
+  readonly #providerFunctions: ReadonlyMap<string, string>;
 
   constructor(resources: ReadonlyMap<string, SimCfnResource>) {
     this.#resources = resources;
+    this.#providerFunctions = this.findProviderFunctions();
   }
 
   /**
@@ -53,7 +54,7 @@ export class SimCdkProviderScaffolding {
    * The Resource is the provider function itself.
    */
   private providerFunctionReason(resource: SimCfnResource): string | undefined {
-    const customResourceType = this.providerFunctions().get(resource.logicalId);
+    const customResourceType = this.#providerFunctions.get(resource.logicalId);
 
     if (customResourceType === undefined) {
       return undefined;
@@ -79,10 +80,9 @@ export class SimCdkProviderScaffolding {
       return undefined;
     }
 
-    const providerFunctions = this.providerFunctions();
     const customResourceType = resource
       .dependencies()
-      .map((logicalId) => providerFunctions.get(logicalId))
+      .map((logicalId) => this.#providerFunctions.get(logicalId))
       .find((found) => found !== undefined);
 
     if (customResourceType === undefined) {
@@ -110,11 +110,7 @@ export class SimCdkProviderScaffolding {
    * CDK builds it as a singleton, so the first type to claim a function is the
    * one reported against it.
    */
-  private providerFunctions(): ReadonlyMap<string, string> {
-    if (this.#providerFunctions !== undefined) {
-      return this.#providerFunctions;
-    }
-
+  private findProviderFunctions(): ReadonlyMap<string, string> {
     const found = new Map<string, string>();
 
     for (const resource of this.#resources.values()) {
@@ -130,8 +126,6 @@ export class SimCdkProviderScaffolding {
         }
       }
     }
-
-    this.#providerFunctions = found;
 
     return found;
   }
