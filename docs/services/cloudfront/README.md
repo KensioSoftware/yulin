@@ -785,8 +785,9 @@ export function handler(event) {
 }
 ```
 
-CloudFront Functions run JS2, which refuses much of what ordinary JavaScript allows. Yulin publishes
-ESLint and Oxlint configs that report those refusals in the editor rather than at publication. See
+CloudFront Functions run JS2, which is ECMAScript 5.1 plus a named subset of ES 6 to 12, so it
+refuses constructs ordinary JavaScript allows. Yulin publishes ESLint and Oxlint configs that report
+those refusals in the editor rather than at publication. See
 [Linting CloudFront Functions JS2](../../lint/ "CloudFront Functions JS2 lint config usage docs").
 
 ## Response headers policies

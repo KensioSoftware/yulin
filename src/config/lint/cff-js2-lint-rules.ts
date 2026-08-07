@@ -7,19 +7,18 @@ export type LintRuleSetting =
   "off" | "error" | readonly ["error", Readonly<Record<string, string>>];
 
 /**
- * Rules a general JavaScript config turns on that JS2 has to be let off.
+ * Rules a general JavaScript config turns on that JS2 cannot satisfy.
  *
- * A CloudFront Function is written against a runtime with no `const`, no
- * shorthand properties and no template literals, so the modern-JavaScript
- * advice a repository applies everywhere else is advice to write code that
- * will not run. Turning these off is not a lowering of standards; the
- * restrictions below are stricter than what they replace.
+ * Only advice the runtime makes impossible is relaxed. `const`, `let` and
+ * template literals are all supported in JS2, so the rules asking for them
+ * stay on: switching them off would tell a reader that `var` and string
+ * concatenation are required here, which is its own kind of wrong answer.
+ *
+ * Shorthand object properties are ES 6 literal syntax the runtime's feature
+ * list does not name, so that one is genuinely unavailable.
  */
 const relaxedRules: Readonly<Record<string, LintRuleSetting>> = {
-  "no-var": "off",
-  "prefer-const": "off",
   "object-shorthand": "off",
-  "prefer-template": "off",
 };
 
 /**

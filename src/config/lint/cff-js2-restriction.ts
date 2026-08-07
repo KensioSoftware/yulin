@@ -1,21 +1,23 @@
 /**
  * What the CloudFront Functions JS2 runtime will not run, as syntax selectors.
  *
- * JS2 is a restricted ECMAScript dialect rather than a JavaScript engine with
- * a few gaps, so a function that only fails once CloudFront rejects it fails a
- * long way from where it was written. Each entry names a construct the runtime
- * has no support for and says what to write instead, so the refusal arrives in
- * the editor rather than at deployment.
+ * JS2 is compliant with ECMAScript 5.1 and adds a named subset of ES 6 to 12,
+ * so a Function that uses something outside that subset fails when it is
+ * published, a long way from where it was written. Each entry names a
+ * construct the runtime has no support for and says what to write instead, so
+ * the refusal arrives in the editor.
+ *
+ * Every entry is drawn from the runtime's own feature list, which is an
+ * allow-list: anything the documentation does not name is unsupported. Nothing
+ * here is house style. A restriction on syntax JS2 accepts would send a reader
+ * away from code that works, which is worse than no lint rule at all.
+ *
+ * https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/functions-javascript-runtime-20.html
  *
  * The selector syntax is the one both ESLint and Oxlint accept, which is what
  * lets a single rule module serve either linter.
  */
 export const cffJs2SyntaxRestrictions = {
-  "no-template-literal": {
-    selector: "TemplateLiteral",
-    message:
-      "CloudFront Functions JS2 does not support template literals. Use string concatenation instead.",
-  },
   "no-import": {
     selector: "ImportDeclaration",
     message:
@@ -27,37 +29,39 @@ export const cffJs2SyntaxRestrictions = {
     message:
       "CloudFront Function files may only export the handler as `export function handler(...)`.",
   },
+  "only-built-in-require": {
+    selector:
+      "CallExpression[callee.name='require']:not(:has(Literal[value='querystring'])):not(:has(Literal[value='crypto'])):not(:has(Literal[value='buffer']))",
+    message:
+      "CloudFront Functions can only require the built-in `querystring`, `crypto` and `buffer` modules. Everything else must be inlined.",
+  },
   "no-class": {
     selector: "ClassDeclaration, ClassExpression",
-    message: "Avoid class syntax in CloudFront Functions JS2 files.",
-  },
-  "no-arrow-function": {
-    selector: "ArrowFunctionExpression",
     message:
-      "Avoid arrow functions in CloudFront Functions JS2 files. Use function declarations/expressions instead.",
-  },
-  "no-async": {
-    selector:
-      "AwaitExpression, FunctionDeclaration[async=true], FunctionExpression[async=true], ArrowFunctionExpression[async=true]",
-    message: "CloudFront Functions should not use async/await.",
+      "CloudFront Functions JS2 does not support class syntax. Use a constructor function or a plain object instead.",
   },
   "no-generator": {
     selector:
       "YieldExpression, FunctionDeclaration[generator=true], FunctionExpression[generator=true]",
-    message: "CloudFront Functions should not use generators.",
+    message: "CloudFront Functions JS2 does not support generators.",
   },
   "no-destructuring": {
     selector: "ObjectPattern, ArrayPattern",
-    message: "Avoid destructuring in CloudFront Functions JS2 files.",
+    message:
+      "CloudFront Functions JS2 does not support destructuring. Read the properties one at a time instead.",
   },
   "no-spread": {
-    selector: "SpreadElement, RestElement",
-    message: "Avoid spread/rest syntax in CloudFront Functions JS2 files.",
+    // Rest parameters are a separate ES 6 feature that JS2 does name as
+    // supported, and they share the `RestElement` node, so only spread is
+    // matched here.
+    selector: "SpreadElement",
+    message:
+      "CloudFront Functions JS2 does not support spread syntax. Rest parameters are supported, so `function f(...args)` is fine, but `[...list]` is not.",
   },
   "no-for-of": {
     selector: "ForOfStatement",
     message:
-      "Avoid for...of in CloudFront Functions JS2 files. Use index-based loops instead.",
+      "CloudFront Functions JS2 does not support for...of. Use an index-based loop or for...in instead.",
   },
 } as const satisfies Readonly<
   Record<string, { readonly selector: string; readonly message: string }>
@@ -70,19 +74,23 @@ export const cffJs2SyntaxRestrictions = {
  * worst place to find out. The reason matters as much as the refusal: `fetch`
  * is missing because the runtime has no network, and `setTimeout` because it
  * has no event loop, and those two dead ends want different rewrites.
+ *
+ * `Promise` and `Buffer` are deliberately absent from this list. Both are
+ * supported in runtime 2.0, and an earlier version of this config refused them.
  */
 export const cffJs2UnavailableGlobals = {
   fetch: "CloudFront Functions cannot make network requests.",
   XMLHttpRequest: "CloudFront Functions cannot make network requests.",
   WebSocket: "CloudFront Functions cannot open network connections.",
-  require:
-    "CloudFront Functions must be self-contained and cannot require modules.",
   process: "CloudFront Functions do not have access to Node.js process APIs.",
-  Buffer: "CloudFront Functions do not have access to Node.js Buffer.",
-  setTimeout: "CloudFront Functions do not support timers.",
-  setInterval: "CloudFront Functions do not support timers.",
-  setImmediate: "CloudFront Functions do not support timers.",
-  Promise: "Avoid Promise usage in CloudFront Functions.",
+  setTimeout:
+    "CloudFront Functions do not support timers, and must run to completion synchronously.",
+  setInterval:
+    "CloudFront Functions do not support timers, and must run to completion synchronously.",
+  setImmediate:
+    "CloudFront Functions do not support timers, and must run to completion synchronously.",
+  clearTimeout:
+    "CloudFront Functions do not support timers, so there is nothing to clear.",
 } as const satisfies Readonly<Record<string, string>>;
 
 /**

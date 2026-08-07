@@ -7,9 +7,9 @@ import cloudFrontFunctionsJs2 from "../eslint/cffjs2.eslint.config.js";
 import { cffJs2LintPlugin, cffJs2PluginName } from "./cff-js2-lint-plugin.js";
 import {
   cffJs2Violations,
+  supportedCffJs2Cases,
   supportedCffJs2Source,
 } from "./cff-js2-lint.fixture.js";
-import { cffJs2SyntaxRestrictions } from "./cff-js2-restriction.js";
 
 /**
  * Lints a source string through the published ESLint config, exactly as a
@@ -50,7 +50,7 @@ describe("Linting a CloudFront Functions JS2 file", () => {
   }
 
   it("stays quiet on a function that respects the restrictions", async () => {
-    // Given a function written the way JS2 wants it, with `var` and no sugar
+    // Given a function using the ES 6 and ES 8 features JS2 does support
     const source = supportedCffJs2Source;
 
     // When it is linted with the published config
@@ -60,6 +60,20 @@ describe("Linting a CloudFront Functions JS2 file", () => {
     // config would otherwise apply to it
     assertArrayLength(reported, 0);
   });
+
+  for (const supported of supportedCffJs2Cases) {
+    it(`allows ${supported.what}`, async () => {
+      // Given a CloudFront Function using something JS2 runs happily
+      const source = supported.source;
+
+      // When it is linted with the published config
+      const reported = await lintCffJs2(source);
+
+      // Then no restriction reports it. Each of these was refused by an
+      // earlier version of this config, against what the runtime documents.
+      assertArrayLength(reported, 0);
+    });
+  }
 
   it("covers every restriction with a case", () => {
     // Given the rules the plugin publishes
@@ -76,17 +90,5 @@ describe("Linting a CloudFront Functions JS2 file", () => {
       published.filter((rule) => !covered.has(rule)),
       0,
     );
-  });
-
-  it("names a rule for every syntax restriction", () => {
-    // Given the restriction table the plugin is built from
-    const restrictions = Object.keys(cffJs2SyntaxRestrictions);
-
-    // When the plugin's rules are counted against it
-    const ruleNames = Object.keys(cffJs2LintPlugin.rules);
-
-    // Then each restriction became a rule, plus the globals rule that resolves
-    // names through scope rather than by selector
-    assertArrayLength(ruleNames, restrictions.length + 1);
   });
 });

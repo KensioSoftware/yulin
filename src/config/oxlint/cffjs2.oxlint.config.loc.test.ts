@@ -15,14 +15,45 @@ import cloudFrontFunctionsJs2 from "../eslint/cffjs2.eslint.config.js";
 import { cffJs2PluginName } from "../lint/cff-js2-lint-plugin.js";
 import {
   cffJs2Violations,
+  supportedCffJs2Cases,
   supportedCffJs2Source,
 } from "../lint/cff-js2-lint.fixture.js";
 import { cloudFrontFunctionsJs2Oxlint } from "./cffjs2.oxlint.config.js";
 
 const projectRoot = path.resolve(import.meta.dirname, "../../..");
 
-/** The one fixture written the way JS2 wants it. */
-const supportedFixtureName = "case-00.cff.js";
+/**
+ * Every fixture, and whether a linter should have anything to say about it.
+ *
+ * The supported cases are in here so that the two linters have to agree about
+ * silence as well as about findings.
+ */
+const fixtureSources: readonly {
+  readonly source: string;
+  readonly clean: boolean;
+}[] = [
+  { source: supportedCffJs2Source, clean: true },
+  ...supportedCffJs2Cases.map((supported) => ({
+    source: supported.source,
+    clean: true,
+  })),
+  ...cffJs2Violations.map((violation) => ({
+    source: violation.source,
+    clean: false,
+  })),
+];
+
+function fixtureName(index: number): string {
+  return `case-${String(index).padStart(2, "0")}.cff.js`;
+}
+
+/** The fixtures no restriction may report. */
+const supportedFixtureNames = new Set(
+  fixtureSources
+    .map((fixture, index) => ({ fixture, index }))
+    .filter((entry) => entry.fixture.clean)
+    .map((entry) => fixtureName(entry.index)),
+);
 
 /** One thing a linter said, in a form the other linter can be compared to. */
 interface Finding {
@@ -82,20 +113,12 @@ async function withFixtures<T>(
   const directory = await mkdtemp(path.join(os.tmpdir(), "yulin-cff-parity-"));
 
   try {
-    const sources = [
-      supportedCffJs2Source,
-      ...cffJs2Violations.map((violation) => violation.source),
-    ];
-
     const files = await Promise.all(
-      sources.map(async (source, index) => {
-        const filePath = path.join(
-          directory,
-          `case-${String(index).padStart(2, "0")}.cff.js`,
-        );
+      fixtureSources.map(async (fixture, index) => {
+        const filePath = path.join(directory, fixtureName(index));
 
         // eslint-disable-next-line security/detect-non-literal-fs-filename -- a temporary directory this test just made
-        await writeFile(filePath, source, "utf8");
+        await writeFile(filePath, fixture.source, "utf8");
 
         return filePath;
       }),
@@ -227,22 +250,23 @@ describe("Linting CloudFront Functions JS2 with either linter", () => {
     });
   });
 
-  it("leaves a supported function alone", async () => {
+  it("leaves syntax JS2 supports alone in both linters", async () => {
     await withFixtures(async (fixtures) => {
-      // Given the fixture written the way JS2 wants it
+      // Given the fixtures that use only what the runtime documents as
+      // supported, including features an earlier version of this config refused
       const eslintFindings = await lintWithEslint(fixtures);
       const oxlintFindings = await lintWithOxlint(fixtures);
 
-      // When each linter's findings for that file are picked out
-      const fromEslint = eslintFindings.filter(
-        (finding) => finding.file === supportedFixtureName,
+      // When each linter's findings for those files are picked out
+      const fromEslint = eslintFindings.filter((finding) =>
+        supportedFixtureNames.has(finding.file),
       );
-      const fromOxlint = oxlintFindings.filter(
-        (finding) => finding.file === supportedFixtureName,
+      const fromOxlint = oxlintFindings.filter((finding) =>
+        supportedFixtureNames.has(finding.file),
       );
 
-      // Then neither reports it, so the restrictions are not simply firing on
-      // everything they are pointed at
+      // Then neither reports them, so the restrictions are neither firing on
+      // everything nor sending a reader away from code that works
       assertArrayLength(fromEslint, 0);
       assertArrayLength(fromOxlint, 0);
     });
