@@ -1,3 +1,4 @@
+import { assertDefined } from "../../../util/type-guard/defined.js";
 import type { BackgroundScheduler } from "../../../util/background/background.js";
 import type { SimAcmCertificate } from "../certificate/sim-acm-certificate.js";
 import type {
@@ -40,12 +41,11 @@ export class SimAcmCertificateValidation {
    * so it is rejected rather than silently issuing certificates anyway.
    */
   alwaysRequireDnsValidation(): void {
-    if (this.dnsRecords === undefined) {
-      throw new Error(
-        "Sim ACM cannot require DNS validation with no sim Route53 to validate against. " +
-          "Use SimAws, so ACM can see Hosted Zones, rather than a standalone SimAcm.",
-      );
-    }
+    assertDefined(
+      this.dnsRecords,
+      "Sim ACM cannot require DNS validation with no sim Route53 to validate against. " +
+        "Use SimAws, so ACM can see Hosted Zones, rather than a standalone SimAcm.",
+    );
 
     this.mode = SimAcmDnsValidationMode.always();
   }

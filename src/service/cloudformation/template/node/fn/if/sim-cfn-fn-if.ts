@@ -1,3 +1,4 @@
+import { assertDefined } from "../../../../../../util/type-guard/defined.js";
 import type { SimCfnResolveContext } from "../../../resolve/sim-cfn-resolve-context.js";
 import type { SimCfnTemplateValue } from "../../../value/sim-cfn-template-value.js";
 import { SimCfnNode } from "../../sim-cfn-node.js";
@@ -25,12 +26,11 @@ export class SimCfnFnIf extends SimCfnNode {
   resolve(context: SimCfnResolveContext): SimCfnTemplateValue {
     const conditions = context.conditions;
 
-    if (conditions === undefined) {
-      throw new Error(
-        `Sim CloudFormation Fn::If ${this.conditionName} cannot be resolved ` +
-          "where the template Conditions are not available",
-      );
-    }
+    assertDefined(
+      conditions,
+      `Sim CloudFormation Fn::If ${this.conditionName} cannot be resolved ` +
+        "where the template Conditions are not available",
+    );
 
     if (!conditions.has(this.conditionName)) {
       throw new Error(

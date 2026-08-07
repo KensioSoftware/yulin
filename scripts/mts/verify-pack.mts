@@ -19,6 +19,7 @@ import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
+import { assertDefined } from "../../src/util/type-guard/defined.js";
 import {
   assertTypesUsable,
   createConsumer,
@@ -135,9 +136,7 @@ async function pack(destination: string): Promise<string> {
     readonly filename: string;
   }[];
 
-  if (entry === undefined) {
-    throw new Error("npm pack produced no tarball");
-  }
+  assertDefined(entry, "npm pack produced no tarball");
 
   return path.join(destination, entry.filename);
 }

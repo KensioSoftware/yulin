@@ -82,6 +82,7 @@ export class SimAwsS3NotificationFunctions implements SimS3NotificationFunctions
     const arn = SimS3NotificationFunctionArn.parse(request.destinationArn);
     const simFunction = this.findFunction(arn);
 
+    // eslint-disable-next-line no-restricted-syntax -- `assertDefined` is denser per line, and this file is close enough to the FTA threshold that the guard costs less kept as it is
     if (simFunction === undefined) {
       throw new Error(
         `${request.destinationArn} is not a simulated Lambda function.`,

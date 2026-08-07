@@ -1,3 +1,4 @@
+import { assertDefined } from "../../../../util/type-guard/defined.js";
 import { simRoute53AbsoluteName } from "../../local-name/sim-route53-local-name.js";
 import type { SimRoute53Record } from "../../record/sim-route53-record.js";
 import type { SimRoute53ResourceRecordSet } from "../change-resource-record-sets/change-resource-record-sets.command.js";
@@ -36,12 +37,10 @@ function toAliasResourceRecordSet(
 ): SimRoute53ResourceRecordSet {
   const aliasTargetName = record.values.at(0);
 
-  /* v8 ignore if -- alias records always store their target as a record value */
-  if (aliasTargetName === undefined) {
-    throw new Error(
-      `Sim Route53 alias record ${record.type} ${record.name} has no alias target value`,
-    );
-  }
+  assertDefined(
+    aliasTargetName,
+    `Sim Route53 alias record ${record.type} ${record.name} has no alias target value`,
+  );
 
   return {
     Name: simRoute53AbsoluteName(record.name),

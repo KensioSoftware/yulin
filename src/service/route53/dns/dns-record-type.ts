@@ -1,3 +1,4 @@
+import { assertDefined } from "../../../util/type-guard/defined.js";
 import type { SimRoute53RecordType } from "../record/sim-route53-record.js";
 
 /**
@@ -67,10 +68,7 @@ export function dnsRecordTypeNumber(
 ): number {
   const typeNumber = typeNumbersByRecordType.get(recordType);
 
-  /* v8 ignore if -- the map covers every type simulated DNS answers */
-  if (typeNumber === undefined) {
-    throw new Error(`No DNS type number for record type ${recordType}`);
-  }
+  assertDefined(typeNumber, `No DNS type number for record type ${recordType}`);
 
   return typeNumber;
 }

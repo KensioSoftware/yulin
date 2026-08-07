@@ -7,6 +7,7 @@ import {
 import {
   assertIdentical,
   assertInstanceOf,
+  assertMapSize,
   assertNonNullable,
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
@@ -124,7 +125,7 @@ describe("Route53 DeleteHostedZoneCommand", () => {
   it("stops the Hosted Zone taking part in name resolution", async () => {
     // Given a Hosted Zone registered for resolution.
     const zone = await givenHostedZone("resolved.test");
-    assertIdentical(zone.simRoute53.resolvableHostedZones().size, 1);
+    assertMapSize(zone.simRoute53.resolvableHostedZones(), 1);
 
     // When the Hosted Zone is deleted.
     await zone.simRoute53.deleteHostedZone(
@@ -132,7 +133,7 @@ describe("Route53 DeleteHostedZoneCommand", () => {
     );
 
     // Then it is out of the registry DNS resolution reads.
-    assertIdentical(zone.simRoute53.resolvableHostedZones().size, 0);
+    assertMapSize(zone.simRoute53.resolvableHostedZones(), 0);
   });
 
   it("rejects a Hosted Zone that does not exist", async () => {

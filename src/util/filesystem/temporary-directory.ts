@@ -1,6 +1,7 @@
 import { mkdir, mkdtemp, writeFile as fsWriteFile } from "node:fs/promises";
 import path from "node:path";
 import { repoPath } from "./path.js";
+import { assertDefined } from "../type-guard/defined.js";
 
 /**
  * Create a temporary directory and return its path.
@@ -29,11 +30,11 @@ export class TemporaryDirectory {
    * Return the absolute path to this temporary directory.
    */
   path(): string {
-    if (this.dirPath === undefined) {
-      throw new Error(
-        "TempDir path has not yet been resolved. Call resolvePath() or writeFile() first.",
-      );
-    }
+    assertDefined(
+      this.dirPath,
+      "TempDir path has not yet been resolved. Call resolvePath() or writeFile() first.",
+    );
+
     return this.dirPath;
   }
 

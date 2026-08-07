@@ -98,6 +98,7 @@ export class SimAwsCognitoTriggerFunctions implements SimCognitoTriggerFunctions
     const arn = parseSimLambdaFunctionArn(request.functionArn);
     const simFunction = arn === undefined ? undefined : this.findFunction(arn);
 
+    // eslint-disable-next-line no-restricted-syntax -- `assertDefined` is denser per line, and this file is close enough to the FTA threshold that the guard costs less kept as it is
     if (simFunction === undefined) {
       throw new Error(
         `${request.functionArn} is not a simulated Lambda function.`,

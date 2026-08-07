@@ -1,3 +1,4 @@
+import { assertDefined } from "../../../util/type-guard/defined.js";
 import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
 import type { SimIam } from "../sim-iam.js";
 import type { SimIamAccountResolver } from "./sim-iam-account-resolver.js";
@@ -45,9 +46,7 @@ export class SimIamRegistry implements SimIamAccountResolver {
   iamForAccount(accountId: SimAwsAccountId): SimIam {
     const iam = this.findIamForAccount(accountId);
 
-    if (iam === undefined) {
-      throw new Error(`Sim IAM is not registered for Account ${accountId}`);
-    }
+    assertDefined(iam, `Sim IAM is not registered for Account ${accountId}`);
 
     return iam;
   }

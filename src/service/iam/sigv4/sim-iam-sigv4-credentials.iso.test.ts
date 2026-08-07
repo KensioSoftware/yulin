@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import { signAwsRequest } from "../../../../test/sigv4/sign-aws-request.js";
 import type { SimClock } from "../../../util/clock/sim-clock.js";
+import { assertDefined } from "../../../util/type-guard/defined.js";
 import { SimAws } from "../../aws/sim-aws.js";
 import { SimIamAccessKey } from "../credential/sim-iam-access-key.js";
 import { SimIamAccountSigningCredentials } from "../credential/sim-iam-account-signing-credentials.js";
@@ -78,9 +79,14 @@ async function assumeRole(simAws: SimAws): Promise<{
 
   const credentials = assumed.Credentials;
 
-  if (credentials?.SessionToken === undefined) {
-    throw new Error("Expected simulated STS to return session credentials");
-  }
+  assertDefined(
+    credentials,
+    "Expected simulated STS to return session credentials",
+  );
+  assertDefined(
+    credentials.SessionToken,
+    "Expected simulated STS to return a session token",
+  );
 
   return {
     accessKeyId: credentials.AccessKeyId ?? "",
