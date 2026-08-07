@@ -86,6 +86,21 @@ export class SimCfnResource<
   }
 
   /**
+   * Whether this Resource was deliberately not created, because nothing this
+   * simulator models could tell it apart from one that was.
+   */
+  public get inert(): boolean {
+    return this.creationState.inert;
+  }
+
+  /**
+   * The reason this Resource was left uncreated, if it was inert.
+   */
+  public get inertReason(): string | undefined {
+    return this.creationState.inertReason;
+  }
+
+  /**
    * Whether this Resource has reached a terminal successful creation status.
    */
   public get createComplete(): boolean {
@@ -226,6 +241,15 @@ export class SimCfnResource<
    */
   markCreateSkipped(reason: string): void {
     this.creationState.markCreateSkipped(reason);
+  }
+
+  /**
+   * Mark this Resource as deliberately not created, and CREATE_COMPLETE as a
+   * skipped one is. Reported apart from the skips, so a reader looking for what
+   * a Stack is missing is not sent after something that is not.
+   */
+  markCreateInert(reason: string): void {
+    this.creationState.markCreateInert(reason);
   }
 
   /**

@@ -494,6 +494,36 @@ Skipped resources are read off the resources as `stack.skippedResources`, the sa
 ignored ones are, by `SimCfnStackResourceReport`. Nothing is collected while the stack runs, so a
 stack an update changed reports the resources it holds now.
 
+### Inert resources
+
+A refusal only means no factory would create the resource. Whether that is worth reporting is a
+separate question, and `simCfnInertResourceReason` answers it, in the same place the skip would
+otherwise be recorded. A resource nothing the simulator models could tell apart from one it had
+created is marked inert instead, and read back as `stack.inertResources`.
+
+The order matters: the question is asked _after_ the factory has refused, never before. So this
+decides only how a resource is reported, never whether it is created. A template function bound to a
+real in-process handler is deployed and invocable even when it is CDK's own custom resource provider,
+because sim Lambda creates it and the refusal never happens.
+
+Two things can make a resource inert:
+
+- `simCfnInertResourceTypes` is the types no simulated service reads, whatever stack they turn up in.
+  `AWS::Lambda::LayerVersion` and `AWS::CDK::Metadata` are there.
+- `SimCdkProviderScaffolding` reads the stack around the resource. The Lambda function a
+  `Custom::` resource names in its `ServiceToken`, where the custom resource type is one
+  `simCdkCustomResourceFactories` creates directly, has nothing left to do by the time anything would
+  have invoked it, and neither has the log group naming that function.
+
+The association is deliberate. CDK generates the provider's logical ID from a construct path and a
+hash, so matching on the name would be matching on something that is not an interface. `ServiceToken`
+is the link CloudFormation itself uses. It also reaches things a name never would: every
+`BucketDeployment` construct synthesizes its own AWS CLI Layer but only the first is named by the
+shared provider's `Layers`, which is why a Layer is recognised on being a Layer instead.
+
+Keeping the two lists apart is the whole point. `stack.skippedResources` is what a test would find
+missing; running the deliberate omissions in with the gaps is how the gaps stop being findable.
+
 ## Resource teardown loop
 
 `SimCfnStackResourceDeleter` owns the reverse-dependency-ordered deletion loop, and mirrors

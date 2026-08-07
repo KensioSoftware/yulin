@@ -26,6 +26,18 @@ export class SimCfnStackResourceReport {
   }
 
   /**
+   * Resources this simulation deliberately created nothing for, because
+   * nothing it models could tell them apart from Resources it had.
+   *
+   * Apart from the skipped ones on purpose. A skip is a gap and these are not,
+   * and a report that runs the two together is one where the gaps stop being
+   * findable.
+   */
+  public get inert(): readonly SimCfnResource[] {
+    return this.matching((resource) => resource.inert);
+  }
+
+  /**
    * Resources a teardown recorded rather than deleted, because sim
    * CloudFormation has no way to delete their Resource type.
    */

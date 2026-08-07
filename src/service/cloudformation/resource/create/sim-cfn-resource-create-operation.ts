@@ -5,6 +5,7 @@ import type {
 } from "../sim-cfn-resource.js";
 import type { SimCfnServiceResourceFactory } from "../factory/sim-cfn-resource-factory.type.js";
 import { SimCfnResourceCreator } from "./sim-cfn-resource-creator.js";
+import { simCfnInertResourceReason } from "../inert/sim-cfn-inert-resource.js";
 import { isSimCfnUnsupportedResourceError } from "../unsupported/sim-cfn-unsupported-resource.js";
 
 interface SimCfnResourceCreateOperationProperties<T extends object> {
@@ -58,10 +59,7 @@ export class SimCfnResourceCreateOperation<T extends object = object> {
           resolve();
         } catch (error) {
           if (isSimCfnUnsupportedResourceError(error)) {
-            const reason =
-              error instanceof Error ? error.message : String(error);
-
-            this.resource.markCreateSkipped(reason);
+            this.recordUncreated(error, context);
             resolve();
 
             return;
@@ -74,6 +72,36 @@ export class SimCfnResourceCreateOperation<T extends object = object> {
         }
       });
     });
+  }
+
+  /**
+   * Record a Resource no factory would create.
+   *
+   * Asked after the refusal rather than before it, so a Resource a service can
+   * create is still created whatever this would have said. That keeps the
+   * decision to one of reporting: a Resource whose type is unsupported here is
+   * a gap and is skipped, unless nothing this simulator models could have told
+   * it apart from one that was created, in which case saying it is missing
+   * sends a reader after something that is not lost.
+   */
+  private recordUncreated(
+    error: unknown,
+    context: SimCloudFormationResourceCreateContext,
+  ): void {
+    const inertReason = simCfnInertResourceReason(
+      this.resource,
+      context.resources,
+    );
+
+    if (inertReason !== undefined) {
+      this.resource.markCreateInert(inertReason);
+
+      return;
+    }
+
+    this.resource.markCreateSkipped(
+      error instanceof Error ? error.message : String(error),
+    );
   }
 
   private resourceCreationError(error: unknown): Error {

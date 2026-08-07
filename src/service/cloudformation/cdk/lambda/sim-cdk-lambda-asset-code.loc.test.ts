@@ -1,5 +1,6 @@
 import { InvokeCommand } from "@aws-sdk/client-lambda";
 import {
+  assertFalse,
   assertIdentical,
   assertNonNullable,
   assertStringIncludes,
@@ -186,7 +187,7 @@ app.synth();
     await simAws.backgroundTasksComplete();
   });
 
-  it("skips a CDK BucketDeployment provider function on its runtime", async () => {
+  it("leaves out a CDK BucketDeployment provider function without calling it a gap", async () => {
     // Given a CDK stack using BucketDeployment, which synthesizes a Python
     // provider function into the stack alongside the user's own function.
     const simAws = new SimAws();
@@ -238,9 +239,11 @@ app.synth();
       );
     await simAws.backgroundTasksComplete();
 
-    // Then the provider function is skipped, because sim Lambda simulates
-    // Node.js runtimes and sim CloudFormation simulates the BucketDeployment
-    // custom resource directly instead of running its provider.
+    // Then the provider function is not created, because sim Lambda simulates
+    // Node.js runtimes and this one is Python. It is not reported as a gap,
+    // because sim CloudFormation simulates the BucketDeployment custom resource
+    // directly rather than running its provider, so there is nothing left for
+    // the function to have done.
     const providerResource = stack.resources
       .values()
       .find(
@@ -249,9 +252,13 @@ app.synth();
           resource.logicalId.startsWith("CustomCDKBucketDeployment"),
       );
     assertNonNullable(providerResource);
-    assertTrue(providerResource.skipped);
-    assertNonNullable(providerResource.skippedReason);
-    assertStringIncludes(providerResource.skippedReason, "python");
+    assertFalse(providerResource.skipped);
+    assertTrue(providerResource.inert);
+    assertNonNullable(providerResource.inertReason);
+    assertStringIncludes(
+      providerResource.inertReason,
+      "Custom::CDKBucketDeployment",
+    );
 
     // And the user's own asset function still deploys and runs.
     const functionName = stack.outputs.get("AssetFunctionName")?.value;

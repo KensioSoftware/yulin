@@ -261,6 +261,11 @@ export class SimCfnStack {
     return this.report.skipped;
   }
 
+  /** Resources deliberately created as nothing, because nothing reads them. */
+  public get inertResources(): readonly SimCfnResource[] {
+    return this.report.inert;
+  }
+
   /** Resources a teardown recorded rather than deleted. */
   public get skippedResourceDeletions(): readonly SimCfnResource[] {
     return this.report.deletionSkipped;

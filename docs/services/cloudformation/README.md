@@ -1325,6 +1325,27 @@ Filter patterns take `*` and `?`. The CLI also takes character classes such as `
 using one is refused by name rather than matched as written, since a pattern that quietly means
 something else would copy the wrong files.
 
+### The provider CDK synthesizes
+
+One `BucketDeployment` construct is four resources in the synthesized template, and only one of them
+is the `Custom::CDKBucketDeployment` above. The other three are the provider that would have run it
+in AWS: an AWS CLI Lambda Layer, a Python Lambda function, and that function's log group. A second
+deployment adds another Layer and another custom resource, and shares the one function, because CDK
+builds it as a singleton.
+
+None of those three do anything here. Yulin makes the copy itself, so the function is never invoked,
+the Layer it would have loaded the CLI from is never read, and nothing is ever written to the log
+group. They are reported in [`stack.inertResources`](#resources-deliberately-left-out) rather than
+as skipped resources, so a stack whose deployments all worked reports no gaps at all.
+
+That matters beyond tidiness. Sim Lambda declines the provider on its Python runtime with a message
+saying to [bind a real in-process handler](#lambda-function-bindings) to the function, which is sound
+advice for a Python function of your own and exactly the wrong thing to do here: it would replace a
+working simulation with a hand-written one.
+
+The provider is found through the `ServiceToken` its custom resource names it by, not by the logical
+ID CDK generated for it, which is a hash of the construct path and not something to match on.
+
 ## S3 Bucket notifications
 
 The `NotificationConfiguration` property of `AWS::S3::Bucket` deploys through the ordinary
@@ -1788,6 +1809,69 @@ A Resource that was skipped on create is stepped over by a teardown rather than 
 nothing reached simulated AWS to delete. It reaches `DELETE_COMPLETE` and stays out of
 `stack.skippedResourceDeletions`, which is for Resources that were created and could not be removed.
 
+### Resources deliberately left out
+
+`stack.skippedResources` is for gaps. A Resource it names is one a test written against would find
+missing, so some Resources are deliberately kept out of it: the ones the simulator left uncreated on
+purpose, because nothing it models could tell them apart from Resources it had created. Those are in
+`stack.inertResources` instead, each with an `inertReason` for what it would take for the difference
+to start mattering.
+
+```typescript sim-cloudformation-inert-resources
+/**
+ * Telling a Resource a Stack is missing from one it left out on purpose.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "inert-stack",
+  template: {
+    Resources: {
+      AwsCliLayer: {
+        Type: "AWS::Lambda::LayerVersion",
+        Properties: {
+          Description: "/opt/awscli/aws",
+        },
+      },
+      AlarmRule: {
+        Type: "AWS::Events::Rule",
+      },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+
+console.log(stack.skippedResources.map((resource) => resource.logicalId));
+// ["AlarmRule"]
+
+console.log(stack.inertResources.map((resource) => resource.logicalId));
+// ["AwsCliLayer"]
+
+console.log(stack.getResource("AwsCliLayer")?.inertReason);
+// "sim Lambda runs a function's own code archive, or a real in-process handler
+//  bound to it, so nothing a Layer carries is ever on a simulated function's
+//  module path"
+```
+
+An inert Resource behaves in every other way like a skipped one. It is still in `stack.resources`,
+it answers `Ref` and `Fn::GetAtt` with the same [stand-in values](#values-from-a-skipped-resource),
+and a teardown steps over it.
+
+Two things make a Resource inert. Its type can be one no simulated service reads:
+
+- `AWS::Lambda::LayerVersion`, because sim Lambda runs a function's own code archive, or a real
+  in-process handler [bound to it](#lambda-function-bindings), and never assembles a Layer onto a
+  function's module path.
+- `AWS::CDK::Metadata`, the construct-library analytics CDK adds to every synthesized stack.
+
+Or the stack around it can: the provider Lambda function for a CDK custom resource the simulator
+carries out itself is inert, and so is that function's log group. See
+[the provider CDK synthesizes](#the-provider-cdk-synthesizes).
+
 ## Properties a Resource was created without
 
 Deployment is best effort. A Resource type that is not simulated is skipped and the rest of the
@@ -1983,6 +2067,14 @@ Each service's own docs describe what its resource types support.
   resource answers `Ref` and `Fn::GetAtt` with
   [stand-in values](#values-from-a-skipped-resource) rather than the value a created resource would
   have given.
+- `stack.skippedResources` deliberately leaves out the resources the simulator did not create on
+  purpose, because nothing it models could tell them apart from ones it had. Those are in
+  `stack.inertResources` instead, and are listed under
+  [resources deliberately left out](#resources-deliberately-left-out). Read both when accounting for
+  every resource in a template.
+- `AWS::Logs::LogGroup` is not simulated. The one CDK writes for a custom resource provider is
+  reported as inert, because that provider is never invoked, but a log group a stack declares for
+  itself is skipped like any other unsupported resource type, and nothing simulated writes to it.
 - A resource property that is not simulated is left out and recorded in `stack.ignoredProperties`
   rather than failing the stack, so the resource is created behaving differently to the one the
   template describes. See
