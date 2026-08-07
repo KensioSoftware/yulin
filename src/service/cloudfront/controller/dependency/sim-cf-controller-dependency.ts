@@ -7,6 +7,7 @@ import { SimCloudFrontBehaviorResolver as DefaultSimCloudFrontBehaviorResolver }
 import { SimCffApplicator } from "../cff/sim-cff-applicator.js";
 import { SimCloudFrontOriginFetcher } from "../origin/sim-cloudfront-origin-fetcher.js";
 import { SimCfCustomErrorResponder } from "../error/sim-cf-custom-error-responder.js";
+import { SimCfResponseHeadersApplicator } from "../response-headers/sim-cf-response-headers-applicator.js";
 
 export interface SimCloudFrontServiceControllerProperties {
   readonly simAws?: SimAws;
@@ -16,6 +17,7 @@ export interface SimCloudFrontServiceControllerProperties {
   readonly cffApplicator?: SimCffApplicator;
   readonly originFetcher?: SimCloudFrontOriginFetcher;
   readonly customErrorResponder?: SimCfCustomErrorResponder;
+  readonly responseHeadersApplicator?: SimCfResponseHeadersApplicator;
 }
 
 export interface SimCloudFrontControllerDependencies {
@@ -24,6 +26,7 @@ export interface SimCloudFrontControllerDependencies {
   readonly cffApplicator: SimCffApplicator;
   readonly originFetcher: SimCloudFrontOriginFetcher;
   readonly customErrorResponder: SimCfCustomErrorResponder;
+  readonly responseHeadersApplicator: SimCfResponseHeadersApplicator;
 }
 
 /**
@@ -62,6 +65,9 @@ export class SimCloudFrontControllerDependenciesFactory {
       customErrorResponder:
         properties.customErrorResponder ??
         new SimCfCustomErrorResponder({ behaviourResolver, originFetcher }),
+      responseHeadersApplicator:
+        properties.responseHeadersApplicator ??
+        new SimCfResponseHeadersApplicator(),
     };
   }
 }

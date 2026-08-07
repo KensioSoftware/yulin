@@ -1,17 +1,12 @@
-import type { SimCloudFrontDistroRouter } from "../router/sim-cloud-front-distro-router.js";
-import type { SimCloudFrontBehaviorResolver } from "../resolver/sim-cloud-front-behavior-resolver.js";
-import type { SimCffApplicator } from "./cff/sim-cff-applicator.js";
-import type { SimCloudFrontOriginFetcher } from "./origin/sim-cloudfront-origin-fetcher.js";
 import type { SimCloudFrontControllerDependencies } from "./dependency/sim-cf-controller-dependency.js";
-import type { SimCfCustomErrorResponder } from "./error/sim-cf-custom-error-responder.js";
 import { simCfDefaultRootObjectRequest } from "./root-object/sim-cf-default-root-object-request.js";
 
 /**
  * Runs a single simulated CloudFront request through its lifecycle:
  * route to a Distribution, apply the default root object, resolve the matching
  * Behavior, run viewer-request hooks, fetch from the Origin, replace an error
- * response with the Distribution's custom error page, then run viewer-response
- * hooks.
+ * response with the Distribution's custom error page, apply the Behavior's
+ * response headers policy, then run viewer-response hooks.
  *
  * This is the request-processing core, kept separate from the service
  * controller so the controller stays a thin adapter to the shared
@@ -19,19 +14,7 @@ import { simCfDefaultRootObjectRequest } from "./root-object/sim-cf-default-root
  * pipeline itself.
  */
 export class SimCloudFrontRequestPipeline {
-  private readonly distroRouter: SimCloudFrontDistroRouter;
-  private readonly behaviourResolver: SimCloudFrontBehaviorResolver;
-  private readonly cffApplicator: SimCffApplicator;
-  private readonly originFetcher: SimCloudFrontOriginFetcher;
-  private readonly customErrorResponder: SimCfCustomErrorResponder;
-
-  constructor(dependencies: SimCloudFrontControllerDependencies) {
-    this.distroRouter = dependencies.distroRouter;
-    this.behaviourResolver = dependencies.behaviourResolver;
-    this.cffApplicator = dependencies.cffApplicator;
-    this.originFetcher = dependencies.originFetcher;
-    this.customErrorResponder = dependencies.customErrorResponder;
-  }
+  constructor(private readonly stages: SimCloudFrontControllerDependencies) {}
 
   /**
    * Process one incoming request and produce the response the caller sees.
@@ -39,7 +22,7 @@ export class SimCloudFrontRequestPipeline {
   async handle(request: Request): Promise<Response> {
     let requestReference = request;
 
-    const route = this.distroRouter.routeForRequest(requestReference);
+    const route = this.stages.distroRouter.routeForRequest(requestReference);
 
     if (route === undefined) {
       return new Response("Suitable sim CloudFront Distribution not found", {
@@ -51,12 +34,15 @@ export class SimCloudFrontRequestPipeline {
 
     requestReference = simCfDefaultRootObjectRequest(requestReference, distro);
 
-    const behaviour = this.behaviourResolver.resolve(requestReference, distro);
+    const behaviour = this.stages.behaviourResolver.resolve(
+      requestReference,
+      distro,
+    );
 
     // Handle viewer-request CFF, if any.
     // A viewer-request CFF can either rewrite the Request that continues to the
     // Origin or short-circuit the request by returning a Response.
-    const cffResult = this.cffApplicator.applyViewerRequest(
+    const cffResult = this.stages.cffApplicator.applyViewerRequest(
       cloudFront,
       requestReference,
       behaviour,
@@ -66,7 +52,7 @@ export class SimCloudFrontRequestPipeline {
     }
     requestReference = cffResult;
 
-    const originResponse = await this.originFetcher.fetch(
+    const originResponse = await this.stages.originFetcher.fetch(
       requestReference,
       distro,
       behaviour,
@@ -75,16 +61,26 @@ export class SimCloudFrontRequestPipeline {
     // Replace an Origin error with the Distribution's custom error page, if it
     // configures one for that status. This happens before the viewer-response
     // CFF so that a function sees the response the viewer is about to get.
-    const response = await this.customErrorResponder.apply(
+    const errorResponse = await this.stages.customErrorResponder.apply(
       requestReference,
       distro,
       originResponse,
     );
 
+    // Apply the Behavior's response headers policy, if it names one. CloudFront
+    // does this after the response leaves the cache and before the
+    // viewer-response event, so the custom error page above carries the
+    // policy's headers and a viewer-response function sees them.
+    const response = this.stages.responseHeadersApplicator.apply(
+      cloudFront,
+      errorResponse,
+      behaviour,
+    );
+
     // Handle viewer-response CFF, if any.
     // A viewer-response CFF can inspect the original request and replace or
     // modify the Origin response before it is returned to the caller.
-    return this.cffApplicator.applyViewerResponse(
+    return this.stages.cffApplicator.applyViewerResponse(
       cloudFront,
       requestReference,
       response,

@@ -779,6 +779,112 @@ export function handler(event) {
 }
 ```
 
+## Response headers policies
+
+A response headers policy sets headers on everything a cache Behavior serves. Declare one as
+`AWS::CloudFront::ResponseHeadersPolicy` and point a Behavior's `ResponseHeadersPolicyId` at it with
+a `Ref`, which is what CDK's `ResponseHeadersPolicy` construct synthesizes.
+
+```typescript sim-cloudfront-response-headers-policy
+/**
+ * Setting response headers on what a cache Behavior serves.
+ */
+
+import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { SimAws } from "@kensio/yulin";
+import { serveSimAws } from "@kensio/yulin/serve";
+
+const simAws = new SimAws();
+const srv = await serveSimAws({ simAws });
+
+try {
+  const stack = await simAws.cloudFormation().deployTemplate({
+    stackName: "site-stack",
+    template: {
+      Resources: {
+        SiteBucket: {
+          Type: "AWS::S3::Bucket",
+          Properties: { BucketName: "site-bucket" },
+        },
+        CacheHeaders: {
+          Type: "AWS::CloudFront::ResponseHeadersPolicy",
+          Properties: {
+            ResponseHeadersPolicyConfig: {
+              Name: "CacheHeaders",
+              CustomHeadersConfig: {
+                Items: [
+                  {
+                    Header: "Cache-Control",
+                    Override: true,
+                    Value: "public, max-age=0, must-revalidate",
+                  },
+                ],
+              },
+            },
+          },
+        },
+        SiteDistribution: {
+          Type: "AWS::CloudFront::Distribution",
+          DependsOn: ["SiteBucket", "CacheHeaders"],
+          Properties: {
+            DistributionConfig: {
+              DefaultRootObject: "index.html",
+              Origins: [
+                {
+                  Id: "SiteOrigin",
+                  DomainName: "site-bucket.s3.amazonaws.com",
+                  S3OriginConfig: {},
+                },
+              ],
+              DefaultCacheBehavior: {
+                TargetOriginId: "SiteOrigin",
+                ViewerProtocolPolicy: "allow-all",
+                ResponseHeadersPolicyId: { Ref: "CacheHeaders" },
+              },
+            },
+          },
+        },
+      },
+      Outputs: {
+        DistributionDomainName: {
+          Value: { "Fn::GetAtt": ["SiteDistribution", "DomainName"] },
+        },
+      },
+    },
+  });
+
+  await stack.waitForDeployComplete();
+
+  await simAws.s3().putObject(
+    new PutObjectCommand({
+      Bucket: "site-bucket",
+      Key: "index.html",
+      ContentType: "text/html",
+      Body: "<h1>Home</h1>",
+    }),
+  );
+
+  const domainName = stack.outputs.get("DistributionDomainName")
+    ?.value as string;
+  const response = await fetch(srv.localUrl(`http://${domainName}/`));
+
+  console.log(response.headers.get("cache-control"));
+} finally {
+  await srv.close();
+}
+```
+
+Each header in `CustomHeadersConfig` carries an `Override` boolean. With it set, the policy's value
+replaces one the Origin sent. Without it, the Origin's value is kept and the policy's is dropped. A
+header the Origin did not send is added either way.
+
+`RemoveHeadersConfig` takes headers away, and is applied before the added ones, so a header named in
+both sections ends up present with the policy's value.
+
+The policy is applied after a custom error response is fetched and before a `viewer-response`
+CloudFront Function runs, as CloudFront does. An error page carries the policy's headers, and a
+function sees them in `event.response.headers` and can change them.
+
 ## Available functionality
 
 Sim CloudFront currently supports:
@@ -792,6 +898,7 @@ Sim CloudFront currently supports:
 - Default cache Behavior and path-based cache Behaviors
 - `DefaultRootObject` and `CustomErrorResponses`, for static sites and single-page apps
 - `viewer-request` and `viewer-response` CloudFront Functions
+- `AWS::CloudFront::ResponseHeadersPolicy`, for headers a cache Behavior sets on every response
 - Viewer certificates from sim ACM, including CloudFront's `us-east-1` requirement
 - Serving simulated CloudFront traffic on localhost with `serveSimAws`
 
@@ -814,3 +921,14 @@ Where sim CloudFront knowingly behaves differently from AWS:
 - **`DeleteFunctionCommand` never answers `FunctionInUse`.** Nothing tells a CloudFront Function that
   a cache Behavior has taken it up, so every Function is deletable. A Behavior left pointing at a
   deleted Function runs no Function code.
+- **A response headers policy sets custom headers and removes named ones, and nothing else.** The
+  `CorsConfig`, `SecurityHeadersConfig` and `ServerTimingHeadersConfig` sections each set headers of
+  their own, and none of them is modelled. A policy declaring one fails the stack by naming the
+  section, rather than deploying and then serving responses missing the headers it promised.
+- **There is no command surface for a response headers policy.** `CreateResponseHeadersPolicy` and
+  its siblings are not simulated, so `AWS::CloudFront::ResponseHeadersPolicy` is the only way to make
+  one.
+- **A managed policy ID is not found.** CloudFront's managed policies belong to AWS rather than to a
+  template, so nothing here creates them. A Behavior naming one is refused with
+  `NoSuchResponseHeadersPolicy` when a request reaches it, rather than serving a response without the
+  headers the policy would have set.

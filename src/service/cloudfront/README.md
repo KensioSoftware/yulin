@@ -123,6 +123,10 @@ HTTP request behaviour is split across a few directories:
   Origin fetch and before the viewer-response CloudFront Function. The response page is fetched
   through the same Behavior resolution and Origin fetching as any other request, so it can come from
   an Origin of its own.
+  `controller/response-headers/` applies the Behavior's response headers policy, after the custom
+  error response and before the viewer-response CloudFront Function. That ordering is CloudFront's
+  own: an error page carries the policy's headers, and a function sees them in its event and can
+  change them.
 - `router/` resolves an incoming `Request` to a simulated Distribution by CloudFront hostname or
   alternate domain name.
 - `resolver/` chooses the matching Cache Behavior for a request path.
@@ -146,6 +150,24 @@ Important pieces include:
 
 CloudFront Functions are represented as JavaScript handlers and can be associated with viewer
 request and viewer response events on cache Behaviors.
+
+## Response headers policies
+
+`response-headers-policy/` holds the policy model. A `SimCloudFrontResponseHeadersPolicy` is a name,
+an ID and two lists: the headers to add and the headers to remove. Removal happens first, so a header
+in both ends up present with the policy's value. Each added header carries an `Override` deciding
+whether it replaces one the Origin sent.
+
+Policies are stored on `SimCloudFront` and found by ID, which is what a Behavior's
+`responseHeadersPolicyId` names. There is no CreateResponseHeadersPolicy command, so
+`cfn/response-headers-policy/` is the only thing that makes one. Its config reader models the custom
+and removed headers, and refuses `CorsConfig`, `SecurityHeadersConfig` and `ServerTimingHeadersConfig`
+by name: each sets headers of its own, and a policy that quietly sets fewer here than in AWS is a
+divergence a passing test would hide.
+
+A lookup miss is `SimCloudFrontNoSuchResponseHeadersPolicy` rather than a pass-through, because the
+common cause is a managed policy ID, which names a policy AWS owns rather than one a template
+creates.
 
 ## Cross-service integration
 

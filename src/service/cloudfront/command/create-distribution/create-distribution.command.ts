@@ -115,6 +115,7 @@ export interface SimCloudFrontDefaultCacheBehaviorConfig {
   readonly AllowedMethods?: SimCloudFrontAllowedMethods | undefined;
   readonly ViewerProtocolPolicy?: SimCloudFrontViewerProtocolPolicy | undefined;
   readonly FunctionAssociations?: SimCloudFrontFunctionAssociations | undefined;
+  readonly ResponseHeadersPolicyId?: string | undefined;
 }
 
 /**
