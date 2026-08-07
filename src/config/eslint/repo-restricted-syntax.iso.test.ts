@@ -1,4 +1,8 @@
-import { assertArrayLength, assertArrayMinLength } from "@kensio/smartass";
+import {
+  assertArrayLength,
+  assertArrayMinLength,
+  assertIdentical,
+} from "@kensio/smartass";
 import { smartassPreferSpecificAssertions } from "@kensio/smartass/eslint";
 import { ESLint } from "eslint";
 import { describe, it } from "vitest";
@@ -80,9 +84,14 @@ describe("Resolving this repository's own no-restricted-syntax rule", () => {
     const forSource = await resolvedSelectors("src/index.ts");
     const forTest = await resolvedSelectors("src/index.iso.test.ts");
 
-    // When the two are compared
+    // When the selectors themselves are compared, rather than how many there
+    // are, since an override could swap one restriction for another and leave
+    // the count alone
+    const asText = (selectors: readonly string[]): string =>
+      selectors.toSorted((left, right) => left.localeCompare(right)).join("\n");
+
     // Then a test file is held to the same restrictions, which is where the
     // assertion advice is worth the most
-    assertArrayLength(forTest, forSource.length);
+    assertIdentical(asText(forTest), asText(forSource));
   });
 });
