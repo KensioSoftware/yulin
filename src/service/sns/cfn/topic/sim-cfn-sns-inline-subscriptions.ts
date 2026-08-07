@@ -3,12 +3,18 @@ import { simCfnSnsResourceError } from "../sim-cfn-sns-resource-error.js";
 import { snsTopicResourceType } from "../sim-cfn-sns-resource-types.js";
 import { topicSubscriptionPropertyName } from "./sim-cfn-sns-topic-property-names.js";
 
+const protocolKey = "Protocol";
+
+const endpointKey = "Endpoint";
+
 /**
  * One entry of the `Subscription` list on an AWS::SNS::Topic.
  *
- * It carries the protocol and the endpoint and nothing else. A subscription
- * declared this way cannot have a filter policy or raw message delivery, which
- * is what the separate AWS::SNS::Subscription Resource is for.
+ * It carries the protocol and the endpoint and nothing else, which is all real
+ * CloudFormation lets one carry. A subscription declared this way therefore
+ * cannot have a filter policy or raw message delivery, and an entry asking for
+ * either is refused rather than deployed without it. That is what the separate
+ * AWS::SNS::Subscription Resource is for.
  */
 export interface SimCfnSnsInlineSubscription {
   readonly protocol: string;
@@ -52,9 +58,21 @@ function inlineSubscription(
     );
   }
 
+  const fields = new Map(Object.entries(entry));
+
+  for (const name of fields.keys()) {
+    if (name !== protocolKey && name !== endpointKey) {
+      throw topicPropertyError(
+        logicalId,
+        `an entry of ${topicSubscriptionPropertyName} carries ${name}, and ` +
+          `the only things one can carry are ${protocolKey} and ${endpointKey}`,
+      );
+    }
+  }
+
   return {
-    protocol: requiredString(logicalId, entry["Protocol"], "Protocol"),
-    endpoint: requiredString(logicalId, entry["Endpoint"], "Endpoint"),
+    protocol: requiredString(logicalId, fields.get(protocolKey), protocolKey),
+    endpoint: requiredString(logicalId, fields.get(endpointKey), endpointKey),
   };
 }
 

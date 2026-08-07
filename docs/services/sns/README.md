@@ -1341,7 +1341,8 @@ simulated and its `Endpoint` has to be an ARN that protocol can reach. `RawMessa
 `FilterPolicy` and `FilterPolicyScope` are carried through as subscription attributes, so a filter
 policy written in a template is read exactly as one set through the SDK. The policy is an object in
 the template where the API takes a JSON string; the conversion happens on the way in. `Ref` on the
-resource gives the subscription ARN.
+resource gives the subscription ARN, and `Fn::GetAtt … Arn` gives the same string, since the ARN is
+the resource's physical id.
 
 ```typescript sim-sns-cloudformation-topic
 /**
@@ -1432,8 +1433,9 @@ stay apart.
 
 A topic can also declare its subscriptions inside itself, with the `Subscription` property, which is
 how a hand-written template usually writes them. Each entry is a `Protocol` and an `Endpoint`, and
-each goes through `Subscribe` the same way a separate resource does. A subscription written this way
-has no attributes, so a filter policy or raw message delivery needs the separate resource.
+each goes through `Subscribe` the same way a separate resource does. A `Protocol` and an `Endpoint`
+are all real CloudFormation lets an entry carry, so an entry carrying anything else fails the
+resource. A filter policy or raw message delivery needs the separate resource.
 
 ```typescript
 {

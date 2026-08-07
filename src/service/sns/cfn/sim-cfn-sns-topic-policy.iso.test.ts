@@ -158,7 +158,8 @@ describe("AWS::SNS::TopicPolicy", () => {
 
     assertStringIncludes(
       error.message,
-      "AWS::SNS::TopicPolicy OrdersTopicPolicy requires a Topics list",
+      "Invalid AWS::SNS::TopicPolicy Resource OrdersTopicPolicy: Topics is " +
+        "required and must be a list of topic ARNs",
     );
   });
 
@@ -190,7 +191,8 @@ describe("AWS::SNS::TopicPolicy", () => {
 
     assertStringIncludes(
       error.message,
-      "AWS::SNS::TopicPolicy OrdersTopicPolicy requires a PolicyDocument object",
+      "Invalid AWS::SNS::TopicPolicy Resource OrdersTopicPolicy: " +
+        "PolicyDocument is required and must be an object",
     );
   });
 
@@ -215,7 +217,7 @@ describe("AWS::SNS::TopicPolicy", () => {
 
     assertStringIncludes(
       error.message,
-      "requires each entry of Topics to be a topic ARN string, got number",
+      "each entry of Topics must be a topic ARN string, and one is a number",
     );
   });
 });

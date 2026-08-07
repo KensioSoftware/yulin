@@ -24,12 +24,17 @@ export class SimSnsSubscriptionCfn implements SimCfnResourceValueAdapter {
   }
 
   /**
-   * AWS::SNS::Subscription has no Fn::GetAtt attributes, on real AWS or here.
+   * AWS::SNS::Subscription attributes.
    *
-   * Everything a template could ask for about a subscription is something it
-   * wrote itself, apart from the ARN the Ref gives.
+   * `Arn` is the only one, and it is the same string the Ref gives, since the
+   * subscription ARN is the Resource's physical id. Everything else a template
+   * could ask for about a subscription is something it wrote itself.
    */
   attributeValue(attributeName: string): SimCfnTemplateValue {
+    if (attributeName === "Arn") {
+      return this.subscription.arn.value;
+    }
+
     throw new Error(
       `Unsupported AWS::SNS::Subscription attribute ${attributeName}`,
     );

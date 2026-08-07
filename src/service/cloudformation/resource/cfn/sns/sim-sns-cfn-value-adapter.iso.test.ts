@@ -1,7 +1,9 @@
 import {
   assertIdentical,
+  assertNonNullable,
   assertStringIncludes,
   assertThrowsErrorAsync,
+  assertTypeString,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 
@@ -74,8 +76,49 @@ describe("Sim SNS CloudFormation value adapter", () => {
     );
   });
 
-  it("refuses an AWS::SNS::Subscription attribute, since it has none", async () => {
-    // Given a template asking for an attribute of a subscription.
+  it("answers an AWS::SNS::Subscription Ref and Arn with the subscription ARN", async () => {
+    // Given a template reading a subscription both ways it can. The
+    // subscription ARN is the Resource's physical id, so Ref and the one
+    // Fn::GetAtt attribute it has are the same string.
+    const simAws = new SimAws();
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "orders-stack",
+      template: {
+        Resources: {
+          ...topicResources,
+          FulfilmentQueue: {
+            Type: "AWS::SQS::Queue",
+            Properties: { QueueName: "fulfilment" },
+          },
+          FulfilmentSubscription: {
+            Type: "AWS::SNS::Subscription",
+            Properties: {
+              TopicArn: { Ref: "OrdersTopic" },
+              Protocol: "sqs",
+              Endpoint: { "Fn::GetAtt": ["FulfilmentQueue", "Arn"] },
+            },
+          },
+        },
+        Outputs: {
+          SubscriptionRef: { Value: { Ref: "FulfilmentSubscription" } },
+          SubscriptionArn: {
+            Value: { "Fn::GetAtt": ["FulfilmentSubscription", "Arn"] },
+          },
+        },
+      },
+    });
+
+    const subscriptionArn = stack.outputs.get("SubscriptionArn")?.value;
+    assertIdentical(
+      stack.outputs.get("SubscriptionRef")?.value,
+      subscriptionArn,
+    );
+    assertTypeString(subscriptionArn);
+    assertNonNullable(simAws.sns().findSubscription(subscriptionArn));
+  });
+
+  it("refuses an AWS::SNS::Subscription attribute that is not Arn", async () => {
+    // Given a template asking for an attribute a subscription does not have.
     const simAws = new SimAws();
 
     const error = await assertThrowsErrorAsync(async () => {
@@ -99,7 +142,7 @@ describe("Sim SNS CloudFormation value adapter", () => {
           },
           Outputs: {
             Nope: {
-              Value: { "Fn::GetAtt": ["FulfilmentSubscription", "Arn"] },
+              Value: { "Fn::GetAtt": ["FulfilmentSubscription", "Endpoint"] },
             },
           },
         },
@@ -108,7 +151,7 @@ describe("Sim SNS CloudFormation value adapter", () => {
 
     assertStringIncludes(
       error.message,
-      "Unsupported AWS::SNS::Subscription attribute Arn",
+      "Unsupported AWS::SNS::Subscription attribute Endpoint",
     );
   });
 

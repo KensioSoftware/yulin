@@ -174,6 +174,27 @@ describe("AWS::SNS::Topic validation", () => {
     );
   });
 
+  it("fails an inline Subscription entry asking for a filter policy", async () => {
+    // Given an inline entry carrying something an inline entry cannot carry.
+    // Real CloudFormation gives one a Protocol and an Endpoint and nothing
+    // else, so the separate Resource is the only place a filter policy goes.
+    const error = await deployTopic({
+      TopicName: "orders",
+      Subscription: [
+        {
+          Protocol: "sqs",
+          Endpoint: "arn:aws:sqs:us-east-1:888888888888:fulfilment",
+          FilterPolicy: { region: ["eu"] },
+        },
+      ],
+    });
+
+    assertStringIncludes(
+      error.message,
+      "an entry of Subscription carries FilterPolicy",
+    );
+  });
+
   it("fails an inline Subscription entry with no Endpoint", async () => {
     const error = await deployTopic({
       TopicName: "orders",

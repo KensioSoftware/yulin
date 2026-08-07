@@ -1,4 +1,5 @@
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
+import { simCfnSnsResourceError } from "../sim-cfn-sns-resource-error.js";
 import { snsTopicPolicyResourceType } from "../sim-cfn-sns-resource-types.js";
 
 /**
@@ -18,18 +19,51 @@ export function simCfnSnsPolicyTopicArns(
   const topics = properties["Topics"];
 
   if (!Array.isArray(topics) || topics.length === 0) {
-    throw new TypeError(
-      `${snsTopicPolicyResourceType} ${logicalId} requires a Topics list of topic ARNs`,
+    throw topicPolicyError(
+      logicalId,
+      "Topics is required and must be a list of topic ARNs",
     );
   }
 
   return topics.map((topic) => {
     if (typeof topic !== "string") {
-      throw new TypeError(
-        `${snsTopicPolicyResourceType} ${logicalId} requires each entry of Topics to be a topic ARN string, got ${typeof topic}`,
+      throw topicPolicyError(
+        logicalId,
+        `each entry of Topics must be a topic ARN string, and one is a ${typeof topic}`,
       );
     }
 
     return topic;
   });
+}
+
+/**
+ * The policy document an AWS::SNS::TopicPolicy Resource carries.
+ *
+ * A template writes it as an object where SetTopicAttributes takes a JSON
+ * string, so what comes back here is what is serialised on the way in.
+ */
+export function simCfnSnsPolicyDocument(
+  logicalId: string,
+  properties: SimCfnTemplateValueRecord,
+): object {
+  const policyDocument = properties["PolicyDocument"];
+
+  if (
+    policyDocument === undefined ||
+    policyDocument === null ||
+    typeof policyDocument !== "object" ||
+    Array.isArray(policyDocument)
+  ) {
+    throw topicPolicyError(
+      logicalId,
+      "PolicyDocument is required and must be an object",
+    );
+  }
+
+  return policyDocument;
+}
+
+function topicPolicyError(logicalId: string, reason: string): Error {
+  return simCfnSnsResourceError(snsTopicPolicyResourceType, logicalId, reason);
 }

@@ -8,7 +8,10 @@ import { simSnsPolicyAttributeName } from "../../topic/sim-sns-topic-attribute-n
 import { parseSnsTopicArn } from "../../topic/sim-sns-topic-arn.js";
 import { simCfnSnsResourceCreation } from "../sim-cfn-sns-resource-error.js";
 import { snsTopicPolicyResourceType } from "../sim-cfn-sns-resource-types.js";
-import { simCfnSnsPolicyTopicArns } from "./sim-cfn-sns-topic-policy-properties.js";
+import {
+  simCfnSnsPolicyDocument,
+  simCfnSnsPolicyTopicArns,
+} from "./sim-cfn-sns-topic-policy-properties.js";
 
 interface SimCfnSnsTopicPolicyCreatorProperties {
   readonly sns: SimSns;
@@ -41,14 +44,15 @@ export class SimCfnSnsTopicPolicyCreator {
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
   ): Promise<SimSnsTopic> {
-    const topicArns = simCfnSnsPolicyTopicArns(resource.logicalId, properties);
+    const { logicalId } = resource;
+    const topicArns = simCfnSnsPolicyTopicArns(logicalId, properties);
     const policy = jsonStringify(
-      this.policyDocumentForResource(resource, properties),
+      simCfnSnsPolicyDocument(logicalId, properties),
     );
 
     return simCfnSnsResourceCreation(
       snsTopicPolicyResourceType,
-      resource.logicalId,
+      logicalId,
       async () => {
         const topics = await Promise.all(
           topicArns.map(async (topicArn) =>
@@ -59,7 +63,7 @@ export class SimCfnSnsTopicPolicyCreator {
         const first = topics[0];
         assertDefined(
           first,
-          `sim SNS topic after CloudFormation topic policy creation for ${resource.logicalId}`,
+          `sim SNS topic after CloudFormation topic policy creation for ${logicalId}`,
         );
 
         return first;
@@ -89,25 +93,5 @@ export class SimCfnSnsTopicPolicyCreator {
     assertDefined(topic, `sim SNS topic at ${topicArn}`);
 
     return topic;
-  }
-
-  private policyDocumentForResource(
-    resource: SimCfnResource,
-    properties: SimCfnTemplateValueRecord,
-  ): object {
-    const policyDocument = properties["PolicyDocument"];
-
-    if (
-      policyDocument === undefined ||
-      policyDocument === null ||
-      typeof policyDocument !== "object" ||
-      Array.isArray(policyDocument)
-    ) {
-      throw new TypeError(
-        `${snsTopicPolicyResourceType} ${resource.logicalId} requires a PolicyDocument object`,
-      );
-    }
-
-    return policyDocument;
   }
 }
