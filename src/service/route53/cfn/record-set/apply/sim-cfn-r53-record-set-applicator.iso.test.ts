@@ -5,6 +5,7 @@ import {
   assertObjectMatches,
   assertStringIncludes,
   assertThrowsErrorAsync,
+  assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../../aws/sim-aws.js";
@@ -103,6 +104,30 @@ describe("SimCfnRoute53RecordSetApplicator", () => {
       type: "A",
       values: ["192.0.2.1"],
     });
+  });
+
+  it("registers no Hosted Zone for a RecordSet it does not go on to create", async () => {
+    // Given a RecordSet applicator with no Hosted Zones.
+    const simAws = new SimAws();
+    const route53 = simAws.route53();
+    const applicator = new SimCfnRoute53RecordSetApplicator({ route53 });
+
+    // When a RecordSet names a looked-up Hosted Zone but declares a record
+    // type sim Route53 does not store, so the Resource is skipped.
+    await assertThrowsErrorAsync(async () =>
+      applicator.create(resource(), {
+        HostedZoneId: "Z2FDTNDATAQYW2",
+        Name: "www.example.com",
+        Type: "DS",
+        ResourceRecords: ["12345 13 2 abc"],
+      }),
+    );
+
+    // Then no zone is left behind for a record that was never created, which a
+    // retry or a later stack would otherwise find already there.
+    assertUndefined(
+      route53.hostedZones.get("Z2FDTNDATAQYW2" as SimRoute53HostedZoneId),
+    );
   });
 
   it("throws when a RecordSet naming a Hosted Zone by ID has no usable Name", async () => {

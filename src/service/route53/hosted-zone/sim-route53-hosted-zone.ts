@@ -71,8 +71,8 @@ export class SimRoute53HostedZone {
    *
    * A zone whose name was inferred from one record can be told about another,
    * and the two together say more about where the zone sits than either does
-   * alone. A zone that was named rather than inferred keeps its name: the
-   * record is outside it, and refusing here is how that gets noticed.
+   * alone. A zone that was named rather than inferred keeps its name, since
+   * nothing about it was a guess in the first place.
    */
   widenInferredName(recordName: string): void {
     if (!this.nameInferred) {

@@ -1,5 +1,6 @@
 import type { SimCfnResource } from "../../../../resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../../template/value/sim-cfn-template-value.js";
+import { SimCdkBucketDeployValues } from "./sim-cdk-bucket-deploy-values.js";
 
 /**
  * The parts of a `Custom::CDKBucketDeployment` that say what to copy where.
@@ -18,25 +19,19 @@ export class SimCdkBucketDeployProperties {
   readonly systemMetadata: ReadonlyMap<string, string>;
 
   constructor(resource: SimCfnResource, properties: SimCfnTemplateValueRecord) {
-    this.destinationBucketName = requiredString(
-      resource,
-      properties,
-      "DestinationBucketName",
-    );
+    const values = new SimCdkBucketDeployValues(resource, properties);
+
+    this.destinationBucketName = values.requiredString("DestinationBucketName");
     this.destinationKeyPrefix = normaliseKeyPrefix(
-      optionalString(resource, properties, "DestinationBucketKeyPrefix"),
+      values.optionalString("DestinationBucketKeyPrefix"),
     );
-    this.sourceObjectKeys = stringList(
-      resource,
-      properties,
-      "SourceObjectKeys",
-    );
-    this.exclude = stringList(resource, properties, "Exclude");
-    this.include = stringList(resource, properties, "Include");
+    this.sourceObjectKeys = values.stringList("SourceObjectKeys");
+    this.exclude = values.stringList("Exclude");
+    this.include = values.stringList("Include");
     // A `BucketDeployment` prunes unless told not to, and the property is only
     // synthesized when it is set, so absent means the construct default.
-    this.prune = properties["Prune"] !== false;
-    this.systemMetadata = systemMetadata(resource, properties);
+    this.prune = values.boolean("Prune", true);
+    this.systemMetadata = values.headers("SystemMetadata");
   }
 
   /**
@@ -57,91 +52,4 @@ function normaliseKeyPrefix(value: string | undefined): string {
   }
 
   return value.endsWith("/") ? value : `${value}/`;
-}
-
-function systemMetadata(
-  resource: SimCfnResource,
-  properties: SimCfnTemplateValueRecord,
-): ReadonlyMap<string, string> {
-  const value = properties["SystemMetadata"];
-
-  if (value === undefined) {
-    return new Map();
-  }
-
-  if (typeof value !== "object" || Array.isArray(value) || value === null) {
-    throw new TypeError(
-      `Custom::CDKBucketDeployment ${resource.logicalId}: SystemMetadata must be an object`,
-    );
-  }
-
-  const entries = Object.entries(value).map(([name, headerValue]) => {
-    if (typeof headerValue !== "string") {
-      throw new TypeError(
-        `Custom::CDKBucketDeployment ${resource.logicalId}: SystemMetadata ${name} must be a string`,
-      );
-    }
-
-    return [name.toLowerCase(), headerValue] as const;
-  });
-
-  return new Map(entries);
-}
-
-function requiredString(
-  resource: SimCfnResource,
-  properties: SimCfnTemplateValueRecord,
-  name: string,
-): string {
-  const value = optionalString(resource, properties, name);
-
-  if (value === undefined) {
-    throw new TypeError(
-      `Custom::CDKBucketDeployment ${resource.logicalId}: ${name} must resolve to a string`,
-    );
-  }
-
-  return value;
-}
-
-function optionalString(
-  resource: SimCfnResource,
-  properties: SimCfnTemplateValueRecord,
-  name: string,
-): string | undefined {
-  // eslint-disable-next-line security/detect-object-injection
-  const value = properties[name];
-
-  if (value === undefined) {
-    return undefined;
-  }
-
-  if (typeof value !== "string") {
-    throw new TypeError(
-      `Custom::CDKBucketDeployment ${resource.logicalId}: ${name} must resolve to a string`,
-    );
-  }
-
-  return value;
-}
-
-function stringList(
-  resource: SimCfnResource,
-  properties: SimCfnTemplateValueRecord,
-  name: string,
-): readonly string[] {
-  // eslint-disable-next-line security/detect-object-injection
-  const value = properties[name];
-
-  if (value === undefined) {
-    return [];
-  }
-
-  if (!Array.isArray(value) || value.some((item) => typeof item !== "string")) {
-    throw new TypeError(
-      `Custom::CDKBucketDeployment ${resource.logicalId}: ${name} must be an array of strings`,
-    );
-  }
-
-  return value as readonly string[];
 }

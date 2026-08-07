@@ -925,6 +925,9 @@ Where sim CloudFront knowingly behaves differently from AWS:
   `CorsConfig`, `SecurityHeadersConfig` and `ServerTimingHeadersConfig` sections each set headers of
   their own, and none of them is modelled. A policy declaring one fails the stack by naming the
   section, rather than deploying and then serving responses missing the headers it promised.
+- **A response headers policy name is unique, but nothing else about it is checked.** A second
+  policy claiming a name is refused with `ResponseHeadersPolicyAlreadyExists`, as CloudFront refuses
+  one. The header names and values themselves are stored as written.
 - **There is no command surface for a response headers policy.** `CreateResponseHeadersPolicy` and
   its siblings are not simulated, so `AWS::CloudFront::ResponseHeadersPolicy` is the only way to make
   one.

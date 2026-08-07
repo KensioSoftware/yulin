@@ -136,7 +136,7 @@ The first record to name the zone names it, and a record above that name widens 
 
 Register the zone yourself when a test depends on its name, such as one listing zones by name, or
 when its name is not a suffix of any record the stack holds. A registered zone keeps the name it was
-given rather than inferring one, and a record outside it is refused.
+given rather than inferring one, so its records are stored under the name you chose.
 
 ## Creating records
 
@@ -1128,9 +1128,11 @@ This lets local integration tests use the same CDK infrastructure shape as produ
 the test process local.
 
 A CDK app whose Hosted Zone comes from `HostedZone.fromLookup` names a real Hosted Zone ID
-throughout its template rather than creating the zone. Register that zone before deploying, as in
-[Registering a Hosted Zone with a chosen ID](#registering-a-hosted-zone-with-a-chosen-id), and the
-template's RecordSets find it.
+throughout its template rather than creating the zone. The template deploys as it is: the zone is
+registered under that ID as the first RecordSet naming it is created, with its name inferred from the
+record names. Register it yourself with
+[Registering a Hosted Zone with a chosen ID](#registering-a-hosted-zone-with-a-chosen-id) when a test
+depends on the zone's name, or when no record in the stack sits inside it.
 
 ## Accounts and Regions
 

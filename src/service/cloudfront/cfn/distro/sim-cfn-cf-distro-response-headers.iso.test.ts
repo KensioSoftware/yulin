@@ -223,6 +223,41 @@ describe("CloudFormation Distribution response headers policies", () => {
     );
   });
 
+  it("fails the stack for a second policy claiming a name", async () => {
+    // Given a template declaring two response headers policies with one name,
+    // which CloudFront refuses because a policy name is unique in an account.
+    const simAws = new SimAws();
+
+    const error = await assertThrowsErrorAsync(async () => {
+      const stack = await simAws.cloudFormation().deployTemplate({
+        stackName: "duplicate-policy-name-stack",
+        template: {
+          Resources: {
+            CacheHeaders: {
+              Type: "AWS::CloudFront::ResponseHeadersPolicy",
+              Properties: {
+                ResponseHeadersPolicyConfig: { Name: "CacheHeaders" },
+              },
+            },
+            MoreCacheHeaders: {
+              Type: "AWS::CloudFront::ResponseHeadersPolicy",
+              DependsOn: "CacheHeaders",
+              Properties: {
+                ResponseHeadersPolicyConfig: { Name: "CacheHeaders" },
+              },
+            },
+          },
+        },
+      });
+
+      await stack.waitForDeployComplete();
+    });
+
+    // Then the second one is refused, rather than both deploying under IDs of
+    // their own and diverging from what AWS would have done.
+    assertStringIncludes(error.message, "CacheHeaders already exists");
+  });
+
   it("fails the stack for a policy section it does not model", async () => {
     // Given a template whose policy sets security headers, which this
     // simulation does not model.

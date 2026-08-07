@@ -41,8 +41,8 @@ import type {
 import type {
   SimCloudFrontResponseHeadersPolicy,
   SimCloudFrontResponseHeadersPolicyId,
-  SimCloudFrontResponseHeadersPolicyMap,
 } from "./response-headers-policy/sim-cf-response-headers-policy.js";
+import { SimCloudFrontResponseHeadersPolicyRegistry } from "./response-headers-policy/sim-cf-response-headers-policy-registry.js";
 import { SimCloudFrontSdkCommandRouter } from "./sdk/sim-cloudfront-sdk-command-router.js";
 import {
   SimCloudFrontCommands,
@@ -62,8 +62,8 @@ export type {
 export class SimCloudFront {
   private readonly distributions: SimCloudFrontDistributionMap = new Map();
   private readonly cloudFrontFunctions: SimCloudFrontFunctionMap = new Map();
-  private readonly responseHeadersPolicies: SimCloudFrontResponseHeadersPolicyMap =
-    new Map();
+  private readonly responseHeadersPolicies =
+    new SimCloudFrontResponseHeadersPolicyRegistry();
 
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly commands: SimCloudFrontCommands;
@@ -198,9 +198,10 @@ export class SimCloudFront {
    *
    * There is no CreateResponseHeadersPolicy command here, so CloudFormation is
    * the only thing that makes one, and this is how it hands the policy over.
+   * A name another policy already holds is refused, as CloudFront refuses one.
    */
   addResponseHeadersPolicy(policy: SimCloudFrontResponseHeadersPolicy): void {
-    this.responseHeadersPolicies.set(policy.id, policy);
+    this.responseHeadersPolicies.add(policy);
   }
 
   /**
@@ -209,7 +210,7 @@ export class SimCloudFront {
   removeResponseHeadersPolicy(
     policyId: SimCloudFrontResponseHeadersPolicyId,
   ): void {
-    this.responseHeadersPolicies.delete(policyId);
+    this.responseHeadersPolicies.remove(policyId);
   }
 
   /**
@@ -218,9 +219,7 @@ export class SimCloudFront {
   getResponseHeadersPolicyById(
     policyId: SimCloudFrontResponseHeadersPolicyId | string,
   ): SimCloudFrontResponseHeadersPolicy | undefined {
-    return this.responseHeadersPolicies.get(
-      policyId as SimCloudFrontResponseHeadersPolicyId,
-    );
+    return this.responseHeadersPolicies.byId(policyId);
   }
 
   /**

@@ -78,7 +78,12 @@ function filterExpression(pattern: string): RegExp {
   // Escape everything a regular expression would read, then turn the two
   // escaped wildcards back into the patterns they stand for. Doing it in that
   // order means a wildcard is never confused with a literal one.
+  //
+  // Runs of stars collapse to one first. A star already crosses `/`, so `**`
+  // means what `*` means, and leaving it would compile to `.*.*` and give the
+  // engine a needless amount of backtracking to do on a long near miss.
   const expression = pattern
+    .replaceAll(/\*+/gu, "*")
     .replaceAll(/[$()*+.?[\\\]^{|}]/gu, String.raw`\$&`)
     .replaceAll(String.raw`\*`, ".*")
     .replaceAll(String.raw`\?`, ".");

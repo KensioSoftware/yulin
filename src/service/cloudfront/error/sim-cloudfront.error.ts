@@ -119,6 +119,20 @@ export class SimCloudFrontNoSuchResponseHeadersPolicy extends SimCloudFrontError
 }
 
 /**
+ * Simulated CloudFront ResponseHeadersPolicyAlreadyExists error.
+ *
+ * CloudFront requires a response headers policy name to be unique within an
+ * account, so a second policy claiming a name is refused rather than created.
+ */
+export class SimCloudFrontResponseHeadersPolicyAlreadyExists extends SimCloudFrontError {
+  public override readonly name = "ResponseHeadersPolicyAlreadyExists";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 409 });
+  }
+}
+
+/**
  * Simulated CloudFront DistributionNotDisabled error.
  *
  * CloudFront will not delete a Distribution that is still serving. The caller

@@ -92,6 +92,22 @@ describe("SimCdkBucketDeployProperties", () => {
     assertFalse(properties({ Prune: false }).prune);
   });
 
+  it("refuses a Prune that is not a boolean", () => {
+    // Given a deployment whose Prune resolved to something other than a
+    // boolean, as a template substituting a parameter can leave it.
+    // When the properties are read, then it is refused rather than read as
+    // truthy: pruning deletes Objects, so "false" quietly meaning true would
+    // delete the ones the template was keeping.
+    assertStringIncludes(
+      assertThrowsError(() => properties({ Prune: "false" })).message,
+      "Custom::CDKBucketDeployment DeploySite: Prune must be a boolean",
+    );
+    assertStringIncludes(
+      assertThrowsError(() => properties({ Prune: 0 })).message,
+      "Prune must be a boolean",
+    );
+  });
+
   it("reads system metadata as the headers it sets", () => {
     // Given a deployment setting content headers on everything it copies.
     const deployProperties = properties({

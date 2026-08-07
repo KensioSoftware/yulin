@@ -1791,8 +1791,9 @@ Every path that serves an Object goes through the same mapping, so the REST endp
 for it. `content-encoding` is the one that matters most: bytes served without it are bytes no client
 can decode, so an Object stored as brotli is only usable if the header comes back with it.
 
-`PutObjectCommand` carries `ContentType` and nothing else, so the way to set the rest today is a CDK
-BucketDeployment's `SystemMetadata`, which applies them to every Object it copies. See
+Sim S3 stores only `ContentType` and your own `Metadata` from a `PutObjectCommand`. The AWS SDK
+carries the rest, and real S3 keeps them, but the simulator drops them, so the way to set them today
+is a CDK BucketDeployment's `SystemMetadata`, which applies them to every Object it copies. See
 [CDK S3 BucketDeployment](../cloudformation/README.md#cdk-s3-bucketdeployment).
 
 ## Standalone SimS3
@@ -1872,6 +1873,7 @@ These apply across the page. The sections above each list what is specific to th
   not simulated.
 - A Bucket using filesystem-backed storage cannot delete Objects, and raises no event
   notifications, because it swaps the whole storage backend rather than putting Objects.
-- `PutObjectCommand` stores `ContentType` and user-defined `Metadata`, and no other system metadata.
-  An Object needing `content-encoding` or `cache-control` gets it from a CDK BucketDeployment's
-  `SystemMetadata`. See [Object system metadata](#object-system-metadata).
+- Sim S3 stores only `ContentType` and user-defined `Metadata` from a `PutObjectCommand`, and drops
+  the other system metadata the SDK carries and real S3 keeps. An Object needing `content-encoding`
+  or `cache-control` gets it from a CDK BucketDeployment's `SystemMetadata`. See
+  [Object system metadata](#object-system-metadata).

@@ -557,7 +557,8 @@ Signature verification itself is not here: it happens once at the serving bounda
 
 - returns `403` if static website hosting is not enabled
 - applies redirect-all-requests configuration before object lookup
-- serves objects with `content-length` and optional `content-type`
+- serves objects with `content-length` and the system metadata headers S3 returns on a read,
+  through `object/s3-object-response-headers.ts`
 - returns headers but no body for `HEAD`
 - applies trailing-slash redirects for folder index documents
 - serves configured error documents with status `404`

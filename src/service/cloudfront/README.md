@@ -40,7 +40,8 @@ Current command areas include:
 - `create-function/`
 - `delete-function/`
 
-The main `SimCloudFront` class owns the Distribution and Function maps and nothing else.
+The main `SimCloudFront` class owns the Distribution, Function and response headers policy maps
+and nothing else.
 `SimCloudFrontCommands` holds the collaborators every command shares (IAM, the registry, the Origin
 resolvers, the background scheduler) and builds the handlers, so the facade stays state plus
 delegation.

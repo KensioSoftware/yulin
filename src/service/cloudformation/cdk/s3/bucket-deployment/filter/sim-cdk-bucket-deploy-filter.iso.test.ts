@@ -109,6 +109,17 @@ describe("SimCdkBucketDeployFilter", () => {
     assertFileIncluded(deployFilter, "aab c.txt");
   });
 
+  it("reads a run of stars as one", () => {
+    // Given a pattern written with a doubled star.
+    const deployFilter = filter(["data/**"]);
+
+    // When files inside and outside that directory are considered.
+    // Then it means what a single star means, since a star already crosses a
+    // slash, and a long near miss does not compile to nested wildcards.
+    assertFileExcluded(deployFilter, "data/nested/deep.keys");
+    assertFileIncluded(deployFilter, "index.html");
+  });
+
   it("refuses a character class rather than mismatching it", () => {
     // Given a pattern using a character class, which the CLI supports and this
     // filter does not.
