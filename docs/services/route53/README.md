@@ -794,6 +794,13 @@ in a browser.
 This is most useful with CloudFront aliases. You can create a CloudFront distribution, create a
 Route53 record pointing at the distribution hostname, then fetch through your application hostname.
 
+The hostname you fetch has to be one of the Distribution's alternate domain names, the same as it
+would be in real CloudFront, which refuses a `Host` it does not serve. So the record name goes in the
+Distribution's `Aliases` as well as in the Route53 record. Real CloudFront also wants an ACM
+certificate covering those names, described under
+[Viewer certificates](../cloudfront/README.md#viewer-certificates); it is left out here because this
+request is served over plain HTTP on localhost.
+
 ```typescript sim-route53-cloudfront-localhost
 /**
  * Serving a CloudFront distribution through a simulated Route53 hostname.
@@ -838,6 +845,8 @@ try {
         CallerReference: "route53-site-distribution",
         Comment: "Route53 local site distribution",
         Enabled: true,
+        Aliases: { Quantity: 1, Items: ["www.example.test"] },
+        DefaultRootObject: "index.html",
         Origins: {
           Quantity: 1,
           Items: [

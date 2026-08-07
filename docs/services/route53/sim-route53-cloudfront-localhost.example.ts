@@ -41,6 +41,8 @@ try {
         CallerReference: "route53-site-distribution",
         Comment: "Route53 local site distribution",
         Enabled: true,
+        Aliases: { Quantity: 1, Items: ["www.example.test"] },
+        DefaultRootObject: "index.html",
         Origins: {
           Quantity: 1,
           Items: [
