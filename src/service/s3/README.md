@@ -242,6 +242,28 @@ The other way these headers reach an Object is a CDK BucketDeployment's `SystemM
 builds the metadata record directly. A `PUT` over the S3 REST endpoint is the one write path that
 does not cover them all: it reads `content-type` off the request and nothing else.
 
+### Metadata declared about a Bucket rather than an Object
+
+A write says what S3 holds about the one Object it writes, and the Object keeps it.
+`bucket/sim-s3-bucket-system-metadata.ts` is the standing statement behind that: what something
+publishing into a Bucket reports about the Objects it publishes, kept on the Bucket itself, for
+storage that has no Object to keep it on.
+
+`SimS3SystemMetadataDeclaration` is the shape those statements take, and it answers two questions
+rather than one. `describes(key)` is what S3 holds about an Object that is there. `wouldDescribe(key)`
+is the rule behind it, which is all there is to go on for a file that turns up later. A CDK
+BucketDeployment answers the first from the keys it copied and the second from its destination prefix
+and its filters; a key prefix declaration answers both the same way, because a prefix is a standing
+statement rather than a record of what was published.
+
+Declarations are kept by source rather than appended, so a Stack deployed twice into a running
+simulator is the same deployment saying its headers again rather than a second one agreeing with it.
+Re-declaring keeps the place in the order the first one took, which is what lets a later deployment
+still win where two describe the same Object.
+
+Nothing reads any of this while the Bucket is holding what was deployed. It is read when the storage
+under those Objects is replaced by a mounted directory, below.
+
 ## Storage implementations
 
 Bucket storage is pluggable through the `SimS3BucketStorage` interface.
@@ -298,16 +320,44 @@ Filesystem storage behaviour:
 - file extensions are filtered through filesystem safety rules
 - path traversal and unsafe directory/object paths are rejected
 - `deleteObject` refuses with `SimS3NotImplemented` rather than unlinking the file
-- system metadata comes from `object/s3-key-prefix-metadata.ts`, because a file carries none of it:
-  the extension gives a default `content-type`, and the mount's `systemMetadata` option declares
-  system metadata for the Objects under a key prefix, including a `ContentType` that replaces the
-  inferred one
+- system metadata comes from `object/s3-declared-system-metadata.ts`, because a file carries none of
+  it: the extension gives a default `content-type`, the Bucket's own declarations describe the
+  Objects the mount replaced, and the mount's `systemMetadata` option declares the rest for the
+  Objects under a key prefix, including a `ContentType` that replaces the inferred one
 
 The filesystem implementation includes safety checks to reduce accidental unsafe file access, but it
 should still be treated as local-development tooling rather than a sandbox boundary. That is why
 deletion is refused: a mounted directory belongs to the user, and unlinking files out of it because
 a test called `DeleteObject` is not a safe default. This is a deliberate divergence from real S3 and
 is recorded in the [usage docs](../../../docs/services/s3/README.md#filesystem-backed-bucket-storage).
+
+### Inheriting what the Bucket was told
+
+A mount replaces the storage, so the Objects a CDK BucketDeployment put in the Bucket go with it, and
+the headers they carried go with them. What the deployment said about them stays behind on the
+Bucket, and `SimS3DeclaredSystemMetadata` reads it, so a directory mounted over a deployed Bucket is
+served as the Bucket was without the mount restating a word of it. That matters most for
+`content-encoding`: a mount that loses it turns a directory of brotli files into bytes no browser can
+decode, silently, and the deployment that would have made them work is in the same simulated account.
+
+The Bucket is read on every lookup rather than copied when the mount is set up, because the two
+happen in either order. A dev script mounts a directory into a Bucket some other Stack created and
+deploys the Stack that describes it afterwards as readily as before, and an inheritance that only
+worked one way round would be a worse trap than restating the headers by hand.
+
+Resolution for one key, in order:
+
+1. every inherited declaration that describes the key, meaning the deployments that published it;
+2. failing that, the rule behind the key, but only where exactly one declaration claims it. Two
+   deployments can publish into one prefix and be told apart only by what their sources hold, and
+   serving a page as the other deployment's brotli breaks it in a way declaring nothing does not;
+3. then the mount's own declarations, over the top, so it has the last word wherever it wants a
+   different answer locally.
+
+The mount is what a local development loop wants different: a year of `cache-control` is what the
+deployed site sets and not what a rebuild wants reaching the browser, and a declaration of its own is
+how a mount says so. Injected HTML is already served `no-store` by live reload, so the page itself is
+never the thing caching holds on to.
 
 ## PutObject, GetObject, and ListObjects
 

@@ -6,7 +6,8 @@ import type {
 import { SimCdkBucketDeploySource } from "./source/sim-cdk-bucket-deploy-source.js";
 import { SimCdkBucketDeployCopier } from "./copy/sim-cdk-bucket-deploy-copier.js";
 import { SimCdkBucketDeployProperties } from "./property/sim-cdk-bucket-deploy-properties.js";
-import { assertDefined } from "../../../../../util/type-guard/defined.js";
+import { declareSimCdkBucketDeployMetadata } from "./metadata/sim-cdk-bucket-deploy-metadata.js";
+import { simCdkBucketDeployDestination } from "./destination/sim-cdk-bucket-deploy-destination.js";
 
 /**
  * CloudFormation Resource factory for CDK BucketDeployment compatibility.
@@ -61,17 +62,7 @@ export class SimCdkBucketDeploymentResourceFactory implements SimCfnServiceResou
       context.resolvedProperties ?? resource.properties,
     );
 
-    const bucket = context.simAws
-      .accountRegionScope(
-        resource.accountRegionScope.accountId,
-        resource.accountRegionScope.regionName,
-      )
-      .s3()
-      .getSimBucketByName(properties.destinationBucketName);
-    assertDefined(
-      bucket,
-      `Custom::CDKBucketDeployment destination Bucket ${properties.destinationBucketName} does not exist`,
-    );
+    const bucket = simCdkBucketDeployDestination(resource, properties, context);
 
     const sourceDirectoryPaths = properties.sourceObjectKeys.map(
       (sourceObjectKey) =>
@@ -82,8 +73,19 @@ export class SimCdkBucketDeploymentResourceFactory implements SimCfnServiceResou
         ),
     );
 
-    await new SimCdkBucketDeployCopier({ bucket, properties }).copy(
-      sourceDirectoryPaths,
-    );
+    const publishedKeys = await new SimCdkBucketDeployCopier({
+      bucket,
+      properties,
+    }).copy(sourceDirectoryPaths);
+
+    // Said as well as set. The Objects above carry these headers themselves,
+    // and a directory mounted over them later cannot, so the Bucket keeps what
+    // this deployment publishes for storage that has only files to go on.
+    declareSimCdkBucketDeployMetadata({
+      bucket,
+      resource,
+      properties,
+      publishedKeys,
+    });
   }
 }

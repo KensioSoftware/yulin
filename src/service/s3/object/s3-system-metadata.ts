@@ -31,6 +31,18 @@ export type SimS3SystemMetadataField =
   | "Expires";
 
 /**
+ * System metadata values, under the request field names a `PutObject` sets
+ * them with.
+ *
+ * Every value is a string here, including `Expires`, which a `PutObject` takes
+ * as a `Date`. Nothing is being written, so there is no request field to format:
+ * this says what S3 already holds about a file, in the form a read hands back.
+ */
+export type SimS3SystemMetadataValues = Partial<
+  Record<SimS3SystemMetadataField, string>
+>;
+
+/**
  * The system metadata S3 stores as a header and returns as one.
  *
  * Content length is not here because it describes the body rather than being
@@ -46,3 +58,28 @@ export const simS3SystemMetadataHeaders: readonly SimS3SystemMetadataHeader[] =
     new SimS3SystemMetadataHeader("ContentType", "content-type"),
     new SimS3SystemMetadataHeader("Expires", "expires"),
   ];
+
+/**
+ * Read system metadata written as headers back into the fields it is declared
+ * with.
+ *
+ * A `Custom::CDKBucketDeployment` carries its `SystemMetadata` as the headers
+ * the sync sets, which is the form an Object holds them in and the wrong form
+ * to declare them in. Anything outside the list above is dropped: only these
+ * are declarable, and only these are served.
+ */
+export function simS3SystemMetadataValues(
+  headers: ReadonlyMap<string, string>,
+): SimS3SystemMetadataValues {
+  const values: SimS3SystemMetadataValues = {};
+
+  for (const header of simS3SystemMetadataHeaders) {
+    const value = headers.get(header.name);
+
+    if (value !== undefined) {
+      values[header.field] = value;
+    }
+  }
+
+  return values;
+}

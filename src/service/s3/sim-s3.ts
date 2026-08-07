@@ -239,9 +239,11 @@ export class SimS3 {
    * the writes stop, without the Bucket having to be filled again.
    *
    * A file on disk carries no metadata, so an Object read out of one is
-   * described by its extension alone. `systemMetadata` declares the rest for
-   * the Objects under a key prefix, which is what a directory of brotli files
-   * needs to be served with a `content-encoding` a browser can act on.
+   * described by its extension and by what the Bucket was told about the
+   * Objects the mount replaced: a CDK `BucketDeployment` into the same Bucket
+   * says what it publishes, which is how a mounted directory of brotli files
+   * keeps its `content-encoding`. `systemMetadata` declares the rest for a key
+   * prefix, and goes over the top of anything inherited.
    */
   mountBucketFilesystem(
     bucketName: SimS3BucketName | string,
