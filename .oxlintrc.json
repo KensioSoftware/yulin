@@ -18,7 +18,7 @@
   //
   // Nothing in `--type-aware` reaches a JS plugin: Oxlint runs those without
   // type information, and less scope information than ESLint gives them. Two
-  // rules are gone outright because of it, and seven Unicorn rules are off for
+  // rules are gone outright because of it, and six Unicorn rules are off for
   // the same reason — see the block among the Unicorn rules below.
   //
   //   `@typescript-eslint/naming-convention` calls `getParserServices()`
@@ -420,6 +420,7 @@
     "unicorn-js/prefer-add-event-listener": "error",
     "unicorn-js/prefer-add-event-listener-options": "error",
     "unicorn-js/prefer-aggregate-error": "error",
+    "unicorn-js/prefer-await": "error",
     "unicorn-js/prefer-array-find": "error",
     "unicorn-js/prefer-array-flat": "error",
     "unicorn-js/prefer-array-flat-map": "error",
@@ -545,14 +546,17 @@
     "unicorn-js/text-encoding-identifier-case": "error",
     "unicorn-js/throw-new-error": "error",
 
-    // ── Unicorn rules that Oxlint cannot run faithfully (7) ──
-    // A JS plugin gets no type information from Oxlint, and less scope
-    // information than ESLint gives it. These seven decide whether to report by
-    // looking at what they are pointed at — is this receiver really an array,
-    // is this chain really convertible to `await` — so without that they report
-    // on code that is fine. Each fires on this repository under Oxlint and on
-    // none of it under ESLint, which runs the same plugin version with the
-    // TypeScript parser services behind it.
+    // ── Unicorn rules that Oxlint cannot run faithfully (6) ──
+    // A JS plugin gets no type information from Oxlint. These six decide
+    // whether to report by looking at what they are pointed at — is this
+    // receiver really an array — so without it they report on code that is
+    // fine. Each fires on this repository under Oxlint and on none of it under
+    // ESLint, which runs the same plugin version with the TypeScript parser
+    // services behind it. `no-array-callback-reference` alone accounts for 56.
+    //
+    // Before adding to this list, check the rule is not simply being reported
+    // at a site whose disable directive still names the pre-alias `unicorn/`
+    // rule rather than `unicorn-js/`. That mistake looks identical from here.
     //
     // They are off rather than warnings: a warning nobody can act on is worse
     // than a rule nobody has. If Oxlint's JS plugin API grows type information,
@@ -563,7 +567,6 @@
     "unicorn-js/no-chained-comparison": "off",
     "unicorn-js/no-for-each": "off",
     "unicorn-js/prefer-array-some": "off",
-    "unicorn-js/prefer-await": "off",
 
     // ── eslint-plugin-jsdoc, likewise (33) ──
     "jsdoc-js/check-access": "error",
@@ -627,6 +630,9 @@
     "jsdoc-js/valid-types": "error",
 
     // ── eslint-plugin-security, likewise (14) ──
+    // These arrive from eslint-plugin-security's recommended set at warn, and
+    // are left there. `pnpm lint` passes `--max-warnings=0`, so a warning stops
+    // CI exactly as an error does; the severity only decides how it reads.
     "security/detect-bidi-characters": "warn",
     "security/detect-buffer-noassert": "warn",
     "security/detect-child-process": "warn",

@@ -1,4 +1,4 @@
-/* oxlint-disable unicorn/prefer-await  */
+/* oxlint-disable unicorn-js/prefer-await  */
 
 import { type SimClock, SimRealClock } from "../clock/sim-clock.js";
 import {

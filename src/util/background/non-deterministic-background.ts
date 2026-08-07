@@ -12,7 +12,7 @@ import {
 import { BackgroundJitter } from "./background-jitter.js";
 import { BackgroundSettledTasks } from "./background-settled-tasks.js";
 
-/* oxlint-disable unicorn/prefer-await  */
+/* oxlint-disable unicorn-js/prefer-await  */
 
 /**
  * Non-deterministic async background tasks scheduler.
