@@ -15,6 +15,7 @@ import type { SimRekognition } from "../rekognition/index.js";
 import type { SimRoute53 } from "../route53/index.js";
 import type { SimS3 } from "../s3/sim-s3.js";
 import type { SimSecretsManager } from "../secretsmanager/index.js";
+import type { SimSns } from "../sns/index.js";
 import type { SimSqs } from "../sqs/index.js";
 import type { SimSsm } from "../ssm/index.js";
 import type { SimSts } from "../sts/sim-sts.js";
@@ -101,6 +102,11 @@ export abstract class SimAwsServiceAccessors {
   /** Get simulated Secrets Manager in the default Account Region scope. */
   secretsManager(): SimSecretsManager {
     return this.defaultAccountRegionScope().secretsManager();
+  }
+
+  /** Get simulated SNS in the default Account Region scope. */
+  sns(): SimSns {
+    return this.defaultAccountRegionScope().sns();
   }
 
   /** Get simulated SQS in the default Account Region scope. */

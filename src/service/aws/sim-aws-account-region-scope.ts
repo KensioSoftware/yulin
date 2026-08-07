@@ -19,6 +19,7 @@ import type { SimIam } from "../iam/index.js";
 import type { SimKms } from "../kms/index.js";
 import type { SimLambda } from "../lambda/index.js";
 import type { SimSecretsManager } from "../secretsmanager/index.js";
+import type { SimSns } from "../sns/index.js";
 import type { SimSqs } from "../sqs/index.js";
 import type { SimSsm } from "../ssm/index.js";
 import type { SimSts } from "../sts/sim-sts.js";
@@ -185,6 +186,15 @@ export class SimAwsAccountRegionContainer {
   secretsManager(): SimSecretsManager {
     return this.memo.getOrCreate("secretsManager", () =>
       this.simAws.serviceFactory.createSecretsManager(this),
+    );
+  }
+
+  /**
+   * Get simulated SNS for this account and region.
+   */
+  sns(): SimSns {
+    return this.memo.getOrCreate("sns", () =>
+      this.simAws.serviceFactory.createSns(this),
     );
   }
 

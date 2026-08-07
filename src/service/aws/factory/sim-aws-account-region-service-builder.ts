@@ -26,10 +26,12 @@ import { SimAwsRekognitionImageObjects } from "../../rekognition/image/s3/sim-aw
 import { SimS3 } from "../../s3/sim-s3.js";
 import { simAwsS3NotificationDestinations } from "./sim-aws-s3-notification-destinations.js";
 import { SimSecretsManager } from "../../secretsmanager/index.js";
+import { SimSns } from "../../sns/index.js";
 import { SimSqs } from "../../sqs/index.js";
 import { SimSsm } from "../../ssm/index.js";
 import { SimSts } from "../../sts/sim-sts.js";
 import type { SimAwsAccountServiceCache } from "./sim-aws-account-service-cache.js";
+import type { SimAwsScopedServiceProperties } from "./sim-aws-scoped-service-properties.js";
 import type { SimAwsScopedServiceRegistries } from "./sim-aws-scoped-service-registries.js";
 
 interface SimAwsAccountRegionServiceBuilderProperties {
@@ -82,9 +84,7 @@ export class SimAwsAccountRegionServiceBuilder {
   /** Create simulated ACM for an Account Region scope. */
   createAcm(scope: SimAwsAccountRegionContainer): SimAcm {
     const acm = new SimAcm({
-      accountRegionScope: scope.accountRegionScope,
-      iam: this.accountServices.createIam(scope),
-      background: this.background,
+      ...this.scoped(scope),
       // Certificates validate against Hosted Zones from any simulated Account,
       // as real ACM validates against public DNS.
       dnsRecords: new SimRoute53AcmDnsRecords({
@@ -105,9 +105,7 @@ export class SimAwsAccountRegionServiceBuilder {
    */
   createApiGatewayV2(scope: SimAwsAccountRegionContainer): SimApiGatewayV2 {
     return new SimApiGatewayV2({
-      accountRegionScope: scope.accountRegionScope,
-      iam: this.accountServices.createIam(scope),
-      background: this.background,
+      ...this.scoped(scope),
       // API ids are unique across the simulation, and an API is reachable by
       // id alone from the serving layer, whichever scope created it.
       registry: this.httpApiRegistry,
@@ -122,10 +120,8 @@ export class SimAwsAccountRegionServiceBuilder {
   /** Create simulated CloudFormation for an Account Region scope. */
   createCloudFormation(scope: SimAwsAccountRegionContainer): SimCloudFormation {
     return new SimCloudFormation({
+      ...this.scoped(scope),
       simAws: this.simAws,
-      accountRegionScope: scope.accountRegionScope,
-      iam: this.accountServices.createIam(scope),
-      background: this.background,
     });
   }
 
@@ -139,9 +135,7 @@ export class SimAwsAccountRegionServiceBuilder {
     scope: SimAwsAccountRegionContainer,
   ): SimCognitoIdentityProvider {
     return new SimCognitoIdentityProvider({
-      accountRegionScope: scope.accountRegionScope,
-      iam: this.accountServices.createIam(scope),
-      background: this.background,
+      ...this.scoped(scope),
       userPoolRegistry: this.registries.cognito,
       triggerFunctions: simAwsCognitoTriggerFunctions(this.simAws),
     });
@@ -149,11 +143,7 @@ export class SimAwsAccountRegionServiceBuilder {
 
   /** Create simulated DynamoDB for an Account Region scope. */
   createDynamoDb(scope: SimAwsAccountRegionContainer): SimDynamoDatabase {
-    return new SimDynamoDatabase({
-      accountRegionScope: scope.accountRegionScope,
-      iam: this.accountServices.createIam(scope),
-      background: this.background,
-    });
+    return new SimDynamoDatabase(this.scoped(scope));
   }
 
   /**
@@ -163,11 +153,7 @@ export class SimAwsAccountRegionServiceBuilder {
    * ciphertext produced in one Region cannot be decrypted in another.
    */
   createKms(scope: SimAwsAccountRegionContainer): SimKms {
-    return new SimKms({
-      accountRegionScope: scope.accountRegionScope,
-      iam: this.accountServices.createIam(scope),
-      background: this.background,
-    });
+    return new SimKms(this.scoped(scope));
   }
 
   /**
@@ -185,9 +171,7 @@ export class SimAwsAccountRegionServiceBuilder {
    */
   createLambda(scope: SimAwsAccountRegionContainer): SimLambda {
     return new SimLambda({
-      accountRegionScope: scope.accountRegionScope,
-      iam: this.accountServices.createIam(scope),
-      background: this.background,
+      ...this.scoped(scope),
       runAsOwner: this.simAws,
       urlRegistry: this.lambdaUrlRegistry,
       codeStore: new SimS3LambdaCodeStore({ s3: scope.s3() }),
@@ -247,12 +231,17 @@ export class SimAwsAccountRegionServiceBuilder {
    * values are encrypted through that same scope's simulated KMS.
    */
   createSecretsManager(scope: SimAwsAccountRegionContainer): SimSecretsManager {
-    return new SimSecretsManager({
-      accountRegionScope: scope.accountRegionScope,
-      iam: this.accountServices.createIam(scope),
-      background: this.background,
-      kms: scope.kms(),
-    });
+    return new SimSecretsManager({ ...this.scoped(scope), kms: scope.kms() });
+  }
+
+  /**
+   * Create simulated SNS for an Account Region scope.
+   *
+   * Topics are Region-scoped on real AWS: a topic ARN names the Region, and a
+   * topic cannot be reached from another one.
+   */
+  createSns(scope: SimAwsAccountRegionContainer): SimSns {
+    return new SimSns(this.scoped(scope));
   }
 
   /**
@@ -262,11 +251,7 @@ export class SimAwsAccountRegionServiceBuilder {
    * Region, and a queue cannot be reached from another one.
    */
   createSqs(scope: SimAwsAccountRegionContainer): SimSqs {
-    return new SimSqs({
-      accountRegionScope: scope.accountRegionScope,
-      iam: this.accountServices.createIam(scope),
-      background: this.background,
-    });
+    return new SimSqs(this.scoped(scope));
   }
 
   /**
@@ -277,12 +262,7 @@ export class SimAwsAccountRegionServiceBuilder {
    * values are encrypted through that same scope's simulated KMS.
    */
   createSsm(scope: SimAwsAccountRegionContainer): SimSsm {
-    return new SimSsm({
-      accountRegionScope: scope.accountRegionScope,
-      iam: this.accountServices.createIam(scope),
-      background: this.background,
-      kms: scope.kms(),
-    });
+    return new SimSsm({ ...this.scoped(scope), kms: scope.kms() });
   }
 
   /** Create simulated STS for an Account/Region scope. */
@@ -294,5 +274,21 @@ export class SimAwsAccountRegionServiceBuilder {
       background: this.background,
       iamResolver: this.iamRegistry,
     });
+  }
+
+  /**
+   * The collaborators every service built here takes.
+   *
+   * Reaching for the Account's IAM through the same cache the factory uses is
+   * what makes a Region's services decide against the one IAM its Account owns.
+   */
+  private scoped(
+    scope: SimAwsAccountRegionContainer,
+  ): SimAwsScopedServiceProperties {
+    return {
+      accountRegionScope: scope.accountRegionScope,
+      iam: this.accountServices.createIam(scope),
+      background: this.background,
+    };
   }
 }

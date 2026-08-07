@@ -21,6 +21,7 @@ import type { SimKms } from "../../kms/index.js";
 import type { SimLambda } from "../../lambda/index.js";
 import { SimLambdaUrlRegistry } from "../../lambda/registry/sim-lambda-url-registry.js";
 import type { SimSecretsManager } from "../../secretsmanager/index.js";
+import type { SimSns } from "../../sns/index.js";
 import type { SimSqs } from "../../sqs/index.js";
 import type { SimSsm } from "../../ssm/index.js";
 import type { SimSts } from "../../sts/sim-sts.js";
@@ -190,6 +191,11 @@ export class SimAwsServiceFactory {
   /** Create simulated Secrets Manager for an Account Region scope. */
   createSecretsManager(scope: SimAwsAccountRegionContainer): SimSecretsManager {
     return this.accountRegionServices.createSecretsManager(scope);
+  }
+
+  /** Create simulated SNS for an Account Region scope. */
+  createSns(scope: SimAwsAccountRegionContainer): SimSns {
+    return this.accountRegionServices.createSns(scope);
   }
 
   /** Create simulated SQS for an Account Region scope. */
