@@ -636,6 +636,7 @@ async function subscribeQueue(
               Principal: { Service: "sns.amazonaws.com" },
               Action: "sqs:SendMessage",
               Resource: queueArn,
+              Condition: { ArnEquals: { "aws:SourceArn": TopicArn } },
             },
           ],
         }),
@@ -694,11 +695,16 @@ By default a policy is matched against the message attributes of the publish, wh
 | `{"anything-but": {"prefix": "tmp-"}}`  | every value not starting that way           |
 | `{"numeric": [">", 100]}`               | a number, with `=`, `<`, `<=`, `>` and `>=` |
 | `{"numeric": [">", 0, "<=", 100]}`      | a number inside a range                     |
-| `{"exists": true}`                      | the key being there, whatever it holds      |
-| `{"exists": false}`                     | the key not being there at all              |
+| `{"exists": true}`                      | the key being there, holding something      |
+| `{"exists": false}`                     | the key not being there                     |
 
 Only `{"exists": false}` matches a key the message does not carry. Every other operator needs a value
 to look at, including `anything-but`: there is nothing there to be anything but the excluded value.
+
+`{"exists": false}` also needs the message to carry something else, which is what real SNS states: a
+publish with no message attributes at all matches no filter policy of the default scope, this one
+included. Under the `MessageBody` scope the same goes for a body holding no keys, so a body that is
+not JSON matches nothing whichever operator the policy uses.
 
 Numeric matching applies to the `Number` message attribute data type, as it does on real SNS, so
 digits published as a `String` are text. A `String.Array` attribute matches when any member of it
@@ -709,6 +715,11 @@ does. A `Binary` attribute matches nothing, since filtering is on text.
 ```json
 { "$or": [{ "type": ["order"] }, { "tenant": ["acme"] }] }
 ```
+
+Real SNS reads `$or` as an or only when it holds a list of at least two objects, none of which names
+a reserved keyword such as `numeric` or `prefix`. Anything else is an attribute named `$or` there, so
+the policy quietly stops being an or and matches nothing. Each of those is refused here when the
+policy is set instead.
 
 ### Filtering on the message body
 
@@ -757,6 +768,7 @@ await sqs.setQueueAttributes(
             Principal: { Service: "sns.amazonaws.com" },
             Action: "sqs:SendMessage",
             Resource: queueArn,
+            Condition: { ArnEquals: { "aws:SourceArn": TopicArn } },
           },
         ],
       }),
@@ -799,7 +811,9 @@ console.log(Messages?.length); // 1
 
 A body that is not JSON, or that is JSON without being an object, matches no policy of this scope. It
 is not an error: the body comes from whoever published, and the scope is the subscription's own
-business, so a publisher would otherwise fail on a subscription it knows nothing about.
+business, so a publisher would otherwise fail on a subscription it knows nothing about. A key holding
+`null`, an object or an empty list holds no value to match, so it is a key `{"exists": false}`
+matches, as long as the body holds some other key.
 
 The two attributes can be set on `Subscribe` or afterwards with `SetSubscriptionAttributes`, and
 `GetSubscriptionAttributes` reports both once a policy is set. Setting `FilterPolicy` with no value
@@ -1379,7 +1393,10 @@ Current documented limitations:
   are a flat set of names and such a policy could never match.
 - A message body that is not a JSON object matches no `MessageBody` filter policy, and is not an
   error. A key holding `null`, an object or an empty list holds no value to match, so
-  `{"exists": false}` matches it.
+  `{"exists": false}` matches it, as long as the body holds some other key.
+- An `$or` real SNS would not read as one, because it holds fewer than two objects or names a
+  reserved keyword, is refused when the policy is set. Real SNS treats it as an attribute named
+  `$or` instead, which matches nothing.
 - Subscription delivery retry policies, subscription dead-letter queues and message replay are not
   simulated, so `DeliveryPolicy`, `RedrivePolicy`, `SubscriptionRoleArn` and `ReplayPolicy` are
   refused.

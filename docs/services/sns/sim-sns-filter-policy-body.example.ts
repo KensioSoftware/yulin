@@ -39,6 +39,7 @@ await sqs.setQueueAttributes(
             Principal: { Service: "sns.amazonaws.com" },
             Action: "sqs:SendMessage",
             Resource: queueArn,
+            Condition: { ArnEquals: { "aws:SourceArn": TopicArn } },
           },
         ],
       }),

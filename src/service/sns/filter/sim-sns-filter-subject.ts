@@ -14,6 +14,15 @@ import type { SimSnsFilterValue } from "./sim-sns-filter-value.js";
  */
 export interface SimSnsFilterSubject {
   /**
+   * Whether the message carries nothing at all at this scope.
+   *
+   * A key missing from a message that carries other keys is not the same thing
+   * as a message carrying none, and `{"exists": false}` is the operator that
+   * tells them apart: real SNS matches the first and not the second.
+   */
+  readonly isEmpty: boolean;
+
+  /**
    * Every value held at a key path, which is empty when nothing is held there.
    *
    * A key can hold more than one value: a `String.Array` attribute and a JSON

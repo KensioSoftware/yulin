@@ -85,6 +85,17 @@ export class SimSnsAttributeSubject implements SimSnsFilterSubject {
   }
 
   /**
+   * Whether the publish carried no message attributes at all.
+   *
+   * An attribute carrying bytes counts as one, even though a filter policy can
+   * match nothing against it: real SNS asks whether the message has attributes
+   * rather than whether it has ones worth matching.
+   */
+  get isEmpty(): boolean {
+    return this.byName.size === 0;
+  }
+
+  /**
    * The values the attribute of a name holds, if there is one.
    */
   valuesAt(path: readonly string[]): readonly SimSnsFilterValue[] {

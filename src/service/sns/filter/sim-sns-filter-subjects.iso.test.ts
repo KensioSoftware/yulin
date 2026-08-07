@@ -1,4 +1,9 @@
-import { assertArrayLength, assertIdentical } from "@kensio/smartass";
+import {
+  assertArrayLength,
+  assertFalse,
+  assertIdentical,
+  assertTrue,
+} from "@kensio/smartass";
 import { describe, it } from "vitest";
 import {
   simSnsStringAttribute,
@@ -26,6 +31,24 @@ describe("SNS filter policy subjects", () => {
     assertArrayLength(subject.valuesAt(["tenant"]), 0);
     assertArrayLength(subject.valuesAt([]), 0);
     assertArrayLength(subject.valuesAt(["type", "kind"]), 0);
+    assertFalse(subject.isEmpty);
+  });
+
+  it("knows when the message carries nothing at this scope", () => {
+    // Given the attributes of a publish that carried none, and bodies holding
+    // nothing.
+    const noAttributes = SimSnsAttributeSubject.of(
+      SimSnsMessageAttributes.of({}),
+    );
+
+    // Then each says so, which is what `{"exists": false}` needs before it can
+    // match a key that is missing.
+    assertTrue(noAttributes.isEmpty);
+    assertTrue(SimSnsBodySubject.of(JSON.stringify({})).isEmpty);
+    assertTrue(SimSnsBodySubject.of("order-1").isEmpty);
+    assertFalse(
+      SimSnsBodySubject.of(JSON.stringify({ type: "order" })).isEmpty,
+    );
   });
 
   it("holds a message body at the paths it nests", () => {

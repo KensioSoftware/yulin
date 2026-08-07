@@ -163,6 +163,8 @@ describe("SNS filter policy numeric matching", () => {
 
     // When policies about it are matched.
     // Then it is a key with no value to match, since real SNS filters on text.
+    // The message still carries an attribute, so a policy about a key that is
+    // missing has something to be missing from.
     assertFalse(
       simSnsFilterMatchesAttributes({ receipt: [{ prefix: "" }] }, receipt),
     );

@@ -130,16 +130,24 @@ describe("SNS filter policy validation", () => {
     assertStringIncludes(error.message, "anything-but takes a value");
   });
 
-  it("refuses an or that is not a list of policies", () => {
-    // Given an $or written as something else.
+  it("refuses an or real SNS would not read as one", () => {
+    // Given the ways an $or falls short of what real SNS recognises: something
+    // other than a list, fewer than two alternatives, an alternative that is
+    // not a policy, and one naming a reserved operator.
     const notAList = simSnsFilterPolicyRefusal({ $or: { type: ["order"] } });
-    const empty = simSnsFilterPolicyRefusal({ $or: [] });
-    const notAPolicy = simSnsFilterPolicyRefusal({ $or: ["order"] });
+    const one = simSnsFilterPolicyRefusal({ $or: [{ type: ["order"] }] });
+    const notAPolicy = simSnsFilterPolicyRefusal({ $or: ["order", "refund"] });
+    const reserved = simSnsFilterPolicyRefusal({
+      $or: [{ numeric: 123 }, { prefix: "abc" }],
+    });
 
-    // Then each is refused.
+    // Then each is refused. Real SNS treats each of these as an attribute
+    // named $or instead, so the policy would quietly stop being an or and
+    // match nothing.
     assertStringIncludes(notAList.message, "$or takes a list");
-    assertStringIncludes(empty.message, "$or holds no alternatives");
+    assertStringIncludes(one.message, "$or holds at least two alternatives");
     assertStringIncludes(notAPolicy.message, "a policy of its own");
+    assertStringIncludes(reserved.message, "reserved numeric");
   });
 
   it("refuses a nested key under the message attributes scope", () => {

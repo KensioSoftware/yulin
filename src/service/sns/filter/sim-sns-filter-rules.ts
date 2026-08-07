@@ -1,18 +1,17 @@
 import type { JSONObject, JSONValue } from "../../../util/type-guard/json.js";
+import { SimSnsFilterAnyRule } from "./sim-sns-filter-any-rule.js";
 import { SimSnsFilterKeyRule } from "./sim-sns-filter-key-rule.js";
+import {
+  simSnsOrAlternatives,
+  simSnsOrKey,
+} from "./sim-sns-filter-or-eligibility.js";
 import type { SimSnsFilterPolicyScope } from "./sim-sns-filter-policy-scope.js";
 import {
-  filterPolicyList,
   isFilterPolicyObject,
   simSnsFilterPolicyRefusal,
 } from "./sim-sns-filter-refusals.js";
 import type { SimSnsFilterRule } from "./sim-sns-filter-rule.js";
 import type { SimSnsFilterSubject } from "./sim-sns-filter-subject.js";
-
-/**
- * The key real SNS reads as an OR across separate keys.
- */
-const simSnsOrKey = "$or";
 
 /**
  * Every key of a filter policy, all of which have to match.
@@ -55,58 +54,6 @@ export class SimSnsFilterRules implements SimSnsFilterRule {
 }
 
 /**
- * An `$or` across separate keys, which matches when any of its sides does.
- *
- * Each side is a policy of its own, so `{"$or": [{"type": ["order"]}, {"kind":
- * ["refund"]}]}` matches a message carrying either key. Everything else in a
- * policy is an AND, which is why this needs a key of its own to express.
- */
-class SimSnsFilterAnyRule implements SimSnsFilterRule {
-  private readonly alternatives: readonly SimSnsFilterRules[];
-
-  private constructor(alternatives: readonly SimSnsFilterRules[]) {
-    this.alternatives = alternatives;
-  }
-
-  /**
-   * Read the list of policies an `$or` holds.
-   */
-  static of(
-    written: JSONValue,
-    path: readonly string[],
-    scope: SimSnsFilterPolicyScope,
-  ): SimSnsFilterAnyRule {
-    const alternatives = filterPolicyList(written, simSnsOrKey);
-
-    if (alternatives.length === 0) {
-      throw simSnsFilterPolicyRefusal(`${simSnsOrKey} holds no alternatives`);
-    }
-
-    return new this(
-      alternatives.map((alternative) => {
-        if (!isFilterPolicyObject(alternative)) {
-          throw simSnsFilterPolicyRefusal(
-            `each alternative of ${simSnsOrKey} is a policy of its own, and ` +
-              `this one is ${JSON.stringify(alternative)}`,
-          );
-        }
-
-        return SimSnsFilterRules.of(alternative, path, scope);
-      }),
-    );
-  }
-
-  /**
-   * Whether the message satisfies any one of the alternatives.
-   */
-  matches(subject: SimSnsFilterSubject): boolean {
-    return this.alternatives.some((alternative) =>
-      alternative.matches(subject),
-    );
-  }
-}
-
-/**
  * Read one key of a policy as the rule it states.
  *
  * A list is the match conditions for that key, an object is a nested key, and
@@ -119,7 +66,11 @@ function ruleOf(
   scope: SimSnsFilterPolicyScope,
 ): SimSnsFilterRule {
   if (key === simSnsOrKey) {
-    return SimSnsFilterAnyRule.of(written, path, scope);
+    return new SimSnsFilterAnyRule(
+      simSnsOrAlternatives(written).map((alternative) =>
+        SimSnsFilterRules.of(alternative, path, scope),
+      ),
+    );
   }
 
   if (Array.isArray(written)) {

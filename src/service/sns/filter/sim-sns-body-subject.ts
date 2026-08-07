@@ -49,6 +49,19 @@ export class SimSnsBodySubject implements SimSnsFilterSubject {
   }
 
   /**
+   * Whether the body holds no keys at all.
+   *
+   * A body that is not a JSON object holds none, which is what keeps
+   * `{"exists": false}` from matching a message that was never JSON in the
+   * first place.
+   */
+  get isEmpty(): boolean {
+    return (
+      this.document === undefined || Object.keys(this.document).length === 0
+    );
+  }
+
+  /**
    * The values held at a key path, after going through what nests it.
    */
   valuesAt(path: readonly string[]): readonly SimSnsFilterValue[] {

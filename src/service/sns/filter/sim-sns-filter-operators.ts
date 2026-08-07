@@ -38,10 +38,10 @@ export type SimSnsFilterOperatorReader = (
  * The one real SNS has that is missing here is `cidr`, which is refused by name
  * rather than left out quietly.
  */
-export const simSnsFilterOperators = new Map<
+export const simSnsFilterOperators: ReadonlyMap<
   string,
   SimSnsFilterOperatorReader
->([
+> = new Map<string, SimSnsFilterOperatorReader>([
   [
     simSnsPrefixOperator,
     (operand): SimSnsFilterMatch => SimSnsPrefixMatch.of(operand),
@@ -66,4 +66,16 @@ export const simSnsFilterOperators = new Map<
     simSnsAnythingButOperator,
     (operand): SimSnsFilterMatch => SimSnsAnythingButMatch.of(operand),
   ],
+]);
+
+/**
+ * The names real SNS reserves, which a policy cannot use as a key.
+ *
+ * These are the operator names. An `$or` alternative naming one of them is not
+ * read as an alternative by real SNS, which is the rule that decides whether a
+ * policy is an or at all.
+ */
+export const simSnsFilterReservedNames: ReadonlySet<string> = new Set([
+  ...simSnsFilterOperators.keys(),
+  "cidr",
 ]);

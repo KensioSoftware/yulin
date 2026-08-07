@@ -116,6 +116,23 @@ describe("SNS filter policy message body matching", () => {
     assertFalse(simSnsFilterMatchesBody(policy, JSON.stringify("order")));
   });
 
+  it("matches no body holding nothing, even asking for a missing key", () => {
+    // Given a policy asking for a key to be missing.
+    const policy = { type: [{ exists: false }] };
+
+    // When a body with no keys in it, and one that is not JSON at all, are
+    // matched.
+    // Then neither matches. A body holding nothing matches no policy, the way
+    // an empty set of message attributes matches none.
+    assertFalse(simSnsFilterMatchesBody(policy, JSON.stringify({})));
+    assertFalse(simSnsFilterMatchesBody(policy, "order-1"));
+
+    // And a body holding some other key does match it.
+    assertTrue(
+      simSnsFilterMatchesBody(policy, JSON.stringify({ tenant: "acme" })),
+    );
+  });
+
   it("ignores the message attributes under this scope", () => {
     // Given a policy of the MessageBody scope.
     const policy = { type: ["order"] };

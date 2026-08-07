@@ -54,10 +54,16 @@ export class SimSnsFilterKeyRule implements SimSnsFilterRule {
     const values = subject.valuesAt(this.path);
 
     // A key the message does not carry is only matched by the operator that
-    // asks for it to be missing. A key holding several values, as a
-    // String.Array attribute or a JSON array does, is matched by any of them.
+    // asks for it to be missing, and only when the message carries something
+    // else: real SNS states that `{"exists": false}` needs at least one
+    // attribute present, so a message carrying none matches no policy at all.
+    // A key holding several values, as a String.Array attribute or a JSON array
+    // does, is matched by any of them.
     if (values.length === 0) {
-      return this.conditions.some((condition) => condition.matchesAbsence);
+      return (
+        !subject.isEmpty &&
+        this.conditions.some((condition) => condition.matchesAbsence)
+      );
     }
 
     return this.conditions.some((condition) =>

@@ -123,6 +123,11 @@ answer what a key path holds, so no operator has to know which of them it is loo
 is not a JSON object holds nothing at any key rather than failing to be read, because the body comes
 from whoever published and the scope is the subscription's own business.
 
+A subject also says whether it holds anything at all, which `{"exists": false}` needs: real SNS
+states that an empty set of message attributes matches no filter policy, so a key missing from a
+message carrying other keys is not the same thing as a message carrying none. That is why the answer
+belongs to the subject rather than to the key being asked about.
+
 `SimSnsFilterValue` is one value a policy can be matched against. It holds the forms it has rather
 than one form, because a `Number` message attribute has two: the digits it was published as, and the
 number they spell. A form a value does not have matches nothing of that form, which is what keeps
@@ -132,6 +137,12 @@ number they spell. A form a value does not have matches nothing of that form, wh
 a list is a `SimSnsFilterKeyRule`, a key holding an object is another level of rules, and `$or` is
 alternatives. A nested key is refused under the `MessageAttributes` scope, since message attributes
 are flat and such a policy could never match.
+
+`sim-sns-filter-or-eligibility.ts` holds the rules deciding whether an `$or` is one. Real SNS asks for
+a list of at least two objects, none of which names a reserved keyword, and reads anything else as an
+attribute named `$or`. That is the divergence worth knowing here: real SNS makes such a policy match
+nothing, and this refuses it when it is set, because a policy that quietly stopped being an or is
+what filtering is meant to protect a test from.
 
 `match/` holds one class per operator, each holding what it was written with and answering one
 question about a value. `SimSnsFilterMatch` is what they share, including the answer to whether they
@@ -362,6 +373,9 @@ here, it does not make another Account's topics reachable through this one.
 - Delivery retry policies, subscription dead-letter queues and delivery status logging are not
   simulated, so a delivery that fails is recorded once rather than retried.
 - The `cidr` filter policy operator is not simulated, and is refused when the policy is set.
+- An `$or` real SNS would read as an ordinary attribute name, because it holds fewer than two objects
+  or names a reserved keyword, is refused when the policy is set rather than matched as that
+  attribute.
 - A filter policy is reported back as the string it was set with, rather than the re-serialised
   document real SNS answers with.
 - Delivery retry policies, dead-letter queues and replay are not simulated, so `DeliveryPolicy`,

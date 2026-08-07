@@ -157,13 +157,25 @@ describe("SNS filter policy string matching", () => {
     const present = { type: [{ exists: true }] };
     const absent = { type: [{ exists: false }] };
     const carried = { type: simSnsStringAttribute("order") };
+    const other = { tenant: simSnsStringAttribute("acme") };
 
-    // When a message carrying the attribute and one without it are matched.
+    // When a message carrying the attribute and one carrying another are
+    // matched.
     // Then each policy matches the one it asks for.
     assertTrue(simSnsFilterMatchesAttributes(present, carried));
-    assertFalse(simSnsFilterMatchesAttributes(present, {}));
+    assertFalse(simSnsFilterMatchesAttributes(present, other));
     assertFalse(simSnsFilterMatchesAttributes(absent, carried));
-    assertTrue(simSnsFilterMatchesAttributes(absent, {}));
+    assertTrue(simSnsFilterMatchesAttributes(absent, other));
+  });
+
+  it("matches nothing at all against a message with no attributes", () => {
+    // Given a policy asking for an attribute to be missing.
+    const absent = { type: [{ exists: false }] };
+
+    // When a message carrying no attributes at all is matched.
+    // Then it does not match, which is what real SNS states: an empty set of
+    // attributes matches no filter policy, including this one.
+    assertFalse(simSnsFilterMatchesAttributes(absent, {}));
   });
 
   it("matches nothing at all when the attribute is missing", () => {
