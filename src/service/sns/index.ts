@@ -9,7 +9,6 @@ export {
   parseSnsTopicArn,
   SimSnsTopicArn,
   type SimSnsTopicLocation,
-  snsAnyTopicArn,
   snsTopicArnPrefix,
 } from "./topic/sim-sns-topic-arn.js";
 export {

@@ -151,14 +151,18 @@ The name and data type rules are the real ones. A name using a reserved `AWS.` o
 data type that is not `String`, `String.Array`, `Number` or `Binary`, or a value that does not match
 its data type is refused here rather than on AWS.
 
-A `Subject` is up to 100 printable ASCII characters and may not begin with a space, as real SNS
-requires. A publish with no `Message`, or with one over the size limit, is refused with
+A `Subject` is UTF-8 text with no line breaks or control characters, of fewer than 100 characters,
+which is the contract real SNS states. A subject of exactly 100 characters is already too long. A
+publish with no `Message`, or with one over the size limit, is refused with
 `InvalidParameterException`.
 
 `PublishBatch` takes up to ten entries. An entry that fails on its own is reported in `Failed` while
 the rest of the batch goes through, as real SNS reports it. An empty batch, more than ten entries, a
-malformed entry id or two entries sharing an id fail the whole request, and so does a batch weighing
-more than the 256 KB a single publish is held to.
+malformed entry id or two entries sharing an id fail the whole request.
+
+The size limit is the one thing a batch is not held to per entry. It covers the whole batch, so ten
+entries each just inside it are one batch far outside it, and a single entry over it fails the batch
+with `BatchRequestTooLongException` rather than being reported as the one entry that did not fit.
 
 ```typescript sim-sns-publish-batch
 /**
@@ -201,8 +205,9 @@ Every operation is authorized against the topic's ARN, which carries the topic n
 type in front of it. Two details are worth knowing, because both are real SNS behaviour that a policy
 can get wrong:
 
-- `ListTopics` has no topic-level permission, so a policy allowing it names
-  `arn:aws:sns:<region>:<account-id>:*`. A policy naming one topic grants no listing.
+- `ListTopics` has no resource type at all, so it is authorized against `*` and only a policy whose
+  `Resource` is `*` allows it. A policy naming one topic grants no listing, and neither does one
+  naming `arn:aws:sns:<region>:<account-id>:*`.
 - `PublishBatch` is authorized as `sns:Publish`. There is no `sns:PublishBatch` action for a policy to
   name.
 
@@ -453,6 +458,10 @@ Current documented limitations:
   real SNS. The exact accounting AWS uses for one attribute is not documented, so this counts the
   bytes of the attribute's name, its data type and its value, which is stricter than counting the
   body alone.
+- A `Subject` is held to the contract real SNS states, which is UTF-8 text with no line breaks or
+  control characters and fewer than 100 characters. Older AWS documentation described it as ASCII
+  text beginning with a letter, number or punctuation mark. That wording is superseded, so a subject
+  beginning with a space is accepted here.
 - `GetTopicAttributes` reports `TopicArn`, `Owner`, `DisplayName`, `SubscriptionsConfirmed`,
   `SubscriptionsPending`, `SubscriptionsDeleted` and `Policy` when one is set. `DeliveryPolicy` and
   `EffectiveDeliveryPolicy` are left out, since delivery retry policies are not simulated.

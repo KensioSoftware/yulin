@@ -1,18 +1,25 @@
 import type { SimAwsResolvedCaller } from "../../../aws/caller/sim-aws-caller-resolver.js";
-import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
 import type { SimIamResourcePolicyInput } from "../../../iam/authorize/context/sim-iam-auth-z-context-builder.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamCallerIdentifier } from "../../../iam/error/sim-iam-caller-identifier.js";
 import { SimSnsAuthorizationErrorException } from "../../error/sim-sns.error.js";
 import type { SimSnsTopic } from "../../topic/sim-sns-topic.js";
-import { snsAnyTopicArn } from "../../topic/sim-sns-topic-arn.js";
 import type { SimSnsRequestOptions } from "../sim-sns-request-options.js";
 import { simSnsConditionContext } from "./sim-sns-condition-context.js";
 import { simSnsTopicResourcePolicies } from "./sim-sns-topic-resource-policies.js";
 
+/**
+ * The resource an action with no resource type authorizes against.
+ *
+ * Real SNS gives ListTopics no resource type at all, so IAM evaluates it
+ * against `*` and only a policy whose Resource is `*` allows it. A policy
+ * naming a topic ARN, or every topic ARN in the Account and Region, allows no
+ * listing, here as on AWS.
+ */
+const noResource = "*";
+
 interface SimSnsAuthorizerProperties {
   readonly iam: SimIamInterServiceAuthZ;
-  readonly accountRegionScope: SimAwsAccountRegionScope;
 }
 
 interface SimSnsTopicAuthorizationInput {
@@ -47,9 +54,9 @@ interface SimSnsResourceAuthorizationInput {
  * what admits a caller from another Account or a service principal, since
  * neither is covered by an identity policy in the Account owning the topic.
  *
- * ListTopics is the exception: real SNS gives it no topic-level permission, so
- * it authorizes against every topic in the account and region rather than one
- * of them, and no topic policy applies to it.
+ * ListTopics is the exception: real SNS gives it no resource type, so it
+ * authorizes against `*` rather than against a topic, and no topic policy
+ * applies to it.
  *
  * A denial is reported as SNS's own AuthorizationErrorException rather than the
  * shared IAM error, because that is the error a real SNS caller would have to
@@ -57,12 +64,10 @@ interface SimSnsResourceAuthorizationInput {
  */
 export class SimSnsAuthorizer {
   private readonly iam: SimIamInterServiceAuthZ;
-  private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly callerIdentifier = new SimIamCallerIdentifier();
 
   constructor(properties: SimSnsAuthorizerProperties) {
     this.iam = properties.iam;
-    this.accountRegionScope = properties.accountRegionScope;
   }
 
   /**
@@ -91,7 +96,7 @@ export class SimSnsAuthorizer {
   ): SimAwsResolvedCaller {
     return this.authorizeResource({
       action,
-      resource: snsAnyTopicArn(this.accountRegionScope),
+      resource: noResource,
       resourcePolicies: [],
       options,
     });

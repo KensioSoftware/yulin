@@ -25,10 +25,10 @@ describe("SNS publish validation", () => {
     // Given a topic.
     const { simAws, topicArn } = await simAwsWithTopic();
 
-    // When a subject with a line break, and one beginning with a space, are
-    // used.
+    // When a subject with a line break, one with a control character, and one
+    // of exactly a hundred characters are used.
     const refusals = await Promise.all(
-      ["New\norder", " New order"].map(async (subject) =>
+      ["New\norder", "New\u{7}order", "x".repeat(100)].map(async (subject) =>
         assertThrowsErrorAsync(async () => {
           await simAws.sns().publish(
             new PublishCommand({
@@ -41,7 +41,8 @@ describe("SNS publish validation", () => {
       ),
     );
 
-    // Then both are refused.
+    // Then each is refused. Real SNS states the limit as fewer than a hundred
+    // characters, so a hundred is already too long.
     for (const error of refusals) {
       assertInstanceOf(error, SimSnsInvalidParameterException);
     }

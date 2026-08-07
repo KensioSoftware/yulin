@@ -48,6 +48,13 @@ export async function simAwsWithTopic(
 export const simSnsOrdersTopicArn = "arn:aws:sns:us-east-1:888888888888:orders";
 
 /**
+ * The ARN the `orders` topic has in a simulation's own default scope.
+ */
+function ordersTopicArn(simAws: SimAws): string {
+  return `arn:aws:sns:${simAws.defaultRegionName}:${simAws.defaultAccountId}:orders`;
+}
+
+/**
  * Make a simulated AWS holding one topic named `orders`, carrying the topic
  * policy a test is about.
  */
@@ -76,6 +83,7 @@ export async function simAwsWithPublishingRole(
   allowed: boolean,
 ): Promise<string> {
   const iam = simAws.account(accountId).iam();
+  const topicArn = ordersTopicArn(simAws);
   const role = await iam.createRole(
     new CreateRoleCommand({
       RoleName: "OrderPublisher",
@@ -100,7 +108,7 @@ export async function simAwsWithPublishingRole(
           Statement: {
             Effect: "Allow",
             Action: "sns:Publish",
-            Resource: simSnsOrdersTopicArn,
+            Resource: topicArn,
           },
         }),
       }),

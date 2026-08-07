@@ -46,6 +46,33 @@ describe("SNS publish", () => {
     assertFalse(first.MessageId === second.MessageId);
   });
 
+  it("takes a subject that is UTF-8 rather than ASCII", async () => {
+    // Given a topic.
+    const { simAws, topicArn } = await simAwsWithTopic();
+
+    // When a subject with characters outside ASCII is published, and one of
+    // the ninety-nine characters real SNS allows.
+    const accented = await simAws.sns().publish(
+      new PublishCommand({
+        TopicArn: topicArn,
+        Message: "order-1",
+        Subject: "Nouvelle commande \u{1F4E6}",
+      }),
+    );
+    const longest = await simAws.sns().publish(
+      new PublishCommand({
+        TopicArn: topicArn,
+        Message: "order-1",
+        Subject: "x".repeat(99),
+      }),
+    );
+
+    // Then both go through, since a subject is UTF-8 text of fewer than a
+    // hundred characters rather than ASCII text.
+    assertNonNullable(accented.MessageId);
+    assertNonNullable(longest.MessageId);
+  });
+
   it("takes the message attributes real SNS takes", async () => {
     // Given a topic.
     const { simAws, topicArn } = await simAwsWithTopic();

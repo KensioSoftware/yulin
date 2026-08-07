@@ -1,6 +1,7 @@
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import { SimSnsBatchRequestTooLongException } from "../../error/sim-sns.error.js";
 import {
+  assertSimSnsMessageWithinLimit,
   simSnsMaximumPublishBytes,
   SimSnsPublishedMessage,
 } from "../../message/sim-sns-published-message.js";
@@ -64,10 +65,11 @@ export class SimSnsPublishCommands {
     // it, which is all a publish needs of it while nothing subscribes.
     this.access.requireByArn(publishAction, command.input.TopicArn, options);
 
-    return {
-      $metadata: {},
-      MessageId: this.published(command.input).messageId,
-    };
+    const message = this.published(command.input);
+
+    assertSimSnsMessageWithinLimit(message.byteSize);
+
+    return { $metadata: {}, MessageId: message.messageId };
   }
 
   /**
@@ -76,7 +78,8 @@ export class SimSnsPublishCommands {
    * A message one entry cannot publish is reported in `Failed` while the rest
    * of the batch goes through, as real SNS reports it. The size limit is
    * different: it covers the whole batch, so a batch over it fails outright
-   * rather than losing its last entry.
+   * rather than reporting one entry as the one that did not fit. That is why
+   * no entry is held to the limit on its own here.
    */
   publishBatch(
     command: SimPublishBatchCommand,

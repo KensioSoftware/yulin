@@ -60,13 +60,17 @@ model exists so that everything a message has to be checked for happens in one p
 publish was one of its own or one entry of a batch.
 
 `SimSnsPublishedMessage` is one message a publish put on a topic: its id, its body, its subject, its
-attributes and the instant it was published. It also owns the 256 KB limit, because that limit covers
-the body and the attributes together rather than either on its own.
+attributes and the instant it was published. It states what it weighs, since the 256 KB limit covers
+the body and the attributes together rather than either on its own, but it does not apply that limit:
+a publish of its own and a batch are held to it differently, so each does its own checking.
 
 `SimSnsMessageBody` refuses an empty message, as real SNS does, and states what a body weighs.
-`SimSnsMessageSubject` holds the printable ASCII and 100 character rules real SNS holds. Only the
-email protocols put a subject where a person sees it and neither is simulated, but the subject
-travels in the SNS envelope a queue or a function receives, so it is validated and carried.
+`SimSnsMessageSubject` holds the contract real SNS states: UTF-8 text with no line breaks or control
+characters, of fewer than 100 characters. It is UTF-8 rather than ASCII because a subject carrying an
+accented character or an emoji reaches AWS, so refusing one here would be a puzzling failure for
+something that works. Only the email protocols put a subject where a person sees it and neither is
+simulated, but the subject travels in the SNS envelope a queue or a function receives, so it is
+validated and carried.
 
 `SimSnsMessageAttributes` is the set of attributes on one message. A value is held as its bytes
 whichever form it arrived in, because the data type already says which form that was: an attribute of
@@ -103,8 +107,13 @@ still checked.
 `sim-sns-batch-entries.ts` holds the two halves of batch behaviour real SNS distinguishes. An empty
 batch, more than ten entries, a malformed id or two entries sharing one take the whole request down;
 anything else is one entry's own failure, reported in `Failed` while the rest of the batch goes
-through. The size limit is the exception: it covers the whole batch, so it is checked once every
-entry has been read rather than per entry.
+through.
+
+The size limit is the exception, which is why `SimSnsPublishedMessage` does not check it and the
+publish commands do. It covers the whole batch rather than each entry, so it is checked once every
+entry has been read. Checking it per entry would report an entry too large for a batch as that
+entry's own failure, where real SNS fails the batch: one entry over the limit is already a batch over
+it.
 
 As elsewhere, implementation code under `src/` does not import real AWS SDK packages. The structural
 command types in `*.command.ts` match the SDK shapes closely enough for callers to pass real SDK
@@ -118,8 +127,10 @@ nothing here, as it matches nothing on real AWS.
 
 Two details are real SNS behaviour worth keeping:
 
-- `ListTopics` authorizes against `arn:aws:sns:region:account:*`, because real SNS gives it no
-  topic-level permission. A policy naming one topic ARN therefore allows no listing.
+- `ListTopics` authorizes against `*`, because real SNS gives it no resource type at all. Only a
+  policy whose `Resource` is `*` allows it, and one naming a topic ARN, or every topic ARN in the
+  Account and Region, allows no listing. Simulated SQS authorizes `ListQueues` against
+  `arn:aws:sqs:region:account:*` instead, which admits a policy real SQS would refuse.
 - `PublishBatch` authorizes as `sns:Publish`. Real SNS has no `sns:PublishBatch` action, so a policy
   naming one grants nothing.
 
@@ -151,6 +162,8 @@ here, it does not make another Account's topics reachable through this one.
 - Message attributes are counted against the 256 KB publish limit alongside the body, as real SNS
   counts them. The exact accounting AWS uses for one attribute is not documented, so this counts the
   bytes of the name, the data type and the value.
+- A subject beginning with a space is accepted. Older AWS documentation described a subject as ASCII
+  text beginning with a letter, number or punctuation mark, and the current contract does not.
 - `GetTopicAttributes` reports `TopicArn`, `Owner`, `DisplayName`, the three subscription counts and
   `Policy` when one is set. `EffectiveDeliveryPolicy` and `DeliveryPolicy` are left out, since
   delivery retry policies are not simulated.

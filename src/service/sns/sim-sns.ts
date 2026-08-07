@@ -54,7 +54,7 @@ export class SimSns {
 
     const access = new SimSnsTopicAccess({
       topics: this.topics,
-      authorizer: new SimSnsAuthorizer({ iam, accountRegionScope }),
+      authorizer: new SimSnsAuthorizer({ iam }),
       accountRegionScope,
     });
 

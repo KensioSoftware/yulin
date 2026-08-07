@@ -15,6 +15,23 @@ import { SimSnsMessageSubject } from "./sim-sns-message-subject.js";
 export const simSnsMaximumPublishBytes = 262_144;
 
 /**
+ * Refuse a publish weighing more than one message is allowed to.
+ *
+ * A publish of its own is held to the limit here. A batch is held to the same
+ * limit over the whole batch rather than over each entry, so it does its own
+ * checking and reports its own error.
+ */
+export function assertSimSnsMessageWithinLimit(byteSize: number): void {
+  if (byteSize > simSnsMaximumPublishBytes) {
+    throw new SimSnsInvalidParameterException(
+      `Invalid parameter: Message too long. A message and its attributes may ` +
+        `be up to ${String(simSnsMaximumPublishBytes)} bytes, and this one ` +
+        `is ${String(byteSize)} bytes.`,
+    );
+  }
+}
+
+/**
  * One message as a publisher describes it, with the request's own wrapping
  * removed.
  */
@@ -37,8 +54,9 @@ interface SimSnsPublishedMessageProperties {
  *
  * A topic keeps no messages, so nothing holds this after the publish that made
  * it. It exists so that everything a message has to be checked for happens in
- * one place, whether the publish was one of its own or one entry of a batch,
- * and so that the two cannot drift apart on what a message may weigh.
+ * one place, whether the publish was one of its own or one entry of a batch.
+ * The size limit is the one thing left to the caller, because a batch is held
+ * to it over the whole batch rather than over each entry.
  */
 export class SimSnsPublishedMessage {
   public readonly messageId: string;
@@ -62,23 +80,13 @@ export class SimSnsPublishedMessage {
     input: SimSnsPublishedMessageInput,
     publishedAt: Date,
   ): SimSnsPublishedMessage {
-    const message = new this({
+    return new this({
       messageId: randomUUID(),
       body: SimSnsMessageBody.of(input.message),
       subject: SimSnsMessageSubject.optional(input.subject),
       attributes: input.attributes,
       publishedAt,
     });
-
-    if (message.byteSize > simSnsMaximumPublishBytes) {
-      throw new SimSnsInvalidParameterException(
-        `Invalid parameter: Message too long. A message and its attributes ` +
-          `may be up to ${String(simSnsMaximumPublishBytes)} bytes, and this ` +
-          `one is ${String(message.byteSize)} bytes.`,
-      );
-    }
-
-    return message;
   }
 
   /**

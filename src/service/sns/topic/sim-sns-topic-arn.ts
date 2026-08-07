@@ -31,18 +31,6 @@ export function snsTopicArnPrefix(
 }
 
 /**
- * The resource an operation naming no particular topic authorizes against.
- *
- * Real SNS gives ListTopics no topic-level permission, so a policy allowing it
- * names every topic in the account and region rather than one of them.
- */
-export function snsAnyTopicArn(
-  accountRegionScope: SimAwsAccountRegionScope,
-): string {
-  return `${snsTopicArnPrefix(accountRegionScope)}*`;
-}
-
-/**
  * Where one topic is, in the three facts its ARN carries.
  *
  * The strings are unbranded because the callers that have only read an ARN,

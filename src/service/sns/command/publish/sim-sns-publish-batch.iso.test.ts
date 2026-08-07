@@ -154,6 +154,32 @@ describe("SNS publish batch", () => {
     assertInstanceOf(repeated, SimSnsBatchEntryIdsNotDistinctException);
   });
 
+  it("fails the whole batch for one entry over the size limit", async () => {
+    // Given a topic and one entry larger than a publish may be.
+    const { simAws, topicArn } = await simAwsWithTopic();
+
+    // When it is published alongside an entry that would have gone through.
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws.sns().publishBatch(
+        new PublishBatchCommand({
+          TopicArn: topicArn,
+          PublishBatchRequestEntries: [
+            { Id: "one", Message: "order-1" },
+            {
+              Id: "two",
+              Message: "x".repeat(simSnsMaximumPublishBytes + 1),
+            },
+          ],
+        }),
+      );
+    });
+
+    // Then the batch is refused rather than the entry being reported in
+    // Failed: the limit real SNS holds a batch to is the batch's, and one
+    // entry over it is already a batch over it.
+    assertInstanceOf(error, SimSnsBatchRequestTooLongException);
+  });
+
   it("holds the whole batch to the size limit one publish is held to", async () => {
     // Given a topic and two messages each just inside the limit on its own.
     const { simAws, topicArn } = await simAwsWithTopic();

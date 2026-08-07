@@ -1,12 +1,31 @@
+import { assertDefined } from "../../../util/type-guard/defined.js";
 import { SimSnsInvalidParameterException } from "../error/sim-sns.error.js";
 
+/**
+ * Real SNS states the limit as fewer than 100 characters, so a subject of
+ * exactly 100 is already too long.
+ */
 const maximumCharacters = 100;
 
+const lastC0Control = 0x1f;
+const firstC1Control = 0x7f;
+const lastC1Control = 0x9f;
+
 /**
- * Real SNS takes a subject of printable ASCII only, so a newline or a control
- * character is refused rather than delivered in an email header.
+ * Whether a code point is one real SNS refuses in a subject.
+ *
+ * The refused set is the C0 controls, which is where a line break lives, and
+ * delete through the C1 controls. Everything else is allowed, because a subject
+ * is UTF-8 text rather than ASCII text: one carrying an accented character or
+ * an emoji reaches AWS, so it has to reach this simulation too.
  */
-const printableAsciiPattern = /^[ -~]+$/;
+function isControlCharacter(codePoint: number): boolean {
+  if (codePoint <= lastC0Control) {
+    return true;
+  }
+
+  return codePoint >= firstC1Control && codePoint <= lastC1Control;
+}
 
 /**
  * The subject of one published message.
@@ -37,23 +56,34 @@ export class SimSnsMessageSubject {
    * Read a subject, refusing one real SNS would refuse.
    */
   static of(value: string): SimSnsMessageSubject {
-    if (
-      value.length > maximumCharacters ||
-      !printableAsciiPattern.test(value)
-    ) {
+    if (value.length >= maximumCharacters || this.hasControlCharacter(value)) {
       throw new SimSnsInvalidParameterException(
-        `Invalid parameter: Subject: Must be ASCII text that does not begin ` +
-          `with whitespace, contains no line breaks or control characters, ` +
-          `and is at most ${String(maximumCharacters)} characters long`,
-      );
-    }
-
-    if (value.startsWith(" ")) {
-      throw new SimSnsInvalidParameterException(
-        "Invalid parameter: Subject: Must not begin with whitespace",
+        `Invalid parameter: Subject: Must be UTF-8 text with no line breaks ` +
+          `or control characters, and fewer than ` +
+          `${String(maximumCharacters)} characters long`,
       );
     }
 
     return new this(value);
+  }
+
+  /**
+   * Whether a subject carries a character real SNS refuses.
+   *
+   * Iterating a string yields whole code points, so a surrogate pair is one
+   * character here rather than two unpaired halves.
+   */
+  private static hasControlCharacter(value: string): boolean {
+    for (const character of value) {
+      const codePoint = character.codePointAt(0);
+
+      assertDefined(codePoint, "Every character has a first code point");
+
+      if (isControlCharacter(codePoint)) {
+        return true;
+      }
+    }
+
+    return false;
   }
 }

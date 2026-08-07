@@ -156,23 +156,53 @@ describe("SNS IAM authorization", () => {
     assertArrayLength(published.Successful, 1);
   });
 
-  it("gives listing no topic-level permission", async () => {
-    // Given a Role allowed to list topics by naming one topic ARN.
+  it("allows listing to a policy whose resource is a bare wildcard", async () => {
+    // Given a Role allowed to list topics the only way real SNS allows it.
     const { simAws, caller } = await simAwsWithRole({
+      Effect: "Allow",
+      Action: "sns:ListTopics",
+      Resource: "*",
+    });
+
+    // When it lists the topics.
+    const listed = await simAws
+      .sns()
+      .listTopics(new ListTopicsCommand({}), { caller });
+
+    // Then the listing goes through.
+    assertArrayLength(listed.Topics, 1);
+  });
+
+  it("gives listing no topic-level permission", async () => {
+    // Given Roles allowed to list topics by naming one topic ARN, and by
+    // naming every topic ARN in the Account and Region.
+    const oneTopic = await simAwsWithRole({
       Effect: "Allow",
       Action: "sns:ListTopics",
       Resource: "arn:aws:sns:us-east-1:888888888888:orders",
     });
-
-    // When it lists the topics.
-    const error = await assertThrowsErrorAsync(async () => {
-      await simAws.sns().listTopics(new ListTopicsCommand({}), { caller });
+    const everyTopic = await simAwsWithRole({
+      Effect: "Allow",
+      Action: "sns:ListTopics",
+      Resource: "arn:aws:sns:us-east-1:888888888888:*",
     });
 
-    // Then the policy allows nothing, as real SNS gives ListTopics no
-    // topic-level permission.
-    assertInstanceOf(error, SimSnsAuthorizationErrorException);
-    assertStringIncludes(error.message, ":*");
+    // When each lists the topics.
+    const refusals = await Promise.all(
+      [oneTopic, everyTopic].map(async ({ simAws, caller }) =>
+        assertThrowsErrorAsync(async () => {
+          await simAws.sns().listTopics(new ListTopicsCommand({}), { caller });
+        }),
+      ),
+    );
+
+    // Then neither allows it. Real SNS gives ListTopics no resource type at
+    // all, so it is authorized against `*` and only a policy naming `*`
+    // reaches it.
+    for (const error of refusals) {
+      assertInstanceOf(error, SimSnsAuthorizationErrorException);
+      assertStringIncludes(error.message, "on resource: *");
+    }
   });
 
   it("refuses a caller with no permission for a topic that does not exist", async () => {
