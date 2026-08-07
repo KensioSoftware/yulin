@@ -7,18 +7,27 @@ describe("SimCloudFrontPathPattern", () => {
     return new SimCloudFrontPathPattern({ pathPattern: pattern });
   }
 
+  interface TimedMatch {
+    readonly elapsedMilliseconds: number;
+    readonly matched: boolean;
+  }
+
   /**
-   * How long a match takes, so a pattern that compiles to nested wildcards is
-   * told apart from one that does not.
+   * What a match answered and how long it took to answer it, so that a pattern
+   * compiling to nested wildcards is told apart from one that does not without
+   * losing sight of whether the answer was right.
    */
-  function matchMilliseconds(
+  function timedMatch(
     cloudFrontPathPattern: SimCloudFrontPathPattern,
     requestPath: string,
-  ): number {
+  ): TimedMatch {
     const startedAt = process.hrtime.bigint();
-    cloudFrontPathPattern.matches(requestPath);
+    const matched = cloudFrontPathPattern.matches(requestPath);
 
-    return Number(process.hrtime.bigint() - startedAt) / 1e6;
+    return {
+      elapsedMilliseconds: Number(process.hrtime.bigint() - startedAt) / 1e6,
+      matched,
+    };
   }
 
   it("reads a run of stars as one", () => {
@@ -39,13 +48,14 @@ describe("SimCloudFrontPathPattern", () => {
 
     // When a long path the pattern almost matches is considered, which is the
     // input that makes a backtracking engine try every split of the run.
-    const elapsedMilliseconds = matchMilliseconds(
+    const { elapsedMilliseconds, matched } = timedMatch(
       cloudFrontPathPattern,
       `/${"a".repeat(32)}`,
     );
 
-    // Then it settles at once, rather than in the seconds a chain of wildcards
-    // takes to exhaust.
+    // Then it answers that the path is a miss, and settles at once rather than
+    // in the seconds a chain of wildcards takes to exhaust.
+    assertFalse(matched);
     assertNumberBetween(elapsedMilliseconds, 0, 500);
   });
 });
