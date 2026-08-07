@@ -100,7 +100,6 @@ export async function subscribeRefusal(
  * The protocols real SNS has that nothing in the simulation delivers over.
  */
 export const simSnsUnsimulatedProtocols = [
-  "lambda",
   "http",
   "https",
   "email",

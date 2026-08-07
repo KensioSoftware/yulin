@@ -1,9 +1,12 @@
-import { SimSnsQueueEndpointArn } from "./sim-sns-queue-endpoint-arn.js";
 import { SimSnsSubscriptionArn } from "./sim-sns-subscription-arn.js";
 import type {
   SimSnsSubscriptionAttributeInput,
   SimSnsSubscriptionAttributes,
 } from "./sim-sns-subscription-attributes.js";
+import {
+  requireSimSnsSubscriptionEndpoint,
+  type SimSnsSubscriptionEndpoint,
+} from "./sim-sns-subscription-endpoint.js";
 import type { SimSnsSubscriptionProtocol } from "./sim-sns-subscription-protocol.js";
 
 const subscriptionArnAttributeName = "SubscriptionArn";
@@ -19,9 +22,9 @@ const ownerAttributeName = "Owner";
 /**
  * The two attributes describing a confirmation that never had to happen.
  *
- * Real SNS confirms an `sqs` subscription itself, so one created through the
- * API is confirmed as soon as it exists and the confirmation counts as
- * authenticated. Both are reported as constants because there is no protocol
+ * Real SNS confirms an `sqs` or a `lambda` subscription itself, so one created
+ * through the API is confirmed as soon as it exists and the confirmation counts
+ * as authenticated. Both are reported as constants because there is no protocol
  * here that leaves a subscription pending.
  */
 const confirmationAttributes: readonly (readonly [string, string])[] = [
@@ -34,7 +37,7 @@ interface SimSnsSubscriptionProperties {
   readonly topicArn: string;
   readonly topicName: string;
   readonly protocol: SimSnsSubscriptionProtocol;
-  readonly endpoint: SimSnsQueueEndpointArn;
+  readonly endpoint: SimSnsSubscriptionEndpoint;
   readonly owner: string;
   readonly attributes: SimSnsSubscriptionAttributes;
 }
@@ -51,17 +54,17 @@ interface SimSnsSubscriptionInput {
 /**
  * One simulated subscription to a topic.
  *
- * The endpoint is held as a queue ARN rather than as a string because `sqs` is
- * the only protocol simulated, and a delivery has to reach the Account and
- * Region that ARN names rather than the topic's. When another protocol arrives
- * this becomes the endpoint of whichever kind the protocol implies.
+ * The endpoint is held as the ARN its protocol implies rather than as a string,
+ * because a delivery has to reach the Account and Region that ARN names rather
+ * than the topic's, and because what the ARN has to name is a question the
+ * protocol answers: a queue for `sqs`, a function for `lambda`.
  */
 export class SimSnsSubscription {
   public readonly arn: SimSnsSubscriptionArn;
   public readonly topicArn: string;
   public readonly topicName: string;
   public readonly protocol: SimSnsSubscriptionProtocol;
-  public readonly endpoint: SimSnsQueueEndpointArn;
+  public readonly endpoint: SimSnsSubscriptionEndpoint;
   public readonly owner: string;
 
   private held: SimSnsSubscriptionAttributes;
@@ -79,11 +82,11 @@ export class SimSnsSubscription {
   /**
    * Create a subscription, refusing an endpoint the protocol cannot reach.
    *
-   * Nothing checks that the queue exists, because real SNS does not either: a
-   * subscription to a queue that is not there is created, and fails when
-   * something is delivered to it. That is the moment the queue's own policy is
-   * consulted too, so both failures surface in the same place, and a permission
-   * taken away after subscribing stops delivery.
+   * Nothing checks that the endpoint exists, because real SNS does not either:
+   * a subscription to a queue or a function that is not there is created, and
+   * fails when something is delivered to it. That is the moment the endpoint's
+   * own policy is consulted too, so both failures surface in the same place,
+   * and a permission taken away after subscribing stops delivery.
    */
   static of(input: SimSnsSubscriptionInput): SimSnsSubscription {
     const arn = SimSnsSubscriptionArn.forTopic(input.topicArn);
@@ -93,10 +96,27 @@ export class SimSnsSubscription {
       topicArn: input.topicArn,
       topicName: input.topicName,
       protocol: input.protocol,
-      endpoint: SimSnsQueueEndpointArn.parse(input.endpoint ?? ""),
+      endpoint: requireSimSnsSubscriptionEndpoint(
+        input.protocol,
+        input.endpoint,
+      ),
       owner: input.owner,
       attributes: input.attributes,
     });
+  }
+
+  /**
+   * Whether another subscription would be a repeat of this one.
+   *
+   * Real SNS matches a repeated Subscribe on the topic, the protocol and the
+   * endpoint. Both subscriptions belong to a topic already by the time this is
+   * asked, so it is the other two that are compared here.
+   */
+  repeats(other: SimSnsSubscription): boolean {
+    return (
+      this.protocol === other.protocol &&
+      this.endpoint.value === other.endpoint.value
+    );
   }
 
   /**

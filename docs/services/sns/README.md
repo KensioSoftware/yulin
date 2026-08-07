@@ -5,8 +5,8 @@ every operation is authorized by simulated IAM.
 
 Standard topics only. SNS-specific types are imported from the `@kensio/yulin/sns` subpath.
 
-A message published to a topic is delivered to every queue subscribed to it. Other subscription
-protocols are not simulated.
+A message published to a topic is delivered to every queue subscribed to it, and invokes every Lambda
+function subscribed to it. Other subscription protocols are not simulated.
 
 ## Creating a topic and publishing to it
 
@@ -200,9 +200,9 @@ console.log(published.Failed?.[0]?.Code); // "InvalidParameterValueException"
 
 ## Subscriptions
 
-`Subscribe` with the `sqs` protocol and a queue ARN answers with a subscription ARN straight away.
-There is no confirmation step for that protocol, as there is none on real SNS: the subscription is
-confirmed the moment it exists.
+`Subscribe` with the `sqs` protocol and a queue ARN, or the `lambda` protocol and a function ARN,
+answers with a subscription ARN straight away. There is no confirmation step for either protocol, as
+there is none on real SNS: the subscription is confirmed the moment it exists.
 
 ```typescript sim-sns-subscriptions
 /**
@@ -273,7 +273,12 @@ A subscription ARN is the topic's ARN with an opaque id on the end. That is the 
 subscription: `Unsubscribe`, `GetSubscriptionAttributes` and `SetSubscriptionAttributes` all name one
 by it.
 
-Subscribing the same queue to the same topic twice answers with the subscription that is already
+The endpoint has to be an ARN of the kind the protocol implies, and it is checked when the
+subscription is made: a queue ARN over the `lambda` protocol is refused, as it is on real SNS. A
+qualified function ARN naming a version or an alias is refused too, since simulated Lambda has
+neither and subscribing `$LATEST` instead would be a different function from the one asked for.
+
+Subscribing the same endpoint to the same topic twice answers with the subscription that is already
 there rather than making a second one, as real SNS does. The attributes the repeated request carries
 are not applied to it, the same way a repeated `CreateTopic` leaves the existing topic alone. They
 are still validated, so a repeated request naming an attribute this simulation will not take is
@@ -289,11 +294,11 @@ topic recreated under the same name starts with none.
 
 `GetTopicAttributes` counts the topic's subscriptions in `SubscriptionsConfirmed`, and counts the
 ones that have been unsubscribed in `SubscriptionsDeleted`. `SubscriptionsPending` is always zero,
-because the only protocol simulated is the one that needs no confirmation.
+because neither protocol simulated needs a confirmation.
 
-Only the `sqs` protocol is simulated. Every other protocol real SNS has is refused by name at
-`Subscribe` time with the reason it is missing, rather than creating a subscription that would never
-be delivered to.
+Only the `sqs` and `lambda` protocols are simulated. Every other protocol real SNS has is refused by
+name at `Subscribe` time with the reason it is missing, rather than creating a subscription that
+would never be delivered to.
 
 ## Delivering to a queue
 
@@ -439,6 +444,136 @@ attribute travels base64 encoded, since the envelope is JSON.
 With `RawMessageDelivery` set to `true` on the subscription, the body is the published `Message` on
 its own and the published message attributes arrive as SQS message attributes instead. Both matter,
 because a consumer written for one breaks on the other.
+
+## Delivering to a Lambda function
+
+Subscribing a function with the `lambda` protocol invokes it once per published message, with the SNS
+event shape. The function's resource policy has to allow `sns.amazonaws.com` to invoke it for the
+topic, which is what `AddPermission` grants:
+
+```typescript sim-sns-lambda-delivery
+/**
+ * Invoking a simulated Lambda function from a simulated topic.
+ */
+
+import {
+  AddPermissionCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-lambda";
+import {
+  CreateTopicCommand,
+  PublishCommand,
+  SubscribeCommand,
+} from "@aws-sdk/client-sns";
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+interface SnsRecord {
+  EventSource: string;
+  Sns: { Subject: string | null; Message: string };
+}
+
+const simAws = new SimAws();
+const sns = simAws.sns();
+const consumerArn = `arn:aws:lambda:${simAws.defaultRegionName}:${simAws.defaultAccountId}:function:order-consumer`;
+
+const { TopicArn } = await sns.createTopic(
+  new CreateTopicCommand({ Name: "orders" }),
+);
+
+await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "order-consumer",
+    Role: `arn:aws:iam::${simAws.defaultAccountId}:role/OrderConsumerRole`,
+    Code: {
+      ZipFile: makeLambdaZipFileInput((event: { Records: [SnsRecord] }) => {
+        const [record] = event.Records;
+
+        console.log(record.EventSource); // "aws:sns"
+        console.log(record.Sns.Subject); // "New order"
+        console.log(record.Sns.Message); // "order-1"
+
+        return "handled";
+      }),
+    },
+  }),
+);
+
+// The function's resource policy is what allows the invocation, and it is
+// checked on every message rather than remembered from subscribe time.
+await simAws.lambda().addPermission(
+  new AddPermissionCommand({
+    FunctionName: "order-consumer",
+    StatementId: "AllowSns",
+    Action: "lambda:InvokeFunction",
+    Principal: "sns.amazonaws.com",
+    SourceArn: TopicArn,
+  }),
+);
+
+// A lambda subscription needs no confirmation either, so the ARN comes back at
+// once.
+await sns.subscribe(
+  new SubscribeCommand({ TopicArn, Protocol: "lambda", Endpoint: consumerArn }),
+);
+
+await sns.publish(
+  new PublishCommand({ TopicArn, Subject: "New order", Message: "order-1" }),
+);
+
+// The invocation happens after the publish is answered, as it does on real SNS.
+await simAws.backgroundTasksComplete();
+```
+
+The permission is checked on every message rather than remembered from subscribe time, so one taken
+away afterwards stops delivery. Nothing checks the function at `Subscribe` time, as nothing checks
+the queue: a subscription to a function that does not exist, or to one whose policy says no, is
+created and fails when a message is delivered to it. Both failures are recorded on
+`simAws.sns().deliveryFailures` the same way a queue's are, and a handler that throws is recorded
+there too without stopping delivery to the topic's other subscriptions.
+
+A function in another account or another region is invoked the same way, on that account's own
+resource policy.
+
+## The event a Lambda function receives
+
+`Records` always holds exactly one entry, even when the message came from a `PublishBatch`. Real SNS
+does not batch to Lambda: each published message is its own invocation, so a handler looping over
+`Records` sees one message per call.
+
+```json
+{
+  "Records": [
+    {
+      "EventSource": "aws:sns",
+      "EventVersion": "1.0",
+      "EventSubscriptionArn": "arn:aws:sns:us-east-1:888888888888:orders:8f1c...",
+      "Sns": {
+        "Type": "Notification",
+        "MessageId": "0f2a0a49-9e3f-4d02-9e5f-2d9f0e5b6d51",
+        "TopicArn": "arn:aws:sns:us-east-1:888888888888:orders",
+        "Subject": "New order",
+        "Message": "order-1",
+        "Timestamp": "2026-01-01T00:00:00.000Z",
+        "SignatureVersion": "1",
+        "Signature": "...",
+        "SigningCertUrl": "https://sns.us-east-1.yulin.invalid/SimulatedNotificationService-....pem",
+        "UnsubscribeUrl": "https://sns.us-east-1.yulin.invalid/?Action=Unsubscribe&SubscriptionArn=...",
+        "MessageAttributes": { "tenant": { "Type": "String", "Value": "acme" } }
+      }
+    }
+  ]
+}
+```
+
+Two fields are spelled differently from the envelope a queue receives, and the difference is real SNS
+behaviour worth writing a consumer against: the envelope has `SigningCertURL` and `UnsubscribeURL`,
+and the Lambda event has `SigningCertUrl` and `UnsubscribeUrl`. `Subject` and `MessageAttributes` are
+always present here as well, carrying `null` and `{}` when the publish had neither, where the
+envelope leaves both out.
+
+`RawMessageDelivery` has no effect on a `lambda` subscription. Real SNS treats it as an SQS and HTTP
+setting, so a function is invoked with the whole event whether it is set or not.
 
 ## Verifying a message signature
 
@@ -793,14 +928,19 @@ Sim SNS currently supports:
 - `GetTopicAttributesCommand` and `SetTopicAttributesCommand`, for `DisplayName` and `Policy`
 - `PublishCommand` and `PublishBatchCommand`, with message attributes, a subject and the 256 KB size
   limit
-- `SubscribeCommand` over the `sqs` protocol, confirmed at once, and `UnsubscribeCommand`
+- `SubscribeCommand` over the `sqs` and `lambda` protocols, confirmed at once, and
+  `UnsubscribeCommand`
 - `ListSubscriptionsCommand` and `ListSubscriptionsByTopicCommand`, paged at a hundred subscriptions
   with a `NextToken`
 - `GetSubscriptionAttributesCommand` and `SetSubscriptionAttributesCommand`, for `RawMessageDelivery`
 - Delivery of a published message to every subscribed queue, including a queue in another account or
   another region, authorized by that queue's own policy on every message
+- Invocation of every subscribed Lambda function, including a function in another account or another
+  region, authorized by that function's own resource policy on every message
 - The SNS envelope, with a real RSA signature a verifier can check against the certificate the
   message names, and `RawMessageDelivery` for the published message on its own
+- The SNS Lambda event, with one `Records` entry per published message and the message attributes in
+  it
 - Authorization of every operation by simulated IAM, against the real IAM action and topic ARN
 - The `Policy` attribute as the topic's resource policy, admitting another account's principal or a
   service principal, with `aws:SourceArn` and `aws:SourceAccount` conditions honoured
@@ -811,9 +951,16 @@ Sim SNS currently supports:
 
 Current documented limitations:
 
-- Only the `sqs` subscription protocol is simulated, so a queue is the only thing a topic can deliver
-  to. `lambda`, `http`, `https`, `email`, `email-json`, `sms`, `application` and `firehose` are
-  refused at `Subscribe` time.
+- Only the `sqs` and `lambda` subscription protocols are simulated, so a queue and a function are the
+  only things a topic can deliver to. `http`, `https`, `email`, `email-json`, `sms`, `application`
+  and `firehose` are refused at `Subscribe` time.
+- A subscribed function is invoked with `Subject: null` and `MessageAttributes: {}` where the publish
+  had neither, which is what real SNS sends. The envelope a queue receives leaves both fields out.
+- `RawMessageDelivery` is accepted on a `lambda` subscription and has no effect on it, as it has none
+  on real SNS.
+- A qualified function ARN naming a version or an alias is refused as a subscription endpoint.
+  Simulated Lambda has no versions or aliases, so subscribing `$LATEST` instead would be a different
+  function from the one named.
 - `SigningCertURL` and `UnsubscribeURL` name `sns.<region>.yulin.invalid` rather than
   `sns.<region>.amazonaws.com`, and neither can be fetched: simulated SNS is not served over HTTP.
   The certificate is handed out in process by `simAws.sns().signingCertificate(url)`. A real SNS
@@ -821,13 +968,13 @@ Current documented limitations:
   fetches the URL itself, so it cannot verify a simulated message as it stands. Verify with
   `node:crypto` against the certificate the simulator hands over instead.
 - A delivery failure is not reported to the publisher, as it is not on real SNS. It is recorded on
-  `simAws.sns().deliveryFailures`, and anything other than a queue policy refusal is also warned
+  `simAws.sns().deliveryFailures`, and anything other than an endpoint policy refusal is also warned
   about once on the console.
 - Delivery retry policies, subscription dead-letter queues and delivery status logging are not
   simulated, so a message an endpoint would not take is delivered once and recorded as a failure
   rather than retried.
-- `ConfirmSubscription` is not supported. The only protocol simulated needs no confirmation, so
-  there is no confirmation token to confirm.
+- `ConfirmSubscription` is not supported. Neither protocol simulated needs a confirmation, so there
+  is no confirmation token to confirm.
 - Subscription filter policies are not simulated, so `FilterPolicy` and `FilterPolicyScope` are
   refused rather than held and never applied.
 - Subscription delivery retry policies, subscription dead-letter queues and message replay are not
@@ -842,7 +989,7 @@ Current documented limitations:
   `FifoThroughputScope` and `ContentBasedDeduplication` attributes, and the `MessageGroupId` and
   `MessageDeduplicationId` publish inputs.
 - `MessageStructure` is refused. A `json` structure picks a different message body per protocol, and
-  none of those protocols is simulated, so it would be a body chosen by a rule that never ran.
+  picking one is not simulated, so it would be a body chosen by a rule that never ran.
 - Publishing to a `TargetArn` or a `PhoneNumber` is refused. Mobile application endpoints and SMS are
   not simulated, so only a `TopicArn` can be published to.
 - Message attributes count against the 256 KB publish limit alongside the message body, as they do on

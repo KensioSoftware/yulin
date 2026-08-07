@@ -5,8 +5,10 @@ import { SimSnsNotFoundException } from "../../error/sim-sns.error.js";
 import type { SimSnsQueueEndpointArn } from "../../subscription/sim-sns-queue-endpoint-arn.js";
 import {
   type SimSnsDeliveryRequest,
+  simSnsDeliverySource,
   simSnsServicePrincipal,
 } from "../sim-sns-delivery.js";
+import { SimSnsQueueMessage } from "./sim-sns-queue-message.js";
 
 interface SimSnsDeliveryQueueProperties {
   readonly arn: SimSnsQueueEndpointArn;
@@ -39,6 +41,8 @@ export class SimSnsDeliveryQueue {
    * at all, which is why this is the only place it is asked.
    */
   async deliver(request: SimSnsDeliveryRequest): Promise<void> {
+    const source = simSnsDeliverySource(request);
+    const endpointArn = request.subscription.endpoint.value;
     const queue = this.scope.sqs().findQueue(this.arn.queueName);
 
     if (queue === undefined) {
@@ -47,7 +51,7 @@ export class SimSnsDeliveryQueue {
       // about, where a policy saying no is a modelled outcome a test may be
       // asking for on purpose.
       throw new SimSnsNotFoundException(
-        `${request.endpointArn} is not a simulated SQS queue.`,
+        `${endpointArn} is not a simulated SQS queue.`,
       );
     }
 
@@ -56,42 +60,29 @@ export class SimSnsDeliveryQueue {
     }).authorize({
       queue,
       servicePrincipal: simSnsServicePrincipal,
-      sourceArn: request.topicArn,
-      sourceAccount: request.topicOwnerAccountId,
+      ...source,
     });
 
     if (decision.isDenied) {
       throw new SimSnsDeliveryNotPermitted(
-        `The queue policy of ${request.endpointArn} does not allow ` +
-          `${simSnsServicePrincipal} to send to it for ${request.topicArn}. ` +
+        `The queue policy of ${endpointArn} does not allow ` +
+          `${simSnsServicePrincipal} to send to it for ${source.sourceArn}. ` +
           "Grant sqs:SendMessage with the queue's Policy attribute.",
       );
     }
 
-    await this.send(request);
-  }
-
-  /**
-   * Send the message through the ordinary SendMessage path.
-   *
-   * A delivered message is therefore the same thing an SDK caller would have
-   * sent, and is authorized again on the way in.
-   */
-  private async send(request: SimSnsDeliveryRequest): Promise<void> {
+    // Sent through the ordinary SendMessage path, so a delivered message is
+    // the same thing an SDK caller would have sent, and is authorized again on
+    // the way in.
     await this.scope.sqs().sendMessage(
       {
-        input: {
-          QueueUrl: this.arn.queueUrl,
-          MessageBody: request.body,
-          ...(request.messageAttributes !== undefined && {
-            MessageAttributes: request.messageAttributes,
-          }),
-        },
+        input: new SimSnsQueueMessage(request).sendMessageInput(
+          this.arn.queueUrl,
+        ),
       },
       {
         caller: { kind: "service", service: simSnsServicePrincipal },
-        sourceArn: request.topicArn,
-        sourceAccount: request.topicOwnerAccountId,
+        ...source,
       },
     );
   }

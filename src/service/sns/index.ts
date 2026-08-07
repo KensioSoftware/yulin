@@ -28,10 +28,13 @@ export {
   SimSnsSubscriptionAttributes,
 } from "./subscription/sim-sns-subscription-attributes.js";
 export {
+  simSnsLambdaProtocol,
   simSnsSqsProtocol,
   type SimSnsSubscriptionProtocol,
 } from "./subscription/sim-sns-subscription-protocol.js";
+export { SimSnsFunctionEndpointArn } from "./subscription/sim-sns-function-endpoint-arn.js";
 export { SimSnsQueueEndpointArn } from "./subscription/sim-sns-queue-endpoint-arn.js";
+export type { SimSnsSubscriptionEndpoint } from "./subscription/sim-sns-subscription-endpoint.js";
 export type { SimSnsSubscriptionCounts } from "./subscription/sim-sns-subscription-store.js";
 export { SimSnsMessageAttributes } from "./message/sim-sns-message-attributes.js";
 export type {
@@ -49,6 +52,11 @@ export {
   type SimSnsDeliveryRequest,
   simSnsServicePrincipal,
 } from "./delivery/sim-sns-delivery.js";
+export { SimSnsEnvelope } from "./delivery/sim-sns-envelope.js";
+export {
+  SimSnsNotification,
+  type SimSnsNotificationFields,
+} from "./delivery/sim-sns-notification.js";
 export {
   SimSnsDeliveryFailure,
   SimSnsDeliveryFailures,

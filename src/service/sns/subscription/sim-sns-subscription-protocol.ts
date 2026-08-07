@@ -4,19 +4,29 @@ import {
 } from "../error/sim-sns.error.js";
 
 /**
- * The one delivery protocol this simulation delivers over.
+ * Delivery to an SQS queue.
  *
- * A queue is the protocol SNS is most often put in front of, and it is the one
- * with no confirmation step: real SNS confirms an `sqs` subscription itself, so
+ * A queue is what SNS is most often put in front of, and it is a protocol with
+ * no confirmation step: real SNS confirms an `sqs` subscription itself, so
  * `Subscribe` answers with a subscription ARN rather than `pending
  * confirmation`.
  */
 export const simSnsSqsProtocol = "sqs";
 
 /**
+ * Delivery by invoking a Lambda function.
+ *
+ * Real SNS confirms this one itself too, so a `lambda` subscription is
+ * confirmed as soon as it exists. The function is invoked asynchronously with
+ * an event carrying the published message.
+ */
+export const simSnsLambdaProtocol = "lambda";
+
+/**
  * A protocol a simulated subscription can be created with.
  */
-export type SimSnsSubscriptionProtocol = typeof simSnsSqsProtocol;
+export type SimSnsSubscriptionProtocol =
+  typeof simSnsSqsProtocol | typeof simSnsLambdaProtocol;
 
 /**
  * The protocols real SNS has that this simulation does not deliver over.
@@ -27,7 +37,6 @@ export type SimSnsSubscriptionProtocol = typeof simSnsSqsProtocol;
  * silence.
  */
 const unsimulatedProtocols = new Map<string, string>([
-  ["lambda", "Delivery to a simulated Lambda function is not implemented yet."],
   ["http", "Delivery over HTTP would leave the simulation."],
   ["https", "Delivery over HTTPS would leave the simulation."],
   ["email", "Sending email is not simulated."],
@@ -53,8 +62,8 @@ const unsimulatedProtocols = new Map<string, string>([
 export function requireSimSnsProtocol(
   value: string | undefined,
 ): SimSnsSubscriptionProtocol {
-  if (value === simSnsSqsProtocol) {
-    return simSnsSqsProtocol;
+  if (value === simSnsSqsProtocol || value === simSnsLambdaProtocol) {
+    return value;
   }
 
   const named = value ?? "(none)";
@@ -63,7 +72,8 @@ export function requireSimSnsProtocol(
   if (reason !== undefined) {
     throw new SimSnsUnsimulatedInputException(
       `The ${named} subscription protocol is not simulated. ${reason} ` +
-        `Subscribe with the ${simSnsSqsProtocol} protocol instead.`,
+        `Subscribe with the ${simSnsSqsProtocol} or ` +
+        `${simSnsLambdaProtocol} protocol instead.`,
     );
   }
 
