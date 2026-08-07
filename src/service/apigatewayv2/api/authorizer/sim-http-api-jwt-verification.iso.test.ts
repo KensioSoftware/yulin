@@ -261,7 +261,7 @@ describe("Validating the claims of a token a JWT authorizer accepted", () => {
     const claims = authorization.jwt?.claims ?? {};
     assertIdentical(claims["cognito:groups"], "[Admins Readers]");
     assertIdentical(claims["auth_time"], String(nowSeconds));
-    // oxlint-disable-next-line yulin/prefer-specific-assertions -- the expected value is the string a boolean claim renders as, not a boolean.
+    // oxlint-disable-next-line smartass/prefer-specific-assertions -- the expected value is the string a boolean claim renders as, not a boolean.
     assertIdentical(claims["email_verified"], "true");
     assertIdentical(claims["address"], '{"formatted":"1 Test Street"}');
     assertIdentical(

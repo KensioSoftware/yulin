@@ -3,6 +3,7 @@ import { execa } from "execa";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, it } from "vitest";
 
 import { repoLintPluginName } from "./repo-lint-plugin.js";
@@ -10,14 +11,51 @@ import { repoLintPluginName } from "./repo-lint-plugin.js";
 const projectRoot = path.resolve(import.meta.dirname, "../../..");
 
 /**
+ * The plugins carrying the syntax restrictions this repository lints with.
+ *
+ * `@kensio/smartass` is here rather than left to its own tests because its
+ * advice reaching this repository is what has failed before: under ESLint it
+ * arrived as a `no-restricted-syntax` block, and a second config setting the
+ * same rule turned it off for 265 commits with nothing to say so.
+ */
+const jsPlugins: readonly {
+  readonly name: string;
+  readonly specifier: string;
+}[] = [
+  {
+    name: repoLintPluginName,
+    specifier: path.join(
+      projectRoot,
+      "src",
+      "config",
+      "lint",
+      "repo-lint-plugin.ts",
+    ),
+  },
+  {
+    name: "smartass",
+    // Oxlint resolves a specifier from the config file's own directory, and
+    // the config this test writes lives outside the repository. Resolving the
+    // package's export here rather than pointing at a path inside it keeps the
+    // test going through the entry point `.oxlintrc.json` names.
+    specifier: fileURLToPath(import.meta.resolve("@kensio/smartass/oxlint")),
+  },
+];
+
+/**
  * A source file that should trip one rule, and the rule it should trip.
  *
- * Reading the plugin's rule list back would prove only that the list exists.
+ * Reading a plugin's rule list back would prove only that the list exists.
  * These prove Oxlint loads the plugin and the selectors match real syntax,
  * which is the part that would break silently.
  */
-const cases: readonly { readonly rule: string; readonly source: string }[] = [
+const cases: readonly {
+  readonly plugin: string;
+  readonly rule: string;
+  readonly source: string;
+}[] = [
   {
+    plugin: repoLintPluginName,
     rule: "assert-defined-guard",
     source: [
       "export function read(value: string | undefined): string {",
@@ -27,6 +65,7 @@ const cases: readonly { readonly rule: string; readonly source: string }[] = [
     ].join("\n"),
   },
   {
+    plugin: repoLintPluginName,
     rule: "assert-not-null-guard",
     source: [
       "export function read(value: string | null): string {",
@@ -36,6 +75,7 @@ const cases: readonly { readonly rule: string; readonly source: string }[] = [
     ].join("\n"),
   },
   {
+    plugin: repoLintPluginName,
     rule: "no-reused-props",
     source: [
       "export class Thing {",
@@ -46,6 +86,7 @@ const cases: readonly { readonly rule: string; readonly source: string }[] = [
     ].join("\n"),
   },
   {
+    plugin: "smartass",
     rule: "prefer-specific-assertions",
     source: [
       "declare function assertIdentical(a: unknown, b: unknown): void;",
@@ -56,12 +97,17 @@ const cases: readonly { readonly rule: string; readonly source: string }[] = [
   },
 ];
 
+/** Every rule under test, turned on and nothing else with it. */
+const enabledRules = Object.fromEntries(
+  cases.map((testCase) => [`${testCase.plugin}/${testCase.rule}`, "error"]),
+);
+
 interface OxlintReport {
   readonly diagnostics: readonly { readonly code: string }[];
 }
 
 /**
- * Lints one source through Oxlint with only this plugin turned on.
+ * Lints one source through Oxlint with only these plugins turned on.
  *
  * The fixture goes outside the repository because Oxlint honours `.gitignore`,
  * and a fixture under the repository's own `.tmp/` would be skipped rather than
@@ -82,24 +128,8 @@ async function lintWithOxlint(source: string): Promise<readonly string[]> {
       JSON.stringify({
         plugins: [],
         categories: { correctness: "off" },
-        jsPlugins: [
-          {
-            name: repoLintPluginName,
-            specifier: path.join(
-              projectRoot,
-              "src",
-              "config",
-              "lint",
-              "repo-lint-plugin.ts",
-            ),
-          },
-        ],
-        rules: {
-          "yulin/assert-defined-guard": "error",
-          "yulin/assert-not-null-guard": "error",
-          "yulin/no-reused-props": "error",
-          "yulin/prefer-specific-assertions": "error",
-        },
+        jsPlugins,
+        rules: enabledRules,
       }),
       "utf8",
     );
@@ -113,9 +143,9 @@ async function lintWithOxlint(source: string): Promise<readonly string[]> {
         "json",
         filePath,
       ],
-      // The working directory is the repository so that the plugin's own import
-      // of @kensio/smartass resolves. Node strips the types itself, so no
-      // loader is passed: tsx in the path breaks eslint-plugin-no-secrets.
+      // The working directory is the repository so that Node resolves what the
+      // plugins import. Node strips the types itself, so no loader is passed:
+      // tsx in the path breaks eslint-plugin-no-secrets.
       { cwd: projectRoot, reject: false },
     );
 
@@ -127,19 +157,19 @@ async function lintWithOxlint(source: string): Promise<readonly string[]> {
   }
 }
 
-describe("Linting this repository with its own plugin", () => {
+describe("Linting this repository with its syntax restriction plugins", () => {
   for (const testCase of cases) {
-    it(`reports ${testCase.rule}`, async () => {
+    it(`reports ${testCase.plugin}/${testCase.rule}`, async () => {
       // Given a file written the way the restriction says not to
       const source = testCase.source;
 
-      // When Oxlint lints it with only this plugin turned on
+      // When Oxlint lints it with only these plugins turned on
       const reported = await lintWithOxlint(source);
 
       // Then the rule for that restriction is what reported it, which means
-      // Oxlint loaded the plugin from TypeScript source and the selector
-      // matched
-      assertArrayIncludes(reported, `${repoLintPluginName}(${testCase.rule})`);
+      // Oxlint loaded the plugin — this repository's from TypeScript source,
+      // smartass's from the package — and the selector matched
+      assertArrayIncludes(reported, `${testCase.plugin}(${testCase.rule})`);
     });
   }
 
