@@ -19,7 +19,7 @@ import type {
  * assets, without using real CDK synth.
  */
 describe("CDK BucketDeployment CloudFormation Custom Resource [iso]", () => {
-  it("configures the destination S3 Bucket with filesystem storage from the CDK asset", async () => {
+  it("copies the CDK asset into the destination S3 Bucket", async () => {
     // Given a synthesized CDK cloud assembly with a BucketDeployment asset.
     const temporaryDirectory = new TemporaryDirectory();
     const assetDirectoryName =
@@ -81,8 +81,8 @@ describe("CDK BucketDeployment CloudFormation Custom Resource [iso]", () => {
 
     await simAws.cloudFormation().deployTemplateFile(templatePath);
 
-    // Then the BucketDeployment configures the destination Bucket with
-    // filesystem storage rooted at the staged CDK asset.
+    // Then the BucketDeployment has copied the staged CDK asset's files into
+    // the destination Bucket as Objects.
     const bucket = simAws.s3().getSimBucketByName("site-bucket");
 
     assertNonNullable(bucket);

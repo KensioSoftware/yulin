@@ -1,12 +1,11 @@
-import path from "node:path";
-
-import { FilesystemS3BucketStorage } from "../../../../s3/storage/filesystem/s3-filesystem-storage.js";
 import type { SimCfnServiceResourceFactory } from "../../../resource/factory/sim-cfn-resource-factory.type.js";
 import type {
   SimCfnResource,
   SimCloudFormationResourceCreateContext,
 } from "../../../resource/sim-cfn-resource.js";
 import { SimCdkBucketDeploySource } from "./source/sim-cdk-bucket-deploy-source.js";
+import { SimCdkBucketDeployCopier } from "./copy/sim-cdk-bucket-deploy-copier.js";
+import { SimCdkBucketDeployProperties } from "./property/sim-cdk-bucket-deploy-properties.js";
 import { assertDefined } from "../../../../../util/type-guard/defined.js";
 
 /**
@@ -16,7 +15,7 @@ export class SimCdkBucketDeploymentResourceFactory implements SimCfnServiceResou
   private readonly sourceResolver = new SimCdkBucketDeploySource();
 
   /**
-   * Configure a simulated destination S3 Bucket for a CDK BucketDeployment.
+   * Copy a CDK BucketDeployment's staged asset into its destination Bucket.
    */
   async create(
     resourceTypeName: string,
@@ -29,9 +28,7 @@ export class SimCdkBucketDeploymentResourceFactory implements SimCfnServiceResou
       );
     }
 
-    this.createCdkBucketDeployment(resource, context);
-
-    await Promise.resolve();
+    await this.createCdkBucketDeployment(resource, context);
 
     return undefined;
   }
@@ -55,51 +52,14 @@ export class SimCdkBucketDeploymentResourceFactory implements SimCfnServiceResou
     }
   }
 
-  private createCdkBucketDeployment(
+  private async createCdkBucketDeployment(
     resource: SimCfnResource,
     context: SimCloudFormationResourceCreateContext,
-  ): void {
-    const properties = context.resolvedProperties ?? resource.properties;
-    const destinationBucketName = properties["DestinationBucketName"];
-
-    /* v8 ignore if -- defensive catch */
-    if (typeof destinationBucketName !== "string") {
-      throw new TypeError(
-        "Custom::CDKBucketDeployment DestinationBucketName must resolve to a string",
-      );
-    }
-
-    const sourceObjectKeys = properties["SourceObjectKeys"];
-    /* v8 ignore if -- defensive catch */
-    if (!Array.isArray(sourceObjectKeys)) {
-      throw new TypeError(
-        "Custom::CDKBucketDeployment SourceObjectKeys must be an array",
-      );
-    }
-
-    /* v8 ignore if -- defensive catch */
-    if (sourceObjectKeys.length !== 1) {
-      throw new Error(
-        "Custom::CDKBucketDeployment currently supports exactly one source object key",
-      );
-    }
-
-    const [sourceObjectKey] = sourceObjectKeys;
-
-    /* v8 ignore if -- defensive catch */
-    if (typeof sourceObjectKey !== "string") {
-      throw new TypeError(
-        "Custom::CDKBucketDeployment SourceObjectKeys must contain a string object key",
-      );
-    }
-
-    const sourceDirectoryPath =
-      this.sourceResolver.sourceDirectoryPathForObjectKey(
-        resource,
-        sourceObjectKey,
-        context.cdkOutContext,
-      );
-    const sourceDirectoryName = path.basename(sourceDirectoryPath);
+  ): Promise<void> {
+    const properties = new SimCdkBucketDeployProperties(
+      resource,
+      context.resolvedProperties ?? resource.properties,
+    );
 
     const bucket = context.simAws
       .accountRegionScope(
@@ -107,18 +67,23 @@ export class SimCdkBucketDeploymentResourceFactory implements SimCfnServiceResou
         resource.accountRegionScope.regionName,
       )
       .s3()
-      .getSimBucketByName(destinationBucketName);
+      .getSimBucketByName(properties.destinationBucketName);
     assertDefined(
       bucket,
-      `Custom::CDKBucketDeployment destination Bucket ${destinationBucketName} does not exist`,
+      `Custom::CDKBucketDeployment destination Bucket ${properties.destinationBucketName} does not exist`,
     );
 
-    bucket.configureSimStorage(
-      new FilesystemS3BucketStorage({
-        directoryPath: sourceDirectoryPath,
-        // Specifically allow the cdk.out asset directory we want to mount.
-        allowedDirectoryNames: [sourceDirectoryName],
-      }),
+    const sourceDirectoryPaths = properties.sourceObjectKeys.map(
+      (sourceObjectKey) =>
+        this.sourceResolver.sourceDirectoryPathForObjectKey(
+          resource,
+          sourceObjectKey,
+          context.cdkOutContext,
+        ),
+    );
+
+    await new SimCdkBucketDeployCopier({ bucket, properties }).copy(
+      sourceDirectoryPaths,
     );
   }
 }
