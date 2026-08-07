@@ -82,6 +82,12 @@ function filterExpression(pattern: string): RegExp {
   // Runs of stars collapse to one first. A star already crosses `/`, so `**`
   // means what `*` means, and leaving it would compile to `.*.*` and give the
   // engine a needless amount of backtracking to do on a long near miss.
+  //
+  // Stars the pattern keeps apart still compile to a `.*` each, and enough of
+  // those is slow on a near miss whatever the runs do. That is left alone: a
+  // filter pattern is written into a `BucketDeployment` by whoever wrote the
+  // template, never carried on a request, so the only run a pathological one
+  // can hold up is their own.
   const expression = pattern
     .replaceAll(/\*+/gu, "*")
     .replaceAll(/[$()*+.?[\\\]^{|}]/gu, String.raw`\$&`)
