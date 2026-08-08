@@ -4,7 +4,7 @@ import {
   BackgroundTasks,
 } from "../../../../util/background/background.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimS3RequestOptions } from "../sim-s3-request-options.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimIamAllowAllAuth } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import type {
@@ -22,10 +22,6 @@ interface DeleteBucketPolicyCommandHandlerProperties {
   readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
-}
-
-interface DeleteBucketPolicyCommandHandlerOptions {
-  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -59,7 +55,7 @@ export class DeleteBucketPolicyCommandHandler implements CommandHandler<
    */
   async handle(
     command: SimDeleteBucketPolicyCommand,
-    options?: DeleteBucketPolicyCommandHandlerOptions,
+    options?: SimS3RequestOptions,
   ): Promise<SimDeleteBucketPolicyCommandOutput> {
     assertDefined(
       command.input.Bucket,
@@ -71,7 +67,7 @@ export class DeleteBucketPolicyCommandHandler implements CommandHandler<
 
     await this.background.sequence();
 
-    this.authorizer.authorize(bucket, options?.caller);
+    this.authorizer.authorize(bucket, options);
 
     bucket.deletePolicy();
 

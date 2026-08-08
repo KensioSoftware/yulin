@@ -1,5 +1,6 @@
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
 import type { SimS3BucketName } from "../../../s3/bucket/sim-s3-bucket.js";
+import type { SimS3RequestOptions } from "../../../s3/command/sim-s3-request-options.js";
 import { SimS3NoSuchKey } from "../../../s3/error/sim-s3.error.js";
 import {
   SimS3Object,
@@ -10,13 +11,16 @@ import { simS3BodyToBuffer } from "../../../s3/storage/s3-body-buffer.js";
 import type { SimCfS3OriginBucket } from "./sim-cf-s3-origin-bucket.js";
 
 /**
- * Reads Objects for a CloudFront S3 Origin, anonymously.
+ * Reads Objects for a CloudFront S3 Origin.
  *
- * Without an origin access control, CloudFront sends the S3 REST endpoint an
- * unsigned request, so the Bucket policy is the only thing that can make an
- * Object readable. Reading through the ordinary GetObject command is what
- * applies it: a Bucket with no policy answers the Distribution 403 here as it
- * does in real S3.
+ * The Bucket policy is the only thing that can make an Object readable, whether
+ * the Origin reads anonymously or as the CloudFront service principal an origin
+ * access control signs for. Reading through the ordinary GetObject command is
+ * what applies it: a Bucket whose policy covers neither answers the
+ * Distribution 403 here as it does in real S3.
+ *
+ * Who the read is made as comes in per Object, from `SimCfS3OriginSigner`,
+ * because it depends on the Distribution the request arrived at.
  */
 export class SimCfS3OriginObjectLoader {
   private readonly simS3: SimS3;
@@ -37,11 +41,12 @@ export class SimCfS3OriginObjectLoader {
    */
   async load(
     objectKey: string,
+    requestOptions: SimS3RequestOptions,
   ): Promise<SimS3Object | SimIamAccessDenied | undefined> {
     try {
       const output = await this.simS3.getObject(
         { input: { Bucket: this.bucketName, Key: objectKey } },
-        { caller: { kind: "anonymous" } },
+        requestOptions,
       );
 
       return new SimS3Object({

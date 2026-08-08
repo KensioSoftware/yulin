@@ -4,7 +4,7 @@ import {
   BackgroundTasks,
 } from "../../../../util/background/background.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimS3RequestOptions } from "../sim-s3-request-options.js";
 import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
@@ -24,10 +24,6 @@ interface GetBucketNotificationConfigurationHandlerProperties {
   readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
-}
-
-interface GetBucketNotificationConfigurationHandlerOptions {
-  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -64,7 +60,7 @@ export class GetBucketNotificationConfigurationCommandHandler implements Command
    */
   async handle(
     command: SimGetBucketNotificationConfigurationCommand,
-    options?: GetBucketNotificationConfigurationHandlerOptions,
+    options?: SimS3RequestOptions,
   ): Promise<SimGetBucketNotificationConfigurationCommandOutput> {
     assertDefined(
       command.input.Bucket,
@@ -76,7 +72,7 @@ export class GetBucketNotificationConfigurationCommandHandler implements Command
 
     await this.background.sequence();
 
-    this.authorizer.authorizeRead(bucket, options?.caller);
+    this.authorizer.authorizeRead(bucket, options);
 
     return {
       ...bucket.getNotifications().toOutput(),

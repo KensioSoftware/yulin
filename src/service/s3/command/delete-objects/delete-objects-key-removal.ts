@@ -1,4 +1,4 @@
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimS3RequestOptions } from "../sim-s3-request-options.js";
 import type { SimIamInterServiceAuthZ } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import type { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
 import type { SimS3ObjectNotifier } from "../../notification/sim-s3-object-notifier.js";
@@ -33,10 +33,10 @@ export class DeleteObjectsKeyRemoval {
   async remove(
     bucket: SimS3Bucket,
     key: string,
-    caller?: SimAwsCaller,
+    options?: SimS3RequestOptions,
   ): Promise<DeleteObjectAttempt> {
     try {
-      const resolvedCaller = this.authorizer.authorize(bucket, key, caller);
+      const resolvedCaller = this.authorizer.authorize(bucket, key, options);
       const removed = await bucket.deleteObject(key);
 
       if (removed) {

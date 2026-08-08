@@ -1083,6 +1083,30 @@ succeeds either way, matching S3's idempotent behaviour.
 A Bucket policy granting `Principal: "*"` is refused by default. See
 [Block Public Access](#block-public-access) below.
 
+### Where a request came from
+
+A request can say what it is being made for, which is what a simulated service supplies when it
+reaches a Bucket on a resource's behalf. `sourceArn` and `sourceAccount` go alongside the caller and
+reach IAM as the `aws:SourceArn` and `aws:SourceAccount` condition keys:
+
+```typescript
+await simS3.getObject(
+  new GetObjectCommand({ Bucket: "site", Key: "index.html" }),
+  {
+    caller: { kind: "service", service: "cloudfront.amazonaws.com" },
+    sourceArn: "arn:aws:cloudfront::111111111111:distribution/E1EXAMPLE",
+  },
+);
+```
+
+That is the condition a Bucket policy granting a service principal usually carries, since a service
+principal is shared by every resource of that service. A request carrying neither leaves the key out
+rather than supplying an empty string, so a statement conditioned on it fails to match. Condition
+key names are matched case insensitively, so CDK's `AWS:SourceArn` spelling matches the same key.
+
+Sim CloudFront supplies both when a Distribution's S3 Origin has an origin access control, which is
+[how it serves a private Bucket](../cloudfront/README.md#origin-access-controls).
+
 ## Block Public Access
 
 Real S3 turns on all four Block Public Access settings for every new Bucket, and `BlockPublicPolicy`

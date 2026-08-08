@@ -6,6 +6,7 @@ import type { SimCfS3OriginBucket } from "./sim-cf-s3-origin-bucket.js";
 import { SimCfS3OriginObjectKey } from "./sim-cf-s3-origin-object-key.js";
 import { SimCfS3OriginObjectLoader } from "./sim-cf-s3-origin-object-loader.js";
 import { SimCfS3OriginResponses } from "./sim-cf-s3-origin-responses.js";
+import { SimCfS3OriginSigner } from "./sim-cf-s3-origin-signer.js";
 
 export type SimCloudFrontS3OriginResolver = (
   originDomainName: string,
@@ -30,19 +31,21 @@ interface SimCloudFrontS3OriginProperties {
  *
  * This represents a basic S3 object origin, not an S3 static website endpoint.
  *
- * Objects are read through the ordinary GetObject command as an anonymous
- * caller, which is the unsigned request real CloudFront sends to the S3 REST
- * endpoint when the Origin has no origin access control. An Object the Bucket
- * policy has not made publicly readable is therefore refused, and the refusal
- * reaches the viewer as the Origin answering 403.
+ * Objects are read through the ordinary GetObject command, so the Bucket policy
+ * decides what the Origin can serve. An Origin whose origin access control
+ * signs reads as the CloudFront service principal, and one without reads
+ * anonymously, which is the unsigned request real CloudFront sends to the S3
+ * REST endpoint. An Object the Bucket policy does not make readable by whoever
+ * the Origin is reading as is refused, and the refusal reaches the viewer as
+ * the Origin answering 403.
  */
 export class SimCloudFrontS3Origin implements SimCloudFrontOrigin {
   /**
    * The origin access control this Origin was created with, if any.
    *
-   * It is stored and reported, and it does not yet sign the read below: the
-   * Object is read anonymously either way, so a Bucket only an origin access
-   * control could reach answers 403 until signing is simulated.
+   * One that signs is what makes the read below a request from the CloudFront
+   * service principal carrying this Distribution's ARN, so a Bucket policy
+   * written for an origin access control is what decides the read.
    */
   public readonly originAccessControl:
     | SimCloudFrontOriginAccessControl
@@ -51,9 +54,11 @@ export class SimCloudFrontS3Origin implements SimCloudFrontOrigin {
   private readonly loader: SimCfS3OriginObjectLoader;
   private readonly responses: SimCfS3OriginResponses;
   private readonly objectKey: SimCfS3OriginObjectKey;
+  private readonly signer: SimCfS3OriginSigner;
 
   constructor(properties: SimCloudFrontS3OriginProperties) {
     this.loader = new SimCfS3OriginObjectLoader(properties.originBucket);
+    this.signer = new SimCfS3OriginSigner(properties.originAccessControl);
     this.responses = new SimCfS3OriginResponses(
       properties.originBucket.bucket.bucketName,
     );
@@ -72,7 +77,10 @@ export class SimCloudFrontS3Origin implements SimCloudFrontOrigin {
     }
 
     const objectKey = this.objectKey.forRequest(request);
-    const object = await this.loader.load(objectKey);
+    const object = await this.loader.load(
+      objectKey,
+      this.signer.forRequest(request),
+    );
 
     if (object instanceof SimIamAccessDenied) {
       return this.responses.accessDenied(objectKey);

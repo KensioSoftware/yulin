@@ -135,10 +135,11 @@ HTTP request behaviour is split across a few directories:
   that Bucket's own GetObject command, while `origin/custom/` turns the Origin request back into an
   HTTP request and sends it into the wider simulated environment.
 
-  An S3 Origin reads as an anonymous caller, which is the unsigned request real CloudFront sends to
-  the S3 REST endpoint when the Origin has no origin access control, so the Bucket policy decides
-  what the Distribution can serve. That is why `SimCloudFrontS3OriginResolver` answers with the
-  Bucket and the sim S3 holding it rather than a bare `SimS3Bucket`: the read goes through that
+  Who an S3 Origin reads as is worked out per request by `SimCfS3OriginSigner`: as the CloudFront
+  service principal where the origin access control signs, and anonymously otherwise, which is the
+  unsigned request real CloudFront sends to the S3 REST endpoint. Either way the Bucket policy
+  decides what the Distribution can serve. That is why `SimCloudFrontS3OriginResolver` answers with
+  the Bucket and the sim S3 holding it rather than a bare `SimS3Bucket`: the read goes through that
   scope's command. A denial becomes a 403 from the Origin, which the Distribution's custom error
   response for 403 can then replace.
 
@@ -192,9 +193,15 @@ nothing created is `SimCloudFrontInvalidOriginAccessControl`, as CloudFront refu
 CreateDistribution. Resolution is eager here, unlike a response headers policy, because CloudFront
 checks an origin access control at creation rather than when a request arrives.
 
-Nothing reads the stored origin access control yet. It does not sign the Origin request, so an
-Origin naming one still reads its Bucket anonymously and a Bucket only an origin access control
-could reach answers 403.
+`SimCfS3OriginSigner` reads the stored origin access control on every Origin fetch. One whose
+`signs` getter is true makes the read a request from the `cloudfront.amazonaws.com` service
+principal, carrying the Distribution's ARN as `aws:SourceArn` and its Account as
+`aws:SourceAccount`, which is the pair a Bucket policy written for an origin access control is
+conditioned on. A `never` signing behaviour reads anonymously, as an Origin with none does.
+
+That resolution is per request rather than per Origin because an Origin does not know its
+Distribution until one fetches through it. Deciding it earlier would be wrong anyway: in a CDK stack
+the Bucket policy is created after the Distribution, since it names the Distribution's ARN.
 
 ## Cross-service integration
 

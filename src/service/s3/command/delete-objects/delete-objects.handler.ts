@@ -4,7 +4,7 @@ import {
   BackgroundTasks,
 } from "../../../../util/background/background.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
-import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
+import type { SimS3RequestOptions } from "../sim-s3-request-options.js";
 import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
@@ -28,10 +28,6 @@ interface DeleteObjectsCommandHandlerProperties {
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
   readonly notifications: SimS3ObjectNotifier;
-}
-
-interface DeleteObjectsCommandHandlerOptions {
-  readonly caller?: SimAwsCaller;
 }
 
 /**
@@ -70,7 +66,7 @@ export class DeleteObjectsCommandHandler implements CommandHandler<
    */
   async handle(
     command: SimDeleteObjectsCommand,
-    options?: DeleteObjectsCommandHandlerOptions,
+    options?: SimS3RequestOptions,
   ): Promise<SimDeleteObjectsCommandOutput> {
     assertDefined(command.input.Bucket, "DeleteObjectsCommand.input.Bucket");
     assertDefined(command.input.Delete, "DeleteObjectsCommand.input.Delete");
@@ -83,7 +79,7 @@ export class DeleteObjectsCommandHandler implements CommandHandler<
 
     const attempts = await Promise.all(
       request.keys.map(
-        async (key) => await this.removal.remove(bucket, key, options?.caller),
+        async (key) => await this.removal.remove(bucket, key, options),
       ),
     );
 

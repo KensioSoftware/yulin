@@ -99,6 +99,15 @@ command means adding one method to the area it belongs to. `requireSimS3Bucket` 
 that raises `SimS3NoSuchBucket`, which is what real S3 answers before considering anything else
 about a Bucket-scoped request.
 
+Every command takes the same `SimS3RequestOptions` alongside its input: the caller, and the
+`sourceArn` and `sourceAccount` a simulated service reaching a Bucket on a resource's behalf
+supplies. `simS3ConditionContext` in `command/authorize/` turns the latter two into the
+`aws:SourceArn` and `aws:SourceAccount` condition keys every authorizer passes to IAM, which is what
+a Bucket policy granting a service principal is usually conditioned on. A request carrying neither
+leaves the keys out rather than supplying empty strings, so a statement conditioned on one fails to
+match instead of matching an empty value. Sim CloudFront supplies both when an Origin's origin
+access control signs the read.
+
 It's important that implementation code under `src/` does not depend on real AWS SDK package
 classes. Command types are local structural types with shapes compatible with the AWS SDK. Tests may
 use real AWS SDK command classes to prove compatibility.
