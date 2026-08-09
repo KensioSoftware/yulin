@@ -1,7 +1,7 @@
 # Simulated Rekognition
 
 Simulated Rekognition answers detection calls from results declared against images, so a test can
-say which image fails moderation or holds a dog without any image analysis happening. No recognition
+say which image fails moderation or holds a cat without any image analysis happening. No recognition
 of any kind is performed on the bytes.
 
 Rekognition-specific types are imported from the `@kensio/yulin/rekognition` subpath.
@@ -27,7 +27,7 @@ await simAws.s3().createBucket(new CreateBucketCommand({ Bucket: "uploads" }));
 await simAws.s3().putObject(
   new PutObjectCommand({
     Bucket: "uploads",
-    Key: "raw/nsfw.png",
+    Key: "incoming/photo.png",
     Body: Buffer.from(
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGO4I2IDAAL8AS3VzMq8AAAAAElFTkSuQmCC",
       "base64",
@@ -39,16 +39,16 @@ await simAws.s3().putObject(
 simAws
   .rekognition()
   .moderation()
-  .onName("raw/nsfw.png", { labels: ["Explicit Nudity"] });
+  .onName("incoming/photo.png", { labels: ["Weapons"] });
 
 const detected = await simAws.rekognition().detectModerationLabels(
   new DetectModerationLabelsCommand({
-    Image: { S3Object: { Bucket: "uploads", Name: "raw/nsfw.png" } },
+    Image: { S3Object: { Bucket: "uploads", Name: "incoming/photo.png" } },
   }),
 );
 
 console.log(detected.ModerationLabels.map((label) => label.Name));
-// [ "Explicit", "Explicit Nudity" ]
+// [ "Violence", "Weapons" ]
 console.log(detected.ModerationModelVersion); // "7.0"
 ```
 
@@ -87,7 +87,7 @@ await simAws.s3().createBucket(new CreateBucketCommand({ Bucket: "uploads" }));
 await simAws.s3().putObject(
   new PutObjectCommand({
     Bucket: "uploads",
-    Key: "raw/dog.png",
+    Key: "incoming/cat.png",
     Body: Buffer.from(
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGO4I2IDAAL8AS3VzMq8AAAAAElFTkSuQmCC",
       "base64",
@@ -98,13 +98,13 @@ await simAws.s3().putObject(
 simAws
   .rekognition()
   .labels()
-  .onName("raw/dog.png", {
+  .onName("incoming/cat.png", {
     labels: [
       {
-        name: "Dog",
+        name: "Cat",
         confidence: 98.2,
-        parents: ["Animal", "Pet", "Canine"],
-        aliases: ["Puppy"],
+        parents: ["Animal", "Pet", "Feline"],
+        aliases: ["Kitten"],
         categories: ["Animals and Pets"],
         // A bounding box is in ratios of the image size, as AWS reports it.
         instances: [
@@ -117,14 +117,14 @@ simAws
 
 const detected = await simAws.rekognition().detectLabels(
   new DetectLabelsCommand({
-    Image: { S3Object: { Bucket: "uploads", Name: "raw/dog.png" } },
+    Image: { S3Object: { Bucket: "uploads", Name: "incoming/cat.png" } },
     MaxLabels: 10,
   }),
 );
 
-console.log(detected.Labels.map((label) => label.Name)); // [ "Dog", "Grass" ]
+console.log(detected.Labels.map((label) => label.Name)); // [ "Cat", "Grass" ]
 console.log(detected.Labels[0]?.Parents);
-// [ { Name: "Animal" }, { Name: "Pet" }, { Name: "Canine" } ]
+// [ { Name: "Animal" }, { Name: "Pet" }, { Name: "Feline" } ]
 console.log(detected.LabelModelVersion); // "3.0"
 ```
 
@@ -136,7 +136,7 @@ example response in the AWS `DetectLabels` documentation, with the parent, alias
 bounding box AWS documents it with. That is a real Rekognition response, but which labels an
 unconfigured image gets is a simulator convention rather than what AWS would return for it.
 
-Nothing is filled in from a label name. Declaring `Dog` with no parents reports `Dog` with no
+Nothing is filled in from a label name. Declaring `Cat` with no parents reports `Cat` with no
 parents, and declaring a `Pizza` nobody has heard of reports `Pizza`, because Yulin ships no general
 label ontology to check a name against or to expand one from.
 
@@ -161,7 +161,7 @@ await simAws.s3().createBucket(new CreateBucketCommand({ Bucket: "uploads" }));
 await simAws.s3().putObject(
   new PutObjectCommand({
     Bucket: "uploads",
-    Key: "raw/selfie.png",
+    Key: "incoming/selfie.png",
     Body: Buffer.from(
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGO4I2IDAAL8AS3VzMq8AAAAAElFTkSuQmCC",
       "base64",
@@ -172,7 +172,7 @@ await simAws.s3().putObject(
 simAws
   .rekognition()
   .faces()
-  .onName("raw/selfie.png", {
+  .onName("incoming/selfie.png", {
     faces: [
       {
         // A bounding box is in ratios of the image size, as AWS reports it.
@@ -189,7 +189,7 @@ simAws
 
 const detected = await simAws.rekognition().detectFaces(
   new DetectFacesCommand({
-    Image: { S3Object: { Bucket: "uploads", Name: "raw/selfie.png" } },
+    Image: { S3Object: { Bucket: "uploads", Name: "incoming/selfie.png" } },
     Attributes: ["ALL"],
   }),
 );
@@ -215,8 +215,8 @@ import {
 
 const faces = simAws.rekognition().faces();
 
-faces.onName("raw/landscape.png", simRekognitionNoFaces);
-faces.onName("raw/crowd.png", simRekognitionSeveralFaces);
+faces.onName("incoming/landscape.png", simRekognitionNoFaces);
+faces.onName("incoming/crowd.png", simRekognitionSeveralFaces);
 ```
 
 An image no rule matches gets the built-in default result: the one face from the example response in
@@ -325,7 +325,7 @@ const moderation = simAws.rekognition().moderation();
 moderation.byDefault({ labels: [] });
 
 // One S3 object, by the Name a request gives Rekognition.
-moderation.onName("raw/nsfw.png", { labels: ["Explicit Nudity"] });
+moderation.onName("incoming/photo.png", { labels: ["Weapons"] });
 
 // One image, by the hash of its bytes, for a system that generates its own
 // object keys. These bytes would usually come from a fixture file, read with
@@ -384,7 +384,7 @@ import { simRekognitionSampleImages } from "@kensio/yulin/rekognition";
 const simAws = new SimAws();
 await simAws.s3().createBucket(new CreateBucketCommand({ Bucket: "uploads" }));
 
-const key = `raw/${randomUUID()}.jpg`;
+const key = `incoming/${randomUUID()}.jpg`;
 
 await simAws.s3().putObject(
   new PutObjectCommand({
@@ -470,10 +470,10 @@ so a surviving label never names a parent that is not in the response. A label t
 reported once, at the higher of the two confidences.
 
 A label the taxonomy does not have is refused where it is declared rather than at detection time.
-That includes a version 6.1 name that version 7.0 dropped, such as `Graphic Male Nudity`, which
-became `Exposed Male Genitalia`. Some names survived the move with a different place in the
-taxonomy: `Explicit Nudity` is still a label, but it now sits under `Explicit` rather than being a
-top-level category itself.
+That includes a version 6.1 name that version 7.0 dropped, such as `Drug Products`, which became
+`Products` under `Drugs & Tobacco`. Some names survived the move with a different place in the
+taxonomy: `Drinking` is still a label, but it now sits under `Alcohol Use` rather than directly
+under `Alcohol`.
 
 ## Filtering by confidence
 
@@ -544,7 +544,7 @@ simAws
   .labels()
   .byDefault({
     labels: [
-      { name: "Dog", confidence: 98.2 },
+      { name: "Cat", confidence: 98.2 },
       { name: "Grass", confidence: 88 },
       { name: "Fence", confidence: 62 },
     ],
@@ -558,7 +558,7 @@ const detected = await simAws.rekognition().detectLabels(
   }),
 );
 
-console.log(detected.Labels.map((label) => label.Name)); // [ "Dog", "Grass" ]
+console.log(detected.Labels.map((label) => label.Name)); // [ "Cat", "Grass" ]
 ```
 
 ## Moderating an upload
@@ -689,7 +689,9 @@ await simAws.s3().putBucketNotificationConfiguration(
           Id: "moderate-uploads",
           Events: ["s3:ObjectCreated:*"],
           LambdaFunctionArn: moderatorArn,
-          Filter: { Key: { FilterRules: [{ Name: "prefix", Value: "raw/" }] } },
+          Filter: {
+            Key: { FilterRules: [{ Name: "prefix", Value: "incoming/" }] },
+          },
         },
       ],
     },
@@ -701,7 +703,7 @@ await simAws.s3().putBucketNotificationConfiguration(
 await simAws.s3().putObject(
   new PutObjectCommand({
     Bucket: "uploads",
-    Key: `raw/${randomUUID()}.jpg`,
+    Key: `incoming/${randomUUID()}.jpg`,
     Body: simRekognitionSampleImages.flaggedByModeration(),
   }),
 );

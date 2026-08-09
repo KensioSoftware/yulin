@@ -28,10 +28,7 @@ describe("Route53 CloudFormation RecordSets for stored-only record types", () =>
               Name: "example.test",
               Type: "MX",
               TTL: "3600",
-              ResourceRecords: [
-                "10 in1-smtp.messagingengine.com.",
-                "20 in2-smtp.messagingengine.com.",
-              ],
+              ResourceRecords: ["10 mx1.example.test.", "20 mx2.example.test."],
             },
           },
         },
@@ -54,10 +51,7 @@ describe("Route53 CloudFormation RecordSets for stored-only record types", () =>
       name: "example.test",
       type: "MX",
       ttl: 3600,
-      values: [
-        "10 in1-smtp.messagingengine.com.",
-        "20 in2-smtp.messagingengine.com.",
-      ],
+      values: ["10 mx1.example.test.", "20 mx2.example.test."],
     });
   });
 });

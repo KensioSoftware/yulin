@@ -29,8 +29,8 @@ const zoneRecords: readonly ZoneRecord[] = [
       Type: "MX",
       TTL: 3600,
       ResourceRecords: [
-        { Value: "10 in1-smtp.messagingengine.com." },
-        { Value: "20 in2-smtp.messagingengine.com." },
+        { Value: "10 mx1.example.test." },
+        { Value: "20 mx2.example.test." },
       ],
     },
   },

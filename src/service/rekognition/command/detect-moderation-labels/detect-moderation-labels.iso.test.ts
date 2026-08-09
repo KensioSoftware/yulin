@@ -62,14 +62,14 @@ describe("Detecting moderation labels in a simulated image", () => {
 
   it("answers with the labels declared for an object name", async () => {
     // Given an object declared to fail moderation.
-    const simAws = await simAwsWithImage("nsfw.png");
+    const simAws = await simAwsWithImage("photo.png");
     simAws
       .rekognition()
       .moderation()
-      .onName("nsfw.png", { labels: ["Explicit Nudity"] });
+      .onName("photo.png", { labels: ["Weapons"] });
 
     // When it is moderated.
-    const detected = await detect(simAws, "nsfw.png");
+    const detected = await detect(simAws, "photo.png");
 
     // Then the declared label comes back with the category above it, as real
     // Rekognition returns a detected label with its whole chain.
@@ -77,11 +77,11 @@ describe("Detecting moderation labels in a simulated image", () => {
     const [top, declared] = detected.ModerationLabels;
     assertNonNullable(top);
     assertNonNullable(declared);
-    assertIdentical(top.Name, "Explicit");
+    assertIdentical(top.Name, "Violence");
     assertIdentical(top.ParentName, "");
     assertIdentical(top.TaxonomyLevel, 1);
-    assertIdentical(declared.Name, "Explicit Nudity");
-    assertIdentical(declared.ParentName, "Explicit");
+    assertIdentical(declared.Name, "Weapons");
+    assertIdentical(declared.ParentName, "Violence");
     assertIdentical(declared.TaxonomyLevel, 2);
   });
 
@@ -283,7 +283,7 @@ describe("Detecting moderation labels in a simulated image", () => {
     simAws
       .rekognition()
       .moderation()
-      .byDefault({ labels: ["Explicit Sexual Activity"] });
+      .byDefault({ labels: ["Gambling"] });
 
     // When an image is moderated in another Region.
     const elsewhere = await simAws

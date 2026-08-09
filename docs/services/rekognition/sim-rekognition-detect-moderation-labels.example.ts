@@ -13,7 +13,7 @@ await simAws.s3().createBucket(new CreateBucketCommand({ Bucket: "uploads" }));
 await simAws.s3().putObject(
   new PutObjectCommand({
     Bucket: "uploads",
-    Key: "raw/nsfw.png",
+    Key: "incoming/photo.png",
     Body: Buffer.from(
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGO4I2IDAAL8AS3VzMq8AAAAAElFTkSuQmCC",
       "base64",
@@ -25,14 +25,14 @@ await simAws.s3().putObject(
 simAws
   .rekognition()
   .moderation()
-  .onName("raw/nsfw.png", { labels: ["Explicit Nudity"] });
+  .onName("incoming/photo.png", { labels: ["Weapons"] });
 
 const detected = await simAws.rekognition().detectModerationLabels(
   new DetectModerationLabelsCommand({
-    Image: { S3Object: { Bucket: "uploads", Name: "raw/nsfw.png" } },
+    Image: { S3Object: { Bucket: "uploads", Name: "incoming/photo.png" } },
   }),
 );
 
 console.log(detected.ModerationLabels.map((label) => label.Name));
-// [ "Explicit", "Explicit Nudity" ]
+// [ "Violence", "Weapons" ]
 console.log(detected.ModerationModelVersion); // "7.0"

@@ -13,7 +13,7 @@ import { simRekognitionSampleImages } from "@kensio/yulin/rekognition";
 const simAws = new SimAws();
 await simAws.s3().createBucket(new CreateBucketCommand({ Bucket: "uploads" }));
 
-const key = `raw/${randomUUID()}.jpg`;
+const key = `incoming/${randomUUID()}.jpg`;
 
 await simAws.s3().putObject(
   new PutObjectCommand({

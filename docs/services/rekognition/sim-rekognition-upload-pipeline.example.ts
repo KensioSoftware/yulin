@@ -115,7 +115,9 @@ await simAws.s3().putBucketNotificationConfiguration(
           Id: "moderate-uploads",
           Events: ["s3:ObjectCreated:*"],
           LambdaFunctionArn: moderatorArn,
-          Filter: { Key: { FilterRules: [{ Name: "prefix", Value: "raw/" }] } },
+          Filter: {
+            Key: { FilterRules: [{ Name: "prefix", Value: "incoming/" }] },
+          },
         },
       ],
     },
@@ -127,7 +129,7 @@ await simAws.s3().putBucketNotificationConfiguration(
 await simAws.s3().putObject(
   new PutObjectCommand({
     Bucket: "uploads",
-    Key: `raw/${randomUUID()}.jpg`,
+    Key: `incoming/${randomUUID()}.jpg`,
     Body: simRekognitionSampleImages.flaggedByModeration(),
   }),
 );

@@ -13,7 +13,7 @@ await simAws.s3().createBucket(new CreateBucketCommand({ Bucket: "uploads" }));
 await simAws.s3().putObject(
   new PutObjectCommand({
     Bucket: "uploads",
-    Key: "raw/dog.png",
+    Key: "incoming/cat.png",
     Body: Buffer.from(
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGO4I2IDAAL8AS3VzMq8AAAAAElFTkSuQmCC",
       "base64",
@@ -24,13 +24,13 @@ await simAws.s3().putObject(
 simAws
   .rekognition()
   .labels()
-  .onName("raw/dog.png", {
+  .onName("incoming/cat.png", {
     labels: [
       {
-        name: "Dog",
+        name: "Cat",
         confidence: 98.2,
-        parents: ["Animal", "Pet", "Canine"],
-        aliases: ["Puppy"],
+        parents: ["Animal", "Pet", "Feline"],
+        aliases: ["Kitten"],
         categories: ["Animals and Pets"],
         // A bounding box is in ratios of the image size, as AWS reports it.
         instances: [
@@ -43,12 +43,12 @@ simAws
 
 const detected = await simAws.rekognition().detectLabels(
   new DetectLabelsCommand({
-    Image: { S3Object: { Bucket: "uploads", Name: "raw/dog.png" } },
+    Image: { S3Object: { Bucket: "uploads", Name: "incoming/cat.png" } },
     MaxLabels: 10,
   }),
 );
 
-console.log(detected.Labels.map((label) => label.Name)); // [ "Dog", "Grass" ]
+console.log(detected.Labels.map((label) => label.Name)); // [ "Cat", "Grass" ]
 console.log(detected.Labels[0]?.Parents);
-// [ { Name: "Animal" }, { Name: "Pet" }, { Name: "Canine" } ]
+// [ { Name: "Animal" }, { Name: "Pet" }, { Name: "Feline" } ]
 console.log(detected.LabelModelVersion); // "3.0"

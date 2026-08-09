@@ -17,7 +17,7 @@ export interface SimRekognitionDeclaredLabelInstance {
  *
  * Everything but the name is optional and empty when it is left out. Yulin
  * ships no general label ontology, so nothing here is filled in from a label
- * name: a `Dog` that is to arrive with its parents says what they are.
+ * name: a `Cat` that is to arrive with its parents says what they are.
  */
 export interface SimRekognitionDeclaredLabel {
   readonly name: string;

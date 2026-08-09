@@ -387,8 +387,8 @@ await route53.changeResourceRecordSets(
             Type: "MX",
             TTL: 3600,
             ResourceRecords: [
-              { Value: "10 in1-smtp.messagingengine.com." },
-              { Value: "20 in2-smtp.messagingengine.com." },
+              { Value: "10 mx1.example.test." },
+              { Value: "20 mx2.example.test." },
             ],
           },
         },
@@ -418,7 +418,7 @@ const mailRecord = listOutput.ResourceRecordSets?.find(
   (recordSet) => recordSet.Type === "MX",
 );
 
-// [ '10 in1-smtp.messagingengine.com.', '20 in2-smtp.messagingengine.com.' ]
+// [ '10 mx1.example.test.', '20 mx2.example.test.' ]
 console.log(mailRecord?.ResourceRecords?.map((record) => record.Value));
 ```
 

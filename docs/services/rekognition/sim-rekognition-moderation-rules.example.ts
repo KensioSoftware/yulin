@@ -12,7 +12,7 @@ const moderation = simAws.rekognition().moderation();
 moderation.byDefault({ labels: [] });
 
 // One S3 object, by the Name a request gives Rekognition.
-moderation.onName("raw/nsfw.png", { labels: ["Explicit Nudity"] });
+moderation.onName("incoming/photo.png", { labels: ["Weapons"] });
 
 // One image, by the hash of its bytes, for a system that generates its own
 // object keys. These bytes would usually come from a fixture file, read with

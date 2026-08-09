@@ -19,7 +19,7 @@ describe("Declaring a simulated moderation result", () => {
       simAws
         .rekognition()
         .moderation()
-        .onName("nsfw.png", { labels: ["Graphic Male Nudity"] });
+        .onName("photo.png", { labels: ["Drug Products"] });
     });
 
     // Then it is refused where it was written, rather than at detection time.

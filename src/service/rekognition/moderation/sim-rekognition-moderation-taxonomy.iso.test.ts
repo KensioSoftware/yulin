@@ -40,14 +40,13 @@ describe("The simulated Rekognition moderation taxonomy", () => {
     const taxonomy = simRekognitionModerationTaxonomy;
 
     // When a third level label's chain is taken.
-    const chain = taxonomy.chain("Implied Nudity");
+    const chain = taxonomy.chain("Weapon Violence");
 
     // Then it runs from the top level category down to the label itself.
     assertArrayLength(chain, 3);
     assertIdentical(
       chain.map((node) => node.name).join(" / "),
-      "Non-Explicit Nudity of Intimate parts and Kissing / " +
-        "Non-Explicit Nudity / Implied Nudity",
+      "Violence / Graphic Violence / Weapon Violence",
     );
   });
 

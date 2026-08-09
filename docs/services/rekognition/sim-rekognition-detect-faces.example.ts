@@ -13,7 +13,7 @@ await simAws.s3().createBucket(new CreateBucketCommand({ Bucket: "uploads" }));
 await simAws.s3().putObject(
   new PutObjectCommand({
     Bucket: "uploads",
-    Key: "raw/selfie.png",
+    Key: "incoming/selfie.png",
     Body: Buffer.from(
       "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGO4I2IDAAL8AS3VzMq8AAAAAElFTkSuQmCC",
       "base64",
@@ -24,7 +24,7 @@ await simAws.s3().putObject(
 simAws
   .rekognition()
   .faces()
-  .onName("raw/selfie.png", {
+  .onName("incoming/selfie.png", {
     faces: [
       {
         // A bounding box is in ratios of the image size, as AWS reports it.
@@ -41,7 +41,7 @@ simAws
 
 const detected = await simAws.rekognition().detectFaces(
   new DetectFacesCommand({
-    Image: { S3Object: { Bucket: "uploads", Name: "raw/selfie.png" } },
+    Image: { S3Object: { Bucket: "uploads", Name: "incoming/selfie.png" } },
     Attributes: ["ALL"],
   }),
 );

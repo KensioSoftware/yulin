@@ -206,12 +206,12 @@ describe("Detecting faces in a simulated image", () => {
   });
 
   it("keeps face rules apart from label rules", async () => {
-    // Given an object declared to hold a dog and no faces.
+    // Given an object declared to hold a cat and no faces.
     const simAws = await simAwsWithImage();
     simAws
       .rekognition()
       .labels()
-      .onName("selfie.jpg", { labels: ["Dog"] });
+      .onName("selfie.jpg", { labels: ["Cat"] });
     simAws.rekognition().faces().onName("selfie.jpg", simRekognitionNoFaces);
 
     // When its faces and its labels are detected.
@@ -225,7 +225,7 @@ describe("Detecting faces in a simulated image", () => {
     assertArrayLength(faces.FaceDetails, 0);
     assertArrayEquals(
       labels.Labels.map((label) => label.Name),
-      ["Dog"],
+      ["Cat"],
     );
   });
 
