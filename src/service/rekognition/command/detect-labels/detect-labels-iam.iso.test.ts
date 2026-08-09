@@ -26,7 +26,7 @@ async function simAwsWithImage(): Promise<SimAws> {
   await simAws.s3().putObject(
     new PutObjectCommand({
       Bucket: "uploads",
-      Key: "dog.jpg",
+      Key: "cat.jpg",
       Body: redPngBytes,
     }),
   );
@@ -35,7 +35,7 @@ async function simAwsWithImage(): Promise<SimAws> {
 }
 
 const imageCommand = new DetectLabelsCommand({
-  Image: { S3Object: { Bucket: "uploads", Name: "dog.jpg" } },
+  Image: { S3Object: { Bucket: "uploads", Name: "cat.jpg" } },
 });
 
 describe("Authorizing a simulated Rekognition label detection", () => {
@@ -49,7 +49,7 @@ describe("Authorizing a simulated Rekognition label detection", () => {
     simAws
       .rekognition()
       .labels()
-      .onName("dog.jpg", { labels: ["Dog"] });
+      .onName("cat.jpg", { labels: ["Cat"] });
 
     // When it detects labels in an image.
     const detected = await simAws.rekognition().detectLabels(imageCommand, {
@@ -57,7 +57,7 @@ describe("Authorizing a simulated Rekognition label detection", () => {
     });
 
     // Then the detection runs.
-    assertIdentical(detected.Labels[0]?.Name, "Dog");
+    assertIdentical(detected.Labels[0]?.Name, "Cat");
   });
 
   it("refuses a caller with no Rekognition permission", async () => {

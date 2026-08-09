@@ -24,8 +24,8 @@ export class SimRekognitionModerationLabelNode {
  *
  * Declaring a label is declaring a whole chain: real Rekognition returns the
  * detected label together with every label above it, so an image declared as
- * `Implied Nudity` comes back as that, its `Non-Explicit Nudity` parent, and
- * the top-level category above that. Handler code filtering on the top-level
+ * `Weapon Violence` comes back as that, its `Graphic Violence` parent, and the
+ * top-level category above that. Handler code filtering on the top-level
  * category therefore sees what it would see on AWS.
  */
 export class SimRekognitionModerationTaxonomy {
@@ -76,7 +76,7 @@ export class SimRekognitionModerationTaxonomy {
         `'${name}' is not a Rekognition moderation label. Declare one of the ` +
           `${String(this.nodes.size)} labels in the version ` +
           `${simRekognitionModerationModelVersion} content moderation ` +
-          `taxonomy, such as 'Explicit Nudity' or 'Violence'.`,
+          `taxonomy, such as 'Violence' or 'Gambling'.`,
       );
     }
 

@@ -97,8 +97,8 @@ export class SimRekognition {
    * Every image is clean until a rule says otherwise:
    *
    * ```typescript
-   * simAws.rekognition().moderation().onName("nsfw.jpg", {
-   *   labels: ["Explicit Nudity"],
+   * simAws.rekognition().moderation().onName("photo.jpg", {
+   *   labels: ["Weapons"],
    * });
    * ```
    */
@@ -112,8 +112,8 @@ export class SimRekognition {
    * Every image gets the built-in default result until a rule says otherwise:
    *
    * ```typescript
-   * simAws.rekognition().labels().onName("dog.jpg", {
-   *   labels: [{ name: "Dog", parents: ["Animal", "Pet"] }],
+   * simAws.rekognition().labels().onName("cat.jpg", {
+   *   labels: [{ name: "Cat", parents: ["Animal", "Pet"] }],
    * });
    * ```
    */

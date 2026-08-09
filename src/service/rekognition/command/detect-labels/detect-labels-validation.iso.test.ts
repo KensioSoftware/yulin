@@ -158,7 +158,7 @@ describe("Rejecting a malformed DetectLabels request", () => {
     await simAws.s3().putObject(
       new PutObjectCommand({
         Bucket: "uploads",
-        Key: "dog.jpg",
+        Key: "cat.jpg",
         Body: redPngBytes,
       }),
     );
@@ -167,7 +167,7 @@ describe("Rejecting a malformed DetectLabels request", () => {
     const error = await detectFailure(
       {
         Image: {
-          S3Object: { Bucket: "uploads", Name: "dog.jpg", Version: "3" },
+          S3Object: { Bucket: "uploads", Name: "cat.jpg", Version: "3" },
         },
       },
       simAws,
@@ -190,14 +190,14 @@ describe("Detecting labels in an image Rekognition cannot use", () => {
     await simAws.s3().putObject(
       new PutObjectCommand({
         Bucket: "uploads",
-        Key: "dog.jpg",
-        Body: "dog picture",
+        Key: "cat.jpg",
+        Body: "cat picture",
       }),
     );
 
     // When its labels are detected.
     const error = await detectFailure(
-      { Image: { S3Object: { Bucket: "uploads", Name: "dog.jpg" } } },
+      { Image: { S3Object: { Bucket: "uploads", Name: "cat.jpg" } } },
       simAws,
     );
 
@@ -211,7 +211,7 @@ describe("Detecting labels in an image Rekognition cannot use", () => {
     // Given no Bucket of that name anywhere in the simulation.
     // When labels in an image in it are detected.
     const error = await detectFailure({
-      Image: { S3Object: { Bucket: "nowhere", Name: "dog.jpg" } },
+      Image: { S3Object: { Bucket: "nowhere", Name: "cat.jpg" } },
     });
 
     // Then it is an S3 object error, which is how real Rekognition reports
@@ -222,7 +222,7 @@ describe("Detecting labels in an image Rekognition cannot use", () => {
   it("detects labels in bytes without any simulated S3 at all", async () => {
     // Given a Rekognition built on its own rather than through SimAws.
     const simRekognition = new SimRekognition();
-    simRekognition.labels().byDefault({ labels: ["Dog"] });
+    simRekognition.labels().byDefault({ labels: ["Cat"] });
 
     // When labels are detected in bytes.
     const detected = await simRekognition.detectLabels(
@@ -230,6 +230,6 @@ describe("Detecting labels in an image Rekognition cannot use", () => {
     );
 
     // Then it answers, since nothing needed reading.
-    assertIdentical(detected.Labels[0]?.Name, "Dog");
+    assertIdentical(detected.Labels[0]?.Name, "Cat");
   });
 });

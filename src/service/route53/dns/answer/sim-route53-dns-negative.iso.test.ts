@@ -123,7 +123,7 @@ describe("Simulated Route53 DNS negative answers", () => {
       {
         name: "example.test",
         type: "MX",
-        values: ["10 in1-smtp.messagingengine.com."],
+        values: ["10 mx1.example.test."],
       },
     ]);
 

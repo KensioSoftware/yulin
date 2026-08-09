@@ -24,7 +24,7 @@ describe("Rekognition SDK interception", () => {
     simSdk.simAws
       .rekognition()
       .moderation()
-      .byDefault({ labels: ["Explicit Nudity"] });
+      .byDefault({ labels: ["Weapons"] });
 
     const rekognition = new RekognitionClient({ region: "us-east-1" });
 
@@ -37,19 +37,19 @@ describe("Rekognition SDK interception", () => {
     assertIdentical(detected.ModerationModelVersion, "7.0");
     assertStringIncludes(
       (detected.ModerationLabels ?? []).map((label) => label.Name).join(","),
-      "Explicit Nudity",
+      "Weapons",
     );
   });
 
   it("routes an intercepted label detection to simulated Rekognition", async () => {
     // Given an intercepted Rekognition SDK client, with an image declared to
-    // hold a dog.
+    // hold a cat.
     using simSdk = new SimSdk();
     simSdk.intercept(RekognitionClient);
     simSdk.simAws
       .rekognition()
       .labels()
-      .byDefault({ labels: [{ name: "Dog", parents: ["Animal"] }] });
+      .byDefault({ labels: [{ name: "Cat", parents: ["Animal"] }] });
 
     const rekognition = new RekognitionClient({ region: "us-east-1" });
 
@@ -62,7 +62,7 @@ describe("Rekognition SDK interception", () => {
     assertIdentical(detected.LabelModelVersion, "3.0");
     assertStringIncludes(
       (detected.Labels ?? []).map((label) => label.Name).join(","),
-      "Dog",
+      "Cat",
     );
   });
 

@@ -148,20 +148,20 @@ async function simAwsWithModerationPipeline(): Promise<SimAws> {
 }
 
 describe("Moderating an uploaded image through a simulated pipeline", () => {
-  it("flags an upload the moderation rules declare as explicit", async () => {
+  it("flags an upload the moderation rules declare a label for", async () => {
     // Given a Bucket that moderates its uploads with a Lambda function, and an
     // image declared to fail moderation.
     const simAws = await simAwsWithModerationPipeline();
     simAws
       .rekognition()
       .moderation()
-      .onName("raw/nsfw.png", { labels: ["Explicit Nudity"] });
+      .onName("raw/photo.png", { labels: ["Weapons"] });
 
     // When the image is uploaded.
     await simAws.s3().putObject(
       new PutObjectCommand({
         Bucket: "uploads",
-        Key: "raw/nsfw.png",
+        Key: "raw/photo.png",
         Body: redPngBytes,
       }),
     );
@@ -172,11 +172,11 @@ describe("Moderating an uploaded image through a simulated pipeline", () => {
     const flagged = await simAws.s3().getObject(
       new GetObjectCommand({
         Bucket: "uploads",
-        Key: "flagged/raw/nsfw.png",
+        Key: "flagged/raw/photo.png",
       }),
     );
     assertNonNullable(flagged.Body);
-    assertStringIncludes(await text(flagged.Body), "Explicit,Explicit Nudity");
+    assertStringIncludes(await text(flagged.Body), "Violence,Weapons");
   });
 
   it("flags a sample image uploaded under a key nothing was declared for", async () => {

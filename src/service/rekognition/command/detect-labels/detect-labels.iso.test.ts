@@ -17,7 +17,7 @@ import { simRekognitionImageHash } from "../../image/sim-rekognition-image-hash.
 import type { SimDetectLabelsCommandOutput } from "./detect-labels.command.js";
 
 async function simAwsWithImage(
-  objectName = "dog.jpg",
+  objectName = "cat.jpg",
   bytes = redPngBytes,
 ): Promise<SimAws> {
   const simAws = new SimAws();
@@ -56,7 +56,7 @@ describe("Detecting labels in a simulated image", () => {
     const simAws = await simAwsWithImage();
 
     // When its labels are detected.
-    const detected = await detect(simAws, "dog.jpg");
+    const detected = await detect(simAws, "cat.jpg");
 
     // Then the documented AWS example response comes back, from the version
     // of the model it was published against.
@@ -82,38 +82,38 @@ describe("Detecting labels in a simulated image", () => {
   });
 
   it("answers with the labels declared for an object name", async () => {
-    // Given an object declared to hold a photograph of a dog.
+    // Given an object declared to hold a photograph of a cat.
     const simAws = await simAwsWithImage();
     simAws
       .rekognition()
       .labels()
-      .onName("dog.jpg", {
+      .onName("cat.jpg", {
         labels: [
           {
-            name: "Dog",
+            name: "Cat",
             confidence: 98.2,
-            parents: ["Animal", "Pet", "Canine"],
+            parents: ["Animal", "Pet", "Feline"],
           },
         ],
       });
 
     // When its labels are detected.
-    const detected = await detect(simAws, "dog.jpg", { MaxLabels: 10 });
+    const detected = await detect(simAws, "cat.jpg", { MaxLabels: 10 });
 
     // Then the declared label comes back with what was declared alongside it.
-    assertArrayEquals(labelNames(detected), ["Dog"]);
-    const [dog] = detected.Labels;
-    assertNonNullable(dog);
-    assertIdentical(dog.Confidence, Math.fround(98.2));
+    assertArrayEquals(labelNames(detected), ["Cat"]);
+    const [cat] = detected.Labels;
+    assertNonNullable(cat);
+    assertIdentical(cat.Confidence, Math.fround(98.2));
     assertArrayEquals(
-      dog.Parents.map((parent) => parent.Name),
-      ["Animal", "Pet", "Canine"],
+      cat.Parents.map((parent) => parent.Name),
+      ["Animal", "Pet", "Feline"],
     );
     // Nothing is filled in from the label name, so what was not declared is
     // empty rather than guessed at from an ontology Yulin does not have.
-    assertArrayLength(dog.Aliases, 0);
-    assertArrayLength(dog.Categories, 0);
-    assertArrayLength(dog.Instances, 0);
+    assertArrayLength(cat.Aliases, 0);
+    assertArrayLength(cat.Categories, 0);
+    assertArrayLength(cat.Instances, 0);
   });
 
   it("reports a label declared as a bare name", async () => {
@@ -122,10 +122,10 @@ describe("Detecting labels in a simulated image", () => {
     simAws
       .rekognition()
       .labels()
-      .onName("dog.jpg", { labels: ["Dog"] });
+      .onName("cat.jpg", { labels: ["Cat"] });
 
     // When its labels are detected.
-    const detected = await detect(simAws, "dog.jpg");
+    const detected = await detect(simAws, "cat.jpg");
 
     // Then it is reported at the default confidence, which is a float32 value
     // as every real Rekognition confidence is.
@@ -138,20 +138,20 @@ describe("Detecting labels in a simulated image", () => {
     simAws
       .rekognition()
       .labels()
-      .onName("dog.jpg", {
+      .onName("cat.jpg", {
         labels: [
           { name: "Pet", confidence: 71.5 },
-          { name: "Dog", confidence: 98.2 },
+          { name: "Cat", confidence: 98.2 },
           { name: "Grass", confidence: 88 },
         ],
       });
 
     // When its labels are detected.
-    const detected = await detect(simAws, "dog.jpg");
+    const detected = await detect(simAws, "cat.jpg");
 
     // Then the most confident label is first, as real Rekognition reports
     // them.
-    assertArrayEquals(labelNames(detected), ["Dog", "Grass", "Pet"]);
+    assertArrayEquals(labelNames(detected), ["Cat", "Grass", "Pet"]);
   });
 
   it("filters labels below the requested confidence", async () => {
@@ -160,18 +160,18 @@ describe("Detecting labels in a simulated image", () => {
     simAws
       .rekognition()
       .labels()
-      .onName("dog.jpg", {
+      .onName("cat.jpg", {
         labels: [
-          { name: "Dog", confidence: 98.2 },
+          { name: "Cat", confidence: 98.2 },
           { name: "Fence", confidence: 62 },
         ],
       });
 
     // When its labels are detected at a confidence above one of them.
-    const detected = await detect(simAws, "dog.jpg", { MinConfidence: 80 });
+    const detected = await detect(simAws, "cat.jpg", { MinConfidence: 80 });
 
     // Then the doubtful one is gone.
-    assertArrayEquals(labelNames(detected), ["Dog"]);
+    assertArrayEquals(labelNames(detected), ["Cat"]);
   });
 
   it("filters at 55 when the request does not say", async () => {
@@ -181,10 +181,10 @@ describe("Detecting labels in a simulated image", () => {
     simAws
       .rekognition()
       .labels()
-      .onName("dog.jpg", { labels: [{ name: "Fence", confidence: 52 }] });
+      .onName("cat.jpg", { labels: [{ name: "Fence", confidence: 52 }] });
 
     // When its labels are detected with no MinConfidence.
-    const detected = await detect(simAws, "dog.jpg");
+    const detected = await detect(simAws, "cat.jpg");
 
     // Then it is filtered out, because label detection defaults to 55 rather
     // than to the 50 moderation uses.
@@ -197,11 +197,11 @@ describe("Detecting labels in a simulated image", () => {
     simAws
       .rekognition()
       .labels()
-      .onName("dog.jpg", { labels: [{ name: "Fence", confidence: 12 }] });
+      .onName("cat.jpg", { labels: [{ name: "Fence", confidence: 12 }] });
 
     // When its labels are detected with an explicit zero rather than no value
     // at all.
-    const detected = await detect(simAws, "dog.jpg", { MinConfidence: 0 });
+    const detected = await detect(simAws, "cat.jpg", { MinConfidence: 0 });
 
     // Then the label survives: an explicit 0 is a request for everything, not
     // an unset value to be promoted to 55.
@@ -214,20 +214,20 @@ describe("Detecting labels in a simulated image", () => {
     simAws
       .rekognition()
       .labels()
-      .onName("dog.jpg", {
+      .onName("cat.jpg", {
         labels: [
           { name: "Pet", confidence: 71.5 },
-          { name: "Dog", confidence: 98.2 },
+          { name: "Cat", confidence: 98.2 },
           { name: "Grass", confidence: 88 },
         ],
       });
 
     // When its labels are detected with room for two.
-    const detected = await detect(simAws, "dog.jpg", { MaxLabels: 2 });
+    const detected = await detect(simAws, "cat.jpg", { MaxLabels: 2 });
 
     // Then the two most confident come back, which is what AWS documents
     // MaxLabels as returning.
-    assertArrayEquals(labelNames(detected), ["Dog", "Grass"]);
+    assertArrayEquals(labelNames(detected), ["Cat", "Grass"]);
   });
 
   it("applies MaxLabels after the confidence filter", async () => {
@@ -237,23 +237,23 @@ describe("Detecting labels in a simulated image", () => {
     simAws
       .rekognition()
       .labels()
-      .onName("dog.jpg", {
+      .onName("cat.jpg", {
         labels: [
-          { name: "Dog", confidence: 98.2 },
+          { name: "Cat", confidence: 98.2 },
           { name: "Fence", confidence: 62 },
           { name: "Grass", confidence: 88 },
         ],
       });
 
     // When its labels are detected with a confidence one of them fails.
-    const detected = await detect(simAws, "dog.jpg", {
+    const detected = await detect(simAws, "cat.jpg", {
       MaxLabels: 2,
       MinConfidence: 80,
     });
 
     // Then the room is spent on labels that survived the filter rather than
     // on labels that then filtered out.
-    assertArrayEquals(labelNames(detected), ["Dog", "Grass"]);
+    assertArrayEquals(labelNames(detected), ["Cat", "Grass"]);
   });
 
   it("answers with nothing when the request asks for no labels", async () => {
@@ -262,10 +262,10 @@ describe("Detecting labels in a simulated image", () => {
     simAws
       .rekognition()
       .labels()
-      .onName("dog.jpg", { labels: ["Dog"] });
+      .onName("cat.jpg", { labels: ["Cat"] });
 
     // When its labels are detected with an explicit MaxLabels of zero.
-    const detected = await detect(simAws, "dog.jpg", { MaxLabels: 0 });
+    const detected = await detect(simAws, "cat.jpg", { MaxLabels: 0 });
 
     // Then no labels come back: an explicit 0 is a request for none, not an
     // unset value to be read as uncapped.
@@ -278,10 +278,10 @@ describe("Detecting labels in a simulated image", () => {
     simAws
       .rekognition()
       .labels()
-      .onName("dog.jpg", {
+      .onName("cat.jpg", {
         labels: [
           {
-            name: "Dog",
+            name: "Cat",
             confidence: 98.2,
             instances: [
               {
@@ -297,16 +297,16 @@ describe("Detecting labels in a simulated image", () => {
       });
 
     // When its labels are detected.
-    const detected = await detect(simAws, "dog.jpg");
+    const detected = await detect(simAws, "cat.jpg");
 
     // Then both instances are located, and the one with no confidence of its
-    // own takes the label's, since a dog detected at 98 is not located at 40.
-    const [dog] = detected.Labels;
-    assertNonNullable(dog);
-    assertArrayLength(dog.Instances, 2);
-    assertIdentical(dog.Instances[0].Confidence, Math.fround(96.5));
-    assertIdentical(dog.Instances[0].BoundingBox.Height, Math.fround(0.4));
-    assertIdentical(dog.Instances[1].Confidence, Math.fround(98.2));
+    // own takes the label's, since a cat detected at 98 is not located at 40.
+    const [cat] = detected.Labels;
+    assertNonNullable(cat);
+    assertArrayLength(cat.Instances, 2);
+    assertIdentical(cat.Instances[0].Confidence, Math.fround(96.5));
+    assertIdentical(cat.Instances[0].BoundingBox.Height, Math.fround(0.4));
+    assertIdentical(cat.Instances[1].Confidence, Math.fround(98.2));
   });
 
   it("matches an image by content hash whatever it is called", async () => {
@@ -316,14 +316,14 @@ describe("Detecting labels in a simulated image", () => {
     simAws
       .rekognition()
       .labels()
-      .onHash(simRekognitionImageHash(bluePngBytes), { labels: ["Dog"] });
+      .onHash(simRekognitionImageHash(bluePngBytes), { labels: ["Cat"] });
 
     // When its labels are detected.
     const detected = await detect(simAws, "2f9c1e40-uuid.png");
 
     // Then the hash rule answers, which is what makes a system that generates
     // its own object keys testable.
-    assertArrayEquals(labelNames(detected), ["Dog"]);
+    assertArrayEquals(labelNames(detected), ["Cat"]);
   });
 
   it("consults hash rules and the default for an image passed as bytes", async () => {
@@ -331,7 +331,7 @@ describe("Detecting labels in a simulated image", () => {
     const simAws = new SimAws();
     const labels = simAws.rekognition().labels();
     labels.byDefault({ labels: ["Grass"] });
-    labels.onName("dog.jpg", { labels: ["Dog"] });
+    labels.onName("cat.jpg", { labels: ["Cat"] });
     labels.onHash(simRekognitionImageHash(bluePngBytes), { labels: ["Cat"] });
 
     // When images are detected as bytes rather than as S3 objects.
@@ -351,23 +351,23 @@ describe("Detecting labels in a simulated image", () => {
   });
 
   it("keeps label rules apart from moderation rules", async () => {
-    // Given an object declared to hold a dog and to fail moderation.
+    // Given an object declared to hold a cat and to fail moderation.
     const simAws = await simAwsWithImage();
     simAws
       .rekognition()
       .labels()
-      .onName("dog.jpg", { labels: ["Dog"] });
+      .onName("cat.jpg", { labels: ["Cat"] });
     simAws
       .rekognition()
       .moderation()
-      .onName("dog.jpg", { labels: ["Explicit Nudity"] });
+      .onName("cat.jpg", { labels: ["Weapons"] });
 
     // When its labels are detected.
-    const detected = await detect(simAws, "dog.jpg");
+    const detected = await detect(simAws, "cat.jpg");
 
     // Then it answers from the label rules alone, since each operation owns
     // the result shape it answers with.
-    assertArrayEquals(labelNames(detected), ["Dog"]);
+    assertArrayEquals(labelNames(detected), ["Cat"]);
   });
 
   it("keeps rules to the Account and Region they were registered in", async () => {
@@ -376,7 +376,7 @@ describe("Detecting labels in a simulated image", () => {
     simAws
       .rekognition()
       .labels()
-      .byDefault({ labels: ["Dog"] });
+      .byDefault({ labels: ["Cat"] });
 
     // When labels are detected in another Region.
     const elsewhere = await simAws

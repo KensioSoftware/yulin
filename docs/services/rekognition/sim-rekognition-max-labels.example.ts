@@ -17,7 +17,7 @@ simAws
   .labels()
   .byDefault({
     labels: [
-      { name: "Dog", confidence: 98.2 },
+      { name: "Cat", confidence: 98.2 },
       { name: "Grass", confidence: 88 },
       { name: "Fence", confidence: 62 },
     ],
@@ -31,4 +31,4 @@ const detected = await simAws.rekognition().detectLabels(
   }),
 );
 
-console.log(detected.Labels.map((label) => label.Name)); // [ "Dog", "Grass" ]
+console.log(detected.Labels.map((label) => label.Name)); // [ "Cat", "Grass" ]

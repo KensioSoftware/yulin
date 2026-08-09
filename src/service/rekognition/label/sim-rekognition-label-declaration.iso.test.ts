@@ -41,7 +41,7 @@ describe("Declaring a simulated label result", () => {
     // Given a simulated Rekognition.
     // When a rule declares a confidence outside the range AWS reports in.
     const error = assertThrowsError(() => {
-      labels().byDefault({ labels: [{ name: "Dog", confidence: 101 }] });
+      labels().byDefault({ labels: [{ name: "Cat", confidence: 101 }] });
     });
 
     // Then it is refused.
@@ -53,38 +53,38 @@ describe("Declaring a simulated label result", () => {
     // Given a simulated Rekognition.
     // When a rule declares a label whose parent has an empty name.
     const error = assertThrowsError(() => {
-      labels().onName("dog.jpg", {
-        labels: [{ name: "Dog", parents: ["Animal", ""] }],
+      labels().onName("cat.jpg", {
+        labels: [{ name: "Cat", parents: ["Animal", ""] }],
       });
     });
 
     // Then it is refused, rather than a response carrying a nameless parent.
     assertInstanceOf(error, SimRekognitionDeclarationError);
-    assertStringIncludes(error.message, "A declared parent for 'Dog'");
+    assertStringIncludes(error.message, "A declared parent for 'Cat'");
   });
 
   it("refuses an alias with no name of its own", () => {
     // Given a simulated Rekognition.
     // When a rule declares a label whose alias has an empty name.
     const error = assertThrowsError(() => {
-      labels().byDefault({ labels: [{ name: "Dog", aliases: [""] }] });
+      labels().byDefault({ labels: [{ name: "Cat", aliases: [""] }] });
     });
 
     // Then it is refused.
     assertInstanceOf(error, SimRekognitionDeclarationError);
-    assertStringIncludes(error.message, "A declared alias for 'Dog'");
+    assertStringIncludes(error.message, "A declared alias for 'Cat'");
   });
 
   it("refuses a category with no name of its own", () => {
     // Given a simulated Rekognition.
     // When a rule declares a label whose category has an empty name.
     const error = assertThrowsError(() => {
-      labels().byDefault({ labels: [{ name: "Dog", categories: [""] }] });
+      labels().byDefault({ labels: [{ name: "Cat", categories: [""] }] });
     });
 
     // Then it is refused.
     assertInstanceOf(error, SimRekognitionDeclarationError);
-    assertStringIncludes(error.message, "A declared category for 'Dog'");
+    assertStringIncludes(error.message, "A declared category for 'Cat'");
   });
 
   it("refuses a bounding box that is not a ratio of the image size", () => {
@@ -94,7 +94,7 @@ describe("Declaring a simulated label result", () => {
       labels().byDefault({
         labels: [
           {
-            name: "Dog",
+            name: "Cat",
             instances: [
               { boundingBox: { left: 120, top: 40, width: 300, height: 220 } },
             ],
@@ -117,7 +117,7 @@ describe("Declaring a simulated label result", () => {
       labels().byDefault({
         labels: [
           {
-            name: "Dog",
+            name: "Cat",
             instances: [
               {
                 boundingBox: { left: 0.1, top: 0.1, width: 0.2, height: 0.2 },
@@ -138,7 +138,7 @@ describe("Declaring a simulated label result", () => {
     // Given a simulated Rekognition.
     // When a rule is registered against a truncated digest.
     const error = assertThrowsError(() => {
-      labels().onHash("9f86d081884c7d65", { labels: ["Dog"] });
+      labels().onHash("9f86d081884c7d65", { labels: ["Cat"] });
     });
 
     // Then it is refused, rather than being stored as a hash nothing can ever
@@ -151,7 +151,7 @@ describe("Declaring a simulated label result", () => {
     // Given a simulated Rekognition.
     // When a rule is registered against an empty name.
     const error = assertThrowsError(() => {
-      labels().onName("", { labels: ["Dog"] });
+      labels().onName("", { labels: ["Cat"] });
     });
 
     // Then it is refused.
