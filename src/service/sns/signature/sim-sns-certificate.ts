@@ -4,7 +4,7 @@ import {
   derBitStringTag,
   derBytes,
   derExplicitZeroTag,
-  derIntegerTag,
+  derInteger,
   derNullTag,
   derObjectIdentifierTag,
   derPrintableStringTag,
@@ -34,7 +34,7 @@ const commonName = [0x55, 0x04, 0x03];
 /**
  * The version number of an X.509 v3 certificate, which counts from zero.
  */
-const version3 = 2;
+const version3 = Buffer.from([2]);
 
 /**
  * When the certificate becomes valid, and when it stops being valid.
@@ -124,8 +124,8 @@ function certificateBody(input: SimSnsCertificateInput): Buffer {
 
   return derValue(
     derSequenceTag,
-    derValue(derExplicitZeroTag, derBytes(derIntegerTag, version3)),
-    derValue(derIntegerTag, input.serialNumber),
+    derValue(derExplicitZeroTag, derInteger(version3)),
+    derInteger(input.serialNumber),
     signatureAlgorithm(),
     name,
     derValue(derSequenceTag, utcTime(notBefore), utcTime(notAfter)),
@@ -167,14 +167,11 @@ export function simSnsSelfSignedCertificatePem(
  * to allocate, and a serial derived from the key is unique in the only way that
  * matters: two simulated scopes with different keys have different serials.
  *
- * The top bit of the first byte is cleared, because a certificate serial number
- * has to be positive and a DER integer is signed. Clearing it is one byte of
- * uniqueness given up for a serial that never needs a leading zero.
+ * The bytes are the number itself, unsigned, and `derInteger` writes them the
+ * way DER writes an unsigned number: a serial has to be positive, and how a
+ * positive number is kept positive is the encoding's business rather than
+ * this function's.
  */
 export function simSnsSerialNumber(digest: Buffer): Buffer {
-  const serial = Buffer.from(digest.subarray(0, serialNumberBytes));
-
-  serial.writeUInt8(serial.readUInt8(0) & 0x7f, 0);
-
-  return serial;
+  return Buffer.from(digest.subarray(0, serialNumberBytes));
 }

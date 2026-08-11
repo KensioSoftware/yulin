@@ -79,3 +79,29 @@ export function derText(tag: number, value: string): Buffer {
 export function derBytes(tag: number, ...bytes: number[]): Buffer {
   return derValue(tag, Buffer.from(bytes));
 }
+
+/**
+ * A DER integer holding a number given as unsigned bytes, most significant
+ * first.
+ *
+ * A DER integer is signed, and it is written in the fewest bytes that say what
+ * it is, so the bytes a number arrives as are not always the bytes it is
+ * written as. A leading zero is dropped, unless the byte after it has its top
+ * bit set: there the zero is the only thing keeping the number positive, and
+ * dropping it would say the number is negative instead.
+ *
+ * Getting either wrong does not produce a number read a little differently. A
+ * reader rejects the value rather than reading it leniently: OpenSSL answers a
+ * zero byte that was not needed with `illegal padding` and then refuses to
+ * parse the certificate carrying it at all.
+ */
+export function derInteger(magnitude: Buffer): Buffer {
+  const significant = magnitude.findIndex((byte) => byte !== 0);
+  const body =
+    significant === -1 ? Buffer.from([0]) : magnitude.subarray(significant);
+  const readsAsNegative = (body.readUInt8(0) & 0x80) !== 0;
+
+  return readsAsNegative
+    ? derValue(derIntegerTag, Buffer.from([0]), body)
+    : derValue(derIntegerTag, body);
+}
