@@ -26,9 +26,14 @@ export function requiredString(
 }
 
 /**
- * A named field that must be a number.
+ * A named field that must be a whole number of the kind CloudFormation calls
+ * an Integer.
+ *
+ * A template is often a JavaScript object rather than parsed JSON here, so a
+ * fraction, a NaN or an Infinity can reach this where JSON could not carry
+ * one, and each would reach a header as a value no client can read.
  */
-export function requiredNumber(
+export function requiredInteger(
   item: Record<string, unknown>,
   field: string,
   context: string,
@@ -37,9 +42,26 @@ export function requiredNumber(
   // oxlint-disable-next-line security/detect-object-injection
   const value = item[field];
 
-  return typeof value === "number"
+  return typeof value === "number" && Number.isSafeInteger(value)
     ? value
-    : refuse(`${context} needs a number ${field}`);
+    : refuse(`${context} needs a whole number ${field}`);
+}
+
+/**
+ * One of a fixed set of values a field is allowed to take.
+ */
+export function requiredEnum(
+  item: Record<string, unknown>,
+  field: string,
+  allowed: readonly string[],
+  context: string,
+  refuse: SimCfnCfRhPolicyFieldRefuse,
+): string {
+  const value = requiredString(item, field, context, refuse);
+
+  return allowed.includes(value)
+    ? value
+    : refuse(`${context} ${field} must be one of ${allowed.join(", ")}`);
 }
 
 /**

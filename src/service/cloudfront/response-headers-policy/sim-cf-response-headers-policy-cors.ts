@@ -1,3 +1,5 @@
+import { simCfCorsOriginPatternMatches } from "./sim-cf-cors-origin-pattern.js";
+
 const allAccessControlMethods = [
   "GET",
   "DELETE",
@@ -6,6 +8,22 @@ const allAccessControlMethods = [
   "PATCH",
   "POST",
   "PUT",
+] as const;
+
+/**
+ * The response headers a CORS section decides, whether or not it sets each.
+ *
+ * Without `OriginOverride`, an Origin response carrying any one of these keeps
+ * the whole section off, so the set matters rather than just the ones the
+ * policy would have added.
+ */
+const corsResponseHeaders = [
+  "Access-Control-Allow-Origin",
+  "Access-Control-Allow-Methods",
+  "Access-Control-Allow-Headers",
+  "Access-Control-Allow-Credentials",
+  "Access-Control-Expose-Headers",
+  "Access-Control-Max-Age",
 ] as const;
 
 interface SimCloudFrontResponseHeadersPolicyCorsProperties {
@@ -51,15 +69,27 @@ export class SimCloudFrontResponseHeadersPolicyCors {
   /**
    * Set this policy's CORS headers on a response, for the `Origin` header a
    * viewer request carried.
+   *
+   * `OriginOverride` decides the whole section rather than one header at a
+   * time, unlike a custom or security header: without it, an Origin response
+   * carrying any CORS header at all keeps every header this section would have
+   * set off the response, whether or not the policy names that header.
    */
   apply(headers: Headers, requestOrigin: string | null): void {
+    if (
+      !this.originOverride &&
+      corsResponseHeaders.some((n) => headers.has(n))
+    ) {
+      return;
+    }
+
     const allowOrigin = this.resolveAllowOrigin(requestOrigin);
 
     if (allowOrigin === undefined) {
       return;
     }
 
-    this.set(headers, "Access-Control-Allow-Origin", allowOrigin);
+    headers.set("Access-Control-Allow-Origin", allowOrigin);
 
     // CloudFront varies the cache on Origin whenever the header it sent back
     // was chosen for this request rather than good for every request, so a
@@ -68,34 +98,28 @@ export class SimCloudFrontResponseHeadersPolicyCors {
       headers.append("Vary", "Origin");
     }
 
-    this.set(
-      headers,
+    headers.set(
       "Access-Control-Allow-Methods",
       this.resolvedAllowMethods().join(","),
     );
-    this.set(
-      headers,
-      "Access-Control-Allow-Headers",
-      this.allowHeaders.join(","),
-    );
+    headers.set("Access-Control-Allow-Headers", this.allowHeaders.join(","));
 
     // A false Access-Control-Allow-Credentials is not a header value the
     // fetch spec recognises, so CloudFront leaves it off rather than sending
     // a value meaning the same as absence.
     if (this.allowCredentials) {
-      this.set(headers, "Access-Control-Allow-Credentials", "true");
+      headers.set("Access-Control-Allow-Credentials", "true");
     }
 
     if (this.exposeHeaders.length > 0) {
-      this.set(
-        headers,
+      headers.set(
         "Access-Control-Expose-Headers",
         this.exposeHeaders.join(","),
       );
     }
 
     if (this.maxAgeSec !== undefined) {
-      this.set(headers, "Access-Control-Max-Age", String(this.maxAgeSec));
+      headers.set("Access-Control-Max-Age", String(this.maxAgeSec));
     }
   }
 
@@ -104,24 +128,20 @@ export class SimCloudFrontResponseHeadersPolicyCors {
       return "*";
     }
 
-    if (requestOrigin !== null && this.allowOrigins.includes(requestOrigin)) {
-      return requestOrigin;
+    if (requestOrigin === null) {
+      return undefined;
     }
 
-    return undefined;
+    return this.allowOrigins.some((pattern) =>
+      simCfCorsOriginPatternMatches(pattern, requestOrigin),
+    )
+      ? requestOrigin
+      : undefined;
   }
 
   private resolvedAllowMethods(): readonly string[] {
     return this.allowMethods.includes("ALL")
       ? allAccessControlMethods
       : this.allowMethods;
-  }
-
-  private set(headers: Headers, name: string, value: string): void {
-    if (!this.originOverride && headers.has(name)) {
-      return;
-    }
-
-    headers.set(name, value);
   }
 }

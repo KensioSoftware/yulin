@@ -1107,11 +1107,23 @@ than real Origin timing.
 `CorsConfig` is what CDK's `corsBehavior` synthesizes. CloudFront reflects the viewer request's
 `Origin` header against `AccessControlAllowOrigins` rather than sending the list itself: a request
 naming an Origin the list allows gets the CORS headers the section configures, with the response
-varying on `Origin` unless the list is `["*"]`; a request naming one it does not allow gets none of
+varying on `Origin` unless the list contains `*`; a request naming one it does not allow gets none of
 them, the same as CloudFront sending none rather than a mismatched one. `AccessControlAllowMethods`
 of `["ALL"]` expands to CloudFront's full method list, and `AccessControlAllowCredentials: false`
 leaves `Access-Control-Allow-Credentials` off entirely, since a header naming `false` means the same
 as its absence to a browser.
+
+An allow-list entry may use the wildcard on its own, meaning every Origin, or as the leftmost
+subdomain, so `*.example.org` matches `https://site.example.org`. It stands for exactly one label, as
+a wildcard certificate does, so it does not match `https://deep.site.example.org`, and an entry
+naming no scheme matches the host whichever scheme the request used. CloudFront allows the wildcard
+nowhere else, and an entry placing one elsewhere — `example.*`, `test.*.example.org`,
+`*test.example.org`, `exa*mple.org` — fails the stack rather than silently matching nothing.
+
+`OriginOverride` decides the whole CORS section rather than one header at a time, unlike the
+`Override` on a custom or security header. Without it, an Origin response carrying any CORS header at
+all — whether or not the policy names that header — keeps every header the section would have set off
+the response.
 
 A Behavior's `ResponseHeadersPolicyId` is checked when the Distribution is created or updated: naming
 a policy this simulation did not create, whether mistyped or a CloudFront managed policy ID, fails the

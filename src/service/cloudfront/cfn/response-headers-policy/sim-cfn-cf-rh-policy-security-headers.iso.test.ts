@@ -133,7 +133,7 @@ describe("simCfnCfResponseHeadersPolicySecurityHeaders", () => {
       assertThrowsError(() =>
         headersFrom({ StrictTransportSecurity: { Override: true } }),
       ).message,
-      "needs a number AccessControlMaxAgeSec",
+      "needs a whole number AccessControlMaxAgeSec",
     );
     assertStringIncludes(
       assertThrowsError(() => headersFrom({ ContentTypeOptions: {} })).message,
@@ -145,6 +145,66 @@ describe("simCfnCfResponseHeadersPolicySecurityHeaders", () => {
     assertStringIncludes(
       assertThrowsError(() => headersFrom({ FrameOptions: "nope" })).message,
       "SecurityHeadersConfig FrameOptions must be an object",
+    );
+  });
+
+  it("refuses a FrameOption or ReferrerPolicy CloudFront does not accept", () => {
+    // Given directives outside the sets CloudFront documents.
+    assertStringIncludes(
+      assertThrowsError(() =>
+        headersFrom({ FrameOptions: { FrameOption: "ALLOW", Override: true } }),
+      ).message,
+      "FrameOption must be one of DENY, SAMEORIGIN",
+    );
+    assertStringIncludes(
+      assertThrowsError(() =>
+        headersFrom({
+          ReferrerPolicy: { ReferrerPolicy: "sometimes", Override: true },
+        }),
+      ).message,
+      "ReferrerPolicy must be one of no-referrer",
+    );
+  });
+
+  it("refuses ModeBlock and ReportUri together", () => {
+    // CloudFront takes the block directive or a reporting URI, not both.
+    assertStringIncludes(
+      assertThrowsError(() =>
+        headersFrom({
+          XSSProtection: {
+            Protection: true,
+            ModeBlock: true,
+            ReportUri: "https://example.com/report",
+            Override: true,
+          },
+        }),
+      ).message,
+      "cannot set both ModeBlock and ReportUri",
+    );
+  });
+
+  it("refuses a ReportUri that is not a string", () => {
+    assertStringIncludes(
+      assertThrowsError(() =>
+        headersFrom({
+          XSSProtection: { Protection: true, ReportUri: 7, Override: true },
+        }),
+      ).message,
+      "ReportUri must be a string",
+    );
+  });
+
+  it("refuses an AccessControlMaxAgeSec that is not a whole number", () => {
+    assertStringIncludes(
+      assertThrowsError(() =>
+        headersFrom({
+          StrictTransportSecurity: {
+            AccessControlMaxAgeSec: 1.5,
+            Override: true,
+          },
+        }),
+      ).message,
+      "needs a whole number AccessControlMaxAgeSec",
     );
   });
 

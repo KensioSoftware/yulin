@@ -10,7 +10,8 @@ import { describe, it } from "vitest";
 import {
   optionalObject,
   requiredBoolean,
-  requiredNumber,
+  requiredEnum,
+  requiredInteger,
   requiredString,
   sectionItems,
 } from "./sim-cfn-cf-rh-policy-field-reader.js";
@@ -32,12 +33,50 @@ describe("sim-cfn-cf-rh-policy-field-reader", () => {
     );
   });
 
-  it("reads a required number", () => {
-    assertIdentical(requiredNumber({ Age: 5 }, "Age", "Config", refuse), 5);
+  it("reads a required whole number", () => {
+    assertIdentical(requiredInteger({ Age: 5 }, "Age", "Config", refuse), 5);
     assertStringIncludes(
-      assertThrowsError(() => requiredNumber({}, "Age", "Config", refuse))
+      assertThrowsError(() => requiredInteger({}, "Age", "Config", refuse))
         .message,
-      "Config needs a number Age",
+      "Config needs a whole number Age",
+    );
+  });
+
+  it("refuses a number that is not a whole one", () => {
+    // A template is often a JavaScript object here rather than parsed JSON, so
+    // these can reach a reader where JSON could not carry them.
+    for (const value of [1.5, NaN, Infinity]) {
+      assertStringIncludes(
+        assertThrowsError(() =>
+          requiredInteger({ Age: value }, "Age", "Config", refuse),
+        ).message,
+        "Config needs a whole number Age",
+      );
+    }
+  });
+
+  it("reads one of a fixed set of values", () => {
+    assertIdentical(
+      requiredEnum(
+        { Mode: "DENY" },
+        "Mode",
+        ["DENY", "SAMEORIGIN"],
+        "Config",
+        refuse,
+      ),
+      "DENY",
+    );
+    assertStringIncludes(
+      assertThrowsError(() =>
+        requiredEnum(
+          { Mode: "ALLOW" },
+          "Mode",
+          ["DENY", "SAMEORIGIN"],
+          "Config",
+          refuse,
+        ),
+      ).message,
+      "Config Mode must be one of DENY, SAMEORIGIN",
     );
   });
 

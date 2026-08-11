@@ -38,9 +38,11 @@ export class SimCloudFrontDistributionReconfigurer {
    * domain names the Distribution answers on so a name the update drops is
    * free for another Distribution.
    *
-   * A name another Distribution already holds is refused before anything is
-   * changed, so a rejected update leaves the Distribution as it was rather
-   * than half replaced.
+   * Everything an update can be refused for that is not a property of the
+   * config itself — a name another Distribution already holds, a response
+   * headers policy no longer there — is checked before anything is changed, so
+   * a rejected update leaves the Distribution as it was rather than half
+   * replaced.
    */
   reconfigure(
     distribution: SimCloudFrontDistribution,
@@ -52,6 +54,7 @@ export class SimCloudFrontDistributionReconfigurer {
       distributionConfig.Aliases?.Items ?? [],
       distributionId,
     );
+    this.configurator.assertConfigurable(distributionConfig);
 
     this.cloudFrontRegistry.deregisterAlternateDomainNames(distributionId);
 

@@ -123,7 +123,7 @@ describe("simCfnCfResponseHeadersPolicyCors", () => {
           OriginOverride: true,
         }),
       ).message,
-      "AccessControlMaxAgeSec must be a number",
+      "needs a whole number AccessControlMaxAgeSec",
     );
     assertStringIncludes(
       assertThrowsError(() =>
@@ -160,6 +160,91 @@ describe("simCfnCfResponseHeadersPolicyCors", () => {
         }),
       ).message,
       "AccessControlAllowOrigins Items must be strings",
+    );
+  });
+
+  it("refuses a config missing a required list field", () => {
+    // Given configs each leaving out one list CloudFront requires. All three
+    // are required by the CloudFront API, so a template omitting one would
+    // deploy here but be refused by AWS.
+    const withoutHeaders = {
+      AccessControlAllowCredentials: true,
+      AccessControlAllowMethods: { Items: [] },
+      AccessControlAllowOrigins: { Items: [] },
+      OriginOverride: true,
+    };
+    const withoutMethods = {
+      AccessControlAllowCredentials: true,
+      AccessControlAllowHeaders: { Items: [] },
+      AccessControlAllowOrigins: { Items: [] },
+      OriginOverride: true,
+    };
+    const withoutOrigins = {
+      AccessControlAllowCredentials: true,
+      AccessControlAllowHeaders: { Items: [] },
+      AccessControlAllowMethods: { Items: [] },
+      OriginOverride: true,
+    };
+
+    assertStringIncludes(
+      assertThrowsError(() => corsFrom(withoutHeaders)).message,
+      "CorsConfig needs an AccessControlAllowHeaders",
+    );
+    assertStringIncludes(
+      assertThrowsError(() => corsFrom(withoutMethods)).message,
+      "CorsConfig needs an AccessControlAllowMethods",
+    );
+    assertStringIncludes(
+      assertThrowsError(() => corsFrom(withoutOrigins)).message,
+      "CorsConfig needs an AccessControlAllowOrigins",
+    );
+  });
+
+  it("keeps AccessControlExposeHeaders optional", () => {
+    // Given a config leaving out the one list CloudFront does not require.
+    const cors = corsFrom({
+      AccessControlAllowCredentials: true,
+      AccessControlAllowHeaders: { Items: [] },
+      AccessControlAllowMethods: { Items: [] },
+      AccessControlAllowOrigins: { Items: ["*"] },
+      OriginOverride: true,
+    });
+
+    // Then it is read rather than refused.
+    const headers = new Headers();
+    cors.apply(headers, null);
+
+    assertIdentical(headers.get("access-control-expose-headers"), null);
+  });
+
+  it("refuses a wildcard where CloudFront does not allow one", () => {
+    assertStringIncludes(
+      assertThrowsError(() =>
+        corsFrom({
+          AccessControlAllowCredentials: true,
+          AccessControlAllowHeaders: { Items: [] },
+          AccessControlAllowMethods: { Items: [] },
+          AccessControlAllowOrigins: { Items: ["test.*.example.org"] },
+          OriginOverride: true,
+        }),
+      ).message,
+      "leftmost subdomain",
+    );
+  });
+
+  it("refuses an AccessControlMaxAgeSec that is not a whole number", () => {
+    assertStringIncludes(
+      assertThrowsError(() =>
+        corsFrom({
+          AccessControlAllowCredentials: true,
+          AccessControlAllowHeaders: { Items: [] },
+          AccessControlAllowMethods: { Items: [] },
+          AccessControlAllowOrigins: { Items: ["*"] },
+          AccessControlMaxAgeSec: 1.5,
+          OriginOverride: true,
+        }),
+      ).message,
+      "needs a whole number AccessControlMaxAgeSec",
     );
   });
 

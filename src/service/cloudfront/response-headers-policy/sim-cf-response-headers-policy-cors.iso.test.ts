@@ -120,9 +120,9 @@ describe("SimCloudFrontResponseHeadersPolicyCors", () => {
     assertIdentical(headers.get("access-control-max-age"), null);
   });
 
-  it("keeps an Origin header it does not override", () => {
-    // Given a policy without OriginOverride, and a response that already
-    // carries the header CloudFront would otherwise set.
+  it("adds nothing at all when the Origin sent any CORS header and it does not override", () => {
+    // Given a policy without OriginOverride, and an Origin response carrying
+    // one CORS header.
     const headers = new Headers({
       "Access-Control-Allow-Methods": "GET,POST,PUT",
     });
@@ -132,10 +132,56 @@ describe("SimCloudFrontResponseHeadersPolicyCors", () => {
       "https://example.com",
     );
 
-    // Then the Origin's value stands.
+    // Then the Origin's value stands and none of the section's other headers
+    // are added either: CloudFront treats OriginOverride as a decision about
+    // the whole CORS section rather than one header at a time.
     assertIdentical(
       headers.get("access-control-allow-methods"),
       "GET,POST,PUT",
     );
+    assertIdentical(headers.get("access-control-allow-origin"), null);
+    assertIdentical(headers.get("access-control-allow-headers"), null);
+  });
+
+  it("keeps the whole section off for a CORS header the policy does not name", () => {
+    // Given a policy that sets no Max-Age, and an Origin response carrying one.
+    const headers = new Headers({ "Access-Control-Max-Age": "60" });
+
+    cors({ originOverride: false }).apply(headers, "https://example.com");
+
+    // Then the section still stands down, because CloudFront looks for any
+    // CORS header from the Origin rather than only the ones in the policy.
+    assertIdentical(headers.get("access-control-allow-origin"), null);
+  });
+
+  it("applies without override when the Origin sent no CORS header", () => {
+    // Given the same policy and a response carrying none.
+    const headers = new Headers({ "content-type": "text/html" });
+
+    cors({ originOverride: false }).apply(headers, "https://example.com");
+
+    // Then the policy's headers are added, as CloudFront adds them whenever
+    // the Origin left the header out.
+    assertIdentical(
+      headers.get("access-control-allow-origin"),
+      "https://example.com",
+    );
+  });
+
+  it("reflects an Origin matching a wildcard subdomain entry", () => {
+    // Given an allow list naming a wildcard subdomain.
+    const headers = new Headers();
+
+    cors({ allowOrigins: ["https://*.example.com"] }).apply(
+      headers,
+      "https://app.example.com",
+    );
+
+    // Then the request's own Origin is reflected, not the pattern.
+    assertIdentical(
+      headers.get("access-control-allow-origin"),
+      "https://app.example.com",
+    );
+    assertIdentical(headers.get("vary"), "Origin");
   });
 });

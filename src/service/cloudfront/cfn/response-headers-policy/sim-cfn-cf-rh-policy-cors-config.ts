@@ -1,7 +1,9 @@
+import { simCfCorsOriginPatternIsValid } from "../../response-headers-policy/sim-cf-cors-origin-pattern.js";
 import { SimCloudFrontResponseHeadersPolicyCors } from "../../response-headers-policy/sim-cf-response-headers-policy-cors.js";
 import {
   optionalObject,
   requiredBoolean,
+  requiredInteger,
   type SimCfnCfRhPolicyFieldRefuse,
 } from "./sim-cfn-cf-rh-policy-field-reader.js";
 
@@ -24,11 +26,15 @@ export function simCfnCfResponseHeadersPolicyCors(
     return undefined;
   }
 
-  const maxAgeSec = section["AccessControlMaxAgeSec"];
-
-  if (maxAgeSec !== undefined && typeof maxAgeSec !== "number") {
-    refuse(`CorsConfig AccessControlMaxAgeSec must be a number`);
-  }
+  const maxAgeSec =
+    section["AccessControlMaxAgeSec"] === undefined
+      ? undefined
+      : requiredInteger(
+          section,
+          "AccessControlMaxAgeSec",
+          "CorsConfig",
+          refuse,
+        );
 
   return new SimCloudFrontResponseHeadersPolicyCors({
     allowCredentials: requiredBoolean(
@@ -37,10 +43,10 @@ export function simCfnCfResponseHeadersPolicyCors(
       "CorsConfig",
       refuse,
     ),
-    allowHeaders: originList(section, "AccessControlAllowHeaders", refuse),
-    allowMethods: originList(section, "AccessControlAllowMethods", refuse),
-    allowOrigins: originList(section, "AccessControlAllowOrigins", refuse),
-    exposeHeaders: originList(section, "AccessControlExposeHeaders", refuse),
+    allowHeaders: requiredList(section, "AccessControlAllowHeaders", refuse),
+    allowMethods: requiredList(section, "AccessControlAllowMethods", refuse),
+    allowOrigins: allowOrigins(section, refuse),
+    exposeHeaders: optionalList(section, "AccessControlExposeHeaders", refuse),
     ...(maxAgeSec !== undefined && { maxAgeSec }),
     originOverride: requiredBoolean(
       section,
@@ -52,10 +58,49 @@ export function simCfnCfResponseHeadersPolicyCors(
 }
 
 /**
- * The string `Items` of one `AccessControl*` field, which CloudFront requires
- * whenever the field itself is present.
+ * The allowed Origins, each of which must place its wildcard where CloudFront
+ * allows one, since an entry it would refuse could never match here either.
  */
-function originList(
+function allowOrigins(
+  section: Record<string, unknown>,
+  refuse: SimCfnCfRhPolicyFieldRefuse,
+): string[] {
+  const origins = requiredList(section, "AccessControlAllowOrigins", refuse);
+
+  for (const origin of origins) {
+    if (!simCfCorsOriginPatternIsValid(origin)) {
+      refuse(
+        `CorsConfig AccessControlAllowOrigins ${origin} may only use the ` +
+          `wildcard on its own or as the leftmost subdomain, as in ` +
+          `*.example.org`,
+      );
+    }
+  }
+
+  return origins;
+}
+
+/**
+ * The string `Items` of a field CloudFront requires a CORS section to carry.
+ */
+function requiredList(
+  section: Record<string, unknown>,
+  fieldName: string,
+  refuse: SimCfnCfRhPolicyFieldRefuse,
+): string[] {
+  // oxlint-disable-next-line security/detect-object-injection
+  if (section[fieldName] === undefined) {
+    refuse(`CorsConfig needs an ${fieldName}`);
+  }
+
+  return optionalList(section, fieldName, refuse);
+}
+
+/**
+ * The string `Items` of one `AccessControl*` field, or nothing when the field
+ * is absent. `Items` itself is required whenever the field is present.
+ */
+function optionalList(
   section: Record<string, unknown>,
   fieldName: string,
   refuse: SimCfnCfRhPolicyFieldRefuse,

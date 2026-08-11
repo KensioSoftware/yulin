@@ -2,6 +2,7 @@ import type { SimCfCustomOriginDispatcher } from "../../origin/custom/sim-cf-cus
 import type { SimCloudFrontS3OriginResolver } from "../../origin/s3/sim-cloudfront-s3-origin.js";
 import type { SimCloudFrontOriginAccessControlRegistry } from "../../origin-access-control/sim-cf-origin-access-control-registry.js";
 import type { SimCloudFrontResponseHeadersPolicyRegistry } from "../../response-headers-policy/sim-cf-response-headers-policy-registry.js";
+import { SimCfBehaviorResponseHeadersPolicy } from "./sim-cf-behavior-response-headers-policy.js";
 import { SimCloudFrontBehaviorConfigurator } from "./sim-cloud-front-behavior-configurator.js";
 import { SimCloudFrontDistributionConfigurator } from "./sim-cloud-front-distribution-configurator.js";
 import { SimCloudFrontOriginConfigurator } from "./sim-cloud-front-origin-configurator.js";
@@ -22,12 +23,17 @@ interface SimCloudFrontConfiguratorOrigins {
 export function makeSimCloudFrontDistributionConfigurator(
   origins: SimCloudFrontConfiguratorOrigins,
 ): SimCloudFrontDistributionConfigurator {
+  const responseHeadersPolicy = new SimCfBehaviorResponseHeadersPolicy(
+    origins.responseHeadersPolicies,
+  );
+
   return new SimCloudFrontDistributionConfigurator(
     new SimCloudFrontOriginConfigurator(
       origins.s3OriginResolver,
       origins.originAccessControls,
       origins.customOriginDispatcher,
     ),
-    new SimCloudFrontBehaviorConfigurator(origins.responseHeadersPolicies),
+    new SimCloudFrontBehaviorConfigurator(responseHeadersPolicy),
+    responseHeadersPolicy,
   );
 }
