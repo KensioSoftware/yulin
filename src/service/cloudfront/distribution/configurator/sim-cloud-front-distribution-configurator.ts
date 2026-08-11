@@ -2,6 +2,7 @@ import type { SimCloudFrontDistributionConfig } from "../../command/create-distr
 import type { SimCloudFrontDistribution } from "../sim-cloudfront-distribution.js";
 import type { SimCloudFrontOriginConfigurator } from "./sim-cloud-front-origin-configurator.js";
 import type { SimCloudFrontBehaviorConfigurator } from "./sim-cloud-front-behavior-configurator.js";
+import type { SimCfBehaviorResponseHeadersPolicy } from "./sim-cf-behavior-response-headers-policy.js";
 import { SimCloudFrontCustomErrorConfigurator } from "./sim-cloud-front-custom-error-configurator.js";
 import { SimCloudFrontInvalidDefaultRootObject } from "../../error/sim-cloudfront.error.js";
 
@@ -25,7 +26,24 @@ export class SimCloudFrontDistributionConfigurator {
   constructor(
     private readonly originConfigurator: SimCloudFrontOriginConfigurator,
     private readonly behaviorConfigurator: SimCloudFrontBehaviorConfigurator,
+    private readonly responseHeadersPolicy: SimCfBehaviorResponseHeadersPolicy,
   ) {}
+
+  /**
+   * Refuse a DistributionConfig this simulation cannot apply, before anything
+   * is applied.
+   *
+   * Only what a Behavior names outside itself is checked here, because that is
+   * what an update can find missing after the Distribution was already built
+   * against it. Everything else the configurators refuse is a property of the
+   * config itself, which `configure` reaches before it has changed anything
+   * worth undoing.
+   */
+  assertConfigurable(
+    distributionConfig: SimCloudFrontDistributionConfig,
+  ): void {
+    this.responseHeadersPolicy.assertAllExist(distributionConfig);
+  }
 
   /**
    * Configure a Distribution from its DistributionConfig.

@@ -1,17 +1,20 @@
 import type {
   SimCloudFrontCacheBehaviorConfig,
   SimCloudFrontDefaultCacheBehaviorConfig,
-  SimCloudFrontMethodList,
 } from "../../command/create-distribution/create-distribution.command.js";
-import type { SimCloudFrontBehavior } from "../../behaviour/sim-cloud-front-behavior.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type { SimCloudFrontDistribution } from "../sim-cloudfront-distribution.js";
-import { configureCffAssociations } from "./sim-cff-associations-configure.js";
+import { simCfBehaviorProperties } from "./sim-cf-behavior-properties.js";
+import type { SimCfBehaviorResponseHeadersPolicy } from "./sim-cf-behavior-response-headers-policy.js";
 
 /**
  * Applies Cache Behavior configuration to a sim CloudFront Distribution.
  */
 export class SimCloudFrontBehaviorConfigurator {
+  constructor(
+    private readonly responseHeadersPolicy: SimCfBehaviorResponseHeadersPolicy,
+  ) {}
+
   /**
    * Configure the default Cache Behavior on a Distribution.
    */
@@ -20,7 +23,9 @@ export class SimCloudFrontBehaviorConfigurator {
     cacheBehavior: SimCloudFrontDefaultCacheBehaviorConfig | undefined,
   ): void {
     assertDefined(cacheBehavior, "CloudFront DefaultCacheBehavior");
-    distribution.addBehavior(buildBaseBehaviorProperties(cacheBehavior));
+    distribution.addBehavior(
+      simCfBehaviorProperties(cacheBehavior, this.responseHeadersPolicy),
+    );
   }
 
   /**
@@ -36,49 +41,7 @@ export class SimCloudFrontBehaviorConfigurator {
     );
     distribution.addBehavior({
       pathPattern: cacheBehavior.PathPattern,
-      ...buildBaseBehaviorProperties(cacheBehavior),
+      ...simCfBehaviorProperties(cacheBehavior, this.responseHeadersPolicy),
     });
   }
-}
-
-/**
- * Build the shared Behavior properties common to both default and named Cache
- * Behaviors. Callers add their own fields (e.g. pathPattern) on top.
- */
-function buildBaseBehaviorProperties(
-  cacheBehavior:
-    | SimCloudFrontDefaultCacheBehaviorConfig
-    | SimCloudFrontCacheBehaviorConfig,
-): SimCloudFrontBehavior {
-  assertDefined(
-    cacheBehavior.TargetOriginId,
-    "CloudFront CacheBehavior TargetOriginId",
-  );
-
-  return {
-    targetOriginName: cacheBehavior.TargetOriginId,
-    allowedMethods: methodsSet(cacheBehavior.AllowedMethods, ["GET", "HEAD"]),
-    cachedMethods: methodsSet(cacheBehavior.AllowedMethods?.CachedMethods, [
-      "GET",
-      "HEAD",
-    ]),
-    ...(cacheBehavior.ViewerProtocolPolicy !== undefined && {
-      viewerProtocolPolicy: cacheBehavior.ViewerProtocolPolicy,
-    }),
-    ...(cacheBehavior.ResponseHeadersPolicyId !== undefined && {
-      responseHeadersPolicyId: cacheBehavior.ResponseHeadersPolicyId,
-    }),
-    functionAssociations: configureCffAssociations(cacheBehavior),
-  };
-}
-
-/**
- * Build a Set of HTTP methods from a method list config, falling back to the
- * provided defaults when no items are configured.
- */
-function methodsSet(
-  methods: SimCloudFrontMethodList | undefined,
-  fallback: string[],
-): Set<string> {
-  return new Set(methods?.Items ?? fallback);
 }

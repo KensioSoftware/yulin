@@ -2,12 +2,16 @@ import { assertIdentical, assertTrue, assertUuidV4 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimCloudFrontResponseHeader } from "./sim-cf-response-header.js";
 import { SimCloudFrontResponseHeadersPolicy } from "./sim-cf-response-headers-policy.js";
+import { SimCloudFrontResponseHeadersPolicyCors } from "./sim-cf-response-headers-policy-cors.js";
 
 describe("SimCloudFrontResponseHeadersPolicy", () => {
   function policy(
     properties: Partial<{
       customHeaders: SimCloudFrontResponseHeader[];
       headersToRemove: string[];
+      securityHeaders: SimCloudFrontResponseHeader[];
+      serverTiming: SimCloudFrontResponseHeader;
+      cors: SimCloudFrontResponseHeadersPolicyCors;
     }> = {},
   ): SimCloudFrontResponseHeadersPolicy {
     return new SimCloudFrontResponseHeadersPolicy({
@@ -96,6 +100,50 @@ describe("SimCloudFrontResponseHeadersPolicy", () => {
     assertIdentical(applied.status, 404);
     assertIdentical(applied.statusText, "Not Found");
     assertIdentical(await applied.text(), "not found");
+  });
+
+  it("adds its security headers and Server-Timing header to a response", () => {
+    // Given a policy setting a security header and Server-Timing.
+    const applied = policy({
+      securityHeaders: [
+        new SimCloudFrontResponseHeader({
+          name: "X-Frame-Options",
+          value: "DENY",
+          override: true,
+        }),
+      ],
+      serverTiming: new SimCloudFrontResponseHeader({
+        name: "Server-Timing",
+        value: `cdn-upstream-layer;desc="EDGE"`,
+        override: true,
+      }),
+    }).apply(new Response("body"));
+
+    // Then both are on the response, alongside whatever else the policy sets.
+    assertIdentical(applied.headers.get("x-frame-options"), "DENY");
+    assertIdentical(
+      applied.headers.get("server-timing"),
+      `cdn-upstream-layer;desc="EDGE"`,
+    );
+  });
+
+  it("applies its CORS headers for the Origin the viewer request carried", () => {
+    // Given a policy with a CORS section allowing one Origin.
+    const applied = policy({
+      cors: new SimCloudFrontResponseHeadersPolicyCors({
+        allowCredentials: false,
+        allowHeaders: [],
+        allowMethods: ["GET"],
+        allowOrigins: ["https://example.com"],
+        originOverride: true,
+      }),
+    }).apply(new Response("body"), "https://example.com");
+
+    // Then the CORS headers are on the response.
+    assertIdentical(
+      applied.headers.get("access-control-allow-origin"),
+      "https://example.com",
+    );
   });
 
   it("passes a response through when it sets and removes nothing", () => {

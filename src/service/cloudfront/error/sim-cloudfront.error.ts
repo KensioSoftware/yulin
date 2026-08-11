@@ -119,6 +119,21 @@ export class SimCloudFrontNoSuchResponseHeadersPolicy extends SimCloudFrontError
 }
 
 /**
+ * Simulated CloudFront InvalidResponseHeadersPolicyId error.
+ *
+ * What CloudFront answers when a Behavior's `ResponseHeadersPolicyId` names no
+ * response headers policy the account holds, at Distribution create or update
+ * time rather than when a request first needs the policy.
+ */
+export class SimCloudFrontInvalidResponseHeadersPolicyId extends SimCloudFrontError {
+  public override readonly name = "InvalidResponseHeadersPolicyId";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
  * Simulated CloudFront ResponseHeadersPolicyAlreadyExists error.
  *
  * CloudFront requires a response headers policy name to be unique within an

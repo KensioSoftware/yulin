@@ -2,6 +2,7 @@ import type { SimCloudFrontDistributionConfig } from "../command/create-distribu
 import type { SimCfCustomOriginDispatcher } from "../origin/custom/sim-cf-custom-origin-dispatcher.js";
 import type { SimCloudFrontS3OriginResolver } from "../origin/s3/sim-cloudfront-s3-origin.js";
 import type { SimCloudFrontOriginAccessControlRegistry } from "../origin-access-control/sim-cf-origin-access-control-registry.js";
+import type { SimCloudFrontResponseHeadersPolicyRegistry } from "../response-headers-policy/sim-cf-response-headers-policy-registry.js";
 import type { SimCloudFrontRegistry } from "../registry/sim-cloud-front-registry.js";
 import { makeSimCloudFrontDistributionConfigurator } from "./configurator/sim-cf-distribution-configurator.factory.js";
 import type { SimCloudFrontDistributionConfigurator } from "./configurator/sim-cloud-front-distribution-configurator.js";
@@ -12,6 +13,7 @@ interface SimCloudFrontDistributionReconfigurerProperties {
   readonly s3OriginResolver: SimCloudFrontS3OriginResolver;
   readonly customOriginDispatcher?: SimCfCustomOriginDispatcher | undefined;
   readonly originAccessControls: SimCloudFrontOriginAccessControlRegistry;
+  readonly responseHeadersPolicies: SimCloudFrontResponseHeadersPolicyRegistry;
 }
 
 /**
@@ -36,9 +38,11 @@ export class SimCloudFrontDistributionReconfigurer {
    * domain names the Distribution answers on so a name the update drops is
    * free for another Distribution.
    *
-   * A name another Distribution already holds is refused before anything is
-   * changed, so a rejected update leaves the Distribution as it was rather
-   * than half replaced.
+   * Everything an update can be refused for that is not a property of the
+   * config itself — a name another Distribution already holds, a response
+   * headers policy no longer there — is checked before anything is changed, so
+   * a rejected update leaves the Distribution as it was rather than half
+   * replaced.
    */
   reconfigure(
     distribution: SimCloudFrontDistribution,
@@ -50,6 +54,7 @@ export class SimCloudFrontDistributionReconfigurer {
       distributionConfig.Aliases?.Items ?? [],
       distributionId,
     );
+    this.configurator.assertConfigurable(distributionConfig);
 
     this.cloudFrontRegistry.deregisterAlternateDomainNames(distributionId);
 
