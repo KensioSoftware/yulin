@@ -22,6 +22,7 @@ import { SimCloudFrontNoSuchDistribution } from "../../error/sim-cloudfront.erro
 import type { SimCfCustomOriginDispatcher } from "../../origin/custom/sim-cf-custom-origin-dispatcher.js";
 import type { SimCloudFrontS3OriginResolver } from "../../origin/s3/sim-cloudfront-s3-origin.js";
 import type { SimCloudFrontOriginAccessControlRegistry } from "../../origin-access-control/sim-cf-origin-access-control-registry.js";
+import type { SimCloudFrontResponseHeadersPolicyRegistry } from "../../response-headers-policy/sim-cf-response-headers-policy-registry.js";
 import type { SimCloudFrontRegistry } from "../../registry/sim-cloud-front-registry.js";
 import { SimCloudFrontDistributionConfigNormalizer } from "../create-distribution/sim-cf-distro-config-normalizer.js";
 import { UpdateDistributionAuthorizer } from "./update-distribution-authorizer.js";
@@ -40,6 +41,7 @@ interface UpdateDistributionCommandHandlerProperties {
   readonly s3OriginResolver: SimCloudFrontS3OriginResolver;
   readonly customOriginDispatcher?: SimCfCustomOriginDispatcher | undefined;
   readonly originAccessControls: SimCloudFrontOriginAccessControlRegistry;
+  readonly responseHeadersPolicies: SimCloudFrontResponseHeadersPolicyRegistry;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly acmRegistry?: SimAcmRegistry | undefined;
   readonly background?: BackgroundScheduler;

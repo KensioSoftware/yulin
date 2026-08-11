@@ -53,6 +53,7 @@ import {
   type SimCloudFrontS3OriginResolver,
 } from "./origin/s3/sim-cloudfront-s3-origin.js";
 import type { SimCloudFrontOriginAccessControlRegistry } from "./origin-access-control/sim-cf-origin-access-control-registry.js";
+import type { SimCloudFrontResponseHeadersPolicyRegistry } from "./response-headers-policy/sim-cf-response-headers-policy-registry.js";
 import { SimCloudFrontRegistry } from "./registry/sim-cloud-front-registry.js";
 
 /**
@@ -73,6 +74,7 @@ interface SimCloudFrontCommandsProperties extends SimCloudFrontProperties {
   readonly distributions: SimCloudFrontDistributionMap;
   readonly cloudFrontFunctions: SimCloudFrontFunctionMap;
   readonly originAccessControls: SimCloudFrontOriginAccessControlRegistry;
+  readonly responseHeadersPolicies: SimCloudFrontResponseHeadersPolicyRegistry;
 }
 
 /**
@@ -125,6 +127,7 @@ export class SimCloudFrontCommands {
     | undefined;
   private readonly acmRegistry: SimAcmRegistry | undefined;
   private readonly originAccessControls: SimCloudFrontOriginAccessControlRegistry;
+  private readonly responseHeadersPolicies: SimCloudFrontResponseHeadersPolicyRegistry;
 
   constructor(properties: SimCloudFrontCommandsProperties) {
     const {
@@ -156,6 +159,7 @@ export class SimCloudFrontCommands {
     this.customOriginDispatcher = customOriginDispatcher;
     this.acmRegistry = acmRegistry;
     this.originAccessControls = properties.originAccessControls;
+    this.responseHeadersPolicies = properties.responseHeadersPolicies;
   }
 
   /**
@@ -242,12 +246,14 @@ export class SimCloudFrontCommands {
     readonly customOriginDispatcher: SimCfCustomOriginDispatcher | undefined;
     readonly acmRegistry: SimAcmRegistry | undefined;
     readonly originAccessControls: SimCloudFrontOriginAccessControlRegistry;
+    readonly responseHeadersPolicies: SimCloudFrontResponseHeadersPolicyRegistry;
   } {
     return {
       s3OriginResolver: this.s3OriginResolver,
       customOriginDispatcher: this.customOriginDispatcher,
       acmRegistry: this.acmRegistry,
       originAccessControls: this.originAccessControls,
+      responseHeadersPolicies: this.responseHeadersPolicies,
     };
   }
 }

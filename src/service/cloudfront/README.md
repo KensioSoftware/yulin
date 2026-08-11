@@ -163,20 +163,32 @@ request and viewer response events on cache Behaviors.
 ## Response headers policies
 
 `response-headers-policy/` holds the policy model. A `SimCloudFrontResponseHeadersPolicy` is a name,
-an ID and two lists: the headers to add and the headers to remove. Removal happens first, so a header
-in both ends up present with the policy's value. Each added header carries an `Override` deciding
-whether it replaces one the Origin sent.
+an ID, the headers to add and remove, the security headers list, an optional Server-Timing header and
+an optional `SimCloudFrontResponseHeadersPolicyCors`. Removal happens first, so a header in both ends
+up present with the policy's value. Each added header, including a security header, carries an
+`Override` deciding whether it replaces one the Origin sent; CORS has one `originOverride` for the
+whole section instead, matching CloudFront's own schema.
+
+`SimCloudFrontResponseHeadersPolicyCors` is its own class because applying it needs the viewer
+request, not just the response: CloudFront reflects the request's `Origin` header against the
+configured allow list rather than sending the list itself, so `apply()` takes the header's value and
+adds nothing when it names no allowed Origin, the same as CloudFront answering none rather than a
+mismatched one.
 
 Policies are stored on `SimCloudFront` and found by ID, which is what a Behavior's
 `responseHeadersPolicyId` names. There is no CreateResponseHeadersPolicy command, so
-`cfn/response-headers-policy/` is the only thing that makes one. Its config reader models the custom
-and removed headers, and refuses `CorsConfig`, `SecurityHeadersConfig` and `ServerTimingHeadersConfig`
-by name: each sets headers of its own, and a policy that quietly sets fewer here than in AWS is a
-divergence a passing test would hide.
+`cfn/response-headers-policy/` is the only thing that makes one. Its config reader models every
+section: `CustomHeadersConfig` and `RemoveHeadersConfig` as before, `SecurityHeadersConfig` as one
+header per sub-section, `ServerTimingHeadersConfig` as a fixed header once `Enabled` (not sampled, so
+a test does not depend on chance), and `CorsConfig` into the CORS model above.
 
-A lookup miss is `SimCloudFrontNoSuchResponseHeadersPolicy` rather than a pass-through, because the
-common cause is a managed policy ID, which names a policy AWS owns rather than one a template
-creates.
+A lookup miss at request time is `SimCloudFrontNoSuchResponseHeadersPolicy` rather than a
+pass-through. In practice this is defence in depth rather than the common path: `ResponseHeadersPolicyId` is checked eagerly too, by `SimCloudFrontBehaviorConfigurator` when the Distribution is
+created or updated, so a Behavior naming an ID nothing created — commonly a managed policy ID, which
+names a policy AWS owns rather than one a template creates — fails there as
+`SimCloudFrontInvalidResponseHeadersPolicyId`, the same as real CloudFront refuses the whole
+CreateDistribution/UpdateDistribution rather than deploying and failing the first request that needs
+it.
 
 ## Origin access controls
 
@@ -190,8 +202,9 @@ CreateOriginAccessControl command, so a template is the only thing that makes on
 `SimCloudFrontOriginConfigurator` resolves an Origin's `OriginAccessControlId` through the registry
 when the Distribution is created, and stores the result on the `SimCloudFrontS3Origin`. An ID
 nothing created is `SimCloudFrontInvalidOriginAccessControl`, as CloudFront refuses the whole
-CreateDistribution. Resolution is eager here, unlike a response headers policy, because CloudFront
-checks an origin access control at creation rather than when a request arrives.
+CreateDistribution. `SimCloudFrontBehaviorConfigurator` resolves a Behavior's
+`ResponseHeadersPolicyId` the same eager way, for the same reason: CloudFront checks both at creation
+rather than when a request arrives.
 
 `SimCfS3OriginSigner` reads the stored origin access control on every Origin fetch. One whose
 `signs` getter is true makes the read a request from the `cloudfront.amazonaws.com` service

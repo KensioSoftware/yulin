@@ -2,6 +2,7 @@ import type {
   SimAwsServiceController,
   SimAwsServiceRequest,
 } from "../../../serve/controller/sim-service-controller.js";
+import { SimCloudFrontErrorResponse } from "./sim-cloudfront-error-response.js";
 import { SimCloudFrontRequestPipeline } from "./sim-cloudfront-request-pipeline.js";
 import {
   SimCloudFrontControllerDependenciesFactory,
@@ -18,6 +19,7 @@ import {
  */
 export class SimCloudFrontServiceController implements SimAwsServiceController {
   private readonly pipeline: SimCloudFrontRequestPipeline;
+  private readonly errors = new SimCloudFrontErrorResponse();
 
   constructor(properties: SimCloudFrontServiceControllerProperties = {}) {
     const dependenciesFactory =
@@ -35,6 +37,10 @@ export class SimCloudFrontServiceController implements SimAwsServiceController {
    * own, so only the request itself is needed to find and serve it.
    */
   async handleRequest(serviceRequest: SimAwsServiceRequest): Promise<Response> {
-    return this.pipeline.handle(serviceRequest.request);
+    try {
+      return await this.pipeline.handle(serviceRequest.request);
+    } catch (error) {
+      return this.errors.build(error);
+    }
   }
 }

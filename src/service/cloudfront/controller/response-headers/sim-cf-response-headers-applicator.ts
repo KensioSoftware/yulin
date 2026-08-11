@@ -18,6 +18,7 @@ export class SimCfResponseHeadersApplicator {
    */
   apply(
     cloudFront: SimCloudFront,
+    request: Request,
     response: Response,
     behaviour: SimCloudFrontBehavior,
   ): Response {
@@ -38,6 +39,6 @@ export class SimCfResponseHeadersApplicator {
       );
     }
 
-    return policy.apply(response);
+    return policy.apply(response, request.headers.get("origin"));
   }
 }

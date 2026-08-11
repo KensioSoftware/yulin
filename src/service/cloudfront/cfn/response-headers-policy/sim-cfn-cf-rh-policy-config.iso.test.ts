@@ -5,6 +5,7 @@ import {
   assertStringIncludes,
   assertThrowsError,
   assertTrue,
+  assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
@@ -84,21 +85,86 @@ describe("SimCfnCfResponseHeadersPolicyConfig", () => {
     assertArrayLength(policy.headersToRemove, 0);
   });
 
-  it("refuses each section it does not model, by name", () => {
-    // Given policy configs using the sections this simulation does not model.
-    // When each is read, then it is refused by name rather than stepped over,
-    // because a policy that quietly sets fewer headers here than in AWS is a
-    // divergence a test would not catch.
-    for (const section of [
-      "CorsConfig",
-      "SecurityHeadersConfig",
-      "ServerTimingHeadersConfig",
-    ]) {
-      const error = assertThrowsError(() => policyFrom({ [section]: {} }));
+  it("reads the security headers a policy sets", () => {
+    // Given the config CDK's securityHeadersBehavior synthesizes, which the
+    // per-section mapping is tested by SimCfnCfResponseHeadersPolicySecurityHeaders.
+    const policy = policyFrom({
+      SecurityHeadersConfig: {
+        ContentTypeOptions: { Override: true },
+      },
+    });
 
-      assertStringIncludes(error.message, section);
-      assertStringIncludes(error.message, "CacheHeaders");
-    }
+    // Then the section is delegated to and its header is on the policy.
+    assertArrayLength(policy.securityHeaders, 1);
+    assertIdentical(policy.securityHeaders[0].name, "X-Content-Type-Options");
+  });
+
+  it("reads a policy setting no security headers", () => {
+    // Given a SecurityHeadersConfig with no sections.
+    const policy = policyFrom({ SecurityHeadersConfig: {} });
+
+    // Then it sets none.
+    assertArrayLength(policy.securityHeaders, 0);
+  });
+
+  it("reads ServerTimingHeadersConfig once enabled", () => {
+    // Given the config enabling the Server-Timing header.
+    const policy = policyFrom({
+      ServerTimingHeadersConfig: { Enabled: true, SamplingRate: 50 },
+    });
+
+    // Then the header is set.
+    assertNonNullable(policy.serverTiming);
+    assertIdentical(policy.serverTiming.name, "Server-Timing");
+  });
+
+  it("reads a disabled ServerTimingHeadersConfig as setting nothing", () => {
+    // Given the config leaving the header off.
+    const policy = policyFrom({
+      ServerTimingHeadersConfig: { Enabled: false },
+    });
+
+    // Then no header is set.
+    assertUndefined(policy.serverTiming);
+  });
+
+  it("refuses a ServerTimingHeadersConfig with no boolean Enabled", () => {
+    assertStringIncludes(
+      assertThrowsError(() => policyFrom({ ServerTimingHeadersConfig: {} }))
+        .message,
+      "needs a boolean Enabled",
+    );
+  });
+
+  it("reads the CORS a policy sets", () => {
+    // Given the config CDK's corsBehavior synthesizes, which the per-field
+    // mapping is tested by SimCfnCfResponseHeadersPolicyCorsConfig.
+    const policy = policyFrom({
+      CorsConfig: {
+        AccessControlAllowCredentials: true,
+        AccessControlAllowHeaders: { Items: ["*"] },
+        AccessControlAllowMethods: { Items: ["GET"] },
+        AccessControlAllowOrigins: { Items: ["https://example.com"] },
+        OriginOverride: true,
+      },
+    });
+
+    // Then the section is delegated to and its model is on the policy.
+    assertNonNullable(policy.cors);
+
+    const headers = new Headers();
+    policy.cors.apply(headers, "https://example.com");
+
+    assertIdentical(
+      headers.get("access-control-allow-origin"),
+      "https://example.com",
+    );
+  });
+
+  it("reads a policy with no CorsConfig as having none", () => {
+    const policy = policyFrom({});
+
+    assertUndefined(policy.cors);
   });
 
   it("refuses a policy config that is not an object", () => {
@@ -127,7 +193,10 @@ describe("SimCfnCfResponseHeadersPolicyConfig", () => {
       }).build(),
     );
 
-    assertStringIncludes(error.message, "Name must be a string");
+    assertStringIncludes(
+      error.message,
+      "ResponseHeadersPolicyConfig needs a string Name",
+    );
   });
 
   it("refuses a custom header missing its Header, Value or Override", () => {
