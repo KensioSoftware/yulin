@@ -1316,3 +1316,7 @@ Where sim CloudFront knowingly behaves differently from AWS:
   template, so nothing here creates them. A Behavior naming one is refused with
   `NoSuchResponseHeadersPolicy` when a request reaches it, rather than serving a response without the
   headers the policy would have set.
+- **`CachePolicyId` and `OriginRequestPolicyId` are accepted and ignored.** Sim CloudFront does not
+  model edge caching, so a Behavior's cache policy — including an AWS managed policy such as
+  `CachingOptimized` — is neither validated nor applied to TTLs or the cache key. Every request
+  reaches the Origin regardless of what the policy would have cached on real CloudFront.
