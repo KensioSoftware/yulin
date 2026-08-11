@@ -1,4 +1,10 @@
-import { assertIdentical, assertNonNullable } from "@kensio/smartass";
+import {
+  assertIdentical,
+  assertNonNullable,
+  assertResponseStatus,
+  assertStringIncludes,
+  describeResponse,
+} from "@kensio/smartass";
 import { CreateFunctionCommand } from "@aws-sdk/client-cloudfront";
 import { describe, it } from "vitest";
 import { SimAws } from "../../aws/sim-aws.js";
@@ -157,5 +163,44 @@ describe("Simulated CloudFront response headers policy in the request pipeline",
     // Then the function's value is what the viewer gets, being the last thing
     // to touch the response.
     assertIdentical(home.headers.get("cache-control"), "no-store");
+  });
+
+  it("answers 404 rather than a mystery 500 when a named policy no longer exists", async () => {
+    // Given a Distribution whose Behavior named a policy that has since been
+    // removed. Creating a Distribution refuses an unknown policy ID, so this
+    // is the one way a request can still find one gone: the policy is removed
+    // after the Distribution was validated against it.
+    const simAws = new SimAws();
+
+    await simCfSiteBucket(simAws, "removed-policy-bucket", {
+      "index.html": "<h1>Home</h1>",
+    });
+
+    const policy = new SimCloudFrontResponseHeadersPolicy({
+      name: "CacheHeaders",
+    });
+
+    simAws.cloudFront().addResponseHeadersPolicy(policy);
+
+    const distributionId = await simCfSiteDistributionId(
+      simAws,
+      simCfSiteDistributionConfig("removed-policy-bucket", {
+        DefaultCacheBehavior: {
+          TargetOriginId: "site-origin",
+          ViewerProtocolPolicy: "allow-all",
+          ResponseHeadersPolicyId: policy.id,
+        },
+      }),
+    );
+
+    simAws.cloudFront().removeResponseHeadersPolicy(policy.id);
+
+    // When the page is requested.
+    const home = await simCfSiteRequest(simAws, distributionId, "/index.html");
+
+    // Then the response reports the gap with the status CloudFront answers
+    // it with, rather than the generic 500 an unrecognised throw becomes.
+    assertResponseStatus(home, 404, await describeResponse(home));
+    assertStringIncludes(await home.text(), policy.id);
   });
 });

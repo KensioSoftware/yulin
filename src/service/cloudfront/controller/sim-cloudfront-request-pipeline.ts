@@ -73,6 +73,7 @@ export class SimCloudFrontRequestPipeline {
     // policy's headers and a viewer-response function sees them.
     const response = this.stages.responseHeadersApplicator.apply(
       cloudFront,
+      requestReference,
       errorResponse,
       behaviour,
     );

@@ -1093,6 +1093,31 @@ The policy is applied after a custom error response is fetched and before a `vie
 CloudFront Function runs, as CloudFront does. An error page carries the policy's headers, and a
 function sees them in `event.response.headers` and can change them.
 
+`SecurityHeadersConfig` is what CDK's `ResponseHeadersPolicy` construct synthesizes from
+`securityHeadersBehavior`, and every one of its sections is modelled: `ContentSecurityPolicy`,
+`ContentTypeOptions`, `FrameOptions`, `ReferrerPolicy`, `StrictTransportSecurity` and `XSSProtection`
+each become the header CloudFront documents for it, honouring the section's own `Override` the same
+way a `CustomHeadersConfig` item does.
+
+`ServerTimingHeadersConfig` adds a `Server-Timing` header once `Enabled` is true. `SamplingRate` is
+not honoured: this simulation always adds the header rather than sampling a share of responses, so a
+test asserting on it does not depend on chance, and the header's value is a fixed placeholder rather
+than real Origin timing.
+
+`CorsConfig` is what CDK's `corsBehavior` synthesizes. CloudFront reflects the viewer request's
+`Origin` header against `AccessControlAllowOrigins` rather than sending the list itself: a request
+naming an Origin the list allows gets the CORS headers the section configures, with the response
+varying on `Origin` unless the list is `["*"]`; a request naming one it does not allow gets none of
+them, the same as CloudFront sending none rather than a mismatched one. `AccessControlAllowMethods`
+of `["ALL"]` expands to CloudFront's full method list, and `AccessControlAllowCredentials: false`
+leaves `Access-Control-Allow-Credentials` off entirely, since a header naming `false` means the same
+as its absence to a browser.
+
+A Behavior's `ResponseHeadersPolicyId` is checked when the Distribution is created or updated: naming
+a policy this simulation did not create, whether mistyped or a CloudFront managed policy ID, fails the
+Stack there rather than deploying successfully and only failing the first request that reaches the
+Behavior.
+
 ## Origin access controls
 
 An origin access control is how a Distribution authenticates to a private S3 Bucket. Declare one as
@@ -1302,20 +1327,22 @@ Where sim CloudFront knowingly behaves differently from AWS:
 - **`DeleteFunctionCommand` never answers `FunctionInUse`.** Nothing tells a CloudFront Function that
   a cache Behavior has taken it up, so every Function is deletable. A Behavior left pointing at a
   deleted Function runs no Function code.
-- **A response headers policy sets custom headers and removes named ones, and nothing else.** The
-  `CorsConfig`, `SecurityHeadersConfig` and `ServerTimingHeadersConfig` sections each set headers of
-  their own, and none of them is modelled. A policy declaring one fails the stack by naming the
-  section, rather than deploying and then serving responses missing the headers it promised.
 - **A response headers policy name is unique, but nothing else about it is checked.** A second
   policy claiming a name is refused with `ResponseHeadersPolicyAlreadyExists`, as CloudFront refuses
   one. The header names and values themselves are stored as written.
 - **There is no command surface for a response headers policy.** `CreateResponseHeadersPolicy` and
   its siblings are not simulated, so `AWS::CloudFront::ResponseHeadersPolicy` is the only way to make
   one.
+- **`ServerTimingHeadersConfig` always adds the header once enabled, rather than sampling.**
+  `SamplingRate` decides what share of real responses carry `Server-Timing`; this simulation adds it
+  to every response once `Enabled` is true, so a test asserting on it does not depend on chance. The
+  header's value is a fixed placeholder rather than real timing data, since nothing here measures an
+  Origin fetch the way CloudFront's edge does.
 - **A managed policy ID is not found.** CloudFront's managed policies belong to AWS rather than to a
   template, so nothing here creates them. A Behavior naming one is refused with
-  `NoSuchResponseHeadersPolicy` when a request reaches it, rather than serving a response without the
-  headers the policy would have set.
+  `InvalidResponseHeadersPolicyId` when the Distribution is created or updated, the same as real
+  CloudFront refuses one at that point, rather than deploying successfully and only failing the first
+  request that reaches the Behavior.
 - **`CachePolicyId` and `OriginRequestPolicyId` are accepted and ignored.** Sim CloudFront does not
   model edge caching, so a Behavior's cache policy — including an AWS managed policy such as
   `CachingOptimized` — is neither validated nor applied to TTLs or the cache key. Every request

@@ -259,33 +259,4 @@ describe("CloudFormation Distribution response headers policies", () => {
     // their own and diverging from what AWS would have done.
     assertStringIncludes(error.message, "CacheHeaders already exists");
   });
-
-  it("fails the stack for a policy section it does not model", async () => {
-    // Given a template whose policy sets security headers, which this
-    // simulation does not model.
-    const simAws = new SimAws();
-
-    // When the template is deployed, then it fails rather than serving
-    // responses missing the headers the policy promised.
-    const error = await assertThrowsErrorAsync(async () => {
-      const stack = await simAws.cloudFormation().deployTemplate({
-        stackName: "unmodelled-section-stack",
-        template: siteTemplate({
-          Name: "CacheHeaders",
-          SecurityHeadersConfig: {
-            StrictTransportSecurity: {
-              AccessControlMaxAgeSec: 31_536_000,
-              Override: true,
-            },
-          },
-        }),
-      });
-
-      await stack.waitForDeployComplete();
-    });
-
-    // And the section is named for diagnosis.
-    assertStringIncludes(error.message, "SecurityHeadersConfig");
-    assertStringIncludes(error.message, "CacheHeaders");
-  });
 });

@@ -88,6 +88,7 @@ export class SimCloudFront {
       distributions: this.distributions,
       cloudFrontFunctions: this.cloudFrontFunctions,
       originAccessControls: this.originAccessControls,
+      responseHeadersPolicies: this.responseHeadersPolicies,
     });
   }
 

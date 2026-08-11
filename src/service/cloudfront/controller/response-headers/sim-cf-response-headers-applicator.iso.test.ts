@@ -43,6 +43,7 @@ describe("SimCfResponseHeadersApplicator", () => {
     // When an Origin response passes through it.
     const response = applicator.apply(
       cloudFront,
+      new Request("https://distro123.cloudfront.net/"),
       new Response("body"),
       behaviour,
     );
@@ -61,7 +62,12 @@ describe("SimCfResponseHeadersApplicator", () => {
 
     // When an Origin response passes through it.
     const originResponse = new Response("body");
-    const response = applicator.apply(cloudFront, originResponse, behaviour);
+    const response = applicator.apply(
+      cloudFront,
+      new Request("https://distro123.cloudfront.net/"),
+      originResponse,
+      behaviour,
+    );
 
     // Then nothing is done to it at all.
     assertIdentical(response, originResponse);
@@ -78,7 +84,12 @@ describe("SimCfResponseHeadersApplicator", () => {
     // When an Origin response passes through it, then the gap is reported
     // rather than the response being served without the headers it promised.
     const error = assertThrowsError(() =>
-      applicator.apply(cloudFront, new Response("body"), behaviour),
+      applicator.apply(
+        cloudFront,
+        new Request("https://distro123.cloudfront.net/"),
+        new Response("body"),
+        behaviour,
+      ),
     );
 
     assertInstanceOf(error, SimCloudFrontNoSuchResponseHeadersPolicy);
