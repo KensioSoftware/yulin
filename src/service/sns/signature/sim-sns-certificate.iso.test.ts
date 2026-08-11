@@ -68,9 +68,8 @@ describe("sim SNS certificate serial number", () => {
     // When the certificate is issued and read back.
     const certificate = issuedCertificate(digest);
 
-    // Then the serial number is zero, written as the one byte DER writes zero
-    // as rather than as no bytes at all, which is a number and not a value a
-    // reader refuses.
-    assertIdentical(certificate.serialNumber, "0");
+    // Then the serial number is one rather than the zero those bytes name,
+    // because X.509 says a serial number is positive and zero is not.
+    assertIdentical(certificate.serialNumber, "01");
   });
 });

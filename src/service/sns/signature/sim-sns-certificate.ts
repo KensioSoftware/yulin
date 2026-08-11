@@ -168,10 +168,17 @@ export function simSnsSelfSignedCertificatePem(
  * matters: two simulated scopes with different keys have different serials.
  *
  * The bytes are the number itself, unsigned, and `derInteger` writes them the
- * way DER writes an unsigned number: a serial has to be positive, and how a
- * positive number is kept positive is the encoding's business rather than
- * this function's.
+ * way DER writes an unsigned number, so how the sign of a written number is
+ * kept is the encoding's business rather than this function's.
+ *
+ * Which number it is stays this function's business, and X.509 says a serial
+ * number is positive. Zero is the one value a digest could name that is not,
+ * so it is answered with one instead. No real digest is all zeroes, and a
+ * certificate that is not a certificate is not worth the byte saved by leaving
+ * that to chance.
  */
 export function simSnsSerialNumber(digest: Buffer): Buffer {
-  return Buffer.from(digest.subarray(0, serialNumberBytes));
+  const serial = Buffer.from(digest.subarray(0, serialNumberBytes));
+
+  return serial.some((byte) => byte !== 0) ? serial : Buffer.from([1]);
 }
