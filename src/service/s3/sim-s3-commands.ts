@@ -17,6 +17,7 @@ import type { SimS3BucketCommandState } from "./command/sim-s3-bucket-command-st
 import type { SimS3NotificationDestinations } from "./notification/destination/sim-s3-notification-destination.js";
 import { SimS3NoNotificationDestinations } from "./notification/destination/sim-s3-service-notification-destinations.js";
 import { SimS3ObjectNotifier } from "./notification/sim-s3-object-notifier.js";
+import { SimS3ObjectListingLimits } from "./object/s3-object-listing-limits.js";
 import type { SimS3GlobalRegistry } from "./sim-s3-global-registry.js";
 
 /**
@@ -33,6 +34,12 @@ export interface SimS3Properties {
    * destination.
    */
   readonly notificationDestinations?: SimS3NotificationDestinations;
+  /**
+   * The most keys one page of an Object listing holds, which real S3 fixes at
+   * a thousand. Lower it to exercise a caller's pagination without having to
+   * store a thousand and one Objects first.
+   */
+  readonly maxKeysPerPage?: number;
 }
 
 interface SimS3CommandsProperties extends SimS3Properties {
@@ -75,6 +82,7 @@ export class SimS3Commands {
       background,
       notificationDestinations,
       notifications: this.objectNotifier,
+      listing: new SimS3ObjectListingLimits(properties.maxKeysPerPage),
     };
 
     this.buckets = new SimS3BucketCommands({

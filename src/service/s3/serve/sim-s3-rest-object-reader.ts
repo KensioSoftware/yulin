@@ -25,7 +25,12 @@ export class SimS3RestObjectReader {
     );
 
     const body = await bodyBytes(output.Body);
-    const headers = simS3ObjectResponseHeaders(output.Metadata, body.length);
+    const headers = simS3ObjectResponseHeaders({
+      metadata: output.Metadata,
+      bodyLength: body.length,
+      etag: output.ETag,
+      lastModified: output.LastModified,
+    });
 
     if (serviceRequest.request.method === "HEAD") {
       return new Response(undefined, { status: 200, headers });

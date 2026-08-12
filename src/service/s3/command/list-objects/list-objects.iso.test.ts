@@ -186,6 +186,23 @@ describe("S3 ListObjectsCommand", () => {
     assertUndefined(listObjectsOutput.NextMarker);
   });
 
+  it("returns no Contents at all for a Bucket with nothing in it", async () => {
+    // Given an empty Bucket.
+    const simS3 = new SimS3();
+
+    await simS3.createBucket(new CreateBucketCommand({ Bucket: "bucket-e" }));
+
+    // When it is listed.
+    const listObjectsOutput = await simS3.listObjects(
+      new ListObjectsCommand({ Bucket: "bucket-e" }),
+    );
+
+    // Then Contents is absent rather than empty, as it is in real S3, so a
+    // caller that assumes an array here fails the same way against both.
+    assertUndefined(listObjectsOutput.Contents);
+    assertFalse(listObjectsOutput.IsTruncated);
+  });
+
   it("rejects undefined bucket name", async () => {
     const simS3 = new SimS3();
 

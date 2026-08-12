@@ -10,7 +10,7 @@ describe("simS3ObjectResponseHeaders", () => {
   it("describes the body length of an Object with no metadata", () => {
     // Given an Object stored without any system metadata.
     // When its response headers are built.
-    const headers = simS3ObjectResponseHeaders(undefined, 42);
+    const headers = simS3ObjectResponseHeaders({ bodyLength: 42 });
 
     // Then only the length of what is being served is reported.
     assertObjectMatches(headers, { "content-length": "42" });
@@ -29,7 +29,7 @@ describe("simS3ObjectResponseHeaders", () => {
     };
 
     // When its response headers are built.
-    const headers = simS3ObjectResponseHeaders(metadata, 100);
+    const headers = simS3ObjectResponseHeaders({ metadata, bodyLength: 100 });
 
     // Then each one comes back unchanged, alongside the body length.
     assertObjectMatches(headers, { ...metadata, "content-length": "100" });
@@ -38,10 +38,10 @@ describe("simS3ObjectResponseHeaders", () => {
   it("keeps a content encoding so the body can be decoded", () => {
     // Given an Object stored as brotli.
     // When its response headers are built.
-    const headers = simS3ObjectResponseHeaders(
-      { "content-encoding": "br", "content-type": "text/plain" },
-      7,
-    );
+    const headers = simS3ObjectResponseHeaders({
+      metadata: { "content-encoding": "br", "content-type": "text/plain" },
+      bodyLength: 7,
+    });
 
     // Then the encoding is reported, because bytes served without it are bytes
     // no client can decode.
@@ -54,12 +54,18 @@ describe("simS3ObjectResponseHeaders", () => {
 
   it("leaves out user metadata and anything else S3 does not return as a header", () => {
     // Given an Object stored with user metadata alongside its content type.
-    const headers = simS3ObjectResponseHeaders(
-      { "content-type": "text/plain", "x-amz-meta-author": "hg", etag: "abc" },
-      3,
-    );
+    const headers = simS3ObjectResponseHeaders({
+      metadata: {
+        "content-type": "text/plain",
+        "x-amz-meta-author": "hg",
+        etag: "abc",
+      },
+      bodyLength: 3,
+    });
 
-    // Then only the system metadata S3 returns as a header comes back.
+    // Then only the system metadata S3 returns as a header comes back, and the
+    // ETag among it is ignored: an entity tag describes the bytes, so it comes
+    // from the Object rather than from whatever was stored under that name.
     assertObjectMatches(headers, {
       "content-type": "text/plain",
       "content-length": "3",
@@ -70,9 +76,29 @@ describe("simS3ObjectResponseHeaders", () => {
   it("reports the length it is given rather than one from metadata", () => {
     // Given an Object whose stored metadata claims a different length.
     // When its response headers are built for a body of a known size.
-    const headers = simS3ObjectResponseHeaders({ "content-length": "999" }, 5);
+    const headers = simS3ObjectResponseHeaders({
+      metadata: { "content-length": "999" },
+      bodyLength: 5,
+    });
 
     // Then the body being served decides the length, not what was remembered.
     assertIdentical(headers["content-length"], "5");
+  });
+
+  it("reports the entity tag and write time of the Object being served", () => {
+    // Given an Object with a known content hash, written at a known instant.
+    // When its response headers are built.
+    const headers = simS3ObjectResponseHeaders({
+      bodyLength: 3,
+      etag: '"acbd18db4cc2f85cedef654fccc4a4d8"',
+      lastModified: new Date("2026-08-12T09:30:00.000Z"),
+    });
+
+    // Then a client has what it needs to tell whether its copy is current,
+    // with the last-modified time as the HTTP date real S3 sends.
+    assertObjectMatches(headers, {
+      etag: '"acbd18db4cc2f85cedef654fccc4a4d8"',
+      "last-modified": "Wed, 12 Aug 2026 09:30:00 GMT",
+    });
   });
 });

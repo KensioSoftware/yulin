@@ -138,8 +138,160 @@ console.log(listBucketsOutput.Buckets?.map((bucket) => bucket.Name));
 
 ## Listing Objects
 
-Use `ListObjectsCommand` to list Object keys in a Bucket. The simulator supports `Prefix`, `MaxKeys`,
-and `Marker`.
+Use `ListObjectsV2Command` to list the Objects in a Bucket. The simulator supports `Prefix`,
+`MaxKeys`, `ContinuationToken` and `StartAfter`, and answers with `Contents`, `KeyCount`,
+`IsTruncated` and `NextContinuationToken`.
+
+```typescript sim-s3-list-objects-v2
+/**
+ * Listing Objects in a simulated S3 Bucket.
+ */
+
+import {
+  CreateBucketCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const simS3 = simAws.s3();
+
+await simS3.createBucket(
+  new CreateBucketCommand({
+    Bucket: "assets-bucket",
+  }),
+);
+
+for (const key of ["docs/index.html", "docs/guide.html", "images/logo.svg"]) {
+  await simS3.putObject(
+    new PutObjectCommand({
+      Bucket: "assets-bucket",
+      Key: key,
+      Body: "file contents",
+    }),
+  );
+}
+
+const listOutput = await simS3.listObjectsV2(
+  new ListObjectsV2Command({
+    Bucket: "assets-bucket",
+    Prefix: "docs/",
+  }),
+);
+
+console.log(listOutput.KeyCount);
+
+const listedObjects = listOutput.Contents ?? [];
+for (const object of listedObjects) {
+  console.log(object.Key, object.Size, object.ETag, object.LastModified);
+}
+```
+
+Listings are sorted by key, and a page holds at most 1,000 keys, as in real S3. `MaxKeys` above that
+is lowered to it, and the response reports the page size that was actually used. A `MaxKeys` of zero
+returns no keys and completes the listing, and a negative one is refused with `InvalidArgument`.
+
+A listing that found no keys has no `Contents` at all rather than an empty one, which is why the
+example reaches for `Contents ?? []`. `KeyCount` is the count either way.
+
+### Walking a truncated listing
+
+A truncated response carries `NextContinuationToken`, which the next request passes as
+`ContinuationToken`. The token is opaque, as it is in real S3: pass it back unchanged rather than
+reading anything out of it, and simulated S3 refuses one it did not issue.
+
+```typescript sim-s3-list-objects-v2-pagination
+/**
+ * Walking a truncated Object listing in a simulated S3 Bucket.
+ */
+
+import {
+  CreateBucketCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const simS3 = simAws.s3();
+
+await simS3.createBucket(
+  new CreateBucketCommand({
+    Bucket: "paged-bucket",
+  }),
+);
+
+for (const key of ["a.txt", "b.txt", "c.txt"]) {
+  await simS3.putObject(
+    new PutObjectCommand({ Bucket: "paged-bucket", Key: key, Body: key }),
+  );
+}
+
+// Ask for a page of one, so the listing has to be continued.
+let continuationToken: string | undefined;
+const allKeys: string[] = [];
+
+do {
+  const page = await simS3.listObjectsV2(
+    new ListObjectsV2Command({
+      Bucket: "paged-bucket",
+      MaxKeys: 1,
+      ContinuationToken: continuationToken,
+    }),
+  );
+
+  const pageObjects = page.Contents ?? [];
+  for (const object of pageObjects) {
+    allKeys.push(object.Key ?? "");
+  }
+
+  continuationToken = page.NextContinuationToken;
+} while (continuationToken !== undefined);
+
+console.log(allKeys);
+```
+
+Code that never names `MaxKeys` never continues a listing in a test small enough to be readable, so
+its pagination goes unexercised. `configureMaxKeysPerPage` lowers the page size for a whole simulated
+S3 instead, which makes a Bucket of two Objects enough to make the caller walk a continuation:
+
+```typescript sim-s3-list-page-size
+/**
+ * Lowering the page size of a simulated S3 listing, so a caller that does not
+ * set MaxKeys still has to ask for a second page.
+ */
+
+import {
+  CreateBucketCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const simS3 = simAws.s3();
+simS3.configureMaxKeysPerPage(1);
+
+await simS3.createBucket(new CreateBucketCommand({ Bucket: "small-pages" }));
+
+for (const key of ["a.txt", "b.txt"]) {
+  await simS3.putObject(
+    new PutObjectCommand({ Bucket: "small-pages", Key: key, Body: key }),
+  );
+}
+
+const firstPage = await simS3.listObjectsV2(
+  new ListObjectsV2Command({ Bucket: "small-pages" }),
+);
+
+console.log(firstPage.IsTruncated, firstPage.KeyCount);
+```
+
+### The first version of the operation
+
+`ListObjectsCommand` is also simulated, with the `Marker` and `NextMarker` shape it has in real S3.
+It lists the same keys as `ListObjectsV2Command` and is bounded by the same page size.
 
 ```typescript sim-s3-list-objects
 /**
@@ -194,7 +346,59 @@ for (const object of objectContentItems) {
 }
 ```
 
-Object listings are sorted by key.
+The marker is exclusive and lexicographic, so a listing resumes after the key it names whether or not
+the Bucket still holds it.
+
+## Object ETags
+
+Every Object has an ETag, which is the MD5 of its body in hex, quoted, as real S3 gives it for a
+single-part upload. `PutObject`, `GetObject`, both list operations and the S3 REST endpoint all
+report the same one, so a tool can compare what a Bucket holds against a local file without reading
+the Object back.
+
+```typescript sim-s3-object-etag
+/**
+ * Comparing a local file against a simulated S3 Object by content hash.
+ */
+
+import { createHash } from "node:crypto";
+import {
+  CreateBucketCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+} from "@aws-sdk/client-s3";
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const simS3 = simAws.s3();
+
+await simS3.createBucket(new CreateBucketCommand({ Bucket: "site-bucket" }));
+
+const published = "<h1>Hello</h1>";
+await simS3.putObject(
+  new PutObjectCommand({
+    Bucket: "site-bucket",
+    Key: "index.html",
+    Body: published,
+  }),
+);
+
+const listOutput = await simS3.listObjectsV2(
+  new ListObjectsV2Command({ Bucket: "site-bucket" }),
+);
+
+const localFile = Buffer.from(published);
+const localETag = `"${createHash("md5").update(localFile).digest("hex")}"`;
+
+const listedObjects = listOutput.Contents ?? [];
+for (const object of listedObjects) {
+  // Nothing to upload: the Bucket already holds these bytes.
+  console.log(object.Key, object.ETag === localETag);
+}
+```
+
+An event notification record carries the same value unquoted, in its `eTag` field, which is how real
+S3 reports it there.
 
 ## Deleting Objects
 
@@ -1495,7 +1699,8 @@ const s3Client = new S3Client({
 - `createPresignedPost` and SigV4A presigning are not simulated.
 - Checksums are verified for CRC32, SHA1 and SHA256. An upload stating a CRC32C or CRC64NVME checksum
   is refused rather than stored unchecked.
-- Responses carry no `ETag`, because sim S3 does not model Object entity tags.
+- Responses carry the Object's `ETag` and `Last-Modified`, but no conditional request is honoured:
+  `If-None-Match` and `If-Modified-Since` are ignored and the Object is served in full.
 
 ## Error documents
 
@@ -2011,7 +2216,8 @@ environment.
 Sim S3 currently supports:
 
 - `CreateBucketCommand` and `ListBucketsCommand`
-- `PutObjectCommand`, `GetObjectCommand` and `ListObjectsCommand`
+- `PutObjectCommand`, `GetObjectCommand`, `ListObjectsV2Command` and `ListObjectsCommand`, with an
+  ETag and a last-modified time on every Object
 - `DeleteObjectCommand` and `DeleteObjectsCommand`, authorized per Object by sim IAM
 - `PutBucketNotificationConfigurationCommand` and `GetBucketNotificationConfigurationCommand`, with
   Object events delivered to a simulated Lambda function, a simulated SQS queue or a simulated SNS
@@ -2047,16 +2253,21 @@ These apply across the page. The sections above each list what is specific to th
 - Object versioning is not simulated. There are no version ids, no delete markers and no
   `VersionId` on any request or response.
 - Multipart uploads are not simulated. An Object is stored by one `PutObject`, so an ETag is always
-  the MD5 of the whole body.
-- `GetObject` and `ListObjects` do not report an ETag or a last-modified time. Object event
-  notifications do carry an ETag, since they compute it at the moment the Object is written.
-- Object tags, ACLs, storage classes, lifecycle rules, replication and server-side encryption are
-  not simulated.
+  the MD5 of the whole body and never carries the `-N` part-count suffix real S3 gives a multipart
+  Object.
+- A listing reports `StorageClass` as `STANDARD` for every Object. Storage classes themselves are not
+  simulated, so nothing can be stored in another one.
+- `Delimiter` and `CommonPrefixes` are not simulated, so a listing cannot be walked as a folder tree.
+  `EncodingType` is ignored, and keys come back unencoded.
+- Object tags, ACLs, lifecycle rules, replication and server-side encryption are not simulated.
 - A Bucket using filesystem-backed storage cannot delete Objects, and raises no event
   notifications, because it swaps the whole storage backend rather than putting Objects.
 - `GetObjectCommand` returns system metadata through `Metadata`, under the header name it is stored
   as, rather than through the `ContentType`, `CacheControl` and other response fields real S3 uses.
   See [Object system metadata](#object-system-metadata).
+- `HeadObjectCommand` is not one of the Commands simulated S3 answers, so it is not routed by SDK
+  interception either. A `HEAD` over the S3 REST endpoint is served, answering with the Object's
+  headers and no body, which is what a presigned `HEAD` URL uses.
 - An upload over the S3 REST endpoint keeps its `content-type` and no other system metadata, so a
   presigned `PUT` cannot set the rest. A `PutObjectCommand` through the SDK keeps all of them.
 - A presigned `GetObject` ignores the `response-content-type`, `response-cache-control` and other

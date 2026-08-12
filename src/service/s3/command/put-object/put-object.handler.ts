@@ -21,6 +21,7 @@ import type { SimS3RequestOptions } from "../sim-s3-request-options.js";
 import { PutObjectAuthorizer } from "./put-object-authorizer.js";
 import { PutObjectBuilder } from "./put-object-builder.js";
 import type { SimS3ObjectNotifier } from "../../notification/sim-s3-object-notifier.js";
+import { simS3QuotedETag } from "../../object/s3-object-etag.js";
 
 interface PutObjectCommandHandlerProperties {
   readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
@@ -40,7 +41,7 @@ export class PutObjectCommandHandler implements CommandHandler<
 > {
   private readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
   private readonly authorizer: PutObjectAuthorizer;
-  private readonly objectBuilder = new PutObjectBuilder();
+  private readonly objectBuilder: PutObjectBuilder;
   private readonly background: BackgroundScheduler;
   private readonly notifications: SimS3ObjectNotifier;
 
@@ -53,6 +54,7 @@ export class PutObjectCommandHandler implements CommandHandler<
     this.buckets = buckets;
     this.authorizer = new PutObjectAuthorizer({ iam });
     this.background = background;
+    this.objectBuilder = new PutObjectBuilder({ clock: background });
     this.notifications = properties.notifications;
   }
 
@@ -98,6 +100,7 @@ export class PutObjectCommandHandler implements CommandHandler<
     this.notifications.objectCreated({ bucket, object, caller });
 
     return {
+      ETag: simS3QuotedETag(object.etag),
       $metadata: {},
     };
   }

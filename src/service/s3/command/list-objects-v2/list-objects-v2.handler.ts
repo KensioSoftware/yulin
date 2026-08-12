@@ -1,8 +1,8 @@
 import type { CommandHandler } from "../../../../command/command-handler.js";
 import type {
-  SimListObjectsCommand,
-  SimListObjectsCommandOutput,
-} from "./list-objects.command.js";
+  SimListObjectsV2Command,
+  SimListObjectsV2CommandOutput,
+} from "./list-objects-v2.command.js";
 import type {
   SimS3Bucket,
   SimS3BucketName,
@@ -20,10 +20,10 @@ import {
 import { simS3EffectiveMaxKeys } from "../../object/s3-object-listing.js";
 import { SimS3ObjectListingLimits } from "../../object/s3-object-listing-limits.js";
 import type { SimS3RequestOptions } from "../sim-s3-request-options.js";
-import { ListObjectsAuthorizer } from "./list-objects-authorizer.js";
-import { ListObjectsPageBuilder } from "./list-objects-page-builder.js";
+import { ListObjectsAuthorizer } from "../list-objects/list-objects-authorizer.js";
+import { ListObjectsV2PageBuilder } from "./list-objects-v2-page-builder.js";
 
-interface ListObjectsCommandHandlerProperties {
+interface ListObjectsV2CommandHandlerProperties {
   readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
@@ -31,21 +31,26 @@ interface ListObjectsCommandHandlerProperties {
 }
 
 /**
- * Simulated S3 ListObjectsCommand handler.
+ * Simulated S3 ListObjectsV2Command handler.
  *
- * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/s3/command/ListObjectsCommand/
+ * The second version of the operation is the one current tooling reaches for.
+ * It authorizes identically to the first, against `s3:ListBucket` on the
+ * Bucket, and lists the same keys; the difference is a continuation token in
+ * place of a marker, and a response that counts the keys it returned.
+ *
+ * https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/s3/command/ListObjectsV2Command/
  */
-export class ListObjectsCommandHandler implements CommandHandler<
-  SimListObjectsCommand,
-  SimListObjectsCommandOutput
+export class ListObjectsV2CommandHandler implements CommandHandler<
+  SimListObjectsV2Command,
+  SimListObjectsV2CommandOutput
 > {
   private readonly buckets: Map<SimS3BucketName, SimS3Bucket>;
   private readonly authorizer: ListObjectsAuthorizer;
-  private readonly pageBuilder = new ListObjectsPageBuilder();
+  private readonly pageBuilder = new ListObjectsV2PageBuilder();
   private readonly background: BackgroundScheduler;
   private readonly listing: SimS3ObjectListingLimits;
 
-  constructor(properties: ListObjectsCommandHandlerProperties) {
+  constructor(properties: ListObjectsV2CommandHandlerProperties) {
     const {
       buckets,
       iam = new SimIamAllowAllAuth(),
@@ -67,10 +72,10 @@ export class ListObjectsCommandHandler implements CommandHandler<
    * a denied caller cannot inspect Object keys or sizes.
    */
   async handle(
-    command: SimListObjectsCommand,
+    command: SimListObjectsV2Command,
     options?: SimS3RequestOptions,
-  ): Promise<SimListObjectsCommandOutput> {
-    assertDefined(command.input.Bucket, "ListObjectsCommand.input.Bucket");
+  ): Promise<SimListObjectsV2CommandOutput> {
+    assertDefined(command.input.Bucket, "ListObjectsV2Command.input.Bucket");
 
     const bucketName = command.input.Bucket as SimS3BucketName;
     const bucket = this.buckets.get(bucketName);
@@ -96,7 +101,8 @@ export class ListObjectsCommandHandler implements CommandHandler<
     return await this.pageBuilder.build({
       bucket,
       prefix: command.input.Prefix,
-      marker: command.input.Marker,
+      continuationToken: command.input.ContinuationToken,
+      startAfter: command.input.StartAfter,
       maxKeys,
     });
   }

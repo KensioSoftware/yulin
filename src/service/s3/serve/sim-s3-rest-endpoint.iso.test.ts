@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import {
   DeleteObjectCommand,
   GetObjectCommand,
@@ -92,6 +93,31 @@ describe("The simulated S3 REST endpoint", () => {
       String(presignObjectBody.length),
     );
     assertIdentical(await response.text(), "");
+  });
+
+  it("serves the entity tag and write time of an Object it reads", async () => {
+    // Given a presigned URL for an Object
+    const { client, http } = await presignSimulation();
+    const url = await getSignedUrl(
+      client,
+      new GetObjectCommand({
+        Bucket: presignBucketName,
+        Key: presignObjectKey,
+      }),
+      { expiresIn: 900 },
+    );
+
+    // When it is read over the REST endpoint
+    const response = await http.fetch(url);
+
+    // Then the response carries the entity tag and last-modified time real S3
+    // sends, which is what lets a client revalidate rather than re-download
+    assertIdentical(response.status, 200);
+    assertIdentical(
+      response.headers.get("etag"),
+      `"${createHash("md5").update(presignObjectBody).digest("hex")}"`,
+    );
+    assertNonNullable(response.headers.get("last-modified"));
   });
 
   it("deletes an Object over a presigned DELETE", async () => {
