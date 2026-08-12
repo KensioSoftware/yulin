@@ -1,4 +1,5 @@
-import { readFile, stat } from "node:fs/promises";
+import type { FileHandle } from "node:fs/promises";
+import { open } from "node:fs/promises";
 
 import type { SimS3ObjectMetadata } from "../../object/s3-object.js";
 import { SimS3Object } from "../../object/s3-object.js";
@@ -22,12 +23,20 @@ interface FilesystemS3ObjectFile {
 export async function filesystemS3ObjectFile(
   file: FilesystemS3ObjectFile,
 ): Promise<SimS3Object | undefined> {
+  // One open handle for both, because the bytes and the time they were written
+  // have to describe the same file. A mounted directory is rebuilt while it is
+  // being served, so reading the path twice can pair one file's content with
+  // its replacement's timestamp.
+  const handle = await openFileToRead(file.filePath);
+
+  if (handle === undefined) {
+    return undefined;
+  }
+
   try {
     const [body, fileStats] = await Promise.all([
-      // oxlint-disable-next-line security/detect-non-literal-fs-filename
-      readFile(file.filePath),
-      // oxlint-disable-next-line security/detect-non-literal-fs-filename
-      stat(file.filePath),
+      handle.readFile(),
+      handle.stat(),
     ]);
 
     return new SimS3Object({
@@ -36,6 +45,21 @@ export async function filesystemS3ObjectFile(
       metadata: file.metadata,
       lastModified: fileStats.mtime,
     });
+  } finally {
+    await handle.close();
+  }
+}
+
+/**
+ * Open a file, or answer with nothing when there is no such file, since a key
+ * a Bucket does not hold is not a failure to read.
+ */
+async function openFileToRead(
+  filePath: string,
+): Promise<FileHandle | undefined> {
+  try {
+    // oxlint-disable-next-line security/detect-non-literal-fs-filename
+    return await open(filePath);
   } catch (error) {
     if (isMissingFilesystemPathError(error)) {
       return undefined;

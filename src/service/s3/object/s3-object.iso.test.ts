@@ -11,10 +11,20 @@ describe("SimS3Object", () => {
       body: Buffer.from("contents"),
     });
 
-    // When its ETag is read, twice, since it is computed on demand and kept.
-    // Then both answers describe the bytes it holds.
+    // Then its ETag describes the bytes it holds.
     assertIdentical(object.etag, simS3ObjectETag(Buffer.from("contents")));
-    assertIdentical(object.etag, simS3ObjectETag(Buffer.from("contents")));
+  });
+
+  it("describes the bytes it holds now, not the ones it was made with", () => {
+    // Given a stored Object whose body has been written to in place, which a
+    // Buffer allows however little anything here does it.
+    const body = Buffer.from("before");
+    const object = new SimS3Object({ key: "a.txt", body });
+    body.write("after!");
+
+    // Then the ETag follows the bytes, rather than being remembered from
+    // before them and describing content the Bucket no longer holds.
+    assertIdentical(object.etag, simS3ObjectETag(Buffer.from("after!")));
   });
 
   it("gives two Objects with the same content the same ETag", () => {
@@ -37,6 +47,12 @@ describe("SimS3Object", () => {
 
     // And holds its own copy, so moving the caller's Date does not move it.
     writtenAt.setFullYear(1999);
+    assertIdentical(object.lastModified.getUTCFullYear(), 2026);
+
+    // And hands out a copy, so a caller adjusting the Date it was given does
+    // not change what the Bucket reports from then on.
+    const reported = object.lastModified;
+    reported.setFullYear(1999);
     assertIdentical(object.lastModified.getUTCFullYear(), 2026);
   });
 

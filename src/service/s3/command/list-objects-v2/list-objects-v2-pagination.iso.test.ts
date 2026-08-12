@@ -154,45 +154,39 @@ describe("S3 ListObjectsV2Command pagination", () => {
     assertInstanceOf(error, SimS3InvalidArgument);
   });
 
-  it("makes no progress for a caller asking for no keys, and loses none", async () => {
-    // Given a listing under way.
+  it("completes a listing asked to hold no keys, rather than looping on it", async () => {
+    // Given a Bucket with keys in it.
     const simS3 = new SimS3();
     await bucketOfKeys(simS3, "zero-bucket", ["a.txt", "b.txt", "c.txt"]);
 
-    const first = await simS3.listObjectsV2(
-      new ListObjectsV2Command({ Bucket: "zero-bucket", MaxKeys: 1 }),
-    );
-
-    // When the next page is asked to hold nothing.
+    // When a page is asked to hold nothing.
     const none = await simS3.listObjectsV2(
-      new ListObjectsV2Command({
-        Bucket: "zero-bucket",
-        MaxKeys: 0,
-        ContinuationToken: first.NextContinuationToken,
-      }),
+      new ListObjectsV2Command({ Bucket: "zero-bucket", MaxKeys: 0 }),
     );
 
-    // Then it comes back empty and still truncated, offering the same place to
-    // carry on from rather than one that would skip what was not shown.
+    // Then it comes back empty and complete, with no token. Calling it
+    // truncated would leave a caller that loops until the listing is complete
+    // repeating the same request forever, since no page of no keys can carry
+    // the listing forward.
     assertIdentical(none.KeyCount, 0);
-    assertTrue(none.IsTruncated);
-    assertIdentical(none.NextContinuationToken, first.NextContinuationToken);
+    assertFalse(none.IsTruncated);
+    assertUndefined(none.NextContinuationToken);
   });
 
-  it("has nowhere to resume when the very first page holds nothing", async () => {
-    // Given a listing that asked for no keys before reading any.
+  it("refuses a negative number of keys", async () => {
+    // Given a Bucket to list.
     const simS3 = new SimS3();
-    await bucketOfKeys(simS3, "zero-first-bucket", ["a.txt"]);
+    await bucketOfKeys(simS3, "negative-bucket", ["a.txt"]);
 
-    // When the page is read.
-    const output = await simS3.listObjectsV2(
-      new ListObjectsV2Command({ Bucket: "zero-first-bucket", MaxKeys: 0 }),
+    // When a listing asks for fewer than no keys.
+    const error = await assertThrowsErrorAsync(async () =>
+      simS3.listObjectsV2(
+        new ListObjectsV2Command({ Bucket: "negative-bucket", MaxKeys: -1 }),
+      ),
     );
 
-    // Then there is more to come but no token yet, because nothing has been
-    // listed to carry on after.
-    assertTrue(output.IsTruncated);
-    assertUndefined(output.NextContinuationToken);
+    // Then it is refused, as real S3 refuses it.
+    assertInstanceOf(error, SimS3InvalidArgument);
   });
 
   it("caps a page at the thousand keys real S3 fixes it at", async () => {

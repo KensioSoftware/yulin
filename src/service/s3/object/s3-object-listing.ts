@@ -1,3 +1,4 @@
+import { SimS3InvalidArgument } from "../error/sim-s3.error.js";
 import type { SimS3Object } from "./s3-object.js";
 
 /**
@@ -21,8 +22,11 @@ interface SimS3ObjectPageRequest {
 export interface SimS3ObjectPage {
   readonly objects: readonly SimS3Object[];
   readonly isTruncated: boolean;
-  /** The last key on the page, which is what a caller resumes after. */
-  readonly lastKey: string | undefined;
+  /**
+   * The key the next page resumes after, which is there exactly when the
+   * listing is truncated, so a caller cannot be offered one that goes nowhere.
+   */
+  readonly resumeAfter: string | undefined;
 }
 
 /**
@@ -47,12 +51,22 @@ export function simS3ObjectPage(
       ? ordered
       : ordered.filter((object) => object.key > startAfter);
 
+  // A negative page size would slice keys off the end rather than take none,
+  // so a page with no room is empty rather than backwards.
   const objects = remaining.slice(0, Math.max(0, request.maxKeys));
+  const lastKey = objects.at(-1)?.key;
+
+  // A page that returned no keys has nowhere for a caller to carry on from, so
+  // it is complete however much the Bucket still holds. Reporting it truncated
+  // would offer a continuation that cannot exist, and a caller looping until
+  // the listing is complete would never stop.
+  const isTruncated =
+    lastKey !== undefined && objects.length < remaining.length;
 
   return {
     objects,
-    isTruncated: objects.length < remaining.length,
-    lastKey: objects.at(-1)?.key,
+    isTruncated,
+    resumeAfter: isTruncated ? lastKey : undefined,
   };
 }
 
@@ -61,12 +75,20 @@ export function simS3ObjectPage(
  *
  * Real S3 treats MaxKeys as an upper bound it is free to lower, and never
  * returns more than a page holds however many the caller asks for. A request
- * that names no MaxKeys is asking for a full page.
+ * that names no MaxKeys is asking for a full page. Asking for none is allowed
+ * and answers with none; asking for fewer than none is refused, as real S3
+ * refuses it, rather than being read as some number of keys from the end.
  */
 export function simS3EffectiveMaxKeys(
   requestedMaxKeys: number | undefined,
   maxKeysPerPage: number,
 ): number {
+  if (requestedMaxKeys !== undefined && requestedMaxKeys < 0) {
+    throw new SimS3InvalidArgument(
+      `MaxKeys must not be negative, rather than ${requestedMaxKeys}`,
+    );
+  }
+
   return Math.min(requestedMaxKeys ?? maxKeysPerPage, maxKeysPerPage);
 }
 

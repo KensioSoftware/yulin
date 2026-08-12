@@ -44,7 +44,7 @@ export class ListObjectsPageBuilder {
       Marker: input.marker,
       MaxKeys: input.maxKeys,
       IsTruncated: page.isTruncated,
-      NextMarker: page.isTruncated ? page.lastKey : undefined,
+      NextMarker: page.resumeAfter,
       $metadata: {},
     };
   }

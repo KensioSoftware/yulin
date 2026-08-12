@@ -189,7 +189,8 @@ for (const object of listedObjects) {
 ```
 
 Listings are sorted by key, and a page holds at most 1,000 keys, as in real S3. `MaxKeys` above that
-is lowered to it, and the response reports the page size that was actually used.
+is lowered to it, and the response reports the page size that was actually used. A `MaxKeys` of zero
+returns no keys and completes the listing, and a negative one is refused with `InvalidArgument`.
 
 A listing that found no keys has no `Contents` at all rather than an empty one, which is why the
 example reaches for `Contents ?? []`. `KeyCount` is the count either way.
@@ -258,7 +259,7 @@ S3 instead, which makes a Bucket of two Objects enough to make the caller walk a
 ```typescript sim-s3-list-page-size
 /**
  * Lowering the page size of a simulated S3 listing, so a caller that does not
- * set MaxKeys still has to continue one.
+ * set MaxKeys still has to ask for a second page.
  */
 
 import {

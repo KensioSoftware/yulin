@@ -1,6 +1,6 @@
 /**
  * Lowering the page size of a simulated S3 listing, so a caller that does not
- * set MaxKeys still has to continue one.
+ * set MaxKeys still has to ask for a second page.
  */
 
 import {

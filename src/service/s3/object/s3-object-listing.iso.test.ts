@@ -2,6 +2,9 @@ import {
   assertArrayLength,
   assertFalse,
   assertIdentical,
+  assertInstanceOf,
+  assertStringIncludes,
+  assertThrowsError,
   assertTrue,
   assertUndefined,
 } from "@kensio/smartass";
@@ -12,6 +15,7 @@ import {
   simS3ObjectPage,
 } from "./s3-object-listing.js";
 import { SimS3Object } from "./s3-object.js";
+import { SimS3InvalidArgument } from "../error/sim-s3.error.js";
 
 function objectsWithKeys(...keys: readonly string[]): SimS3Object[] {
   return keys.map((key) => new SimS3Object({ key }));
@@ -48,7 +52,7 @@ describe("simS3ObjectPage", () => {
     // Then the caller is told there is more, and where it stopped.
     assertIdentical(keysOf(page.objects).join(","), "a.txt,b.txt");
     assertTrue(page.isTruncated);
-    assertIdentical(page.lastKey, "b.txt");
+    assertIdentical(page.resumeAfter, "b.txt");
   });
 
   it("resumes strictly after the key it is given", () => {
@@ -61,7 +65,7 @@ describe("simS3ObjectPage", () => {
     // Then the key resumed from is not repeated.
     assertIdentical(keysOf(page.objects).join(","), "c.txt");
     assertFalse(page.isTruncated);
-    assertIdentical(page.lastKey, "c.txt");
+    assertUndefined(page.resumeAfter);
   });
 
   it("resumes after a key the Bucket does not hold", () => {
@@ -87,21 +91,34 @@ describe("simS3ObjectPage", () => {
     // Then it is empty and complete, with nothing to resume after.
     assertArrayLength(page.objects, 0);
     assertFalse(page.isTruncated);
-    assertUndefined(page.lastKey);
+    assertUndefined(page.resumeAfter);
   });
 
-  it("returns nothing for a page with no room, without losing the rest", () => {
+  it("completes a page with no room rather than offering nowhere to resume", () => {
     // Given a caller asking for no keys at all.
     const objects = objectsWithKeys("a.txt", "b.txt");
 
     // When the page is taken.
     const page = simS3ObjectPage({ objects, maxKeys: 0 });
 
-    // Then nothing comes back, and the listing is still truncated, because the
-    // Bucket holds keys the caller has not been shown.
+    // Then nothing comes back, and the listing is complete rather than
+    // truncated: a page that returned no keys has none to carry on after, so
+    // calling it truncated would leave a caller looping on the same request.
     assertArrayLength(page.objects, 0);
-    assertTrue(page.isTruncated);
-    assertUndefined(page.lastKey);
+    assertFalse(page.isTruncated);
+    assertUndefined(page.resumeAfter);
+  });
+
+  it("takes no keys rather than keys off the end for a negative page size", () => {
+    // Given a page size below zero, which slicing would read backwards.
+    const objects = objectsWithKeys("a.txt", "b.txt", "c.txt");
+
+    // When the page is taken.
+    const page = simS3ObjectPage({ objects, maxKeys: -1 });
+
+    // Then it holds nothing, rather than everything but the last key.
+    assertArrayLength(page.objects, 0);
+    assertFalse(page.isTruncated);
   });
 });
 
@@ -112,6 +129,15 @@ describe("simS3EffectiveMaxKeys", () => {
 
   it("honours a caller asking for fewer than a page holds", () => {
     assertIdentical(simS3EffectiveMaxKeys(5, 1000), 5);
+  });
+
+  it("refuses a negative number of keys", () => {
+    // Real S3 refuses a negative MaxKeys rather than reading it as some number
+    // of keys counted back from the end.
+    const error = assertThrowsError(() => simS3EffectiveMaxKeys(-1, 1000));
+
+    assertInstanceOf(error, SimS3InvalidArgument);
+    assertStringIncludes(error.message, "-1");
   });
 
   it("caps a caller asking for more than a page holds", () => {
