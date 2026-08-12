@@ -1,6 +1,7 @@
 import { Readable } from "node:stream";
 import type { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
 import { SimS3NoSuchKey } from "../../error/sim-s3.error.js";
+import { simS3QuotedETag } from "../../object/s3-object-etag.js";
 import type { SimGetObjectCommandOutput } from "./get-object.command.js";
 
 /**
@@ -15,7 +16,8 @@ import type { SimGetObjectCommandOutput } from "./get-object.command.js";
  *
  * - a missing storage entry becomes the S3 NoSuchKey error;
  * - the stored Buffer becomes the readable response body;
- * - stored metadata becomes SDK response metadata.
+ * - stored metadata becomes SDK response metadata;
+ * - the Object's content hash and write time become its ETag and LastModified.
  *
  * Bucket resolution remains in the command handler because AWS request ordering
  * requires a missing Bucket to be reported before Object authorization.
@@ -36,6 +38,8 @@ export class GetObjectLoader {
     return {
       Body: Readable.from([object.body]),
       Metadata: object.metadata.values,
+      ETag: simS3QuotedETag(object.etag),
+      LastModified: object.lastModified,
       $metadata: {},
     };
   }

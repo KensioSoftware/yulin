@@ -79,6 +79,7 @@ Supported command areas currently include:
 - `put-object/`
 - `get-object/`
 - `list-objects/`
+- `list-objects-v2/`
 - `delete-object/`
 - `delete-objects/`
 - `put-bucket-notification-configuration/`
@@ -232,7 +233,12 @@ Metadata is stored separately from the object body. `PutObjectCommandHandler` co
   `object/s3-system-metadata.ts`
 
 `GetObjectCommandHandler` returns object bodies as Node `Readable` streams and returns stored
-metadata through `Metadata`.
+metadata through `Metadata`, alongside the Object's `ETag` and `LastModified`.
+
+`object/s3-object-etag.ts` computes an Object's ETag as the MD5 of its body and quotes it for a
+response. The digest is what `SimS3Object` holds, computed on demand and kept, because the two
+surfaces disagree about the quotes: an SDK response and an HTTP header carry them, and the `eTag` of
+an Object event notification record does not.
 
 `object/s3-system-metadata.ts` holds the list of headers S3 remembers about an Object, pairing the
 request field a write sets each one with against the lowercase key it is stored under. Both sides
@@ -244,8 +250,9 @@ field names, which makes a missing field a type error rather than a silently dro
 headers, and every path that serves an Object goes through it: the S3 REST endpoint reader, the
 static website endpoint and the CloudFront S3 Origin. It returns the system metadata S3 keeps as a
 header and hands back on a read, and nothing else, so user-defined metadata does not leak into the
-response. Keeping it in one place is what stops the three endpoints disagreeing about what reading an
-Object looks like.
+response. Alongside it go `etag` and `last-modified`, which are not metadata but facts about the
+stored bytes. Keeping it in one place is what stops the three endpoints disagreeing about what
+reading an Object looks like.
 
 The other way these headers reach an Object is a CDK BucketDeployment's `SystemMetadata`, which
 builds the metadata record directly. A `PUT` over the S3 REST endpoint is the one write path that
@@ -368,7 +375,7 @@ deployed site sets and not what a rebuild wants reaching the browser, and a decl
 how a mount says so. Injected HTML is already served `no-store` by live reload, so the page itself is
 never the thing caching holds on to.
 
-## PutObject, GetObject, and ListObjects
+## PutObject, GetObject, and the listings
 
 ### PutObject
 
@@ -380,7 +387,7 @@ never the thing caching holds on to.
 4. sequences background work
 5. builds a `SimS3Object`
 6. stores it through the Bucket storage abstraction
-7. returns AWS-like `$metadata`
+7. returns the Object's quoted `ETag` alongside AWS-like `$metadata`
 
 ### GetObject
 
@@ -392,7 +399,7 @@ never the thing caching holds on to.
 4. sequences background work
 5. gets the object from Bucket storage
 6. throws `SimS3NoSuchKey` if absent
-7. returns a readable body stream, metadata, and `$metadata`
+7. returns a readable body stream, metadata, `ETag`, `LastModified`, and `$metadata`
 
 ### ListObjects
 
@@ -407,6 +414,33 @@ never the thing caching holds on to.
 7. applies marker-based pagination
 8. returns `Contents`, `Name`, `Prefix`, `Marker`, `MaxKeys`, `IsTruncated`,
    `NextMarker`, and `$metadata`
+
+### ListObjectsV2
+
+`ListObjectsV2CommandHandler` follows the same steps and shares `ListObjectsAuthorizer` with the
+first version, because real S3 authorizes both against `s3:ListBucket` on the Bucket ARN. It differs
+in how a caller says where to carry on from and in what the response reports:
+
+1. resumes after the key a `ContinuationToken` stands for, or after `StartAfter` when there is no
+   token, since a token in hand means the listing is already under way
+2. returns `Contents`, `Name`, `Prefix`, `MaxKeys`, `KeyCount`, `IsTruncated`, `ContinuationToken`,
+   `NextContinuationToken`, `StartAfter`, and `$metadata`
+
+`list-objects-v2/list-objects-v2-continuation-token.ts` encodes the resume key so a token looks
+opaque, and refuses one that does not decode back to itself rather than listing from somewhere
+arbitrary.
+
+### What the two listings share
+
+`object/s3-object-listing.ts` orders a Bucket's Objects and takes the page a listing asked for, and
+`object/s3-object-summary.ts` describes each one. Both versions of the operation go through them, so
+they cannot disagree about which keys a page holds or how an Object in one is described.
+
+`object/s3-object-listing-limits.ts` holds the page size, on the shared `SimS3BucketCommandState` so
+that both versions see the same one. Real S3 fixes it at a thousand keys with no way to change it;
+`SimS3.configureMaxKeysPerPage` exists anyway, because a caller that never continues a listing is a
+caller whose pagination has never run, and provoking one honestly would mean storing a thousand and
+one Objects first.
 
 `MaxKeys` defaults to `1000`. `NextMarker` is set to the last returned key only when the result is
 truncated.

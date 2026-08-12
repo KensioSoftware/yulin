@@ -69,10 +69,12 @@ export class SimS3WebsiteObjectLoader {
         { caller: this.caller },
       );
 
-      return new SimS3WebsiteObject(
-        await simS3BodyToBuffer(output.Body as AsyncIterable<Buffer>),
-        output.Metadata,
-      );
+      return new SimS3WebsiteObject({
+        body: await simS3BodyToBuffer(output.Body as AsyncIterable<Buffer>),
+        metadata: output.Metadata,
+        etag: output.ETag,
+        lastModified: output.LastModified,
+      });
     } catch (error) {
       if (error instanceof SimS3NoSuchKey) {
         return undefined;

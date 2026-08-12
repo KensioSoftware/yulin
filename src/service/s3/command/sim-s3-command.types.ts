@@ -52,7 +52,12 @@ export type {
 export type {
   SimListObjectsCommand,
   SimListObjectsCommandOutput,
+  SimS3ObjectSummary,
 } from "./list-objects/list-objects.command.js";
+export type {
+  SimListObjectsV2Command,
+  SimListObjectsV2CommandOutput,
+} from "./list-objects-v2/list-objects-v2.command.js";
 export type {
   SimPutBucketNotificationConfigurationCommand,
   SimPutBucketNotificationConfigurationCommandOutput,

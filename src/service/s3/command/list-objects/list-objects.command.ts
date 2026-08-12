@@ -1,4 +1,7 @@
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
+import type { SimS3ObjectSummary } from "../../object/s3-object-summary.js";
+
+export type { SimS3ObjectSummary } from "../../object/s3-object-summary.js";
 
 /**
  * Minimal structural sim S3 ListObjects command.
@@ -21,7 +24,7 @@ export interface SimListObjectsCommandInput {
  * Minimal structural sim S3 ListObjects output.
  */
 export interface SimListObjectsCommandOutput {
-  readonly Contents?: SimS3ObjectSummary[];
+  readonly Contents?: SimS3ObjectSummary[] | undefined;
   readonly Name?: string;
   readonly Prefix?: string | undefined;
   readonly Marker?: string | undefined;
@@ -29,12 +32,4 @@ export interface SimListObjectsCommandOutput {
   readonly IsTruncated?: boolean;
   readonly NextMarker?: string | undefined;
   readonly $metadata: SimResponseMetadata;
-}
-
-/**
- * Minimal structural sim S3 object summary.
- */
-export interface SimS3ObjectSummary {
-  readonly Key?: string;
-  readonly Size?: number;
 }

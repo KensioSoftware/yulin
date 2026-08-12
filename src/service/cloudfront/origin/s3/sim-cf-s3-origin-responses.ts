@@ -1,6 +1,7 @@
 import type { SimS3BucketName } from "../../../s3/bucket/sim-s3-bucket.js";
 import type { SimS3Object } from "../../../s3/object/s3-object.js";
 import { simS3ObjectResponseHeaders } from "../../../s3/object/s3-object-response-headers.js";
+import { simS3QuotedETag } from "../../../s3/object/s3-object-etag.js";
 
 const plainTextHeaders = {
   "content-type": "text/plain; charset=utf-8",
@@ -20,10 +21,12 @@ export class SimCfS3OriginResponses {
    * Serve an Object, with no body when the request was a HEAD.
    */
   foundObject(object: SimS3Object, request: Request): Response {
-    const headers = simS3ObjectResponseHeaders(
-      object.metadata.values,
-      object.body.length,
-    );
+    const headers = simS3ObjectResponseHeaders({
+      metadata: object.metadata.values,
+      bodyLength: object.body.length,
+      etag: simS3QuotedETag(object.etag),
+      lastModified: object.lastModified,
+    });
 
     if (request.method === "HEAD") {
       return new Response(undefined, { status: 200, headers });

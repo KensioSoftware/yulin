@@ -1,13 +1,14 @@
 import type { SimS3BucketStorage } from "../s3-bucket-storage.js";
-import { SimS3Object } from "../../object/s3-object.js";
+import type { SimS3Object } from "../../object/s3-object.js";
 import path from "node:path";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { FilesystemS3StorageSafety } from "./s3-filesystem-safety.js";
 import { metadataForFilesystemS3ObjectKey } from "./s3-filesystem-object-metadata.js";
 import { FilesystemS3ObjectKeys } from "./s3-filesystem-object-keys.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import { SimS3NotImplemented } from "../../error/sim-s3.error.js";
 import { SimS3DeclaredSystemMetadata } from "../../object/s3-declared-system-metadata.js";
+import { filesystemS3ObjectFile } from "./s3-filesystem-object-file.js";
 
 interface FilesystemS3BucketStorageProperties {
   readonly directoryPath: string;
@@ -60,48 +61,29 @@ export class FilesystemS3BucketStorage implements SimS3BucketStorage {
       return undefined;
     }
 
-    const filePath = this.filePathForObjectKey(key);
-
-    try {
-      // oxlint-disable-next-line security/detect-non-literal-fs-filename
-      const body = await readFile(filePath);
-      return new SimS3Object({
+    return await filesystemS3ObjectFile({
+      key,
+      filePath: this.objectKeys.filePathFor(key),
+      metadata: metadataForFilesystemS3ObjectKey(
         key,
-        body,
-        metadata: metadataForFilesystemS3ObjectKey(
-          key,
-          this.systemMetadata.headersForObjectKey(key),
-        ),
-      });
-    } catch (error) {
-      if (
-        error instanceof Error &&
-        "code" in error &&
-        error.code === "ENOENT"
-      ) {
-        return undefined;
-      }
-
-      /* v8 ignore next */
-      throw error;
-    }
+        this.systemMetadata.headersForObjectKey(key),
+      ),
+    });
   }
 
   /**
    * List simulated Objects based on files in the directory.
    */
   async listObjects(prefix?: string): Promise<SimS3Object[]> {
-    const objectKeys = await this.objectKeys.list();
+    const objectKeys = await this.objectKeys.list(prefix);
 
     return await Promise.all(
-      objectKeys
-        .filter((key) => prefix === undefined || key.startsWith(prefix))
-        .map(async (key) => {
-          const object = await this.getObject(key);
-          assertDefined(object, "Sim S3 filesystem storage listed object");
+      objectKeys.map(async (key) => {
+        const object = await this.getObject(key);
+        assertDefined(object, "Sim S3 filesystem storage listed object");
 
-          return object;
-        }),
+        return object;
+      }),
     );
   }
 
@@ -109,7 +91,7 @@ export class FilesystemS3BucketStorage implements SimS3BucketStorage {
    * Store a simulated Object as a file in the directory.
    */
   async putObject(object: SimS3Object): Promise<void> {
-    const filePath = this.filePathForObjectKey(object.key);
+    const filePath = this.objectKeys.filePathFor(object.key);
 
     // oxlint-disable-next-line security/detect-non-literal-fs-filename
     await mkdir(path.dirname(filePath), { recursive: true });
@@ -134,23 +116,5 @@ export class FilesystemS3BucketStorage implements SimS3BucketStorage {
           `Use the default in-memory Bucket storage to simulate deletion.`,
       ),
     );
-  }
-
-  private filePathForObjectKey(key: string): string {
-    this.safety.assertSafeObjectKey(key);
-
-    const filePath = path.resolve(this.directoryPath, key);
-
-    /* v8 ignore if -- defensive guard after object key validation */
-    if (
-      filePath !== this.directoryPath &&
-      !filePath.startsWith(`${this.directoryPath}${path.sep}`)
-    ) {
-      throw new Error(
-        `Invalid S3 Object key outside storage directory: ${key}`,
-      );
-    }
-
-    return filePath;
   }
 }

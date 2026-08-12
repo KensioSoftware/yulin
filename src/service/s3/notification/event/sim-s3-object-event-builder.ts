@@ -6,7 +6,6 @@ import type { SimS3Bucket } from "../../bucket/sim-s3-bucket.js";
 import type { SimS3Object } from "../../object/s3-object.js";
 import { SimS3ObjectSequencers } from "../sim-s3-object-sequencers.js";
 import { simS3EventPrincipalId } from "./sim-s3-event-principal.js";
-import { simS3ObjectETag } from "./sim-s3-object-etag.js";
 import { SimS3ObjectEvent } from "./sim-s3-object-event.js";
 
 /**
@@ -71,7 +70,7 @@ export class SimS3ObjectEventBuilder {
       key: input.object.key,
       caller: input.caller,
       size: input.object.body.length,
-      eTag: simS3ObjectETag(input.object.body),
+      eTag: input.object.etag,
     });
   }
 

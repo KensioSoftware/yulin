@@ -10,11 +10,12 @@ interface FilesystemS3ObjectKeysProperties {
 }
 
 /**
- * Finds the Object keys a storage directory holds.
+ * Maps between the Object keys of a Bucket and the files of a directory.
  *
  * A directory tree is a listing here, so the walk lives on its own rather than
  * in the storage class: files become keys relative to the directory root, with
- * platform separators normalised to the `/` an S3 key uses.
+ * platform separators normalised to the `/` an S3 key uses, and a key becomes
+ * the file path under the root it names.
  */
 export class FilesystemS3ObjectKeys {
   private readonly directoryPath: string;
@@ -26,17 +27,47 @@ export class FilesystemS3ObjectKeys {
   }
 
   /**
-   * List every Object key under the storage directory.
+   * List the Object keys under the storage directory, under a prefix when one
+   * is given.
    *
    * A directory that is not there holds nothing, which is what an empty Bucket
    * looks like.
    */
-  async list(): Promise<string[]> {
+  async list(prefix?: string): Promise<string[]> {
     if (!(await filesystemPathExists(this.directoryPath))) {
       return [];
     }
 
-    return await this.listInDirectory(this.directoryPath);
+    const keys = await this.listInDirectory(this.directoryPath);
+
+    return prefix === undefined
+      ? keys
+      : keys.filter((key) => key.startsWith(prefix));
+  }
+
+  /**
+   * The file an Object key names, once the key is known to be safe to follow.
+   *
+   * The guard after resolving is defensive rather than the check that matters:
+   * key validation has already rejected anything that could climb out, and this
+   * is the assertion that it did.
+   */
+  filePathFor(key: string): string {
+    this.safety.assertSafeObjectKey(key);
+
+    const filePath = path.resolve(this.directoryPath, key);
+
+    /* v8 ignore if -- defensive guard after object key validation */
+    if (
+      filePath !== this.directoryPath &&
+      !filePath.startsWith(`${this.directoryPath}${path.sep}`)
+    ) {
+      throw new Error(
+        `Invalid S3 Object key outside storage directory: ${key}`,
+      );
+    }
+
+    return filePath;
   }
 
   private async listInDirectory(directoryPath: string): Promise<string[]> {

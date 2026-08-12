@@ -10,6 +10,7 @@ import {
   GetBucketPolicyCommand,
   GetPublicAccessBlockCommand,
   ListObjectsCommand,
+  ListObjectsV2Command,
   PutBucketNotificationConfigurationCommand,
   PutBucketPolicyCommand,
   PutBucketWebsiteCommand,
@@ -52,6 +53,27 @@ describe("simulated S3 SDK Command routing", () => {
     );
 
     assertIdentical(output.Contents?.length, 2);
+  });
+
+  it("routes ListObjectsV2Command through an intercepted client", async () => {
+    using simSdk = new SimSdk();
+    const client = new S3Client({ region: "us-east-1" });
+    simSdk.intercept(client);
+
+    await client.send(new CreateBucketCommand({ Bucket: "bucket-v2" }));
+    await client.send(
+      new PutObjectCommand({ Bucket: "bucket-v2", Key: "a.txt", Body: "a" }),
+    );
+    await client.send(
+      new PutObjectCommand({ Bucket: "bucket-v2", Key: "b.txt", Body: "b" }),
+    );
+
+    const output = await client.send(
+      new ListObjectsV2Command({ Bucket: "bucket-v2" }),
+    );
+
+    assertIdentical(output.KeyCount, 2);
+    assertIdentical(output.Contents?.[0]?.Key, "a.txt");
   });
 
   it("routes DeleteBucketCommand through an intercepted client", async () => {
@@ -251,8 +273,9 @@ describe("simulated S3 SDK Command routing", () => {
 
     const supported = router.supportedCommandNames();
 
-    assertArrayLength(supported, 17);
+    assertArrayLength(supported, 18);
     assertArrayIncludes(supported, "GetObjectCommand");
+    assertArrayIncludes(supported, "ListObjectsV2Command");
     assertArrayIncludes(supported, "DeleteBucketCommand");
     assertArrayIncludes(supported, "PutBucketNotificationConfigurationCommand");
     assertArrayIncludes(supported, "GetBucketNotificationConfigurationCommand");
