@@ -1,5 +1,6 @@
 import { describe, it } from "vitest";
-import { symlink } from "node:fs/promises";
+import path from "node:path";
+import { symlink, utimes } from "node:fs/promises";
 import {
   assertArrayLength,
   assertBufferEqual,
@@ -37,6 +38,33 @@ describe("Filesystem simulated S3 storage", () => {
     assertNonNullable(object);
     assertIdentical(object.key, "foo.txt");
     assertBufferEqual(object.body, body);
+  });
+
+  it("dates an Object by the file behind it", async () => {
+    // Given a file whose modification time has been set to a known instant.
+    const testDirectory = new TemporaryDirectory();
+    await testDirectory.resolvePath();
+    const directoryPath = testDirectory.join("public");
+    const storage = new FilesystemS3BucketStorage({ directoryPath });
+
+    await storage.putObject(
+      new SimS3Object({ key: "foo.txt", body: Buffer.from("hi") }),
+    );
+
+    const modifiedAt = new Date("2026-08-12T09:30:00.000Z");
+    // oxlint-disable-next-line security/detect-non-literal-fs-filename
+    await utimes(path.join(directoryPath, "foo.txt"), modifiedAt, modifiedAt);
+
+    // When the Object is read.
+    const object = await storage.getObject("foo.txt");
+
+    // Then it is dated by the file rather than by when it was read, since a
+    // mounted directory is written to behind S3's back.
+    assertNonNullable(object);
+    assertIdentical(
+      object.lastModified.toISOString(),
+      modifiedAt.toISOString(),
+    );
   });
 
   it("gets undefined for missing Object", async () => {

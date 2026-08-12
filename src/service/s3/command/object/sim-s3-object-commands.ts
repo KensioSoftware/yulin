@@ -2,6 +2,7 @@ import { DeleteObjectCommandHandler } from "../delete-object/delete-object.handl
 import { DeleteObjectsCommandHandler } from "../delete-objects/delete-objects.handler.js";
 import { GetObjectCommandHandler } from "../get-object/get-object.handler.js";
 import { ListObjectsCommandHandler } from "../list-objects/list-objects.handler.js";
+import { ListObjectsV2CommandHandler } from "../list-objects-v2/list-objects-v2.handler.js";
 import { PutObjectCommandHandler } from "../put-object/put-object.handler.js";
 import type { SimS3BucketCommandState } from "../sim-s3-bucket-command-state.js";
 import type * as simS3Commands from "../sim-s3-command.types.js";
@@ -15,6 +16,13 @@ export class SimS3ObjectCommands {
 
   constructor(state: SimS3BucketCommandState) {
     this.state = state;
+  }
+
+  /**
+   * Change how many keys one page of a listing holds.
+   */
+  configureMaxKeysPerPage(maxKeys: number): void {
+    this.state.listing.configureMaxKeysPerPage(maxKeys);
   }
 
   /**
@@ -77,6 +85,19 @@ export class SimS3ObjectCommands {
     options?: SimS3RequestOptions,
   ): Promise<simS3Commands.SimListObjectsCommandOutput> {
     return await new ListObjectsCommandHandler(this.state).handle(
+      command,
+      options,
+    );
+  }
+
+  /**
+   * List the Objects in a Bucket, the way current tooling asks.
+   */
+  async listV2(
+    command: simS3Commands.SimListObjectsV2Command,
+    options?: SimS3RequestOptions,
+  ): Promise<simS3Commands.SimListObjectsV2CommandOutput> {
+    return await new ListObjectsV2CommandHandler(this.state).handle(
       command,
       options,
     );

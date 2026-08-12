@@ -3,7 +3,6 @@ import type * as simS3Commands from "./command/sim-s3-command.types.js";
 import { SimS3GlobalRegistry } from "./sim-s3-global-registry.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { SimS3BucketAccess } from "./bucket/sim-s3-bucket-access.js";
-import { simS3ServiceUrl } from "./bucket/sim-s3-endpoint-url.js";
 import { SimS3CloudFormationResourceFactory } from "./cfn/sim-cfn-s3-resource-factory.js";
 import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
@@ -22,8 +21,6 @@ import type { SimS3MountFilesystemOptions } from "./mount/sim-s3-mount.type.js";
 export class SimS3 {
   private readonly buckets = new Map<SimS3BucketName, SimS3Bucket>();
 
-  private readonly accountRegionScope: SimAwsAccountRegionScope;
-  private readonly s3GlobalRegistry: SimS3GlobalRegistry;
   private readonly commands: SimS3Commands;
   private readonly bucketAccess: SimS3BucketAccess;
   private readonly cfnFactory = new SimS3CloudFormationResourceFactory(this);
@@ -35,8 +32,6 @@ export class SimS3 {
       s3GlobalRegistry = new SimS3GlobalRegistry(),
     } = properties;
 
-    this.accountRegionScope = accountRegionScope;
-    this.s3GlobalRegistry = s3GlobalRegistry;
     this.commands = new SimS3Commands({
       ...properties,
       accountRegionScope,
@@ -46,6 +41,7 @@ export class SimS3 {
     this.bucketAccess = new SimS3BucketAccess({
       buckets: this.buckets,
       accountRegionScope,
+      s3GlobalRegistry,
     });
   }
 
@@ -185,11 +181,30 @@ export class SimS3 {
     return await this.commands.objects.list(command, options);
   }
 
+  /** Handle a List Objects V2 Command from the SDK. */
+  async listObjectsV2(
+    command: simS3Commands.SimListObjectsV2Command,
+    options?: SimS3RequestOptions,
+  ): Promise<simS3Commands.SimListObjectsV2CommandOutput> {
+    return await this.commands.objects.listV2(command, options);
+  }
+
+  /**
+   * Change how many keys one page of an Object listing holds, which real S3
+   * fixes at a thousand.
+   *
+   * Lowering it is how a test gets a caller to walk a continuation without
+   * storing a thousand and one Objects to provoke one.
+   */
+  configureMaxKeysPerPage(maxKeys: number): void {
+    this.commands.objects.configureMaxKeysPerPage(maxKeys);
+  }
+
   /** Get a simulated S3 Bucket instance by name. */
   getSimBucketByName(
     bucketName: SimS3BucketName | string,
   ): SimS3Bucket | undefined {
-    return this.buckets.get(bucketName as SimS3BucketName);
+    return this.bucketAccess.find(bucketName);
   }
 
   /**
@@ -202,14 +217,11 @@ export class SimS3 {
   }
 
   /**
-   * Get the simulated S3 REST API endpoint URL for this Region.
-   *
-   * This is the endpoint an AWS SDK S3 client is configured with, so that the
-   * client, and the presigner built on it, address simulated S3 the same way
-   * they address the real thing.
+   * Get the simulated S3 REST API endpoint URL for this Region, which is what
+   * an AWS SDK S3 client, and the presigner built on it, is configured with.
    */
   getServiceUrl(): URL {
-    return simS3ServiceUrl(this.accountRegionScope.regionName);
+    return this.bucketAccess.serviceUrl();
   }
 
   /** Get the simulated S3 REST API endpoint URL for one Bucket. */
@@ -228,22 +240,15 @@ export class SimS3 {
   findBucketScope(
     bucketName: SimS3BucketName | string,
   ): SimAwsAccountRegionScope | undefined {
-    return this.s3GlobalRegistry.findBucketScope(bucketName as SimS3BucketName);
+    return this.bucketAccess.scopeOf(bucketName);
   }
 
   /**
-   * Have a simulated S3 Bucket use a local filesystem directory for storage.
+   * Have a simulated S3 Bucket use a local filesystem directory for storage,
+   * watching it when `{ reload: srv }` says where to reload.
    *
-   * Passing somewhere to reload, as `{ reload: srv }`, also watches the
-   * directory: a build that writes into it reloads the connected browsers once
-   * the writes stop, without the Bucket having to be filled again.
-   *
-   * A file on disk carries no metadata, so an Object read out of one is
-   * described by its extension and by what the Bucket was told about the
-   * Objects the mount replaced: a CDK `BucketDeployment` into the same Bucket
-   * says what it publishes, which is how a mounted directory of brotli files
-   * keeps its `content-encoding`. `systemMetadata` declares the rest for a key
-   * prefix, and goes over the top of anything inherited.
+   * See `SimS3BucketAccess.mountFilesystem`, which describes what a mounted
+   * directory does about the metadata a file cannot carry.
    */
   mountBucketFilesystem(
     bucketName: SimS3BucketName | string,
@@ -253,23 +258,12 @@ export class SimS3 {
     this.bucketAccess.mountFilesystem(bucketName, directoryPath, options);
   }
 
-  /**
-   * The mounted directories being watched for changes.
-   *
-   * A directory mounted with somewhere to reload is watched from then on, and
-   * a build in it reloads the browser rather than restarting anything.
-   */
+  /** The mounted directories being watched for changes. */
   watchedMountedDirectories(): readonly string[] {
     return this.bucketAccess.watchedMounts();
   }
 
-  /**
-   * Stop watching mounted directories.
-   *
-   * A watch holds an open filesystem handle, so a process with one open does
-   * not exit on its own. A dev process wants exactly that and never calls this;
-   * anything with an end, such as a test, calls it when it is done.
-   */
+  /** Stop watching mounted directories, as `close` does. */
   stopWatchingMountedDirectories(): void {
     this.bucketAccess.stopWatchingMounts();
   }
@@ -278,9 +272,12 @@ export class SimS3 {
    * Let go of everything this simulated S3 is holding open.
    *
    * The mounted directory watches, which is what `SimAws.close()` reaches to
-   * release when a simulated environment is closed as a whole. The Buckets and
-   * the Objects in them are left where they are, mounts included: this is the
-   * open filesystem handles going, not the storage behind them.
+   * release when a simulated environment is closed as a whole. A watch holds an
+   * open filesystem handle, so a process with one open does not exit on its
+   * own: a dev process wants exactly that, and anything with an end, such as a
+   * test, closes when it is done. The Buckets and the Objects in them are left
+   * where they are, mounts included: this is the open filesystem handles going,
+   * not the storage behind them.
    */
   close(): void {
     this.stopWatchingMountedDirectories();

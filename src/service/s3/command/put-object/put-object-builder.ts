@@ -2,6 +2,11 @@ import { SimS3Object, SimS3ObjectMetadata } from "../../object/s3-object.js";
 import { simS3SystemMetadataHeaders } from "../../object/s3-system-metadata.js";
 import type { SimPutObjectCommand } from "./put-object.command.js";
 import { assertDefined } from "../../../../util/type-guard/defined.js";
+import type { SimClock } from "../../../../util/clock/sim-clock.js";
+
+interface PutObjectBuilderProperties {
+  readonly clock: SimClock;
+}
 
 /**
  * Converts the supported PutObject request fields into a stored sim S3 Object.
@@ -18,12 +23,21 @@ import { assertDefined } from "../../../../util/type-guard/defined.js";
  * added here when the simulation gains support for them.
  */
 export class PutObjectBuilder {
+  private readonly clock: SimClock;
+
+  constructor(properties: PutObjectBuilderProperties) {
+    this.clock = properties.clock;
+  }
+
   /**
    * Build the Object that will be written to Bucket storage.
    *
    * This method performs conversion only. Callers must complete request
    * validation and authorization before invoking it so failed authorization
    * cannot trigger body processing or lead to storage mutation.
+   *
+   * The Object is dated by the simulation's clock rather than the host's, so a
+   * test that freezes time gets a last-modified time it can assert on.
    */
   build(command: SimPutObjectCommand): SimS3Object {
     assertDefined(command.input.Key, "PutObjectCommand.input.Key");
@@ -31,6 +45,7 @@ export class PutObjectBuilder {
       key: command.input.Key,
       body: this.toBuffer(command.input.Body),
       metadata: new SimS3ObjectMetadata(this.toMetadata(command)),
+      lastModified: this.clock.now(),
     });
   }
 

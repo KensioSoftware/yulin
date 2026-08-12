@@ -32,8 +32,12 @@ export interface SimPutObjectCommandInput {
 
 /**
  * Minimal structural sim S3 PutObject output.
+ *
+ * `ETag` is the quoted MD5 of the body S3 has just stored, which is what a
+ * caller keeps to recognise the same content later without reading it back.
  */
 export interface SimPutObjectCommandOutput {
+  readonly ETag?: string;
   readonly $metadata: SimResponseMetadata;
 }
 
