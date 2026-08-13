@@ -5,6 +5,19 @@ on:
   pull_request:
     branches:
       - main
+  # release.yml opens its version pull request with GITHUB_TOKEN, and a pull
+  # request opened with that token does not fire `pull_request`: GitHub
+  # declines to let a workflow start another workflow. Without this the main
+  # ruleset's four required checks would never report on it and it could never
+  # be merged.
+  #
+  # A ruleset matches a check by name whatever workflow posted it, and these
+  # are the same four jobs under the same four names, so running them on the
+  # push satisfies the same gate. Scoped to the branch prefix release.yml uses,
+  # so ordinary branches still get one run rather than two.
+  push:
+    branches:
+      - "release/**"
 
 defaults:
   run:

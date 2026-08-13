@@ -1,6 +1,6 @@
 {
   "name": "@kensio/yulin",
-  "version": "1.7.0",
+  "version": "1.10.4",
   "description": "AWS system behaviour simulation for isolated unit testing",
   "repository": "https://github.com/KensioSoftware/yulin",
   "homepage": "https://yulinsim.dev/",
@@ -178,7 +178,7 @@
     "aws-jwt-verify": "^5.2.1",
     "aws-sdk-client-mock": "^4.1.0",
     "constructs": "^10.8.0",
-    "conventional-changelog-conventionalcommits": "10.2.1",
+    "conventional-changelog-conventionalcommits": "9.3.1",
     "eslint": "^10.8.0",
     "eslint-plugin-jsdoc": "^63.3.2",
     "eslint-plugin-no-secrets": "^2.3.3",

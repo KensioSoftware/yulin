@@ -2,7 +2,7 @@
 # Publishes @kensio/yulin, when someone runs it from the Actions tab.
 # What it does is decided by .releaserc.yaml; this file is the plumbing.
 #
-# Two things live outside the repository and have to exist for it to work:
+# Three things live outside the repository and have to exist for it to work:
 #
 #   1. A trusted publisher on npmjs.com for @kensio/yulin, pointing at this
 #      repository, this workflow file, and the "release" environment below,
@@ -15,9 +15,15 @@
 #      deliberate act, so approving your own run adds little on its own. The
 #      choice is only made there, not here.
 #
-# Neither is recorded in the repository, so if publishes start failing with an
-# authentication error, check that the trusted publisher still names this
-# workflow file — renaming this file silently invalidates it.
+#   3. Settings → Actions → General → "Allow GitHub Actions to create and
+#      approve pull requests", for the version job at the bottom. Without it
+#      `gh pr create` fails with a permissions error that does not mention the
+#      setting. The publish itself is unaffected, since by then it has already
+#      happened.
+#
+# None of them is recorded in the repository, so if publishes start failing
+# with an authentication error, check that the trusted publisher still names
+# this workflow file — renaming this file silently invalidates it.
 
 name: Release
 
@@ -199,6 +205,12 @@ jobs:
       # for an NPM_TOKEN and fails.
       id-token: write
 
+    # Empty when the commits since the last tag were only chore/test/docs, and
+    # nothing was published. The version job below reads it to decide whether
+    # there is anything to write down.
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -226,9 +238,83 @@ jobs:
       # only chore/test/docs. See .releaserc.yaml. The tarball is built here by
       # prepack, from this checkout, rather than carried over from the pack
       # check — that check proves the build works, it does not hand anything on.
-      - run: pnpm exec semantic-release
+      - id: release
+        run: pnpm exec semantic-release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Read by analyzeCommitsCmd in .releaserc.yaml, which raises the
           # release to a minor when this is "true".
           RELEASE_MINOR: ${{ inputs.minor }}
+
+  # `version` in package.json, caught up to what was just published, and sent
+  # to main as a pull request.
+  #
+  # A pull request rather than a push, because the main ruleset requires four
+  # passing status checks on whatever lands there and a commit created inside
+  # this run has none. pr.yml runs those four on pushes to `release/**` for
+  # exactly this reason.
+  #
+  # That number is not what the released version *is*: the tag and the registry
+  # are that, and both already exist by the time this runs. So a failure here,
+  # or a pull request left unmerged, costs a stale package.json and nothing
+  # else. It does not cost a broken release, and nothing about the next one
+  # depends on it having been merged, since semantic-release reads the tags.
+  version:
+    name: Write the version back
+    needs: release
+    if: needs.release.outputs.version != ''
+    runs-on: ubuntu-latest
+    permissions:
+      # Pushing the branch.
+      contents: write
+      # Opening the pull request.
+      pull-requests: write
+    steps:
+      # The one job here that keeps checkout's credential, because it is the
+      # one that pushes. It holds no npm credential and publishes nothing.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: true
+
+      # For `npm pkg set` below, and so that the version of npm rewriting
+      # package.json is the one everyone else's edits go through.
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .nvmrc
+
+      - name: Commit and open a pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.release.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          npm pkg set version="$VERSION"
+
+          if [[ -z "$(git status --porcelain)" ]]; then
+            echo "Nothing changed. Already written back?"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          branch="release/v$VERSION"
+          git switch --create "$branch"
+          git add package.json
+          git commit --message "chore: version $VERSION"
+          git push origin "$branch"
+
+          # --body-file rather than --body, so the markdown below is not at the
+          # mercy of how this block is indented.
+          cat > "$RUNNER_TEMP/pr-body.md" <<EOF
+          [$VERSION](https://github.com/KensioSoftware/yulin/releases/tag/v$VERSION) is published. This is the part of it that belongs on main: \`version\` in package.json caught up to it.
+
+          Nothing depends on this being merged: the tag and the registry are the version of record, and the next release works out its own number from the tags rather than from this file.
+          EOF
+
+          gh pr create \
+            --base main \
+            --head "$branch" \
+            --title "chore: version $VERSION" \
+            --body-file "$RUNNER_TEMP/pr-body.md"

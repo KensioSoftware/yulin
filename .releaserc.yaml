@@ -45,10 +45,45 @@ plugins:
         - type: build
           release: patch
 
-  # Turns those same commits into the GitHub Release notes. Same preset as the
-  # analyzer, so the notes group commits the way the analyzer read them.
+  # Turns those same commits into the GitHub Release notes.
+  #
+  # Which is to say the pull request titles. Everything lands on main as a
+  # squash, so a subject is the title someone wrote on a pull request with the
+  # number GitHub appended to it, and both halves of that become links: the
+  # number back to the pull request, the hash to the commit.
+  #
+  # `types` is the whole list rather than an addition to the preset's: a type
+  # not named here is left out of the notes entirely, and the preset's own list
+  # names only feat and fix. So this is the list from the analyzer above, given
+  # section headings, and without it a release made of perf, refactor or build
+  # commits publishes a version with nothing written under it. docs, test,
+  # chore, ci and style are absent for the same reason they are absent there:
+  # they publish nothing, so there is no release for them to describe.
+  #
+  # conventional-changelog-conventionalcommits is pinned to 9.3.1 in
+  # package.json and cannot be taken to 10 while semantic-release is on 25.
+  # Both plugins here reach for that package by name, but the notes generator
+  # renders it through conventional-changelog-writer 8, which is Handlebars and
+  # reads `mainTemplate` and the partials as strings; the preset's 10 line
+  # returns functions instead. Nothing errors when they are mismatched. The
+  # header renders, every commit is dropped, and the release goes out with a
+  # version number and no notes under it, which is how v1.10.4 shipped empty.
+  # .github/dependabot.yml holds the major back, and that entry is the only
+  # thing keeping this pin in place.
   - - "@semantic-release/release-notes-generator"
     - preset: conventionalcommits
+      presetConfig:
+        types:
+          - type: feat
+            section: Added
+          - type: fix
+            section: Fixed
+          - type: perf
+            section: Faster
+          - type: refactor
+            section: Changed
+          - type: build
+            section: Packaging and dependencies
 
   # The two ends of the ladder the analyzer above deliberately cannot reach.
   #
@@ -79,6 +114,14 @@ plugins:
         major releases are published by hand." >&2;
         exit 1;
         fi
+      # Read by the workflow, which needs the version to open the pull request
+      # that catches package.json up. Guarded because this file is also
+      # runnable outside Actions, where the variable is unset and the redirect
+      # would be an error.
+      successCmd: >-
+        if [ -n "$GITHUB_OUTPUT" ]; then
+        echo "version=${nextRelease.version}" >> "$GITHUB_OUTPUT";
+        fi
 
   # Publishes to npm. No NPM_TOKEN anywhere: the npm CLI detects the OIDC
   # token the workflow requests and exchanges it for a credential that lasts
@@ -90,11 +133,12 @@ plugins:
   # Creates the git tag and the GitHub Release.
   #
   # Note there is no @semantic-release/git plugin: nothing here commits the
-  # bumped version back to main. That is partly taste — the tag and the
-  # registry are the version of record for a library — and partly that it
-  # could not work anyway, since the main ruleset requires pull requests,
-  # signed commits and linear history, and only an org admin bypasses it.
-  # Tags are unaffected, because the ruleset only covers the default branch.
+  # bumped version back to main directly. It could not work anyway, since the
+  # main ruleset requires a pull request with four passing status checks on
+  # whatever lands there, and a commit made inside this run has none. The pull
+  # request the workflow opens from successCmd's version is that commit taking
+  # the ordinary route instead. Tags are unaffected, because the ruleset only
+  # covers the default branch.
   - - "@semantic-release/github"
     # The released-in comments this would otherwise leave on every merged pull
     # request and closed issue. The GitHub Release is the announcement.
