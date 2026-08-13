@@ -64,6 +64,16 @@ export function handler() {
 `,
   },
   {
+    rule: "no-import",
+    what: "an import of a package other than the built-in module",
+    source: `import helper from "helper";
+
+export function handler() {
+  return helper();
+}
+`,
+  },
+  {
     rule: "only-handler-export",
     what: "an export other than the handler",
     source: `export var version = 1;
@@ -214,6 +224,19 @@ export function handler(event) {
     what: "a Buffer",
     source: `export function handler(event) {
   return Buffer.from(event.request.uri, "utf8").toString("base64");
+}
+`,
+  },
+  {
+    what: "importing the built-in cloudfront module",
+    source: `import cf from "cloudfront";
+
+export async function handler(event) {
+  const request = event.request;
+
+  request.uri = await cf.kvs().get(request.uri);
+
+  return request;
 }
 `,
   },
