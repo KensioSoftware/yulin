@@ -188,3 +188,75 @@ export class SimCloudFrontDistributionNotDisabled extends SimCloudFrontError {
     super(message, { httpStatusCode: 409 });
   }
 }
+
+/**
+ * Simulated CloudFront EntityAlreadyExists error.
+ *
+ * CloudFront requires a key value store name to be unique within an account,
+ * so a second store claiming a name is refused rather than created.
+ */
+export class SimCloudFrontEntityAlreadyExists extends SimCloudFrontError {
+  public override readonly name = "EntityAlreadyExists";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 409 });
+  }
+}
+
+/**
+ * Simulated CloudFront EntityNotFound error.
+ *
+ * What CloudFront answers when a key value store name, ID or ARN names
+ * nothing the account holds.
+ */
+export class SimCloudFrontEntityNotFound extends SimCloudFrontError {
+  public override readonly name = "EntityNotFound";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 404 });
+  }
+}
+
+/**
+ * Simulated CloudFront CannotDeleteEntityWhileInUse error.
+ *
+ * CloudFront will not delete a key value store a Function is still associated
+ * with. The caller updates the Function to drop the association first.
+ */
+export class SimCloudFrontCannotDeleteEntityWhileInUse extends SimCloudFrontError {
+  public override readonly name = "CannotDeleteEntityWhileInUse";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 409 });
+  }
+}
+
+/**
+ * Simulated CloudFront PreconditionFailed error.
+ *
+ * What CloudFront answers when a write carries an IfMatch ETag that is not the
+ * resource's current one, which is how it stops two writers overwriting each
+ * other.
+ */
+export class SimCloudFrontPreconditionFailed extends SimCloudFrontError {
+  public override readonly name = "PreconditionFailed";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 412 });
+  }
+}
+
+/**
+ * Simulated CloudFront key value store ResourceNotFoundException error.
+ *
+ * What the key value store data API answers for a key that is not stored. It
+ * is the data API's own error rather than one of CloudFront's, which is why it
+ * is named in the exception style that API uses.
+ */
+export class SimCloudFrontKeyValueStoreKeyNotFound extends SimCloudFrontError {
+  public override readonly name = "ResourceNotFoundException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 404 });
+  }
+}

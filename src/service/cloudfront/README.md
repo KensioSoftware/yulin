@@ -40,8 +40,39 @@ Current command areas include:
 - `create-function/`
 - `delete-function/`
 
+## Key value stores
+
+`key-value-store/` holds the store model and the collaborators the commands share.
+
+The store is reached through two different AWS SDK clients, so it is reached two ways here. The
+CloudFront client owns the resource, and its five commands are under `command/key-value-store/`,
+grouped behind `SimCfKeyValueStoreCommands` and reached as `simCloudFront.keyValueStores()`. The key
+value store client owns the data, and its six commands are under `command/key-value-store-data/`,
+behind `SimCloudFrontKeyValueStoreApi` and reached as `simAws.cloudFrontKeyValueStore()`. Both work
+on the same `SimCloudFrontKeyValueStoreRegistry`, the way both AWS clients work on one store. This
+mirrors how sim DynamoDB Streams is a second API over sim DynamoDB's state rather than a service of
+its own.
+
+`DescribeKeyValueStore` is a command name both clients have, answering with different things. They
+do not collide because SDK interception resolves the router by the client's AWS service before it
+looks up the command name.
+
+`SimCfKeyValueStoreAccess` is what every command is given: the registry, IAM and the clock. Its
+`authorizedByName` resolves a store and authorizes the action on the store's ARN, and authorizes
+against the store wildcard first when the name resolves to nothing, so an unauthorized caller cannot
+learn which names exist.
+
+`SimCfKeyValueStoreUsers` decides whether a store can be deleted. Nothing can be associated with a
+store yet, so its default says nothing uses one. Associating a Function with a store is what will
+supply the real implementation.
+
+Unlike the Distribution commands, these enforce the `IfMatch` ETag rather than accepting and
+ignoring it. The data API requires it on every write and CloudFront refuses a stale one, so a caller
+that does not thread the ETag through fails here the way it would fail against CloudFront.
+
 The main `SimCloudFront` class owns the Distribution, Function and response headers policy maps
-and nothing else.
+and nothing else. The key value store registry is owned by `SimCloudFrontCommands` instead, because
+the facade never reads it.
 `SimCloudFrontCommands` holds the collaborators every command shares (IAM, the registry, the Origin
 resolvers, the background scheduler) and builds the handlers, so the facade stays state plus
 delegation.

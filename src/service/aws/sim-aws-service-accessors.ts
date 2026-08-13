@@ -3,6 +3,7 @@ import type { SimAcm } from "../acm/sim-acm.js";
 import type { SimApiGatewayV2 } from "../apigatewayv2/index.js";
 import type { SimCloudFormation } from "../cloudformation/index.js";
 import type { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
+import type { SimCloudFrontKeyValueStoreApi } from "../cloudfront/sim-cloudfront-key-value-store.js";
 import type { SimCognitoIdentityProvider } from "../cognito/index.js";
 import type {
   SimDynamoDb as SimDynamoDatabase,
@@ -52,6 +53,13 @@ export abstract class SimAwsServiceAccessors {
   /** Get simulated CloudFront in the default Account scope. */
   cloudFront(): SimCloudFront {
     return this.defaultAccountRegionScope().cloudFront();
+  }
+
+  /**
+   * Get the simulated CloudFront key value store data API.
+   */
+  cloudFrontKeyValueStore(): SimCloudFrontKeyValueStoreApi {
+    return this.defaultAccountRegionScope().cloudFrontKeyValueStore();
   }
 
   /** Get simulated Cognito user pools in the default Account Region scope. */

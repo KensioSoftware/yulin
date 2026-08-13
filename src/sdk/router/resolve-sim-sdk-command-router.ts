@@ -35,6 +35,9 @@ export function resolveSimSdkCommandRouter(
     case "CloudFront": {
       return scoped.cloudFront().sdkCommandRouter();
     }
+    case "CloudFront KeyValueStore": {
+      return scoped.cloudFrontKeyValueStore().sdkCommandRouter();
+    }
     case "Cognito Identity Provider": {
       return scoped.cognitoIdentityProvider().sdkCommandRouter();
     }

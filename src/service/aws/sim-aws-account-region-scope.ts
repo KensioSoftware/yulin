@@ -5,6 +5,7 @@ import { isSimAwsClosing } from "./sim-aws-closing.js";
 import { SimAws } from "./sim-aws.js";
 import type { SimS3 } from "../s3/sim-s3.js";
 import type { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
+import type { SimCloudFrontKeyValueStoreApi } from "../cloudfront/sim-cloudfront-key-value-store.js";
 import type {
   SimDynamoDb as SimDynamoDatabase,
   SimDynamoDbStreams,
@@ -95,6 +96,17 @@ export class SimAwsAccountRegionContainer {
     return this.memo.getOrCreate("cloudFront", () =>
       this.simAws.serviceFactory.createCloudFront(this),
     );
+  }
+
+  /**
+   * Get the simulated CloudFront key value store data API for this account.
+   *
+   * It is not made here, unlike the services around it. The stores it reads
+   * and writes are the ones this scope's CloudFront owns, so it belongs to
+   * that service and is reached through it.
+   */
+  cloudFrontKeyValueStore(): SimCloudFrontKeyValueStoreApi {
+    return this.cloudFront().keyValueStoreApi();
   }
 
   /**

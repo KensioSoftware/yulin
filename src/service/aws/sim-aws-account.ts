@@ -3,6 +3,7 @@ import type { SimAwsAccountRegionContainer } from "./sim-aws-account-region-scop
 import { simAwsAccountId, type SimAwsAccountId } from "./sim-aws-account-id.js";
 import type { SimS3 } from "../s3/sim-s3.js";
 import type { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
+import type { SimCloudFrontKeyValueStoreApi } from "../cloudfront/sim-cloudfront-key-value-store.js";
 import type {
   SimDynamoDb as SimDynamoDatabase,
   SimDynamoDbStreams,
@@ -91,6 +92,13 @@ export class SimAwsAccount {
    */
   cloudFront(): SimCloudFront {
     return this.region().cloudFront();
+  }
+
+  /**
+   * Get the simulated CloudFront key value store data API.
+   */
+  cloudFrontKeyValueStore(): SimCloudFrontKeyValueStoreApi {
+    return this.region().cloudFrontKeyValueStore();
   }
 
   /**
