@@ -251,8 +251,22 @@ jobs:
   #
   # A pull request rather than a push, because the main ruleset requires four
   # passing status checks on whatever lands there and a commit created inside
-  # this run has none. pr.yml runs those four on pushes to `release/**` for
-  # exactly this reason.
+  # this run has none.
+  #
+  # It needs one click to merge. A pull request opened with GITHUB_TOKEN does
+  # fire `pull_request`, so pr.yml's four jobs are queued against it under the
+  # four names the ruleset wants, but GitHub holds the run in an
+  # approval-required state rather than starting it: this is the loop guard
+  # that stops a workflow starting another workflow unattended. "Approve and
+  # run" on the pull request releases it and the checks report normally.
+  #
+  # Adding a `push:` trigger for this branch does not avoid that click, which
+  # is worth knowing before trying it. A push made with GITHUB_TOKEN starts no
+  # workflow run at all, with no approval offered, so the trigger is simply
+  # dead. The way to have the checks start unattended is to push with a GitHub
+  # App installation token or a personal access token instead, and that means
+  # holding a credential in a repository whose release path is built around
+  # not having one. One click a release is the cheaper side of that trade.
   #
   # That number is not what the released version *is*: the tag and the registry
   # are that, and both already exist by the time this runs. So a failure here,
