@@ -44,7 +44,7 @@ export class SimCfDescribeKeyValueStore {
     return {
       $metadata: {},
       KeyValueStore: simCfKeyValueStoreSummary(store),
-      ETag: store.eTag,
+      ETag: store.resourceETag,
     };
   }
 }

@@ -3,6 +3,7 @@ import {
   assertIdentical,
   assertNonNullable,
   assertObjectEquals,
+  assertStringIncludes,
   assertThrowsError,
   assertTrue,
 } from "@kensio/smartass";
@@ -69,41 +70,87 @@ describe("Sim CloudFront key value store", () => {
     assertIdentical(store.comment, "kept");
   });
 
-  it("gives a new ETag on every change", () => {
-    // Given a store with a comment
+  it("gives a new resource ETag when the configuration changes", () => {
+    // Given a store
     const store = new SimCloudFrontKeyValueStore({ name: "redirects" });
-    const before = store.eTag;
+    const before = store.resourceETag;
 
-    // When it changes
-    store.touch();
+    // When its comment changes
+    store.update({ comment: "changed" });
 
-    // Then the ETag it had is no longer current, which is what makes a stale
-    // write fail
-    assertFalse(store.eTag === before);
+    // Then the resource ETag it had is no longer current, which is what makes
+    // a stale CloudFront client write fail
+    assertFalse(store.resourceETag === before);
+  });
+
+  it("keeps the two ETags apart, as AWS does", () => {
+    // Given a store, and both of its ETags read
+    const store = new SimCloudFrontKeyValueStore({ name: "redirects" });
+    const resourceBefore = store.resourceETag;
+    const dataBefore = store.dataETag;
+
+    // Then they are different values to begin with
+    assertFalse(resourceBefore === dataBefore);
+
+    // When the keys change
+    store.touchData();
+
+    // Then only the data ETag moves, so a CloudFront client write that was
+    // already holding the resource ETag is still good
+    assertIdentical(store.resourceETag, resourceBefore);
+    assertFalse(store.dataETag === dataBefore);
+
+    // And when the configuration changes, only the resource ETag moves
+    const dataAfterWrite = store.dataETag;
+    store.touchResource();
+    assertIdentical(store.dataETag, dataAfterWrite);
+    assertFalse(store.resourceETag === resourceBefore);
   });
 
   it("refuses a write carrying an ETag that is not the current one", () => {
-    // Given a store that has changed since a caller read its ETag
+    // Given a store that has changed since a caller read both its ETags
     const store = new SimCloudFrontKeyValueStore({ name: "redirects" });
-    const stale = store.eTag;
-    store.touch();
+    const staleResource = store.resourceETag;
+    const staleData = store.dataETag;
+    store.touchResource();
+    store.touchData();
 
-    // When a write carries the ETag from before the change
-    const error = assertThrowsError(() => {
-      store.assertETag(stale);
+    // When each write carries the ETag from before its change
+    const resourceError = assertThrowsError(() => {
+      store.assertResourceETag(staleResource);
+    });
+    const dataError = assertThrowsError(() => {
+      store.assertDataETag(staleData);
     });
 
-    // Then it is refused
+    // Then both are refused
+    assertIdentical(resourceError.name, "PreconditionFailed");
+    assertIdentical(dataError.name, "PreconditionFailed");
+  });
+
+  it("refuses a write carrying the other API's ETag", () => {
+    // Given a store nothing has written to
+    const store = new SimCloudFrontKeyValueStore({ name: "redirects" });
+
+    // When a write reaches for the ETag belonging to the other client, which
+    // is the mistake two separate ETags exist to catch
+    const error = assertThrowsError(() => {
+      store.assertDataETag(store.resourceETag);
+    });
+
+    // Then it is refused, and the message says which side it wanted
     assertIdentical(error.name, "PreconditionFailed");
+    assertStringIncludes(error.message, "data ETag");
   });
 
   it("accepts a write carrying the current ETag", () => {
     // Given a store
     const store = new SimCloudFrontKeyValueStore({ name: "redirects" });
 
-    // When a write carries the ETag it has now
-    // Then it is not refused
-    store.assertETag(store.eTag);
+    // When each write carries the ETag its own side has now
+    // Then neither is refused
+    store.assertResourceETag(store.resourceETag);
+    store.assertDataETag(store.dataETag);
   });
 
   it("was created when it was last modified, to begin with", () => {
@@ -118,7 +165,7 @@ describe("Sim CloudFront key value store", () => {
     // Then they are the same, and a later change moves only one of them
     assertIdentical(store.createdTime, lastModifiedTime);
 
-    store.touch(new Date("2026-02-01T00:00:00.000Z"));
+    store.touchData(new Date("2026-02-01T00:00:00.000Z"));
 
     assertIdentical(store.createdTime, lastModifiedTime);
     assertTrue(store.lastModifiedTime > store.createdTime);

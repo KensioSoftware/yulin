@@ -260,3 +260,18 @@ export class SimCloudFrontKeyValueStoreKeyNotFound extends SimCloudFrontError {
     super(message, { httpStatusCode: 404 });
   }
 }
+
+/**
+ * Simulated key value store data API ResourceNotFoundException error.
+ *
+ * What that API answers for a `KvsARN` naming no store. The two clients have
+ * separate error sets, so this is not CloudFront's `EntityNotFound` even
+ * though both mean the store was not found.
+ */
+export class SimCloudFrontKeyValueStoreNotFound extends SimCloudFrontError {
+  public override readonly name = "ResourceNotFoundException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 404 });
+  }
+}

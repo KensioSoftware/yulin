@@ -1,6 +1,7 @@
 import {
   SimCloudFrontEntityAlreadyExists,
   SimCloudFrontEntityNotFound,
+  SimCloudFrontKeyValueStoreNotFound,
 } from "../error/sim-cloudfront.error.js";
 import type {
   SimCloudFrontKeyValueStore,
@@ -100,15 +101,18 @@ export class SimCloudFrontKeyValueStoreRegistry {
   /**
    * Get a key value store by ARN, refusing one this Account does not hold.
    *
-   * This is the data API's way in, so the ARN it was given is quoted back on
-   * a miss: a store in another Account and a store that was deleted both
-   * arrive here, and the ARN is what tells them apart.
+   * This is the data API's way in, so the refusal is that API's own
+   * ResourceNotFoundException rather than CloudFront's EntityNotFound: the two
+   * clients have separate error sets, and EntityNotFound is not in this one.
+   *
+   * The ARN it was given is quoted back on a miss, because a store in another
+   * Account and a store that was deleted both arrive here.
    */
   requireByArn(storeArn: string): SimCloudFrontKeyValueStore {
     const store = this.byArn(storeArn);
 
     if (store === undefined) {
-      throw new SimCloudFrontEntityNotFound(
+      throw new SimCloudFrontKeyValueStoreNotFound(
         `Sim CloudFront has no key value store with ARN ${storeArn}`,
       );
     }

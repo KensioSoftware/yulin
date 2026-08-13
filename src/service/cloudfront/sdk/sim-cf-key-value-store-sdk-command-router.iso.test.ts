@@ -36,15 +36,22 @@ describe("simulated key value store SDK Command routing", () => {
       new CreateKeyValueStoreCommand({ Name: "redirects" }),
     );
     assertNonNullable(created.KeyValueStore?.ARN);
-    assertNonNullable(created.ETag);
 
-    // And the key value store client writes to it
+    // And the key value store client writes to it, carrying the ETag from its
+    // own describe rather than the one CloudFront just returned
+    const described = await keyValueStore.send(
+      new DescribeKeyValueStoreDataCommand({
+        KvsARN: created.KeyValueStore.ARN,
+      }),
+    );
+    assertNonNullable(described.ETag);
+
     await keyValueStore.send(
       new PutKeyCommand({
         KvsARN: created.KeyValueStore.ARN,
         Key: "/old",
         Value: "/new",
-        IfMatch: created.ETag,
+        IfMatch: described.ETag,
       }),
     );
 

@@ -1,5 +1,6 @@
 import { CreateKeyValueStoreCommand } from "@aws-sdk/client-cloudfront";
 import {
+  DescribeKeyValueStoreCommand,
   GetKeyCommand,
   PutKeyCommand,
 } from "@aws-sdk/client-cloudfront-keyvaluestore";
@@ -148,6 +149,11 @@ describe("CloudFront key value store IAM authorization", () => {
     const data = simAws.account(accountId).cloudFrontKeyValueStore();
     const caller = { kind: "arn", arn: roleArn } as const;
 
+    // A data write carries this API's own ETag, not the CloudFront client's.
+    const described = await data.describeKeyValueStore(
+      new DescribeKeyValueStoreCommand({ KvsARN: created.KeyValueStore.ARN }),
+    );
+
     // When the Role writes a key
     const error = await assertThrowsErrorAsync(
       async () =>
@@ -156,7 +162,7 @@ describe("CloudFront key value store IAM authorization", () => {
             KvsARN: created.KeyValueStore.ARN,
             Key: "a",
             Value: "1",
-            IfMatch: created.ETag,
+            IfMatch: described.ETag,
           }),
           { caller },
         ),
@@ -173,7 +179,7 @@ describe("CloudFront key value store IAM authorization", () => {
           KvsARN: created.KeyValueStore.ARN,
           Key: "a",
           Value: "1",
-          IfMatch: created.ETag,
+          IfMatch: described.ETag,
         }),
       );
 

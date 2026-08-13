@@ -62,14 +62,25 @@ describe("Sim CloudFront key value store registry", () => {
     const registry = new SimCloudFrontKeyValueStoreRegistry();
 
     // When a store is required by each of the three ways
-    // Then each is refused, quoting back what it was given
+    // Then each is refused, quoting back what it was given. The ARN lookup is
+    // the data API's way in, so it answers with that API's own error rather
+    // than CloudFront's: the two clients have separate error sets.
     for (const required of [
-      (): unknown => registry.requireById("no-such-id"),
-      (): unknown => registry.requireByName("no-such-name"),
-      (): unknown => registry.requireByArn("no-such-arn"),
+      {
+        find: (): unknown => registry.requireById("no-such-id"),
+        name: "EntityNotFound",
+      },
+      {
+        find: (): unknown => registry.requireByName("no-such-name"),
+        name: "EntityNotFound",
+      },
+      {
+        find: (): unknown => registry.requireByArn("no-such-arn"),
+        name: "ResourceNotFoundException",
+      },
     ]) {
-      const error = assertThrowsError(required);
-      assertIdentical(error.name, "EntityNotFound");
+      const error = assertThrowsError(required.find);
+      assertIdentical(error.name, required.name);
     }
   });
 

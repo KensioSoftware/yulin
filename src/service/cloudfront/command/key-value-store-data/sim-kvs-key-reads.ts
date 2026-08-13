@@ -110,7 +110,7 @@ export class SimKvsKeyReads {
       Status: store.status,
       ItemCount: store.keys.itemCount,
       TotalSizeInBytes: store.keys.totalSizeInBytes,
-      ETag: store.eTag,
+      ETag: store.dataETag,
     };
   }
 }

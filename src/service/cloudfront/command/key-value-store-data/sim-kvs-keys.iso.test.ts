@@ -25,6 +25,7 @@ async function storeToWriteTo(): Promise<{
   readonly data: SimCloudFrontKeyValueStoreApi;
   readonly kvsArn: string;
   readonly eTag: string;
+  readonly resourceETag: string;
 }> {
   const simAws = new SimAws();
   const created = await simAws
@@ -32,10 +33,19 @@ async function storeToWriteTo(): Promise<{
     .keyValueStores()
     .createKeyValueStore(new CreateKeyValueStoreCommand({ Name: "redirects" }));
 
+  const data = simAws.cloudFrontKeyValueStore();
+
+  // The ETag a data write has to carry is this API's own, not the one the
+  // CloudFront client just returned. The two are not interchangeable.
+  const described = await data.describeKeyValueStore(
+    new DescribeKeyValueStoreCommand({ KvsARN: created.KeyValueStore.ARN }),
+  );
+
   return {
-    data: simAws.cloudFrontKeyValueStore(),
+    data,
     kvsArn: created.KeyValueStore.ARN,
-    eTag: created.ETag,
+    eTag: described.ETag,
+    resourceETag: created.ETag,
   };
 }
 
@@ -278,6 +288,27 @@ describe("CloudFront key value store data commands", () => {
     assertIdentical(described.Status, "PROVISIONING");
   });
 
+  it("refuses a data write carrying the CloudFront client's ETag", async () => {
+    // Given a store, and the ETag its CreateKeyValueStore returned
+    const { data, kvsArn, resourceETag } = await storeToWriteTo();
+
+    // When a key write carries that ETag rather than the data API's own
+    const error = await assertThrowsErrorAsync(
+      async () =>
+        await data.putKey(
+          new PutKeyCommand({
+            KvsARN: kvsArn,
+            Key: "a",
+            Value: "1",
+            IfMatch: resourceETag,
+          }),
+        ),
+    );
+
+    // Then it is refused, because the two ETags are not interchangeable
+    assertIdentical(error.name, "PreconditionFailed");
+  });
+
   it("refuses a command naming a store that does not exist", async () => {
     // Given a simulated key value store data API
     const { data } = await storeToWriteTo();
@@ -290,7 +321,7 @@ describe("CloudFront key value store data commands", () => {
     );
 
     // Then it is refused
-    assertIdentical(error.name, "EntityNotFound");
+    assertIdentical(error.name, "ResourceNotFoundException");
   });
 
   it("refuses a command that leaves out what the data API requires", async () => {

@@ -43,7 +43,7 @@ export class SimCfDeleteKeyValueStore {
       options?.caller,
     );
 
-    store.assertETag(command.input.IfMatch);
+    store.assertResourceETag(command.input.IfMatch);
     this.assertNotInUse(store.id, store.name);
 
     this.access.stores.remove(store.id);

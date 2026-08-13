@@ -1304,6 +1304,7 @@ and `simAws.cloudFrontKeyValueStore()`.
 
 import { CreateKeyValueStoreCommand } from "@aws-sdk/client-cloudfront";
 import {
+  DescribeKeyValueStoreCommand,
   GetKeyCommand,
   UpdateKeysCommand,
 } from "@aws-sdk/client-cloudfront-keyvaluestore";
@@ -1324,13 +1325,19 @@ const created = await simAws
   );
 
 const kvsArn = created.KeyValueStore.ARN;
+const data = simAws.cloudFrontKeyValueStore();
 
 // The key value store client owns the data, and addresses the store by ARN.
-// Every write carries the current ETag, which the previous write returns.
-const written = await simAws.cloudFrontKeyValueStore().updateKeys(
+// Every write carries an ETag, and it is this API's own: the one the
+// CloudFront client returned above versions the resource, not the keys.
+const described = await data.describeKeyValueStore(
+  new DescribeKeyValueStoreCommand({ KvsARN: kvsArn }),
+);
+
+const written = await data.updateKeys(
   new UpdateKeysCommand({
     KvsARN: kvsArn,
-    IfMatch: created.ETag,
+    IfMatch: described.ETag,
     Puts: [
       { Key: "/old-page", Value: "/new-page" },
       { Key: "/legacy", Value: "/current" },
@@ -1340,9 +1347,9 @@ const written = await simAws.cloudFrontKeyValueStore().updateKeys(
 
 console.log(written.ItemCount); // 2
 
-const read = await simAws
-  .cloudFrontKeyValueStore()
-  .getKey(new GetKeyCommand({ KvsARN: kvsArn, Key: "/old-page" }));
+const read = await data.getKey(
+  new GetKeyCommand({ KvsARN: kvsArn, Key: "/old-page" }),
+);
 
 console.log(read.Value); // /new-page
 ```
@@ -1352,14 +1359,17 @@ CloudFront. `await simAws.backgroundTasksComplete()` waits for that.
 
 ### ETags
 
-Unlike the Distribution and Function commands, the key value store commands do check `IfMatch`. The
-data API requires it on every write, and CloudFront refuses a stale one, which is what stops two
-writers overwriting each other. A write carrying an ETag that is not the store's current one is
-refused with `PreconditionFailed`, so a caller has to thread the ETag through the way it does
-against CloudFront. Each write returns the new ETag for the next one.
+Unlike the Distribution and Function commands, the key value store commands do check `IfMatch`. Both
+APIs require it on every write and CloudFront refuses a stale one, which is what stops two writers
+overwriting each other. A write carrying an ETag that is not current is refused with
+`PreconditionFailed`, so a caller has to thread the ETag through the way it does against CloudFront.
+Each write returns the new ETag for the next one.
 
-`DescribeKeyValueStoreCommand` on the CloudFront client is how to read the current ETag without
-writing.
+A store has two ETags and they are not interchangeable, as in AWS. Each `DescribeKeyValueStore`
+returns its own: the CloudFront client's versions the store's configuration, and the key value store
+client's versions the keys. Writing a key does not move the configuration's ETag, and changing the
+comment does not move the keys'. A write carrying the other API's ETag is refused, and the message
+says which of the two it wanted.
 
 ## Available functionality
 

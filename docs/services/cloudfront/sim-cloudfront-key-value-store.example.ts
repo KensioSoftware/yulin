@@ -4,6 +4,7 @@
 
 import { CreateKeyValueStoreCommand } from "@aws-sdk/client-cloudfront";
 import {
+  DescribeKeyValueStoreCommand,
   GetKeyCommand,
   UpdateKeysCommand,
 } from "@aws-sdk/client-cloudfront-keyvaluestore";
@@ -24,13 +25,19 @@ const created = await simAws
   );
 
 const kvsArn = created.KeyValueStore.ARN;
+const data = simAws.cloudFrontKeyValueStore();
 
 // The key value store client owns the data, and addresses the store by ARN.
-// Every write carries the current ETag, which the previous write returns.
-const written = await simAws.cloudFrontKeyValueStore().updateKeys(
+// Every write carries an ETag, and it is this API's own: the one the
+// CloudFront client returned above versions the resource, not the keys.
+const described = await data.describeKeyValueStore(
+  new DescribeKeyValueStoreCommand({ KvsARN: kvsArn }),
+);
+
+const written = await data.updateKeys(
   new UpdateKeysCommand({
     KvsARN: kvsArn,
-    IfMatch: created.ETag,
+    IfMatch: described.ETag,
     Puts: [
       { Key: "/old-page", Value: "/new-page" },
       { Key: "/legacy", Value: "/current" },
@@ -40,8 +47,8 @@ const written = await simAws.cloudFrontKeyValueStore().updateKeys(
 
 console.log(written.ItemCount); // 2
 
-const read = await simAws
-  .cloudFrontKeyValueStore()
-  .getKey(new GetKeyCommand({ KvsARN: kvsArn, Key: "/old-page" }));
+const read = await data.getKey(
+  new GetKeyCommand({ KvsARN: kvsArn, Key: "/old-page" }),
+);
 
 console.log(read.Value); // /new-page

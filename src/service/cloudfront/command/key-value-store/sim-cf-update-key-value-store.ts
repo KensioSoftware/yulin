@@ -42,13 +42,13 @@ export class SimCfUpdateKeyValueStore {
       options?.caller,
     );
 
-    store.assertETag(command.input.IfMatch);
+    store.assertResourceETag(command.input.IfMatch);
     store.update({ comment: command.input.Comment });
 
     return {
       $metadata: {},
       KeyValueStore: simCfKeyValueStoreSummary(store),
-      ETag: store.eTag,
+      ETag: store.resourceETag,
     };
   }
 }

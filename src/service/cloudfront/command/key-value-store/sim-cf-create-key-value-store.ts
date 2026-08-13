@@ -53,7 +53,7 @@ export class SimCfCreateKeyValueStore {
     return {
       $metadata: {},
       KeyValueStore: simCfKeyValueStoreSummary(store),
-      ETag: store.eTag,
+      ETag: store.resourceETag,
       Location: `https://cloudfront.amazonaws.com/2020-05-31/key-value-store/${store.id}`,
     };
   }

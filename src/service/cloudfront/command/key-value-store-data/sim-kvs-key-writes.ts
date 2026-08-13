@@ -122,16 +122,16 @@ export class SimKvsKeyWrites {
       options?.caller,
     );
 
-    store.assertETag(write.IfMatch);
+    store.assertDataETag(write.IfMatch);
 
     store.keys.applyBatch(write.puts, write.deletes);
-    store.touch(this.access.background.now());
+    store.touchData(this.access.background.now());
 
     return {
       $metadata: {},
       ItemCount: store.keys.itemCount,
       TotalSizeInBytes: store.keys.totalSizeInBytes,
-      ETag: store.eTag,
+      ETag: store.dataETag,
     };
   }
 }

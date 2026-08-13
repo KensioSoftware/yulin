@@ -61,7 +61,8 @@ export class SimCloudFrontKeyValueStore {
   #comment: string | undefined;
   #status: SimCloudFrontKeyValueStoreStatus;
   #lastModifiedTime: Date;
-  #eTag: string;
+  #resourceETag: string;
+  #dataETag: string;
 
   constructor(properties: SimCloudFrontKeyValueStoreProperties) {
     this.id = properties.id ?? makeKeyValueStoreId();
@@ -71,7 +72,8 @@ export class SimCloudFrontKeyValueStore {
     this.#status = properties.status ?? "PROVISIONING";
     this.#lastModifiedTime = properties.lastModifiedTime ?? new Date();
     this.createdTime = this.#lastModifiedTime;
-    this.#eTag = makeKeyValueStoreETag();
+    this.#resourceETag = makeKeyValueStoreETag();
+    this.#dataETag = makeKeyValueStoreETag();
   }
 
   /**
@@ -103,10 +105,28 @@ export class SimCloudFrontKeyValueStore {
   }
 
   /**
-   * The current ETag, which every write has to match.
+   * The ETag of the resource, which the CloudFront client works against.
+   *
+   * A store has two ETags and they are not interchangeable, which is what AWS
+   * has: each of the two DescribeKeyValueStore operations returns its own, and
+   * a write has to carry the one belonging to the API it is calling. This one
+   * versions the store's configuration, so a key write does not move it and a
+   * comment change does.
+   *
+   * https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/kvs-with-functions-get-reference.html
    */
-  get eTag(): string {
-    return this.#eTag;
+  get resourceETag(): string {
+    return this.#resourceETag;
+  }
+
+  /**
+   * The ETag of the data, which the key value store client works against.
+   *
+   * This one versions the keys, so a key write moves it and a comment change
+   * does not. See resourceETag for why there are two.
+   */
+  get dataETag(): string {
+    return this.#dataETag;
   }
 
   /**
@@ -136,31 +156,42 @@ export class SimCloudFrontKeyValueStore {
   }): void {
     this.#name = properties.name ?? this.#name;
     this.#comment = properties.comment ?? this.#comment;
-    this.touch();
+    this.touchResource();
   }
 
   /**
-   * Refuse a write whose ETag is not the current one.
+   * Refuse a CloudFront client write whose ETag is not the resource's.
    *
-   * The data API takes IfMatch on every write and CloudFront refuses a stale
-   * one, which is what stops two writers overwriting each other. Yulin enforces
-   * it rather than accepting and ignoring it, so a caller that does not thread
-   * the ETag through fails here the way it would fail against CloudFront.
+   * CloudFront takes IfMatch on every write and refuses a stale one, which is
+   * what stops two writers overwriting each other. Yulin enforces it here
+   * rather than accepting and ignoring it, so a caller that does not thread the
+   * ETag through fails the way it would fail against CloudFront.
    */
-  assertETag(ifMatch: string): void {
-    if (ifMatch !== this.#eTag) {
-      throw new SimCloudFrontPreconditionFailed(
-        `Sim CloudFront key value store ${this.name} has ETag ${this.#eTag}, not ${ifMatch}`,
-      );
-    }
+  assertResourceETag(ifMatch: string): void {
+    this.assertETag(ifMatch, this.#resourceETag, "resource");
   }
 
   /**
-   * Record that this key value store changed, giving it a new ETag.
+   * Refuse a data API write whose ETag is not the data's.
    */
-  touch(lastModifiedTime: Date = new Date()): void {
+  assertDataETag(ifMatch: string): void {
+    this.assertETag(ifMatch, this.#dataETag, "data");
+  }
+
+  /**
+   * Record that this store's configuration changed.
+   */
+  touchResource(lastModifiedTime: Date = new Date()): void {
     this.#lastModifiedTime = lastModifiedTime;
-    this.#eTag = makeKeyValueStoreETag();
+    this.#resourceETag = makeKeyValueStoreETag();
+  }
+
+  /**
+   * Record that this store's keys changed.
+   */
+  touchData(lastModifiedTime: Date = new Date()): void {
+    this.#lastModifiedTime = lastModifiedTime;
+    this.#dataETag = makeKeyValueStoreETag();
   }
 
   /**
@@ -168,6 +199,22 @@ export class SimCloudFrontKeyValueStore {
    */
   listKeys(): readonly SimCloudFrontKeyValuePair[] {
     return this.keys.list();
+  }
+
+  /**
+   * Refuse a write against the wrong version of one side of the store.
+   *
+   * The side is named in the message because the two ETags are not
+   * interchangeable, and reaching for the other API's ETag is the mistake this
+   * is most likely to be catching.
+   */
+  private assertETag(ifMatch: string, current: string, side: string): void {
+    if (ifMatch !== current) {
+      throw new SimCloudFrontPreconditionFailed(
+        `Sim CloudFront key value store ${this.name} has ${side} ETag ` +
+          `${current}, not ${ifMatch}`,
+      );
+    }
   }
 }
 
