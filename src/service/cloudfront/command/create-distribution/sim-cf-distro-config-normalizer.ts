@@ -7,6 +7,7 @@ import type {
   SimCloudFrontOriginConfig,
 } from "./create-distribution.command.js";
 import { isRecord } from "../../../../util/type-guard/record.js";
+import { assertConsistentQuantity } from "../sim-cf-list-quantity.js";
 
 interface SimCloudFrontConfigList<T> {
   readonly Items?: readonly T[] | undefined;
@@ -38,17 +39,23 @@ export class SimCloudFrontDistributionConfigNormalizer {
       object
     >;
     const cacheBehaviors = this.normalizeList<SimCloudFrontCacheBehaviorConfig>(
+      "CacheBehaviors",
       distributionConfig["CacheBehaviors"],
     );
 
     return {
       ...this.distributionConfig,
-      Aliases: this.normalizeList<string>(distributionConfig["Aliases"]),
+      Aliases: this.normalizeList<string>(
+        "Aliases",
+        distributionConfig["Aliases"],
+      ),
       Origins: this.normalizeList<SimCloudFrontOriginConfig>(
+        "Origins",
         distributionConfig["Origins"],
       ),
       CustomErrorResponses:
         this.normalizeList<SimCloudFrontCustomErrorResponseConfig>(
+          "CustomErrorResponses",
           distributionConfig["CustomErrorResponses"],
         ),
       DefaultCacheBehavior:
@@ -78,17 +85,21 @@ export class SimCloudFrontDistributionConfigNormalizer {
       ...cacheBehavior,
       FunctionAssociations:
         this.normalizeList<SimCloudFrontFunctionAssociation>(
+          "FunctionAssociations",
           cacheBehaviorRecord["FunctionAssociations"],
         ),
     };
   }
 
   private normalizeList<T>(
+    listName: string,
     value: unknown,
   ): SimCloudFrontConfigList<T> | undefined {
     if (value === undefined) {
       return undefined;
     }
+
+    assertConsistentQuantity(listName, value);
 
     if (Array.isArray(value)) {
       return {

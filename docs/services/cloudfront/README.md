@@ -1560,6 +1560,12 @@ Where sim CloudFront knowingly behaves differently from AWS:
   claiming a name is refused with `OriginAccessControlAlreadyExists`, as CloudFront refuses one.
 - **There is no command surface for an origin access control.** `CreateOriginAccessControl` and its
   siblings are not simulated, so `AWS::CloudFront::OriginAccessControl` is the only way to make one.
+- **A list's `Quantity` is only checked when it is there.** Every CloudFront list carries a count
+  alongside its items, and a `Quantity` that disagrees with `Items` is refused with
+  `InconsistentQuantities`, as CloudFront refuses it. A list arriving as a plain array has no count
+  to disagree with, which is the CloudFormation shape, so a template is not checked this way. Nor is
+  a hand-written `{ Items: [...] }` with the count left out: the AWS SDK types make omitting
+  `Quantity` a compile error, so what arrives without one is not the mistake this catches.
 - **`IfMatch` ETags are not checked on a Distribution or a Function.**
   `UpdateDistributionCommand`, `DeleteDistributionCommand` and `DeleteFunctionCommand` all accept
   `IfMatch` and ignore it, so neither `PreconditionFailed` nor `InvalidIfMatchVersion` is returned

@@ -176,6 +176,20 @@ export class SimCloudFrontOriginAccessControlAlreadyExists extends SimCloudFront
 }
 
 /**
+ * Simulated CloudFront InconsistentQuantities error.
+ *
+ * Every CloudFront list carries a `Quantity` alongside its `Items`, and
+ * CloudFront refuses a request where the two disagree.
+ */
+export class SimCloudFrontInconsistentQuantities extends SimCloudFrontError {
+  public override readonly name = "InconsistentQuantities";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
  * Simulated CloudFront DistributionNotDisabled error.
  *
  * CloudFront will not delete a Distribution that is still serving. The caller

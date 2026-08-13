@@ -7,6 +7,7 @@ import type { SimCloudFrontBehavior } from "../../behaviour/sim-cloud-front-beha
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type { SimCfBehaviorResponseHeadersPolicy } from "./sim-cf-behavior-response-headers-policy.js";
 import { configureCffAssociations } from "./sim-cff-associations-configure.js";
+import { assertConsistentQuantity } from "../../command/sim-cf-list-quantity.js";
 
 /**
  * Build the Behavior properties common to both the default Cache Behavior and
@@ -26,11 +27,15 @@ export function simCfBehaviorProperties(
 
   return {
     targetOriginName: TargetOriginId,
-    allowedMethods: methodsSet(cacheBehavior.AllowedMethods, ["GET", "HEAD"]),
-    cachedMethods: methodsSet(cacheBehavior.AllowedMethods?.CachedMethods, [
+    allowedMethods: methodsSet("AllowedMethods", cacheBehavior.AllowedMethods, [
       "GET",
       "HEAD",
     ]),
+    cachedMethods: methodsSet(
+      "CachedMethods",
+      cacheBehavior.AllowedMethods?.CachedMethods,
+      ["GET", "HEAD"],
+    ),
     ...(cacheBehavior.ViewerProtocolPolicy !== undefined && {
       viewerProtocolPolicy: cacheBehavior.ViewerProtocolPolicy,
     }),
@@ -46,8 +51,11 @@ export function simCfBehaviorProperties(
  * provided defaults when no items are configured.
  */
 function methodsSet(
+  listName: string,
   methods: SimCloudFrontMethodList | undefined,
   fallback: string[],
 ): Set<string> {
+  assertConsistentQuantity(listName, methods);
+
   return new Set(methods?.Items ?? fallback);
 }
