@@ -1,6 +1,6 @@
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
-import { SimCloudFrontCannotDeleteEntityWhileInUse } from "../../error/sim-cloudfront.error.js";
+import { SimCloudFrontCannotDeleteEntityWhileInUse } from "../../error/sim-cf-key-value-store.error.js";
 import type { SimCfKeyValueStoreAccess } from "../../key-value-store/sim-cf-key-value-store-access.js";
 import type { SimCloudFrontKeyValueStoreId } from "../../key-value-store/sim-cf-key-value-store.js";
 import type { SimCfKeyValueStoreUsers } from "../../key-value-store/sim-cf-key-value-store-users.js";

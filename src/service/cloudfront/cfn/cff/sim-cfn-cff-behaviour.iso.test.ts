@@ -57,7 +57,7 @@ function handler(event) {
     );
 
     const request = new Request("https://example.test/object.json");
-    const result = cloudFrontFunction.handleViewerRequest(request);
+    const result = await cloudFrontFunction.handleViewerRequest(request);
 
     // Then the FunctionCode from the template is executed through the sim CFF.
     assertInstanceOf(result, Request);
@@ -109,7 +109,7 @@ function handler(event) {
     assertNonNullable(resource);
     assertInstanceOf(resource.simResource, SimCloudFrontFunction);
 
-    const result = resource.simResource.handleViewerRequest(
+    const result = await resource.simResource.handleViewerRequest(
       new Request("https://example.test/original.html"),
     );
 
@@ -161,7 +161,7 @@ function handler(event) {
     assertNonNullable(resource);
     assertInstanceOf(resource.simResource, SimCloudFrontFunction);
 
-    const result = resource.simResource.handleViewerRequest(
+    const result = await resource.simResource.handleViewerRequest(
       new Request("https://example.test/original.html"),
     );
 

@@ -62,9 +62,31 @@ looks up the command name.
 against the store wildcard first when the name resolves to nothing, so an unauthorized caller cannot
 learn which names exist.
 
-`SimCfKeyValueStoreUsers` decides whether a store can be deleted. Nothing can be associated with a
-store yet, so its default says nothing uses one. Associating a Function with a store is what will
-supply the real implementation.
+`SimCfKeyValueStoreUsers` decides whether a store can be deleted.
+`SimCffKeyValueStoreUsers` under `cff/kvs/` is what answers, by reading the Function map live. It
+stays an interface because the delete command has no business knowing about Functions, and because a
+standalone `SimCloudFront` with no Functions has nothing to ask.
+
+### Reading a store from a Function
+
+`cff/kvs/` holds what a Function reaches a store through. `cffCloudFrontModule` builds the `cf` a
+Function sees, closed over that Function's own store, and `CffKvsHandle` is what `cf.kvs()` returns.
+The handle is read-only: a Function can never write to a store, so there is deliberately no method
+for it.
+
+The two kinds of Function reach `cf` differently, which is the whole difficulty here. Source code
+runs in a `vm` context, so `cf` goes in as a context global and `cffSourceWithoutCloudFrontImport`
+rewrites `import cf from "cloudfront"` into a binding to it: a `vm.Script` is not a module, so the
+import would otherwise be a syntax error. A Function given as a function reference is an ordinary
+closure with no sandbox, so `simCffCloudFrontGlobal` holds its module in an `AsyncLocalStorage` store
+for the length of the invocation and a global `cf` accessor resolves to it. The store follows the
+invocation across await points, which matters because reading a key value store is awaited, and it
+is what keeps two concurrently running Functions reading their own stores. This mirrors
+`SimLambdaProcessEnvironment`, which does the same thing for a Lambda handler's `process.env`.
+
+Reading a store is asynchronous, so `SimCloudFrontFunction.handleViewerRequest` and
+`handleViewerResponse` return promises and `SimCffApplicator` awaits them. A synchronous handler
+still works unchanged: awaiting a plain value is what makes both shapes the same.
 
 Unlike the Distribution commands, these enforce the `IfMatch` ETag rather than accepting and
 ignoring it. The data API requires it on every write and CloudFront refuses a stale one, so a caller

@@ -4,11 +4,13 @@ import type { SimCloudFrontKeyValueStoreId } from "./sim-cf-key-value-store.js";
  * What still uses a key value store, which decides whether it can be deleted.
  *
  * CloudFront refuses to delete a store a Function is still associated with, so
- * the delete command has to ask something what is using it. That something is
- * the Function map, and a Function cannot be associated with a store yet: the
- * association arrives with the runtime read path. Until then the answer is
- * always nothing, and the guard is here so that wiring the real one in is a
- * change of collaborator rather than a change to the delete command.
+ * the delete command has to ask something what is using it. SimCffKeyValueStoreUsers
+ * is what answers: it reads the Function map, which is the only thing here that
+ * can hold a store open.
+ *
+ * This stays an interface because the delete command has no business knowing
+ * about Functions, and because a standalone SimCloudFront with no Functions
+ * has nothing to ask.
  */
 export interface SimCfKeyValueStoreUsers {
   /**

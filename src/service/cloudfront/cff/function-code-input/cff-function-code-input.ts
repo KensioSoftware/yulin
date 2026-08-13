@@ -1,7 +1,8 @@
 import type { CloudFrontFunction } from "../../typings/cloudfront-functions.namespace.js";
 import { defaultCffHandler } from "../sim-cloudfront-function.js";
 import type { SimCreateFunctionCommand } from "../../command/create-function/create-function.command.js";
-import vm from "node:vm";
+import type { CffCloudFrontModule } from "../kvs/cff-cloudfront-module.js";
+import { cffHandlerFromSource } from "./cff-vm-source-handler.js";
 
 type FunctionCodeInput = SimCreateFunctionCommand["input"]["FunctionCode"];
 
@@ -48,7 +49,10 @@ export class CffUint8ArrayFunctionCodeExtractor<
   H extends CloudFrontFunction.Handler =
     CloudFrontFunction.ViewerRequestHandler,
 > {
-  constructor(private readonly functionCodeInput: FunctionCodeInput) {}
+  constructor(
+    private readonly functionCodeInput: FunctionCodeInput,
+    private readonly cloudFront?: CffCloudFrontModule,
+  ) {}
 
   /**
    * Extract the handler function.
@@ -63,24 +67,7 @@ export class CffUint8ArrayFunctionCodeExtractor<
 
   private extractUint8ArraySourceCode(): H {
     const source = Buffer.from(this.functionCodeInput ?? "").toString();
-    const context = vm.createContext({
-      console,
-    });
-    const script = new vm.Script(`
-    ${source}
-    handler;
-    `);
-    const handler = script.runInContext(context, {
-      timeout: 50, // Real CloudFront Functions have a short timeout.
-      breakOnSigint: true,
-    }) as CloudFrontFunction.Handler;
 
-    if (typeof handler !== "function") {
-      throw new TypeError(
-        "CloudFront Function code did not define a handler function",
-      );
-    }
-
-    return handler as H;
+    return cffHandlerFromSource(source, this.cloudFront) as H;
   }
 }

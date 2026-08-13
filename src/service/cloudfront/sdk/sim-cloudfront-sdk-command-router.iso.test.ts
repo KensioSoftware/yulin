@@ -18,7 +18,6 @@ import {
   assertUndefined,
 } from "@kensio/smartass";
 import { SimSdk } from "../../../sdk/index.js";
-import type { SimCloudFrontFunctionName } from "../cff/sim-cloudfront-function.js";
 
 describe("simulated CloudFront SDK Command routing", () => {
   it("round-trips Distribution Commands through an intercepted client", async () => {
@@ -121,11 +120,7 @@ describe("simulated CloudFront SDK Command routing", () => {
 
     assertIdentical(distroCreation.FunctionSummary?.Status, "UNPUBLISHED");
     assertNonNullable(
-      simSdk.simAws
-        .cloudFront()
-        .getCloudFrontFunctionByName(
-          "intercepted-cff" as SimCloudFrontFunctionName,
-        ),
+      simSdk.simAws.cloudFront().getCloudFrontFunctionByName("intercepted-cff"),
     );
 
     // Deleting it again goes through the router the same way.
@@ -137,11 +132,7 @@ describe("simulated CloudFront SDK Command routing", () => {
     );
 
     assertUndefined(
-      simSdk.simAws
-        .cloudFront()
-        .getCloudFrontFunctionByName(
-          "intercepted-cff" as SimCloudFrontFunctionName,
-        ),
+      simSdk.simAws.cloudFront().getCloudFrontFunctionByName("intercepted-cff"),
     );
   });
 

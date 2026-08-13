@@ -1371,6 +1371,114 @@ client's versions the keys. Writing a key does not move the configuration's ETag
 comment does not move the keys'. A write carrying the other API's ETag is refused, and the message
 says which of the two it wanted.
 
+### Reading a store from a CloudFront Function
+
+A Function reads its store through `cf`, which it gets from `import cf from "cloudfront"`. That is
+the one import JS 2.0 has. `cf.kvs()` opens the store the Function is associated with, and its
+`get`, `exists` and `meta` are all promises, so a Function that reads a store is async.
+
+A Function names the store it may read with `KeyValueStoreAssociations` on its `FunctionConfig`.
+CloudFront takes at most one, and only on `cloudfront-js-2.0`: an association on the 1.0 runtime is
+refused, because that runtime has no `cf` to reach a store through.
+
+```typescript sim-cloudfront-function-key-value-store
+/**
+ * Reading a key value store from a CloudFront Function.
+ */
+
+import {
+  CreateFunctionCommand,
+  CreateKeyValueStoreCommand,
+} from "@aws-sdk/client-cloudfront";
+import {
+  DescribeKeyValueStoreCommand,
+  PutKeyCommand,
+} from "@aws-sdk/client-cloudfront-keyvaluestore";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const created = await simAws
+  .cloudFront()
+  .keyValueStores()
+  .createKeyValueStore(new CreateKeyValueStoreCommand({ Name: "redirects" }));
+
+const kvsArn = created.KeyValueStore.ARN;
+const data = simAws.cloudFrontKeyValueStore();
+
+const described = await data.describeKeyValueStore(
+  new DescribeKeyValueStoreCommand({ KvsARN: kvsArn }),
+);
+
+await data.putKey(
+  new PutKeyCommand({
+    KvsARN: kvsArn,
+    Key: "/old-page",
+    Value: "/new-page",
+    IfMatch: described.ETag,
+  }),
+);
+
+// The Function names the store it may read. It gets `cf` from the one import
+// JS 2.0 has, and the read is awaited, so the handler is async.
+await simAws.cloudFront().createFunction(
+  new CreateFunctionCommand({
+    Name: "redirect-cff",
+    FunctionConfig: {
+      Comment: "Redirects from a key value store",
+      Runtime: "cloudfront-js-2.0",
+      KeyValueStoreAssociations: {
+        Quantity: 1,
+        Items: [{ KeyValueStoreARN: kvsArn }],
+      },
+    },
+    FunctionCode: Buffer.from(`
+      import cf from "cloudfront";
+
+      async function handler(event) {
+        const request = event.request;
+
+        if (await cf.kvs().exists(request.uri)) {
+          const target = await cf.kvs().get(request.uri);
+
+          return {
+            statusCode: 302,
+            statusDescription: "Found",
+            headers: { location: { value: target } },
+          };
+        }
+
+        return request;
+      }
+    `),
+  }),
+);
+
+const cff = simAws.cloudFront().getCloudFrontFunctionByName("redirect-cff");
+
+const redirected = await cff!.handleViewerRequest(
+  new Request("https://cdn.test/old-page"),
+);
+
+console.log((redirected as Response).status); // 302
+console.log((redirected as Response).headers.get("location")); // /new-page
+```
+
+`get` reads a string by default, and takes `{ format: "json" }` to parse the stored string or
+`{ format: "bytes" }` for its UTF-8 bytes. A key that is not stored rejects, so a Function that
+wants a default checks `exists` first, as the example does.
+
+A Function written as a function reference rather than as source has no import to write, so it reads
+`cf` as a global. Importing `@kensio/yulin/cloudfront/globals` gives that global a type, along with
+the CloudFront Function event types. Each invocation gets its own `cf` through Node.js asynchronous
+context, so two Functions associated with different stores read their own even when they run at the
+same time.
+
+`cf.kvs()` refuses when the Function is associated with no store, and refuses an ID that is not the
+associated store's. Neither hands back an empty store, which would let a Function that lost its
+association run to completion and quietly take every default.
+
 ## Available functionality
 
 Sim CloudFront currently supports:
@@ -1384,7 +1492,8 @@ Sim CloudFront currently supports:
 - CloudFront Distribution hostnames such as `distro123.cloudfront.net`
 - Default cache Behavior and path-based cache Behaviors
 - `DefaultRootObject` and `CustomErrorResponses`, for static sites and single-page apps
-- `viewer-request` and `viewer-response` CloudFront Functions
+- `viewer-request` and `viewer-response` CloudFront Functions, including async ones
+- CloudFront Functions reading an associated key value store through `cf.kvs()`
 - `AWS::CloudFront::ResponseHeadersPolicy`, for headers a cache Behavior sets on every response
 - `AWS::CloudFront::OriginAccessControl`, so an Origin reads a private Bucket as CloudFront
 - Viewer certificates from sim ACM, including CloudFront's `us-east-1` requirement
@@ -1428,9 +1537,9 @@ Where sim CloudFront knowingly behaves differently from AWS:
   single key and value, and refuses a write that would exceed either. Nothing here counts against a
   quota, so `TotalSizeInBytes` is reported but never enforced. A test cannot find out that its data
   would be too large for a real store.
-- **Nothing is associated with a key value store yet.** A CloudFront Function cannot name one, so
-  `DeleteKeyValueStoreCommand` never answers `CannotDeleteEntityWhileInUse` and no Function can read
-  one at request time.
+- **A key value store association cannot be changed after the Function is created.** There is no
+  `UpdateFunction` here, so the store a Function reads is the one it was created with. Delete the
+  Function and create it again to change it.
 - **`ImportSource` is not supported.** `CreateKeyValueStoreCommand` ignores it, so a store is always
   created empty rather than seeded from an S3 Object.
 - **Key listing is not paginated.** `ListKeysCommand` and `ListKeyValueStoresCommand` answer with

@@ -42,7 +42,7 @@ export class SimCloudFrontRequestPipeline {
     // Handle viewer-request CFF, if any.
     // A viewer-request CFF can either rewrite the Request that continues to the
     // Origin or short-circuit the request by returning a Response.
-    const cffResult = this.stages.cffApplicator.applyViewerRequest(
+    const cffResult = await this.stages.cffApplicator.applyViewerRequest(
       cloudFront,
       requestReference,
       behaviour,
@@ -81,7 +81,7 @@ export class SimCloudFrontRequestPipeline {
     // Handle viewer-response CFF, if any.
     // A viewer-response CFF can inspect the original request and replace or
     // modify the Origin response before it is returned to the caller.
-    return this.stages.cffApplicator.applyViewerResponse(
+    return await this.stages.cffApplicator.applyViewerResponse(
       cloudFront,
       requestReference,
       response,

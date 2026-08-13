@@ -6,6 +6,9 @@ import {
   makeSimAwsAccountId,
   type SimAwsAccountId,
 } from "../../aws/sim-aws-account.js";
+import type { SimCloudFrontKeyValueStore } from "../key-value-store/sim-cf-key-value-store.js";
+import { cffCloudFrontModule } from "./kvs/cff-cloudfront-module.js";
+import { simCffCloudFrontGlobal } from "./kvs/sim-cff-cloudfront-global.js";
 
 export type SimCloudFrontFunctionName = Brand<
   string,
@@ -23,6 +26,7 @@ interface SimCloudFrontFunctionProperties {
   readonly accountId?: SimAwsAccountId;
   handlerFunction?: CloudFrontFunction.Handler;
   eventAdapter?: SimCffEventAdapter;
+  keyValueStore?: SimCloudFrontKeyValueStore | undefined;
 }
 
 export const defaultCffHandler: CloudFrontFunction.Handler = (
@@ -44,6 +48,9 @@ export class SimCloudFrontFunction {
   #status: CloudFrontFunctionStatus;
   private readonly handlerFunction: CloudFrontFunction.Handler;
   private readonly eventAdapter: SimCffEventAdapter;
+  private readonly associatedKeyValueStore:
+    | SimCloudFrontKeyValueStore
+    | undefined;
 
   constructor(properties: SimCloudFrontFunctionProperties) {
     const {
@@ -58,6 +65,7 @@ export class SimCloudFrontFunction {
     this.accountId = accountId;
     this.handlerFunction = handlerFunction;
     this.eventAdapter = eventAdapter;
+    this.associatedKeyValueStore = properties.keyValueStore;
   }
 
   /**
@@ -83,14 +91,27 @@ export class SimCloudFrontFunction {
   }
 
   /**
-   * Run the viewer-request CFF handler on a native Request.
+   * The key value store this Function may read, if it is associated with one.
    */
-  handleViewerRequest(request: Request): Request | Response {
+  get keyValueStore(): SimCloudFrontKeyValueStore | undefined {
+    return this.associatedKeyValueStore;
+  }
+
+  /**
+   * Run the viewer-request CFF handler on a native Request.
+   *
+   * Awaited because a Function reading a key value store is async. One that
+   * reads nothing is synchronous and still works: awaiting a plain value is
+   * what makes both shapes the same here.
+   */
+  async handleViewerRequest(request: Request): Promise<Request | Response> {
     const cffEvent = this.eventAdapter.toViewerRequestEvent(request);
 
     const handlerFunction = this
       .handlerFunction as CloudFrontFunction.ViewerRequestHandler;
-    const cffResult = handlerFunction(cffEvent);
+    const cffResult = await this.running(
+      async () => await handlerFunction(cffEvent),
+    );
 
     return this.eventAdapter.fromViewerRequestResult(cffResult, request);
   }
@@ -98,13 +119,34 @@ export class SimCloudFrontFunction {
   /**
    * Run the viewer-response CFF handler on a native Request and Response.
    */
-  handleViewerResponse(request: Request, response: Response): Response {
+  async handleViewerResponse(
+    request: Request,
+    response: Response,
+  ): Promise<Response> {
     const cffEvent = this.eventAdapter.toViewerResponseEvent(request, response);
 
     const handlerFunction = this
       .handlerFunction as CloudFrontFunction.ViewerResponseHandler;
-    const cffResult = handlerFunction(cffEvent);
+    const cffResult = await this.running(
+      async () => await handlerFunction(cffEvent),
+    );
 
     return this.eventAdapter.fromViewerResponseResult(cffResult, response);
+  }
+
+  /**
+   * Run the handler with this Function's own `cf` in scope.
+   *
+   * A Function given as source code already has `cf` in its vm sandbox, so this
+   * is what gives one given as a function reference the same thing: the module
+   * is held in asynchronous context for the length of the invocation, and the
+   * global `cf` resolves to it. Setting it for both is harmless and means the
+   * two kinds of Function reach a store the same way.
+   */
+  private async running<T>(handler: () => Promise<T>): Promise<T> {
+    return await simCffCloudFrontGlobal.run(
+      cffCloudFrontModule(this.associatedKeyValueStore),
+      handler,
+    );
   }
 }

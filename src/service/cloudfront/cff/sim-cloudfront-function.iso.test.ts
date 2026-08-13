@@ -4,10 +4,10 @@ import { assertIdentical, assertInstanceOf } from "@kensio/smartass";
 import type { CloudFrontFunction } from "../typings/cloudfront-functions.namespace.js";
 
 describe("sim CloudFront Function", () => {
-  it("applies default handler function for viewer-request", () => {
+  it("applies default handler function for viewer-request", async () => {
     const simCff = new SimCloudFrontFunction({ name: "foo-cff" });
 
-    const cffResponse = simCff.handleViewerRequest(
+    const cffResponse = await simCff.handleViewerRequest(
       new Request("http://foobar.cloudfront.net/foo/bar/object.json"),
     );
 
@@ -16,10 +16,10 @@ describe("sim CloudFront Function", () => {
     assertIdentical(url.pathname, "/foo/bar/object.json");
   });
 
-  it("applies default handler function for viewer-response", () => {
+  it("applies default handler function for viewer-response", async () => {
     const simCff = new SimCloudFrontFunction({ name: "foo-cff" });
 
-    const cffResponse = simCff.handleViewerResponse(
+    const cffResponse = await simCff.handleViewerResponse(
       new Request("http://foobar.cloudfront.net/foo/bar/object.json"),
       new Response(),
     );
@@ -27,7 +27,7 @@ describe("sim CloudFront Function", () => {
     assertInstanceOf(cffResponse, Response);
   });
 
-  it("applies injected handler function", () => {
+  it("applies injected handler function", async () => {
     const simCff = new SimCloudFrontFunction({
       name: "foo-cff",
       handlerFunction: (event: CloudFrontFunction.ViewerRequestEvent) => {
@@ -39,7 +39,7 @@ describe("sim CloudFront Function", () => {
       },
     });
 
-    const cffResponse = simCff.handleViewerRequest(
+    const cffResponse = await simCff.handleViewerRequest(
       new Request("http://foobar.cloudfront.net/foo/bar/object.json"),
     );
 

@@ -65,11 +65,20 @@ export declare namespace CloudFrontFunction {
 
   export type Event = ViewerRequestEvent | ViewerResponseEvent;
 
+  /**
+   * A handler may be async, because a key value store read is awaited.
+   *
+   * Runtime 2.0 supports `async` and `await`, and `cf.kvs().get()` returns a
+   * promise, so a Function that reads a store has to be async. One that reads
+   * nothing stays synchronous, and both are accepted here.
+   */
   export type ViewerRequestHandler = (
     event: ViewerRequestEvent,
-  ) => Request | Response;
+  ) => Request | Response | Promise<Request | Response>;
 
-  export type ViewerResponseHandler = (event: ViewerResponseEvent) => Response;
+  export type ViewerResponseHandler = (
+    event: ViewerResponseEvent,
+  ) => Response | Promise<Response>;
 
   export type Handler = ViewerRequestHandler | ViewerResponseHandler;
 }

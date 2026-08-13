@@ -34,10 +34,11 @@ function commandsWith(
 }
 
 describe("Deleting a key value store something still uses", () => {
-  it("says nothing uses any store, while nothing can be associated", () => {
-    // Given the default collaborator
+  it("says nothing uses any store, for a CloudFront with no Functions", () => {
+    // Given the default collaborator, which is what a standalone sim
+    // CloudFront with no Function map gets
     // When it is asked what uses a store
-    // Then nothing does, because a Function cannot be associated with one yet
+    // Then nothing does
     assertArrayLength(
       noKeyValueStoreUsers.functionsUsing(
         "any-store-id" as Parameters<

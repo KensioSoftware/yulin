@@ -35,7 +35,7 @@ describe("CloudFront CreateFunctionCommand", () => {
     await simAws.backgroundTasksComplete();
     assertIdentical(simCloudFrontFunction.status, "UNASSOCIATED");
 
-    const cffResponse = simCloudFrontFunction.handleViewerRequest(
+    const cffResponse = await simCloudFrontFunction.handleViewerRequest(
       new Request("http://foobar.cloudfront.net/foo/bar/object.json"),
     );
     assertInstanceOf(cffResponse, Request);
@@ -69,7 +69,7 @@ describe("CloudFront CreateFunctionCommand", () => {
     const simCloudFrontFunction =
       simCloudFront.getCloudFrontFunctionByName(cffName);
     assertInstanceOf(simCloudFrontFunction, SimCloudFrontFunction);
-    const cffResponse = simCloudFrontFunction.handleViewerRequest(
+    const cffResponse = await simCloudFrontFunction.handleViewerRequest(
       new Request("http://foobar.cloudfront.net/foo/bar/object.json"),
     );
     assertInstanceOf(cffResponse, Request);
@@ -102,7 +102,7 @@ describe("CloudFront CreateFunctionCommand", () => {
     await simAws.backgroundTasksComplete();
     assertIdentical(simCloudFrontFunction.status, "UNASSOCIATED");
 
-    const cffResponse = simCloudFrontFunction.handleViewerResponse(
+    const cffResponse = await simCloudFrontFunction.handleViewerResponse(
       new Request("http://foobar.cloudfront.net/foo/bar/object.json"),
       new Response("OK", { status: 200 }),
     );
@@ -136,7 +136,7 @@ describe("CloudFront CreateFunctionCommand", () => {
     const simCloudFrontFunction =
       simCloudFront.getCloudFrontFunctionByName(cffName);
     assertInstanceOf(simCloudFrontFunction, SimCloudFrontFunction);
-    const cffResponse = simCloudFrontFunction.handleViewerResponse(
+    const cffResponse = await simCloudFrontFunction.handleViewerResponse(
       new Request("http://foobar.cloudfront.net/foo/bar/object.json"),
       new Response("OK", { status: 200 }),
     );

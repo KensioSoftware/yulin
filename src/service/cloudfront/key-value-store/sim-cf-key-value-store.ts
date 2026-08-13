@@ -6,7 +6,7 @@ import {
   makeSimAwsAccountId,
   type SimAwsAccountId,
 } from "../../aws/sim-aws-account.js";
-import { SimCloudFrontPreconditionFailed } from "../error/sim-cloudfront.error.js";
+import { SimCloudFrontPreconditionFailed } from "../error/sim-cf-key-value-store.error.js";
 import {
   type SimCloudFrontKeyValuePair,
   SimCloudFrontKeyValueStoreKeys,
