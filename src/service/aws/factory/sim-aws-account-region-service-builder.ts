@@ -12,18 +12,16 @@ import { SimCloudFormation } from "../../cloudformation/index.js";
 import { SimCognitoIdentityProvider } from "../../cognito/index.js";
 import { simAwsCognitoTriggerFunctions } from "../../cognito/user-pool/trigger/sim-aws-cognito-trigger-functions.js";
 import { SimDynamoDb as SimDynamoDatabase } from "../../dynamodb/index.js";
+import { SimEventBridge } from "../../eventbridge/index.js";
 import type { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
 import { SimKms } from "../../kms/index.js";
 import type { SimHttpApiRegistry } from "../../apigatewayv2/registry/sim-http-api-registry.js";
 import { SimLambda } from "../../lambda/index.js";
 import type { SimLambdaUrlRegistry } from "../../lambda/registry/sim-lambda-url-registry.js";
-import { SimSqsEventSourceQueues } from "../../lambda/event-source/queue/sim-sqs-event-source-queues.js";
-import { SimDynamoDbEventSourceStreams } from "../../lambda/event-source/stream/sim-dynamodb-event-source-streams.js";
-import { SimS3LambdaCodeStore } from "../../lambda/function/code/store/sim-s3-lambda-code-store.js";
-import { SimSdkLambdaVmModuleProvider } from "../../lambda/function/code/vm/sdk/sim-sdk-lambda-vm-module-provider.js";
 import { SimRekognition } from "../../rekognition/index.js";
 import { SimAwsRekognitionImageObjects } from "../../rekognition/image/s3/sim-aws-rekognition-image-objects.js";
 import { SimS3 } from "../../s3/sim-s3.js";
+import { simAwsLambdaCollaborators } from "./sim-aws-lambda-collaborators.js";
 import { simAwsS3NotificationDestinations } from "./sim-aws-s3-notification-destinations.js";
 import { SimSecretsManager } from "../../secretsmanager/index.js";
 import { SimSns } from "../../sns/index.js";
@@ -148,6 +146,16 @@ export class SimAwsAccountRegionServiceBuilder {
   }
 
   /**
+   * Create simulated EventBridge for an Account Region scope.
+   *
+   * Event buses are Region-scoped on real AWS: a bus ARN names its Region, and
+   * an event put in one Region reaches no rule in another.
+   */
+  createEventBridge(scope: SimAwsAccountRegionContainer): SimEventBridge {
+    return new SimEventBridge(this.scoped(scope));
+  }
+
+  /**
    * Create simulated KMS for an Account Region scope.
    *
    * KMS keys are Region-scoped on real AWS: a key ARN names its Region, and a
@@ -157,32 +165,14 @@ export class SimAwsAccountRegionServiceBuilder {
     return new SimKms(this.scoped(scope));
   }
 
-  /**
-   * Create simulated Lambda for an Account Region scope.
-   *
-   * S3-located function code is fetched from the same Account/Region scope's
-   * simulated S3, as real Lambda requires same-region code buckets. Function
-   * code running in the vm runtime is provided host-installed AWS SDK
-   * packages intercepted into this SimAws, as the real Lambda runtime
-   * provides the SDK.
-   *
-   * Event source mappings poll the same scope's simulated SQS and DynamoDB, as
-   * a queue or a table's stream can only be an event source for a function in
-   * its own Account and Region.
-   */
+  /** Create simulated Lambda for an Account Region scope. */
   createLambda(scope: SimAwsAccountRegionContainer): SimLambda {
     return new SimLambda({
       ...this.scoped(scope),
-      runAsOwner: this.simAws,
-      urlRegistry: this.lambdaUrlRegistry,
-      codeStore: new SimS3LambdaCodeStore({ s3: scope.s3() }),
-      eventSourceQueues: new SimSqsEventSourceQueues({ sqs: scope.sqs() }),
-      eventSourceStreams: new SimDynamoDbEventSourceStreams({
-        dynamoDb: scope.dynamoDb(),
-      }),
-      vmSdkModuleProvider: new SimSdkLambdaVmModuleProvider({
+      ...simAwsLambdaCollaborators({
         simAws: this.simAws,
-        regionName: scope.accountRegionScope.regionName,
+        scope,
+        urlRegistry: this.lambdaUrlRegistry,
       }),
     });
   }

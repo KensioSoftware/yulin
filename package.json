@@ -74,6 +74,10 @@
       "import": "./dist/config/eslint/index.js",
       "types": "./dist/config/eslint/index.d.ts"
     },
+    "./eventbridge": {
+      "import": "./dist/service/eventbridge/index.js",
+      "types": "./dist/service/eventbridge/index.d.ts"
+    },
     "./iam": {
       "import": "./dist/service/iam/index.js",
       "types": "./dist/service/iam/index.d.ts"
@@ -151,6 +155,7 @@
     "@aws-sdk/client-cognito-identity-provider": "^3.1101.0",
     "@aws-sdk/client-dynamodb": "^3.1101.0",
     "@aws-sdk/client-dynamodb-streams": "^3.1101.0",
+    "@aws-sdk/client-eventbridge": "^3.1109.0",
     "@aws-sdk/client-iam": "^3.1101.0",
     "@aws-sdk/client-kms": "^3.1101.0",
     "@aws-sdk/client-lambda": "^3.1101.0",

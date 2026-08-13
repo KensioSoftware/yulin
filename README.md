@@ -24,6 +24,8 @@ npm i -D @kensio/yulin
 - [CloudFormation](./docs/services/cloudformation "Simulated CloudFormation docs")
 - [CloudFront](./docs/services/cloudfront "Simulated CloudFront docs")
 - [Cognito user pools](./docs/services/cognito "Simulated Cognito user pools docs")
+- [DynamoDB](./docs/services/dynamodb "Simulated DynamoDB docs")
+- [EventBridge](./docs/services/eventbridge "Simulated EventBridge docs")
 - [IAM](./docs/services/iam "Simulated IAM docs")
 - [KMS](./docs/services/kms "Simulated KMS docs")
 - [Lambda](./docs/services/lambda "Simulated Lambda docs")

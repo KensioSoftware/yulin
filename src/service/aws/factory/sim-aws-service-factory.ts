@@ -21,6 +21,7 @@ import type { SimKms } from "../../kms/index.js";
 import type { SimLambda } from "../../lambda/index.js";
 import { SimLambdaUrlRegistry } from "../../lambda/registry/sim-lambda-url-registry.js";
 import type { SimSecretsManager } from "../../secretsmanager/index.js";
+import type { SimEventBridge } from "../../eventbridge/index.js";
 import type { SimSns } from "../../sns/index.js";
 import type { SimSqs } from "../../sqs/index.js";
 import type { SimSsm } from "../../ssm/index.js";
@@ -156,6 +157,11 @@ export class SimAwsServiceFactory {
   /** Create simulated DynamoDB for an Account Region scope. */
   createDynamoDb(scope: SimAwsAccountRegionContainer): SimDynamoDatabase {
     return this.accountRegionServices.createDynamoDb(scope);
+  }
+
+  /** Create simulated EventBridge for an Account Region scope. */
+  createEventBridge(scope: SimAwsAccountRegionContainer): SimEventBridge {
+    return this.accountRegionServices.createEventBridge(scope);
   }
 
   /** Create or get simulated IAM for an Account scope. */
