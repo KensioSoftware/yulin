@@ -1,4 +1,5 @@
 import { SimCloudFrontInvalidKeyValueStoreAssociation } from "../../error/sim-cf-key-value-store.error.js";
+import { assertConsistentQuantity } from "../sim-cf-list-quantity.js";
 import type { SimCloudFrontKeyValueStore } from "../../key-value-store/sim-cf-key-value-store.js";
 import type { SimCloudFrontKeyValueStoreRegistry } from "../../key-value-store/sim-cf-key-value-store-registry.js";
 import type { SimCreateFunctionCommandInput } from "./create-function.command.js";
@@ -25,6 +26,11 @@ export class CreateFunctionKeyValueStoreAssociation {
     functionName: string,
     config: FunctionConfig,
   ): SimCloudFrontKeyValueStore | undefined {
+    assertConsistentQuantity(
+      "KeyValueStoreAssociations",
+      config?.KeyValueStoreAssociations,
+    );
+
     const items = config?.KeyValueStoreAssociations?.Items ?? [];
 
     if (items.length === 0) {

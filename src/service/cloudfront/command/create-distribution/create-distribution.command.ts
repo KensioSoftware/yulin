@@ -35,6 +35,7 @@ export interface SimCloudFrontDistributionConfig {
   readonly CustomErrorResponses?:
     | undefined
     | {
+        readonly Quantity?: number | undefined;
         readonly Items?:
           | readonly SimCloudFrontCustomErrorResponseConfig[]
           | undefined;
@@ -42,11 +43,13 @@ export interface SimCloudFrontDistributionConfig {
   readonly Aliases?:
     | undefined
     | {
+        readonly Quantity?: number | undefined;
         readonly Items?: readonly string[] | undefined;
       };
   readonly Origins?:
     | undefined
     | {
+        readonly Quantity?: number | undefined;
         readonly Items?: readonly SimCloudFrontOriginConfig[] | undefined;
       };
   readonly DefaultCacheBehavior?:
@@ -55,6 +58,7 @@ export interface SimCloudFrontDistributionConfig {
   readonly CacheBehaviors?:
     | undefined
     | {
+        readonly Quantity?: number | undefined;
         readonly Items?:
           | readonly SimCloudFrontCacheBehaviorConfig[]
           | undefined;
@@ -162,6 +166,7 @@ export interface SimCloudFrontFunctionAssociation {
  * Minimal structural sim CloudFront allowed methods list.
  */
 export interface SimCloudFrontAllowedMethods {
+  readonly Quantity?: number | undefined;
   readonly Items?: readonly string[] | undefined;
   readonly CachedMethods?: SimCloudFrontMethodList | undefined;
 }
@@ -170,6 +175,7 @@ export interface SimCloudFrontAllowedMethods {
  * Minimal structural sim CloudFront method list.
  */
 export interface SimCloudFrontMethodList {
+  readonly Quantity?: number | undefined;
   readonly Items?: readonly string[] | undefined;
 }
 
