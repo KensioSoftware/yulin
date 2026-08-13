@@ -1,11 +1,13 @@
 import {
   CreateEventBusCommand,
+  DeleteEventBusCommand,
   DescribeEventBusCommand,
   ListEventBusesCommand,
   PutEventsCommand,
 } from "@aws-sdk/client-eventbridge";
 import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
 import {
+  assertArrayLength,
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
@@ -143,6 +145,63 @@ describe("EventBridge IAM authorization", () => {
     });
 
     // Then it matches nothing, as it matches nothing on real AWS.
+    assertInstanceOf(error, SimEventBridgeAccessDeniedException);
+  });
+
+  it("puts no event at all when one entry of a request is refused", async () => {
+    // Given a Role allowed to put events on the orders bus only.
+    const { simAws, caller } = await simAwsWithRole({
+      Effect: "Allow",
+      Action: "events:PutEvents",
+      Resource: "arn:aws:events:us-east-1:888888888888:event-bus/orders",
+    });
+
+    // When a request puts one entry on that bus and a later one on default.
+    await assertThrowsErrorAsync(async () => {
+      await simAws.eventBridge().putEvents(
+        new PutEventsCommand({
+          Entries: [
+            {
+              EventBusName: "orders",
+              Source: "orders.service",
+              DetailType: "OrderPlaced",
+              Detail: "{}",
+            },
+            {
+              Source: "orders.service",
+              DetailType: "OrderPlaced",
+              Detail: "{}",
+            },
+          ],
+        }),
+        { caller },
+      );
+    });
+
+    // Then the allowed entry was not delivered either, so a refused request
+    // leaves nothing behind.
+    assertArrayLength(simAws.eventBridge().eventsOn("orders"), 0);
+  });
+
+  it("refuses deleting the default bus with the permission error first", async () => {
+    // Given a Role with no EventBridge permission at all.
+    const { simAws, caller } = await simAwsWithRole({
+      Effect: "Allow",
+      Action: "s3:GetObject",
+      Resource: "*",
+    });
+
+    // When it deletes the default bus, which nobody may delete.
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws
+        .eventBridge()
+        .deleteEventBus(new DeleteEventBusCommand({ Name: "default" }), {
+          caller,
+        });
+    });
+
+    // Then IAM decides first, as it does on real AWS, so the answer is the
+    // permission one rather than the rule about the default bus.
     assertInstanceOf(error, SimEventBridgeAccessDeniedException);
   });
 

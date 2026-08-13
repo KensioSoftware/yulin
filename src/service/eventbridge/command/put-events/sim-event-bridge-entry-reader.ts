@@ -126,14 +126,18 @@ export class SimEventBridgeEntryReader {
       return SimEventBridgeEntryFailure.malformedDetail();
     }
 
+    // The timestamp and the resource list are copied rather than held onto,
+    // because they belong to the request the caller still has a reference to.
+    // A caller reusing an entry object between calls would otherwise change an
+    // event that has already been put.
     return new SimEventBridgeEvent({
       id: randomUUID(),
       detailType: read.detailType,
       source: read.source,
       account: this.accountRegionScope.accountId,
-      time: read.entry.Time ?? read.at,
+      time: new Date(read.entry.Time?.getTime() ?? read.at.getTime()),
       region: this.accountRegionScope.regionName,
-      resources: read.entry.Resources ?? [],
+      resources: [...(read.entry.Resources ?? [])],
       detail,
     });
   }

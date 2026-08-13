@@ -14,6 +14,14 @@ import type {
   SimPutEventsResultEntry,
 } from "./put-events.command.js";
 
+/**
+ * One entry, and the name of the bus the caller is allowed to put it on.
+ */
+interface SimEventBridgeAuthorizedEntry {
+  readonly entry: SimPutEventsRequestEntry;
+  readonly busName: string;
+}
+
 interface SimEventBridgePutEventsProperties {
   readonly buses: SimEventBusStore;
   readonly access: SimEventBridgeBusAccess;
@@ -63,7 +71,9 @@ export class SimEventBridgePutEvents {
     const entries = putEventsRequestEntries(command.input);
     const at = this.clock.now();
 
-    const results = entries.map((entry) => this.put(entry, at, options));
+    const results = this.authorized(entries, options).map((authorized) =>
+      this.put(authorized, at),
+    );
 
     return {
       $metadata: {},
@@ -75,27 +85,44 @@ export class SimEventBridgePutEvents {
   }
 
   /**
-   * Put one entry onto the bus it names.
+   * Resolve and authorize the bus every entry names, before any of them is
+   * delivered.
+   *
+   * Authorizing entry by entry as each is delivered would leave a refused
+   * request half done: an earlier entry's event would already be on its bus
+   * when a later entry's refusal threw. Every entry is therefore decided
+   * first, so a request that throws has changed nothing.
+   */
+  private authorized(
+    entries: readonly SimPutEventsRequestEntry[],
+    options: SimEventBridgeRequestOptions | undefined,
+  ): readonly SimEventBridgeAuthorizedEntry[] {
+    return entries.map((entry) => {
+      const busName = this.access.requestedName(entry.EventBusName);
+
+      this.access.authorizeName("events:PutEvents", busName, options);
+
+      return { entry, busName: busName.value };
+    });
+  }
+
+  /**
+   * Put one authorized entry onto the bus it names.
    *
    * A bus that is not there takes the event nowhere, and the entry still
    * succeeds.
    */
   private put(
-    entry: SimPutEventsRequestEntry,
+    authorized: SimEventBridgeAuthorizedEntry,
     at: Date,
-    options: SimEventBridgeRequestOptions | undefined,
   ): SimPutEventsResultEntry {
-    const name = this.access.requestedName(entry.EventBusName);
-
-    this.access.authorizeName("events:PutEvents", name, options);
-
-    const read = this.reader.read(entry, at);
+    const read = this.reader.read(authorized.entry, at);
 
     if (read instanceof SimEventBridgeEntryFailure) {
       return read.toResultEntry();
     }
 
-    this.deliver(name.value, read);
+    this.deliver(authorized.busName, read);
 
     return { EventId: read.id };
   }

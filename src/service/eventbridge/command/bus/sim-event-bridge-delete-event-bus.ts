@@ -37,20 +37,24 @@ export class SimEventBridgeDeleteEventBus {
    * Delete a custom event bus.
    *
    * The name frees at once, so it can be reused straight away.
+   *
+   * The caller is authorized before the default bus is refused, because IAM
+   * decides a request on real AWS before the operation's own rules do. A
+   * caller with no permission is told that rather than told which bus it may
+   * not delete.
    */
   handle(
     command: SimDeleteEventBusCommand,
     options?: SimEventBridgeRequestOptions,
   ): SimDeleteEventBusCommandOutput {
     const name = SimEventBusName.required(command.input.Name, "Name");
+    const bus = this.access.find("events:DeleteEventBus", name, options);
 
     if (name.isDefault) {
       throw new SimEventBridgeValidationException(
         "Cannot delete event bus default.",
       );
     }
-
-    const bus = this.access.find("events:DeleteEventBus", name, options);
 
     if (bus !== undefined) {
       this.buses.remove(bus);
