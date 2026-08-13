@@ -48,6 +48,8 @@ import type {
   SimCloudFrontOriginAccessControlId,
 } from "./origin-access-control/sim-cf-origin-access-control.js";
 import { SimCloudFrontOriginAccessControlRegistry } from "./origin-access-control/sim-cf-origin-access-control-registry.js";
+import type { SimCfKeyValueStoreCommands } from "./key-value-store/sim-cf-key-value-store-commands.js";
+import type { SimCloudFrontKeyValueStoreApi } from "./sim-cloudfront-key-value-store.js";
 import { SimCloudFrontSdkCommandRouter } from "./sdk/sim-cloudfront-sdk-command-router.js";
 import {
   SimCloudFrontCommands,
@@ -90,6 +92,23 @@ export class SimCloudFront {
       originAccessControls: this.originAccessControls,
       responseHeadersPolicies: this.responseHeadersPolicies,
     });
+  }
+
+  /**
+   * The key value store commands, and the stores they work on.
+   */
+  keyValueStores(): SimCfKeyValueStoreCommands {
+    return this.commands.keyValueStores;
+  }
+
+  /**
+   * The key value store data API over this sim CloudFront's stores.
+   *
+   * This is what the separate `@aws-sdk/client-cloudfront-keyvaluestore`
+   * client talks to, reached from SimAws as `cloudFrontKeyValueStore()`.
+   */
+  keyValueStoreApi(): SimCloudFrontKeyValueStoreApi {
+    return this.commands.keyValueStoreApi;
   }
 
   /**

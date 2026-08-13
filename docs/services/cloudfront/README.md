@@ -1282,6 +1282,95 @@ fails the Stack by name.
 There is no `CreateOriginAccessControl` command here, so a CloudFormation template is the only way
 to make one.
 
+## Key value stores
+
+A key value store holds data a CloudFront Function reads at request time, so a redirect table or a
+feature flag does not have to be baked into the Function's code.
+
+AWS splits this across two SDK clients, and so does the simulator. The CloudFront client owns the
+store: `CreateKeyValueStoreCommand`, `DescribeKeyValueStoreCommand`, `ListKeyValueStoresCommand`,
+`UpdateKeyValueStoreCommand` and `DeleteKeyValueStoreCommand`, all addressing a store by name. The
+key value store client owns the data: `GetKeyCommand`, `PutKeyCommand`, `DeleteKeyCommand`,
+`ListKeysCommand`, `UpdateKeysCommand` and its own `DescribeKeyValueStoreCommand`, all addressing a
+store by ARN.
+
+Both clients are intercepted by `SimSdk`. Used directly, they are `simAws.cloudFront().keyValueStores()`
+and `simAws.cloudFrontKeyValueStore()`.
+
+```typescript sim-cloudfront-key-value-store
+/**
+ * Creating a CloudFront key value store and writing keys to it.
+ */
+
+import { CreateKeyValueStoreCommand } from "@aws-sdk/client-cloudfront";
+import {
+  DescribeKeyValueStoreCommand,
+  GetKeyCommand,
+  UpdateKeysCommand,
+} from "@aws-sdk/client-cloudfront-keyvaluestore";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+// The CloudFront client owns the store itself.
+const created = await simAws
+  .cloudFront()
+  .keyValueStores()
+  .createKeyValueStore(
+    new CreateKeyValueStoreCommand({
+      Name: "redirects",
+      Comment: "Where old paths go",
+    }),
+  );
+
+const kvsArn = created.KeyValueStore.ARN;
+const data = simAws.cloudFrontKeyValueStore();
+
+// The key value store client owns the data, and addresses the store by ARN.
+// Every write carries an ETag, and it is this API's own: the one the
+// CloudFront client returned above versions the resource, not the keys.
+const described = await data.describeKeyValueStore(
+  new DescribeKeyValueStoreCommand({ KvsARN: kvsArn }),
+);
+
+const written = await data.updateKeys(
+  new UpdateKeysCommand({
+    KvsARN: kvsArn,
+    IfMatch: described.ETag,
+    Puts: [
+      { Key: "/old-page", Value: "/new-page" },
+      { Key: "/legacy", Value: "/current" },
+    ],
+  }),
+);
+
+console.log(written.ItemCount); // 2
+
+const read = await data.getKey(
+  new GetKeyCommand({ KvsARN: kvsArn, Key: "/old-page" }),
+);
+
+console.log(read.Value); // /new-page
+```
+
+A new store is `PROVISIONING` when the command returns and becomes `READY` in the background, as in
+CloudFront. `await simAws.backgroundTasksComplete()` waits for that.
+
+### ETags
+
+Unlike the Distribution and Function commands, the key value store commands do check `IfMatch`. Both
+APIs require it on every write and CloudFront refuses a stale one, which is what stops two writers
+overwriting each other. A write carrying an ETag that is not current is refused with
+`PreconditionFailed`, so a caller has to thread the ETag through the way it does against CloudFront.
+Each write returns the new ETag for the next one.
+
+A store has two ETags and they are not interchangeable, as in AWS. Each `DescribeKeyValueStore`
+returns its own: the CloudFront client's versions the store's configuration, and the key value store
+client's versions the keys. Writing a key does not move the configuration's ETag, and changing the
+comment does not move the keys'. A write carrying the other API's ETag is refused, and the message
+says which of the two it wanted.
+
 ## Available functionality
 
 Sim CloudFront currently supports:
@@ -1289,6 +1378,7 @@ Sim CloudFront currently supports:
 - `CreateDistributionCommand`, `GetDistributionCommand`, `UpdateDistributionCommand` and
   `DeleteDistributionCommand`
 - `CreateFunctionCommand` and `DeleteFunctionCommand`
+- Key value stores, through both the CloudFront client and the key value store data client
 - S3 Origins backed by sim S3 Buckets, reading them as the Bucket policy allows
 - Custom Origins reaching sim HTTP APIs and sim Lambda Function URLs in process
 - CloudFront Distribution hostnames such as `distro123.cloudfront.net`
@@ -1328,10 +1418,23 @@ Where sim CloudFront knowingly behaves differently from AWS:
   claiming a name is refused with `OriginAccessControlAlreadyExists`, as CloudFront refuses one.
 - **There is no command surface for an origin access control.** `CreateOriginAccessControl` and its
   siblings are not simulated, so `AWS::CloudFront::OriginAccessControl` is the only way to make one.
-- **`IfMatch` ETags are not checked.** `UpdateDistributionCommand`, `DeleteDistributionCommand` and
-  `DeleteFunctionCommand` all accept `IfMatch` and ignore it, so neither `PreconditionFailed` nor
-  `InvalidIfMatchVersion` is ever returned. Nothing else here versions a resource, and a stale ETag
-  is a retry rather than a design mistake. A test expecting the ETag refusal will not get it.
+- **`IfMatch` ETags are not checked on a Distribution or a Function.**
+  `UpdateDistributionCommand`, `DeleteDistributionCommand` and `DeleteFunctionCommand` all accept
+  `IfMatch` and ignore it, so neither `PreconditionFailed` nor `InvalidIfMatchVersion` is returned
+  for those. A stale ETag there is a retry rather than a design mistake. The key value store
+  commands are the exception and do check it, because the data API is built around it: two writers
+  racing on one store is the case it exists to catch.
+- **A key value store has no size quota.** CloudFront caps a store's total size and the length of a
+  single key and value, and refuses a write that would exceed either. Nothing here counts against a
+  quota, so `TotalSizeInBytes` is reported but never enforced. A test cannot find out that its data
+  would be too large for a real store.
+- **Nothing is associated with a key value store yet.** A CloudFront Function cannot name one, so
+  `DeleteKeyValueStoreCommand` never answers `CannotDeleteEntityWhileInUse` and no Function can read
+  one at request time.
+- **`ImportSource` is not supported.** `CreateKeyValueStoreCommand` ignores it, so a store is always
+  created empty rather than seeded from an S3 Object.
+- **Key listing is not paginated.** `ListKeysCommand` and `ListKeyValueStoresCommand` answer with
+  everything and never set a `NextToken` or `NextMarker`, so a test cannot exercise a paging loop.
 - **A deletion does not wait for the disable to deploy.** Real CloudFront needs the disabled
   Distribution to reach `Deployed` before it accepts the deletion. Here, `Enabled: false` is enough.
 - **A disabled Distribution still serves requests.** Real CloudFront answers a disabled Distribution

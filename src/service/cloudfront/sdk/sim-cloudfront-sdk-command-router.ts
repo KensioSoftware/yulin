@@ -8,6 +8,13 @@ import type { SimCreateFunctionCommand } from "../command/create-function/create
 import type { SimDeleteDistributionCommand } from "../command/delete-distribution/delete-distribution.command.js";
 import type { SimDeleteFunctionCommand } from "../command/delete-function/delete-function.command.js";
 import type { SimGetDistributionCommand } from "../command/get-distribution/get-distribution.command.js";
+import type {
+  SimCreateKeyValueStoreCommand,
+  SimDeleteKeyValueStoreCommand,
+  SimDescribeKeyValueStoreCommand,
+  SimListKeyValueStoresCommand,
+  SimUpdateKeyValueStoreCommand,
+} from "../command/key-value-store/sim-cf-key-value-store-command.types.js";
 import type { SimUpdateDistributionCommand } from "../command/update-distribution/update-distribution.command.js";
 import type { SimCloudFront } from "../sim-cloudfront.js";
 
@@ -59,6 +66,56 @@ export class SimCloudFrontSdkCommandRouter implements SimSdkCommandRouter {
             command as SimGetDistributionCommand,
             simSdkCallerOptions(context),
           ),
+      ],
+      [
+        "CreateKeyValueStoreCommand",
+        async (command, context): Promise<unknown> =>
+          await simCloudFront
+            .keyValueStores()
+            .createKeyValueStore(
+              command as SimCreateKeyValueStoreCommand,
+              simSdkCallerOptions(context),
+            ),
+      ],
+      [
+        "DescribeKeyValueStoreCommand",
+        async (command, context): Promise<unknown> =>
+          await simCloudFront
+            .keyValueStores()
+            .describeKeyValueStore(
+              command as SimDescribeKeyValueStoreCommand,
+              simSdkCallerOptions(context),
+            ),
+      ],
+      [
+        "ListKeyValueStoresCommand",
+        async (command, context): Promise<unknown> =>
+          await simCloudFront
+            .keyValueStores()
+            .listKeyValueStores(
+              command as SimListKeyValueStoresCommand,
+              simSdkCallerOptions(context),
+            ),
+      ],
+      [
+        "UpdateKeyValueStoreCommand",
+        async (command, context): Promise<unknown> =>
+          await simCloudFront
+            .keyValueStores()
+            .updateKeyValueStore(
+              command as SimUpdateKeyValueStoreCommand,
+              simSdkCallerOptions(context),
+            ),
+      ],
+      [
+        "DeleteKeyValueStoreCommand",
+        async (command, context): Promise<unknown> =>
+          await simCloudFront
+            .keyValueStores()
+            .deleteKeyValueStore(
+              command as SimDeleteKeyValueStoreCommand,
+              simSdkCallerOptions(context),
+            ),
       ],
       [
         "UpdateDistributionCommand",

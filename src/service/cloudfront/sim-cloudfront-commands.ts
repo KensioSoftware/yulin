@@ -55,6 +55,10 @@ import {
 import type { SimCloudFrontOriginAccessControlRegistry } from "./origin-access-control/sim-cf-origin-access-control-registry.js";
 import type { SimCloudFrontResponseHeadersPolicyRegistry } from "./response-headers-policy/sim-cf-response-headers-policy-registry.js";
 import { SimCloudFrontRegistry } from "./registry/sim-cloud-front-registry.js";
+import { SimCfKeyValueStoreAccess } from "./key-value-store/sim-cf-key-value-store-access.js";
+import { SimCfKeyValueStoreCommands } from "./key-value-store/sim-cf-key-value-store-commands.js";
+import { SimCloudFrontKeyValueStoreRegistry } from "./key-value-store/sim-cf-key-value-store-registry.js";
+import { SimCloudFrontKeyValueStoreApi } from "./sim-cloudfront-key-value-store.js";
 
 /**
  * How one simulated CloudFront is put together.
@@ -119,6 +123,16 @@ interface SimCloudFrontFunctionState {
  * what it should be: state plus delegation.
  */
 export class SimCloudFrontCommands {
+  /**
+   * The key value store commands on the CloudFront client.
+   */
+  public readonly keyValueStores: SimCfKeyValueStoreCommands;
+
+  /**
+   * The key value store data API over those same stores.
+   */
+  public readonly keyValueStoreApi: SimCloudFrontKeyValueStoreApi;
+
   private readonly distributionState: SimCloudFrontDistributionState;
   private readonly functionState: SimCloudFrontFunctionState;
   private readonly s3OriginResolver: SimCloudFrontS3OriginResolver;
@@ -160,6 +174,19 @@ export class SimCloudFrontCommands {
     this.acmRegistry = acmRegistry;
     this.originAccessControls = properties.originAccessControls;
     this.responseHeadersPolicies = properties.responseHeadersPolicies;
+    const keyValueStoreAccess = new SimCfKeyValueStoreAccess({
+      accountId,
+      stores: new SimCloudFrontKeyValueStoreRegistry(),
+      iam,
+      background,
+    });
+
+    // Nothing can be associated with a store yet, so the delete command's
+    // in-use guard is left on its default. See SimCfKeyValueStoreUsers.
+    this.keyValueStores = new SimCfKeyValueStoreCommands(keyValueStoreAccess);
+    this.keyValueStoreApi = new SimCloudFrontKeyValueStoreApi(
+      keyValueStoreAccess,
+    );
   }
 
   /**
