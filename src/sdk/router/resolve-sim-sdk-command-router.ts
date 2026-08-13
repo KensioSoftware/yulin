@@ -1,8 +1,92 @@
 import type { SimAwsAccountId } from "../../service/aws/sim-aws-account.js";
+import type { SimAwsAccountRegionContainer } from "../../service/aws/sim-aws-account-region-scope.js";
 import type { AwsRegionName } from "../../service/aws/sim-aws-region.js";
 import type { SimAws } from "../../service/aws/sim-aws.js";
 import { SimSdkUnknownServiceError } from "../error/sim-sdk.error.js";
 import type { SimSdkCommandRouter } from "./sim-sdk-command-router.type.js";
+
+/**
+ * How one AWS service identity reaches its scoped simulated service.
+ */
+type SimSdkScopedRouter = (
+  scoped: SimAwsAccountRegionContainer,
+) => SimSdkCommandRouter;
+
+/**
+ * Every AWS service identity SDK interception supports, and the scoped
+ * simulated service each one routes to.
+ *
+ * A table rather than a switch, because there is one entry per simulated
+ * service and the list only grows: a branch per service would put the whole of
+ * this file's complexity in one function.
+ *
+ * The keys are the SDK's own `serviceId` values, which is why some of them
+ * carry spaces.
+ */
+const scopedRouters: ReadonlyMap<string, SimSdkScopedRouter> = new Map<
+  string,
+  SimSdkScopedRouter
+>([
+  ["ACM", (scoped): SimSdkCommandRouter => scoped.acm().sdkCommandRouter()],
+  [
+    "ApiGatewayV2",
+    (scoped): SimSdkCommandRouter => scoped.apiGatewayV2().sdkCommandRouter(),
+  ],
+  [
+    "CloudFormation",
+    (scoped): SimSdkCommandRouter => scoped.cloudFormation().sdkCommandRouter(),
+  ],
+  [
+    "CloudFront",
+    (scoped): SimSdkCommandRouter => scoped.cloudFront().sdkCommandRouter(),
+  ],
+  [
+    "CloudFront KeyValueStore",
+    (scoped): SimSdkCommandRouter =>
+      scoped.cloudFrontKeyValueStore().sdkCommandRouter(),
+  ],
+  [
+    "Cognito Identity Provider",
+    (scoped): SimSdkCommandRouter =>
+      scoped.cognitoIdentityProvider().sdkCommandRouter(),
+  ],
+  [
+    "DynamoDB",
+    (scoped): SimSdkCommandRouter => scoped.dynamoDb().sdkCommandRouter(),
+  ],
+  [
+    "DynamoDB Streams",
+    (scoped): SimSdkCommandRouter =>
+      scoped.dynamoDbStreams().sdkCommandRouter(),
+  ],
+  [
+    "EventBridge",
+    (scoped): SimSdkCommandRouter => scoped.eventBridge().sdkCommandRouter(),
+  ],
+  ["IAM", (scoped): SimSdkCommandRouter => scoped.iam().sdkCommandRouter()],
+  ["KMS", (scoped): SimSdkCommandRouter => scoped.kms().sdkCommandRouter()],
+  [
+    "Lambda",
+    (scoped): SimSdkCommandRouter => scoped.lambda().sdkCommandRouter(),
+  ],
+  [
+    "Rekognition",
+    (scoped): SimSdkCommandRouter => scoped.rekognition().sdkCommandRouter(),
+  ],
+  [
+    "Route 53",
+    (scoped): SimSdkCommandRouter => scoped.route53().sdkCommandRouter(),
+  ],
+  ["S3", (scoped): SimSdkCommandRouter => scoped.s3().sdkCommandRouter()],
+  [
+    "Secrets Manager",
+    (scoped): SimSdkCommandRouter => scoped.secretsManager().sdkCommandRouter(),
+  ],
+  ["SNS", (scoped): SimSdkCommandRouter => scoped.sns().sdkCommandRouter()],
+  ["SQS", (scoped): SimSdkCommandRouter => scoped.sqs().sdkCommandRouter()],
+  ["SSM", (scoped): SimSdkCommandRouter => scoped.ssm().sdkCommandRouter()],
+  ["STS", (scoped): SimSdkCommandRouter => scoped.sts().sdkCommandRouter()],
+]);
 
 /**
  * Resolve the scoped simulated service SDK Command router for an intercepted
@@ -20,71 +104,14 @@ export function resolveSimSdkCommandRouter(
   accountId: SimAwsAccountId | string,
   regionName: AwsRegionName,
 ): SimSdkCommandRouter {
-  const scoped = simAws.account(accountId).region(regionName);
+  const scopedRouter = scopedRouters.get(serviceId);
 
-  switch (serviceId) {
-    case "ACM": {
-      return scoped.acm().sdkCommandRouter();
-    }
-    case "ApiGatewayV2": {
-      return scoped.apiGatewayV2().sdkCommandRouter();
-    }
-    case "CloudFormation": {
-      return scoped.cloudFormation().sdkCommandRouter();
-    }
-    case "CloudFront": {
-      return scoped.cloudFront().sdkCommandRouter();
-    }
-    case "CloudFront KeyValueStore": {
-      return scoped.cloudFrontKeyValueStore().sdkCommandRouter();
-    }
-    case "Cognito Identity Provider": {
-      return scoped.cognitoIdentityProvider().sdkCommandRouter();
-    }
-    case "DynamoDB": {
-      return scoped.dynamoDb().sdkCommandRouter();
-    }
-    case "DynamoDB Streams": {
-      return scoped.dynamoDbStreams().sdkCommandRouter();
-    }
-    case "IAM": {
-      return scoped.iam().sdkCommandRouter();
-    }
-    case "KMS": {
-      return scoped.kms().sdkCommandRouter();
-    }
-    case "Lambda": {
-      return scoped.lambda().sdkCommandRouter();
-    }
-    case "Rekognition": {
-      return scoped.rekognition().sdkCommandRouter();
-    }
-    case "Route 53": {
-      return scoped.route53().sdkCommandRouter();
-    }
-    case "S3": {
-      return scoped.s3().sdkCommandRouter();
-    }
-    case "Secrets Manager": {
-      return scoped.secretsManager().sdkCommandRouter();
-    }
-    case "SNS": {
-      return scoped.sns().sdkCommandRouter();
-    }
-    case "SQS": {
-      return scoped.sqs().sdkCommandRouter();
-    }
-    case "SSM": {
-      return scoped.ssm().sdkCommandRouter();
-    }
-    case "STS": {
-      return scoped.sts().sdkCommandRouter();
-    }
-    default: {
-      throw new SimSdkUnknownServiceError(
-        `Simulated AWS has no SDK interception support for service ` +
-          `${serviceId} yet`,
-      );
-    }
+  if (scopedRouter === undefined) {
+    throw new SimSdkUnknownServiceError(
+      `Simulated AWS has no SDK interception support for service ` +
+        `${serviceId} yet`,
+    );
   }
+
+  return scopedRouter(simAws.account(accountId).region(regionName));
 }

@@ -16,6 +16,7 @@ import type { SimRekognition } from "../rekognition/index.js";
 import type { SimRoute53 } from "../route53/index.js";
 import type { SimS3 } from "../s3/sim-s3.js";
 import type { SimSecretsManager } from "../secretsmanager/index.js";
+import type { SimEventBridge } from "../eventbridge/index.js";
 import type { SimSns } from "../sns/index.js";
 import type { SimSqs } from "../sqs/index.js";
 import type { SimSsm } from "../ssm/index.js";
@@ -75,6 +76,11 @@ export abstract class SimAwsServiceAccessors {
   /** Get simulated DynamoDB Streams in the default Account Region scope. */
   dynamoDbStreams(): SimDynamoDbStreams {
     return this.defaultAccountRegionScope().dynamoDbStreams();
+  }
+
+  /** Get simulated EventBridge in the default Account Region scope. */
+  eventBridge(): SimEventBridge {
+    return this.defaultAccountRegionScope().eventBridge();
   }
 
   /** Get simulated IAM in the default Account scope. */

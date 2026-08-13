@@ -1,0 +1,286 @@
+# Simulated EventBridge
+
+Yulin includes a simulated Amazon EventBridge for tests and local development. Event buses are held
+in memory and every operation is authorized by simulated IAM.
+
+Event buses and `PutEvents` only. Rules, targets and EventBridge Scheduler are not simulated yet, so
+an event put onto a bus today is accepted and then dropped. EventBridge-specific types are imported
+from the `@kensio/yulin/eventbridge` subpath.
+
+## Putting an event onto a bus
+
+```typescript sim-event-bridge-put-events
+/**
+ * Putting an event onto the default event bus.
+ */
+
+import { PutEventsCommand } from "@aws-sdk/client-eventbridge";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const events = simAws.eventBridge();
+
+const output = await events.putEvents(
+  new PutEventsCommand({
+    Entries: [
+      {
+        Source: "orders.service",
+        DetailType: "OrderPlaced",
+        Detail: JSON.stringify({ orderId: "order-1", total: 4200 }),
+      },
+    ],
+  }),
+);
+
+console.log(output.FailedEntryCount); // 0
+console.log(output.Entries?.[0]?.EventId !== undefined); // true
+```
+
+Every account and region has a `default` bus without one being created, and an entry that names no
+bus goes to it. A request carries between one and ten entries, and they are independent: each may
+name a different bus, and one that fails does not stop the others.
+
+`Detail`, `DetailType` and `Source` are all optional in the API model, and all three are needed for
+EventBridge to take an entry. An entry missing one fails on its own, with the rest of the request
+going through. A request in which no entry carries all three fails outright.
+
+The size limit applies to the request rather than to any one entry: the entries together come to less
+than 1 MB, measured the way AWS measures them, where a `Time` counts as 14 bytes and `Source`,
+`DetailType`, `Detail` and each `Resources` entry count as the length of their UTF-8 forms.
+
+## Creating an event bus
+
+```typescript sim-event-bridge-create-bus
+/**
+ * Creating a custom event bus and putting an event onto it.
+ */
+
+import {
+  CreateEventBusCommand,
+  DescribeEventBusCommand,
+  PutEventsCommand,
+} from "@aws-sdk/client-eventbridge";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const events = simAws.eventBridge();
+
+const created = await events.createEventBus(
+  new CreateEventBusCommand({ Name: "orders" }),
+);
+
+console.log(created.EventBusArn);
+// "arn:aws:events:us-east-1:888888888888:event-bus/orders"
+
+await events.putEvents(
+  new PutEventsCommand({
+    Entries: [
+      {
+        EventBusName: "orders",
+        Source: "orders.service",
+        DetailType: "OrderPlaced",
+        Detail: JSON.stringify({ orderId: "order-1" }),
+      },
+    ],
+  }),
+);
+
+const described = await events.describeEventBus(
+  new DescribeEventBusCommand({ Name: "orders" }),
+);
+
+console.log(described.Name); // "orders"
+```
+
+A bus ARN is `arn:aws:events:<region>:<account-id>:event-bus/<name>`. Unlike an SNS topic ARN it
+carries a resource type, so an IAM policy naming a bus has the `event-bus/` in it.
+
+A bus name is up to 256 characters of letters, numbers, full stops, hyphens and underscores. Creating
+one that already exists is refused with `ResourceAlreadyExistsException`, which includes `default`,
+since that bus is always there. That differs from SNS `CreateTopic`, which answers a repeated create
+with the existing topic.
+
+`DescribeEventBus` takes a name or a bus ARN, and describes the default bus when the request names
+neither. `ListEventBuses` reports the default bus alongside the custom ones, narrowed by `NamePrefix`
+and paged by `Limit` and `NextToken`.
+
+`DeleteEventBus` frees the name at once, so it can be reused straight away. Deleting a bus that is
+not there succeeds. The default bus cannot be deleted.
+
+## A bus that does not exist
+
+An event put onto a bus that was never created **succeeds**:
+
+```typescript sim-event-bridge-missing-bus
+/**
+ * An event put onto a bus that does not exist is accepted and dropped.
+ */
+
+import { PutEventsCommand } from "@aws-sdk/client-eventbridge";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const output = await simAws.eventBridge().putEvents(
+  new PutEventsCommand({
+    Entries: [
+      {
+        EventBusName: "odrers", // A typo, and nothing says so.
+        Source: "orders.service",
+        DetailType: "OrderPlaced",
+        Detail: JSON.stringify({ orderId: "order-1" }),
+      },
+    ],
+  }),
+);
+
+console.log(output.FailedEntryCount); // 0
+console.log(output.Entries?.[0]?.EventId !== undefined); // true
+```
+
+This is real EventBridge behaviour rather than a gap. AWS answers 200, finds no rule to match the
+event against, and drops it, without counting the entry as failed. A mistyped bus name therefore
+looks exactly like a working call, which is worth knowing before it costs an afternoon, so the
+simulation reproduces it rather than being helpfully stricter.
+
+## Inspecting what a bus received
+
+Real EventBridge keeps no events, so there is no API for reading them back. For tests,
+`eventsOn(...)` reports what a bus received, in arrival order. It is a simulator accessor rather than
+a simulated API: nothing an SDK command returns is built from it.
+
+```typescript sim-event-bridge-inspecting-events
+/**
+ * Asserting on the envelope EventBridge built from an entry.
+ */
+
+import { PutEventsCommand } from "@aws-sdk/client-eventbridge";
+
+import { SimAws, SimFixedClock } from "@kensio/yulin";
+
+const simAws = new SimAws({
+  defaultAccountId: "111111111111",
+  defaultRegionName: "eu-west-2",
+  clock: new SimFixedClock(new Date("2026-07-26T09:00:00.000Z")),
+});
+
+await simAws.eventBridge().putEvents(
+  new PutEventsCommand({
+    Entries: [
+      {
+        Source: "orders.service",
+        DetailType: "OrderPlaced",
+        Detail: JSON.stringify({ orderId: "order-1" }),
+        Resources: ["arn:aws:s3:::orders"],
+      },
+    ],
+  }),
+);
+
+const [event] = simAws.eventBridge().eventsOn("default");
+
+console.log(event?.toEnvelope());
+// {
+//   version: "0",
+//   id: "0f2c...",
+//   "detail-type": "OrderPlaced",
+//   source: "orders.service",
+//   account: "111111111111",
+//   time: "2026-07-26T09:00:00Z",
+//   region: "eu-west-2",
+//   resources: ["arn:aws:s3:::orders"],
+//   detail: { orderId: "order-1" },
+// }
+```
+
+The envelope is the shape a rule matches against and a target receives. An entry that names no `Time`
+is stamped from the simulation's own clock, so a test with a fixed clock gets a predictable
+timestamp, and the timestamp is written to the second, as real EventBridge writes it.
+
+## Permissions
+
+Every operation is authorized by simulated IAM against the bus ARN. `events:ListEventBuses` has no
+bus-level resource on real AWS, so it authorizes against `*` and a policy naming a bus does not allow
+it.
+
+```typescript sim-event-bridge-iam-policy
+/**
+ * A policy allowing events onto one bus and nothing else.
+ */
+
+const policy = {
+  Version: "2012-10-17",
+  Statement: [
+    {
+      Effect: "Allow",
+      Action: "events:PutEvents",
+      Resource: "arn:aws:events:us-east-1:888888888888:event-bus/orders",
+    },
+  ],
+};
+
+console.log(JSON.stringify(policy).length > 0); // true
+```
+
+A caller refused by IAM gets `AccessDeniedException`. Permission is checked before the bus is looked
+up, so a caller who is not allowed to reach a bus is refused whether or not that bus exists.
+
+## Scoping
+
+Buses belong to one account and region, as they do on real AWS:
+
+```typescript sim-event-bridge-scoping
+/**
+ * Event buses in two Regions of the same Account.
+ */
+
+import { CreateEventBusCommand } from "@aws-sdk/client-eventbridge";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+await simAws
+  .account("111111111111")
+  .region("eu-west-2")
+  .eventBridge()
+  .createEventBus(new CreateEventBusCommand({ Name: "orders" }));
+
+const elsewhere = simAws.account("111111111111").region("us-east-1");
+
+console.log(elsewhere.eventBridge().findEventBus("orders")); // undefined
+```
+
+An entry naming a bus ARN in another account or region is refused. Real EventBridge does deliver
+events across accounts that way, but nothing here can reach another simulation's bus, and quietly
+treating a foreign ARN as local would let a test pass while the real call crossed a boundary it has
+no permission for.
+
+## Available functionality
+
+- `CreateEventBus`, `DeleteEventBus`, `DescribeEventBus`, `ListEventBuses` and `PutEvents`.
+- The `default` bus in every account and region, without one being created.
+- Bus descriptions, creation timestamps from the simulation's clock, and prefix-narrowed paged
+  listings.
+- The event envelope EventBridge builds from an entry, reached through `eventsOn(...)`.
+- IAM authorization against the bus ARN.
+- SDK interception of `EventBridgeClient`.
+
+## Limitations
+
+- Rules, event patterns and targets are not simulated, so every event put onto a bus is dropped after
+  it arrives.
+- Scheduled rules and EventBridge Scheduler are not simulated.
+- `AWS::Events::*` CloudFormation resource types are not simulated.
+- Event bus resource policies are not simulated. `PutPermission`, `RemovePermission` and the bus
+  `Policy` attribute are all absent, so a caller from another account cannot be admitted to a bus,
+  which is stricter than real AWS.
+- Putting an event onto another account's or region's bus is refused rather than delivered.
+- Partner event buses and partner event sources are refused rather than simulated, as are event bus
+  tags, encryption with a customer managed key, dead letter queues, logging configuration and global
+  endpoints.
+- Archives, replay, schema registry and discovery, API destinations and connections are not
+  simulated.
