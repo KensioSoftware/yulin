@@ -6,6 +6,7 @@ import {
   assertIdentical,
   assertInstanceOf,
   assertNonNullable,
+  assertStringIncludes,
   assertStringStartsWith,
   assertThrowsErrorAsync,
   assertUndefined,
@@ -192,6 +193,51 @@ describe("AWS::CloudFront::KeyValueStore", () => {
     assertStringStartsWith(
       error.message.includes("ImportSource") ? "ImportSource" : error.message,
       "ImportSource",
+    );
+  });
+
+  it("refuses a Function association the template got wrong", async () => {
+    // Given Stacks whose Function associations cannot be read: a misspelled
+    // key, an entry that is not an object, and a value that is not an array
+    const badAssociations: readonly [string, unknown][] = [
+      ["misspelled-key", [{ KeyValueStoreArn: "arn:aws:cloudfront::1:kvs/x" }]],
+      ["not-an-object", ["arn:aws:cloudfront::1:kvs/x"]],
+      ["not-an-array", { KeyValueStoreARN: "arn:aws:cloudfront::1:kvs/x" }],
+    ];
+
+    await Promise.all(
+      badAssociations.map(async ([name, associations]) => {
+        const simAws = new SimAws();
+
+        // When each is deployed
+        const error = await assertThrowsErrorAsync(async () => {
+          const stack = await simAws.cloudFormation().deployTemplate({
+            stackName: `bad-${name}`,
+            template: {
+              Resources: {
+                RedirectFunction: {
+                  Type: "AWS::CloudFront::Function",
+                  Properties: {
+                    Name: `cff-${name}`,
+                    AutoPublish: true,
+                    FunctionCode: redirectSource,
+                    FunctionConfig: {
+                      Comment: "Associates a store badly",
+                      Runtime: "cloudfront-js-2.0",
+                      KeyValueStoreAssociations: associations,
+                    },
+                  },
+                },
+              },
+            } as CfnTemplateBodyRecord,
+          });
+          await stack.waitForDeployComplete();
+        });
+
+        // Then the Stack fails naming the property, rather than deploying a
+        // Function with no store that fails later on cf.kvs()
+        assertStringIncludes(error.message, "KeyValueStoreAssociations");
+      }),
     );
   });
 });

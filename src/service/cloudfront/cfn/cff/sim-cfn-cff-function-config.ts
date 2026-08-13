@@ -69,24 +69,57 @@ export function simCfnCffFunctionConfig(
  * the shape being read, so the translation happens here rather than the command
  * learning a second shape.
  *
- * An entry with no `KeyValueStoreARN` is dropped rather than refused. The
- * command refuses an association it cannot resolve, and refusing it here would
- * report the same mistake in worse terms.
+ * An entry that cannot be read is refused rather than dropped. Dropping one
+ * leaves the command nothing to refuse: a Function whose only association was
+ * misspelled would deploy with no store at all and fail at request time on
+ * `cf.kvs()`, a long way from the template line that was wrong.
  */
 function cffKeyValueStoreAssociations(
   value: SimCfnTemplateValue | undefined,
 ): SimCfnCffFunctionConfig["KeyValueStoreAssociations"] {
-  if (!Array.isArray(value)) {
+  if (value === undefined || value === null) {
     return undefined;
   }
 
-  const items = value
-    .filter((entry) => isCfnTemplateValueRecord(entry))
-    .map((entry) => entry["KeyValueStoreARN"])
-    .filter((arn) => typeof arn === "string")
-    .map((KeyValueStoreARN) => ({ KeyValueStoreARN }));
+  if (!Array.isArray(value)) {
+    throw new TypeError(
+      "AWS::CloudFront::Function FunctionConfig KeyValueStoreAssociations " +
+        "must be an array",
+    );
+  }
+
+  const items = value.map((entry, index) =>
+    keyValueStoreAssociation(entry, index),
+  );
 
   return { Quantity: items.length, Items: items };
+}
+
+/**
+ * One association from the template array, refusing one that cannot be read.
+ */
+function keyValueStoreAssociation(
+  entry: SimCfnTemplateValue,
+  index: number,
+): { readonly KeyValueStoreARN: string } {
+  const at = `KeyValueStoreAssociations[${String(index)}]`;
+
+  if (!isCfnTemplateValueRecord(entry)) {
+    throw new TypeError(
+      `AWS::CloudFront::Function FunctionConfig ${at} must be an object`,
+    );
+  }
+
+  const arn = entry["KeyValueStoreARN"];
+
+  if (typeof arn !== "string") {
+    throw new TypeError(
+      `AWS::CloudFront::Function FunctionConfig ${at} KeyValueStoreARN must ` +
+        `be a string`,
+    );
+  }
+
+  return { KeyValueStoreARN: arn };
 }
 
 /**
