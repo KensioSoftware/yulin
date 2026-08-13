@@ -2,7 +2,7 @@ import {
   SimCloudFrontEntityAlreadyExists,
   SimCloudFrontEntityNotFound,
   SimCloudFrontKeyValueStoreNotFound,
-} from "../error/sim-cloudfront.error.js";
+} from "../error/sim-cf-key-value-store.error.js";
 import type {
   SimCloudFrontKeyValueStore,
   SimCloudFrontKeyValueStoreId,

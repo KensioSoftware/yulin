@@ -216,9 +216,11 @@ export class SimCloudFront {
    * Get a sim CloudFront Function by name.
    */
   getCloudFrontFunctionByName(
-    cloudFrontFunctionName: SimCloudFrontFunctionName,
+    cloudFrontFunctionName: SimCloudFrontFunctionName | string,
   ): SimCloudFrontFunction | undefined {
-    return this.cloudFrontFunctions.get(cloudFrontFunctionName);
+    return this.cloudFrontFunctions.get(
+      cloudFrontFunctionName as SimCloudFrontFunctionName,
+    );
   }
 
   /**

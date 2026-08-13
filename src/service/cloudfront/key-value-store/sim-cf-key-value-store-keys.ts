@@ -1,4 +1,4 @@
-import { SimCloudFrontKeyValueStoreKeyNotFound } from "../error/sim-cloudfront.error.js";
+import { SimCloudFrontKeyValueStoreKeyNotFound } from "../error/sim-cf-key-value-store.error.js";
 
 /**
  * One key and its value, as the key value store data API returns a pair.

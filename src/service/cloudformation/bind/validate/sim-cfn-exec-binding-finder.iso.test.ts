@@ -62,7 +62,7 @@ function handler(event) {
     assertNonNullable(resource);
     assertInstanceOf(resource.simResource, SimCloudFrontFunction);
 
-    const result = resource.simResource.handleViewerRequest(
+    const result = await resource.simResource.handleViewerRequest(
       new Request("https://example.test/original.html"),
     );
 
@@ -122,7 +122,7 @@ function handler(event) {
     assertNonNullable(resource);
     assertInstanceOf(resource.simResource, SimCloudFrontFunction);
 
-    const result = resource.simResource.handleViewerRequest(
+    const result = await resource.simResource.handleViewerRequest(
       new Request("https://example.test/original.html"),
     );
 

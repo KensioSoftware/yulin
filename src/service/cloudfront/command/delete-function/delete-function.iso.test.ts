@@ -12,7 +12,6 @@ import {
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
 import { SimIamAccessDenied } from "../../../iam/error/sim-iam.error.js";
-import type { SimCloudFrontFunctionName } from "../../cff/sim-cloudfront-function.js";
 import { SimCloudFrontNoSuchFunctionExists } from "../../error/sim-cloudfront.error.js";
 import type { SimCloudFront } from "../../sim-cloudfront.js";
 
@@ -46,9 +45,7 @@ describe("CloudFront DeleteFunctionCommand", () => {
     // Given a published CloudFront Function.
     const { simCloudFront } = await givenFunction("deletable-cff");
     assertNonNullable(
-      simCloudFront.getCloudFrontFunctionByName(
-        "deletable-cff" as SimCloudFrontFunctionName,
-      ),
+      simCloudFront.getCloudFrontFunctionByName("deletable-cff"),
     );
 
     // When the Function is deleted.
@@ -61,11 +58,7 @@ describe("CloudFront DeleteFunctionCommand", () => {
 
     // Then CloudFront accepts it, and the Function is gone.
     assertIdentical(output.$metadata.httpStatusCode, 204);
-    assertUndefined(
-      simCloudFront.getCloudFrontFunctionByName(
-        "deletable-cff" as SimCloudFrontFunctionName,
-      ),
-    );
+    assertUndefined(simCloudFront.getCloudFrontFunctionByName("deletable-cff"));
   });
 
   it("rejects a Function that does not exist", async () => {
@@ -124,9 +117,7 @@ describe("CloudFront DeleteFunctionCommand", () => {
     assertInstanceOf(error, SimIamAccessDenied);
     assertIdentical(error.action, "cloudfront:DeleteFunction");
     assertNonNullable(
-      simCloudFront.getCloudFrontFunctionByName(
-        "protected-cff" as SimCloudFrontFunctionName,
-      ),
+      simCloudFront.getCloudFrontFunctionByName("protected-cff"),
     );
   });
 });

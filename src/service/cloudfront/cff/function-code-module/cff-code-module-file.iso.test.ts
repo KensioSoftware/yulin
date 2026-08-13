@@ -36,7 +36,7 @@ export function handler(event) {
       handlerFunction,
     });
 
-    const result = simCff.handleViewerRequest(
+    const result = await simCff.handleViewerRequest(
       new Request("https://example.cloudfront.net/original.html"),
     );
 
@@ -72,7 +72,7 @@ export function handler(event) {
       handlerFunction,
     });
 
-    const result = simCff.handleViewerResponse(
+    const result = await simCff.handleViewerResponse(
       new Request("https://example.cloudfront.net/object.html"),
       new Response(),
     );
@@ -107,7 +107,7 @@ function handler(event) {
       handlerFunction,
     });
 
-    const result = simCff.handleViewerRequest(
+    const result = await simCff.handleViewerRequest(
       new Request("https://example.cloudfront.net/original.html"),
     );
 

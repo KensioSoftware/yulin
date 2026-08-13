@@ -22,6 +22,14 @@ export interface SimCreateFunctionCommandInput {
     | {
         Comment?: string | undefined;
         Runtime?: "cloudfront-js-1.0" | "cloudfront-js-2.0" | undefined;
+        KeyValueStoreAssociations?:
+          | undefined
+          | {
+              Quantity?: number | undefined;
+              Items?:
+                | readonly { KeyValueStoreARN?: string | undefined }[]
+                | undefined;
+            };
       };
   FunctionCode?: Uint8Array | undefined;
 }

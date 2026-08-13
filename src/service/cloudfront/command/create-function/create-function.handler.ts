@@ -9,6 +9,7 @@ import {
   type SimCloudFrontFunctionName,
 } from "../../cff/sim-cloudfront-function.js";
 import { CffUint8ArrayFunctionCodeExtractor } from "../../cff/function-code-input/cff-function-code-input.js";
+import { cffCloudFrontModule } from "../../cff/kvs/cff-cloudfront-module.js";
 import {
   type BackgroundScheduler,
   BackgroundTasks,
@@ -20,6 +21,8 @@ import {
 } from "../../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import type { SimAwsCaller } from "../../../aws/caller/sim-aws-caller.js";
 import { CreateFunctionAuthorizer } from "./create-function-authorizer.js";
+import { CreateFunctionKeyValueStoreAssociation } from "./create-function-kvs-association.js";
+import { SimCloudFrontKeyValueStoreRegistry } from "../../key-value-store/sim-cf-key-value-store-registry.js";
 
 export type SimCloudFrontFunctionMap = Map<
   SimCloudFrontFunctionName,
@@ -31,6 +34,7 @@ interface CreateFunctionCommandHandlerProperties {
   cloudFrontFunctions?: SimCloudFrontFunctionMap;
   iam?: SimIamInterServiceAuthZ;
   background?: BackgroundScheduler;
+  keyValueStores?: SimCloudFrontKeyValueStoreRegistry;
 }
 
 interface CreateFunctionCommandHandlerOptions {
@@ -50,6 +54,7 @@ export class CreateFunctionCommandHandler implements CommandHandler<
   private readonly cloudFrontFunctions: SimCloudFrontFunctionMap;
   private readonly authorizer: CreateFunctionAuthorizer;
   private readonly background: BackgroundScheduler;
+  private readonly keyValueStoreAssociation: CreateFunctionKeyValueStoreAssociation;
 
   constructor(properties: CreateFunctionCommandHandlerProperties) {
     const {
@@ -57,6 +62,7 @@ export class CreateFunctionCommandHandler implements CommandHandler<
       cloudFrontFunctions = new Map() as SimCloudFrontFunctionMap,
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
+      keyValueStores = new SimCloudFrontKeyValueStoreRegistry(),
     } = properties;
     this.accountId = accountId;
     this.cloudFrontFunctions = cloudFrontFunctions;
@@ -65,6 +71,9 @@ export class CreateFunctionCommandHandler implements CommandHandler<
       iam,
     });
     this.background = background;
+    this.keyValueStoreAssociation = new CreateFunctionKeyValueStoreAssociation(
+      keyValueStores,
+    );
   }
 
   /**
@@ -85,14 +94,23 @@ export class CreateFunctionCommandHandler implements CommandHandler<
 
     this.authorizer.authorize(command.input.Name, options?.caller);
 
+    const keyValueStore = this.keyValueStoreAssociation.resolve(
+      command.input.Name,
+      command.input.FunctionConfig,
+    );
+
+    // The extractor is given the store so that source code running in the vm
+    // sandbox gets a `cf` bound to this Function's own association.
     const extractor = new CffUint8ArrayFunctionCodeExtractor(
       command.input.FunctionCode,
+      cffCloudFrontModule(keyValueStore),
     );
     const handlerFunction = extractor.extractHandlerFunction();
     const simCff = new SimCloudFrontFunction({
       name: command.input.Name,
       accountId: this.accountId,
       handlerFunction,
+      keyValueStore,
     });
 
     this.cloudFrontFunctions.set(simCff.name, simCff);
