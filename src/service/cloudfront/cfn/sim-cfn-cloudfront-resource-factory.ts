@@ -9,6 +9,7 @@ import { SimCfnCffCreator } from "./cff/sim-cfn-cff-creator.js";
 import { SimCfnCfDistroDeleter } from "./distro/sim-cfn-cf-distro-deleter.js";
 import { SimCfnCfResponseHeadersPolicyCreator } from "./response-headers-policy/sim-cfn-cf-rh-policy-creator.js";
 import { SimCfnCfOriginAccessControlCreator } from "./origin-access-control/sim-cfn-cf-oac-creator.js";
+import { SimCfnCfKeyValueStoreCreator } from "./key-value-store/sim-cfn-cf-kvs-creator.js";
 import type { SimCloudFrontFunction } from "../cff/sim-cloudfront-function.js";
 import { assertDefined } from "../../../util/type-guard/defined.js";
 
@@ -22,6 +23,7 @@ export class SimCloudFrontCloudFormationResourceFactory implements SimCfnService
   private readonly distroDeleter: SimCfnCfDistroDeleter;
   private readonly responseHeadersPolicyCreator: SimCfnCfResponseHeadersPolicyCreator;
   private readonly originAccessControlCreator: SimCfnCfOriginAccessControlCreator;
+  private readonly keyValueStoreCreator: SimCfnCfKeyValueStoreCreator;
 
   constructor(cloudFront: SimCloudFront) {
     this.cloudFront = cloudFront;
@@ -31,6 +33,9 @@ export class SimCloudFrontCloudFormationResourceFactory implements SimCfnService
     this.responseHeadersPolicyCreator =
       new SimCfnCfResponseHeadersPolicyCreator({ cloudFront });
     this.originAccessControlCreator = new SimCfnCfOriginAccessControlCreator({
+      cloudFront,
+    });
+    this.keyValueStoreCreator = new SimCfnCfKeyValueStoreCreator({
       cloudFront,
     });
   }
@@ -69,6 +74,12 @@ export class SimCloudFrontCloudFormationResourceFactory implements SimCfnService
           context.resolvedProperties ?? resource.properties,
         );
       }
+      case "KeyValueStore": {
+        return await this.keyValueStoreCreator.create(
+          resource,
+          context.resolvedProperties ?? resource.properties,
+        );
+      }
       default: {
         throw new Error(
           `Unsupported sim CloudFront CloudFormation Resource ${resourceTypeName}`,
@@ -100,6 +111,10 @@ export class SimCloudFrontCloudFormationResourceFactory implements SimCfnService
       }
       case "OriginAccessControl": {
         this.originAccessControlCreator.delete(resource);
+        return;
+      }
+      case "KeyValueStore": {
+        await this.keyValueStoreCreator.delete(resource);
         return;
       }
       default: {

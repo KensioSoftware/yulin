@@ -12,6 +12,12 @@ export type SimCfnCffRuntime = "cloudfront-js-1.0" | "cloudfront-js-2.0";
 export interface SimCfnCffFunctionConfig {
   readonly Comment?: string | undefined;
   readonly Runtime?: SimCfnCffRuntime | undefined;
+  readonly KeyValueStoreAssociations?:
+    | {
+        readonly Quantity: number;
+        readonly Items: readonly { readonly KeyValueStoreARN: string }[];
+      }
+    | undefined;
 }
 
 const simCfnCffRuntimes = new Set<SimCfnCffRuntime>([
@@ -42,11 +48,45 @@ export function simCfnCffFunctionConfig(
 
   const commentValue = functionConfigValue["Comment"];
   const runtimeValue = functionConfigValue["Runtime"];
+  const associations = cffKeyValueStoreAssociations(
+    functionConfigValue["KeyValueStoreAssociations"],
+  );
 
   return {
     Comment: typeof commentValue === "string" ? commentValue : undefined,
     Runtime: cffRuntime(runtimeValue),
+    ...(associations !== undefined && {
+      KeyValueStoreAssociations: associations,
+    }),
   };
+}
+
+/**
+ * Read the template's key value store associations into the command's shape.
+ *
+ * CloudFormation takes a plain array here, while the CreateFunction API takes
+ * the Quantity and Items pair every other CloudFront list uses. The template is
+ * the shape being read, so the translation happens here rather than the command
+ * learning a second shape.
+ *
+ * An entry with no `KeyValueStoreARN` is dropped rather than refused. The
+ * command refuses an association it cannot resolve, and refusing it here would
+ * report the same mistake in worse terms.
+ */
+function cffKeyValueStoreAssociations(
+  value: SimCfnTemplateValue | undefined,
+): SimCfnCffFunctionConfig["KeyValueStoreAssociations"] {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+
+  const items = value
+    .filter((entry) => isCfnTemplateValueRecord(entry))
+    .map((entry) => entry["KeyValueStoreARN"])
+    .filter((arn) => typeof arn === "string")
+    .map((KeyValueStoreARN) => ({ KeyValueStoreARN }));
+
+  return { Quantity: items.length, Items: items };
 }
 
 /**

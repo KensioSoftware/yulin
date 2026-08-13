@@ -6,6 +6,8 @@ import { SimCloudFrontResponseHeadersPolicy } from "../../../../cloudfront/respo
 import { SimCloudFrontResponseHeadersPolicyCfn } from "./sim-cloudfront-rh-policy-cfn.js";
 import { SimCloudFrontOriginAccessControl } from "../../../../cloudfront/origin-access-control/sim-cf-origin-access-control.js";
 import { SimCloudFrontOriginAccessControlCfn } from "./sim-cloudfront-oac-cfn.js";
+import { SimCloudFrontKeyValueStore } from "../../../../cloudfront/key-value-store/sim-cf-key-value-store.js";
+import { SimCloudFrontKeyValueStoreCfn } from "./sim-cloudfront-kvs-cfn.js";
 import type {
   SimCfnResourceValueAdapterProperties,
   SimCfnServiceValueAdapter,
@@ -48,6 +50,15 @@ export function cloudFrontValueAdapter(
   ) {
     return new SimCloudFrontOriginAccessControlCfn({
       originAccessControl: properties.simResource,
+    });
+  }
+
+  if (
+    properties.type === "AWS::CloudFront::KeyValueStore" &&
+    properties.simResource instanceof SimCloudFrontKeyValueStore
+  ) {
+    return new SimCloudFrontKeyValueStoreCfn({
+      keyValueStore: properties.simResource,
     });
   }
 

@@ -1475,6 +1475,38 @@ the CloudFront Function event types. Each invocation gets its own `cf` through N
 context, so two Functions associated with different stores read their own even when they run at the
 same time.
 
+### From CloudFormation
+
+`AWS::CloudFront::KeyValueStore` creates a store, and a Function associates one with
+`FunctionConfig.KeyValueStoreAssociations`. CloudFormation takes a plain array there rather than the
+`Quantity` and `Items` pair the SDK uses, and `Ref` on a key value store is its ARN, so the two fit
+together directly:
+
+```yaml
+Redirects:
+  Type: AWS::CloudFront::KeyValueStore
+  Properties:
+    Name: redirects
+
+RedirectFunction:
+  Type: AWS::CloudFront::Function
+  Properties:
+    Name: redirect-cff
+    AutoPublish: true
+    FunctionCode: !Sub "..."
+    FunctionConfig:
+      Comment: Redirects from a key value store
+      Runtime: cloudfront-js-2.0
+      KeyValueStoreAssociations:
+        - KeyValueStoreARN: !Ref Redirects
+```
+
+`Fn::GetAtt` supports `Arn`, `Id` and `Status`. Deleting the Stack deletes the store, after the
+Functions holding it have gone.
+
+CDK's `cloudfront.KeyValueStore` and the `keyValueStore` prop on `cloudfront.Function` both deploy,
+so a CDK stack needs no hand-editing.
+
 `cf.kvs()` refuses when the Function is associated with no store, and refuses an ID that is not the
 associated store's. Neither hands back an empty store, which would let a Function that lost its
 association run to completion and quietly take every default.
@@ -1495,6 +1527,7 @@ Sim CloudFront currently supports:
 - `viewer-request` and `viewer-response` CloudFront Functions, including async ones
 - CloudFront Functions reading an associated key value store through `cf.kvs()`
 - `AWS::CloudFront::ResponseHeadersPolicy`, for headers a cache Behavior sets on every response
+- `AWS::CloudFront::KeyValueStore`, and `KeyValueStoreAssociations` on `AWS::CloudFront::Function`
 - `AWS::CloudFront::OriginAccessControl`, so an Origin reads a private Bucket as CloudFront
 - Viewer certificates from sim ACM, including CloudFront's `us-east-1` requirement
 - Serving simulated CloudFront traffic on localhost with `serveSimAws`
@@ -1540,8 +1573,15 @@ Where sim CloudFront knowingly behaves differently from AWS:
 - **A key value store association cannot be changed after the Function is created.** There is no
   `UpdateFunction` here, so the store a Function reads is the one it was created with. Delete the
   Function and create it again to change it.
-- **`ImportSource` is not supported.** `CreateKeyValueStoreCommand` ignores it, so a store is always
-  created empty rather than seeded from an S3 Object.
+- **`ImportSource` is not supported.** `CreateKeyValueStoreCommand` ignores it, and
+  `AWS::CloudFront::KeyValueStore` refuses a Resource carrying one rather than deploying a store that
+  came up empty. Nothing here reads an S3 Object as key data, and a test passing against no data the
+  deploy would have seeded is the failure worth avoiding. Write the keys with `PutKey` or
+  `UpdateKeys` instead.
+- **A `Status` Output holds the status at deploy time.** CloudFormation Outputs are resolved once,
+  while a new store is still `PROVISIONING`, so `Fn::GetAtt` on `Status` in an Output reads
+  `PROVISIONING` even though the store goes on to become `READY`. Read the store itself for its
+  current status.
 - **Key listing is not paginated.** `ListKeysCommand` and `ListKeyValueStoresCommand` answer with
   everything and never set a `NextToken` or `NextMarker`, so a test cannot exercise a paging loop.
 - **A deletion does not wait for the disable to deploy.** Real CloudFront needs the disabled
