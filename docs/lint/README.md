@@ -73,7 +73,7 @@ Each restriction is its own rule, under the `cff-js2` name in both linters.
 
 | Rule                            | What it refuses                                          |
 | ------------------------------- | -------------------------------------------------------- |
-| `cff-js2/no-import`             | `import` declarations, since a Function is one file      |
+| `cff-js2/no-import`             | `import` declarations, apart from `cloudfront`           |
 | `cff-js2/only-handler-export`   | Any export other than `export function handler(...)`     |
 | `cff-js2/only-built-in-require` | Requiring anything but `querystring`, `crypto`, `buffer` |
 | `cff-js2/no-class`              | Class declarations and expressions                       |
@@ -105,6 +105,8 @@ These all work in JS2 and no rule here objects to them:
 - `async` and `await`
 - `Promise`, including `all`, `allSettled`, `any` and `race`
 - `Buffer`, and `require` of `querystring`, `crypto` or `buffer`
+- `import cf from "cloudfront"`, which is how a Function reaches `cf.kvs()` and
+  `cf.updateRequestOrigin()`
 - `String.prototype.replaceAll`, `atob`, `btoa` and numeric separators
 
 ## Turning one restriction off

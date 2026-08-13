@@ -19,9 +19,12 @@
  */
 export const cffJs2SyntaxRestrictions = {
   "no-import": {
-    selector: "ImportDeclaration",
+    // `cloudfront` is the runtime's own built-in module, and importing it is
+    // the documented way to reach the `cf` helpers, so it is the one specifier
+    // a Function may import.
+    selector: "ImportDeclaration:not([source.value='cloudfront'])",
     message:
-      "CloudFront Functions must be self-contained and should not use import syntax.",
+      "CloudFront Functions must be self-contained, and may only import the built-in `cloudfront` module. Everything else must be inlined.",
   },
   "only-handler-export": {
     selector:
@@ -83,12 +86,12 @@ export const cffJs2UnavailableGlobals = {
   XMLHttpRequest: "CloudFront Functions cannot make network requests.",
   WebSocket: "CloudFront Functions cannot open network connections.",
   process: "CloudFront Functions do not have access to Node.js process APIs.",
-  setTimeout:
-    "CloudFront Functions do not support timers, and must run to completion synchronously.",
-  setInterval:
-    "CloudFront Functions do not support timers, and must run to completion synchronously.",
-  setImmediate:
-    "CloudFront Functions do not support timers, and must run to completion synchronously.",
+  // Awaiting is not the problem here: a Function may await a key value store
+  // read. Deferring work to a later tick is, because there is no event loop to
+  // run it on.
+  setTimeout: "CloudFront Functions do not support timers.",
+  setInterval: "CloudFront Functions do not support timers.",
+  setImmediate: "CloudFront Functions do not support timers.",
   clearTimeout:
     "CloudFront Functions do not support timers, so there is nothing to clear.",
 } as const satisfies Readonly<Record<string, string>>;
