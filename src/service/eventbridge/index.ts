@@ -26,9 +26,16 @@ export {
   simEventBridgeEntrySize,
   simEventBridgeMaximumRequestBytes,
 } from "./command/put-events/sim-event-bridge-entry-size.js";
+export { SimEventRule } from "./rule/sim-event-rule.js";
+export { eventRuleArn } from "./rule/sim-event-rule-arn.js";
+export { SimEventRuleName } from "./rule/sim-event-rule-name.js";
+export { SimEventRuleState } from "./rule/sim-event-rule-state.js";
+export { SimEventPattern } from "./pattern/sim-event-pattern.js";
+export type { SimEventBusReceipt } from "./bus/sim-event-bus.js";
 export {
   SimEventBridgeAccessDeniedException,
   SimEventBridgeError,
+  SimEventBridgeInvalidEventPatternException,
   SimEventBridgeResourceAlreadyExistsException,
   SimEventBridgeResourceNotFoundException,
   SimEventBridgeUnsimulatedInputException,

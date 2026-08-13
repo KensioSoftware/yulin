@@ -1,7 +1,7 @@
 # Simulated EventBridge implementation
 
-This directory contains the simulated EventBridge service implementation. Event buses and PutEvents
-only, for now: rules, targets and EventBridge Scheduler come later.
+This directory contains the simulated EventBridge service implementation. Event buses, rules and
+PutEvents: targets and EventBridge Scheduler come later.
 
 The guiding decision here is that a bus is a router rather than a store. Real EventBridge keeps no
 events, so nothing here answers an SDK command from stored events. The events a bus does keep are a
@@ -43,6 +43,45 @@ entry that produced it: the entry carries `DetailType` and a `Detail` string, an
 `toEnvelope()` produces that shape, writing the timestamp RFC3339 to the second, as real EventBridge
 does.
 
+## Rule model
+
+Rule state lives under `rule/`, and the pattern engine under `pattern/`.
+
+`SimEventRule` is a pattern and a state. What a rule does when it matches is deliberately not on it:
+targets will live in their own store, keyed by rule, the same way a topic's subscriptions are in
+simulated SNS.
+
+`eventRuleArn` is the one place a rule ARN is built, because a request has to authorize against the
+ARN a rule would have before knowing whether that rule exists. A rule on the default bus leaves the
+bus out of its ARN and a rule on a custom bus carries it, which is what keeps two rules of the same
+name on two buses apart.
+
+`SimEventRuleStore` keys rules by bus and name together, since a rule name is unique within a bus
+rather than within the account.
+
+## Pattern engine
+
+The shape mirrors simulated SNS's filter policies, and deliberately shares no code with them. Both
+read a JSON document into a tree of matchers, but they are matching different things: an SNS filter
+policy matches a flat map of typed message attributes, and an EventBridge pattern matches the nested
+JSON of a whole event. The operator sets differ too. Sharing would have meant a type parameter
+threaded through every matcher to save a handful of comparisons.
+
+- `SimEventPattern` is the public thing: parse from the string a request carried, keep that string
+  for DescribeRule to report back, and match an event.
+- `SimEventPatternNode` is one object of the pattern, and `SimEventPatternField` is one key's list of
+  conditions. The node holds the "every key matches" rule and the field holds the "any condition
+  matches" rule, which is the whole of the and/or behaviour.
+- `match/` holds one class per operator, and `sim-event-pattern-operators.ts` is the table that picks
+  between them. An operator real EventBridge has and this does not is listed by name there, so a
+  pattern using one is refused saying so rather than refused as unrecognised. Which of the two
+  messages a reader gets tells them whether they mistyped an operator or reached for one that is not
+  here yet.
+
+Matchers take `unknown` for the event value they compare, and narrow it themselves. Event values are
+parsed JSON of no known shape, so the alternative was casting the envelope into a JSON type at the
+boundary, which would have been a lie about what the matcher can be handed.
+
 ## Commands
 
 Command handling follows the usual layout: `command/<area>/*.command.ts` for the local structural SDK
@@ -66,9 +105,13 @@ what fails and how:
   calculation rather than by the JSON on the wire. `sim-event-bridge-entry-size.ts` implements that
   calculation, which is why a `Time` counts as a flat 14 bytes and a `TraceHeader` counts as nothing.
 
+`SimEventBridgeRouter` under `routing/` is what a bus does with an event: find the bus, ask each of
+its enabled rules, and record the matches. Sending a matched event on to the rule's targets belongs
+here too, and is what the next change adds.
+
 ## Divergences
 
-Two, both deliberate and both in `PutEvents`.
+Three, all deliberate.
 
 An entry naming a bus that does not exist **succeeds**. Real EventBridge answers 200, matches the
 event against no rule, and drops it, without counting the entry as failed. It is a trap, because a
@@ -77,6 +120,10 @@ mistyped bus name looks exactly like a working call, and reproducing it is the p
 An entry naming a bus ARN in another account or region is **refused**, which real EventBridge allows.
 Nothing here can reach another simulation's bus, and treating a foreign ARN as local would let a test
 pass while the real call crossed a boundary it has no permission for.
+
+Deleting an event bus **deletes its rules**. Real EventBridge refuses to delete a bus that still has
+rules on it. Refusing would mean a test tearing down a stack had to delete rules in order, and a rule
+that outlived its bus would match events put onto a bus later recreated under the same name.
 
 Event bus resource policies are not modelled at all, since nothing sets one: `PutPermission` and the
 bus `Policy` attribute are both absent. A caller from another account therefore has no way to be

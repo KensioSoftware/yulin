@@ -3,6 +3,14 @@ import type { SimEventBridgeEvent } from "../event/sim-event-bridge-event.js";
 import { SimEventBusArn } from "./sim-event-bus-arn.js";
 import { SimEventBusName } from "./sim-event-bus-name.js";
 
+/**
+ * One event a bus took, and the rules on that bus it matched.
+ */
+export interface SimEventBusReceipt {
+  readonly event: SimEventBridgeEvent;
+  readonly matchedRuleNames: readonly string[];
+}
+
 interface SimEventBusProperties {
   readonly name: SimEventBusName;
   readonly accountRegionScope: SimAwsAccountRegionScope;
@@ -25,7 +33,7 @@ export class SimEventBus {
   public readonly creationTime: Date;
   public readonly description: string | undefined;
 
-  private readonly received: SimEventBridgeEvent[] = [];
+  private readonly received: SimEventBusReceipt[] = [];
 
   constructor(properties: SimEventBusProperties) {
     this.name = properties.name;
@@ -60,16 +68,31 @@ export class SimEventBus {
    * like it without an archive.
    */
   get receivedEvents(): readonly SimEventBridgeEvent[] {
+    return this.received.map((receipt) => receipt.event);
+  }
+
+  /**
+   * Every event this bus received, with the rules each one matched.
+   *
+   * This is the simulator's own accessor, for a test asserting on routing
+   * before it has a target to watch. Real EventBridge keeps nothing like it.
+   */
+  get receipts(): readonly SimEventBusReceipt[] {
     return [...this.received];
   }
 
   /**
-   * Take an event onto this bus.
+   * Take an event onto this bus, along with the rules it matched.
    *
-   * Today that only records it. Matching it against the bus's rules, and
-   * sending it to their targets, is what a later change adds here.
+   * The matching is done before the event gets here rather than by the bus
+   * itself, because a bus holds no rules: they are keyed by bus in their own
+   * store, the same way a topic's subscriptions are in simulated SNS. Sending
+   * the event on to each matched rule's targets is what a later change adds.
    */
-  receive(event: SimEventBridgeEvent): void {
-    this.received.push(event);
+  receive(
+    event: SimEventBridgeEvent,
+    matchedRuleNames: readonly string[],
+  ): void {
+    this.received.push({ event, matchedRuleNames });
   }
 }

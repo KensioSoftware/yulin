@@ -10,13 +10,20 @@ describe("EventBridge SDK Command router", () => {
     // When its router is asked what it supports.
     const supported = simEventBridge.sdkCommandRouter().supportedCommandNames();
 
-    // Then it names the bus commands and PutEvents.
+    // Then it names the bus commands, PutEvents and the rule commands.
     assertArrayEquals(supported, [
       "CreateEventBusCommand",
       "DeleteEventBusCommand",
       "DescribeEventBusCommand",
       "ListEventBusesCommand",
       "PutEventsCommand",
+      "PutRuleCommand",
+      "DeleteRuleCommand",
+      "DescribeRuleCommand",
+      "ListRulesCommand",
+      "EnableRuleCommand",
+      "DisableRuleCommand",
+      "TestEventPatternCommand",
     ]);
   });
 
@@ -25,10 +32,10 @@ describe("EventBridge SDK Command router", () => {
     const simEventBridge = new SimEventBridge();
 
     // When a Command from a later change is asked for.
-    const route = simEventBridge.sdkCommandRouter().route("PutRuleCommand");
+    const route = simEventBridge.sdkCommandRouter().route("PutTargetsCommand");
 
     // Then there is none, so the interception engine reports it rather than
-    // this service answering a rule request it cannot handle.
+    // this service answering a target request it cannot handle.
     assertUndefined(route);
   });
 });

@@ -3,9 +3,9 @@
 Yulin includes a simulated Amazon EventBridge for tests and local development. Event buses are held
 in memory and every operation is authorized by simulated IAM.
 
-Event buses and `PutEvents` only. Rules, targets and EventBridge Scheduler are not simulated yet, so
-an event put onto a bus today is accepted and then dropped. EventBridge-specific types are imported
-from the `@kensio/yulin/eventbridge` subpath.
+Event buses, rules and `PutEvents`. Targets and EventBridge Scheduler are not simulated yet, so a
+rule today records that it matched an event rather than sending it anywhere. EventBridge-specific
+types are imported from the `@kensio/yulin/eventbridge` subpath.
 
 ## Putting an event onto a bus
 
@@ -200,6 +200,129 @@ The envelope is the shape a rule matches against and a target receives. An entry
 is stamped from the simulation's own clock, so a test with a fixed clock gets a predictable
 timestamp, and the timestamp is written to the second, as real EventBridge writes it.
 
+## Matching events with rules
+
+A rule watches one bus and matches events against an event pattern.
+
+```typescript sim-event-bridge-rules
+/**
+ * A rule matching order events on a bus.
+ */
+
+import { PutEventsCommand, PutRuleCommand } from "@aws-sdk/client-eventbridge";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const events = simAws.eventBridge();
+
+await events.putRule(
+  new PutRuleCommand({
+    Name: "large-orders",
+    EventPattern: JSON.stringify({
+      source: ["orders.service"],
+      "detail-type": ["OrderPlaced"],
+      detail: { total: [{ numeric: [">=", 1000] }] },
+    }),
+  }),
+);
+
+await events.putEvents(
+  new PutEventsCommand({
+    Entries: [
+      {
+        Source: "orders.service",
+        DetailType: "OrderPlaced",
+        Detail: JSON.stringify({ orderId: "order-1", total: 4200 }),
+      },
+    ],
+  }),
+);
+
+const [receipt] = events.receiptsOn("default");
+
+console.log(receipt?.matchedRuleNames); // ["large-orders"]
+```
+
+A rule name is up to 64 characters, shorter than a bus name, and it is unique within one bus rather
+than within the account. A rule ARN on the default bus is `arn:aws:events:<region>:<account>:rule/<name>`,
+and a rule on a custom bus carries the bus as well: `rule/<bus>/<name>`.
+
+`PutRule` creates and updates alike, and an update **replaces** the rule rather than merging into it.
+A second request that leaves out the description clears the description. That is real behaviour and a
+common surprise.
+
+`DisableRule` stops a rule matching, and `EnableRule` starts it again. A rule that was off does not
+replay what it missed. `DeleteRule` on a rule that is not there succeeds. Deleting a bus deletes its
+rules with it.
+
+`receiptsOn(...)` is a simulator accessor rather than an API: it reports what a bus received and
+which rules each event matched, which is how a test asserts on routing before there are targets to
+watch.
+
+## Event patterns
+
+A pattern has the same shape as the events it matches. Every key of a pattern has to match, which is
+an "and"; a field's conditions are written as a list, and any one matching is enough, which is an
+"or".
+
+Supported conditions:
+
+| Condition                      | Written as                                             |
+| ------------------------------ | ------------------------------------------------------ |
+| Exact value, or any of several | `"source": ["orders.service", "billing.service"]`      |
+| Nested field                   | `"detail": { "customer": { "tier": ["gold"] } }`       |
+| Begins with                    | `"time": [{ "prefix": "2026-07-26" }]`                 |
+| Ends with                      | `"FileName": [{ "suffix": ".png" }]`                   |
+| Anything but                   | `"state": [{ "anything-but": ["stopped", "failed"] }]` |
+| Numeric, and ranges            | `"total": [{ "numeric": [">", 0, "<=", 5000] }]`       |
+| Field is or is not there       | `"refundId": [{ "exists": false }]`                    |
+
+Values are compared by type, so the string `"5"` in a pattern does not match the number `5` in an
+event. `null` and the empty string are values like any other. Where the event carries a list for a
+field, the pattern matches when the two lists overlap, which is how a pattern naming one ARN matches
+an event whose `resources` names several.
+
+Anything else is refused at `PutRule` rather than quietly never matching. The `cidr`,
+`equals-ignore-case`, `wildcard` and `$or` operators are all refused by name, as are the nested forms
+of `anything-but` and the case-insensitive forms of `prefix` and `suffix`. A pattern that silently
+matched nothing would look like a pattern that was simply too specific, and the rule would go
+unnoticed until the deployment.
+
+## Testing a pattern without a rule
+
+`TestEventPattern` answers whether one event matches one pattern, creating nothing:
+
+```typescript sim-event-bridge-test-pattern
+/**
+ * Checking a pattern against an event before writing a rule with it.
+ */
+
+import { TestEventPatternCommand } from "@aws-sdk/client-eventbridge";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const { Result } = await simAws.eventBridge().testEventPattern(
+  new TestEventPatternCommand({
+    EventPattern: JSON.stringify({
+      detail: { total: [{ numeric: [">=", 1000] }] },
+    }),
+    Event: JSON.stringify({
+      source: "orders.service",
+      "detail-type": "OrderPlaced",
+      detail: { orderId: "order-1", total: 4200 },
+    }),
+  }),
+);
+
+console.log(Result); // true
+```
+
+This is the quickest way to find out why a rule is not firing, and a pattern this simulation cannot
+evaluate is refused here exactly as `PutRule` refuses it.
+
 ## Permissions
 
 Every operation is authorized by simulated IAM against the bus ARN. `events:ListEventBuses` has no
@@ -262,6 +385,10 @@ no permission for.
 ## Available functionality
 
 - `CreateEventBus`, `DeleteEventBus`, `DescribeEventBus`, `ListEventBuses` and `PutEvents`.
+- `PutRule`, `DeleteRule`, `DescribeRule`, `ListRules`, `EnableRule`, `DisableRule` and
+  `TestEventPattern`.
+- Event pattern matching on exact values, nested fields, lists, `prefix`, `suffix`, `anything-but`,
+  `numeric` and `exists`.
 - The `default` bus in every account and region, without one being created.
 - Bus descriptions, creation timestamps from the simulation's clock, and prefix-narrowed paged
   listings.
@@ -271,9 +398,17 @@ no permission for.
 
 ## Limitations
 
-- Rules, event patterns and targets are not simulated, so every event put onto a bus is dropped after
-  it arrives.
-- Scheduled rules and EventBridge Scheduler are not simulated.
+- Rule targets are not simulated, so a matched event is recorded against the rule and goes no
+  further. `PutTargets`, `RemoveTargets` and `ListTargetsByRule` are absent.
+- The `cidr`, `equals-ignore-case`, `wildcard` and `$or` pattern operators are refused rather than
+  evaluated, as are the nested forms of `anything-but` and the case-insensitive forms of `prefix`
+  and `suffix`.
+- Scheduled rules and EventBridge Scheduler are not simulated, so `PutRule` refuses a
+  `ScheduleExpression`. A rule needs an event pattern.
+- Rule tags, a rule `RoleArn`, managed rules and the
+  `ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS` state are refused rather than simulated.
+- Deleting an event bus deletes its rules. Real EventBridge refuses to delete a bus that still has
+  rules on it.
 - `AWS::Events::*` CloudFormation resource types are not simulated.
 - Event bus resource policies are not simulated. `PutPermission`, `RemovePermission` and the bus
   `Policy` attribute are all absent, so a caller from another account cannot be admitted to a bus,
