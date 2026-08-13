@@ -103,6 +103,56 @@ describe("Two CloudFront Functions reading different key value stores", () => {
     assertIdentical(new URL(secondResult.url).pathname, "/from-second");
   });
 
+  it("leaves cf undefined to work the Function did not await", async () => {
+    // Given a Function that starts work inside its own invocation and returns
+    // without awaiting it, so the leaked work inherits the invocation's
+    // asynchronous context
+    const simAws = new SimAws();
+    const created = await simAws
+      .cloudFront()
+      .keyValueStores()
+      .createKeyValueStore(new CreateKeyValueStoreCommand({ Name: "leaky" }));
+
+    let leakedCf: unknown = "not run yet";
+    const { promise: leaked, resolve: leakedRan } =
+      Promise.withResolvers<unknown>();
+
+    await simAws.cloudFront().createFunction(
+      new CreateFunctionCommand({
+        Name: "leaky-cff",
+        FunctionConfig: {
+          Comment: "Leaks work past its return",
+          Runtime: "cloudfront-js-2.0",
+          KeyValueStoreAssociations: {
+            Quantity: 1,
+            Items: [{ KeyValueStoreARN: created.KeyValueStore.ARN }],
+          },
+        },
+        FunctionCode: makeCffFunctionCodeInput(
+          (event: CloudFrontFunctionType.ViewerRequestEvent) => {
+            setTimeout(() => {
+              leakedCf = (globalThis as { cf?: unknown }).cf;
+              leakedRan(leakedCf);
+            }, 0);
+
+            return event.request;
+          },
+        ),
+      }),
+    );
+
+    const cff = simAws.cloudFront().getCloudFrontFunctionByName("leaky-cff");
+    assertNonNullable(cff);
+
+    // When the invocation finishes and the leaked work runs afterwards
+    await cff.handleViewerRequest(new Request("https://cdn.test/a"));
+    await leaked;
+
+    // Then it finds no cf: the Function is done when it returns, so work it
+    // left running is not still entitled to read the store
+    assertUndefined(leakedCf);
+  });
+
   it("leaves cf undefined outside an invocation", () => {
     // Given no Function running
     // When cf is read from ordinary test code

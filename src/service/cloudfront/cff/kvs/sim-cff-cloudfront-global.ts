@@ -23,8 +23,16 @@ import type { CffCloudFrontModule } from "./cff-cloudfront-module.js";
  * rather than through a Function fails on `cf` being undefined rather than
  * silently reading another Function's store.
  */
+/**
+ * One invocation's module, and whether that invocation is still running.
+ */
+interface CffInvocation {
+  readonly module: CffCloudFrontModule;
+  active: boolean;
+}
+
 class SimCffCloudFrontGlobal {
-  private readonly storage = new AsyncLocalStorage<CffCloudFrontModule>();
+  private readonly storage = new AsyncLocalStorage<CffInvocation>();
   private installed = false;
 
   /**
@@ -33,14 +41,32 @@ class SimCffCloudFrontGlobal {
   async run<T>(module: CffCloudFrontModule, run: () => Promise<T>): Promise<T> {
     this.install();
 
-    return await this.storage.run(module, run);
+    const invocation: CffInvocation = { module, active: true };
+
+    try {
+      return await this.storage.run(invocation, run);
+    } finally {
+      invocation.active = false;
+    }
   }
 
   /**
    * The module the invocation in progress is using, if there is one.
+   *
+   * An invocation that has finished holds nothing, even though asynchronous
+   * context still reaches its store. Work a Function starts and does not await
+   * outlives the invocation here, and in CloudFront it does not: the Function
+   * is done when it returns. Reading `cf` from that leaked work finds nothing
+   * rather than a store the Function is no longer entitled to.
    */
   current(): CffCloudFrontModule | undefined {
-    return this.storage.getStore();
+    const invocation = this.storage.getStore();
+
+    if (invocation?.active !== true) {
+      return undefined;
+    }
+
+    return invocation.module;
   }
 
   /**
@@ -50,6 +76,12 @@ class SimCffCloudFrontGlobal {
    * another invocation is in flight, and there is nothing to gain: an
    * installed accessor with no invocation running reads as undefined, exactly
    * as though it were not there.
+   *
+   * It stays configurable so that a second copy of this package in one process
+   * can install over the first. Locking it down would stop a Function
+   * reassigning `cf`, which is the Function sabotaging its own test rather than
+   * a boundary worth defending, at the cost of turning a duplicated dependency
+   * into a hard throw.
    */
   private install(): void {
     if (this.installed) {
@@ -58,7 +90,7 @@ class SimCffCloudFrontGlobal {
 
     Object.defineProperty(globalThis, "cf", {
       configurable: true,
-      get: (): CffCloudFrontModule | undefined => this.storage.getStore(),
+      get: (): CffCloudFrontModule | undefined => this.current(),
     });
 
     this.installed = true;
