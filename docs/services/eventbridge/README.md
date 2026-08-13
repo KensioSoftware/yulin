@@ -3,8 +3,8 @@
 Yulin includes a simulated Amazon EventBridge for tests and local development. Event buses are held
 in memory and every operation is authorized by simulated IAM.
 
-Event buses, rules and `PutEvents`. Targets and EventBridge Scheduler are not simulated yet, so a
-rule today records that it matched an event rather than sending it anywhere. EventBridge-specific
+Event buses, rules and `PutEvents`. Targets and EventBridge Scheduler are not simulated yet, so the
+bus records the event and the names of the rules it matched rather than sending it to a target. EventBridge-specific
 types are imported from the `@kensio/yulin/eventbridge` subpath.
 
 ## Putting an event onto a bus
@@ -281,7 +281,8 @@ Supported conditions:
 Values are compared by type, so the string `"5"` in a pattern does not match the number `5` in an
 event. `null` and the empty string are values like any other. Where the event carries a list for a
 field, the pattern matches when the two lists overlap, which is how a pattern naming one ARN matches
-an event whose `resources` names several.
+an event whose `resources` names several. `exists` is about the field rather than its members, so a
+field carrying an empty list still exists.
 
 Anything else is refused at `PutRule` rather than quietly never matching. The `cidr`,
 `equals-ignore-case`, `wildcard` and `$or` operators are all refused by name, as are the nested forms
@@ -398,8 +399,12 @@ no permission for.
 
 ## Limitations
 
-- Rule targets are not simulated, so a matched event is recorded against the rule and goes no
-  further. `PutTargets`, `RemoveTargets` and `ListTargetsByRule` are absent.
+- Rule targets are not simulated, so a matched event is recorded in the bus receipt with the names
+  of the rules it matched and goes no further. `PutTargets`, `RemoveTargets` and `ListTargetsByRule`
+  are absent.
+- Numbers are compared after JSON parsing, so `300`, `300.0` and `3.0e2` are one value here. Real
+  EventBridge compares the JSON token when matching an exact value, and so may tell those forms
+  apart. Use `numeric` to compare numbers, which is what it is for.
 - The `cidr`, `equals-ignore-case`, `wildcard` and `$or` pattern operators are refused rather than
   evaluated, as are the nested forms of `anything-but` and the case-insensitive forms of `prefix`
   and `suffix`.

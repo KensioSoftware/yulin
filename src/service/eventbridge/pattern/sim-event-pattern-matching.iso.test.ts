@@ -15,6 +15,7 @@ const orderEvent = {
   time: "2026-07-26T09:00:00Z",
   region: "us-east-1",
   resources: ["arn:aws:s3:::orders", "arn:aws:s3:::invoices"],
+  tags: [],
   detail: {
     orderId: "order-1",
     total: 4200,
@@ -171,6 +172,24 @@ describe("EventBridge event pattern matching", () => {
     assertFalse(await matches({ detail: { orderId: [{ exists: false }] } }));
     assertTrue(await matches({ detail: { refundId: [{ exists: false }] } }));
     assertFalse(await matches({ detail: { refundId: [{ exists: true }] } }));
+  });
+
+  it("matches a field the event carries an empty list for as being there", async () => {
+    // Given a field the event carries as an empty list.
+    // Then it exists, because exists is about the field rather than its
+    // members, and no value matches inside it.
+    assertTrue(await matches({ tags: [{ exists: true }] }));
+    assertFalse(await matches({ tags: [{ exists: false }] }));
+    assertFalse(await matches({ tags: ["release"] }));
+  });
+
+  it("compares numbers after parsing, so equivalent forms are one value", async () => {
+    // Given the total, written three ways that JSON parses the same.
+    // Then all three match, which is a divergence recorded in the docs: real
+    // EventBridge compares the JSON token for an exact match.
+    assertTrue(await matches({ detail: { total: [4200] } }));
+    assertTrue(await matches({ detail: { total: [4200] } }));
+    assertTrue(await matches({ detail: { total: [4.2e3] } }));
   });
 
   it("does not match a field the event does not have", async () => {

@@ -55,18 +55,33 @@ export class SimEventPatternField {
   }
 
   /**
-   * Whether the value an event carries for this field satisfies any condition.
+   * Whether one condition holds for the value the event carries.
    *
-   * A field the event carries a list for matches when the two lists overlap:
-   * any member satisfying any condition is enough. That is how a pattern
-   * naming one ARN matches an event whose `resources` names several.
+   * A field the event carries a list for matches a value condition when the
+   * two lists overlap: any member satisfying it is enough. That is how a
+   * pattern naming one ARN matches an event whose `resources` names several.
+   *
+   * A presence condition is asked about the list itself rather than its
+   * members, so a field carrying an empty list still exists.
    */
-  matches(value: unknown): boolean {
-    if (Array.isArray(value)) {
-      return value.some((member: unknown) => this.matchesValue(member));
+  private static holds(
+    condition: SimEventPatternMatch,
+    value: unknown,
+  ): boolean {
+    if (!condition.isAboutPresence && Array.isArray(value)) {
+      return value.some((member: unknown) => condition.matchesValue(member));
     }
 
-    return this.matchesValue(value);
+    return condition.matchesValue(value);
+  }
+
+  /**
+   * Whether the value an event carries for this field satisfies any condition.
+   */
+  matches(value: unknown): boolean {
+    return this.conditions.some((condition) =>
+      SimEventPatternField.holds(condition, value),
+    );
   }
 
   /**
@@ -74,9 +89,5 @@ export class SimEventPatternField {
    */
   matchesAbsent(): boolean {
     return this.conditions.some((condition) => condition.matchesAbsent());
-  }
-
-  private matchesValue(value: unknown): boolean {
-    return this.conditions.some((condition) => condition.matchesValue(value));
   }
 }

@@ -16,6 +16,11 @@ export const eventPatternExistsOperator = "exists";
  * real EventBridge does not answer.
  */
 export class SimEventExistsMatch extends SimEventPatternMatch {
+  /**
+   * This condition is about the field being there, not about its value.
+   */
+  public override readonly isAboutPresence: boolean = true;
+
   private readonly expected: boolean;
 
   constructor(expected: boolean) {

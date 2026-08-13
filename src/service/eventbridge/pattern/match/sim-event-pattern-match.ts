@@ -8,6 +8,16 @@
  */
 export abstract class SimEventPatternMatch {
   /**
+   * Whether this condition is about the field being there at all, rather than
+   * about the value it holds.
+   *
+   * Only `exists` is. It matters for a field the event carries a list for: a
+   * value condition asks about the members, and a presence condition asks
+   * about the list, so an empty list still exists.
+   */
+  readonly isAboutPresence: boolean = false;
+
+  /**
    * Whether a value the event carries satisfies this condition.
    */
   abstract matchesValue(value: unknown): boolean;

@@ -27,7 +27,9 @@ const ignoreCaseOperator = "equals-ignore-case";
  * Real EventBridge also writes both with a nested `equals-ignore-case` operand
  * to compare regardless of case. That form is refused by name rather than
  * evaluated case-sensitively, which would silently answer a different question
- * from the one the pattern asked.
+ * from the one the pattern asked. Any other object operand is refused as
+ * malformed rather than as that form, so the message says what is actually
+ * wrong.
  */
 export class SimEventAffixMatch extends SimEventPatternMatch {
   private readonly affix: string;
@@ -61,7 +63,8 @@ export class SimEventAffixMatch extends SimEventPatternMatch {
     if (
       operand !== null &&
       typeof operand === "object" &&
-      !Array.isArray(operand)
+      !Array.isArray(operand) &&
+      Object.hasOwn(operand, ignoreCaseOperator)
     ) {
       throw unsimulatedOperatorRefusal(
         `${operator} with ${ignoreCaseOperator}`,

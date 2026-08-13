@@ -98,7 +98,7 @@ function comparisonsIn(
 ): readonly SimEventNumericComparison[] {
   const written = patternList(operand, eventPatternNumericOperator);
 
-  if (written.length === 0 || written.length % 2 !== 0) {
+  if (written.length !== 2 && written.length !== 4) {
     throw eventPatternRefusal(
       `${eventPatternNumericOperator} match is a comparator and a number, ` +
         `optionally twice for a range, and this one is ${JSON.stringify(

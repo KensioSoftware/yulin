@@ -132,4 +132,38 @@ describe("EventBridge event pattern refusals", () => {
 
     assertInstanceOf(error, SimEventBridgeInvalidEventPatternException);
   });
+
+  it("refuses an anything-but excluding an object rather than a value", async () => {
+    // Given a nested operator written inside the exclusion list.
+    const error = await refusedPattern({
+      detail: { state: [{ "anything-but": [{ prefix: "init" }] }] },
+    });
+
+    // Then it is refused rather than kept and compared by reference, which
+    // would exclude nothing and leave the rule matching everything.
+    assertInstanceOf(error, SimEventBridgeInvalidEventPatternException);
+    assertStringIncludes(error.message, "excludes plain values");
+  });
+
+  it("refuses a numeric condition with more than a range in it", async () => {
+    // Given three comparisons where a numeric condition takes one or two.
+    const error = await refusedPattern({
+      detail: { total: [{ numeric: [">", 0, "<", 10_000, ">", 5] }] },
+    });
+
+    assertInstanceOf(error, SimEventBridgeInvalidEventPatternException);
+  });
+
+  it("refuses a malformed affix operand as malformed, not as ignore-case", async () => {
+    // Given a prefix whose operand is an object that is not the
+    // equals-ignore-case form.
+    const error = await refusedPattern({
+      source: [{ prefix: { unknown: "orders" } }],
+    });
+
+    // Then the message says the operand is wrong rather than naming an
+    // operator the pattern never used.
+    assertInstanceOf(error, SimEventBridgeInvalidEventPatternException);
+    assertStringIncludes(error.message, "compares against a string");
+  });
 });

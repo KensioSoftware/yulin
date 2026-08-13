@@ -32,7 +32,7 @@ function excludedIn(operand: JSONValue): readonly JSONValue[] {
       );
     }
 
-    return operand;
+    return operand.map(excludedValue);
   }
 
   if (operand !== null && typeof operand === "object") {
@@ -40,6 +40,25 @@ function excludedIn(operand: JSONValue): readonly JSONValue[] {
   }
 
   return [operand];
+}
+
+/**
+ * Read one member of an anything-but exclusion list.
+ *
+ * The list holds plain values. A member that is an object is a nested operator
+ * form written in the wrong place, and it is refused rather than kept: kept, it
+ * would be compared by reference and so exclude nothing, leaving a rule that
+ * matches everything it was written to filter.
+ */
+function excludedValue(member: JSONValue): JSONValue {
+  if (member !== null && typeof member === "object") {
+    throw eventPatternRefusal(
+      `${eventPatternAnythingButOperator} match excludes plain values, and ` +
+        `this one excludes ${JSON.stringify(member)}`,
+    );
+  }
+
+  return member;
 }
 
 /**
