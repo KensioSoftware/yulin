@@ -23,8 +23,18 @@ updates:
         update-types:
           - "patch"
           - "minor"
+    # conventional-changelog-conventionalcommits has to stay on 9 while
+    # semantic-release is on 25. Its 10 line returns the Handlebars templates as
+    # functions, and conventional-changelog-writer 8 reads them as strings, so a
+    # release goes out with a version number and no notes under it. Nothing
+    # errors and no check fails: the first sign is an empty GitHub Release. See
+    # .releaserc.yaml. Take this out when semantic-release moves to a writer
+    # that reads the new shape.
     ignore:
       - dependency-name: "@types/node"
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: "conventional-changelog-conventionalcommits"
         update-types:
           - "version-update:semver-major"
     commit-message:
