@@ -8,6 +8,8 @@ import {
 } from "./sim-kms-key-lifecycle.js";
 import type { SimKmsKeyMaterial } from "./sim-kms-key-material.js";
 import type { SimKmsKeyPolicy } from "./sim-kms-key-policy.js";
+import type { SimKmsKeySpec } from "./spec/sim-kms-key-spec.js";
+import type { SimKmsSigningAlgorithm } from "./spec/sim-kms-signing-algorithm.js";
 
 export { SimKmsKeyState } from "./sim-kms-key-lifecycle.js";
 
@@ -64,6 +66,13 @@ export class SimKmsKey {
     this.description = properties.description ?? "";
     this.keyManager = properties.keyManager ?? SimKmsKeyManager.Customer;
     this.lifecycle = new SimKmsKeyLifecycle(this.arn);
+  }
+
+  /**
+   * The spec this key was created with, which is what says what it can do.
+   */
+  get keySpec(): SimKmsKeySpec {
+    return this.material.keySpec;
   }
 
   /**
@@ -148,5 +157,36 @@ export class SimKmsKey {
   ): Uint8Array {
     this.lifecycle.requireUsable();
     return this.material.decrypt(parts, encryptionContext);
+  }
+
+  /**
+   * Sign a message under this key.
+   */
+  sign(message: Uint8Array, algorithm: SimKmsSigningAlgorithm): Uint8Array {
+    this.lifecycle.requireUsable();
+    return this.material.sign(message, algorithm);
+  }
+
+  /**
+   * Check a signature made under this key.
+   */
+  verify(
+    message: Uint8Array,
+    signature: Uint8Array,
+    algorithm: SimKmsSigningAlgorithm,
+  ): boolean {
+    this.lifecycle.requireUsable();
+    return this.material.verify(message, signature, algorithm);
+  }
+
+  /**
+   * This key's public key, as DER SubjectPublicKeyInfo.
+   *
+   * A disabled key still has one on real KMS, but GetPublicKey refuses it, so
+   * this goes through the same usability check every other operation does.
+   */
+  publicKeyDer(): Uint8Array {
+    this.lifecycle.requireUsable();
+    return this.material.publicKeyDer();
   }
 }

@@ -8,23 +8,29 @@ import {
 
 /**
  * Validates and schedules Route53 record changes for a Hosted Zone.
+ *
+ * Nothing here waits: the changes are validated, the zone goes to PENDING, and
+ * the mutation is handed to the background scheduler. Waiting for it is what
+ * the zone's own synchronization is for.
  */
-export async function scheduleChangeResourceRecordSets(
+export function scheduleChangeResourceRecordSets(
   background: BackgroundScheduler,
   hostedZone: SimRoute53HostedZone,
   changes: readonly SimRoute53Change[],
-): Promise<void> {
+): void {
   for (const change of changes) {
     validateChangeResourceRecordSet(change);
   }
 
-  await hostedZone.beginSynchronization();
+  hostedZone.beginSynchronization();
 
-  hostedZone.scheduleSynchronization(background, async () => {
+  hostedZone.scheduleSynchronization(background, () => {
     for (const change of changes) {
       applyChangeResourceRecordSet(hostedZone, change);
     }
 
-    await hostedZone.completeSynchronization();
+    hostedZone.markSynchronized();
+
+    return Promise.resolve();
   });
 }

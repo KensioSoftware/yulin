@@ -91,7 +91,6 @@ export class SimAwsAccountRegionServiceBuilder {
       ...this.scoped(scope),
       dnsRecords: simAwsAcmDnsRecords(this.registries),
     });
-
     this.registries.acm.register(scope.accountRegionScope, acm);
 
     return acm;
@@ -160,10 +159,13 @@ export class SimAwsAccountRegionServiceBuilder {
    * Create simulated KMS for an Account Region scope.
    *
    * KMS keys are Region-scoped on real AWS: a key ARN names its Region, and a
-   * ciphertext produced in one Region cannot be decrypted in another.
+   * ciphertext produced in one Region cannot be decrypted in another. That is
+   * why it is registered: a key ARN carries the Region another service needs.
    */
   createKms(scope: SimAwsAccountRegionContainer): SimKms {
-    return new SimKms(this.scoped(scope));
+    const kms = new SimKms(this.scoped(scope));
+    this.registries.kms.register(scope.accountRegionScope, kms);
+    return kms;
   }
 
   /** Create simulated Lambda for an Account Region scope. */

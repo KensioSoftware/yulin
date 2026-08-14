@@ -42,3 +42,12 @@ export type {
   SimScheduleKeyDeletionCommand,
   SimScheduleKeyDeletionCommandOutput,
 } from "./key/key.command.js";
+
+export type {
+  SimGetPublicKeyCommand,
+  SimGetPublicKeyCommandOutput,
+  SimSignCommand,
+  SimSignCommandOutput,
+  SimVerifyCommand,
+  SimVerifyCommandOutput,
+} from "./sign/sign.command.js";

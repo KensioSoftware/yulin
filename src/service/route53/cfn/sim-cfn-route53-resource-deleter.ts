@@ -5,9 +5,13 @@ import type { SimRoute53HostedZone } from "../hosted-zone/sim-route53-hosted-zon
 import { SimCfnRoute53RecordSetBuilder } from "./record-set/build/sim-cfn-r53-record-set-builder.js";
 import { SimCfnRoute53RecordSetHostedZoneResolver } from "./record-set/resolve/sim-cfn-r53-rec-set-zone-resolver.js";
 import { assertDefined } from "../../../util/type-guard/defined.js";
+import type { SimCfnRoute53KskCreator } from "./dnssec/sim-cfn-r53-ksk-creator.js";
+import type { SimCfnRoute53ZoneSigningCreator } from "./dnssec/sim-cfn-r53-zone-signing-creator.js";
 
 interface SimCfnRoute53ResourceDeleterProperties {
   readonly route53: SimRoute53;
+  readonly keySigningKeyCreator: SimCfnRoute53KskCreator;
+  readonly zoneSigningCreator: SimCfnRoute53ZoneSigningCreator;
 }
 
 /**
@@ -20,13 +24,20 @@ interface SimCfnRoute53ResourceDeleterProperties {
  * The Hosted Zone goes last, and only works because it does: DeleteHostedZone
  * refuses a zone that still holds records, and the record set Resources naming
  * the zone have already been taken off it by then.
+ *
+ * DNSSEC comes off the same way. Signing stops before the key-signing keys go,
+ * because a key that is still signing cannot be deleted.
  */
 export class SimCfnRoute53ResourceDeleter {
   private readonly route53: SimRoute53;
+  private readonly keySigningKeyCreator: SimCfnRoute53KskCreator;
+  private readonly zoneSigningCreator: SimCfnRoute53ZoneSigningCreator;
   private readonly hostedZoneResolver: SimCfnRoute53RecordSetHostedZoneResolver;
 
   constructor(properties: SimCfnRoute53ResourceDeleterProperties) {
     this.route53 = properties.route53;
+    this.keySigningKeyCreator = properties.keySigningKeyCreator;
+    this.zoneSigningCreator = properties.zoneSigningCreator;
     this.hostedZoneResolver = new SimCfnRoute53RecordSetHostedZoneResolver({
       route53: this.route53,
     });
@@ -47,6 +58,14 @@ export class SimCfnRoute53ResourceDeleter {
       }
       case "RecordSet": {
         await this.deleteRecordSet(resource, properties);
+        return;
+      }
+      case "KeySigningKey": {
+        await this.keySigningKeyCreator.delete(resource, properties);
+        return;
+      }
+      case "DNSSEC": {
+        await this.zoneSigningCreator.delete(resource, properties);
         return;
       }
       default: {

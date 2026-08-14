@@ -210,6 +210,39 @@ export class SimKms {
   }
 
   /**
+   * Handle a Sign Command from the SDK.
+   */
+  async sign(
+    command: simKmsCommands.SimSignCommand,
+    options?: SimKmsRequestOptions,
+  ): Promise<simKmsCommands.SimSignCommandOutput> {
+    await this.commands.background.sequence();
+    return this.commands.signing.sign(command, options);
+  }
+
+  /**
+   * Handle a Verify Command from the SDK.
+   */
+  async verify(
+    command: simKmsCommands.SimVerifyCommand,
+    options?: SimKmsRequestOptions,
+  ): Promise<simKmsCommands.SimVerifyCommandOutput> {
+    await this.commands.background.sequence();
+    return this.commands.signing.verify(command, options);
+  }
+
+  /**
+   * Handle a GetPublicKey Command from the SDK.
+   */
+  async getPublicKey(
+    command: simKmsCommands.SimGetPublicKeyCommand,
+    options?: SimKmsRequestOptions,
+  ): Promise<simKmsCommands.SimGetPublicKeyCommandOutput> {
+    await this.commands.background.sequence();
+    return this.commands.signing.getPublicKey(command, options);
+  }
+
+  /**
    * Get this service's CloudFormation Resource factory, which creates
    * simulated keys and aliases from AWS::KMS::* Resources.
    */

@@ -9,6 +9,7 @@ import type { BackgroundScheduler } from "../../../util/background/background.js
 import { SimRoute53ZoneSynchronization } from "./sim-route53-zone-synchronization.js";
 import { SimRoute53HostedZoneNotEmpty } from "../error/sim-route53.error.js";
 import { widenSimRoute53ZoneName } from "./sim-route53-zone-name-widening.js";
+import { SimRoute53ZoneDnssec } from "../dnssec/sim-route53-zone-dnssec.js";
 
 export type SimRoute53HostedZoneStatus = "PENDING" | "INSYNC";
 
@@ -34,6 +35,15 @@ interface SimRoute53HostedZoneProperties {
 export class SimRoute53HostedZone {
   /* @internal */
   public readonly records = new SimRoute53HostedZoneRecords();
+  /**
+   * This zone's key-signing keys and whether it is being signed.
+   *
+   * DNSSEC state belongs to the zone rather than to the account-scoped
+   * service, in the same way its records do, so a zone reached through the
+   * shared registry carries it too.
+   * @internal
+   */
+  public readonly dnssec = new SimRoute53ZoneDnssec();
   /**
    * AWS Route53 Hosted Zone ID.
    */
@@ -101,9 +111,8 @@ export class SimRoute53HostedZone {
   /**
    * Move the sim Hosted Zone into PENDING status.
    */
-  beginSynchronization(): Promise<void> {
+  beginSynchronization(): void {
     this.#status = "PENDING";
-    return Promise.resolve();
   }
 
   /**
@@ -140,18 +149,12 @@ export class SimRoute53HostedZone {
   }
 
   /**
-   * Move the sim Hosted Zone into INSYNC status.
-   */
-  completeSynchronization(): Promise<void> {
-    this.markSynchronized();
-    return Promise.resolve();
-  }
-
-  /**
-   * Put the sim Hosted Zone into INSYNC status without awaiting anything.
+   * Put the sim Hosted Zone into INSYNC status.
    *
-   * A zone registered as already existing has no synchronization to wait for,
-   * and setup methods are not asynchronous.
+   * Neither this nor `beginSynchronization` awaits anything. Both used to
+   * answer with a resolved promise, which said the status change was
+   * asynchronous when it never was: the waiting is what
+   * `scheduleSynchronization` arranges, and it is separate.
    */
   markSynchronized(): void {
     this.#status = "INSYNC";

@@ -23,6 +23,7 @@ or sim CloudFront.
 - `resolve/` contains Yulin-local hostname resolution.
 - `local-name/` contains conversion and normalization helpers for simulated hostnames.
 - `cfn/` contains CloudFormation support for supported `AWS::Route53::*` resources.
+- `dnssec/` contains the key-signing key model and the DNSKEY derivation behind it.
 - `error/` contains Route53-specific AWS-like errors.
 
 When used through `SimAws`, Route53 is exposed from account/region containers like other services,
@@ -47,9 +48,9 @@ or missing ID with `SimRoute53InvalidInput`. A well-formed ID that no hosted zon
 fail later with `SimRoute53NoSuchHostedZone`, so callers can tell a bad ID apart from an unknown
 zone. `assertIsSimRoute53HostedZoneId` applies the same shape check as an internal invariant.
 
-`SimRoute53` is a thin facade. It does not contain command implementation details. Each
-public AWS-style operation constructs the appropriate command handler with the hosted-zone map and
-background scheduler, then delegates to that handler.
+`SimRoute53` is a thin facade. It does not contain command implementation details. Each public
+AWS-style operation is one line into `SimRoute53Commands`, which holds the command handlers and the
+hosted-zone map, IAM and background scheduler they share.
 
 This keeps the service object responsible for shared state and wiring, while command handlers own
 validation, state transitions, and AWS-shaped outputs.
@@ -67,9 +68,15 @@ Supported command areas currently include:
 
 - `create-hosted-zone/`
 - `get-hosted-zone/`
+- `delete-hosted-zone/`
 - `list-hosted-zones-by-name/`
 - `change-resource-record-sets/`
 - `list-resource-record-sets/`
+- `dnssec/`
+
+`dnssec/` is the exception to one directory per command. Its seven commands all start from the same
+hosted zone lookup and authorization, and four of them work on the same key-signing key list, so
+they are grouped by the collaborators they share the way the simulated KMS commands are.
 
 The command handlers follow the same broad pattern used by other sim services:
 
@@ -225,8 +232,9 @@ insertion order rather than DNS order, because the store is a lookup structure; 
 Route53 ordering sort the result themselves.
 
 The simulator does not currently model routing policies, weighted records, health checks,
-multi-value answer records, DNSSEC, or alias-specific evaluation beyond converting alias targets
-into record values for supported routing scenarios.
+multi-value answer records, or alias-specific evaluation beyond converting alias targets into record
+values for supported routing scenarios. DNSSEC is modelled as zone state rather than as records:
+see [DNSSEC](#dnssec).
 
 ## ChangeResourceRecordSets behaviour
 
@@ -364,6 +372,8 @@ Sim Route53 CloudFormation support lives under `cfn/`.
 
 - `AWS::Route53::HostedZone`
 - `AWS::Route53::RecordSet`
+- `AWS::Route53::KeySigningKey`
+- `AWS::Route53::DNSSEC`
 
 CloudFormation creation is delegated from the generic CloudFormation engine into this
 service-specific factory. The generic CloudFormation service resolves dependencies and properties;
@@ -430,6 +440,47 @@ one Account and it does not apply sim IAM authorization. Zones come from `SimRou
 Rendering is split into `zone-summary/`, with the page structure in
 `sim-route53-zone-summary-page.ts` and escaping in `sim-route53-summary-html.ts`. Hosted-zone names
 and record values originate in user templates and test code, so everything rendered is escaped.
+
+## DNSSEC
+
+DNSSEC state lives under `dnssec/`, on the hosted zone rather than on the account-scoped service.
+`SimRoute53HostedZone` holds a `SimRoute53ZoneDnssec` in the same way it holds its records, so a
+zone reached through the shared registry carries its signing state with it.
+
+`SimRoute53ZoneDnssec` keeps the zone's key-signing keys and whether the zone is being signed apart,
+because AWS does: adding a key does not start signing, and stopping signing leaves the keys in
+place. That separation is what lets a zone be prepared for DNSSEC before its DS record is published.
+
+`SimRoute53KeySigningKey` holds what Route53 adds on top of the KMS key: a name within the zone, a
+status, and the DNSSEC parameters derived once at creation. Real Route53 derives them once in the
+same way, which is why there is no operation to point an existing key-signing key at another KMS
+key.
+
+The derivation is the part worth getting right, because it is what a test asserts on:
+
+- `sim-route53-dnskey-rdata.ts` takes the raw X and Y point out of the DER `SubjectPublicKeyInfo`
+  `GetPublicKey` returns, and builds the DNSKEY RDATA from it. A point that is not an uncompressed
+  P-256 one is refused rather than read as if it were.
+- `sim-route53-dnskey-tag.ts` computes the key tag by the RFC 4034 Appendix B algorithm.
+- `SimRoute53Dnskey` digests the canonical owner name and that RDATA into the delegation signer
+  value, and formats the DS and DNSKEY records.
+
+There is one algorithm rather than a table, in `sim-route53-dnssec-algorithm.ts`, because Route53
+only accepts an `ECC_NIST_P256` key: ECDSA with SHA-256, algorithm 13, and the SHA-256 digest,
+algorithm 2.
+
+`sim-route53-dnskey.iso.test.ts` checks the key tag and the digest against the published ECDSA
+P-256 example in RFC 6605 Appendix A.1. Self-consistency would not catch an algorithm that is wrong
+in the same way twice, and these values are exactly the ones a registrar would be given.
+
+### Reaching KMS
+
+A key-signing key is built on a KMS customer managed key, and Route53 is account-scoped while KMS is
+account and region-scoped. `SimKmsRegistry` bridges that, in the way `SimAcmRegistry` lets CloudFront
+reach a certificate: a key ARN carries both the account and the region, so the lookup is the same
+shape. `SimRoute53KskKmsKey` then applies the checks real Route53 applies before it takes a key.
+
+A standalone `new SimRoute53()` has no registry, and refuses rather than accepting an unchecked key.
 
 ## DNS wire format
 

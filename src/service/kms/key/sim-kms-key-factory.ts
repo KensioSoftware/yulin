@@ -4,9 +4,11 @@ import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-
 import type { SimIamPolicyDocument } from "../../iam/policy/sim-iam-policy.js";
 import { SimKmsCiphertextBlob } from "./sim-kms-ciphertext-blob.js";
 import { SimKmsKey, SimKmsKeyManager } from "./sim-kms-key.js";
-import { SimKmsKeyMaterial } from "./sim-kms-key-material.js";
+import { makeSimKmsKeyMaterial } from "./sim-kms-key-material-factory.js";
 import { SimKmsKeyPolicy } from "./sim-kms-key-policy.js";
 import { SimKmsViaService } from "./sim-kms-via-service.js";
+import type { SimKmsKeySpec } from "./spec/sim-kms-key-spec.js";
+import { simKmsSymmetricKeySpec } from "./spec/sim-kms-key-specs.js";
 
 interface SimKmsKeyFactoryProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
@@ -16,6 +18,12 @@ interface SimKmsKeyFactoryProperties {
 interface SimKmsMakeKeyProperties {
   readonly description?: string | undefined;
   readonly policy?: SimIamPolicyDocument | undefined;
+
+  /**
+   * The spec the key is made to. Omitting it gets a symmetric encryption key,
+   * which is what CreateKey gives a request naming no KeySpec.
+   */
+  readonly keySpec?: SimKmsKeySpec | undefined;
 
   /**
    * The service an AWS managed key belongs to, such as `ssm`.
@@ -57,7 +65,11 @@ export class SimKmsKeyFactory {
     return new SimKmsKey({
       keyId,
       accountRegionScope: this.accountRegionScope,
-      material: new SimKmsKeyMaterial({ keyArn: arn, blob: this.blob }),
+      material: makeSimKmsKeyMaterial({
+        keyArn: arn,
+        keySpec: properties.keySpec ?? simKmsSymmetricKeySpec,
+        blob: this.blob,
+      }),
       policy: this.keyPolicy(arn, properties),
       creationDate: this.clock.now(),
       description: properties.description,

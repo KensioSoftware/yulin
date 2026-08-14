@@ -9,6 +9,12 @@ import type { SimDeleteHostedZoneCommand } from "../command/delete-hosted-zone/d
 import type { SimGetHostedZoneCommand } from "../command/get-hosted-zone/get-hosted-zone.command.js";
 import type { SimListHostedZonesByNameCommand } from "../command/list-hosted-zones-by-name/list-hosted-zones-by-name.command.js";
 import type { SimListResourceRecordSetsCommand } from "../command/list-resource-record-sets/list-resource-record-sets.command.js";
+import type {
+  SimCreateKeySigningKeyCommand,
+  SimGetDnssecCommand,
+  SimHostedZoneDnssecCommand,
+  SimKeySigningKeyCommand,
+} from "../command/dnssec/dnssec.command.js";
 import type { SimRoute53 } from "../sim-route53.js";
 
 /**
@@ -64,6 +70,62 @@ export class SimRoute53SdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simRoute53.listResourceRecordSets(
             command as SimListResourceRecordSetsCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "CreateKeySigningKeyCommand",
+        async (command, context): Promise<unknown> =>
+          await simRoute53.createKeySigningKey(
+            command as SimCreateKeySigningKeyCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ActivateKeySigningKeyCommand",
+        async (command, context): Promise<unknown> =>
+          await simRoute53.activateKeySigningKey(
+            command as SimKeySigningKeyCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeactivateKeySigningKeyCommand",
+        async (command, context): Promise<unknown> =>
+          await simRoute53.deactivateKeySigningKey(
+            command as SimKeySigningKeyCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteKeySigningKeyCommand",
+        async (command, context): Promise<unknown> =>
+          await simRoute53.deleteKeySigningKey(
+            command as SimKeySigningKeyCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "EnableHostedZoneDNSSECCommand",
+        async (command, context): Promise<unknown> =>
+          await simRoute53.enableHostedZoneDnssec(
+            command as SimHostedZoneDnssecCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DisableHostedZoneDNSSECCommand",
+        async (command, context): Promise<unknown> =>
+          await simRoute53.disableHostedZoneDnssec(
+            command as SimHostedZoneDnssecCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "GetDNSSECCommand",
+        async (command, context): Promise<unknown> =>
+          await simRoute53.getDnssec(
+            command as SimGetDnssecCommand,
             simSdkCallerOptions(context),
           ),
       ],

@@ -944,6 +944,160 @@ try {
 You can also call `srv.localUrl(...)` with a URL that contains the simulated hostname when you want
 the server to adapt it to the selected local port.
 
+## DNSSEC
+
+A Hosted Zone can be signed. Signing needs a key-signing key, and a key-signing key needs a KMS
+customer managed key: an enabled `ECC_NIST_P256` `SIGN_VERIFY` key, which is the only kind real
+Route53 accepts.
+
+```typescript sim-route53-dnssec
+/**
+ * Signing a simulated Route53 Hosted Zone with DNSSEC.
+ */
+
+import { CreateKeyCommand } from "@aws-sdk/client-kms";
+import {
+  CreateHostedZoneCommand,
+  CreateKeySigningKeyCommand,
+  EnableHostedZoneDNSSECCommand,
+  GetDNSSECCommand,
+} from "@aws-sdk/client-route-53";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const zone = await simAws.route53().createHostedZone(
+  new CreateHostedZoneCommand({
+    Name: "example.test",
+    CallerReference: "dnssec-zone",
+  }),
+);
+const HostedZoneId = zone.HostedZone?.Id;
+
+const key = await simAws.kms().createKey(
+  new CreateKeyCommand({
+    KeySpec: "ECC_NIST_P256",
+    KeyUsage: "SIGN_VERIFY",
+  }),
+);
+
+await simAws.route53().createKeySigningKey(
+  new CreateKeySigningKeyCommand({
+    CallerReference: "ksk",
+    HostedZoneId,
+    KeyManagementServiceArn: key.KeyMetadata?.Arn,
+    Name: "zone_signing_key",
+    Status: "ACTIVE",
+  }),
+);
+
+await simAws
+  .route53()
+  .enableHostedZoneDnssec(new EnableHostedZoneDNSSECCommand({ HostedZoneId }));
+
+const dnssec = await simAws
+  .route53()
+  .getDnssec(new GetDNSSECCommand({ HostedZoneId }));
+
+console.log(dnssec.Status?.ServeSignature); // "SIGNING"
+
+// The DS record the zone's registrar would be given, computed from the KMS
+// key's own public key: "<KeyTag> 13 2 <DigestValue>".
+console.log(dnssec.KeySigningKeys?.[0]?.DSRecord);
+```
+
+Nothing about the key-signing key is invented. Its `PublicKey` is the KMS key's own public key in
+the base64 form RFC 4034 defines, its `KeyTag` is computed by the RFC 4034 Appendix B algorithm, and
+its `DigestValue` is the SHA-256 delegation signer digest over the zone name and the DNSKEY. So a
+test can assert on the DS record it would hand to a registrar, and two zones on two keys get two
+different ones.
+
+Adding a key-signing key does not start signing, and stopping signing leaves the keys in place, the
+same as on AWS. `ActivateKeySigningKey` and `DeactivateKeySigningKey` move a key between `ACTIVE`
+and `INACTIVE`; `DeleteKeySigningKey` refuses a key that is still active. `EnableHostedZoneDNSSEC`
+refuses a zone with no active key to sign with, and `DisableHostedZoneDNSSEC` refuses a zone that is
+not signed.
+
+A KMS key that is symmetric, disabled, or not there at all is refused when the key-signing key is
+created, so a stack naming the wrong key fails here rather than on the deployment. A signed zone
+cannot be deleted either, for the reason real Route53 gives: the DS record at the parent would be
+left pointing at a zone that had gone.
+
+### DNSSEC from CloudFormation
+
+`AWS::Route53::KeySigningKey` and `AWS::Route53::DNSSEC` deploy, which is the shape CDK's
+`KeySigningKey` construct and `CfnDNSSEC` synthesize.
+
+```typescript sim-route53-cloudformation-dnssec
+/**
+ * Deploying a signed Route53 Hosted Zone from CloudFormation.
+ */
+
+import { GetDNSSECCommand } from "@aws-sdk/client-route-53";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "dns-stack",
+  template: {
+    Resources: {
+      SiteZone: {
+        Type: "AWS::Route53::HostedZone",
+        Properties: { Name: "example.test" },
+      },
+      ZoneSigningKey: {
+        Type: "AWS::KMS::Key",
+        Properties: {
+          KeySpec: "ECC_NIST_P256",
+          KeyUsage: "SIGN_VERIFY",
+        },
+      },
+      ZoneKeySigningKey: {
+        Type: "AWS::Route53::KeySigningKey",
+        Properties: {
+          HostedZoneId: { Ref: "SiteZone" },
+          KeyManagementServiceArn: { "Fn::GetAtt": ["ZoneSigningKey", "Arn"] },
+          Name: "zone_signing_key",
+          Status: "ACTIVE",
+        },
+      },
+      ZoneDnssec: {
+        Type: "AWS::Route53::DNSSEC",
+        Properties: { HostedZoneId: { Ref: "SiteZone" } },
+        DependsOn: "ZoneKeySigningKey",
+      },
+    },
+    Outputs: {
+      ZoneId: { Value: { Ref: "SiteZone" } },
+    },
+  },
+});
+await stack.waitForDeployComplete();
+
+const hostedZoneId = stack.outputs.get("ZoneId")?.value;
+
+if (typeof hostedZoneId !== "string") {
+  throw new TypeError("The stack did not output a hosted zone ID");
+}
+
+const dnssec = await simAws
+  .route53()
+  .getDnssec(new GetDNSSECCommand({ HostedZoneId: hostedZoneId }));
+
+console.log(dnssec.Status?.ServeSignature); // "SIGNING"
+console.log(dnssec.KeySigningKeys?.[0]?.Status); // "ACTIVE"
+```
+
+`Ref` on an `AWS::Route53::KeySigningKey` returns `<HostedZoneId>|<Name>`, which is what CDK reads
+as `keySigningKeyId`. `Ref` on an `AWS::Route53::DNSSEC` returns the hosted zone ID. Neither type
+has any `Fn::GetAtt` attributes, so one is refused rather than answered.
+
+Tearing the stack down stops signing and takes the key-signing key with it, deactivating it first,
+because an active key cannot be deleted.
+
 ## CloudFormation Hosted Zones
 
 Sim CloudFormation can create Route53 Hosted Zones from `AWS::Route53::HostedZone`.
@@ -1273,8 +1427,12 @@ Sim Route53 currently supports:
 - A browser-viewable hosted zone and record summary at `dns.sim-aws.localhost`
 - DNS answers over UDP for `A`, `AAAA`, `CNAME`, `TXT`, `NS` and `SOA`, so those records can be
   queried with `dig` or any DNS client
+- `CreateKeySigningKeyCommand`, `ActivateKeySigningKeyCommand`,
+  `DeactivateKeySigningKeyCommand`, `DeleteKeySigningKeyCommand`,
+  `EnableHostedZoneDNSSECCommand`, `DisableHostedZoneDNSSECCommand` and `GetDNSSECCommand`
 - The `AWS::Route53::HostedZone` and `AWS::Route53::RecordSet` CloudFormation resources, with a
   RecordSet declaring an unstored record type skipped rather than failing the stack
+- The `AWS::Route53::KeySigningKey` and `AWS::Route53::DNSSEC` CloudFormation resources
 - CDK-created Route53 Hosted Zones and records in synthesized templates
 
 The simulator focuses on useful behaviour for tests and local development rather than full Route53
@@ -1293,3 +1451,15 @@ Where sim Route53 knowingly behaves differently from AWS:
 - **The name of such a zone is a guess.** Nothing in a synthesized template says what a looked-up
   zone is called, so the name is inferred from the records that reference it and is only as specific
   as they are. Register the zone yourself when a test depends on its name.
+- **A signed zone is signed on paper only.** No RRSIG records are produced, no DNSKEY records are
+  added to the zone, and a query answered over UDP is unsigned whatever `GetDNSSEC` says. Signing is
+  observable through `GetDNSSEC`, which is where the key-signing keys and the DS record fields are.
+  Sim Route53 is not a general DNS server, and an RRSIG needs canonical RRset ordering and
+  wire-format signing that nothing here would read back.
+- **A key-signing key does not rotate, and a zone never reports trouble.** `ACTIVE` and `INACTIVE`
+  are the only key statuses, and `SIGNING` and `NOT_SIGNING` the only zone statuses. Real Route53
+  also has `DELETING`, `ACTION_NEEDED` and `INTERNAL_FAILURE`, which describe a key mid-operation or
+  a zone that needs attention, and nothing here produces either.
+- **DNSSEC needs KMS wired to Route53.** A standalone `new SimRoute53()` has no simulated KMS to
+  resolve a key ARN against, so `CreateKeySigningKey` refuses. Reach Route53 through `SimAws` when a
+  test signs a zone.
