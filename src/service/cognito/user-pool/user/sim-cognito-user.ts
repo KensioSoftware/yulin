@@ -1,4 +1,5 @@
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
+import type { SimCognitoFederatedIdentity } from "../idp/sim-cognito-federated-identity.js";
 import { SimCognitoUserConfirmation } from "./sim-cognito-user-confirmation.js";
 import type {
   SimCognitoAttributeType,
@@ -20,6 +21,12 @@ interface SimCognitoUserProperties {
    * `UNCONFIRMED`.
    */
   readonly status?: SimCognitoUserStatus | undefined;
+
+  /**
+   * Where the user came from, for one the pool is creating because an external
+   * provider signed it in.
+   */
+  readonly identity?: SimCognitoFederatedIdentity | undefined;
   readonly clock: SimClock;
 }
 
@@ -43,6 +50,7 @@ export class SimCognitoUser {
   private readonly clock: SimClock;
   private readonly userAttributes: SimCognitoUserAttributes;
   private readonly confirmation: SimCognitoUserConfirmation;
+  private readonly federatedIdentity: SimCognitoFederatedIdentity | undefined;
   private userStatus: SimCognitoUserStatus;
   private userPassword: SimCognitoUserPassword | undefined;
   private isEnabled = true;
@@ -53,6 +61,7 @@ export class SimCognitoUser {
     this.sub = properties.sub;
     this.userAttributes = properties.attributes;
     this.userPassword = properties.password;
+    this.federatedIdentity = properties.identity;
     this.userStatus =
       properties.status ?? SimCognitoUserStatus.forceChangePassword;
     this.confirmation = new SimCognitoUserConfirmation(this.userStatus);
@@ -94,7 +103,22 @@ export class SimCognitoUser {
    * is where most code reads a user's identifier from.
    */
   get attributes(): readonly SimCognitoAttributeType[] {
-    return [{ Name: "sub", Value: this.sub }, ...this.userAttributes.entries];
+    return [
+      { Name: "sub", Value: this.sub },
+      ...this.identityAttribute(),
+      ...this.userAttributes.entries,
+    ];
+  }
+
+  /**
+   * Where this user came from, for one the pool created for a federated
+   * sign-in.
+   *
+   * Cognito allocates this in the same way it allocates `sub`, and a request
+   * cannot set it, so it lives on the user rather than among its attributes.
+   */
+  get identity(): SimCognitoFederatedIdentity | undefined {
+    return this.federatedIdentity;
   }
 
   /**
@@ -225,6 +249,20 @@ export class SimCognitoUser {
     this.userStatus = status;
     this.confirmation.settle(status);
     this.touch();
+  }
+
+  /**
+   * The `identities` attribute a federated user reports, which a local user
+   * does not have at all.
+   */
+  private identityAttribute(): readonly SimCognitoAttributeType[] {
+    if (this.federatedIdentity === undefined) {
+      return [];
+    }
+
+    return [
+      { Name: "identities", Value: this.federatedIdentity.toAttributeValue() },
+    ];
   }
 
   private touch(): void {

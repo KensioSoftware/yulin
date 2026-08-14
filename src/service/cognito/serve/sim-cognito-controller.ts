@@ -5,6 +5,7 @@ import type {
 } from "../../../serve/controller/sim-service-controller.js";
 import { SimAws } from "../../aws/sim-aws.js";
 import type { SimCognitoUserPool } from "../user-pool/sim-cognito-user-pool.js";
+import { SimCognitoDomainController } from "./sim-cognito-domain-controller.js";
 import { SimCognitoEndpointResponse } from "./sim-cognito-endpoint-response.js";
 import { SimCognitoOpenIdConfiguration } from "./sim-cognito-openid-configuration.js";
 
@@ -61,6 +62,10 @@ interface SimCognitoServedRequest {
  * Cognito serves nothing at. Nothing here delivers a message, so this is where
  * one is read during local development.
  *
+ * A pool's hosted domain is served too, on its own hostname rather than on the
+ * regional endpoint, and `SimCognitoDomainController` answers those requests.
+ * That is where the OAuth endpoints of an authorization code grant live.
+ *
  * The Cognito API itself is not served. An SDK client reaches the simulator
  * through `SimSdk` rather than through an endpoint override.
  */
@@ -68,17 +73,24 @@ export class SimCognitoServiceController implements SimAwsServiceController {
   private readonly simAws: SimAws;
   private readonly openIdConfiguration = new SimCognitoOpenIdConfiguration();
   private readonly response = new SimCognitoEndpointResponse();
+  private readonly domainController: SimCognitoDomainController;
 
   constructor(properties: SimCognitoServiceControllerProperties = {}) {
     const { simAws = new SimAws() } = properties;
     this.simAws = simAws;
+    this.domainController = new SimCognitoDomainController({ simAws });
   }
 
   /**
    * Handle an HTTP request routed to a simulated Cognito regional endpoint.
    */
-  handleRequest(serviceRequest: SimAwsServiceRequest): Promise<Response> {
-    return Promise.resolve(this.respond(serviceRequest));
+  async handleRequest(serviceRequest: SimAwsServiceRequest): Promise<Response> {
+    // A request that reached a hosted domain's hostname names that domain,
+    // where one to the regional endpoint names no resource at all.
+    const domainResponse =
+      await this.domainController.handleRequest(serviceRequest);
+
+    return domainResponse ?? this.respond(serviceRequest);
   }
 
   private respond(serviceRequest: SimAwsServiceRequest): Response {

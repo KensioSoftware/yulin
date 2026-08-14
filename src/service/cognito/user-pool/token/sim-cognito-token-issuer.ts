@@ -54,6 +54,12 @@ interface SimCognitoIssueTokensProperties {
    * from a challenge response and from nowhere else, as on real Cognito.
    */
   readonly clientMetadata?: Readonly<Record<string, string>> | undefined;
+
+  /**
+   * The scopes a hosted sign-in was granted, which reach the access token's
+   * `scope` claim. A sign-in through the API grants none of its own.
+   */
+  readonly scopes?: readonly string[] | undefined;
 }
 
 /**
@@ -115,6 +121,9 @@ export class SimCognitoTokenIssuer {
           issuedAt,
           client.tokenValidity.refreshToken.seconds,
         ),
+        // A hosted sign-in was granted scopes, and the tokens a refresh hands
+        // out later carry the same ones.
+        scopes: properties.scopes,
       }),
     );
 

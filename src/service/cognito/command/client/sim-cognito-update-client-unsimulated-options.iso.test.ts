@@ -26,44 +26,9 @@ interface RefusedInput {
 
 const refusedInputs: readonly RefusedInput[] = [
   {
-    label: "SupportedIdentityProviders",
-    input: { SupportedIdentityProviders: ["COGNITO", "Google"] },
-    says: "federated sign-in happens at the provider",
-  },
-  {
-    label: "AllowedOAuthFlowsUserPoolClient",
-    input: { AllowedOAuthFlowsUserPoolClient: true },
-    says: "the OAuth 2.0 authorization server endpoints",
-  },
-  {
     label: "EnableTokenRevocation",
     input: { EnableTokenRevocation: false },
     says: "token revocation",
-  },
-  {
-    label: "AllowedOAuthFlows",
-    input: { AllowedOAuthFlows: ["code"] },
-    says: "OAuth grants through managed login",
-  },
-  {
-    label: "AllowedOAuthScopes",
-    input: { AllowedOAuthScopes: ["openid"] },
-    says: "OAuth scopes",
-  },
-  {
-    label: "CallbackURLs",
-    input: { CallbackURLs: ["https://example.com"] },
-    says: "managed login redirects",
-  },
-  {
-    label: "LogoutURLs",
-    input: { LogoutURLs: ["https://example.com/out"] },
-    says: "managed login redirects",
-  },
-  {
-    label: "DefaultRedirectURI",
-    input: { DefaultRedirectURI: "https://example.com" },
-    says: "managed login redirects",
   },
   {
     label: "AnalyticsConfiguration",

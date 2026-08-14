@@ -9,6 +9,7 @@ import {
   assertNonNullable,
   assertObjectEquals,
   assertStringIncludes,
+  assertTrue,
   assertTypeString,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -17,6 +18,7 @@ import {
   deployFailure,
   simAwsInEuWest2,
 } from "../../../../test/cognito/cfn-deploy.js";
+import type { SimCognitoUserPoolClient } from "../user-pool/client/sim-cognito-user-pool-client.js";
 
 /**
  * The AWS::Cognito::UserPool and AWS::Cognito::UserPoolClient Resources
@@ -208,63 +210,45 @@ describe("Cognito CloudFormation defaults a CDK stack emits", () => {
     assertArrayEquals(described.UserPool.AutoVerifiedAttributes, ["email"]);
   });
 
-  it("refuses a client asking for the hosted UI flows", async () => {
-    // Given a template turning the managed login OAuth flows on, which the
-    // two accepted settings exist to turn off.
+  it("deploys a client with the hosted OAuth settings on", async () => {
+    // Given a template turning the authorization code grant on, with the
+    // callback URL and the identity provider that go with it.
     const simAws = simAwsInEuWest2();
 
     // When it is deployed.
-    const error = await deployFailure(simAws, {
-      AppPool: {
-        Type: "AWS::Cognito::UserPool",
-        Properties: { UserPoolName: "myapp-users" },
-      },
-      AppClient: {
-        Type: "AWS::Cognito::UserPoolClient",
-        Properties: {
-          UserPoolId: { Ref: "AppPool" },
-          ClientName: "web",
-          AllowedOAuthFlowsUserPoolClient: true,
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "cognito-stack",
+      template: {
+        Resources: {
+          AppPool: {
+            Type: "AWS::Cognito::UserPool",
+            Properties: { UserPoolName: "myapp-users" },
+          },
+          AppClient: {
+            Type: "AWS::Cognito::UserPoolClient",
+            Properties: {
+              UserPoolId: { Ref: "AppPool" },
+              ClientName: "web",
+              AllowedOAuthFlowsUserPoolClient: true,
+              AllowedOAuthFlows: ["code"],
+              AllowedOAuthScopes: ["openid", "email"],
+              CallbackURLs: ["https://www.example.com/user/callback"],
+              SupportedIdentityProviders: ["Google"],
+            },
+          },
         },
       },
     });
+    await stack.waitForDeployComplete();
 
-    // Then it is refused in the words CreateUserPoolClient already uses,
-    // rather than deploying a client offering flows nothing here can run.
-    assertStringIncludes(error.message, "AppClient");
-    assertStringIncludes(
-      error.message,
-      "CreateUserPoolClient AllowedOAuthFlowsUserPoolClient 'true' is not " +
-        "simulated",
-    );
-  });
-
-  it("refuses a client federating to another identity provider", async () => {
-    // Given a template naming a provider outside the pool.
-    const simAws = simAwsInEuWest2();
-
-    // When it is deployed.
-    const error = await deployFailure(simAws, {
-      AppPool: {
-        Type: "AWS::Cognito::UserPool",
-        Properties: { UserPoolName: "myapp-users" },
-      },
-      AppClient: {
-        Type: "AWS::Cognito::UserPoolClient",
-        Properties: {
-          UserPoolId: { Ref: "AppPool" },
-          ClientName: "web",
-          SupportedIdentityProviders: ["COGNITO", "Google"],
-        },
-      },
-    });
-
-    // Then it is refused, because federated sign-in happens at the provider
-    // rather than anywhere this simulation could stand in for.
-    assertStringIncludes(error.message, "AppClient");
-    assertStringIncludes(
-      error.message,
-      "federated sign-in happens at the provider",
-    );
+    // Then the client holds them, so an authorize request through the pool's
+    // domain can be checked against them.
+    const client = stack.getResource("AppClient")
+      ?.simResource as SimCognitoUserPoolClient;
+    assertTrue(client.oauth.allowsCodeGrant);
+    assertArrayEquals(client.oauth.callbackUrls.values, [
+      "https://www.example.com/user/callback",
+    ]);
+    assertArrayEquals(client.oauth.identityProviders, ["Google"]);
   });
 });

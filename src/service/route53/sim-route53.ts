@@ -1,3 +1,4 @@
+import type { SimAwsServiceHosts } from "../../serve/controller/host/sim-aws-service-hosts.js";
 import type { SimAwsServiceTarget } from "../../serve/controller/sim-service-controller.js";
 import { SimRoute53Resolver } from "./resolve/sim-route53-resolver.js";
 import { CreateHostedZoneCommandHandler } from "./command/create-hosted-zone/create-hosted-zone.handler.js";
@@ -59,6 +60,14 @@ interface SimRoute53Properties {
   readonly iam?: SimIamInterServiceAuthZ | undefined;
   readonly background?: BackgroundScheduler | undefined;
   readonly route53Registry?: SimRoute53Registry | undefined;
+
+  /**
+   * Where a hostname a simulated resource claimed for itself is looked up,
+   * such as a Cognito user pool custom domain. Resolution reaches those the
+   * same way it reaches the built-in service hostnames, so a browser sent to
+   * one arrives at the service holding it.
+   */
+  readonly serviceHosts?: SimAwsServiceHosts | undefined;
 }
 
 /**
@@ -91,6 +100,7 @@ export class SimRoute53 {
     this.route53Registry = route53Registry;
     this.resolver = new SimRoute53Resolver({
       hostedZones: this.route53Registry.hostedZones,
+      serviceHosts: properties.serviceHosts,
     });
   }
 

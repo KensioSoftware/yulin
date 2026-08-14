@@ -114,6 +114,9 @@ export class SimAwsServiceFactory {
       acmRegistry: this.registries.acm,
       cloudFrontRegistry: this.cloudFrontRegistry,
       route53Registry: this.registries.route53,
+      // A Cognito hosted domain answers on a hostname of its own, so DNS
+      // resolution asks the registry holding those domains about it.
+      serviceHosts: this.registries.cognitoDomains,
       iamRegistry: this.iamRegistry,
       accessKeyRegistry: this.requestAuth.accessKeyRegistry,
     });

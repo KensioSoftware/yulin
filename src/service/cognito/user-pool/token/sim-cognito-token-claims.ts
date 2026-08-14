@@ -1,8 +1,13 @@
 import type { SimCognitoUserPool } from "../sim-cognito-user-pool.js";
 import type { SimCognitoUserPoolClient } from "../client/sim-cognito-user-pool-client.js";
+import type { SimCognitoIdentityClaim } from "../idp/sim-cognito-federated-identity.js";
 import type { SimCognitoUser } from "../user/sim-cognito-user.js";
 
-export type SimCognitoClaimValue = string | number | readonly string[];
+export type SimCognitoClaimValue =
+  | string
+  | number
+  | readonly string[]
+  | readonly SimCognitoIdentityClaim[];
 
 /**
  * The claims of one token, in the shape they are signed in.
@@ -21,6 +26,15 @@ export interface SimCognitoTokenClaimsProperties {
    * A fresh id for this token, which becomes its `jti` claim.
    */
   readonly tokenId: string;
+
+  /**
+   * The scopes the sign-in was granted, which an access token carries.
+   *
+   * A sign-in through the API is granted the one scope that authorizes the
+   * pool's own self-service operations, and one through the hosted endpoints
+   * is granted what the authorize request asked its app client for.
+   */
+  readonly scopes?: readonly string[] | undefined;
 }
 
 function epochSeconds(instant: Date): number {

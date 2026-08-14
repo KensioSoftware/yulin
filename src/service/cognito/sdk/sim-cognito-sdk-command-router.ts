@@ -5,14 +5,16 @@ import type {
 import type { SimCognitoIdentityProvider } from "../sim-cognito-identity-provider.js";
 import { simCognitoSdkAuthRoutes } from "./sim-cognito-sdk-auth-routes.js";
 import { simCognitoSdkDirectoryRoutes } from "./sim-cognito-sdk-directory-routes.js";
+import { simCognitoSdkFederationRoutes } from "./sim-cognito-sdk-federation-routes.js";
 import { simCognitoSdkPoolRoutes } from "./sim-cognito-sdk-pool-routes.js";
 
 /**
  * Routes intercepted SDK Commands to one scoped simulated Cognito.
  *
  * The routes are grouped the way the operations themselves are, into pools and
- * their app clients, the users and groups in them, and signing in, so that
- * adding an operation touches the group it belongs to.
+ * their app clients, the users and groups in them, the domain and identity
+ * providers they federate through, and signing in, so that adding an operation
+ * touches the group it belongs to.
  */
 export class SimCognitoSdkCommandRouter implements SimSdkCommandRouter {
   private readonly routes: ReadonlyMap<string, SimSdkCommandRoute>;
@@ -22,6 +24,7 @@ export class SimCognitoSdkCommandRouter implements SimSdkCommandRouter {
       ...simCognitoSdkPoolRoutes(simCognito),
       ...simCognitoSdkDirectoryRoutes(simCognito),
       ...simCognitoSdkAuthRoutes(simCognito),
+      ...simCognitoSdkFederationRoutes(simCognito),
     ]);
   }
 

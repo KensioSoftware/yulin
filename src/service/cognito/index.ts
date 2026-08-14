@@ -37,6 +37,7 @@ export {
   type SimCognitoTokenValidityUnitsType,
 } from "./user-pool/client/sim-cognito-token-validity.js";
 export { SimCognitoUserDirectory } from "./sim-cognito-user-directory.js";
+export { SimCognitoFederation } from "./sim-cognito-federation.js";
 export { SimCognitoAuthentication } from "./sim-cognito-authentication.js";
 export { SimCognitoUser } from "./user-pool/user/sim-cognito-user.js";
 export { SimCognitoConfirmationCode } from "./user-pool/user/sim-cognito-confirmation-code.js";
@@ -49,6 +50,39 @@ export {
   SimCognitoUserAttributes,
   type SimCognitoAttributeType,
 } from "./user-pool/user/sim-cognito-user-attributes.js";
+export {
+  SimCognitoOAuthSettings,
+  type SimCognitoOAuthSettingsType,
+} from "./user-pool/client/sim-cognito-oauth-settings.js";
+export { SimCognitoUserPoolDomain } from "./user-pool/domain/sim-cognito-user-pool-domain.js";
+export { SimCognitoDomainName } from "./user-pool/domain/sim-cognito-domain-name.js";
+export {
+  SimCognitoCustomDomainConfig,
+  type SimCognitoCustomDomainConfigType,
+} from "./user-pool/domain/sim-cognito-custom-domain-config.js";
+export { SimCognitoUserPoolIdentityProvider } from "./user-pool/idp/sim-cognito-user-pool-identity-provider.js";
+export {
+  SimCognitoIdentityProviderSettings,
+  type SimCognitoIdentityProviderSettingsInput,
+} from "./user-pool/idp/sim-cognito-identity-provider-settings.js";
+export { SimCognitoProviderType } from "./user-pool/idp/sim-cognito-provider-type.js";
+export {
+  SimCognitoProviderDetails,
+  type SimCognitoProviderDetailsType,
+} from "./user-pool/idp/sim-cognito-provider-details.js";
+export {
+  SimCognitoAttributeMapping,
+  type SimCognitoAttributeMappingType,
+} from "./user-pool/idp/sim-cognito-attribute-mapping.js";
+export {
+  SimCognitoExternalUser,
+  type SimCognitoExternalUserType,
+} from "./user-pool/idp/sim-cognito-external-user.js";
+export {
+  SimCognitoFederatedIdentity,
+  type SimCognitoIdentityClaim,
+} from "./user-pool/idp/sim-cognito-federated-identity.js";
+export { SimCognitoAuthorizationCode } from "./user-pool/auth/sim-cognito-authorization-code.js";
 export { SimCognitoGroup } from "./user-pool/group/sim-cognito-group.js";
 export type { SimCognitoGroupName } from "./user-pool/group/sim-cognito-group-name.js";
 export {
@@ -75,7 +109,13 @@ export { SimCognitoAuthSession } from "./user-pool/auth/sim-cognito-auth-session
 export { SimCognitoIssuedToken } from "./user-pool/auth/sim-cognito-issued-token.js";
 export { SimCognitoPoolAuth } from "./user-pool/auth/sim-cognito-pool-auth.js";
 export {
+  isSimCognitoOAuthError,
+  SimCognitoOAuthError,
+  type SimCognitoOAuthErrorCode,
+} from "./error/sim-cognito-oauth.error.js";
+export {
   SimCognitoCodeMismatchException,
+  SimCognitoDuplicateProviderException,
   SimCognitoError,
   SimCognitoGroupExistsException,
   SimCognitoInvalidParameterException,

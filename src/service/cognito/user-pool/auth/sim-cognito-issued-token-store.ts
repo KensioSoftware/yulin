@@ -85,6 +85,23 @@ export class SimCognitoIssuedTokenStore {
   }
 
   /**
+   * Find a refresh token this pool issued and still holds.
+   *
+   * The hosted token endpoint reads one this way rather than through
+   * `requireRefreshToken`, because its refusal is an OAuth error rather than
+   * the API exception a `REFRESH_TOKEN_AUTH` request is answered with.
+   */
+  findRefreshToken(
+    value: string | undefined,
+  ): SimCognitoIssuedToken | undefined {
+    if (value === undefined) {
+      return undefined;
+    }
+
+    return this.refreshTokens.get(value);
+  }
+
+  /**
    * Find an access token this pool issued and still honours.
    *
    * A token from a signed-out session has been forgotten by then, so nothing

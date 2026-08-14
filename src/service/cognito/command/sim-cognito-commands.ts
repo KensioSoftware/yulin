@@ -9,7 +9,12 @@ import { SimCognitoPoolMessenger } from "../user-pool/message/sim-cognito-pool-m
 import type { SimCognitoTriggerFunctions } from "../user-pool/trigger/sim-cognito-trigger-functions.js";
 import { SimCognitoUserPoolTriggers } from "../user-pool/trigger/sim-cognito-user-pool-triggers.js";
 import { SimCognitoUserFactory } from "../user-pool/user/sim-cognito-user-factory.js";
+import type { SimCognitoDomainRegistry } from "../registry/sim-cognito-domain-registry.js";
+import { SimCognitoTokenIssuer } from "../user-pool/token/sim-cognito-token-issuer.js";
 import { SimCognitoAuthCommands } from "./auth/sim-cognito-auth-commands.js";
+import { SimCognitoDomainCommands } from "./domain/sim-cognito-domain-commands.js";
+import { SimCognitoHostedCommands } from "./hosted/sim-cognito-hosted-commands.js";
+import { SimCognitoIdentityProviderCommands } from "./idp/sim-cognito-identity-provider-commands.js";
 import { SimCognitoAuthResolver } from "./auth/sim-cognito-auth-resolver.js";
 import { SimCognitoAuthorizer } from "./authorize/sim-cognito-authorizer.js";
 import { SimCognitoListUserPoolClients } from "./client/sim-cognito-list-user-pool-clients.js";
@@ -30,6 +35,7 @@ interface SimCognitoCommandsProperties {
   readonly iam: SimIamInterServiceAuthZ;
   readonly clock: SimClock;
   readonly pools: SimCognitoUserPoolStore;
+  readonly domains: SimCognitoDomainRegistry;
   readonly triggerFunctions: SimCognitoTriggerFunctions;
 }
 
@@ -53,9 +59,12 @@ export class SimCognitoCommands {
   public readonly groupMembership: SimCognitoGroupMembershipCommands;
   public readonly listGroups: SimCognitoListGroups;
   public readonly auth: SimCognitoAuthCommands;
+  public readonly domains: SimCognitoDomainCommands;
+  public readonly identityProviders: SimCognitoIdentityProviderCommands;
+  public readonly hosted: SimCognitoHostedCommands;
 
   constructor(properties: SimCognitoCommandsProperties) {
-    const { accountRegionScope, iam, clock, pools, triggerFunctions } =
+    const { accountRegionScope, iam, clock, pools, domains, triggerFunctions } =
       properties;
     const authorizer = new SimCognitoAuthorizer({ iam, accountRegionScope });
     const resolver = new SimCognitoRequestResolver({ pools, authorizer });
@@ -69,6 +78,9 @@ export class SimCognitoCommands {
     // The messages a pool would have sent are recorded by the sign-up and user
     // commands alike, and both run the pool's CustomMessage trigger first.
     const messenger = new SimCognitoPoolMessenger({ triggers, clock });
+    // One token issuer serves the API sign-ins and the hosted endpoints, so a
+    // token is the same thing however the user reached it.
+    const tokenIssuer = new SimCognitoTokenIssuer({ clock, triggers });
 
     this.userPools = new SimCognitoUserPoolCommands({
       pools,
@@ -113,6 +125,25 @@ export class SimCognitoCommands {
       pools,
       clock,
       triggers,
+      tokenIssuer,
+    });
+    this.domains = new SimCognitoDomainCommands({
+      pools,
+      domains,
+      authorizer,
+      accountRegionScope,
+    });
+    this.identityProviders = new SimCognitoIdentityProviderCommands({
+      resolver,
+      clock,
+    });
+    // The hosted endpoints issue the same tokens the API sign-ins issue, and
+    // create pool users the same way a sign-up does, so they are given the
+    // same collaborators rather than ones of their own.
+    this.hosted = new SimCognitoHostedCommands({
+      tokenIssuer,
+      userFactory,
+      clock,
     });
   }
 }

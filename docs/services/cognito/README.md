@@ -1141,6 +1141,227 @@ try {
 }
 ```
 
+## Signing in through a hosted domain
+
+A pool with a domain serves the OAuth endpoints an authorization code grant runs through, on the
+domain's own hostname. That is the only way a user signs in with Google or another external
+provider: there is no Cognito API operation that does it, so an application redirects the browser to
+the authorize endpoint and exchanges the code it comes back with.
+
+Three things have to be in place. The pool needs a domain, the app client needs the OAuth settings
+that say what it may ask for and where the user may be sent back to, and the provider itself has to
+be configured.
+
+```typescript sim-cognito-hosted-domain
+/**
+ * Giving a pool a domain, an identity provider and an app client that can use
+ * them.
+ */
+
+import {
+  CreateIdentityProviderCommand,
+  CreateUserPoolClientCommand,
+  CreateUserPoolCommand,
+  CreateUserPoolDomainCommand,
+  DescribeUserPoolDomainCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
+const cognito = simAws.cognitoIdentityProvider();
+
+const pool = await cognito.createUserPool(
+  new CreateUserPoolCommand({ PoolName: "myapp-users" }),
+);
+const userPoolId = pool.UserPool!.Id!;
+
+await cognito.createUserPoolDomain(
+  new CreateUserPoolDomainCommand({
+    UserPoolId: userPoolId,
+    Domain: "myapp-login",
+  }),
+);
+
+await cognito.createIdentityProvider(
+  new CreateIdentityProviderCommand({
+    UserPoolId: userPoolId,
+    ProviderName: "Google",
+    ProviderType: "Google",
+    ProviderDetails: {
+      client_id: "google-client-id",
+      client_secret: "google-client-secret",
+      authorize_scopes: "openid email",
+    },
+    AttributeMapping: { email: "email", given_name: "given_name" },
+  }),
+);
+
+const appClient = await cognito.createUserPoolClient(
+  new CreateUserPoolClientCommand({
+    UserPoolId: userPoolId,
+    ClientName: "web",
+    GenerateSecret: true,
+    AllowedOAuthFlowsUserPoolClient: true,
+    AllowedOAuthFlows: ["code"],
+    AllowedOAuthScopes: ["openid", "email"],
+    CallbackURLs: ["https://www.example.com/user/callback"],
+    LogoutURLs: ["https://www.example.com/"],
+    SupportedIdentityProviders: ["Google"],
+  }),
+);
+console.log(appClient.UserPoolClient!.ClientId);
+
+const domain = await cognito.describeUserPoolDomain(
+  new DescribeUserPoolDomainCommand({ Domain: "myapp-login" }),
+);
+console.log(domain.DomainDescription!.Status); // "ACTIVE"
+```
+
+A prefix domain is served at `<prefix>.auth.<region>.amazoncognito.com`, and a custom domain, which
+is one created with a `CustomDomainConfig`, at the hostname it names. A pool has one domain, and a
+domain string is unique across every simulated account and region, as it is across the whole of real
+AWS.
+
+### Who is signed in at the provider
+
+Nothing here calls Google. A simulated identity provider holds the user signed in at it instead, and
+an authorize request naming that provider signs that user in. The URL the application builds is
+therefore the URL it builds in production, and the test says who is at the other end of it:
+
+```typescript sim-cognito-federated-user
+/**
+ * Saying who is signed in at a simulated identity provider.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws({ defaultRegionName: "eu-west-2" });
+const cognito = simAws.cognitoIdentityProvider();
+
+declare const userPoolId: string;
+
+cognito
+  .userPool(userPoolId)
+  .auth.identityProviders.require("Google")
+  .signInAs({
+    Subject: "108412093487519382745",
+    Claims: { email: "someone@example.com", given_name: "Someone" },
+  });
+```
+
+`signInAs` stands in for everything that happens at the provider, which is where a real user types a
+password this simulation never sees. An authorize request that reaches a provider nobody is signed
+in at is refused, saying so, rather than signing in a user nothing put there. `signOut()` on the
+provider puts it back that way.
+
+### Driving the code flow
+
+The browser goes to `/oauth2/authorize`, comes back to the app client's callback URL with a code,
+and the application's own server exchanges that code at `/oauth2/token`. Both endpoints are on the
+domain's hostname, and `SimAwsHttp` sends a request into the simulation without a server listening.
+A domain answers on the real AWS hostname as well as on the localhost one `serveSimAws` rewrites it
+to, so the URL an application already builds needs no changing:
+
+```typescript sim-cognito-hosted-sign-in
+/**
+ * Completing an authorization code grant against a simulated hosted domain.
+ */
+
+import { CognitoJwtVerifier } from "aws-jwt-verify";
+
+import type { SimAws } from "@kensio/yulin";
+import { SimAwsHttp } from "@kensio/yulin/serve";
+
+declare const simAws: SimAws;
+declare const userPoolId: string;
+declare const clientId: string;
+declare const clientSecret: string;
+
+const http = new SimAwsHttp({ simAws });
+const callbackUrl = "https://www.example.com/user/callback";
+const hosted = (path: string, query = ""): string =>
+  `https://myapp-login.auth.eu-west-2.amazoncognito.com${path}${query}`;
+
+// The browser is sent to the authorize endpoint, naming the provider.
+const authorizeQuery = new URLSearchParams({
+  response_type: "code",
+  client_id: clientId,
+  redirect_uri: callbackUrl,
+  scope: "openid email",
+  state: "csrf-token",
+  identity_provider: "Google",
+});
+const authorized = await http.fetch(
+  hosted("/oauth2/authorize", `?${authorizeQuery.toString()}`),
+);
+
+console.log(authorized.status); // 302
+
+// It comes back to the callback URL with a code and the state it was given.
+const callback = new URL(authorized.headers.get("location")!);
+const code = callback.searchParams.get("code")!;
+console.log(callback.searchParams.get("state")); // "csrf-token"
+
+// The application's own server exchanges the code, authenticating as the app
+// client with its secret.
+const exchanged = await http.fetch(hosted("/oauth2/token"), {
+  method: "POST",
+  headers: {
+    "content-type": "application/x-www-form-urlencoded",
+    authorization: `Basic ${Buffer.from(`${clientId}:${clientSecret}`).toString("base64")}`,
+  },
+  body: new URLSearchParams({
+    grant_type: "authorization_code",
+    code,
+    redirect_uri: callbackUrl,
+  }).toString(),
+});
+
+const tokens = (await exchanged.json()) as {
+  access_token: string;
+  id_token: string;
+  refresh_token: string;
+  expires_in: number;
+};
+
+const verifier = CognitoJwtVerifier.create({
+  userPoolId,
+  tokenUse: "id",
+  clientId,
+});
+verifier.cacheJwks(
+  simAws.cognitoIdentityProvider().userPool(userPoolId).jwks(),
+);
+
+const claims = await verifier.verify(tokens.id_token);
+console.log(claims["cognito:username"]); // "Google_108412093487519382745"
+console.log(claims["email"]); // "someone@example.com"
+```
+
+The pool creates a user of its own for each external subject the first time it signs in, exactly as
+real Cognito does: the username is the provider name and the subject with an underscore between
+them, the status is `EXTERNAL_PROVIDER`, and the provider's claims reach the user through the
+provider's attribute mapping. The same subject signing in again reaches the same user, with its
+mapped attributes brought up to date. `AdminGetUser` reports where it came from in an `identities`
+attribute, and the id token carries the same thing as an `identities` claim.
+
+An authorization code is single use and lasts five minutes on the simulated clock. The token
+endpoint also answers a `grant_type` of `refresh_token`, with the refresh token the grant handed
+out.
+
+### Signing out
+
+`GET /logout?client_id=...&logout_uri=...` redirects to the sign-out URL, once it has checked it is
+one of the app client's `LogoutURLs`. It ends no session, because there is no managed login cookie
+here: every authorize request signs in afresh at the identity provider. `GlobalSignOut` and
+`AdminUserGlobalSignOut` are what revoke a user's tokens.
+
+### PKCE
+
+An authorize request carrying a `code_challenge` and a `code_challenge_method` of `S256` gets a code
+that only the matching `code_verifier` exchanges. `plain` is refused, as it is by real Cognito.
+
 ## Lambda triggers
 
 A pool created with a `LambdaConfig` runs the functions it names as part of a sign-up, a sign-in or
@@ -2029,10 +2250,16 @@ The properties each type reads are the ones this simulation models:
   as `CreateUserPool` refuses them.
 - `AWS::Cognito::UserPoolClient`: `UserPoolId`, `ClientName`, `GenerateSecret`, `ExplicitAuthFlows`,
   `PreventUserExistenceErrors`, `AccessTokenValidity`, `IdTokenValidity`, `RefreshTokenValidity`,
-  `TokenValidityUnits`, `AllowedOAuthFlowsUserPoolClient` and `SupportedIdentityProviders`. The last
-  two are accepted at the values that turn managed login off.
+  `TokenValidityUnits`, `AllowedOAuthFlowsUserPoolClient`, `AllowedOAuthFlows`,
+  `AllowedOAuthScopes`, `CallbackURLs`, `LogoutURLs`, `DefaultRedirectURI` and
+  `SupportedIdentityProviders`.
 - `AWS::Cognito::UserPoolGroup`: `UserPoolId`, `GroupName`, `Description`, `Precedence` and
   `RoleArn`.
+- `AWS::Cognito::UserPoolDomain`: `UserPoolId`, `Domain`, `CustomDomainConfig` and
+  `ManagedLoginVersion`. `Ref` returns the domain string, and `Fn::GetAtt CloudFrontDistribution`
+  the distribution name, which only a custom domain has.
+- `AWS::Cognito::UserPoolIdentityProvider`: `UserPoolId`, `ProviderName`, `ProviderType`,
+  `ProviderDetails`, `AttributeMapping` and `IdpIdentifiers`. `Ref` returns the provider name.
 
 Any other property is left out of what is created and recorded in
 [`stack.ignoredProperties`](../cloudformation/README.md#properties-a-resource-was-created-without),
@@ -2457,9 +2684,23 @@ Sim Cognito currently supports:
   pool verifies them unchanged
 - A pool's `.well-known/jwks.json` and `.well-known/openid-configuration` served over HTTP by
   `serveSimAws`, anonymously, so a verifier fetches the keys rather than being handed them
-- `AWS::Cognito::UserPool`, `AWS::Cognito::UserPoolClient` and `AWS::Cognito::UserPoolGroup`
-  deployed from a CloudFormation template, with the `Ref` and `Fn::GetAtt` values real
-  CloudFormation returns
+- `CreateUserPoolDomainCommand`, `DescribeUserPoolDomainCommand` and
+  `DeleteUserPoolDomainCommand`, for a Cognito prefix domain and for a custom domain
+- `CreateIdentityProviderCommand`, `DescribeIdentityProviderCommand`,
+  `UpdateIdentityProviderCommand`, `DeleteIdentityProviderCommand` and
+  `ListIdentityProvidersCommand`
+- The `/oauth2/authorize`, `/oauth2/token` and `/logout` endpoints of a pool's domain, served on the
+  domain's own hostname, for an authorization code grant through an external identity provider,
+  with PKCE and with a `refresh_token` grant
+- The pool user a federated sign-in creates, named `<ProviderName>_<subject>`, in the
+  `EXTERNAL_PROVIDER` status, carrying the `identities` attribute and claim and the attributes the
+  provider's `AttributeMapping` named
+- App client OAuth settings: `AllowedOAuthFlowsUserPoolClient`, `AllowedOAuthFlows`,
+  `AllowedOAuthScopes`, `CallbackURLs`, `LogoutURLs`, `DefaultRedirectURI` and
+  `SupportedIdentityProviders`, each of which an authorize or token request is checked against
+- `AWS::Cognito::UserPool`, `AWS::Cognito::UserPoolClient`, `AWS::Cognito::UserPoolGroup`,
+  `AWS::Cognito::UserPoolDomain` and `AWS::Cognito::UserPoolIdentityProvider` deployed from a
+  CloudFormation template, with the `Ref` and `Fn::GetAtt` values real CloudFormation returns
 - Pool ids in the real `<region>_<nine characters>` form, and pool ARNs built from them
 - The real default password policy, applied to the passwords users are given
 - The real user status lifecycle, so an admin-created user stays in `FORCE_CHANGE_PASSWORD` until it
@@ -2609,7 +2850,8 @@ Current documented limitations:
   refused when the pool is created or updated, naming the trigger, because a pool that accepted one
   would never call the function the template named. The custom challenge triggers would need a
   challenge loop this simulation does not have, and the migration and federation triggers have no
-  external directory to reach.
+  external directory to reach: a simulated identity provider answers with the user `signInAs` put
+  there rather than with anything a trigger could change.
 - `AdminCreateUser` does not fire `PostConfirmation`, here or on real Cognito. It is the tempting
   place to hang the trigger and the wrong one: a project relying on it would pass here and write
   nothing in production.
@@ -2618,8 +2860,8 @@ Current documented limitations:
 - A `PreSignUp` handler asking to verify an attribute the sign-up did not carry refuses the sign-up
   with `InvalidParameterException`. Real Cognito refuses it too, and what it names the error has not
   been checked against a live account.
-- `PreSignUp_ExternalProvider` is not reached either. Federated sign-in is not simulated, so no user
-  ever arrives from an identity provider.
+- `PreSignUp_ExternalProvider` is not reached either. A federated sign-in creates the pool's user
+  directly rather than through the sign-up path a trigger hangs off.
 - A `PostConfirmation` or `PostAuthentication` handler that throws fails the request, and what it
   ran after is not undone: a confirmed user stays confirmed and the tokens a pool issued stay
   issued, as they do on real Cognito.
@@ -2667,40 +2909,70 @@ Current documented limitations:
 - `UsernameAttributes` is worth calling out among those. A pool that signs users in by email or phone
   number stores a generated UUID as the username, so a pool created here without that would answer
   with the wrong username and the right one on real AWS.
-- Unsimulated `CreateUserPoolClient` inputs are refused the same way: the OAuth and managed login
-  settings (`AllowedOAuthFlows`, `AllowedOAuthScopes`, `CallbackURLs`, `LogoutURLs`,
-  `DefaultRedirectURI`, and an `AllowedOAuthFlowsUserPoolClient` of `true`), a
-  `SupportedIdentityProviders` naming anything but `COGNITO`, a `ClientSecret` of your own,
+- Unsimulated `CreateUserPoolClient` inputs are refused the same way: a `ClientSecret` of your own,
   `AnalyticsConfiguration`, `AuthSessionValidity`, `EnablePropagateAdditionalUserContextData`,
   `RefreshTokenRotation`, `ReadAttributes`, `WriteAttributes`, and an `EnableTokenRevocation` of
   `false`. `UpdateUserPoolClient` refuses the same inputs, in the same words.
-- An `AllowedOAuthFlowsUserPoolClient` of `false`, and a `SupportedIdentityProviders` of
-  `["COGNITO"]`, are accepted and change nothing, because both say the client wants the pool's own
-  users and nothing else, which is all there is here. `DescribeUserPoolClient` reports them back.
+- The OAuth settings need `AllowedOAuthFlowsUserPoolClient` to be true before they can be set, as
+  they do on real Cognito. `AllowedOAuthFlows` takes `code` alone: `implicit` hands tokens to the
+  browser, and `client_credentials` needs the resource servers that define its scopes, so both are
+  refused. `AllowedOAuthScopes` takes the system scopes, and a custom scope is refused for the same
+  reason.
 - Unsimulated authentication inputs are refused the same way: `AnalyticsMetadata` on all four
   operations, `ContextData` on the admin ones, `UserContextData` on the client ones, and a `Session`
   on `InitiateAuth` or `AdminInitiateAuth`, which continues a flow neither of them starts.
 - A pool does not report `SchemaAttributes`. Real Cognito reports the standard attribute schema on
   every pool, and there are no user attributes here to describe.
-- Managed login and the hosted UI are not simulated, and neither are the OAuth endpoints, the
-  `/oauth2/token` endpoint among them.
-- The served OpenID configuration therefore carries no `authorization_endpoint`, `token_endpoint` or
-  `userinfo_endpoint`, where real Cognito names all three. A client that needs one of them finds
-  nothing rather than an address that would not answer.
+- Managed login and the classic hosted UI are pages a person fills in, and are not simulated. An
+  authorize request naming no `identity_provider`, or naming `COGNITO`, would reach one of those
+  pages on real Cognito and is refused here with a message saying so. The pool's own users sign in
+  through `InitiateAuth` and `AdminInitiateAuth`, which are simulated. `/login`, `/signup`,
+  `/oauth2/userInfo`, `/oauth2/revoke`, `/oauth2/idpresponse` and the SAML endpoints are not served.
+- The implicit grant is refused, and so is the client credentials grant, which needs resource
+  servers.
+- The served OpenID configuration names its `authorization_endpoint`, `token_endpoint` and
+  `end_session_endpoint` once the pool has a domain, at that domain's local hostname. It carries no
+  `userinfo_endpoint`, where real Cognito names one.
+- Nothing calls an external identity provider. A provider's `ProviderDetails` are recorded and
+  validated for presence, and never used: the user a simulated provider signs in is the one
+  `signInAs` put there. That accessor is a divergence for the same reason `confirmationCode` is one.
+- A custom domain answers on its own hostname with no Route53 record of its own, where real AWS
+  needs an alias record to the CloudFront distribution Cognito creates. The distribution name a
+  domain reports is a name nothing here serves.
+- `/logout` redirects and ends no session. There is no managed login session cookie here, because
+  every authorize request signs in afresh at the identity provider, so there is nothing for it to
+  end. It signs nobody out at the provider either, which real Cognito also does not do.
+- A pool does not create a group for each identity provider, where real Cognito creates one named
+  `<userPoolId>_<ProviderName>` and puts each federated user in it. A `cognito:groups` claim here
+  therefore names only the groups something added the user to.
+- A federated sign-in is refused with `UsernameExistsException` where the username it would take is
+  already a user of the pool's own. A username may hold an underscore, so `Google_1234` can be a
+  local user, and signing in as it would hand the application someone else's account.
+- `AdminLinkProviderForUser` is not implemented, so a federated user is never linked to a user that
+  was already in the pool, and the `identities` it carries always names one provider.
+- The `PreAuthentication`, `PostAuthentication` and migrate user triggers do not fire on a federated
+  sign-in.
+- A domain reports no `S3Bucket` or `Version`, both of which name parts of the machinery real
+  Cognito builds a domain out of. Its `Status` is `ACTIVE` as soon as it exists, where a real prefix
+  domain takes a minute and a custom domain up to an hour.
+- A custom domain's `CertificateArn` is required and recorded, and is not resolved against simulated
+  ACM. Nothing here terminates TLS.
+- A `SupportedIdentityProviders` naming a provider the pool does not have is accepted, and the
+  authorize request naming that provider is what refuses. Real Cognito checks the provider exists
+  when the app client is written.
 - The served `issuer` and `jwks_uri` name the localhost origin the request arrived on, so a client
   can fetch the keys they point at. A token's `iss` claim still names the real
   `https://cognito-idp.<region>.amazonaws.com/<userPoolId>`, so the two disagree here and agree on
   real Cognito.
-- Identity providers, resource servers, user pool domains, MFA configuration and risk configuration
-  are not simulated.
+- Resource servers, MFA configuration and risk configuration are not simulated.
 - Tags are not simulated. `UserPoolTags` is refused, and `TagResource`, `UntagResource` and
   `ListTagsForResource` are not implemented.
 - Listings carry no filtering, and are in creation order rather than any order real Cognito chooses.
-- Of the CloudFormation resource types, only `AWS::Cognito::UserPool`,
-  `AWS::Cognito::UserPoolClient` and `AWS::Cognito::UserPoolGroup` deploy. The others, including
-  `AWS::Cognito::UserPoolDomain`, `AWS::Cognito::UserPoolIdentityProvider`,
-  `AWS::Cognito::UserPoolUser` and everything under `AWS::Cognito::IdentityPool`, are reported as
-  unsupported and skipped rather than deployed.
+- Of the CloudFormation resource types, `AWS::Cognito::UserPool`, `AWS::Cognito::UserPoolClient`,
+  `AWS::Cognito::UserPoolGroup`, `AWS::Cognito::UserPoolDomain` and
+  `AWS::Cognito::UserPoolIdentityProvider` deploy. The others, including
+  `AWS::Cognito::UserPoolResourceServer`, `AWS::Cognito::UserPoolUser` and everything under
+  `AWS::Cognito::IdentityPool`, are reported as unsupported and skipped rather than deployed.
 - The Cognito API itself is not served as HTTP by `serveSimAws`, only the two public pool endpoints.
   A `CognitoIdentityProviderClient` reaches the simulator through `SimSdk` rather than through an
   endpoint override.

@@ -6,7 +6,8 @@ import {
 export type SimCognitoUserStatusValue =
   | "UNCONFIRMED"
   | "FORCE_CHANGE_PASSWORD"
-  | "CONFIRMED";
+  | "CONFIRMED"
+  | "EXTERNAL_PROVIDER";
 
 /**
  * The status of one simulated user.
@@ -16,9 +17,11 @@ export type SimCognitoUserStatusValue =
  * stops it signing in normally on real Cognito, and reaches `CONFIRMED` when an
  * admin sets a permanent password on it. A user that signed itself up with
  * `SignUp` starts in `UNCONFIRMED`, which is what stops that one signing in,
- * and reaches `CONFIRMED` through `ConfirmSignUp` or `AdminConfirmSignUp`. The
- * other real statuses (`RESET_REQUIRED`, `EXTERNAL_PROVIDER` and the rest)
- * belong to password resets and federation, neither of which is simulated.
+ * and reaches `CONFIRMED` through `ConfirmSignUp` or `AdminConfirmSignUp`. A
+ * user the pool created for a federated sign-in is `EXTERNAL_PROVIDER` and
+ * stays there, because its password is at the provider rather than in the
+ * pool. `RESET_REQUIRED` and the rest belong to password resets, which are not
+ * simulated.
  */
 export class SimCognitoUserStatus {
   /**
@@ -37,6 +40,17 @@ export class SimCognitoUserStatus {
    * The status a user with a password of its own reaches.
    */
   public static readonly confirmed = new SimCognitoUserStatus("CONFIRMED");
+
+  /**
+   * The status a user created by a federated sign-in stays in.
+   *
+   * Such a user has no password in the pool, so nothing moves it on: it signs
+   * in at its provider each time, and the pool's own sign-in flows refuse it,
+   * as they do on real Cognito.
+   */
+  public static readonly externalProvider = new SimCognitoUserStatus(
+    "EXTERNAL_PROVIDER",
+  );
 
   public readonly value: SimCognitoUserStatusValue;
 
