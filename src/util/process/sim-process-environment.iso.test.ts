@@ -1,6 +1,6 @@
 import { assertIdentical, assertUndefined } from "@kensio/smartass";
 import { describe, it } from "vitest";
-import { simLambdaProcessEnvironment } from "./sim-lambda-process-environment.js";
+import { simProcessEnvironment } from "./sim-process-environment.js";
 
 /**
  * Resolve after the given number of microtask-ish ticks, so a test can
@@ -18,7 +18,7 @@ describe("sim Lambda process env", () => {
     const variables = { TABLE_NAME: "widgets" };
 
     // When process.env is read inside the run.
-    const insideRun = await simLambdaProcessEnvironment.run(variables, () =>
+    const insideRun = await simProcessEnvironment.run(variables, () =>
       Promise.resolve(process.env["TABLE_NAME"]),
     );
 
@@ -29,7 +29,7 @@ describe("sim Lambda process env", () => {
 
   it("keeps the run's variables across an await", async () => {
     // Given a run that reads process.env on both sides of an await.
-    const read = await simLambdaProcessEnvironment.run(
+    const read = await simProcessEnvironment.run(
       { TABLE_NAME: "widgets" },
       async () => {
         const before = process.env["TABLE_NAME"];
@@ -49,7 +49,7 @@ describe("sim Lambda process env", () => {
 
     try {
       // When a run that does not declare it reads process.env.
-      const insideRun = await simLambdaProcessEnvironment.run({}, () =>
+      const insideRun = await simProcessEnvironment.run({}, () =>
         Promise.resolve(process.env["YULIN_HOST_ONLY"]),
       );
 
@@ -63,7 +63,7 @@ describe("sim Lambda process env", () => {
 
   it("keeps a write inside the run out of the host environment", async () => {
     // Given a run that writes to process.env, as function code may.
-    await simLambdaProcessEnvironment.run({}, () => {
+    await simProcessEnvironment.run({}, () => {
       process.env["YULIN_WRITTEN_IN_RUN"] = "written";
       return Promise.resolve();
     });
@@ -75,11 +75,11 @@ describe("sim Lambda process env", () => {
   it("isolates concurrent runs from each other", async () => {
     // Given two overlapping runs declaring the same variable name.
     const [first, second] = await Promise.all([
-      simLambdaProcessEnvironment.run({ TABLE_NAME: "widgets" }, async () => {
+      simProcessEnvironment.run({ TABLE_NAME: "widgets" }, async () => {
         await tick(6);
         return process.env["TABLE_NAME"];
       }),
-      simLambdaProcessEnvironment.run({ TABLE_NAME: "gadgets" }, async () => {
+      simProcessEnvironment.run({ TABLE_NAME: "gadgets" }, async () => {
         await tick(2);
         return process.env["TABLE_NAME"];
       }),
@@ -96,11 +96,11 @@ describe("sim Lambda process env", () => {
 
     try {
       // When the host variables are read from inside a run.
-      const hostValue = await simLambdaProcessEnvironment.run(
+      const hostValue = await simProcessEnvironment.run(
         { YULIN_HOST_LOOKUP: "run value" },
         () =>
           Promise.resolve(
-            simLambdaProcessEnvironment.hostVariables()["YULIN_HOST_LOOKUP"],
+            simProcessEnvironment.hostVariables()["YULIN_HOST_LOOKUP"],
           ),
       );
 
@@ -117,7 +117,7 @@ describe("sim Lambda process env", () => {
 
     try {
       // When a run replaces process.env wholesale, as function code may.
-      const insideRun = await simLambdaProcessEnvironment.run(
+      const insideRun = await simProcessEnvironment.run(
         { TABLE_NAME: "widgets" },
         () => {
           process.env = { REPLACED: "replaced" };
@@ -141,7 +141,7 @@ describe("sim Lambda process env", () => {
 
   it("keeps process.env assignable", async () => {
     // Given the patch is installed.
-    await simLambdaProcessEnvironment.run({}, () => Promise.resolve());
+    await simProcessEnvironment.run({}, () => Promise.resolve());
     const hostVariables = process.env;
 
     try {

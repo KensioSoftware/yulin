@@ -47,3 +47,23 @@ export type {
   SimRegisterTaskDefinitionCommandInput,
   SimRegisterTaskDefinitionCommandOutput,
 } from "./register-task-definition/register-task-definition.command.js";
+export type {
+  SimRunTaskCommand,
+  SimRunTaskCommandInput,
+  SimRunTaskCommandOutput,
+} from "./run-task/run-task.command.js";
+export type {
+  SimDescribeTasksCommand,
+  SimDescribeTasksCommandInput,
+  SimDescribeTasksCommandOutput,
+} from "./describe-tasks/describe-tasks.command.js";
+export type {
+  SimListTasksCommand,
+  SimListTasksCommandInput,
+  SimListTasksCommandOutput,
+} from "./list-tasks/list-tasks.command.js";
+export type {
+  SimStopTaskCommand,
+  SimStopTaskCommandInput,
+  SimStopTaskCommandOutput,
+} from "./stop-task/stop-task.command.js";

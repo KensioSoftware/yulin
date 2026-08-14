@@ -3,34 +3,50 @@ import {
   BackgroundTasks,
 } from "../../util/background/background.js";
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
+import type { SimAwsRunAsOwner } from "../aws/caller/sim-aws-run-as-context.js";
 import type { SimAwsAccountRegionScope } from "../aws/sim-aws-account-region-scope.js";
 import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
 import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
-import { SimEcsClusterArn } from "./cluster/sim-ecs-cluster-arn.js";
+import { SimEcsContainerBindings } from "./bind/sim-ecs-container-bindings.js";
+import type { SimEcsContainerBinding } from "./bind/sim-ecs-container-binding.type.js";
 import { SimEcsClusterStore } from "./cluster/sim-ecs-cluster-store.js";
 import { SimEcsAuthorizer } from "./command/authorize/sim-ecs-authorizer.js";
+import { SimEcsCommandContexts } from "./command/sim-ecs-command-contexts.js";
 import { CreateClusterCommandHandler } from "./command/create-cluster/create-cluster.handler.js";
 import { DeleteClusterCommandHandler } from "./command/delete-cluster/delete-cluster.handler.js";
 import { DeregisterTaskDefinitionCommandHandler } from "./command/deregister-task-definition/deregister-task-definition.handler.js";
 import { DescribeClustersCommandHandler } from "./command/describe-clusters/describe-clusters.handler.js";
 import { DescribeTaskDefinitionCommandHandler } from "./command/describe-task-definition/describe-task-definition.handler.js";
+import { DescribeTasksCommandHandler } from "./command/describe-tasks/describe-tasks.handler.js";
 import { ListClustersCommandHandler } from "./command/list-clusters/list-clusters.handler.js";
 import { ListTaskDefinitionFamiliesCommandHandler } from "./command/list-task-definition-families/list-task-definition-families.handler.js";
 import { ListTaskDefinitionsCommandHandler } from "./command/list-task-definitions/list-task-definitions.handler.js";
+import { ListTasksCommandHandler } from "./command/list-tasks/list-tasks.handler.js";
 import { RegisterTaskDefinitionCommandHandler } from "./command/register-task-definition/register-task-definition.handler.js";
+import { RunTaskCommandHandler } from "./command/run-task/run-task.handler.js";
+import { StopTaskCommandHandler } from "./command/stop-task/stop-task.handler.js";
 import type * as simEcsCommands from "./command/sim-ecs-command.types.js";
 import type { SimEcsRequestOptions } from "./command/sim-ecs-request-options.js";
 import { SimEcsSdkCommandRouter } from "./sdk/sim-ecs-sdk-command-router.js";
-import { SimEcsTaskDefinitionArn } from "./task-definition/sim-ecs-task-definition-arn.js";
+import { SimEcsTaskStore } from "./task/sim-ecs-task-store.js";
 import { SimEcsTaskDefinitionStore } from "./task-definition/sim-ecs-task-definition-store.js";
 
 interface SimEcsProperties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
+  /**
+   * Whose ambient caller a running task's task Role becomes.
+   *
+   * This is the owning SimAws instance when ECS was built through one, so a
+   * simulated AWS call a container makes is attributed to the task Role
+   * everywhere in that simulation. Simulated ECS built on its own is its own
+   * owner, which reaches nothing else.
+   */
+  readonly runAsOwner?: SimAwsRunAsOwner;
 }
 
 /**
@@ -40,12 +56,16 @@ interface SimEcsProperties {
  * are on real AWS: both ARNs name the region, and a cluster name is unique
  * within one account and region rather than globally.
  *
- * Nothing runs here yet. This is the state ECS holds, which is what everything
- * that will run reads from.
+ * A task runs the handlers bound to the containers its task definition
+ * declares. Nothing else runs: Yulin never looks inside a container image, so
+ * a container with no binding is recorded as not simulated rather than
+ * failing anything.
  */
 export class SimEcs {
   private readonly clusters = new SimEcsClusterStore();
   private readonly taskDefinitions = new SimEcsTaskDefinitionStore();
+  private readonly tasks = new SimEcsTaskStore();
+  private readonly bindings = new SimEcsContainerBindings();
 
   private readonly createClusterCommand: CreateClusterCommandHandler;
   private readonly describeClustersCommand: DescribeClustersCommandHandler;
@@ -56,6 +76,10 @@ export class SimEcs {
   private readonly describeTaskDefinitionCommand: DescribeTaskDefinitionCommandHandler;
   private readonly listTaskDefinitionsCommand: ListTaskDefinitionsCommandHandler;
   private readonly listTaskDefinitionFamiliesCommand: ListTaskDefinitionFamiliesCommandHandler;
+  private readonly runTaskCommand: RunTaskCommandHandler;
+  private readonly describeTasksCommand: DescribeTasksCommandHandler;
+  private readonly listTasksCommand: ListTasksCommandHandler;
+  private readonly stopTaskCommand: StopTaskCommandHandler;
   private readonly sdkRouter = new SimEcsSdkCommandRouter(this);
 
   constructor(properties: SimEcsProperties = {}) {
@@ -63,40 +87,41 @@ export class SimEcs {
       accountRegionScope = simAwsAccountRegionScopeFactory.make(),
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
+      runAsOwner = this,
     } = properties;
 
-    const authorizer = new SimEcsAuthorizer({ iam });
-    const clusterContext = {
-      clusters: this.clusters,
-      clusterArn: new SimEcsClusterArn(accountRegionScope),
-      authorizer,
-      background,
-    };
-    const taskDefinitionContext = {
-      taskDefinitions: this.taskDefinitions,
-      taskDefinitionArn: new SimEcsTaskDefinitionArn(accountRegionScope),
+    const contexts = new SimEcsCommandContexts({
       accountRegionScope,
-      authorizer,
+      authorizer: new SimEcsAuthorizer({ iam }),
       background,
-    };
+      runAsOwner,
+      clusters: this.clusters,
+      taskDefinitions: this.taskDefinitions,
+      tasks: this.tasks,
+      bindings: this.bindings,
+    });
+    const { cluster, taskDefinition, task } = contexts;
 
-    this.createClusterCommand = new CreateClusterCommandHandler(clusterContext);
-    this.describeClustersCommand = new DescribeClustersCommandHandler(
-      clusterContext,
-    );
-    this.deleteClusterCommand = new DeleteClusterCommandHandler(clusterContext);
-    this.listClustersCommand = new ListClustersCommandHandler(clusterContext);
+    this.runTaskCommand = new RunTaskCommandHandler(contexts.runTask);
+    this.describeTasksCommand = new DescribeTasksCommandHandler(task);
+    this.listTasksCommand = new ListTasksCommandHandler(task);
+    this.stopTaskCommand = new StopTaskCommandHandler(task);
+
+    this.createClusterCommand = new CreateClusterCommandHandler(cluster);
+    this.describeClustersCommand = new DescribeClustersCommandHandler(cluster);
+    this.deleteClusterCommand = new DeleteClusterCommandHandler(cluster);
+    this.listClustersCommand = new ListClustersCommandHandler(cluster);
     this.registerTaskDefinitionCommand =
-      new RegisterTaskDefinitionCommandHandler(taskDefinitionContext);
+      new RegisterTaskDefinitionCommandHandler(taskDefinition);
     this.deregisterTaskDefinitionCommand =
-      new DeregisterTaskDefinitionCommandHandler(taskDefinitionContext);
+      new DeregisterTaskDefinitionCommandHandler(taskDefinition);
     this.describeTaskDefinitionCommand =
-      new DescribeTaskDefinitionCommandHandler(taskDefinitionContext);
+      new DescribeTaskDefinitionCommandHandler(taskDefinition);
     this.listTaskDefinitionsCommand = new ListTaskDefinitionsCommandHandler(
-      taskDefinitionContext,
+      taskDefinition,
     );
     this.listTaskDefinitionFamiliesCommand =
-      new ListTaskDefinitionFamiliesCommandHandler(taskDefinitionContext);
+      new ListTaskDefinitionFamiliesCommandHandler(taskDefinition);
   }
 
   /**
@@ -190,6 +215,72 @@ export class SimEcs {
       command,
       options,
     );
+  }
+
+  /**
+   * Handle a RunTask Command from the SDK.
+   */
+  async runTask(
+    command: simEcsCommands.SimRunTaskCommand,
+    options?: SimEcsRequestOptions,
+  ): Promise<simEcsCommands.SimRunTaskCommandOutput> {
+    return await this.runTaskCommand.handle(command, options);
+  }
+
+  /**
+   * Handle a DescribeTasks Command from the SDK.
+   */
+  async describeTasks(
+    command: simEcsCommands.SimDescribeTasksCommand,
+    options?: SimEcsRequestOptions,
+  ): Promise<simEcsCommands.SimDescribeTasksCommandOutput> {
+    return await this.describeTasksCommand.handle(command, options);
+  }
+
+  /**
+   * Handle a ListTasks Command from the SDK.
+   */
+  async listTasks(
+    command: simEcsCommands.SimListTasksCommand,
+    options?: SimEcsRequestOptions,
+  ): Promise<simEcsCommands.SimListTasksCommandOutput> {
+    return await this.listTasksCommand.handle(command, options);
+  }
+
+  /**
+   * Handle a StopTask Command from the SDK.
+   */
+  async stopTask(
+    command: simEcsCommands.SimStopTaskCommand,
+    options?: SimEcsRequestOptions,
+  ): Promise<simEcsCommands.SimStopTaskCommandOutput> {
+    return await this.stopTaskCommand.handle(command, options);
+  }
+
+  /**
+   * Bind a real in-process handler to a container a task definition declares.
+   *
+   * The container is named either by its family and container name or by the
+   * repository its image comes from. A task run from that definition runs the
+   * bound handler in this process, with the container's environment variables
+   * and the task Role.
+   *
+   * ```typescript
+   * simAws.ecs().bindContainer({
+   *   family: "orders-worker",
+   *   containerName: "app",
+   *   run: async () => {
+   *     await processOutstandingOrders();
+   *   },
+   * });
+   * ```
+   *
+   * Bindings belong to the Account and Region they were made in, as the task
+   * definitions they target do, and can be made before or after the task
+   * definition is registered.
+   */
+  bindContainer(binding: SimEcsContainerBinding): void {
+    this.bindings.add(binding);
   }
 
   /**

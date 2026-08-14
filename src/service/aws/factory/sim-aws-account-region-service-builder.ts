@@ -16,6 +16,7 @@ import {
 import { SimCloudFormation } from "../../cloudformation/index.js";
 import { SimCognitoIdentityProvider } from "../../cognito/index.js";
 import { SimEcr } from "../../ecr/index.js";
+import { SimEcs } from "../../ecs/index.js";
 import { simAwsCognitoTriggerFunctions } from "../../cognito/user-pool/trigger/sim-aws-cognito-trigger-functions.js";
 import { SimEventBridge } from "../../eventbridge/index.js";
 import type { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
@@ -151,6 +152,17 @@ export class SimAwsAccountRegionServiceBuilder {
       accountRegionScope: scope.accountRegionScope,
       registry: this.registries.ecr,
     });
+  }
+
+  /**
+   * Create simulated ECS for an Account Region scope.
+   *
+   * It reaches this simulation because a running task's containers take its
+   * task Role as their ambient caller, so what they do is authorized across
+   * the whole of it rather than only in this scope.
+   */
+  createEcs(scope: SimAwsAccountRegionContainer): SimEcs {
+    return new SimEcs({ ...this.scoped(scope), runAsOwner: this.simAws });
   }
 
   /**

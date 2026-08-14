@@ -35,6 +35,20 @@ export class SimEcsContainerDefinitions {
   }
 
   /**
+   * The containers this task definition declares, in declaration order.
+   */
+  all(): readonly SimEcsContainerDefinition[] {
+    return this.containers;
+  }
+
+  /**
+   * Whether a container of this name is one of them.
+   */
+  has(name: string): boolean {
+    return this.containers.some((container) => container.name === name);
+  }
+
+  /**
    * These containers as a described task definition reports them.
    */
   toOutput(): readonly SimEcsContainerDefinitionType[] {

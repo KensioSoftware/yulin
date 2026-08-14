@@ -1,4 +1,4 @@
-import { simLambdaProcessEnvironment } from "./sim-lambda-process-environment.js";
+import { simProcessEnvironment } from "../../../../util/process/sim-process-environment.js";
 
 /**
  * The function details the AWS-provided runtime environment variables are
@@ -94,7 +94,7 @@ export class SimLambdaEnvironment {
       return await run();
     }
 
-    return await simLambdaProcessEnvironment.run(this.variables(), run);
+    return await simProcessEnvironment.run(this.variables(), run);
   }
 
   /**

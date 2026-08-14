@@ -4,11 +4,15 @@ import {
   DeregisterTaskDefinitionCommand,
   DescribeClustersCommand,
   DescribeTaskDefinitionCommand,
+  DescribeTasksCommand,
   ECSClient,
   ListClustersCommand,
   ListTaskDefinitionFamiliesCommand,
   ListTaskDefinitionsCommand,
+  ListTasksCommand,
   RegisterTaskDefinitionCommand,
+  RunTaskCommand,
+  StopTaskCommand,
 } from "@aws-sdk/client-ecs";
 import {
   assertArrayIncludesAll,
@@ -101,6 +105,43 @@ describe("ECS SDK interception", () => {
     assertIdentical(deleted.cluster?.status, "INACTIVE");
   });
 
+  it("routes the task operations to simulated ECS", async () => {
+    // Given an intercepted ECS SDK client with a cluster and a definition.
+    using simSdk = new SimSdk();
+    simSdk.intercept(ECSClient);
+
+    const ecs = new ECSClient({ region: "eu-west-2" });
+    await ecs.send(new CreateClusterCommand({ clusterName: "services" }));
+    await ecs.send(
+      new RegisterTaskDefinitionCommand({
+        family: "checkout",
+        containerDefinitions: [{ name: "app", image: "checkout:1" }],
+      }),
+    );
+
+    // When ordinary SDK code runs a task and asks about it.
+    const run = await ecs.send(
+      new RunTaskCommand({ cluster: "services", taskDefinition: "checkout" }),
+    );
+    const taskArn = run.tasks?.[0]?.taskArn ?? "";
+    const listed = await ecs.send(
+      new ListTasksCommand({ cluster: "services" }),
+    );
+    const stopped = await ecs.send(
+      new StopTaskCommand({ cluster: "services", task: taskArn }),
+    );
+    const described = await ecs.send(
+      new DescribeTasksCommand({ cluster: "services", tasks: [taskArn] }),
+    );
+
+    // Then each one is answered by the simulation.
+    assertArrayLength(listed.taskArns, 1);
+    assertIdentical(stopped.task?.desiredStatus, "STOPPED");
+    assertIdentical(described.tasks?.[0]?.taskArn, taskArn);
+
+    await simSdk.simAws.backgroundTasksComplete();
+  });
+
   it("supports every ECS operation this service simulates", () => {
     // Given simulated ECS.
     const simEcs = new SimEcs();
@@ -119,6 +160,10 @@ describe("ECS SDK interception", () => {
       DescribeTaskDefinitionCommand.name,
       ListTaskDefinitionsCommand.name,
       ListTaskDefinitionFamiliesCommand.name,
+      RunTaskCommand.name,
+      DescribeTasksCommand.name,
+      ListTasksCommand.name,
+      StopTaskCommand.name,
     ]);
   });
 
@@ -127,7 +172,7 @@ describe("ECS SDK interception", () => {
     const simEcs = new SimEcs();
 
     // When a command it does not handle is looked up.
-    const route = simEcs.sdkCommandRouter().route("RunTaskCommand");
+    const route = simEcs.sdkCommandRouter().route("CreateServiceCommand");
 
     // Then there is no route for it, so interception reports it as
     // unsupported rather than answering with nothing.

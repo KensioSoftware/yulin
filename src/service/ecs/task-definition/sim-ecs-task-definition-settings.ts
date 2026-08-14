@@ -123,6 +123,16 @@ export class SimEcsTaskDefinitionSettings {
   }
 
   /**
+   * The Role a task made from this definition attributes its AWS calls to.
+   *
+   * A definition declaring none leaves a running task unattributed, as a real
+   * task without a task role has no credentials of its own.
+   */
+  get taskRoleArn(): string | undefined {
+    return this.settings.taskRoleArn;
+  }
+
+  /**
    * These settings as a described task definition reports them.
    */
   toOutput(): SimEcsTaskDefinitionSettingsType {

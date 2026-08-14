@@ -195,7 +195,7 @@ variables and the declared ones can never collide, so neither set needs to win o
 Zip code needs nothing special: the vm context already owns its `process` object. A function backed
 by a real in-process handler is the harder case, because that handler is a closure over its own
 module scope and reads the host `process.env` like any other code in the test run.
-`sim-lambda-process-environment.ts` bridges that with `AsyncLocalStorage`: `process.env` is a plain
+`util/process/sim-process-environment.ts` bridges that with `AsyncLocalStorage`: `process.env` is a plain
 configurable data property on `process`, so it is redefined once as a getter that resolves to the
 current invocation's variables while one is set, and to the untouched host environment object
 otherwise. The store follows the invocation across `await` points and keeps concurrent invocations
@@ -204,7 +204,10 @@ apart, which swapping and restoring `process.env` around the handler call could 
 This is the only place the simulator patches a process global, so it is deliberately narrow. The
 patch is only installed when a function actually declares variables, it is inert whenever no
 invocation is running, and it is never removed, since removing it would be unsafe while another
-invocation is in flight and buys nothing.
+invocation is in flight and buys nothing. It lives under `util/` rather than here because simulated
+ECS applies a container's environment variables through the same object: two patches would each
+install a getter, and the second would capture whatever the first was reporting as its host
+environment.
 
 The limitation it cannot reach is a read that already happened: a handler module doing
 `const TABLE = process.env.TABLE_NAME` at module scope is evaluated when the test file imports it,

@@ -104,6 +104,16 @@ export class SimEcsContainerDefinition {
   }
 
   /**
+   * The environment variables this container declared.
+   *
+   * These are what a bound handler sees in `process.env` while the container
+   * runs, before any override the `RunTask` request made.
+   */
+  get environment(): readonly SimEcsKeyValuePair[] {
+    return this.declared.environment ?? [];
+  }
+
+  /**
    * This container as a described task definition reports it.
    */
   toOutput(): SimEcsContainerDefinitionType {
