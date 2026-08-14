@@ -24,6 +24,14 @@ const simulatedActionTypes = new Set(["forward", "fixed-response", "redirect"]);
 const redirectStatusCodes = new Set(["HTTP_301", "HTTP_302"]);
 
 /**
+ * The status codes real ELB takes on a fixed-response action.
+ *
+ * A 3XX is missing on purpose rather than by oversight: redirecting is the
+ * redirect action's job, and real ELB refuses one here.
+ */
+const fixedResponseStatusCodes = /^[245]\d\d$/u;
+
+/**
  * The target groups a forward action names, whichever form it names them in.
  */
 function forwardTargetGroupArns(input: SimElbV2ActionInput): readonly string[] {
@@ -54,14 +62,23 @@ export class SimElbV2Action {
   private readonly input: SimElbV2ActionInput;
 
   private constructor(input: SimElbV2ActionInput, type: string) {
-    this.input = input;
+    // Copied, so that a caller mutating the command input it sent cannot
+    // change where a listener or rule forwards afterwards. Real ELB reads the
+    // request off the wire, and nothing a caller does to its own objects
+    // reaches it.
+    this.input = structuredClone(input);
     this.type = type;
     this.order = input.Order;
     this.targetGroupArns = forwardTargetGroupArns(input);
   }
 
   /**
-   * Read the actions a request carries, refusing an empty or absent list.
+   * Read the actions a request carries, refusing a list ELB would not take.
+   *
+   * Real ELB takes exactly one routing action, last in the list, and the only
+   * thing that may come before it is an authentication action. None of those
+   * is simulated, so every action here is a routing action, and a list holding
+   * more than one names two places for the same request to go.
    */
   static readAll(
     actions: readonly SimElbV2ActionInput[] | undefined,
@@ -70,6 +87,14 @@ export class SimElbV2Action {
     if (actions === undefined || actions.length === 0) {
       throw new SimElbV2ValidationError(
         `${field} must hold at least one action`,
+      );
+    }
+
+    if (actions.length > 1) {
+      throw new SimElbV2ValidationError(
+        `${field} holds ${String(actions.length)} actions, and a listener or ` +
+          `rule takes one routing action. The authentication actions that can ` +
+          `precede it are not simulated.`,
       );
     }
 
@@ -140,10 +165,13 @@ export class SimElbV2Action {
   private validateFixedResponse(field: string): void {
     const statusCode = this.input.FixedResponseConfig?.StatusCode;
 
-    if (statusCode === undefined || !/^[2-5]\d\d$/u.test(statusCode)) {
+    if (
+      statusCode === undefined ||
+      !fixedResponseStatusCodes.test(statusCode)
+    ) {
       throw new SimElbV2ValidationError(
         `${field} fixed-response action requires a FixedResponseConfig ` +
-          `StatusCode between 200 and 599`,
+          `StatusCode of 2XX, 4XX or 5XX. A 3XX code is a redirect action.`,
       );
     }
   }

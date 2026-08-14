@@ -1,20 +1,55 @@
-import type { SimElbV2RuleConditionInput } from "../../command/rule/rule-condition.command.js";
+import type {
+  SimElbV2ConditionValues,
+  SimElbV2RuleConditionInput,
+} from "../../command/rule/rule-condition.command.js";
 import {
   SimElbV2UnsimulatedInputException,
   SimElbV2ValidationError,
 } from "../../error/sim-elbv2.error.js";
 
 /**
- * The condition fields an Application Load Balancer rule can be written on.
+ * The condition fields whose values are a plain list, and where each one keeps
+ * them.
+ *
+ * The field decides which configuration is read rather than the first one that
+ * happens to be there, so a `host-header` condition carrying only a
+ * `PathPatternConfig` has no values and is refused, as it is on real ELB.
  */
-const simulatedFields = new Set([
-  "host-header",
-  "path-pattern",
-  "http-header",
-  "http-request-method",
-  "query-string",
-  "source-ip",
+const valueFields = new Map<
+  string,
+  (input: SimElbV2RuleConditionInput) => SimElbV2ConditionValues | undefined
+>([
+  [
+    "host-header",
+    (input): SimElbV2ConditionValues | undefined => input.HostHeaderConfig,
+  ],
+  [
+    "path-pattern",
+    (input): SimElbV2ConditionValues | undefined => input.PathPatternConfig,
+  ],
+  [
+    "http-request-method",
+    (input): SimElbV2ConditionValues | undefined =>
+      input.HttpRequestMethodConfig,
+  ],
+  [
+    "source-ip",
+    (input): SimElbV2ConditionValues | undefined => input.SourceIpConfig,
+  ],
 ]);
+
+/**
+ * The condition fields carrying a shape of their own rather than a value list,
+ * each checked by its own rule.
+ */
+const shapedFields = new Set(["http-header", "query-string"]);
+
+/**
+ * Every condition field an Application Load Balancer rule can be written on.
+ */
+function simulatedFieldNames(): readonly string[] {
+  return [...valueFields.keys(), ...shapedFields];
+}
 
 /**
  * One condition on a simulated listener rule.
@@ -31,7 +66,10 @@ export class SimElbV2RuleCondition {
   private readonly input: SimElbV2RuleConditionInput;
 
   private constructor(input: SimElbV2RuleConditionInput, field: string) {
-    this.input = input;
+    // Copied, so that a caller mutating the command input it sent cannot
+    // change what a rule matches on afterwards. Real ELB reads the request off
+    // the wire, and nothing a caller does to its own objects reaches it.
+    this.input = structuredClone(input);
     this.field = field;
   }
 
@@ -60,10 +98,10 @@ export class SimElbV2RuleCondition {
       throw new SimElbV2ValidationError("Conditions member requires a Field");
     }
 
-    if (!simulatedFields.has(field)) {
+    if (!valueFields.has(field) && !shapedFields.has(field)) {
       throw new SimElbV2UnsimulatedInputException(
         `Condition field '${field}' is not simulated. Simulated fields are ` +
-          `${[...simulatedFields].join(", ")}.`,
+          `${simulatedFieldNames().join(", ")}.`,
       );
     }
 
@@ -82,21 +120,32 @@ export class SimElbV2RuleCondition {
   }
 
   private validate(): void {
+    const readValues = valueFields.get(this.field);
+
+    if (readValues === undefined) {
+      this.validateShapedField();
+      return;
+    }
+
+    if (
+      (this.input.Values ?? readValues(this.input)?.Values ?? []).length === 0
+    ) {
+      throw new SimElbV2ValidationError(
+        `A '${this.field}' condition requires at least one value`,
+      );
+    }
+  }
+
+  /**
+   * Check a field whose values are not a plain list against its own rule.
+   */
+  private validateShapedField(): void {
     if (this.field === "http-header") {
       this.validateHttpHeader();
       return;
     }
 
-    if (this.field === "query-string") {
-      this.validateQueryString();
-      return;
-    }
-
-    if (this.valueCount() === 0) {
-      throw new SimElbV2ValidationError(
-        `A '${this.field}' condition requires at least one value`,
-      );
-    }
+    this.validateQueryString();
   }
 
   private validateHttpHeader(): void {
@@ -123,19 +172,5 @@ export class SimElbV2RuleCondition {
           "least one key and value pair",
       );
     }
-  }
-
-  /**
-   * How many values this condition compares against, in either of the two
-   * forms ELB takes them in.
-   */
-  private valueCount(): number {
-    const configValues =
-      this.input.HostHeaderConfig ??
-      this.input.PathPatternConfig ??
-      this.input.HttpRequestMethodConfig ??
-      this.input.SourceIpConfig;
-
-    return (this.input.Values ?? configValues?.Values ?? []).length;
   }
 }

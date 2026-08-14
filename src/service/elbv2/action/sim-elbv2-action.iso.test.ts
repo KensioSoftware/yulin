@@ -76,6 +76,50 @@ describe("sim ELBv2 actions", () => {
     assertStringIncludes(empty.message, "at least one action");
   });
 
+  it("refuses a 3XX fixed response, which is a redirect action's job", () => {
+    // Given a fixed-response action carrying a redirect's status code.
+    const error = assertThrowsError(() => {
+      SimElbV2Action.read(
+        { Type: "fixed-response", FixedResponseConfig: { StatusCode: "302" } },
+        "Actions",
+      );
+    });
+
+    // Then it is refused, as real ELB takes only 2XX, 4XX and 5XX here.
+    assertInstanceOf(error, SimElbV2ValidationError);
+    assertStringIncludes(error.message, "redirect action");
+  });
+
+  it("refuses more than one action, since each one is a routing action", () => {
+    // Given two forward actions in one list.
+    const error = assertThrowsError(() => {
+      SimElbV2Action.readAll(
+        [
+          { Type: "forward", TargetGroupArn: targetGroupArn },
+          { Type: "forward", TargetGroupArn: targetGroupArn },
+        ],
+        "DefaultActions",
+      );
+    });
+
+    // Then it is refused: real ELB takes one routing action, and the
+    // authentication actions that could precede it are not simulated.
+    assertInstanceOf(error, SimElbV2ValidationError);
+    assertStringIncludes(error.message, "one routing action");
+  });
+
+  it("keeps what it stored when the caller mutates the input afterwards", () => {
+    // Given an action read from an object the caller still holds.
+    const input = { Type: "forward", TargetGroupArn: targetGroupArn };
+    const action = SimElbV2Action.read(input, "Actions");
+
+    // When the caller changes that object.
+    input.TargetGroupArn = "arn:aws:elasticloadbalancing:::targetgroup/other/1";
+
+    // Then the action still forwards where it was written to forward.
+    assertIdentical(action.view().TargetGroupArn, targetGroupArn);
+  });
+
   it("refuses an action type this simulation does not perform", () => {
     // Given an action with no type, and one that authenticates.
     const noType = assertThrowsError(() => {
@@ -120,10 +164,7 @@ describe("sim ELBv2 actions", () => {
 
     // Then each is refused when written rather than when a request arrives.
     assertStringIncludes(forward.message, "TargetGroupArn");
-    assertStringIncludes(
-      fixedResponse.message,
-      "StatusCode between 200 and 599",
-    );
+    assertStringIncludes(fixedResponse.message, "2XX, 4XX or 5XX");
     assertStringIncludes(redirect.message, "HTTP_301 or HTTP_302");
   });
 });

@@ -70,9 +70,7 @@ export class SimAwsAccountRegionContainer {
    * Get simulated ACM for this account and region.
    */
   acm(): SimAcm {
-    return this.memo.getOrCreate("acm", () =>
-      this.simAws.serviceFactory.createAcm(this),
-    );
+    return this.memo.getOrCreate("acm", () => this.factory.createAcm(this));
   }
 
   /**
@@ -80,7 +78,7 @@ export class SimAwsAccountRegionContainer {
    */
   apiGatewayV2(): SimApiGatewayV2 {
     return this.memo.getOrCreate("apiGatewayV2", () =>
-      this.simAws.serviceFactory.createApiGatewayV2(this),
+      this.factory.createApiGatewayV2(this),
     );
   }
 
@@ -89,7 +87,7 @@ export class SimAwsAccountRegionContainer {
    */
   cloudFormation(): SimCloudFormation {
     return this.memo.getOrCreate("cloudFormation", () =>
-      this.simAws.serviceFactory.createCloudFormation(this),
+      this.factory.createCloudFormation(this),
     );
   }
 
@@ -98,7 +96,7 @@ export class SimAwsAccountRegionContainer {
    */
   cloudFront(): SimCloudFront {
     return this.memo.getOrCreate("cloudFront", () =>
-      this.simAws.serviceFactory.createCloudFront(this),
+      this.factory.createCloudFront(this),
     );
   }
 
@@ -118,7 +116,7 @@ export class SimAwsAccountRegionContainer {
    */
   cognitoIdentityProvider(): SimCognitoIdentityProvider {
     return this.memo.getOrCreate("cognitoIdentityProvider", () =>
-      this.simAws.serviceFactory.createCognitoIdentityProvider(this),
+      this.factory.createCognitoIdentityProvider(this),
     );
   }
 
@@ -127,7 +125,7 @@ export class SimAwsAccountRegionContainer {
    */
   dynamoDb(): SimDynamoDatabase {
     return this.memo.getOrCreate("dynamoDb", () =>
-      this.simAws.serviceFactory.createDynamoDb(this),
+      this.factory.createDynamoDb(this),
     );
   }
 
@@ -146,9 +144,7 @@ export class SimAwsAccountRegionContainer {
    * Get simulated ECS for this account and region.
    */
   ecs(): SimEcs {
-    return this.memo.getOrCreate("ecs", () =>
-      this.simAws.serviceFactory.createEcs(this),
-    );
+    return this.memo.getOrCreate("ecs", () => this.factory.createEcs(this));
   }
 
   /**
@@ -156,7 +152,7 @@ export class SimAwsAccountRegionContainer {
    */
   eventBridge(): SimEventBridge {
     return this.memo.getOrCreate("eventBridge", () =>
-      this.simAws.serviceFactory.createEventBridge(this),
+      this.factory.createEventBridge(this),
     );
   }
 
@@ -165,7 +161,7 @@ export class SimAwsAccountRegionContainer {
    */
   scheduler(): SimScheduler {
     return this.memo.getOrCreate("scheduler", () =>
-      this.simAws.serviceFactory.createScheduler(this),
+      this.factory.createScheduler(this),
     );
   }
 
@@ -173,27 +169,21 @@ export class SimAwsAccountRegionContainer {
    * Get simulated Elastic Load Balancing v2 for this account and region.
    */
   elbV2(): SimElbV2 {
-    return this.memo.getOrCreate("elbV2", () =>
-      this.simAws.serviceFactory.createElbV2(this),
-    );
+    return this.memo.getOrCreate("elbV2", () => this.factory.createElbV2(this));
   }
 
   /**
    * Get simulated IAM for this account.
    */
   iam(): SimIam {
-    return this.memo.getOrCreate("iam", () =>
-      this.simAws.serviceFactory.createIam(this),
-    );
+    return this.memo.getOrCreate("iam", () => this.factory.createIam(this));
   }
 
   /**
    * Get simulated KMS for this account and region.
    */
   kms(): SimKms {
-    return this.memo.getOrCreate("kms", () =>
-      this.simAws.serviceFactory.createKms(this),
-    );
+    return this.memo.getOrCreate("kms", () => this.factory.createKms(this));
   }
 
   /**
@@ -201,7 +191,7 @@ export class SimAwsAccountRegionContainer {
    */
   lambda(): SimLambda {
     return this.memo.getOrCreate("lambda", () =>
-      this.simAws.serviceFactory.createLambda(this),
+      this.factory.createLambda(this),
     );
   }
 
@@ -210,7 +200,7 @@ export class SimAwsAccountRegionContainer {
    */
   rekognition(): SimRekognition {
     return this.memo.getOrCreate("rekognition", () =>
-      this.simAws.serviceFactory.createRekognition(this),
+      this.factory.createRekognition(this),
     );
   }
 
@@ -219,7 +209,7 @@ export class SimAwsAccountRegionContainer {
    */
   route53(): SimRoute53 {
     return this.memo.getOrCreate("route53", () =>
-      this.simAws.serviceFactory.createRoute53(this),
+      this.factory.createRoute53(this),
     );
   }
 
@@ -227,9 +217,7 @@ export class SimAwsAccountRegionContainer {
    * Get simulated S3 for this account and region.
    */
   s3(): SimS3 {
-    return this.memo.getOrCreate("s3", () =>
-      this.simAws.serviceFactory.createS3(this),
-    );
+    return this.memo.getOrCreate("s3", () => this.factory.createS3(this));
   }
 
   /**
@@ -237,7 +225,7 @@ export class SimAwsAccountRegionContainer {
    */
   secretsManager(): SimSecretsManager {
     return this.memo.getOrCreate("secretsManager", () =>
-      this.simAws.serviceFactory.createSecretsManager(this),
+      this.factory.createSecretsManager(this),
     );
   }
 
@@ -245,36 +233,28 @@ export class SimAwsAccountRegionContainer {
    * Get simulated SNS for this account and region.
    */
   sns(): SimSns {
-    return this.memo.getOrCreate("sns", () =>
-      this.simAws.serviceFactory.createSns(this),
-    );
+    return this.memo.getOrCreate("sns", () => this.factory.createSns(this));
   }
 
   /**
    * Get simulated SQS for this account and region.
    */
   sqs(): SimSqs {
-    return this.memo.getOrCreate("sqs", () =>
-      this.simAws.serviceFactory.createSqs(this),
-    );
+    return this.memo.getOrCreate("sqs", () => this.factory.createSqs(this));
   }
 
   /**
    * Get simulated SSM for this account and region.
    */
   ssm(): SimSsm {
-    return this.memo.getOrCreate("ssm", () =>
-      this.simAws.serviceFactory.createSsm(this),
-    );
+    return this.memo.getOrCreate("ssm", () => this.factory.createSsm(this));
   }
 
   /**
    * Get simulated STS for this account and region.
    */
   sts(): SimSts {
-    return this.memo.getOrCreate("sts", () =>
-      this.simAws.serviceFactory.createSts(this),
-    );
+    return this.memo.getOrCreate("sts", () => this.factory.createSts(this));
   }
 
   /**
@@ -295,6 +275,18 @@ export class SimAwsAccountRegionContainer {
           await service.close();
         }),
     );
+  }
+
+  /**
+   * Where every service in this scope is made.
+   *
+   * Read through here rather than reached for in full by each accessor above.
+   * The accessors are one memoised call each and there is one per simulated
+   * service, so what the whole block costs is worth keeping down: this file
+   * has twice been at its line limit with a service waiting to be added to it.
+   */
+  private get factory(): SimAws["serviceFactory"] {
+    return this.simAws.serviceFactory;
   }
 }
 

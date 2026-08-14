@@ -72,7 +72,9 @@ export class SimElbV2Listener {
       properties.protocol,
       properties.sslPolicy,
     );
-    this.currentCertificates = properties.certificates;
+    // Copied for the same reason an action's input is: what a listener
+    // presents cannot change because a caller reused the array it sent.
+    this.currentCertificates = structuredClone(properties.certificates);
     this.currentDefaultActions = properties.defaultActions;
 
     requireSimElbV2ListenerCertificate(properties.protocol, this.certificates);
@@ -114,7 +116,7 @@ export class SimElbV2Listener {
 
     this.currentPort = changes.port ?? this.currentPort;
     this.currentProtocol = protocol;
-    this.currentCertificates = certificates;
+    this.currentCertificates = structuredClone(certificates);
     this.currentSslPolicy = simElbV2ListenerSslPolicy(
       protocol,
       changes.sslPolicy ?? this.currentSslPolicy,

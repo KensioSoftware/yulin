@@ -35,7 +35,10 @@ export async function createFixtureLoadBalancer(
 }
 
 /**
- * Create a target group holding one function and answer with its ARN.
+ * Create an empty target group of the `lambda` type and answer with its ARN.
+ *
+ * Nothing is registered in it: a test that wants a function in it registers
+ * `fixtureFunctionArn` itself, since that is usually the thing being tested.
  */
 export async function createFixtureLambdaTargetGroup(
   elbV2: SimElbV2,
@@ -51,7 +54,7 @@ export async function createFixtureLambdaTargetGroup(
 }
 
 /**
- * Create a target group holding addresses and answer with its ARN.
+ * Create an empty target group of the `ip` type and answer with its ARN.
  */
 export async function createFixtureIpTargetGroup(
   elbV2: SimElbV2,

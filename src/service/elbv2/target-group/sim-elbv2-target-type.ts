@@ -1,3 +1,5 @@
+import { isIP } from "node:net";
+
 import {
   SimElbV2InvalidConfigurationRequestException,
   SimElbV2InvalidTargetException,
@@ -60,25 +62,6 @@ export interface SimElbV2TargetShape {
  * A function ARN, which is the only Id a `lambda` target takes.
  */
 const functionArn = /^arn:aws:lambda:[\da-z-]+:\d{12}:function:[\w-]+$/u;
-
-/**
- * An IPv4 address.
- */
-const ipv4Address = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/u;
-
-/**
- * An IPv6 address, recognised by the characters it is made of and the colons
- * in it rather than parsed in full, since nothing here does anything with the
- * address beyond storing it.
- */
-const ipv6Characters = /^[\dA-Fa-f:]+$/u;
-
-/**
- * Whether a target Id is an address of either family.
- */
-function isIpAddress(id: string): boolean {
-  return ipv4Address.test(id) || (id.includes(":") && ipv6Characters.test(id));
-}
 
 /**
  * A target group holding one Lambda function.
@@ -153,7 +136,9 @@ class SimElbV2IpTargetType extends SimElbV2TargetType {
    * Refuse an Id that is not an address.
    */
   override validateTarget(target: SimElbV2TargetShape): void {
-    if (!isIpAddress(target.id)) {
+    // Parsed rather than pattern matched, so that something shaped like an
+    // address but impossible, such as 999.999.999.999, is refused too.
+    if (isIP(target.id) === 0) {
       throw new SimElbV2InvalidTargetException(
         `Target '${target.id}' is not an IP address. An ip target group ` +
           `registers addresses rather than instance ids or ARNs.`,

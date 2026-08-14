@@ -35,7 +35,10 @@ describe("sim ELBv2 rule conditions", () => {
     // Given one condition of each simulated field.
     const conditions = SimElbV2RuleCondition.readAll([
       { Field: "path-pattern", PathPatternConfig: { Values: ["/api/*"] } },
-      { Field: "http-request-method", Values: ["POST"] },
+      {
+        Field: "http-request-method",
+        HttpRequestMethodConfig: { Values: ["POST"] },
+      },
       { Field: "source-ip", SourceIpConfig: { Values: ["10.0.0.0/8"] } },
       {
         Field: "http-header",
@@ -68,6 +71,21 @@ describe("sim ELBv2 rule conditions", () => {
     // Then both are refused, since a rule matching everything is the default.
     assertStringIncludes(absent.message, "at least one condition");
     assertStringIncludes(empty.message, "at least one condition");
+  });
+
+  it("refuses a condition carrying another field's configuration", () => {
+    // Given a host header condition whose only values are a path pattern's.
+    const error = assertThrowsError(() => {
+      SimElbV2RuleCondition.read({
+        Field: "host-header",
+        PathPatternConfig: { Values: ["/api/*"] },
+      });
+    });
+
+    // Then it is refused: the field decides which configuration is read, so
+    // this condition has no host names to match on.
+    assertInstanceOf(error, SimElbV2ValidationError);
+    assertStringIncludes(error.message, "at least one value");
   });
 
   it("refuses a field nothing here understands", () => {

@@ -190,6 +190,29 @@ describe("ELBv2 CreateTargetGroupCommand", () => {
     assertStringIncludes(error.message, "Application Load Balancer");
   });
 
+  it("refuses a protocol that is not an ELB protocol at all", async () => {
+    // Given simulated ELBv2.
+    const simAws = new SimAws();
+    const elbV2 = simAws.elbV2();
+
+    // When a target group names something that is not an ELB protocol.
+    const error = await assertThrowsErrorAsync(async () => {
+      await elbV2.createTargetGroup({
+        input: {
+          Name: "web-tg",
+          TargetType: "ip",
+          Protocol: "FTP",
+          Port: 21,
+        },
+      });
+    });
+
+    // Then it is a validation failure rather than something unsimulated: the
+    // request is wrong, not beyond what this goes as far as.
+    assertInstanceOf(error, SimElbV2ValidationError);
+    assertStringIncludes(error.message, "not a valid ELB protocol");
+  });
+
   it("refuses a port outside the range, and a duplicate name", async () => {
     // Given a target group that already exists.
     const simAws = new SimAws();

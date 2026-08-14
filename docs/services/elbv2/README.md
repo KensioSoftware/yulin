@@ -18,7 +18,10 @@ application load balancer in disguise.
 
 ```typescript sim-elbv2-create-load-balancer
 /**
- * Creating a load balancer and reading the DNS name it answers on.
+ * Creating a load balancer and reading the DNS name it is issued.
+ *
+ * Nothing answers on that name yet: it is the name a Route53 alias or a
+ * CloudFront origin would point at.
  */
 
 import {
@@ -54,8 +57,8 @@ const described = await elbV2.describeLoadBalancers(
 console.log(described.LoadBalancers?.[0]?.State.Code); // "active"
 ```
 
-A load balancer is `active` as soon as it is created, where real ELB leaves one `provisioning` for a
-few minutes first. A name is unique within one account and region, so the same name can be used in
+A load balancer is `active` as soon as it is created, where real ELB leaves one in `provisioning`
+for a few minutes first. A name is unique within one account and region, so the same name can be used in
 another region and the two do not see each other.
 
 An internal load balancer's host name carries the `internal-` prefix real ELB gives it, which is also
@@ -181,7 +184,10 @@ on one listener cannot hold the same priority.
 
 ```typescript sim-elbv2-listener-rules
 /**
- * A listener with a rule routing one host name somewhere else.
+ * A listener and a rule sending one host name to a different target group.
+ *
+ * The rule is stored rather than applied: nothing matches a request against it
+ * yet.
  */
 
 import {
@@ -459,7 +465,8 @@ console.log(created.LoadBalancers?.[0]?.DNSName);
 - `CreateRule`, `DescribeRules`, `ModifyRule`, `DeleteRule` and `SetRulePriorities`, with priorities
   unique within a listener and the listener's default rule reported last.
 - `forward`, `fixed-response` and `redirect` actions, and `host-header`, `path-pattern`,
-  `http-header`, `http-request-method`, `query-string` and `source-ip` conditions.
+  `http-header`, `http-request-method`, `query-string` and `source-ip` conditions. A condition is
+  read through its own field's configuration, so one carrying another field's is refused.
 - Paged describes with `PageSize` and `Marker`.
 - IAM authorization against the ARN of whatever an operation names.
 - SDK interception of `ElasticLoadBalancingV2Client`.
@@ -481,12 +488,14 @@ console.log(created.LoadBalancers?.[0]?.DNSName);
   of a describe rather than modelled, and `AvailabilityZones` and `SecurityGroups` are therefore
   absent from a described load balancer.
 - `CanonicalHostedZoneId` is one value everywhere rather than the real per-region one. Simulated
-  Route53 resolves an alias by looking its target up, so only the shape is load bearing, and copying
+  Route53 resolves an alias by looking its target up, so only the shape is load-bearing, and copying
   this value into a real template would be copying the wrong one.
 - ARN ids and DNS name suffixes count from one rather than being random, so a test can assert on an
   ARN it did not capture. The shape is the one real ELB issues either way.
 - `authenticate-oidc` and `authenticate-cognito` actions are refused. Nothing here performs that
-  exchange, and treating one as a plain forward would quietly skip authentication.
+  exchange, and treating one as a plain forward would quietly skip authentication. Since those are
+  the only actions that may precede a routing action, a listener or rule takes exactly one action
+  here and a longer list is refused.
 - Load balancer attributes, access logs, listener certificates as a separate resource, trust stores,
   tags as a readable resource, and weighted forwarding across target groups are not simulated. A
   `ForwardConfig` naming several target groups is stored and its weights are not acted on.

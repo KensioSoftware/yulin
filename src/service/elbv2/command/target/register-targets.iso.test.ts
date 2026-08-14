@@ -178,6 +178,35 @@ describe("ELBv2 RegisterTargetsCommand", () => {
     );
   });
 
+  it("refuses an address that could not exist", async () => {
+    // Given an ip target group.
+    const simAws = new SimAws();
+    const elbV2 = simAws.elbV2();
+    const targetGroupArn = await createFixtureIpTargetGroup(elbV2);
+
+    // When addresses that are shaped right but impossible are registered.
+    const refusals = await Promise.all(
+      ["999.999.999.999", "::::", "1.2.3"].map(
+        async (id) =>
+          await assertThrowsErrorAsync(async () => {
+            await elbV2.registerTargets(
+              new RegisterTargetsCommand({
+                TargetGroupArn: targetGroupArn,
+                Targets: [{ Id: id }],
+              }),
+            );
+          }),
+      ),
+    );
+
+    // Then each is refused, because the address is parsed rather than matched.
+    assertArrayLength(refusals, 3);
+
+    for (const refusal of refusals) {
+      assertInstanceOf(refusal, SimElbV2InvalidTargetException);
+    }
+  });
+
   it("takes targets out again, and ignores one that was never in", async () => {
     // Given an ip target group holding two addresses.
     const simAws = new SimAws();

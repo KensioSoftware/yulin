@@ -183,7 +183,7 @@ describe("ELBv2 listeners", () => {
     // Then each is refused.
     assertStringIncludes(noLoadBalancer.message, "LoadBalancerArn is required");
     assertStringIncludes(noPort.message, "Protocol and a Port");
-    assertStringIncludes(networkProtocol.message, "not simulated");
+    assertStringIncludes(networkProtocol.message, "neither is simulated");
   });
 
   it("describes listeners by load balancer and by ARN, and refuses both at once", async () => {

@@ -104,5 +104,11 @@ There is no resource policy support here, and none to add: ELBv2 has none on rea
   than invented.
 - ARN ids and DNS name suffixes count rather than being random, so a test can assert on an ARN it
   did not capture. The shape is the real one either way.
+- A listener or rule takes exactly one action. Real ELB takes one routing action with an optional
+  authentication action before it, and neither authentication action is simulated, so a longer list
+  is refused rather than half honoured.
+- What a request carries in is copied when it is stored, so a caller mutating the command input it
+  sent cannot change a listener or rule afterwards. Real ELB reads the request off the wire and is
+  immune to that by construction.
 
 The full list is in [docs/services/elbv2](../../../docs/services/elbv2/).

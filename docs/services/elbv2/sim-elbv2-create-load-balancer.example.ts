@@ -1,5 +1,8 @@
 /**
- * Creating a load balancer and reading the DNS name it answers on.
+ * Creating a load balancer and reading the DNS name it is issued.
+ *
+ * Nothing answers on that name yet: it is the name a Route53 alias or a
+ * CloudFront origin would point at.
  */
 
 import {
