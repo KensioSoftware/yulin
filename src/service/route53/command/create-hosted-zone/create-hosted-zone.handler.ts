@@ -109,7 +109,11 @@ export class CreateHostedZoneCommandHandler implements CommandHandler<
     this.route53Registry.registerHostedZone(hostedZoneId, hostedZone);
 
     // Schedule background task to complete creation of the sim Hosted Zone.
-    this.background.schedule(() => hostedZone.completeSynchronization());
+    this.background.schedule(() => {
+      hostedZone.markSynchronized();
+
+      return Promise.resolve();
+    });
 
     return {
       HostedZone: {

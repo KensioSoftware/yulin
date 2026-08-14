@@ -11,6 +11,7 @@ import { makeSimCfCustomOriginDispatcher } from "../../cloudfront/origin/custom/
 import { SimCloudFront } from "../../cloudfront/sim-cloudfront.js";
 import { SimRoute53 } from "../../route53/index.js";
 import type { SimRoute53Registry } from "../../route53/registry/sim-route53-registry.js";
+import type { SimKmsRegistry } from "../../kms/registry/sim-kms-registry.js";
 import { SimIam } from "../../iam/index.js";
 import type { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
 import {
@@ -28,6 +29,7 @@ interface SimAwsAccountServiceCacheProperties {
   readonly acmRegistry: SimAcmRegistry;
   readonly cloudFrontRegistry: SimCloudFrontRegistry;
   readonly route53Registry: SimRoute53Registry;
+  readonly kmsRegistry: SimKmsRegistry;
   readonly serviceHosts: SimAwsServiceHosts;
   readonly iamRegistry: SimIamRegistry;
   readonly accessKeyRegistry: SimIamAccessKeyRegistry;
@@ -62,6 +64,7 @@ export class SimAwsAccountServiceCache {
   private readonly iamRegistry: SimIamRegistry;
   private readonly accessKeyRegistry: SimIamAccessKeyRegistry;
   private readonly route53Registry: SimRoute53Registry;
+  private readonly kmsRegistry: SimKmsRegistry;
   private readonly serviceHosts: SimAwsServiceHosts;
 
   /**
@@ -81,6 +84,7 @@ export class SimAwsAccountServiceCache {
     this.iamRegistry = properties.iamRegistry;
     this.accessKeyRegistry = properties.accessKeyRegistry;
     this.route53Registry = properties.route53Registry;
+    this.kmsRegistry = properties.kmsRegistry;
     this.serviceHosts = properties.serviceHosts;
   }
 
@@ -150,6 +154,9 @@ export class SimAwsAccountServiceCache {
           background: this.background,
           route53Registry: this.route53Registry,
           serviceHosts: this.serviceHosts,
+          // A DNSSEC key-signing key names a KMS key by ARN, in whichever
+          // Region holds it, so Route53 resolves it through the registry.
+          kmsKeys: this.kmsRegistry,
         }),
     );
   }

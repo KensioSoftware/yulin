@@ -1,42 +1,13 @@
 import type { SimAwsServiceHosts } from "../../serve/controller/host/sim-aws-service-hosts.js";
 import type { SimAwsServiceTarget } from "../../serve/controller/sim-service-controller.js";
 import { SimRoute53Resolver } from "./resolve/sim-route53-resolver.js";
-import { CreateHostedZoneCommandHandler } from "./command/create-hosted-zone/create-hosted-zone.handler.js";
-import type {
-  SimCreateHostedZoneCommand,
-  SimCreateHostedZoneCommandOutput,
-} from "./command/create-hosted-zone/create-hosted-zone.command.js";
+import type * as simRoute53Commands from "./command/sim-route53-command.types.js";
 import type { SimRoute53HostedZone } from "./hosted-zone/sim-route53-hosted-zone.js";
 import {
   registerSimRoute53HostedZone,
   type SimRoute53HostedZoneRegistration,
 } from "./hosted-zone/register-sim-route53-hosted-zone.js";
 import type { SimRoute53HostedZoneId } from "./command/create-hosted-zone/sim-route53-zone-id.js";
-import type {
-  SimGetHostedZoneCommand,
-  SimGetHostedZoneCommandOutput,
-} from "./command/get-hosted-zone/get-hosted-zone.command.js";
-import { GetHostedZoneCommandHandler } from "./command/get-hosted-zone/get-hosted-zone.handler.js";
-import type {
-  SimDeleteHostedZoneCommand,
-  SimDeleteHostedZoneCommandOutput,
-} from "./command/delete-hosted-zone/delete-hosted-zone.command.js";
-import { DeleteHostedZoneCommandHandler } from "./command/delete-hosted-zone/delete-hosted-zone.handler.js";
-import type {
-  SimListHostedZonesByNameCommand,
-  SimListHostedZonesByNameCommandOutput,
-} from "./command/list-hosted-zones-by-name/list-hosted-zones-by-name.command.js";
-import { ListHostedZonesByNameCommandHandler } from "./command/list-hosted-zones-by-name/list-hosted-zones-by-name.handler.js";
-import type {
-  SimListResourceRecordSetsCommand,
-  SimListResourceRecordSetsCommandOutput,
-} from "./command/list-resource-record-sets/list-resource-record-sets.command.js";
-import { ListResourceRecordSetsCommandHandler } from "./command/list-resource-record-sets/list-resource-record-sets.handler.js";
-import type {
-  SimChangeResourceRecordSetsCommand,
-  SimChangeResourceRecordSetsCommandOutput,
-} from "./command/change-resource-record-sets/change-resource-record-sets.command.js";
-import { ChangeResourceRecordSetsCommandHandler } from "./command/change-resource-record-sets/change-resource-record-sets.handler.js";
 import {
   type BackgroundScheduler,
   BackgroundTasks,
@@ -44,17 +15,17 @@ import {
 import { SimRoute53CloudFormationResourceFactory } from "./cfn/sim-cfn-route53-resource-factory.js";
 import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import { SimRoute53Registry } from "./registry/sim-route53-registry.js";
-import type { SimAwsCaller } from "../aws/caller/sim-aws-caller.js";
 import {
   SimIamAllowAllAuth,
   type SimIamInterServiceAuthZ,
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimRoute53SdkCommandRouter } from "./sdk/sim-route53-sdk-command-router.js";
 import type { SimSdkCommandRouter } from "../../sdk/index.js";
+import type { SimKmsKeyResolver } from "../kms/registry/sim-kms-registry.js";
+import type { SimRoute53RequestOptions } from "./sim-route53-request-options.js";
+import { SimRoute53Commands } from "./sim-route53-commands.js";
 
-export interface SimRoute53RequestOptions {
-  readonly caller?: SimAwsCaller;
-}
+export type { SimRoute53RequestOptions } from "./sim-route53-request-options.js";
 
 interface SimRoute53Properties {
   readonly iam?: SimIamInterServiceAuthZ | undefined;
@@ -68,6 +39,12 @@ interface SimRoute53Properties {
    * one arrives at the service holding it.
    */
   readonly serviceHosts?: SimAwsServiceHosts | undefined;
+
+  /**
+   * Where a KMS key ARN is looked up. A DNSSEC key-signing key is built on a
+   * customer managed key, and Route53 checks that key before it takes one.
+   */
+  readonly kmsKeys?: SimKmsKeyResolver | undefined;
 }
 
 /**
@@ -78,8 +55,6 @@ export class SimRoute53 {
     SimRoute53HostedZoneId,
     SimRoute53HostedZone
   >();
-  private readonly iam: SimIamInterServiceAuthZ;
-  private readonly background: BackgroundScheduler;
   private readonly route53Registry: SimRoute53Registry;
   private readonly cfnFactory = new SimRoute53CloudFormationResourceFactory({
     route53: this,
@@ -87,6 +62,7 @@ export class SimRoute53 {
   private readonly sdkRouter = new SimRoute53SdkCommandRouter(this);
 
   private readonly resolver: SimRoute53Resolver;
+  private readonly commands: SimRoute53Commands;
 
   constructor(properties: SimRoute53Properties = {}) {
     const {
@@ -95,12 +71,17 @@ export class SimRoute53 {
       route53Registry = new SimRoute53Registry(),
     } = properties;
 
-    this.iam = iam;
-    this.background = background;
     this.route53Registry = route53Registry;
     this.resolver = new SimRoute53Resolver({
-      hostedZones: this.route53Registry.hostedZones,
+      hostedZones: route53Registry.hostedZones,
       serviceHosts: properties.serviceHosts,
+    });
+    this.commands = new SimRoute53Commands({
+      hostedZones: this.hostedZones,
+      iam,
+      background,
+      route53Registry,
+      kmsKeys: properties.kmsKeys,
     });
   }
 
@@ -108,16 +89,10 @@ export class SimRoute53 {
    * Create a new simulated Route53 Hosted Zone.
    */
   async createHostedZone(
-    command: SimCreateHostedZoneCommand,
+    command: simRoute53Commands.SimCreateHostedZoneCommand,
     options?: SimRoute53RequestOptions,
-  ): Promise<SimCreateHostedZoneCommandOutput> {
-    const handler = new CreateHostedZoneCommandHandler({
-      hostedZones: this.hostedZones,
-      iam: this.iam,
-      background: this.background,
-      route53Registry: this.route53Registry,
-    });
-    return await handler.handle(command, options);
+  ): Promise<simRoute53Commands.SimCreateHostedZoneCommandOutput> {
+    return await this.commands.createHostedZone.handle(command, options);
   }
 
   /**
@@ -145,76 +120,126 @@ export class SimRoute53 {
    * Handle a Get Hosted Zone command from the SDK.
    */
   async getHostedZone(
-    command: SimGetHostedZoneCommand,
+    command: simRoute53Commands.SimGetHostedZoneCommand,
     options?: SimRoute53RequestOptions,
-  ): Promise<SimGetHostedZoneCommandOutput> {
-    const handler = new GetHostedZoneCommandHandler({
-      hostedZones: this.hostedZones,
-      iam: this.iam,
-      background: this.background,
-    });
-    return await handler.handle(command, options);
+  ): Promise<simRoute53Commands.SimGetHostedZoneCommandOutput> {
+    return await this.commands.getHostedZone.handle(command, options);
   }
 
   /**
    * Handle a Delete Hosted Zone command from the SDK.
    */
   async deleteHostedZone(
-    command: SimDeleteHostedZoneCommand,
+    command: simRoute53Commands.SimDeleteHostedZoneCommand,
     options?: SimRoute53RequestOptions,
-  ): Promise<SimDeleteHostedZoneCommandOutput> {
-    const handler = new DeleteHostedZoneCommandHandler({
-      hostedZones: this.hostedZones,
-      route53Registry: this.route53Registry,
-      iam: this.iam,
-      background: this.background,
-    });
-    return await handler.handle(command, options);
+  ): Promise<simRoute53Commands.SimDeleteHostedZoneCommandOutput> {
+    return await this.commands.deleteHostedZone.handle(command, options);
   }
 
   /**
    * Handle a List Hosted Zones By Name command from the SDK.
    */
   async listHostedZonesByName(
-    command: SimListHostedZonesByNameCommand,
+    command: simRoute53Commands.SimListHostedZonesByNameCommand,
     options?: SimRoute53RequestOptions,
-  ): Promise<SimListHostedZonesByNameCommandOutput> {
-    const handler = new ListHostedZonesByNameCommandHandler({
-      hostedZones: this.hostedZones,
-      iam: this.iam,
-      background: this.background,
-    });
-    return await handler.handle(command, options);
+  ): Promise<simRoute53Commands.SimListHostedZonesByNameCommandOutput> {
+    return await this.commands.listHostedZonesByName.handle(command, options);
   }
 
   /**
    * Handle a List Resource Record Sets command from the SDK.
    */
   async listResourceRecordSets(
-    command: SimListResourceRecordSetsCommand,
+    command: simRoute53Commands.SimListResourceRecordSetsCommand,
     options?: SimRoute53RequestOptions,
-  ): Promise<SimListResourceRecordSetsCommandOutput> {
-    const handler = new ListResourceRecordSetsCommandHandler({
-      hostedZones: this.hostedZones,
-      iam: this.iam,
-      background: this.background,
-    });
-    return await handler.handle(command, options);
+  ): Promise<simRoute53Commands.SimListResourceRecordSetsCommandOutput> {
+    return await this.commands.listResourceRecordSets.handle(command, options);
   }
 
   /**
    * Handle a Change Resource Record Sets command from the SDK.
    */
   async changeResourceRecordSets(
-    command: SimChangeResourceRecordSetsCommand,
+    command: simRoute53Commands.SimChangeResourceRecordSetsCommand,
     options?: SimRoute53RequestOptions,
-  ): Promise<SimChangeResourceRecordSetsCommandOutput> {
-    const handler = new ChangeResourceRecordSetsCommandHandler({
-      hostedZones: this.hostedZones,
-      iam: this.iam,
-      background: this.background,
-    });
-    return await handler.handle(command, options);
+  ): Promise<simRoute53Commands.SimChangeResourceRecordSetsCommandOutput> {
+    return await this.commands.changeResourceRecordSets.handle(
+      command,
+      options,
+    );
+  }
+
+  /**
+   * Handle a Create Key Signing Key command from the SDK.
+   */
+  async createKeySigningKey(
+    command: simRoute53Commands.SimCreateKeySigningKeyCommand,
+    options?: SimRoute53RequestOptions,
+  ): Promise<simRoute53Commands.SimCreateKeySigningKeyCommandOutput> {
+    return await this.commands.dnssec.keySigningKeys.create(command, options);
+  }
+
+  /**
+   * Handle an Activate Key Signing Key command from the SDK.
+   */
+  async activateKeySigningKey(
+    command: simRoute53Commands.SimKeySigningKeyCommand,
+    options?: SimRoute53RequestOptions,
+  ): Promise<simRoute53Commands.SimKeySigningKeyCommandOutput> {
+    return await this.commands.dnssec.keySigningKeys.activate(command, options);
+  }
+
+  /**
+   * Handle a Deactivate Key Signing Key command from the SDK.
+   */
+  async deactivateKeySigningKey(
+    command: simRoute53Commands.SimKeySigningKeyCommand,
+    options?: SimRoute53RequestOptions,
+  ): Promise<simRoute53Commands.SimKeySigningKeyCommandOutput> {
+    return await this.commands.dnssec.keySigningKeys.deactivate(
+      command,
+      options,
+    );
+  }
+
+  /**
+   * Handle a Delete Key Signing Key command from the SDK.
+   */
+  async deleteKeySigningKey(
+    command: simRoute53Commands.SimKeySigningKeyCommand,
+    options?: SimRoute53RequestOptions,
+  ): Promise<simRoute53Commands.SimKeySigningKeyCommandOutput> {
+    return await this.commands.dnssec.keySigningKeys.delete(command, options);
+  }
+
+  /**
+   * Handle an Enable Hosted Zone DNSSEC command from the SDK.
+   */
+  async enableHostedZoneDnssec(
+    command: simRoute53Commands.SimHostedZoneDnssecCommand,
+    options?: SimRoute53RequestOptions,
+  ): Promise<simRoute53Commands.SimHostedZoneDnssecCommandOutput> {
+    return await this.commands.dnssec.zoneSigning.enable(command, options);
+  }
+
+  /**
+   * Handle a Disable Hosted Zone DNSSEC command from the SDK.
+   */
+  async disableHostedZoneDnssec(
+    command: simRoute53Commands.SimHostedZoneDnssecCommand,
+    options?: SimRoute53RequestOptions,
+  ): Promise<simRoute53Commands.SimHostedZoneDnssecCommandOutput> {
+    return await this.commands.dnssec.zoneSigning.disable(command, options);
+  }
+
+  /**
+   * Handle a Get DNSSEC command from the SDK.
+   */
+  async getDnssec(
+    command: simRoute53Commands.SimGetDnssecCommand,
+    options?: SimRoute53RequestOptions,
+  ): Promise<simRoute53Commands.SimGetDnssecCommandOutput> {
+    return await this.commands.dnssec.zoneSigning.get(command, options);
   }
 
   /**

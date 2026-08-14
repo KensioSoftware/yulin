@@ -144,8 +144,9 @@ describe("KMS CloudFormation Resource validation", () => {
     );
   });
 
-  it("refuses an asymmetric KeySpec", async () => {
-    // Given a template asking for an asymmetric key.
+  it("refuses an asymmetric KeySpec used for encryption", async () => {
+    // Given a template asking for an RSA key to encrypt with, which real KMS
+    // allows and this simulation does not.
     // When the Resource is created, then CreateKey refuses it in the same
     // terms it refuses an SDK caller.
     const error = await createKmsResource("Key", {
@@ -153,7 +154,18 @@ describe("KMS CloudFormation Resource validation", () => {
       KeyUsage: "ENCRYPT_DECRYPT",
     });
 
-    assertStringIncludes(error.message, "KeySpec 'RSA_2048' is not simulated");
+    assertStringIncludes(
+      error.message,
+      "KeyUsage 'ENCRYPT_DECRYPT' with KeySpec 'RSA_2048' is not simulated",
+    );
+  });
+
+  it("refuses a KeySpec this simulation does not create", async () => {
+    // Given a template asking for a key spec with no simulated key behind it.
+    // When the Resource is created, then it is refused.
+    const error = await createKmsResource("Key", { KeySpec: "SM2" });
+
+    assertStringIncludes(error.message, "KeySpec 'SM2' is not simulated");
   });
 
   it("refuses an HMAC KeyUsage", async () => {

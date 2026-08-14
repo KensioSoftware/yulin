@@ -72,6 +72,10 @@ export class DeleteHostedZoneCommandHandler implements CommandHandler<
    * simulated zone is created without those two, so any record at all counts
    * here, and the caller removes them with ChangeResourceRecordSets first.
    *
+   * A signed zone is refused for the same reason: real Route53 wants DNSSEC
+   * disabled before the zone goes, so the DS record at the parent stops
+   * pointing at a zone that no longer exists.
+   *
    * Deregistering the zone is what stops its names resolving, because DNS
    * resolution reads the cross-Account registry rather than this Account's
    * own hosted zone map.
@@ -97,6 +101,7 @@ export class DeleteHostedZoneCommandHandler implements CommandHandler<
     }
 
     hostedZone.assertDeletable();
+    hostedZone.dnssec.assertZoneDeletable();
 
     this.hostedZones.delete(hostedZoneId);
     this.route53Registry.deregisterHostedZone(hostedZoneId);

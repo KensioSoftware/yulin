@@ -20,27 +20,76 @@ import {
 const plaintext = Uint8Array.from(Buffer.from("hunter2", "utf8"));
 
 describe("KMS CreateKey validation", () => {
-  it("refuses an asymmetric key spec", async () => {
-    // Given a simulation that models only symmetric keys.
+  it("refuses a key spec this simulation does not create", async () => {
+    // Given a simulation that models a fixed set of key specs.
     const simAws = new SimAws();
 
-    // When an asymmetric key is asked for.
+    // When a key spec outside that set is asked for.
     const error = await assertThrowsErrorAsync(async () =>
-      simAws.kms().createKey(new CreateKeyCommand({ KeySpec: "RSA_2048" })),
+      simAws.kms().createKey(new CreateKeyCommand({ KeySpec: "SM2" })),
     );
 
-    // Then it is refused rather than quietly made symmetric, so a test cannot
-    // pass against a key type this simulation does not model.
+    // Then it is refused rather than quietly made something else, so a test
+    // cannot pass against a key type this simulation does not model.
     assertInstanceOf(error, SimKmsInvalidKeyUsageException);
   });
 
-  it("refuses a key usage other than encrypt and decrypt", async () => {
-    // Given a simulation that models only encryption keys.
+  it("refuses an asymmetric key spec used for encryption", async () => {
+    // Given a simulation whose asymmetric keys only sign.
     const simAws = new SimAws();
 
-    // When a signing key is asked for.
+    // When an RSA key is asked for to encrypt with, which real KMS allows.
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws.kms().createKey(
+        new CreateKeyCommand({
+          KeySpec: "RSA_2048",
+          KeyUsage: "ENCRYPT_DECRYPT",
+        }),
+      ),
+    );
+
+    // Then it is refused.
+    assertInstanceOf(error, SimKmsInvalidKeyUsageException);
+  });
+
+  it("refuses an asymmetric key spec with no key usage", async () => {
+    // Given a simulation where KeyUsage is only optional for a symmetric key.
+    const simAws = new SimAws();
+
+    // When an ECC key is asked for without one, which real KMS requires.
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws
+        .kms()
+        .createKey(new CreateKeyCommand({ KeySpec: "ECC_NIST_P256" })),
+    );
+
+    // Then it is refused rather than filled in, because a key created that
+    // way would be a key real KMS would not have made.
+    assertInstanceOf(error, SimKmsInvalidKeyUsageException);
+  });
+
+  it("refuses a signing key usage with no key spec", async () => {
+    // Given a simulation whose default key spec is symmetric.
+    const simAws = new SimAws();
+
+    // When a signing key is asked for without naming a spec that can sign.
     const error = await assertThrowsErrorAsync(async () =>
       simAws.kms().createKey(new CreateKeyCommand({ KeyUsage: "SIGN_VERIFY" })),
+    );
+
+    // Then it is refused, as real KMS refuses it.
+    assertInstanceOf(error, SimKmsInvalidKeyUsageException);
+  });
+
+  it("refuses a key usage no simulated key spec has", async () => {
+    // Given a simulation with no HMAC keys.
+    const simAws = new SimAws();
+
+    // When an HMAC key is asked for.
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws
+        .kms()
+        .createKey(new CreateKeyCommand({ KeyUsage: "GENERATE_VERIFY_MAC" })),
     );
 
     // Then it is refused.

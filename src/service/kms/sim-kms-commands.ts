@@ -16,6 +16,7 @@ import { SimKmsKeyCommands } from "./command/key/sim-kms-key-commands.js";
 import { SimKmsKeyLifecycleCommands } from "./command/key/sim-kms-key-lifecycle-commands.js";
 import { SimKmsKeyPolicyCommands } from "./command/key/sim-kms-key-policy-commands.js";
 import { SimKmsListKeys } from "./command/key/sim-kms-list-keys.js";
+import { SimKmsSignCommands } from "./command/sign/sim-kms-sign-commands.js";
 import { SimKmsKeyFactory } from "./key/sim-kms-key-factory.js";
 import { SimKmsKeyMetadataView } from "./key/sim-kms-key-metadata.js";
 import { SimKmsKeyStore } from "./key/sim-kms-key-store.js";
@@ -45,6 +46,7 @@ export class SimKmsCommands {
   public readonly policies: SimKmsKeyPolicyCommands;
   public readonly aliases: SimKmsAliasCommands;
   public readonly crypto: SimKmsCryptoCommands;
+  public readonly signing: SimKmsSignCommands;
   public readonly generateDataKey: SimKmsGenerateDataKey;
   public readonly background: BackgroundScheduler;
 
@@ -81,6 +83,7 @@ export class SimKmsCommands {
     });
     this.aliases = new SimKmsAliasCommands({ keys: this.keys, authorizer });
     this.crypto = new SimKmsCryptoCommands({ keys: this.keys, authorizer });
+    this.signing = new SimKmsSignCommands({ keys: this.keys, authorizer });
     this.generateDataKey = new SimKmsGenerateDataKey({
       keys: this.keys,
       authorizer,

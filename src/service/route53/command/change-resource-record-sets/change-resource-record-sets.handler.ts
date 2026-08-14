@@ -96,11 +96,7 @@ export class ChangeResourceRecordSetsCommandHandler implements CommandHandler<
 
     const submittedAt = this.background.now();
 
-    await scheduleChangeResourceRecordSets(
-      this.background,
-      hostedZone,
-      changes,
-    );
+    scheduleChangeResourceRecordSets(this.background, hostedZone, changes);
 
     return {
       ChangeInfo: {

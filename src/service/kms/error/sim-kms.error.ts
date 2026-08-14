@@ -122,3 +122,33 @@ export class SimKmsInvalidKeyUsageException extends SimKmsError {
     super(message, { httpStatusCode: 400 });
   }
 }
+
+/**
+ * Simulated KMS UnsupportedOperationException error.
+ *
+ * Real KMS keeps this apart from InvalidKeyUsageException, and GetPublicKey is
+ * where the difference shows: a symmetric key has no public key to hand out at
+ * all, rather than having one it is not allowed to use for the operation.
+ */
+export class SimKmsUnsupportedOperationException extends SimKmsError {
+  public override readonly name = "UnsupportedOperationException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
+ * Simulated KMS KMSInvalidSignatureException error.
+ *
+ * Verify reports a signature that does not check out by failing rather than by
+ * returning SignatureValid false, which is what real KMS does and what code
+ * written against it handles.
+ */
+export class SimKmsInvalidSignatureException extends SimKmsError {
+  public override readonly name = "KMSInvalidSignatureException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}

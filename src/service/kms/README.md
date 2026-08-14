@@ -3,10 +3,11 @@
 This directory contains the simulated KMS service implementation.
 
 The guiding decision here is that the cryptography is real. A simulated key holds real AES-256 key
-material and every operation goes through Node.js's `crypto`, rather than a stand-in that records
-what it was asked to encrypt. That costs almost nothing in a test suite and it buys behaviour that
-would otherwise have to be hand-modelled: a ciphertext that cannot be read without its key, an
-authentication tag that fails on tampering, and an encryption context that has to match.
+material, or a real key pair, and every operation goes through Node.js's `crypto`, rather than a
+stand-in that records what it was asked to encrypt. That costs almost nothing in a test suite and it
+buys behaviour that would otherwise have to be hand-modelled: a ciphertext that cannot be read
+without its key, an authentication tag that fails on tampering, an encryption context that has to
+match, and a signature that verifies against the public key `GetPublicKey` hands out.
 
 ## Entry points
 
@@ -26,9 +27,21 @@ material and its lifecycle. `SimKmsKeyLifecycle` holds the state and the rules a
 transitions are legal, so no command handler has to remember that a key pending deletion cannot be
 enabled, or which of the two failures an unusable key produces.
 
-`SimKmsKeyMaterial` holds the AES-256 bytes and performs the cipher operations. Nothing exposes the
-bytes, mirroring the fact that real key material never leaves KMS. That is a modelling choice, not a
-security boundary: this all runs in one process.
+`SimKmsKeyMaterial` is what a key holds and operates through. It declares every operation and
+refuses each one by default, because that is how AWS answers one: an `Encrypt` against a signing key
+is not an unknown operation, it is `InvalidKeyUsageException` on a key that cannot do it. Two
+subclasses override what their usage allows.
+
+`SimKmsSymmetricKeyMaterial` holds the AES-256 bytes and performs the cipher operations.
+`SimKmsSigningKeyMaterial` holds a key pair and performs the signing ones. Neither exposes its
+private material, mirroring the fact that real key material never leaves KMS. That is a modelling
+choice, not a security boundary: this all runs in one process.
+
+`key/spec/` is the third answer that used to be a constant. `SimKmsKeySpec` says what a key of one
+spec can do: which usage it has, which algorithms it offers, and which Node key pair it needs.
+`sim-kms-key-specs.ts` is the catalogue, and a spec absent from it is a spec `CreateKey` refuses.
+`SimKmsKeyType` resolves a requested spec and usage pair against that catalogue, and reports which
+of the ways it can fail applies.
 
 `SimKmsCiphertextBlob` encodes the opaque blob KMS hands back. Real blobs are opaque to the caller
 but not to KMS, which is why `Decrypt` needs no `KeyId` for a symmetric key. The layout keeps that
@@ -54,6 +67,8 @@ rather than one class per command, so the `SimKms` facade stays a delegation:
 - `command/key/` — `CreateKey` and `DescribeKey`; `ListKeys`; the lifecycle commands; the key policy
   commands
 - `command/crypto/` — `Encrypt` and `Decrypt`; `GenerateDataKey`
+- `command/sign/` — `Sign`, `Verify` and `GetPublicKey`, which go together because they are the
+  operations an asymmetric signing key answers and each has to refuse a key that is not one
 - `command/alias/` — `CreateAlias`, `ListAliases`
 - `command/authorize/` — the shared IAM authorizer
 - `command/sim-kms-command.types.ts` — the command types gathered for the facade
@@ -61,8 +76,18 @@ rather than one class per command, so the `SimKms` facade stays a delegation:
 Input validation that is a rule in its own right lives beside the commands that apply it, rather
 than inside them: `SimKmsKeyType` for the key types this simulation models, `SimKmsPendingWindow`
 for the deletion recovery window, `SimKmsDataKeySpec` for data key lengths, `SimKmsPolicyDocument`
-for the JSON policy both `CreateKey` and `PutKeyPolicy` take, and `SimKmsCiphertextKey` for finding
-the key behind a ciphertext.
+for the JSON policy both `CreateKey` and `PutKeyPolicy` take, `SimKmsCiphertextKey` for finding the
+key behind a ciphertext, and `SimKmsSignedMessage` for the message `Sign` and `Verify` take.
+
+`SimKmsSignedMessage` is where the one deliberate divergence in this service lives. A `MessageType`
+of `DIGEST` is refused, because Node cannot sign a digest that has already been computed:
+`crypto.sign` with no algorithm hashes what it is given rather than signing it. A signature made
+that way would not be the one real KMS makes and would not verify against the message anywhere
+outside this simulator, which is worse than not answering at all.
+
+`SimKmsRegistry` indexes the KMS facade of each account and region for one simulation, so a service
+holding only a key ARN can reach the key it names. Simulated Route53 uses it to check the customer
+managed key behind a DNSSEC key-signing key.
 
 As elsewhere, implementation code under `src/` does not import real AWS SDK packages. The structural
 command types in `*.command.ts` match the SDK shapes closely enough for callers to pass real SDK

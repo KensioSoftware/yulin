@@ -1,34 +1,8 @@
 import type { SimAwsAccountId } from "../../aws/sim-aws-account.js";
-import type {
-  SimKmsKey,
-  SimKmsKeyManager,
-  SimKmsKeyState,
-} from "./sim-kms-key.js";
+import type { SimKmsKey } from "./sim-kms-key.js";
+import type { SimKmsKeyMetadata } from "./sim-kms-key-metadata.type.js";
 
-/**
- * The KeyMetadata structure CreateKey and DescribeKey return.
- *
- * Only symmetric encryption keys are simulated, so the fields describing key
- * type are constants rather than stored state. They are reported anyway
- * because application code reads them to decide what a key can do.
- */
-export interface SimKmsKeyMetadata {
-  readonly AWSAccountId: SimAwsAccountId;
-  readonly KeyId: string;
-  readonly Arn: string;
-  readonly CreationDate: Date;
-  readonly Enabled: boolean;
-  readonly Description: string;
-  readonly KeyUsage: "ENCRYPT_DECRYPT";
-  readonly KeyState: SimKmsKeyState;
-  readonly DeletionDate?: Date | undefined;
-  readonly Origin: "AWS_KMS";
-  readonly KeyManager: SimKmsKeyManager;
-  readonly KeySpec: "SYMMETRIC_DEFAULT";
-  readonly CustomerMasterKeySpec: "SYMMETRIC_DEFAULT";
-  readonly EncryptionAlgorithms: readonly ["SYMMETRIC_DEFAULT"];
-  readonly MultiRegion: false;
-}
+export type { SimKmsKeyMetadata } from "./sim-kms-key-metadata.type.js";
 
 /**
  * Builds the AWS-shaped view of a stored key.
@@ -47,6 +21,8 @@ export class SimKmsKeyMetadataView {
    * Describe a key the way KMS reports it.
    */
   describe(key: SimKmsKey): SimKmsKeyMetadata {
+    const keySpec = key.keySpec;
+
     return {
       AWSAccountId: this.accountId,
       KeyId: key.keyId,
@@ -54,16 +30,32 @@ export class SimKmsKeyMetadataView {
       CreationDate: new Date(key.creationDate),
       Enabled: key.isEnabled,
       Description: key.description,
-      KeyUsage: "ENCRYPT_DECRYPT",
+      KeyUsage: keySpec.keyUsage,
       KeyState: key.keyState,
       DeletionDate: this.copied(key.deletionDate),
       Origin: "AWS_KMS",
       KeyManager: key.keyManager,
-      KeySpec: "SYMMETRIC_DEFAULT",
-      CustomerMasterKeySpec: "SYMMETRIC_DEFAULT",
-      EncryptionAlgorithms: ["SYMMETRIC_DEFAULT"],
+      KeySpec: keySpec.name,
+      CustomerMasterKeySpec: keySpec.name,
+      EncryptionAlgorithms: this.listed(keySpec.encryptionAlgorithms),
+      SigningAlgorithms: this.listed(keySpec.signingAlgorithmNames()),
       MultiRegion: false,
     };
+  }
+
+  /**
+   * An algorithm list, or nothing at all where the key has none.
+   *
+   * Real KMS omits the list that does not apply rather than returning it
+   * empty, so an encryption key reports no SigningAlgorithms and a signing key
+   * reports no EncryptionAlgorithms.
+   */
+  private listed(algorithms: readonly string[]): readonly string[] | undefined {
+    if (algorithms.length === 0) {
+      return undefined;
+    }
+
+    return algorithms;
   }
 
   /**

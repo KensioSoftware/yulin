@@ -138,6 +138,126 @@ const recovered = await kms.decrypt(
 console.log(recovered.Plaintext?.length); // 32
 ```
 
+## Signing and verifying
+
+A key created with `KeyUsage: SIGN_VERIFY` holds a real key pair, and the signatures are real
+signatures. A key spec is required, because the default `SYMMETRIC_DEFAULT` spec cannot sign.
+
+```typescript sim-kms-sign-verify
+/**
+ * Signing and verifying with a simulated asymmetric KMS key.
+ */
+
+import {
+  CreateKeyCommand,
+  SignCommand,
+  VerifyCommand,
+} from "@aws-sdk/client-kms";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const kms = simAws.kms();
+
+const created = await kms.createKey(
+  new CreateKeyCommand({
+    KeySpec: "ECC_NIST_P256",
+    KeyUsage: "SIGN_VERIFY",
+  }),
+);
+
+const message = Buffer.from("order-1234", "utf8");
+
+const signed = await kms.sign(
+  new SignCommand({
+    KeyId: created.KeyMetadata?.Arn,
+    Message: message,
+    SigningAlgorithm: "ECDSA_SHA_256",
+  }),
+);
+
+const verified = await kms.verify(
+  new VerifyCommand({
+    KeyId: created.KeyMetadata?.Arn,
+    Message: message,
+    Signature: signed.Signature,
+    SigningAlgorithm: "ECDSA_SHA_256",
+  }),
+);
+
+console.log(verified.SignatureValid); // true
+```
+
+`Verify` fails with `KMSInvalidSignatureException` when a signature does not check out, rather than
+answering `SignatureValid: false`. That is what real KMS does.
+
+The key specs simulated are `ECC_NIST_P256`, `ECC_NIST_P384`, `ECC_NIST_P521`, `ECC_SECG_P256K1`,
+`RSA_2048`, `RSA_3072` and `RSA_4096`. Each ECC spec offers the one ECDSA algorithm paired with its
+curve; each RSA spec offers all six RSASSA algorithms. A signing algorithm the key spec does not
+offer is refused. So is `Sign` against an encryption key, and `Encrypt` against a signing key.
+
+`DescribeKey` reports the key's own spec, usage and algorithms, so code that branches on them
+branches the same way it would on AWS.
+
+### Verifying outside KMS
+
+`GetPublicKey` returns the public key as DER `SubjectPublicKeyInfo`, the encoding real KMS returns.
+A verifier that never sees the simulator accepts a signature made in it.
+
+```typescript sim-kms-public-key
+/**
+ * Verifying a simulated KMS signature outside KMS, with its public key.
+ */
+
+import { createPublicKey, verify } from "node:crypto";
+
+import {
+  CreateKeyCommand,
+  GetPublicKeyCommand,
+  SignCommand,
+} from "@aws-sdk/client-kms";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const kms = simAws.kms();
+
+const created = await kms.createKey(
+  new CreateKeyCommand({
+    KeySpec: "ECC_NIST_P256",
+    KeyUsage: "SIGN_VERIFY",
+  }),
+);
+
+const message = Buffer.from("order-1234", "utf8");
+
+const signed = await kms.sign(
+  new SignCommand({
+    KeyId: created.KeyMetadata?.Arn,
+    Message: message,
+    SigningAlgorithm: "ECDSA_SHA_256",
+  }),
+);
+
+const fetched = await kms.getPublicKey(
+  new GetPublicKeyCommand({ KeyId: created.KeyMetadata?.Arn }),
+);
+
+const publicKey = createPublicKey({
+  key: Buffer.from(fetched.PublicKey ?? new Uint8Array()),
+  format: "der",
+  type: "spki",
+});
+
+console.log(
+  verify("sha256", message, publicKey, signed.Signature ?? new Uint8Array()),
+); // true
+```
+
+ECDSA signatures are DER encoded, and RSASSA-PSS signatures use a salt the length of the digest,
+both matching what KMS produces. `GetPublicKey` against a symmetric key is
+`UnsupportedOperationException`, since there is no public key to hand out.
+
 ## Key policies and IAM
 
 Every KMS key has a policy, and it cannot be removed. An IAM policy granting `kms:Decrypt` reaches
@@ -457,9 +577,10 @@ created without them and each one is recorded in
 [`stack.ignoredProperties`](../cloudformation/README.md#properties-a-resource-was-created-without),
 so a template deploys and the record says what the key does not do. `EnableKeyRotation`,
 `RotationPeriodInDays`, `MultiRegion` and `Tags` are all recorded that way: the key encrypts and
-decrypts, its material never rotates, it exists in one region, and nothing reads its tags. An
-asymmetric or HMAC `KeySpec` or `KeyUsage`, or an `Origin` other than `AWS_KMS`, is still refused by
-`CreateKey` in the same terms it refuses an SDK caller, because there is no key to create at all.
+decrypts, its material never rotates, it exists in one region, and nothing reads its tags. A `KeySpec`
+or `KeyUsage` pair simulated KMS does not model, or an `Origin` other than `AWS_KMS`, is still
+refused by `CreateKey` in the same terms it refuses an SDK caller, because there is no key to
+create at all.
 `Enabled: false` is supported, and deploys a key that is disabled from the moment it exists.
 
 ## Inside a simulated Lambda handler
@@ -473,11 +594,12 @@ allowed to, by both the key policy and the role's identity policy, the same as o
 
 Sim KMS currently supports:
 
-- `CreateKeyCommand`, for symmetric encryption keys
+- `CreateKeyCommand`, for symmetric encryption keys and asymmetric signing keys
 - `DescribeKeyCommand` and `ListKeysCommand`
 - `GetKeyPolicyCommand` and `PutKeyPolicyCommand`
 - `EncryptCommand` and `DecryptCommand`, including encryption context
 - `GenerateDataKeyCommand`, by `KeySpec` or `NumberOfBytes`
+- `SignCommand`, `VerifyCommand` and `GetPublicKeyCommand`, for asymmetric signing keys
 - `CreateAliasCommand` and `ListAliasesCommand`, including AWS managed key aliases
 - `EnableKeyCommand`, `DisableKeyCommand`, `ScheduleKeyDeletionCommand`, `CancelKeyDeletionCommand`
 - Key policy evaluation by simulated IAM
@@ -489,8 +611,16 @@ Sim KMS currently supports:
 
 Current documented limitations:
 
-- Only symmetric encryption keys (`SYMMETRIC_DEFAULT`, `ENCRYPT_DECRYPT`) are simulated. Asymmetric
-  keys, HMAC keys, `Sign`, `Verify` and `ReEncrypt` are not.
+- Only encryption with a symmetric key and signing with an asymmetric key are simulated. Asymmetric
+  encryption (`RSAES_OAEP_SHA_1` and `RSAES_OAEP_SHA_256`), HMAC keys and `GENERATE_VERIFY_MAC`,
+  key agreement and `DeriveSharedSecret`, the `SM2` key spec, and `ReEncrypt` are not. An RSA key
+  asked for with `KeyUsage: ENCRYPT_DECRYPT` is refused, which real KMS allows.
+- `Sign` and `Verify` take a `MessageType` of `RAW` only. A `DIGEST` message is refused, because
+  Node cannot sign a digest that has already been computed: `crypto.sign` with no algorithm hashes
+  what it is given rather than signing it, so the signature would not be the one real KMS makes and
+  would not verify against the message anywhere outside the simulator.
+- Generating an RSA key pair is real key generation, so an `RSA_4096` key costs a second or so of
+  test time. The ECC specs are effectively free.
 - Imported key material and custom key stores are not simulated; `Origin` other than `AWS_KMS` is
   refused.
 - Grants (`CreateGrant` and friends) are not simulated.

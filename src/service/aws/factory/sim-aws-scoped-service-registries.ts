@@ -1,6 +1,7 @@
 import { SimAcmRegistry } from "../../acm/registry/sim-acm-registry.js";
 import { SimCognitoDomainRegistry } from "../../cognito/registry/sim-cognito-domain-registry.js";
 import { SimCognitoUserPoolRegistry } from "../../cognito/registry/sim-cognito-user-pool-registry.js";
+import { SimKmsRegistry } from "../../kms/registry/sim-kms-registry.js";
 import { SimRoute53Registry } from "../../route53/registry/sim-route53-registry.js";
 import { SimS3GlobalRegistry } from "../../s3/sim-s3-global-registry.js";
 
@@ -34,6 +35,13 @@ export class SimAwsScopedServiceRegistries {
    * where DNS resolution finds the pool a hosted request is for.
    */
   public readonly cognitoDomains = new SimCognitoDomainRegistry();
+
+  /**
+   * Indexes the account/region-scoped KMS facades created for one SimAws
+   * instance, so services holding only a key ARN, such as Route53 DNSSEC, can
+   * resolve the key it names.
+   */
+  public readonly kms = new SimKmsRegistry();
 
   /**
    * Owns hosted zone and DNS record state shared by the account-scoped Route53

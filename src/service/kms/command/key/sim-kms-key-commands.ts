@@ -48,7 +48,7 @@ export class SimKmsKeyCommands {
     command: SimCreateKeyCommand,
     options?: SimKmsRequestOptions,
   ): SimCreateKeyCommandOutput {
-    this.keyType.require(
+    const keySpec = this.keyType.require(
       command.input.KeyUsage,
       command.input.KeySpec,
       command.input.Origin,
@@ -58,6 +58,7 @@ export class SimKmsKeyCommands {
     const key = this.keyFactory.make({
       description: command.input.Description,
       policy: this.policyDocument.parseOptional(command.input.Policy),
+      keySpec,
     });
 
     this.keys.add(key);

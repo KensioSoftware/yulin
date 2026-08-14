@@ -24,6 +24,11 @@ import type {
   SimPutKeyPolicyCommand,
   SimScheduleKeyDeletionCommand,
 } from "../command/key/key.command.js";
+import type {
+  SimGetPublicKeyCommand,
+  SimSignCommand,
+  SimVerifyCommand,
+} from "../command/sign/sign.command.js";
 import type { SimKms } from "../sim-kms.js";
 
 /**
@@ -151,6 +156,30 @@ export class SimKmsSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simKms.generateDataKey(
             command as SimGenerateDataKeyCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "SignCommand",
+        async (command, context): Promise<unknown> =>
+          await simKms.sign(
+            command as SimSignCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "VerifyCommand",
+        async (command, context): Promise<unknown> =>
+          await simKms.verify(
+            command as SimVerifyCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "GetPublicKeyCommand",
+        async (command, context): Promise<unknown> =>
+          await simKms.getPublicKey(
+            command as SimGetPublicKeyCommand,
             simSdkCallerOptions(context),
           ),
       ],

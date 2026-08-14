@@ -3,13 +3,17 @@ import {
   CreateKeyCommand,
   DecryptCommand,
   EncryptCommand,
+  GetPublicKeyCommand,
   KMSClient,
+  SignCommand,
+  VerifyCommand,
 } from "@aws-sdk/client-kms";
 import { CreateFunctionCommand, InvokeCommand } from "@aws-sdk/client-lambda";
 import {
   assertIdentical,
   assertNonNullable,
   assertStringIncludes,
+  assertTrue,
 } from "@kensio/smartass";
 import { SimSdk } from "../../../sdk/index.js";
 import { describe, it } from "vitest";
@@ -21,6 +25,43 @@ const emptyBytes = new Uint8Array();
 const plaintext = Uint8Array.from(Buffer.from("hunter2", "utf8"));
 
 describe("KMS SDK interception", () => {
+  it("routes the signing Commands to simulated KMS", async () => {
+    // Given an intercepted KMS SDK client and an asymmetric signing key.
+    using simSdk = new SimSdk();
+    simSdk.intercept(KMSClient);
+
+    const kmsClient = new KMSClient({ region: "eu-west-2" });
+    const created = await kmsClient.send(
+      new CreateKeyCommand({
+        KeySpec: "ECC_NIST_P256",
+        KeyUsage: "SIGN_VERIFY",
+      }),
+    );
+    const KeyId = created.KeyMetadata?.KeyId;
+
+    // When ordinary SDK code signs, verifies and reads the public key.
+    const signed = await kmsClient.send(
+      new SignCommand({
+        KeyId,
+        Message: plaintext,
+        SigningAlgorithm: "ECDSA_SHA_256",
+      }),
+    );
+    const verified = await kmsClient.send(
+      new VerifyCommand({
+        KeyId,
+        Message: plaintext,
+        Signature: signed.Signature,
+        SigningAlgorithm: "ECDSA_SHA_256",
+      }),
+    );
+    const publicKey = await kmsClient.send(new GetPublicKeyCommand({ KeyId }));
+
+    // Then all three reached the simulation.
+    assertTrue(verified.SignatureValid);
+    assertIdentical(publicKey.KeySpec, "ECC_NIST_P256");
+  });
+
   it("routes an intercepted KMSClient to simulated KMS", async () => {
     // Given an intercepted KMS SDK client.
     const simSdk = new SimSdk();
