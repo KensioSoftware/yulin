@@ -19,4 +19,12 @@ export interface SimScheduleDialect {
    * is refused rather than read as one hour.
    */
   readonly requiresRateAgreement: boolean;
+
+  /**
+   * Whether `at(...)`, a single instant, is one of the forms this dialect
+   * takes. EventBridge Scheduler has one-time schedules and an EventBridge
+   * rule has no equivalent, so a rule written with one is refused rather than
+   * created as a rule that never fires.
+   */
+  readonly allowsOneTime: boolean;
 }

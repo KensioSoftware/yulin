@@ -1,3 +1,4 @@
+import { SimAtExpression } from "./at/sim-at-expression.js";
 import { SimCronExpression } from "./cron/sim-cron-expression.js";
 import { SimRateExpression } from "./rate/sim-rate-expression.js";
 import type { SimScheduleDialect } from "./sim-schedule-dialect.js";
@@ -69,9 +70,14 @@ export class SimSchedule {
       return SimCronExpression.of(dialect.cronFields, body);
     }
 
+    if (read["kind"] === "at" && dialect.allowsOneTime) {
+      return SimAtExpression.of(body);
+    }
+
     throw new SimScheduleExpressionError(
-      `a schedule expression is a 'rate(...)' or a 'cron(...)', and this one ` +
-        `is a '${String(read["kind"])}(...)'`,
+      `a schedule expression is a ${dialect.allowsOneTime ? "'at(...)', a " : ""}` +
+        `'rate(...)' or a 'cron(...)', and this one is a ` +
+        `'${String(read["kind"])}(...)'`,
     );
   }
 

@@ -15,6 +15,7 @@ import type { SimDynamoDb as SimDynamoDatabase } from "../../dynamodb/index.js";
 import type { SimRekognition } from "../../rekognition/index.js";
 import type { SimRoute53 } from "../../route53/index.js";
 import type { SimS3 } from "../../s3/sim-s3.js";
+import type { SimScheduler } from "../../scheduler/index.js";
 import type { SimIam } from "../../iam/index.js";
 import { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
 import type { SimKms } from "../../kms/index.js";
@@ -197,6 +198,11 @@ export class SimAwsServiceFactory {
   /** Create simulated Secrets Manager for an Account Region scope. */
   createSecretsManager(scope: SimAwsAccountRegionContainer): SimSecretsManager {
     return this.accountRegionServices.createSecretsManager(scope);
+  }
+
+  /** Create simulated EventBridge Scheduler for an Account Region scope. */
+  createScheduler(scope: SimAwsAccountRegionContainer): SimScheduler {
+    return this.accountRegionServices.createScheduler(scope);
   }
 
   /** Create simulated SNS for an Account Region scope. */

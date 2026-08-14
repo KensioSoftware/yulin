@@ -15,12 +15,15 @@ import {
  *
  * Six cron fields, and a rate whose unit has to agree with its value:
  * `rate(1 hours)` is refused by real EventBridge rather than read as one hour.
- * EventBridge Scheduler is a separate service with its own dialect, which is
- * why this is a value here rather than the parser's own assumption.
+ * A rule has no one-time form either, so `at(...)` is not one of the shapes it
+ * takes. EventBridge Scheduler is a separate service with a different answer to
+ * all three, which is why this is a value here rather than the parser's own
+ * assumption.
  */
 export const eventBridgeScheduleDialect: SimScheduleDialect = {
   cronFields: awsCronFieldSpecs,
   requiresRateAgreement: true,
+  allowsOneTime: false,
 };
 
 /**

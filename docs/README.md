@@ -18,6 +18,7 @@ behaviour and includes example code that can be copied into tests or local devel
 - [Rekognition](./services/rekognition/ "Simulated Rekognition usage docs")
 - [Route53](./services/route53/ "Simulated Route53 usage docs")
 - [S3](./services/s3/ "Simulated S3 usage docs")
+- [Scheduler](./services/scheduler/ "Simulated EventBridge Scheduler usage docs")
 - [Secrets Manager](./services/secretsmanager/ "Simulated Secrets Manager usage docs")
 - [SNS](./services/sns/ "Simulated SNS usage docs")
 - [SQS](./services/sqs/ "Simulated SQS usage docs")

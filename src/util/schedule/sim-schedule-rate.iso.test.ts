@@ -11,6 +11,7 @@ import { SimScheduleExpressionError } from "./sim-schedule.error.js";
 const strict: SimScheduleDialect = {
   cronFields: awsCronFieldSpecs,
   requiresRateAgreement: true,
+  allowsOneTime: false,
 };
 
 /**
@@ -19,6 +20,7 @@ const strict: SimScheduleDialect = {
 const lenient: SimScheduleDialect = {
   cronFields: awsCronFieldSpecs,
   requiresRateAgreement: false,
+  allowsOneTime: false,
 };
 
 const noon = new Date("2026-07-26T12:00:00.000Z");

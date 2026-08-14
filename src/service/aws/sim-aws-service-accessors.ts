@@ -15,6 +15,7 @@ import type { SimLambda } from "../lambda/index.js";
 import type { SimRekognition } from "../rekognition/index.js";
 import type { SimRoute53 } from "../route53/index.js";
 import type { SimS3 } from "../s3/sim-s3.js";
+import type { SimScheduler } from "../scheduler/index.js";
 import type { SimSecretsManager } from "../secretsmanager/index.js";
 import type { SimEventBridge } from "../eventbridge/index.js";
 import type { SimSns } from "../sns/index.js";
@@ -81,6 +82,11 @@ export abstract class SimAwsServiceAccessors {
   /** Get simulated EventBridge in the default Account Region scope. */
   eventBridge(): SimEventBridge {
     return this.defaultAccountRegionScope().eventBridge();
+  }
+
+  /** Get simulated EventBridge Scheduler in the default Account Region scope. */
+  scheduler(): SimScheduler {
+    return this.defaultAccountRegionScope().scheduler();
   }
 
   /** Get simulated IAM in the default Account scope. */

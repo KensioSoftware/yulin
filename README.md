@@ -32,6 +32,7 @@ npm i -D @kensio/yulin
 - [Rekognition](./docs/services/rekognition "Simulated Rekognition docs")
 - [Route53](./docs/services/route53 "Simulated Route53 docs")
 - [S3](./docs/services/s3 "Simulated S3 docs")
+- [Scheduler](./docs/services/scheduler "Simulated EventBridge Scheduler docs")
 - [Secrets Manager](./docs/services/secretsmanager "Simulated Secrets Manager docs")
 - [SNS](./docs/services/sns "Simulated SNS docs")
 - [SQS](./docs/services/sqs "Simulated SQS docs")
