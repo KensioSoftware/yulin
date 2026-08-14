@@ -15,6 +15,8 @@ export interface SimCfnLambdaFunctionProperties {
   readonly functionName: string;
   readonly roleArn: string;
   readonly code: SimLambdaFunctionCode | undefined;
+  readonly imageUri: string | undefined;
+  readonly packageType: string | undefined;
   readonly handlerName: string | undefined;
   readonly runtimeName: string | undefined;
   readonly description: string | undefined;
@@ -64,10 +66,18 @@ export class SimCfnLambdaFunctionPropertiesParser {
     resource: SimCfnResource,
     properties: SimCfnTemplateValueRecord,
   ): SimCfnLambdaFunctionProperties {
+    const parsedCode = this.codeParser.parse(resource, properties["Code"]);
+
     return {
       functionName: this.functionName(resource, properties),
       roleArn: this.roleArn(resource, properties),
-      code: this.codeParser.parse(resource, properties["Code"]),
+      code: parsedCode.code,
+      imageUri: parsedCode.imageUri,
+      packageType: this.propertyParser.optionalString(
+        resource,
+        properties["PackageType"],
+        "PackageType",
+      ),
       handlerName: this.propertyParser.optionalString(
         resource,
         properties["Handler"],

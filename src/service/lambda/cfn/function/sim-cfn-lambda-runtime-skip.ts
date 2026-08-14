@@ -11,11 +11,15 @@ const nodeJsRuntimePrefix = "nodejs";
  * Skips template functions declaring a runtime sim Lambda does not simulate.
  *
  * Yulin is a Node.js simulator: function code is evaluated as CommonJS modules
- * in a vm, so a Python, Java, Go or container function cannot run whatever its
- * code says. CDK synthesizes such functions into a user's stack without being
- * asked to. The CDK BucketDeployment provider, for instance, is a Python
- * function, and sim CloudFormation simulates that custom resource directly
- * rather than running its provider.
+ * in a vm, so a Python, Java or Go function cannot run whatever its code says.
+ * CDK synthesizes such functions into a user's stack without being asked to.
+ * The CDK BucketDeployment provider, for instance, is a Python function, and
+ * sim CloudFormation simulates that custom resource directly rather than
+ * running its provider.
+ *
+ * A container image function is not declined here. It declares no Runtime at
+ * all, so there is nothing for this gate to match on, and
+ * SimCfnLambdaImageSkip declines it instead.
  *
  * Declining those functions on their Runtime keeps the reason honest, and
  * keeps their code from being loaded at all. A function with an executable
