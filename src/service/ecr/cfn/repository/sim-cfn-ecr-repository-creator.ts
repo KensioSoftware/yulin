@@ -45,13 +45,29 @@ export class SimCfnEcrRepositoryCreator {
   /**
    * Delete a repository created from an AWS::ECR::Repository Resource.
    *
-   * The simulated images go with it. They are handlers a test registered
-   * rather than artifacts a pipeline pushed, so there is nothing here for the
-   * refusal real ECR makes over a repository that still holds images to
-   * protect, and a teardown that could not remove a repository would leave a
-   * later deploy of the same template adopting the old one.
+   * A repository holding a simulated image is left where it is, and the
+   * deletion is recorded as skipped. The image is a handler registered outside
+   * any stack, usually in test setup, and it is the whole reason the
+   * repository is the place to say what an image is: it outlives the stack
+   * that declared it. Taking it down with one stack would leave the next
+   * deploy resolving nothing.
+   *
+   * Real ECR refuses to delete a repository that still holds images too,
+   * which fails the stack unless the template says `EmptyOnDelete`. This
+   * records the refusal rather than failing the teardown, because what is
+   * being protected here is a test's own registration rather than anything
+   * CloudFormation put there.
    */
-  delete(repository: SimEcrRepository): void {
+  delete(resource: SimCfnResource, repository: SimEcrRepository): void {
+    if (repository.hasImage) {
+      throw new Error(
+        `Unsupported sim ECR CloudFormation Resource ${resource.logicalId} ` +
+          `deletion: the simulated ECR repository ` +
+          `${repository.repositoryName} holds a simulated image, which ` +
+          `outlives the Stack that declared the repository`,
+      );
+    }
+
     this.ecr.deleteRepository(repository.repositoryName);
   }
 }

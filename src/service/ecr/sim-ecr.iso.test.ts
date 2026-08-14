@@ -153,6 +153,27 @@ describe("SimEcr simulated images", () => {
     assertIdentical(repository.image("latest")?.handler, second);
   });
 
+  it("counts a replaced tag as the image registered most recently", () => {
+    // Given a tag registered, another registered after it, and then the first
+    // one registered again.
+    const repository = new SimAws().ecr().repository("orders");
+    const replacement = (): string => "blue again";
+
+    repository
+      .simulateImage({ imageTag: "blue", handler: () => "blue" })
+      .simulateImage({ imageTag: "green", handler: () => "green" })
+      .simulateImage({ imageTag: "blue", handler: replacement });
+
+    // When a tag the repository does not hold is asked for.
+    const image = repository.image("2f0e1dab4c");
+
+    // Then the replacement is what answers, because registering a tag again
+    // is the most recent registration whatever order the tags first arrived
+    // in.
+    assertIdentical(image?.handler, replacement);
+    assertArrayLength(repository.images(), 2);
+  });
+
   it("holds no image until one is registered", () => {
     // Given a repository nothing has registered an image in.
     const repository = new SimAws().ecr().repository("orders");

@@ -187,8 +187,8 @@ describe("AWS::ECR::Repository", () => {
     await simAws.backgroundTasksComplete();
   });
 
-  it("removes the repository when the stack is torn down", async () => {
-    // Given a deployed repository stack.
+  it("removes an empty repository when the stack is torn down", async () => {
+    // Given a deployed repository nothing has registered an image in.
     const simAws = new SimAws();
     const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "platform-stack",
@@ -201,8 +201,46 @@ describe("AWS::ECR::Repository", () => {
     await stack.teardown();
     await simAws.backgroundTasksComplete();
 
-    // Then the repository goes with it.
+    // Then the repository goes with it, since nothing was holding on to it.
     assertFalse(simAws.ecr().hasRepository("orders"));
+    assertIdentical(
+      stack.resources.get("OrdersRepository")?.status,
+      "DELETE_COMPLETE",
+    );
+  });
+
+  it("keeps a repository holding an image through a teardown", async () => {
+    // Given a deployed repository a test registered a handler in, which is
+    // where the handler lives for every stack that runs that image.
+    const simAws = new SimAws();
+    const stack = await simAws.cloudFormation().deployTemplate({
+      stackName: "platform-stack",
+      template: repositoryTemplate,
+    });
+
+    await stack.waitForDeployComplete();
+
+    simAws
+      .ecr()
+      .repository("orders")
+      .simulateImage({ handler: () => "held" });
+
+    // When the Stack's Resources are torn down.
+    await stack.teardown();
+    await simAws.backgroundTasksComplete();
+
+    // Then the repository and its image outlive the Stack, and the deletion
+    // is recorded rather than failing the teardown.
+    assertTrue(simAws.ecr().repository("orders").hasImage);
+
+    const resource = stack.resources.get("OrdersRepository");
+
+    assertTrue(resource?.deletionSkipped ?? false);
+    assertNonNullable(resource?.deletionSkippedReason);
+    assertStringIncludes(
+      resource.deletionSkippedReason,
+      "the simulated ECR repository orders holds a simulated image",
+    );
   });
 
   it("refuses an ECR Resource type it does not simulate", async () => {

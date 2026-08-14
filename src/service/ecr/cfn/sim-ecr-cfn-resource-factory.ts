@@ -67,7 +67,7 @@ export class SimEcrCfnResourceFactory implements SimCfnServiceResourceFactory {
       `sim ECR repository for CloudFormation Resource ${resource.logicalId}`,
     );
 
-    this.repositoryCreator.delete(repository);
+    this.repositoryCreator.delete(resource, repository);
 
     return Promise.resolve();
   }

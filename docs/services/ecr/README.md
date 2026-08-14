@@ -91,21 +91,27 @@ are names and an image URI is not one. A name real ECR would refuse is refused h
 
 ## How an image URI is matched
 
-A function's `Code.ImageUri` is matched to a repository on the registry host and the repository
-name, with the tag and any digest ignored.
+Resolving an image URI happens in two steps, and the tag means something different in each.
 
-The tag is ignored because no tag is stable enough to write into a test. A CDK image asset is tagged
-with the asset content hash, which changes whenever the image source does, and a pipeline-built
-image is usually tagged with a git sha or a build number passed in as a stack parameter. An
-`ImageUri` built by `Fn::Sub` or from a stack parameter is matched on what it resolves to.
+Finding the repository ignores the tag. A function's `Code.ImageUri` is matched on the registry host
+and the repository name, with any tag or digest dropped, because no tag is stable enough to write
+into a test: a CDK image asset is tagged with the asset content hash, which changes whenever the
+image source does, and a pipeline-built image is usually tagged with a git sha or a build number
+passed in as a stack parameter. An `ImageUri` built by `Fn::Sub` or from a stack parameter is
+matched on what it resolves to.
+
+Choosing the image in that repository does read the tag. A tag the repository holds selects exactly
+that image, and any other tag, or none at all, falls back to the image registered most recently.
 
 The registry host is part of the match, so the account and the region have to agree. A function can
 run an image from another account's repository, as it can on real AWS, and a same-named repository
 in another account is a different repository.
 
-A repository holding more than one tagged image answers a tag it holds with exactly that image, and
-any other tag with the image registered most recently. That is how a blue/green pair of images in
-one repository can back two functions differently.
+So `orders:blue` runs the handler registered under `blue` where there is one, and the handler
+registered most recently where there is not. That is how a blue/green pair of images in one
+repository can back two functions differently, while a content hash tag nobody registered still
+finds something to run. Registering a tag again both replaces what it held and makes it the most
+recent registration.
 
 ```typescript sim-ecr-image-tags
 /**
@@ -232,8 +238,14 @@ await simAws.backgroundTasksComplete();
 
 A repository a handler is already registered in is adopted rather than replaced, so the order these
 happen in does not matter: the image exists before the stack that declares the repository, as it
-does in real life. Tearing the stack down removes the repository, and the simulated images it holds
-go with it.
+does in real life.
+
+Tearing the stack down removes the repository only where it holds no simulated image. One that does
+is left where it is, and the deletion is recorded as skipped, because the handler in it was
+registered outside any stack and is what every later deploy resolves to. Real ECR also refuses to
+delete a repository that still holds images, which fails the stack unless the template says
+`EmptyOnDelete`; the refusal is recorded rather than failing the teardown here, since what is being
+protected is a test's own registration.
 
 Every other property a repository can declare is about image content, so each one is recorded as an
 ignored property and the repository is created without it. That covers
@@ -259,8 +271,8 @@ registered.
 
 - Repositories, made by naming them, scoped by account and region
 - `simulateImage`, registering a real in-process handler as the image under a tag
-- Resolution of a Lambda `Code.ImageUri` to that handler, matching on registry host and repository
-  name and ignoring the tag
+- Resolution of a Lambda `Code.ImageUri` to that handler, finding the repository on registry host
+  and name alone, then reading the tag to choose between the images it holds
 - Functions created from a repository image through CloudFormation and through `CreateFunction`
 - Images resolved across accounts and regions, as real Lambda pulls across them
 - `AWS::ECR::Repository`, answering `Ref` with the repository name and `Fn::GetAtt` with `Arn` and
@@ -282,9 +294,11 @@ Current documented limitations:
   not enforced, so registering the same tag again replaces what it held.
 - Naming a repository creates it. There is no `CreateRepository` to fail for a name already taken,
   and no way to ask whether a repository exists without making one, other than `hasRepository`.
-- A repository is deleted with the images it holds, where real ECR refuses to delete one that still
-  holds images unless it is emptied first. A simulated image is a handler a test registered rather
-  than an artifact anything could lose.
+- A stack teardown records the deletion of a repository holding a simulated image rather than
+  failing, where real CloudFormation fails the stack unless the template says `EmptyOnDelete`. The
+  repository and its handler are left in place. `EmptyOnDelete` itself is not read.
+- Nothing tracks which stack created a repository. A repository holding no simulated image is
+  removed by the teardown of any stack that declared it, and made again by the next deploy.
 - Repository tags, registry policies, pull through cache rules, replication configuration and
   ECR Public are not simulated.
 - ECR is not served as an HTTP API by `serveSimAws`, and there is nothing for a Docker client to

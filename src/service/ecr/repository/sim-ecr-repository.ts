@@ -70,12 +70,17 @@ export class SimEcrRepository {
    * is deliberate: real `PutImage` takes an image manifest for layers that
    * were pushed over the Docker registry protocol, and none of that exists
    * here. Registering the same tag again replaces what it held.
+   *
+   * A replaced tag is taken out before it goes back in, because a Map keeps a
+   * key it already has where it first went. Without that, the image registered
+   * most recently would not be the one an untagged reference resolves to.
    */
   simulateImage<TEvent = never, TResult = unknown>(
     input: SimEcrSimulatedImageInput<TEvent, TResult>,
   ): this {
     const imageTag = input.imageTag ?? "latest";
 
+    this.imagesByTag.delete(imageTag);
     this.imagesByTag.set(
       imageTag,
       new SimEcrImage({ imageTag, handler: input.handler }),

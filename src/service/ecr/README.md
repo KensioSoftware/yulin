@@ -50,11 +50,15 @@ match.
 handler function is the only thing this simulator can run, and a duplicate structural type would
 only have to be kept in step with it.
 
-A repository resolves a reference to a tag it holds with exactly that image, and any other tag, or
-none, with the image registered most recently. Resolution ignoring the tag is the same decision
-deploy-time image bindings made: no tag is stable enough to write into a test, since a CDK image
-asset is tagged with a content hash and a pipeline-built image with a build number. Honouring a tag
-it does hold is what makes registering two of them mean anything.
+Finding a repository ignores the tag, which is the same decision deploy-time image bindings made: no
+tag is stable enough to write into a test, since a CDK image asset is tagged with a content hash and
+a pipeline-built image with a build number. Choosing an image within that repository does read it: a
+tag the repository holds answers with exactly that image, and any other tag, or none, with the image
+registered most recently. Honouring a tag it does hold is what makes registering two of them mean
+anything.
+
+Registering a tag again takes it out of the map before putting it back, so the replacement counts as
+the most recent registration rather than keeping the position the tag first went in at.
 
 ## Resolving an image URI
 
@@ -82,3 +86,9 @@ image is pushed by whatever built it, long before the stack that runs it.
 `SimCfnEcrRepositoryPropertyRules` records every other property as ignored. All of them describe
 image content, so a repository created without them is still a repository that does what one does
 here.
+
+A teardown removes a repository holding no simulated image, and records the deletion of one that
+holds an image rather than carrying it out. The handler in it was registered outside any stack, and
+it is what every later deploy resolves to, so taking it down with one stack would leave the next one
+resolving nothing. Real ECR refuses that deletion as well, which fails the stack unless the template
+says `EmptyOnDelete`; recording it keeps a teardown from failing over a test's own registration.
