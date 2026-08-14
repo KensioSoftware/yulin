@@ -132,13 +132,20 @@ export class SimEventTargetArn {
   }
 
   /**
-   * The name of a Lambda function this ARN names.
+   * The name of a Lambda function this ARN names, or nothing when it names
+   * something else in Lambda.
    *
    * A function ARN's resource is `function:<name>`, and may carry a version or
    * alias after a second colon, which this simulation does not model and so
-   * reads as part of nothing.
+   * reads as part of nothing. The resource type is checked rather than
+   * assumed, because Lambda writes more than functions this way: a layer is
+   * `layer:<name>` and an event source mapping is
+   * `event-source-mapping:<uuid>`, and taking the part after the first colon
+   * would read either as a function that is not there.
    */
   get functionName(): string {
-    return this.resource.split(":", 2)[1] ?? "";
+    const [resourceType, name = ""] = this.resource.split(":", 2);
+
+    return resourceType === "function" ? name : "";
   }
 }
