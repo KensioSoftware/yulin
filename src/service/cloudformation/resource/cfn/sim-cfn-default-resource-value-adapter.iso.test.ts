@@ -12,15 +12,15 @@ import type { CfnTemplateBodyRecord } from "../../template/sim-cfn-template.js";
  * A template whose only Resource is one no service claims, referenced both
  * ways, so a test can read what a skipped Resource answers with.
  */
-const skippedRuleTemplate: CfnTemplateBodyRecord = {
+const skippedAlarmTemplate: CfnTemplateBodyRecord = {
   Resources: {
     AlarmRule: {
-      Type: "AWS::Events::Rule",
+      Type: "AWS::CloudWatch::Alarm",
     },
   },
   Outputs: {
-    RuleRef: { Value: { Ref: "AlarmRule" } },
-    RuleArn: { Value: { "Fn::GetAtt": ["AlarmRule", "Arn"] } },
+    AlarmRef: { Value: { Ref: "AlarmRule" } },
+    AlarmArn: { Value: { "Fn::GetAtt": ["AlarmRule", "Arn"] } },
   },
 };
 
@@ -32,13 +32,13 @@ describe("skipped CloudFormation Resource values", () => {
     // When the template is deployed.
     const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "stand-in-stack",
-      template: skippedRuleTemplate,
+      template: skippedAlarmTemplate,
     });
     await stack.waitForDeployComplete();
 
     // Then the Ref resolved to the logical ID rather than failing the
     // Resources that hold it.
-    assertIdentical(stack.outputs.get("RuleRef")?.value, "AlarmRule");
+    assertIdentical(stack.outputs.get("AlarmRef")?.value, "AlarmRule");
   });
 
   it("answers an Fn::GetAtt with the logical ID and attribute name", async () => {
@@ -49,13 +49,13 @@ describe("skipped CloudFormation Resource values", () => {
     // When the template is deployed.
     const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "stand-in-stack",
-      template: skippedRuleTemplate,
+      template: skippedAlarmTemplate,
     });
     await stack.waitForDeployComplete();
 
     // Then the attribute resolved to a stand-in that is deliberately not
     // ARN-shaped, so it fails closed wherever it is read as one.
-    assertIdentical(stack.outputs.get("RuleArn")?.value, "AlarmRule.Arn");
+    assertIdentical(stack.outputs.get("AlarmArn")?.value, "AlarmRule.Arn");
   });
 
   it("records the skip the stand-ins came from", async () => {
@@ -65,7 +65,7 @@ describe("skipped CloudFormation Resource values", () => {
     // When the template is deployed.
     const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "stand-in-stack",
-      template: skippedRuleTemplate,
+      template: skippedAlarmTemplate,
     });
     await stack.waitForDeployComplete();
 
@@ -74,7 +74,7 @@ describe("skipped CloudFormation Resource values", () => {
     assertArrayLength(stack.skippedResources, 1);
     assertStringIncludes(
       stack.getResource("AlarmRule")?.skippedReason ?? "",
-      "Unsupported sim CloudFormation Resource service Events",
+      "Unsupported sim CloudFormation Resource service CloudWatch",
     );
   });
 });

@@ -382,6 +382,112 @@ That is the caller's own permission to manage schedules, and it is a separate qu
 schedule's execution role may invoke its target. The second is asked when the schedule fires, against
 the `RoleArn` on the target rather than against whoever created the schedule.
 
+## Deploying from a CloudFormation template
+
+`AWS::Scheduler::Schedule` deploys through [simulated CloudFormation](../cloudformation/), so a stack
+that declares its schedules rather than calling the SDK can be exercised end to end. Everything the
+Resource carries lines up with `CreateSchedule`, and a target ARN or execution role resolved by
+`Fn::GetAtt` from the same template works as it would in a real deployment.
+
+```typescript sim-scheduler-cloudformation
+/**
+ * A schedule deployed from a template, firing as simulated time advances.
+ */
+
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import { ReceiveMessageCommand } from "@aws-sdk/client-sqs";
+
+import { SimAws, SimFixedClock } from "@kensio/yulin";
+
+const simAws = new SimAws({
+  clock: new SimFixedClock(new Date("2026-07-26T09:00:00.000Z")),
+});
+
+const queueArn = "arn:aws:sqs:us-east-1:888888888888:reports";
+const roleArn = "arn:aws:iam::888888888888:role/SchedulerRole";
+
+// The execution role has to trust Scheduler, and be allowed to send.
+await simAws.iam().createRole(
+  new CreateRoleCommand({
+    RoleName: "SchedulerRole",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { Service: "scheduler.amazonaws.com" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+
+await simAws.iam().putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "SchedulerRole",
+    PolicyName: "SendReports",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Action: "sqs:SendMessage",
+        Resource: queueArn,
+      },
+    }),
+  }),
+);
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "reporting-stack",
+  template: {
+    Resources: {
+      ReportQueue: {
+        Type: "AWS::SQS::Queue",
+        Properties: { QueueName: "reports" },
+      },
+      HourlyReport: {
+        Type: "AWS::Scheduler::Schedule",
+        Properties: {
+          Name: "hourly-report",
+          ScheduleExpression: "rate(1 hour)",
+          FlexibleTimeWindow: { Mode: "OFF" },
+          Target: {
+            Arn: { "Fn::GetAtt": ["ReportQueue", "Arn"] },
+            RoleArn: roleArn,
+            Input: JSON.stringify({ report: "hourly" }),
+          },
+        },
+      },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+
+// Three simulated hours on, the schedule has invoked its target three times.
+await simAws.clock().advanceBy({ hours: 3 });
+
+const received = await simAws.sqs().receiveMessage(
+  new ReceiveMessageCommand({
+    QueueUrl: "https://sqs.us-east-1.amazonaws.com/888888888888/reports",
+    MaxNumberOfMessages: 10,
+  }),
+);
+
+console.log(received.Messages?.length); // 3
+
+// Nothing went wrong on the way, which is worth checking: a schedule that
+// could not reach its target says so here rather than by throwing.
+console.log(simAws.scheduler().deliveryFailures.length); // 0
+```
+
+`Ref` returns the schedule's **name** and `Fn::GetAtt ... Arn` its ARN, which carries the schedule
+group as it always does. A schedule the template does not name gets one generated from the stack name
+and the logical ID.
+
+A property this simulation does not model is refused at deploy time naming the Resource, rather than
+deploying a schedule that behaves differently from the one that was declared. Tearing the stack down
+removes the schedules it created, so nothing fires afterwards.
+
 ## Available functionality
 
 - `CreateSchedule`, `GetSchedule`, `UpdateSchedule`, `DeleteSchedule` and `ListSchedules`.
@@ -422,4 +528,5 @@ the `RoleArn` on the target rather than against whoever created the schedule.
   dropped.
 - `KmsKeyArn` is refused, and `ClientToken` is accepted and ignored: nothing here retries, so there is
   no request for it to make idempotent.
-- `AWS::Scheduler::Schedule` CloudFormation resources are not simulated.
+- `AWS::Scheduler::ScheduleGroup` is not simulated as a CloudFormation resource type.
+  `AWS::Scheduler::Schedule` is: see [deploying from a template](#deploying-from-a-cloudformation-template).

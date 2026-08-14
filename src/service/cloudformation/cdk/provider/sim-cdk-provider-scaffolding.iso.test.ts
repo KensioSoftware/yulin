@@ -122,7 +122,7 @@ describe("CDK custom Resource provider scaffolding [iso]", () => {
           Prune: false,
         },
       },
-      AlarmRule: { Type: "AWS::Events::Rule" },
+      AlarmRule: { Type: "AWS::CloudWatch::Alarm" },
     });
 
     // Then it deploys like any other, and the scaffolding around the two that

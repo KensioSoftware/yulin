@@ -586,27 +586,27 @@ const stack = await simAws.cloudFormation().deployTemplate({
   template: {
     Resources: {
       AlarmRule: {
-        Type: "AWS::Events::Rule",
+        Type: "AWS::CloudWatch::Alarm",
       },
     },
     Outputs: {
-      RuleRef: { Value: { Ref: "AlarmRule" } },
-      RuleArn: { Value: { "Fn::GetAtt": ["AlarmRule", "Arn"] } },
+      AlarmRef: { Value: { Ref: "AlarmRule" } },
+      AlarmArn: { Value: { "Fn::GetAtt": ["AlarmRule", "Arn"] } },
     },
   },
 });
 
 await stack.waitForDeployComplete();
 
-console.log(stack.outputs.get("RuleRef")?.value);
+console.log(stack.outputs.get("AlarmRef")?.value);
 // "AlarmRule"
 
-console.log(stack.outputs.get("RuleArn")?.value);
+console.log(stack.outputs.get("AlarmArn")?.value);
 // "AlarmRule.Arn"
 
 for (const skipped of stack.skippedResources) {
   console.log(skipped.logicalId, skipped.skippedReason);
-  // "AlarmRule Unsupported sim CloudFormation Resource service Events"
+  // "AlarmRule Unsupported sim CloudFormation Resource service CloudWatch"
 }
 ```
 
@@ -1781,7 +1781,7 @@ const stack = await simAws.cloudFormation().deployTemplate({
         },
       },
       AlarmRule: {
-        Type: "AWS::Events::Rule",
+        Type: "AWS::CloudWatch::Alarm",
       },
     },
   },
@@ -1793,7 +1793,7 @@ console.log(stack.skippedResources.map((resource) => resource.logicalId));
 // ["AlarmRule"]
 
 console.log(stack.getResource("AlarmRule")?.skippedReason);
-// "Unsupported sim CloudFormation Resource service Events"
+// "Unsupported sim CloudFormation Resource service CloudWatch"
 ```
 
 A skipped Resource is still in `stack.resources`, and still answers `Ref` and `Fn::GetAtt` with
@@ -1837,7 +1837,7 @@ const stack = await simAws.cloudFormation().deployTemplate({
         },
       },
       AlarmRule: {
-        Type: "AWS::Events::Rule",
+        Type: "AWS::CloudWatch::Alarm",
       },
     },
   },
@@ -2046,11 +2046,13 @@ The resource types it creates are:
 - `AWS::Cognito::UserPool`, `AWS::Cognito::UserPoolClient` and
   `AWS::Cognito::UserPoolGroup`
 - `AWS::DynamoDB::Table` and `AWS::DynamoDB::GlobalTable`
+- `AWS::Events::EventBus` and `AWS::Events::Rule`, with the rule's inline `Targets`
 - `AWS::IAM::Role`, `AWS::IAM::ManagedPolicy` and `AWS::IAM::Policy`
 - `AWS::KMS::Key` and `AWS::KMS::Alias`
 - `AWS::Lambda::Function`, `AWS::Lambda::Url` and `AWS::Lambda::Permission`
 - `AWS::Route53::HostedZone` and `AWS::Route53::RecordSet`
 - `AWS::S3::Bucket` and `AWS::S3::BucketPolicy`
+- `AWS::Scheduler::Schedule`
 - `AWS::SecretsManager::Secret`
 - `AWS::SQS::Queue`
 - `AWS::SSM::Parameter`

@@ -576,6 +576,104 @@ replacing a scheduled rule restarts the schedule from the replacement.
 A rule with no target still fires, and what it produced can be read with `eventsOn(...)`, which is
 useful for asserting on the schedule itself before there is anything to deliver to.
 
+## Deploying from a CloudFormation template
+
+`AWS::Events::EventBus` and `AWS::Events::Rule` deploy through
+[simulated CloudFormation](../cloudformation/), so a stack that declares its routing rather than
+calling the SDK can be exercised end to end. A rule carries its `EventPattern` or
+`ScheduleExpression`, its `State`, and its inline `Targets`, and a target ARN resolved by
+`Fn::GetAtt` from a function or queue in the same template works as it would in a real deployment.
+
+```typescript sim-event-bridge-cloudformation
+/**
+ * A rule and its target, deployed from a template rather than by the SDK.
+ */
+
+import { PutEventsCommand } from "@aws-sdk/client-eventbridge";
+
+import { SimAws } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+const handled: unknown[] = [];
+
+await simAws.lambda().createFunction({
+  input: {
+    FunctionName: "fulfilment",
+    Role: "arn:aws:iam::888888888888:role/FulfilmentRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput((event: unknown) => {
+        handled.push(event);
+        return { ok: true };
+      }),
+    },
+  },
+});
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "orders-stack",
+  template: {
+    Resources: {
+      OrdersRule: {
+        Type: "AWS::Events::Rule",
+        Properties: {
+          Name: "orders",
+          // A template carries the pattern as an object, where the API takes
+          // it as a string of JSON.
+          EventPattern: { source: ["orders.service"] },
+          Targets: [
+            {
+              Id: "fulfilment",
+              Arn: "arn:aws:lambda:us-east-1:888888888888:function:fulfilment",
+            },
+          ],
+        },
+      },
+      // The grant CDK emits alongside a Lambda target, and that the target
+      // needs here too.
+      PermissionForEventsToInvokeLambda: {
+        Type: "AWS::Lambda::Permission",
+        Properties: {
+          FunctionName: "fulfilment",
+          Action: "lambda:InvokeFunction",
+          Principal: "events.amazonaws.com",
+          SourceArn: { "Fn::GetAtt": ["OrdersRule", "Arn"] },
+        },
+      },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+
+await simAws.eventBridge().putEvents(
+  new PutEventsCommand({
+    Entries: [
+      {
+        Source: "orders.service",
+        DetailType: "OrderPlaced",
+        Detail: JSON.stringify({ orderId: "order-1" }),
+      },
+    ],
+  }),
+);
+
+await simAws.backgroundTasksComplete();
+
+console.log(handled.length); // 1
+```
+
+`Ref` returns the **name** of a bus or a rule, not its ARN, which is what AWS returns and what makes
+a bus `Ref` usable straight away as another resource's `EventBusName`. The ARN comes from
+`Fn::GetAtt ... Arn`, which is what an `AWS::Lambda::Permission` `SourceArn` needs. A rule the
+template does not name gets one generated from the stack name and the logical ID, as real
+CloudFormation generates one.
+
+A target property this simulation does not model, such as `InputTransformer` or `InputPath`, is
+refused at deploy time naming the property and the Resource, rather than deploying a rule that sends
+the whole event where one field was asked for. Tearing the stack down removes the buses, rules and
+targets it created.
+
 ## Deliveries that did not happen
 
 Real EventBridge tells the caller nothing about a failed delivery: a `PutEvents` that matched a rule
@@ -739,7 +837,10 @@ no permission for.
   `ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS` state are refused rather than simulated.
 - Deleting an event bus deletes its rules, and deleting a rule deletes its targets. Real EventBridge
   refuses to delete either while it still has what hangs off it.
-- `AWS::Events::*` CloudFormation resource types are not simulated.
+- `AWS::Events::EventBusPolicy`, `AWS::Events::Archive`, `AWS::Events::Connection` and
+  `AWS::Events::ApiDestination` are not simulated as CloudFormation resource types.
+  `AWS::Events::EventBus` and `AWS::Events::Rule` are: see
+  [deploying from a template](#deploying-from-a-cloudformation-template).
 - Event bus resource policies are not simulated. `PutPermission`, `RemovePermission` and the bus
   `Policy` attribute are all absent, so a caller from another account cannot be admitted to a bus,
   which is stricter than real AWS.

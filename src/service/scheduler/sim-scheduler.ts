@@ -15,6 +15,7 @@ import type { SimSchedulerDeliveryFailure } from "./delivery/sim-scheduler-deliv
 import { SimSchedulerCommands } from "./command/sim-scheduler-commands.js";
 import type { SimSchedulerRequestOptions } from "./command/sim-scheduler-request-options.js";
 import { SimSchedulerScheduleStore } from "./schedule/sim-scheduler-schedule-store.js";
+import { SimSchedulerCfnResourceFactory } from "./cfn/sim-scheduler-cfn-resource-factory.js";
 import { SimSchedulerSdkCommandRouter } from "./sdk/sim-scheduler-sdk-command-router.js";
 import { SimSchedulerInspection } from "./sim-scheduler-inspection.js";
 
@@ -49,6 +50,9 @@ export class SimScheduler extends SimSchedulerInspection {
   private readonly commands: SimSchedulerCommands;
   private readonly background: BackgroundScheduler;
   private readonly sdkRouter = new SimSchedulerSdkCommandRouter(this);
+  private readonly cfnFactory = new SimSchedulerCfnResourceFactory({
+    scheduler: this,
+  });
 
   constructor(properties: SimSchedulerProperties = {}) {
     super();
@@ -139,5 +143,12 @@ export class SimScheduler extends SimSchedulerInspection {
    */
   sdkCommandRouter(): SimSdkCommandRouter {
     return this.sdkRouter;
+  }
+
+  /**
+   * Get this service's CloudFormation Resource factory.
+   */
+  cfnResourceFactory(): SimSchedulerCfnResourceFactory {
+    return this.cfnFactory;
   }
 }
