@@ -25,8 +25,8 @@ export function compareSimDynamoDbMagnitudes(
   first: string,
   second: string,
 ): number {
-  const [firstWhole = "", firstFraction = ""] = first.split(".");
-  const [secondWhole = "", secondFraction = ""] = second.split(".");
+  const [firstWhole = "", firstFraction = ""] = first.split(".", 2);
+  const [secondWhole = "", secondFraction = ""] = second.split(".", 2);
 
   if (firstWhole.length !== secondWhole.length) {
     return firstWhole.length - secondWhole.length;

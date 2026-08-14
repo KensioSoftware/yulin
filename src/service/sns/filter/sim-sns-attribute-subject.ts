@@ -101,7 +101,7 @@ export class SimSnsAttributeSubject implements SimSnsFilterSubject {
   valuesAt(path: readonly string[]): readonly SimSnsFilterValue[] {
     const [name] = path;
 
-    if (path.length !== 1 || name === undefined) {
+    if (name === undefined || path.length !== 1) {
       return [];
     }
 

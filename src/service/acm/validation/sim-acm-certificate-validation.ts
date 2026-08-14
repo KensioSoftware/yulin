@@ -145,7 +145,7 @@ export class SimAcmCertificateValidation {
   private listenForRecordChanges(): void {
     const dnsRecords = this.dnsRecords;
 
-    if (this.listeningForRecordChanges || dnsRecords === undefined) {
+    if (dnsRecords === undefined || this.listeningForRecordChanges) {
       return;
     }
 

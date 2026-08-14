@@ -16,7 +16,7 @@ export function simIamSigV4CanonicalPath(path: string): string {
   const segments: string[] = [];
 
   for (const segment of path.split("/")) {
-    if (segment.length === 0 || segment === ".") {
+    if (segment === "" || segment === ".") {
       continue;
     }
 

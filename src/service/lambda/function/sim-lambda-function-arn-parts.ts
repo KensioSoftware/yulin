@@ -40,7 +40,7 @@ export function parseSimLambdaFunctionArn(
     resourceType,
     name,
     qualifier,
-  ] = arn.split(":");
+  ] = arn.split(":", 8);
 
   if (
     prefix !== "arn" ||

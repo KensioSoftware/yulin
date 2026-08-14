@@ -103,7 +103,7 @@ function queryOf(url: URL): Record<string, string | string[]> {
 
     query.set(
       key,
-      values.length === 1 && single !== undefined ? single : values,
+      single !== undefined && values.length === 1 ? single : values,
     );
   }
 

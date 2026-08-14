@@ -104,8 +104,8 @@ function checksumAlgorithm(name: string): string | undefined {
   const lowerCased = name.toLowerCase();
 
   if (
-    !lowerCased.startsWith(checksumPrefix) ||
-    lowerCased === algorithmParameter
+    lowerCased === algorithmParameter ||
+    !lowerCased.startsWith(checksumPrefix)
   ) {
     return undefined;
   }

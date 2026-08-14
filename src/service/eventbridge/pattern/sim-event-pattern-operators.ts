@@ -86,7 +86,7 @@ export function readPatternCondition(
   const written = Object.entries(condition);
   const [only] = written;
 
-  if (written.length !== 1 || only === undefined) {
+  if (only === undefined || written.length !== 1) {
     throw eventPatternRefusal(
       `a match condition is written with one operator, and this one is ` +
         `written with ${String(written.length)}`,

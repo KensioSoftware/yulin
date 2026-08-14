@@ -75,7 +75,7 @@ export class SimSsmParameterEncryption {
     withDecryption: boolean | undefined,
     caller: SimAwsCaller | undefined,
   ): Promise<string> {
-    if (!parameter.type.isSecure || withDecryption !== true) {
+    if (withDecryption !== true || !parameter.type.isSecure) {
       return version.value.value;
     }
 

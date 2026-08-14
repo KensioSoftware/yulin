@@ -35,7 +35,7 @@ export class SimDynamoDbUpdateAnswer {
       return this.attributesOf(updated);
     }
 
-    if (this.asked.reportsBefore() && existing !== undefined) {
+    if (existing !== undefined && this.asked.reportsBefore()) {
       return this.attributesOf(existing);
     }
 

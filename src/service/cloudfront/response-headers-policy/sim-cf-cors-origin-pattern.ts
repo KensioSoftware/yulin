@@ -21,7 +21,7 @@ interface SimCfCorsOrigin {
  * An entry with no wildcard is always well formed, and so is the bare wildcard.
  */
 export function simCfCorsOriginPatternIsValid(pattern: string): boolean {
-  if (!pattern.includes("*") || pattern === "*") {
+  if (pattern === "*" || !pattern.includes("*")) {
     return true;
   }
 

@@ -16,7 +16,7 @@ export class SimCffApplicator {
   ): Promise<Request | Response> {
     const viewerRequestCffArn = behaviour.functionAssociations?.viewerRequest;
     if (viewerRequestCffArn === undefined) {
-      return await Promise.resolve(request);
+      return request;
     }
 
     const viewerRequestCff =
@@ -40,7 +40,7 @@ export class SimCffApplicator {
   ): Promise<Response> {
     const viewerResponseCffArn = behaviour.functionAssociations?.viewerResponse;
     if (viewerResponseCffArn === undefined) {
-      return await Promise.resolve(response);
+      return response;
     }
 
     const viewerResponseCff =

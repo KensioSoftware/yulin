@@ -109,7 +109,7 @@ function optionsIn(given: readonly string[]): SimWatchOptions {
  * default window does not suit.
  */
 function settleValue(option: string): number {
-  const [, value] = option.split("=");
+  const [, value] = option.split("=", 2);
   const milliseconds = Number(value);
 
   if (
@@ -126,7 +126,7 @@ function settleValue(option: string): number {
 }
 
 function flagOf(option: string): string {
-  const [flag = ""] = option.split("=");
+  const [flag = ""] = option.split("=", 1);
 
   return flag;
 }

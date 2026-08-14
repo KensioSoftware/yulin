@@ -62,7 +62,7 @@ export class SimLiveReloadInjectable {
    */
   private isPlainHtml(response: Response): boolean {
     const contentType = response.headers.get("content-type") ?? "";
-    const [mediaType = ""] = contentType.split(";");
+    const [mediaType = ""] = contentType.split(";", 1);
 
     return (
       mediaType.trim().toLowerCase() === htmlContentType &&

@@ -98,7 +98,7 @@ export class SimCognitoServiceController implements SimAwsServiceController {
 
     if (
       userPoolId === undefined ||
-      userPoolId.length === 0 ||
+      userPoolId === "" ||
       segment === undefined ||
       !servedSegments.has(segment) ||
       rest.length > 0

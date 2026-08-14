@@ -25,7 +25,7 @@ export interface SimArnComponents {
  */
 export function parseSimArn(value: string): SimArnComponents | undefined {
   const [arnPrefix, partition, service, region, accountId, resource] =
-    value.split(":");
+    value.split(":", 6);
 
   if (
     arnPrefix !== "arn" ||

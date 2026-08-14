@@ -140,12 +140,12 @@ describe("SimCfnTemplateFileWatches", () => {
  */
 function records(applied: string[]): SimCfnTemplateFileUpdating {
   return {
-    update: async (
+    update: (
       properties: SimCloudFormationDeployTemplateFileProperties,
     ): Promise<SimCfnStack> => {
       applied.push(String(properties.stackName));
 
-      return await Promise.resolve({} as SimCfnStack);
+      return Promise.resolve({} as SimCfnStack);
     },
   };
 }
