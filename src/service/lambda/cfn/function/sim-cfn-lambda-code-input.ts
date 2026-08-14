@@ -31,7 +31,8 @@ export interface SimCfnLambdaCodeInput {
  * uses, so execution-role attribution and invocation behave identically. A
  * bound function may omit template Code and Handler entirely, as the binding
  * replaces the code wholesale. Bindings can target the logical ID (or CDK
- * construct ID), the resolved function name, or the function ARN.
+ * construct ID), the resolved function name, the function ARN, or the
+ * container image repository the function's Code.ImageUri names.
  */
 export function simCfnLambdaCodeInput(
   properties: SimCfnLambdaCodeInputProperties,
@@ -48,6 +49,7 @@ export function simCfnLambdaCodeInput(
       resource.accountRegionScope,
       functionProperties.functionName,
     ),
+    imageUri: functionProperties.imageUri,
   });
 
   if (binding === undefined) {

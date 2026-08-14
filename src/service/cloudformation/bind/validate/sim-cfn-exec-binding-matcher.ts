@@ -1,15 +1,9 @@
 import { simLambdaFunctionArn } from "../../../lambda/function/sim-lambda-function.js";
 import type { SimCfnResource } from "../../resource/sim-cfn-resource.js";
 import type { SimCfnExecutableResourceBinding } from "../sim-cfn-exec-binding.type.js";
-
-/**
- * CDK metadata paths for identifying resources corresponding to bindings.
- *
- * CDK templates commonly store construct path information under `aws:cdk:path`.
- * Some synthesized templates also expose `aws:cdk:logicalId`. Both values can
- * help map a user-facing executable binding back to the synthesized Resource.
- */
-export const cdkPathMetadataKeys = ["aws:cdk:path", "aws:cdk:logicalId"];
+import { SimCfnImageRepositoryTarget } from "./sim-cfn-image-repository-target.js";
+import { SimCfnResourceCdkPath } from "./sim-cfn-resource-cdk-path.js";
+import { SimCfnResourceImageUri } from "./sim-cfn-resource-image-uri.js";
 
 /**
  * Matches executable-resource bindings against synthesized CloudFormation
@@ -42,6 +36,7 @@ export class SimCfnExecutableResourceBindingMatcher {
    * - `arn` reconstructs the simulator's CloudFront Function or Lambda
    *   function ARN format.
    * - `cdkPath` checks CDK metadata emitted into the synthesized template.
+   * - `imageRepository` checks the Lambda Code.ImageUri, ignoring its tag.
    */
   matches(binding: SimCfnExecutableResourceBinding): boolean {
     if ("logicalId" in binding) {
@@ -65,12 +60,28 @@ export class SimCfnExecutableResourceBindingMatcher {
 
     if ("cdkPath" in binding) {
       return this.#resources.some(
-        (resource) => this.#cdkPath(resource) === binding.cdkPath,
+        (resource) =>
+          new SimCfnResourceCdkPath(resource).path() === binding.cdkPath,
       );
+    }
+
+    if ("imageRepository" in binding) {
+      return this.#matchesImageRepository(binding.imageRepository);
     }
 
     /* v8 ignore next -- compile-time exhaustive guard */
     return false;
+  }
+
+  /**
+   * Whether any function in the Stack runs an image from this repository.
+   */
+  #matchesImageRepository(imageRepository: string): boolean {
+    const target = new SimCfnImageRepositoryTarget(imageRepository);
+
+    return this.#resources.some((resource) =>
+      target.matchesImageUri(new SimCfnResourceImageUri(resource).value()),
+    );
   }
 
   #resourceMatchesLogicalIdBinding(
@@ -85,7 +96,7 @@ export class SimCfnExecutableResourceBindingMatcher {
      */
     return (
       resource.logicalId === logicalId ||
-      this.#cdkConstructIdFromPath(resource) === logicalId
+      new SimCfnResourceCdkPath(resource).constructId() === logicalId
     );
   }
 
@@ -145,52 +156,5 @@ export class SimCfnExecutableResourceBindingMatcher {
       return simLambdaFunctionArn(resource.accountRegionScope, functionName);
     }
     return `arn:aws:cloudfront::${resource.accountRegionScope.accountId}:function/${functionName}`;
-  }
-
-  #cdkPath(resource: SimCfnResource): string | undefined {
-    const metadata = resource.template["Metadata"];
-
-    if (
-      metadata === null ||
-      typeof metadata !== "object" ||
-      Array.isArray(metadata)
-    ) {
-      return undefined;
-    }
-
-    for (const metadataKey of cdkPathMetadataKeys) {
-      // oxlint-disable-next-line security/detect-object-injection
-      const value = metadata[metadataKey];
-
-      if (typeof value === "string") {
-        return value;
-      }
-    }
-
-    /* v8 ignore next */
-    return undefined;
-  }
-
-  #cdkConstructIdFromPath(resource: SimCfnResource): string | undefined {
-    const path = this.#cdkPath(resource);
-
-    if (path === undefined) {
-      return undefined;
-    }
-
-    const parts = path.split("/").filter((part) => part.length > 0);
-    const resourceIndex = parts.lastIndexOf("Resource");
-
-    /*
-     * L2 CDK constructs often synthesize a child named `Resource`, for example:
-     * `Stack/RedirectFunction/Resource`. In that case the meaningful construct
-     * ID is the path segment before `Resource`, not the generated child
-     * segment.
-     */
-    if (resourceIndex > 0) {
-      return parts[resourceIndex - 1];
-    }
-
-    return parts.at(-1);
   }
 }
