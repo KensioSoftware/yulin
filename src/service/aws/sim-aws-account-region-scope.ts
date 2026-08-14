@@ -19,6 +19,7 @@ import type { SimRekognition } from "../rekognition/index.js";
 import type { SimRoute53 } from "../route53/index.js";
 import type { SimAcm } from "../acm/sim-acm.js";
 import type { SimApiGatewayV2 } from "../apigatewayv2/index.js";
+import type { SimElbV2 } from "../elbv2/index.js";
 import type { SimIam } from "../iam/index.js";
 import type { SimKms } from "../kms/index.js";
 import type { SimLambda } from "../lambda/index.js";
@@ -165,6 +166,15 @@ export class SimAwsAccountRegionContainer {
   scheduler(): SimScheduler {
     return this.memo.getOrCreate("scheduler", () =>
       this.simAws.serviceFactory.createScheduler(this),
+    );
+  }
+
+  /**
+   * Get simulated Elastic Load Balancing v2 for this account and region.
+   */
+  elbV2(): SimElbV2 {
+    return this.memo.getOrCreate("elbV2", () =>
+      this.simAws.serviceFactory.createElbV2(this),
     );
   }
 

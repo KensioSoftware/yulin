@@ -17,6 +17,7 @@ import type { SimRekognition } from "../../rekognition/index.js";
 import type { SimRoute53 } from "../../route53/index.js";
 import type { SimS3 } from "../../s3/sim-s3.js";
 import type { SimScheduler } from "../../scheduler/index.js";
+import type { SimElbV2 } from "../../elbv2/index.js";
 import type { SimIam } from "../../iam/index.js";
 import { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
 import type { SimKms } from "../../kms/index.js";
@@ -173,6 +174,11 @@ export class SimAwsServiceFactory {
   /** Create simulated EventBridge for an Account Region scope. */
   createEventBridge(scope: SimAwsAccountRegionContainer): SimEventBridge {
     return this.accountRegionServices.createEventBridge(scope);
+  }
+
+  /** Create simulated Elastic Load Balancing v2 for an Account Region scope. */
+  createElbV2(scope: SimAwsAccountRegionContainer): SimElbV2 {
+    return this.accountRegionServices.createElbV2(scope);
   }
 
   /** Create or get simulated IAM for an Account scope. */

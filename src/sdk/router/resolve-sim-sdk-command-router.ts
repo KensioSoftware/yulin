@@ -61,6 +61,10 @@ const scopedRouters: ReadonlyMap<string, SimSdkScopedRouter> = new Map<
   ],
   ["ECS", (scoped): SimSdkCommandRouter => scoped.ecs().sdkCommandRouter()],
   [
+    "Elastic Load Balancing v2",
+    (scoped): SimSdkCommandRouter => scoped.elbV2().sdkCommandRouter(),
+  ],
+  [
     "EventBridge",
     (scoped): SimSdkCommandRouter => scoped.eventBridge().sdkCommandRouter(),
   ],

@@ -1,7 +1,9 @@
 import { SimRoute53AcmDnsRecords } from "../../acm/validation/sim-route53-acm-dns-records.js";
 import { SimCognitoHttpApiJwtIssuerKeys } from "../../apigatewayv2/api/authorizer/sim-cognito-http-api-jwt-issuer-keys.js";
 import { SimAwsEventBridgeDeliveryTargets } from "../../eventbridge/delivery/sim-aws-event-bridge-delivery-targets.js";
+import { SimAwsRekognitionImageObjects } from "../../rekognition/image/s3/sim-aws-rekognition-image-objects.js";
 import { SimAwsSchedulerDeliveryTargets } from "../../scheduler/delivery/sim-aws-scheduler-delivery-targets.js";
+import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-scope.js";
 import type { SimAws } from "../sim-aws.js";
 import type { SimAwsScopedServiceRegistries } from "./sim-aws-scoped-service-registries.js";
 
@@ -55,4 +57,20 @@ export function simAwsSchedulerDeliveryTargets(
   simAws: SimAws,
 ): SimAwsSchedulerDeliveryTargets {
   return new SimAwsSchedulerDeliveryTargets({ simAws });
+}
+
+/**
+ * The images a simulated Rekognition detection reads.
+ *
+ * Real Rekognition reads a Bucket another Account's policy admits it to, so
+ * this reads the whole simulation's S3 rather than one scope's.
+ */
+export function simAwsRekognitionImages(
+  simAws: SimAws,
+  scope: SimAwsAccountRegionContainer,
+): SimAwsRekognitionImageObjects {
+  return new SimAwsRekognitionImageObjects({
+    simAws,
+    accountRegionScope: scope.accountRegionScope,
+  });
 }
