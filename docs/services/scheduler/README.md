@@ -382,6 +382,64 @@ That is the caller's own permission to manage schedules, and it is a separate qu
 schedule's execution role may invoke its target. The second is asked when the schedule fires, against
 the `RoleArn` on the target rather than against whoever created the schedule.
 
+## Deploying from a CloudFormation template
+
+`AWS::Scheduler::Schedule` deploys through [simulated CloudFormation](../cloudformation/), so a stack
+that declares its schedules rather than calling the SDK can be exercised end to end. Everything the
+Resource carries lines up with `CreateSchedule`, and a target ARN or execution role resolved by
+`Fn::GetAtt` from the same template works as it would in a real deployment.
+
+```typescript sim-scheduler-cloudformation
+/**
+ * A schedule deployed from a template, firing as simulated time advances.
+ */
+
+import { SimAws, SimFixedClock } from "@kensio/yulin";
+
+const simAws = new SimAws({
+  clock: new SimFixedClock(new Date("2026-07-26T09:00:00.000Z")),
+});
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "reporting-stack",
+  template: {
+    Resources: {
+      ReportQueue: {
+        Type: "AWS::SQS::Queue",
+        Properties: { QueueName: "reports" },
+      },
+      HourlyReport: {
+        Type: "AWS::Scheduler::Schedule",
+        Properties: {
+          Name: "hourly-report",
+          ScheduleExpression: "rate(1 hour)",
+          FlexibleTimeWindow: { Mode: "OFF" },
+          Target: {
+            Arn: { "Fn::GetAtt": ["ReportQueue", "Arn"] },
+            RoleArn: "arn:aws:iam::888888888888:role/SchedulerRole",
+          },
+        },
+      },
+    },
+  },
+});
+
+await stack.waitForDeployComplete();
+
+console.log(stack.outputs.size); // 0, and the schedule is armed
+
+// Three simulated hours on, the schedule has fallen due three times.
+await simAws.clock().advanceBy({ hours: 3 });
+```
+
+`Ref` returns the schedule's **name** and `Fn::GetAtt ... Arn` its ARN, which carries the schedule
+group as it always does. A schedule the template does not name gets one generated from the stack name
+and the logical ID.
+
+A property this simulation does not model is refused at deploy time naming the Resource, rather than
+deploying a schedule that behaves differently from the one that was declared. Tearing the stack down
+removes the schedules it created, so nothing fires afterwards.
+
 ## Available functionality
 
 - `CreateSchedule`, `GetSchedule`, `UpdateSchedule`, `DeleteSchedule` and `ListSchedules`.
@@ -422,4 +480,5 @@ the `RoleArn` on the target rather than against whoever created the schedule.
   dropped.
 - `KmsKeyArn` is refused, and `ClientToken` is accepted and ignored: nothing here retries, so there is
   no request for it to make idempotent.
-- `AWS::Scheduler::Schedule` CloudFormation resources are not simulated.
+- `AWS::Scheduler::ScheduleGroup` is not simulated as a CloudFormation resource type.
+  `AWS::Scheduler::Schedule` is: see [deploying from a template](#deploying-from-a-cloudformation-template).

@@ -18,6 +18,7 @@ import { SimEventRuleStore } from "./rule/sim-event-rule-store.js";
 import { SimEventTargetStore } from "./target/sim-event-target-store.js";
 import type { SimEventBridgeDeliveryTargets } from "./delivery/sim-event-bridge-delivery.js";
 import type { SimEventBridgeDeliveryFailure } from "./delivery/sim-event-bridge-delivery-failures.js";
+import { SimEventBridgeCfnResourceFactory } from "./cfn/sim-event-bridge-cfn-resource-factory.js";
 import { SimEventBridgeSdkCommandRouter } from "./sdk/sim-event-bridge-sdk-command-router.js";
 import { SimEventBridgeInspection } from "./sim-event-bridge-inspection.js";
 
@@ -55,6 +56,9 @@ export class SimEventBridge extends SimEventBridgeInspection {
   private readonly commands: SimEventBridgeCommands;
   private readonly background: BackgroundScheduler;
   private readonly sdkRouter = new SimEventBridgeSdkCommandRouter(this);
+  private readonly cfnFactory = new SimEventBridgeCfnResourceFactory({
+    eventBridge: this,
+  });
 
   constructor(properties: SimEventBridgeProperties = {}) {
     super();
@@ -271,5 +275,12 @@ export class SimEventBridge extends SimEventBridgeInspection {
    */
   sdkCommandRouter(): SimSdkCommandRouter {
     return this.sdkRouter;
+  }
+
+  /**
+   * Get this service's CloudFormation Resource factory.
+   */
+  cfnResourceFactory(): SimEventBridgeCfnResourceFactory {
+    return this.cfnFactory;
   }
 }

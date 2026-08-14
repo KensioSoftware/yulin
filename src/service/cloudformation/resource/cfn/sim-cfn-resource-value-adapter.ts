@@ -4,11 +4,13 @@ import { apiGatewayV2ValueAdapter } from "./apigatewayv2/sim-api-gateway-v2-cfn-
 import { cloudFrontValueAdapter } from "./cloudfront/sim-cloudfront-cfn-value-adapter.js";
 import { cognitoValueAdapter } from "./cognito/sim-cognito-cfn-value-adapter.js";
 import { dynamoDbValueAdapter } from "./dynamodb/sim-dynamodb-cfn-value-adapter.js";
+import { eventBridgeValueAdapter } from "./events/sim-event-bridge-cfn-value-adapter.js";
 import { iamValueAdapter } from "./iam/sim-iam-cfn-value-adapter.js";
 import { kmsValueAdapter } from "./kms/sim-kms-cfn-value-adapter.js";
 import { lambdaValueAdapter } from "./lambda/sim-lambda-cfn-value-adapter.js";
 import { route53ValueAdapter } from "./route53/sim-route53-cfn-value-adapter.js";
 import { s3ValueAdapter } from "./s3/sim-s3-cfn-value-adapter.js";
+import { schedulerValueAdapter } from "./scheduler/sim-scheduler-cfn-value-adapter.js";
 import { secretsManagerValueAdapter } from "./secretsmanager/sim-secrets-manager-cfn-value-adapter.js";
 import { snsValueAdapter } from "./sns/sim-sns-cfn-value-adapter.js";
 import { sqsValueAdapter } from "./sqs/sim-sqs-cfn-value-adapter.js";
@@ -54,11 +56,13 @@ export function simCfnResourceValueAdapter(
     cloudFrontValueAdapter(properties) ??
     cognitoValueAdapter(properties) ??
     dynamoDbValueAdapter(properties) ??
+    eventBridgeValueAdapter(properties) ??
     iamValueAdapter(properties) ??
     kmsValueAdapter(properties) ??
     lambdaValueAdapter(properties) ??
     route53ValueAdapter(properties) ??
     s3ValueAdapter(properties) ??
+    schedulerValueAdapter(properties) ??
     secretsManagerValueAdapter(properties) ??
     snsValueAdapter(properties) ??
     sqsValueAdapter(properties) ??

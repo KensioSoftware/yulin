@@ -17,7 +17,7 @@ const stack = await simAws.cloudFormation().deployTemplate({
         },
       },
       AlarmRule: {
-        Type: "AWS::Events::Rule",
+        Type: "AWS::CloudWatch::Alarm",
       },
     },
   },
@@ -29,4 +29,4 @@ console.log(stack.skippedResources.map((resource) => resource.logicalId));
 // ["AlarmRule"]
 
 console.log(stack.getResource("AlarmRule")?.skippedReason);
-// "Unsupported sim CloudFormation Resource service Events"
+// "Unsupported sim CloudFormation Resource service CloudWatch"

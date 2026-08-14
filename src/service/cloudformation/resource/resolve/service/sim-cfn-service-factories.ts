@@ -90,6 +90,16 @@ export const simCfnServiceResourceFactories: ReadonlyMap<
       scopedAws.secretsManager().cfnResourceFactory(),
   ],
   [
+    "Events",
+    (scopedAws): SimCfnServiceResourceFactory =>
+      scopedAws.eventBridge().cfnResourceFactory(),
+  ],
+  [
+    "Scheduler",
+    (scopedAws): SimCfnServiceResourceFactory =>
+      scopedAws.scheduler().cfnResourceFactory(),
+  ],
+  [
     "SNS",
     (scopedAws): SimCfnServiceResourceFactory =>
       scopedAws.sns().cfnResourceFactory(),

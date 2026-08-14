@@ -229,7 +229,7 @@ describe("SimCfnStack", () => {
       template: {
         Resources: {
           TestRule: {
-            Type: "AWS::Events::Rule",
+            Type: "AWS::CloudWatch::Alarm",
           },
         },
       },
@@ -244,7 +244,7 @@ describe("SimCfnStack", () => {
     assertTrue(skippedResource.skipped);
     assertIdentical(
       skippedResource.skippedReason,
-      "Unsupported sim CloudFormation Resource service Events",
+      "Unsupported sim CloudFormation Resource service CloudWatch",
     );
   });
 

@@ -17,7 +17,7 @@ const stack = await simAws.cloudFormation().deployTemplate({
         },
       },
       AlarmRule: {
-        Type: "AWS::Events::Rule",
+        Type: "AWS::CloudWatch::Alarm",
       },
     },
   },

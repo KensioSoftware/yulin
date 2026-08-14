@@ -105,7 +105,7 @@ describe("resolveSimCloudFormationServiceResourceFactory", () => {
         accountRegionScope,
         {
           providerName: "AWS",
-          serviceName: "Events",
+          serviceName: "CloudWatch",
           resourceTypeName: "Rule",
         },
       ),
@@ -114,7 +114,7 @@ describe("resolveSimCloudFormationServiceResourceFactory", () => {
     // Then the unsupported service name is included for diagnosis.
     assertIdentical(
       error.message,
-      "Unsupported sim CloudFormation Resource service Events",
+      "Unsupported sim CloudFormation Resource service CloudWatch",
     );
   });
 
