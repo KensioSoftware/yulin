@@ -10,6 +10,7 @@ import {
   simAwsAcmDnsRecords,
   simAwsEventBridgeDeliveryTargets,
   simAwsHttpApiJwtIssuerKeys,
+  simAwsRekognitionImages,
   simAwsSchedulerDeliveryTargets,
 } from "./sim-aws-cross-account-collaborators.js";
 import { SimCloudFormation } from "../../cloudformation/index.js";
@@ -17,6 +18,7 @@ import { SimCognitoIdentityProvider } from "../../cognito/index.js";
 import { simAwsCognitoTriggerFunctions } from "../../cognito/user-pool/trigger/sim-aws-cognito-trigger-functions.js";
 import { SimDynamoDb as SimDynamoDatabase } from "../../dynamodb/index.js";
 import { SimEcs } from "../../ecs/index.js";
+import { SimElbV2 } from "../../elbv2/index.js";
 import { SimEventBridge } from "../../eventbridge/index.js";
 import type { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
 import { SimKms } from "../../kms/index.js";
@@ -24,7 +26,6 @@ import type { SimHttpApiRegistry } from "../../apigatewayv2/registry/sim-http-ap
 import { SimLambda } from "../../lambda/index.js";
 import type { SimLambdaUrlRegistry } from "../../lambda/registry/sim-lambda-url-registry.js";
 import { SimRekognition } from "../../rekognition/index.js";
-import { SimAwsRekognitionImageObjects } from "../../rekognition/image/s3/sim-aws-rekognition-image-objects.js";
 import { SimS3 } from "../../s3/sim-s3.js";
 import { SimScheduler } from "../../scheduler/index.js";
 import { simAwsLambdaCollaborators } from "./sim-aws-lambda-collaborators.js";
@@ -161,6 +162,11 @@ export class SimAwsAccountRegionServiceBuilder {
     });
   }
 
+  /** Create simulated Elastic Load Balancing v2 for an Account Region scope. */
+  createElbV2(scope: SimAwsAccountRegionContainer): SimElbV2 {
+    return new SimElbV2(this.scoped(scope));
+  }
+
   /**
    * Create simulated KMS for an Account Region scope.
    *
@@ -190,18 +196,13 @@ export class SimAwsAccountRegionServiceBuilder {
    * Create simulated Rekognition for an Account Region scope.
    *
    * Rekognition is Region-scoped because the results declared against it are:
-   * a detection made in one Region is answered by that Region's rules. Image
-   * objects come from the whole simulation rather than this scope's S3, since
-   * real Rekognition reads a Bucket another Account's policy admits it to.
+   * a detection made in one Region is answered by that Region's rules.
    */
   createRekognition(scope: SimAwsAccountRegionContainer): SimRekognition {
     return new SimRekognition({
       iam: this.accountServices.createIam(scope),
       background: this.background,
-      images: new SimAwsRekognitionImageObjects({
-        simAws: this.simAws,
-        accountRegionScope: scope.accountRegionScope,
-      }),
+      images: simAwsRekognitionImages(this.simAws, scope),
     });
   }
 
