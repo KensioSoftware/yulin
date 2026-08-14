@@ -65,7 +65,7 @@ describe("EventBridge CloudFormation Rule deployment", () => {
     // CDK emits alongside it.
     const { simAws, received } = await simAwsWithFunction();
 
-    await simAws.cloudFormation().deployTemplate({
+    const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "orders-stack",
       template: {
         Resources: {
@@ -96,6 +96,8 @@ describe("EventBridge CloudFormation Rule deployment", () => {
       },
     });
 
+    await stack.waitForDeployComplete();
+
     // When a matching event is put, with no further SDK setup.
     await putOrder(simAws);
 
@@ -107,7 +109,7 @@ describe("EventBridge CloudFormation Rule deployment", () => {
     // Given a template whose rule targets a queue it also declares.
     const simAws = new SimAws();
 
-    await simAws.cloudFormation().deployTemplate({
+    const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "orders-stack",
       template: {
         Resources: {
@@ -132,6 +134,8 @@ describe("EventBridge CloudFormation Rule deployment", () => {
       },
     });
 
+    await stack.waitForDeployComplete();
+
     // Then the target carries the queue's real ARN rather than the intrinsic.
     const [target] = simAws.eventBridge().ruleTargets("orders");
 
@@ -146,7 +150,7 @@ describe("EventBridge CloudFormation Rule deployment", () => {
     // Given a template with a bus and a rule that Refs it.
     const simAws = new SimAws();
 
-    await simAws.cloudFormation().deployTemplate({
+    const stack = await simAws.cloudFormation().deployTemplate({
       stackName: "orders-stack",
       template: {
         Resources: {
@@ -165,6 +169,8 @@ describe("EventBridge CloudFormation Rule deployment", () => {
         },
       },
     });
+
+    await stack.waitForDeployComplete();
 
     // Then the rule is on that bus, because Ref on a bus is its name rather
     // than its ARN, which is what makes it usable as an EventBusName.
@@ -205,7 +211,7 @@ describe("EventBridge CloudFormation Rule deployment", () => {
     const simAws = new SimAws();
 
     const error = await assertThrowsErrorAsync(async () => {
-      await simAws.cloudFormation().deployTemplate({
+      const stack = await simAws.cloudFormation().deployTemplate({
         stackName: "orders-stack",
         template: {
           Resources: {
@@ -229,12 +235,67 @@ describe("EventBridge CloudFormation Rule deployment", () => {
           },
         },
       });
+
+      await stack.waitForDeployComplete();
     });
 
     // Then the deployment failed naming the property, rather than deploying a
     // rule that sends the whole event where one field was asked for.
     assertStringIncludes(error.message, "InputTransformer");
     assertStringIncludes(error.message, "OrdersRule");
+  });
+
+  it("refuses rule tags rather than deploying without them", async () => {
+    // Given a tagged rule. Tags reach no EventBridge command, so nothing else
+    // would notice them going missing.
+    const simAws = new SimAws();
+
+    const error = await assertThrowsErrorAsync(async () => {
+      const stack = await simAws.cloudFormation().deployTemplate({
+        stackName: "orders-stack",
+        template: {
+          Resources: {
+            OrdersRule: {
+              Type: "AWS::Events::Rule",
+              Properties: {
+                Name: "orders",
+                EventPattern: orderPattern,
+                Tags: [{ Key: "team", Value: "orders" }],
+              },
+            },
+          },
+        },
+      });
+
+      await stack.waitForDeployComplete();
+    });
+
+    assertStringIncludes(error.message, "Tags");
+  });
+
+  it("refuses a bus property written as null", async () => {
+    // Given a template writing null for a property that is not simulated,
+    // which is a value rather than an absence.
+    const simAws = new SimAws();
+
+    const error = await assertThrowsErrorAsync(async () => {
+      const stack = await simAws.cloudFormation().deployTemplate({
+        stackName: "orders-stack",
+        template: {
+          Resources: {
+            OrdersBus: {
+              Type: "AWS::Events::EventBus",
+              Properties: { Name: "orders", Policy: null },
+            },
+          },
+        },
+      });
+
+      await stack.waitForDeployComplete();
+    });
+
+    // Then it is refused, rather than read as having left the policy out.
+    assertStringIncludes(error.message, "Policy");
   });
 
   it("removes the rules and targets a stack created", async () => {

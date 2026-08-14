@@ -84,7 +84,9 @@ export class SimCfnEventBusProperties {
    */
   refuseUnsimulated(): void {
     for (const [property, reason] of unsimulatedProperties) {
-      if (this.properties.get(property) !== undefined) {
+      // Asked by key rather than by value, so a template writing `null` for
+      // one of these is refused rather than read as having left it out.
+      if (this.properties.has(property)) {
         throw this.propertyError(
           `${property} is not simulated, so the Resource is refused rather ` +
             `than deployed without it: ${reason}`,
