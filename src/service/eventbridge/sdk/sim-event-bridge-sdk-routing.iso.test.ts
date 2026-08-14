@@ -8,12 +8,17 @@ import {
   EnableRuleCommand,
   EventBridgeClient,
   ListEventBusesCommand,
+  ListRuleNamesByTargetCommand,
   ListRulesCommand,
+  ListTargetsByRuleCommand,
   PutEventsCommand,
   PutRuleCommand,
+  PutTargetsCommand,
+  RemoveTargetsCommand,
   TestEventPatternCommand,
 } from "@aws-sdk/client-eventbridge";
 import {
+  assertArrayEquals,
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
@@ -127,5 +132,48 @@ describe("EventBridge SDK interception", () => {
     assertArrayLength(listed.Rules ?? [], 1);
     assertTrue(tested.Result);
     assertArrayLength(afterDelete.Rules ?? [], 0);
+  });
+
+  it("routes every target Command through the intercepted client", async () => {
+    // Given an intercepted client with a rule to hang targets on.
+    using simSdk = new SimSdk();
+    simSdk.intercept(EventBridgeClient);
+
+    const client = new EventBridgeClient({ region: "us-east-1" });
+    const queueArn = "arn:aws:sqs:us-east-1:888888888888:orders";
+
+    await client.send(
+      new PutRuleCommand({
+        Name: "orders",
+        EventPattern: JSON.stringify({ source: ["orders.service"] }),
+      }),
+    );
+
+    // When targets are added, listed both ways, and removed.
+    const put = await client.send(
+      new PutTargetsCommand({
+        Rule: "orders",
+        Targets: [{ Id: "queue", Arn: queueArn }],
+      }),
+    );
+    const listed = await client.send(
+      new ListTargetsByRuleCommand({ Rule: "orders" }),
+    );
+    const byTarget = await client.send(
+      new ListRuleNamesByTargetCommand({ TargetArn: queueArn }),
+    );
+    const removed = await client.send(
+      new RemoveTargetsCommand({ Rule: "orders", Ids: ["queue"] }),
+    );
+    const afterRemove = await client.send(
+      new ListTargetsByRuleCommand({ Rule: "orders" }),
+    );
+
+    // Then each answers as the simulated service does.
+    assertIdentical(put.FailedEntryCount, 0);
+    assertArrayLength(listed.Targets ?? [], 1);
+    assertArrayEquals(byTarget.RuleNames ?? [], ["orders"]);
+    assertIdentical(removed.FailedEntryCount, 0);
+    assertArrayLength(afterRemove.Targets ?? [], 0);
   });
 });
