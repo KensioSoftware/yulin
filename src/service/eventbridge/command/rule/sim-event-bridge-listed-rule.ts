@@ -4,15 +4,17 @@ import type { SimListedRule } from "./rule.command.js";
 /**
  * One rule as a describe or a listing reports it.
  *
- * The pattern comes back as the string the rule was created with rather than a
- * re-serialised version of it, so a caller comparing what they read against
- * what they sent sees what they sent.
+ * The pattern and the schedule expression both come back as the strings the
+ * rule was created with rather than re-serialised versions of them, so a caller
+ * comparing what they read against what they sent sees what they sent. A rule
+ * with only a schedule reports no pattern, and the other way round.
  */
 export function listedRule(rule: SimEventRule): SimListedRule {
   return {
     Name: rule.name.value,
     Arn: rule.arn,
-    EventPattern: rule.pattern.source,
+    EventPattern: rule.pattern?.source,
+    ScheduleExpression: rule.schedule?.source,
     State: rule.state.value,
     Description: rule.description,
     EventBusName: rule.busName.value,

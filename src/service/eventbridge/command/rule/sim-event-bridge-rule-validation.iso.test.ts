@@ -56,26 +56,17 @@ describe("EventBridge rule validation", () => {
     assertInstanceOf(tooLong, SimEventBridgeValidationException);
   });
 
-  it("refuses a rule with no event pattern, pointing at scheduled rules", async () => {
-    // Given a rule carrying neither a pattern nor anything else.
+  it("refuses a rule with neither a pattern nor a schedule", async () => {
+    // Given a rule carrying nothing that would make it fire.
     const error = await refusedRule({
       Name: "watcher",
       EventPattern: undefined,
     });
 
-    // Then it is refused, saying what the other kind of rule would be.
+    // Then it is refused, naming both of the things it could have carried.
     assertInstanceOf(error, SimEventBridgeUnsimulatedInputException);
+    assertStringIncludes(error.message, "EventPattern");
     assertStringIncludes(error.message, "ScheduleExpression");
-  });
-
-  it("refuses a scheduled rule rather than creating one that never fires", async () => {
-    const error = await refusedRule({
-      Name: "hourly",
-      ScheduleExpression: "rate(1 hour)",
-    });
-
-    assertInstanceOf(error, SimEventBridgeUnsimulatedInputException);
-    assertStringIncludes(error.message, "Scheduled rules are not simulated");
   });
 
   it("refuses rule inputs it does not model rather than dropping them", async () => {

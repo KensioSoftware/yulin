@@ -7,6 +7,7 @@ import type { SimEventBridgeDeliveryTargets } from "../delivery/sim-event-bridge
 import { SimEventBridgeNoDeliveryTargets } from "../delivery/sim-event-bridge-no-delivery-targets.js";
 import type { SimEventRuleStore } from "../rule/sim-event-rule-store.js";
 import type { SimEventTargetStore } from "../target/sim-event-target-store.js";
+import { SimEventBridgeRuleSchedules } from "../schedule/sim-event-bridge-rule-schedules.js";
 import { SimEventBridgeAuthorizer } from "./authorize/sim-event-bridge-authorizer.js";
 import { SimEventBridgeBusAccess } from "./bus/sim-event-bridge-bus-access.js";
 import { SimEventBridgeBusCommands } from "./bus/sim-event-bridge-bus-commands.js";
@@ -49,6 +50,7 @@ export class SimEventBridgeCommands {
   public readonly targetCreation: SimEventBridgePutTargets;
   public readonly targets: SimEventBridgeTargetCommands;
   public readonly router: SimEventBridgeRouter;
+  public readonly schedules: SimEventBridgeRuleSchedules;
 
   constructor(properties: SimEventBridgeCommandsProperties) {
     const { buses, rules, targets, accountRegionScope, background } =
@@ -88,6 +90,12 @@ export class SimEventBridgeCommands {
       background,
       accountId: accountRegionScope.accountId,
     });
+    this.schedules = new SimEventBridgeRuleSchedules({
+      rules,
+      router: this.router,
+      background,
+      accountRegionScope,
+    });
     this.putEvents = new SimEventBridgePutEvents({
       access,
       accountRegionScope,
@@ -97,6 +105,7 @@ export class SimEventBridgeCommands {
     this.ruleCreation = new SimEventBridgePutRule({
       rules,
       access: ruleAccess,
+      schedules: this.schedules,
       accountRegionScope,
     });
     this.rules = new SimEventBridgeRuleCommands({

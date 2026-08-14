@@ -1,7 +1,7 @@
 # Simulated EventBridge implementation
 
 This directory contains the simulated EventBridge service implementation. Event buses, rules,
-targets and PutEvents. EventBridge Scheduler and scheduled rules come later.
+targets, PutEvents and scheduled rules. EventBridge Scheduler comes later.
 
 The guiding decision here is that a bus is a router rather than a store. Real EventBridge keeps no
 events, so nothing here answers an SDK command from stored events. The events a bus does keep are a
@@ -47,9 +47,12 @@ does.
 
 Rule state lives under `rule/`, and the pattern engine under `pattern/`.
 
-`SimEventRule` is a pattern and a state. What a rule does when it matches is deliberately not on it:
-targets will live in their own store, keyed by rule, the same way a topic's subscriptions are in
-simulated SNS.
+`SimEventRule` is a state and whatever makes it fire: an event pattern, a schedule, or both. Both are
+optional on it and PutRule refuses a rule carrying neither, rather than the rule type being an
+enumeration: real EventBridge takes both on one rule, and a rule with only a schedule matching no
+event falls out of `pattern` being absent rather than out of a check. What a rule does when it fires
+is deliberately not on it: targets live in their own store, keyed by rule, the same way a topic's
+subscriptions are in simulated SNS.
 
 `eventRuleArn` is the one place a rule ARN is built, because a request has to authorize against the
 ARN a rule would have before knowing whether that rule exists. A rule on the default bus leaves the
@@ -130,11 +133,44 @@ its own gets `SimEventBridgeNoDeliveryTargets` instead, which records every deli
 saying why there was nowhere to make it. A rule that appeared to deliver to a target that was never
 reachable would be the worst of the possible answers.
 
+## Scheduled rules
+
+`schedule/` holds what makes a rule fire on its own, and the expression parser it uses lives in
+`src/util/schedule/` rather than here.
+
+That split is the point. EventBridge Scheduler is a separate service with its own dialect: its cron
+fields are the same six and its rate expression does not insist a unit agrees with its value. So
+`SimScheduleDialect` is what a service brings, and `eventBridgeScheduleDialect` in
+`sim-event-bridge-schedule.ts` is EventBridge's. The parser throws `SimScheduleExpressionError` and
+`SimUnsimulatedScheduleExpressionError`, which know nothing about any service, and
+`eventBridgeSchedule(...)` turns them into this service's own `ValidationException` and
+`UnsimulatedInputException`.
+
+`SimCronExpression.nextAfter(...)` searches rather than enumerates. A field that does not match skips
+the whole of the unit below it, so a month that does not match moves to the first of the next month
+instead of trying its forty thousand minutes. The search ends at the year after the dialect's highest,
+which is what gives a cron expression naming only past years an answer of "never" rather than a loop.
+
+`SimEventBridgeRuleSchedules` arms a rule for its next due instant through
+`BackgroundScheduler.scheduleAt`, and a firing arms the next one before it returns. That is what makes
+firing per due instant rather than per advance: `SimClockControl.advanceBy` walks the interval taking
+whatever has fallen due, so a rule rescheduling itself inside the interval is taken again in the same
+walk. An hour of `rate(1 minute)` is therefore sixty firings at sixty instants.
+
+Nothing cancels a timer. A firing checks that the rule it holds is still the rule its store has under
+that name, and stops if it is not, which covers deletion and a PutRule replacement in one. A disabled
+rule is re-armed without firing, which is what makes `EnableRule` pick up from the next due instant
+rather than replay what it missed.
+
 ## Routing
 
 `SimEventBridgeRouter` under `routing/` is what a bus does with an event: find the bus, ask each of
 its enabled rules, record the matches, and schedule a delivery for every target of every rule that
 matched. `SimEventBridgeTargetDelivery` makes each of those deliveries and keeps whatever went wrong.
+
+`fire(...)` is the scheduled path, and it skips the matching: nothing put the event onto the bus, so
+there is nothing to match it against. It still records the event on the bus, which is what lets a test
+with no target yet assert on a schedule through `eventsOn(...)`.
 
 The split is that the router decides and the delivery does. A failure is recorded rather than thrown
 because these run as background tasks: one left rejected would fail an unrelated
@@ -143,7 +179,7 @@ anyway.
 
 ## Divergences
 
-Five, all deliberate.
+Six, all deliberate.
 
 An entry naming a bus that does not exist **succeeds**. Real EventBridge answers 200, matches the
 event against no rule, and drops it, without counting the entry as failed. It is a trap, because a
@@ -166,3 +202,7 @@ no-op.
 Event bus resource policies are not modelled at all, since nothing sets one: `PutPermission` and the
 bus `Policy` attribute are both absent. A caller from another account therefore has no way to be
 admitted to a bus, which is stricter than real AWS.
+
+A scheduled rule fires **exactly, and exactly once**. Real EventBridge documents a delay of several
+seconds between a rule falling due and its target running, and does not promise a single delivery.
+Reproducing either would make a test on a schedule assert on something that is not the schedule.

@@ -8,6 +8,7 @@ export interface SimListedRule {
   readonly Name: string;
   readonly Arn: string;
   readonly EventPattern?: string | undefined;
+  readonly ScheduleExpression?: string | undefined;
   readonly State: string;
   readonly Description?: string | undefined;
   readonly EventBusName: string;
@@ -75,6 +76,7 @@ export interface SimDescribeRuleCommandOutput {
   readonly Name?: string | undefined;
   readonly Arn?: string | undefined;
   readonly EventPattern?: string | undefined;
+  readonly ScheduleExpression?: string | undefined;
   readonly State?: string | undefined;
   readonly Description?: string | undefined;
   readonly EventBusName?: string | undefined;

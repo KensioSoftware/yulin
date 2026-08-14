@@ -12,21 +12,13 @@ const maximumDescriptionLength = 512;
 /**
  * Refuse the rule request inputs this simulation does not model.
  *
- * A schedule expression is refused pointing at what it would have done, since
- * it is the one of these that is planned rather than declined. A role and tags
- * are refused because dropping either would leave a rule looking configured to
- * the request that sent it and unconfigured to everything else.
+ * A role and tags are refused because dropping either would leave a rule
+ * looking configured to the request that sent it and unconfigured to
+ * everything else.
  */
 export function refuseUnsimulatedRuleInput(
   input: SimPutRuleCommandInput,
 ): void {
-  if (input.ScheduleExpression !== undefined) {
-    throw new SimEventBridgeUnsimulatedInputException(
-      "Scheduled rules are not simulated, so PutRule refuses a " +
-        "ScheduleExpression rather than creating a rule that never fires",
-    );
-  }
-
   if (input.RoleArn !== undefined) {
     throw new SimEventBridgeUnsimulatedInputException(
       "A rule RoleArn is not simulated, so PutRule refuses one rather than " +
