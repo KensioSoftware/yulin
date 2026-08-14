@@ -22,6 +22,7 @@ import type { SimAwsServiceHosts } from "../../../serve/controller/host/sim-aws-
 import { SimIamCredentialRegistry } from "../../iam/credential/sim-iam-credential-registry.js";
 import { Memo } from "../../../util/memo/memo.js";
 import { accountServiceCacheKey } from "./account-service-cache-key.js";
+import type { SimAwsScopedServiceProperties } from "./sim-aws-scoped-service-properties.js";
 
 interface SimAwsAccountServiceCacheProperties {
   readonly simAws: SimAws;
@@ -86,6 +87,23 @@ export class SimAwsAccountServiceCache {
     this.route53Registry = properties.route53Registry;
     this.kmsRegistry = properties.kmsRegistry;
     this.serviceHosts = properties.serviceHosts;
+  }
+
+  /**
+   * The collaborators every Account/Region scoped service takes.
+   *
+   * It is assembled here because the IAM in it is the Account's one IAM, which
+   * is what makes a Region's services decide against it rather than against
+   * one of their own.
+   */
+  scopedServiceProperties(
+    scope: SimAwsAccountRegionContainer,
+  ): SimAwsScopedServiceProperties {
+    return {
+      accountRegionScope: scope.accountRegionScope,
+      iam: this.createIam(scope),
+      background: this.background,
+    };
   }
 
   /**

@@ -59,6 +59,7 @@ const scopedRouters: ReadonlyMap<string, SimSdkScopedRouter> = new Map<
     (scoped): SimSdkCommandRouter =>
       scoped.dynamoDbStreams().sdkCommandRouter(),
   ],
+  ["ECS", (scoped): SimSdkCommandRouter => scoped.ecs().sdkCommandRouter()],
   [
     "EventBridge",
     (scoped): SimSdkCommandRouter => scoped.eventBridge().sdkCommandRouter(),

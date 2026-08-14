@@ -16,6 +16,7 @@ import { SimCloudFormation } from "../../cloudformation/index.js";
 import { SimCognitoIdentityProvider } from "../../cognito/index.js";
 import { simAwsCognitoTriggerFunctions } from "../../cognito/user-pool/trigger/sim-aws-cognito-trigger-functions.js";
 import { SimDynamoDb as SimDynamoDatabase } from "../../dynamodb/index.js";
+import { SimEcs } from "../../ecs/index.js";
 import { SimEventBridge } from "../../eventbridge/index.js";
 import type { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
 import { SimKms } from "../../kms/index.js";
@@ -140,6 +141,11 @@ export class SimAwsAccountRegionServiceBuilder {
   /** Create simulated DynamoDB for an Account Region scope. */
   createDynamoDb(scope: SimAwsAccountRegionContainer): SimDynamoDatabase {
     return new SimDynamoDatabase(this.scoped(scope));
+  }
+
+  /** Create simulated ECS for an Account Region scope. */
+  createEcs(scope: SimAwsAccountRegionContainer): SimEcs {
+    return new SimEcs(this.scoped(scope));
   }
 
   /**
@@ -284,17 +290,10 @@ export class SimAwsAccountRegionServiceBuilder {
 
   /**
    * The collaborators every service built here takes.
-   *
-   * Reaching for the Account's IAM through the same cache the factory uses is
-   * what makes a Region's services decide against the one IAM its Account owns.
    */
   private scoped(
     scope: SimAwsAccountRegionContainer,
   ): SimAwsScopedServiceProperties {
-    return {
-      accountRegionScope: scope.accountRegionScope,
-      iam: this.accountServices.createIam(scope),
-      background: this.background,
-    };
+    return this.accountServices.scopedServiceProperties(scope);
   }
 }
