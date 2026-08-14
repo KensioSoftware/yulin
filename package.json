@@ -70,6 +70,10 @@
       "import": "./dist/service/dynamodb/index.js",
       "types": "./dist/service/dynamodb/index.d.ts"
     },
+    "./ecs": {
+      "import": "./dist/service/ecs/index.js",
+      "types": "./dist/service/ecs/index.d.ts"
+    },
     "./eslint": {
       "import": "./dist/config/eslint/index.js",
       "types": "./dist/config/eslint/index.d.ts"
@@ -159,6 +163,7 @@
     "@aws-sdk/client-cognito-identity-provider": "^3.1101.0",
     "@aws-sdk/client-dynamodb": "^3.1101.0",
     "@aws-sdk/client-dynamodb-streams": "^3.1101.0",
+    "@aws-sdk/client-ecs": "^3.1101.0",
     "@aws-sdk/client-eventbridge": "^3.1109.0",
     "@aws-sdk/client-iam": "^3.1101.0",
     "@aws-sdk/client-kms": "^3.1101.0",

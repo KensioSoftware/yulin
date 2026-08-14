@@ -12,6 +12,7 @@ import type {
   SimDynamoDbStreams,
 } from "../dynamodb/index.js";
 import type { SimCloudFormation } from "../cloudformation/index.js";
+import type { SimEcs } from "../ecs/index.js";
 import type { SimEventBridge } from "../eventbridge/index.js";
 import type { SimCognitoIdentityProvider } from "../cognito/index.js";
 import type { SimRekognition } from "../rekognition/index.js";
@@ -138,6 +139,15 @@ export class SimAwsAccountRegionContainer {
    */
   dynamoDbStreams(): SimDynamoDbStreams {
     return this.dynamoDb().streams();
+  }
+
+  /**
+   * Get simulated ECS for this account and region.
+   */
+  ecs(): SimEcs {
+    return this.memo.getOrCreate("ecs", () =>
+      this.simAws.serviceFactory.createEcs(this),
+    );
   }
 
   /**
