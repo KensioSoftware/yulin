@@ -437,6 +437,38 @@ rather than simulated.
 The policy is consulted on every delivery rather than when the target is added, so a permission taken
 away afterwards stops delivery. Real EventBridge does not check it at `PutTargets` time either.
 
+A target may be in another account or region of the same simulation. It is the target's own account
+that decides, so the policy lives with the target and is evaluated by that account's IAM, as it is on
+real AWS. Both condition keys AWS documents for this work: `aws:SourceArn` carries the rule's ARN and
+`aws:SourceAccount` carries the account the rule belongs to.
+
+```typescript sim-event-bridge-cross-account
+/**
+ * A rule in one Account sending to a queue in another.
+ */
+
+const queuePolicy = {
+  Version: "2012-10-17",
+  Statement: [
+    {
+      Effect: "Allow",
+      Principal: { Service: "events.amazonaws.com" },
+      Action: "sqs:SendMessage",
+      Resource: "arn:aws:sqs:us-east-1:222222222222:orders",
+      Condition: {
+        ArnLike: {
+          "aws:SourceArn": "arn:aws:events:us-east-1:111111111111:rule/orders",
+        },
+      },
+    },
+  ],
+};
+
+console.log(JSON.stringify(queuePolicy).length > 0); // true
+```
+
+An event delivered across accounts still names the account it was put in, not the target's.
+
 ## Deliveries that did not happen
 
 Real EventBridge tells the caller nothing about a failed delivery: a `PutEvents` that matched a rule
@@ -562,8 +594,8 @@ no permission for.
   `numeric` and `exists`.
 - `PutTargets`, `RemoveTargets`, `ListTargetsByRule` and `ListRuleNamesByTarget`, with delivery to a
   simulated Lambda function, SQS queue or SNS topic, authorized by the target's own resource policy.
-- Targets in another account or region of the same simulation, which the target's own account
-  decides on, as real EventBridge does.
+- Targets in another account or region of the same simulation, admitted by the target's own resource
+  policy on `aws:SourceArn` or `aws:SourceAccount`, as real EventBridge does.
 - A target's fixed `Input`, and `deliveryFailures` for deliveries that did not happen.
 - The `default` bus in every account and region, without one being created.
 - Bus descriptions, creation timestamps from the simulation's clock, and prefix-narrowed paged
