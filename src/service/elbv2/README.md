@@ -143,7 +143,9 @@ There is no resource policy support here, and none to add: ELBv2 has none on rea
 - Subnets, security groups and availability zones are accepted and left out of a describe rather
   than invented.
 - ARN ids and DNS name suffixes count rather than being random, so a test can assert on an ARN it
-  did not capture. The shape is the real one either way.
+  did not capture. The shape is the real one either way. The ARN id counts within one scope, because
+  an ARN already names the Account; the DNS name counts across the whole simulation, because a host
+  name names nothing but itself and two Accounts issued the same one could not both answer on it.
 - A listener or rule takes exactly one action. Real ELB takes one routing action with an optional
   authentication action before it, and neither authentication action is simulated, so a longer list
   is refused rather than half honoured.

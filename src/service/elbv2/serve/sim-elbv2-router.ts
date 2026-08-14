@@ -1,6 +1,6 @@
 import type { SimAwsServiceTarget } from "../../../serve/controller/sim-service-controller.js";
 import { assertDefined } from "../../../util/type-guard/defined.js";
-import { SimAws } from "../../aws/sim-aws.js";
+import type { SimAws } from "../../aws/sim-aws.js";
 import type { SimIamInterServiceAuthZ } from "../../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { parseSimLambdaFunctionArn } from "../../lambda/function/sim-lambda-function-arn-parts.js";
 import type { SimLambdaFunction } from "../../lambda/function/sim-lambda-function.js";
@@ -10,7 +10,11 @@ import type { SimElbV2 } from "../sim-elbv2.js";
 import type { SimElbV2TargetGroup } from "../target-group/sim-elbv2-target-group.js";
 
 interface SimElbV2RouterProperties {
-  readonly simAws?: SimAws;
+  /**
+   * The simulation to route within. Required, because a router with a
+   * simulation of its own would find no load balancer anything created.
+   */
+  readonly simAws: SimAws;
 }
 
 /**
@@ -37,10 +41,11 @@ export interface SimElbV2FunctionTarget {
  * Routes a request to the load balancer behind its host name, and a target
  * group to the function behind that.
  *
- * The host name gives the Region, because real ELB puts it there, but not the
- * Account. The registry supplies that missing hop. The function is not a second
- * hop: real ELB requires a Lambda target to be in the same Account and Region
- * as its target group, so that is the only scope it is looked for in.
+ * A host name names nothing but itself, while simulated ELBv2 state is per
+ * Account and Region, and the registry is the hop between the two. The function
+ * is not a second hop: real ELB
+ * requires a Lambda target to be in the same Account and Region as its target
+ * group, so that is the only scope it is looked for in.
  */
 export class SimElbV2Router {
   /**
@@ -54,8 +59,8 @@ export class SimElbV2Router {
 
   private readonly registry: SimElbV2Registry;
 
-  constructor(properties: SimElbV2RouterProperties = {}) {
-    this.simAws = properties.simAws ?? new SimAws();
+  constructor(properties: SimElbV2RouterProperties) {
+    this.simAws = properties.simAws;
     this.registry = this.simAws.serviceFactory.elbV2Registry;
   }
 
@@ -63,23 +68,23 @@ export class SimElbV2Router {
    * Find the load balancer a request target addresses.
    */
   route(target: SimAwsServiceTarget): SimElbV2LoadBalancerRoute | undefined {
-    const accountId = this.registry.accountIdForDnsName(target.resourceName);
+    const scope = this.registry.scopeForDnsName(target.resourceName);
 
-    if (accountId === undefined) {
+    if (scope === undefined) {
       return undefined;
     }
 
     const elbV2 = this.simAws
-      .accountRegionScope(accountId, target.regionName)
+      .accountRegionScope(scope.accountId, scope.regionName)
       .elbV2();
     const loadBalancer = elbV2.findLoadBalancerByDnsName(target.resourceName);
 
-    // A registered DNS name is one the scope's own store holds, because the
+    // A registered DNS name is one that scope's own store holds, because the
     // store is what registers and deregisters it.
     assertDefined(
       loadBalancer,
-      `Account ${accountId} is registered for the load balancer DNS name ` +
-        `${target.resourceName} and does not hold it`,
+      `${scope.accountId} in ${scope.regionName} is registered for the load ` +
+        `balancer DNS name ${target.resourceName} and does not hold it`,
     );
 
     return { loadBalancer, elbV2 };

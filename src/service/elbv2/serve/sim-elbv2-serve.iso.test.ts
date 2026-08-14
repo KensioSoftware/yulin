@@ -3,7 +3,14 @@ import { describe, expect, it } from "vitest";
 
 import { SimAws } from "../../aws/sim-aws.js";
 import type { SimElbV2Event, SimElbV2Result } from "./sim-elbv2-event.type.js";
+import { makeLambdaZipFileInput } from "../../lambda/function/code/lambda-zip-file-input.js";
+import {
+  createFixtureLambdaTargetGroup,
+  createFixtureListener,
+  createFixtureLoadBalancer,
+} from "../sim-elbv2.fixture.js";
 import { simElbV2Fetch } from "./sim-elbv2-fetch.js";
+import { simElbV2ServicePrincipal } from "./sim-elbv2-invoke-authorizer.js";
 import { simElbV2LambdaTargetFactory } from "./sim-elbv2-lambda-target.factory.js";
 
 describe("Serving a request through a sim ELBv2 load balancer", () => {
@@ -167,6 +174,69 @@ describe("Serving a request through a sim ELBv2 load balancer", () => {
     // Then it is looking for the listener on 443, which is what an HTTPS URL
     // naming no port means
     await expect(request).rejects.toThrow("has no listener on port 443");
+  });
+
+  it("answers on a load balancer in another Account and Region", async () => {
+    // Given a load balancer in the default Account and Region
+    const simAws = new SimAws();
+    const first = await simElbV2LambdaTargetFactory.make({}, simAws);
+
+    // And a second one of the same name in another Account and Region,
+    // forwarding to that scope's own function
+    const account = simAws.account("222222222222");
+    const { FunctionArn } = await account
+      .region("eu-west-1")
+      .lambda()
+      .createFunction({
+        input: {
+          FunctionName: "refunds",
+          Role: "arn:aws:iam::222222222222:role/RefundsRole",
+          Code: {
+            ZipFile: makeLambdaZipFileInput((): SimElbV2Result => ({
+              statusCode: 200,
+              body: "refunds",
+            })),
+          },
+        },
+      });
+    const elbV2 = account.region("eu-west-1").elbV2();
+    const loadBalancerArn = await createFixtureLoadBalancer(elbV2, "shop-alb");
+    const targetGroupArn = await createFixtureLambdaTargetGroup(
+      elbV2,
+      "refunds-tg",
+    );
+    await account
+      .region("eu-west-1")
+      .lambda()
+      .addPermission({
+        input: {
+          FunctionName: "refunds",
+          StatementId: "elb-invoke",
+          Action: "lambda:InvokeFunction",
+          Principal: simElbV2ServicePrincipal,
+          SourceArn: targetGroupArn,
+        },
+      });
+    await elbV2.registerTargets({
+      input: { TargetGroupArn: targetGroupArn, Targets: [{ Id: FunctionArn }] },
+    });
+    await createFixtureListener(elbV2, loadBalancerArn, targetGroupArn);
+
+    // When a request reaches each DNS name
+    const second = elbV2.findLoadBalancerByName("shop-alb");
+    const toFirst = await simElbV2Fetch(
+      simAws,
+      `http://${first.dnsName}/orders`,
+    );
+    const toSecond = await simElbV2Fetch(
+      simAws,
+      `http://${second?.dnsName ?? ""}/orders`,
+    );
+
+    // Then each name reaches the load balancer in its own scope, which is what
+    // the two host names being different is for
+    assertIdentical(await toFirst.text(), "checkout");
+    assertIdentical(await toSecond.text(), "refunds");
   });
 
   it("stops answering on a deleted load balancer's DNS name", async () => {

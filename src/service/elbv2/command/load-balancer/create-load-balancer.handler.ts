@@ -67,13 +67,15 @@ export class CreateLoadBalancerCommandHandler
 
     this.stores.loadBalancers.requireNameAvailable(name);
 
-    const sequence = this.stores.loadBalancers.nextSequence();
     const loadBalancer = new SimElbV2LoadBalancer({
       name,
       scheme,
       ipAddressType: input.IpAddressType ?? "ipv4",
-      id: simElbV2ResourceId(sequence),
-      dnsSuffix: simElbV2DnsSuffix(sequence),
+      // The ARN id counts within this scope, because an ARN already names the
+      // Account. The DNS name counts across the whole simulation, because a
+      // host name names nothing but itself.
+      id: simElbV2ResourceId(this.stores.loadBalancers.nextSequence()),
+      dnsSuffix: simElbV2DnsSuffix(this.stores.loadBalancers.nextDnsSequence()),
       createdTime: this.background.now(),
       accountRegionScope: this.accountRegionScope,
     });

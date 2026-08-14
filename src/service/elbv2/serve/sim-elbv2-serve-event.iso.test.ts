@@ -76,6 +76,20 @@ describe("The event a sim ELBv2 load balancer invokes a function with", () => {
     });
   });
 
+  it("leaves an encoded query string value as it arrived", async () => {
+    // Given a load balancer with a Lambda target
+
+    // When a request carries percent escapes and a plus sign
+    const event = await eventFor("/orders?token=a%2Bb&note=one+two&flag");
+
+    // Then none of it is decoded, because real ELB leaves that to the function
+    expect(event.queryStringParameters).toStrictEqual({
+      token: "a%2Bb",
+      note: "one+two",
+      flag: "",
+    });
+  });
+
   it("carries an empty query map when there was no query string", async () => {
     // Given a load balancer with a Lambda target
 
@@ -99,14 +113,15 @@ describe("The event a sim ELBv2 load balancer invokes a function with", () => {
       },
     });
 
-    // Then the load balancer's own values replace what the client sent, the
-    // host is the load balancer's DNS name, and the cookie stays in its header
-    // rather than being lifted into a field of its own
+    // Then the load balancer appends its client's address to the forwarding
+    // chain, overwrites the headers describing the connection it terminated,
+    // and leaves the cookie in its header rather than lifting it into a field
+    // of its own
     assertIdentical(
       event.headers["host"],
       "shop-alb-0000000001.us-east-1.elb.amazonaws.com",
     );
-    assertIdentical(event.headers["x-forwarded-for"], "127.0.0.1");
+    assertIdentical(event.headers["x-forwarded-for"], "203.0.113.1, 127.0.0.1");
     assertIdentical(event.headers["x-forwarded-port"], "80");
     assertIdentical(event.headers["x-forwarded-proto"], "http");
     assertIdentical(event.headers["cookie"], "session=abc");

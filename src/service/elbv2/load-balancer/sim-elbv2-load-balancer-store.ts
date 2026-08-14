@@ -46,6 +46,18 @@ export class SimElbV2LoadBalancerStore {
   }
 
   /**
+   * Take the next number for the DNS name of a load balancer about to be
+   * created.
+   *
+   * This one comes from the registry rather than from this store, because a
+   * DNS name has to be unique across every scope while an ARN id only has to
+   * be unique within one.
+   */
+  nextDnsSequence(): number {
+    return this.registry.nextDnsSequence();
+  }
+
+  /**
    * Refuse a name another load balancer in this scope already holds.
    */
   requireNameAvailable(name: string): void {

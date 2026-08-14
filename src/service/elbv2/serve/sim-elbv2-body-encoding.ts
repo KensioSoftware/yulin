@@ -49,6 +49,11 @@ export class SimElbV2BodyEncoding {
 
   /**
    * Encode request body bytes for the handler event.
+   *
+   * A text body that is not valid UTF-8 throws rather than being decoded into
+   * replacement characters. Real ELB fails the invocation for the same reason,
+   * with `LambdaBadRequest` in its logs and a 502 for the client, so a handler
+   * never sees a body silently rewritten on its way in.
    */
   encode(
     bytes: Uint8Array,
@@ -56,7 +61,7 @@ export class SimElbV2BodyEncoding {
     contentEncoding: string | null,
   ): string {
     if (this.isText(contentType, contentEncoding)) {
-      return new TextDecoder().decode(bytes);
+      return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
     }
 
     return Buffer.from(bytes).toString("base64");

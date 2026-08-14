@@ -205,6 +205,27 @@ describe("What a sim ELBv2 load balancer answers when a target fails", () => {
     assertIdentical(response.status, 502);
   });
 
+  it("answers 502 for a text body that is not valid UTF-8", async () => {
+    // Given a load balancer with a Lambda target
+    const simAws = new SimAws();
+    const loadBalancer = await simElbV2LambdaTargetFactory.make({}, simAws);
+
+    // When a request calls its body text and sends bytes that are not
+    const response = await simElbV2Fetch(
+      simAws,
+      `http://${loadBalancer.dnsName}/orders`,
+      {
+        method: "POST",
+        headers: { "content-type": "text/plain" },
+        body: new Uint8Array([0xc3, 0x28]),
+      },
+    );
+
+    // Then the invocation fails rather than the handler seeing the body
+    // rewritten into replacement characters
+    assertIdentical(response.status, 502);
+  });
+
   it("answers 413 for a request body larger than a function takes", async () => {
     // Given a load balancer with a Lambda target
     const simAws = new SimAws();
@@ -225,14 +246,16 @@ describe("What a sim ELBv2 load balancer answers when a target fails", () => {
     assertIdentical(response.status, 413);
   });
 
-  it("answers 502 for a response body larger than a function may return", async () => {
-    // Given a handler answering with more than the megabyte ELB takes back
+  it("answers 502 for a response larger than a function may return", async () => {
+    // Given a handler whose body fits in a megabyte only until it is base64
+    // encoded, which is how real ELB measures it
     const simAws = new SimAws();
     const loadBalancer = await simElbV2LambdaTargetFactory.make(
       {
         handler: (): SimElbV2Result => ({
           statusCode: 200,
-          body: "x".repeat(1024 * 1024 + 1),
+          isBase64Encoded: true,
+          body: Buffer.alloc(768 * 1024).toString("base64"),
         }),
       },
       simAws,

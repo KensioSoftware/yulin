@@ -388,14 +388,20 @@ in it.
 
 Every field is always there. A request with no query string carries an empty `queryStringParameters`
 rather than none, and one with no body carries an empty `body`. Cookies stay in the `cookie` header
-they arrived in rather than being lifted into a field of their own. The load balancer writes `host`,
-`x-amzn-trace-id`, `x-forwarded-for`, `x-forwarded-port` and `x-forwarded-proto` itself, so whatever
-a client sent under those names does not survive.
+they arrived in rather than being lifted into a field of their own. Query string values arrive as
+they were sent, since real ELB does not decode percent escapes and leaves that to the function.
+
+The load balancer writes `host`, `x-amzn-trace-id`, `x-forwarded-port` and `x-forwarded-proto`
+itself, so whatever a client sent under those names does not survive. `x-forwarded-for` is the
+exception: the client's address is appended to what the request already carried, which is what makes
+that header a chain of proxies.
 
 A body is passed through as text for `text/*`, `application/json`, `application/javascript` and
 `application/xml`, and base64 encoded otherwise, with `isBase64Encoded` saying which happened. A
 request carrying a `content-encoding` header is always base64. That list is shorter than API
-Gateway's: a form post is text to API Gateway and base64 to a load balancer.
+Gateway's: a form post is text to API Gateway and base64 to a load balancer. A body called text that
+is not valid UTF-8 fails the invocation rather than reaching the handler with replacement characters
+in it.
 
 The response has to carry a `statusCode`. `statusDescription`, `headers`, `body` and
 `isBase64Encoded` are all optional, and a `statusDescription` of `200 OK` becomes the reason phrase
@@ -489,8 +495,9 @@ registered in it.
 
 A 502 means there was a target and it did not produce a response. A missing invoke permission, a
 function that is not there, a handler that threw, a result with no usable `statusCode`, and a
-response body over 1 MB are all 502, as they are on real ELB, where the difference between them is
-only visible in the load balancer's own logs.
+response over 1 MB are all 502, as they are on real ELB, where the difference between them is only
+visible in the load balancer's own logs. The response limit is on the whole response document rather
+than on the body alone, so a base64 body counts at its encoded size.
 
 A request body over 1 MB is a 413, which is the limit on what real ELB sends to a Lambda target.
 
@@ -729,6 +736,9 @@ console.log(created.LoadBalancers?.[0]?.DNSName);
   are each refused when the request arrives rather than answered with something else.
 - A request only reaches a load balancer through `simElbV2Fetch`. Nothing resolves a load balancer's
   DNS name yet, so `serveSimAws` does not serve one and a Route53 alias to one does not answer.
+- No TLS is performed. `simElbV2Fetch` reads only the port out of a URL, so an `https:` URL reaches
+  the listener on 443 without a handshake and without being checked against that listener's
+  protocol. HTTPS listeners and their certificates follow separately.
 - The invoke permission is checked when the request arrives, where real ELB checks it when a Lambda
   target is registered and refuses `RegisterTargets` without it. A target naming a function in
   another Account or Region is registered here and then answers 502, where real ELB refuses the

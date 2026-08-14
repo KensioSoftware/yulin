@@ -4,6 +4,9 @@ import type { SimElbV2Result } from "./sim-elbv2-event.type.js";
 
 /**
  * The largest response real ELB takes from a Lambda target.
+ *
+ * The limit is on the whole response document rather than on the body alone,
+ * so a base64 body counts at its encoded size and the headers count too.
  */
 const maximumResponseBytes = 1024 * 1024;
 
@@ -52,15 +55,15 @@ export class SimElbV2ResponseBuilder {
       return this.errorResponse.badGateway();
     }
 
+    if (this.isTooLarge(result)) {
+      return this.errorResponse.badGateway();
+    }
+
     const statusCode = result.statusCode;
     const body = this.bodyEncoding.decode(
       result.body ?? "",
       result.isBase64Encoded ?? false,
     );
-
-    if (body.length > maximumResponseBytes) {
-      return this.errorResponse.badGateway();
-    }
 
     return new Response(this.sendableBody(statusCode, body), {
       status: statusCode,
@@ -84,8 +87,22 @@ export class SimElbV2ResponseBuilder {
     const statusCode = (result as SimElbV2Result).statusCode;
 
     return (
-      typeof statusCode === "number" && statusCode >= 200 && statusCode <= 599
+      Number.isSafeInteger(statusCode) &&
+      typeof statusCode === "number" &&
+      statusCode >= 200 &&
+      statusCode <= 599
     );
+  }
+
+  /**
+   * Whether the response document is larger than a load balancer takes back.
+   *
+   * The whole document is measured, as real ELB measures it, so a body that is
+   * under the limit once decoded is still refused when its base64 and its
+   * headers put the response over.
+   */
+  private isTooLarge(result: SimElbV2SendableResult): boolean {
+    return Buffer.byteLength(JSON.stringify(result)) > maximumResponseBytes;
   }
 
   /**

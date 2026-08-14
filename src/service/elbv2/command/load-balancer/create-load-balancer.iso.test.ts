@@ -203,4 +203,33 @@ describe("ELBv2 CreateLoadBalancerCommand", () => {
     );
     assertNonNullable(second.findLoadBalancerByName("shop-alb"));
   });
+
+  it("issues a DNS name no other Account's load balancer holds", async () => {
+    // Given two Accounts each creating their first load balancer of the same
+    // name in one Region
+    const simAws = new SimAws();
+    const first = await simAws
+      .account("111111111111")
+      .region("eu-west-1")
+      .elbV2()
+      .createLoadBalancer(new CreateLoadBalancerCommand({ Name: "shop-alb" }));
+    const second = await simAws
+      .account("222222222222")
+      .region("eu-west-1")
+      .elbV2()
+      .createLoadBalancer(new CreateLoadBalancerCommand({ Name: "shop-alb" }));
+
+    // Then the two host names differ, as they do on real AWS, where a DNS name
+    // names nothing but itself and only one load balancer can answer on it
+    assertArrayLength(first.LoadBalancers, 1);
+    assertArrayLength(second.LoadBalancers, 1);
+    assertIdentical(
+      first.LoadBalancers[0].DNSName,
+      "shop-alb-0000000001.eu-west-1.elb.amazonaws.com",
+    );
+    assertIdentical(
+      second.LoadBalancers[0].DNSName,
+      "shop-alb-0000000002.eu-west-1.elb.amazonaws.com",
+    );
+  });
 });
