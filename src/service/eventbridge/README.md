@@ -1,7 +1,7 @@
 # Simulated EventBridge implementation
 
-This directory contains the simulated EventBridge service implementation. Event buses, rules and
-PutEvents: targets and EventBridge Scheduler come later.
+This directory contains the simulated EventBridge service implementation. Event buses, rules,
+targets and PutEvents. EventBridge Scheduler and scheduled rules come later.
 
 The guiding decision here is that a bus is a router rather than a store. Real EventBridge keeps no
 events, so nothing here answers an SDK command from stored events. The events a bus does keep are a
@@ -105,13 +105,45 @@ what fails and how:
   calculation rather than by the JSON on the wire. `sim-event-bridge-entry-size.ts` implements that
   calculation, which is why a `Time` counts as a flat 14 bytes and a `TraceHeader` counts as nothing.
 
+## Target model and delivery
+
+Targets live under `target/`, and getting an event to one lives under `delivery/`.
+
+`SimEventTargetStore` holds targets keyed by bus and rule rather than on the rule itself, the same
+way a topic's subscriptions are held apart from the topic in simulated SNS. A rule with no targets is
+a rule that matches events and sends them nowhere, which real EventBridge lets you have, and holding
+them apart is what keeps that from looking like a broken rule.
+
+`SimEventTargetArn` reads target ARNs itself rather than deferring to `parseSimArn`, because the
+three services it delivers to write their resource part three ways: a queue and a topic put the name
+straight after the Account, and a function writes `function:<name>`. An ARN naming any other service
+is refused when the target is added, so a rule that cannot work says so at the point it was written.
+
+Delivery has one class per destination service, and each asks that service's own authorizer:
+`SimSqsServiceSendAuthorizer`, `SimSnsServicePublishAuthorizer` and
+`SimLambdaServiceInvokeAuthorizer`. Those already existed for simulated SNS's own fan-out, and they
+answer the same question here with a different service principal, so nothing about who may reach a
+queue lives in this service.
+
+`SimAwsEventBridgeDeliveryTargets` is the SimAws-level dispatcher, and a `SimEventBridge` built on
+its own gets `SimEventBridgeNoDeliveryTargets` instead, which records every delivery as a failure
+saying why there was nowhere to make it. A rule that appeared to deliver to a target that was never
+reachable would be the worst of the possible answers.
+
+## Routing
+
 `SimEventBridgeRouter` under `routing/` is what a bus does with an event: find the bus, ask each of
-its enabled rules, and record the matches. Sending a matched event on to the rule's targets belongs
-here too, and is what the next change adds.
+its enabled rules, record the matches, and schedule a delivery for every target of every rule that
+matched. `SimEventBridgeTargetDelivery` makes each of those deliveries and keeps whatever went wrong.
+
+The split is that the router decides and the delivery does. A failure is recorded rather than thrown
+because these run as background tasks: one left rejected would fail an unrelated
+`backgroundTasksComplete()`, and real EventBridge has nowhere to report a delivery failure to
+anyway.
 
 ## Divergences
 
-Three, all deliberate.
+Four, all deliberate.
 
 An entry naming a bus that does not exist **succeeds**. Real EventBridge answers 200, matches the
 event against no rule, and drops it, without counting the entry as failed. It is a trap, because a
@@ -121,9 +153,15 @@ An entry naming a bus ARN in another account or region is **refused**, which rea
 Nothing here can reach another simulation's bus, and treating a foreign ARN as local would let a test
 pass while the real call crossed a boundary it has no permission for.
 
-Deleting an event bus **deletes its rules**. Real EventBridge refuses to delete a bus that still has
-rules on it. Refusing would mean a test tearing down a stack had to delete rules in order, and a rule
-that outlived its bus would match events put onto a bus later recreated under the same name.
+Deleting an event bus **deletes its rules**, and deleting a rule **deletes its targets**. Real
+EventBridge refuses to delete either while it still has what hangs off it. Refusing would mean a test
+tearing down a stack had to delete in order, and a rule that outlived its bus would match events put
+onto a bus later recreated under the same name.
+
+`PutTargets` **refuses the whole request** for a target it will not take, where real EventBridge
+reports a failed entry. Every failure this simulation has is about the request being written for
+something unmodelled, and a caller not reading `FailedEntryCount` would otherwise see a silent
+no-op.
 
 Event bus resource policies are not modelled at all, since nothing sets one: `PutPermission` and the
 bus `Policy` attribute are both absent. A caller from another account therefore has no way to be

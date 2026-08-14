@@ -19,6 +19,12 @@ import type {
   SimPutRuleCommand,
   SimTestEventPatternCommand,
 } from "../command/rule/rule.command.js";
+import type {
+  SimListRuleNamesByTargetCommand,
+  SimListTargetsByRuleCommand,
+  SimPutTargetsCommand,
+  SimRemoveTargetsCommand,
+} from "../command/target/target.command.js";
 import type { SimEventBridge } from "../sim-event-bridge.js";
 
 /**
@@ -122,6 +128,38 @@ export class SimEventBridgeSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simEventBridge.testEventPattern(
             command as SimTestEventPatternCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "PutTargetsCommand",
+        async (command, context): Promise<unknown> =>
+          await simEventBridge.putTargets(
+            command as SimPutTargetsCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "RemoveTargetsCommand",
+        async (command, context): Promise<unknown> =>
+          await simEventBridge.removeTargets(
+            command as SimRemoveTargetsCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListTargetsByRuleCommand",
+        async (command, context): Promise<unknown> =>
+          await simEventBridge.listTargetsByRule(
+            command as SimListTargetsByRuleCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListRuleNamesByTargetCommand",
+        async (command, context): Promise<unknown> =>
+          await simEventBridge.listRuleNamesByTarget(
+            command as SimListRuleNamesByTargetCommand,
             simSdkCallerOptions(context),
           ),
       ],

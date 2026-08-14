@@ -1,4 +1,5 @@
 import type { SimEventRuleStore } from "../../rule/sim-event-rule-store.js";
+import type { SimEventTargetStore } from "../../target/sim-event-target-store.js";
 import { SimEventRuleState } from "../../rule/sim-event-rule-state.js";
 import { SimEventBridgePage } from "../sim-event-bridge-page.js";
 import type { SimEventBridgeRequestOptions } from "../sim-event-bridge-request-options.js";
@@ -19,6 +20,7 @@ import type {
 
 interface SimEventBridgeRuleCommandsProperties {
   readonly rules: SimEventRuleStore;
+  readonly targets: SimEventTargetStore;
   readonly access: SimEventBridgeRuleAccess;
 }
 
@@ -30,10 +32,12 @@ interface SimEventBridgeRuleCommandsProperties {
  */
 export class SimEventBridgeRuleCommands {
   private readonly rules: SimEventRuleStore;
+  private readonly targets: SimEventTargetStore;
   private readonly access: SimEventBridgeRuleAccess;
 
   constructor(properties: SimEventBridgeRuleCommandsProperties) {
     this.rules = properties.rules;
+    this.targets = properties.targets;
     this.access = properties.access;
   }
 
@@ -50,6 +54,11 @@ export class SimEventBridgeRuleCommands {
     const rule = this.access.find("events:DeleteRule", command.input, options);
 
     if (rule !== undefined) {
+      // Real EventBridge refuses to delete a rule that still has targets
+      // unless the request forces it. Nothing here can be left orphaned
+      // instead: targets outliving their rule would be delivered to by a rule
+      // recreated under the same name.
+      this.targets.removeForRule(rule.busName.value, rule.name.value);
       this.rules.remove(rule);
     }
 

@@ -93,11 +93,18 @@ describe("EventBridge event pattern refusals", () => {
     const badOperand = await refusedPattern({
       detail: { total: [{ numeric: [">", "10"] }] },
     });
+    const numericComparator = await refusedPattern({
+      detail: { total: [{ numeric: [10, 10] }] },
+    });
 
     // Then each is refused.
     assertInstanceOf(oddLength, SimEventBridgeInvalidEventPatternException);
     assertInstanceOf(badComparator, SimEventBridgeInvalidEventPatternException);
     assertInstanceOf(badOperand, SimEventBridgeInvalidEventPatternException);
+    assertInstanceOf(
+      numericComparator,
+      SimEventBridgeInvalidEventPatternException,
+    );
   });
 
   it("refuses an exists condition that is not a boolean", async () => {

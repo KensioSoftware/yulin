@@ -47,3 +47,19 @@ export type {
   SimTestEventPatternCommandInput,
   SimTestEventPatternCommandOutput,
 } from "./rule/rule.command.js";
+export type {
+  SimEventBridgeTarget,
+  SimEventBridgeTargetFailure,
+  SimListRuleNamesByTargetCommand,
+  SimListRuleNamesByTargetCommandInput,
+  SimListRuleNamesByTargetCommandOutput,
+  SimListTargetsByRuleCommand,
+  SimListTargetsByRuleCommandInput,
+  SimListTargetsByRuleCommandOutput,
+  SimPutTargetsCommand,
+  SimPutTargetsCommandInput,
+  SimPutTargetsCommandOutput,
+  SimRemoveTargetsCommand,
+  SimRemoveTargetsCommandInput,
+  SimRemoveTargetsCommandOutput,
+} from "./target/target.command.js";
