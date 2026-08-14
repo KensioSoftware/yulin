@@ -199,4 +199,27 @@ describe("EventBridge target validation", () => {
     assertInstanceOf(noName, SimEventBridgeValidationException);
     assertStringIncludes(noName.message, "names no function");
   });
+
+  it("refuses a Lambda ARN naming something that is not a function", async () => {
+    // Given a layer and an event source mapping, which are Lambda ARNs and
+    // are not functions.
+    const layer = await refusedTargets([
+      {
+        Id: "layer",
+        Arn: "arn:aws:lambda:us-east-1:888888888888:layer:shared",
+      },
+    ]);
+    const mapping = await refusedTargets([
+      {
+        Id: "mapping",
+        Arn: "arn:aws:lambda:us-east-1:888888888888:event-source-mapping:abcd",
+      },
+    ]);
+
+    // Then both are refused rather than read as a function of that name.
+    assertInstanceOf(layer, SimEventBridgeValidationException);
+    assertStringIncludes(layer.message, "names no function");
+    assertInstanceOf(mapping, SimEventBridgeValidationException);
+    assertStringIncludes(mapping.message, "names no function");
+  });
 });
