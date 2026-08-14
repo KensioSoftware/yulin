@@ -76,6 +76,24 @@ describe("SimSchedule rate expressions", () => {
     );
   });
 
+  it("refuses a rate longer than any two instants can be apart", () => {
+    // Given a rate of more days than time itself holds
+    // When it is read
+    // Then it is refused, rather than becoming an interval no Date can hold
+    expect(() => nextAfter("rate(99999999999 days)")).toThrow(
+      /longer than any two instants can be apart/u,
+    );
+  });
+
+  it("has nothing left once an interval runs past the end of time", () => {
+    // Given a daily rate asked from the last instant a Date reaches
+    // When the next occurrence is taken
+    // Then there is none, rather than a due time that quietly never arrives
+    expect(
+      nextAfter("rate(1 day)", new Date(8_640_000_000_000_000)),
+    ).toBeUndefined();
+  });
+
   it("refuses a rate that is not a value and a unit", () => {
     expect(() => nextAfter("rate(hour)")).toThrow(/value and a unit/u);
     expect(() => nextAfter("rate(1 hour or so)")).toThrow(/value and a unit/u);

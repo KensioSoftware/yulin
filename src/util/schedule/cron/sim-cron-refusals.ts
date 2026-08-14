@@ -7,7 +7,7 @@ import type { SimCronFieldSpec } from "./sim-cron-field-spec.js";
 /**
  * Every way one field of a cron expression can be refused, in one place.
  *
- * Each says which field it is about, since a six field expression gives a
+ * Each says which field it is about, since a six-field expression gives a
  * reader nothing to go on otherwise, and each says what was written, since a
  * cron expression is usually wrong by one character.
  */

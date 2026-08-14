@@ -561,7 +561,7 @@ refused as real EventBridge refuses it. There is no unit under a minute, which i
 AWS runs.
 
 `cron(<six fields>)` names absolute instants in UTC. The six fields are minutes, hours, day-of-month,
-month, day-of-week and year, so the every-day-at-noon expression is `cron(0 12 * * ? *)`. A five field
+month, day-of-week and year, so the every-day-at-noon expression is `cron(0 12 * * ? *)`. A five-field
 expression, which is what Unix cron takes, is refused naming the six-field form. Day-of-week runs
 `1-7` or `SUN-SAT` with Sunday as one, unlike Unix cron, and the day-of-month and day-of-week fields
 cannot both say something: whichever is not deciding the day is written `?`.
@@ -697,7 +697,7 @@ no permission for.
 - `CreateEventBus`, `DeleteEventBus`, `DescribeEventBus`, `ListEventBuses` and `PutEvents`.
 - `PutRule`, `DeleteRule`, `DescribeRule`, `ListRules`, `EnableRule`, `DisableRule` and
   `TestEventPattern`.
-- Scheduled rules, with a `rate(...)` or six field `cron(...)` `ScheduleExpression`, fired by
+- Scheduled rules, with a `rate(...)` or six-field `cron(...)` `ScheduleExpression`, fired by
   advancing the simulation's clock.
 - Event pattern matching on exact values, nested fields, lists, `prefix`, `suffix`, `anything-but`,
   `numeric` and `exists`.

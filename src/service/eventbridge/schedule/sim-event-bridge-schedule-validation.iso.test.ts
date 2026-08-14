@@ -57,13 +57,13 @@ describe("EventBridge schedule expression validation", () => {
   });
 
   it("refuses a cron expression short of its six fields", async () => {
-    // Given a five field expression, which is what Unix cron takes.
+    // Given a five-field expression, which is what Unix cron takes.
     const error = await refusedRule({
       Name: "noon",
       ScheduleExpression: "cron(0 12 * * ?)",
     });
 
-    // Then it is refused naming the six field form EventBridge expects.
+    // Then it is refused naming the six-field form EventBridge expects.
     assertInstanceOf(error, SimEventBridgeValidationException);
     assertStringIncludes(
       error.message,

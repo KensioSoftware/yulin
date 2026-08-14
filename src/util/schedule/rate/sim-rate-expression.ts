@@ -2,6 +2,12 @@ import { SimScheduleExpressionError } from "../sim-schedule.error.js";
 
 const millisecondsPerMinute = 60_000;
 
+/**
+ * The furthest apart two instants can be, which is the whole span a JavaScript
+ * Date reaches either side of the epoch.
+ */
+const maximumInterval = 2 * 8_640_000_000_000_000;
+
 const wholeNumber = /^\d+$/u;
 
 const whitespace = /\s+/u;
@@ -110,7 +116,18 @@ export class SimRateExpression {
       refuseDisagreement(count, unit, read.singular);
     }
 
-    return new this(source, count * read.minutes * millisecondsPerMinute);
+    const interval = count * read.minutes * millisecondsPerMinute;
+
+    // A rate longer than time itself would otherwise arrive as an interval no
+    // Date can hold, and a rule armed for an instant that is not one never
+    // fires and never says why.
+    if (interval > maximumInterval) {
+      throw new SimScheduleExpressionError(
+        `a rate of '${source}' is longer than any two instants can be apart`,
+      );
+    }
+
+    return new this(source, interval);
   }
 
   /**
@@ -118,8 +135,18 @@ export class SimRateExpression {
    *
    * One interval on from whatever it is asked about, so asking it about each
    * due time in turn walks the schedule from where it started.
+   *
+   * Nothing comes back when that lands past the end of representable time. A
+   * schedule that has run out of instants is not armed again, which is a better
+   * answer than a due time of Not a Number that quietly never arrives.
    */
-  nextAfter(instant: Date): Date {
-    return new Date(instant.getTime() + this.interval);
+  nextAfter(instant: Date): Date | undefined {
+    const due = new Date(instant.getTime() + this.interval);
+
+    if (Number.isNaN(due.getTime())) {
+      return undefined;
+    }
+
+    return due;
   }
 }
