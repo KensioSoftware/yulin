@@ -141,6 +141,12 @@ If work triggered by advancing fails, the failure is thrown from `advanceBy(...)
 in the background, and the clock is left at the point it failed rather than at the instant asked
 for. Anything still queued stays queued.
 
+Delivery to a target is the exception, and deliberately so. An EventBridge rule or a Scheduler
+schedule that cannot reach its target records the failure instead of throwing, because real AWS
+reports a failed delivery to nobody and because one rejected delivery would otherwise fail an
+unrelated `advanceBy(...)` elsewhere in the same test. Those are read from
+`eventBridge().deliveryFailures` and `scheduler().deliveryFailures` rather than caught.
+
 Several parts of the simulator schedule work on the clock, so advancing time does more than change
 what timestamps and expiry checks see. A scheduled EventBridge rule fires, an EventBridge Scheduler
 schedule invokes its target, a DynamoDB item passes its time to live, a Secrets Manager deletion

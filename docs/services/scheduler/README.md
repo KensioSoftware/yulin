@@ -175,7 +175,9 @@ Two things therefore have to be right, and they are fixed in different places:
   `sqs:SendMessage` or `sns:Publish`.
 
 When either is missing the target is not invoked and nothing is thrown, exactly as on AWS, where the
-failure goes to CloudWatch and nowhere the caller can see. `deliveryFailures` is what explains it:
+failure goes to CloudWatch and nowhere the caller can see. `advanceBy(...)` still returns normally,
+so a test asserting on a failed invocation reads `deliveryFailures` rather than expecting the advance
+to reject:
 
 ```typescript sim-scheduler-delivery-failures
 /**
@@ -401,7 +403,8 @@ the `RoleArn` on the target rather than against whoever created the schedule.
 - Firing is exact and exactly once. Real Scheduler invokes within a minute of the due time and does
   not promise a single invocation.
 - An invocation is attempted once. There is no retry and no dead letter queue, so a target that
-  throws is a recorded failure rather than a redelivery.
+  throws is a recorded failure rather than a redelivery. A failed invocation never rejects
+  `advanceBy(...)`; it is read from `deliveryFailures`.
 - Schedule groups are not a manageable resource. Every schedule is in `default`, and a `GroupName`
   naming any other group is refused rather than quietly put in `default`, where its ARN would name a
   group it is not in.

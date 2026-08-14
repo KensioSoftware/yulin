@@ -160,9 +160,9 @@ describe("Scheduler target invocation", () => {
       Input: JSON.stringify({ report: "nightly" }),
     });
 
-    await simAws.backgroundTasksComplete();
-
     // Then it fanned out to the subscription as an ordinary publish would.
+    // No extra draining: advanceBy settles the invocation and the fan-out it
+    // caused before it returns.
     const received = await simAws
       .sqs()
       .receiveMessage(new ReceiveMessageCommand({ QueueUrl: queue.QueueUrl }));
