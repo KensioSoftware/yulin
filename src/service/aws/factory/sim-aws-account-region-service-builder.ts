@@ -6,8 +6,10 @@ import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-sco
 import type { SimAws } from "../sim-aws.js";
 import { SimAcm } from "../../acm/sim-acm.js";
 import { SimApiGatewayV2 } from "../../apigatewayv2/index.js";
-import { SimCognitoHttpApiJwtIssuerKeys } from "../../apigatewayv2/api/authorizer/sim-cognito-http-api-jwt-issuer-keys.js";
-import { SimRoute53AcmDnsRecords } from "../../acm/validation/sim-route53-acm-dns-records.js";
+import {
+  simAwsAcmDnsRecords,
+  simAwsHttpApiJwtIssuerKeys,
+} from "./sim-aws-cross-account-collaborators.js";
 import { SimCloudFormation } from "../../cloudformation/index.js";
 import { SimCognitoIdentityProvider } from "../../cognito/index.js";
 import { simAwsCognitoTriggerFunctions } from "../../cognito/user-pool/trigger/sim-aws-cognito-trigger-functions.js";
@@ -22,6 +24,7 @@ import type { SimLambdaUrlRegistry } from "../../lambda/registry/sim-lambda-url-
 import { SimRekognition } from "../../rekognition/index.js";
 import { SimAwsRekognitionImageObjects } from "../../rekognition/image/s3/sim-aws-rekognition-image-objects.js";
 import { SimS3 } from "../../s3/sim-s3.js";
+import { SimScheduler } from "../../scheduler/index.js";
 import { simAwsLambdaCollaborators } from "./sim-aws-lambda-collaborators.js";
 import { simAwsS3NotificationDestinations } from "./sim-aws-s3-notification-destinations.js";
 import { SimSecretsManager } from "../../secretsmanager/index.js";
@@ -85,11 +88,7 @@ export class SimAwsAccountRegionServiceBuilder {
   createAcm(scope: SimAwsAccountRegionContainer): SimAcm {
     const acm = new SimAcm({
       ...this.scoped(scope),
-      // Certificates validate against Hosted Zones from any simulated Account,
-      // as real ACM validates against public DNS.
-      dnsRecords: new SimRoute53AcmDnsRecords({
-        route53Registry: this.registries.route53,
-      }),
+      dnsRecords: simAwsAcmDnsRecords(this.registries),
     });
 
     this.registries.acm.register(scope.accountRegionScope, acm);
@@ -109,11 +108,7 @@ export class SimAwsAccountRegionServiceBuilder {
       // API ids are unique across the simulation, and an API is reachable by
       // id alone from the serving layer, whichever scope created it.
       registry: this.httpApiRegistry,
-      // A JWT authorizer verifies against user pools from any simulated
-      // Account, as a real one can name a pool in any Account.
-      jwtIssuerKeys: new SimCognitoHttpApiJwtIssuerKeys({
-        userPoolRegistry: this.registries.cognito,
-      }),
+      jwtIssuerKeys: simAwsHttpApiJwtIssuerKeys(this.registries),
     });
   }
 
@@ -266,6 +261,11 @@ export class SimAwsAccountRegionServiceBuilder {
    */
   createSsm(scope: SimAwsAccountRegionContainer): SimSsm {
     return new SimSsm({ ...this.scoped(scope), kms: scope.kms() });
+  }
+
+  /** Create simulated EventBridge Scheduler for an Account Region scope. */
+  createScheduler(scope: SimAwsAccountRegionContainer): SimScheduler {
+    return new SimScheduler(this.scoped(scope));
   }
 
   /** Create simulated STS for an Account/Region scope. */

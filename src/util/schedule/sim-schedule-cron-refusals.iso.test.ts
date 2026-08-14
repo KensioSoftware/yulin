@@ -11,6 +11,7 @@ import { SimUnsimulatedScheduleExpressionError } from "./sim-schedule.error.js";
 const strict: SimScheduleDialect = {
   cronFields: awsCronFieldSpecs,
   requiresRateAgreement: true,
+  allowsOneTime: false,
 };
 
 const noon = new Date("2026-07-26T12:00:00.000Z");
@@ -40,6 +41,7 @@ describe("SimSchedule cron refusals", () => {
       SimSchedule.of("cron(0 12 * * ?)", {
         cronFields: awsCronFieldSpecs.slice(0, 5),
         requiresRateAgreement: true,
+        allowsOneTime: false,
       }).nextAfter(noon),
     ).toThrow(/a cron dialect describes six fields/u);
   });

@@ -108,6 +108,10 @@
       "import": "./dist/service/route53/index.js",
       "types": "./dist/service/route53/index.d.ts"
     },
+    "./scheduler": {
+      "import": "./dist/service/scheduler/index.js",
+      "types": "./dist/service/scheduler/index.d.ts"
+    },
     "./sdk": {
       "import": "./dist/sdk/index.js",
       "types": "./dist/sdk/index.d.ts"
@@ -162,6 +166,7 @@
     "@aws-sdk/client-rekognition": "^3.1101.0",
     "@aws-sdk/client-route-53": "^3.1101.0",
     "@aws-sdk/client-s3": "^3.1101.0",
+    "@aws-sdk/client-scheduler": "^3.1109.0",
     "@aws-sdk/client-secrets-manager": "^3.1101.0",
     "@aws-sdk/client-sns": "^3.1104.0",
     "@aws-sdk/client-sqs": "^3.1101.0",

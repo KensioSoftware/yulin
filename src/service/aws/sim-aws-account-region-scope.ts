@@ -4,6 +4,7 @@ import { Memo } from "../../util/memo/memo.js";
 import { isSimAwsClosing } from "./sim-aws-closing.js";
 import { SimAws } from "./sim-aws.js";
 import type { SimS3 } from "../s3/sim-s3.js";
+import type { SimScheduler } from "../scheduler/index.js";
 import type { SimCloudFront } from "../cloudfront/sim-cloudfront.js";
 import type { SimCloudFrontKeyValueStoreApi } from "../cloudfront/sim-cloudfront-key-value-store.js";
 import type {
@@ -145,6 +146,15 @@ export class SimAwsAccountRegionContainer {
   eventBridge(): SimEventBridge {
     return this.memo.getOrCreate("eventBridge", () =>
       this.simAws.serviceFactory.createEventBridge(this),
+    );
+  }
+
+  /**
+   * Get simulated EventBridge Scheduler for this account and region.
+   */
+  scheduler(): SimScheduler {
+    return this.memo.getOrCreate("scheduler", () =>
+      this.simAws.serviceFactory.createScheduler(this),
     );
   }
 

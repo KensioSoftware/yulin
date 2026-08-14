@@ -10,6 +10,7 @@ import type { SimScheduleDialect } from "./sim-schedule-dialect.js";
 const strict: SimScheduleDialect = {
   cronFields: awsCronFieldSpecs,
   requiresRateAgreement: true,
+  allowsOneTime: false,
 };
 
 /**
