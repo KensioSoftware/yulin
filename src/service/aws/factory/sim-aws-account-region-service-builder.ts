@@ -18,10 +18,10 @@ import { SimCognitoIdentityProvider } from "../../cognito/index.js";
 import { SimEcr } from "../../ecr/index.js";
 import { SimEcs } from "../../ecs/index.js";
 import { simAwsCognitoTriggerFunctions } from "../../cognito/user-pool/trigger/sim-aws-cognito-trigger-functions.js";
+import { SimElbV2 } from "../../elbv2/index.js";
 import { SimEventBridge } from "../../eventbridge/index.js";
 import type { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
 import { SimKms } from "../../kms/index.js";
-import type { SimHttpApiRegistry } from "../../apigatewayv2/registry/sim-http-api-registry.js";
 import { SimLambda } from "../../lambda/index.js";
 import type { SimLambdaUrlRegistry } from "../../lambda/registry/sim-lambda-url-registry.js";
 import { SimRekognition } from "../../rekognition/index.js";
@@ -42,7 +42,6 @@ interface SimAwsAccountRegionServiceBuilderProperties {
   readonly registries: SimAwsScopedServiceRegistries;
   readonly iamRegistry: SimIamRegistry;
   readonly lambdaUrlRegistry: SimLambdaUrlRegistry;
-  readonly httpApiRegistry: SimHttpApiRegistry;
   readonly accountServices: SimAwsAccountServiceCache;
 }
 
@@ -74,7 +73,6 @@ export class SimAwsAccountRegionServiceBuilder {
   private readonly registries: SimAwsScopedServiceRegistries;
   private readonly iamRegistry: SimIamRegistry;
   private readonly lambdaUrlRegistry: SimLambdaUrlRegistry;
-  private readonly httpApiRegistry: SimHttpApiRegistry;
   private readonly accountServices: SimAwsAccountServiceCache;
 
   constructor(properties: SimAwsAccountRegionServiceBuilderProperties) {
@@ -83,7 +81,6 @@ export class SimAwsAccountRegionServiceBuilder {
     this.registries = properties.registries;
     this.iamRegistry = properties.iamRegistry;
     this.lambdaUrlRegistry = properties.lambdaUrlRegistry;
-    this.httpApiRegistry = properties.httpApiRegistry;
     this.accountServices = properties.accountServices;
   }
 
@@ -109,7 +106,7 @@ export class SimAwsAccountRegionServiceBuilder {
       ...this.scoped(scope),
       // API ids are unique across the simulation, and an API is reachable by
       // id alone from the serving layer, whichever scope created it.
-      registry: this.httpApiRegistry,
+      registry: this.registries.httpApi,
       jwtIssuerKeys: simAwsHttpApiJwtIssuerKeys(this.registries),
     });
   }
@@ -176,6 +173,18 @@ export class SimAwsAccountRegionServiceBuilder {
       ...this.scoped(scope),
       deliveryTargets: simAwsEventBridgeDeliveryTargets(this.simAws),
     });
+  }
+
+  /**
+   * Create simulated Elastic Load Balancing v2 for an Account Region scope.
+   *
+   * The registry is what gets a request from a load balancer's DNS name to the
+   * scope holding it, since a host name names neither an Account nor a Region.
+   */
+  createElbV2(scope: SimAwsAccountRegionContainer): SimElbV2 {
+    const registry = this.registries.elbV2;
+
+    return new SimElbV2({ ...this.scoped(scope), registry });
   }
 
   /**

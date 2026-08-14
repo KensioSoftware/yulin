@@ -48,6 +48,14 @@ export class SimElbV2TargetGroup {
   public readonly protocol: string | undefined;
   public readonly port: number | undefined;
   public readonly vpcId: string | undefined;
+  /**
+   * The Account and Region this target group belongs to.
+   *
+   * Real ELB requires a Lambda target to be in the same Account and Region as
+   * its target group, so this is also where the function a request reaches is
+   * looked for.
+   */
+  public readonly accountRegionScope: SimAwsAccountRegionScope;
 
   private readonly healthCheck: SimElbV2HealthCheck;
   private readonly targets: SimElbV2TargetSet;
@@ -55,6 +63,7 @@ export class SimElbV2TargetGroup {
   constructor(properties: SimElbV2TargetGroupProperties) {
     const { accountRegionScope } = properties;
 
+    this.accountRegionScope = accountRegionScope;
     this.name = properties.name;
     this.targetType = properties.targetType;
     this.protocol = properties.protocol;

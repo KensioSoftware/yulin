@@ -1,6 +1,5 @@
 import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-scope.js";
 import { SimDynamoDb as SimDynamoDatabase } from "../../dynamodb/index.js";
-import { SimElbV2 } from "../../elbv2/index.js";
 import { SimSecretsManager } from "../../secretsmanager/index.js";
 import { SimSqs } from "../../sqs/index.js";
 import { SimSsm } from "../../ssm/index.js";
@@ -36,11 +35,6 @@ export class SimAwsSelfContainedServiceBuilder {
   /** Create simulated DynamoDB for an Account Region scope. */
   createDynamoDb(scope: SimAwsAccountRegionContainer): SimDynamoDatabase {
     return new SimDynamoDatabase(this.scoped(scope));
-  }
-
-  /** Create simulated Elastic Load Balancing v2 for an Account Region scope. */
-  createElbV2(scope: SimAwsAccountRegionContainer): SimElbV2 {
-    return new SimElbV2(this.scoped(scope));
   }
 
   /**

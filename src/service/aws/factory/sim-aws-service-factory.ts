@@ -6,7 +6,7 @@ import type { SimAwsAccountRegionContainer } from "../sim-aws-account-region-sco
 import type { SimAws } from "../sim-aws.js";
 import type { SimAcm } from "../../acm/sim-acm.js";
 import type { SimApiGatewayV2 } from "../../apigatewayv2/index.js";
-import { SimHttpApiRegistry } from "../../apigatewayv2/registry/sim-http-api-registry.js";
+import type { SimHttpApiRegistry } from "../../apigatewayv2/registry/sim-http-api-registry.js";
 import type { SimCloudFormation } from "../../cloudformation/index.js";
 import type { SimCognitoIdentityProvider } from "../../cognito/index.js";
 import { SimCloudFrontRegistry } from "../../cloudfront/registry/sim-cloud-front-registry.js";
@@ -19,6 +19,7 @@ import type { SimRoute53 } from "../../route53/index.js";
 import type { SimS3 } from "../../s3/sim-s3.js";
 import type { SimScheduler } from "../../scheduler/index.js";
 import type { SimElbV2 } from "../../elbv2/index.js";
+import type { SimElbV2Registry } from "../../elbv2/registry/sim-elbv2-registry.js";
 import type { SimIam } from "../../iam/index.js";
 import { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
 import type { SimKms } from "../../kms/index.js";
@@ -94,16 +95,6 @@ export class SimAwsServiceFactory {
   public readonly lambdaUrlRegistry = new SimLambdaUrlRegistry();
 
   /**
-   * Shared simulated API Gateway HTTP API registry.
-   *
-   * This maps API ids to the Accounts that own them, so the localhost serving
-   * layer can route a request to the right Account/Region scope from the
-   * request hostname alone.
-   * @internal
-   */
-  public readonly httpApiRegistry = new SimHttpApiRegistry();
-
-  /**
    * The registries this simulation's scoped services share between them.
    */
   private readonly registries = new SimAwsScopedServiceRegistries();
@@ -132,12 +123,35 @@ export class SimAwsServiceFactory {
       registries: this.registries,
       iamRegistry: this.iamRegistry,
       lambdaUrlRegistry: this.lambdaUrlRegistry,
-      httpApiRegistry: this.httpApiRegistry,
       accountServices: this.accountServices,
     });
     this.selfContainedServices = new SimAwsSelfContainedServiceBuilder({
       accountServices: this.accountServices,
     });
+  }
+
+  /**
+   * Shared simulated API Gateway HTTP API registry.
+   *
+   * This maps API ids to the Accounts that own them, so the localhost serving
+   * layer routes a request to the right Account/Region scope from the request
+   * host name alone.
+   * @internal
+   */
+  get httpApiRegistry(): SimHttpApiRegistry {
+    return this.registries.httpApi;
+  }
+
+  /**
+   * Shared simulated ELBv2 registry.
+   *
+   * This maps load balancer DNS names to the Accounts that own them, so a
+   * request reaching a load balancer is routed to the right Account/Region
+   * scope from the host name alone.
+   * @internal
+   */
+  get elbV2Registry(): SimElbV2Registry {
+    return this.registries.elbV2;
   }
 
   /** Create simulated ACM for an Account Region scope. */
@@ -189,7 +203,7 @@ export class SimAwsServiceFactory {
 
   /** Create simulated Elastic Load Balancing v2 for an Account Region scope. */
   createElbV2(scope: SimAwsAccountRegionContainer): SimElbV2 {
-    return this.selfContainedServices.createElbV2(scope);
+    return this.accountRegionServices.createElbV2(scope);
   }
 
   /** Create or get simulated IAM for an Account scope. */

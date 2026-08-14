@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 
 import type { SimAwsRequestCaller } from "../../service/iam/request/sim-aws-request-caller.js";
-import { simPayload2SourceIp } from "./sim-payload-2-connection.js";
+import { simAwsProxiedSourceIp } from "../http/sim-aws-proxied-connection.js";
 import type { SimPayload2Endpoint } from "./sim-payload-2-endpoint.js";
 import type {
   SimPayload2JwtAuthorizer,
@@ -69,7 +69,7 @@ export class SimPayload2RequestContextBuilder {
         method: request.method,
         path: url.pathname,
         protocol: "HTTP/1.1",
-        sourceIp: simPayload2SourceIp,
+        sourceIp: simAwsProxiedSourceIp,
         userAgent: request.headers.get("user-agent") ?? "",
       },
       requestId: randomUUID(),

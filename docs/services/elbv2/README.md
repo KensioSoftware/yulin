@@ -5,10 +5,12 @@ balancers, target groups, listeners and listener rules are held in memory and ev
 authorized by simulated IAM. ELBv2-specific types are imported from the `@kensio/yulin/elbv2`
 subpath.
 
-This is the state an Application Load Balancer holds. A load balancer created here has a DNS name of
-the shape real ELB issues, so a [Route53](../route53/) alias or a [CloudFront](../cloudfront/) origin
-has something of the right form to point at, and its listeners and rules say what it would do with a
-request. Answering a request is separate work that follows.
+A load balancer created here has a DNS name of the shape real ELB issues, so a
+[Route53](../route53/) alias or a [CloudFront](../cloudfront/) origin has something of the right form
+to point at. It also carries a request: a request is matched to a listener by port, and the
+listener's default `forward` action sends it to a target group, where a registered
+[Lambda](../lambda/) function is invoked with the request and its response becomes the HTTP
+response.
 
 Only the application load balancer is simulated. A network or gateway load balancer routes below
 HTTP, which nothing here speaks, so `Type: "network"` is refused rather than created as an
@@ -267,6 +269,249 @@ rules about is `SetRulePriorities`, which reorders a whole listener, and which j
 against the order it would leave behind rather than the one it started from, so two rules can swap
 places in one request.
 
+## Carrying a request to a Lambda function
+
+`simElbV2Fetch` sends a request to whichever load balancer its host name names, in process and
+without a socket. The port in the URL is the listener's, so `http://<dns-name>/orders` reaches the
+listener on port 80.
+
+The listener's default action decides what happens next. A `forward` action sends the request to its
+target group, and a `lambda` target group invokes the function registered in it.
+
+```typescript sim-elbv2-serve-lambda-target
+/**
+ * A request carried through a load balancer to a Lambda function.
+ */
+
+import {
+  CreateListenerCommand,
+  CreateLoadBalancerCommand,
+  CreateTargetGroupCommand,
+  RegisterTargetsCommand,
+} from "@aws-sdk/client-elastic-load-balancing-v2";
+import {
+  AddPermissionCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import type { SimElbV2Event, SimElbV2Result } from "@kensio/yulin/elbv2";
+import { simElbV2Fetch } from "@kensio/yulin/elbv2";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+const region = simAws.account("888888888888").region("eu-west-1");
+
+const created = await region.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "checkout",
+    Role: "arn:aws:iam::888888888888:role/CheckoutRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput(
+        (event: SimElbV2Event): SimElbV2Result => ({
+          statusCode: 200,
+          statusDescription: "200 OK",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ path: event.path, method: event.httpMethod }),
+          isBase64Encoded: false,
+        }),
+      ),
+    },
+  }),
+);
+
+const elbV2 = region.elbV2();
+
+const loadBalancer = await elbV2.createLoadBalancer(
+  new CreateLoadBalancerCommand({ Name: "shop-alb" }),
+);
+const targetGroup = await elbV2.createTargetGroup(
+  new CreateTargetGroupCommand({ Name: "checkout-tg", TargetType: "lambda" }),
+);
+
+const targetGroupArn = targetGroup.TargetGroups?.[0]?.TargetGroupArn;
+
+// Without this the load balancer cannot invoke the function, and every request
+// gets a 502.
+await region.lambda().addPermission(
+  new AddPermissionCommand({
+    FunctionName: "checkout",
+    StatementId: "elb-invoke",
+    Action: "lambda:InvokeFunction",
+    Principal: "elasticloadbalancing.amazonaws.com",
+    SourceArn: targetGroupArn,
+  }),
+);
+
+await elbV2.registerTargets(
+  new RegisterTargetsCommand({
+    TargetGroupArn: targetGroupArn,
+    Targets: [{ Id: created.FunctionArn }],
+  }),
+);
+
+await elbV2.createListener(
+  new CreateListenerCommand({
+    LoadBalancerArn: loadBalancer.LoadBalancers?.[0]?.LoadBalancerArn,
+    Protocol: "HTTP",
+    Port: 80,
+    DefaultActions: [{ Type: "forward", TargetGroupArn: targetGroupArn }],
+  }),
+);
+
+const dnsName = loadBalancer.LoadBalancers?.[0]?.DNSName;
+
+const response = await simElbV2Fetch(simAws, `http://${dnsName}/orders`);
+
+console.log(response.status); // 200
+console.log(response.statusText); // "OK"
+console.log(await response.json()); // { path: "/orders", method: "GET" }
+```
+
+### The event and the response
+
+The event is ELB's own shape, not either API Gateway payload format. A handler can tell them apart by
+the request context: an ALB event has an `elb` block carrying the target group ARN, and nothing else
+in it.
+
+```typescript
+{
+  requestContext: { elb: { targetGroupArn: "arn:aws:elasticloadbalancing:..." } },
+  httpMethod: "GET",
+  path: "/orders",
+  queryStringParameters: { page: "2" },
+  headers: { host: "shop-alb-0000000001.eu-west-1.elb.amazonaws.com", ... },
+  body: "",
+  isBase64Encoded: false,
+}
+```
+
+Every field is always there. A request with no query string carries an empty `queryStringParameters`
+rather than none, and one with no body carries an empty `body`. Cookies stay in the `cookie` header
+they arrived in rather than being lifted into a field of their own. The load balancer writes `host`,
+`x-amzn-trace-id`, `x-forwarded-for`, `x-forwarded-port` and `x-forwarded-proto` itself, so whatever
+a client sent under those names does not survive.
+
+A body is passed through as text for `text/*`, `application/json`, `application/javascript` and
+`application/xml`, and base64 encoded otherwise, with `isBase64Encoded` saying which happened. A
+request carrying a `content-encoding` header is always base64. That list is shorter than API
+Gateway's: a form post is text to API Gateway and base64 to a load balancer.
+
+The response has to carry a `statusCode`. `statusDescription`, `headers`, `body` and
+`isBase64Encoded` are all optional, and a `statusDescription` of `200 OK` becomes the reason phrase
+`OK`, since the status line already has the code. Hop-by-hop headers and `content-length` are
+dropped, because the load balancer writes those itself.
+
+### What a load balancer answers itself
+
+```typescript sim-elbv2-serve-errors
+/**
+ * What a load balancer answers when its target cannot serve the request.
+ */
+
+import {
+  CreateListenerCommand,
+  CreateLoadBalancerCommand,
+  CreateTargetGroupCommand,
+  RegisterTargetsCommand,
+} from "@aws-sdk/client-elastic-load-balancing-v2";
+import {
+  AddPermissionCommand,
+  CreateFunctionCommand,
+} from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+import { simElbV2Fetch } from "@kensio/yulin/elbv2";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws();
+const simLambda = simAws.lambda();
+const elbV2 = simAws.elbV2();
+
+const created = await simLambda.createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "checkout",
+    Role: "arn:aws:iam::888888888888:role/CheckoutRole",
+    // A handler written for an API Gateway proxy integration, which returns no
+    // status code of its own.
+    Code: { ZipFile: makeLambdaZipFileInput(() => ({ body: "checkout" })) },
+  }),
+);
+
+const loadBalancer = await elbV2.createLoadBalancer(
+  new CreateLoadBalancerCommand({ Name: "shop-alb" }),
+);
+const targetGroup = await elbV2.createTargetGroup(
+  new CreateTargetGroupCommand({ Name: "checkout-tg", TargetType: "lambda" }),
+);
+
+const targetGroupArn = targetGroup.TargetGroups?.[0]?.TargetGroupArn;
+const dnsName = loadBalancer.LoadBalancers?.[0]?.DNSName;
+
+await elbV2.createListener(
+  new CreateListenerCommand({
+    LoadBalancerArn: loadBalancer.LoadBalancers?.[0]?.LoadBalancerArn,
+    Protocol: "HTTP",
+    Port: 80,
+    DefaultActions: [{ Type: "forward", TargetGroupArn: targetGroupArn }],
+  }),
+);
+
+// Nothing is registered yet, so there is no target to send the request to.
+const empty = await simElbV2Fetch(simAws, `http://${dnsName}/orders`);
+
+console.log(empty.status); // 503
+
+await simLambda.addPermission(
+  new AddPermissionCommand({
+    FunctionName: "checkout",
+    StatementId: "elb-invoke",
+    Action: "lambda:InvokeFunction",
+    Principal: "elasticloadbalancing.amazonaws.com",
+    SourceArn: targetGroupArn,
+  }),
+);
+await elbV2.registerTargets(
+  new RegisterTargetsCommand({
+    TargetGroupArn: targetGroupArn,
+    Targets: [{ Id: created.FunctionArn }],
+  }),
+);
+
+// The function runs now, and what it returns is not a response ELB can send.
+const malformed = await simElbV2Fetch(simAws, `http://${dnsName}/orders`);
+
+console.log(malformed.status); // 502
+```
+
+A 503 means there was no target to send the request to, which is a target group with nothing
+registered in it.
+
+A 502 means there was a target and it did not produce a response. A missing invoke permission, a
+function that is not there, a handler that threw, a result with no usable `statusCode`, and a
+response body over 1 MB are all 502, as they are on real ELB, where the difference between them is
+only visible in the load balancer's own logs.
+
+A request body over 1 MB is a 413, which is the limit on what real ELB sends to a Lambda target.
+
+A host name no load balancer answers on, and a port no listener holds, both throw a
+`SimElbV2ConnectionRefusedError` rather than answering. Neither reaches a load balancer on real AWS
+either: one resolves to nothing and the other refuses the connection, so there is no status for
+either.
+
+### The invoke permission
+
+A load balancer invokes a Lambda function through the function's resource-based policy, exactly as
+real ELB does. The grant names `elasticloadbalancing.amazonaws.com` as the principal and the target
+group as the source ARN, and the load balancer supplies the target group's own Account as the source
+Account, so a policy written with the `aws:SourceAccount` condition the ELB documentation recommends
+matches.
+
+Forgetting the grant is a common way to end up with a load balancer that looks configured and serves
+nothing but 502s. Real ELB refuses to register a Lambda target at all until the permission is there;
+here the permission is checked when the request arrives instead, so a target group can be built in
+any order and a policy that is later removed stops the requests.
+
 ## Deleting
 
 Deleting a load balancer takes its listeners and their rules with it, and leaves its target groups
@@ -468,13 +713,34 @@ console.log(created.LoadBalancers?.[0]?.DNSName);
   `http-header`, `http-request-method`, `query-string` and `source-ip` conditions. A condition is
   read through its own field's configuration, so one carrying another field's is refused.
 - Paged describes with `PageSize` and `Marker`.
+- Carrying a request through `simElbV2Fetch`: a listener matched by port, its default `forward`
+  action, and a `lambda` target group invoking its function with an ALB-shaped event.
+- The load balancer's own 503, 502 and 413, and the invoke permission the function's resource policy
+  has to grant `elasticloadbalancing.amazonaws.com`.
 - IAM authorization against the ARN of whatever an operation names.
 - SDK interception of `ElasticLoadBalancingV2Client`.
 
 ## Limitations
 
-- Nothing routes a request yet. Listeners, rules and target groups say what would happen to one, and
-  a simulated load balancer answers nothing.
+- Only a listener's default action carries a request. Listener rules are stored and are not matched
+  against a request, so every request a listener takes is answered by its default action.
+- Only a `forward` action to a `lambda` target group is performed. A `fixed-response` or `redirect`
+  default action, an `ip` target group, and a `ForwardConfig` naming several target groups by weight
+  are each refused when the request arrives rather than answered with something else.
+- A request only reaches a load balancer through `simElbV2Fetch`. Nothing resolves a load balancer's
+  DNS name yet, so `serveSimAws` does not serve one and a Route53 alias to one does not answer.
+- The invoke permission is checked when the request arrives, where real ELB checks it when a Lambda
+  target is registered and refuses `RegisterTargets` without it. A target naming a function in
+  another Account or Region is registered here and then answers 502, where real ELB refuses the
+  registration.
+- Multi-value headers are not simulated. `lambda.multi_value_headers.enabled` cannot be set, since
+  target group attributes are not simulated, so the event and the accepted response always use the
+  single-value `headers` and `queryStringParameters` fields. A repeated query string key keeps its
+  last value, as real ELB does with the attribute off, while repeated request headers arrive already
+  joined with commas rather than reduced to the last one.
+- Health check requests are never sent to a Lambda target, so a handler will not see the
+  `ELB-HealthChecker/2.0` event real ELB sends when health checks are enabled on a `lambda` target
+  group.
 - Network and gateway load balancers are not simulated. `Type: "network"` and `"gateway"` are
   refused, as are the `TCP`, `TLS`, `UDP`, `TCP_UDP` and `GENEVE` protocols.
 - `TargetType: "instance"` and `"alb"` are refused rather than accepted and ignored, and a target
@@ -496,8 +762,7 @@ console.log(created.LoadBalancers?.[0]?.DNSName);
   exchange, and treating one as a plain forward would quietly skip authentication. Since those are
   the only actions that may precede a routing action, a listener or rule takes exactly one action
   here and a longer list is refused.
-- Load balancer attributes, access logs, listener certificates as a separate resource, trust stores,
-  tags as a readable resource, and weighted forwarding across target groups are not simulated. A
-  `ForwardConfig` naming several target groups is stored and its weights are not acted on.
+- Load balancer and target group attributes, access logs, listener certificates as a separate
+  resource, trust stores, and tags as a readable resource are not simulated.
 - There is no CloudFormation support yet, so `AWS::ElasticLoadBalancingV2::*` resources in a template
   are not deployed.

@@ -3,7 +3,12 @@ import { SimElbV2ListenerRuleStore } from "./listener/rule/sim-elbv2-listener-ru
 import { SimElbV2LoadBalancerStore } from "./load-balancer/sim-elbv2-load-balancer-store.js";
 import type { SimElbV2LoadBalancer } from "./load-balancer/sim-elbv2-load-balancer.js";
 import type { SimElbV2Listener } from "./listener/sim-elbv2-listener.js";
+import type { SimElbV2Registry } from "./registry/sim-elbv2-registry.js";
 import { SimElbV2TargetGroupStore } from "./target-group/sim-elbv2-target-group-store.js";
+
+interface SimElbV2StoresProperties {
+  readonly registry: SimElbV2Registry;
+}
 
 /**
  * Everything one simulated ELBv2 scope holds.
@@ -15,10 +20,14 @@ import { SimElbV2TargetGroupStore } from "./target-group/sim-elbv2-target-group-
  * its listeners, and deleting a listener takes its rules.
  */
 export class SimElbV2Stores {
-  public readonly loadBalancers = new SimElbV2LoadBalancerStore();
+  public readonly loadBalancers: SimElbV2LoadBalancerStore;
   public readonly targetGroups = new SimElbV2TargetGroupStore();
   public readonly listeners = new SimElbV2ListenerStore();
   public readonly rules = new SimElbV2ListenerRuleStore();
+
+  constructor(properties: SimElbV2StoresProperties) {
+    this.loadBalancers = new SimElbV2LoadBalancerStore(properties);
+  }
 
   /**
    * Delete a load balancer, and everything that only existed on it.

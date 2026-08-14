@@ -18,8 +18,27 @@ export type { SimElbV2ListenerView } from "./listener/sim-elbv2-listener.js";
 export { SimElbV2ListenerRule } from "./listener/rule/sim-elbv2-listener-rule.js";
 export type { SimElbV2ListenerRuleView } from "./listener/rule/sim-elbv2-listener-rule.js";
 export { SimElbV2Action } from "./action/sim-elbv2-action.js";
+export { SimElbV2Registry } from "./registry/sim-elbv2-registry.js";
+export { SimElbV2ServiceController } from "./serve/sim-elbv2-controller.js";
+export { simElbV2Fetch } from "./serve/sim-elbv2-fetch.js";
+export { SimElbV2Router } from "./serve/sim-elbv2-router.js";
+export type {
+  SimElbV2FunctionTarget,
+  SimElbV2LoadBalancerRoute,
+} from "./serve/sim-elbv2-router.js";
+export { simElbV2ServicePrincipal } from "./serve/sim-elbv2-invoke-authorizer.js";
+export type {
+  SimElbV2Event,
+  SimElbV2EventRequestContext,
+  SimElbV2Result,
+} from "./serve/sim-elbv2-event.type.js";
+export {
+  simElbV2LambdaTargetFactory,
+  type SimElbV2LambdaTargetInput,
+} from "./serve/sim-elbv2-lambda-target.factory.js";
 export {
   SimElbV2AccessDeniedException,
+  SimElbV2ConnectionRefusedError,
   SimElbV2DuplicateListenerException,
   SimElbV2DuplicateLoadBalancerNameException,
   SimElbV2DuplicateTargetGroupNameException,

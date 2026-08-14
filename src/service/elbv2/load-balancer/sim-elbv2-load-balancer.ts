@@ -57,12 +57,21 @@ export class SimElbV2LoadBalancer {
   public readonly scheme: SimElbV2LoadBalancerScheme;
   public readonly ipAddressType: string;
   public readonly createdTime: Date;
+  /**
+   * The Account and Region this load balancer belongs to.
+   *
+   * Held rather than read back out of the ARN, because whatever answers a
+   * request to this load balancer has to look for its listeners, target groups
+   * and functions in the same scope.
+   */
+  public readonly accountRegionScope: SimAwsAccountRegionScope;
 
   constructor(properties: SimElbV2LoadBalancerProperties) {
     const { name, scheme, accountRegionScope } = properties;
 
     this.name = name;
     this.scheme = scheme;
+    this.accountRegionScope = accountRegionScope;
     this.ipAddressType = properties.ipAddressType;
     this.createdTime = properties.createdTime;
     this.arn = simElbV2LoadBalancerArn(name, properties.id, accountRegionScope);

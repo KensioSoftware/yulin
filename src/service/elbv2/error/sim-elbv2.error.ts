@@ -189,6 +189,19 @@ export class SimElbV2InvalidConfigurationRequestException extends SimElbV2Error 
 }
 
 /**
+ * Nothing answered a request sent to a load balancer.
+ *
+ * There is no HTTP status for this, because on real AWS there is no HTTP
+ * response either: a host name no load balancer answers on resolves to nothing,
+ * and a port no listener holds refuses the connection. Both reach a client as a
+ * failed connection rather than as a response, so both are thrown here rather
+ * than answered.
+ */
+export class SimElbV2ConnectionRefusedError extends SimElbV2Error {
+  public override readonly name = "ConnectionRefusedError";
+}
+
+/**
  * Request input that real ELBv2 takes and this simulation does not.
  *
  * Held apart from a validation failure because the two mean different things:

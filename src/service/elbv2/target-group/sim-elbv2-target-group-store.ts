@@ -58,6 +58,13 @@ export class SimElbV2TargetGroupStore {
   }
 
   /**
+   * Find a target group by ARN.
+   */
+  findByArn(arn: string): SimElbV2TargetGroup | undefined {
+    return this.targetGroups.get(arn);
+  }
+
+  /**
    * Resolve a target group by ARN, or refuse.
    */
   requireByArn(arn: string): SimElbV2TargetGroup {

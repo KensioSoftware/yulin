@@ -2,7 +2,12 @@ import {
   SimElbV2DuplicateLoadBalancerNameException,
   SimElbV2LoadBalancerNotFoundException,
 } from "../error/sim-elbv2.error.js";
+import type { SimElbV2Registry } from "../registry/sim-elbv2-registry.js";
 import type { SimElbV2LoadBalancer } from "./sim-elbv2-load-balancer.js";
+
+interface SimElbV2LoadBalancerStoreProperties {
+  readonly registry: SimElbV2Registry;
+}
 
 /**
  * The load balancers of one simulated ELBv2 scope.
@@ -10,10 +15,20 @@ import type { SimElbV2LoadBalancer } from "./sim-elbv2-load-balancer.js";
  * A name is unique within an account and region on real ELB rather than
  * globally, which is the same scope this store is created in, so holding the
  * names here is all that uniqueness needs.
+ *
+ * A DNS name is not scoped that way: a request arriving at one has no account
+ * to start from. Storing and forgetting a load balancer therefore also tells
+ * the cross-scope registry, so the two cannot disagree about which names
+ * answer.
  */
 export class SimElbV2LoadBalancerStore {
   private readonly loadBalancers = new Map<string, SimElbV2LoadBalancer>();
+  private readonly registry: SimElbV2Registry;
   private sequence = 0;
+
+  constructor(properties: SimElbV2LoadBalancerStoreProperties) {
+    this.registry = properties.registry;
+  }
 
   /**
    * Every load balancer in this scope, in creation order.
@@ -47,6 +62,7 @@ export class SimElbV2LoadBalancerStore {
    */
   put(loadBalancer: SimElbV2LoadBalancer): void {
     this.loadBalancers.set(loadBalancer.arn, loadBalancer);
+    this.registry.register(loadBalancer);
   }
 
   /**
@@ -54,6 +70,17 @@ export class SimElbV2LoadBalancerStore {
    */
   findByName(name: string): SimElbV2LoadBalancer | undefined {
     return this.all.find((loadBalancer) => loadBalancer.name === name);
+  }
+
+  /**
+   * Find the load balancer answering on a DNS name.
+   */
+  findByDnsName(dnsName: string): SimElbV2LoadBalancer | undefined {
+    const wanted = dnsName.toLowerCase();
+
+    return this.all.find(
+      (loadBalancer) => loadBalancer.dnsName.toLowerCase() === wanted,
+    );
   }
 
   /**
@@ -91,5 +118,6 @@ export class SimElbV2LoadBalancerStore {
    */
   remove(loadBalancer: SimElbV2LoadBalancer): void {
     this.loadBalancers.delete(loadBalancer.arn);
+    this.registry.deregister(loadBalancer);
   }
 }

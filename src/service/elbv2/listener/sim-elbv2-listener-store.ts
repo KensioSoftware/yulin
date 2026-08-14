@@ -40,6 +40,22 @@ export class SimElbV2ListenerStore {
   }
 
   /**
+   * Find the listener answering on one port of a load balancer.
+   *
+   * A port holds at most one listener, which is what makes a request's port
+   * the whole of the question a load balancer asks about which listener takes
+   * it.
+   */
+  findOnPort(
+    loadBalancerArn: string,
+    port: number,
+  ): SimElbV2Listener | undefined {
+    return this.forLoadBalancer(loadBalancerArn).find(
+      (listener) => listener.port === port,
+    );
+  }
+
+  /**
    * Refuse a port another listener on the same load balancer already answers
    * on.
    *
