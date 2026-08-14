@@ -16,7 +16,7 @@ interface ScaledDigits {
  * Read the plain decimal text a normalised number holds.
  */
 function scaledDigitsOf(text: string): ScaledDigits {
-  const [whole = "", fraction = ""] = text.split(".");
+  const [whole = "", fraction = ""] = text.split(".", 2);
 
   return { digits: BigInt(whole + fraction), scale: -fraction.length };
 }

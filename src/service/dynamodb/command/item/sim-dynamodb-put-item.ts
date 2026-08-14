@@ -73,7 +73,7 @@ export class SimDynamoDbPutItem {
 
     const replaced = table.putItem(item);
 
-    if (!asked.reportsBefore() || replaced === undefined) {
+    if (replaced === undefined || !asked.reportsBefore()) {
       return { $metadata: {} };
     }
 

@@ -31,7 +31,7 @@ const widestWidth = Math.max(...renditionWidths);
  * upload key it answered with already carries.
  */
 function userIdOf(uploadKey: string): string {
-  const [, userId = ""] = uploadKey.split("/");
+  const [, userId = ""] = uploadKey.split("/", 2);
 
   return userId;
 }

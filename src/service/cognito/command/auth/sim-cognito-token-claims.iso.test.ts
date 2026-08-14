@@ -40,13 +40,13 @@ function decodePart(part: string | undefined): JSONObject {
 }
 
 function tokenHeader(token: string): JSONObject {
-  const [header] = token.split(".");
+  const [header] = token.split(".", 1);
 
   return decodePart(header);
 }
 
 function tokenClaims(token: string): JSONObject {
-  const [, claims] = token.split(".");
+  const [, claims] = token.split(".", 2);
 
   return decodePart(claims);
 }

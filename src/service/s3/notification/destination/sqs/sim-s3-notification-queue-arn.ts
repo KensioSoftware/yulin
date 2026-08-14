@@ -37,7 +37,7 @@ export class SimS3NotificationQueueArn {
    */
   static parse(arn: string): SimS3NotificationQueueArn {
     const [prefix, partition, service, region, accountId, name, extra] =
-      arn.split(":");
+      arn.split(":", 7);
 
     if (
       prefix !== "arn" ||

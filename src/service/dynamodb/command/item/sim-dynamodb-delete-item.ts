@@ -63,7 +63,7 @@ export class SimDynamoDbDeleteItem {
 
     const removed = table.deleteItem(key);
 
-    if (!asked.reportsBefore() || removed === undefined) {
+    if (removed === undefined || !asked.reportsBefore()) {
       return { $metadata: {} };
     }
 

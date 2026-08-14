@@ -87,7 +87,6 @@ export class SimEventTargetArn {
     // being empty as well as for being there: `arn:aws:sqs:::` has six parts
     // and names nothing.
     if (
-      parts.length < minimumArnParts ||
       prefix !== "arn" ||
       partition !== "aws" ||
       service === undefined ||
@@ -95,7 +94,8 @@ export class SimEventTargetArn {
       regionName === "" ||
       accountId === undefined ||
       accountId === "" ||
-      resource === ""
+      resource === "" ||
+      parts.length < minimumArnParts
     ) {
       throw new SimEventBridgeValidationException(
         `Invalid parameter: Target Arn Reason: ${value} is not an ARN`,

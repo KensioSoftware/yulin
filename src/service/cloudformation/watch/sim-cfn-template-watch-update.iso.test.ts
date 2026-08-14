@@ -221,8 +221,8 @@ function watchUpdate(
  */
 function succeeds(): SimCfnTemplateFileUpdating {
   return {
-    update: async (): Promise<SimCfnStack> => {
-      return await Promise.resolve({} as SimCfnStack);
+    update: (): Promise<SimCfnStack> => {
+      return Promise.resolve({} as SimCfnStack);
     },
   };
 }

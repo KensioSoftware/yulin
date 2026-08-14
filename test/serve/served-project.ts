@@ -129,8 +129,8 @@ export class ServedProject {
       // the script prints on its way out, among them — sends another signal at
       // a script that has already given its handlers up.
       if (
-        options.signal !== undefined &&
         !signalled &&
+        options.signal !== undefined &&
         output.stdout.includes("watching ")
       ) {
         signalled = true;

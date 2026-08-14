@@ -45,11 +45,11 @@ export class SimIamAccessKeyChecks {
     accessKey: SimIamAccessKey,
     sessionToken: string | undefined,
   ): void {
-    if (accessKey.session !== undefined && sessionToken === undefined) {
+    if (sessionToken === undefined && accessKey.session !== undefined) {
       throw this.invalid(accessKey, "session-token-missing");
     }
 
-    if (accessKey.session === undefined && sessionToken !== undefined) {
+    if (sessionToken !== undefined && accessKey.session === undefined) {
       throw this.invalid(accessKey, "session-token-unexpected");
     }
 

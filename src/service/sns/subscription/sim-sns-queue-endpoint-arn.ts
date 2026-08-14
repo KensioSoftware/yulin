@@ -55,7 +55,6 @@ export class SimSnsQueueEndpointArn {
       parts;
 
     if (
-      parts.length !== queueArnParts ||
       prefix !== "arn" ||
       partition !== "aws" ||
       service !== "sqs" ||
@@ -64,7 +63,8 @@ export class SimSnsQueueEndpointArn {
       accountId === undefined ||
       accountId === "" ||
       queueName === undefined ||
-      queueName === ""
+      queueName === "" ||
+      parts.length !== queueArnParts
     ) {
       throw new SimSnsInvalidParameterException(
         `Invalid parameter: Endpoint Reason: ${endpoint} is not an SQS queue ` +

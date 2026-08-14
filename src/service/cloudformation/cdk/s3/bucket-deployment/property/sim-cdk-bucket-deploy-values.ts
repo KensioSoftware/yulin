@@ -99,7 +99,7 @@ export class SimCdkBucketDeployValues {
       return new Map();
     }
 
-    if (typeof value !== "object" || Array.isArray(value) || value === null) {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
       this.refuse(`${name} must be an object`);
     }
 

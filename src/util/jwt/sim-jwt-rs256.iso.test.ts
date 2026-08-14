@@ -32,7 +32,7 @@ describe("Verifying the RS256 signature of a JWT", () => {
     // Given a token from a pool, with its claims rewritten and re-encoded
     const simAws = new SimAws();
     const signedIn = await simCognitoSignedInFactory.make({}, simAws);
-    const [header = "", , signature = ""] = signedIn.accessToken.split(".");
+    const [header = "", , signature = ""] = signedIn.accessToken.split(".", 3);
     const forgedPayload = Buffer.from(
       JSON.stringify({ sub: "someone-else" }),
       "utf8",

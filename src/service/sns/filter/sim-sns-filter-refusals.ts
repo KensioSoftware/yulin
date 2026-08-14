@@ -67,7 +67,7 @@ export function filterPolicyOperator(value: JSONObject): SimSnsFilterOperator {
   const entries = Object.entries(value);
   const [entry] = entries;
 
-  if (entries.length !== 1 || entry === undefined) {
+  if (entry === undefined || entries.length !== 1) {
     throw simSnsFilterPolicyRefusal(
       `a match condition names one operator, and this one names ` +
         `${String(entries.length)}: ${JSON.stringify(value)}`,
