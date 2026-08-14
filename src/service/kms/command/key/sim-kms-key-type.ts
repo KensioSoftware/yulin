@@ -109,7 +109,13 @@ export class SimKmsKeyType {
     keyUsage: string | undefined,
     requestedKeySpec: string | undefined,
   ): void {
-    if (keyUsage === undefined || keyUsage === spec.keyUsage) {
+    if (keyUsage === undefined) {
+      this.requireDefaultableSpec(spec);
+
+      return;
+    }
+
+    if (keyUsage === spec.keyUsage) {
       return;
     }
 
@@ -121,6 +127,24 @@ export class SimKmsKeyType {
 
     throw new SimKmsInvalidKeyUsageException(
       `KeyUsage '${keyUsage}' with KeySpec '${spec.name}' is not simulated: simulated KMS creates ${spec.name} keys for ${spec.keyUsage}`,
+    );
+  }
+
+  /**
+   * Refuse a spec that cannot take the default key usage.
+   *
+   * `KeyUsage` is optional only for a symmetric encryption key. Every other
+   * spec requires it, so leaving it out is a request AWS refuses rather than
+   * one it fills in, and filling it in here would create a key real KMS would
+   * not have made.
+   */
+  private requireDefaultableSpec(spec: SimKmsKeySpec): void {
+    if (!spec.isAsymmetric) {
+      return;
+    }
+
+    throw new SimKmsInvalidKeyUsageException(
+      `KeySpec '${spec.name}' needs a KeyUsage: it is only optional for a ${simKmsSymmetricKeySpecName} key`,
     );
   }
 }

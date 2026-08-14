@@ -1024,6 +1024,12 @@ created, so a stack naming the wrong key fails here rather than on the deploymen
 cannot be deleted either, for the reason real Route53 gives: the DS record at the parent would be
 left pointing at a zone that had gone.
 
+The key's policy is not checked. Real Route53 needs the key to allow `kms:DescribeKey`,
+`kms:GetPublicKey` and `kms:Sign` to the `dnssec-route53.amazonaws.com` service principal, and
+`kms:CreateGrant` conditioned on `kms:GrantIsForAWSResource`, which is what CDK's `KeySigningKey`
+construct adds for you. A key created here without those statements takes a key-signing key anyway,
+so a template that would fail on AWS for that reason deploys here.
+
 ### DNSSEC from CloudFormation
 
 `AWS::Route53::KeySigningKey` and `AWS::Route53::DNSSEC` deploy, which is the shape CDK's
@@ -1460,6 +1466,10 @@ Where sim Route53 knowingly behaves differently from AWS:
   are the only key statuses, and `SIGNING` and `NOT_SIGNING` the only zone statuses. Real Route53
   also has `DELETING`, `ACTION_NEEDED` and `INTERNAL_FAILURE`, which describe a key mid-operation or
   a zone that needs attention, and nothing here produces either.
+- **A key-signing key's KMS key policy is not checked.** Real Route53 refuses a key that does not
+  admit the `dnssec-route53.amazonaws.com` service principal, and this does not, so a template
+  missing those statements deploys here and fails on AWS. Checking it would mean authorizing the
+  service principal against the key policy, which is its own piece of work.
 - **DNSSEC needs KMS wired to Route53.** A standalone `new SimRoute53()` has no simulated KMS to
   resolve a key ARN against, so `CreateKeySigningKey` refuses. Reach Route53 through `SimAws` when a
   test signs a zone.

@@ -1,5 +1,6 @@
 import {
   SimRoute53DnssecNotFound,
+  SimRoute53InvalidInput,
   SimRoute53KeySigningKeyAlreadyExists,
   SimRoute53NoActiveKeySigningKey,
   SimRoute53NoSuchKeySigningKey,
@@ -118,10 +119,14 @@ export class SimRoute53ZoneDnssec {
    * Real Route53 will not delete a signed zone: DNSSEC has to be disabled
    * first, so the DS record at the parent stops pointing at a zone that has
    * gone.
+   *
+   * Which error it answers with is not documented among DeleteHostedZone's
+   * errors, so this reports the InvalidInput that operation does document
+   * rather than claiming a code that may not be the one AWS sends.
    */
   assertZoneDeletable(): void {
     if (this.#serveSignature === SimRoute53ServeSignature.Signing) {
-      throw new SimRoute53DnssecNotFound(
+      throw new SimRoute53InvalidInput(
         "This hosted zone is signed and cannot be deleted: disable DNSSEC first",
       );
     }

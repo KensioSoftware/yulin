@@ -78,7 +78,7 @@ export class SimKmsSignCommands {
     const algorithm = key.keySpec.requireSigningAlgorithm(
       command.input.SigningAlgorithm,
     );
-    const signature = command.input.Signature ?? new Uint8Array();
+    const signature = this.message.requireSignature(command.input.Signature);
 
     if (!key.verify(message, signature, algorithm)) {
       throw new SimKmsInvalidSignatureException(

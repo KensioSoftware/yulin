@@ -119,8 +119,30 @@ describe("KMS signing validation", () => {
       }),
     );
 
-    // Then nothing verifies, which is the same answer as a wrong one.
-    assertInstanceOf(error, SimKmsInvalidSignatureException);
+    // Then it is a validation failure rather than a signature that did not
+    // verify. The two mean different things to a caller.
+    assertInstanceOf(error, SimKmsValidationException);
+  });
+
+  it("refuses a signature larger than KMS accepts", async () => {
+    // Given a signing key.
+    const simAws = new SimAws();
+    const signingKeyArn = await keyArn(simAws, "ECC_NIST_P256");
+
+    // When a signature past the 6144 byte limit is checked.
+    const error = await assertThrowsErrorAsync(async () =>
+      simAws.kms().verify(
+        new VerifyCommand({
+          KeyId: signingKeyArn,
+          Message: message("zone apex"),
+          Signature: new Uint8Array(6145),
+          SigningAlgorithm: "ECDSA_SHA_256",
+        }),
+      ),
+    );
+
+    // Then it is refused before any cryptography runs.
+    assertInstanceOf(error, SimKmsValidationException);
   });
 
   it("refuses signing with a symmetric key", async () => {

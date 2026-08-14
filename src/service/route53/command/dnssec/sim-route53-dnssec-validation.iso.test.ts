@@ -18,6 +18,7 @@ import { SimRoute53 } from "../../sim-route53.js";
 import {
   SimRoute53DnssecNotFound,
   SimRoute53InvalidKeySigningKeyStatus,
+  SimRoute53InvalidInput,
   SimRoute53InvalidKmsArn,
   SimRoute53KeySigningKeyAlreadyExists,
   SimRoute53NoActiveKeySigningKey,
@@ -320,7 +321,8 @@ describe("Route53 DNSSEC validation", () => {
 
     // Then it is refused, as real Route53 refuses it: the DS record at the
     // parent would be left pointing at a zone that had gone.
-    assertInstanceOf(error, SimRoute53DnssecNotFound);
+    assertInstanceOf(error, SimRoute53InvalidInput);
+    assertStringIncludes(error.message, "disable DNSSEC first");
   });
 
   it("refuses DNSSEC on a hosted zone that does not exist", async () => {

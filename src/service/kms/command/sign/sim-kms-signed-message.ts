@@ -11,6 +11,12 @@ const rawMessageType = "RAW";
 const maxMessageBytes = 4096;
 
 /**
+ * The largest signature Verify accepts, which is what an RSA_4096 signature
+ * needs room for.
+ */
+const maxSignatureBytes = 6144;
+
+/**
  * Reads the message a Sign or Verify request carries.
  *
  * `MessageType: DIGEST` is refused rather than answered. Node has no way to
@@ -41,6 +47,27 @@ export class SimKmsSignedMessage {
     }
 
     return message;
+  }
+
+  /**
+   * The signature bytes to check.
+   *
+   * A missing signature is a request AWS refuses before it does any
+   * cryptography, so it fails as validation here rather than as a signature
+   * that did not verify. The two mean different things to a caller.
+   */
+  requireSignature(signature: Uint8Array | undefined): Uint8Array {
+    if (signature === undefined || signature.length === 0) {
+      throw new SimKmsValidationException("Signature is required");
+    }
+
+    if (signature.length > maxSignatureBytes) {
+      throw new SimKmsValidationException(
+        `Signature of ${String(signature.length)} bytes exceeds the ${String(maxSignatureBytes)} byte limit`,
+      );
+    }
+
+    return signature;
   }
 
   private requireRawMessageType(messageType: string | undefined): void {
