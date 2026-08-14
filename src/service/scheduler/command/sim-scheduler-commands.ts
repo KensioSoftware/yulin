@@ -1,6 +1,10 @@
-import type { SimClock } from "../../../util/clock/sim-clock.js";
+import type { BackgroundScheduler } from "../../../util/background/background.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type { SimIamInterServiceAuthZ } from "../../iam/authorize/sim-iam-inter-service-auth-z.js";
+import type { SimSchedulerDeliveryTargets } from "../delivery/sim-scheduler-delivery.js";
+import { SimSchedulerNoDeliveryTargets } from "../delivery/sim-scheduler-no-delivery-targets.js";
+import { SimSchedulerTargetDelivery } from "../delivery/sim-scheduler-target-delivery.js";
+import { SimSchedulerSchedules } from "../schedule/sim-scheduler-schedules.js";
 import type { SimSchedulerScheduleStore } from "../schedule/sim-scheduler-schedule-store.js";
 import { SimSchedulerAuthorizer } from "./authorize/sim-scheduler-authorizer.js";
 import { SimSchedulerCreateSchedule } from "./schedule/sim-scheduler-create-schedule.js";
@@ -12,7 +16,8 @@ import { SimSchedulerUpdateSchedule } from "./schedule/sim-scheduler-update-sche
 interface SimSchedulerCommandsProperties {
   readonly schedules: SimSchedulerScheduleStore;
   readonly iam: SimIamInterServiceAuthZ;
-  readonly clock: SimClock;
+  readonly background: BackgroundScheduler;
+  readonly deliveryTargets?: SimSchedulerDeliveryTargets | undefined;
   readonly accountRegionScope: SimAwsAccountRegionScope;
 }
 
@@ -26,9 +31,11 @@ export class SimSchedulerCommands {
   public readonly scheduleCreation: SimSchedulerCreateSchedule;
   public readonly scheduleUpdate: SimSchedulerUpdateSchedule;
   public readonly schedules: SimSchedulerScheduleCommands;
+  public readonly delivery: SimSchedulerTargetDelivery;
+  public readonly firing: SimSchedulerSchedules;
 
   constructor(properties: SimSchedulerCommandsProperties) {
-    const { schedules, accountRegionScope } = properties;
+    const { schedules, accountRegionScope, background } = properties;
     const authorizer = new SimSchedulerAuthorizer({ iam: properties.iam });
     const access = new SimSchedulerScheduleAccess({
       schedules,
@@ -37,18 +44,30 @@ export class SimSchedulerCommands {
     });
     const writer = new SimSchedulerScheduleWriter({
       accountRegionScope,
-      clock: properties.clock,
+      clock: background,
+    });
+
+    this.delivery = new SimSchedulerTargetDelivery({
+      endpoints:
+        properties.deliveryTargets ?? new SimSchedulerNoDeliveryTargets(),
+    });
+    this.firing = new SimSchedulerSchedules({
+      schedules,
+      delivery: this.delivery,
+      background,
     });
 
     this.scheduleCreation = new SimSchedulerCreateSchedule({
       schedules,
       access,
       writer,
+      firing: this.firing,
     });
     this.scheduleUpdate = new SimSchedulerUpdateSchedule({
       schedules,
       access,
       writer,
+      firing: this.firing,
     });
     this.schedules = new SimSchedulerScheduleCommands({ schedules, access });
   }

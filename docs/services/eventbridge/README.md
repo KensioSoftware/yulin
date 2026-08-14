@@ -5,8 +5,8 @@ in memory and every operation is authorized by simulated IAM.
 
 Event buses, rules, targets and `PutEvents`. A rule can send matched events to a simulated Lambda
 function, SQS queue or SNS topic, or fire on a schedule when a test advances simulated time.
-EventBridge Scheduler is not simulated yet. EventBridge-specific types are imported from the
-`@kensio/yulin/eventbridge` subpath.
+[EventBridge Scheduler](../scheduler/) is a separate service with its own docs.
+EventBridge-specific types are imported from the `@kensio/yulin/eventbridge` subpath.
 
 ## Putting an event onto a bus
 
@@ -733,7 +733,8 @@ no permission for.
   simulated. Everything is read in UTC.
 - Firing is exact and exactly once. Real EventBridge may deliver a scheduled event a few seconds
   late, and may deliver it more than once.
-- EventBridge Scheduler is a separate service and is not simulated.
+- EventBridge Scheduler is a separate service, simulated separately: see
+  [simulated Scheduler](../scheduler/).
 - Rule tags, a rule `RoleArn`, managed rules and the
   `ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS` state are refused rather than simulated.
 - Deleting an event bus deletes its rules, and deleting a rule deletes its targets. Real EventBridge

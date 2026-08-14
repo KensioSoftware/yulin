@@ -1,4 +1,5 @@
 import { SimSchedulerConflictException } from "../../error/sim-scheduler.error.js";
+import type { SimSchedulerSchedules } from "../../schedule/sim-scheduler-schedules.js";
 import type { SimSchedulerScheduleStore } from "../../schedule/sim-scheduler-schedule-store.js";
 import type { SimSchedulerRequestOptions } from "../sim-scheduler-request-options.js";
 import type { SimSchedulerScheduleAccess } from "./sim-scheduler-schedule-access.js";
@@ -12,6 +13,7 @@ interface SimSchedulerCreateScheduleProperties {
   readonly schedules: SimSchedulerScheduleStore;
   readonly access: SimSchedulerScheduleAccess;
   readonly writer: SimSchedulerScheduleWriter;
+  readonly firing: SimSchedulerSchedules;
 }
 
 /**
@@ -27,11 +29,13 @@ export class SimSchedulerCreateSchedule {
   private readonly schedules: SimSchedulerScheduleStore;
   private readonly access: SimSchedulerScheduleAccess;
   private readonly writer: SimSchedulerScheduleWriter;
+  private readonly firing: SimSchedulerSchedules;
 
   constructor(properties: SimSchedulerCreateScheduleProperties) {
     this.schedules = properties.schedules;
     this.access = properties.access;
     this.writer = properties.writer;
+    this.firing = properties.firing;
   }
 
   /**
@@ -59,6 +63,7 @@ export class SimSchedulerCreateSchedule {
     const schedule = this.writer.write(input, requested);
 
     this.schedules.put(schedule);
+    this.firing.arm(schedule);
 
     return { $metadata: {}, ScheduleArn: schedule.arn };
   }

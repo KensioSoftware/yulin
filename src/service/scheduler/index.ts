@@ -18,6 +18,15 @@ export {
   type SimSchedulerTargetService,
 } from "./target/sim-scheduler-target-arn.js";
 export {
+  simSchedulerServicePrincipal,
+  type SimSchedulerDeliveryTargets,
+} from "./delivery/sim-scheduler-delivery.js";
+export { SimSchedulerDeliveryFailure } from "./delivery/sim-scheduler-delivery-failures.js";
+export {
+  SimSchedulerDeliveryNotPermitted,
+  SimSchedulerTargetNotFound,
+} from "./error/sim-scheduler-delivery.error.js";
+export {
   SimSchedulerAccessDeniedException,
   SimSchedulerConflictException,
   SimSchedulerError,

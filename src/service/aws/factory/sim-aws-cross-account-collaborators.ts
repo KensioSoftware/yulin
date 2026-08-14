@@ -1,5 +1,8 @@
 import { SimRoute53AcmDnsRecords } from "../../acm/validation/sim-route53-acm-dns-records.js";
 import { SimCognitoHttpApiJwtIssuerKeys } from "../../apigatewayv2/api/authorizer/sim-cognito-http-api-jwt-issuer-keys.js";
+import { SimAwsEventBridgeDeliveryTargets } from "../../eventbridge/delivery/sim-aws-event-bridge-delivery-targets.js";
+import { SimAwsSchedulerDeliveryTargets } from "../../scheduler/delivery/sim-aws-scheduler-delivery-targets.js";
+import type { SimAws } from "../sim-aws.js";
 import type { SimAwsScopedServiceRegistries } from "./sim-aws-scoped-service-registries.js";
 
 /**
@@ -27,4 +30,29 @@ export function simAwsHttpApiJwtIssuerKeys(
   return new SimCognitoHttpApiJwtIssuerKeys({
     userPoolRegistry: registries.cognito,
   });
+}
+
+/**
+ * Everywhere a simulated EventBridge rule can deliver.
+ *
+ * Rules deliver to targets in any Account and Region of the simulation, as real
+ * EventBridge delivers across both.
+ */
+export function simAwsEventBridgeDeliveryTargets(
+  simAws: SimAws,
+): SimAwsEventBridgeDeliveryTargets {
+  return new SimAwsEventBridgeDeliveryTargets({ simAws });
+}
+
+/**
+ * Everywhere a simulated Scheduler schedule can invoke.
+ *
+ * A schedule assumes its execution role in that role's own Account and reaches
+ * its target in the target's, which need not be the same one, so this reads the
+ * whole simulation rather than one scope.
+ */
+export function simAwsSchedulerDeliveryTargets(
+  simAws: SimAws,
+): SimAwsSchedulerDeliveryTargets {
+  return new SimAwsSchedulerDeliveryTargets({ simAws });
 }
