@@ -77,6 +77,25 @@ export class SimEventBridgeValidationException extends SimEventBridgeError {
 }
 
 /**
+ * Simulated EventBridge InvalidEventPatternException.
+ *
+ * Real EventBridge answers a pattern it will not take this way, whether the
+ * pattern is not JSON, is not shaped like a pattern, or uses an operator
+ * wrongly. This simulation also uses it for an operator real EventBridge has
+ * and this does not, since a pattern carrying one is a pattern this cannot
+ * evaluate.
+ */
+export class SimEventBridgeInvalidEventPatternException extends SimEventBridgeError {
+  public override readonly name = "InvalidEventPatternException";
+
+  constructor(reason: string) {
+    super(`Event pattern is not valid. Reason: ${reason}`, {
+      httpStatusCode: 400,
+    });
+  }
+}
+
+/**
  * Simulated EventBridge error for a request input this simulation does not
  * model.
  *

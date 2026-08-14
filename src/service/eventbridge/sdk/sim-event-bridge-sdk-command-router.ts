@@ -10,6 +10,21 @@ import type {
   SimListEventBusesCommand,
 } from "../command/bus/bus.command.js";
 import type { SimPutEventsCommand } from "../command/put-events/put-events.command.js";
+import type {
+  SimDeleteRuleCommand,
+  SimDescribeRuleCommand,
+  SimDisableRuleCommand,
+  SimEnableRuleCommand,
+  SimListRulesCommand,
+  SimPutRuleCommand,
+  SimTestEventPatternCommand,
+} from "../command/rule/rule.command.js";
+import type {
+  SimListRuleNamesByTargetCommand,
+  SimListTargetsByRuleCommand,
+  SimPutTargetsCommand,
+  SimRemoveTargetsCommand,
+} from "../command/target/target.command.js";
 import type { SimEventBridge } from "../sim-event-bridge.js";
 
 /**
@@ -57,6 +72,94 @@ export class SimEventBridgeSdkCommandRouter implements SimSdkCommandRouter {
         async (command, context): Promise<unknown> =>
           await simEventBridge.putEvents(
             command as SimPutEventsCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "PutRuleCommand",
+        async (command, context): Promise<unknown> =>
+          await simEventBridge.putRule(
+            command as SimPutRuleCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DeleteRuleCommand",
+        async (command, context): Promise<unknown> =>
+          await simEventBridge.deleteRule(
+            command as SimDeleteRuleCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DescribeRuleCommand",
+        async (command, context): Promise<unknown> =>
+          await simEventBridge.describeRule(
+            command as SimDescribeRuleCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListRulesCommand",
+        async (command, context): Promise<unknown> =>
+          await simEventBridge.listRules(
+            command as SimListRulesCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "EnableRuleCommand",
+        async (command, context): Promise<unknown> =>
+          await simEventBridge.enableRule(
+            command as SimEnableRuleCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "DisableRuleCommand",
+        async (command, context): Promise<unknown> =>
+          await simEventBridge.disableRule(
+            command as SimDisableRuleCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "TestEventPatternCommand",
+        async (command, context): Promise<unknown> =>
+          await simEventBridge.testEventPattern(
+            command as SimTestEventPatternCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "PutTargetsCommand",
+        async (command, context): Promise<unknown> =>
+          await simEventBridge.putTargets(
+            command as SimPutTargetsCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "RemoveTargetsCommand",
+        async (command, context): Promise<unknown> =>
+          await simEventBridge.removeTargets(
+            command as SimRemoveTargetsCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListTargetsByRuleCommand",
+        async (command, context): Promise<unknown> =>
+          await simEventBridge.listTargetsByRule(
+            command as SimListTargetsByRuleCommand,
+            simSdkCallerOptions(context),
+          ),
+      ],
+      [
+        "ListRuleNamesByTargetCommand",
+        async (command, context): Promise<unknown> =>
+          await simEventBridge.listRuleNamesByTarget(
+            command as SimListRuleNamesByTargetCommand,
             simSdkCallerOptions(context),
           ),
       ],

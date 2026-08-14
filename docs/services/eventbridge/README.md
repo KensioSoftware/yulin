@@ -3,9 +3,9 @@
 Yulin includes a simulated Amazon EventBridge for tests and local development. Event buses are held
 in memory and every operation is authorized by simulated IAM.
 
-Event buses and `PutEvents` only. Rules, targets and EventBridge Scheduler are not simulated yet, so
-an event put onto a bus today is accepted and then dropped. EventBridge-specific types are imported
-from the `@kensio/yulin/eventbridge` subpath.
+Event buses, rules, targets and `PutEvents`. A rule can send matched events to a simulated Lambda
+function, SQS queue or SNS topic. EventBridge Scheduler and scheduled rules are not simulated yet. EventBridge-specific
+types are imported from the `@kensio/yulin/eventbridge` subpath.
 
 ## Putting an event onto a bus
 
@@ -200,6 +200,332 @@ The envelope is the shape a rule matches against and a target receives. An entry
 is stamped from the simulation's own clock, so a test with a fixed clock gets a predictable
 timestamp, and the timestamp is written to the second, as real EventBridge writes it.
 
+## Matching events with rules
+
+A rule watches one bus and matches events against an event pattern.
+
+```typescript sim-event-bridge-rules
+/**
+ * A rule matching order events on a bus.
+ */
+
+import { PutEventsCommand, PutRuleCommand } from "@aws-sdk/client-eventbridge";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const events = simAws.eventBridge();
+
+await events.putRule(
+  new PutRuleCommand({
+    Name: "large-orders",
+    EventPattern: JSON.stringify({
+      source: ["orders.service"],
+      "detail-type": ["OrderPlaced"],
+      detail: { total: [{ numeric: [">=", 1000] }] },
+    }),
+  }),
+);
+
+await events.putEvents(
+  new PutEventsCommand({
+    Entries: [
+      {
+        Source: "orders.service",
+        DetailType: "OrderPlaced",
+        Detail: JSON.stringify({ orderId: "order-1", total: 4200 }),
+      },
+    ],
+  }),
+);
+
+const [receipt] = events.receiptsOn("default");
+
+console.log(receipt?.matchedRuleNames); // ["large-orders"]
+```
+
+A rule name is up to 64 characters, shorter than a bus name, and it is unique within one bus rather
+than within the account. A rule ARN on the default bus is `arn:aws:events:<region>:<account>:rule/<name>`,
+and a rule on a custom bus carries the bus as well: `rule/<bus>/<name>`.
+
+`PutRule` creates and updates alike, and an update **replaces** the rule rather than merging into it.
+A second request that leaves out the description clears the description. That is real behaviour and a
+common surprise.
+
+`DisableRule` stops a rule matching, and `EnableRule` starts it again. A rule that was off does not
+replay what it missed. `DeleteRule` on a rule that is not there succeeds. Deleting a bus deletes its
+rules with it.
+
+`receiptsOn(...)` is a simulator accessor rather than an API: it reports what a bus received and
+which rules each event matched, which is how a test asserts on routing before there are targets to
+watch.
+
+## Event patterns
+
+A pattern has the same shape as the events it matches. Every key of a pattern has to match, which is
+an "and"; a field's conditions are written as a list, and any one matching is enough, which is an
+"or".
+
+Supported conditions:
+
+| Condition                      | Written as                                             |
+| ------------------------------ | ------------------------------------------------------ |
+| Exact value, or any of several | `"source": ["orders.service", "billing.service"]`      |
+| Nested field                   | `"detail": { "customer": { "tier": ["gold"] } }`       |
+| Begins with                    | `"time": [{ "prefix": "2026-07-26" }]`                 |
+| Ends with                      | `"FileName": [{ "suffix": ".png" }]`                   |
+| Anything but                   | `"state": [{ "anything-but": ["stopped", "failed"] }]` |
+| Numeric, and ranges            | `"total": [{ "numeric": [">", 0, "<=", 5000] }]`       |
+| Field is or is not there       | `"refundId": [{ "exists": false }]`                    |
+
+Values are compared by type, so the string `"5"` in a pattern does not match the number `5` in an
+event. `null` and the empty string are values like any other. Where the event carries a list for a
+field, the pattern matches when the two lists overlap, which is how a pattern naming one ARN matches
+an event whose `resources` names several. `exists` is about the field rather than its members, so a
+field carrying an empty list still exists.
+
+Anything else is refused at `PutRule` rather than quietly never matching. The `cidr`,
+`equals-ignore-case`, `wildcard` and `$or` operators are all refused by name, as are the nested forms
+of `anything-but` and the case-insensitive forms of `prefix` and `suffix`. A pattern that silently
+matched nothing would look like a pattern that was simply too specific, and the rule would go
+unnoticed until the deployment.
+
+## Testing a pattern without a rule
+
+`TestEventPattern` answers whether one event matches one pattern, creating nothing:
+
+```typescript sim-event-bridge-test-pattern
+/**
+ * Checking a pattern against an event before writing a rule with it.
+ */
+
+import { TestEventPatternCommand } from "@aws-sdk/client-eventbridge";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const { Result } = await simAws.eventBridge().testEventPattern(
+  new TestEventPatternCommand({
+    EventPattern: JSON.stringify({
+      detail: { total: [{ numeric: [">=", 1000] }] },
+    }),
+    Event: JSON.stringify({
+      source: "orders.service",
+      "detail-type": "OrderPlaced",
+      detail: { orderId: "order-1", total: 4200 },
+    }),
+  }),
+);
+
+console.log(Result); // true
+```
+
+This is the quickest way to find out why a rule is not firing, and a pattern this simulation cannot
+evaluate is refused here exactly as `PutRule` refuses it.
+
+## Sending matched events to targets
+
+A rule sends every event it matches to each of its targets. A target is a simulated Lambda function,
+SQS queue or SNS topic.
+
+```typescript sim-event-bridge-targets
+/**
+ * A rule sending order events to a queue.
+ */
+
+import {
+  PutEventsCommand,
+  PutRuleCommand,
+  PutTargetsCommand,
+} from "@aws-sdk/client-eventbridge";
+import {
+  CreateQueueCommand,
+  ReceiveMessageCommand,
+  SetQueueAttributesCommand,
+} from "@aws-sdk/client-sqs";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const queueArn = "arn:aws:sqs:us-east-1:888888888888:orders";
+
+const queue = await simAws
+  .sqs()
+  .createQueue(new CreateQueueCommand({ QueueName: "orders" }));
+
+// The queue's own policy is what admits EventBridge.
+await simAws.sqs().setQueueAttributes(
+  new SetQueueAttributesCommand({
+    QueueUrl: queue.QueueUrl,
+    Attributes: {
+      Policy: JSON.stringify({
+        Version: "2012-10-17",
+        Statement: [
+          {
+            Effect: "Allow",
+            Principal: { Service: "events.amazonaws.com" },
+            Action: "sqs:SendMessage",
+            Resource: queueArn,
+          },
+        ],
+      }),
+    },
+  }),
+);
+
+await simAws.eventBridge().putRule(
+  new PutRuleCommand({
+    Name: "orders",
+    EventPattern: JSON.stringify({ source: ["orders.service"] }),
+  }),
+);
+
+await simAws.eventBridge().putTargets(
+  new PutTargetsCommand({
+    Rule: "orders",
+    Targets: [{ Id: "orders-queue", Arn: queueArn }],
+  }),
+);
+
+await simAws.eventBridge().putEvents(
+  new PutEventsCommand({
+    Entries: [
+      {
+        Source: "orders.service",
+        DetailType: "OrderPlaced",
+        Detail: JSON.stringify({ orderId: "order-1" }),
+      },
+    ],
+  }),
+);
+
+// Delivery happens after PutEvents has answered, as it does on real AWS.
+await simAws.backgroundTasksComplete();
+
+const received = await simAws
+  .sqs()
+  .receiveMessage(new ReceiveMessageCommand({ QueueUrl: queue.QueueUrl }));
+
+console.log(received.Messages?.length); // 1
+```
+
+A queue or topic target receives the event as its message body, with no envelope around it. A Lambda
+target is invoked with the event as its payload. A target with an `Input` receives that fixed JSON
+instead of the event, which is what makes `Input` useful for a target that only needs to know
+something happened.
+
+A rule has at most five targets, and a target id is unique within one rule. `PutTargets` replaces a
+target of the same id rather than adding a second beside it. `RemoveTargets` reports an id the rule
+does not have as a failed entry rather than failing the request. Deleting a rule takes its targets
+with it.
+
+`ListTargetsByRule` reports a rule's targets, and `ListRuleNamesByTarget` reports the rules of a bus
+that send to one target ARN.
+
+## What a target has to allow
+
+EventBridge reaches a target as the `events.amazonaws.com` service principal, and the target's own
+resource policy is the whole of the decision. There is no execution role: a rule `RoleArn` is refused
+rather than simulated.
+
+- **A queue** needs `sqs:SendMessage` for `events.amazonaws.com` in its `Policy` attribute.
+- **A topic** needs `sns:Publish` for `events.amazonaws.com` in its `Policy` attribute.
+- **A function** needs an `AddPermission` grant of `lambda:InvokeFunction` to
+  `events.amazonaws.com`.
+
+The policy is consulted on every delivery rather than when the target is added, so a permission taken
+away afterwards stops delivery. Real EventBridge does not check it at `PutTargets` time either.
+
+A target may be in another account or region of the same simulation. It is the target's own account
+that decides, so the policy lives with the target and is evaluated by that account's IAM, as it is on
+real AWS. Both condition keys AWS documents for this work: `aws:SourceArn` carries the rule's ARN and
+`aws:SourceAccount` carries the account the rule belongs to.
+
+```typescript sim-event-bridge-cross-account
+/**
+ * A rule in one Account sending to a queue in another.
+ */
+
+const queuePolicy = {
+  Version: "2012-10-17",
+  Statement: [
+    {
+      Effect: "Allow",
+      Principal: { Service: "events.amazonaws.com" },
+      Action: "sqs:SendMessage",
+      Resource: "arn:aws:sqs:us-east-1:222222222222:orders",
+      Condition: {
+        ArnLike: {
+          "aws:SourceArn": "arn:aws:events:us-east-1:111111111111:rule/orders",
+        },
+      },
+    },
+  ],
+};
+
+console.log(JSON.stringify(queuePolicy).length > 0); // true
+```
+
+An event delivered across accounts still names the account it was put in, not the target's.
+
+## Deliveries that did not happen
+
+Real EventBridge tells the caller nothing about a failed delivery: a `PutEvents` that matched a rule
+whose target refuses the call still answers with an event id. A target that is unexpectedly empty is
+explained by `deliveryFailures` instead:
+
+```typescript sim-event-bridge-delivery-failures
+/**
+ * Finding out why a target received nothing.
+ */
+
+import {
+  PutEventsCommand,
+  PutRuleCommand,
+  PutTargetsCommand,
+} from "@aws-sdk/client-eventbridge";
+import { CreateQueueCommand } from "@aws-sdk/client-sqs";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+// A queue with no policy admitting EventBridge.
+await simAws.sqs().createQueue(new CreateQueueCommand({ QueueName: "orders" }));
+
+await simAws.eventBridge().putRule(
+  new PutRuleCommand({
+    Name: "orders",
+    EventPattern: JSON.stringify({ source: ["orders.service"] }),
+  }),
+);
+await simAws.eventBridge().putTargets(
+  new PutTargetsCommand({
+    Rule: "orders",
+    Targets: [{ Id: "q", Arn: "arn:aws:sqs:us-east-1:888888888888:orders" }],
+  }),
+);
+
+await simAws.eventBridge().putEvents(
+  new PutEventsCommand({
+    Entries: [
+      { Source: "orders.service", DetailType: "OrderPlaced", Detail: "{}" },
+    ],
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+const [failure] = simAws.eventBridge().deliveryFailures;
+
+console.log(failure?.targetId); // "q"
+console.log(failure?.message);
+// "The queue policy of arn:aws:sqs:... does not allow events.amazonaws.com..."
+```
+
+A target that names nothing reads differently from one whose policy said no, because a policy saying
+no is a modelled outcome a test may be asking for on purpose.
+
 ## Permissions
 
 Every operation is authorized by simulated IAM against the bus ARN. `events:ListEventBuses` has no
@@ -262,6 +588,15 @@ no permission for.
 ## Available functionality
 
 - `CreateEventBus`, `DeleteEventBus`, `DescribeEventBus`, `ListEventBuses` and `PutEvents`.
+- `PutRule`, `DeleteRule`, `DescribeRule`, `ListRules`, `EnableRule`, `DisableRule` and
+  `TestEventPattern`.
+- Event pattern matching on exact values, nested fields, lists, `prefix`, `suffix`, `anything-but`,
+  `numeric` and `exists`.
+- `PutTargets`, `RemoveTargets`, `ListTargetsByRule` and `ListRuleNamesByTarget`, with delivery to a
+  simulated Lambda function, SQS queue or SNS topic, authorized by the target's own resource policy.
+- Targets in another account or region of the same simulation, admitted by the target's own resource
+  policy on `aws:SourceArn` or `aws:SourceAccount`, as real EventBridge does.
+- A target's fixed `Input`, and `deliveryFailures` for deliveries that did not happen.
 - The `default` bus in every account and region, without one being created.
 - Bus descriptions, creation timestamps from the simulation's clock, and prefix-narrowed paged
   listings.
@@ -271,9 +606,22 @@ no permission for.
 
 ## Limitations
 
-- Rules, event patterns and targets are not simulated, so every event put onto a bus is dropped after
-  it arrives.
-- Scheduled rules and EventBridge Scheduler are not simulated.
+- Targets deliver to Lambda, SQS and SNS only. A target ARN naming any other service is refused when
+  the target is added rather than when an event first matches.
+- Target `InputPath` and `InputTransformer` are refused, as are a target `RoleArn`, dead letter
+  queues and retry policies. A delivery is attempted once.
+- Numbers are compared after JSON parsing, so `300`, `300.0` and `3.0e2` are one value here. Real
+  EventBridge compares the JSON token when matching an exact value, and so may tell those forms
+  apart. Use `numeric` to compare numbers, which is what it is for.
+- The `cidr`, `equals-ignore-case`, `wildcard` and `$or` pattern operators are refused rather than
+  evaluated, as are the nested forms of `anything-but` and the case-insensitive forms of `prefix`
+  and `suffix`.
+- Scheduled rules and EventBridge Scheduler are not simulated, so `PutRule` refuses a
+  `ScheduleExpression`. A rule needs an event pattern.
+- Rule tags, a rule `RoleArn`, managed rules and the
+  `ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS` state are refused rather than simulated.
+- Deleting an event bus deletes its rules, and deleting a rule deletes its targets. Real EventBridge
+  refuses to delete either while it still has what hangs off it.
 - `AWS::Events::*` CloudFormation resource types are not simulated.
 - Event bus resource policies are not simulated. `PutPermission`, `RemovePermission` and the bus
   `Policy` attribute are all absent, so a caller from another account cannot be admitted to a bus,

@@ -13,6 +13,7 @@ import { SimCognitoIdentityProvider } from "../../cognito/index.js";
 import { simAwsCognitoTriggerFunctions } from "../../cognito/user-pool/trigger/sim-aws-cognito-trigger-functions.js";
 import { SimDynamoDb as SimDynamoDatabase } from "../../dynamodb/index.js";
 import { SimEventBridge } from "../../eventbridge/index.js";
+import { SimAwsEventBridgeDeliveryTargets } from "../../eventbridge/delivery/sim-aws-event-bridge-delivery-targets.js";
 import type { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
 import { SimKms } from "../../kms/index.js";
 import type { SimHttpApiRegistry } from "../../apigatewayv2/registry/sim-http-api-registry.js";
@@ -152,7 +153,14 @@ export class SimAwsAccountRegionServiceBuilder {
    * an event put in one Region reaches no rule in another.
    */
   createEventBridge(scope: SimAwsAccountRegionContainer): SimEventBridge {
-    return new SimEventBridge(this.scoped(scope));
+    return new SimEventBridge({
+      ...this.scoped(scope),
+      // Rules deliver to targets in any Account and Region of this
+      // simulation, as real EventBridge delivers across both.
+      deliveryTargets: new SimAwsEventBridgeDeliveryTargets({
+        simAws: this.simAws,
+      }),
+    });
   }
 
   /**

@@ -1,32 +1,26 @@
 import type { BackgroundScheduler } from "../../../../util/background/background.js";
 import type { SimAwsAccountRegionScope } from "../../../aws/sim-aws-account-region-scope.js";
-import type { SimEventBusStore } from "../../bus/sim-event-bus-store.js";
-import type { SimEventBridgeEvent } from "../../event/sim-event-bridge-event.js";
+import type { SimEventBridgeRouter } from "../../routing/sim-event-bridge-router.js";
 import type { SimEventBridgeRequestOptions } from "../sim-event-bridge-request-options.js";
 import type { SimEventBridgeBusAccess } from "../bus/sim-event-bridge-bus-access.js";
+import {
+  type SimEventBridgeAuthorizedEntry,
+  authorizedEntries,
+} from "./sim-event-bridge-authorized-entries.js";
 import { SimEventBridgeEntryFailure } from "./sim-event-bridge-entry-failure.js";
 import { SimEventBridgeEntryReader } from "./sim-event-bridge-entry-reader.js";
 import { putEventsRequestEntries } from "./sim-event-bridge-request-entries.js";
 import type {
   SimPutEventsCommand,
   SimPutEventsCommandOutput,
-  SimPutEventsRequestEntry,
   SimPutEventsResultEntry,
 } from "./put-events.command.js";
 
-/**
- * One entry, and the name of the bus the caller is allowed to put it on.
- */
-interface SimEventBridgeAuthorizedEntry {
-  readonly entry: SimPutEventsRequestEntry;
-  readonly busName: string;
-}
-
 interface SimEventBridgePutEventsProperties {
-  readonly buses: SimEventBusStore;
   readonly access: SimEventBridgeBusAccess;
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly clock: BackgroundScheduler;
+  readonly router: SimEventBridgeRouter;
 }
 
 /**
@@ -43,15 +37,15 @@ interface SimEventBridgePutEventsProperties {
  * reproduces it rather than being helpfully stricter.
  */
 export class SimEventBridgePutEvents {
-  private readonly buses: SimEventBusStore;
   private readonly access: SimEventBridgeBusAccess;
   private readonly clock: BackgroundScheduler;
+  private readonly router: SimEventBridgeRouter;
   private readonly reader: SimEventBridgeEntryReader;
 
   constructor(properties: SimEventBridgePutEventsProperties) {
-    this.buses = properties.buses;
     this.access = properties.access;
     this.clock = properties.clock;
+    this.router = properties.router;
     this.reader = new SimEventBridgeEntryReader({
       accountRegionScope: properties.accountRegionScope,
     });
@@ -71,8 +65,8 @@ export class SimEventBridgePutEvents {
     const entries = putEventsRequestEntries(command.input);
     const at = this.clock.now();
 
-    const results = this.authorized(entries, options).map((authorized) =>
-      this.put(authorized, at),
+    const results = authorizedEntries(entries, this.access, options).map(
+      (authorized) => this.put(authorized, at),
     );
 
     return {
@@ -82,28 +76,6 @@ export class SimEventBridgePutEvents {
         (result) => result.ErrorCode !== undefined,
       ).length,
     };
-  }
-
-  /**
-   * Resolve and authorize the bus every entry names, before any of them is
-   * delivered.
-   *
-   * Authorizing entry by entry as each is delivered would leave a refused
-   * request half done: an earlier entry's event would already be on its bus
-   * when a later entry's refusal threw. Every entry is therefore decided
-   * first, so a request that throws has changed nothing.
-   */
-  private authorized(
-    entries: readonly SimPutEventsRequestEntry[],
-    options: SimEventBridgeRequestOptions | undefined,
-  ): readonly SimEventBridgeAuthorizedEntry[] {
-    return entries.map((entry) => {
-      const busName = this.access.requestedName(entry.EventBusName);
-
-      this.access.authorizeName("events:PutEvents", busName, options);
-
-      return { entry, busName: busName.value };
-    });
   }
 
   /**
@@ -122,15 +94,8 @@ export class SimEventBridgePutEvents {
       return read.toResultEntry();
     }
 
-    this.deliver(authorized.busName, read);
+    this.router.deliver(authorized.busName, read);
 
     return { EventId: read.id };
-  }
-
-  /**
-   * Hand an event to the bus it was put onto, where there is one.
-   */
-  private deliver(busName: string, event: SimEventBridgeEvent): void {
-    this.buses.find(busName)?.receive(event);
   }
 }

@@ -1,5 +1,7 @@
 import { SimEventBusName } from "../../bus/sim-event-bus-name.js";
 import type { SimEventBusStore } from "../../bus/sim-event-bus-store.js";
+import type { SimEventRuleStore } from "../../rule/sim-event-rule-store.js";
+import type { SimEventTargetStore } from "../../target/sim-event-target-store.js";
 import { SimEventBridgeValidationException } from "../../error/sim-event-bridge.error.js";
 import type { SimEventBridgeRequestOptions } from "../sim-event-bridge-request-options.js";
 import type { SimEventBridgeBusAccess } from "./sim-event-bridge-bus-access.js";
@@ -10,6 +12,8 @@ import type {
 
 interface SimEventBridgeDeleteEventBusProperties {
   readonly buses: SimEventBusStore;
+  readonly rules: SimEventRuleStore;
+  readonly targets: SimEventTargetStore;
   readonly access: SimEventBridgeBusAccess;
 }
 
@@ -26,10 +30,14 @@ interface SimEventBridgeDeleteEventBusProperties {
  */
 export class SimEventBridgeDeleteEventBus {
   private readonly buses: SimEventBusStore;
+  private readonly rules: SimEventRuleStore;
+  private readonly targets: SimEventTargetStore;
   private readonly access: SimEventBridgeBusAccess;
 
   constructor(properties: SimEventBridgeDeleteEventBusProperties) {
     this.buses = properties.buses;
+    this.rules = properties.rules;
+    this.targets = properties.targets;
     this.access = properties.access;
   }
 
@@ -57,6 +65,11 @@ export class SimEventBridgeDeleteEventBus {
     }
 
     if (bus !== undefined) {
+      // Real EventBridge refuses to delete a bus that still has rules on it.
+      // Nothing here can be left orphaned instead: a rule outliving its bus
+      // would match events put onto a bus recreated under the same name.
+      this.targets.removeForRules(this.rules.forBus(bus.name.value));
+      this.rules.removeForBus(bus.name.value);
       this.buses.remove(bus);
     }
 
