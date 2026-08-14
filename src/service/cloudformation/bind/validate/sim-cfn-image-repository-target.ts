@@ -23,6 +23,17 @@ export class SimCfnImageRepositoryTarget {
   }
 
   /**
+   * The repository this target names, with any tag or digest removed and read
+   * the same way both sides of a match are.
+   *
+   * A simulated ECR repository is indexed by this, so one reading of an image
+   * reference serves both binding matches and repository lookups.
+   */
+  repositoryReference(): string {
+    return this.repository;
+  }
+
+  /**
    * Whether a function's image URI names this repository.
    */
   matchesImageUri(imageUri: string | undefined): boolean {

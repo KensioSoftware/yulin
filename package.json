@@ -70,6 +70,10 @@
       "import": "./dist/service/dynamodb/index.js",
       "types": "./dist/service/dynamodb/index.d.ts"
     },
+    "./ecr": {
+      "import": "./dist/service/ecr/index.js",
+      "types": "./dist/service/ecr/index.d.ts"
+    },
     "./ecs": {
       "import": "./dist/service/ecs/index.js",
       "types": "./dist/service/ecs/index.d.ts"

@@ -11,6 +11,7 @@ behaviour and includes example code that can be copied into tests or local devel
 - [CloudFront](./services/cloudfront/ "Simulated CloudFront usage docs")
 - [Cognito user pools](./services/cognito/ "Simulated Cognito user pools usage docs")
 - [DynamoDB](./services/dynamodb/ "Simulated DynamoDB usage docs")
+- [ECR](./services/ecr/ "Simulated ECR usage docs")
 - [ECS](./services/ecs/ "Simulated ECS usage docs")
 - [Elastic Load Balancing](./services/elbv2/ "Simulated Application Load Balancer usage docs")
 - [EventBridge](./services/eventbridge/ "Simulated EventBridge usage docs")

@@ -3,6 +3,7 @@ import type { SimAwsCaller } from "../aws/caller/sim-aws-caller.js";
 import type { SimCfnServiceResourceFactory } from "../cloudformation/resource/factory/sim-cfn-resource-factory.type.js";
 import { SimLambdaCloudFormationResourceFactory } from "./cfn/sim-cfn-lambda-resource-factory.js";
 import type { SimLambdaEventSourceMapping } from "./event-source/sim-lambda-event-source-mapping.js";
+import type { SimLambdaContainerImages } from "./function/code/image/sim-lambda-container-images.js";
 import type {
   SimLambdaFunction,
   SimLambdaFunctionMap,
@@ -33,6 +34,7 @@ export class SimLambda {
   private readonly cfnFactory = new SimLambdaCloudFormationResourceFactory(
     this,
   );
+
   private readonly sdkRouter = new SimLambdaSdkCommandRouter(this);
 
   constructor(properties: SimLambdaProperties = {}) {
@@ -44,6 +46,18 @@ export class SimLambda {
       // ambient callers.
       runAsOwner: properties.runAsOwner ?? this,
     });
+  }
+
+  /**
+   * Where this simulated Lambda resolves a container image URI to a real
+   * in-process handler.
+   *
+   * Read by the CloudFormation Resource factory, which decides whether a
+   * template's container image function can be created or has to be skipped.
+   * @internal
+   */
+  containerImages(): SimLambdaContainerImages {
+    return this.commands.containerImages;
   }
 
   /**

@@ -118,7 +118,7 @@ describe("Lambda CreateFunctionCommand", () => {
     assertInstanceOf(error, SimLambdaInvalidParameterValueException);
     assertStringIncludes(
       error.message,
-      "requires either ZipFile bytes or an S3Bucket and S3Key",
+      "requires either ZipFile bytes, an S3Bucket and S3Key",
     );
   });
 

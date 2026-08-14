@@ -12,6 +12,7 @@ import type {
   SimDynamoDbStreams,
 } from "../dynamodb/index.js";
 import type { SimCloudFormation } from "../cloudformation/index.js";
+import type { SimEcr } from "../ecr/index.js";
 import type { SimEcs } from "../ecs/index.js";
 import type { SimEventBridge } from "../eventbridge/index.js";
 import type { SimCognitoIdentityProvider } from "../cognito/index.js";
@@ -66,34 +67,26 @@ export class SimAwsAccountRegionContainer {
     };
   }
 
-  /**
-   * Get simulated ACM for this account and region.
-   */
+  /** Get simulated ACM for this account and region. */
   acm(): SimAcm {
     return this.memo.getOrCreate("acm", () => this.factory.createAcm(this));
   }
 
-  /**
-   * Get simulated API Gateway v2 for this account and region.
-   */
+  /** Get simulated API Gateway v2 for this account and region. */
   apiGatewayV2(): SimApiGatewayV2 {
     return this.memo.getOrCreate("apiGatewayV2", () =>
       this.factory.createApiGatewayV2(this),
     );
   }
 
-  /**
-   * Get simulated CloudFormation for this account and region.
-   */
+  /** Get simulated CloudFormation for this account and region. */
   cloudFormation(): SimCloudFormation {
     return this.memo.getOrCreate("cloudFormation", () =>
       this.factory.createCloudFormation(this),
     );
   }
 
-  /**
-   * Get simulated CloudFront for this account.
-   */
+  /** Get simulated CloudFront for this account. */
   cloudFront(): SimCloudFront {
     return this.memo.getOrCreate("cloudFront", () =>
       this.factory.createCloudFront(this),
@@ -111,18 +104,14 @@ export class SimAwsAccountRegionContainer {
     return this.cloudFront().keyValueStoreApi();
   }
 
-  /**
-   * Get simulated Cognito user pools for this account and region.
-   */
+  /** Get simulated Cognito user pools for this account and region. */
   cognitoIdentityProvider(): SimCognitoIdentityProvider {
     return this.memo.getOrCreate("cognitoIdentityProvider", () =>
       this.factory.createCognitoIdentityProvider(this),
     );
   }
 
-  /**
-   * Get simulated DynamoDB for this account and region.
-   */
+  /** Get simulated DynamoDB for this account and region. */
   dynamoDb(): SimDynamoDatabase {
     return this.memo.getOrCreate("dynamoDb", () =>
       this.factory.createDynamoDb(this),
@@ -140,119 +129,94 @@ export class SimAwsAccountRegionContainer {
     return this.dynamoDb().streams();
   }
 
-  /**
-   * Get simulated ECS for this account and region.
-   */
+  /** Get simulated ECR for this account and region. */
+  ecr(): SimEcr {
+    return this.memo.getOrCreate("ecr", () => this.factory.createEcr(this));
+  }
+
+  /** Get simulated ECS for this account and region. */
   ecs(): SimEcs {
     return this.memo.getOrCreate("ecs", () => this.factory.createEcs(this));
   }
 
-  /**
-   * Get simulated EventBridge for this account and region.
-   */
+  /** Get simulated EventBridge for this account and region. */
   eventBridge(): SimEventBridge {
     return this.memo.getOrCreate("eventBridge", () =>
       this.factory.createEventBridge(this),
     );
   }
 
-  /**
-   * Get simulated EventBridge Scheduler for this account and region.
-   */
+  /** Get simulated EventBridge Scheduler for this account and region. */
   scheduler(): SimScheduler {
     return this.memo.getOrCreate("scheduler", () =>
       this.factory.createScheduler(this),
     );
   }
 
-  /**
-   * Get simulated Elastic Load Balancing v2 for this account and region.
-   */
+  /** Get simulated Elastic Load Balancing v2 for this account and region. */
   elbV2(): SimElbV2 {
     return this.memo.getOrCreate("elbV2", () => this.factory.createElbV2(this));
   }
 
-  /**
-   * Get simulated IAM for this account.
-   */
+  /** Get simulated IAM for this account. */
   iam(): SimIam {
     return this.memo.getOrCreate("iam", () => this.factory.createIam(this));
   }
 
-  /**
-   * Get simulated KMS for this account and region.
-   */
+  /** Get simulated KMS for this account and region. */
   kms(): SimKms {
     return this.memo.getOrCreate("kms", () => this.factory.createKms(this));
   }
 
-  /**
-   * Get simulated Lambda for this account and region.
-   */
+  /** Get simulated Lambda for this account and region. */
   lambda(): SimLambda {
     return this.memo.getOrCreate("lambda", () =>
       this.factory.createLambda(this),
     );
   }
 
-  /**
-   * Get simulated Rekognition for this account and region.
-   */
+  /** Get simulated Rekognition for this account and region. */
   rekognition(): SimRekognition {
     return this.memo.getOrCreate("rekognition", () =>
       this.factory.createRekognition(this),
     );
   }
 
-  /**
-   * Get simulated Route53 for this account.
-   */
+  /** Get simulated Route53 for this account. */
   route53(): SimRoute53 {
     return this.memo.getOrCreate("route53", () =>
       this.factory.createRoute53(this),
     );
   }
 
-  /**
-   * Get simulated S3 for this account and region.
-   */
+  /** Get simulated S3 for this account and region. */
   s3(): SimS3 {
     return this.memo.getOrCreate("s3", () => this.factory.createS3(this));
   }
 
-  /**
-   * Get simulated Secrets Manager for this account and region.
-   */
+  /** Get simulated Secrets Manager for this account and region. */
   secretsManager(): SimSecretsManager {
     return this.memo.getOrCreate("secretsManager", () =>
       this.factory.createSecretsManager(this),
     );
   }
 
-  /**
-   * Get simulated SNS for this account and region.
-   */
+  /** Get simulated SNS for this account and region. */
   sns(): SimSns {
     return this.memo.getOrCreate("sns", () => this.factory.createSns(this));
   }
 
-  /**
-   * Get simulated SQS for this account and region.
-   */
+  /** Get simulated SQS for this account and region. */
   sqs(): SimSqs {
     return this.memo.getOrCreate("sqs", () => this.factory.createSqs(this));
   }
 
-  /**
-   * Get simulated SSM for this account and region.
-   */
+  /** Get simulated SSM for this account and region. */
   ssm(): SimSsm {
     return this.memo.getOrCreate("ssm", () => this.factory.createSsm(this));
   }
 
-  /**
-   * Get simulated STS for this account and region.
-   */
+  /** Get simulated STS for this account and region. */
   sts(): SimSts {
     return this.memo.getOrCreate("sts", () => this.factory.createSts(this));
   }

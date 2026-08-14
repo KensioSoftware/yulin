@@ -1,0 +1,291 @@
+# Simulated ECR
+
+Yulin includes a simulated Amazon ECR for tests and local development. It holds repositories, and
+each repository holds images by tag, where a simulated image is a real in-process handler.
+
+That is what this service is for. A container image Lambda function cannot run here, because Yulin
+never reads an image, so something has to say what the code inside that image actually is. A
+repository is the natural place to say it: it is the stable name for the thing that holds the code,
+and it outlives any stack, any tag and any CDK construct ID.
+
+ECR-specific types are imported from the `@kensio/yulin/ecr` subpath.
+
+## What a simulated image is
+
+An image URI is only ever an identifier here. Nothing is pulled, nothing is inspected, and no layer,
+manifest, digest or scan finding exists. A simulated image is a handler function, registered against
+a repository and a tag.
+
+Registering one is a Yulin-native operation rather than a simulated `PutImage`, and it is named
+`simulateImage` so it cannot be mistaken for one. Real `PutImage` takes an image manifest for layers
+that were pushed over the Docker registry protocol, none of which happens in this process, so a
+simulated `PutImage` would be a command that took an argument nothing could produce.
+
+## Registering a handler as an image
+
+Register the handler once, in test setup, and every function that runs an image from that repository
+is created from it.
+
+```typescript sim-ecr-register-image
+/**
+ * Registering a handler as the image in a simulated ECR repository.
+ */
+
+import { InvokeCommand } from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+simAws
+  .ecr()
+  .repository("orders")
+  .simulateImage({
+    imageTag: "latest",
+    handler: (event: { orderId: string }): string =>
+      `Processed ${event.orderId}`,
+  });
+
+// Any stack whose function image points into that repository runs the handler.
+await simAws.cloudFormation().deployTemplate({
+  stackName: "orders-api",
+  template: {
+    Resources: {
+      OrdersFunction: {
+        Type: "AWS::Lambda::Function",
+        Properties: {
+          FunctionName: "orders",
+          Role: `arn:aws:iam::${simAws.defaultAccountId}:role/OrdersRole`,
+          PackageType: "Image",
+          Code: {
+            ImageUri:
+              `${simAws.defaultAccountId}.dkr.ecr.` +
+              `${simAws.defaultRegionName}.amazonaws.com/orders:2f0e1dab4c`,
+          },
+        },
+      },
+    },
+  },
+});
+
+const output = await simAws.lambda().invoke(
+  new InvokeCommand({
+    FunctionName: "orders",
+    Payload: JSON.stringify({ orderId: "order-1" }),
+  }),
+);
+
+if (output.Payload === undefined) throw new Error("No invoke Payload");
+console.log(Buffer.from(output.Payload).toString());
+
+await simAws.backgroundTasksComplete();
+```
+
+Naming a repository is what creates it. There is nothing to declare first, because a repository
+holds nothing of its own beyond its images, so a test can name the repository its templates already
+point at.
+
+The repository name is a name rather than a URI. The account, the region and the registry host
+around it come from the simulated ECR the repository belongs to, so `orders` and `platform/orders`
+are names and an image URI is not one. A name real ECR would refuse is refused here too.
+
+## How an image URI is matched
+
+A function's `Code.ImageUri` is matched to a repository on the registry host and the repository
+name, with the tag and any digest ignored.
+
+The tag is ignored because no tag is stable enough to write into a test. A CDK image asset is tagged
+with the asset content hash, which changes whenever the image source does, and a pipeline-built
+image is usually tagged with a git sha or a build number passed in as a stack parameter. An
+`ImageUri` built by `Fn::Sub` or from a stack parameter is matched on what it resolves to.
+
+The registry host is part of the match, so the account and the region have to agree. A function can
+run an image from another account's repository, as it can on real AWS, and a same-named repository
+in another account is a different repository.
+
+A repository holding more than one tagged image answers a tag it holds with exactly that image, and
+any other tag with the image registered most recently. That is how a blue/green pair of images in
+one repository can back two functions differently.
+
+```typescript sim-ecr-image-tags
+/**
+ * Two tagged images in one simulated ECR repository.
+ */
+
+import { CreateFunctionCommand, InvokeCommand } from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const registryHost =
+  `${simAws.defaultAccountId}.dkr.ecr.` +
+  `${simAws.defaultRegionName}.amazonaws.com`;
+
+simAws
+  .ecr()
+  .repository("orders")
+  .simulateImage({ imageTag: "blue", handler: (): string => "blue handler" })
+  .simulateImage({ imageTag: "green", handler: (): string => "green handler" });
+
+await simAws.lambda().createFunction(
+  new CreateFunctionCommand({
+    FunctionName: "orders-blue",
+    Role: `arn:aws:iam::${simAws.defaultAccountId}:role/OrdersRole`,
+    PackageType: "Image",
+    Code: { ImageUri: `${registryHost}/orders:blue` },
+  }),
+);
+
+const output = await simAws
+  .lambda()
+  .invoke(new InvokeCommand({ FunctionName: "orders-blue" }));
+
+if (output.Payload === undefined) throw new Error("No invoke Payload");
+console.log(Buffer.from(output.Payload).toString()); // "blue handler"
+
+await simAws.backgroundTasksComplete();
+```
+
+A function created directly through `CreateFunction` resolves its image the same way a template
+function does, as the example above shows. A function whose image resolves to nothing is refused,
+the way real Lambda refuses a function whose image it cannot pull.
+
+## Repositories in CloudFormation
+
+`AWS::ECR::Repository` creates a simulated repository. A template declares a repository and never an
+image, which is what real CloudFormation does too, so a deployed repository starts empty unless a
+handler has already been registered in it.
+
+`Ref` returns the repository name, and `Fn::GetAtt` exposes `Arn` and `RepositoryUri`, so an
+application stack can build its function's `ImageUri` from the repository a platform stack declared.
+
+```typescript sim-ecr-cloudformation-repository
+/**
+ * An AWS::ECR::Repository declared by one stack and used by another.
+ */
+
+import { InvokeCommand } from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+// The platform stack declares the repository.
+const platformStack = await simAws.cloudFormation().deployTemplate({
+  stackName: "platform",
+  template: {
+    Resources: {
+      OrdersRepository: {
+        Type: "AWS::ECR::Repository",
+        Properties: { RepositoryName: "orders" },
+      },
+    },
+    Outputs: {
+      RepositoryUri: {
+        Value: { "Fn::GetAtt": ["OrdersRepository", "RepositoryUri"] },
+      },
+    },
+  },
+});
+
+await platformStack.waitForDeployComplete();
+
+const repositoryUri = platformStack.outputs.get("RepositoryUri")?.value;
+
+if (typeof repositoryUri !== "string") {
+  throw new TypeError("No RepositoryUri Output");
+}
+
+// The handler stands in for whatever the pipeline would have pushed.
+simAws
+  .ecr()
+  .repository("orders")
+  .simulateImage({ handler: (): string => "ran the repository image" });
+
+// The application stack runs an image from it.
+await simAws.cloudFormation().deployTemplate({
+  stackName: "orders-api",
+  template: {
+    Resources: {
+      OrdersFunction: {
+        Type: "AWS::Lambda::Function",
+        Properties: {
+          FunctionName: "orders",
+          Role: `arn:aws:iam::${simAws.defaultAccountId}:role/OrdersRole`,
+          PackageType: "Image",
+          Code: { ImageUri: `${repositoryUri}:latest` },
+        },
+      },
+    },
+  },
+});
+
+const output = await simAws
+  .lambda()
+  .invoke(new InvokeCommand({ FunctionName: "orders" }));
+
+if (output.Payload === undefined) throw new Error("No invoke Payload");
+console.log(Buffer.from(output.Payload).toString());
+
+await simAws.backgroundTasksComplete();
+```
+
+A repository a handler is already registered in is adopted rather than replaced, so the order these
+happen in does not matter: the image exists before the stack that declares the repository, as it
+does in real life. Tearing the stack down removes the repository, and the simulated images it holds
+go with it.
+
+Every other property a repository can declare is about image content, so each one is recorded as an
+ignored property and the repository is created without it. That covers
+`ImageScanningConfiguration`, `ImageTagMutability`, `LifecyclePolicy`, `RepositoryPolicyText`,
+`EncryptionConfiguration`, `EmptyOnDelete` and `Tags`.
+
+## Where a function's handler comes from
+
+Two things can back a container image function, and a deploy is looked at in this order:
+
+1. An [executable binding](../lambda/#executable-bindings) given to that deploy, including one
+   naming the image repository. A binding is the more specific thing to have said, since it is about
+   one deploy.
+2. The simulated ECR repository the function's `Code.ImageUri` names, which is a standing statement
+   about what that image is, made once and good for every stack that runs it.
+
+A function neither backs is skipped with a diagnostic, and the rest of the stack deploys. The reason
+distinguishes an image whose repository nothing holds from one whose repository holds no image,
+since those send you to different places: a name that is wrong, or a handler that was never
+registered.
+
+## Available functionality
+
+- Repositories, made by naming them, scoped by account and region
+- `simulateImage`, registering a real in-process handler as the image under a tag
+- Resolution of a Lambda `Code.ImageUri` to that handler, matching on registry host and repository
+  name and ignoring the tag
+- Functions created from a repository image through CloudFormation and through `CreateFunction`
+- Images resolved across accounts and regions, as real Lambda pulls across them
+- `AWS::ECR::Repository`, answering `Ref` with the repository name and `Fn::GetAtt` with `Arn` and
+  `RepositoryUri`
+
+## Limitations
+
+Current documented limitations:
+
+- No image content, layer, digest, manifest or scan behaviour is simulated. Nothing is pulled,
+  nothing is inspected, and a repository holds handlers rather than artifacts.
+- There are no ECR SDK commands. `CreateRepository`, `DescribeRepositories`, `PutImage`,
+  `DescribeImages`, `BatchDeleteImage` and `GetAuthorizationToken` are not simulated. Registering an
+  image is a Yulin-native operation because real `PutImage` takes a manifest for layers pushed over
+  the Docker registry protocol, which does not happen in this process.
+- Nothing authorizes against a repository. There are no requests to authorize, so a repository
+  policy is not evaluated and simulated IAM is not consulted.
+- Lifecycle policies are not evaluated, so no simulated image ever expires, and tag mutability is
+  not enforced, so registering the same tag again replaces what it held.
+- Naming a repository creates it. There is no `CreateRepository` to fail for a name already taken,
+  and no way to ask whether a repository exists without making one, other than `hasRepository`.
+- A repository is deleted with the images it holds, where real ECR refuses to delete one that still
+  holds images unless it is emptied first. A simulated image is a handler a test registered rather
+  than an artifact anything could lose.
+- Repository tags, registry policies, pull through cache rules, replication configuration and
+  ECR Public are not simulated.
+- ECR is not served as an HTTP API by `serveSimAws`, and there is nothing for a Docker client to
+  talk to.
