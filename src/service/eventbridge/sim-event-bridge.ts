@@ -10,11 +10,15 @@ import {
   type SimIamInterServiceAuthZ,
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
 import { SimEventBus } from "./bus/sim-event-bus.js";
+import { defaultEventBusName } from "./bus/sim-event-bus-name.js";
 import { SimEventBusStore } from "./bus/sim-event-bus-store.js";
 import type * as simEventBridgeCommands from "./command/sim-event-bridge-command.types.js";
 import { SimEventBridgeCommands } from "./command/sim-event-bridge-commands.js";
 import type { SimEventBridgeRequestOptions } from "./command/sim-event-bridge-request-options.js";
 import type { SimEventBridgeEvent } from "./event/sim-event-bridge-event.js";
+import type { SimEventBusReceipt } from "./bus/sim-event-bus.js";
+import type { SimEventRule } from "./rule/sim-event-rule.js";
+import { SimEventRuleStore } from "./rule/sim-event-rule-store.js";
 import { SimEventBridgeSdkCommandRouter } from "./sdk/sim-event-bridge-sdk-command-router.js";
 
 interface SimEventBridgeProperties {
@@ -38,6 +42,7 @@ interface SimEventBridgeProperties {
  */
 export class SimEventBridge {
   private readonly buses: SimEventBusStore;
+  private readonly rules = new SimEventRuleStore();
   private readonly commands: SimEventBridgeCommands;
   private readonly background: BackgroundScheduler;
   private readonly sdkRouter = new SimEventBridgeSdkCommandRouter(this);
@@ -55,6 +60,7 @@ export class SimEventBridge {
     );
     this.commands = new SimEventBridgeCommands({
       buses: this.buses,
+      rules: this.rules,
       iam,
       background,
       accountRegionScope,
@@ -81,6 +87,30 @@ export class SimEventBridge {
    */
   eventsOn(busName: string): readonly SimEventBridgeEvent[] {
     return this.buses.find(busName)?.receivedEvents ?? [];
+  }
+
+  /**
+   * Find a rule by name, on a bus.
+   *
+   * This is the simulator's own accessor, for tests seeding or inspecting rule
+   * state without going through a Command and its authorization.
+   */
+  findRule(
+    ruleName: string,
+    busName = defaultEventBusName,
+  ): SimEventRule | undefined {
+    return this.rules.find(busName, ruleName);
+  }
+
+  /**
+   * Every event a bus received, with the rules each one matched.
+   *
+   * This is the simulator's own accessor, for a test asserting on which rules
+   * an event reached. Real EventBridge keeps nothing like it, and nothing an
+   * SDK command returns is built from it.
+   */
+  receiptsOn(busName: string): readonly SimEventBusReceipt[] {
+    return this.buses.find(busName)?.receipts ?? [];
   }
 
   /**
@@ -136,6 +166,83 @@ export class SimEventBridge {
   ): Promise<simEventBridgeCommands.SimPutEventsCommandOutput> {
     await this.background.sequence();
     return this.commands.putEvents.handle(command, options);
+  }
+
+  /**
+   * Handle a PutRule Command from the SDK.
+   */
+  async putRule(
+    command: simEventBridgeCommands.SimPutRuleCommand,
+    options?: SimEventBridgeRequestOptions,
+  ): Promise<simEventBridgeCommands.SimPutRuleCommandOutput> {
+    await this.background.sequence();
+    return this.commands.ruleCreation.handle(command, options);
+  }
+
+  /**
+   * Handle a DeleteRule Command from the SDK.
+   */
+  async deleteRule(
+    command: simEventBridgeCommands.SimDeleteRuleCommand,
+    options?: SimEventBridgeRequestOptions,
+  ): Promise<simEventBridgeCommands.SimDeleteRuleCommandOutput> {
+    await this.background.sequence();
+    return this.commands.rules.deleteRule(command, options);
+  }
+
+  /**
+   * Handle a DescribeRule Command from the SDK.
+   */
+  async describeRule(
+    command: simEventBridgeCommands.SimDescribeRuleCommand,
+    options?: SimEventBridgeRequestOptions,
+  ): Promise<simEventBridgeCommands.SimDescribeRuleCommandOutput> {
+    await this.background.sequence();
+    return this.commands.rules.describeRule(command, options);
+  }
+
+  /**
+   * Handle a ListRules Command from the SDK.
+   */
+  async listRules(
+    command: simEventBridgeCommands.SimListRulesCommand,
+    options?: SimEventBridgeRequestOptions,
+  ): Promise<simEventBridgeCommands.SimListRulesCommandOutput> {
+    await this.background.sequence();
+    return this.commands.rules.listRules(command, options);
+  }
+
+  /**
+   * Handle an EnableRule Command from the SDK.
+   */
+  async enableRule(
+    command: simEventBridgeCommands.SimEnableRuleCommand,
+    options?: SimEventBridgeRequestOptions,
+  ): Promise<simEventBridgeCommands.SimEnableRuleCommandOutput> {
+    await this.background.sequence();
+    return this.commands.rules.enableRule(command, options);
+  }
+
+  /**
+   * Handle a DisableRule Command from the SDK.
+   */
+  async disableRule(
+    command: simEventBridgeCommands.SimDisableRuleCommand,
+    options?: SimEventBridgeRequestOptions,
+  ): Promise<simEventBridgeCommands.SimDisableRuleCommandOutput> {
+    await this.background.sequence();
+    return this.commands.rules.disableRule(command, options);
+  }
+
+  /**
+   * Handle a TestEventPattern Command from the SDK.
+   */
+  async testEventPattern(
+    command: simEventBridgeCommands.SimTestEventPatternCommand,
+    options?: SimEventBridgeRequestOptions,
+  ): Promise<simEventBridgeCommands.SimTestEventPatternCommandOutput> {
+    await this.background.sequence();
+    return this.commands.patternTest.handle(command, options);
   }
 
   /**

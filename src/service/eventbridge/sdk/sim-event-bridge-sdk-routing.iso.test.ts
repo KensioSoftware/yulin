@@ -1,16 +1,24 @@
 import {
   CreateEventBusCommand,
   DeleteEventBusCommand,
+  DeleteRuleCommand,
   DescribeEventBusCommand,
+  DescribeRuleCommand,
+  DisableRuleCommand,
+  EnableRuleCommand,
   EventBridgeClient,
   ListEventBusesCommand,
+  ListRulesCommand,
   PutEventsCommand,
+  PutRuleCommand,
+  TestEventPatternCommand,
 } from "@aws-sdk/client-eventbridge";
 import {
   assertArrayLength,
   assertIdentical,
   assertNonNullable,
   assertStringIncludes,
+  assertTrue,
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -74,5 +82,50 @@ describe("EventBridge SDK interception", () => {
     assertArrayLength(listed.EventBuses ?? [], 2);
     assertArrayLength(afterDelete.EventBuses ?? [], 1);
     assertUndefined(listed.NextToken);
+  });
+
+  it("routes every rule Command through the intercepted client", async () => {
+    // Given an intercepted EventBridge SDK client.
+    using simSdk = new SimSdk();
+    simSdk.intercept(EventBridgeClient);
+
+    const client = new EventBridgeClient({ region: "us-east-1" });
+    const pattern = JSON.stringify({ source: ["orders.service"] });
+
+    // When a rule is created, read, switched off and on, tested and deleted.
+    const put = await client.send(
+      new PutRuleCommand({ Name: "watcher", EventPattern: pattern }),
+    );
+    const described = await client.send(
+      new DescribeRuleCommand({ Name: "watcher" }),
+    );
+    const listed = await client.send(new ListRulesCommand({}));
+
+    await client.send(new DisableRuleCommand({ Name: "watcher" }));
+
+    const disabled = await client.send(
+      new DescribeRuleCommand({ Name: "watcher" }),
+    );
+
+    await client.send(new EnableRuleCommand({ Name: "watcher" }));
+
+    const tested = await client.send(
+      new TestEventPatternCommand({
+        EventPattern: pattern,
+        Event: JSON.stringify({ source: "orders.service" }),
+      }),
+    );
+
+    await client.send(new DeleteRuleCommand({ Name: "watcher" }));
+
+    const afterDelete = await client.send(new ListRulesCommand({}));
+
+    // Then each answers as the simulated service does.
+    assertStringIncludes(String(put.RuleArn), "rule/watcher");
+    assertIdentical(described.State, "ENABLED");
+    assertIdentical(disabled.State, "DISABLED");
+    assertArrayLength(listed.Rules ?? [], 1);
+    assertTrue(tested.Result);
+    assertArrayLength(afterDelete.Rules ?? [], 0);
   });
 });
