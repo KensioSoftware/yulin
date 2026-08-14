@@ -15,6 +15,10 @@ const familyStatuses: ReadonlySet<string> = new Set([
  * A family is active while any of its revisions is. `INACTIVE` therefore means
  * a family whose revisions have all been deregistered, which is the only way a
  * family stops being current: nothing removes one.
+ *
+ * A request saying nothing about status gets both, which is what real ECS
+ * reports here. That is the opposite of `ListTaskDefinitions`, where saying
+ * nothing means the active revisions.
  */
 export class FamilyStatusFilter {
   private readonly familyPrefix: string | undefined;
@@ -27,7 +31,7 @@ export class FamilyStatusFilter {
 
   private static requestedStatus(status: string | undefined): FamilyStatus {
     if (status === undefined) {
-      return "ACTIVE";
+      return "ALL";
     }
 
     if (familyStatuses.has(status)) {

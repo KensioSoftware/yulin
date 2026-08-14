@@ -16,8 +16,13 @@ export class SimEcsClusterStore {
 
   /**
    * Hold a cluster, replacing any earlier one of the same name.
+   *
+   * The earlier one is dropped before the replacement is held, so a cluster
+   * created again after being deleted takes its place at the end of the
+   * listing rather than keeping the position the deleted one had.
    */
   put(cluster: SimEcsCluster): void {
+    this.clusters.delete(cluster.clusterName);
     this.clusters.set(cluster.clusterName, cluster);
   }
 

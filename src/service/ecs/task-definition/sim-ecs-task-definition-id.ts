@@ -3,6 +3,11 @@ import { parseSimEcsArn } from "../sim-ecs-arn.js";
 import { SimEcsClientException } from "../error/sim-ecs.error.js";
 
 /**
+ * What a revision is written as.
+ */
+const digits = /^\d+$/;
+
+/**
  * What a request means when it names a task definition.
  *
  * The three forms ECS accepts come down to two things: which family, and which
@@ -60,8 +65,8 @@ export class SimEcsTaskDefinitionId {
       arn.accountId !== accountId
     ) {
       throw new SimEcsClientException(
-        `Unable to describe task definition. ${identifier} does not name a ` +
-          `task definition in Account ${accountId} Region ${regionName}.`,
+        `${identifier} does not name a task definition in Account ` +
+          `${accountId} Region ${regionName}.`,
       );
     }
 
@@ -88,12 +93,15 @@ export class SimEcsTaskDefinitionId {
   }
 
   private static revisionNumber(value: string, identifier: string): number {
-    const revision = Number(value);
+    // Read the digits rather than the number, because `Number` also accepts
+    // hexadecimal, exponents, decimal points and surrounding spaces, none of
+    // which real ECS takes as a revision.
+    const revision = digits.test(value) ? Number(value) : NaN;
 
     if (!Number.isSafeInteger(revision) || revision < 1) {
       throw new SimEcsClientException(
-        `Unable to describe task definition. ${identifier} does not name a ` +
-          `revision, which is a whole number from 1.`,
+        `${identifier} does not name a task definition revision, which is a ` +
+          `whole number from 1.`,
       );
     }
 

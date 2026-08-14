@@ -4,6 +4,9 @@ import { parseSimEcsArn } from "../sim-ecs-arn.js";
 
 /**
  * The cluster an ECS request means when it names no cluster at all.
+ *
+ * Only the operations that take an optional cluster fall back to it.
+ * `DeleteCluster` needs one to be named, as it does on real ECS.
  */
 export const simEcsDefaultClusterName = "default";
 
@@ -38,13 +41,11 @@ export class SimEcsClusterArn {
    * scope: it is not an ARN of the right shape, it is an ARN of something
    * else, or it is an ECS cluster ARN belonging to another Account or Region.
    * Callers report that in their own terms, because `DescribeClusters` reports
-   * a cluster it cannot find as a failure while `DeleteCluster` raises.
+   * a cluster it cannot find as a failure while `DeleteCluster` raises. An
+   * identifier is required here: the operations that take an optional cluster
+   * fall back to the default one before they get this far.
    */
-  clusterName(identifier: string | undefined): string | undefined {
-    if (identifier === undefined || identifier === "") {
-      return simEcsDefaultClusterName;
-    }
-
+  clusterName(identifier: string): string | undefined {
     if (!identifier.startsWith("arn:")) {
       return identifier;
     }

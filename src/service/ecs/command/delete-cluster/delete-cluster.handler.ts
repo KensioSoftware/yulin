@@ -2,7 +2,10 @@ import type { CommandHandler } from "../../../../command/command-handler.js";
 import type { SimEcsClusterArn } from "../../cluster/sim-ecs-cluster-arn.js";
 import type { SimEcsCluster } from "../../cluster/sim-ecs-cluster.js";
 import type { SimEcsClusterStore } from "../../cluster/sim-ecs-cluster-store.js";
-import { SimEcsClusterNotFoundException } from "../../error/sim-ecs.error.js";
+import {
+  SimEcsClientException,
+  SimEcsClusterNotFoundException,
+} from "../../error/sim-ecs.error.js";
 import type { SimEcsClusterCommandContext } from "../sim-ecs-command-context.js";
 import { SimEcsCommandHandler } from "../sim-ecs-command-handler.js";
 import type { SimEcsRequestOptions } from "../sim-ecs-request-options.js";
@@ -45,7 +48,7 @@ export class DeleteClusterCommandHandler
   ): Promise<SimDeleteClusterCommandOutput> {
     this.refuseUnaccepted(command.input);
 
-    const identifier = command.input.cluster;
+    const identifier = this.requiredCluster(command);
     const clusterName = this.clusterArn.clusterName(identifier);
 
     await this.sequence();
@@ -53,7 +56,7 @@ export class DeleteClusterCommandHandler
     this.authorizer.authorizeCluster(
       "ecs:DeleteCluster",
       clusterName === undefined
-        ? String(identifier)
+        ? identifier
         : this.clusterArn.make(clusterName),
       options,
     );
@@ -71,9 +74,30 @@ export class DeleteClusterCommandHandler
     };
   }
 
+  /**
+   * The cluster the request named.
+   *
+   * Real ECS makes this required, unlike the operations that read a cluster,
+   * so a request naming none is refused rather than taken as meaning the
+   * `default` cluster. Deleting a cluster nobody asked to delete is the one
+   * answer worth being strict about.
+   */
+  private requiredCluster(command: SimDeleteClusterCommand): string {
+    const { cluster } = command.input;
+
+    if (cluster === undefined || cluster === "") {
+      throw new SimEcsClientException(
+        "DeleteCluster needs the cluster to delete, named by its short name " +
+          "or its full ARN.",
+      );
+    }
+
+    return cluster;
+  }
+
   private deletable(
     clusterName: string | undefined,
-    identifier: string | undefined,
+    identifier: string,
   ): SimEcsCluster {
     const cluster =
       clusterName === undefined
@@ -83,7 +107,7 @@ export class DeleteClusterCommandHandler
     if (cluster === undefined) {
       throw new SimEcsClusterNotFoundException(
         `The simulated Account and Region hold no active cluster ` +
-          `${identifier ?? "default"}.`,
+          `${identifier}.`,
       );
     }
 

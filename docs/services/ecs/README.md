@@ -12,14 +12,15 @@ ECS-specific types are imported from the `@kensio/yulin/ecs` subpath.
 Yulin never looks inside a container image. It cannot: an image may hold a Go binary, nginx, Redis or
 anything else, and the only thing Yulin can run is JavaScript or TypeScript in its own process.
 
-So an image URI is only ever an identifier. It is what a container will be matched on when a task is
-run, in the same way an image URI identifies a container image Lambda function. A container matched
-to a handler runs it. A container with no match does not run, and is recorded as not simulated rather
-than failing anything.
+So an image URI is only ever an identifier. Nothing here reads it, pulls it, or runs anything from
+it. It is stored as declared, and it is what a container will be matched on once running a task
+arrives, in the same way an image URI identifies a container image Lambda function. The rule that
+will follow from it is that a container matched to a handler will run that handler, and a container
+with no match will be recorded as not simulated rather than failing anything.
 
 A realistic task definition holds an application container, a log router and an observability agent.
-Only the first of those is something Yulin could ever run, and the other two are stored and reported
-back exactly as declared.
+Only the first of those is something Yulin could ever run, and all three are stored and reported back
+exactly as declared.
 
 Where this does not work is a sidecar the application depends on, such as a Redis or a database in
 the same task. Yulin does not simulate that. The connection details are ordinary environment
@@ -184,7 +185,9 @@ revision 3.
 ## Listing task definitions
 
 `ListTaskDefinitions` reports revision ARNs and `ListTaskDefinitionFamilies` reports family names.
-Both list what is active unless the request asks otherwise, and both take a `familyPrefix`.
+Both take a `familyPrefix`. A `ListTaskDefinitions` request saying nothing about status gets the
+active revisions, while a `ListTaskDefinitionFamilies` request saying nothing gets both the active
+and the inactive families, which is how real ECS defaults each of them.
 
 ```typescript sim-ecs-list-task-definitions
 /**
@@ -278,7 +281,9 @@ Settings, configuration and tags are reported only where the request asked for t
 are on real ECS. A request naming no cluster means the `default` cluster.
 
 `DeleteCluster` marks a cluster `INACTIVE`. It stays describable and drops out of `ListClusters`, and
-creating a cluster of the same name again makes a new active one.
+creating a cluster of the same name again makes a new active one, listed in the position it was
+created in. Unlike the operations that read a cluster, `DeleteCluster` needs one to be named: a
+request naming none is refused rather than taken as meaning the `default` cluster.
 
 A cluster is named either by its short name or by its full ARN, and the two are interchangeable. An
 ARN belonging to another account or region names a different cluster, so `DescribeClusters` reports
@@ -450,6 +455,13 @@ Current documented limitations:
 - Image contents are never read. An image URI is an identifier and nothing else, so no image is
   pulled, inspected or run, and a tag that does not exist on any registry is stored without
   complaint.
+- A container definition field the `SimEcsContainerDefinitionType` shape does not name, such as
+  `hostname` or `links`, is still stored and reported back. The shape names the fields the docs
+  describe rather than every field ECS has, and it deliberately carries no index signature, since
+  one would stop a real SDK command input being passed straight in.
+- `ListTaskDefinitions` refuses a `status` of `DELETE_IN_PROGRESS`, which real ECS accepts. Nothing
+  deletes a task definition here, so the answer would always be an empty listing, and refusing says
+  so rather than looking like a result.
 - Nothing runs. `RunTask`, `StartTask`, `StopTask`, `DescribeTasks`, `ListTasks` and the whole of the
   service API (`CreateService`, `UpdateService`, `DescribeServices`) are not simulated.
 - A described task definition reports neither `compatibilities` nor `requiresAttributes`. Real ECS

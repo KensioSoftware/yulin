@@ -13,7 +13,10 @@ import {
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
 import { SimAws } from "../../../aws/sim-aws.js";
-import { SimEcsClusterNotFoundException } from "../../error/sim-ecs.error.js";
+import {
+  SimEcsClientException,
+  SimEcsClusterNotFoundException,
+} from "../../error/sim-ecs.error.js";
 import type { SimEcs } from "../../sim-ecs.js";
 
 async function simEcsWithCluster(): Promise<SimEcs> {
@@ -78,6 +81,29 @@ describe("ECS DeleteClusterCommand", () => {
     assertIdentical(deleted.cluster?.clusterName, "services");
   });
 
+  it("lists a recreated cluster in the order it was created again", async () => {
+    // Given two clusters, the first of which has been deleted.
+    const simEcs = await simEcsWithCluster();
+    await simEcs.createCluster(
+      new CreateClusterCommand({ clusterName: "batch" }),
+    );
+    await simEcs.deleteCluster(
+      new DeleteClusterCommand({ cluster: "services" }),
+    );
+
+    // When the deleted name is created again.
+    await simEcs.createCluster(
+      new CreateClusterCommand({ clusterName: "services" }),
+    );
+
+    // Then it comes last, since it is the most recently created one.
+    const listed = await simEcs.listClusters(new ListClustersCommand({}));
+
+    assertArrayLength(listed.clusterArns, 2);
+    assertStringIncludes(listed.clusterArns[0], "cluster/batch");
+    assertStringIncludes(listed.clusterArns[1], "cluster/services");
+  });
+
   it("frees the name for a new cluster", async () => {
     // Given a cluster that has been deleted.
     const simEcs = await simEcsWithCluster();
@@ -125,18 +151,23 @@ describe("ECS DeleteClusterCommand", () => {
     assertInstanceOf(error, SimEcsClusterNotFoundException);
   });
 
-  it("refuses the default cluster where there is none", async () => {
-    // Given simulated ECS holding no clusters.
+  it("refuses a deletion naming no cluster", async () => {
+    // Given the default cluster.
     const simEcs = new SimAws().ecs();
+    await simEcs.createCluster(new CreateClusterCommand({}));
 
     // When a deletion names no cluster at all.
     const error = await assertThrowsErrorAsync(async () =>
       simEcs.deleteCluster({ input: {} }),
     );
 
-    // Then it means the default cluster, which is not there either.
-    assertInstanceOf(error, SimEcsClusterNotFoundException);
-    assertStringIncludes(error.message, "no active cluster default");
+    // Then it is refused rather than taken as meaning the default cluster,
+    // because real ECS makes this one required.
+    assertInstanceOf(error, SimEcsClientException);
+    assertStringIncludes(error.message, "needs the cluster to delete");
+
+    const listed = await simEcs.listClusters(new ListClustersCommand({}));
+    assertArrayLength(listed.clusterArns, 1);
   });
 
   it("refuses an identifier that is not an ECS ARN", async () => {

@@ -15,8 +15,9 @@ or anything else, and the only thing Yulin can run is JavaScript or TypeScript i
 An image URI is therefore only ever an identifier, used to match a container against an executable
 binding, exactly as it is for a container image Lambda function.
 
-That gives one rule. A container with a binding runs the bound handler. A container without one does
-not run, and is recorded as not simulated rather than failing anything. A realistic task definition
+That gives one rule, which running a task will follow when it arrives: a container with a binding
+will run the bound handler, and a container without one will not run and will be recorded as not
+simulated rather than failing anything. Nothing here runs anything yet. A realistic task definition
 holds an application container plus a log router plus an observability agent, and only the first of
 those is something Yulin could ever run.
 
@@ -115,4 +116,9 @@ command instances.
   meaning.
 - `CreateCluster` refuses capacity providers and Service Connect defaults, and
   `RegisterTaskDefinition` refuses any setting it does not model.
+- `ListTaskDefinitions` refuses a `status` of `DELETE_IN_PROGRESS`, which real ECS accepts, because
+  nothing deletes a task definition here for one to describe.
+- `SimEcsContainerDefinitionType` carries no index signature. One would stop a real SDK
+  `RegisterTaskDefinitionCommand` input being assignable to it, which is the whole point of the
+  structural types. A field it does not name is stored and reported back all the same.
 - The full list is in [docs/services/ecs](../../../docs/services/ecs/).

@@ -186,6 +186,31 @@ describe("ECS DescribeTaskDefinitionCommand", () => {
     assertStringIncludes(error.message, "a whole number from 1");
   });
 
+  it("refuses a revision written as anything but digits", async () => {
+    // Given a registered revision.
+    const simAws = new SimAws();
+    await simEcsRegisteredTaskDefinitionFactory.make({}, simAws);
+
+    // When revisions are named in forms real ECS does not take.
+    const errors = await Promise.all(
+      ["checkout:1.0", "checkout:0x1", "checkout: 1"].map(async (written) =>
+        assertThrowsErrorAsync(async () =>
+          simAws
+            .ecs()
+            .describeTaskDefinition(
+              new DescribeTaskDefinitionCommand({ taskDefinition: written }),
+            ),
+        ),
+      ),
+    );
+
+    // Then each is refused, rather than being read as revision 1.
+    for (const error of errors) {
+      assertInstanceOf(error, SimEcsClientException);
+      assertStringIncludes(error.message, "a whole number from 1");
+    }
+  });
+
   it("refuses an ARN belonging to another account", async () => {
     // Given a registered revision.
     const simAws = new SimAws();

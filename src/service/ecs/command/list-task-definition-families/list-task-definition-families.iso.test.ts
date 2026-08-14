@@ -45,6 +45,24 @@ describe("ECS ListTaskDefinitionFamiliesCommand", () => {
     assertIdentical(listed.families[1], "billing");
   });
 
+  it("lists both active and inactive families where none is asked for", async () => {
+    // Given a family whose only revision has been deregistered.
+    const simAws = await simAwsWithTwoFamilies();
+    await simAws
+      .ecs()
+      .deregisterTaskDefinition(
+        new DeregisterTaskDefinitionCommand({ taskDefinition: "billing:1" }),
+      );
+
+    // When the families are listed without a status.
+    const listed = await simAws
+      .ecs()
+      .listTaskDefinitionFamilies(new ListTaskDefinitionFamiliesCommand({}));
+
+    // Then both are listed, as real ECS lists them when none is asked for.
+    assertArrayLength(listed.families, 2);
+  });
+
   it("lists the families a prefix asks for", async () => {
     // Given two families.
     const simAws = await simAwsWithTwoFamilies();
@@ -71,9 +89,11 @@ describe("ECS ListTaskDefinitionFamiliesCommand", () => {
       );
 
     // When the families are listed by each status in turn.
-    const active = await simAws
+    const asked = await simAws
       .ecs()
-      .listTaskDefinitionFamilies(new ListTaskDefinitionFamiliesCommand({}));
+      .listTaskDefinitionFamilies(
+        new ListTaskDefinitionFamiliesCommand({ status: "ACTIVE" }),
+      );
     const inactive = await simAws
       .ecs()
       .listTaskDefinitionFamilies(
@@ -86,8 +106,8 @@ describe("ECS ListTaskDefinitionFamiliesCommand", () => {
       );
 
     // Then it has moved out of the active listing without being removed.
-    assertArrayLength(active.families, 1);
-    assertIdentical(active.families[0], "checkout");
+    assertArrayLength(asked.families, 1);
+    assertIdentical(asked.families[0], "checkout");
     assertArrayLength(inactive.families, 1);
     assertIdentical(inactive.families[0], "billing");
     assertArrayLength(all.families, 2);
