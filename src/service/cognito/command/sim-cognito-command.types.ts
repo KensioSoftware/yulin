@@ -137,3 +137,41 @@ export type {
   SimRespondToAuthChallengeCommandInput,
   SimRespondToAuthChallengeCommandOutput,
 } from "./auth/auth.command.js";
+export type {
+  SimCognitoDomainDescriptionType,
+  SimCreateUserPoolDomainCommand,
+  SimCreateUserPoolDomainCommandInput,
+  SimCreateUserPoolDomainCommandOutput,
+  SimDeleteUserPoolDomainCommand,
+  SimDeleteUserPoolDomainCommandInput,
+  SimDeleteUserPoolDomainCommandOutput,
+  SimDescribeUserPoolDomainCommand,
+  SimDescribeUserPoolDomainCommandInput,
+  SimDescribeUserPoolDomainCommandOutput,
+} from "./domain/user-pool-domain.command.js";
+export type {
+  SimCognitoIdentityProviderType,
+  SimCognitoProviderDescription,
+  SimCreateIdentityProviderCommand,
+  SimCreateIdentityProviderCommandInput,
+  SimCreateIdentityProviderCommandOutput,
+  SimDeleteIdentityProviderCommand,
+  SimDeleteIdentityProviderCommandInput,
+  SimDeleteIdentityProviderCommandOutput,
+  SimDescribeIdentityProviderCommand,
+  SimDescribeIdentityProviderCommandInput,
+  SimDescribeIdentityProviderCommandOutput,
+  SimListIdentityProvidersCommand,
+  SimListIdentityProvidersCommandInput,
+  SimListIdentityProvidersCommandOutput,
+  SimUpdateIdentityProviderCommand,
+  SimUpdateIdentityProviderCommandInput,
+  SimUpdateIdentityProviderCommandOutput,
+} from "./idp/identity-provider.command.js";
+export type {
+  SimCognitoAuthorizeInput,
+  SimCognitoHostedRedirect,
+  SimCognitoLogoutInput,
+  SimCognitoTokenInput,
+  SimCognitoTokenOutput,
+} from "./hosted/hosted-auth.command.js";

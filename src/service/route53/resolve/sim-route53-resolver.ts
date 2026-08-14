@@ -1,3 +1,7 @@
+import {
+  SimAwsNoServiceHosts,
+  type SimAwsServiceHosts,
+} from "../../../serve/controller/host/sim-aws-service-hosts.js";
 import type { SimAwsServiceTarget } from "../../../serve/controller/sim-service-controller.js";
 import {
   simRoute53LocalName,
@@ -13,6 +17,12 @@ const maxCnameDepth = 8;
 
 interface SimRoute53ResolverProperties {
   readonly hostedZones: ReadonlyMap<string, SimRoute53HostedZone>;
+
+  /**
+   * Where a hostname a simulated resource claimed for itself is looked up,
+   * such as a Cognito user pool custom domain.
+   */
+  readonly serviceHosts?: SimAwsServiceHosts | undefined;
 }
 
 /**
@@ -22,11 +32,13 @@ export class SimRoute53Resolver {
   private readonly recordFinder: SimRoute53HostedZoneRecordFinder;
   private readonly serviceTargetResolver =
     new SimRoute53ServiceTargetResolver();
+  private readonly serviceHosts: SimAwsServiceHosts;
 
   constructor(properties: SimRoute53ResolverProperties) {
     this.recordFinder = new SimRoute53HostedZoneRecordFinder(
       properties.hostedZones,
     );
+    this.serviceHosts = properties.serviceHosts ?? new SimAwsNoServiceHosts();
   }
 
   /**
@@ -65,15 +77,21 @@ export class SimRoute53Resolver {
       }
       visitedNames.add(localName);
 
-      const directTarget = this.serviceTargetResolver.resolve(localName);
-      if (directTarget !== undefined) {
-        return directTarget;
-      }
-
       const logicalName = simRoute53LogicalName(localName);
       /* v8 ignore if -- defensive check */
       if (logicalName === undefined) {
         return undefined;
+      }
+
+      // A hostname a resource claimed for itself, such as a Cognito user pool
+      // custom domain, is checked after the built-in service hostnames, so
+      // nothing a test creates can take one of those away from the service it
+      // belongs to.
+      const directTarget =
+        this.serviceTargetResolver.resolve(localName) ??
+        this.serviceHosts.targetForHost(logicalName);
+      if (directTarget !== undefined) {
+        return directTarget;
       }
 
       const nextRecord = this.findNextResolutionRecord(logicalName);

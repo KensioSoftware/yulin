@@ -12,12 +12,12 @@ import {
 import { SimCognitoCfnResourceFactory } from "./cfn/sim-cfn-cognito-resource-factory.js";
 import type * as simCognitoCommands from "./command/sim-cognito-command.types.js";
 import { SimCognitoCommands } from "./command/sim-cognito-commands.js";
+import { SimCognitoDomainRegistry } from "./registry/sim-cognito-domain-registry.js";
 import { SimCognitoUserPoolRegistry } from "./registry/sim-cognito-user-pool-registry.js";
 import { SimCognitoSdkCommandRouter } from "./sdk/sim-cognito-sdk-command-router.js";
-import {
-  type SimCognitoIdentityProviderRequestOptions,
-  SimCognitoUserDirectory,
-} from "./sim-cognito-user-directory.js";
+import { SimCognitoFederation } from "./sim-cognito-federation.js";
+import type { SimCognitoIdentityProviderRequestOptions } from "./sim-cognito-user-directory.js";
+import type { SimCognitoUserPoolDomain } from "./user-pool/domain/sim-cognito-user-pool-domain.js";
 
 import type { SimCognitoUserPool } from "./user-pool/sim-cognito-user-pool.js";
 import {
@@ -45,6 +45,14 @@ interface SimCognitoIdentityProviderProperties {
   readonly userPoolRegistry?: SimCognitoUserPoolRegistry;
 
   /**
+   * Where every hosted domain in the simulation is indexed. A domain is unique
+   * across the whole of AWS rather than within one Account, and a request to
+   * one carries a hostname that says nothing about which Account owns the pool
+   * behind it.
+   */
+  readonly domainRegistry?: SimCognitoDomainRegistry;
+
+  /**
    * The Lambda functions a pool's triggers can reach, which is the whole
    * simulation rather than this scope: a `LambdaConfig` names a function by
    * ARN, and that ARN can name any Account and Region.
@@ -67,9 +75,10 @@ interface SimCognitoIdentityProviderProperties {
  * Only user pools are simulated. Cognito identity pools, which hand out AWS
  * credentials, are a different service and are not simulated at all.
  */
-export class SimCognitoIdentityProvider extends SimCognitoUserDirectory {
+export class SimCognitoIdentityProvider extends SimCognitoFederation {
   private readonly pools: SimCognitoUserPoolStore;
   private readonly userPoolRegistry: SimCognitoUserPoolRegistry;
+  private readonly domainRegistry: SimCognitoDomainRegistry;
   private readonly sdkRouter = new SimCognitoSdkCommandRouter(this);
   private readonly cfnFactory = new SimCognitoCfnResourceFactory({
     cognito: this,
@@ -81,9 +90,13 @@ export class SimCognitoIdentityProvider extends SimCognitoUserDirectory {
       iam = new SimIamAllowAllAuth(),
       background = new BackgroundTasks(),
       userPoolRegistry = new SimCognitoUserPoolRegistry(),
+      domainRegistry = new SimCognitoDomainRegistry(),
       triggerFunctions = new SimCognitoNoTriggerFunctions(),
     } = properties;
-    const pools = new SimCognitoUserPoolStore({ registry: userPoolRegistry });
+    const pools = new SimCognitoUserPoolStore({
+      registry: userPoolRegistry,
+      domains: domainRegistry,
+    });
 
     super({
       commands: new SimCognitoCommands({
@@ -91,6 +104,7 @@ export class SimCognitoIdentityProvider extends SimCognitoUserDirectory {
         iam,
         clock: background,
         pools,
+        domains: domainRegistry,
         triggerFunctions,
       }),
       background,
@@ -98,6 +112,20 @@ export class SimCognitoIdentityProvider extends SimCognitoUserDirectory {
 
     this.pools = pools;
     this.userPoolRegistry = userPoolRegistry;
+    this.domainRegistry = domainRegistry;
+  }
+
+  /**
+   * Find a hosted domain by the domain string it was created with, in
+   * whichever Account and Region created it.
+   *
+   * A request to a hosted endpoint carries a hostname and nothing else, so
+   * this is what the serving layer resolves it with.
+   */
+  findUserPoolDomainInAnyAccount(
+    domainValue: string,
+  ): SimCognitoUserPoolDomain | undefined {
+    return this.domainRegistry.find(domainValue);
   }
 
   /**

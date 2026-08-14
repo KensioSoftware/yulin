@@ -1,8 +1,12 @@
+import { SimCognitoIdentityProviderStore } from "../idp/sim-cognito-identity-provider-store.js";
+import type { SimCognitoUserPoolDomain } from "../domain/sim-cognito-user-pool-domain.js";
 import type { SimCognitoAuthSession } from "./sim-cognito-auth-session.js";
 import {
   SimCognitoAuthSessionStore,
   type SimCognitoAuthSessionRequest,
 } from "./sim-cognito-auth-session-store.js";
+import type { SimCognitoAuthorizationCode } from "./sim-cognito-authorization-code.js";
+import { SimCognitoAuthorizationCodeStore } from "./sim-cognito-authorization-code-store.js";
 import type { SimCognitoIssuedToken } from "./sim-cognito-issued-token.js";
 import {
   SimCognitoIssuedTokenStore,
@@ -10,16 +14,72 @@ import {
 } from "./sim-cognito-issued-token-store.js";
 
 /**
- * The authentication state of one simulated user pool: the sign-ins that are
- * part way through, and the tokens the finished ones handed out.
+ * The authentication state of one simulated user pool: where users can sign
+ * in, the sign-ins that are part way through, and the tokens the finished ones
+ * handed out.
  *
- * The two live together because signing a user out reaches both kinds of
- * state, and because keeping them here leaves `SimCognitoUserPool` as what it
+ * These live together because signing a user out reaches more than one of
+ * them, and because keeping them here leaves `SimCognitoUserPool` as what it
  * is elsewhere, a resource holding its contents.
+ *
+ * The hosted domain and the external identity providers are here for the same
+ * reason. A domain is where a browser signs in, a provider is who it signs in
+ * with, and an authorization code is a sign-in part way through, in the same
+ * way a challenge session is.
  */
 export class SimCognitoPoolAuth {
+  /**
+   * The external identity providers this pool federates to.
+   */
+  public readonly identityProviders = new SimCognitoIdentityProviderStore();
+
   private readonly sessions = new SimCognitoAuthSessionStore();
+  private readonly codes = new SimCognitoAuthorizationCodeStore();
   private readonly tokens = new SimCognitoIssuedTokenStore();
+
+  #domain: SimCognitoUserPoolDomain | undefined;
+
+  /**
+   * The hosted domain this pool serves its OAuth endpoints on, if it has one.
+   *
+   * A pool has at most one, as a real pool does: a prefix domain and a custom
+   * domain are two forms of the same thing rather than two domains.
+   */
+  get domain(): SimCognitoUserPoolDomain | undefined {
+    return this.#domain;
+  }
+
+  /**
+   * Give this pool the domain a `CreateUserPoolDomain` request asked for.
+   */
+  addDomain(domain: SimCognitoUserPoolDomain): void {
+    this.#domain = domain;
+  }
+
+  /**
+   * Forget this pool's domain, because it has been deleted.
+   */
+  removeDomain(): void {
+    this.#domain = undefined;
+  }
+
+  /**
+   * Remember an authorization code this pool handed to a browser.
+   */
+  addAuthorizationCode(code: SimCognitoAuthorizationCode): void {
+    this.codes.add(code);
+  }
+
+  /**
+   * Take the authorization code a token request carries, if this pool still
+   * holds one that has not run out.
+   */
+  spendAuthorizationCode(
+    value: string | undefined,
+    now: Date,
+  ): SimCognitoAuthorizationCode | undefined {
+    return this.codes.spend(value, now);
+  }
 
   /**
    * Remember a challenge session an authentication was left waiting on.
@@ -63,6 +123,15 @@ export class SimCognitoPoolAuth {
     request: SimCognitoRefreshTokenRequest,
   ): SimCognitoIssuedToken {
     return this.tokens.requireRefreshToken(request);
+  }
+
+  /**
+   * Find a refresh token this pool issued and still holds.
+   */
+  findRefreshToken(
+    value: string | undefined,
+  ): SimCognitoIssuedToken | undefined {
+    return this.tokens.findRefreshToken(value);
   }
 
   /**

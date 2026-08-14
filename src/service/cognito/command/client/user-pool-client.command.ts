@@ -1,18 +1,17 @@
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
 import type { SimCognitoTokenValidityUnitsType } from "../../user-pool/client/sim-cognito-token-validity.js";
-import type { SimCognitoUnsimulatedClientSettingsType } from "../../user-pool/client/sim-cognito-unsimulated-client-settings.js";
+import type { SimCognitoOAuthSettingsType } from "../../user-pool/client/sim-cognito-oauth-settings.js";
 
 /**
  * An app client as sim Cognito reports it.
  *
- * Only the properties this simulation models appear, alongside the two
- * managed login settings it accepts without acting on and reports back so a
- * request's intent stays visible. Real Cognito reports more, including the
- * rest of the OAuth settings.
+ * Only the properties this simulation models appear. Real Cognito reports
+ * more, including the per-client attribute permissions and the analytics
+ * configuration.
  *
  * https://docs.aws.amazon.com/cognito-user-identity-pools/latest/APIReference/API_UserPoolClientType.html
  */
-export interface SimCognitoUserPoolClientType extends SimCognitoUnsimulatedClientSettingsType {
+export interface SimCognitoUserPoolClientType extends SimCognitoOAuthSettingsType {
   readonly ClientId?: string | undefined;
   readonly ClientName?: string | undefined;
   readonly UserPoolId?: string | undefined;

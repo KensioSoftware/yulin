@@ -17,6 +17,7 @@ import {
   SimIamAccountAccessKeyIndex,
   type SimIamAccessKeyRegistry,
 } from "../../iam/registry/sim-iam-access-key-registry.js";
+import type { SimAwsServiceHosts } from "../../../serve/controller/host/sim-aws-service-hosts.js";
 import { SimIamCredentialRegistry } from "../../iam/credential/sim-iam-credential-registry.js";
 import { Memo } from "../../../util/memo/memo.js";
 import { accountServiceCacheKey } from "./account-service-cache-key.js";
@@ -27,6 +28,7 @@ interface SimAwsAccountServiceCacheProperties {
   readonly acmRegistry: SimAcmRegistry;
   readonly cloudFrontRegistry: SimCloudFrontRegistry;
   readonly route53Registry: SimRoute53Registry;
+  readonly serviceHosts: SimAwsServiceHosts;
   readonly iamRegistry: SimIamRegistry;
   readonly accessKeyRegistry: SimIamAccessKeyRegistry;
 }
@@ -60,6 +62,7 @@ export class SimAwsAccountServiceCache {
   private readonly iamRegistry: SimIamRegistry;
   private readonly accessKeyRegistry: SimIamAccessKeyRegistry;
   private readonly route53Registry: SimRoute53Registry;
+  private readonly serviceHosts: SimAwsServiceHosts;
 
   /**
    * Shared memo for account-scoped service instances.
@@ -78,6 +81,7 @@ export class SimAwsAccountServiceCache {
     this.iamRegistry = properties.iamRegistry;
     this.accessKeyRegistry = properties.accessKeyRegistry;
     this.route53Registry = properties.route53Registry;
+    this.serviceHosts = properties.serviceHosts;
   }
 
   /**
@@ -145,6 +149,7 @@ export class SimAwsAccountServiceCache {
           iam,
           background: this.background,
           route53Registry: this.route53Registry,
+          serviceHosts: this.serviceHosts,
         }),
     );
   }

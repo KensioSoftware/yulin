@@ -3,7 +3,7 @@ import type { SimCognitoUserPoolId } from "../sim-cognito-user-pool-id.js";
 import type { SimCognitoExplicitAuthFlows } from "./sim-cognito-explicit-auth-flows.js";
 import type { SimCognitoPreventUserExistenceErrors } from "./sim-cognito-prevent-user-existence-errors.js";
 import type { SimCognitoTokenValidity } from "./sim-cognito-token-validity.js";
-import type { SimCognitoUnsimulatedClientSettings } from "./sim-cognito-unsimulated-client-settings.js";
+import type { SimCognitoOAuthSettings } from "./sim-cognito-oauth-settings.js";
 import type { SimCognitoUserPoolClientSettings } from "./sim-cognito-user-pool-client-settings.js";
 import type { SimCognitoUserPoolClientId } from "./sim-cognito-user-pool-client-id.js";
 
@@ -77,11 +77,11 @@ export class SimCognitoUserPoolClient {
   }
 
   /**
-   * What the client was given and nothing here acts on, kept so a described
-   * client reports it.
+   * What this client may do at its pool's hosted domain: which grant, which
+   * scopes, which redirects and which identity providers.
    */
-  get unsimulatedSettings(): SimCognitoUnsimulatedClientSettings {
-    return this.clientSettings.unsimulated;
+  get oauth(): SimCognitoOAuthSettings {
+    return this.clientSettings.oauth;
   }
 
   /**

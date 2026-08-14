@@ -1,5 +1,4 @@
 import { SimCognitoUnsimulatedInput } from "../sim-cognito-unsimulated-input.js";
-import { SimCognitoUnsimulatedManagedLogin } from "./sim-cognito-unsimulated-managed-login.js";
 import type { SimCognitoUserPoolClientSettingsInput } from "./user-pool-client.command.js";
 
 /**
@@ -11,19 +10,15 @@ import type { SimCognitoUserPoolClientSettingsInput } from "./user-pool-client.c
  */
 export class SimCognitoUnsimulatedUserPoolClientOptions {
   private readonly unsimulated: SimCognitoUnsimulatedInput;
-  private readonly managedLogin: SimCognitoUnsimulatedManagedLogin;
 
   constructor(operation: string) {
     this.unsimulated = new SimCognitoUnsimulatedInput(operation);
-    this.managedLogin = new SimCognitoUnsimulatedManagedLogin(operation);
   }
 
   /**
    * Refuse a request carrying an input this simulation cannot honour.
    */
   refuseIn(input: SimCognitoUserPoolClientSettingsInput): void {
-    this.managedLogin.refuseIn(input);
-
     this.unsimulated.refuseUnless(
       "EnableTokenRevocation",
       input.EnableTokenRevocation,
