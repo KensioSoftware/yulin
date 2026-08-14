@@ -172,6 +172,63 @@ describe("Authorizing what a simulated ECS task does", () => {
     assertIdentical(described.tasks?.[0]?.containers?.[0]?.exitCode, 0);
   });
 
+  it("runs a container with no task Role as nobody", async () => {
+    // Given a Role allowed to run tasks and to write an SSM parameter.
+    using simSdk = new SimSdk();
+    const { simAws } = simSdk;
+    const ecs = simAws.ecs();
+    await simEcsClusterFactory.make({}, simAws);
+    const starter = await simIamRoleWithPolicyFactory.make(
+      { roleName: "Starter", actions: ["ecs:RunTask", "ssm:PutParameter"] },
+      simAws,
+    );
+
+    // And a task definition declaring no task Role, whose container writes one.
+    simSdk.intercept(SSMClient);
+    ecs.bindContainer({
+      family: "orders-worker",
+      containerName: "app",
+      run: async () => {
+        await new SSMClient({}).send(
+          new PutParameterCommand({
+            Name: "/orders/last-run",
+            Value: "done",
+            Type: "String",
+          }),
+        );
+      },
+    });
+    await ecs.registerTaskDefinition(
+      new RegisterTaskDefinitionCommand({
+        family: "orders-worker",
+        containerDefinitions: [{ name: "app", image: "orders-worker:1" }],
+      }),
+    );
+
+    // When that Role runs the task, so its own permissions are the ambient
+    // ones while the containers are scheduled.
+    const run = await simAws.runAs(
+      { kind: "arn", arn: starter.Arn },
+      async () =>
+        await ecs.runTask(
+          new RunTaskCommand({ taskDefinition: "orders-worker" }),
+        ),
+    );
+    await simAws.backgroundTasksComplete();
+
+    // Then the container did not take the starter's identity: a real task with
+    // no task Role has no credentials of its own.
+    const described = await ecs.describeTasks(
+      new DescribeTasksCommand({ tasks: [run.tasks?.[0]?.taskArn ?? ""] }),
+    );
+
+    assertIdentical(described.tasks?.[0]?.containers?.[0]?.exitCode, 1);
+    assertStringIncludes(
+      described.tasks[0].containers[0].reason ?? "",
+      "User: anonymous is not authorized",
+    );
+  });
+
   it("refuses a caller whose policy does not permit running the task", async () => {
     // Given a Role allowed to describe task definitions but not to run tasks.
     const simAws = new SimAws();

@@ -11,9 +11,9 @@ interface SimEcsContainerEnvironmentProperties {
  * The environment one container of a simulated task runs with.
  *
  * It is the container definition's `environment`, with any `RunTask` container
- * override applied over the top, which is the order real ECS applies them in.
- * The Region variables are added the way a real task agent adds them, so code
- * that reads `AWS_REGION` to build a client finds one.
+ * override applied over the top, which is the order real ECS applies them in,
+ * and the Region variables a real task agent adds, so code that reads
+ * `AWS_REGION` to build a client finds one.
  *
  * The variables are applied to `process.env` for the length of the run, in the
  * same way a sim Lambda function's are: a bound handler is an ordinary closure
@@ -59,6 +59,11 @@ export class SimEcsContainerEnvironment {
 
   /**
    * Run a container's handler with this environment applied to process.env.
+   *
+   * A container with nothing of its own is left reading the host environment
+   * untouched, Region variables included. Giving it only the Region ones would
+   * take away everything the test process set, which is where an in-process
+   * handler's configuration usually comes from.
    */
   async runWith<T>(run: () => Promise<T>): Promise<T> {
     if (!this.hasVariables) {

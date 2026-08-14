@@ -1,3 +1,4 @@
+import type { SimAwsPrincipal } from "../../../aws/caller/sim-aws-caller.js";
 import type { SimAwsRunAsOwner } from "../../../aws/caller/sim-aws-run-as-context.js";
 import { simAwsRunAsContext } from "../../../aws/caller/sim-aws-run-as-context.js";
 import type { SimEcsContainerBindings } from "../../bind/sim-ecs-container-bindings.js";
@@ -30,9 +31,10 @@ interface SimEcsContainerRunnerProperties {
  * credentials its agent hands the container, and it is the same thing a sim
  * Lambda function does with its execution Role.
  *
- * A task definition declaring no task Role leaves the caller alone. There is
- * no ambient identity to give the handler, and inventing one would let a call
- * through that real ECS would have had no credentials for.
+ * A task definition declaring no task Role runs anonymously. A real task
+ * without one has no credentials of its own, and taking the identity of
+ * whoever called `RunTask` would let a container through with permissions the
+ * deployed one would not have.
  *
  * A handler that throws stops its container with a non-zero exit code and the
  * message as its reason, rather than failing the request that started the
@@ -104,15 +106,24 @@ export class SimEcsContainerRunner {
     });
   }
 
-  private async asTaskRole<T>(run: () => Promise<T>): Promise<T> {
+  /**
+   * The principal a container's AWS calls are attributed to.
+   *
+   * A task definition with no task Role runs anonymously rather than as
+   * whoever called `RunTask`. The caller's ambient principal is still set
+   * while the background work that runs the containers happens, and inheriting
+   * it would let a container do whatever the caller could: a test would pass
+   * on permissions the deployed task has no credentials for.
+   */
+  private principal(): SimAwsPrincipal {
     if (this.taskRoleArn === undefined) {
-      return await run();
+      return { kind: "anonymous" };
     }
 
-    return await simAwsRunAsContext.run(
-      this.runAsOwner,
-      { kind: "arn", arn: this.taskRoleArn },
-      run,
-    );
+    return { kind: "arn", arn: this.taskRoleArn };
+  }
+
+  private async asTaskRole<T>(run: () => Promise<T>): Promise<T> {
+    return await simAwsRunAsContext.run(this.runAsOwner, this.principal(), run);
   }
 }

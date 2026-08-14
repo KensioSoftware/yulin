@@ -44,6 +44,14 @@ describe("ECS DescribeTasksCommand", () => {
     assertArrayLength(described.tasks[0].containers, 1);
     assertIdentical(described.tasks[0].containers[0].name, "app");
 
+    // And the full ARN names the same task.
+    const byArn = await simAws
+      .ecs()
+      .describeTasks(new DescribeTasksCommand({ tasks: [taskArn] }));
+
+    assertArrayLength(byArn.tasks, 1);
+    assertIdentical(byArn.tasks[0].taskArn, taskArn);
+
     await simAws.backgroundTasksComplete();
   });
 

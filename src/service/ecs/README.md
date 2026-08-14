@@ -124,8 +124,10 @@ container, which is what makes `StopTask` stop a run part way through.
 `SimEcsContainerRunner` runs one container: it finds the binding, applies the environment, and runs
 the handler as the task Role. The task Role is applied through `simAwsRunAsContext`, exactly as a sim
 Lambda function applies its execution Role, so a container's AWS calls are authorized the way the
-deployed one's would be. A definition with no task Role leaves the ambient caller alone rather than
-inventing an identity.
+deployed one's would be. A definition with no task Role runs its containers anonymously, which is
+the one thing the ambient caller must not be left alone for: the background work that runs the
+containers keeps the `RunTask` caller's context, so leaving it would attribute a container's calls
+to whoever started the task.
 
 `SimEcsContainerEnvironment` merges the container definition's `environment` with any `RunTask`
 override and the Region variables, and applies them through `simProcessEnvironment`, the shared

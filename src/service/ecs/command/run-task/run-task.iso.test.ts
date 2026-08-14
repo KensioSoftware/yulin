@@ -312,5 +312,7 @@ describe("ECS RunTaskCommand", () => {
     assertIdentical(run.tasks?.[0]?.group, "nightly");
     assertIdentical(run.tasks[0].launchType, "FARGATE");
     assertIdentical(run.tasks[0].startedBy, "batch-runner");
+
+    await simAws.backgroundTasksComplete();
   });
 });

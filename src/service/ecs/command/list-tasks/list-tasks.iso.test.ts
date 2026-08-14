@@ -67,13 +67,13 @@ describe("ECS ListTasksCommand", () => {
       { family: "billing" },
       simAws,
     );
-    await simAws.ecs().runTask(
+    const checkout = await simAws.ecs().runTask(
       new RunTaskCommand({
         taskDefinition: "checkout",
         startedBy: "nightly-batch",
       }),
     );
-    await simAws
+    const billing = await simAws
       .ecs()
       .runTask(new RunTaskCommand({ taskDefinition: "billing" }));
 
@@ -84,6 +84,7 @@ describe("ECS ListTasksCommand", () => {
 
     // Then only that family's task is listed.
     assertArrayLength(byFamily.taskArns, 1);
+    assertIdentical(byFamily.taskArns[0], billing.tasks?.[0]?.taskArn);
 
     // And the same holds for what started it.
     const byStarter = await simAws
@@ -91,6 +92,7 @@ describe("ECS ListTasksCommand", () => {
       .listTasks(new ListTasksCommand({ startedBy: "nightly-batch" }));
 
     assertArrayLength(byStarter.taskArns, 1);
+    assertIdentical(byStarter.taskArns[0], checkout.tasks?.[0]?.taskArn);
 
     await simAws.backgroundTasksComplete();
   });

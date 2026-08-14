@@ -12,7 +12,7 @@ async function tick(milliseconds: number): Promise<void> {
   });
 }
 
-describe("sim Lambda process env", () => {
+describe("The process env an in-process handler run sees", () => {
   it("gives the run its own process.env", async () => {
     // Given a variable that only the run declares.
     const variables = { TABLE_NAME: "widgets" };
@@ -70,6 +70,23 @@ describe("sim Lambda process env", () => {
 
     // Then the host process environment is unchanged.
     assertUndefined(process.env["YULIN_WRITTEN_IN_RUN"]);
+  });
+
+  it("keeps a run's variables when code assigns process.env back to itself", async () => {
+    // Given a run whose code saves process.env and puts it back, as code that
+    // means to restore what it found does.
+    const kept = await simProcessEnvironment.run(
+      { TABLE_NAME: "widgets" },
+      () => {
+        const saved = process.env;
+        process.env = saved;
+        return Promise.resolve(process.env["TABLE_NAME"]);
+      },
+    );
+
+    // Then the run still has its variables: the assignment was the store to
+    // itself, so reading it first is what stops it emptying.
+    assertIdentical(kept, "widgets");
   });
 
   it("isolates concurrent runs from each other", async () => {

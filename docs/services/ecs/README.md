@@ -288,8 +288,8 @@ A cluster is named either by its short name or by its full ARN, and the two are 
 ARN belonging to another account or region names a different cluster, so `DescribeClusters` reports
 it as a `MISSING` failure and `DeleteCluster` refuses it.
 
-A cluster has to exist before a task can run in it, including the `default` one. Real ECS does not
-create that one for you either.
+A cluster has to exist before a task can run in it, including the `default` one. Yulin creates no
+cluster on its own, so create the one the tasks run in.
 
 ## Running a task
 
@@ -589,9 +589,10 @@ denial as its reason. That is the test worth writing: a task role missing a perm
 test rather than in the deployment.
 
 A `RunTask` request can override the role with `overrides.taskRoleArn`. A task definition declaring
-no task role leaves the caller alone, since a real task without one has no credentials of its own.
-The execution role is stored but does nothing here, because there is no image to pull and no log
-driver to write to.
+no task role runs its containers as nobody, so their AWS calls are denied: a real task without one
+has no credentials of its own, and taking the identity of whoever called `RunTask` would let a test
+pass on permissions the deployed task has not got. The execution role is stored but does nothing
+here, because there is no image to pull and no log driver to write to.
 
 ## Describing, listing and stopping tasks
 
@@ -787,6 +788,11 @@ Current documented limitations:
 - `ListTaskDefinitions` refuses a `status` of `DELETE_IN_PROGRESS`, which real ECS accepts. Nothing
   deletes a task definition here, so the answer would always be an empty listing, and refusing says
   so rather than looking like a result.
+- Yulin creates no cluster on its own, including the `default` one, so a `RunTask` request naming no
+  cluster needs one to have been created. An AWS account often has a `default` cluster already,
+  created the first time ECS was used from the console.
+- A container of a task definition with no `taskRoleArn` is denied every AWS call, rather than
+  running with whatever credentials a container instance role might have supplied.
 - Only a bound container runs. A container with no binding never starts and is reported with a reason
   saying so, and a task where nothing is bound stops with `TaskFailedToStart`.
 - Containers run one after another in the order the task definition declares them, rather than

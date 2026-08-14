@@ -89,6 +89,10 @@ class SimProcessEnvironment {
    * assignment is copied into it rather than swapping the reference. Outside a
    * run it replaces the host environment, as an assignment to process.env
    * normally would.
+   *
+   * The replacement is read before the store is cleared, because handler code
+   * saving process.env and assigning it back is assigning the store to itself:
+   * clearing first would empty the run's environment rather than keep it.
    */
   private replaceVariables(replacement: NodeJS.ProcessEnv): void {
     const store = this.storage.getStore();
@@ -97,10 +101,12 @@ class SimProcessEnvironment {
       return;
     }
 
+    const replacing = Object.entries(replacement);
+
     for (const name of Object.keys(store)) {
       Reflect.deleteProperty(store, name);
     }
-    for (const [name, value] of Object.entries(replacement)) {
+    for (const [name, value] of replacing) {
       if (value !== undefined) {
         // oxlint-disable-next-line security/detect-object-injection
         store[name] = value;

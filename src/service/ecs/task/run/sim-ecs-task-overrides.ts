@@ -60,7 +60,11 @@ export class SimEcsTaskOverrides {
     unsimulated.refuseUnaccepted(declared ?? {}, acceptedOverrides);
 
     this.taskRoleArn = declared?.taskRoleArn;
-    this.containerOverrides = declared?.containerOverrides ?? [];
+    // Copied rather than held by reference, since the caller owns what it
+    // passed in and the containers read it later, on background work.
+    this.containerOverrides = structuredClone(
+      declared?.containerOverrides ?? [],
+    );
 
     for (const override of this.containerOverrides) {
       new SimEcsUnsimulatedInput("RunTask containerOverrides").refuseUnaccepted(
