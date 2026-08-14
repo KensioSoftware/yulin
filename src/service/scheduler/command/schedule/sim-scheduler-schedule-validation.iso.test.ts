@@ -101,6 +101,29 @@ describe("Scheduler schedule validation", () => {
     assertStringIncludes(error.message, "lambda, sqs, sns");
   });
 
+  it("refuses a Lambda ARN naming something that is not a function", async () => {
+    // Given a layer and an event source mapping, which are Lambda ARNs and
+    // are not functions.
+    const layer = await refusedSchedule({
+      Target: {
+        Arn: "arn:aws:lambda:us-east-1:888888888888:layer:shared",
+        RoleArn: roleArn,
+      },
+    });
+    const mapping = await refusedSchedule({
+      Target: {
+        Arn: "arn:aws:lambda:us-east-1:888888888888:event-source-mapping:abcd",
+        RoleArn: roleArn,
+      },
+    });
+
+    // Then both are refused rather than read as a function of that name.
+    assertInstanceOf(layer, SimSchedulerValidationException);
+    assertStringIncludes(layer.message, "names no function");
+    assertInstanceOf(mapping, SimSchedulerValidationException);
+    assertStringIncludes(mapping.message, "names no function");
+  });
+
   it("requires the execution role every schedule invokes its target as", async () => {
     // Given a target with no RoleArn, which AWS requires.
     const missing = await refusedSchedule({

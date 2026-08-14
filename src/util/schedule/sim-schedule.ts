@@ -74,9 +74,12 @@ export class SimSchedule {
       return SimAtExpression.of(body);
     }
 
+    const forms = dialect.allowsOneTime
+      ? "an 'at(...)', a 'rate(...)' or a 'cron(...)'"
+      : "a 'rate(...)' or a 'cron(...)'";
+
     throw new SimScheduleExpressionError(
-      `a schedule expression is a ${dialect.allowsOneTime ? "'at(...)', a " : ""}` +
-        `'rate(...)' or a 'cron(...)', and this one is a ` +
+      `a schedule expression is ${forms}, and this one is a ` +
         `'${String(read["kind"])}(...)'`,
     );
   }
