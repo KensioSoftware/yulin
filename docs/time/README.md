@@ -141,10 +141,16 @@ If work triggered by advancing fails, the failure is thrown from `advanceBy(...)
 in the background, and the clock is left at the point it failed rather than at the instant asked
 for. Anything still queued stays queued.
 
+Delivery to a target is the exception, and deliberately so. An EventBridge rule or a Scheduler
+schedule that cannot reach its target records the failure instead of throwing, because real AWS
+reports a failed delivery to nobody and because one rejected delivery would otherwise fail an
+unrelated `advanceBy(...)` elsewhere in the same test. Those are read from
+`eventBridge().deliveryFailures` and `scheduler().deliveryFailures` rather than caught.
+
 Several parts of the simulator schedule work on the clock, so advancing time does more than change
-what timestamps and expiry checks see. A scheduled EventBridge rule fires, a DynamoDB item passes
-its time to live, a Secrets Manager deletion falls due, and a Lambda event source mapping polls
-again. Each of those runs at its own due instant inside the interval, not all at once at the end.
+what timestamps and expiry checks see. A scheduled EventBridge rule fires, an EventBridge Scheduler
+schedule invokes its target, a DynamoDB item passes its time to live, a Secrets Manager deletion
+falls due, and a Lambda event source mapping polls again. Each of those runs at its own due instant inside the interval, not all at once at the end.
 
 ## Time inside a simulated Lambda handler
 
@@ -257,8 +263,8 @@ runs on a clock a test can control: `await simSdk.simAws.clock().advanceBy({ hou
 - Advancing the clock is the only thing that fires a scheduled
   [EventBridge rule](../services/eventbridge/#rules-that-fire-on-a-schedule). Nothing runs on the
   host's clock, so a simulation left alone in real time fires nothing however long it is left.
-- EventBridge Scheduler is not simulated, so `rate` and `cron` reach the clock through an
-  EventBridge rule only.
+- Advancing the clock is also the only thing that fires an [EventBridge Scheduler
+  schedule](../services/scheduler/#firing-a-schedule), including a one-time `at(...)` one.
 - Only `SimAws` exposes time control. Services constructed standalone, such as `new SimS3()`, get
   their own real clock and no way to move it.
 - A `SimAws` constructed with a `background` scheduler of its own cannot control time, because that

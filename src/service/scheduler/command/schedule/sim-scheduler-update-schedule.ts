@@ -1,3 +1,4 @@
+import type { SimSchedulerSchedules } from "../../schedule/sim-scheduler-schedules.js";
 import type { SimSchedulerScheduleStore } from "../../schedule/sim-scheduler-schedule-store.js";
 import type { SimSchedulerRequestOptions } from "../sim-scheduler-request-options.js";
 import type { SimSchedulerScheduleAccess } from "./sim-scheduler-schedule-access.js";
@@ -11,6 +12,7 @@ interface SimSchedulerUpdateScheduleProperties {
   readonly schedules: SimSchedulerScheduleStore;
   readonly access: SimSchedulerScheduleAccess;
   readonly writer: SimSchedulerScheduleWriter;
+  readonly firing: SimSchedulerSchedules;
 }
 
 /**
@@ -28,11 +30,13 @@ export class SimSchedulerUpdateSchedule {
   private readonly schedules: SimSchedulerScheduleStore;
   private readonly access: SimSchedulerScheduleAccess;
   private readonly writer: SimSchedulerScheduleWriter;
+  private readonly firing: SimSchedulerSchedules;
 
   constructor(properties: SimSchedulerUpdateScheduleProperties) {
     this.schedules = properties.schedules;
     this.access = properties.access;
     this.writer = properties.writer;
+    this.firing = properties.firing;
   }
 
   /**
@@ -55,6 +59,11 @@ export class SimSchedulerUpdateSchedule {
     const schedule = this.writer.write(input, requested, existing.creationDate);
 
     this.schedules.put(schedule);
+
+    // Arming the replacement is what reschedules from the new expression. The
+    // schedule it replaced is no longer the one the store holds, so its next
+    // firing finds itself out of date and stops.
+    this.firing.arm(schedule);
 
     return { $metadata: {}, ScheduleArn: schedule.arn };
   }

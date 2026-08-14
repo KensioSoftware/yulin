@@ -1,8 +1,7 @@
 # Simulated EventBridge Scheduler implementation
 
 This directory contains the simulated EventBridge Scheduler service implementation. Schedules, their
-targets, and the five commands that manage them. Firing a schedule as simulated time advances, and
-invoking its target through an execution role, come next.
+targets, the five commands that manage them, and firing a schedule as simulated time advances.
 
 The guiding decision is that this is a separate service from simulated EventBridge rather than a
 corner of it. The two look similar from a distance and differ in every detail that matters: a
@@ -81,6 +80,48 @@ decisions are. Every one of them refuses rather than drops, on the same reasonin
 simulator: a schedule that silently ignored its `ScheduleExpressionTimezone` would fire at the wrong
 hour, and that is exactly the thing a test of a nightly job is checking.
 
+## Firing
+
+`SimSchedulerSchedules` arms a schedule for its next due instant through
+`BackgroundScheduler.scheduleAt`, and a firing arms the next one before it returns. That is what
+makes firing per due instant rather than per advance: `SimClockControl.advanceBy` walks the interval
+taking whatever has fallen due, so a schedule rescheduling itself inside the interval is taken again
+in the same walk.
+
+Nothing cancels a timer. A firing checks that the schedule it holds is still the one its store has
+under that name and stops if it is not, which covers deletion and an update replacement in one. That
+is also what makes an update reschedule from the new expression: an update stores a newly built
+schedule and arms it, and the previous one's next firing finds itself out of date.
+
+`ActionAfterCompletion` needs a schedule that has _completed_, which is one that invoked its target
+and has no next occurrence. A disabled schedule whose only instant goes past has not completed, so it
+survives whatever the action says. Nothing else needs to know a schedule is one-time: `SimAtExpression`
+answers with its instant once and with nothing afterwards, so arming simply stops.
+
+## Delivery
+
+`delivery/` is where Scheduler's execution model lives, and it is the part with no precedent
+elsewhere in the simulator. Everything else that reaches across services — SNS to Lambda, S3 to SQS,
+an EventBridge rule to anything — arrives as a service principal and is admitted by the target's
+resource policy. A schedule arrives as an assumed role and is admitted by that role's identity
+policies, with no resource policy involved.
+
+`sim-scheduler-execution-role.ts` is that difference. It asks STS's own
+`AssumeRoleTrustPolicyAuthorizer` whether the role admits `scheduler.amazonaws.com`, then builds a
+`SimResolvedCaller` whose principal is the session and whose `identityPolicyPrincipal` is the role.
+That split is exactly what `SimResolvedCaller` exists for, and it is why no STS session or temporary
+credential is created: nothing would read them, and registering credentials nobody uses would be
+state the simulation has to keep straight for no benefit.
+
+The two failures are reported apart from each other, because they are fixed in different places: the
+trust policy is on the role's `AssumeRolePolicyDocument`, and the permission is in a policy attached
+to it. Telling a reader which one it was saves the whole diagnosis.
+
+`SimAwsSchedulerDeliveryTargets` assumes the role in the role's own Account and reaches the target in
+the target's, which need not be the same one. A `SimScheduler` built outside SimAws gets
+`SimSchedulerNoDeliveryTargets`, which records every invocation as a failure saying why there was
+nowhere to make it.
+
 ## Authorization
 
 `SimSchedulerAuthorizer` authorizes the caller against the schedule ARN. It is deliberately not
@@ -90,7 +131,7 @@ the command that created the schedule.
 
 ## Divergences
 
-Two so far, both deliberate.
+Four, all deliberate.
 
 Schedule groups are **refused rather than simulated**. A `GroupName` other than `default` fails, where
 real AWS creates the schedule in whichever group is named. Accepting the name and using `default`
@@ -100,3 +141,11 @@ lie.
 `ClientToken` is **accepted and ignored**, on `CreateSchedule`, `UpdateSchedule` and
 `DeleteSchedule`. It exists to make a retried request idempotent, nothing here retries, and refusing
 it would break ordinary AWS code that passes one as a matter of course.
+
+A schedule fires **exactly, and exactly once**. Real Scheduler invokes within a minute of the due
+time and promises no more than that. Reproducing the imprecision would make a test of a schedule
+assert on something that is not the schedule.
+
+A target with no `Input` receives an **empty JSON object**. AWS documents that for a Lambda target
+and says nothing about it for a queue or a topic, so the same answer is used for all three rather
+than inventing a different one per service.

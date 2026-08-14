@@ -10,6 +10,8 @@ import {
   type SimIamInterServiceAuthZ,
 } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
 import type * as simSchedulerCommands from "./command/sim-scheduler-command.types.js";
+import type { SimSchedulerDeliveryTargets } from "./delivery/sim-scheduler-delivery.js";
+import type { SimSchedulerDeliveryFailure } from "./delivery/sim-scheduler-delivery-failures.js";
 import { SimSchedulerCommands } from "./command/sim-scheduler-commands.js";
 import type { SimSchedulerRequestOptions } from "./command/sim-scheduler-request-options.js";
 import { SimSchedulerScheduleStore } from "./schedule/sim-scheduler-schedule-store.js";
@@ -20,6 +22,14 @@ interface SimSchedulerProperties {
   readonly accountRegionScope?: SimAwsAccountRegionScope;
   readonly iam?: SimIamInterServiceAuthZ;
   readonly background?: BackgroundScheduler;
+
+  /**
+   * Where this scope's schedules invoke.
+   *
+   * A SimScheduler built on its own has none, since a function, queue or topic
+   * in another simulated service is only reachable through SimAws.
+   */
+  readonly deliveryTargets?: SimSchedulerDeliveryTargets;
 }
 
 /**
@@ -53,9 +63,20 @@ export class SimScheduler extends SimSchedulerInspection {
     this.commands = new SimSchedulerCommands({
       schedules: this.scheduleStore,
       iam,
-      clock: background,
+      background,
+      deliveryTargets: properties.deliveryTargets,
       accountRegionScope,
     });
+  }
+
+  /**
+   * Every invocation this scope's schedules could not make.
+   *
+   * Real Scheduler tells nobody about a failed invocation as it happens, and
+   * neither does this. A target that is unexpectedly empty is explained here.
+   */
+  get deliveryFailures(): readonly SimSchedulerDeliveryFailure[] {
+    return this.commands.delivery.deliveryFailures;
   }
 
   /**

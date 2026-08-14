@@ -8,14 +8,15 @@ import { SimAcm } from "../../acm/sim-acm.js";
 import { SimApiGatewayV2 } from "../../apigatewayv2/index.js";
 import {
   simAwsAcmDnsRecords,
+  simAwsEventBridgeDeliveryTargets,
   simAwsHttpApiJwtIssuerKeys,
+  simAwsSchedulerDeliveryTargets,
 } from "./sim-aws-cross-account-collaborators.js";
 import { SimCloudFormation } from "../../cloudformation/index.js";
 import { SimCognitoIdentityProvider } from "../../cognito/index.js";
 import { simAwsCognitoTriggerFunctions } from "../../cognito/user-pool/trigger/sim-aws-cognito-trigger-functions.js";
 import { SimDynamoDb as SimDynamoDatabase } from "../../dynamodb/index.js";
 import { SimEventBridge } from "../../eventbridge/index.js";
-import { SimAwsEventBridgeDeliveryTargets } from "../../eventbridge/delivery/sim-aws-event-bridge-delivery-targets.js";
 import type { SimIamRegistry } from "../../iam/registry/sim-iam-registry.js";
 import { SimKms } from "../../kms/index.js";
 import type { SimHttpApiRegistry } from "../../apigatewayv2/registry/sim-http-api-registry.js";
@@ -150,11 +151,7 @@ export class SimAwsAccountRegionServiceBuilder {
   createEventBridge(scope: SimAwsAccountRegionContainer): SimEventBridge {
     return new SimEventBridge({
       ...this.scoped(scope),
-      // Rules deliver to targets in any Account and Region of this
-      // simulation, as real EventBridge delivers across both.
-      deliveryTargets: new SimAwsEventBridgeDeliveryTargets({
-        simAws: this.simAws,
-      }),
+      deliveryTargets: simAwsEventBridgeDeliveryTargets(this.simAws),
     });
   }
 
@@ -265,7 +262,10 @@ export class SimAwsAccountRegionServiceBuilder {
 
   /** Create simulated EventBridge Scheduler for an Account Region scope. */
   createScheduler(scope: SimAwsAccountRegionContainer): SimScheduler {
-    return new SimScheduler(this.scoped(scope));
+    return new SimScheduler({
+      ...this.scoped(scope),
+      deliveryTargets: simAwsSchedulerDeliveryTargets(this.simAws),
+    });
   }
 
   /** Create simulated STS for an Account/Region scope. */
