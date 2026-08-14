@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import type { SimClock } from "../../../../util/clock/sim-clock.js";
+import type { SimCognitoFederatedIdentity } from "../idp/sim-cognito-federated-identity.js";
 import { SimCognitoPasswordCheck } from "../sim-cognito-password-check.js";
 import type { SimCognitoPasswordPolicy } from "../sim-cognito-password-policy.js";
 import {
@@ -27,6 +28,14 @@ interface SimCognitoMakeUserProperties {
 
   /** The policy the pool holds its users' passwords to. */
   readonly passwordPolicy: SimCognitoPasswordPolicy;
+}
+
+interface SimCognitoFederatedUserProperties {
+  readonly username: SimCognitoUsername;
+  readonly attributes?: readonly SimCognitoAttributeType[] | undefined;
+
+  /** Which provider signed the user in, and which subject it signed in as. */
+  readonly identity: SimCognitoFederatedIdentity;
 }
 
 interface SimCognitoSignUpUserProperties {
@@ -92,6 +101,24 @@ export class SimCognitoUserFactory {
         properties.temporaryPassword,
         properties.passwordPolicy,
       ),
+      clock: this.clock,
+    });
+  }
+
+  /**
+   * Make a user for an external subject an identity provider signed in.
+   *
+   * The user has no password at all, because its password is at the provider:
+   * real Cognito leaves a federated user in `EXTERNAL_PROVIDER`, where the
+   * pool's own sign-in flows refuse it.
+   */
+  federated(properties: SimCognitoFederatedUserProperties): SimCognitoUser {
+    return new SimCognitoUser({
+      username: properties.username,
+      sub: randomUUID(),
+      attributes: new SimCognitoUserAttributes(properties.attributes),
+      status: SimCognitoUserStatus.externalProvider,
+      identity: properties.identity,
       clock: this.clock,
     });
   }

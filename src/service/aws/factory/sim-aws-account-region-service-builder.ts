@@ -132,6 +132,7 @@ export class SimAwsAccountRegionServiceBuilder {
     return new SimCognitoIdentityProvider({
       ...this.scoped(scope),
       userPoolRegistry: this.registries.cognito,
+      domainRegistry: this.registries.cognitoDomains,
       triggerFunctions: simAwsCognitoTriggerFunctions(this.simAws),
     });
   }

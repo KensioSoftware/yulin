@@ -5,11 +5,11 @@ import {
 } from "./sim-cognito-token-claims.js";
 
 /**
- * The scope an access token from an admin authentication flow carries.
+ * The scope an access token from an authentication flow in the API carries.
  *
- * Real Cognito issues this scope for sign-in through the user pool API. The
- * scopes a resource server defines reach a token through the hosted UI and
- * client credentials flows, neither of which is simulated.
+ * Real Cognito issues this scope for sign-in through the user pool API, which
+ * asks for no scopes of its own. A sign-in through the hosted endpoints asks
+ * for scopes, and those are what its access token carries instead.
  */
 const userPoolAdminScope = "aws.cognito.signin.user.admin";
 
@@ -39,8 +39,22 @@ export class SimCognitoAccessToken {
       ...this.shared.build(),
       client_id: client.id,
       token_use: "access",
-      scope: userPoolAdminScope,
+      scope: this.scope(),
       username: user.username,
     };
+  }
+
+  /**
+   * The `scope` claim, which is a space separated list however many scopes
+   * the sign-in was granted.
+   */
+  private scope(): string {
+    const { scopes } = this.properties;
+
+    if (scopes === undefined) {
+      return userPoolAdminScope;
+    }
+
+    return scopes.join(" ");
   }
 }

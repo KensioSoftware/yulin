@@ -30,10 +30,27 @@ export class SimCognitoIdToken {
     return {
       ...this.shared.build(),
       ...this.attributeClaims(),
+      ...this.identityClaims(),
       aud: client.id,
       token_use: "id",
       "cognito:username": user.username,
     };
+  }
+
+  /**
+   * Where a federated user came from, which real Cognito reports in the id
+   * token as an array rather than as the JSON string the user attribute holds.
+   *
+   * A user of the pool's own has no such claim at all.
+   */
+  private identityClaims(): SimCognitoTokenClaims {
+    const identity = this.properties.user.identity;
+
+    if (identity === undefined) {
+      return {};
+    }
+
+    return { identities: [identity.toClaim()] };
   }
 
   /**

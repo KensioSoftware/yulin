@@ -14,9 +14,8 @@ export class SimCognitoUserPoolClientView {
    * `DescribeUserPoolClient` is how an application reads the secret it was
    * given, since nothing else ever shows it again.
    *
-   * The two managed login settings the client accepted without acting on
-   * are reported back as the request set them, and omitted where it set
-   * neither.
+   * The OAuth settings are reported as the request set them, and a list it
+   * set none of is left out rather than reported empty.
    *
    * `AccessTokenValidity` and `IdTokenValidity` appear only when the request
    * set them, which is what real Cognito does. `RefreshTokenValidity` always
@@ -39,7 +38,7 @@ export class SimCognitoUserPoolClientView {
       TokenValidityUnits: tokenValidity.unitsOutput(),
       CreationDate: client.creationDate,
       LastModifiedDate: client.lastModifiedDate,
-      ...client.unsimulatedSettings.toOutput(),
+      ...client.oauth.toOutput(),
     };
   }
 

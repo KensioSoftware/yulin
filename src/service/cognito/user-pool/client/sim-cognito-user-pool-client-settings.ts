@@ -1,14 +1,14 @@
 import { SimCognitoName } from "../sim-cognito-name.js";
 import { SimCognitoExplicitAuthFlows } from "./sim-cognito-explicit-auth-flows.js";
+import {
+  SimCognitoOAuthSettings,
+  type SimCognitoOAuthSettingsType,
+} from "./sim-cognito-oauth-settings.js";
 import { SimCognitoPreventUserExistenceErrors } from "./sim-cognito-prevent-user-existence-errors.js";
 import {
   SimCognitoTokenValidity,
   type SimCognitoTokenValidityInput,
 } from "./sim-cognito-token-validity.js";
-import {
-  SimCognitoUnsimulatedClientSettings,
-  type SimCognitoUnsimulatedClientSettingsType,
-} from "./sim-cognito-unsimulated-client-settings.js";
 
 /**
  * The app client properties a request can set.
@@ -18,9 +18,7 @@ import {
  * cannot touch either.
  */
 export interface SimCognitoUserPoolClientSettingsProperties
-  extends
-    SimCognitoTokenValidityInput,
-    SimCognitoUnsimulatedClientSettingsType {
+  extends SimCognitoTokenValidityInput, SimCognitoOAuthSettingsType {
   readonly ClientName?: string | undefined;
   readonly ExplicitAuthFlows?: readonly string[] | undefined;
   readonly PreventUserExistenceErrors?: string | undefined;
@@ -42,10 +40,9 @@ export class SimCognitoUserPoolClientSettings {
   public readonly tokenValidity: SimCognitoTokenValidity;
 
   /**
-   * What the request set and nothing here acts on, kept so a described client
-   * reports it.
+   * What this client may do at the pool's hosted domain.
    */
-  public readonly unsimulated: SimCognitoUnsimulatedClientSettings;
+  public readonly oauth: SimCognitoOAuthSettings;
 
   constructor(properties: SimCognitoUserPoolClientSettingsProperties) {
     this.name = new SimCognitoName({
@@ -59,6 +56,6 @@ export class SimCognitoUserPoolClientSettings {
       properties.PreventUserExistenceErrors,
     );
     this.tokenValidity = new SimCognitoTokenValidity(properties);
-    this.unsimulated = new SimCognitoUnsimulatedClientSettings(properties);
+    this.oauth = new SimCognitoOAuthSettings(properties);
   }
 }

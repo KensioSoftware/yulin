@@ -4,18 +4,20 @@ This directory contains the simulated Cognito user pools implementation. Cognito
 which exchange a token for AWS credentials, are a separate service and are not simulated at all.
 
 The pool, the app client, the users and groups in it, self-service sign-up, the sign-in flows on
-both sides of the API, the messages it would have sent, the tokens it issues and the authorizer are
-all here. SRP, the hosted UI, MFA, password resets and device tracking are not.
+both sides of the API, the domain and identity providers a federated sign-in runs through, the
+messages it would have sent, the tokens it issues and the authorizer are all here. SRP, managed
+login, MFA, password resets and device tracking are not.
 
 ## Entry points
 
 - `sim-cognito-identity-provider.ts` is the main in-memory service object for one account/region
-  scope. It holds the pool and app client operations, and extends
+  scope. It holds the pool and app client operations, and extends `sim-cognito-federation.ts`,
+  which holds the domain and identity provider ones and the three hosted endpoints, and extends
   `sim-cognito-user-directory.ts`, which holds the user and group ones and extends
   `sim-cognito-authentication.ts`, which holds signing in and signing out. A caller sees one service
-  object, as the real API is one service; the split is because a pool's settings, a pool's contents
-  and authenticating against it are three concerns, and one class holding all of them had outgrown
-  reading in one sitting.
+  object, as the real API is one service; the split is because a pool's settings, a pool's contents,
+  where it is signed in at and authenticating against it are separate concerns, and one class
+  holding all of them had outgrown reading in one sitting.
 - `index.ts` exports the public Cognito simulator API for `@kensio/yulin/cognito`.
 
 A `SimCognitoIdentityProvider` instance owns a `SimCognitoUserPoolStore` holding its pools. The
@@ -77,6 +79,13 @@ Cognito does. `ClientName` is the exception the command applies: a client has to
 `CreateUserPoolClient` requires one, so there is no default to reset to and an update naming none
 keeps the name the client has.
 
+`SimCognitoOAuthSettings` holds what an app client may do at the pool's hosted domain: whether it is
+an authorization server client at all, which grant and scopes it may ask for, which URLs it may send
+a browser back to, and which identity providers it may sign a user in through. Each of those is what
+the authorize and token endpoints check a request against, so they live together rather than beside
+the settings the API sign-ins read. `AllowedOAuthFlowsUserPoolClient` gates the rest, as it does on
+real Cognito.
+
 `makeSimCognitoClientSecret` generates a client secret, and only a client created with
 `GenerateSecret` gets one. A public client has no secret at all rather than an empty one, which is
 what makes code computing a `SECRET_HASH` fail on the client it should fail on. The secret is not
@@ -128,6 +137,66 @@ simulation does not.
 characters, and no whitespace. Cognito gives both the same rule, so it lives in one place and
 `requireSimCognitoUsername` and `requireSimCognitoGroupName` each name their own field in the
 refusal.
+
+## Domain and identity provider model
+
+Domain state lives under `user-pool/domain/`, and identity provider state under `user-pool/idp/`.
+Both hang off `SimCognitoPoolAuth` rather than off the pool directly, because both are part of how a
+pool is signed in at: a domain is where a browser signs in, and a provider is who it signs in with.
+
+`SimCognitoDomainName` is the domain string and the hostname it is served on. A prefix and a custom
+domain are checked differently, and it is the request rather than the value that says which was
+asked for: a `CustomDomainConfig` is what makes a domain custom. The reserved words a prefix cannot
+contain are checked, because real Cognito refuses those and a pool deployed with one would fail on
+the way to AWS rather than here.
+
+`SimCognitoUserPoolDomain` is the stored domain. It answers on two hostnames, the real AWS one and
+the local one serving rewrites it to, so a request naming either finds it.
+`SimCognitoDomainRegistry` in `registry/` indexes domains across every Account and Region, which is
+where the uniqueness of a domain string comes from and how a served request finds the pool behind a
+hostname. It implements `SimAwsServiceHosts`, which is what Route53 resolution asks about a hostname
+no pattern recognises, and is how a custom domain is reached at all.
+
+`SimCognitoUserPoolIdentityProvider` is one configured provider. On real Cognito it holds the
+credentials the pool signs users in with at Google; here it holds the user signed in at the
+provider, which `signInAs` puts there. Nothing calls an external directory, so that stands in for
+everything that happens at one. The configuration is validated for presence all the same, in
+`SimCognitoProviderType` and `SimCognitoProviderDetails`, so a provider that could not have been
+created on real AWS is not created here.
+
+`SimCognitoAttributeMapping` is what a provider's claims become on the pool user. The key is the
+pool attribute and the value is the provider's claim, which is the direction real Cognito reads it
+in and the one most easily got backwards. A mapping onto an attribute no pool here holds is refused
+where it is written rather than during a sign-in much later.
+
+`SimCognitoFederatedSignIn` is what links an external subject to a pool user, building the
+`<ProviderName>_<subject>` username real Cognito builds. That username is what makes the same
+subject signing in twice reach the same user. `SimCognitoFederatedIdentity` is where the user came
+from, reported as a JSON `identities` attribute and as an `identities` token claim, which are the
+two shapes real Cognito reports it in.
+
+## Hosted endpoints
+
+`command/hosted/` holds the three endpoints a domain serves, and `serve/sim-cognito-domain-controller.ts`
+is the HTTP side of them. They are not SDK commands and authorize no IAM caller: a browser and an
+application's own server hold no AWS credentials, in the same way an `InitiateAuth` caller holds
+none. What authenticates the application is its app client secret, at the token endpoint.
+
+`SimCognitoAuthorizeEndpoint` signs a user in through an identity provider and answers with the
+redirect back to the application. A request naming no provider would reach managed login on real
+Cognito, which is a page rather than anything an API answers, so it is refused with a message saying
+what to do instead. `SimCognitoTokenEndpoint` exchanges the code, through the pool's own token
+issuer rather than anything of its own, so a hosted sign-in and an API sign-in issue the same tokens
+and run the same `PreTokenGeneration` trigger.
+
+`SimCognitoOAuthError` is what both refuse with, because an OAuth error is a code and a description
+rather than an API exception. Whether a refusal can be redirected back to the application is part of
+the error: real Cognito redirects one only once the request has shown it knows a redirect URI the
+app client registered, and doing otherwise would be an open redirect.
+
+`SimCognitoAuthorizationCode` and its store live under `user-pool/auth/`, beside the challenge
+sessions, because a code is the same kind of thing: a sign-in part way through, single use, and
+worth nothing to anyone else.
 
 ## Message model
 
@@ -221,8 +290,9 @@ event makes to one.
 
 ## CloudFormation resources
 
-`cfn/` creates `AWS::Cognito::UserPool`, `AWS::Cognito::UserPoolClient` and
-`AWS::Cognito::UserPoolGroup`, one creator per type behind
+`cfn/` creates `AWS::Cognito::UserPool`, `AWS::Cognito::UserPoolClient`,
+`AWS::Cognito::UserPoolGroup`, `AWS::Cognito::UserPoolDomain` and
+`AWS::Cognito::UserPoolIdentityProvider`, one creator per type behind
 `SimCognitoCfnResourceFactory`. Each creator goes through the ordinary Command rather than
 constructing the model, so a deployed pool is the same thing an SDK caller would have got, refusals
 included.
@@ -259,8 +329,9 @@ type, rather than on the service objects.
 
 ## Served pool endpoints
 
-`serve/` holds the localhost HTTP side, which is the two endpoints real Cognito serves without any
-authentication: `/<userPoolId>/.well-known/jwks.json` and
+`serve/` holds the localhost HTTP side. A request that arrived at a hosted domain's hostname is
+answered by `SimCognitoDomainController`, and everything else is one of the endpoints real Cognito
+serves without any authentication: `/<userPoolId>/.well-known/jwks.json` and
 `/<userPoolId>/.well-known/openid-configuration`. `SimCognitoServiceController` is the controller the
 serving layer dispatches to, `SimCognitoOpenIdConfiguration` builds the discovery document, and
 `SimCognitoEndpointResponse` builds the responses. The Cognito API itself is not served: an SDK
@@ -447,13 +518,25 @@ resource, here or on real AWS.
   validates user attributes against it.
 - Users are resolved by username only, and real Cognito also accepts a `sub` there.
 - `AdminListGroupsForUser` sorts by precedence. Real Cognito does not document an order for it.
+- Managed login and the classic hosted UI are not simulated. An authorize request naming no
+  identity provider, or naming `COGNITO`, is refused rather than answered with a page. The implicit
+  and client credentials grants are refused too, and `/login`, `/oauth2/userInfo`, `/oauth2/revoke`
+  and the SAML endpoints are not served.
+- A simulated identity provider signs in the user `signInAs` put there, and calls nothing. A
+  provider nobody is signed in at refuses the authorize request rather than inventing one.
+- A custom domain answers on its own hostname with no Route53 record, where real AWS needs an alias
+  record to the CloudFront distribution Cognito creates. The distribution name a domain reports is a
+  name nothing here serves.
+- `/logout` redirects and ends no session, because there is no managed login session cookie here.
+- A pool creates no group for an identity provider, where real Cognito creates one named
+  `<userPoolId>_<ProviderName>` and puts each federated user in it.
 - One signing key is published per pool, where real Cognito publishes two and rotates between them.
 - The served OpenID configuration names the localhost origin the request arrived on as its `issuer`,
   because a client that discovers a document has to be able to fetch the keys it points at. A token's
   `iss` claim still names the real AWS URL, which is what a verifier built from a pool id checks
-  against, so the two disagree here and agree on real Cognito. The document also names no
-  `authorization_endpoint`, `token_endpoint` or `userinfo_endpoint`, as the hosted UI and the OAuth
-  endpoints are not simulated.
+  against, so the two disagree here and agree on real Cognito. Its `authorization_endpoint`,
+  `token_endpoint` and `end_session_endpoint` name the pool's domain, once it has one, at that
+  domain's local hostname. It names no `userinfo_endpoint`, which is not served.
 - The password and refresh flows run on both sides of the API, and only `NEW_PASSWORD_REQUIRED` is
   issued. SRP, `USER_AUTH`, custom authentication, MFA challenges and device tracking are refused
   rather than treated as a flow or challenge that is simulated.

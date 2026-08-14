@@ -5,6 +5,8 @@ import type {
 } from "../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCognitoIdentityProvider } from "../sim-cognito-identity-provider.js";
 import { SimCfnCognitoClientCreator } from "./client/sim-cfn-cognito-client-creator.js";
+import { SimCfnCognitoDomainCreator } from "./domain/sim-cfn-cognito-domain-creator.js";
+import { SimCfnCognitoIdpCreator } from "./idp/sim-cfn-cognito-idp-creator.js";
 import { SimCfnCognitoGroupCreator } from "./group/sim-cfn-cognito-group-creator.js";
 import { SimCfnCognitoUserPoolCreator } from "./user-pool/sim-cfn-cognito-user-pool-creator.js";
 import { SimCfnCognitoResourceDeleter } from "./sim-cfn-cognito-resource-deleter.js";
@@ -20,6 +22,8 @@ export class SimCognitoCfnResourceFactory implements SimCfnServiceResourceFactor
   private readonly userPoolCreator: SimCfnCognitoUserPoolCreator;
   private readonly clientCreator: SimCfnCognitoClientCreator;
   private readonly groupCreator: SimCfnCognitoGroupCreator;
+  private readonly domainCreator: SimCfnCognitoDomainCreator;
+  private readonly idpCreator: SimCfnCognitoIdpCreator;
   private readonly deleter: SimCfnCognitoResourceDeleter;
 
   constructor(properties: SimCognitoCfnResourceFactoryProperties) {
@@ -28,15 +32,17 @@ export class SimCognitoCfnResourceFactory implements SimCfnServiceResourceFactor
     this.userPoolCreator = new SimCfnCognitoUserPoolCreator({ cognito });
     this.clientCreator = new SimCfnCognitoClientCreator({ cognito });
     this.groupCreator = new SimCfnCognitoGroupCreator({ cognito });
+    this.domainCreator = new SimCfnCognitoDomainCreator({ cognito });
+    this.idpCreator = new SimCfnCognitoIdpCreator({ cognito });
     this.deleter = new SimCfnCognitoResourceDeleter({ cognito });
   }
 
   /**
    * Create a simulated Cognito resource from a CloudFormation Resource.
    *
-   * The hosted UI, identity providers, resource servers and the user Resource
-   * types are not simulated, so their Resource types are reported as
-   * unsupported rather than quietly treated as deployed.
+   * Resource servers and the user Resource types are not simulated, so their
+   * Resource types are reported as unsupported rather than quietly treated as
+   * deployed.
    */
   async create(
     resourceTypeName: string,
@@ -54,6 +60,12 @@ export class SimCognitoCfnResourceFactory implements SimCfnServiceResourceFactor
       }
       case "UserPoolGroup": {
         return await this.groupCreator.create(resource, properties);
+      }
+      case "UserPoolDomain": {
+        return await this.domainCreator.create(resource, properties);
+      }
+      case "UserPoolIdentityProvider": {
+        return await this.idpCreator.create(resource, properties);
       }
       default: {
         throw new Error(

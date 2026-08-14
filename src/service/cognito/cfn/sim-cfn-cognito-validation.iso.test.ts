@@ -112,7 +112,8 @@ describe("Cognito CloudFormation validation", () => {
   });
 
   it("creates an app client without a property it does not simulate", async () => {
-    // Given a template asking for a client with the hosted UI OAuth flows.
+    // Given a template asking for a client with per-client attribute
+    // permissions.
     const simAws = simAwsInEuWest2();
 
     // When it is deployed.
@@ -125,7 +126,7 @@ describe("Cognito CloudFormation validation", () => {
         Type: "AWS::Cognito::UserPoolClient",
         Properties: {
           UserPoolId: { Ref: "AppPool" },
-          AllowedOAuthFlows: ["code"],
+          WriteAttributes: ["email"],
         },
       },
     });
@@ -137,7 +138,7 @@ describe("Cognito CloudFormation validation", () => {
     const [reason] = ignoredReasons(stack);
     assertNonNullable(reason);
     assertStringIncludes(reason, "AppClient");
-    assertStringIncludes(reason, "AllowedOAuthFlows is not simulated");
+    assertStringIncludes(reason, "WriteAttributes is not simulated");
   });
 
   it("refuses a pool feature the Cognito API refuses", async () => {
@@ -262,32 +263,36 @@ describe("Cognito CloudFormation validation", () => {
   });
 
   it("reports an unsimulated Cognito Resource type as unsupported", async () => {
-    // Given a template declaring a user pool domain, which is the hosted UI
-    // and is not simulated.
+    // Given a template declaring a resource server, which defines the custom
+    // scopes of a machine to machine grant and is not simulated.
     const simAws = simAwsInEuWest2();
 
     // When it is deployed.
     const stack = await simAws.cloudFormation().deployTemplate({
-      stackName: "domain-stack",
+      stackName: "resource-server-stack",
       template: {
         Resources: {
           AppPool: {
             Type: "AWS::Cognito::UserPool",
             Properties: { UserPoolName: "myapp-users" },
           },
-          AppDomain: {
-            Type: "AWS::Cognito::UserPoolDomain",
-            Properties: { UserPoolId: { Ref: "AppPool" }, Domain: "myapp" },
+          AppApi: {
+            Type: "AWS::Cognito::UserPoolResourceServer",
+            Properties: {
+              UserPoolId: { Ref: "AppPool" },
+              Identifier: "https://api.example.com",
+              Name: "api",
+            },
           },
         },
       },
     });
     await stack.waitForDeployComplete();
 
-    // Then the domain is skipped rather than deployed, and the pool beside it
-    // is created as usual.
+    // Then the resource server is skipped rather than deployed, and the pool
+    // beside it is created as usual.
     assertArrayLength(stack.skippedResources, 1);
-    assertIdentical(stack.skippedResources[0].logicalId, "AppDomain");
+    assertIdentical(stack.skippedResources[0].logicalId, "AppApi");
     assertInstanceOf(
       stack.getResource("AppPool")?.simResource,
       SimCognitoUserPool,

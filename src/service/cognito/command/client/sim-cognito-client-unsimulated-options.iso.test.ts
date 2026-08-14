@@ -13,6 +13,7 @@ import {
   assertNonNullable,
   assertStringIncludes,
   assertThrowsErrorAsync,
+  assertTrue,
   assertUndefined,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -28,44 +29,9 @@ interface RefusedInput {
 
 const refusedInputs: readonly RefusedInput[] = [
   {
-    label: "SupportedIdentityProviders",
-    input: { SupportedIdentityProviders: ["COGNITO", "Google"] },
-    says: "federated sign-in happens at the provider",
-  },
-  {
-    label: "AllowedOAuthFlowsUserPoolClient",
-    input: { AllowedOAuthFlowsUserPoolClient: true },
-    says: "the OAuth 2.0 authorization server endpoints",
-  },
-  {
     label: "EnableTokenRevocation",
     input: { EnableTokenRevocation: false },
     says: "token revocation",
-  },
-  {
-    label: "AllowedOAuthFlows",
-    input: { AllowedOAuthFlows: ["code"] },
-    says: "OAuth grants through managed login",
-  },
-  {
-    label: "AllowedOAuthScopes",
-    input: { AllowedOAuthScopes: ["openid"] },
-    says: "OAuth scopes",
-  },
-  {
-    label: "CallbackURLs",
-    input: { CallbackURLs: ["https://example.com"] },
-    says: "managed login redirects",
-  },
-  {
-    label: "LogoutURLs",
-    input: { LogoutURLs: ["https://example.com/out"] },
-    says: "managed login redirects",
-  },
-  {
-    label: "DefaultRedirectURI",
-    input: { DefaultRedirectURI: "https://example.com" },
-    says: "managed login redirects",
   },
   {
     label: "ClientSecret",
@@ -157,7 +123,7 @@ describe("sim Cognito app client unsimulated options", () => {
     }
   });
 
-  it("accepts the inputs whose only simulated value is their default", async () => {
+  it("accepts the OAuth settings of a client that signs in at a domain", async () => {
     // Given a user pool.
     const withPool = await simCognitoWithPool();
 
@@ -167,7 +133,7 @@ describe("sim Cognito app client unsimulated options", () => {
         UserPoolId: withPool.userPoolId,
         ClientName: "web",
         SupportedIdentityProviders: ["COGNITO"],
-        AllowedOAuthFlowsUserPoolClient: false,
+        AllowedOAuthFlowsUserPoolClient: true,
         EnableTokenRevocation: true,
       }),
     );
@@ -175,8 +141,8 @@ describe("sim Cognito app client unsimulated options", () => {
     // Then it is created rather than refused.
     assertIdentical(created.UserPoolClient?.ClientName, "web");
 
-    // And the two managed login settings are reported back as the request set
-    // them, so what a template declared stays visible on the client.
+    // And the OAuth settings are reported back as the request set them, so
+    // what a template declared stays visible on the client.
     const clientId = created.UserPoolClient.ClientId;
     assertNonNullable(clientId);
 
@@ -186,13 +152,13 @@ describe("sim Cognito app client unsimulated options", () => {
         ClientId: clientId,
       }),
     );
-    assertFalse(described.UserPoolClient?.AllowedOAuthFlowsUserPoolClient);
+    assertTrue(described.UserPoolClient?.AllowedOAuthFlowsUserPoolClient);
     assertArrayEquals(described.UserPoolClient.SupportedIdentityProviders, [
       "COGNITO",
     ]);
   });
 
-  it("reports neither of them for a client created without them", async () => {
+  it("reports no OAuth settings for a client created without them", async () => {
     // Given a user pool.
     const withPool = await simCognitoWithPool();
 
@@ -204,10 +170,12 @@ describe("sim Cognito app client unsimulated options", () => {
       }),
     );
 
-    // Then neither appears, rather than the client reporting the value a
-    // request would have had to use to be accepted.
-    assertUndefined(created.UserPoolClient?.AllowedOAuthFlowsUserPoolClient);
-    assertUndefined(created.UserPoolClient?.SupportedIdentityProviders);
+    // Then the authorization server is off, and none of the settings it gates
+    // is reported at all rather than being reported empty.
+    assertFalse(created.UserPoolClient?.AllowedOAuthFlowsUserPoolClient);
+    assertUndefined(created.UserPoolClient.SupportedIdentityProviders);
+    assertUndefined(created.UserPoolClient.CallbackURLs);
+    assertUndefined(created.UserPoolClient.AllowedOAuthFlows);
   });
 
   it("takes a PreventUserExistenceErrors of either value", async () => {

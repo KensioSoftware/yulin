@@ -1,4 +1,5 @@
 import { SimCognitoInvalidParameterException } from "../../error/sim-cognito.error.js";
+import { isSimCognitoStandardAttribute } from "./sim-cognito-standard-attributes.js";
 
 /**
  * One user attribute, in the shape Cognito reads and reports it.
@@ -9,35 +10,6 @@ export interface SimCognitoAttributeType {
   readonly Name?: string | undefined;
   readonly Value?: string | undefined;
 }
-
-/**
- * The standard attributes every Cognito pool's schema holds.
- *
- * These are the OpenID Connect claims, plus the two verification flags. A pool
- * here has no custom attributes, because `CreateUserPool` refuses a `Schema`
- * of its own.
- */
-const standardAttributeNames: ReadonlySet<string> = new Set([
-  "address",
-  "birthdate",
-  "email",
-  "email_verified",
-  "family_name",
-  "gender",
-  "given_name",
-  "locale",
-  "middle_name",
-  "name",
-  "nickname",
-  "phone_number",
-  "phone_number_verified",
-  "picture",
-  "preferred_username",
-  "profile",
-  "updated_at",
-  "website",
-  "zoneinfo",
-]);
 
 const maxAttributeValueLength = 2048;
 
@@ -74,7 +46,7 @@ export class SimCognitoUserAttributes {
       );
     }
 
-    if (!standardAttributeNames.has(name)) {
+    if (!isSimCognitoStandardAttribute(name)) {
       throw new SimCognitoInvalidParameterException(
         `User attribute '${name}' is not in the pool's schema: a pool here ` +
           `holds the standard attributes only, because CreateUserPool ` +

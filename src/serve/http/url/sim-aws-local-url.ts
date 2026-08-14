@@ -75,6 +75,7 @@ export class SimAwsLocalUrl {
       ) ??
       /^(?<prefix>s3\.[^.]+)\.amazonaws\.com$/.exec(hostname) ??
       /^(?<prefix>cognito-idp\.[^.]+)\.amazonaws\.com$/.exec(hostname) ??
+      /^(?<prefix>.+\.auth\.[^.]+)\.amazoncognito\.com$/.exec(hostname) ??
       /^(?<prefix>.+\.execute-api\.[^.]+)\.amazonaws\.com$/.exec(hostname) ??
       /^(?<prefix>.+\.lambda-url\.[^.]+)\.on\.aws$/.exec(hostname);
 

@@ -1,4 +1,5 @@
 import { SimAcmRegistry } from "../../acm/registry/sim-acm-registry.js";
+import { SimCognitoDomainRegistry } from "../../cognito/registry/sim-cognito-domain-registry.js";
 import { SimCognitoUserPoolRegistry } from "../../cognito/registry/sim-cognito-user-pool-registry.js";
 import { SimRoute53Registry } from "../../route53/registry/sim-route53-registry.js";
 import { SimS3GlobalRegistry } from "../../s3/sim-s3-global-registry.js";
@@ -25,6 +26,14 @@ export class SimAwsScopedServiceRegistries {
    * pool's JWKS, finds the pool it belongs to.
    */
   public readonly cognito = new SimCognitoUserPoolRegistry();
+
+  /**
+   * Indexes the hosted domains created in any Account and Region of one SimAws
+   * instance. A domain is unique across the whole of AWS rather than within an
+   * Account, and a request to one carries only a hostname, so this is also
+   * where DNS resolution finds the pool a hosted request is for.
+   */
+  public readonly cognitoDomains = new SimCognitoDomainRegistry();
 
   /**
    * Owns hosted zone and DNS record state shared by the account-scoped Route53

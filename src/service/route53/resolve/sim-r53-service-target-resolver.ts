@@ -21,6 +21,7 @@ const cognitoIdpServiceLabel = "cognito-idp";
  * the Route53 resolver easier to read because the resolver only has to follow
  * records and ask this mapper whether the current name is a terminal service
  * target.
+ 
  */
 export class SimRoute53ServiceTargetResolver {
   private readonly s3Targets = new SimRoute53S3ServiceTargets();

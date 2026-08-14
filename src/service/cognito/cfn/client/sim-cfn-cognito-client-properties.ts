@@ -11,15 +11,13 @@ import { SimCfnCognitoTokenValidityUnits } from "./sim-cfn-cognito-token-validit
 /**
  * The AWS::Cognito::UserPoolClient properties this simulation deploys.
  *
- * The OAuth and managed login properties that turn the hosted UI on are
- * absent, because it is not simulated at all, so a client deployed with them
- * would offer flows nothing here can run.
+ * The OAuth properties are among them, because a client is what an authorize
+ * request at the pool's domain is checked against: which grant it may ask
+ * for, which scopes, which URL it may be sent back to, and which identity
+ * provider it may sign a user in through.
  *
- * The last two are the ones that turn it off, which is what a CDK client
- * created with `disableOAuth` emits. CreateUserPoolClient accepts an
- * `AllowedOAuthFlowsUserPoolClient` of `false`, and a
- * `SupportedIdentityProviders` naming only `COGNITO`, because both ask for
- * the pool's own users and nothing else. Any other value is refused there.
+ * The managed login branding properties are not, because managed login is a
+ * set of web pages rather than anything this simulation answers.
  */
 const simulatedProperties = [
   "UserPoolId",
@@ -31,7 +29,12 @@ const simulatedProperties = [
   "IdTokenValidity",
   "RefreshTokenValidity",
   "TokenValidityUnits",
+  "AllowedOAuthFlows",
   "AllowedOAuthFlowsUserPoolClient",
+  "AllowedOAuthScopes",
+  "CallbackURLs",
+  "LogoutURLs",
+  "DefaultRedirectURI",
   "SupportedIdentityProviders",
 ];
 
@@ -113,8 +116,24 @@ export class SimCfnCognitoClientProperties {
         this.properties["AllowedOAuthFlowsUserPoolClient"],
         "AllowedOAuthFlowsUserPoolClient",
       ),
-      SupportedIdentityProviders: this.propertyParser.optionalStringArray(
-        this.resource,
+      AllowedOAuthFlows: this.stringArray(
+        this.properties["AllowedOAuthFlows"],
+        "AllowedOAuthFlows",
+      ),
+      AllowedOAuthScopes: this.stringArray(
+        this.properties["AllowedOAuthScopes"],
+        "AllowedOAuthScopes",
+      ),
+      CallbackURLs: this.stringArray(
+        this.properties["CallbackURLs"],
+        "CallbackURLs",
+      ),
+      LogoutURLs: this.stringArray(this.properties["LogoutURLs"], "LogoutURLs"),
+      DefaultRedirectURI: this.string(
+        this.properties["DefaultRedirectURI"],
+        "DefaultRedirectURI",
+      ),
+      SupportedIdentityProviders: this.stringArray(
         this.properties["SupportedIdentityProviders"],
         "SupportedIdentityProviders",
       ),
@@ -136,6 +155,13 @@ export class SimCfnCognitoClientProperties {
       stackName: this.resource.stackName,
       logicalId: this.resource.logicalId,
     }).value;
+  }
+
+  private stringArray(
+    value: SimCfnTemplateValue | undefined,
+    label: string,
+  ): readonly string[] | undefined {
+    return this.propertyParser.optionalStringArray(this.resource, value, label);
   }
 
   private string(
