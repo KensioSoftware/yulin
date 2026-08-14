@@ -4,8 +4,9 @@ Yulin includes a simulated Amazon EventBridge for tests and local development. E
 in memory and every operation is authorized by simulated IAM.
 
 Event buses, rules, targets and `PutEvents`. A rule can send matched events to a simulated Lambda
-function, SQS queue or SNS topic. EventBridge Scheduler and scheduled rules are not simulated yet. EventBridge-specific
-types are imported from the `@kensio/yulin/eventbridge` subpath.
+function, SQS queue or SNS topic, or fire on a schedule when a test advances simulated time.
+EventBridge Scheduler is not simulated yet. EventBridge-specific types are imported from the
+`@kensio/yulin/eventbridge` subpath.
 
 ## Putting an event onto a bus
 
@@ -469,6 +470,112 @@ console.log(JSON.stringify(queuePolicy).length > 0); // true
 
 An event delivered across accounts still names the account it was put in, not the target's.
 
+## Rules that fire on a schedule
+
+A rule created with a `ScheduleExpression` instead of an event pattern fires on its own timing rather
+than in response to anything put onto a bus. That timing is the simulation's clock, not the host's:
+the rule fires when a test advances simulated time past a due instant, and never otherwise. So a
+schedule that takes an hour in production takes no time at all to test.
+
+```typescript sim-event-bridge-scheduled-rules
+/**
+ * A scheduled rule invoking a function three times in three simulated hours.
+ */
+
+import { PutRuleCommand, PutTargetsCommand } from "@aws-sdk/client-eventbridge";
+import { AddPermissionCommand } from "@aws-sdk/client-lambda";
+
+import { SimAws, SimFixedClock } from "@kensio/yulin";
+import { makeLambdaZipFileInput } from "@kensio/yulin/lambda";
+
+const simAws = new SimAws({
+  clock: new SimFixedClock(new Date("2026-07-26T09:00:00.000Z")),
+});
+
+const ranAt: string[] = [];
+
+await simAws.lambda().createFunction({
+  input: {
+    FunctionName: "reconcile",
+    Role: "arn:aws:iam::888888888888:role/ReconcileRole",
+    Code: {
+      ZipFile: makeLambdaZipFileInput((event: { time: string }) => {
+        ranAt.push(event.time);
+        return { ok: true };
+      }),
+    },
+  },
+});
+
+await simAws.lambda().addPermission(
+  new AddPermissionCommand({
+    FunctionName: "reconcile",
+    StatementId: "events",
+    Action: "lambda:InvokeFunction",
+    Principal: "events.amazonaws.com",
+  }),
+);
+
+await simAws.eventBridge().putRule(
+  new PutRuleCommand({
+    Name: "hourly-reconciliation",
+    ScheduleExpression: "rate(1 hour)",
+  }),
+);
+
+await simAws.eventBridge().putTargets(
+  new PutTargetsCommand({
+    Rule: "hourly-reconciliation",
+    Targets: [
+      {
+        Id: "reconcile",
+        Arn: "arn:aws:lambda:us-east-1:888888888888:function:reconcile",
+      },
+    ],
+  }),
+);
+
+// Three simulated hours later, the function has run three times.
+await simAws.clock().advanceBy({ hours: 3 });
+
+console.log(ranAt);
+// [ '2026-07-26T10:00:00Z', '2026-07-26T11:00:00Z', '2026-07-26T12:00:00Z' ]
+```
+
+Firing is per due instant rather than per advance. Advancing an hour with a `rate(1 minute)` rule
+invokes the target sixty times, at sixty distinct simulated timestamps, because that is what an hour
+of that rule does. `advanceBy(...)` returns once every one of those firings and its deliveries have
+settled, so the next line can assert.
+
+A scheduled event carries the standard envelope with `source: "aws.events"`,
+`detail-type: "Scheduled Event"` and an empty `detail`, and names the rule that fired in `resources`.
+Its `time` is the instant the rule fell due, not the instant the advance finished, which is the field
+AWS advises scheduled handler code to read instead of the clock.
+
+### Writing the schedule
+
+`rate(<value> <unit>)` runs from the moment the rule was created, so a `rate(1 day)` rule created at
+half past nine falls due at half past nine. The unit is `minute`, `hour` or `day`, and has to agree
+with its value: `rate(1 hour)` and `rate(5 hours)` are the valid forms, and `rate(1 hours)` is
+refused as real EventBridge refuses it. There is no unit under a minute, which is the finest schedule
+AWS runs.
+
+`cron(<six fields>)` names absolute instants in UTC. The six fields are minutes, hours, day-of-month,
+month, day-of-week and year, so the every-day-at-noon expression is `cron(0 12 * * ? *)`. A five field
+expression, which is what Unix cron takes, is refused naming the six-field form. Day-of-week runs
+`1-7` or `SUN-SAT` with Sunday as one, unlike Unix cron, and the day-of-month and day-of-week fields
+cannot both say something: whichever is not deciding the day is written `?`.
+
+A scheduled rule only works on the `default` bus, as it does on real AWS, and a `ScheduleExpression`
+on any other bus is refused.
+
+`DisableRule` stops a scheduled rule firing while it is off, and `EnableRule` picks up from the next
+due instant rather than replaying what was missed. `DeleteRule` stops it for good, and `PutRule`
+replacing a scheduled rule restarts the schedule from the replacement.
+
+A rule with no target still fires, and what it produced can be read with `eventsOn(...)`, which is
+useful for asserting on the schedule itself before there is anything to deliver to.
+
 ## Deliveries that did not happen
 
 Real EventBridge tells the caller nothing about a failed delivery: a `PutEvents` that matched a rule
@@ -590,6 +697,8 @@ no permission for.
 - `CreateEventBus`, `DeleteEventBus`, `DescribeEventBus`, `ListEventBuses` and `PutEvents`.
 - `PutRule`, `DeleteRule`, `DescribeRule`, `ListRules`, `EnableRule`, `DisableRule` and
   `TestEventPattern`.
+- Scheduled rules, with a `rate(...)` or six field `cron(...)` `ScheduleExpression`, fired by
+  advancing the simulation's clock.
 - Event pattern matching on exact values, nested fields, lists, `prefix`, `suffix`, `anything-but`,
   `numeric` and `exists`.
 - `PutTargets`, `RemoveTargets`, `ListTargetsByRule` and `ListRuleNamesByTarget`, with delivery to a
@@ -616,8 +725,15 @@ no permission for.
 - The `cidr`, `equals-ignore-case`, `wildcard` and `$or` pattern operators are refused rather than
   evaluated, as are the nested forms of `anything-but` and the case-insensitive forms of `prefix`
   and `suffix`.
-- Scheduled rules and EventBridge Scheduler are not simulated, so `PutRule` refuses a
-  `ScheduleExpression`. A rule needs an event pattern.
+- A rule needs an `EventPattern`, a `ScheduleExpression` or both. Real EventBridge takes a rule with
+  neither, which matches nothing and fires never, and that is refused here rather than created.
+- A scheduled rule only fires while a test advances the simulation's clock. Nothing runs on the
+  host's clock, so a simulation left alone in real time fires nothing.
+- `ScheduleExpressionTimezone` and the `L`, `W` and `#` cron wildcards are refused rather than
+  simulated. Everything is read in UTC.
+- Firing is exact and exactly once. Real EventBridge may deliver a scheduled event a few seconds
+  late, and may deliver it more than once.
+- EventBridge Scheduler is a separate service and is not simulated.
 - Rule tags, a rule `RoleArn`, managed rules and the
   `ENABLED_WITH_ALL_CLOUDTRAIL_MANAGEMENT_EVENTS` state are refused rather than simulated.
 - Deleting an event bus deletes its rules, and deleting a rule deletes its targets. Real EventBridge

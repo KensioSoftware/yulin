@@ -45,8 +45,8 @@ interface SimEventBridgeProperties {
  *
  * A bus is a router rather than a store. An event put onto one is matched
  * against that bus's rules and sent to their targets, and an event that
- * matches nothing is gone. Rules and targets are not simulated yet, so every
- * event put onto a bus today is dropped after it arrives.
+ * matches nothing is gone. A rule carrying a schedule instead fires on the
+ * simulation's own clock, so advancing time is what sends its event.
  */
 export class SimEventBridge extends SimEventBridgeInspection {
   protected readonly buses: SimEventBusStore;

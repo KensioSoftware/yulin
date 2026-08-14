@@ -141,9 +141,10 @@ If work triggered by advancing fails, the failure is thrown from `advanceBy(...)
 in the background, and the clock is left at the point it failed rather than at the instant asked
 for. Anything still queued stays queued.
 
-Nothing in the simulator schedules work on the clock yet, so today advancing mostly changes what
-timestamps and expiry checks see. The mechanism is there for scheduled behaviour to hook into as
-it arrives.
+Several parts of the simulator schedule work on the clock, so advancing time does more than change
+what timestamps and expiry checks see. A scheduled EventBridge rule fires, a DynamoDB item passes
+its time to live, a Secrets Manager deletion falls due, and a Lambda event source mapping polls
+again. Each of those runs at its own due instant inside the interval, not all at once at the end.
 
 ## Time inside a simulated Lambda handler
 
@@ -253,10 +254,11 @@ runs on a clock a test can control: `await simSdk.simAws.clock().advanceBy({ hou
 
 ## Limitations
 
-- There are no scheduled event sources such as EventBridge rules, so nothing here is driven by a
-  cron or rate expression. What the clock does drive is state that falls due: a Secrets Manager
-  recovery window running out, or a DynamoDB item passing its
-  [time to live](../services/dynamodb/#expiring-items-with-time-to-live) deletion window.
+- Advancing the clock is the only thing that fires a scheduled
+  [EventBridge rule](../services/eventbridge/#rules-that-fire-on-a-schedule). Nothing runs on the
+  host's clock, so a simulation left alone in real time fires nothing however long it is left.
+- EventBridge Scheduler is not simulated, so `rate` and `cron` reach the clock through an
+  EventBridge rule only.
 - Only `SimAws` exposes time control. Services constructed standalone, such as `new SimS3()`, get
   their own real clock and no way to move it.
 - A `SimAws` constructed with a `background` scheduler of its own cannot control time, because that

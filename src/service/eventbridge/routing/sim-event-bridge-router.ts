@@ -86,6 +86,20 @@ export class SimEventBridgeRouter {
   }
 
   /**
+   * Send a scheduled rule's own event to its targets.
+   *
+   * This does not go through pattern matching, because nothing put it onto the
+   * bus: the rule's schedule produced it and the rule is the only thing it is
+   * for. It is still recorded on the bus, so a test with no target yet can see
+   * what firing produced through `eventsOn(...)`.
+   */
+  fire(rule: SimEventRule, event: SimEventBridgeEvent): void {
+    this.buses.find(rule.busName.value)?.receive(event, [rule.name.value]);
+
+    this.send(rule, event);
+  }
+
+  /**
    * Schedule one event for every target of a rule that matched it.
    */
   private send(rule: SimEventRule, event: SimEventBridgeEvent): void {
