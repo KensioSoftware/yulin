@@ -1,6 +1,7 @@
 import {
   CreateUserPoolCommand,
   CreateUserPoolDomainCommand,
+  DeleteUserPoolCommand,
   DeleteUserPoolDomainCommand,
   DescribeUserPoolDomainCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
@@ -165,6 +166,26 @@ describe("sim Cognito user pool domains", () => {
       first.cognito.findUserPoolDomainInAnyAccount("myapp-login")?.userPoolId,
       second.userPoolId,
     );
+  });
+
+  it("frees the domain of a pool that is deleted", async () => {
+    // Given a pool with a domain.
+    const { cognito, userPoolId } = await simCognitoWithPool();
+    await cognito.createUserPoolDomain(
+      new CreateUserPoolDomainCommand({
+        UserPoolId: userPoolId,
+        Domain: "myapp-login",
+      }),
+    );
+
+    // When the pool itself is deleted, rather than the domain.
+    await cognito.deleteUserPool(
+      new DeleteUserPoolCommand({ UserPoolId: userPoolId }),
+    );
+
+    // Then the domain goes with it, as it does on real Cognito, so nothing is
+    // left resolving to a pool that no longer exists.
+    assertUndefined(cognito.findUserPoolDomainInAnyAccount("myapp-login"));
   });
 
   it("refuses a domain another pool already holds", async () => {

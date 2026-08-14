@@ -115,7 +115,7 @@ describe("Signing in through a sim Cognito hosted domain", () => {
     assertIdentical(claims["email"], "someone@example.com");
     assertIdentical(claims["given_name"], "Someone");
     assertObjectMatches(claims.identities, [
-      { userId: "google-subject-1", providerName: "Google", primary: true },
+      { userId: "google-subject-1", providerName: "Google", primary: "true" },
     ]);
   });
 

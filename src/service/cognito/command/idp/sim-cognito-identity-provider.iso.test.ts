@@ -10,6 +10,7 @@ import {
   assertArrayEquals,
   assertArrayLength,
   assertIdentical,
+  assertInstanceOf,
   assertNonNullable,
   assertObjectEquals,
   assertStringIncludes,
@@ -18,6 +19,7 @@ import {
 import { describe, it } from "vitest";
 
 import { SimAws } from "../../../aws/sim-aws.js";
+import { SimCognitoDuplicateProviderException } from "../../error/sim-cognito.error.js";
 import type { SimCognitoIdentityProvider } from "../../sim-cognito-identity-provider.js";
 
 const googleDetails = {
@@ -192,7 +194,9 @@ describe("sim Cognito identity providers", () => {
       );
     });
 
-    // Then it is refused, because a provider name is unique in its pool.
+    // Then it is refused as real Cognito refuses one, which reports a
+    // duplicate rather than a bad parameter.
+    assertInstanceOf(error, SimCognitoDuplicateProviderException);
     assertStringIncludes(error.message, "already exists in the pool");
   });
 });

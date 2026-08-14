@@ -3,11 +3,6 @@ import { simCognitoSimulatedOAuthFlow } from "./sim-cognito-oauth-grants.js";
 import { SimCognitoRequestedOAuth } from "./sim-cognito-requested-oauth.js";
 
 /**
- * The name a pool's own users are known by among identity providers.
- */
-export const simCognitoLocalProviderName = "COGNITO";
-
-/**
  * The OAuth properties of an app client, in the shape a request sets them and
  * a described client reports them.
  */

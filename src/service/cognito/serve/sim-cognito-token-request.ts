@@ -3,8 +3,14 @@ import type { SimCognitoTokenInput } from "../command/hosted/hosted-auth.command
 
 /**
  * The scheme the token endpoint's client authentication header uses.
+ *
+ * The scheme name is matched without regard to case, as HTTP authentication
+ * scheme names are. The credentials are the base64 of `client_id:client_secret`
+ * as Cognito's own documentation writes them, rather than the form encoded
+ * pair the OAuth specification describes, because an app client's id and
+ * secret hold nothing that either encoding would change.
  */
-const basicScheme = "Basic ";
+const basicScheme = /^basic (?<credentials>.+)$/iu;
 
 /**
  * Reads a `/oauth2/token` request into the fields the endpoint answers on.
@@ -51,16 +57,14 @@ export class SimCognitoTokenRequest {
   private basicCredentials(
     serviceRequest: SimAwsServiceRequest,
   ): Partial<SimCognitoTokenInput> {
-    const header = serviceRequest.request.headers.get("authorization");
+    const header = serviceRequest.request.headers.get("authorization") ?? "";
+    const credentials = basicScheme.exec(header)?.groups?.["credentials"];
 
-    if (header === null || !header.startsWith(basicScheme)) {
+    if (credentials === undefined) {
       return {};
     }
 
-    const decoded = Buffer.from(
-      header.slice(basicScheme.length),
-      "base64",
-    ).toString("utf8");
+    const decoded = Buffer.from(credentials, "base64").toString("utf8");
     const separator = decoded.indexOf(":");
 
     if (separator === -1) {

@@ -2,6 +2,7 @@ import {
   SimCognitoNotAuthorizedException,
   SimCognitoResourceNotFoundException,
 } from "../error/sim-cognito.error.js";
+import { SimCognitoDomainRegistry } from "../registry/sim-cognito-domain-registry.js";
 import { SimCognitoUserPoolRegistry } from "../registry/sim-cognito-user-pool-registry.js";
 import type { SimCognitoIssuedToken } from "./auth/sim-cognito-issued-token.js";
 import type { SimCognitoUserPoolClient } from "./client/sim-cognito-user-pool-client.js";
@@ -27,6 +28,12 @@ export interface SimCognitoAccessTokenInPool {
 
 interface SimCognitoUserPoolStoreProperties {
   readonly registry?: SimCognitoUserPoolRegistry;
+
+  /**
+   * Where hosted domains are indexed, so a deleted pool's domain stops
+   * resolving and its name goes back into use.
+   */
+  readonly domains?: SimCognitoDomainRegistry;
 }
 
 /**
@@ -42,9 +49,11 @@ interface SimCognitoUserPoolStoreProperties {
 export class SimCognitoUserPoolStore {
   private readonly pools = new Map<string, SimCognitoUserPool>();
   private readonly registry: SimCognitoUserPoolRegistry;
+  private readonly domains: SimCognitoDomainRegistry;
 
   constructor(properties: SimCognitoUserPoolStoreProperties = {}) {
     this.registry = properties.registry ?? new SimCognitoUserPoolRegistry();
+    this.domains = properties.domains ?? new SimCognitoDomainRegistry();
   }
 
   private static unexpired(
@@ -85,11 +94,20 @@ export class SimCognitoUserPoolStore {
   }
 
   /**
-   * Forget a deleted pool.
+   * Forget a deleted pool, and with it the domain it was served on.
+   *
+   * Deleting a pool takes its domain with it on real Cognito, which is what
+   * frees the domain string for another pool.
    */
   remove(pool: SimCognitoUserPool): void {
     this.pools.delete(pool.id);
     this.registry.deregister(pool);
+
+    const { domain } = pool.auth;
+
+    if (domain !== undefined) {
+      this.domains.deregister(domain);
+    }
   }
 
   /**

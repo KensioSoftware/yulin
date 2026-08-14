@@ -173,6 +173,50 @@ describe("Refusals from a sim Cognito authorize endpoint", () => {
     );
   });
 
+  it("refuses a PKCE method with no challenge to go with it", async () => {
+    // Given a pool with a domain.
+    const setUp = await simCognitoHosted();
+
+    // When an authorize request names the method and no challenge.
+    const response = await authorize(setUp, {
+      ...authorizeParameters(setUp),
+      code_challenge_method: "S256",
+    });
+
+    // Then it is refused, rather than issuing a code nothing has to produce a
+    // verifier for.
+    assertIdentical(redirectedError(response).get("error"), "invalid_request");
+    assertStringIncludes(
+      redirectedError(response).get("error_description") ?? "",
+      "code_challenge is required",
+    );
+  });
+
+  it("refuses to sign in as a user of the pool's own", async () => {
+    // Given a pool holding a user of its own whose username is the one a
+    // Google subject would federate to.
+    const setUp = await simCognitoHosted();
+    await setUp.cognito.adminCreateUser({
+      input: {
+        UserPoolId: setUp.userPoolId,
+        Username: "Google_google-subject-1",
+      },
+    });
+    simCognitoSignedInAtGoogle(setUp, "google-subject-1", {
+      email: "someone@example.com",
+    });
+
+    // When that subject signs in through the provider.
+    const response = await authorize(setUp, authorizeParameters(setUp));
+
+    // Then it is refused rather than taking over the user it did not create.
+    assertIdentical(response.status, 400);
+    assertStringIncludes(
+      await refusedBody(response),
+      "is not the Google user this sign-in is for",
+    );
+  });
+
   it("refuses a request that would reach managed login", async () => {
     // Given a pool with a domain.
     const setUp = await simCognitoHosted();

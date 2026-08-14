@@ -60,12 +60,28 @@ export class SimCognitoAuthorizeRequest {
   /**
    * Check the PKCE parameters, which arrive together or not at all.
    *
-   * Real Cognito supports the `S256` method alone, and refuses a challenge
-   * sent without a method to go with it.
+   * Real Cognito supports the `S256` method alone, and requires each of the
+   * two parameters where the request carries the other. A method with no
+   * challenge is refused rather than answered with a code nothing has to
+   * produce a verifier for.
    */
   requireChallengeMethod(input: SimCognitoAuthorizeInput): void {
-    if (input.code_challenge === undefined) {
+    if (
+      input.code_challenge === undefined &&
+      input.code_challenge_method === undefined
+    ) {
       return;
+    }
+
+    if (input.code_challenge === undefined) {
+      throw new SimCognitoOAuthError({
+        code: "invalid_request",
+        description:
+          "code_challenge is required alongside a code_challenge_method: a " +
+          "grant made without the challenge would be redeemed without the " +
+          "verifier, which is what PKCE is for",
+        redirectable: true,
+      });
     }
 
     if (input.code_challenge_method !== simCognitoCodeChallengeMethod) {

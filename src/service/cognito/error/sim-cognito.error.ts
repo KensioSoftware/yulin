@@ -74,6 +74,20 @@ export class SimCognitoGroupExistsException extends SimCognitoError {
 }
 
 /**
+ * Simulated Cognito DuplicateProviderException error.
+ *
+ * Real Cognito reports a second identity provider added under a name the pool
+ * already holds this way, rather than as a bad parameter.
+ */
+export class SimCognitoDuplicateProviderException extends SimCognitoError {
+  public override readonly name = "DuplicateProviderException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
  * Simulated Cognito UserNotFoundException error.
  *
  * Real Cognito reports an operation naming a user its pool does not hold this

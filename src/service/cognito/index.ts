@@ -115,6 +115,7 @@ export {
 } from "./error/sim-cognito-oauth.error.js";
 export {
   SimCognitoCodeMismatchException,
+  SimCognitoDuplicateProviderException,
   SimCognitoError,
   SimCognitoGroupExistsException,
   SimCognitoInvalidParameterException,

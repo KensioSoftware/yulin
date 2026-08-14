@@ -11,7 +11,7 @@ export interface SimCognitoExternalUserType {
    * the federated username from, so the same subject signing in twice reaches
    * the same pool user.
    */
-  readonly Subject: string;
+  readonly Subject: string | undefined;
 
   /**
    * The claims the provider would return about the user. The provider's own
@@ -34,7 +34,7 @@ export class SimCognitoExternalUser {
   private readonly claims: ReadonlyMap<string, string>;
 
   constructor(externalUser: SimCognitoExternalUserType) {
-    if (externalUser.Subject === "") {
+    if (externalUser.Subject === undefined || externalUser.Subject === "") {
       throw new SimCognitoInvalidParameterException(
         "An external user needs a Subject: it is what the provider " +
           "identifies the user by, and what the pool builds its username from",

@@ -2945,6 +2945,9 @@ Current documented limitations:
 - A pool does not create a group for each identity provider, where real Cognito creates one named
   `<userPoolId>_<ProviderName>` and puts each federated user in it. A `cognito:groups` claim here
   therefore names only the groups something added the user to.
+- A federated sign-in is refused with `UsernameExistsException` where the username it would take is
+  already a user of the pool's own. A username may hold an underscore, so `Google_1234` can be a
+  local user, and signing in as it would hand the application someone else's account.
 - `AdminLinkProviderForUser` is not implemented, so a federated user is never linked to a user that
   was already in the pool, and the `identities` it carries always names one provider.
 - The `PreAuthentication`, `PostAuthentication` and migrate user triggers do not fire on a federated

@@ -93,7 +93,10 @@ export class SimCognitoIdentityProvider extends SimCognitoFederation {
       domainRegistry = new SimCognitoDomainRegistry(),
       triggerFunctions = new SimCognitoNoTriggerFunctions(),
     } = properties;
-    const pools = new SimCognitoUserPoolStore({ registry: userPoolRegistry });
+    const pools = new SimCognitoUserPoolStore({
+      registry: userPoolRegistry,
+      domains: domainRegistry,
+    });
 
     super({
       commands: new SimCognitoCommands({

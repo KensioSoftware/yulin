@@ -1,5 +1,5 @@
 import {
-  SimCognitoInvalidParameterException,
+  SimCognitoDuplicateProviderException,
   SimCognitoResourceNotFoundException,
 } from "../../error/sim-cognito.error.js";
 import type { SimCognitoUserPoolIdentityProvider } from "./sim-cognito-user-pool-identity-provider.js";
@@ -32,7 +32,7 @@ export class SimCognitoIdentityProviderStore {
    */
   add(provider: SimCognitoUserPoolIdentityProvider): void {
     if (this.providers.has(provider.name)) {
-      throw new SimCognitoInvalidParameterException(
+      throw new SimCognitoDuplicateProviderException(
         `A provider with the name ${provider.name} already exists in the pool.`,
       );
     }

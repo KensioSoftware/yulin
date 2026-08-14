@@ -33,12 +33,12 @@ const reservedWords = ["aws", "amazon", "cognito"];
 /**
  * The label a hosted domain sits under, between the prefix and the region.
  */
-export const cognitoDomainHostLabel = "auth";
+const cognitoDomainHostLabel = "auth";
 
 /**
  * The domain suffix real Cognito serves a prefix domain on.
  */
-export const cognitoDomainHostSuffix = "amazoncognito.com";
+const cognitoDomainHostSuffix = "amazoncognito.com";
 
 interface SimCognitoDomainNameProperties {
   readonly value: string | undefined;

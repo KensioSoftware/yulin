@@ -180,7 +180,9 @@ two shapes real Cognito reports it in.
 `command/hosted/` holds the three endpoints a domain serves, and `serve/sim-cognito-domain-controller.ts`
 is the HTTP side of them. They are not SDK commands and authorize no IAM caller: a browser and an
 application's own server hold no AWS credentials, in the same way an `InitiateAuth` caller holds
-none. What authenticates the application is its app client secret, at the token endpoint.
+none. What the token endpoint authenticates instead is the app client: one with a secret presents
+it, in a basic authorization header or in the body, and a public client presents its client id and
+binds the grant with PKCE.
 
 `SimCognitoAuthorizeEndpoint` signs a user in through an identity provider and answers with the
 redirect back to the application. A request naming no provider would reach managed login on real
@@ -530,6 +532,10 @@ resource, here or on real AWS.
 - `/logout` redirects and ends no session, because there is no managed login session cookie here.
 - A pool creates no group for an identity provider, where real Cognito creates one named
   `<userPoolId>_<ProviderName>` and puts each federated user in it.
+- A federated sign-in whose username is already a user of the pool's own is refused with
+  `UsernameExistsException`, rather than signing in as that user. A username may validly hold an
+  underscore, so `Google_1234` can be a local user, and issuing a token for it would hand an
+  application someone else's account.
 - One signing key is published per pool, where real Cognito publishes two and rotates between them.
 - The served OpenID configuration names the localhost origin the request arrived on as its `issuer`,
   because a client that discovers a document has to be able to fetch the keys it points at. A token's

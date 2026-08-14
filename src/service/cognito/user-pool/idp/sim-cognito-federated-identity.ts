@@ -12,8 +12,16 @@ export interface SimCognitoIdentityClaim {
   readonly providerName: string;
   readonly providerType: string;
   readonly issuer: string | null;
-  readonly primary: boolean;
-  readonly dateCreated: number;
+
+  /**
+   * Whether this is the identity the user signs in as, which Cognito writes as
+   * the string `"true"` rather than as a boolean, in the token as well as in
+   * the attribute.
+   */
+  readonly primary: string;
+
+  /** When the identity was linked, in milliseconds, written as a string. */
+  readonly dateCreated: string;
 }
 
 interface SimCognitoFederatedIdentityProperties {
@@ -50,6 +58,9 @@ export class SimCognitoFederatedIdentity {
 
   /**
    * This identity as a token claim carries it.
+   *
+   * `primary` and `dateCreated` are strings, which is how the AWS
+   * documentation's own id token example writes them.
    */
   toClaim(): SimCognitoIdentityClaim {
     return {
@@ -57,8 +68,8 @@ export class SimCognitoFederatedIdentity {
       providerName: this.providerName,
       providerType: this.providerType,
       issuer: this.issuer,
-      primary: true,
-      dateCreated: this.dateCreated,
+      primary: "true",
+      dateCreated: String(this.dateCreated),
     };
   }
 
@@ -66,15 +77,10 @@ export class SimCognitoFederatedIdentity {
    * This identity as the user's `identities` attribute holds it.
    *
    * The attribute is a JSON string, which is what a described user reports and
-   * what code reading `identities` from `AdminGetUser` has to parse.
+   * what code reading `identities` from `AdminGetUser` has to parse. What it
+   * holds is what the token claim holds.
    */
   toAttributeValue(): string {
-    return JSON.stringify([
-      {
-        ...this.toClaim(),
-        primary: "true",
-        dateCreated: String(this.dateCreated),
-      },
-    ]);
+    return JSON.stringify([this.toClaim()]);
   }
 }
