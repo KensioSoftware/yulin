@@ -1647,6 +1647,10 @@ A function declaring `Code.ImageUri` without `PackageType` is treated the same w
 is ignored, because `Command`, `EntryPoint` and `WorkingDirectory` have no meaning for a handler
 running in this process.
 
+A binding can also name the image repository instead of the function, which covers every function
+running that image without repeating the binding per stack. See
+[binding by container image repository](#binding-by-container-image-repository).
+
 ## Function URLs in templates
 
 `AWS::Lambda::Url` creates a Function URL for a deployed function, which is what CDK's
@@ -1789,10 +1793,89 @@ await simAws.backgroundTasksComplete();
 ```
 
 A binding can target the function by `logicalId` (which also matches a CDK construct ID from
-`aws:cdk:path` metadata), by `functionName`, by `arn`, or by full `cdkPath`. A bound function may
-omit template `Code` and `Handler` entirely; unbound functions in the same template keep their
-template code on the vm path. A binding that does not resolve to any template resource fails the
-deploy with the unmatched target named for diagnosis.
+`aws:cdk:path` metadata), by `functionName`, by `arn`, by full `cdkPath`, or by `imageRepository`
+for a function packaged as a container image. A bound function may omit template `Code` and
+`Handler` entirely; unbound functions in the same template keep their template code on the vm path.
+A binding that does not resolve to any template resource fails the deploy with the unmatched target
+named for diagnosis. Where two bindings could both back the same function, the one listed first is
+the one that backs it.
+
+### Binding by container image repository
+
+`imageRepository` matches any function whose resolved `Code.ImageUri` names that repository. One
+binding covers every function running that image, in every stack deployed from the same `SimAws`,
+rather than naming a logical ID that belongs to one construct tree.
+
+The image tag is ignored on both sides of the match. No tag is stable enough to write into a test:
+a CDK image asset is tagged with the asset content hash, which changes whenever the image source
+does, and a pipeline-built image is usually tagged with a git sha or a build number passed in as a
+stack parameter. The registry host is part of the repository, so the account and region have to
+match too, and an `ImageUri` built by `Fn::Sub` or from a stack parameter is matched on what it
+resolves to.
+
+```typescript sim-lambda-image-repository-binding
+/**
+ * Binding a handler to a container image function by its image repository.
+ */
+
+import { InvokeCommand } from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+await simAws.cloudFormation().deployTemplate({
+  stackName: "orders-stack",
+  template: {
+    Parameters: {
+      ImageTag: { Type: "String" },
+    },
+    Resources: {
+      OrdersFunction: {
+        Type: "AWS::Lambda::Function",
+        Properties: {
+          FunctionName: "orders",
+          Role: "arn:aws:iam::111111111111:role/OrdersRole",
+          PackageType: "Image",
+          Code: {
+            ImageUri: {
+              "Fn::Sub":
+                // eslint-disable-next-line no-template-curly-in-string
+                "${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com/orders:${ImageTag}",
+            },
+          },
+        },
+      },
+    },
+  },
+  parameters: { ImageTag: "build-4172" },
+  bindings: [
+    {
+      imageRepository:
+        `${simAws.defaultAccountId}.dkr.ecr.` +
+        `${simAws.defaultRegionName}.amazonaws.com/orders`,
+      handler: (event: { orderId: string }): string =>
+        `Processed ${event.orderId}`,
+    },
+  ],
+});
+
+const output = await simAws.lambda().invoke(
+  new InvokeCommand({
+    FunctionName: "orders",
+    Payload: JSON.stringify({ orderId: "order-1" }),
+  }),
+);
+
+if (output.Payload === undefined) throw new Error("No invoke Payload");
+console.log(Buffer.from(output.Payload).toString());
+
+await simAws.backgroundTasksComplete();
+```
+
+A function matched this way is created from the bound handler, so it never reaches the
+[container image skip](#container-image-functions). Functions in the same template running an image
+from another repository are skipped as usual.
 
 ## Available functionality
 

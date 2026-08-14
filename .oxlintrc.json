@@ -294,7 +294,8 @@
           "configuration": { "config": false },
           "fn": false,
           "ref": false,
-          "db": false
+          "db": false,
+          "repository": false
         }
       }
     ],

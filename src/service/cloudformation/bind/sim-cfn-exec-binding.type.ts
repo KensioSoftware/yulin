@@ -20,6 +20,7 @@ export type SimCfnExecutableResourceBinding<
       readonly functionName?: never;
       readonly arn?: never;
       readonly cdkPath?: never;
+      readonly imageRepository?: never;
       readonly handler: H;
     }
   | {
@@ -27,6 +28,7 @@ export type SimCfnExecutableResourceBinding<
       readonly logicalId?: never;
       readonly arn?: never;
       readonly cdkPath?: never;
+      readonly imageRepository?: never;
       readonly handler: H;
     }
   | {
@@ -34,6 +36,7 @@ export type SimCfnExecutableResourceBinding<
       readonly logicalId?: never;
       readonly functionName?: never;
       readonly cdkPath?: never;
+      readonly imageRepository?: never;
       readonly handler: H;
     }
   | {
@@ -41,6 +44,20 @@ export type SimCfnExecutableResourceBinding<
       readonly logicalId?: never;
       readonly functionName?: never;
       readonly arn?: never;
+      readonly imageRepository?: never;
+      readonly handler: H;
+    }
+  /**
+   * A container image repository, matching any AWS::Lambda::Function whose
+   * `Code.ImageUri` names it. The image tag is ignored, so one binding covers
+   * every stack that runs that image.
+   */
+  | {
+      readonly imageRepository: string;
+      readonly logicalId?: never;
+      readonly functionName?: never;
+      readonly arn?: never;
+      readonly cdkPath?: never;
       readonly handler: H;
     };
 

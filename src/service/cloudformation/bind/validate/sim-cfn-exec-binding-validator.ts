@@ -48,6 +48,10 @@ function describeBinding(binding: SimCfnExecutableResourceBinding): string {
     return `cdkPath ${JSON.stringify(binding.cdkPath)}`;
   }
 
+  if ("imageRepository" in binding) {
+    return `imageRepository ${JSON.stringify(binding.imageRepository)}`;
+  }
+
   /* v8 ignore next -- compile-time exhaustive guard */
   return "unknown binding target";
 }
