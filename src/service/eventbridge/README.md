@@ -143,7 +143,7 @@ anyway.
 
 ## Divergences
 
-Four, all deliberate.
+Five, all deliberate.
 
 An entry naming a bus that does not exist **succeeds**. Real EventBridge answers 200, matches the
 event against no rule, and drops it, without counting the entry as failed. It is a trap, because a

@@ -172,4 +172,31 @@ describe("EventBridge target validation", () => {
       assertInstanceOf(error, SimEventBridgeUnsimulatedInputException);
     }
   });
+
+  it("refuses a request naming one target id twice", async () => {
+    // Given two targets in one request sharing an id.
+    const error = await refusedTargets([
+      { Id: "main", Arn: queueArn },
+      { Id: "main", Arn: "arn:aws:sns:us-east-1:888888888888:orders" },
+    ]);
+
+    // Then it is refused rather than leaving the rule with two targets of one
+    // id, which would deliver twice and be removed by a single RemoveTargets.
+    assertInstanceOf(error, SimEventBridgeValidationException);
+    assertStringIncludes(error.message, "named twice");
+  });
+
+  it("refuses an ARN whose parts are there but empty", async () => {
+    // Given ARNs with the right number of parts and nothing in them.
+    const empty = await refusedTargets([{ Id: "q", Arn: "arn:aws:sqs:::" }]);
+    const noName = await refusedTargets([
+      { Id: "f", Arn: "arn:aws:lambda:us-east-1:888888888888:function" },
+    ]);
+
+    // Then both are refused when the target is added, rather than failing
+    // every delivery later.
+    assertInstanceOf(empty, SimEventBridgeValidationException);
+    assertInstanceOf(noName, SimEventBridgeValidationException);
+    assertStringIncludes(noName.message, "names no function");
+  });
 });

@@ -562,6 +562,8 @@ no permission for.
   `numeric` and `exists`.
 - `PutTargets`, `RemoveTargets`, `ListTargetsByRule` and `ListRuleNamesByTarget`, with delivery to a
   simulated Lambda function, SQS queue or SNS topic, authorized by the target's own resource policy.
+- Targets in another account or region of the same simulation, which the target's own account
+  decides on, as real EventBridge does.
 - A target's fixed `Input`, and `deliveryFailures` for deliveries that did not happen.
 - The `default` bus in every account and region, without one being created.
 - Bus descriptions, creation timestamps from the simulation's clock, and prefix-narrowed paged

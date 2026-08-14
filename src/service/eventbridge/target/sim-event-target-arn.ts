@@ -81,14 +81,21 @@ export class SimEventTargetArn {
 
     const parts = value.split(":");
     const [prefix, partition, service, regionName, accountId] = parts;
+    const resource = parts.slice(minimumArnParts - 1).join(":");
 
+    // Every part after a split is a string, so each one has to be checked for
+    // being empty as well as for being there: `arn:aws:sqs:::` has six parts
+    // and names nothing.
     if (
       parts.length < minimumArnParts ||
       prefix !== "arn" ||
       partition !== "aws" ||
       service === undefined ||
       regionName === undefined ||
-      accountId === undefined
+      regionName === "" ||
+      accountId === undefined ||
+      accountId === "" ||
+      resource === ""
     ) {
       throw new SimEventBridgeValidationException(
         `Invalid parameter: Target Arn Reason: ${value} is not an ARN`,
@@ -105,13 +112,23 @@ export class SimEventTargetArn {
     // Branded at the parse boundary, the way every other ARN reader in the
     // simulator does it: what came off the wire is a string, and this is where
     // it becomes a scope the rest of the simulation can be asked about.
-    return new this({
+    const arn = new this({
       value,
       service,
       regionName: regionName as AwsRegionName,
       accountId: accountId as SimAwsAccountId,
-      resource: parts.slice(minimumArnParts - 1).join(":"),
+      resource,
     });
+
+    if (arn.service === "lambda" && arn.functionName === "") {
+      throw new SimEventBridgeValidationException(
+        `Invalid parameter: Target Arn Reason: ${value} names no function. ` +
+          `A function ARN is ` +
+          `arn:aws:lambda:<region>:<account-id>:function:<function-name>`,
+      );
+    }
+
+    return arn;
   }
 
   /**

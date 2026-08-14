@@ -1,11 +1,12 @@
 import { SimEventBridgeValidationException } from "../../error/sim-event-bridge.error.js";
 import { SimEventTarget } from "../../target/sim-event-target.js";
-import {
-  simEventMaximumTargets,
-  type SimEventTargetStore,
-} from "../../target/sim-event-target-store.js";
+import type { SimEventTargetStore } from "../../target/sim-event-target-store.js";
 import type { SimEventBridgeRequestOptions } from "../sim-event-bridge-request-options.js";
 import type { SimEventBridgeRuleAccess } from "../rule/sim-event-bridge-rule-access.js";
+import {
+  refuseOverfullRule,
+  refuseRepeatedTargetIds,
+} from "./sim-event-bridge-target-refusals.js";
 import { refuseUnsimulatedTargetInput } from "./sim-event-bridge-unsimulated-target-input.js";
 import type {
   SimPutTargetsCommand,
@@ -63,37 +64,19 @@ export class SimEventBridgePutTargets {
     }
 
     const added = requested.map((target) => SimEventTarget.of(target));
+
+    refuseRepeatedTargetIds(added);
+
     const busName = rule.busName.value;
     const ruleName = rule.name.value;
 
-    this.refuseOverfullRule(busName, ruleName, added);
+    refuseOverfullRule(
+      ruleName,
+      this.targets.forRule(busName, ruleName),
+      added,
+    );
     this.targets.put(busName, ruleName, added);
 
     return { $metadata: {}, FailedEntryCount: 0, FailedEntries: [] };
-  }
-
-  /**
-   * Refuse a request that would take a rule past the targets it may have.
-   *
-   * Targets already on the rule count, except the ones this request replaces,
-   * so replacing an existing id is the only way past a full rule.
-   */
-  private refuseOverfullRule(
-    busName: string,
-    ruleName: string,
-    added: readonly SimEventTarget[],
-  ): void {
-    const kept = this.targets
-      .forRule(busName, ruleName)
-      .filter((existing) =>
-        added.every((target) => target.id !== existing.id),
-      ).length;
-
-    if (kept + added.length > simEventMaximumTargets) {
-      throw new SimEventBridgeValidationException(
-        `Rule ${ruleName} would have ${String(kept + added.length)} targets, ` +
-          `and a rule has at most ${String(simEventMaximumTargets)}.`,
-      );
-    }
   }
 }
