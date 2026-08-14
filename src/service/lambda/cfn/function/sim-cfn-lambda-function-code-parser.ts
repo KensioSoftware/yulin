@@ -5,6 +5,19 @@ import { makeLambdaCodeZip } from "../../function/code/make-lambda-code-zip.js";
 import { SimCfnLambdaPropertyParser } from "./sim-cfn-lambda-property-parser.js";
 
 /**
+ * The parsed AWS::Lambda::Function Code property.
+ *
+ * The image URI is kept apart from the CreateFunction code input because sim
+ * Lambda has nothing to do with it: a container image function is either
+ * backed by an executable binding, which replaces its code wholesale, or
+ * skipped. Carrying it here is what lets the skip name the image.
+ */
+export interface SimCfnLambdaParsedCode {
+  readonly code: SimLambdaFunctionCode | undefined;
+  readonly imageUri: string | undefined;
+}
+
+/**
  * Parses the AWS::Lambda::Function Code property into sim Lambda
  * CreateFunction code input.
  *
@@ -22,9 +35,9 @@ export class SimCfnLambdaFunctionCodeParser {
   parse(
     resource: SimCfnResource,
     value: SimCfnTemplateValue | undefined,
-  ): SimLambdaFunctionCode | undefined {
+  ): SimCfnLambdaParsedCode {
     if (value === undefined) {
-      return undefined;
+      return { code: undefined, imageUri: undefined };
     }
 
     if (typeof value !== "object" || value === null || Array.isArray(value)) {
@@ -36,21 +49,28 @@ export class SimCfnLambdaFunctionCodeParser {
     }
 
     return {
-      ZipFile: this.zipFileBytes(resource, value["ZipFile"]),
-      S3Bucket: this.propertyParser.optionalString(
+      code: {
+        ZipFile: this.zipFileBytes(resource, value["ZipFile"]),
+        S3Bucket: this.propertyParser.optionalString(
+          resource,
+          value["S3Bucket"],
+          "Code.S3Bucket",
+        ),
+        S3Key: this.propertyParser.optionalString(
+          resource,
+          value["S3Key"],
+          "Code.S3Key",
+        ),
+        S3ObjectVersion: this.propertyParser.optionalString(
+          resource,
+          value["S3ObjectVersion"],
+          "Code.S3ObjectVersion",
+        ),
+      },
+      imageUri: this.propertyParser.optionalString(
         resource,
-        value["S3Bucket"],
-        "Code.S3Bucket",
-      ),
-      S3Key: this.propertyParser.optionalString(
-        resource,
-        value["S3Key"],
-        "Code.S3Key",
-      ),
-      S3ObjectVersion: this.propertyParser.optionalString(
-        resource,
-        value["S3ObjectVersion"],
-        "Code.S3ObjectVersion",
+        value["ImageUri"],
+        "Code.ImageUri",
       ),
     };
   }

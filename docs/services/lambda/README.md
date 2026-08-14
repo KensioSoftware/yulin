@@ -1565,6 +1565,88 @@ Two cases are skipped with a diagnostic rather than failing the stack:
   inline to `deployTemplate`, where there is no asset to publish and the staging bucket does not
   exist.
 
+### Container image functions
+
+A function with `PackageType: Image` names a container image instead of code, which is what CDK's
+`DockerImageFunction` and `lambda.DockerImageCode` synthesize. Yulin never reads an image, so there
+is nothing for it to run. The Resource is skipped with a diagnostic naming the image, and the rest
+of the stack deploys.
+
+Bind a real in-process handler to the function to simulate it. The binding replaces the image, so
+the function is created and invoked like any other. This is the same mechanism as
+[executable bindings](#executable-bindings), and it is the only way to run an image-packaged
+function.
+
+```typescript sim-lambda-container-image-function
+/**
+ * Simulating a container image Lambda function with a bound handler.
+ */
+
+import { InvokeCommand } from "@aws-sdk/client-lambda";
+
+import { SimAws } from "@kensio/yulin";
+
+const imageFunctionTemplate = {
+  Resources: {
+    OrdersFunction: {
+      Type: "AWS::Lambda::Function",
+      Properties: {
+        FunctionName: "orders",
+        Role: "arn:aws:iam::111111111111:role/OrdersRole",
+        PackageType: "Image",
+        Code: {
+          ImageUri:
+            "111111111111.dkr.ecr.eu-west-2.amazonaws.com/orders:latest",
+        },
+      },
+    },
+  },
+};
+
+// Without a binding, the function is skipped and the stack still deploys.
+const skippedSimAws = new SimAws();
+
+const skippedStack = await skippedSimAws.cloudFormation().deployTemplate({
+  stackName: "orders-stack",
+  template: imageFunctionTemplate,
+});
+
+console.log(skippedStack.getResource("OrdersFunction")?.skippedReason);
+
+await skippedSimAws.backgroundTasksComplete();
+
+// With a binding, the handler replaces the image and the function runs.
+const simAws = new SimAws();
+
+await simAws.cloudFormation().deployTemplate({
+  stackName: "orders-stack",
+  template: imageFunctionTemplate,
+  bindings: [
+    {
+      logicalId: "OrdersFunction",
+      handler: (event: { orderId: string }): string =>
+        `Processed ${event.orderId}`,
+    },
+  ],
+});
+
+const output = await simAws.lambda().invoke(
+  new InvokeCommand({
+    FunctionName: "orders",
+    Payload: JSON.stringify({ orderId: "order-1" }),
+  }),
+);
+
+if (output.Payload === undefined) throw new Error("No invoke Payload");
+console.log(Buffer.from(output.Payload).toString());
+
+await simAws.backgroundTasksComplete();
+```
+
+A function declaring `Code.ImageUri` without `PackageType` is treated the same way. `ImageConfig`
+is ignored, because `Command`, `EntryPoint` and `WorkingDirectory` have no meaning for a handler
+running in this process.
+
 ## Function URLs in templates
 
 `AWS::Lambda::Url` creates a Function URL for a deployed function, which is what CDK's
@@ -1782,7 +1864,9 @@ Current documented limitations:
 - Function versions, aliases, and qualifiers are not simulated (`Version` is always `$LATEST`).
 - The vm runtime supports CommonJS function code only; ES module source (`.mjs` / `export`
   syntax) is not supported yet.
-- Container image functions (`Code.ImageUri`) are not supported. The simulator stays Docker-free.
+- Container image functions are not run. Yulin never reads a container image, and stays Docker-free.
+  A template function with `PackageType: Image` is skipped unless a real in-process handler is bound
+  to it. See [Container image functions](#container-image-functions).
 - Lambda Layers are not simulated.
 - Environment variables declared with `Environment.Variables` reach a real in-process handler
   function only while it runs, so a variable read at module scope sees the host process value

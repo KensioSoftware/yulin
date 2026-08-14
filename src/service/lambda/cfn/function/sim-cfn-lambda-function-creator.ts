@@ -4,9 +4,8 @@ import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template
 import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type { SimLambdaFunction } from "../../function/sim-lambda-function.js";
 import type { SimLambda } from "../../sim-lambda.js";
-import { SimCfnLambdaCdkAssetsSkip } from "./sim-cfn-lambda-cdk-assets-skip.js";
 import { simCfnLambdaCodeInput } from "./sim-cfn-lambda-code-input.js";
-import { SimCfnLambdaRuntimeSkip } from "./sim-cfn-lambda-runtime-skip.js";
+import { SimCfnLambdaCreationSkips } from "./sim-cfn-lambda-creation-skips.js";
 import {
   simCfnLambdaCreateFunctionInput,
   SimCfnLambdaFunctionPropertiesParser,
@@ -23,8 +22,7 @@ export class SimCfnLambdaFunctionCreator {
   private readonly lambda: SimLambda;
   private readonly propertiesParser =
     new SimCfnLambdaFunctionPropertiesParser();
-  private readonly cdkAssetsSkip = new SimCfnLambdaCdkAssetsSkip();
-  private readonly runtimeSkip = new SimCfnLambdaRuntimeSkip();
+  private readonly skips = new SimCfnLambdaCreationSkips();
 
   constructor(properties: SimCfnLambdaFunctionCreatorProperties) {
     this.lambda = properties.lambda;
@@ -53,13 +51,13 @@ export class SimCfnLambdaFunctionCreator {
       bindings,
     });
 
-    const runtimeSkipError = this.runtimeSkip.findSkipError(
+    const skipError = this.skips.beforeCreate(
       resource,
       functionProperties,
       bound,
     );
-    if (runtimeSkipError !== undefined) {
-      throw runtimeSkipError;
+    if (skipError !== undefined) {
+      throw skipError;
     }
 
     try {
@@ -67,13 +65,13 @@ export class SimCfnLambdaFunctionCreator {
         input: simCfnLambdaCreateFunctionInput(functionProperties, code),
       });
     } catch (error) {
-      const skipError = this.cdkAssetsSkip.findSkipError(
+      const assetsSkipError = this.skips.fromCreateFailure(
         resource,
         functionProperties,
         error,
       );
-      if (skipError !== undefined) {
-        throw skipError;
+      if (assetsSkipError !== undefined) {
+        throw assetsSkipError;
       }
 
       throw error;
