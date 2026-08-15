@@ -9,6 +9,11 @@ import type { SimEcsServiceLoadBalancer } from "../sim-ecs-service-detail.js";
 const targetGroupResourceType = "targetgroup";
 
 /**
+ * The ports a target can be registered on, which are every port there is.
+ */
+const portRange = { lowest: 1, highest: 65_535 } as const;
+
+/**
  * One load balancer registration a service was created with, read once.
  *
  * A registration is three things together: the target group tasks are
@@ -127,6 +132,20 @@ export class SimEcsServiceRegistration {
       throw new SimEcsInvalidParameterException(
         `The registration into ${targetGroupArn} needs a containerPort, ` +
           `which is the port its tasks are registered on.`,
+      );
+    }
+
+    if (
+      !Number.isSafeInteger(containerPort) ||
+      containerPort < portRange.lowest ||
+      containerPort > portRange.highest
+    ) {
+      throw new SimEcsInvalidParameterException(
+        `The registration into ${targetGroupArn} states a containerPort of ` +
+          `${String(containerPort)}, which is not a port between ` +
+          `${String(portRange.lowest)} and ${String(portRange.highest)}. ` +
+          `A target is registered on the port, so a port nothing could ` +
+          `listen on registers nothing.`,
       );
     }
 

@@ -35,7 +35,8 @@ interface SimEcsRegisteredService {
  * by name and port would therefore send every request to a container that does
  * not exist here. So the request goes to a bound container: the one the
  * registration names where that container is bound, and otherwise the one that
- * declared the registration's port, and otherwise the only one there is.
+ * declared the registration's port, and otherwise the first one the task
+ * definition declares.
  */
 export class SimEcsTargetGroupContainers {
   private readonly services: SimEcsServiceStore;

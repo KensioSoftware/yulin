@@ -255,6 +255,38 @@ describe("Refusing a simulated ECS service load balancer", () => {
     assertStringIncludes(error.message, "reaches no simulated Elastic Load");
   });
 
+  it("refuses a container port nothing could listen on", async () => {
+    // Given a registered task definition and a target group of addresses.
+    const simAws = new SimAws();
+    const ecs = simAws.ecs();
+    await simEcsClusterFactory.make({}, simAws);
+    await ecs.registerTaskDefinition(
+      new RegisterTaskDefinitionCommand({
+        family: "checkout",
+        containerDefinitions: [{ name: "app", image: "checkout:1" }],
+      }),
+    );
+
+    const targetGroupArn = await makeServedTargetGroup(simAws);
+
+    // When a service registers on a port outside the range a target takes,
+    // then it says so rather than registering a target nothing could reach.
+    const error = await assertThrowsErrorAsync(async () => {
+      return await ecs.createService(
+        new CreateServiceCommand({
+          serviceName: "checkout",
+          taskDefinition: "checkout",
+          desiredCount: 1,
+          loadBalancers: [
+            { targetGroupArn, containerName: "app", containerPort: 70_000 },
+          ],
+        }),
+      );
+    });
+
+    assertStringIncludes(error.message, "not a port between 1 and 65535");
+  });
+
   it("refuses a target group of another Account or Region", async () => {
     // Given a registered task definition and a target group in another Region.
     const simAws = new SimAws();

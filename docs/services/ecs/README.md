@@ -1901,9 +1901,10 @@ Current documented limitations:
 - A service whose tasks fail to start does not start replacements for them. Real ECS keeps trying,
   which would be an endless retry in a test rather than a result to assert on, so the service
   reports the running count it actually has.
-- A `loadBalancers` entry needs a `targetGroupArn`, a `containerName` and a `containerPort`, and the
-  target group has to be an `ip` one in the service's own account and region. A `loadBalancerName`,
-  which is the Classic Load Balancer form, is refused, and so is a target group that is not there.
+- A `loadBalancers` entry needs a `targetGroupArn`, a `containerName` and a `containerPort` between
+  1 and 65535, and the target group has to be an `ip` one in the service's own account and region. A
+  `loadBalancerName`, which is the Classic Load Balancer form, is refused, and so is a target group
+  that is not there.
 - Which container of a task a request reaches diverges from real ECS on purpose. Real ECS routes to
   the container the registration names, on the port it names; here the request goes to a container
   that is bound, which is the one the registration names where it is bound, otherwise the bound

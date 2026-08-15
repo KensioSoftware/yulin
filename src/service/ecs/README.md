@@ -293,8 +293,8 @@ routes to the container the registration names, on the port it names, and the co
 a proxy such as nginx on that port with the application behind it. Yulin has nothing to run in place
 of the proxy, so routing strictly by name and port would send every request to a container that does
 not exist here. The request goes to a bound container instead: the one the registration names where
-it is bound, otherwise the one that declared the registration's port, otherwise the only one there
-is. A service with no bound container at all is nothing, which the load balancer answers 503 for.
+it is bound, otherwise the one that declared the registration's port, otherwise the first one the
+task definition declares. A service with no bound container at all is nothing, which the load balancer answers 503 for.
 
 ## Registering a service's tasks
 
