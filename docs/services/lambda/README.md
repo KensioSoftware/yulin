@@ -178,9 +178,9 @@ That is what AWS Lambda Powertools' `Logger` does, at module scope, so a bundled
 runs here. Its `Metrics` writes its embedded metric format document to standard output, so the
 metrics a handler emitted can be read back the same way its log lines can.
 
-Everything a handler prints reaches the host process's standard output or standard error, which is
-where a test or a `pnpm run dev` session already sees output. A test that wants to assert on it
-captures the host stream:
+What a handler prints reaches the matching host stream, standard output to standard output and
+standard error to standard error, which is where a test or a `pnpm run dev` session already sees
+output. A test that wants to assert on it captures that host stream:
 
 ```typescript
 const written: string[] = [];
@@ -189,6 +189,9 @@ vi.spyOn(process.stdout, "write").mockImplementation((chunk): boolean => {
   return true;
 });
 ```
+
+That captures standard output, which is where log lines and EMF metric documents go. Spy on
+`process.stderr` the same way for what a handler wrote there, including its `console.error`.
 
 ## Function code from S3
 
