@@ -34,8 +34,9 @@ the only two fields it looks at are `name`, which is how everything else refers 
 - `sim-ecs.ts` is the main in-memory service object for one account/region scope.
 - `index.ts` exports the public ECS simulator API for `@kensio/yulin/ecs`.
 
-A `SimEcs` instance owns a `SimEcsClusterStore`, a `SimEcsTaskDefinitionStore`, a `SimEcsTaskStore`
-and the `SimEcsContainerBindings` for its scope. All of them are scoped to an account and region
+A `SimEcs` instance owns a `SimEcsClusterStore`, a `SimEcsTaskDefinitionStore`, a `SimEcsTaskStore`,
+a `SimEcsServiceStore` and the `SimEcsContainerBindings` for its scope, all of them through
+`SimEcsCommands`. All of them are scoped to an account and region
 because ECS scopes them that way: a cluster ARN, a task definition ARN and a task ARN all name their
 region, and a cluster name is unique within one account and region rather than globally. Bindings
 follow the task definitions they target, so a binding made in one scope reaches no container in
@@ -185,11 +186,47 @@ behind it, so a task a rule started is the same task as one a caller started: th
 same refusals, and the same IAM decision against `ecs:RunTask` for the role the target carries. What
 neither service holds is a second answer to whether that role may run the task.
 
+## Service model
+
+Service state lives under `service/`, and what keeps a service's tasks running lives under
+`service/run/`.
+
+A service is the first ECS thing here that keeps running rather than running and finishing, and one
+decision settles what that means. A desired count of three cannot be three copies of one in-process
+handler, because Yulin runs in a single Node.js process and there are no containers to copy. The
+count is therefore kept as state: `SimEcsServiceTasks` starts that many simulated tasks, they are
+reported as running, and the handler bound to a container is called once per request or per poll
+rather than once per task. That divergence is stated in the usage docs as well as here, because a
+test could otherwise read a running count of three as three things happening at once.
+
+`SimEcsService` splits into `SimEcsServiceIdentity`, which is what the service is, and what the
+service is being kept at, which is the only part that changes. The tasks it is keeping are held in a
+`SimEcsServiceTaskSet` of its own, because the running and pending counts are read from them and
+because a task it has stopped leaves the set while staying in the task store. Nothing in the service
+schedules anything: whatever starts and stops tasks takes them from the set to stop them.
+
+`SimEcsServiceTasks` is that whatever. It reconciles a service to its desired count, replaces every
+task when the service moves to another revision, and stops the lot when the service is deleted or the
+simulated environment is closed. Starting goes through `SimEcsServiceTaskStarter`, which puts a task
+in the store straight away and schedules it to reach `RUNNING` on the simulator's background
+scheduler, so a task is listed as soon as the request is answered and a service deleted in between
+brings nothing up. Stopping is immediate, because there is nothing here to drain.
+
+`SimEcsServiceContainers` brings one task's containers up, which is where a service container differs
+from a task container: no handler is called. A bound container is marked running and left available
+for whatever reaches it, and an unbound one records the same not-simulated reason a run task's
+container does, so the wording is shared with `SimEcsContainerRunner` rather than repeated.
+
+`SimEcsServiceStore` keys services by cluster and name together, because a service name is unique
+within a cluster on real ECS rather than across an Account.
+
 ## Command handling
 
 AWS SDK-style operations are implemented under `command/`, one directory per operation, so the
-`SimEcs` facade stays a delegation. `command/sim-ecs-command-context.ts` holds what each kind of
-handler is built with, split between the cluster operations and the task definition ones.
+`SimEcs` facade stays a delegation. `SimEcsCommands` builds the state and the handlers, which leaves
+the facade with one method per operation and nothing else; it is also what `SimEcs.close()` reaches
+to stop what the services are running. `command/sim-ecs-command-context.ts` holds what each kind of
+handler is built with, split between the cluster, task definition, task and service operations.
 
 `SimEcsCommandHandler` is what each handler extends. Every operation starts the same way: it refuses
 the inputs it does not hold, waits at the simulator's sequencing point, and authorizes the caller.
@@ -212,6 +249,8 @@ command instances.
   that is;
 - `DescribeTasks` and `StopTask` authorize against the task's ARN, and `DescribeTasks` authorizes
   each task it was given separately, so a policy can name one task;
+- the service operations authorize against the service's ARN, `CreateService` against the ARN the
+  service is about to have, and `DescribeServices` authorizes each service it was given separately;
 - everything else authorizes against `*`, because real ECS gives the task definition operations no
   resource type at all, and gives `CreateCluster`, `ListClusters` and `ListTasks` none either. A
   policy naming a task definition ARN grants none of those, here as on AWS.
@@ -239,6 +278,13 @@ command instances.
 - A task with no bound container stops with `TaskFailedToStart` rather than
   `EssentialContainerExited`. Nothing started, and saying so is what makes a binding that matches
   nothing visible.
+- A service's desired count is state rather than concurrency, and nothing calls a service container's
+  handler yet. The container is treated as running and left available for whatever reaches it.
+- `CreateService` refuses a name an active service of the cluster already has, which is the opposite
+  of what `CreateCluster` does with a name already taken. Real ECS refuses each of them that way.
+- `DeleteService` refuses a service still scaled above zero unless the request forces it, as real ECS
+  does. Deleting a cluster still holding services does not refuse, which real ECS would.
+- A service's tasks are `startedBy` `ecs-svc/` and the service name, where real ECS uses a number.
 - `SimEcsContainerDefinitionType` carries no index signature. One would stop a real SDK
   `RegisterTaskDefinitionCommand` input being assignable to it, which is the whole point of the
   structural types. A field it does not name is stored and reported back all the same.

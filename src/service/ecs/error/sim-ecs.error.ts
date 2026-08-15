@@ -54,6 +54,17 @@ export class SimEcsClusterNotFoundException extends SimEcsError {
 }
 
 /**
+ * Simulated ECS ServiceNotFoundException error.
+ */
+export class SimEcsServiceNotFoundException extends SimEcsError {
+  public override readonly name = "ServiceNotFoundException";
+
+  constructor(message: string) {
+    super(message, { httpStatusCode: 400 });
+  }
+}
+
+/**
  * Simulated ECS AccessDeniedException error.
  */
 export class SimEcsAccessDeniedException extends SimEcsError {

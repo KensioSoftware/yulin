@@ -16,6 +16,7 @@ const acceptedInput: readonly string[] = [
   "cluster",
   "family",
   "desiredStatus",
+  "serviceName",
   "startedBy",
   "launchType",
   "maxResults",
@@ -63,6 +64,7 @@ export class ListTasksCommandHandler
       clusterName: cluster.clusterName,
       desiredStatus,
       family: command.input.family,
+      serviceName: command.input.serviceName,
       startedBy: command.input.startedBy,
       launchType: command.input.launchType,
     });

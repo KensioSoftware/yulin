@@ -15,6 +15,15 @@ export interface SimEcsTaskIdentityProperties {
   readonly createdAt: Date;
   readonly launchType?: string | undefined;
   readonly startedBy?: string | undefined;
+  /**
+   * The service keeping this task running, where one is.
+   *
+   * It is not something a described task reports, since real ECS says which
+   * service a task belongs to through its `group` and `startedBy`. It is here
+   * because `ListTasks` filters on a service name, and matching on the shape of
+   * a group string would be reading a label rather than knowing the answer.
+   */
+  readonly serviceName?: string | undefined;
 }
 
 /**
@@ -45,6 +54,7 @@ export class SimEcsTaskIdentity {
   public readonly family: string;
   public readonly launchType: string | undefined;
   public readonly startedBy: string | undefined;
+  public readonly serviceName: string | undefined;
 
   private readonly declared: SimEcsTaskIdentityProperties;
 
@@ -56,6 +66,7 @@ export class SimEcsTaskIdentity {
     this.family = declared.family;
     this.launchType = declared.launchType;
     this.startedBy = declared.startedBy;
+    this.serviceName = declared.serviceName;
   }
 
   /**

@@ -4,6 +4,9 @@ import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-
 import type { SimEcsContainerBindings } from "../bind/sim-ecs-container-bindings.js";
 import { SimEcsClusterArn } from "../cluster/sim-ecs-cluster-arn.js";
 import type { SimEcsClusterStore } from "../cluster/sim-ecs-cluster-store.js";
+import { SimEcsServiceTasks } from "../service/run/sim-ecs-service-tasks.js";
+import { SimEcsServiceArn } from "../service/sim-ecs-service-arn.js";
+import type { SimEcsServiceStore } from "../service/sim-ecs-service-store.js";
 import type { SimEcsSecretStores } from "../task/run/secret/sim-ecs-secret-stores.js";
 import { SimEcsTaskArn } from "../task/sim-ecs-task-arn.js";
 import type { SimEcsTaskStore } from "../task/sim-ecs-task-store.js";
@@ -13,6 +16,7 @@ import type { SimEcsAuthorizer } from "./authorize/sim-ecs-authorizer.js";
 import type {
   SimEcsClusterCommandContext,
   SimEcsRunTaskCommandContext,
+  SimEcsServiceCommandContext,
   SimEcsTaskCommandContext,
   SimEcsTaskDefinitionCommandContext,
 } from "./sim-ecs-command-context.js";
@@ -25,6 +29,7 @@ interface SimEcsCommandContextsProperties {
   readonly clusters: SimEcsClusterStore;
   readonly taskDefinitions: SimEcsTaskDefinitionStore;
   readonly tasks: SimEcsTaskStore;
+  readonly services: SimEcsServiceStore;
   readonly bindings: SimEcsContainerBindings;
   readonly secretStores: SimEcsSecretStores;
 }
@@ -42,6 +47,7 @@ export class SimEcsCommandContexts {
   public readonly taskDefinition: SimEcsTaskDefinitionCommandContext;
   public readonly task: SimEcsTaskCommandContext;
   public readonly runTask: SimEcsRunTaskCommandContext;
+  public readonly service: SimEcsServiceCommandContext;
 
   constructor(properties: SimEcsCommandContextsProperties) {
     const { accountRegionScope, authorizer, background } = properties;
@@ -72,6 +78,20 @@ export class SimEcsCommandContexts {
       bindings: properties.bindings,
       runAsOwner: properties.runAsOwner,
       secretStores: properties.secretStores,
+    };
+    this.service = {
+      ...this.task,
+      accountRegionScope,
+      taskDefinitions: properties.taskDefinitions,
+      services: properties.services,
+      serviceArn: new SimEcsServiceArn(accountRegionScope),
+      serviceTasks: new SimEcsServiceTasks({
+        tasks: properties.tasks,
+        taskArn: this.task.taskArn,
+        bindings: properties.bindings,
+        secretStores: properties.secretStores,
+        background,
+      }),
     };
   }
 }

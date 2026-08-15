@@ -1,8 +1,11 @@
 import {
   CreateClusterCommand,
+  CreateServiceCommand,
   DeleteClusterCommand,
+  DeleteServiceCommand,
   DeregisterTaskDefinitionCommand,
   DescribeClustersCommand,
+  DescribeServicesCommand,
   DescribeTaskDefinitionCommand,
   DescribeTasksCommand,
   ECSClient,
@@ -13,6 +16,7 @@ import {
   RegisterTaskDefinitionCommand,
   RunTaskCommand,
   StopTaskCommand,
+  UpdateServiceCommand,
 } from "@aws-sdk/client-ecs";
 import {
   assertArrayIncludesAll,
@@ -142,6 +146,59 @@ describe("ECS SDK interception", () => {
     await simSdk.simAws.backgroundTasksComplete();
   });
 
+  it("routes the service operations to simulated ECS", async () => {
+    // Given an intercepted ECS SDK client with a cluster and a definition.
+    using simSdk = new SimSdk();
+    simSdk.intercept(ECSClient);
+
+    const ecs = new ECSClient({ region: "eu-west-2" });
+    await ecs.send(new CreateClusterCommand({ clusterName: "services" }));
+    await ecs.send(
+      new RegisterTaskDefinitionCommand({
+        family: "checkout",
+        containerDefinitions: [{ name: "app", image: "checkout:1" }],
+      }),
+    );
+
+    // When ordinary SDK code creates a service, scales it and deletes it.
+    const created = await ecs.send(
+      new CreateServiceCommand({
+        cluster: "services",
+        serviceName: "checkout",
+        taskDefinition: "checkout",
+        desiredCount: 1,
+      }),
+    );
+    const updated = await ecs.send(
+      new UpdateServiceCommand({
+        cluster: "services",
+        service: "checkout",
+        desiredCount: 2,
+      }),
+    );
+    await simSdk.simAws.backgroundTasksComplete();
+
+    const described = await ecs.send(
+      new DescribeServicesCommand({
+        cluster: "services",
+        services: ["checkout"],
+      }),
+    );
+    const deleted = await ecs.send(
+      new DeleteServiceCommand({
+        cluster: "services",
+        service: "checkout",
+        force: true,
+      }),
+    );
+
+    // Then each one is answered by the simulation.
+    assertIdentical(created.service?.desiredCount, 1);
+    assertIdentical(updated.service?.desiredCount, 2);
+    assertIdentical(described.services?.[0]?.runningCount, 2);
+    assertIdentical(deleted.service?.status, "INACTIVE");
+  });
+
   it("supports every ECS operation this service simulates", () => {
     // Given simulated ECS.
     const simEcs = new SimEcs();
@@ -164,6 +221,10 @@ describe("ECS SDK interception", () => {
       DescribeTasksCommand.name,
       ListTasksCommand.name,
       StopTaskCommand.name,
+      CreateServiceCommand.name,
+      UpdateServiceCommand.name,
+      DescribeServicesCommand.name,
+      DeleteServiceCommand.name,
     ]);
   });
 
@@ -172,7 +233,7 @@ describe("ECS SDK interception", () => {
     const simEcs = new SimEcs();
 
     // When a command it does not handle is looked up.
-    const route = simEcs.sdkCommandRouter().route("CreateServiceCommand");
+    const route = simEcs.sdkCommandRouter().route("ListServicesCommand");
 
     // Then there is no route for it, so interception reports it as
     // unsupported rather than answering with nothing.

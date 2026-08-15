@@ -17,6 +17,7 @@ export interface SimListTasksCommandInput {
   readonly cluster?: string | undefined;
   readonly family?: string | undefined;
   readonly desiredStatus?: string | undefined;
+  readonly serviceName?: string | undefined;
   readonly startedBy?: string | undefined;
   readonly launchType?: string | undefined;
   readonly maxResults?: number | undefined;

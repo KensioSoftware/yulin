@@ -12,6 +12,7 @@ import { SimAws } from "../../../aws/sim-aws.js";
 import { simEcsClusterFactory } from "../../cluster/sim-ecs-cluster.factory.js";
 import { SimEcsInvalidParameterException } from "../../error/sim-ecs.error.js";
 import { simEcsRegisteredTaskDefinitionFactory } from "../../task-definition/sim-ecs-registered-task-definition.factory.js";
+import { simEcsServiceFactory } from "../../service/sim-ecs-service.factory.js";
 
 describe("ECS ListTasksCommand", () => {
   it("lists the tasks that are meant to be running", async () => {
@@ -56,6 +57,36 @@ describe("ECS ListTasksCommand", () => {
       .listTasks(new ListTasksCommand({ desiredStatus: "STOPPED" }));
 
     assertArrayLength(stopped.taskArns, 1);
+  });
+
+  it("filters by the service keeping the task running", async () => {
+    // Given a service running two tasks and a task run on its own from the
+    // same family.
+    const simAws = new SimAws();
+    const ecs = simAws.ecs();
+    await simEcsClusterFactory.make({}, simAws);
+    await simEcsRegisteredTaskDefinitionFactory.make({}, simAws);
+    await simEcsServiceFactory.make({ desiredCount: 2 }, simAws);
+    await simAws.backgroundTasksComplete();
+
+    // And the one run on its own still wanted running, so that a listing that
+    // ignored the service would answer with all three.
+    await ecs.runTask(new RunTaskCommand({ taskDefinition: "checkout" }));
+
+    // When the tasks of the service are listed.
+    const ofService = await ecs.listTasks(
+      new ListTasksCommand({ serviceName: "checkout" }),
+    );
+    const ofFamily = await ecs.listTasks(
+      new ListTasksCommand({ family: "checkout" }),
+    );
+
+    // Then only the two the service is keeping are listed, out of the three
+    // the family has running.
+    assertArrayLength(ofService.taskArns, 2);
+    assertArrayLength(ofFamily.taskArns, 3);
+
+    await simAws.backgroundTasksComplete();
   });
 
   it("filters by family and by what started the task", async () => {

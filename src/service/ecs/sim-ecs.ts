@@ -1,39 +1,17 @@
-import { BackgroundTasks } from "../../util/background/background.js";
 import type { SimSdkCommandRouter } from "../../sdk/router/sim-sdk-command-router.type.js";
-import { simAwsAccountRegionScopeFactory } from "../aws/sim-aws-account-region-scope.factory.js";
-import { SimIamAllowAllAuth } from "../iam/authorize/sim-iam-inter-service-auth-z.js";
-import { SimEcsContainerBindings } from "./bind/sim-ecs-container-bindings.js";
 import type { SimEcsContainerBinding } from "./bind/sim-ecs-container-binding.type.js";
-import { SimEcsClusterStore } from "./cluster/sim-ecs-cluster-store.js";
-import { SimEcsAuthorizer } from "./command/authorize/sim-ecs-authorizer.js";
-import { SimEcsCommandContexts } from "./command/sim-ecs-command-contexts.js";
-import { CreateClusterCommandHandler } from "./command/create-cluster/create-cluster.handler.js";
-import { DeleteClusterCommandHandler } from "./command/delete-cluster/delete-cluster.handler.js";
-import { DeregisterTaskDefinitionCommandHandler } from "./command/deregister-task-definition/deregister-task-definition.handler.js";
-import { DescribeClustersCommandHandler } from "./command/describe-clusters/describe-clusters.handler.js";
-import { DescribeTaskDefinitionCommandHandler } from "./command/describe-task-definition/describe-task-definition.handler.js";
-import { DescribeTasksCommandHandler } from "./command/describe-tasks/describe-tasks.handler.js";
-import { ListClustersCommandHandler } from "./command/list-clusters/list-clusters.handler.js";
-import { ListTaskDefinitionFamiliesCommandHandler } from "./command/list-task-definition-families/list-task-definition-families.handler.js";
-import { ListTaskDefinitionsCommandHandler } from "./command/list-task-definitions/list-task-definitions.handler.js";
-import { ListTasksCommandHandler } from "./command/list-tasks/list-tasks.handler.js";
-import { RegisterTaskDefinitionCommandHandler } from "./command/register-task-definition/register-task-definition.handler.js";
-import { RunTaskCommandHandler } from "./command/run-task/run-task.handler.js";
-import { StopTaskCommandHandler } from "./command/stop-task/stop-task.handler.js";
 import type * as simEcsCommands from "./command/sim-ecs-command.types.js";
 import type { SimEcsRequestOptions } from "./command/sim-ecs-request-options.js";
 import { SimEcsSdkCommandRouter } from "./sdk/sim-ecs-sdk-command-router.js";
+import { SimEcsCommands } from "./sim-ecs-commands.js";
 import type { SimEcsProperties } from "./sim-ecs-properties.js";
-import { SimEcsUnreachableSecretStores } from "./task/run/secret/sim-ecs-secret-stores.js";
-import { SimEcsTaskStore } from "./task/sim-ecs-task-store.js";
-import { SimEcsTaskDefinitionStore } from "./task-definition/sim-ecs-task-definition-store.js";
 
 /**
  * Simulated ECS. Handles SDK commands. Emulates AWS behaviour and state.
  *
- * Clusters and task definitions are scoped to an account and region, as they
- * are on real AWS: both ARNs name the region, and a cluster name is unique
- * within one account and region rather than globally.
+ * Clusters, task definitions and services are scoped to an account and region,
+ * as they are on real AWS: their ARNs name the region, and a cluster name is
+ * unique within one account and region rather than globally.
  *
  * A task runs the handlers bound to the containers its task definition
  * declares. Nothing else runs: Yulin never looks inside a container image, so
@@ -41,68 +19,14 @@ import { SimEcsTaskDefinitionStore } from "./task-definition/sim-ecs-task-defini
  * failing anything.
  */
 export class SimEcs {
-  private readonly clusters = new SimEcsClusterStore();
-  private readonly taskDefinitions = new SimEcsTaskDefinitionStore();
-  private readonly tasks = new SimEcsTaskStore();
-  private readonly bindings = new SimEcsContainerBindings();
-
-  private readonly createClusterCommand: CreateClusterCommandHandler;
-  private readonly describeClustersCommand: DescribeClustersCommandHandler;
-  private readonly deleteClusterCommand: DeleteClusterCommandHandler;
-  private readonly listClustersCommand: ListClustersCommandHandler;
-  private readonly registerTaskDefinitionCommand: RegisterTaskDefinitionCommandHandler;
-  private readonly deregisterTaskDefinitionCommand: DeregisterTaskDefinitionCommandHandler;
-  private readonly describeTaskDefinitionCommand: DescribeTaskDefinitionCommandHandler;
-  private readonly listTaskDefinitionsCommand: ListTaskDefinitionsCommandHandler;
-  private readonly listTaskDefinitionFamiliesCommand: ListTaskDefinitionFamiliesCommandHandler;
-  private readonly runTaskCommand: RunTaskCommandHandler;
-  private readonly describeTasksCommand: DescribeTasksCommandHandler;
-  private readonly listTasksCommand: ListTasksCommandHandler;
-  private readonly stopTaskCommand: StopTaskCommandHandler;
+  private readonly commands: SimEcsCommands;
   private readonly sdkRouter = new SimEcsSdkCommandRouter(this);
 
   constructor(properties: SimEcsProperties = {}) {
-    const {
-      accountRegionScope = simAwsAccountRegionScopeFactory.make(),
-      iam = new SimIamAllowAllAuth(),
-      background = new BackgroundTasks(),
-      runAsOwner = this,
-      secretStores = new SimEcsUnreachableSecretStores(),
-    } = properties;
-
-    const contexts = new SimEcsCommandContexts({
-      accountRegionScope,
-      authorizer: new SimEcsAuthorizer({ iam }),
-      background,
-      runAsOwner,
-      clusters: this.clusters,
-      taskDefinitions: this.taskDefinitions,
-      tasks: this.tasks,
-      bindings: this.bindings,
-      secretStores,
+    this.commands = new SimEcsCommands({
+      ...properties,
+      runAsOwner: properties.runAsOwner ?? this,
     });
-    const { cluster, taskDefinition, task } = contexts;
-
-    this.runTaskCommand = new RunTaskCommandHandler(contexts.runTask);
-    this.describeTasksCommand = new DescribeTasksCommandHandler(task);
-    this.listTasksCommand = new ListTasksCommandHandler(task);
-    this.stopTaskCommand = new StopTaskCommandHandler(task);
-
-    this.createClusterCommand = new CreateClusterCommandHandler(cluster);
-    this.describeClustersCommand = new DescribeClustersCommandHandler(cluster);
-    this.deleteClusterCommand = new DeleteClusterCommandHandler(cluster);
-    this.listClustersCommand = new ListClustersCommandHandler(cluster);
-    this.registerTaskDefinitionCommand =
-      new RegisterTaskDefinitionCommandHandler(taskDefinition);
-    this.deregisterTaskDefinitionCommand =
-      new DeregisterTaskDefinitionCommandHandler(taskDefinition);
-    this.describeTaskDefinitionCommand =
-      new DescribeTaskDefinitionCommandHandler(taskDefinition);
-    this.listTaskDefinitionsCommand = new ListTaskDefinitionsCommandHandler(
-      taskDefinition,
-    );
-    this.listTaskDefinitionFamiliesCommand =
-      new ListTaskDefinitionFamiliesCommandHandler(taskDefinition);
   }
 
   /**
@@ -112,7 +36,7 @@ export class SimEcs {
     command: simEcsCommands.SimCreateClusterCommand,
     options?: SimEcsRequestOptions,
   ): Promise<simEcsCommands.SimCreateClusterCommandOutput> {
-    return await this.createClusterCommand.handle(command, options);
+    return await this.commands.createCluster.handle(command, options);
   }
 
   /**
@@ -122,7 +46,7 @@ export class SimEcs {
     command: simEcsCommands.SimDescribeClustersCommand,
     options?: SimEcsRequestOptions,
   ): Promise<simEcsCommands.SimDescribeClustersCommandOutput> {
-    return await this.describeClustersCommand.handle(command, options);
+    return await this.commands.describeClusters.handle(command, options);
   }
 
   /**
@@ -132,7 +56,7 @@ export class SimEcs {
     command: simEcsCommands.SimDeleteClusterCommand,
     options?: SimEcsRequestOptions,
   ): Promise<simEcsCommands.SimDeleteClusterCommandOutput> {
-    return await this.deleteClusterCommand.handle(command, options);
+    return await this.commands.deleteCluster.handle(command, options);
   }
 
   /**
@@ -142,7 +66,7 @@ export class SimEcs {
     command: simEcsCommands.SimListClustersCommand,
     options?: SimEcsRequestOptions,
   ): Promise<simEcsCommands.SimListClustersCommandOutput> {
-    return await this.listClustersCommand.handle(command, options);
+    return await this.commands.listClusters.handle(command, options);
   }
 
   /**
@@ -152,7 +76,7 @@ export class SimEcs {
     command: simEcsCommands.SimRegisterTaskDefinitionCommand,
     options?: SimEcsRequestOptions,
   ): Promise<simEcsCommands.SimRegisterTaskDefinitionCommandOutput> {
-    return await this.registerTaskDefinitionCommand.handle(command, options);
+    return await this.commands.registerTaskDefinition.handle(command, options);
   }
 
   /**
@@ -162,7 +86,10 @@ export class SimEcs {
     command: simEcsCommands.SimDeregisterTaskDefinitionCommand,
     options?: SimEcsRequestOptions,
   ): Promise<simEcsCommands.SimDeregisterTaskDefinitionCommandOutput> {
-    return await this.deregisterTaskDefinitionCommand.handle(command, options);
+    return await this.commands.deregisterTaskDefinition.handle(
+      command,
+      options,
+    );
   }
 
   /**
@@ -172,7 +99,7 @@ export class SimEcs {
     command: simEcsCommands.SimDescribeTaskDefinitionCommand,
     options?: SimEcsRequestOptions,
   ): Promise<simEcsCommands.SimDescribeTaskDefinitionCommandOutput> {
-    return await this.describeTaskDefinitionCommand.handle(command, options);
+    return await this.commands.describeTaskDefinition.handle(command, options);
   }
 
   /**
@@ -182,7 +109,7 @@ export class SimEcs {
     command: simEcsCommands.SimListTaskDefinitionsCommand,
     options?: SimEcsRequestOptions,
   ): Promise<simEcsCommands.SimListTaskDefinitionsCommandOutput> {
-    return await this.listTaskDefinitionsCommand.handle(command, options);
+    return await this.commands.listTaskDefinitions.handle(command, options);
   }
 
   /**
@@ -192,7 +119,7 @@ export class SimEcs {
     command: simEcsCommands.SimListTaskDefinitionFamiliesCommand,
     options?: SimEcsRequestOptions,
   ): Promise<simEcsCommands.SimListTaskDefinitionFamiliesCommandOutput> {
-    return await this.listTaskDefinitionFamiliesCommand.handle(
+    return await this.commands.listTaskDefinitionFamilies.handle(
       command,
       options,
     );
@@ -205,7 +132,7 @@ export class SimEcs {
     command: simEcsCommands.SimRunTaskCommand,
     options?: SimEcsRequestOptions,
   ): Promise<simEcsCommands.SimRunTaskCommandOutput> {
-    return await this.runTaskCommand.handle(command, options);
+    return await this.commands.runTask.handle(command, options);
   }
 
   /**
@@ -215,7 +142,7 @@ export class SimEcs {
     command: simEcsCommands.SimDescribeTasksCommand,
     options?: SimEcsRequestOptions,
   ): Promise<simEcsCommands.SimDescribeTasksCommandOutput> {
-    return await this.describeTasksCommand.handle(command, options);
+    return await this.commands.describeTasks.handle(command, options);
   }
 
   /**
@@ -225,7 +152,7 @@ export class SimEcs {
     command: simEcsCommands.SimListTasksCommand,
     options?: SimEcsRequestOptions,
   ): Promise<simEcsCommands.SimListTasksCommandOutput> {
-    return await this.listTasksCommand.handle(command, options);
+    return await this.commands.listTasks.handle(command, options);
   }
 
   /**
@@ -235,7 +162,63 @@ export class SimEcs {
     command: simEcsCommands.SimStopTaskCommand,
     options?: SimEcsRequestOptions,
   ): Promise<simEcsCommands.SimStopTaskCommandOutput> {
-    return await this.stopTaskCommand.handle(command, options);
+    return await this.commands.stopTask.handle(command, options);
+  }
+
+  /**
+   * Handle a CreateService Command from the SDK.
+   */
+  async createService(
+    command: simEcsCommands.SimCreateServiceCommand,
+    options?: SimEcsRequestOptions,
+  ): Promise<simEcsCommands.SimCreateServiceCommandOutput> {
+    return await this.commands.createService.handle(command, options);
+  }
+
+  /**
+   * Handle an UpdateService Command from the SDK.
+   */
+  async updateService(
+    command: simEcsCommands.SimUpdateServiceCommand,
+    options?: SimEcsRequestOptions,
+  ): Promise<simEcsCommands.SimUpdateServiceCommandOutput> {
+    return await this.commands.updateService.handle(command, options);
+  }
+
+  /**
+   * Handle a DescribeServices Command from the SDK.
+   */
+  async describeServices(
+    command: simEcsCommands.SimDescribeServicesCommand,
+    options?: SimEcsRequestOptions,
+  ): Promise<simEcsCommands.SimDescribeServicesCommandOutput> {
+    return await this.commands.describeServices.handle(command, options);
+  }
+
+  /**
+   * Handle a DeleteService Command from the SDK.
+   */
+  async deleteService(
+    command: simEcsCommands.SimDeleteServiceCommand,
+    options?: SimEcsRequestOptions,
+  ): Promise<simEcsCommands.SimDeleteServiceCommandOutput> {
+    return await this.commands.deleteService.handle(command, options);
+  }
+
+  /**
+   * Stop everything the services in this scope are keeping running.
+   *
+   * A service is the one thing simulated ECS keeps running rather than runs and
+   * finishes, so this is what a simulated environment being finished with comes
+   * down to here: every service's tasks stop, and nothing is left scheduled.
+   * The services themselves stay as they were, describable with the desired
+   * count they had.
+   *
+   * Closing again does nothing again, since the second time round there is
+   * nothing running to stop.
+   */
+  close(): void {
+    this.commands.closeServices();
   }
 
   /**
@@ -261,7 +244,7 @@ export class SimEcs {
    * definition is registered.
    */
   bindContainer(binding: SimEcsContainerBinding): void {
-    this.bindings.add(binding);
+    this.commands.bindings.add(binding);
   }
 
   /**

@@ -4,6 +4,7 @@ import type { SimEcsTaskContainer } from "./sim-ecs-task-container.js";
 import type {
   SimEcsTaskDesiredStatus,
   SimEcsTaskDetail,
+  SimEcsTaskStatus,
 } from "./sim-ecs-task-detail.js";
 import {
   SimEcsTaskIdentity,
@@ -69,9 +70,19 @@ export class SimEcsTask {
     return this.identity.launchType;
   }
 
+  /** The service keeping this task running, where one is. */
+  get serviceName(): string | undefined {
+    return this.identity.serviceName;
+  }
+
   /** The state this task is being kept in. */
   get desiredStatus(): SimEcsTaskDesiredStatus {
     return this.lifecycle.desiredStatus;
+  }
+
+  /** Where this task has actually got to. */
+  get lastStatus(): SimEcsTaskStatus {
+    return this.lifecycle.lastStatus;
   }
 
   /**

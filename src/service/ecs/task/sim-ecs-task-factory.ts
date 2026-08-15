@@ -12,6 +12,7 @@ interface SimEcsStartingTask {
   readonly group?: string | undefined;
   readonly startedBy?: string | undefined;
   readonly launchType?: string | undefined;
+  readonly serviceName?: string | undefined;
 }
 
 /**
@@ -48,6 +49,7 @@ export class SimEcsTaskFactory {
       createdAt: starting.createdAt,
       launchType: starting.launchType,
       startedBy: starting.startedBy,
+      serviceName: starting.serviceName,
     });
   }
 

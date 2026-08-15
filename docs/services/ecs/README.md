@@ -1,8 +1,8 @@
 # Simulated ECS
 
-Yulin includes a simulated Amazon ECS for tests and local development. It holds clusters and task
-definitions in memory, runs tasks from handlers you bind to their containers, and authorizes every
-operation with simulated IAM.
+Yulin includes a simulated Amazon ECS for tests and local development. It holds clusters, task
+definitions and services in memory, runs tasks from handlers you bind to their containers, and
+authorizes every operation with simulated IAM.
 
 ECS-specific types are imported from the `@kensio/yulin/ecs` subpath.
 
@@ -756,6 +756,247 @@ not started yet runs none of them, and one stopped part way through runs no more
 a task between `RunTask` and the background work that runs it. A task that has already stopped is
 reported as it stands, keeping the reason it stopped for.
 
+## Services
+
+A task runs and stops. A service keeps tasks running, which is what a deployed application usually
+is: a named service in a cluster, running some number of tasks from a task definition.
+
+`CreateService` creates one. Its tasks exist as soon as the request is answered and reach `RUNNING`
+on the simulation's background work, as real ECS brings a new service up, so the service reports the
+desired count it was given and a running count that catches up.
+
+```typescript sim-ecs-create-service
+/**
+ * Creating a simulated ECS service that keeps three tasks running.
+ */
+
+import {
+  CreateClusterCommand,
+  CreateServiceCommand,
+  DescribeServicesCommand,
+  ListTasksCommand,
+  RegisterTaskDefinitionCommand,
+} from "@aws-sdk/client-ecs";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const ecs = simAws.ecs();
+
+await ecs.createCluster(new CreateClusterCommand({ clusterName: "orders" }));
+
+ecs.bindContainer({
+  family: "checkout",
+  containerName: "app",
+  run: async () => {
+    await handleOneRequest();
+  },
+});
+
+await ecs.registerTaskDefinition(
+  new RegisterTaskDefinitionCommand({
+    family: "checkout",
+    containerDefinitions: [{ name: "app", image: "checkout:1" }],
+  }),
+);
+
+const created = await ecs.createService(
+  new CreateServiceCommand({
+    cluster: "orders",
+    serviceName: "checkout",
+    taskDefinition: "checkout",
+    desiredCount: 3,
+  }),
+);
+
+console.log(created.service?.desiredCount); // 3
+console.log(created.service?.runningCount); // 0, as real ECS answers one
+
+// The tasks come up in the background, as they do on real ECS.
+await simAws.backgroundTasksComplete();
+
+const described = await ecs.describeServices(
+  new DescribeServicesCommand({ cluster: "orders", services: ["checkout"] }),
+);
+
+console.log(described.services?.[0]?.runningCount); // 3
+
+const listed = await ecs.listTasks(
+  new ListTasksCommand({ cluster: "orders", serviceName: "checkout" }),
+);
+
+console.log(listed.taskArns?.length); // 3
+
+async function handleOneRequest(): Promise<void> {
+  await Promise.resolve();
+}
+```
+
+Each of those tasks is a task like any other: `ListTasks` returns its ARN, `DescribeTasks` describes
+it, and its containers report which of them Yulin is simulating.
+
+### The desired count is state, not concurrency
+
+A desired count of three does not mean three copies of your handler. Yulin runs in one Node.js
+process and there are no containers to copy, so the count is simulated as state: three tasks exist
+and are reported as running, while the handler bound to a container is called once per request or per
+poll, whenever something reaches it.
+
+That is a deliberate divergence. What it means in practice is that a service is worth asserting on
+for its state — how many tasks it keeps, which revision they run — rather than for anything about
+running three things at once. A test that needs concurrency is a test about your own code, not about
+ECS.
+
+Nothing calls a service container's handler yet. A container of a service that has come up is
+treated as running from that point, and what will call it is whatever reaches it: a load balancer
+sending it a request, or a queue it polls. Both follow separately.
+
+### Updating and deleting a service
+
+`UpdateService` changes the desired count, the task definition, or both. A new count starts or stops
+tasks to reach it. A new revision moves the service onto it, which replaces every task the service is
+running: real ECS replaces them a few at a time under a deployment configuration, and Yulin replaces
+them at once because nothing here takes any time to start.
+
+```typescript sim-ecs-update-service
+/**
+ * Scaling a simulated ECS service and moving it to a new revision.
+ */
+
+import {
+  CreateClusterCommand,
+  CreateServiceCommand,
+  ListTasksCommand,
+  RegisterTaskDefinitionCommand,
+  UpdateServiceCommand,
+} from "@aws-sdk/client-ecs";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const ecs = simAws.ecs();
+
+await ecs.createCluster(new CreateClusterCommand({ clusterName: "orders" }));
+await ecs.registerTaskDefinition(
+  new RegisterTaskDefinitionCommand({
+    family: "checkout",
+    containerDefinitions: [{ name: "app", image: "checkout:1" }],
+  }),
+);
+await ecs.createService(
+  new CreateServiceCommand({
+    cluster: "orders",
+    serviceName: "checkout",
+    taskDefinition: "checkout",
+    desiredCount: 1,
+  }),
+);
+
+const scaled = await ecs.updateService(
+  new UpdateServiceCommand({
+    cluster: "orders",
+    service: "checkout",
+    desiredCount: 4,
+  }),
+);
+
+console.log(scaled.service?.desiredCount); // 4
+
+const second = await ecs.registerTaskDefinition(
+  new RegisterTaskDefinitionCommand({
+    family: "checkout",
+    containerDefinitions: [{ name: "app", image: "checkout:2" }],
+  }),
+);
+
+const deployed = await ecs.updateService(
+  new UpdateServiceCommand({
+    cluster: "orders",
+    service: "checkout",
+    taskDefinition: "checkout:2",
+  }),
+);
+
+console.log(
+  deployed.service?.taskDefinition === second.taskDefinition?.taskDefinitionArn,
+); // true
+
+await simAws.backgroundTasksComplete();
+
+const listed = await ecs.listTasks(
+  new ListTasksCommand({ cluster: "orders", serviceName: "checkout" }),
+);
+
+console.log(listed.taskArns?.length); // 4, all of them on the new revision
+```
+
+`DeleteService` stops the service and its tasks. A service still scaled above zero is refused unless
+the request forces it, as real ECS refuses one, so scaling to zero first is the ordinary way round. A
+deleted service is still describable as `INACTIVE`, and its name is free to create again.
+
+```typescript sim-ecs-delete-service
+/**
+ * Deleting a simulated ECS service and the tasks it was keeping running.
+ */
+
+import {
+  CreateClusterCommand,
+  CreateServiceCommand,
+  DeleteServiceCommand,
+  DescribeServicesCommand,
+  ListTasksCommand,
+  RegisterTaskDefinitionCommand,
+} from "@aws-sdk/client-ecs";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const ecs = simAws.ecs();
+
+await ecs.createCluster(new CreateClusterCommand({ clusterName: "orders" }));
+await ecs.registerTaskDefinition(
+  new RegisterTaskDefinitionCommand({
+    family: "checkout",
+    containerDefinitions: [{ name: "app", image: "checkout:1" }],
+  }),
+);
+await ecs.createService(
+  new CreateServiceCommand({
+    cluster: "orders",
+    serviceName: "checkout",
+    taskDefinition: "checkout",
+    desiredCount: 2,
+  }),
+);
+await simAws.backgroundTasksComplete();
+
+const deleted = await ecs.deleteService(
+  new DeleteServiceCommand({
+    cluster: "orders",
+    service: "checkout",
+    force: true,
+  }),
+);
+
+console.log(deleted.service?.status); // "INACTIVE"
+
+const listed = await ecs.listTasks(
+  new ListTasksCommand({ cluster: "orders", serviceName: "checkout" }),
+);
+
+console.log(listed.taskArns?.length); // 0
+
+const described = await ecs.describeServices(
+  new DescribeServicesCommand({ cluster: "orders", services: ["checkout"] }),
+);
+
+console.log(described.services?.[0]?.runningCount); // 0
+```
+
+Closing the simulated environment with `simAws.close()` stops the tasks of every service in it, and
+nothing is left scheduled either way: a service is kept as state rather than by a timer, so a test
+that finishes with a service running leaves nothing behind it.
+
 ## Authorization
 
 Every operation is authorized by simulated IAM against the real ECS action.
@@ -764,7 +1005,9 @@ Real ECS gives the task definition operations no resource type at all, and gives
 `ListClusters` and `ListTasks` none either, so all of those authorize against `*`. A policy naming a
 task definition ARN grants none of them, here as on AWS. The operations that do take a resource are
 `DescribeClusters` and `DeleteCluster`, which take the cluster's ARN, `RunTask`, which takes the
-task definition revision it would run, and `DescribeTasks` and `StopTask`, which take the task's ARN.
+task definition revision it would run, `DescribeTasks` and `StopTask`, which take the task's ARN, and
+the service operations, which take the service's ARN. `CreateService` authorizes against the ARN the
+service is about to have, so a policy can name one service by name before it exists.
 
 ```typescript sim-ecs-iam-policy
 /**
@@ -914,6 +1157,10 @@ console.log(described.taskDefinition?.revision); // 1
 - `DescribeTasksCommand`, `ListTasksCommand` and `StopTaskCommand`
 - Tasks run from an EventBridge rule target or a Scheduler schedule target, through that target's
   role
+- `CreateServiceCommand`, keeping a desired count of tasks running from a task definition
+- `UpdateServiceCommand`, changing the desired count, the task definition, or both
+- `DescribeServicesCommand` and `DeleteServiceCommand`, with the `force` a scaled-up service needs
+- `ListTasks` filtering by `serviceName`, so a service's tasks can be listed on their own
 - `bindContainer`, targeting a container by family and container name or by image repository
 - Container environment variables and `RunTask` container overrides, through `process.env`
 - Container AWS calls authorized as the task role, including a `RunTask` `taskRoleArn` override
@@ -923,7 +1170,7 @@ console.log(described.taskDefinition?.revision); // 1
 - Task definition tags, reported under `include: ["TAGS"]`
 - Cluster settings, configuration and tags, reported under their matching `include` values
 - Authorization of every operation by simulated IAM, against the real IAM action and resource
-- Clusters, task definitions and tasks scoped by account and region
+- Clusters, task definitions, tasks and services scoped by account and region
 - ECS SDK clients intercepted by `SimSdk`
 
 ## Limitations
@@ -969,8 +1216,6 @@ Current documented limitations:
   for them to configure.
 - A task definition declaring `secrets` and no `executionRoleArn` fails when a task is run rather
   than when the revision is registered. Real ECS refuses the registration.
-- `StartTask` and the whole of the service API (`CreateService`, `UpdateService`,
-  `DescribeServices`) are not simulated.
 - An EventBridge or Scheduler target's `EcsParameters` takes `TaskDefinitionArn` and `TaskCount`
   only, taking and ignoring the launch type, platform version, network configuration and capacity
   provider strategy for the same reason `RunTask` refuses them: there is no placement and no network
@@ -979,6 +1224,32 @@ Current documented limitations:
 - A rule or schedule target's `Input` is read as the task's overrides rather than as a payload,
   since a task has nowhere to receive one, so container environment variables are set with a
   `containerOverrides` list naming the container.
+- A service's desired count is simulated as state rather than as concurrency. Three tasks exist and
+  are reported as running, and the handler bound to a container is called once per request or per
+  poll rather than once per task. Yulin runs in one Node.js process, so there is nothing to copy.
+- Nothing calls a service container's handler yet. A bound container of a service is treated as
+  running and stays available until the service is deleted or its `SimAws` is closed, but a load
+  balancer sending it a request and a queue it polls both follow separately. Its container secrets
+  are resolved as the task comes up, so a secret that cannot be read stops the task, but the values
+  reach a container's environment only when something calls its handler.
+- A service's tasks come up all at once and are replaced all at once. There are no deployments,
+  deployment controllers, circuit breakers or rolling replacement, so `DescribeServices` reports no
+  `deployments` and no `events`, and `UpdateService` refuses `forceNewDeployment`.
+- A service whose tasks fail to start does not start replacements for them. Real ECS keeps trying,
+  which would be an endless retry in a test rather than a result to assert on, so the service
+  reports the running count it actually has.
+- `CreateService` refuses `loadBalancers`, `serviceRegistries`, `networkConfiguration`,
+  `deploymentConfiguration`, `capacityProviderStrategy` and the rest of what it takes. There is no
+  network here, and nothing serves a service container yet.
+- `CreateService` refuses a `schedulingStrategy` of `DAEMON`, which places one task on each container
+  instance. There are no container instances here to place one on each of.
+- `CreateService` needs a `desiredCount`, as a replica service does on real ECS, and it can be zero.
+- A service's tasks are `startedBy` `ecs-svc/` and the service name. Real ECS uses `ecs-svc/` and a
+  number, which would name nothing here.
+- Service autoscaling and service discovery are not simulated, and neither is `ListServices`.
+- `StartTask` is not simulated.
+- Closing a `SimAws` stops the tasks of every service in it. The services stay describable with the
+  desired count they had, and their tasks are not brought back.
 - `DescribeTasks` refuses `include`, and a task carries no tags, so `RunTask` refuses `tags` too.
 - `ListTasks` refuses a `desiredStatus` of `PENDING`, which real ECS accepts. A simulated task is
   wanted either running or stopped, so the answer would always be an empty listing.
@@ -1002,12 +1273,15 @@ Current documented limitations:
   `INACTIVE`.
 - `CreateCluster` with a name an active cluster already has hands that cluster back rather than
   raising, as real ECS does. The settings, configuration and tags on the second request are ignored.
-- Deleting a cluster is immediate, and never fails for a cluster holding tasks or services, because
-  there are none to hold.
+- Deleting a cluster is immediate, and never fails for a cluster still holding running tasks or
+  active services, which real ECS refuses. The services in it go on reporting what they are keeping.
+- `DescribeClusters` reports zero services and zero tasks whatever the cluster holds.
+  `DescribeServices` and `ListTasks` are what report those.
 - Task definition and cluster tags are stored and reported, but `TagResource`,
   `UntagResource` and `ListTagsForResource` are not simulated.
-- There are no ECS CloudFormation resource types yet. `AWS::ECS::Cluster` and
-  `AWS::ECS::TaskDefinition` are reported as unsupported and skipped rather than deployed.
+- There are no ECS CloudFormation resource types yet. `AWS::ECS::Cluster`,
+  `AWS::ECS::TaskDefinition` and `AWS::ECS::Service` are reported as unsupported and skipped rather
+  than deployed.
 - Cluster and family names are validated to the 255 letters, numbers, hyphens and underscores real
   ECS accepts, but error messages differ from the real ones.
 - Account-wide limits do not exist, so no request fails for having registered too many task
