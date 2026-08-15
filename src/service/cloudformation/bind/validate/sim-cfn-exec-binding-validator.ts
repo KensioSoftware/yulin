@@ -1,34 +1,64 @@
+import { SimCfnEcsContainerBindingMatcher } from "../../../ecs/cfn/bind/sim-cfn-ecs-container-binding-matcher.js";
+import {
+  type SimCfnDeployBinding,
+  simCfnIsExecutableBinding,
+} from "../sim-cfn-deploy-binding.js";
 import type { SimCfnExecutableResourceBinding } from "../sim-cfn-exec-binding.type.js";
 import type { SimCfnResource } from "../../resource/sim-cfn-resource.js";
 import { SimCfnExecutableResourceBindingMatcher } from "./sim-cfn-exec-binding-matcher.js";
 
 /**
- * Validate that every executable binding targets a Resource in the Stack.
+ * Validate that every binding a deployment supplied targets a Resource in the
+ * Stack.
  *
  * The validator owns the high-level validation contract: each supplied binding
  * must resolve to a synthesized CloudFormation Resource. The detailed matching
- * rules live in `SimCfnExecutableResourceBindingMatcher`, which keeps this file
- * small and focused on reporting actionable validation errors.
+ * rules live with whichever kind of binding it is, in
+ * `SimCfnExecutableResourceBindingMatcher` for a handler backing an executable
+ * Resource and in `SimCfnEcsContainerBindingMatcher` for a container an ECS
+ * task definition declares, which keeps this file small and focused on
+ * reporting actionable validation errors.
  */
 export function validateSimCfnExecutableResourceBindings(properties: {
   readonly stackName: string;
   readonly resources: ReadonlyMap<string, SimCfnResource>;
-  readonly bindings?: readonly SimCfnExecutableResourceBinding[] | undefined;
+  readonly bindings?: readonly SimCfnDeployBinding[] | undefined;
 }): void {
   const bindings = properties.bindings ?? [];
   const matcher = new SimCfnExecutableResourceBindingMatcher(
     properties.resources,
   );
+  const containerMatcher = new SimCfnEcsContainerBindingMatcher(
+    properties.resources,
+  );
 
   for (const binding of bindings) {
+    if (!simCfnIsExecutableBinding(binding)) {
+      if (containerMatcher.matches(binding)) {
+        continue;
+      }
+
+      throw unresolvedBindingError(
+        properties.stackName,
+        SimCfnEcsContainerBindingMatcher.describe(binding),
+      );
+    }
+
     if (matcher.matches(binding)) {
       continue;
     }
 
-    throw new Error(
-      `Invalid sim CloudFormation executable binding in Stack ${properties.stackName}: ${describeBinding(binding)} does not resolve to a Resource in the Stack`,
+    throw unresolvedBindingError(
+      properties.stackName,
+      describeBinding(binding),
     );
   }
+}
+
+function unresolvedBindingError(stackName: string, described: string): Error {
+  return new Error(
+    `Invalid sim CloudFormation executable binding in Stack ${stackName}: ${described} does not resolve to a Resource in the Stack`,
+  );
 }
 
 function describeBinding(binding: SimCfnExecutableResourceBinding): string {

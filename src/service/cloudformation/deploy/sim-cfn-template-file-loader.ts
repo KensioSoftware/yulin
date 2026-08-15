@@ -7,7 +7,7 @@ import {
   loadSiblingCdkAssetsManifest,
   type SimCdkOutContext,
 } from "../cdk/sim-cdk-out-context.js";
-import type { SimCfnExecutableResourceBinding } from "../bind/sim-cfn-exec-binding.type.js";
+import type { SimCfnDeployBinding } from "../bind/sim-cfn-deploy-binding.js";
 import { simWatch } from "../../../watch/sim-watch-runtime.js";
 import type { SimCfnTemplateFileWatchOptions } from "../watch/sim-cfn-template-watch.type.js";
 import { simCfnTemplateFileDeployment } from "./sim-cfn-template-file-deployment.js";
@@ -20,7 +20,7 @@ export interface SimCloudFormationDeployTemplateFileProperties {
   readonly templatePath: string;
   readonly stackName?: SimCloudFormationStackName | string | undefined;
   readonly parameters?: Record<string, string> | undefined;
-  readonly bindings?: readonly SimCfnExecutableResourceBinding[] | undefined;
+  readonly bindings?: readonly SimCfnDeployBinding[] | undefined;
 
   /**
    * Adapt the parsed template before it is deployed, and again every time a
@@ -56,7 +56,7 @@ export interface SimCfnLoadedTemplateFile {
   readonly stackName: SimCloudFormationStackName | string;
   readonly template: CfnTemplateBodyRecord;
   readonly parameters?: Record<string, string> | undefined;
-  readonly bindings?: readonly SimCfnExecutableResourceBinding[] | undefined;
+  readonly bindings?: readonly SimCfnDeployBinding[] | undefined;
   readonly cdkOutContext?: SimCdkOutContext | undefined;
 }
 

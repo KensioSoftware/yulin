@@ -1,7 +1,7 @@
 import type { BackgroundScheduler } from "../../../util/background/background.js";
 import type { SimAws } from "../../aws/sim-aws.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
-import type { SimCfnExecutableResourceBinding } from "../bind/sim-cfn-exec-binding.type.js";
+import type { SimCfnDeployBinding } from "../bind/sim-cfn-deploy-binding.js";
 import type { SimCdkOutContext } from "../cdk/sim-cdk-out-context.js";
 import { SimCdkAssetsPublisher } from "../cdk/assets/sim-cdk-assets-publisher.js";
 import type { SimCfnResource } from "../resource/sim-cfn-resource.js";
@@ -23,7 +23,7 @@ interface SimCfnStackResourceOperationsProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
   readonly stackName: SimCloudFormationStackName;
   readonly cdkOutContext?: SimCdkOutContext | undefined;
-  readonly bindings?: readonly SimCfnExecutableResourceBinding[] | undefined;
+  readonly bindings?: readonly SimCfnDeployBinding[] | undefined;
 }
 
 /**
@@ -43,9 +43,7 @@ export class SimCfnStackResourceOperations {
   private readonly simAws: SimAws;
   private readonly accountRegionScope: SimAwsAccountRegionScope;
   private readonly stackName: SimCloudFormationStackName;
-  private readonly bindings:
-    | readonly SimCfnExecutableResourceBinding[]
-    | undefined;
+  private readonly bindings: readonly SimCfnDeployBinding[] | undefined;
   private cdkOutContext: SimCdkOutContext | undefined;
 
   constructor(properties: SimCfnStackResourceOperationsProperties) {

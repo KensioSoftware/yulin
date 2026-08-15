@@ -997,6 +997,190 @@ Closing the simulated environment with `simAws.close()` stops the tasks of every
 nothing is left scheduled either way: a service is kept as state rather than by a timer, so a test
 that finishes with a service running leaves nothing behind it.
 
+## Deploying ECS from CloudFormation
+
+`AWS::ECS::Cluster` creates a simulated cluster, and `AWS::ECS::TaskDefinition` registers a
+simulated task definition revision, so a test can start from the stack the application is actually
+defined in rather than from `RegisterTaskDefinition` calls written for the test.
+
+`Ref` on a cluster returns the cluster name and `Fn::GetAtt` `Arn` returns its ARN. `Ref` on a task
+definition returns the task definition ARN, revision and all, which is also what `Fn::GetAtt`
+`TaskDefinitionArn` returns. Each deployment registers a new revision, as real CloudFormation does,
+because a revision is immutable and a changed one is a new revision of the same family.
+
+Containers are stored as declared, whatever their image, and what makes one of them run is an
+executable binding supplied at deploy time, in the same `bindings` list a Lambda function handler is
+supplied in. A container binding targets a container by family and container name, by the logical ID
+of the task definition that declares it, or by the repository its image comes from.
+
+```typescript sim-ecs-cloudformation-task-definition
+/**
+ * Deploying an ECS stack and binding a handler to one of its containers.
+ */
+
+import { RunTaskCommand } from "@aws-sdk/client-ecs";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const processedOrders: string[] = [];
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "orders",
+  template: {
+    Resources: {
+      OrdersCluster: {
+        Type: "AWS::ECS::Cluster",
+        Properties: { ClusterName: "orders" },
+      },
+      WorkerTaskDefinition: {
+        Type: "AWS::ECS::TaskDefinition",
+        Properties: {
+          Family: "orders-worker",
+          Cpu: "512",
+          Memory: "1024",
+          NetworkMode: "awsvpc",
+          RequiresCompatibilities: ["FARGATE"],
+          ContainerDefinitions: [
+            {
+              Name: "app",
+              Image: "example.dkr.ecr.eu-west-2.amazonaws.com/orders-worker:1",
+              Essential: true,
+              Environment: [{ Name: "LOG_LEVEL", Value: "debug" }],
+            },
+          ],
+        },
+      },
+    },
+    Outputs: {
+      TaskDefinition: { Value: { Ref: "WorkerTaskDefinition" } },
+    },
+  },
+  bindings: [
+    {
+      family: "orders-worker",
+      containerName: "app",
+      run: async (): Promise<void> => {
+        await Promise.resolve();
+        processedOrders.push("outstanding orders");
+      },
+    },
+  ],
+});
+
+await stack.waitForDeployComplete();
+
+console.log(stack.outputs.get("TaskDefinition")?.value);
+// "arn:aws:ecs:us-east-1:888888888888:task-definition/orders-worker:1"
+
+// Running a task from the deployed task definition runs the bound handler.
+await simAws
+  .ecs()
+  .runTask(
+    new RunTaskCommand({ cluster: "orders", taskDefinition: "orders-worker" }),
+  );
+
+await simAws.backgroundTasksComplete();
+
+console.log(processedOrders); // ["outstanding orders"]
+```
+
+A binding can name the task definition Resource instead, which is what a CDK stack gives a test to
+name: the construct ID is accepted as well as the synthesized logical ID, and the container name can
+be left out where the task definition declares one container. A binding naming an image repository
+matches any container running an image from it, whichever family declares it, which covers a tag
+that changes with every build.
+
+```typescript sim-ecs-cloudformation-binding-targets
+/**
+ * Binding a container by the task definition Resource and by its repository.
+ */
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+
+const stack = await simAws.cloudFormation().deployTemplate({
+  stackName: "orders",
+  template: {
+    Resources: {
+      WorkerTaskDefinition: {
+        Type: "AWS::ECS::TaskDefinition",
+        Metadata: { "aws:cdk:path": "OrdersStack/WorkerTask/Resource" },
+        Properties: {
+          Family: "orders-worker",
+          ContainerDefinitions: [
+            {
+              Name: "app",
+              Image: "example.dkr.ecr.eu-west-2.amazonaws.com/orders-worker:1",
+            },
+            {
+              Name: "log-router",
+              Image: "public.ecr.aws/aws-observability/aws-for-fluent-bit:1",
+            },
+          ],
+        },
+      },
+      CheckoutTaskDefinition: {
+        Type: "AWS::ECS::TaskDefinition",
+        Properties: {
+          Family: "orders-checkout",
+          ContainerDefinitions: [
+            {
+              Name: "app",
+              Image: "example.dkr.ecr.eu-west-2.amazonaws.com/checkout:9f21c0",
+            },
+          ],
+        },
+      },
+    },
+  },
+  bindings: [
+    // The CDK construct ID, naming the container because this task definition
+    // declares more than one.
+    {
+      logicalId: "WorkerTask",
+      containerName: "app",
+      run: (): void => {
+        // Whatever the worker does.
+      },
+    },
+    // Any container running an image from this repository, whatever its tag.
+    {
+      imageRepository: "example.dkr.ecr.eu-west-2.amazonaws.com/checkout",
+      run: (): void => {
+        // Whatever the checkout container does.
+      },
+    },
+  ],
+});
+
+await stack.waitForDeployComplete();
+
+console.log(simAws.ecs().taskDefinition("orders-worker").revision); // 1
+```
+
+A binding that resolves to no Resource in the stack fails the deployment naming the binding, since
+the usual cause is a container renamed in the template and not in the test. A container with no
+binding is a different thing: the stack deploys, the container is stored as declared, and it is
+recorded as not simulated when a task runs, which is what lets a task definition holding a log
+router and an observability agent alongside the application deploy and run.
+
+A task definition's `TaskRoleArn` and `ExecutionRoleArn` resolve whether the template gives an ARN
+or a `Ref` to an `AWS::IAM::Role` of the same stack, so a container's AWS calls are authorized as
+the role the stack deploys.
+
+Everything else the two Resource types declare is stored as declared, or recorded as ignored where
+this simulation has nothing to act on it with. `CapacityProviders`,
+`DefaultCapacityProviderStrategy` and `ServiceConnectDefaults` on a cluster, and
+`InferenceAccelerators` and `EnableFaultInjection` on a task definition, are read and ignored rather
+than failing the stack, and each one is reported on the Resource:
+
+```typescript
+console.log(stack.resources.get("OrdersCluster")?.ignoredProperties);
+```
+
 ## Authorization
 
 Every operation is authorized by simulated IAM against the real ECS action.
@@ -1162,6 +1346,11 @@ console.log(described.taskDefinition?.revision); // 1
 - `DescribeServicesCommand` and `DeleteServiceCommand`, with the `force` a scaled-up service needs
 - `ListTasks` filtering by `serviceName`, so a service's tasks can be listed on their own
 - `bindContainer`, targeting a container by family and container name or by image repository
+- `AWS::ECS::Cluster`, answering `Ref` with the cluster name and `Fn::GetAtt` with `Arn`
+- `AWS::ECS::TaskDefinition`, registering a revision and answering `Ref` with its ARN
+- Deploy-time container bindings, targeting a container by family and container name, by the task
+  definition's logical ID or CDK construct ID, or by its image repository
+- Task and execution roles resolved from a `Ref` to a same-stack role or from an ARN
 - Container environment variables and `RunTask` container overrides, through `process.env`
 - Container AWS calls authorized as the task role, including a `RunTask` `taskRoleArn` override
 - Container `secrets` resolved from simulated Secrets Manager and SSM Parameter Store as the
@@ -1279,9 +1468,32 @@ Current documented limitations:
   `DescribeServices` and `ListTasks` are what report those.
 - Task definition and cluster tags are stored and reported, but `TagResource`,
   `UntagResource` and `ListTagsForResource` are not simulated.
-- There are no ECS CloudFormation resource types yet. `AWS::ECS::Cluster`,
-  `AWS::ECS::TaskDefinition` and `AWS::ECS::Service` are reported as unsupported and skipped rather
-  than deployed.
+- `AWS::ECS::Service` is not deployed yet. A template declaring one is reported as unsupported and
+  skipped rather than failing the stack.
+- A cluster or task definition the template does not name gets a name composed from the stack name
+  and the logical ID, without the random part real CloudFormation adds, so a test can predict it. A
+  stack deployed twice under different names therefore gets two different families.
+- An update replaces a task definition Resource rather than updating it in place, so it registers a
+  new revision and deregisters the one it replaced. The family accumulates revisions with only the
+  newest one `ACTIVE`, where real CloudFormation leaves the earlier revisions active.
+- A stack teardown deletes its cluster, leaving it `INACTIVE`, and deregisters the revision it
+  registered, leaving that `INACTIVE`. Neither is removed, and revision numbers are not freed.
+- CloudFormation property names are translated to the API's by lowering the first letter of each of
+  them, all the way down, apart from `EFSVolumeConfiguration`,
+  `FSxWindowsFileServerVolumeConfiguration` and `ProxyConfigurationProperties`, which the API spells
+  differently. `DockerLabels`, `Options`, `DriverOpts` and `Labels` hold keys the template wrote, so
+  those are left alone. A name outside all of that is stored under the name lowering gives it.
+- `CapacityProviders`, `DefaultCapacityProviderStrategy` and `ServiceConnectDefaults` on a cluster,
+  and `InferenceAccelerators` and `EnableFaultInjection` on a task definition, are read and recorded
+  as ignored rather than refused, where the equivalent SDK request is refused. A stack that will not
+  deploy is worth less to a test than a Resource without a property nothing here acts on.
+- A deploy-time binding is checked against the template as the stack is built, so a family, a
+  container name or an image repository built from another Resource's attribute rather than written
+  as a string resolves to nothing and fails the deployment.
+- A `TaskRoleArn` or `ExecutionRoleArn` given as a `Ref` to a role resolves to the role name, which
+  is turned into the ARN that name would have at the default path. A role declaring a `Path` of its
+  own therefore resolves to an ARN without it. This is what an `AWS::Lambda::Function` `Role` already
+  does, so the two agree, and naming the role by `Fn::GetAtt` `Arn` gets the real ARN either way.
 - Cluster and family names are validated to the 255 letters, numbers, hyphens and underscores real
   ECS accepts, but error messages differ from the real ones.
 - Account-wide limits do not exist, so no request fails for having registered too many task

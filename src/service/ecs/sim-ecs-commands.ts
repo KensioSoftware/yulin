@@ -25,6 +25,7 @@ import { StopTaskCommandHandler } from "./command/stop-task/stop-task.handler.js
 import { UpdateServiceCommandHandler } from "./command/update-service/update-service.handler.js";
 import type { SimEcsServiceTasks } from "./service/run/sim-ecs-service-tasks.js";
 import { SimEcsServiceStore } from "./service/sim-ecs-service-store.js";
+import { SimEcsLookup } from "./sim-ecs-lookup.js";
 import type { SimEcsProperties } from "./sim-ecs-properties.js";
 import { SimEcsUnreachableSecretStores } from "./task/run/secret/sim-ecs-secret-stores.js";
 import { SimEcsTaskStore } from "./task/sim-ecs-task-store.js";
@@ -74,6 +75,10 @@ export class SimEcsCommands {
   public readonly describeServices: DescribeServicesCommandHandler;
   public readonly deleteService: DeleteServiceCommandHandler;
 
+  public readonly lookup: SimEcsLookup;
+
+  private readonly clusters = new SimEcsClusterStore();
+  private readonly taskDefinitions = new SimEcsTaskDefinitionStore();
   private readonly services = new SimEcsServiceStore();
   private readonly serviceTasks: SimEcsServiceTasks;
 
@@ -86,13 +91,19 @@ export class SimEcsCommands {
       secretStores = new SimEcsUnreachableSecretStores(),
     } = properties;
 
+    this.lookup = new SimEcsLookup({
+      accountRegionScope,
+      clusters: this.clusters,
+      taskDefinitions: this.taskDefinitions,
+    });
+
     const contexts = new SimEcsCommandContexts({
       accountRegionScope,
       authorizer: new SimEcsAuthorizer({ iam }),
       background,
       runAsOwner,
-      clusters: new SimEcsClusterStore(),
-      taskDefinitions: new SimEcsTaskDefinitionStore(),
+      clusters: this.clusters,
+      taskDefinitions: this.taskDefinitions,
       tasks: new SimEcsTaskStore(),
       services: this.services,
       bindings: this.bindings,

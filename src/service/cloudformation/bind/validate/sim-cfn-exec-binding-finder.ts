@@ -1,3 +1,7 @@
+import {
+  type SimCfnDeployBinding,
+  simCfnIsExecutableBinding,
+} from "../sim-cfn-deploy-binding.js";
 import type {
   SimCfnExecutableResource,
   SimCfnExecutableResourceBinding,
@@ -8,7 +12,7 @@ import type { SimCfnResource } from "../../resource/sim-cfn-resource.js";
 
 interface SimCfnExecBindingFinderProperties {
   readonly resource: SimCfnResource;
-  readonly bindings?: readonly SimCfnExecutableResourceBinding[] | undefined;
+  readonly bindings?: readonly SimCfnDeployBinding[] | undefined;
 }
 
 /**
@@ -53,7 +57,13 @@ export class SimCfnExecBindingFinder<
   constructor(properties: SimCfnExecBindingFinderProperties) {
     this.resource = properties.resource;
     this.cdkPath = new SimCfnResourceCdkPath(properties.resource);
-    this.bindings = properties.bindings;
+    // A deployment's bindings are one list holding both kinds, and a container
+    // binding can name a logical ID as an executable one can. Dropping them
+    // here is what stops a container binding backing a function that happens
+    // to share the task definition's logical ID.
+    this.bindings = properties.bindings?.filter((binding) =>
+      simCfnIsExecutableBinding(binding),
+    );
   }
 
   /**

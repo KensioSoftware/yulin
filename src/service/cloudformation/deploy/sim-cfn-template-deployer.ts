@@ -16,7 +16,7 @@ import {
 import { SimCfnTemplateFileUpdater } from "./sim-cfn-template-file-updater.js";
 import { simCfnTemplateFileDeployment } from "./sim-cfn-template-file-deployment.js";
 import { SimCfnTemplateFileWatches } from "../watch/sim-cfn-template-file-watches.js";
-import type { SimCfnExecutableResourceBinding } from "../bind/sim-cfn-exec-binding.type.js";
+import type { SimCfnDeployBinding } from "../bind/sim-cfn-deploy-binding.js";
 import type { SimAws } from "../../aws/sim-aws.js";
 import type { SimAwsAccountRegionScope } from "../../aws/sim-aws-account-region-scope.js";
 import type {
@@ -31,7 +31,7 @@ export interface SimCloudFormationCreateStackProperties {
   readonly stackName?: SimCloudFormationStackName | string;
   readonly template: CfnTemplateBodyRecord;
   readonly parameters?: Record<string, string> | undefined;
-  readonly bindings?: readonly SimCfnExecutableResourceBinding[] | undefined;
+  readonly bindings?: readonly SimCfnDeployBinding[] | undefined;
 
   /**
    * The synthesized CDK template file this in-memory template stands in for.
@@ -156,7 +156,7 @@ export class SimCloudFormationTemplateDeployer {
     readonly stackName: SimCloudFormationStackName | string;
     readonly template: CfnTemplateBodyRecord;
     readonly parameters?: Record<string, string> | undefined;
-    readonly bindings?: readonly SimCfnExecutableResourceBinding[] | undefined;
+    readonly bindings?: readonly SimCfnDeployBinding[] | undefined;
     readonly cdkOutContext?: SimCdkOutContext | undefined;
   }): Promise<SimCfnStack> {
     await this.createStackWithContext(
@@ -201,7 +201,7 @@ export class SimCloudFormationTemplateDeployer {
       };
     },
     cdkOutContext?: SimCdkOutContext,
-    bindings?: readonly SimCfnExecutableResourceBinding[],
+    bindings?: readonly SimCfnDeployBinding[],
   ): Promise<SimCreateStackCommandOutput> {
     const handler = new CreateStackCommandHandler({
       simAws: this.simAws,

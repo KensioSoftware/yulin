@@ -255,6 +255,35 @@ command instances.
   resource type at all, and gives `CreateCluster`, `ListClusters` and `ListTasks` none either. A
   policy naming a task definition ARN grants none of those, here as on AWS.
 
+## CloudFormation
+
+`cfn/` holds what deploys `AWS::ECS::Cluster` and `AWS::ECS::TaskDefinition`, under the rule the
+CloudFormation engine works by: CloudFormation orchestrates and the service creates. Both go through
+the ordinary `CreateCluster` and `RegisterTaskDefinition` commands rather than constructing state
+directly, so a Resource a template deployed is the same thing an SDK caller would have got, refusals
+included.
+
+`property/sim-cfn-ecs-api-shape.ts` is the piece with the most in it. CloudFormation writes an ECS
+declaration in the API's own shape with the first letter of every name upper cased, so translating
+one is mechanical, and doing it in one place is what lets a container definition, a cluster
+configuration and a task definition's volumes all be stored as declared without anything reading what
+they mean. What it cannot be mechanical about is named there: the handful of names the API spells
+differently, and the maps whose keys the user wrote.
+
+`SimCfnEcsDeclaredTaskDefinition` reads a task definition Resource before anything has been created
+from it. A Stack checks its bindings as it is built, so a binding naming a family or an image
+repository has to be matched against the template rather than against simulated ECS, and the family a
+template does not name is worked out the same way there as it is at creation.
+
+`SimCfnEcsContainerBindings` applies the bindings a deployment supplied. A binding naming a family or
+a repository already says everything simulated ECS needs and is handed over unchanged; a binding
+naming the task definition Resource is turned into the family the registration made, since a logical
+ID means nothing to ECS. Only bindings that target this Resource are applied, so a stack declaring
+several task definitions does not bind one handler to all of them.
+
+The two Resource types' `Ref` and `Fn::GetAtt` answers live with the other services' value adapters,
+under `cloudformation/resource/cfn/ecs/`, as the CloudFormation engine's own design has them.
+
 ## Divergences worth knowing
 
 - `ListClusters` leaves out a deleted cluster. It is still describable by name or ARN as `INACTIVE`.
@@ -288,4 +317,10 @@ command instances.
 - `SimEcsContainerDefinitionType` carries no index signature. One would stop a real SDK
   `RegisterTaskDefinitionCommand` input being assignable to it, which is the whole point of the
   structural types. A field it does not name is stored and reported back all the same.
+- `AWS::ECS::Service` has no factory yet, so a template declaring one is skipped.
+- A cluster or task definition a template does not name gets a name composed from the stack name and
+  the logical ID, without the random part real CloudFormation adds, so a test can predict it.
+- A cluster property or task definition property `CreateCluster` or `RegisterTaskDefinition` would
+  refuse is recorded as ignored rather than refused, so the stack deploys. A declaration nothing acts
+  on is worth less than a stack that will not come up.
 - The full list is in [docs/services/ecs](../../../docs/services/ecs/).

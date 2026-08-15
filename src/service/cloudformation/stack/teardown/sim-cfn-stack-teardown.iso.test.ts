@@ -106,7 +106,7 @@ describe("SimCfnStack teardown", () => {
       template: {
         Resources: {
           Handle: { Type: "AWS::CloudFormation::WaitConditionHandle" },
-          Cluster: { Type: "AWS::ECS::Cluster" },
+          Network: { Type: "AWS::EC2::VPC" },
         },
       },
     });
@@ -119,7 +119,7 @@ describe("SimCfnStack teardown", () => {
 
     // Then the skipped Resource is delete-complete without any service being
     // asked to delete something it never made.
-    assertIdentical(stack.resources.get("Cluster")?.status, "DELETE_COMPLETE");
+    assertIdentical(stack.resources.get("Network")?.status, "DELETE_COMPLETE");
     assertArrayLength(stack.skippedResourceDeletions, 0);
   });
 

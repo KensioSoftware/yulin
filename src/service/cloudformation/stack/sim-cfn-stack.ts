@@ -17,7 +17,7 @@ import { SimCfnStackDeploymentLifecycle } from "./deploy/sim-cfn-stack-deploymen
 import { SimCfnStackResourceOperations } from "./sim-cfn-stack-resource-operations.js";
 import { SimCfnStackUpdateLifecycle } from "./update/sim-cfn-stack-update-lifecycle.js";
 import type { SimCdkOutContext } from "../cdk/sim-cdk-out-context.js";
-import type { SimCfnExecutableResourceBinding } from "../bind/sim-cfn-exec-binding.type.js";
+import type { SimCfnDeployBinding } from "../bind/sim-cfn-deploy-binding.js";
 import type { SimCfnStackOutput } from "./output/sim-cfn-stack-output.js";
 import { SimCfnStackOutputResolver } from "./output/sim-cfn-stack-output-resolver.js";
 import { SimCfnStackResourceReport } from "./report/sim-cfn-stack-resource-report.js";
@@ -58,7 +58,7 @@ interface SimCloudFormationStackProperties {
   readonly stackName: SimCloudFormationStackName;
   readonly template: SimCfnTemplate;
   readonly cdkOutContext?: SimCdkOutContext | undefined;
-  readonly bindings?: readonly SimCfnExecutableResourceBinding[] | undefined;
+  readonly bindings?: readonly SimCfnDeployBinding[] | undefined;
 }
 
 /**

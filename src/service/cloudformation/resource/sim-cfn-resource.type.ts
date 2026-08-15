@@ -5,7 +5,7 @@ import type { SimCfnServiceResourceFactory } from "./factory/sim-cfn-resource-fa
 import type { SimCfnTemplateValueRecord } from "../template/value/sim-cfn-template-value.js";
 import type { SimCfnParameters } from "../parameters/sim-cfn-parameters.js";
 import type { SimCdkOutContext } from "../cdk/sim-cdk-out-context.js";
-import type { SimCfnExecutableResourceBinding } from "../bind/sim-cfn-exec-binding.type.js";
+import type { SimCfnDeployBinding } from "../bind/sim-cfn-deploy-binding.js";
 import type { SimCfnResource } from "./sim-cfn-resource.js";
 
 export interface SimCloudFormationResourceProperties {
@@ -54,7 +54,7 @@ export interface SimCloudFormationResourceCreateContext {
   readonly resources: ReadonlyMap<string, SimCfnResource>;
   readonly resolvedProperties?: SimCfnTemplateValueRecord | undefined;
   readonly cdkOutContext?: SimCdkOutContext | undefined;
-  readonly bindings?: readonly SimCfnExecutableResourceBinding[] | undefined;
+  readonly bindings?: readonly SimCfnDeployBinding[] | undefined;
 }
 
 /**
