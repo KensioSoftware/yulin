@@ -1490,6 +1490,10 @@ Current documented limitations:
 - A deploy-time binding is checked against the template as the stack is built, so a family, a
   container name or an image repository built from another Resource's attribute rather than written
   as a string resolves to nothing and fails the deployment.
+- A `TaskRoleArn` or `ExecutionRoleArn` given as a `Ref` to a role resolves to the role name, which
+  is turned into the ARN that name would have at the default path. A role declaring a `Path` of its
+  own therefore resolves to an ARN without it. This is what an `AWS::Lambda::Function` `Role` already
+  does, so the two agree, and naming the role by `Fn::GetAtt` `Arn` gets the real ARN either way.
 - Cluster and family names are validated to the 255 letters, numbers, hyphens and underscores real
   ECS accepts, but error messages differ from the real ones.
 - Account-wide limits do not exist, so no request fails for having registered too many task

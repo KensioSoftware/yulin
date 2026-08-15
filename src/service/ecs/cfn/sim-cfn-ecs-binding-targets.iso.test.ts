@@ -3,6 +3,7 @@ import { InvokeCommand } from "@aws-sdk/client-lambda";
 import {
   assertIdentical,
   assertStringIncludes,
+  assertThrowsError,
   assertThrowsErrorAsync,
 } from "@kensio/smartass";
 import { describe, it } from "vitest";
@@ -250,6 +251,35 @@ describe("ECS CloudFormation binding targets", () => {
     });
 
     assertStringIncludes(error.message, "does not resolve to a Resource");
+  });
+
+  it("registers nothing when a binding is refused", async () => {
+    // Given a binding naming a container the task definition does not declare.
+    const simAws = new SimAws();
+
+    // When the template is deployed, then the deployment is refused.
+    await assertThrowsErrorAsync(async () => {
+      return await simAws.cloudFormation().deployTemplate({
+        stackName: "orders-stack",
+        template: twoFamilies,
+        bindings: [
+          {
+            logicalId: "WorkerTaskDefinition",
+            containerName: "worker",
+            run: () => undefined,
+          },
+        ],
+      });
+    });
+
+    // And no revision is left behind, because the binding is read before the
+    // registration is made rather than after it. A revision is immutable once
+    // registered, so one made here could only have been deregistered.
+    const error = assertThrowsError(() =>
+      simAws.ecs().taskDefinition("orders-worker"),
+    );
+
+    assertStringIncludes(error.message, "orders-worker");
   });
 
   it("keeps a Lambda binding and a container binding apart", async () => {

@@ -2,6 +2,7 @@ import { assertDefined } from "../../../../util/type-guard/defined.js";
 import type { SimCfnDeployBinding } from "../../../cloudformation/bind/sim-cfn-deploy-binding.js";
 import type { SimCfnResource } from "../../../cloudformation/resource/sim-cfn-resource.js";
 import type { SimCfnTemplateValueRecord } from "../../../cloudformation/template/value/sim-cfn-template-value.js";
+import type { SimRegisterTaskDefinitionCommandInput } from "../../command/register-task-definition/register-task-definition.command.js";
 import type { SimEcsTaskDefinition } from "../../task-definition/sim-ecs-task-definition.js";
 import type { SimEcs } from "../../sim-ecs.js";
 import { SimCfnEcsContainerBindings } from "../bind/sim-cfn-ecs-container-bindings.js";
@@ -34,9 +35,12 @@ export class SimCfnEcsTaskDefinitionCreator {
   /**
    * Register a revision from an AWS::ECS::TaskDefinition Resource.
    *
-   * The bindings the deployment supplied are applied after the revision is
-   * registered, because a binding naming the Resource is bound by family and
-   * the family is only settled once the registration has been made.
+   * The bindings the deployment supplied are applied before the registration
+   * is made, from what the registration is going to say. A binding naming a
+   * container the declaration does not hold is refused, and refusing it first
+   * is what leaves nothing behind: a revision is immutable once registered, so
+   * one registered and then found to be unbindable could only be deregistered,
+   * and simulated CloudFormation rolls nothing back.
    */
   async create(
     resource: SimCfnResource,
@@ -51,6 +55,11 @@ export class SimCfnEcsTaskDefinitionCreator {
 
     taskDefinitionProperties.recordIgnoredProperties();
 
+    new SimCfnEcsContainerBindings({ resource, bindings }).applyTo(this.ecs, {
+      family: taskDefinitionProperties.family(),
+      containerNames: simCfnEcsDeclaredContainerNames(input),
+    });
+
     const registered = await this.ecs.registerTaskDefinition({ input });
     const taskDefinitionArn = registered.taskDefinition?.taskDefinitionArn;
 
@@ -59,14 +68,7 @@ export class SimCfnEcsTaskDefinitionCreator {
       `sim ECS task definition ARN for CloudFormation Resource ${resource.logicalId}`,
     );
 
-    const taskDefinition = this.ecs.taskDefinition(taskDefinitionArn);
-
-    new SimCfnEcsContainerBindings({ resource, bindings }).applyTo(
-      this.ecs,
-      taskDefinition,
-    );
-
-    return taskDefinition;
+    return this.ecs.taskDefinition(taskDefinitionArn);
   }
 
   /**
@@ -84,4 +86,19 @@ export class SimCfnEcsTaskDefinitionCreator {
       input: { taskDefinition: taskDefinition.taskDefinitionArn },
     });
   }
+}
+
+/**
+ * The container names the registration about to be made declares.
+ *
+ * A container declaring no name at all is left out, since
+ * `RegisterTaskDefinition` is about to refuse it, and naming it in a binding
+ * refusal would send a reader after the wrong thing.
+ */
+function simCfnEcsDeclaredContainerNames(
+  input: SimRegisterTaskDefinitionCommandInput,
+): readonly string[] {
+  return (input.containerDefinitions ?? [])
+    .map((container) => container.name)
+    .filter((name) => name !== undefined);
 }
