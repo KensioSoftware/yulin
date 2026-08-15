@@ -172,7 +172,7 @@ Two things therefore have to be right, and they are fixed in different places:
 - The role's **trust policy** has to let `scheduler.amazonaws.com` assume it. A role copied from an
   EventBridge rule trusts `events.amazonaws.com` and fails here.
 - A policy **on the role** has to allow the action on the target: `lambda:InvokeFunction`,
-  `sqs:SendMessage` or `sns:Publish`.
+  `sqs:SendMessage`, `sns:Publish` or `ecs:RunTask`.
 
 When either is missing the target is not invoked and nothing is thrown, exactly as on AWS, where the
 failure goes to CloudWatch and nowhere the caller can see. `advanceBy(...)` still returns normally,
@@ -242,6 +242,128 @@ invoked, so it is still there afterwards whatever `ActionAfterCompletion` says.
 `State: "DISABLED"` stops a recurring schedule firing while it is off, and an `UpdateSchedule`
 enabling it picks up from the next due instant rather than replaying what it missed. An update that
 changes the expression reschedules from the new one.
+
+## Running an ECS task on a schedule
+
+A target whose ARN names an ECS cluster runs a [simulated ECS](../ecs/) task instead of being
+invoked with a payload. That is the shape a nightly batch job usually has: a container that runs,
+does its work and stops, rather than a function or a queue.
+
+```typescript sim-scheduler-ecs-target
+/**
+ * A schedule running an ECS task every night.
+ */
+
+import {
+  CreateClusterCommand,
+  ListTasksCommand,
+  RegisterTaskDefinitionCommand,
+} from "@aws-sdk/client-ecs";
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+import { CreateScheduleCommand } from "@aws-sdk/client-scheduler";
+
+import { SimAws, SimFixedClock } from "@kensio/yulin";
+
+const simAws = new SimAws({
+  clock: new SimFixedClock(new Date("2026-07-26T09:00:00.000Z")),
+});
+const ecs = simAws.ecs();
+const imported: string[] = [];
+
+await ecs.createCluster(new CreateClusterCommand({ clusterName: "orders" }));
+
+ecs.bindContainer({
+  family: "nightly-import",
+  containerName: "app",
+  run: () => {
+    imported.push(process.env["IMPORT_MODE"] ?? "");
+  },
+});
+
+await ecs.registerTaskDefinition(
+  new RegisterTaskDefinitionCommand({
+    family: "nightly-import",
+    containerDefinitions: [{ name: "app", image: "nightly-import:1" }],
+  }),
+);
+
+// The schedule runs the task as this role, so the role trusts Scheduler and is
+// allowed to run it.
+await simAws.iam().createRole(
+  new CreateRoleCommand({
+    RoleName: "SchedulerRole",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { Service: "scheduler.amazonaws.com" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+
+await simAws.iam().putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "SchedulerRole",
+    PolicyName: "RunImport",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: { Effect: "Allow", Action: "ecs:RunTask", Resource: "*" },
+    }),
+  }),
+);
+
+await simAws.scheduler().createSchedule(
+  new CreateScheduleCommand({
+    Name: "nightly-import",
+    ScheduleExpression: "cron(0 2 * * ? *)",
+    FlexibleTimeWindow: { Mode: "OFF" },
+    Target: {
+      Arn: "arn:aws:ecs:us-east-1:888888888888:cluster/orders",
+      RoleArn: "arn:aws:iam::888888888888:role/SchedulerRole",
+      EcsParameters: {
+        TaskDefinitionArn: "nightly-import",
+        TaskCount: 1,
+      },
+      // An ECS target's Input is the task's overrides, since a task has
+      // nowhere to receive a payload.
+      Input: JSON.stringify({
+        containerOverrides: [
+          {
+            name: "app",
+            environment: [{ name: "IMPORT_MODE", value: "full" }],
+          },
+        ],
+      }),
+    },
+  }),
+);
+
+// Advancing past 02:00 fires the schedule and runs the task.
+await simAws.clock().advanceBy({ hours: 24 });
+
+console.log(imported); // ["full"]
+
+const tasks = await ecs.listTasks(
+  new ListTasksCommand({ cluster: "orders", desiredStatus: "STOPPED" }),
+);
+
+console.log(tasks.taskArns?.length); // 1
+```
+
+The target ARN names the cluster, so an ARN naming anything else in ECS is refused when the schedule
+is created. `EcsParameters` names the task definition, as a family, a `family:revision` or a full
+ARN, and the same one `RunTask` would take.
+
+An ECS target's `Input` is the task's overrides rather than something the target receives, because a
+task has nowhere to receive a payload. A target with no `Input` runs the task with no overrides.
+`EcsParameters` on a target whose ARN names anything else is refused, since it would do nothing.
+
+Which containers actually run is [simulated ECS](../ecs/)'s answer rather than the schedule's: a
+container with a binding runs its handler, and a container without one is recorded as not simulated.
+A target naming a task definition with nothing bound therefore records a task that never started,
+and the schedule counts as invoked.
 
 ## Updating and deleting
 
@@ -495,6 +617,8 @@ removes the schedules it created, so nothing fires afterwards.
   clock.
 - Lambda, SQS and SNS targets, with a target `Input`, invoked as the target's execution role and
   authorized against that role's own policies.
+- ECS targets, running a simulated task as the execution role, with the task definition and
+  `TaskCount` from `EcsParameters` and container overrides from the target's `Input`.
 - `ActionAfterCompletion`, and `deliveryFailures` for invocations that did not happen.
 - The `default` schedule group in every account and region, without one being created.
 - Creation and modification timestamps from the simulation's clock, and prefix-narrowed,
@@ -520,12 +644,21 @@ removes the schedules it created, so nothing fires afterwards.
 - `ScheduleExpressionTimezone` other than `UTC` is refused rather than ignored, since running a
   schedule in the wrong zone fires it at the wrong hour.
 - `StartDate` and `EndDate` are refused rather than ignored.
-- Targets are Lambda, SQS and SNS only. The universal target
+- Targets are Lambda, SQS, SNS and ECS. The universal target
   (`arn:aws:scheduler:::aws-sdk:<service>:<action>`) and every other target service are refused when
   the schedule is created rather than when it first falls due.
-- A target `DeadLetterConfig`, `RetryPolicy`, `EcsParameters`, `EventBridgeParameters`,
-  `KinesisParameters`, `SageMakerPipelineParameters` and `SqsParameters` are refused rather than
-  dropped.
+- A target `DeadLetterConfig`, `RetryPolicy`, `EventBridgeParameters`, `KinesisParameters`,
+  `SageMakerPipelineParameters` and `SqsParameters` are refused rather than dropped, as is
+  `EcsParameters` on a target whose ARN does not name an ECS cluster.
+- An ECS target's `EcsParameters` takes `TaskDefinitionArn` and `TaskCount`, and takes and ignores
+  `LaunchType`, `PlatformVersion`, `NetworkConfiguration` and `CapacityProviderStrategy`, since
+  there is no placement and no network here for them to apply to. Anything else it can carry, such
+  as `Group`, `Tags` or `PropagateTags`, is refused rather than dropped.
+- An ECS target's `Input` is read as the task's overrides rather than as text the target receives,
+  so a `containerOverrides` list is how a schedule sets a container's environment. An `Input` that
+  is not a JSON object is refused on an ECS target, where every other target type takes any text.
+- A `TaskCount` above one runs that many simulated tasks, and a bound container handler runs once
+  for each of them, in this process and one after another.
 - `KmsKeyArn` is refused, and `ClientToken` is accepted and ignored: nothing here retries, so there is
   no request for it to make idempotent.
 - `AWS::Scheduler::ScheduleGroup` is not simulated as a CloudFormation resource type.

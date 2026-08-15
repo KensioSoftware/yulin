@@ -28,6 +28,7 @@ export function describedSchedule(
       Arn: schedule.target.arn.value,
       RoleArn: schedule.target.roleArn,
       Input: schedule.target.input,
+      EcsParameters: schedule.target.task?.parameters.declared,
     },
     CreationDate: schedule.creationDate,
     LastModificationDate: schedule.lastModificationDate,

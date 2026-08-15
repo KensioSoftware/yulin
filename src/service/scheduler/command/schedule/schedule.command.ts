@@ -1,4 +1,5 @@
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
+import type { SimEcsTargetParametersType } from "../../../ecs/target/sim-ecs-target-parameters.js";
 
 /**
  * The target properties a simulated schedule reads.
@@ -13,7 +14,7 @@ export interface SimSchedulerRequestTarget {
   readonly Input?: string | undefined;
   readonly DeadLetterConfig?: unknown;
   readonly RetryPolicy?: unknown;
-  readonly EcsParameters?: unknown;
+  readonly EcsParameters?: SimEcsTargetParametersType | undefined;
   readonly EventBridgeParameters?: unknown;
   readonly KinesisParameters?: unknown;
   readonly SageMakerPipelineParameters?: unknown;

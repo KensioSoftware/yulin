@@ -1,11 +1,12 @@
 import type { SimResponseMetadata } from "../../../aws/metadata/response-metadata.type.js";
+import type { SimEcsTargetParametersType } from "../../../ecs/target/sim-ecs-target-parameters.js";
 
 /**
  * One target as a request carries it, and as ListTargetsByRule reports it.
  *
- * The properties beyond `Id`, `Arn` and `Input` are the ones real EventBridge
- * takes and this simulation refuses, kept in the shape so a request carrying
- * one is recognised and named rather than ignored.
+ * The properties beyond `Id`, `Arn`, `Input`, `RoleArn` and `EcsParameters`
+ * are the ones real EventBridge takes and this simulation refuses, kept in the
+ * shape so a request carrying one is recognised and named rather than ignored.
  */
 export interface SimEventBridgeTarget {
   readonly Id?: string | undefined;
@@ -18,7 +19,7 @@ export interface SimEventBridgeTarget {
   readonly RetryPolicy?: object | undefined;
   readonly SqsParameters?: object | undefined;
   readonly KinesisParameters?: object | undefined;
-  readonly EcsParameters?: object | undefined;
+  readonly EcsParameters?: SimEcsTargetParametersType | undefined;
   readonly BatchParameters?: object | undefined;
   readonly HttpParameters?: object | undefined;
   readonly RunCommandParameters?: object | undefined;

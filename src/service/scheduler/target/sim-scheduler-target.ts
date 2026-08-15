@@ -1,4 +1,8 @@
-import { SimSchedulerValidationException } from "../error/sim-scheduler.error.js";
+import { SimEcsTargetTask } from "../../ecs/target/sim-ecs-target-task.js";
+import {
+  SimSchedulerUnsimulatedInputException,
+  SimSchedulerValidationException,
+} from "../error/sim-scheduler.error.js";
 import { SimSchedulerTargetArn } from "./sim-scheduler-target-arn.js";
 
 /**
@@ -6,10 +10,30 @@ import { SimSchedulerTargetArn } from "./sim-scheduler-target-arn.js";
  */
 const roleArn = /^arn:aws[a-z-]*:iam::\d{12}:role\/.+$/u;
 
+/**
+ * What a target request says, of the parts a target reads.
+ */
+interface SimSchedulerRequestedTarget {
+  readonly Arn?: string | undefined;
+  readonly RoleArn?: string | undefined;
+  readonly Input?: string | undefined;
+  readonly EcsParameters?: unknown;
+}
+
 interface SimSchedulerTargetProperties {
   readonly arn: SimSchedulerTargetArn;
   readonly roleArn: string;
   readonly input: string | undefined;
+  readonly task: SimEcsTargetTask | undefined;
+}
+
+/**
+ * How this reports a target that could never run the task it describes.
+ */
+function refuse(reason: string): Error {
+  return new SimSchedulerValidationException(
+    `Invalid parameter: Target Reason: ${reason}`,
+  );
 }
 
 /**
@@ -34,33 +58,66 @@ export class SimSchedulerTarget {
    */
   public readonly input: string | undefined;
 
+  /**
+   * The ECS task this target runs, where its ARN names a cluster.
+   *
+   * An ECS target is the one target type here whose `Input` is not what the
+   * target receives: a task has nowhere to receive a payload, so the `Input` is
+   * what the task overrides instead.
+   */
+  public readonly task: SimEcsTargetTask | undefined;
+
   private constructor(properties: SimSchedulerTargetProperties) {
     this.arn = properties.arn;
     this.roleArn = properties.roleArn;
     this.input = properties.input;
+    this.task = properties.task;
   }
 
   /**
    * Read the target a request carries.
    */
   static of(
-    target:
-      | {
-          readonly Arn?: string | undefined;
-          readonly RoleArn?: string | undefined;
-          readonly Input?: string | undefined;
-        }
-      | undefined,
+    target: SimSchedulerRequestedTarget | undefined,
   ): SimSchedulerTarget {
     if (target === undefined) {
       throw new SimSchedulerValidationException("Target is required");
     }
 
+    const arn = SimSchedulerTargetArn.of(target.Arn);
+
     return new this({
-      arn: SimSchedulerTargetArn.of(target.Arn),
+      arn,
       roleArn: this.roleArnIn(target.RoleArn),
       input: target.Input,
+      task: this.taskIn(arn, target),
     });
+  }
+
+  /**
+   * Read what the target says about the task it runs, where it runs one.
+   *
+   * A target whose ARN names anything but an ECS cluster runs no task, and
+   * `EcsParameters` on one is refused rather than taken and ignored: a target
+   * that looks configured to whoever wrote it and behaves as though it is not
+   * is the answer worth avoiding.
+   */
+  private static taskIn(
+    arn: SimSchedulerTargetArn,
+    target: SimSchedulerRequestedTarget,
+  ): SimEcsTargetTask | undefined {
+    if (arn.service === "ecs") {
+      return SimEcsTargetTask.of(target, refuse);
+    }
+
+    if (target.EcsParameters !== undefined) {
+      throw new SimSchedulerUnsimulatedInputException(
+        "EcsParameters belongs to a target whose Arn names an ECS cluster, " +
+          "and this target's does not.",
+      );
+    }
+
+    return undefined;
   }
 
   /**

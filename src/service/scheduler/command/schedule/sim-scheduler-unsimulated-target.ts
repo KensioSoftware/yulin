@@ -19,7 +19,6 @@ function unsimulatedTargetProperties(
       "a failed invocation is recorded rather than sent on",
     ],
     ["RetryPolicy", target.RetryPolicy, "an invocation is attempted once"],
-    ["EcsParameters", target.EcsParameters, "ECS is not a simulated target"],
     [
       "EventBridgeParameters",
       target.EventBridgeParameters,

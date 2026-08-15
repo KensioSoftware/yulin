@@ -5,7 +5,7 @@ import { SimEventBridgeValidationException } from "../error/sim-event-bridge.err
 /**
  * The services a simulated rule can send an event to.
  */
-export const simEventTargetServices = ["lambda", "sqs", "sns"] as const;
+export const simEventTargetServices = ["lambda", "sqs", "sns", "ecs"] as const;
 
 export type SimEventTargetService = (typeof simEventTargetServices)[number];
 
@@ -38,10 +38,10 @@ interface SimEventTargetArnProperties {
 /**
  * The ARN of somewhere a rule sends events.
  *
- * Target ARNs are read here rather than by `parseSimArn`, because the three
- * services this delivers to write their resource part three ways: a queue and
- * a topic put the name straight after the Account with no type in front of it,
- * and a function writes `function:<name>`.
+ * Target ARNs are read here rather than by `parseSimArn`, because the services
+ * this delivers to write their resource part several ways: a queue and a topic
+ * put the name straight after the Account with no type in front of it, a
+ * function writes `function:<name>`, and a cluster writes `cluster/<name>`.
  *
  * A target in another Account or Region is allowed, as real EventBridge
  * delivers across both.
@@ -120,15 +120,36 @@ export class SimEventTargetArn {
       resource,
     });
 
+    this.refuseUnnamedResource(arn);
+
+    return arn;
+  }
+
+  /**
+   * Refuse an ARN of the right service that names nothing in it.
+   *
+   * Both services whose resource part carries a type are checked, because both
+   * write more than one kind of resource: `arn:aws:lambda:...:layer:shared` and
+   * `arn:aws:ecs:...:task-definition/orders:3` are well formed ARNs of a
+   * service this delivers to, and neither names anything a rule can reach.
+   */
+  private static refuseUnnamedResource(arn: SimEventTargetArn): void {
     if (arn.service === "lambda" && arn.functionName === "") {
       throw new SimEventBridgeValidationException(
-        `Invalid parameter: Target Arn Reason: ${value} names no function. ` +
-          `A function ARN is ` +
+        `Invalid parameter: Target Arn Reason: ${arn.value} names no ` +
+          `function. A function ARN is ` +
           `arn:aws:lambda:<region>:<account-id>:function:<function-name>`,
       );
     }
 
-    return arn;
+    if (arn.service === "ecs" && arn.clusterName === "") {
+      throw new SimEventBridgeValidationException(
+        `Invalid parameter: Target Arn Reason: ${arn.value} names no ` +
+          `cluster. An ECS target names the cluster the task runs in, as ` +
+          `arn:aws:ecs:<region>:<account-id>:cluster/<cluster-name>, and ` +
+          `names its task definition in EcsParameters.`,
+      );
+    }
   }
 
   /**
@@ -147,5 +168,27 @@ export class SimEventTargetArn {
     const [resourceType, name = ""] = this.resource.split(":", 2);
 
     return resourceType === "function" ? name : "";
+  }
+
+  /**
+   * The name of the ECS cluster this ARN names, or nothing when it names
+   * something else in ECS.
+   *
+   * A cluster ARN's resource is `cluster/<name>` exactly, with a slash rather
+   * than the colon Lambda uses. Both the resource type and there being nothing
+   * after the name are checked rather than assumed, because ECS writes more
+   * than clusters this way: a task definition is
+   * `task-definition/<family>:<revision>` and a task is `task/<cluster>/<id>`,
+   * and reading the first two segments alone would take a task ARN for the
+   * cluster it runs in.
+   */
+  get clusterName(): string {
+    const [resourceType, name = "", beyond] = this.resource.split("/", 3);
+
+    if (resourceType !== "cluster" || beyond !== undefined) {
+      return "";
+    }
+
+    return name;
   }
 }

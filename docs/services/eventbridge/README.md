@@ -4,7 +4,8 @@ Yulin includes a simulated Amazon EventBridge for tests and local development. E
 in memory and every operation is authorized by simulated IAM.
 
 Event buses, rules, targets and `PutEvents`. A rule can send matched events to a simulated Lambda
-function, SQS queue or SNS topic, or fire on a schedule when a test advances simulated time.
+function, SQS queue or SNS topic, run a simulated ECS task, or fire on a schedule when a test
+advances simulated time.
 [EventBridge Scheduler](../scheduler/) is a separate service with its own docs.
 EventBridge-specific types are imported from the `@kensio/yulin/eventbridge` subpath.
 
@@ -328,7 +329,8 @@ evaluate is refused here exactly as `PutRule` refuses it.
 ## Sending matched events to targets
 
 A rule sends every event it matches to each of its targets. A target is a simulated Lambda function,
-SQS queue or SNS topic.
+SQS queue or SNS topic, or an ECS cluster, where the rule runs a task rather than delivering
+anything: see [running an ECS task](#running-an-ecs-task).
 
 ```typescript sim-event-bridge-targets
 /**
@@ -426,9 +428,11 @@ that send to one target ARN.
 
 ## What a target has to allow
 
-EventBridge reaches a target as the `events.amazonaws.com` service principal, and the target's own
-resource policy is the whole of the decision. There is no execution role: a rule `RoleArn` is refused
-rather than simulated.
+EventBridge reaches a queue, topic or function target as the `events.amazonaws.com` service
+principal, and the target's own resource policy is the whole of the decision. There is no execution
+role for those three: a rule `RoleArn` and a target `RoleArn` are both refused rather than
+simulated. An ECS target is the exception, because there is no resource policy on a task definition
+for a rule to be admitted by, and it carries a role of its own.
 
 - **A queue** needs `sqs:SendMessage` for `events.amazonaws.com` in its `Policy` attribute.
 - **A topic** needs `sns:Publish` for `events.amazonaws.com` in its `Policy` attribute.
@@ -469,6 +473,147 @@ console.log(JSON.stringify(queuePolicy).length > 0); // true
 ```
 
 An event delivered across accounts still names the account it was put in, not the target's.
+
+## Running an ECS task
+
+A target whose ARN names an ECS cluster runs a [simulated ECS](../ecs/) task instead of receiving
+the event. `EcsParameters` says which task definition and how many tasks, and the target's `RoleArn`
+is the role the rule runs it as, both of which real EventBridge requires for the same reasons.
+
+```typescript sim-event-bridge-ecs-target
+/**
+ * A rule running an ECS task when an order event arrives.
+ */
+
+import {
+  CreateClusterCommand,
+  RegisterTaskDefinitionCommand,
+} from "@aws-sdk/client-ecs";
+import {
+  PutEventsCommand,
+  PutRuleCommand,
+  PutTargetsCommand,
+} from "@aws-sdk/client-eventbridge";
+import { CreateRoleCommand, PutRolePolicyCommand } from "@aws-sdk/client-iam";
+
+import { SimAws } from "@kensio/yulin";
+
+const simAws = new SimAws();
+const ecs = simAws.ecs();
+const imported: string[] = [];
+
+await ecs.createCluster(new CreateClusterCommand({ clusterName: "orders" }));
+
+ecs.bindContainer({
+  family: "order-import",
+  containerName: "app",
+  run: () => {
+    imported.push(process.env["ORDER_ID"] ?? "");
+  },
+});
+
+await ecs.registerTaskDefinition(
+  new RegisterTaskDefinitionCommand({
+    family: "order-import",
+    containerDefinitions: [{ name: "app", image: "order-import:1" }],
+  }),
+);
+
+// The rule runs the task as this role, so the role trusts EventBridge and is
+// allowed to run it.
+await simAws.iam().createRole(
+  new CreateRoleCommand({
+    RoleName: "EventsRole",
+    AssumeRolePolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: {
+        Effect: "Allow",
+        Principal: { Service: "events.amazonaws.com" },
+        Action: "sts:AssumeRole",
+      },
+    }),
+  }),
+);
+
+await simAws.iam().putRolePolicy(
+  new PutRolePolicyCommand({
+    RoleName: "EventsRole",
+    PolicyName: "RunImport",
+    PolicyDocument: JSON.stringify({
+      Version: "2012-10-17",
+      Statement: { Effect: "Allow", Action: "ecs:RunTask", Resource: "*" },
+    }),
+  }),
+);
+
+await simAws.eventBridge().putRule(
+  new PutRuleCommand({
+    Name: "orders",
+    EventPattern: JSON.stringify({ source: ["orders.service"] }),
+  }),
+);
+
+await simAws.eventBridge().putTargets(
+  new PutTargetsCommand({
+    Rule: "orders",
+    Targets: [
+      {
+        Id: "order-import",
+        Arn: "arn:aws:ecs:us-east-1:888888888888:cluster/orders",
+        RoleArn: "arn:aws:iam::888888888888:role/EventsRole",
+        EcsParameters: { TaskDefinitionArn: "order-import", TaskCount: 1 },
+        // An ECS target's Input is the task's overrides, since a task has
+        // nowhere to receive a payload.
+        Input: JSON.stringify({
+          containerOverrides: [
+            {
+              name: "app",
+              environment: [{ name: "ORDER_ID", value: "order-1" }],
+            },
+          ],
+        }),
+      },
+    ],
+  }),
+);
+
+await simAws.eventBridge().putEvents(
+  new PutEventsCommand({
+    Entries: [
+      {
+        Source: "orders.service",
+        DetailType: "OrderPlaced",
+        Detail: JSON.stringify({ orderId: "order-1" }),
+      },
+    ],
+  }),
+);
+
+// The task runs after PutEvents has answered, as it does on real AWS.
+await simAws.backgroundTasksComplete();
+
+console.log(imported); // ["order-1"]
+```
+
+The target ARN names the cluster, so an ARN naming anything else in ECS is refused when the target
+is added. `EcsParameters` names the task definition, as a family, a `family:revision` or a full ARN,
+and the same one `RunTask` would take.
+
+An ECS target's `Input` is the task's overrides rather than something the target receives, because
+a task has nowhere to receive a payload. So container environment variables are set the way the CDK
+sets them, with a `containerOverrides` list naming the container. A target with no `Input` runs the
+task with no overrides: the matched event is not passed to the container in its place.
+
+The role is the whole of the decision. It has to trust `events.amazonaws.com` in its
+`AssumeRolePolicyDocument`, and it has to be allowed `ecs:RunTask` on the task definition revision
+the target runs. A role that may not is a recorded delivery failure, in
+[deliveries that did not happen](#deliveries-that-did-not-happen), rather than an error the caller
+who put the event sees.
+
+Which containers actually run is [simulated ECS](../ecs/)'s answer rather than the rule's: a
+container with a binding runs its handler, and a container without one is recorded as not simulated.
+A target naming a task definition with nothing bound therefore records a task that never started,
+and the rule counts as delivered.
 
 ## Rules that fire on a schedule
 
@@ -801,6 +946,8 @@ no permission for.
   `numeric` and `exists`.
 - `PutTargets`, `RemoveTargets`, `ListTargetsByRule` and `ListRuleNamesByTarget`, with delivery to a
   simulated Lambda function, SQS queue or SNS topic, authorized by the target's own resource policy.
+- ECS targets, running a simulated task through the target's `RoleArn` with the task definition and
+  `TaskCount` from `EcsParameters` and container overrides from the target's `Input`.
 - Targets in another account or region of the same simulation, admitted by the target's own resource
   policy on `aws:SourceArn` or `aws:SourceAccount`, as real EventBridge does.
 - A target's fixed `Input`, and `deliveryFailures` for deliveries that did not happen.
@@ -813,10 +960,23 @@ no permission for.
 
 ## Limitations
 
-- Targets deliver to Lambda, SQS and SNS only. A target ARN naming any other service is refused when
-  the target is added rather than when an event first matches.
-- Target `InputPath` and `InputTransformer` are refused, as are a target `RoleArn`, dead letter
-  queues and retry policies. A delivery is attempted once.
+- Targets deliver to Lambda, SQS and SNS, and run a task in ECS. A target ARN naming any other
+  service is refused when the target is added rather than when an event first matches.
+- Target `InputPath` and `InputTransformer` are refused, as are dead letter queues and retry
+  policies. A delivery is attempted once. A target `RoleArn` is refused except on an ECS target,
+  which is the one target type that runs as a role rather than as the service principal.
+- An ECS target's `EcsParameters` takes `TaskDefinitionArn` and `TaskCount`, and takes and ignores
+  `LaunchType`, `PlatformVersion`, `NetworkConfiguration` and `CapacityProviderStrategy`, since
+  there is no placement and no network here for them to apply to. Anything else it can carry, such
+  as `Group`, `Tags` or `PropagateTags`, is refused rather than dropped.
+- An ECS target's `Input` is read as the task's overrides rather than as something the target
+  receives, so a `containerOverrides` list is how a rule sets a container's environment. A target
+  with no `Input` runs the task with no overrides, and the matched event is not passed on in its
+  place.
+- A `TaskCount` above one runs that many simulated tasks, and a bound container handler runs once
+  for each of them, in this process and one after another.
+- An ECS target is refused in a CloudFormation template. `AWS::Events::Rule` still refuses a target
+  `RoleArn` and `EcsParameters`, so an ECS target is written with `PutTargets`.
 - Numbers are compared after JSON parsing, so `300`, `300.0` and `3.0e2` are one value here. Real
   EventBridge compares the JSON token when matching an exact value, and so may tell those forms
   apart. Use `numeric` to compare numbers, which is what it is for.

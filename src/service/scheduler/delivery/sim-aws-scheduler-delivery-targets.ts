@@ -7,6 +7,7 @@ import type {
 } from "./sim-scheduler-delivery.js";
 import { SimSchedulerDeliveryFunction } from "./sim-scheduler-delivery-function.js";
 import { SimSchedulerDeliveryQueue } from "./sim-scheduler-delivery-queue.js";
+import { SimSchedulerDeliveryTask } from "./sim-scheduler-delivery-task.js";
 import { SimSchedulerDeliveryTopic } from "./sim-scheduler-delivery-topic.js";
 import {
   assumeSchedulerExecutionRole,
@@ -75,6 +76,10 @@ export class SimAwsSchedulerDeliveryTargets implements SimSchedulerDeliveryTarge
       }
       case "sns": {
         await new SimSchedulerDeliveryTopic({ scope }).deliver(delivery);
+        return;
+      }
+      case "ecs": {
+        await new SimSchedulerDeliveryTask({ scope }).deliver(delivery);
         return;
       }
     }

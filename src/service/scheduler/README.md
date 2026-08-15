@@ -8,7 +8,9 @@ corner of it. The two look similar from a distance and differ in every detail th
 separate SDK client, an ARN carrying a schedule group, `CreateSchedule` conflicting where `PutRule`
 replaces, a listing shaped differently from a describe, and an execution model built on an IAM role
 instead of a resource policy. Code sharing between them is therefore deliberate and narrow: the
-schedule expression parser, and nothing else.
+schedule expression parser, assuming a service role, and reading what a target says about an ECS
+task. The last two arrived with ECS targets, which both services reach the same way because ECS is
+the same service on the other side of them.
 
 ## Entry points
 
@@ -106,12 +108,15 @@ an EventBridge rule to anything — arrives as a service principal and is admitt
 resource policy. A schedule arrives as an assumed role and is admitted by that role's identity
 policies, with no resource policy involved.
 
-`sim-scheduler-execution-role.ts` is that difference. It asks STS's own
-`AssumeRoleTrustPolicyAuthorizer` whether the role admits `scheduler.amazonaws.com`, then builds a
-`SimResolvedCaller` whose principal is the session and whose `identityPolicyPrincipal` is the role.
-That split is exactly what `SimResolvedCaller` exists for, and it is why no STS session or temporary
-credential is created: nothing would read them, and registering credentials nobody uses would be
-state the simulation has to keep straight for no benefit.
+`sim-scheduler-execution-role.ts` is that difference. It names the two refusals in Scheduler's own
+words and hands the mechanism to `assumeSimServiceRole` under `src/service/sts/service-role/`, which
+asks STS's own `AssumeRoleTrustPolicyAuthorizer` whether the role admits `scheduler.amazonaws.com`
+and then builds a `SimResolvedCaller` whose principal is the session and whose
+`identityPolicyPrincipal` is the role. That split is exactly what `SimResolvedCaller` exists for, and
+it is why no STS session or temporary credential is created: nothing would read them, and
+registering credentials nobody uses would be state the simulation has to keep straight for no
+benefit. It is shared because an EventBridge rule assumes a role the same way for its one target type
+that runs rather than receives.
 
 The two failures are reported apart from each other, because they are fixed in different places: the
 trust policy is on the role's `AssumeRolePolicyDocument`, and the permission is in a policy attached
@@ -121,6 +126,12 @@ to it. Telling a reader which one it was saves the whole diagnosis.
 the target's, which need not be the same one. A `SimScheduler` built outside SimAws gets
 `SimSchedulerNoDeliveryTargets`, which records every invocation as a failure saying why there was
 nowhere to make it.
+
+`SimSchedulerDeliveryTask` is the one target type that runs something rather than being invoked with
+a payload. It runs the task through simulated ECS's own `RunTask` as the execution role, so the
+role's permission to run it is ECS's answer rather than a second one kept here. Its `EcsParameters`
+and its `Input`, which is the task's overrides, are read by `src/service/ecs/target/`, shared with
+EventBridge because a rule target says the same things about a task in the same words.
 
 ## Authorization
 

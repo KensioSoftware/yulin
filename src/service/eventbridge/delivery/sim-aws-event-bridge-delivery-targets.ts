@@ -5,6 +5,7 @@ import type {
 } from "./sim-event-bridge-delivery.js";
 import { SimEventBridgeDeliveryFunction } from "./sim-event-bridge-delivery-function.js";
 import { SimEventBridgeDeliveryQueue } from "./sim-event-bridge-delivery-queue.js";
+import { SimEventBridgeDeliveryTask } from "./sim-event-bridge-delivery-task.js";
 import { SimEventBridgeDeliveryTopic } from "./sim-event-bridge-delivery-topic.js";
 import type { SimEventTargetService } from "../target/sim-event-target-arn.js";
 
@@ -63,6 +64,12 @@ export class SimAwsEventBridgeDeliveryTargets implements SimEventBridgeDeliveryT
       }
       case "sns": {
         await new SimEventBridgeDeliveryTopic({ scope }).deliver(request);
+        return;
+      }
+      case "ecs": {
+        await new SimEventBridgeDeliveryTask({ simAws: this.simAws }).deliver(
+          request,
+        );
         return;
       }
     }

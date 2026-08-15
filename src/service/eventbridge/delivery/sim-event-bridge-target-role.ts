@@ -1,0 +1,63 @@
+import type { SimAwsCaller } from "../../aws/caller/sim-aws-caller.js";
+import type { SimIam } from "../../iam/sim-iam.js";
+import {
+  assumeSimServiceRole,
+  type SimServiceRoleRefusals,
+  type SimServiceRoleTarget,
+  simServiceRoleTarget,
+} from "../../sts/service-role/sim-service-role.js";
+import { SimEventBridgeDeliveryNotPermitted } from "../error/sim-event-bridge-delivery.error.js";
+import { simEventBridgeServicePrincipal } from "./sim-event-bridge-delivery.js";
+
+/**
+ * The session name AWS gives a role a rule assumes to run a task.
+ */
+const sessionName = "AWSEvents";
+
+export type SimEventBridgeTargetRole = SimServiceRoleTarget;
+
+/**
+ * Read the Account and name out of a target's role ARN.
+ */
+export function eventBridgeTargetRole(roleArn: string): SimServiceRoleTarget {
+  return simServiceRoleTarget(roleArn);
+}
+
+/**
+ * What a rule says when it could not assume its target's role.
+ */
+const refusals: SimServiceRoleRefusals = {
+  missingRole: (target) =>
+    new SimEventBridgeDeliveryNotPermitted(
+      `${target.roleArn} is not a simulated IAM role, so the rule could not ` +
+        `assume it to run its target's task.`,
+    ),
+  untrustedRole: (target, servicePrincipal) =>
+    new SimEventBridgeDeliveryNotPermitted(
+      `The trust policy of ${target.roleArn} does not allow ` +
+        `${servicePrincipal} to assume it, so the rule could not run its ` +
+        `target's task. Add it to the role's AssumeRolePolicyDocument.`,
+    ),
+};
+
+/**
+ * Assume a target's role, and answer with the caller it makes.
+ *
+ * Only an ECS target has one. A queue, topic or function is reached as the
+ * `events.amazonaws.com` service principal and admitted by its own resource
+ * policy, but there is no resource policy on a task definition for a rule to be
+ * admitted by, so running a task is a call the rule makes as a role of the
+ * account instead. Real EventBridge requires the role for that reason.
+ */
+export async function assumeEventBridgeTargetRole(
+  target: SimEventBridgeTargetRole,
+  iam: SimIam,
+): Promise<SimAwsCaller> {
+  return await assumeSimServiceRole({
+    target,
+    servicePrincipal: simEventBridgeServicePrincipal,
+    sessionName,
+    iam,
+    refusals,
+  });
+}

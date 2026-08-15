@@ -29,12 +29,6 @@ const behaviourRefusals: readonly SimEventBridgeTargetRefusal[] = [
       "rather than sending the untransformed event",
   ],
   [
-    (target): unknown => target.RoleArn,
-    "A target RoleArn is not simulated. A rule reaches its target as the " +
-      "events.amazonaws.com service principal, which the target's own " +
-      "resource policy admits.",
-  ],
-  [
     (target): unknown => target.DeadLetterConfig,
     "Target dead letter queues are not simulated, so PutTargets refuses a " +
       "DeadLetterConfig rather than dropping undelivered events silently",
@@ -63,7 +57,6 @@ const unsimulatedTargetTypes: readonly (readonly [
   string,
 ])[] = [
   [(target): unknown => target.KinesisParameters, "Kinesis"],
-  [(target): unknown => target.EcsParameters, "ECS"],
   [(target): unknown => target.BatchParameters, "Batch"],
   [(target): unknown => target.HttpParameters, "API destination"],
   [(target): unknown => target.RunCommandParameters, "Run Command"],

@@ -595,6 +595,29 @@ has no credentials of its own, and taking the identity of whoever called `RunTas
 pass on permissions the deployed task has not got. The execution role is stored but does nothing
 here, because there is no image to pull and no log driver to write to.
 
+## Running a task from a rule or a schedule
+
+A task does not have to be started by a `RunTask` call. A [simulated EventBridge](../eventbridge/)
+rule target and a [simulated Scheduler](../scheduler/) schedule target can both name an ECS cluster,
+and both then run a task here when the rule matches an event or the schedule falls due. That is the
+usual shape of a nightly batch job or an import kicked off by something happening.
+
+Both go through `RunTask`, so a task started that way is the same task as one started by a caller:
+the same cluster and revision lookups, the same IAM decision against `ecs:RunTask`, and the same
+task state afterwards. What a target may ask for is not the same, though. `EcsParameters` takes and
+ignores the launch type, platform version, network configuration and capacity provider strategy that
+`RunTask` refuses, since a target written for real AWS carries them and refusing one would make an
+otherwise workable target unusable. The other difference is who runs it. A rule or a
+schedule runs the task as the role on its target, so that role needs `ecs:RunTask` on the revision,
+and the task role inside the task definition is still what the containers' own AWS calls are
+attributed to.
+
+The container model applies unchanged: only a bound container runs, and a target naming a task
+definition with nothing bound records a task that never started rather than failing the rule or the
+schedule. Writing one of these targets is documented where the target is written, in
+[running an ECS task](../eventbridge/#running-an-ecs-task) for a rule and
+[running an ECS task on a schedule](../scheduler/#running-an-ecs-task-on-a-schedule) for a schedule.
+
 ## Describing, listing and stopping tasks
 
 `DescribeTasks` reports a task by its id or its full ARN, with its containers, which of them ran and
@@ -765,6 +788,8 @@ console.log(described.taskDefinition?.revision); // 1
 - `RunTaskCommand`, running the handlers bound to a task definition's containers, up to a `count` of
   ten tasks at a time
 - `DescribeTasksCommand`, `ListTasksCommand` and `StopTaskCommand`
+- Tasks run from an EventBridge rule target or a Scheduler schedule target, through that target's
+  role
 - `bindContainer`, targeting a container by family and container name or by image repository
 - Container environment variables and `RunTask` container overrides, through `process.env`
 - Container AWS calls authorized as the task role, including a `RunTask` `taskRoleArn` override
@@ -808,6 +833,14 @@ Current documented limitations:
   to, and container `secrets` are not resolved.
 - `StartTask` and the whole of the service API (`CreateService`, `UpdateService`,
   `DescribeServices`) are not simulated.
+- An EventBridge or Scheduler target's `EcsParameters` takes `TaskDefinitionArn` and `TaskCount`
+  only, taking and ignoring the launch type, platform version, network configuration and capacity
+  provider strategy for the same reason `RunTask` refuses them: there is no placement and no network
+  here. A `TaskCount` above one runs that many simulated tasks, and a bound container handler runs
+  once for each of them, in this process and one after another.
+- A rule or schedule target's `Input` is read as the task's overrides rather than as a payload,
+  since a task has nowhere to receive one, so container environment variables are set with a
+  `containerOverrides` list naming the container.
 - `DescribeTasks` refuses `include`, and a task carries no tags, so `RunTask` refuses `tags` too.
 - `ListTasks` refuses a `desiredStatus` of `PENDING`, which real ECS accepts. A simulated task is
   wanted either running or stopped, so the answer would always be an empty listing.
