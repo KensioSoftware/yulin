@@ -15,7 +15,7 @@ import { SimCognitoCommands } from "./command/sim-cognito-commands.js";
 import { SimCognitoDomainRegistry } from "./registry/sim-cognito-domain-registry.js";
 import { SimCognitoUserPoolRegistry } from "./registry/sim-cognito-user-pool-registry.js";
 import { SimCognitoSdkCommandRouter } from "./sdk/sim-cognito-sdk-command-router.js";
-import { SimCognitoFederation } from "./sim-cognito-federation.js";
+import { SimCognitoAppClients } from "./sim-cognito-app-clients.js";
 import type { SimCognitoIdentityProviderRequestOptions } from "./sim-cognito-user-directory.js";
 import type { SimCognitoUserPoolDomain } from "./user-pool/domain/sim-cognito-user-pool-domain.js";
 
@@ -68,14 +68,15 @@ interface SimCognitoIdentityProviderProperties {
  * id names the region it was created in, and an app client id is only
  * meaningful inside its pool.
  *
- * The pool and app client operations are here. The user and group operations
- * are on `SimCognitoUserDirectory`, which this extends, so a caller reaches
+ * The pool operations are here. The app client ones are on
+ * `SimCognitoAppClients` and the user and group ones on
+ * `SimCognitoUserDirectory`, both of which this extends, so a caller reaches
  * all of them on one service object.
  *
  * Only user pools are simulated. Cognito identity pools, which hand out AWS
  * credentials, are a different service and are not simulated at all.
  */
-export class SimCognitoIdentityProvider extends SimCognitoFederation {
+export class SimCognitoIdentityProvider extends SimCognitoAppClients {
   private readonly pools: SimCognitoUserPoolStore;
   private readonly userPoolRegistry: SimCognitoUserPoolRegistry;
   private readonly domainRegistry: SimCognitoDomainRegistry;
@@ -205,6 +206,32 @@ export class SimCognitoIdentityProvider extends SimCognitoFederation {
   }
 
   /**
+   * Handle a SetUserPoolMfaConfig Command from the SDK.
+   *
+   * This is the second call real CloudFormation makes when a template declares
+   * a pool with MFA, and the only place the factors behind an `MfaConfiguration`
+   * are set.
+   */
+  async setUserPoolMfaConfig(
+    command: simCognitoCommands.SimSetUserPoolMfaConfigCommand,
+    options?: SimCognitoIdentityProviderRequestOptions,
+  ): Promise<simCognitoCommands.SimSetUserPoolMfaConfigCommandOutput> {
+    await this.background.sequence();
+    return this.commands.userPoolMfa.set(command, options);
+  }
+
+  /**
+   * Handle a GetUserPoolMfaConfig Command from the SDK.
+   */
+  async getUserPoolMfaConfig(
+    command: simCognitoCommands.SimGetUserPoolMfaConfigCommand,
+    options?: SimCognitoIdentityProviderRequestOptions,
+  ): Promise<simCognitoCommands.SimGetUserPoolMfaConfigCommandOutput> {
+    await this.background.sequence();
+    return this.commands.userPoolMfa.get(command, options);
+  }
+
+  /**
    * Handle a ListUserPools Command from the SDK.
    */
   async listUserPools(
@@ -213,61 +240,6 @@ export class SimCognitoIdentityProvider extends SimCognitoFederation {
   ): Promise<simCognitoCommands.SimListUserPoolsCommandOutput> {
     await this.background.sequence();
     return this.commands.listUserPools.handle(command, options);
-  }
-
-  /**
-   * Handle a CreateUserPoolClient Command from the SDK.
-   */
-  async createUserPoolClient(
-    command: simCognitoCommands.SimCreateUserPoolClientCommand,
-    options?: SimCognitoIdentityProviderRequestOptions,
-  ): Promise<simCognitoCommands.SimCreateUserPoolClientCommandOutput> {
-    await this.background.sequence();
-    return this.commands.clients.create(command, options);
-  }
-
-  /**
-   * Handle a DescribeUserPoolClient Command from the SDK.
-   */
-  async describeUserPoolClient(
-    command: simCognitoCommands.SimDescribeUserPoolClientCommand,
-    options?: SimCognitoIdentityProviderRequestOptions,
-  ): Promise<simCognitoCommands.SimDescribeUserPoolClientCommandOutput> {
-    await this.background.sequence();
-    return this.commands.clients.describe(command, options);
-  }
-
-  /**
-   * Handle an UpdateUserPoolClient Command from the SDK.
-   */
-  async updateUserPoolClient(
-    command: simCognitoCommands.SimUpdateUserPoolClientCommand,
-    options?: SimCognitoIdentityProviderRequestOptions,
-  ): Promise<simCognitoCommands.SimUpdateUserPoolClientCommandOutput> {
-    await this.background.sequence();
-    return this.commands.clients.update(command, options);
-  }
-
-  /**
-   * Handle a DeleteUserPoolClient Command from the SDK.
-   */
-  async deleteUserPoolClient(
-    command: simCognitoCommands.SimDeleteUserPoolClientCommand,
-    options?: SimCognitoIdentityProviderRequestOptions,
-  ): Promise<simCognitoCommands.SimDeleteUserPoolClientCommandOutput> {
-    await this.background.sequence();
-    return this.commands.clients.delete(command, options);
-  }
-
-  /**
-   * Handle a ListUserPoolClients Command from the SDK.
-   */
-  async listUserPoolClients(
-    command: simCognitoCommands.SimListUserPoolClientsCommand,
-    options?: SimCognitoIdentityProviderRequestOptions,
-  ): Promise<simCognitoCommands.SimListUserPoolClientsCommandOutput> {
-    await this.background.sequence();
-    return this.commands.listClients.handle(command, options);
   }
 
   /**

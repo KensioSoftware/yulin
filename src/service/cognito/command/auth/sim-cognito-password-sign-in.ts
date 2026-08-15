@@ -9,6 +9,7 @@ import type { SimCognitoTokenIssuer } from "../../user-pool/token/sim-cognito-to
 import { SimCognitoTriggerOccasion } from "../../user-pool/trigger/sim-cognito-trigger-occasion.js";
 import type { SimCognitoUserPoolTriggers } from "../../user-pool/trigger/sim-cognito-user-pool-triggers.js";
 import { SimCognitoAuthenticationResult } from "./sim-cognito-authentication-result.js";
+import { SimCognitoMfaChallenge } from "./sim-cognito-mfa-challenge.js";
 import type { SimCognitoAuthParameters } from "./sim-cognito-auth-parameters.js";
 import type { SimCognitoAuthResolver } from "./sim-cognito-auth-resolver.js";
 import type { SimCognitoNewPasswordChallenge } from "./sim-cognito-new-password-challenge.js";
@@ -51,6 +52,7 @@ export class SimCognitoPasswordSignIn {
   private readonly challenge: SimCognitoNewPasswordChallenge;
   private readonly triggers: SimCognitoUserPoolTriggers;
   private readonly result = new SimCognitoAuthenticationResult();
+  private readonly mfaChallenge = new SimCognitoMfaChallenge();
 
   constructor(properties: SimCognitoPasswordSignInProperties) {
     this.authResolver = properties.authResolver;
@@ -92,6 +94,11 @@ export class SimCognitoPasswordSignIn {
     if (user.status.mustChangePassword) {
       return this.challenge.issue({ pool, clientId: client.id, user });
     }
+
+    // A pool that challenges every user would answer with an MFA challenge
+    // here rather than with tokens, and this simulation has no challenge to
+    // issue, so it refuses where the challenge would have been.
+    this.mfaChallenge.refuseIn(pool);
 
     // `ClientMetadata` reaches PreAuthentication and PostAuthentication, and
     // not the token trigger: real Cognito does not pass an InitiateAuth or

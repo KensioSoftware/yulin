@@ -40,10 +40,10 @@ export interface SimCognitoUserPoolType
  *
  * Every input real Cognito accepts on both is named here, whether or not it
  * is simulated, so a request carrying one this simulation does not model can
- * be refused rather than silently ignored.
+ * be refused rather than silently ignored. The ones a pool acts on are on the
+ * settings input this extends, `MfaConfiguration` among them.
  */
 export interface SimCognitoUserPoolCommandInput extends SimCognitoUserPoolSettingsInput {
-  readonly MfaConfiguration?: string | undefined;
   readonly UserPoolTier?: string | undefined;
   readonly DeviceConfiguration?: object | undefined;
   readonly EmailConfiguration?: object | undefined;

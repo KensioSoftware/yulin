@@ -6,12 +6,13 @@ which exchange a token for AWS credentials, are a separate service and are not s
 The pool, the app client, the users and groups in it, self-service sign-up, the sign-in flows on
 both sides of the API, the domain and identity providers a federated sign-in runs through, the
 messages it would have sent, the tokens it issues and the authorizer are all here. SRP, managed
-login, MFA, password resets and device tracking are not.
+login, MFA challenges, password resets and device tracking are not.
 
 ## Entry points
 
 - `sim-cognito-identity-provider.ts` is the main in-memory service object for one account/region
-  scope. It holds the pool and app client operations, and extends `sim-cognito-federation.ts`,
+  scope. It holds the pool operations, and extends `sim-cognito-app-clients.ts`, which holds the
+  app client ones, and extends `sim-cognito-federation.ts`,
   which holds the domain and identity provider ones and the three hosted endpoints, and extends
   `sim-cognito-user-directory.ts`, which holds the user and group ones and extends
   `sim-cognito-authentication.ts`, which holds signing in and signing out. A caller sees one service
@@ -35,10 +36,22 @@ pool that issued it.
 
 `SimCognitoUserPoolSettings` holds the settings a request can change: the password policy, the
 deletion protection, whether users may sign themselves up, what confirming a sign-up verifies, the
-Lambda triggers the pool runs, and what its messages say. `CreateUserPool` and `UpdateUserPool` both
+Lambda triggers the pool runs, whether it asks for a second factor, and what its messages say. `CreateUserPool` and `UpdateUserPool` both
 build one out of their own request, and an update swaps the pool's for it. That is what makes an
 update replace rather than merge, and it is where the pool's `LastModifiedDate` moves. Each takes the
 operation name, so a refusal from inside the settings names the request it came from.
+
+`SimCognitoUserPoolMfa` under `user-pool/mfa/` is the multi-factor authentication one pool is
+configured for: a `SimCognitoMfaConfiguration`, which is whether it challenges, and the factors
+behind it. It is one of the settings because `CreateUserPool` and `UpdateUserPool` both carry the
+configuration, and it is the one setting an update does not wholly replace: only
+`SetUserPoolMfaConfig` says which factors a challenge could use, and it changes them in place, so
+`keepFactorsOf` carries them onto the settings replacing them, as real Cognito keeps them.
+
+Nothing here challenges, so the whole of it is state a pool reports rather than acts on. The one
+place it is read is `SimCognitoMfaChallenge`, which refuses a sign-in to a pool configured `ON`,
+because real Cognito answers every one of those with a challenge and would never issue the tokens
+this simulation otherwise would.
 
 `makeSimCognitoUserPoolId` builds the `<region>_<nine characters>` form. The region is part of the id
 rather than decoration: SDK code splits a pool id on the underscore to work out which region to talk
@@ -304,12 +317,18 @@ A properties class per type turns the template's properties into that Command's 
 `SimCfnCognitoPropertyParser` and the `SimCfnCognitoValueParser` it extends read the property
 shapes, accepting the quoted forms CloudFormation carries numbers and booleans in.
 
-Each type states the properties it simulates, and every other property is refused. That is an
-allow-list rather than a list of known-unsimulated properties, because CloudFormation has properties
-the Cognito API does not, `EnabledMfas` among them, and those would otherwise be dropped on the way
-to a Command that has nowhere to refuse them. Properties the API does know, such as
-`MfaConfiguration`, are passed through instead, so the refusal that reaches the reader is the one
-that says why.
+Each type states the properties it simulates, and every other property is recorded against the
+Resource and left out of what is created. That is an allow-list rather than a list of
+known-unsimulated properties, because CloudFormation has properties the Cognito API does not, and
+those would otherwise be dropped on the way to a Command that has nowhere to record them.
+
+`MfaConfiguration` and `EnabledMfas` are the two that do not reach `CreateUserPool` at all.
+`SimCfnCognitoUserPoolCreator` sets them in a `SetUserPoolMfaConfig` call once the pool exists,
+which is the shape real CloudFormation deploys them in: a stack declaring MFA needs
+`cognito-idp:SetUserPoolMfaConfig` on its execution role for exactly that reason.
+`SimCfnCognitoUserPoolMfa` turns the template's factor names into the configurations that Command
+takes, so which of them are simulated is decided in one place rather than two. A template asking
+for no MFA makes no second call, here or on real AWS.
 
 A property whose only accepted value is one particular value counts as simulated at this layer and
 is judged by the Command that receives it, so the value is judged in one place rather than two.
@@ -423,7 +442,8 @@ AWS SDK-style operations are implemented under `command/`, grouped by the collab
 rather than one class per command, so the `SimCognitoIdentityProvider` facade stays a delegation:
 
 - `command/user-pool/`: the pool commands, their structural input/output types and their output
-  views
+  views, with the two that set and read a pool's MFA kept apart in
+  `SimCognitoUserPoolMfaCommands`, because what they act on is not one of the pool's settings
 - `command/client/`: the same for app clients
 - `command/user/`: the same for users, split between the commands that create, read and delete one,
   the commands that change one afterwards, and the commands a user signs itself up with. The
@@ -546,6 +566,12 @@ resource, here or on real AWS.
 - The password and refresh flows run on both sides of the API, and only `NEW_PASSWORD_REQUIRED` is
   issued. SRP, `USER_AUTH`, custom authentication, MFA challenges and device tracking are refused
   rather than treated as a flow or challenge that is simulated.
+- A pool records its `MfaConfiguration` and the factors behind it, and challenges for none of them.
+  A pool configured `OPTIONAL` behaves as a real one does for a user that never registered a factor,
+  because nothing here registers one. A sign-in to a pool configured `ON` is refused, as every one
+  of those is answered with a challenge on real Cognito. `SetUserPoolMfaConfig` accepts
+  `SoftwareTokenMfaConfiguration` alone, and the operations that register a factor for a user are
+  not implemented.
 - A `PreTokenGeneration` response is refused where real Cognito would quietly drop part of it: a
   reserved claim, any `cognito:` claim in `claimsToAddOrOverride`, a claim value that is not a
   string, and a group override naming IAM roles. The trigger runs at `V1_0` only, so

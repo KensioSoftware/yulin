@@ -1,6 +1,8 @@
 import {
   CreateUserPoolCommand,
   DescribeUserPoolCommand,
+  GetUserPoolMfaConfigCommand,
+  SetUserPoolMfaConfigCommand,
   UpdateUserPoolCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
 import {
@@ -130,6 +132,69 @@ describe("sim Cognito UpdateUserPool authorization", () => {
     });
 
     // Then it is denied, because UpdateUserPool is its own IAM action.
+    assertInstanceOf(error, SimIamAccessDenied);
+  });
+
+  it("authorizes setting and reading a pool's MFA against the pool's ARN", async () => {
+    // Given a Role allowed to set and read the MFA of that pool alone. A stack
+    // deploying a pool with MFA needs both actions, because CloudFormation
+    // configures MFA in a call of its own after the pool exists.
+    const { simAws, userPoolId } = await simAwsWithPool();
+    const role = await simIamRoleWithPolicyFactory.make(
+      {
+        roleName: "PoolMfaAdministrator",
+        actions: [
+          "cognito-idp:SetUserPoolMfaConfig",
+          "cognito-idp:GetUserPoolMfaConfig",
+        ],
+        resource: userPoolArn(userPoolId),
+      },
+      simAws,
+    );
+    const caller = { caller: { kind: "arn", arn: role.Arn } } as const;
+    const cognito = simAws.cognitoIdentityProvider();
+
+    // When that Role configures the pool's MFA and reads it back.
+    await cognito.setUserPoolMfaConfig(
+      new SetUserPoolMfaConfigCommand({
+        UserPoolId: userPoolId,
+        MfaConfiguration: "OPTIONAL",
+      }),
+      caller,
+    );
+    const read = await cognito.getUserPoolMfaConfig(
+      new GetUserPoolMfaConfigCommand({ UserPoolId: userPoolId }),
+      caller,
+    );
+
+    // Then both are allowed.
+    assertIdentical(read.MfaConfiguration, "OPTIONAL");
+  });
+
+  it("denies setting a pool's MFA to a caller that may only update it", async () => {
+    // Given a Role allowed to update any pool and nothing else.
+    const { simAws, userPoolId } = await simAwsWithPool();
+    const role = await simIamRoleWithPolicyFactory.make(
+      {
+        roleName: "PoolUpdater",
+        actions: ["cognito-idp:UpdateUserPool"],
+        resource: userPoolArn("*"),
+      },
+      simAws,
+    );
+
+    // When that Role configures the pool's MFA.
+    const error = await assertThrowsErrorAsync(async () => {
+      await simAws.cognitoIdentityProvider().setUserPoolMfaConfig(
+        new SetUserPoolMfaConfigCommand({
+          UserPoolId: userPoolId,
+          MfaConfiguration: "OPTIONAL",
+        }),
+        { caller: { kind: "arn", arn: role.Arn } },
+      );
+    });
+
+    // Then it is denied, because SetUserPoolMfaConfig is its own IAM action.
     assertInstanceOf(error, SimIamAccessDenied);
   });
 });

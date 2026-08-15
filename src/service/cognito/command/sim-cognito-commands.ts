@@ -29,6 +29,7 @@ import { SimCognitoRequestResolver } from "./sim-cognito-request-resolver.js";
 import { SimCognitoUserUpdateCommands } from "./user/sim-cognito-user-update-commands.js";
 import { SimCognitoListUserPools } from "./user-pool/sim-cognito-list-user-pools.js";
 import { SimCognitoUserPoolCommands } from "./user-pool/sim-cognito-user-pool-commands.js";
+import { SimCognitoUserPoolMfaCommands } from "./user-pool/sim-cognito-user-pool-mfa-commands.js";
 
 interface SimCognitoCommandsProperties {
   readonly accountRegionScope: SimAwsAccountRegionScope;
@@ -48,6 +49,7 @@ interface SimCognitoCommandsProperties {
  */
 export class SimCognitoCommands {
   public readonly userPools: SimCognitoUserPoolCommands;
+  public readonly userPoolMfa: SimCognitoUserPoolMfaCommands;
   public readonly listUserPools: SimCognitoListUserPools;
   public readonly clients: SimCognitoUserPoolClientCommands;
   public readonly listClients: SimCognitoListUserPoolClients;
@@ -91,6 +93,7 @@ export class SimCognitoCommands {
       }),
       authorizer,
     });
+    this.userPoolMfa = new SimCognitoUserPoolMfaCommands({ pools, authorizer });
     this.listUserPools = new SimCognitoListUserPools({ pools, authorizer });
     this.clients = new SimCognitoUserPoolClientCommands({
       pools,

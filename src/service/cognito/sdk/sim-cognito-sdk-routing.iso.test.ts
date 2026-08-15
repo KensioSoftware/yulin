@@ -6,8 +6,10 @@ import {
   DeleteUserPoolCommand,
   DescribeUserPoolClientCommand,
   DescribeUserPoolCommand,
+  GetUserPoolMfaConfigCommand,
   ListUserPoolClientsCommand,
   ListUserPoolsCommand,
+  SetUserPoolMfaConfigCommand,
   UpdateUserPoolClientCommand,
   UpdateUserPoolCommand,
 } from "@aws-sdk/client-cognito-identity-provider";
@@ -183,6 +185,17 @@ describe("Cognito SDK interception", () => {
       }),
     );
 
+    await client.send(
+      new SetUserPoolMfaConfigCommand({
+        UserPoolId: userPoolId,
+        MfaConfiguration: "OPTIONAL",
+        SoftwareTokenMfaConfiguration: { Enabled: true },
+      }),
+    );
+    const readMfa = await client.send(
+      new GetUserPoolMfaConfigCommand({ UserPoolId: userPoolId }),
+    );
+
     const describedPool = await client.send(
       new DescribeUserPoolCommand({ UserPoolId: userPoolId }),
     );
@@ -209,9 +222,11 @@ describe("Cognito SDK interception", () => {
     assertIdentical(updatedClient.UserPoolClient?.AccessTokenValidity, 30);
     assertIdentical(describedClient.UserPoolClient?.ClientName, "web");
     assertIdentical(describedClient.UserPoolClient.AccessTokenValidity, 30);
+    assertIdentical(readMfa.MfaConfiguration, "OPTIONAL");
     assertArrayEquals(describedPool.UserPool?.AutoVerifiedAttributes, [
       "email",
     ]);
+    assertIdentical(describedPool.UserPool.MfaConfiguration, "OPTIONAL");
     assertArrayEquals(
       listedPools.UserPools?.map((listed) => listed.Name),
       ["myapp-users"],

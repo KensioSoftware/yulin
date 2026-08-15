@@ -103,11 +103,18 @@ export class SimCognitoUserPoolCommands {
     );
     this.unsimulatedUpdates.refuseIn(input);
 
-    this.pools
-      .require(userPoolId)
-      .update(
-        new SimCognitoUserPoolSettings({ input, operation: "UpdateUserPool" }),
-      );
+    const pool = this.pools.require(userPoolId);
+    const settings = new SimCognitoUserPoolSettings({
+      input,
+      operation: "UpdateUserPool",
+    });
+
+    // An update carries whether the pool challenges for a second factor and
+    // nothing about the factors behind it, so the factors a
+    // SetUserPoolMfaConfig request configured survive it, as they do on real
+    // Cognito.
+    settings.mfa.keepFactorsOf(pool.settings.mfa);
+    pool.update(settings);
 
     return { $metadata: {} };
   }

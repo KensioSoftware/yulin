@@ -2242,12 +2242,15 @@ the secret with `DescribeUserPoolClient`, which reports it here as it does on re
 The properties each type reads are the ones this simulation models:
 
 - `AWS::Cognito::UserPool`: `UserPoolName`, `Policies`, `DeletionProtection`, `LambdaConfig`,
-  `AdminCreateUserConfig`, `AutoVerifiedAttributes`, `MfaConfiguration`, `UserPoolTier`,
-  `AccountRecoverySetting`, `EmailVerificationMessage`, `EmailVerificationSubject`,
+  `AdminCreateUserConfig`, `AutoVerifiedAttributes`, `MfaConfiguration`, `EnabledMfas`,
+  `UserPoolTier`, `AccountRecoverySetting`, `EmailVerificationMessage`, `EmailVerificationSubject`,
   `SmsVerificationMessage` and `VerificationMessageTemplate`. `LambdaConfig` is read a trigger at a
   time, so a template naming a trigger this simulation runs deploys and one naming a trigger it
-  does not fails the stack. The last six are accepted at one value each and refused at any other,
-  as `CreateUserPool` refuses them.
+  does not fails the stack. `MfaConfiguration` and `EnabledMfas` are deployed in a
+  `SetUserPoolMfaConfig` call once the pool exists, which is how real CloudFormation deploys them
+  and why a stack declaring MFA needs `cognito-idp:SetUserPoolMfaConfig` on its execution role. A
+  template asking for neither makes no such call. The last five are accepted at one value each and
+  refused at any other, as `CreateUserPool` refuses them.
 - `AWS::Cognito::UserPoolClient`: `UserPoolId`, `ClientName`, `GenerateSecret`, `ExplicitAuthFlows`,
   `PreventUserExistenceErrors`, `AccessTokenValidity`, `IdTokenValidity`, `RefreshTokenValidity`,
   `TokenValidityUnits`, `AllowedOAuthFlowsUserPoolClient`, `AllowedOAuthFlows`,
@@ -2639,12 +2642,121 @@ Real Cognito wants an `UpdateUserPool` request deactivating the protection befor
 and so does this. Send an `UpdateUserPool` with `DeletionProtection: "INACTIVE"` first, then delete
 the pool.
 
+## Multi-factor authentication
+
+A pool can be created with an `MfaConfiguration` of `OFF`, `OPTIONAL` or `ON`, and reports back what
+it was asked for. `SetUserPoolMfaConfig` sets which factors are behind that setting, and
+`GetUserPoolMfaConfig` reads both back, as they do on real Cognito. `SOFTWARE_TOKEN_MFA` is the
+factor this simulation accepts. A second factor sent by SMS or by email is refused, because a pool
+here has neither the `SmsConfiguration` nor the `EmailConfiguration` real Cognito wants before it
+will deliver one.
+
+No sign-in is ever challenged for a second factor. A pool configured `OPTIONAL` challenges only the
+users that have registered a factor, and nothing here registers one, so a sign-in to such a pool
+hands out tokens as it does on real Cognito for a user that never set one up. That is what makes a
+pool declaring optional MFA testable: everything that is not MFA behaves as it would in a
+deployment.
+
+A pool configured `ON` is the one that differs. Real Cognito answers every sign-in to it with an MFA
+challenge, so `InitiateAuth`, `AdminInitiateAuth` and the new password challenge response are
+refused with `InvalidParameterException` where that challenge would have been, rather than handing
+out tokens a deployment would not.
+
+```typescript sim-cognito-mfa
+/**
+ * A user pool that offers multi-factor authentication.
+ */
+
+import {
+  ConfirmSignUpCommand,
+  CreateUserPoolClientCommand,
+  CreateUserPoolCommand,
+  DescribeUserPoolCommand,
+  GetUserPoolMfaConfigCommand,
+  InitiateAuthCommand,
+  SetUserPoolMfaConfigCommand,
+  SignUpCommand,
+} from "@aws-sdk/client-cognito-identity-provider";
+
+import { SimAws } from "@kensio/yulin";
+
+const cognito = new SimAws().cognitoIdentityProvider();
+
+const pool = await cognito.createUserPool(
+  new CreateUserPoolCommand({
+    PoolName: "myapp-users",
+    MfaConfiguration: "OPTIONAL",
+  }),
+);
+const userPoolId = pool.UserPool!.Id!;
+
+// Which factors the pool offers is set separately, as it is on real Cognito.
+await cognito.setUserPoolMfaConfig(
+  new SetUserPoolMfaConfigCommand({
+    UserPoolId: userPoolId,
+    MfaConfiguration: "OPTIONAL",
+    SoftwareTokenMfaConfiguration: { Enabled: true },
+  }),
+);
+
+const described = await cognito.describeUserPool(
+  new DescribeUserPoolCommand({ UserPoolId: userPoolId }),
+);
+
+console.log(described.UserPool?.MfaConfiguration); // "OPTIONAL"
+
+const mfa = await cognito.getUserPoolMfaConfig(
+  new GetUserPoolMfaConfigCommand({ UserPoolId: userPoolId }),
+);
+
+console.log(mfa.SoftwareTokenMfaConfiguration?.Enabled); // true
+
+// A user of the pool signs up and signs in with a password alone, because no
+// user here has registered a second factor.
+const appClient = await cognito.createUserPoolClient(
+  new CreateUserPoolClientCommand({
+    UserPoolId: userPoolId,
+    ClientName: "web",
+    ExplicitAuthFlows: ["ALLOW_USER_PASSWORD_AUTH"],
+  }),
+);
+const clientId = appClient.UserPoolClient!.ClientId!;
+
+await cognito.signUp(
+  new SignUpCommand({
+    ClientId: clientId,
+    Username: "alice",
+    Password: "Sup3rSecret!",
+  }),
+);
+
+await cognito.confirmSignUp(
+  new ConfirmSignUpCommand({
+    ClientId: clientId,
+    Username: "alice",
+    ConfirmationCode: cognito.userPool(userPoolId).confirmationCode("alice"),
+  }),
+);
+
+const signedIn = await cognito.initiateAuth(
+  new InitiateAuthCommand({
+    ClientId: clientId,
+    AuthFlow: "USER_PASSWORD_AUTH",
+    AuthParameters: { USERNAME: "alice", PASSWORD: "Sup3rSecret!" },
+  }),
+);
+
+console.log(typeof signedIn.AuthenticationResult?.AccessToken); // "string"
+```
+
 ## Available functionality
 
 Sim Cognito currently supports:
 
 - `CreateUserPoolCommand`, `DescribeUserPoolCommand`, `UpdateUserPoolCommand`,
   `DeleteUserPoolCommand` and `ListUserPoolsCommand`
+- `SetUserPoolMfaConfigCommand` and `GetUserPoolMfaConfigCommand`, which record what a pool offers
+  as a second factor without any sign-in being challenged for one
 - `CreateUserPoolClientCommand`, `DescribeUserPoolClientCommand`, `UpdateUserPoolClientCommand`,
   `DeleteUserPoolClientCommand` and `ListUserPoolClientsCommand`
 - `AdminCreateUserCommand`, `AdminGetUserCommand`, `AdminDeleteUserCommand`,
@@ -2723,7 +2835,8 @@ Current documented limitations:
   `USER_AUTH` choice-based sign-in, custom authentication and device tracking are not simulated, and
   an `AuthFlow` naming one of them is refused rather than run as a flow that is.
 - `NEW_PASSWORD_REQUIRED` is the only challenge issued, so MFA and custom challenges cannot be
-  reached. A `ChallengeName` this simulation does not issue is refused.
+  reached. A `ChallengeName` this simulation does not issue is refused, and a sign-in to a pool
+  whose `MfaConfiguration` is `ON` is refused where the MFA challenge would have been.
 - `GetTokensFromRefreshToken` and `RevokeToken` are not implemented, and `RefreshTokenRotation` is
   refused on an app client. Refreshing goes through `REFRESH_TOKEN_AUTH`, which issues no new
   refresh token.
@@ -2828,13 +2941,21 @@ Current documented limitations:
   implemented, so an attribute can be changed but not removed.
 - `EstimatedNumberOfUsers` is how many users the pool holds now. Real Cognito refreshes that number
   periodically rather than on each write, so it can lag there in a way it never does here.
-- MFA is not simulated, so `AdminGetUser` reports no `UserMFASettingList`, `PreferredMfaSetting` or
-  `MFAOptions`.
+- A pool records its `MfaConfiguration` and the factors behind it, and no sign-in is ever challenged
+  for a second factor. Nothing registers a factor for a user, so `AdminGetUser` reports no
+  `UserMFASettingList`, `PreferredMfaSetting` or `MFAOptions`, and `AssociateSoftwareToken`,
+  `VerifySoftwareToken`, `SetUserMFAPreference` and `AdminSetUserMFAPreference` are not implemented.
+  A sign-in to a pool configured `ON` is refused, because real Cognito answers every one of those
+  with a challenge.
+- `SetUserPoolMfaConfig` accepts `SoftwareTokenMfaConfiguration` alone. `SmsMfaConfiguration` and
+  `EmailMfaConfiguration` are refused, because a pool here has neither the `SmsConfiguration` nor
+  the `EmailConfiguration` real Cognito wants before it will deliver either message.
 - `UpdateUserPool` replaces a pool's settings rather than merging into them, as real Cognito does, so
   a setting the request leaves out goes back to the default `CreateUserPool` would have given it. It
   covers the settings this simulation models: `Policies.PasswordPolicy`, `DeletionProtection`,
-  `AdminCreateUserConfig.AllowAdminCreateUserOnly`, `AutoVerifiedAttributes`, `LambdaConfig` and the
-  verification wording.
+  `AdminCreateUserConfig.AllowAdminCreateUserOnly`, `AutoVerifiedAttributes`, `LambdaConfig`,
+  `MfaConfiguration` and the verification wording. An update carries no factor configuration, so the
+  factors a `SetUserPoolMfaConfig` request set are left alone, as real Cognito leaves them.
   `PoolName` is refused, so a pool cannot be renamed, and every input `CreateUserPool` refuses is
   refused here too, in the same words.
 - `UpdateUserPoolClient` replaces an app client's settings the same way, so a setting the request
@@ -2896,8 +3017,8 @@ Current documented limitations:
   `AliasAttributes`, `Schema`, `UsernameConfiguration`,
   `UserAttributeUpdateSettings`, `DeviceConfiguration`, `UserPoolAddOns`, `KeyConfiguration`,
   `IssuerConfiguration`, `UserPoolTags`, the email and SMS configurations, an
-  `SmsAuthenticationMessage`, an `MfaConfiguration` other than `OFF`, a `UserPoolTier` other than
-  `ESSENTIALS`, a `SignInPolicy`, and a `PasswordHistorySize`.
+  `SmsAuthenticationMessage`, a `UserPoolTier` other than `ESSENTIALS`, a `SignInPolicy`, and a
+  `PasswordHistorySize`.
 - `AccountRecoverySetting` is accepted at one value and refused at any other. Nothing here reads it,
   because there is no `ForgotPassword`. It is accepted so a CDK stack deploys, and reported back by
   `DescribeUserPool` so what the template declared stays visible. The accepted value is in
@@ -2964,7 +3085,7 @@ Current documented limitations:
   can fetch the keys they point at. A token's `iss` claim still names the real
   `https://cognito-idp.<region>.amazonaws.com/<userPoolId>`, so the two disagree here and agree on
   real Cognito.
-- Resource servers, MFA configuration and risk configuration are not simulated.
+- Resource servers and risk configuration are not simulated.
 - Tags are not simulated. `UserPoolTags` is refused, and `TagResource`, `UntagResource` and
   `ListTagsForResource` are not implemented.
 - Listings carry no filtering, and are in creation order rather than any order real Cognito chooses.

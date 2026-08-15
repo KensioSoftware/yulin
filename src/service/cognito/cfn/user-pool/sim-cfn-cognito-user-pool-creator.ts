@@ -47,6 +47,29 @@ export class SimCfnCognitoUserPoolCreator {
       `sim Cognito user pool id after CloudFormation creation for ${resource.logicalId}`,
     );
 
+    await this.setMfaConfig(poolProperties, userPoolId);
+
     return this.cognito.userPool(userPoolId);
+  }
+
+  /**
+   * Configure the pool's MFA, where the template asked for any.
+   *
+   * This is the second call real CloudFormation makes for a pool declaring
+   * `MfaConfiguration` or `EnabledMfas`, rather than a property of the
+   * creation, so a stack that deploys here needs the same
+   * `cognito-idp:SetUserPoolMfaConfig` permission it needs on real AWS.
+   */
+  private async setMfaConfig(
+    poolProperties: SimCfnCognitoUserPoolProperties,
+    userPoolId: string,
+  ): Promise<void> {
+    const input = poolProperties.setUserPoolMfaConfigInput(userPoolId);
+
+    if (input === undefined) {
+      return;
+    }
+
+    await this.cognito.setUserPoolMfaConfig({ input });
   }
 }

@@ -16,6 +16,15 @@ export {
   SimCognitoAdminCreateUserConfig,
   type SimCognitoAdminCreateUserConfigType,
 } from "./user-pool/sim-cognito-admin-create-user-config.js";
+export {
+  SimCognitoMfaConfiguration,
+  type SimCognitoMfaConfigurationValue,
+} from "./user-pool/mfa/sim-cognito-mfa-configuration.js";
+export {
+  SimCognitoUserPoolMfa,
+  type SimCognitoSoftwareTokenMfaConfigType,
+  type SimCognitoUserPoolMfaType,
+} from "./user-pool/mfa/sim-cognito-user-pool-mfa.js";
 export { SimCognitoAutoVerifiedAttributes } from "./user-pool/sim-cognito-auto-verified-attributes.js";
 export {
   SimCognitoPasswordPolicy,

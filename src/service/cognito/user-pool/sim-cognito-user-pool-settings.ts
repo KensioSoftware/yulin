@@ -4,6 +4,8 @@ import {
 } from "./sim-cognito-admin-create-user-config.js";
 import { SimCognitoAutoVerifiedAttributes } from "./sim-cognito-auto-verified-attributes.js";
 import { SimCognitoDeletionProtection } from "./sim-cognito-deletion-protection.js";
+import { SimCognitoMfaConfiguration } from "./mfa/sim-cognito-mfa-configuration.js";
+import { SimCognitoUserPoolMfa } from "./mfa/sim-cognito-user-pool-mfa.js";
 import {
   SimCognitoPasswordPolicy,
   type SimCognitoUserPoolPoliciesType,
@@ -30,6 +32,7 @@ export interface SimCognitoUserPoolSettingsInput
     SimCognitoVerificationMessagesType {
   readonly Policies?: SimCognitoUserPoolPoliciesType | undefined;
   readonly DeletionProtection?: string | undefined;
+  readonly MfaConfiguration?: string | undefined;
   readonly AdminCreateUserConfig?:
     | SimCognitoAdminCreateUserConfigType
     | undefined;
@@ -50,8 +53,8 @@ interface SimCognitoUserPoolSettingsProperties {
 /**
  * The settings of one simulated user pool that a request can change: the
  * password policy, the deletion protection, whether users may sign themselves
- * up, what confirming a sign-up verifies, the Lambda triggers the pool runs
- * and what its messages say.
+ * up, what confirming a sign-up verifies, the Lambda triggers the pool runs,
+ * whether it asks for a second factor and what its messages say.
  *
  * The pool's id, ARN and name are not among them. The first two identify the
  * pool, and renaming one is not simulated.
@@ -72,6 +75,18 @@ export class SimCognitoUserPoolSettings {
    * The Lambda triggers the pool runs, by the ARN of the function each names.
    */
   public readonly lambdaConfig: SimCognitoLambdaConfig;
+
+  /**
+   * Whether the pool challenges for a second factor, and which factors it
+   * offers.
+   *
+   * The `MfaConfiguration` is one of these settings because both pool requests
+   * carry it. The factors behind it are not: only `SetUserPoolMfaConfig` says
+   * what they are, and it changes them in place rather than through a whole
+   * new set of settings, so an update carries them across rather than
+   * replacing them.
+   */
+  public readonly mfa: SimCognitoUserPoolMfa;
 
   /**
    * What the pool says in the message it sends a user signing itself up.
@@ -102,6 +117,9 @@ export class SimCognitoUserPoolSettings {
     this.lambdaConfig = new SimCognitoLambdaConfig(
       input.LambdaConfig,
       operation,
+    );
+    this.mfa = new SimCognitoUserPoolMfa(
+      new SimCognitoMfaConfiguration(input.MfaConfiguration),
     );
     this.verificationMessages = new SimCognitoVerificationMessages(input);
     this.unsimulated = new SimCognitoUnsimulatedPoolSettings(input);
